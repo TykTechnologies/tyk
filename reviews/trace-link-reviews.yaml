@@ -5,7 +5,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-001
@@ -13,7 +13,7 @@ reviews:
       target: internal/policy/apply.go
       source_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-001
@@ -21,7 +21,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-001
@@ -29,7 +29,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-001
@@ -37,7 +37,7 @@ reviews:
       target: internal/policy/z3_spec_test.go
       source_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
       target_fingerprint: sha256:a26b6432642c0f457a05a3e9488c58bea1d43e5b511ef54e704a4453c75a9820
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-002
@@ -45,7 +45,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:0010d196f06cddee7701323c97f8043d908ae1068db00b3a73129559f4340bb2
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-002
@@ -53,7 +53,7 @@ reviews:
       target: internal/policy/apply.go
       source_fingerprint: sha256:0010d196f06cddee7701323c97f8043d908ae1068db00b3a73129559f4340bb2
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-002
@@ -61,7 +61,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:0010d196f06cddee7701323c97f8043d908ae1068db00b3a73129559f4340bb2
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-003
@@ -69,7 +69,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:b411053e28b37693a2c2e4c6b31ddfa1bd8fd418cc94b510f67d2166e0976074
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-003
@@ -77,7 +77,7 @@ reviews:
       target: internal/policy/apply.go
       source_fingerprint: sha256:b411053e28b37693a2c2e4c6b31ddfa1bd8fd418cc94b510f67d2166e0976074
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-003
@@ -85,7 +85,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:b411053e28b37693a2c2e4c6b31ddfa1bd8fd418cc94b510f67d2166e0976074
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-003
@@ -93,7 +93,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:b411053e28b37693a2c2e4c6b31ddfa1bd8fd418cc94b510f67d2166e0976074
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-004
@@ -101,7 +101,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:1d5eec6c37c06ccf2c7db5454ba77e19fe7091ecfa64ae1b8c391fab27aef1cd
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-004
@@ -109,7 +109,7 @@ reviews:
       target: internal/policy/apply.go
       source_fingerprint: sha256:1d5eec6c37c06ccf2c7db5454ba77e19fe7091ecfa64ae1b8c391fab27aef1cd
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-004
@@ -117,7 +117,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:1d5eec6c37c06ccf2c7db5454ba77e19fe7091ecfa64ae1b8c391fab27aef1cd
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-004
@@ -125,7 +125,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:1d5eec6c37c06ccf2c7db5454ba77e19fe7091ecfa64ae1b8c391fab27aef1cd
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-005
@@ -133,7 +133,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-005
@@ -141,7 +141,7 @@ reviews:
       target: internal/policy/apply.go
       source_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-005
@@ -149,7 +149,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-005
@@ -157,7 +157,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-006
@@ -165,7 +165,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:78aa36a8e45de62e7c511c6a38a2921579a504efacd178543d97e072a9874439
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-006
@@ -173,7 +173,7 @@ reviews:
       target: internal/policy/apply.go
       source_fingerprint: sha256:78aa36a8e45de62e7c511c6a38a2921579a504efacd178543d97e072a9874439
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-006
@@ -181,7 +181,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:78aa36a8e45de62e7c511c6a38a2921579a504efacd178543d97e072a9874439
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-007
@@ -189,7 +189,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:53af367edb595eadaf726520ca3cdcf360f52c66893deb5343ba1c52714588d1
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-007
@@ -197,7 +197,7 @@ reviews:
       target: internal/policy/apply.go
       source_fingerprint: sha256:53af367edb595eadaf726520ca3cdcf360f52c66893deb5343ba1c52714588d1
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-007
@@ -205,7 +205,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:53af367edb595eadaf726520ca3cdcf360f52c66893deb5343ba1c52714588d1
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: STK-REQ-007
@@ -213,7 +213,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:53af367edb595eadaf726520ca3cdcf360f52c66893deb5343ba1c52714588d1
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-001
@@ -221,7 +221,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:80c90a48a7e2c69e9105b13dad629fe7d057801ebd0c335648a728ee51feb7fa
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-001
@@ -229,7 +229,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:80c90a48a7e2c69e9105b13dad629fe7d057801ebd0c335648a728ee51feb7fa
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-001
@@ -237,7 +237,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:80c90a48a7e2c69e9105b13dad629fe7d057801ebd0c335648a728ee51feb7fa
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:50Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-002
@@ -245,7 +245,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:b45e5a42ba7ba0ff0efee0950a72c7307d9740414cdb67c8e289d315d01e4e1f
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-002
@@ -253,7 +253,7 @@ reviews:
       target: STK-REQ-005
       source_fingerprint: sha256:b45e5a42ba7ba0ff0efee0950a72c7307d9740414cdb67c8e289d315d01e4e1f
       target_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-002
@@ -261,7 +261,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:b45e5a42ba7ba0ff0efee0950a72c7307d9740414cdb67c8e289d315d01e4e1f
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-003
@@ -269,7 +269,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:280a009bc13b4773153c22f08155b6e05e205bed95cf868fd8421b68e97147f7
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-003
@@ -277,7 +277,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:280a009bc13b4773153c22f08155b6e05e205bed95cf868fd8421b68e97147f7
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-003
@@ -285,7 +285,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:280a009bc13b4773153c22f08155b6e05e205bed95cf868fd8421b68e97147f7
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-004
@@ -293,7 +293,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:edc09b1ce77acdae6aaebccd383bf6dd9f91e99cd1fb8e33f10fa597f3b3368f
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-004
@@ -301,7 +301,7 @@ reviews:
       target: STK-REQ-006
       source_fingerprint: sha256:edc09b1ce77acdae6aaebccd383bf6dd9f91e99cd1fb8e33f10fa597f3b3368f
       target_fingerprint: sha256:78aa36a8e45de62e7c511c6a38a2921579a504efacd178543d97e072a9874439
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-004
@@ -309,7 +309,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:edc09b1ce77acdae6aaebccd383bf6dd9f91e99cd1fb8e33f10fa597f3b3368f
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-005
@@ -317,7 +317,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:f34ef147db25d7d51f4b91055c99f1ababfbbe5e8d4657961bccd239eeda44a3
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-005
@@ -325,7 +325,7 @@ reviews:
       target: STK-REQ-006
       source_fingerprint: sha256:f34ef147db25d7d51f4b91055c99f1ababfbbe5e8d4657961bccd239eeda44a3
       target_fingerprint: sha256:78aa36a8e45de62e7c511c6a38a2921579a504efacd178543d97e072a9874439
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-005
@@ -333,7 +333,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:f34ef147db25d7d51f4b91055c99f1ababfbbe5e8d4657961bccd239eeda44a3
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-006
@@ -341,7 +341,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:59befe79f621236e7445e9d45d9835929a763052008509135f01069622cc2003
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-006
@@ -349,7 +349,7 @@ reviews:
       target: STK-REQ-006
       source_fingerprint: sha256:59befe79f621236e7445e9d45d9835929a763052008509135f01069622cc2003
       target_fingerprint: sha256:78aa36a8e45de62e7c511c6a38a2921579a504efacd178543d97e072a9874439
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-006
@@ -357,7 +357,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:59befe79f621236e7445e9d45d9835929a763052008509135f01069622cc2003
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-007
@@ -365,7 +365,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:0746452c02a3fd786173d34232c1584e2557d0226d0d784c2ab84d088d92ab13
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-007
@@ -373,7 +373,7 @@ reviews:
       target: STK-REQ-006
       source_fingerprint: sha256:0746452c02a3fd786173d34232c1584e2557d0226d0d784c2ab84d088d92ab13
       target_fingerprint: sha256:78aa36a8e45de62e7c511c6a38a2921579a504efacd178543d97e072a9874439
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -381,7 +381,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -389,7 +389,7 @@ reviews:
       target: internal/policy/apply.go:New
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -397,7 +397,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -405,7 +405,7 @@ reviews:
       target: internal/policy/apply.go:Service.Logger
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -413,15 +413,15 @@ reviews:
       target: internal/policy/apply.go:Service.policyIds
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
       relation: implemented_by
       target: internal/policy/rpc.go
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
-      target_fingerprint: sha256:3eb5107e42961684c58713b8d16fe68189edea4d1d2455c554c01cedafe37c35
-      reviewed_at: "2026-04-23T06:27:58Z"
+      target_fingerprint: sha256:0e40b705cf492ffa91ab4835d6a5b94cbf3d7e27f230b77a28a5b451b564d32b
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -429,7 +429,7 @@ reviews:
       target: internal/policy/store.go:NewStore
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:0b871001e1125f3881afd6636a98e162038ff80ce43c764e0288c1b418f818d7
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -437,7 +437,7 @@ reviews:
       target: internal/policy/store.go:Store.PolicyByID
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:0b871001e1125f3881afd6636a98e162038ff80ce43c764e0288c1b418f818d7
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -445,7 +445,7 @@ reviews:
       target: internal/policy/store.go:Store.PolicyCount
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:0b871001e1125f3881afd6636a98e162038ff80ce43c764e0288c1b418f818d7
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -453,7 +453,7 @@ reviews:
       target: internal/policy/store.go:Store.PolicyIDs
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:0b871001e1125f3881afd6636a98e162038ff80ce43c764e0288c1b418f818d7
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -461,7 +461,7 @@ reviews:
       target: internal/policy/store_map.go:NewStoreMap
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:7a7b1601bc4fd3d7ecac375ab6e5044dc9a444cc21e67f9b9f2a195a8cecb967
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -469,7 +469,7 @@ reviews:
       target: internal/policy/store_map.go:StoreMap.PolicyByID
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:7a7b1601bc4fd3d7ecac375ab6e5044dc9a444cc21e67f9b9f2a195a8cecb967
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -477,7 +477,7 @@ reviews:
       target: internal/policy/store_map.go:StoreMap.PolicyCount
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:7a7b1601bc4fd3d7ecac375ab6e5044dc9a444cc21e67f9b9f2a195a8cecb967
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -485,7 +485,7 @@ reviews:
       target: internal/policy/store_map.go:StoreMap.PolicyIDs
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:7a7b1601bc4fd3d7ecac375ab6e5044dc9a444cc21e67f9b9f2a195a8cecb967
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -493,7 +493,7 @@ reviews:
       target: internal/policy/store_mock.gen.go
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:40369f57926e217e9147ef3143864b6835f8d80b51beed9d873730f1c494e88f
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -501,7 +501,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -509,7 +509,7 @@ reviews:
       target: internal/policy/apply_mcp_test.go
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:caf487f38a25cedbedf16589a1af278de2db7c41e4cc16b4f5a7bb8311bdadde
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -517,7 +517,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -525,7 +525,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-008
@@ -533,7 +533,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-009
@@ -541,7 +541,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:d6e6f245d8dad6a04d079641ff539941ff7b5ce7339506db0073cb645d8fb8a9
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-009
@@ -549,7 +549,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:d6e6f245d8dad6a04d079641ff539941ff7b5ce7339506db0073cb645d8fb8a9
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-010
@@ -557,7 +557,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:c20b2869777dbc2491cb2a7382967c4d1dc229f5c73bdb25518e549489eed3a1
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-010
@@ -565,7 +565,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:c20b2869777dbc2491cb2a7382967c4d1dc229f5c73bdb25518e549489eed3a1
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-010
@@ -573,7 +573,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:c20b2869777dbc2491cb2a7382967c4d1dc229f5c73bdb25518e549489eed3a1
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-010
@@ -581,7 +581,7 @@ reviews:
       target: STK-REQ-005
       source_fingerprint: sha256:c20b2869777dbc2491cb2a7382967c4d1dc229f5c73bdb25518e549489eed3a1
       target_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-010
@@ -589,7 +589,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:c20b2869777dbc2491cb2a7382967c4d1dc229f5c73bdb25518e549489eed3a1
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-011
@@ -597,7 +597,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:472c32cb171d03898b03c787d8f29086543350e290905fb67d69732d37322cb6
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-011
@@ -605,7 +605,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:472c32cb171d03898b03c787d8f29086543350e290905fb67d69732d37322cb6
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-011
@@ -613,7 +613,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:472c32cb171d03898b03c787d8f29086543350e290905fb67d69732d37322cb6
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-011
@@ -621,7 +621,7 @@ reviews:
       target: STK-REQ-005
       source_fingerprint: sha256:472c32cb171d03898b03c787d8f29086543350e290905fb67d69732d37322cb6
       target_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-011
@@ -629,7 +629,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:472c32cb171d03898b03c787d8f29086543350e290905fb67d69732d37322cb6
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-012
@@ -637,7 +637,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:151e2a2d99d9560a65c3418886b4113453910606eb9216ddb6f9ba28ba6c4f1b
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-012
@@ -645,7 +645,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:151e2a2d99d9560a65c3418886b4113453910606eb9216ddb6f9ba28ba6c4f1b
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-012
@@ -653,7 +653,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:151e2a2d99d9560a65c3418886b4113453910606eb9216ddb6f9ba28ba6c4f1b
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-012
@@ -661,7 +661,7 @@ reviews:
       target: STK-REQ-005
       source_fingerprint: sha256:151e2a2d99d9560a65c3418886b4113453910606eb9216ddb6f9ba28ba6c4f1b
       target_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-012
@@ -669,7 +669,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:151e2a2d99d9560a65c3418886b4113453910606eb9216ddb6f9ba28ba6c4f1b
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-013
@@ -677,7 +677,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:a6b946affcf2710b2d023671421773db59a72777acfde26ef219e8f503b0ece0
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-013
@@ -685,7 +685,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:a6b946affcf2710b2d023671421773db59a72777acfde26ef219e8f503b0ece0
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-013
@@ -693,7 +693,7 @@ reviews:
       target: internal/policy/apply.go:Service.applyPerAPI
       source_fingerprint: sha256:a6b946affcf2710b2d023671421773db59a72777acfde26ef219e8f503b0ece0
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-013
@@ -701,7 +701,7 @@ reviews:
       target: internal/policy/util.go:MergeAllowedURLs
       source_fingerprint: sha256:a6b946affcf2710b2d023671421773db59a72777acfde26ef219e8f503b0ece0
       target_fingerprint: sha256:4911569b7a7daa2debf13355b6746e11a01927e248f3982cfd3d88e832355ac9
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-013
@@ -709,7 +709,7 @@ reviews:
       target: internal/policy/util.go:appendIfMissing
       source_fingerprint: sha256:a6b946affcf2710b2d023671421773db59a72777acfde26ef219e8f503b0ece0
       target_fingerprint: sha256:4911569b7a7daa2debf13355b6746e11a01927e248f3982cfd3d88e832355ac9
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-013
@@ -717,7 +717,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:a6b946affcf2710b2d023671421773db59a72777acfde26ef219e8f503b0ece0
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-013
@@ -725,7 +725,7 @@ reviews:
       target: internal/policy/apply_mcp_test.go
       source_fingerprint: sha256:a6b946affcf2710b2d023671421773db59a72777acfde26ef219e8f503b0ece0
       target_fingerprint: sha256:caf487f38a25cedbedf16589a1af278de2db7c41e4cc16b4f5a7bb8311bdadde
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-013
@@ -733,7 +733,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:a6b946affcf2710b2d023671421773db59a72777acfde26ef219e8f503b0ece0
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-013
@@ -741,7 +741,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:a6b946affcf2710b2d023671421773db59a72777acfde26ef219e8f503b0ece0
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-013
@@ -749,7 +749,7 @@ reviews:
       target: internal/policy/mcdc_test.go
       source_fingerprint: sha256:a6b946affcf2710b2d023671421773db59a72777acfde26ef219e8f503b0ece0
       target_fingerprint: sha256:74722f6fa50efffe745f938caedccdca3743fcd59cfc0b256891a51b5b21f3f7
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-014
@@ -757,7 +757,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:060395f0a07630a86e688b8aa50fd6b6d7e93c2b5d1ac778a40a308c1c3418e6
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-014
@@ -765,7 +765,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:060395f0a07630a86e688b8aa50fd6b6d7e93c2b5d1ac778a40a308c1c3418e6
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-014
@@ -773,7 +773,7 @@ reviews:
       target: internal/policy/apply.go:Service.applyPerAPI
       source_fingerprint: sha256:060395f0a07630a86e688b8aa50fd6b6d7e93c2b5d1ac778a40a308c1c3418e6
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-014
@@ -781,7 +781,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:060395f0a07630a86e688b8aa50fd6b6d7e93c2b5d1ac778a40a308c1c3418e6
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-014
@@ -789,7 +789,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:060395f0a07630a86e688b8aa50fd6b6d7e93c2b5d1ac778a40a308c1c3418e6
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-014
@@ -797,7 +797,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:060395f0a07630a86e688b8aa50fd6b6d7e93c2b5d1ac778a40a308c1c3418e6
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-014
@@ -805,7 +805,7 @@ reviews:
       target: internal/policy/mcdc_test.go
       source_fingerprint: sha256:060395f0a07630a86e688b8aa50fd6b6d7e93c2b5d1ac778a40a308c1c3418e6
       target_fingerprint: sha256:74722f6fa50efffe745f938caedccdca3743fcd59cfc0b256891a51b5b21f3f7
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-015
@@ -813,7 +813,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:9edb346f66c9a1364af82bf499d833709c31bfc099831195bc03bce35543e13b
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-015
@@ -821,7 +821,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:9edb346f66c9a1364af82bf499d833709c31bfc099831195bc03bce35543e13b
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-015
@@ -829,7 +829,7 @@ reviews:
       target: internal/policy/apply.go:Service.applyPerAPI
       source_fingerprint: sha256:9edb346f66c9a1364af82bf499d833709c31bfc099831195bc03bce35543e13b
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-015
@@ -837,7 +837,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:9edb346f66c9a1364af82bf499d833709c31bfc099831195bc03bce35543e13b
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-015
@@ -845,7 +845,7 @@ reviews:
       target: STK-REQ-003
       source_fingerprint: sha256:9edb346f66c9a1364af82bf499d833709c31bfc099831195bc03bce35543e13b
       target_fingerprint: sha256:b411053e28b37693a2c2e4c6b31ddfa1bd8fd418cc94b510f67d2166e0976074
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-015
@@ -853,7 +853,7 @@ reviews:
       target: internal/policy/apply_mcp_test.go
       source_fingerprint: sha256:9edb346f66c9a1364af82bf499d833709c31bfc099831195bc03bce35543e13b
       target_fingerprint: sha256:caf487f38a25cedbedf16589a1af278de2db7c41e4cc16b4f5a7bb8311bdadde
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-015
@@ -861,7 +861,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:9edb346f66c9a1364af82bf499d833709c31bfc099831195bc03bce35543e13b
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-015
@@ -869,7 +869,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:9edb346f66c9a1364af82bf499d833709c31bfc099831195bc03bce35543e13b
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-015
@@ -877,7 +877,7 @@ reviews:
       target: internal/policy/mcdc_test.go
       source_fingerprint: sha256:9edb346f66c9a1364af82bf499d833709c31bfc099831195bc03bce35543e13b
       target_fingerprint: sha256:74722f6fa50efffe745f938caedccdca3743fcd59cfc0b256891a51b5b21f3f7
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-016
@@ -885,7 +885,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:f5ee6caa810cb29ffa5ffdd64e8a4346c84dcf348ca06cfed41c8cc806f982ee
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-016
@@ -893,7 +893,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:f5ee6caa810cb29ffa5ffdd64e8a4346c84dcf348ca06cfed41c8cc806f982ee
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-016
@@ -901,7 +901,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:f5ee6caa810cb29ffa5ffdd64e8a4346c84dcf348ca06cfed41c8cc806f982ee
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-016
@@ -909,7 +909,7 @@ reviews:
       target: STK-REQ-003
       source_fingerprint: sha256:f5ee6caa810cb29ffa5ffdd64e8a4346c84dcf348ca06cfed41c8cc806f982ee
       target_fingerprint: sha256:b411053e28b37693a2c2e4c6b31ddfa1bd8fd418cc94b510f67d2166e0976074
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-016
@@ -917,7 +917,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:f5ee6caa810cb29ffa5ffdd64e8a4346c84dcf348ca06cfed41c8cc806f982ee
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-016
@@ -925,7 +925,7 @@ reviews:
       target: internal/policy/z3_spec_test.go
       source_fingerprint: sha256:f5ee6caa810cb29ffa5ffdd64e8a4346c84dcf348ca06cfed41c8cc806f982ee
       target_fingerprint: sha256:a26b6432642c0f457a05a3e9488c58bea1d43e5b511ef54e704a4453c75a9820
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-017
@@ -933,7 +933,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:f9cf5199dd2abdbbb9fcf0d0a599fb8850d6c45db3f0cb1759d2c77a9ce2817d
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-017
@@ -941,7 +941,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:f9cf5199dd2abdbbb9fcf0d0a599fb8850d6c45db3f0cb1759d2c77a9ce2817d
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-017
@@ -949,7 +949,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:f9cf5199dd2abdbbb9fcf0d0a599fb8850d6c45db3f0cb1759d2c77a9ce2817d
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-017
@@ -957,7 +957,7 @@ reviews:
       target: STK-REQ-004
       source_fingerprint: sha256:f9cf5199dd2abdbbb9fcf0d0a599fb8850d6c45db3f0cb1759d2c77a9ce2817d
       target_fingerprint: sha256:1d5eec6c37c06ccf2c7db5454ba77e19fe7091ecfa64ae1b8c391fab27aef1cd
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-017
@@ -965,7 +965,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:f9cf5199dd2abdbbb9fcf0d0a599fb8850d6c45db3f0cb1759d2c77a9ce2817d
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-017
@@ -973,7 +973,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:f9cf5199dd2abdbbb9fcf0d0a599fb8850d6c45db3f0cb1759d2c77a9ce2817d
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-017
@@ -981,7 +981,7 @@ reviews:
       target: internal/policy/z3_spec_test.go
       source_fingerprint: sha256:f9cf5199dd2abdbbb9fcf0d0a599fb8850d6c45db3f0cb1759d2c77a9ce2817d
       target_fingerprint: sha256:a26b6432642c0f457a05a3e9488c58bea1d43e5b511ef54e704a4453c75a9820
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-018
@@ -989,7 +989,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:0f0b6a15086d30c25bd23b9175077557949f2a2573e8a6b3e4731bf5e6d44d29
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-018
@@ -997,7 +997,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:0f0b6a15086d30c25bd23b9175077557949f2a2573e8a6b3e4731bf5e6d44d29
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-018
@@ -1005,7 +1005,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:0f0b6a15086d30c25bd23b9175077557949f2a2573e8a6b3e4731bf5e6d44d29
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-019
@@ -1013,7 +1013,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:d7418ad4b7eaa4e5b8f67d8437a9a2a876be84cf6f3ba85b11b0251584a9e6fd
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-019
@@ -1021,7 +1021,7 @@ reviews:
       target: internal/policy/apply.go:Service.ClearSession
       source_fingerprint: sha256:d7418ad4b7eaa4e5b8f67d8437a9a2a876be84cf6f3ba85b11b0251584a9e6fd
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-019
@@ -1029,7 +1029,7 @@ reviews:
       target: STK-REQ-002
       source_fingerprint: sha256:d7418ad4b7eaa4e5b8f67d8437a9a2a876be84cf6f3ba85b11b0251584a9e6fd
       target_fingerprint: sha256:0010d196f06cddee7701323c97f8043d908ae1068db00b3a73129559f4340bb2
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-019
@@ -1037,7 +1037,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:d7418ad4b7eaa4e5b8f67d8437a9a2a876be84cf6f3ba85b11b0251584a9e6fd
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-019
@@ -1045,7 +1045,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:d7418ad4b7eaa4e5b8f67d8437a9a2a876be84cf6f3ba85b11b0251584a9e6fd
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-020
@@ -1053,7 +1053,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:b40f687c3fe30f09474c9fa3043f37ac272afe5863de18814b1dffe8cb137ed6
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-020
@@ -1061,7 +1061,7 @@ reviews:
       target: internal/policy/apply.go:Service.ClearSession
       source_fingerprint: sha256:b40f687c3fe30f09474c9fa3043f37ac272afe5863de18814b1dffe8cb137ed6
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-020
@@ -1069,7 +1069,7 @@ reviews:
       target: STK-REQ-002
       source_fingerprint: sha256:b40f687c3fe30f09474c9fa3043f37ac272afe5863de18814b1dffe8cb137ed6
       target_fingerprint: sha256:0010d196f06cddee7701323c97f8043d908ae1068db00b3a73129559f4340bb2
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-020
@@ -1077,7 +1077,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:b40f687c3fe30f09474c9fa3043f37ac272afe5863de18814b1dffe8cb137ed6
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-020
@@ -1085,7 +1085,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:b40f687c3fe30f09474c9fa3043f37ac272afe5863de18814b1dffe8cb137ed6
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-021
@@ -1093,7 +1093,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:2f766222d905aef89f91a206c4455cb568d7f7715754fab7b522c5fee01f5511
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-021
@@ -1101,7 +1101,7 @@ reviews:
       target: internal/policy/apply.go:Service.ApplyRateLimits
       source_fingerprint: sha256:2f766222d905aef89f91a206c4455cb568d7f7715754fab7b522c5fee01f5511
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-021
@@ -1109,7 +1109,7 @@ reviews:
       target: internal/policy/apply.go:Service.emptyRateLimit
       source_fingerprint: sha256:2f766222d905aef89f91a206c4455cb568d7f7715754fab7b522c5fee01f5511
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-021
@@ -1117,7 +1117,7 @@ reviews:
       target: internal/policy/util.go:greaterThanInt
       source_fingerprint: sha256:2f766222d905aef89f91a206c4455cb568d7f7715754fab7b522c5fee01f5511
       target_fingerprint: sha256:4911569b7a7daa2debf13355b6746e11a01927e248f3982cfd3d88e832355ac9
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-021
@@ -1125,7 +1125,7 @@ reviews:
       target: internal/policy/util.go:greaterThanInt64
       source_fingerprint: sha256:2f766222d905aef89f91a206c4455cb568d7f7715754fab7b522c5fee01f5511
       target_fingerprint: sha256:4911569b7a7daa2debf13355b6746e11a01927e248f3982cfd3d88e832355ac9
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-021
@@ -1133,7 +1133,7 @@ reviews:
       target: STK-REQ-003
       source_fingerprint: sha256:2f766222d905aef89f91a206c4455cb568d7f7715754fab7b522c5fee01f5511
       target_fingerprint: sha256:b411053e28b37693a2c2e4c6b31ddfa1bd8fd418cc94b510f67d2166e0976074
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-021
@@ -1141,7 +1141,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:2f766222d905aef89f91a206c4455cb568d7f7715754fab7b522c5fee01f5511
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-021
@@ -1149,7 +1149,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:2f766222d905aef89f91a206c4455cb568d7f7715754fab7b522c5fee01f5511
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-021
@@ -1157,7 +1157,7 @@ reviews:
       target: internal/policy/mcdc_test.go
       source_fingerprint: sha256:2f766222d905aef89f91a206c4455cb568d7f7715754fab7b522c5fee01f5511
       target_fingerprint: sha256:74722f6fa50efffe745f938caedccdca3743fcd59cfc0b256891a51b5b21f3f7
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-021
@@ -1165,7 +1165,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:2f766222d905aef89f91a206c4455cb568d7f7715754fab7b522c5fee01f5511
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-021
@@ -1173,7 +1173,7 @@ reviews:
       target: internal/policy/z3_spec_test.go
       source_fingerprint: sha256:2f766222d905aef89f91a206c4455cb568d7f7715754fab7b522c5fee01f5511
       target_fingerprint: sha256:a26b6432642c0f457a05a3e9488c58bea1d43e5b511ef54e704a4453c75a9820
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-022
@@ -1181,7 +1181,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:797e46c1e35220d27e6b8bc05106a9fce91a769660f981033677d4a27982f2a9
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-022
@@ -1189,7 +1189,7 @@ reviews:
       target: internal/policy/apply.go:Service.ApplyRateLimits
       source_fingerprint: sha256:797e46c1e35220d27e6b8bc05106a9fce91a769660f981033677d4a27982f2a9
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-022
@@ -1197,7 +1197,7 @@ reviews:
       target: STK-REQ-003
       source_fingerprint: sha256:797e46c1e35220d27e6b8bc05106a9fce91a769660f981033677d4a27982f2a9
       target_fingerprint: sha256:b411053e28b37693a2c2e4c6b31ddfa1bd8fd418cc94b510f67d2166e0976074
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-022
@@ -1205,7 +1205,7 @@ reviews:
       target: STK-REQ-004
       source_fingerprint: sha256:797e46c1e35220d27e6b8bc05106a9fce91a769660f981033677d4a27982f2a9
       target_fingerprint: sha256:1d5eec6c37c06ccf2c7db5454ba77e19fe7091ecfa64ae1b8c391fab27aef1cd
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-022
@@ -1213,7 +1213,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:797e46c1e35220d27e6b8bc05106a9fce91a769660f981033677d4a27982f2a9
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-022
@@ -1221,7 +1221,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:797e46c1e35220d27e6b8bc05106a9fce91a769660f981033677d4a27982f2a9
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-022
@@ -1229,7 +1229,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:797e46c1e35220d27e6b8bc05106a9fce91a769660f981033677d4a27982f2a9
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-022
@@ -1237,7 +1237,7 @@ reviews:
       target: internal/policy/z3_spec_test.go
       source_fingerprint: sha256:797e46c1e35220d27e6b8bc05106a9fce91a769660f981033677d4a27982f2a9
       target_fingerprint: sha256:a26b6432642c0f457a05a3e9488c58bea1d43e5b511ef54e704a4453c75a9820
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-023
@@ -1245,7 +1245,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:79f8b6ce7632ff99baaaf892d508b395befbe9008d1ff7b68efacbcc35b22609
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-023
@@ -1253,7 +1253,7 @@ reviews:
       target: internal/policy/apply.go:Service.ApplyEndpointLevelLimits
       source_fingerprint: sha256:79f8b6ce7632ff99baaaf892d508b395befbe9008d1ff7b68efacbcc35b22609
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-023
@@ -1261,7 +1261,7 @@ reviews:
       target: internal/policy/apply.go:Service.ApplyJSONRPCMethodLimits
       source_fingerprint: sha256:79f8b6ce7632ff99baaaf892d508b395befbe9008d1ff7b68efacbcc35b22609
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-023
@@ -1269,7 +1269,7 @@ reviews:
       target: internal/policy/apply.go:Service.ApplyMCPPrimitiveLimits
       source_fingerprint: sha256:79f8b6ce7632ff99baaaf892d508b395befbe9008d1ff7b68efacbcc35b22609
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-023
@@ -1277,7 +1277,7 @@ reviews:
       target: internal/policy/apply.go:Service.applyAPILevelLimits
       source_fingerprint: sha256:79f8b6ce7632ff99baaaf892d508b395befbe9008d1ff7b68efacbcc35b22609
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-023
@@ -1285,7 +1285,7 @@ reviews:
       target: internal/policy/apply.go:mergeACLRules
       source_fingerprint: sha256:79f8b6ce7632ff99baaaf892d508b395befbe9008d1ff7b68efacbcc35b22609
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-023
@@ -1293,7 +1293,7 @@ reviews:
       target: STK-REQ-004
       source_fingerprint: sha256:79f8b6ce7632ff99baaaf892d508b395befbe9008d1ff7b68efacbcc35b22609
       target_fingerprint: sha256:1d5eec6c37c06ccf2c7db5454ba77e19fe7091ecfa64ae1b8c391fab27aef1cd
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-023
@@ -1301,7 +1301,7 @@ reviews:
       target: internal/policy/apply_mcp_test.go
       source_fingerprint: sha256:79f8b6ce7632ff99baaaf892d508b395befbe9008d1ff7b68efacbcc35b22609
       target_fingerprint: sha256:caf487f38a25cedbedf16589a1af278de2db7c41e4cc16b4f5a7bb8311bdadde
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-023
@@ -1309,7 +1309,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:79f8b6ce7632ff99baaaf892d508b395befbe9008d1ff7b68efacbcc35b22609
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-023
@@ -1317,7 +1317,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:79f8b6ce7632ff99baaaf892d508b395befbe9008d1ff7b68efacbcc35b22609
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-024
@@ -1325,7 +1325,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:b7cb01418bcc845eb828e86eb29e3bf393652389b237ef481d88db4105372152
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-024
@@ -1333,7 +1333,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:b7cb01418bcc845eb828e86eb29e3bf393652389b237ef481d88db4105372152
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-024
@@ -1341,7 +1341,7 @@ reviews:
       target: internal/policy/apply.go:Service.updateSessionRootVars
       source_fingerprint: sha256:b7cb01418bcc845eb828e86eb29e3bf393652389b237ef481d88db4105372152
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-024
@@ -1349,7 +1349,7 @@ reviews:
       target: STK-REQ-005
       source_fingerprint: sha256:b7cb01418bcc845eb828e86eb29e3bf393652389b237ef481d88db4105372152
       target_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-024
@@ -1357,7 +1357,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:b7cb01418bcc845eb828e86eb29e3bf393652389b237ef481d88db4105372152
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-024
@@ -1365,7 +1365,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:b7cb01418bcc845eb828e86eb29e3bf393652389b237ef481d88db4105372152
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:58Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-025
@@ -1373,7 +1373,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:25293cb4d973ac07e3ddee22035d8f9ee729fb8f51b05dfa547d556b80cea410
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-025
@@ -1381,7 +1381,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:25293cb4d973ac07e3ddee22035d8f9ee729fb8f51b05dfa547d556b80cea410
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-025
@@ -1389,7 +1389,7 @@ reviews:
       target: internal/policy/apply.go:Service.updateSessionRootVars
       source_fingerprint: sha256:25293cb4d973ac07e3ddee22035d8f9ee729fb8f51b05dfa547d556b80cea410
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-025
@@ -1397,7 +1397,7 @@ reviews:
       target: STK-REQ-005
       source_fingerprint: sha256:25293cb4d973ac07e3ddee22035d8f9ee729fb8f51b05dfa547d556b80cea410
       target_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-025
@@ -1405,7 +1405,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:25293cb4d973ac07e3ddee22035d8f9ee729fb8f51b05dfa547d556b80cea410
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-025
@@ -1413,7 +1413,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:25293cb4d973ac07e3ddee22035d8f9ee729fb8f51b05dfa547d556b80cea410
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-026
@@ -1421,7 +1421,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:69ae23b0997dd808c63f8c3408cccb05a3e78d2ad96cfc6c47c1c91cd714aa02
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-026
@@ -1429,7 +1429,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:69ae23b0997dd808c63f8c3408cccb05a3e78d2ad96cfc6c47c1c91cd714aa02
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-026
@@ -1437,7 +1437,7 @@ reviews:
       target: STK-REQ-005
       source_fingerprint: sha256:69ae23b0997dd808c63f8c3408cccb05a3e78d2ad96cfc6c47c1c91cd714aa02
       target_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-026
@@ -1445,7 +1445,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:69ae23b0997dd808c63f8c3408cccb05a3e78d2ad96cfc6c47c1c91cd714aa02
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-027
@@ -1453,7 +1453,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:c4373f81072505545594fe13017285e4d932720c7a20b8224838746384a38a2a
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-027
@@ -1461,7 +1461,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:c4373f81072505545594fe13017285e4d932720c7a20b8224838746384a38a2a
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-027
@@ -1469,7 +1469,7 @@ reviews:
       target: STK-REQ-006
       source_fingerprint: sha256:c4373f81072505545594fe13017285e4d932720c7a20b8224838746384a38a2a
       target_fingerprint: sha256:78aa36a8e45de62e7c511c6a38a2921579a504efacd178543d97e072a9874439
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-027
@@ -1477,7 +1477,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:c4373f81072505545594fe13017285e4d932720c7a20b8224838746384a38a2a
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-027
@@ -1485,7 +1485,7 @@ reviews:
       target: internal/policy/mcdc_test.go
       source_fingerprint: sha256:c4373f81072505545594fe13017285e4d932720c7a20b8224838746384a38a2a
       target_fingerprint: sha256:74722f6fa50efffe745f938caedccdca3743fcd59cfc0b256891a51b5b21f3f7
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-028
@@ -1493,7 +1493,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:f80d869ca8f37be953fa5cd2cabe1171e537afab8155622bc87335dc76b00c5b
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-028
@@ -1501,7 +1501,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:f80d869ca8f37be953fa5cd2cabe1171e537afab8155622bc87335dc76b00c5b
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-028
@@ -1509,7 +1509,7 @@ reviews:
       target: STK-REQ-005
       source_fingerprint: sha256:f80d869ca8f37be953fa5cd2cabe1171e537afab8155622bc87335dc76b00c5b
       target_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-028
@@ -1517,7 +1517,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:f80d869ca8f37be953fa5cd2cabe1171e537afab8155622bc87335dc76b00c5b
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-029
@@ -1525,7 +1525,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:0bf8a5ee7b98320674ff63f34f54c77d673fe15ba9a933355bd37b48d0b6decd
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-029
@@ -1533,7 +1533,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:0bf8a5ee7b98320674ff63f34f54c77d673fe15ba9a933355bd37b48d0b6decd
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-029
@@ -1541,7 +1541,7 @@ reviews:
       target: STK-REQ-005
       source_fingerprint: sha256:0bf8a5ee7b98320674ff63f34f54c77d673fe15ba9a933355bd37b48d0b6decd
       target_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-029
@@ -1549,7 +1549,7 @@ reviews:
       target: STK-REQ-006
       source_fingerprint: sha256:0bf8a5ee7b98320674ff63f34f54c77d673fe15ba9a933355bd37b48d0b6decd
       target_fingerprint: sha256:78aa36a8e45de62e7c511c6a38a2921579a504efacd178543d97e072a9874439
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-030
@@ -1557,7 +1557,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:8840ea30224c4c2cb377f652d96463afc21f124b6a153c5cf1a1073329808101
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-030
@@ -1565,7 +1565,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:8840ea30224c4c2cb377f652d96463afc21f124b6a153c5cf1a1073329808101
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-030
@@ -1573,7 +1573,7 @@ reviews:
       target: internal/policy/apply.go:Service.applyPartitions
       source_fingerprint: sha256:8840ea30224c4c2cb377f652d96463afc21f124b6a153c5cf1a1073329808101
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-030
@@ -1581,7 +1581,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:8840ea30224c4c2cb377f652d96463afc21f124b6a153c5cf1a1073329808101
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-030
@@ -1589,7 +1589,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:8840ea30224c4c2cb377f652d96463afc21f124b6a153c5cf1a1073329808101
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-030
@@ -1597,7 +1597,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:8840ea30224c4c2cb377f652d96463afc21f124b6a153c5cf1a1073329808101
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-030
@@ -1605,7 +1605,7 @@ reviews:
       target: internal/policy/mcdc_test.go
       source_fingerprint: sha256:8840ea30224c4c2cb377f652d96463afc21f124b6a153c5cf1a1073329808101
       target_fingerprint: sha256:74722f6fa50efffe745f938caedccdca3743fcd59cfc0b256891a51b5b21f3f7
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-031
@@ -1613,7 +1613,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:2a753340347f1ec7b500a68283d559cebcdc2827dfca9d92f3c285226eac13eb
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-031
@@ -1621,7 +1621,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:2a753340347f1ec7b500a68283d559cebcdc2827dfca9d92f3c285226eac13eb
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-031
@@ -1629,7 +1629,7 @@ reviews:
       target: internal/policy/apply.go:Service.applyPartitions
       source_fingerprint: sha256:2a753340347f1ec7b500a68283d559cebcdc2827dfca9d92f3c285226eac13eb
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-031
@@ -1637,7 +1637,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:2a753340347f1ec7b500a68283d559cebcdc2827dfca9d92f3c285226eac13eb
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-031
@@ -1645,7 +1645,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:2a753340347f1ec7b500a68283d559cebcdc2827dfca9d92f3c285226eac13eb
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-031
@@ -1653,7 +1653,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:2a753340347f1ec7b500a68283d559cebcdc2827dfca9d92f3c285226eac13eb
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-031
@@ -1661,7 +1661,7 @@ reviews:
       target: internal/policy/mcdc_test.go
       source_fingerprint: sha256:2a753340347f1ec7b500a68283d559cebcdc2827dfca9d92f3c285226eac13eb
       target_fingerprint: sha256:74722f6fa50efffe745f938caedccdca3743fcd59cfc0b256891a51b5b21f3f7
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-032
@@ -1669,7 +1669,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:05a43a48a0801ebff0f39206d9f0ef91b2547622169012b40db6f3e83cf6b5f5
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-032
@@ -1677,7 +1677,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:05a43a48a0801ebff0f39206d9f0ef91b2547622169012b40db6f3e83cf6b5f5
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-032
@@ -1685,7 +1685,7 @@ reviews:
       target: internal/policy/apply.go:Service.applyPartitions
       source_fingerprint: sha256:05a43a48a0801ebff0f39206d9f0ef91b2547622169012b40db6f3e83cf6b5f5
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-032
@@ -1693,7 +1693,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:05a43a48a0801ebff0f39206d9f0ef91b2547622169012b40db6f3e83cf6b5f5
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-032
@@ -1701,7 +1701,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:05a43a48a0801ebff0f39206d9f0ef91b2547622169012b40db6f3e83cf6b5f5
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-032
@@ -1709,7 +1709,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:05a43a48a0801ebff0f39206d9f0ef91b2547622169012b40db6f3e83cf6b5f5
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-032
@@ -1717,7 +1717,7 @@ reviews:
       target: internal/policy/mcdc_test.go
       source_fingerprint: sha256:05a43a48a0801ebff0f39206d9f0ef91b2547622169012b40db6f3e83cf6b5f5
       target_fingerprint: sha256:74722f6fa50efffe745f938caedccdca3743fcd59cfc0b256891a51b5b21f3f7
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-033
@@ -1725,7 +1725,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:054dbf188c831d55a1f3dbf47f979877e71355108f7c8944d17e94fe2ae67c9c
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-033
@@ -1733,7 +1733,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:054dbf188c831d55a1f3dbf47f979877e71355108f7c8944d17e94fe2ae67c9c
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-033
@@ -1741,7 +1741,7 @@ reviews:
       target: internal/policy/apply.go:Service.policyIds
       source_fingerprint: sha256:054dbf188c831d55a1f3dbf47f979877e71355108f7c8944d17e94fe2ae67c9c
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-033
@@ -1749,7 +1749,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:054dbf188c831d55a1f3dbf47f979877e71355108f7c8944d17e94fe2ae67c9c
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-033
@@ -1757,7 +1757,7 @@ reviews:
       target: internal/policy/apply_mcp_test.go
       source_fingerprint: sha256:054dbf188c831d55a1f3dbf47f979877e71355108f7c8944d17e94fe2ae67c9c
       target_fingerprint: sha256:caf487f38a25cedbedf16589a1af278de2db7c41e4cc16b4f5a7bb8311bdadde
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-033
@@ -1765,7 +1765,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:054dbf188c831d55a1f3dbf47f979877e71355108f7c8944d17e94fe2ae67c9c
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-033
@@ -1773,7 +1773,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:054dbf188c831d55a1f3dbf47f979877e71355108f7c8944d17e94fe2ae67c9c
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-033
@@ -1781,7 +1781,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:054dbf188c831d55a1f3dbf47f979877e71355108f7c8944d17e94fe2ae67c9c
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-033
@@ -1789,7 +1789,7 @@ reviews:
       target: internal/policy/z3_spec_test.go
       source_fingerprint: sha256:054dbf188c831d55a1f3dbf47f979877e71355108f7c8944d17e94fe2ae67c9c
       target_fingerprint: sha256:a26b6432642c0f457a05a3e9488c58bea1d43e5b511ef54e704a4453c75a9820
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-034
@@ -1797,7 +1797,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:401e60143f03e706daaf03145cf950b32c7f0a79db68db548f3651bd96965c11
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-034
@@ -1805,7 +1805,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:401e60143f03e706daaf03145cf950b32c7f0a79db68db548f3651bd96965c11
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-034
@@ -1813,7 +1813,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:401e60143f03e706daaf03145cf950b32c7f0a79db68db548f3651bd96965c11
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-035
@@ -1821,7 +1821,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:2e2686300dd0346cda6161e4c778245c98c7c93475c4f08d0bc518ef4c0cd13b
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-035
@@ -1829,7 +1829,7 @@ reviews:
       target: STK-REQ-003
       source_fingerprint: sha256:2e2686300dd0346cda6161e4c778245c98c7c93475c4f08d0bc518ef4c0cd13b
       target_fingerprint: sha256:b411053e28b37693a2c2e4c6b31ddfa1bd8fd418cc94b510f67d2166e0976074
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-035
@@ -1837,7 +1837,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:2e2686300dd0346cda6161e4c778245c98c7c93475c4f08d0bc518ef4c0cd13b
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-036
@@ -1845,7 +1845,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:c8204610f24757b3f1f8dc97155fdc3eec0c9f3caf9a64083c3756e45be4a9be
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-036
@@ -1853,7 +1853,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:c8204610f24757b3f1f8dc97155fdc3eec0c9f3caf9a64083c3756e45be4a9be
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-037
@@ -1861,7 +1861,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:65af31984fbb2d975e7045f6cb7b93ef564629ff25b320c0eaf6540fe3ef871f
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-037
@@ -1869,7 +1869,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:65af31984fbb2d975e7045f6cb7b93ef564629ff25b320c0eaf6540fe3ef871f
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-037
@@ -1877,7 +1877,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:65af31984fbb2d975e7045f6cb7b93ef564629ff25b320c0eaf6540fe3ef871f
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-038
@@ -1885,7 +1885,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:5a01af5cbea965d07d234f93b51bc4e0e7c96996c6a2c8204600b8a2dae07f16
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-038
@@ -1893,7 +1893,7 @@ reviews:
       target: STK-REQ-005
       source_fingerprint: sha256:5a01af5cbea965d07d234f93b51bc4e0e7c96996c6a2c8204600b8a2dae07f16
       target_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-039
@@ -1901,7 +1901,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:9af5c9443b87d35fa17daf90e2b2c7340ed915ec21c375f143ddaef48efe0fac
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-039
@@ -1909,7 +1909,7 @@ reviews:
       target: STK-REQ-003
       source_fingerprint: sha256:9af5c9443b87d35fa17daf90e2b2c7340ed915ec21c375f143ddaef48efe0fac
       target_fingerprint: sha256:b411053e28b37693a2c2e4c6b31ddfa1bd8fd418cc94b510f67d2166e0976074
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-040
@@ -1917,7 +1917,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:6700a8346fcf9315092dbbfdb6c478ca4a1d9e0df0e3accf69e519debfe808db
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-040
@@ -1925,7 +1925,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:6700a8346fcf9315092dbbfdb6c478ca4a1d9e0df0e3accf69e519debfe808db
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-040
@@ -1933,7 +1933,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:6700a8346fcf9315092dbbfdb6c478ca4a1d9e0df0e3accf69e519debfe808db
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-040
@@ -1941,7 +1941,7 @@ reviews:
       target: STK-REQ-003
       source_fingerprint: sha256:6700a8346fcf9315092dbbfdb6c478ca4a1d9e0df0e3accf69e519debfe808db
       target_fingerprint: sha256:b411053e28b37693a2c2e4c6b31ddfa1bd8fd418cc94b510f67d2166e0976074
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-040
@@ -1949,7 +1949,7 @@ reviews:
       target: STK-REQ-005
       source_fingerprint: sha256:6700a8346fcf9315092dbbfdb6c478ca4a1d9e0df0e3accf69e519debfe808db
       target_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-040
@@ -1957,7 +1957,7 @@ reviews:
       target: internal/policy/mcdc_test.go
       source_fingerprint: sha256:6700a8346fcf9315092dbbfdb6c478ca4a1d9e0df0e3accf69e519debfe808db
       target_fingerprint: sha256:74722f6fa50efffe745f938caedccdca3743fcd59cfc0b256891a51b5b21f3f7
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-041
@@ -1965,7 +1965,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:12d61d65b7e0fc9d9519602234daaa72ccc58c5f595cd72c2443694fcf9ba21e
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-041
@@ -1973,7 +1973,7 @@ reviews:
       target: internal/policy/apply.go:Service.ApplyRateLimits
       source_fingerprint: sha256:12d61d65b7e0fc9d9519602234daaa72ccc58c5f595cd72c2443694fcf9ba21e
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-041
@@ -1981,7 +1981,7 @@ reviews:
       target: internal/policy/util.go:greaterThanInt
       source_fingerprint: sha256:12d61d65b7e0fc9d9519602234daaa72ccc58c5f595cd72c2443694fcf9ba21e
       target_fingerprint: sha256:4911569b7a7daa2debf13355b6746e11a01927e248f3982cfd3d88e832355ac9
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-041
@@ -1989,7 +1989,7 @@ reviews:
       target: internal/policy/util.go:greaterThanInt64
       source_fingerprint: sha256:12d61d65b7e0fc9d9519602234daaa72ccc58c5f595cd72c2443694fcf9ba21e
       target_fingerprint: sha256:4911569b7a7daa2debf13355b6746e11a01927e248f3982cfd3d88e832355ac9
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-041
@@ -1997,7 +1997,7 @@ reviews:
       target: STK-REQ-003
       source_fingerprint: sha256:12d61d65b7e0fc9d9519602234daaa72ccc58c5f595cd72c2443694fcf9ba21e
       target_fingerprint: sha256:b411053e28b37693a2c2e4c6b31ddfa1bd8fd418cc94b510f67d2166e0976074
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-041
@@ -2005,7 +2005,7 @@ reviews:
       target: internal/policy/apply_test.go
       source_fingerprint: sha256:12d61d65b7e0fc9d9519602234daaa72ccc58c5f595cd72c2443694fcf9ba21e
       target_fingerprint: sha256:d6a1a738289de541e75bed52d084a17874ce1defe717aca36b58a6931793b892
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-041
@@ -2013,7 +2013,7 @@ reviews:
       target: internal/policy/mcdc_test.go
       source_fingerprint: sha256:12d61d65b7e0fc9d9519602234daaa72ccc58c5f595cd72c2443694fcf9ba21e
       target_fingerprint: sha256:74722f6fa50efffe745f938caedccdca3743fcd59cfc0b256891a51b5b21f3f7
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-042
@@ -2021,7 +2021,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:64462a97333c9d97032a9bf448a93ffbe373ddbc0340b91d8ee3b9706e1f1a27
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-042
@@ -2029,7 +2029,7 @@ reviews:
       target: internal/policy/apply.go:New
       source_fingerprint: sha256:64462a97333c9d97032a9bf448a93ffbe373ddbc0340b91d8ee3b9706e1f1a27
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-042
@@ -2037,7 +2037,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:64462a97333c9d97032a9bf448a93ffbe373ddbc0340b91d8ee3b9706e1f1a27
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-042
@@ -2045,7 +2045,7 @@ reviews:
       target: STK-REQ-006
       source_fingerprint: sha256:64462a97333c9d97032a9bf448a93ffbe373ddbc0340b91d8ee3b9706e1f1a27
       target_fingerprint: sha256:78aa36a8e45de62e7c511c6a38a2921579a504efacd178543d97e072a9874439
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-042
@@ -2053,7 +2053,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:64462a97333c9d97032a9bf448a93ffbe373ddbc0340b91d8ee3b9706e1f1a27
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-042
@@ -2061,7 +2061,7 @@ reviews:
       target: internal/policy/mcdc_test.go
       source_fingerprint: sha256:64462a97333c9d97032a9bf448a93ffbe373ddbc0340b91d8ee3b9706e1f1a27
       target_fingerprint: sha256:74722f6fa50efffe745f938caedccdca3743fcd59cfc0b256891a51b5b21f3f7
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-042
@@ -2069,7 +2069,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:64462a97333c9d97032a9bf448a93ffbe373ddbc0340b91d8ee3b9706e1f1a27
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-043
@@ -2077,7 +2077,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:b9478315f251f8626f0c1b9a6063f1913fc5fd52b64e348cef0d0b713ca19b04
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-043
@@ -2085,7 +2085,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:b9478315f251f8626f0c1b9a6063f1913fc5fd52b64e348cef0d0b713ca19b04
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-043
@@ -2093,7 +2093,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:b9478315f251f8626f0c1b9a6063f1913fc5fd52b64e348cef0d0b713ca19b04
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-044
@@ -2101,7 +2101,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:5af6e4f6e60b7c6e68571f5f74a447c2368dc60acc00380cc3ecfba10e730df9
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-044
@@ -2109,7 +2109,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:5af6e4f6e60b7c6e68571f5f74a447c2368dc60acc00380cc3ecfba10e730df9
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-044
@@ -2117,7 +2117,7 @@ reviews:
       target: STK-REQ-007
       source_fingerprint: sha256:5af6e4f6e60b7c6e68571f5f74a447c2368dc60acc00380cc3ecfba10e730df9
       target_fingerprint: sha256:53af367edb595eadaf726520ca3cdcf360f52c66893deb5343ba1c52714588d1
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-044
@@ -2125,7 +2125,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:5af6e4f6e60b7c6e68571f5f74a447c2368dc60acc00380cc3ecfba10e730df9
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-045
@@ -2133,7 +2133,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:ed21c1c1604afacfe8d6ec2727f2eeb9b8788e57efdd06aeac989d8a963930d8
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-045
@@ -2141,7 +2141,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:ed21c1c1604afacfe8d6ec2727f2eeb9b8788e57efdd06aeac989d8a963930d8
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-045
@@ -2149,7 +2149,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:ed21c1c1604afacfe8d6ec2727f2eeb9b8788e57efdd06aeac989d8a963930d8
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-046
@@ -2157,7 +2157,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:1101f26c090460c285b7829fd5f4f223e875c7a439507ed314929c5696a8e8b8
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-046
@@ -2165,7 +2165,7 @@ reviews:
       target: STK-REQ-003
       source_fingerprint: sha256:1101f26c090460c285b7829fd5f4f223e875c7a439507ed314929c5696a8e8b8
       target_fingerprint: sha256:b411053e28b37693a2c2e4c6b31ddfa1bd8fd418cc94b510f67d2166e0976074
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-046
@@ -2173,7 +2173,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:1101f26c090460c285b7829fd5f4f223e875c7a439507ed314929c5696a8e8b8
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-047
@@ -2181,7 +2181,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:1497ab4bd83cda24582ee7de2ad7182c88f03be81415dde1dce97185808f4858
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-047
@@ -2189,7 +2189,7 @@ reviews:
       target: STK-REQ-006
       source_fingerprint: sha256:1497ab4bd83cda24582ee7de2ad7182c88f03be81415dde1dce97185808f4858
       target_fingerprint: sha256:78aa36a8e45de62e7c511c6a38a2921579a504efacd178543d97e072a9874439
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-048
@@ -2197,7 +2197,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:ed62e4477430333490fe0715df54710f3ce63ddeffa79b418bf7bf1e1b8b689c
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-048
@@ -2205,7 +2205,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:ed62e4477430333490fe0715df54710f3ce63ddeffa79b418bf7bf1e1b8b689c
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-048
@@ -2213,7 +2213,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:ed62e4477430333490fe0715df54710f3ce63ddeffa79b418bf7bf1e1b8b689c
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-049
@@ -2221,7 +2221,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:4bd72c4d45037d5d58d73bddabb7a02087970e6bda03bec29306f92058e1d334
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-049
@@ -2229,7 +2229,7 @@ reviews:
       target: internal/policy/apply.go:Service.ClearSession
       source_fingerprint: sha256:4bd72c4d45037d5d58d73bddabb7a02087970e6bda03bec29306f92058e1d334
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-049
@@ -2237,7 +2237,7 @@ reviews:
       target: STK-REQ-006
       source_fingerprint: sha256:4bd72c4d45037d5d58d73bddabb7a02087970e6bda03bec29306f92058e1d334
       target_fingerprint: sha256:78aa36a8e45de62e7c511c6a38a2921579a504efacd178543d97e072a9874439
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-049
@@ -2245,7 +2245,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:4bd72c4d45037d5d58d73bddabb7a02087970e6bda03bec29306f92058e1d334
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-050
@@ -2253,7 +2253,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:68add8b44d7a33d3b472a0787af535b0804e63dd023a0b599ec5b81671da69ca
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-050
@@ -2261,7 +2261,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:68add8b44d7a33d3b472a0787af535b0804e63dd023a0b599ec5b81671da69ca
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-050
@@ -2269,7 +2269,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:68add8b44d7a33d3b472a0787af535b0804e63dd023a0b599ec5b81671da69ca
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-050
@@ -2277,7 +2277,7 @@ reviews:
       target: internal/policy/mcdc_closure_test.go
       source_fingerprint: sha256:68add8b44d7a33d3b472a0787af535b0804e63dd023a0b599ec5b81671da69ca
       target_fingerprint: sha256:063ea0b4227a652bdd92d9a5548568737f71e3e1e76d3c4dcacc00000a5d2a4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-050
@@ -2285,7 +2285,7 @@ reviews:
       target: internal/policy/mcdc_test.go
       source_fingerprint: sha256:68add8b44d7a33d3b472a0787af535b0804e63dd023a0b599ec5b81671da69ca
       target_fingerprint: sha256:74722f6fa50efffe745f938caedccdca3743fcd59cfc0b256891a51b5b21f3f7
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-051
@@ -2293,7 +2293,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:e196ee40e75de40e750451ea8372e25ec4caf1021c249ffed7753ff5ee0bec45
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-051
@@ -2301,7 +2301,7 @@ reviews:
       target: internal/policy/apply.go:Service.ApplyRateLimits
       source_fingerprint: sha256:e196ee40e75de40e750451ea8372e25ec4caf1021c249ffed7753ff5ee0bec45
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-051
@@ -2309,7 +2309,7 @@ reviews:
       target: STK-REQ-003
       source_fingerprint: sha256:e196ee40e75de40e750451ea8372e25ec4caf1021c249ffed7753ff5ee0bec45
       target_fingerprint: sha256:b411053e28b37693a2c2e4c6b31ddfa1bd8fd418cc94b510f67d2166e0976074
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-051
@@ -2317,7 +2317,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:e196ee40e75de40e750451ea8372e25ec4caf1021c249ffed7753ff5ee0bec45
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-052
@@ -2325,7 +2325,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:ae63309404bee72a8dfe84449962b1e42d4fe0a08f52669cc4122347c1442ecd
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-052
@@ -2333,7 +2333,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:ae63309404bee72a8dfe84449962b1e42d4fe0a08f52669cc4122347c1442ecd
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-052
@@ -2341,7 +2341,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:ae63309404bee72a8dfe84449962b1e42d4fe0a08f52669cc4122347c1442ecd
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-052
@@ -2349,7 +2349,7 @@ reviews:
       target: STK-REQ-005
       source_fingerprint: sha256:ae63309404bee72a8dfe84449962b1e42d4fe0a08f52669cc4122347c1442ecd
       target_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-052
@@ -2357,7 +2357,7 @@ reviews:
       target: internal/policy/spec_test.go
       source_fingerprint: sha256:ae63309404bee72a8dfe84449962b1e42d4fe0a08f52669cc4122347c1442ecd
       target_fingerprint: sha256:79b42307810c052cc63fd367a8090fa90c7b1dd2dac99789bc39f002e4340c4b
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-053
@@ -2365,7 +2365,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:5a9c3eff8b47b1e4f4957336b265b42413029c84406cbbb96bda249090d7e9f1
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-053
@@ -2373,7 +2373,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:5a9c3eff8b47b1e4f4957336b265b42413029c84406cbbb96bda249090d7e9f1
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-053
@@ -2381,7 +2381,7 @@ reviews:
       target: STK-REQ-001
       source_fingerprint: sha256:5a9c3eff8b47b1e4f4957336b265b42413029c84406cbbb96bda249090d7e9f1
       target_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-053
@@ -2389,7 +2389,7 @@ reviews:
       target: internal/policy/mcdc_test.go
       source_fingerprint: sha256:5a9c3eff8b47b1e4f4957336b265b42413029c84406cbbb96bda249090d7e9f1
       target_fingerprint: sha256:74722f6fa50efffe745f938caedccdca3743fcd59cfc0b256891a51b5b21f3f7
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-054
@@ -2397,7 +2397,7 @@ reviews:
       target: README.md
       source_fingerprint: sha256:4b429a2804bcb247151746b44a4fa7e0158bc5bc7ca5f4d9359b07767aaa1de9
       target_fingerprint: sha256:98e08b4b7a34ea51f67000b8924a64aa85b47d84f44afecd5af6ee2c2afca07a
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-054
@@ -2405,7 +2405,7 @@ reviews:
       target: internal/policy/apply.go:Service.Apply
       source_fingerprint: sha256:4b429a2804bcb247151746b44a4fa7e0158bc5bc7ca5f4d9359b07767aaa1de9
       target_fingerprint: sha256:21235f998b420b6c7b446090f5eba54942deff89cee41344971eba6f8fde65a8
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-054
@@ -2413,7 +2413,7 @@ reviews:
       target: STK-REQ-005
       source_fingerprint: sha256:4b429a2804bcb247151746b44a4fa7e0158bc5bc7ca5f4d9359b07767aaa1de9
       target_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
     - requirement: SYS-REQ-054
@@ -2421,6 +2421,6 @@ reviews:
       target: internal/policy/mcdc_test.go
       source_fingerprint: sha256:4b429a2804bcb247151746b44a4fa7e0158bc5bc7ca5f4d9359b07767aaa1de9
       target_fingerprint: sha256:74722f6fa50efffe745f938caedccdca3743fcd59cfc0b256891a51b5b21f3f7
-      reviewed_at: "2026-04-23T06:27:59Z"
+      reviewed_at: "2026-04-24T15:52:51Z"
       reviewed_by: human:leonidbugaev
       rationale: manual trace review via proof trace review
