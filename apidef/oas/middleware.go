@@ -2,7 +2,6 @@ package oas
 
 import (
 	"encoding/json"
-	"math"
 	"net/http"
 	"sort"
 	"strings"
@@ -1334,7 +1333,7 @@ func (et *EnforceTimeout) Fill(meta apidef.HardTimeoutMeta) {
 
 	if meta.TimeoutDuration > 0 {
 		et.Timeout = meta.TimeoutDuration
-		et.Value = int(math.Ceil(meta.TimeoutDuration.Seconds()))
+		et.Value = int(meta.TimeoutDuration.SecondsCeil())
 	} else {
 		et.Value = meta.TimeOut
 	}
