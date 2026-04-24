@@ -192,13 +192,7 @@ func (r *RuleValidateEnforceTimeout) Validate(apiDef *APIDefinition, validationR
 	if apiDef.VersionData.Versions != nil {
 		for _, vInfo := range apiDef.VersionData.Versions {
 			for _, hardTimeOutMeta := range vInfo.ExtendedPaths.HardTimeouts {
-				// TODO: refactor validation
-				// ^(\d+(\.\d+)?)(ms|s|m)?$
-				// Rules:
-				// Only ms, s, m units
-				// invalid configuration like <0, 0ms or empty strings should be rejected
-				// Minimum 1ms, max 300s
-				if hardTimeOutMeta.TimeOut < 0 {
+				if hardTimeOutMeta.TimeOut < 0 || hardTimeOutMeta.TimeoutDuration < 0 {
 					validationResult.IsValid = false
 					validationResult.AppendError(ErrInvalidTimeoutValue)
 					return
