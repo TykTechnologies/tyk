@@ -71,17 +71,18 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	storeRef := k.Gw.GlobalSessionManager.Store()
+	limitHeader := k.Gw.limitHeaderFactory(w.Header())
+
 	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
 		session,
 		rateLimitKey,
 		quotaKey,
-		storeRef,
 		!k.Spec.DisableRateLimit,
 		!k.Spec.DisableQuota,
 		k.Spec,
 		false,
+		limitHeader,
 	)
 
 	throttleRetryLimit := session.ThrottleRetryLimit
@@ -97,6 +98,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	}
 
 	k.emitRateLimitEvents(r, rateLimitKey)
+	headerSender := k.Gw.limitHeaderFactory(w.Header())
 
 	switch reason {
 	case sessionFailNone:
@@ -114,11 +116,11 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 					session,
 					rateLimitKey,
 					quotaKey,
-					storeRef,
 					!k.Spec.DisableRateLimit,
 					!k.Spec.DisableQuota,
 					k.Spec,
 					true,
+					headerSender,
 				)
 
 				log.WithFields(logrus.Fields{

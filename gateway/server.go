@@ -27,6 +27,7 @@ import (
 	"time"
 
 	logstashhook "github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/cenkalti/backoff/v4"
 	logrussentry "github.com/evalphobia/logrus_sentry"
 	grayloghook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
@@ -58,6 +59,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -201,6 +203,11 @@ type Gateway struct {
 	// performedSuccessfulReload is used to know whether a successful reload happened
 	performedSuccessfulReload bool
 
+	// reloadRetryBackoff optionally returns a custom backoff strategy for
+	// DoReloadWithRetry. Production code leaves this nil (default exponential
+	// backoff is used). Tests set it to return a fast constant backoff.
+	reloadRetryBackoff func() backoff.BackOff
+
 	requeueLock sync.Mutex
 
 	// This is a list of callbacks to execute on the next reload. It is protected by
@@ -231,9 +238,15 @@ type Gateway struct {
 	// apiJWKCaches cache per api entity
 	apiJWKCaches sync.Map
 
+	limitHeaderFactory rate.HeaderSenderFactory
+
 	BundleChecksumVerifier bundleChecksumVerifyFunction
 
 	validator validator.Validator
+
+	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
+	// Built from apidef.ErrorOverrides during gateway startup.
+	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -282,6 +295,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
+	gw.limitHeaderFactory = rate.NewSenderFactory(config.RateLimitResponseHeaders)
 
 	// Only create registry in RPC mode
 	if config.SlaveOptions.UseRPC {
@@ -1183,6 +1197,10 @@ func (gw *Gateway) createResponseMiddlewareChain(
 		responseMWChain = append(responseMWChain, processor)
 	}
 
+	// Add error override handler (before cache) - intercepts upstream 4xx/5xx
+	gw.responseMWAppendEnabled(&responseMWChain,
+		decorate(&ResponseErrorOverrideMiddleware{BaseTykResponseHandler: baseHandler}))
+
 	keyPrefix := "cache-" + spec.APIID
 	cacheStore := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
 	cacheStore.Connect()
@@ -1209,7 +1227,10 @@ func (gw *Gateway) rpcReloadLoop(rpcKey string) {
 	}
 }
 
-func (gw *Gateway) DoReload() {
+// DoReloadWithError performs a full reload of APIs and policies, returning any
+// sync error that prevented a successful reload. The reloadMu mutex is acquired
+// for the duration of the reload, so each call is safe to make concurrently.
+func (gw *Gateway) DoReloadWithError() error {
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
 
@@ -1240,20 +1261,20 @@ func (gw *Gateway) DoReload() {
 	// Load the API Policies
 	if _, err := syncResourcesWithReload("policies", gw.GetConfig(), gw.syncPolicies); err != nil {
 		mainLog.Error("Error during syncing policies")
-		return
+		return err
 	}
 
 	// load the specs
 	if count, err := syncResourcesWithReload("apis", gw.GetConfig(), gw.syncAPISpecs); err != nil {
 		mainLog.Error("Error during syncing apis")
-		return
+		return err
 	} else {
 		// skip re-loading only if dashboard service reported 0 APIs
 		// and current registry had 0 APIs
 		if count == 0 && gw.apisByIDLen() == 0 {
 			mainLog.Warning("No API Definitions found, not reloading")
 			gw.performedSuccessfulReload = true
-			return
+			return nil
 		}
 	}
 
@@ -1263,6 +1284,60 @@ func (gw *Gateway) DoReload() {
 
 	gw.performedSuccessfulReload = true
 	mainLog.Info("API reload complete")
+	return nil
+}
+
+// DoReload preserves the func() signature required by RPCStorageHandler,
+// rpc.Connect, reloadLoop, gracefulShutdown, and all test callers.
+// Changing DoReload to return an error would break the stored func() field
+// in RPCStorageHandler and the emergencyModeLoadedFunc func() parameter in
+// rpc.Connect without a much wider refactor.
+func (gw *Gateway) DoReload() {
+	if err := gw.DoReloadWithError(); err != nil {
+		mainLog.Errorf("Reload failed: %v", err)
+	}
+}
+
+// Backoff parameters for DoReloadWithRetry.
+const (
+	reloadRetryInitialInterval = 5 * time.Second
+	reloadRetryMaxInterval     = 60 * time.Second
+	reloadRetryMultiplier      = 2.0
+)
+
+// DoReloadWithRetry calls DoReloadWithError in an exponential-backoff retry
+// loop (5s → 10s → 20s → 40s → 60s cap). It is used at the two startup call
+// sites (Register and startServer) where a failed reload means the gateway has
+// zero APIs and policies and must keep retrying until the upstream recovers.
+//
+// The loop is intentionally NOT used in reloadLoop (the runtime hot-reload
+// path) because that goroutine must remain unblocked so that subsequent
+// pub/sub-triggered reloads can be processed without delay.
+func (gw *Gateway) DoReloadWithRetry(ctx context.Context) {
+	var b backoff.BackOff
+	if gw.reloadRetryBackoff != nil {
+		b = gw.reloadRetryBackoff()
+	} else {
+		eb := backoff.NewExponentialBackOff()
+		eb.InitialInterval = reloadRetryInitialInterval
+		eb.MaxInterval = reloadRetryMaxInterval
+		eb.MaxElapsedTime = 0 // never stop on elapsed time; only ctx or success stops it
+		eb.Multiplier = reloadRetryMultiplier
+		eb.Reset()
+		b = eb
+	}
+
+	err := backoff.Retry(func() error {
+		if err := gw.DoReloadWithError(); err != nil {
+			mainLog.Errorf("Reload failed, will retry: %v", err)
+			return err
+		}
+		return nil
+	}, backoff.WithContext(b, ctx))
+
+	if err != nil && ctx.Err() != nil {
+		mainLog.Warning("Reload retry abandoned: gateway shutting down")
+	}
 }
 
 func createCORSWrapper(spec *APISpec) func(handler http.HandlerFunc) http.HandlerFunc {
@@ -1558,6 +1633,13 @@ func (gw *Gateway) initSystem() error {
 			return err
 		}
 
+		// Compile error override regex patterns and build indexed lookup
+		// Compilation failures are logged as warnings and those rules are skipped
+		compiled := CompileErrorOverrides(gwConfig.ErrorOverrides)
+		if compiled != nil {
+			gw.SetCompiledErrorOverrides(compiled)
+		}
+
 		gw.SetConfig(gwConfig)
 		if err := gw.afterConfSetup(); err != nil {
 			log.WithError(err).Fatal("Could not complete configuration setup.")
@@ -1663,6 +1745,9 @@ func (gw *Gateway) initSystem() error {
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
+
+	gw.limitHeaderFactory = rate.NewSenderFactory(gwConfig.RateLimitResponseHeaders)
+	gw.jwkCache = buildJWKSCache(gwConfig)
 
 	gw.initMembers(gwConfig)
 
@@ -2370,7 +2455,11 @@ func (gw *Gateway) startServer() {
 	mainLog.Info("--> Listening on port: ", gw.GetConfig().ListenPort)
 	mainLog.Info("--> PID: ", gw.hostDetails.PID)
 
-	gw.DoReload()
+	if gw.GetConfig().UseDBAppConfigs {
+		gw.DoReloadWithRetry(gw.ctx)
+	} else {
+		gw.DoReload()
+	}
 }
 
 func (gw *Gateway) GetConfig() config.Config {
@@ -2379,6 +2468,16 @@ func (gw *Gateway) GetConfig() config.Config {
 
 func (gw *Gateway) GetCertificateManager() certs.CertificateManager {
 	return gw.CertificateManager
+}
+
+// GetCompiledErrorOverrides returns the compiled error overrides for O(1) lookup.
+func (gw *Gateway) GetCompiledErrorOverrides() *CompiledErrorOverrides {
+	return gw.compiledErrorOverrides.Load()
+}
+
+// SetCompiledErrorOverrides stores the compiled error overrides.
+func (gw *Gateway) SetCompiledErrorOverrides(compiled *CompiledErrorOverrides) {
+	gw.compiledErrorOverrides.Store(compiled)
 }
 
 func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {

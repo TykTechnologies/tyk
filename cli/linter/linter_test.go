@@ -94,6 +94,14 @@ var tests = []struct {
 		"InvalidDnsCacheMultipleIPsHandleStrategy", `{"dns_cache": { "enabled": true, "ttl": 1, "multiple_ips_handle_strategy": "true" } }`,
 		`dns_cache.multiple_ips_handle_strategy: dns_cache.multiple_ips_handle_strategy must be one of the following: "pick_first", "random", "no_cache"`,
 	},
+	{
+		"InvalidErrorOverridesResponseStatusCode", `{"error_overrides": {"400": [{"response": {"status_code": "not-an-int"}}]}}`,
+		"cannot unmarshal string into Go struct field ErrorResponse.error_overrides.response.status_code of type int",
+	},
+	{
+		"InvalidErrorOverridesMissingRequired", `{"error_overrides": {"400": [{}]}}`,
+		"error_overrides.400.0: response is required",
+	},
 }
 
 func allContains(got, want []string) bool {

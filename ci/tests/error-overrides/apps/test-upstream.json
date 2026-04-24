@@ -1,0 +1,21 @@
+{
+  "name": "Test Upstream Error Overrides",
+  "api_id": "test-upstream",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-upstream/",
+    "target_url": "http://backend-multi-error:5003/",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  }
+}

@@ -792,6 +792,10 @@ type APIDefinition struct {
 	// SecurityRequirements stores all OAS security requirements (auto-populated from OpenAPI description import)
 	// When len(SecurityRequirements) > 1, OR logic is automatically applied
 	SecurityRequirements [][]string `json:"security_requirements,omitempty" bson:"security_requirements,omitempty"`
+
+	// ErrorOverrides contains the configurations for error response customization.
+	ErrorOverrides         ErrorOverridesMap `bson:"error_overrides" json:"error_overrides"`
+	ErrorOverridesDisabled bool              `bson:"error_overrides_disabled" json:"error_overrides_disabled" `
 }
 
 type JWK struct {
@@ -1601,6 +1605,26 @@ func DummyAPI() APIDefinition {
 		},
 	}
 
+	errorOverrides := ErrorOverridesMap{
+		"400": []ErrorOverride{
+			{
+				Match: &ErrorMatcher{
+					Flag:           "RLT",
+					MessagePattern: ".*",
+					BodyField:      "error",
+					BodyValue:      "invalid",
+				},
+				Response: ErrorResponse{
+					StatusCode: 400,
+					Body:       "Bad Request",
+					Message:    "Error",
+					Template:   "error",
+					Headers:    map[string]string{"X-Error": "true"},
+				},
+			},
+		},
+	}
+
 	return APIDefinition{
 		VersionData:          versionData,
 		ConfigData:           map[string]interface{}{},
@@ -1632,9 +1656,10 @@ func DummyAPI() APIDefinition {
 		Proxy: ProxyConfig{
 			DisableStripSlash: true,
 		},
-		CORS:    defaultCORSConfig,
-		Tags:    []string{},
-		GraphQL: graphql,
+		CORS:           defaultCORSConfig,
+		Tags:           []string{},
+		GraphQL:        graphql,
+		ErrorOverrides: errorOverrides,
 	}
 }
 

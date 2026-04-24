@@ -1349,6 +1349,25 @@ type Config struct {
 	// ```
 	OverrideMessages map[string]TykError `bson:"override_messages" json:"override_messages"`
 
+	// ErrorOverrides allows you to customize the error responses that the Gateway will return to API clients.
+	// This configuration will be used to override both Gateway-generated errors (e.g. authentication failures, rate limits, validation errors)
+	// and errors returned by the upstream service (4xx/5xx responses from backend APIs).
+	// Rules are organized by HTTP status code and can include additional matching criteria.
+	// These rules will be superseded by any overrides configured in the API definition
+	//
+	// Sample Override Setting
+	// ```
+	// "error_overrides": {
+	//   "500": [{
+	//     "response": {
+	//       "status_code": 503,
+	//       "body": "{\"error\": \"Service temporarily unavailable\"}"
+	//     }
+	//   }]
+	// }
+	// ```
+	ErrorOverrides apidef.ErrorOverridesMap `json:"error_overrides,omitempty"`
+
 	// Cloud flag shows the Gateway runs in Tyk Cloud.
 	Cloud bool `json:"cloud"`
 
