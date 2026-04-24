@@ -11,12 +11,18 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	b3prop "go.opentelemetry.io/contrib/propagators/b3"
+	gotel "go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
+
 	otelconfig "github.com/TykTechnologies/opentelemetry/config"
 	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 )
 
@@ -633,6 +639,72 @@ func TestOTelConfig_BackwardCompatibility(t *testing.T) {
 
 		assert.NotNil(t, provider)
 		assert.Equal(t, tyktrace.NOOP_PROVIDER, provider.Type())
+	})
+}
+
+func setGlobalPropagator(t *testing.T, p propagation.TextMapPropagator) {
+	t.Helper()
+	prev := gotel.GetTextMapPropagator()
+	gotel.SetTextMapPropagator(p)
+	t.Cleanup(func() { gotel.SetTextMapPropagator(prev) })
+}
+
+func spanContextFromHex(t *testing.T, traceHex, spanHex string) trace.SpanContext {
+	t.Helper()
+	tid, err := trace.TraceIDFromHex(traceHex)
+	require.NoError(t, err)
+	sid, err := trace.SpanIDFromHex(spanHex)
+	require.NoError(t, err)
+	return trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    tid,
+		SpanID:     sid,
+		TraceFlags: trace.FlagsSampled,
+		Remote:     true,
+	})
+}
+
+func TestInjectTraceContext(t *testing.T) {
+	const traceHex = "4bf92f3577b34da6a3ce929d0e0e4736"
+	const spanHex = "00f067aa0ba902b7"
+
+	t.Run("returns nil when no span in context", func(t *testing.T) {
+		setGlobalPropagator(t, propagation.TraceContext{})
+		result := InjectTraceContext(context.Background())
+		assert.Nil(t, result)
+	})
+
+	t.Run("W3C tracecontext propagator injects traceparent", func(t *testing.T) {
+		setGlobalPropagator(t, propagation.TraceContext{})
+
+		sc := spanContextFromHex(t, traceHex, spanHex)
+		ctx := trace.ContextWithSpanContext(context.Background(), sc)
+
+		result := InjectTraceContext(ctx)
+		require.NotNil(t, result)
+
+		tp, ok := result["traceparent"]
+		require.True(t, ok)
+		assert.Equal(t, "00-"+traceHex+"-"+spanHex+"-"+trace.FlagsSampled.String(), tp)
+
+		_, hasB3 := result["x-b3-traceid"]
+		assert.False(t, hasB3)
+	})
+
+	t.Run("B3 multi-header propagator injects X-B3-* headers", func(t *testing.T) {
+		setGlobalPropagator(t, b3prop.New(b3prop.WithInjectEncoding(b3prop.B3MultipleHeader)))
+
+		sc := spanContextFromHex(t, traceHex, spanHex)
+		ctx := trace.ContextWithSpanContext(context.Background(), sc)
+
+		result := InjectTraceContext(ctx)
+		require.NotNil(t, result)
+
+		assert.Equal(t, traceHex, result["x-b3-traceid"])
+		assert.Equal(t, spanHex, result["x-b3-spanid"])
+		assert.Equal(t, "1", result["x-b3-sampled"])
+
+		_, hasTraceparent := result["traceparent"]
+		assert.False(t, hasTraceparent)
 	})
 }
 
