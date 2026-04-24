@@ -24,7 +24,7 @@ type NodeResponse struct {
 
 type DashboardServiceSender interface {
 	Init() error
-	Register() error
+	Register(ctx context.Context) error
 	DeRegister() error
 	StartBeating(ctx context.Context) error
 	StopBeating()
@@ -107,7 +107,7 @@ func (gw *Gateway) reLogin() {
 
 	time.Sleep(5 * time.Second)
 
-	if err := gw.DashService.Register(); err != nil {
+	if err := gw.DashService.Register(context.Background()); err != nil {
 		dashLog.Error("Could not register: ", err)
 	} else {
 		go func() {
@@ -189,7 +189,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 	return nil
 }
 
-func (h *HTTPDashboardHandler) Register() error {
+func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 	dashLog.Info("Registering gateway node with Dashboard")
 
 	for {
@@ -201,14 +201,22 @@ func (h *HTTPDashboardHandler) Register() error {
 
 		if err != nil {
 			dashLog.Errorf("Request failed with error %v; retrying in 5s", err)
-			time.Sleep(5 * time.Second)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(5 * time.Second):
+			}
 			continue
 		}
 
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
 			resp.Body.Close()
 			dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
-			time.Sleep(5 * time.Second)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(5 * time.Second):
+			}
 			continue
 		}
 
@@ -222,7 +230,11 @@ func (h *HTTPDashboardHandler) Register() error {
 		// 409 with Status != "OK" means lock contention or Redis failure — retry.
 		if resp.StatusCode == http.StatusConflict && val.Status != "OK" {
 			dashLog.Warning("Registration deferred (409 with status: ", val.Status, "); retrying in 5s")
-			time.Sleep(5 * time.Second)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(5 * time.Second):
+			}
 			continue
 		}
 
@@ -230,13 +242,21 @@ func (h *HTTPDashboardHandler) Register() error {
 		msgMap, ok := val.Message.(map[string]interface{})
 		if !ok {
 			dashLog.Error("Failed to register node, retrying in 5s")
-			time.Sleep(5 * time.Second)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(5 * time.Second):
+			}
 			continue
 		}
 		nodeID, ok := msgMap["NodeID"].(string)
 		if !ok || nodeID == "" {
 			dashLog.Error("Failed to register node, retrying in 5s")
-			time.Sleep(5 * time.Second)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(5 * time.Second):
+			}
 			continue
 		}
 
@@ -317,7 +337,7 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
-		return h.Gw.DashService.Register()
+		return h.Gw.DashService.Register(ctx)
 	}
 
 	if resp.StatusCode != http.StatusOK {
