@@ -36,6 +36,8 @@ import (
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/test"
+
+	_ "github.com/warpstreamlabs/bento/public/components/nats"
 )
 
 func TestGetHTTPPaths(t *testing.T) {
