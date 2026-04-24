@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -2148,17 +2149,7 @@ func testEq(a, b []string) bool {
 		return false
 	}
 
-	if len(a) != len(b) {
-		return false
-	}
-
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-
-	return true
+	return slices.Equal(a, b)
 }
 
 func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
