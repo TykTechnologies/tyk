@@ -1345,9 +1345,9 @@ func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 
 	if et.Timeout > 0 {
 		meta.TimeoutDuration = et.Timeout
-	} else {
-		meta.TimeOut = et.Value
 	}
+
+	meta.TimeOut = et.Value
 }
 
 // CustomPlugin configures custom plugin.
