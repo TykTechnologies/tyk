@@ -1,0 +1,63 @@
+{
+  "name": "Test API Override Edge cases",
+  "api_id": "edge-cases-api",
+  "org_id": "default",
+  "use_keyless": true,
+  "version_data": {
+    "not_versioned": true,
+    "versions": {
+      "Default": {
+        "name": "Default",
+        "use_extended_paths": true
+      }
+    }
+  },
+  "proxy": {
+    "listen_path": "/edge-cases",
+    "target_url": "http://backend-multi-error:5003",
+    "strip_listen_path": true
+  },
+  "error_overrides": {
+    "500": [
+      {
+        "match": {
+          "body_field": "error",
+          "body_value": "template"
+        },
+        "response": {
+          "status_code": 501,
+          "body": "{\"code\": {{.StatusCode}}}",
+          "headers": {
+            "X-Error-Flag": "UPSTREAM-INLINE-TEMPLATE",
+            "X-Override-Applied": "true"
+          }
+        }
+      },
+      {
+        "match": {
+          "body_field": "error",
+          "body_value": "json_escape"
+        },
+        "response": {
+          "status_code": 502,
+          "message": "Invalid token \"abc\"\nand some newlines",
+          "body": "{\"error_detail\": \"{{.Message}}\"}",
+          "headers": {
+            "X-Error-Flag": "UPSTREAM-JSON-ESCAPED-INLINE-TEMPLATE",
+            "X-Override-Applied": "true"
+          }
+        }
+      },
+      {
+        "match": {
+          "body_field": "target_value",
+          "body_value": "find_me_if_you_can"
+        },
+        "response": {
+          "status_code": 506,
+          "body": "{\"status\": \"matched_truncated_body\"}"
+        }
+      }
+    ]
+  }
+}

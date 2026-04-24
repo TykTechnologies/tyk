@@ -1,0 +1,56 @@
+{
+  "name": "Test BIV - InvalidParams Template (Schema Validation)",
+  "api_id": "test-biv-schema-invalid-params",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-biv-schema-invalid-params/",
+    "target_url": "http://backend-ok:80",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default",
+        "use_extended_paths": true,
+        "extended_paths": {
+          "validate_json": [
+            {
+              "path": "validate",
+              "method": "POST",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {"type": "string", "format": "email"},
+                  "count": {"type": "integer", "minimum": 1}
+                },
+                "required": ["email", "count"]
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "error_overrides": {
+    "422": [
+      {
+        "match": {
+          "flag": "BIV"
+        },
+        "response": {
+          "status_code": 422,
+          "template": "error_validation_invalid_params",
+          "message": "Request body failed schema validation",
+          "headers": {
+            "X-Error-Flag": "BIV",
+            "X-Override-Applied": "true"
+          }
+        }
+      }
+    ]
+  }
+}

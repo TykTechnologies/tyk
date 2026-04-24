@@ -426,6 +426,40 @@
           }
         }
       }
+    },
+    "ErrorOverrides": {
+      "type": ["object", "null"],
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "match": {
+              "type": "object",
+              "properties": {
+                "flag": { "type": "string" },
+                "message_pattern": { "type": "string" },
+                "body_field": { "type": "string" },
+                "body_value": { "type": "string" }
+              }
+            },
+            "response": {
+              "type": "object",
+              "properties": {
+                "status_code": { "type": "integer" },
+                "body": { "type": "string" },
+                "message": { "type": "string" },
+                "template": { "type": "string" },
+                "headers": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                }
+              }
+            }
+          },
+          "required": ["response"]
+        }
+      }
     }
   },
   "properties": {
@@ -1619,6 +1653,9 @@
     "allow_unsafe_policy_ids": {
       "type": ["boolean", "null"],
       "additionalProperties": false
+    },
+    "error_overrides": {
+      "$ref": "#/definitions/ErrorOverrides"
     }
   }
 }
