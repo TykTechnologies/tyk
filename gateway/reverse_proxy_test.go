@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bufio"
+	"runtime"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -2417,4 +2418,75 @@ func TestTimeoutPrioritization(t *testing.T) {
 			BodyMatch: "Upstream service reached hard timeout",
 		})
 	})
+}
+
+func TestLargeFileUploadMemory(t *testing.T) {
+	// Simulate a 100MB file upload
+	size := 100 * 1024 * 1024
+	payload := make([]byte, size)
+
+	req, err := http.NewRequest("POST", "http://example.com/upload", bytes.NewReader(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// We need to set ContentLength so copyRequest doesn't skip it
+	req.ContentLength = int64(size)
+
+	targetReq, err := http.NewRequest("POST", "http://example.com/upload", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	runtime.GC()
+	var m1 runtime.MemStats
+	runtime.ReadMemStats(&m1)
+
+	// 1. Call deepCopyBody
+	err = deepCopyBody(req, targetReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	runtime.GC()
+	var m2 runtime.MemStats
+	runtime.ReadMemStats(&m2)
+
+	allocAfterDeepCopy := m2.TotalAlloc - m1.TotalAlloc
+	t.Logf("Memory allocated after deepCopyBody: %d MB", allocAfterDeepCopy/(1024*1024))
+
+	// 2. Read from targetReq.Body
+	buf := make([]byte, 1024)
+	_, err = targetReq.Body.Read(buf)
+	if err != nil && err != io.EOF {
+		t.Fatal(err)
+	}
+
+	runtime.GC()
+	var m3 runtime.MemStats
+	runtime.ReadMemStats(&m3)
+
+	allocAfterTargetRead := m3.TotalAlloc - m2.TotalAlloc
+	t.Logf("Memory allocated after targetReq.Body.Read: %d MB", allocAfterTargetRead/(1024*1024))
+
+	// 3. Read from req.Body
+	_, err = req.Body.Read(buf)
+	if err != nil && err != io.EOF {
+		t.Fatal(err)
+	}
+
+	runtime.GC()
+	var m4 runtime.MemStats
+	runtime.ReadMemStats(&m4)
+
+	allocAfterReqRead := m4.TotalAlloc - m3.TotalAlloc
+	t.Logf("Memory allocated after req.Body.Read: %d MB", allocAfterReqRead/(1024*1024))
+
+	totalAlloc := m4.TotalAlloc - m1.TotalAlloc
+	t.Logf("Total memory allocated: %d MB", totalAlloc/(1024*1024))
+
+	// Assert that memory is multiplied
+	// It should be at least 3x the size of the payload
+	if totalAlloc < uint64(size*3) {
+		t.Errorf("Expected total memory allocation to be at least %d bytes, got %d bytes", size*3, totalAlloc)
+	}
 }
