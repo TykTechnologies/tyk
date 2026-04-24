@@ -2117,7 +2117,10 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 	}
 	ts.Gw.performedSuccessfulReload = false
 
-	err := ts.Gw.DashService.Register()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err := ts.Gw.DashService.Register(ctx)
 
 	assert.NoError(t, err, "Register should not return an error")
 	assert.True(t, ts.Gw.performedSuccessfulReload,
