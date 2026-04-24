@@ -16,9 +16,9 @@ import (
 
 var dashLog = log.WithField("prefix", "dashboard")
 
-type NodeResponseOK struct {
+type NodeResponse struct {
 	Status  string
-	Message map[string]string
+	Message any
 	Nonce   string
 }
 
@@ -177,7 +177,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 		return err
 	}
 
-	val := NodeResponseOK{}
+	val := NodeResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
 		return err
 	}
@@ -206,10 +206,7 @@ func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 		case <-time.After(5 * time.Second):
 		}
 		return h.Register(ctx)
-	} else if resp.StatusCode == http.StatusConflict {
-		dashLog.Debug("Node is already registered")
-		return nil
-	} else if resp != nil && resp.StatusCode != 200 {
+	} else if resp != nil && resp.StatusCode != 200 && resp.StatusCode != http.StatusConflict {
 		dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
 		select {
 		case <-ctx.Done():
@@ -220,16 +217,37 @@ func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 	}
 
 	defer resp.Body.Close()
-	val := NodeResponseOK{}
+
+	val := NodeResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
 		return err
 	}
 
-	// Set the NodeID
-	var found bool
-	nodeID, found := val.Message["NodeID"]
-	h.Gw.SetNodeID(nodeID)
-	if !found {
+	// Any 409 whose Status is not "OK" means the gateway has not been assigned a node yet
+	// (lock contention, Redis failure, etc). Retry after backoff.
+	if resp.StatusCode == http.StatusConflict && val.Status != "OK" {
+		dashLog.Warning("Registration deferred (409 with status: ", val.Status, "); retrying in 5s")
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Second):
+		}
+		return h.Register(ctx)
+	}
+
+	// Both 200 and duplicate-session 409 (Status=="OK") carry a NodeID.
+	msgMap, ok := val.Message.(map[string]interface{})
+	if !ok {
+		dashLog.Error("Failed to register node, retrying in 5s")
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Second):
+		}
+		return h.Register(ctx)
+	}
+	nodeID, _ := msgMap["NodeID"].(string)
+	if nodeID == "" {
 		dashLog.Error("Failed to register node, retrying in 5s")
 		select {
 		case <-ctx.Done():
@@ -239,6 +257,7 @@ func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 		return h.Register(ctx)
 	}
 
+	h.Gw.SetNodeID(nodeID)
 	dashLog.WithField("id", h.Gw.GetNodeID()).Info("Node Registered")
 
 	// Set the nonce
@@ -321,7 +340,7 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 	if resp.StatusCode != http.StatusOK {
 		return errors.New("dashboard is down? Heartbeat non-200 response")
 	}
-	val := NodeResponseOK{}
+	val := NodeResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
 		return err
 	}
@@ -354,7 +373,7 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 		return fmt.Errorf("deregister request failed with status %d", resp.StatusCode)
 	}
 
-	val := NodeResponseOK{}
+	val := NodeResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
 		return err
 	}
