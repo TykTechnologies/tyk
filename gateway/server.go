@@ -1879,7 +1879,7 @@ func handleDashboardRegistration(gw *Gateway) {
 	dashboardServiceInit(gw)
 
 	// connStr := buildDashboardConnStr("/register/node")
-	if err := gw.DashService.Register(); err != nil {
+	if err := gw.DashService.Register(gw.ctx); err != nil {
 		dashLog.Error("Registration failed: ", err)
 	}
 

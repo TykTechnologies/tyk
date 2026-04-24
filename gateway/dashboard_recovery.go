@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -110,7 +111,7 @@ func (gw *Gateway) attemptDashboardRecovery() error {
 		return errors.New("dashboard service not available for recovery")
 	}
 
-	return gw.DashService.Register()
+	return gw.DashService.Register(context.Background())
 }
 
 // shouldRetryOnNetworkError checks if an error is a network error that might benefit from retry
