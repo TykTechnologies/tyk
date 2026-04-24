@@ -12,7 +12,13 @@ import (
 	"gopkg.in/yaml.v2"
 
 	_ "github.com/TykTechnologies/tyk/internal/portal"
-	_ "github.com/warpstreamlabs/bento/public/components/all"
+	_ "github.com/warpstreamlabs/bento/public/components/amqp09"
+	_ "github.com/warpstreamlabs/bento/public/components/amqp1"
+	_ "github.com/warpstreamlabs/bento/public/components/avro" // Required for the avro processor mentioned in docs
+	_ "github.com/warpstreamlabs/bento/public/components/io"     // Required for HTTP, WebSocket, etc.
+	_ "github.com/warpstreamlabs/bento/public/components/kafka"
+	_ "github.com/warpstreamlabs/bento/public/components/mqtt"
+	_ "github.com/warpstreamlabs/bento/public/components/pure"   // Required for core processors (mapping, switch, etc.)
 	"github.com/warpstreamlabs/bento/public/service"
 )
 
