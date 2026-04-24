@@ -24,7 +24,7 @@ type NodeResponse struct {
 
 type DashboardServiceSender interface {
 	Init() error
-	Register(ctx context.Context) error
+	Register() error
 	DeRegister() error
 	StartBeating(ctx context.Context) error
 	StopBeating()
@@ -107,7 +107,7 @@ func (gw *Gateway) reLogin() {
 
 	time.Sleep(5 * time.Second)
 
-	if err := gw.DashService.Register(context.Background()); err != nil {
+	if err := gw.DashService.Register(); err != nil {
 		dashLog.Error("Could not register: ", err)
 	} else {
 		go func() {
@@ -189,85 +189,68 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 	return nil
 }
 
-func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
+func (h *HTTPDashboardHandler) Register() error {
 	dashLog.Info("Registering gateway node with Dashboard")
-	req := h.newRequest(http.MethodGet, h.RegistrationEndpoint)
-	req.Header.Set(header.XTykSessionID, h.Gw.SessionID)
 
-	c := h.Gw.initialiseClient()
+	for {
+		req := h.newRequest(http.MethodGet, h.RegistrationEndpoint)
+		req.Header.Set(header.XTykSessionID, h.Gw.SessionID)
 
-	resp, err := c.Do(req)
+		c := h.Gw.initialiseClient()
+		resp, err := c.Do(req)
 
-	if err != nil {
-		dashLog.Errorf("Request failed with error %v; retrying in 5s", err)
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(5 * time.Second):
+		if err != nil {
+			dashLog.Errorf("Request failed with error %v; retrying in 5s", err)
+			time.Sleep(5 * time.Second)
+			continue
 		}
-		return h.Register(ctx)
-	} else if resp != nil && resp.StatusCode != 200 && resp.StatusCode != http.StatusConflict {
-		dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(5 * time.Second):
+
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
+			resp.Body.Close()
+			dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
+			time.Sleep(5 * time.Second)
+			continue
 		}
-		return h.Register(ctx)
-	}
 
-	defer resp.Body.Close()
-
-	val := NodeResponse{}
-	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
-		return err
-	}
-
-	// Any 409 whose Status is not "OK" means the gateway has not been assigned a node yet
-	// (lock contention, Redis failure, etc). Retry after backoff.
-	if resp.StatusCode == http.StatusConflict && val.Status != "OK" {
-		dashLog.Warning("Registration deferred (409 with status: ", val.Status, "); retrying in 5s")
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(5 * time.Second):
+		val := NodeResponse{}
+		if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
+			resp.Body.Close()
+			return err
 		}
-		return h.Register(ctx)
-	}
+		resp.Body.Close()
 
-	// Both 200 and duplicate-session 409 (Status=="OK") carry a NodeID.
-	msgMap, ok := val.Message.(map[string]interface{})
-	if !ok {
-		dashLog.Error("Failed to register node, retrying in 5s")
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(5 * time.Second):
+		// 409 with Status != "OK" means lock contention or Redis failure — retry.
+		if resp.StatusCode == http.StatusConflict && val.Status != "OK" {
+			dashLog.Warning("Registration deferred (409 with status: ", val.Status, "); retrying in 5s")
+			time.Sleep(5 * time.Second)
+			continue
 		}
-		return h.Register(ctx)
-	}
-	nodeID, _ := msgMap["NodeID"].(string)
-	if nodeID == "" {
-		dashLog.Error("Failed to register node, retrying in 5s")
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(5 * time.Second):
+
+		// Both 200 and duplicate-session 409 (Status=="OK") carry a NodeID.
+		msgMap, ok := val.Message.(map[string]interface{})
+		if !ok {
+			dashLog.Error("Failed to register node, retrying in 5s")
+			time.Sleep(5 * time.Second)
+			continue
 		}
-		return h.Register(ctx)
+		nodeID, ok := msgMap["NodeID"].(string)
+		if !ok || nodeID == "" {
+			dashLog.Error("Failed to register node, retrying in 5s")
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		h.Gw.SetNodeID(nodeID)
+		dashLog.WithField("id", h.Gw.GetNodeID()).Info("Node Registered")
+
+		h.Gw.ServiceNonceMutex.Lock()
+		h.Gw.ServiceNonce = val.Nonce
+		h.Gw.ServiceNonceMutex.Unlock()
+		dashLog.Debug("Registration Finished: Nonce Set: ", val.Nonce)
+		h.Gw.DoReloadWithRetry(context.Background())
+
+		return nil
 	}
-
-	h.Gw.SetNodeID(nodeID)
-	dashLog.WithField("id", h.Gw.GetNodeID()).Info("Node Registered")
-
-	// Set the nonce
-	h.Gw.ServiceNonceMutex.Lock()
-	h.Gw.ServiceNonce = val.Nonce
-	h.Gw.ServiceNonceMutex.Unlock()
-	dashLog.Debug("Registration Finished: Nonce Set: ", val.Nonce)
-	h.Gw.DoReloadWithRetry(ctx)
-
-	return nil
 }
 
 func (h *HTTPDashboardHandler) Ping() error {
@@ -334,7 +317,7 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
-		return h.Gw.DashService.Register(ctx)
+		return h.Gw.DashService.Register()
 	}
 
 	if resp.StatusCode != http.StatusOK {

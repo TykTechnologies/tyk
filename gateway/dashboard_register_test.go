@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -79,7 +78,7 @@ func TestRegister_Success(t *testing.T) {
 	h, close := newTestDashboardHandler(t, srv.URL)
 	defer close()
 
-	require.NoError(t, h.Register(context.Background()))
+	require.NoError(t, h.Register())
 
 	assert.Equal(t, "node-abc-123", h.Gw.GetNodeID())
 
@@ -106,7 +105,7 @@ func TestRegister_DuplicateSession409(t *testing.T) {
 	h, close := newTestDashboardHandler(t, srv.URL)
 	defer close()
 
-	require.NoError(t, h.Register(context.Background()))
+	require.NoError(t, h.Register())
 
 	assert.Equal(t, "node-already-registered", h.Gw.GetNodeID())
 
@@ -160,10 +159,7 @@ func TestRegister_Retries(t *testing.T) {
 			h, close := newTestDashboardHandler(t, srv.URL)
 			defer close()
 
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-			defer cancel()
-
-			require.NoError(t, h.Register(ctx))
+			require.NoError(t, h.Register())
 
 			assert.Equal(t, "node-after-retry", h.Gw.GetNodeID())
 
