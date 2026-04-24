@@ -107,11 +107,11 @@ func (gw *Gateway) reLogin() {
 
 	time.Sleep(5 * time.Second)
 
-	if err := gw.DashService.Register(context.Background()); err != nil {
+	if err := gw.DashService.Register(gw.ctx); err != nil {
 		dashLog.Error("Could not register: ", err)
 	} else {
 		go func() {
-			beatErr := gw.DashService.StartBeating(context.Background())
+			beatErr := gw.DashService.StartBeating(gw.ctx)
 			if beatErr != nil {
 				dashLog.Error("Could not start beating. ", beatErr.Error())
 			}
@@ -227,7 +227,7 @@ func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 				h.Gw.ServiceNonce = val.Nonce
 				h.Gw.ServiceNonceMutex.Unlock()
 				dashLog.Debug("Registration Finished: Nonce Set: ", val.Nonce)
-				h.Gw.DoReloadWithRetry(context.Background())
+				h.Gw.DoReloadWithRetry(ctx)
 
 				return nil
 			}

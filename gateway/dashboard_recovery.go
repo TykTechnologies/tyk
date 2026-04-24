@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -105,13 +104,15 @@ func (gw *Gateway) HandleDashboardResponseReadError(err error, errorContext stri
 	return false
 }
 
-// attemptDashboardRecovery attempts to re-register the node with the dashboard
+// attemptDashboardRecovery attempts to re-register the node with the dashboard.
+// It uses gw.ctx so that recovery is cancelled when the Gateway receives a shutdown
+// signal (SIGTERM/SIGINT), preventing goroutines from blocking indefinitely.
 func (gw *Gateway) attemptDashboardRecovery() error {
 	if gw.DashService == nil {
 		return errors.New("dashboard service not available for recovery")
 	}
 
-	return gw.DashService.Register(context.Background())
+	return gw.DashService.Register(gw.ctx)
 }
 
 // shouldRetryOnNetworkError checks if an error is a network error that might benefit from retry
