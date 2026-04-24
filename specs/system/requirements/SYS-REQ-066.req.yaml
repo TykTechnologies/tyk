@@ -1,0 +1,47 @@
+id: SYS-REQ-066
+version: 1
+status: review
+priority: shall
+category: non-functional
+req_type: guarantee
+fretish: the policy shall always satisfy !rpc_data_load_requested | encoding_roundtrip_safe
+description: Policy data loaded via RPC (json.Marshal/json.Unmarshal) shall survive encoding round-trips without data loss or corruption. Specifically, all policy fields used by Apply -- including nested maps, slices, and numeric types -- shall marshal to JSON and unmarshal back to identical Go values. Empty slices, nil maps, zero-valued numerics, and Unicode strings in metadata keys must all round-trip correctly.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Policy data is transmitted between the Tyk dashboard and gateway via RPC using JSON serialization. If any policy field does not survive the marshal/unmarshal round-trip, the gateway operates on corrupted policy data. Known risks include nil vs empty slice distinction, float64 precision loss for large integers, and map key ordering changes.
+tags:
+    - encoding-safety
+    - rpc
+    - data-loading
+    - json
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-007
+    documented_by_extra:
+        - README.md
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: ""
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-04-21T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-04-21T00:00:00Z"
+obligation_class: encoding_safety
+lifecycle:
+    change_history:
+        - date: "2026-04-21T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class encoding_safety added for RPC data loading JSON round-trip safety
+          changed_by: ai:claude

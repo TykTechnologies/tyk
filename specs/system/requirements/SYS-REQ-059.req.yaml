@@ -1,0 +1,45 @@
+id: SYS-REQ-059
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !rate_limit_apply_requested | !multiple_policies | (rate_merge_AB = rate_merge_BA)
+description: Rate limit merge shall be commutative -- applying rate limits from policies [A, B] shall produce the same session rate as applying from [B, A]. The highest-rate-wins comparison is inherently order-independent for strict inequalities, but equal-rate tie-breaking must also be order-independent.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Highest-rate-wins is a max operation, which is commutative by definition. However, when rates are equal, the current implementation preserves the existing value (SYS-REQ-041), making the result independent of merge order. This requirement formalizes that the entire rate limit merge operation is commutative.
+tags:
+    - commutativity
+    - rate-limiting
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-003
+    documented_by_extra:
+        - README.md
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: ""
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-04-21T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-04-21T00:00:00Z"
+obligation_class: commutativity
+lifecycle:
+    change_history:
+        - date: "2026-04-21T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class commutativity added for rate limit merge order independence
+          changed_by: ai:claude

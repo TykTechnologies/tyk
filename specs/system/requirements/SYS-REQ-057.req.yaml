@@ -1,0 +1,46 @@
+id: SYS-REQ-057
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !apply_requested | !multiple_policies | merge_order_independent
+description: When multiple policies are applied to a session, the resulting session state shall be independent of the order in which policies are processed. Specifically, rate limits, quotas, tags, and access rights produced by applying policies [A, B] must equal those produced by applying [B, A]. This commutativity property ensures that policy ordering in the session's AppliedPolicies list does not affect access control decisions.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Policy IDs are stored in maps and slices whose iteration order may vary. If the merge result depends on processing order, the same session configuration produces different access control outcomes depending on runtime conditions. The highest-rate-wins rule for rate limits is inherently commutative, but metadata merge (last-write-wins) is not -- this requirement makes the expectation explicit.
+tags:
+    - commutativity
+    - policy-merge
+    - policy-apply
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-001
+    documented_by_extra:
+        - README.md
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: ""
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-04-21T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-04-21T00:00:00Z"
+obligation_class: commutativity
+lifecycle:
+    change_history:
+        - date: "2026-04-21T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class commutativity added for policy merge order independence
+          changed_by: ai:claude

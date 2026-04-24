@@ -1,0 +1,46 @@
+id: SYS-REQ-058
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !rate_limit_apply_requested | !multiple_policies | rate_result_deterministic
+description: When ApplyRateLimits processes multiple policies with rate limit values, the resulting session rate and per values shall be deterministic regardless of map iteration order. The highest-rate-wins comparison shall produce the same winner independent of the sequence in which policies are visited.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Rate limits from multiple policies are compared via highest-rate-wins. Since this comparison is based on numeric magnitude, the result is inherently deterministic. However, if policies have equal rates with different Per values, map iteration order could affect which Per value is selected. This requirement makes the determinism expectation explicit.
+tags:
+    - determinism
+    - rate-limiting
+    - map-iteration
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-003
+    documented_by_extra:
+        - README.md
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: ""
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-04-21T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-04-21T00:00:00Z"
+obligation_class: determinism
+lifecycle:
+    change_history:
+        - date: "2026-04-21T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class determinism added for rate limit merge determinism
+          changed_by: ai:claude

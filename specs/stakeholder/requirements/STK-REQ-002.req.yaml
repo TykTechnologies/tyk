@@ -52,6 +52,7 @@ stakeholder:
     obligation_checklist:
         - nominal
         - error_handling
+        - nil_safety
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

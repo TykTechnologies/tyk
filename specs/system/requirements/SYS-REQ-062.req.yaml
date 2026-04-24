@@ -1,0 +1,45 @@
+id: SYS-REQ-062
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !endpoint_limit_apply_requested | !multiple_policies | (endpoint_merge_AB = endpoint_merge_BA)
+description: Endpoint-level rate limit merge shall be commutative -- merging endpoint limits from policies [A, B] shall produce the same per-endpoint rates as merging from [B, A]. For each path+method key, the highest-rate-wins comparison is order-independent.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Endpoint limits are keyed by path+method and merged via highest-rate-wins per key. The max operation is commutative, so the per-endpoint merge is inherently order-independent. This requirement formalizes the expectation so that any future change to the merge algorithm maintains this property.
+tags:
+    - commutativity
+    - endpoint-limits
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-004
+    documented_by_extra:
+        - README.md
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: ""
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-04-21T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-04-21T00:00:00Z"
+obligation_class: commutativity
+lifecycle:
+    change_history:
+        - date: "2026-04-21T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class commutativity added for endpoint limit merge order independence
+          changed_by: ai:claude

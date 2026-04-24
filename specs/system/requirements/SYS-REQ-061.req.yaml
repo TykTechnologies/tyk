@@ -1,0 +1,46 @@
+id: SYS-REQ-061
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !endpoint_limit_apply_requested | !multiple_policies | endpoint_result_deterministic
+description: When ApplyEndpointLevelLimits processes multiple policies with endpoint-level rate limits, the resulting per-endpoint rates shall be deterministic regardless of policy iteration order. For each unique path+method combination, the highest rate shall be selected consistently.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Endpoint-level limits are merged per path+method key. Since the merge uses highest-rate-wins per endpoint, the result should be deterministic. However, if the iteration over policies uses map order, the intermediate state during merge could vary. This requirement makes the final-result determinism explicit.
+tags:
+    - determinism
+    - endpoint-limits
+    - map-iteration
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-004
+    documented_by_extra:
+        - README.md
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: ""
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-04-21T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-04-21T00:00:00Z"
+obligation_class: determinism
+lifecycle:
+    change_history:
+        - date: "2026-04-21T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class determinism added for endpoint limit merge determinism
+          changed_by: ai:claude

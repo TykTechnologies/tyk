@@ -1,0 +1,45 @@
+id: SYS-REQ-056
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !apply_requested | (apply_result_first = apply_result_second)
+description: Calling Apply twice on the same session with the same policies shall produce the same session state. Apply is idempotent -- repeated application does not accumulate or alter fields beyond the first application. Tags, metadata, and access rights shall not be duplicated or modified by a second Apply call.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: In production, Apply may be called multiple times on the same session due to retries, cache refreshes, or middleware re-entry. If Apply is not idempotent, repeated calls would accumulate tags, duplicate access rights, or drift rate limits, producing incorrect session state.
+tags:
+    - idempotency
+    - policy-apply
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-001
+    documented_by_extra:
+        - README.md
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: ""
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-04-21T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-04-21T00:00:00Z"
+obligation_class: idempotency
+lifecycle:
+    change_history:
+        - date: "2026-04-21T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class idempotency added for Apply repeat-safety
+          changed_by: ai:claude

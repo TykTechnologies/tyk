@@ -85,6 +85,9 @@ stakeholder:
         - boundary
         - access_denied
         - policy_merge
+        - determinism
+        - idempotency
+        - commutativity
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

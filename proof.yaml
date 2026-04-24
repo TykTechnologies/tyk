@@ -28,6 +28,12 @@ project:
         - access_denied
         - policy_merge
         - rate_limit_boundary
+        - determinism
+        - idempotency
+        - commutativity
+        - monotonicity
+        - nil_safety
+        - encoding_safety
     checks:
         coverage_threshold:
             threshold: 90

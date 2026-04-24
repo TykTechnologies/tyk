@@ -64,6 +64,9 @@ stakeholder:
         - rate_limit_boundary
         - error_handling
         - policy_merge
+        - determinism
+        - commutativity
+        - monotonicity
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

@@ -1,0 +1,46 @@
+id: SYS-REQ-063
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !endpoint_limit_apply_requested | !policy_added | (new_endpoint_rate >= old_endpoint_rate)
+description: Adding a policy with endpoint-level limits shall never decrease the effective rate for any existing endpoint path+method combination. The highest-rate-wins merge is monotonic -- the resulting per-endpoint rate after merging N+1 policies is always greater than or equal to the rate after merging N policies.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Endpoint-level limits follow the same highest-rate-wins semantics as session-level limits. Monotonicity ensures that administrators can safely add policies with endpoint limits without risk of reducing existing per-endpoint allowances for any path+method combination.
+tags:
+    - monotonicity
+    - endpoint-limits
+    - highest-rate-wins
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-004
+    documented_by_extra:
+        - README.md
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: ""
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-04-21T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-04-21T00:00:00Z"
+obligation_class: monotonicity
+lifecycle:
+    change_history:
+        - date: "2026-04-21T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class monotonicity added for endpoint limit highest-wins guarantee
+          changed_by: ai:claude

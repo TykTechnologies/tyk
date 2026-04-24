@@ -51,6 +51,7 @@ stakeholder:
             - SYS-REQ-044
     obligation_checklist:
         - nominal
+        - encoding_safety
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

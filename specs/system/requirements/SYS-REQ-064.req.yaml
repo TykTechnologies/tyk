@@ -1,0 +1,45 @@
+id: SYS-REQ-064
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !clear_session_requested | !nil_session_fields | safe_clear_completion
+description: ClearSession shall handle nil or zero-valued session fields safely. When clearing a session whose quota, rate limit, or complexity fields are already nil or zero, ClearSession shall complete without panic or error. Nil maps, nil slices, and zero-valued structs in the session must not cause nil pointer dereferences during clearing.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Sessions may have partially initialized fields when ClearSession is called -- for example, a session created but never fully populated, or a session where some policy fields were not applicable. ClearSession must be robust against nil fields to prevent gateway panics.
+tags:
+    - nil-safety
+    - session-management
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-002
+    documented_by_extra:
+        - README.md
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: ""
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-04-21T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-04-21T00:00:00Z"
+obligation_class: nil_safety
+lifecycle:
+    change_history:
+        - date: "2026-04-21T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class nil_safety added for ClearSession nil field robustness
+          changed_by: ai:claude
