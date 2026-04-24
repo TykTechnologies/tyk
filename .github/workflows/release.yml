@@ -16,6 +16,7 @@ on:
   schedule:
     - cron: "0 0 * * 1"
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches:
       - master
@@ -64,6 +65,13 @@ jobs:
       std_tags: ${{ steps.ci_metadata_std.outputs.tags }}
       commit_author: ${{ steps.set_outputs.outputs.commit_author}}
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
       - name: Checkout of tyk
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -119,7 +127,7 @@ jobs:
         run: |
           echo '#!/bin/sh
           ci/bin/unlock-agent.sh
-          git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
+          git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
           goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign,docker' || '--skip=docker' }}' | tee /tmp/build.sh
           chmod +x /tmp/build.sh
@@ -175,6 +183,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
       - name: Docker metadata for ee tag push
         id: tag_metadata_ee
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
@@ -210,6 +219,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
       - name: Attach base image VEX to ee
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
@@ -258,6 +268,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-fips
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
       - name: Docker metadata for fips tag push
         id: tag_metadata_fips
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
@@ -292,6 +303,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-fips
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
       - name: Attach base image VEX to fips
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
@@ -391,8 +403,11 @@ jobs:
             !dist/*PAYG*.rpm
             !dist/*fips*.rpm
   resolve-dashboard-image:
-    if: github.event.pull_request.draft == false
     needs: goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success' &&
+      github.event.pull_request.draft == false
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     permissions:
       id-token: write
@@ -403,6 +418,13 @@ jobs:
       dashboard_branch: ${{ steps.resolve.outputs.dashboard_branch }}
       strategy: ${{ steps.resolve.outputs.strategy }}
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
       - name: Checkout tyk repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -457,7 +479,7 @@ jobs:
         id: check_branch
         shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           HEAD_REF: ${{ github.head_ref }}
         run: |
           if [ -z "$HEAD_REF" ]; then
@@ -517,7 +539,7 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HAS_RELEVANT_CHANGES: ${{ steps.check_changes.outputs.has_relevant_changes }}
-          ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          ORG_GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           echo "=================================="
           echo "📊 Dashboard Image Resolution"
@@ -593,8 +615,11 @@ jobs:
           echo "✅ Resolution complete"
           echo "=================================="
   build-dashboard-image:
-    if: needs.resolve-dashboard-image.outputs.needs_build == 'true'
     needs: resolve-dashboard-image
+    if: |
+      !cancelled() &&
+      needs.resolve-dashboard-image.result == 'success' &&
+      needs.resolve-dashboard-image.outputs.needs_build == 'true'
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     permissions:
       id-token: write
@@ -602,24 +627,31 @@ jobs:
     outputs:
       dashboard_image: ${{ steps.output.outputs.image }}
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
       - name: Checkout tyk-analytics
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: TykTechnologies/tyk-analytics
           ref: ${{ needs.resolve-dashboard-image.outputs.dashboard_branch }}
-          token: ${{ secrets.ORG_GH_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 1
           submodules: true
       - name: Update gateway reference to PR branch
         shell: bash
         env:
           GATEWAY_BRANCH: ${{ github.head_ref }}
-          ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          ORG_GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           echo "📦 Updating tyk-gateway dependency to branch: $GATEWAY_BRANCH"
 
           # Configure git for go get
-          git config --global url."https://${ORG_GH_TOKEN}@github.com".insteadOf "https://github.com"
+          git config --global url."https://x-access-token:${ORG_GH_TOKEN}@github.com/".insteadOf "https://github.com/"
 
           # Update dependency using branch name
           go get github.com/TykTechnologies/tyk@$GATEWAY_BRANCH
@@ -677,7 +709,7 @@ jobs:
           ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
           IMAGE_TAG: tyk-${{ github.event.pull_request.number }}
           GOPRIVATE: github.com/TykTechnologies
-          ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          ORG_GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           # Detect current architecture
           ARCH=$(uname -m)
@@ -701,7 +733,7 @@ jobs:
           cat > /tmp/build-dashboard.sh <<'EOF'
           #!/bin/sh
           set -eax
-          git config --global url."https://${ORG_GH_TOKEN}@github.com".insteadOf "https://github.com"
+          git config --global url."https://x-access-token:${ORG_GH_TOKEN}@github.com/".insteadOf "https://github.com/"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk-analytics
 
           # Build packages for current platform (GOOS and GOARCH are set via docker -e)
@@ -723,7 +755,7 @@ jobs:
             -e GOMODCACHE=/go/pkg/mod \
             -v /tmp/build-dashboard.sh:/tmp/build-dashboard.sh \
             -w /go/src/github.com/TykTechnologies/tyk-analytics \
-            tykio/golang-cross:1.24-bookworm /tmp/build-dashboard.sh
+            tykio/golang-cross:1.25-bullseye /tmp/build-dashboard.sh
 
           echo "✅ Packages built successfully for $GOARCH"
       - name: Detect platform for Docker build
@@ -773,9 +805,12 @@ jobs:
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
           echo "✅ Dashboard image built and pushed: $IMAGE"
   test-controller-api:
-    if: github.event.pull_request.draft == false
     needs:
       - goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success' &&
+      github.event.pull_request.draft == false
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     outputs:
       envfiles: ${{ steps.params.outputs.envfiles }}
@@ -795,9 +830,9 @@ jobs:
       - goreleaser
       - resolve-dashboard-image
       - build-dashboard-image
-    # build-dashboard-image may be skipped, so use if: always() to run regardless
+    # build-dashboard-image may be skipped, so use !cancelled() to run regardless
     if: |
-      always() &&
+      !cancelled() &&
       needs.test-controller-api.result == 'success' &&
       needs.goreleaser.result == 'success' &&
       needs.resolve-dashboard-image.result == 'success' &&
@@ -820,6 +855,13 @@ jobs:
           - pump: $ECR/tyk-pump:master
             sink: tykio/tyk-mdcb-docker:v2.4
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
       - uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c # v4
         with:
           role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
@@ -849,14 +891,14 @@ jobs:
           base_ref: ${{ env.BASE_REF }}
           tags: ${{ needs.goreleaser.outputs.ee_tags || needs.goreleaser.outputs.std_tags || format('{0}/tyk-ee:master', steps.ecr.outputs.registry) }}
           dashboard_image: ${{ needs.resolve-dashboard-image.outputs.dashboard_image }}
-          github_token: ${{ secrets.ORG_GH_TOKEN }}
+          github_token: ${{ steps.app-token.outputs.token }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
       - name: Choose test code branch
         uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@42304edda365365e0a887cf018d8edc34b960b82 # main
         with:
           test_folder: api
-          org_gh_token: ${{ secrets.ORG_GH_TOKEN }}
+          org_gh_token: ${{ steps.app-token.outputs.token }}
       - name: Run API tests
         uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@42304edda365365e0a887cf018d8edc34b960b82 # main
         timeout-minutes: 30
@@ -873,7 +915,7 @@ jobs:
     name: Aggregated CI Status
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     # Dynamically determine which jobs to depend on based on repository configuration
-    needs: [goreleaser, api-tests]
+    needs: [goreleaser, api-tests, dep-guard]
     if: ${{ always() && github.event_name == 'pull_request' }}
     steps:
       - name: Aggregate results
@@ -900,9 +942,12 @@ jobs:
 
           echo "✅ All required jobs succeeded"
   test-controller-distros:
-    if: github.event.pull_request.draft == false
     needs:
       - goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success' &&
+      github.event.pull_request.draft == false
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     outputs:
       deb: ${{ steps.params.outputs.deb }}
@@ -927,6 +972,9 @@ jobs:
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     needs:
       - test-controller-distros
+    if: |
+      !cancelled() &&
+      needs.test-controller-distros.result == 'success'
     strategy:
       fail-fast: true
       matrix:
@@ -986,6 +1034,9 @@ jobs:
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     needs:
       - test-controller-distros
+    if: |
+      !cancelled() &&
+      needs.test-controller-distros.result == 'success'
     strategy:
       fail-fast: true
       matrix:
@@ -1039,16 +1090,12 @@ jobs:
   release-tests:
     needs:
       - goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success'
     permissions:
       id-token: write # This is required for requesting the JWT
       contents: read # This is required for actions/checkout
       actions: read # This is required for the report_logs job in the called workflow
     uses: ./.github/workflows/release-tests.yml
     secrets: inherit
-  sbom:
-    needs: goreleaser
-    uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@42304edda365365e0a887cf018d8edc34b960b82 # main
-    secrets:
-      DEPDASH_URL: ${{ secrets.DEPDASH_URL }}
-      DEPDASH_KEY: ${{ secrets.DEPDASH_KEY }}
-      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}

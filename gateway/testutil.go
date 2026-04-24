@@ -1223,6 +1223,15 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	gw.SetConfig(gwConfig)
 
+	// Compile error override patterns for O(1) lookup in tests
+	// (In production, this is done in initialiseSystem() when !isRunningTests())
+	if len(gwConfig.ErrorOverrides) > 0 {
+		compiled := CompileErrorOverrides(gwConfig.ErrorOverrides)
+		if compiled != nil {
+			gw.SetCompiledErrorOverrides(compiled)
+		}
+	}
+
 	cli.Init(confPaths)
 
 	err = gw.initSystem()

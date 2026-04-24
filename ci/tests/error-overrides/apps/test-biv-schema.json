@@ -1,0 +1,38 @@
+{
+  "name": "Test BIV - Schema Validation Failed",
+  "api_id": "test-biv-schema",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-biv-schema/",
+    "target_url": "http://backend-ok:80",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default",
+        "use_extended_paths": true,
+        "extended_paths": {
+          "validate_json": [
+            {
+              "path": "validate",
+              "method": "POST",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {"type": "string", "format": "email"},
+                  "count": {"type": "integer", "minimum": 1}
+                },
+                "required": ["email", "count"]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

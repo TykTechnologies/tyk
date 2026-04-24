@@ -14,12 +14,16 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/pkg/schema"
 
 	tykregexp "github.com/TykTechnologies/tyk/regexp"
 )
+
+const requestValidationErrFmt = "request validation error: %w"
 
 var (
 	skipHeaderNormalization = map[string]bool{
@@ -153,7 +157,10 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	err = openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
-		return fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err)), errResponseCode
+		err = schema.RestoreUnicodeEscapesInError(err)
+		ctx.SetErrorClassification(r, tykerrors.ClassifyJSONValidationError(tykerrors.ErrTypeSchemaValidationFailed, k.Name()).
+			WithTemplateData(map[string]any{"InvalidParams": err.Error()}))
+		return fmt.Errorf(requestValidationErrFmt, err), errResponseCode
 	}
 
 	// Handle Success
@@ -229,7 +236,7 @@ func (k *ValidateRequest) validateRoute(r *http.Request, route *routers.Route, p
 	}
 
 	if err := openapi3filter.ValidateRequest(r.Context(), input); err != nil {
-		return errResponseCode, fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err))
+		return errResponseCode, fmt.Errorf(requestValidationErrFmt, schema.RestoreUnicodeEscapesInError(err))
 	}
 	return http.StatusOK, nil
 }
@@ -386,7 +393,9 @@ func (k *ValidateRequest) processRequestWithFindOperation(r *http.Request) (erro
 
 	err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
-		return fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err)), errResponseCode
+		ctx.SetErrorClassification(r, tykerrors.ClassifyJSONValidationError(tykerrors.ErrTypeSchemaValidationFailed, k.Name()).
+			WithTemplateData(map[string]any{"InvalidParams": err.Error()}))
+		return fmt.Errorf(requestValidationErrFmt, err), errResponseCode
 	}
 
 	// Handle Success
