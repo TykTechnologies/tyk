@@ -556,28 +556,6 @@ func proxyTimeout(spec *APISpec) float64 {
 	return defaultProxyTimeout
 }
 
-// CheckHardTimeoutEnforced checks APISpec versions for a fine grained timeout
-// value. The value is defined in seconds, but we're using float64 to enable
-// sub-second durations for tests. Changing to int would break that behaviour.
-func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
-	if !spec.EnforcedTimeoutEnabled {
-		return false, 0
-	}
-
-	vInfo, _ := spec.Version(req)
-	versionPaths := spec.RxPaths[vInfo.Name]
-	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
-	if found {
-		intMeta, ok := meta.(*int)
-		if ok && *intMeta > 0 {
-			p.logger.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
-			return true, float64(*intMeta)
-		}
-	}
-
-	return false, 0
-}
-
 // GetHardTimeoutEnforcedSettings checks APISpec versions for a fine-grained timeout value.
 func (p *ReverseProxy) GetHardTimeoutEnforcedSettings(spec *APISpec, req *http.Request) (time.Duration, bool) {
 	if !spec.EnforcedTimeoutEnabled {
