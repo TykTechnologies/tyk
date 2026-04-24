@@ -1315,7 +1315,7 @@ type EnforceTimeout struct {
 	// Tyk classic API definition: `version_data.versions.extended_paths.hard_timeouts[].disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"`
 
-	// Value is the configured timeout in seconds or string.
+	// Value is the configured timeout in seconds.
 	//
 	// Tyk classic API definition: `version_data.versions.extended_paths.hard_timeouts[].timeout`.
 	// Deprecated: Use Timeout instead.
