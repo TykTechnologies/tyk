@@ -201,75 +201,43 @@ func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 
 		if err != nil {
 			dashLog.Errorf("Request failed with error %v; retrying in 5s", err)
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(5 * time.Second):
-			}
-			continue
-		}
-
-		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
+		} else if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
 			resp.Body.Close()
 			dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(5 * time.Second):
+		} else {
+			val := NodeResponse{}
+			if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
+				resp.Body.Close()
+				return err
 			}
-			continue
-		}
-
-		val := NodeResponse{}
-		if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
 			resp.Body.Close()
-			return err
-		}
-		resp.Body.Close()
 
-		// 409 with Status != "OK" means lock contention or Redis failure — retry.
-		if resp.StatusCode == http.StatusConflict && val.Status != "OK" {
-			dashLog.Warning("Registration deferred (409 with status: ", val.Status, "); retrying in 5s")
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(5 * time.Second):
+			// 409 with Status != "OK" means lock contention or Redis failure — retry.
+			if resp.StatusCode == http.StatusConflict && val.Status != "OK" {
+				dashLog.Warning("Registration deferred (409 with status: ", val.Status, "); retrying in 5s")
+			} else if msgMap, ok := val.Message.(map[string]interface{}); !ok {
+				dashLog.Error("Failed to register node, retrying in 5s")
+			} else if nodeID, ok := msgMap["NodeID"].(string); !ok || nodeID == "" {
+				dashLog.Error("Failed to register node, retrying in 5s")
+			} else {
+				h.Gw.SetNodeID(nodeID)
+				dashLog.WithField("id", h.Gw.GetNodeID()).Info("Node Registered")
+
+				h.Gw.ServiceNonceMutex.Lock()
+				h.Gw.ServiceNonce = val.Nonce
+				h.Gw.ServiceNonceMutex.Unlock()
+				dashLog.Debug("Registration Finished: Nonce Set: ", val.Nonce)
+				h.Gw.DoReloadWithRetry(context.Background())
+
+				return nil
 			}
-			continue
 		}
 
-		// Both 200 and duplicate-session 409 (Status=="OK") carry a NodeID.
-		msgMap, ok := val.Message.(map[string]interface{})
-		if !ok {
-			dashLog.Error("Failed to register node, retrying in 5s")
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(5 * time.Second):
-			}
-			continue
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Second):
 		}
-		nodeID, ok := msgMap["NodeID"].(string)
-		if !ok || nodeID == "" {
-			dashLog.Error("Failed to register node, retrying in 5s")
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(5 * time.Second):
-			}
-			continue
-		}
-
-		h.Gw.SetNodeID(nodeID)
-		dashLog.WithField("id", h.Gw.GetNodeID()).Info("Node Registered")
-
-		h.Gw.ServiceNonceMutex.Lock()
-		h.Gw.ServiceNonce = val.Nonce
-		h.Gw.ServiceNonceMutex.Unlock()
-		dashLog.Debug("Registration Finished: Nonce Set: ", val.Nonce)
-		h.Gw.DoReloadWithRetry(context.Background())
-
-		return nil
 	}
 }
 
