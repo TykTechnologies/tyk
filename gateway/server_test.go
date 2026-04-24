@@ -2059,7 +2059,7 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 		case strings.Contains(r.URL.Path, "/register/node"):
 			registerCount++
 			w.Header().Set("Content-Type", "application/json")
-			err := json.NewEncoder(w).Encode(NodeResponseOK{
+			err := json.NewEncoder(w).Encode(NodeResponse{
 				Status:  "ok",
 				Message: map[string]string{"NodeID": "test-node-id"},
 				Nonce:   fmt.Sprintf("nonce-%d", registerCount),
@@ -2117,10 +2117,7 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 	}
 	ts.Gw.performedSuccessfulReload = false
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	err := ts.Gw.DashService.Register(ctx)
+	err := ts.Gw.DashService.Register()
 
 	assert.NoError(t, err, "Register should not return an error")
 	assert.True(t, ts.Gw.performedSuccessfulReload,

@@ -2,13 +2,11 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
 
 // DashboardAuthError represents a non-nonce authentication failure
@@ -112,10 +110,7 @@ func (gw *Gateway) attemptDashboardRecovery() error {
 		return errors.New("dashboard service not available for recovery")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	return gw.DashService.Register(ctx)
+	return gw.DashService.Register()
 }
 
 // shouldRetryOnNetworkError checks if an error is a network error that might benefit from retry
