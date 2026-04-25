@@ -59,42 +59,105 @@ func TestObligation_SYS_REQ_055_Determinism(t *testing.T) {
 	// When a session has multiple access rights entries but only one API
 	// has policies applied, session-level fields must come from that API.
 	// Run Apply multiple times (map iteration is randomized) and assert
-	// the result is always the same.
+	// ALL session fields are always the same — especially QuotaRenews,
+	// which is the field known to diverge due to map iteration order.
 	orgID := "org1"
-	pol := user.Policy{
-		ID:    "pol1",
+	// Policy A: ACL + rate + quota + complexity for api1
+	// The ACL partition is required so api1 stays in the rights map
+	// after the cleanup loop (which deletes entries without didAcl).
+	polA := user.Policy{
+		ID:    "polA",
 		OrgID: orgID,
 		Rate:  100,
 		Per:   60,
 		QuotaMax:         5000,
 		QuotaRenewalRate: 3600,
+		MaxQueryDepth:    10,
+		Partitions: user.PolicyPartitions{
+			Acl:        true,
+			Quota:      true,
+			RateLimit:  true,
+			Complexity: true,
+		},
 		AccessRights: map[string]user.AccessDefinition{
-			"api-with-policy": {Versions: []string{"v1"}},
+			"api1": {Versions: []string{"v1"}},
 		},
 	}
-	svc := obligationTestService(orgID, []user.Policy{pol})
+	// Policy B: ACL-only for api2 — adds api2 to rights without
+	// adding it to didQuota/didRateLimit/didComplexity. This creates
+	// the mismatch: len(didQuota)==1 but len(rights)==2.
+	polB := user.Policy{
+		ID:    "polB",
+		OrgID: orgID,
+		Partitions: user.PolicyPartitions{
+			Acl: true,
+		},
+		AccessRights: map[string]user.AccessDefinition{
+			"api2": {Versions: []string{"v1"}},
+		},
+	}
+	svc := obligationTestService(orgID, []user.Policy{polA, polB})
 
-	var results []float64
-	for i := 0; i < 20; i++ {
+	type snapshot struct {
+		Rate             float64
+		Per              float64
+		QuotaMax         int64
+		QuotaRenews      int64
+		QuotaRenewalRate int64
+		MaxQueryDepth    int
+	}
+
+	var snapshots []snapshot
+	for i := 0; i < 50; i++ {
+		// Simulate a SECOND Apply on an existing session where per-API
+		// QuotaRenews has already diverged from session-level QuotaRenews.
+		// This is the exact scenario where map iteration order causes
+		// non-deterministic session.QuotaRenews.
 		session := &user.SessionState{
+			// Session-level QuotaRenews = 99999 (from previous Apply cycle)
+			QuotaRenews: 99999,
+			// Per-API QuotaRenews differ: api1 was renewed (11111),
+			// api2 inherited from session (99999) on previous Apply.
 			AccessRights: map[string]user.AccessDefinition{
-				"api-with-policy":    {},
-				"api-without-policy": {},
-				"another-api":        {},
+				"api1": {
+					Versions: []string{"v1"},
+					Limit: user.APILimit{
+						RateLimit:        user.RateLimit{Rate: 100, Per: 60},
+						QuotaMax:         5000,
+						QuotaRenewalRate: 3600,
+						QuotaRenews:      11111, // Different from session level!
+					},
+				},
+				"api2": {
+					Versions: []string{"v1"},
+					Limit: user.APILimit{
+						QuotaRenews: 99999, // Inherited from session
+					},
+				},
 			},
 			MetaData: map[string]interface{}{},
 		}
-		session.SetPolicies("pol1")
+		session.SetPolicies("polA", "polB")
 
 		err := svc.Apply(session)
 		require.NoError(t, err)
-		results = append(results, session.Rate)
+		snapshots = append(snapshots, snapshot{
+			Rate:             session.Rate,
+			Per:              session.Per,
+			QuotaMax:         session.QuotaMax,
+			QuotaRenews:      session.QuotaRenews,
+			QuotaRenewalRate: session.QuotaRenewalRate,
+			MaxQueryDepth:    session.MaxQueryDepth,
+		})
 	}
 
-	// All 20 runs should produce the same rate (100 from the policy).
-	for i, r := range results {
-		assert.Equal(t, float64(100), r,
-			"run %d: rate should be deterministic regardless of map iteration order", i)
+	// All 50 runs must produce identical session-level fields.
+	// If the bug exists, QuotaRenews will randomly be 11111 or 99999
+	// depending on which map entry is visited last.
+	first := snapshots[0]
+	for i, s := range snapshots[1:] {
+		assert.Equal(t, first, s,
+			"run %d: session fields must be deterministic regardless of map iteration order", i+1)
 	}
 }
 
