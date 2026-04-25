@@ -626,7 +626,17 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 // SYS-REQ-024, SYS-REQ-025
 func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[string]user.AccessDefinition, applyState applyStatus) {
 	if len(applyState.didQuota) == 1 && len(applyState.didRateLimit) == 1 && len(applyState.didComplexity) == 1 {
-		for _, v := range rights {
+		// Use the single API that had policies applied, not an arbitrary
+		// map entry. The rights map can have more entries (from ACL-only
+		// policies) whose inherited values may differ from the policy-
+		// applied API — iterating all entries causes non-deterministic
+		// session fields due to Go map iteration order.
+		var apiID string
+		for k := range applyState.didRateLimit {
+			apiID = k
+			break
+		}
+		if v, ok := rights[apiID]; ok {
 			session.Rate = v.Limit.Rate
 			session.Per = v.Limit.Per
 			session.Smoothing = v.Limit.Smoothing
