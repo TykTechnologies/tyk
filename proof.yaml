@@ -79,14 +79,7 @@ project:
                 C: 1
                 D: 1
                 E: 1
-    waivers:
-        - check: ambiguity_reviewed
-          scope: "*"
-          reason: 'Reviewed by leonid (2026-04-19): 154 ambiguous pairs are expected for a policy engine with 4 operation modes (apply, clear, rate_limit, endpoint_limit) sharing output variables (error_reported, result_returned, access_rights_merged, rate_limit_applied) under disjoint input conditions. Kind2 consistency proof confirms no actual conflicts. Gap review recorded in reviews/gap-reviews.yaml.'
-          by: leonid
-          role: system_owner
-          created_at: "2026-04-19"
-          expires: "2026-10-01"
+    waivers: []
     verification_scope:
         include:
             - internal/policy/**

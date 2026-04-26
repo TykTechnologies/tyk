@@ -4,7 +4,7 @@ status: review
 priority: shall
 category: functional
 req_type: guarantee
-fretish: the policy shall always satisfy !any_operation_requested | !nil_store | error_reported
+fretish: the policy shall always satisfy !any_operation_requested | !nil_store | nil_store_rejected
 description: All policy engine operations (Apply, ClearSession, ApplyRateLimits, ApplyEndpointLevelLimits) shall detect a nil policy store before any field access and return an error. No operation shall dereference a nil store pointer. This complements SYS-REQ-042 (which covers Apply specifically) by extending nil store safety to all entry points.
 formalization_strategy: fretish
 informal_verification:

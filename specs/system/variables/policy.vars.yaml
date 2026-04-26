@@ -652,6 +652,11 @@ variables:
       direction: input
       description: The policy store pointer is nil
 
+    - name: nil_store_rejected
+      type: bool
+      direction: output
+      description: A nil-store condition was detected and the operation was rejected before any pointer dereference
+
     # --- Encoding safety (SYS-REQ-066) ---
     - name: rpc_data_load_requested
       type: bool

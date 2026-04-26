@@ -2305,6 +2305,72 @@ func TestMCDCFlip_AllowanceScope242(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// Gap: apply.go:639 -- if v, ok := rights[apiID]; ok
+// Need: ok=F to prove the false branch of the rights lookup.
+// This happens when didRateLimit has an API that was pruned from rights
+// because didAcl was not set for that API (line 226 deletes it).
+// Setup: one policy with RateLimit+Quota+Complexity partitions (but NOT Acl)
+// for a single API. The outer guard (len==1 for all three) passes,
+// but the API is not in rights (deleted due to missing ACL), so ok=F.
+// Verifies: SYS-REQ-024, SYS-REQ-025 [boundary]
+// MCDC SYS-REQ-024: access_rights_merged=T, apply_requested=T, error_reported=F => TRUE
+// MCDC SYS-REQ-025: apply_requested=T, error_reported=F, rate_limit_applied=T => TRUE
+func TestMCDCClosure_UpdateSessionRootVars_RightsLookupFalse(t *testing.T) {
+	orgID := "org1"
+
+	// Two policies needed:
+	// pol1: RateLimit+Quota+Complexity partitions (NOT Acl) for "api1".
+	//   -> didRateLimit["api1"]=true, didQuota["api1"]=true, didComplexity["api1"]=true
+	//   -> didAcl["api1"] is NOT set
+	//   -> At line 226, rights["api1"] is deleted (no ACL)
+	// pol2: Acl partition for "api2".
+	//   -> didAcl["api2"]=true
+	//   -> rights["api2"] survives pruning
+	//   -> prevents "key has no valid policies" error (rights is non-empty)
+	//
+	// Result: outer guard passes (len==1 for all three did* maps).
+	// Inner lookup: rights["api1"] -> ok=false (api1 pruned from rights).
+	pol1 := user.Policy{
+		ID: "pol1", OrgID: orgID,
+		Partitions: user.PolicyPartitions{
+			Quota:      true,
+			RateLimit:  true,
+			Complexity: true,
+			// Acl is deliberately NOT set
+		},
+		Rate:          100,
+		Per:           60,
+		QuotaMax:      5000,
+		MaxQueryDepth: 10,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {Versions: []string{"v1"}},
+		},
+	}
+	pol2 := user.Policy{
+		ID: "pol2", OrgID: orgID,
+		Partitions: user.PolicyPartitions{
+			Acl: true,
+		},
+		AccessRights: map[string]user.AccessDefinition{
+			"api2": {Versions: []string{"v1"}},
+		},
+	}
+
+	svc := newClosureTestService(orgID, []user.Policy{pol1, pol2})
+	session := &user.SessionState{}
+	session.SetPolicies("pol1", "pol2")
+	session.MetaData = map[string]interface{}{}
+
+	err := svc.Apply(session)
+	require.NoError(t, err)
+
+	// api1 was pruned from rights (no ACL partition), so the rights lookup
+	// at line 639 returns ok=false. Session root vars are NOT overwritten
+	// from the rights map. The test exercises the false branch.
+	// api2 survives in rights (has ACL), but it is NOT in didRateLimit,
+	// so it does not affect the updateSessionRootVars logic.
+}
+
 // Verifies: SYS-REQ-008, SYS-REQ-042 [boundary]
 // MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
 // MCDC SYS-REQ-042: apply_requested=T, error_reported=F, store_available=T => TRUE
