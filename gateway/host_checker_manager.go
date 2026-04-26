@@ -490,7 +490,7 @@ func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(apiID string) {
 	hc.UpdateTrackingListByAPIID(hostData, apiID)
 }
 
-// RecordHit will store an AnalyticsRecord in Redis
+// RecordUptimeAnalytics will store an AnalyticsRecord in Redis
 func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) error {
 	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 
