@@ -193,7 +193,7 @@ func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 	dashLog.Info("Registering gateway node with Dashboard")
 
 	for {
-		req := h.newRequest(http.MethodGet, h.RegistrationEndpoint)
+		req := h.newRequestWithContext(ctx, http.MethodGet, h.RegistrationEndpoint)
 		req.Header.Set(header.XTykSessionID, h.Gw.SessionID)
 
 		c := h.Gw.initialiseClient()
@@ -285,10 +285,24 @@ func (h *HTTPDashboardHandler) newRequest(method, endpoint string) *http.Request
 	if err != nil {
 		panic(err)
 	}
+	h.addHeaderToRequest(req)
+	return req
+}
+
+func (h *HTTPDashboardHandler) newRequestWithContext(ctx context.Context, method, endpoint string) *http.Request {
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	h.addHeaderToRequest(req)
+	return req
+}
+
+func (h *HTTPDashboardHandler) addHeaderToRequest(req *http.Request) {
 	req.Header.Set("authorization", h.Secret)
 	req.Header.Set(header.XTykHostname, h.Gw.hostDetails.Hostname)
 	req.Header.Set(header.XTykSessionID, h.Gw.SessionID)
-	return req
 }
 
 func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Client, ctx context.Context) error {
