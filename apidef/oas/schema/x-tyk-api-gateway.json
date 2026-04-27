@@ -727,11 +727,13 @@
         "value": {
           "type": "integer",
           "minimum": 0
+        },
+        "timeout": {
+          "type": "string"
         }
       },
       "required": [
-        "enabled",
-        "value"
+        "enabled"
       ]
     },
     "X-Tyk-ValidateRequest": {
