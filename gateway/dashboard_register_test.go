@@ -118,6 +118,25 @@ func TestRegister_DuplicateSession409(t *testing.T) {
 	assert.Equal(t, int32(1), atomic.LoadInt32(&callCount))
 }
 
+// retryTestHandler returns an httptest handler that responds with firstStatus/firstBody
+// on the first call, then with a successful registration response on subsequent calls.
+func retryTestHandler(t *testing.T, callCount *int32, firstStatus int, firstBody string) http.Handler {
+	t.Helper()
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if atomic.AddInt32(callCount, 1) == 1 {
+			w.WriteHeader(firstStatus)
+			if firstBody != "" {
+				if _, err := w.Write([]byte(firstBody)); err != nil {
+					t.Errorf("failed to write response body: %v", err)
+				}
+			}
+			return
+		}
+		writeJSON(t, w, okResponse("node-after-retry", "nonce-after-retry"))
+	})
+}
+
 // TestRegister_Retries verifies that non-successful responses trigger a retry and the
 // gateway correctly registers on the subsequent successful response.
 func TestRegister_Retries(t *testing.T) {
@@ -141,20 +160,7 @@ func TestRegister_Retries(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var callCount int32
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				call := atomic.AddInt32(&callCount, 1)
-				w.Header().Set("Content-Type", "application/json")
-				if call == 1 {
-					w.WriteHeader(tc.firstStatus)
-					if tc.firstBody != "" {
-						if _, err := w.Write([]byte(tc.firstBody)); err != nil {
-							t.Errorf("failed to write response body: %v", err)
-						}
-					}
-					return
-				}
-				writeJSON(t, w, okResponse("node-after-retry", "nonce-after-retry"))
-			}))
+			srv := httptest.NewServer(retryTestHandler(t, &callCount, tc.firstStatus, tc.firstBody))
 			defer srv.Close()
 
 			h, close := newTestDashboardHandler(t, srv.URL)

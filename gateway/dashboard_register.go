@@ -189,48 +189,40 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 	return nil
 }
 
+// parseRegistrationResponse extracts the NodeID from a successful registration
+// response body. It returns ("", false) when a retry should be attempted.
+func parseRegistrationResponse(statusCode int, val NodeResponse) (nodeID string, ok bool) {
+	// 409 with Status != "OK" means lock contention or Redis failure — retry.
+	if statusCode == http.StatusConflict && val.Status != "OK" {
+		dashLog.Warning("Registration deferred (409 with status: ", val.Status, "); retrying in 5s")
+		return "", false
+	}
+
+	msgMap, ok := val.Message.(map[string]interface{})
+	if !ok {
+		dashLog.Error("Failed to register node, retrying in 5s")
+		return "", false
+	}
+
+	nodeID, ok = msgMap["NodeID"].(string)
+	if !ok || nodeID == "" {
+		dashLog.Error("Failed to register node, retrying in 5s")
+		return "", false
+	}
+
+	return nodeID, true
+}
+
 func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 	dashLog.Info("Registering gateway node with Dashboard")
 
 	for {
-		req := h.newRequestWithContext(ctx, http.MethodGet, h.RegistrationEndpoint)
-		req.Header.Set(header.XTykSessionID, h.Gw.SessionID)
-
-		c := h.Gw.initialiseClient()
-		resp, err := c.Do(req)
-
+		registered, err := h.attemptRegistration(ctx)
 		if err != nil {
-			dashLog.Errorf("Request failed with error %v; retrying in 5s", err)
-		} else if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
-			resp.Body.Close()
-			dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
-		} else {
-			val := NodeResponse{}
-			if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
-				resp.Body.Close()
-				return err
-			}
-			resp.Body.Close()
-
-			// 409 with Status != "OK" means lock contention or Redis failure — retry.
-			if resp.StatusCode == http.StatusConflict && val.Status != "OK" {
-				dashLog.Warning("Registration deferred (409 with status: ", val.Status, "); retrying in 5s")
-			} else if msgMap, ok := val.Message.(map[string]interface{}); !ok {
-				dashLog.Error("Failed to register node, retrying in 5s")
-			} else if nodeID, ok := msgMap["NodeID"].(string); !ok || nodeID == "" {
-				dashLog.Error("Failed to register node, retrying in 5s")
-			} else {
-				h.Gw.SetNodeID(nodeID)
-				dashLog.WithField("id", h.Gw.GetNodeID()).Info("Node Registered")
-
-				h.Gw.ServiceNonceMutex.Lock()
-				h.Gw.ServiceNonce = val.Nonce
-				h.Gw.ServiceNonceMutex.Unlock()
-				dashLog.Debug("Registration Finished: Nonce Set: ", val.Nonce)
-				h.Gw.DoReloadWithRetry(ctx)
-
-				return nil
-			}
+			return err
+		}
+		if registered {
+			return nil
 		}
 
 		select {
@@ -239,6 +231,44 @@ func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 		case <-time.After(5 * time.Second):
 		}
 	}
+}
+
+func (h *HTTPDashboardHandler) attemptRegistration(ctx context.Context) (registered bool, err error) {
+	req := h.newRequestWithContext(ctx, http.MethodGet, h.RegistrationEndpoint)
+	req.Header.Set(header.XTykSessionID, h.Gw.SessionID)
+
+	resp, err := h.Gw.initialiseClient().Do(req)
+	if err != nil {
+		dashLog.Errorf("Request failed with error %v; retrying in 5s", err)
+		return false, nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
+		dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
+		return false, nil
+	}
+
+	var val NodeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
+		return false, err
+	}
+
+	nodeID, ok := parseRegistrationResponse(resp.StatusCode, val)
+	if !ok {
+		return false, nil
+	}
+
+	h.Gw.SetNodeID(nodeID)
+	dashLog.WithField("id", h.Gw.GetNodeID()).Info("Node Registered")
+
+	h.Gw.ServiceNonceMutex.Lock()
+	h.Gw.ServiceNonce = val.Nonce
+	h.Gw.ServiceNonceMutex.Unlock()
+	dashLog.Debug("Registration Finished: Nonce Set: ", val.Nonce)
+	h.Gw.DoReloadWithRetry(ctx)
+
+	return true, nil
 }
 
 func (h *HTTPDashboardHandler) Ping() error {
