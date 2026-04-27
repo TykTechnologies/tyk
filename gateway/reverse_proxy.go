@@ -46,7 +46,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/service/core"
-	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
@@ -566,15 +565,11 @@ func (p *ReverseProxy) GetHardTimeoutEnforcedSettings(spec *APISpec, req *http.R
 	versionPaths := spec.RxPaths[vInfo.Name]
 	urlSpec, found := spec.FindSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
-		var timeout tyktime.ReadableDuration
-
 		if urlSpec.HardTimeout.TimeoutDuration > 0 {
-			timeout = urlSpec.HardTimeout.TimeoutDuration
-		} else {
-			timeout = tyktime.ReadableDuration(time.Duration(urlSpec.HardTimeout.TimeOut) * time.Second)
+			return time.Duration(urlSpec.HardTimeout.TimeoutDuration), true
+		} else if urlSpec.HardTimeout.TimeOut > 0 {
+			return time.Duration(urlSpec.HardTimeout.TimeOut) * time.Second, true
 		}
-
-		return time.Duration(timeout), true
 	}
 
 	return 0, false
