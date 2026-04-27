@@ -192,7 +192,7 @@ func (r *RuleValidateEnforceTimeout) Validate(apiDef *APIDefinition, validationR
 	if apiDef.VersionData.Versions != nil {
 		for _, vInfo := range apiDef.VersionData.Versions {
 			for _, hardTimeOutMeta := range vInfo.ExtendedPaths.HardTimeouts {
-				if hardTimeOutMeta.TimeOut < 0 {
+				if hardTimeOutMeta.TimeOut < 0 || hardTimeOutMeta.TimeoutDuration < 0 {
 					validationResult.IsValid = false
 					validationResult.AppendError(ErrInvalidTimeoutValue)
 					return

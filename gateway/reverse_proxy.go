@@ -555,26 +555,24 @@ func proxyTimeout(spec *APISpec) float64 {
 	return defaultProxyTimeout
 }
 
-// CheckHardTimeoutEnforced checks APISpec versions for a fine grained timeout
-// value. The value is defined in seconds, but we're using float64 to enable
-// sub-second durations for tests. Changing to int would break that behaviour.
-func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
+// GetHardTimeoutEnforcedSettings checks APISpec versions for a fine-grained timeout value.
+func (p *ReverseProxy) GetHardTimeoutEnforcedSettings(spec *APISpec, req *http.Request) (time.Duration, bool) {
 	if !spec.EnforcedTimeoutEnabled {
-		return false, 0
+		return 0, false
 	}
 
 	vInfo, _ := spec.Version(req)
 	versionPaths := spec.RxPaths[vInfo.Name]
-	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
+	urlSpec, found := spec.FindSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
-		intMeta, ok := meta.(*int)
-		if ok && *intMeta > 0 {
-			p.logger.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
-			return true, float64(*intMeta)
+		if urlSpec.HardTimeout.TimeoutDuration > 0 {
+			return time.Duration(urlSpec.HardTimeout.TimeoutDuration), true
+		} else if urlSpec.HardTimeout.TimeOut > 0 {
+			return time.Duration(urlSpec.HardTimeout.TimeOut) * time.Second, true
 		}
 	}
 
-	return false, 0
+	return 0, false
 }
 
 func (p *ReverseProxy) CheckHeaderInRemoveList(hdr string, spec *APISpec, req *http.Request) bool {
@@ -1182,11 +1180,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	p.TykAPISpec.Lock()
 
-	isTimeoutEnforced, enforcedTimeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, outreq)
+	enforcedTimeout, isTimeoutEnforced := p.GetHardTimeoutEnforcedSettings(p.TykAPISpec, outreq)
 
 	// limit request time with context timeout
 	if isTimeoutEnforced {
-		timeoutContext, cancel := context.WithTimeout(outreq.Context(), time.Duration(enforcedTimeout)*time.Second)
+		timeoutContext, cancel := context.WithTimeout(outreq.Context(), enforcedTimeout)
 		defer cancel()
 
 		outreq = outreq.WithContext(timeoutContext)

@@ -760,11 +760,13 @@
         "value": {
           "type": "integer",
           "minimum": 0
+        },
+        "timeout": {
+          "type": "string"
         }
       },
       "required": [
-        "enabled",
-        "value"
+        "enabled"
       ],
       "additionalProperties": false
     },

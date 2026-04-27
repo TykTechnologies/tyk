@@ -34,6 +34,7 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -2151,6 +2152,8 @@ func TestTimeoutPrioritization(t *testing.T) {
 	})
 	defer ts.Close()
 
+	upstreamTimeout := "Upstream service reached hard timeout"
+
 	t.Run("Basic Timeout Behavior - enforced timeout higher than default", func(t *testing.T) {
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(1 * time.Second)
@@ -2217,8 +2220,114 @@ func TestTimeoutPrioritization(t *testing.T) {
 			Method:    http.MethodGet,
 			Path:      "/test2",
 			Code:      http.StatusGatewayTimeout,
-			BodyMatch: "Upstream service reached hard timeout",
+			BodyMatch: upstreamTimeout,
 		})
+	})
+
+	t.Run("Basic Timeout Behavior - enforced timeout with different granularity", func(t *testing.T) {
+		sResp := "seconds response"
+		msResp := "milliseconds response"
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var resp string
+			if strings.HasPrefix(r.URL.Path, "/timeout/seconds") {
+				time.Sleep(2 * time.Second)
+				resp = sResp
+			} else if strings.HasPrefix(r.URL.Path, "/success/seconds") {
+				time.Sleep(1 * time.Second)
+				resp = sResp
+			} else if strings.HasPrefix(r.URL.Path, "/timeout/milliseconds/1") {
+				time.Sleep(500 * time.Millisecond)
+				resp = msResp
+			} else if strings.HasPrefix(r.URL.Path, "/timeout/milliseconds/2") {
+				time.Sleep(3000 * time.Millisecond)
+				resp = msResp
+			} else if strings.HasPrefix(r.URL.Path, "/success/milliseconds") {
+				time.Sleep(500 * time.Millisecond)
+				resp = msResp
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+			}
+
+			w.Write([]byte(resp))
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled:        false,
+						Path:            "/timeout/seconds",
+						Method:          http.MethodGet,
+						TimeoutDuration: tyktime.ReadableDuration(1500 * time.Millisecond),
+					},
+					{
+						Disabled:        false,
+						Path:            "/success/seconds",
+						Method:          http.MethodGet,
+						TimeoutDuration: tyktime.ReadableDuration(1500 * time.Millisecond),
+					},
+					{
+						Disabled:        false,
+						Path:            "/timeout/milliseconds/1",
+						Method:          http.MethodGet,
+						TimeoutDuration: tyktime.ReadableDuration(400 * time.Millisecond),
+					},
+					{
+						Disabled:        false,
+						Path:            "/timeout/milliseconds/2",
+						Method:          http.MethodGet,
+						TimeoutDuration: tyktime.ReadableDuration(2500 * time.Millisecond),
+					},
+					{
+						Disabled:        false,
+						Path:            "/success/milliseconds",
+						Method:          http.MethodGet,
+						TimeoutDuration: tyktime.ReadableDuration(700 * time.Millisecond),
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCases{
+			{
+				Method:    http.MethodGet,
+				Path:      "/timeout/seconds",
+				Code:      http.StatusGatewayTimeout,
+				BodyMatch: upstreamTimeout,
+			},
+			{
+				Method:    http.MethodGet,
+				Path:      "/success/seconds",
+				Code:      http.StatusOK,
+				BodyMatch: sResp,
+			},
+			{
+				Method:    http.MethodGet,
+				Path:      "/timeout/milliseconds/1",
+				Code:      http.StatusGatewayTimeout,
+				BodyMatch: upstreamTimeout,
+			},
+			{
+				Method:    http.MethodGet,
+				Path:      "/timeout/milliseconds/2",
+				Code:      http.StatusGatewayTimeout,
+				BodyMatch: upstreamTimeout,
+			},
+			{
+				Method:    http.MethodGet,
+				Path:      "/success/milliseconds",
+				Code:      http.StatusOK,
+				BodyMatch: msResp,
+			},
+		}...)
 	})
 
 	t.Run("Basic Timeout Behavior - delay higher than both timeouts", func(t *testing.T) {
@@ -2252,7 +2361,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 			Method:    http.MethodGet,
 			Path:      "/test3",
 			Code:      http.StatusGatewayTimeout,
-			BodyMatch: "Upstream service reached hard timeout",
+			BodyMatch: upstreamTimeout,
 		})
 	})
 
@@ -2342,7 +2451,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 			Method:    http.MethodGet,
 			Path:      "/delay2/2",
 			Code:      http.StatusGatewayTimeout,
-			BodyMatch: "Upstream service reached hard timeout",
+			BodyMatch: upstreamTimeout,
 		})
 	})
 
@@ -2399,7 +2508,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 			Method:    http.MethodGet,
 			Path:      "/delay/4000",
 			Code:      http.StatusGatewayTimeout,
-			BodyMatch: "Upstream service reached hard timeout",
+			BodyMatch: upstreamTimeout,
 		})
 
 		_, _ = ts.Run(t, test.TestCase{
@@ -2414,7 +2523,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 			Method:    http.MethodGet,
 			Path:      "/delay2/4000",
 			Code:      http.StatusGatewayTimeout,
-			BodyMatch: "Upstream service reached hard timeout",
+			BodyMatch: upstreamTimeout,
 		})
 	})
 }
