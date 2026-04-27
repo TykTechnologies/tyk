@@ -22,6 +22,8 @@ traces:
         - STK-REQ-002
     documented_by_extra:
         - README.md
+    reviewed_at: "2026-04-27T06:25:20.893299Z"
+    reviewed_by: human:leonidbugaev
 verification:
     assurance_level: A
     formalization_status: ""

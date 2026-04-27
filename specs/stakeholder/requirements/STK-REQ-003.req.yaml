@@ -22,6 +22,8 @@ traces:
         - internal/policy/apply.go
     documented_by_extra:
         - README.md
+    reviewed_at: "2026-04-27T06:25:20.756754Z"
+    reviewed_by: human:leonidbugaev
 verification:
     assurance_level: A
     formalization_status: ""

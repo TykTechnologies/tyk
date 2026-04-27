@@ -23,6 +23,8 @@ traces:
         - FLIP:policy/tc-087
     documented_by_extra:
         - README.md
+    reviewed_at: "2026-04-27T06:25:20.846439Z"
+    reviewed_by: human:leonidbugaev
 verification:
     assurance_level: B
     formalization_status: valid

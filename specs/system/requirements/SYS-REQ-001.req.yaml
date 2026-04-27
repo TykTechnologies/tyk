@@ -30,6 +30,8 @@ traces:
         - FLIP:policy/tc-001
     documented_by_extra:
         - README.md
+    reviewed_at: "2026-04-27T06:25:20.767744Z"
+    reviewed_by: human:leonidbugaev
 verification:
     assurance_level: B
     formalization_status: valid

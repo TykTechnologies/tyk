@@ -24,6 +24,8 @@ traces:
         - STK-REQ-007
     documented_by_extra:
         - README.md
+    reviewed_at: "2026-04-27T06:25:20.897312Z"
+    reviewed_by: human:leonidbugaev
 verification:
     assurance_level: A
     formalization_status: ""

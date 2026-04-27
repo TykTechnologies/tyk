@@ -20,6 +20,8 @@ traces:
         - STK-REQ-001
     documented_by_extra:
         - README.md
+    reviewed_at: "2026-04-27T06:25:20.867098Z"
+    reviewed_by: human:leonidbugaev
 verification:
     assurance_level: B
     formalization_status: valid
@@ -28,6 +30,8 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
+    gaps_reviewed_at: "2026-04-27T06:26:19.418656Z"
+    gaps_reviewed_by: leonidbugaev
 history:
     created_by: human:cli
     created_at: "2026-04-19T15:28:51Z"
