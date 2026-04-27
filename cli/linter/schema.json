@@ -71,6 +71,9 @@
         },
         "min_version": {
           "type": "string"
+        },
+        "compress_policies": {
+          "type": "boolean"
         }
       }
     },
