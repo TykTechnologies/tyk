@@ -54,7 +54,6 @@ import (
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/certs"
@@ -596,15 +595,15 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	} else {
 		// POST path (create). Reject a user-supplied custom key ID that would
 		// be unreachable at auth time: CheckSessionAndIdentityForValidKey uses
-		// `len(key) <= MinTokenLength` (see middleware.go), so storing a key
-		// at or below that length would succeed here but every subsequent auth
-		// attempt with the raw ID would silently 403 (AKI). Empty keyName is
-		// fine — generateToken below will produce a safe-length UUID envelope.
+		// `len(key) < MinTokenLength` (see middleware.go), so storing a key
+		// shorter than that length would succeed here but every subsequent
+		// auth attempt with the raw ID would silently 403 (AKI). Empty keyName
+		// is fine — generateToken below will produce a safe-length UUID envelope.
 		minLen := gw.GetConfig().MinTokenLength
-		if keyName != "" && minLen > 0 && len(keyName) <= minLen {
+		if keyName != "" && minLen > 0 && len(keyName) < minLen {
 			return apiError(fmt.Sprintf(
-				"custom key ID length %d is less than or equal to min_token_length (%d); "+
-					"the key would be unreachable at auth time. Use an ID longer than min_token_length, "+
+				"custom key ID length %d is less than min_token_length (%d); "+
+					"the key would be unreachable at auth time. Use an ID of at least min_token_length characters, "+
 					"or lower min_token_length in the gateway configuration.",
 				len(keyName), minLen,
 			)), http.StatusBadRequest
