@@ -1,0 +1,99 @@
+id: STK-REQ-001
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The policy engine shall correctly apply access control policies to API sessions, merging access rights, rate limits, quotas, tags, metadata, and complexity limits from one or more policies into the session state. Policy application must handle per-API mode, partitioned mode, and standard mode correctly.
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Policy application is the core function of the policy engine. Every API request is governed by the session state produced by policy application. Incorrect merge behavior leads to either over-permissive access (security breach) or over-restrictive access (service denial).
+tags:
+    - policy-apply
+    - access-control
+    - security-critical
+variables: []
+traces:
+    implemented_by_extra:
+        - internal/policy/apply.go
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-04-27T06:25:20.750411Z"
+    reviewed_by: human:leonidbugaev
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-04-14T10:00:00Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:33Z"
+stakeholder:
+    persona: API platform administrator
+    story: As an API platform administrator, I need the policy engine to correctly apply access control policies to sessions so that API consumers get the right permissions, rate limits, and quotas.
+    acceptance_criteria:
+        - id: STK-REQ-001-AC-01
+          text: Given a valid single-policy session, when Apply is called, then all policy fields are merged into the session
+          testable: true
+          derived_reqs:
+            - SYS-REQ-008
+            - SYS-REQ-013
+            - SYS-REQ-014
+            - SYS-REQ-015
+            - SYS-REQ-016
+            - SYS-REQ-017
+            - SYS-REQ-018
+            - SYS-REQ-033
+        - id: STK-REQ-001-AC-02
+          text: Given a per-API policy, when Apply is called, then per-API limits are applied independently
+          testable: true
+          derived_reqs:
+            - SYS-REQ-013
+            - SYS-REQ-014
+            - SYS-REQ-015
+        - id: STK-REQ-001-AC-03
+          text: Given a partitioned policy, when Apply is called, then only the partitioned fields are applied
+          testable: true
+          derived_reqs:
+            - SYS-REQ-030
+            - SYS-REQ-031
+            - SYS-REQ-032
+        - id: STK-REQ-001-AC-04
+          text: Given multiple policies, when Apply is called, then the highest-rate-wins rule resolves conflicts
+          testable: true
+          derived_reqs:
+            - SYS-REQ-016
+            - SYS-REQ-017
+            - SYS-REQ-043
+        - id: STK-REQ-001-AC-05
+          text: Given a policy with an org mismatch, when Apply is called, then an error is returned
+          testable: true
+          derived_reqs:
+            - SYS-REQ-011
+    obligation_checklist:
+        - nominal
+        - error_handling
+        - malformed_input
+        - boundary
+        - access_denied
+        - policy_merge
+        - determinism
+        - idempotency
+        - commutativity
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:33Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

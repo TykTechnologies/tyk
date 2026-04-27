@@ -21,6 +21,11 @@ import (
 //go:embed testdata/*.json
 var testDataFS embed.FS
 
+// Verifies: STK-REQ-003, SYS-REQ-021, SYS-REQ-022, SYS-REQ-041 [boundary]
+// MCDC STK-REQ-003: N/A
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-041: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 	t.Run("policy limits unset", func(t *testing.T) {
 		svc := &policy.Service{}
@@ -120,6 +125,9 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-021, SYS-REQ-031 [example]
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-031: apply_requested=T, complexity_applied=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
 func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
 	svc := policy.New(nil, nil, logrus.StandardLogger())
 
@@ -148,6 +156,9 @@ func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
 	assert.Equal(t, 10, int(session.Rate))
 }
 
+// Verifies: SYS-REQ-013, SYS-REQ-030 [example]
+// MCDC SYS-REQ-013: access_rights_merged=T, apply_requested=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
+// MCDC SYS-REQ-030: access_rights_merged=T, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
 func TestApplyACL_FromCustomPolicies(t *testing.T) {
 	svc := policy.New(nil, nil, logrus.StandardLogger())
 
@@ -195,6 +206,9 @@ func TestApplyACL_FromCustomPolicies(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-004, SYS-REQ-023 [example]
+// MCDC STK-REQ-004: N/A
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApplyEndpointLevelLimits(t *testing.T) {
 	f, err := testDataFS.ReadFile("testdata/apply_endpoint_rl.json")
 	assert.NoError(t, err)
@@ -229,6 +243,8 @@ type testApplyPoliciesData struct {
 	reverseOrder bool
 }
 
+// Verifies: SYS-REQ-008
+// MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
 func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPoliciesData) {
 	tb.Helper()
 
@@ -1279,6 +1295,22 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 	return service, tests
 }
 
+// Verifies: STK-REQ-001, STK-REQ-005, STK-REQ-007, SYS-REQ-008, SYS-REQ-010, SYS-REQ-011, SYS-REQ-012, SYS-REQ-013, SYS-REQ-014, SYS-REQ-015, SYS-REQ-025, SYS-REQ-026, SYS-REQ-027, SYS-REQ-030, SYS-REQ-032 [example]
+// MCDC STK-REQ-001: N/A
+// MCDC STK-REQ-005: N/A
+// MCDC STK-REQ-007: N/A
+// MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
+// MCDC SYS-REQ-010: apply_requested=T, error_reported=F, multiple_policies=F, policy_found=T => TRUE
+// MCDC SYS-REQ-011: apply_requested=T, error_reported=F, org_matches=T => TRUE
+// MCDC SYS-REQ-012: apply_requested=T, error_reported=F, per_api_and_partition_set=F => TRUE
+// MCDC SYS-REQ-013: access_rights_merged=T, apply_requested=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
+// MCDC SYS-REQ-014: apply_requested=T, is_per_api=T, org_matches=T, policy_found=T, quota_applied=T => TRUE
+// MCDC SYS-REQ-015: apply_requested=T, is_per_api=T, org_matches=T, policy_found=T, rate_limit_applied=T => TRUE
+// MCDC SYS-REQ-025: apply_requested=T, error_reported=F, rate_limit_applied=T => TRUE
+// MCDC SYS-REQ-026: apply_requested=T, error_reported=F, quota_applied=T => TRUE
+// MCDC SYS-REQ-027: access_rights_merged=T, apply_requested=T, clear_requested=F, complexity_applied=F, endpoint_limit_apply_requested=F, endpoints_merged=F, error_reported=F, metadata_merged=F, quota_applied=F, rate_limit_applied=F, rate_limit_apply_requested=F, result_returned=F, session_cleared=F, session_inactive_set=F, tags_merged=F => TRUE
+// MCDC SYS-REQ-030: access_rights_merged=T, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
+// MCDC SYS-REQ-032: apply_requested=T, complexity_applied=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
 func TestService_Apply(t *testing.T) {
 	service, tests := testPrepareApplyPolicies(t)
 
@@ -1321,6 +1353,9 @@ func TestService_Apply(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-007, SYS-REQ-008 [example]
+// MCDC STK-REQ-007: N/A
+// MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
 func BenchmarkService_Apply(b *testing.B) {
 	b.ReportAllocs()
 
@@ -1336,6 +1371,8 @@ func BenchmarkService_Apply(b *testing.B) {
 	}
 }
 
+// Verifies: SYS-REQ-008, SYS-REQ-033 [example]
+// MCDC SYS-REQ-033: apply_requested=T, result_returned=T => TRUE
 func TestApply_PostExpiryPropagation(t *testing.T) {
 	polID := "post-expiry-pol"
 	pol := user.Policy{
@@ -1363,6 +1400,8 @@ func TestApply_PostExpiryPropagation(t *testing.T) {
 	assert.Equal(t, int64(3600), sess.PostExpiryGracePeriod)
 }
 
+// Verifies: SYS-REQ-008, SYS-REQ-033 [boundary]
+// MCDC SYS-REQ-033: apply_requested=T, result_returned=T => TRUE
 func TestApply_PostExpiryPropagation_Scenarios(t *testing.T) {
 	orgID := ""
 
@@ -1474,4 +1513,147 @@ func TestApply_PostExpiryPropagation_Scenarios(t *testing.T) {
 		assert.NoError(t, svc.Apply(sess))
 		assert.Equal(t, user.PostExpiryActionDelete, sess.PostExpiryAction)
 	})
+}
+
+// Verifies: SYS-REQ-008, SYS-REQ-033 [boundary]
+// MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
+// MCDC SYS-REQ-033: apply_requested=T, result_returned=T => TRUE
+func TestApply_PolicyIds_SessionOrgIDUsed(t *testing.T) {
+	// When the session has a non-empty OrgID, policyIds uses it directly
+	// (the service orgID is NOT substituted). This tests orgID != "" branch.
+	polID := "org-test-pol"
+	pol := user.Policy{
+		ID:    polID,
+		OrgID: "org123",
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"Default"}},
+		},
+	}
+
+	store := policy.NewStoreMap(map[string]user.Policy{polID: pol})
+	svcOrgID := "org123"
+	svc := policy.New(&svcOrgID, store, logrus.StandardLogger())
+
+	sess := &user.SessionState{OrgID: "org123"}
+	sess.SetPolicies(polID)
+	err := svc.Apply(sess)
+	assert.NoError(t, err)
+	assert.Contains(t, sess.AccessRights, "api1")
+}
+
+// Verifies: SYS-REQ-008, SYS-REQ-033 [boundary]
+// MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
+// MCDC SYS-REQ-033: apply_requested=T, result_returned=T => TRUE
+func TestApply_PolicyIds_NilServiceOrgID(t *testing.T) {
+	// When the service's orgID pointer is nil, policyIds uses session's
+	// orgID directly without substitution (t.orgID == nil branch).
+	polID := "nil-org-pol"
+	pol := user.Policy{
+		ID: polID,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"Default"}},
+		},
+	}
+
+	store := policy.NewStoreMap(map[string]user.Policy{polID: pol})
+	svc := policy.New(nil, store, logrus.StandardLogger()) // nil orgID
+
+	sess := &user.SessionState{}
+	sess.SetPolicies(polID)
+	err := svc.Apply(sess)
+	assert.NoError(t, err)
+	assert.Contains(t, sess.AccessRights, "api1")
+}
+
+// Verifies: SYS-REQ-023 [boundary]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
+func TestApply_MCPPrimitiveLimits_HigherRateWins_StorePolicy(t *testing.T) {
+	// Two store-based policies with same primitive; higher rate (lower duration) wins.
+	// pol1: weather tool Rate=5/Per=60 (duration=12s)
+	// pol2: weather tool Rate=15/Per=60 (duration=4s) — wins
+	pol1 := user.Policy{
+		ID: "mcp-prim-1", Rate: 100, Per: 60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {
+				APIID: "api1", Versions: []string{"Default"},
+				MCPPrimitives: []user.MCPPrimitiveLimit{
+					{Type: "tool", Name: "weather", Limit: user.RateLimit{Rate: 5, Per: 60}},
+				},
+			},
+		},
+	}
+	pol2 := user.Policy{
+		ID: "mcp-prim-2", Rate: 100, Per: 60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {
+				APIID: "api1", Versions: []string{"Default"},
+				MCPPrimitives: []user.MCPPrimitiveLimit{
+					{Type: "tool", Name: "weather", Limit: user.RateLimit{Rate: 15, Per: 60}},
+				},
+			},
+		},
+	}
+
+	store := policy.NewStoreMap(map[string]user.Policy{"mcp-prim-1": pol1, "mcp-prim-2": pol2})
+	orgID := ""
+	svc := policy.New(&orgID, store, logrus.StandardLogger())
+
+	sess := &user.SessionState{}
+	sess.SetPolicies("mcp-prim-1", "mcp-prim-2")
+	err := svc.Apply(sess)
+	assert.NoError(t, err)
+	ad := sess.AccessRights["api1"]
+	assert.Len(t, ad.MCPPrimitives, 1)
+	assert.Equal(t, float64(15), ad.MCPPrimitives[0].Limit.Rate)
+}
+
+// Verifies: SYS-REQ-023 [boundary]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
+func TestApply_JSONRPCMethodLimits_ZeroDurationCurrentOverwritten(t *testing.T) {
+	// When the existing method limit has Per=0 (zero duration, unconfigured),
+	// the policy's limit replaces it regardless of rate value.
+	polID := "jsonrpc-zero"
+	pol := user.Policy{
+		ID: polID, Rate: 100, Per: 60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {
+				APIID:    "api1",
+				Versions: []string{"Default"},
+				JSONRPCMethods: []user.JSONRPCMethodLimit{
+					{Name: "tools/call", Limit: user.RateLimit{Rate: 3, Per: 60}},
+				},
+			},
+		},
+	}
+	// First policy sets Per=0 (unconfigured duration), second policy has real rate.
+	polPre := user.Policy{
+		ID: "jsonrpc-pre", Rate: 100, Per: 60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {
+				APIID:    "api1",
+				Versions: []string{"Default"},
+				JSONRPCMethods: []user.JSONRPCMethodLimit{
+					{Name: "tools/call", Limit: user.RateLimit{Rate: 999, Per: 0}},
+				},
+			},
+		},
+	}
+
+	store := policy.NewStoreMap(map[string]user.Policy{polID: pol, "jsonrpc-pre": polPre})
+	orgID := ""
+	svc := policy.New(&orgID, store, logrus.StandardLogger())
+
+	sess := &user.SessionState{}
+	sess.SetPolicies("jsonrpc-pre", polID)
+	err := svc.Apply(sess)
+	assert.NoError(t, err)
+	ad := sess.AccessRights["api1"]
+	assert.NotEmpty(t, ad.JSONRPCMethods)
+	// The policy with real Per=60 should win over Per=0
+	for _, m := range ad.JSONRPCMethods {
+		if m.Name == "tools/call" {
+			assert.Equal(t, float64(60), m.Limit.Per)
+			break
+		}
+	}
 }

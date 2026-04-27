@@ -1,0 +1,90 @@
+project:
+    name: Tyk API Gateway - Policy Engine
+    version: 0.2.0
+    description: Formal requirements verification for the Tyk API Gateway policy component. Covers access control, rate limiting, quota management, policy merge semantics, and API authorization decisions.
+    purpose: Ensure correctness and safety of the policy engine that governs API access control, rate limiting, quota enforcement, and multi-policy merge behavior for all API traffic through the Tyk gateway.
+    scope: The policy module (internal/policy) including Apply, ClearSession, ApplyRateLimits, and ApplyEndpointLevelLimits operations.
+    specs:
+        - path: specs/stakeholder
+          prefix: STK-REQ
+          type: stakeholder
+        - path: specs/system
+          prefix: SYS-REQ
+          type: system
+    default_assurance_level: A
+    solvers:
+        kind2:
+            path: /Users/leonidbugaev/tools/kind2/kind2
+            timeout: 30
+    commands:
+        build: go build ./internal/policy/...
+        test: mkdir -p .proof/test-results .proof/coverage && go test ./internal/policy/... -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
+        lint: go vet ./internal/policy/...
+    obligation_classes:
+        - nominal
+        - error_handling
+        - malformed_input
+        - boundary
+        - access_denied
+        - policy_merge
+        - rate_limit_boundary
+        - determinism
+        - idempotency
+        - commutativity
+        - monotonicity
+        - nil_safety
+        - encoding_safety
+    checks:
+        coverage_threshold:
+            threshold: 90
+            auto_link: true
+            report_path: .proof/coverage/unit.coverprofile
+            format: go-cover
+        test_results:
+            auto_link: true
+            report_path: .proof/test-results/go-test.json
+        slow_tests:
+            enabled: true
+        test_mcdc_annotations:
+            enabled: true
+        mcdc_coverage:
+            advisory: false
+            max_no_verifying_tests: 0
+            max_missing_row_witnesses: 0
+            max_partial_row_coverage: 0
+            max_stale_witness_lines: 0
+            max_budget_skips: 0
+        under_modeled_requirements:
+            code_rich_decision_multiplier: 6
+            code_rich_decision_floor: 10
+        proof_complexity_clean:
+            max_formalized_requirements: 75
+            max_variables: 65
+            max_guarantees: 70
+        code_mcdc:
+            severity: warn
+            engine: go
+            min_decision_percent: 100
+            min_condition_percent: 100
+            max_incomplete_decisions: 0
+            targets:
+                - id: policy
+                  enabled: true
+                  language: go
+                  scope: ./internal/policy/...
+        evidence_diversity:
+            min_classes:
+                A: 2
+                B: 2
+                C: 1
+                D: 1
+                E: 1
+    waivers: []
+    verification_scope:
+        include:
+            - internal/policy/**
+    audit:
+        fail_level: error
+        scope: baseline
+    workflow:
+        fail_level: error

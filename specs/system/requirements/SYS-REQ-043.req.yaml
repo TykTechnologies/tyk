@@ -1,0 +1,45 @@
+id: SYS-REQ-043
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: constraint
+fretish: the policy shall always satisfy !apply_requested | metadata_order_independent
+description: 'KNOWN LIMITATION: Metadata merge uses last-write-wins per key. When policies are iterated in different order, conflicting keys produce different results. This is a known non-determinism risk documented in vars as last-write-wins. The iteration order depends on the order of policy IDs in the session, which is controlled by the caller.'
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: 'KNOWN LIMITATION: Metadata merge uses last-write-wins per key. When policies are iterated in different order, conflicting keys produce different results. This is a known non-determinism risk documente'
+tags: []
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-001
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-04-27T06:25:20.854987Z"
+    reviewed_by: human:leonidbugaev
+verification:
+    assurance_level: B
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: human:cli
+    created_at: "2026-03-28T17:44:07Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:34Z"
+obligation_class: policy_merge
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:34Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

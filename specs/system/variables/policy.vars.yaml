@@ -1,0 +1,669 @@
+component: policy
+variables:
+    # ==========================================
+    # MODE VARIABLES (operation selectors)
+    # These are input from the caller's perspective:
+    # the gateway decides when to call Apply/Clear/etc.
+    # ==========================================
+    - name: apply_requested
+      type: bool
+      direction: input
+      description: Policy application has been requested via Apply()
+
+    - name: clear_requested
+      type: bool
+      direction: input
+      description: Session clearing has been requested via ClearSession()
+
+    - name: rate_limit_apply_requested
+      type: bool
+      direction: input
+      description: Rate limit application requested via ApplyRateLimits()
+
+    - name: endpoint_limit_apply_requested
+      type: bool
+      direction: input
+      description: Endpoint-level limit merge requested via ApplyEndpointLevelLimits()
+
+    # ==========================================
+    # INPUT VARIABLES (environment state)
+    # ==========================================
+    - name: no_policies
+      type: bool
+      direction: input
+      proof_auxiliary: true  # complement of policies_provided for Z3 data completeness
+      description: No policy IDs exist in the session (policy_count == 0)
+      data_constraint:
+        domain: integer
+        variable: policy_count
+        condition: "policy_count == 0"
+        parameters:
+          - name: policy_count
+            type: int
+            constraint: ">= 0"
+
+    - name: policies_provided
+      type: bool
+      direction: input
+      description: Exactly one policy ID exists in the session (single-policy mode)
+      data_constraint:
+        domain: integer
+        variable: policy_count
+        condition: "policy_count == 1"
+        parameters:
+          - name: policy_count
+            type: int
+            constraint: ">= 0"
+
+    - name: policy_found
+      type: bool
+      direction: input
+      description: The referenced policy exists in the store
+
+    - name: org_matches
+      type: bool
+      direction: input
+      description: Policy org ID matches the service org ID
+
+    - name: is_per_api
+      type: bool
+      direction: input
+      description: Policy has Partitions.PerAPI set
+      data_constraint:
+        domain: boolean
+        variable: policy_mode
+        condition: "per_api && !partition_quota && !partition_rate && !partition_acl && !partition_complexity"
+        depends_on:
+          - per_api
+          - partition_quota
+          - partition_rate
+          - partition_acl
+          - partition_complexity
+
+    - name: partitions_enabled
+      type: bool
+      direction: input
+      description: Policy has at least one partition flag set (Quota/RateLimit/Acl/Complexity)
+      data_constraint:
+        domain: boolean
+        variable: policy_mode
+        condition: "!per_api && (partition_quota || partition_rate || partition_acl || partition_complexity)"
+        depends_on:
+          - per_api
+          - partition_quota
+          - partition_rate
+          - partition_acl
+          - partition_complexity
+
+    - name: has_access_rights
+      type: bool
+      direction: input
+      description: Policy has non-empty AccessRights map
+      data_constraint:
+        domain: integer
+        variable: access_rights_count
+        condition: "access_rights_count >= 1"
+        parameters:
+          - name: access_rights_count
+            type: int
+            constraint: ">= 0"
+
+    - name: no_access_rights
+      type: bool
+      direction: input
+      proof_auxiliary: true  # complement of has_access_rights for Z3 data completeness
+      description: Policy has empty AccessRights map (master policy case)
+      data_constraint:
+        domain: integer
+        variable: access_rights_count
+        condition: "access_rights_count == 0"
+        parameters:
+          - name: access_rights_count
+            type: int
+            constraint: ">= 0"
+
+    - name: policy_rate_empty
+      type: bool
+      direction: input
+      description: Policy rate limit values are zero/empty
+      data_constraint:
+        domain: integer
+        variable: policy_rate
+        condition: "policy_rate == 0 || policy_per == 0"
+        parameters:
+          - name: policy_rate
+            type: int64
+            constraint: ">= 0"
+          - name: policy_per
+            type: int64
+            constraint: ">= 0"
+
+    - name: policy_rate_nonempty
+      type: bool
+      direction: input
+      proof_auxiliary: true  # complement of policy_rate_empty for Z3 data completeness
+      description: Policy rate limit values are non-zero (Rate > 0 and Per > 0)
+      data_constraint:
+        domain: integer
+        variable: policy_rate
+        condition: "policy_rate > 0 && policy_per > 0"
+        parameters:
+          - name: policy_rate
+            type: int64
+            constraint: ">= 0"
+          - name: policy_per
+            type: int64
+            constraint: ">= 0"
+
+    - name: api_limit_empty
+      type: bool
+      direction: input
+      description: Current API-level rate limit is empty (Rate=0 or Per=0)
+      data_constraint:
+        domain: integer
+        variable: api_rate
+        condition: "api_rate == 0 || api_per == 0"
+        parameters:
+          - name: api_rate
+            type: int64
+            constraint: ">= 0"
+          - name: api_per
+            type: int64
+            constraint: ">= 0"
+
+    - name: api_limit_nonempty
+      type: bool
+      direction: input
+      proof_auxiliary: true  # complement of api_limit_empty for Z3 data completeness
+      description: Current API-level rate limit has non-zero values (Rate > 0 and Per > 0)
+      data_constraint:
+        domain: integer
+        variable: api_rate
+        condition: "api_rate > 0 && api_per > 0"
+        parameters:
+          - name: api_rate
+            type: int64
+            constraint: ">= 0"
+          - name: api_per
+            type: int64
+            constraint: ">= 0"
+
+    - name: policy_rate_higher
+      type: bool
+      direction: input
+      description: Policy allows higher request rate than current API limit (shorter duration)
+      data_constraint:
+        domain: integer
+        variable: rate_comparison
+        condition: "policy_duration < api_duration"
+        parameters:
+          - name: policy_duration
+            type: int64
+            constraint: ">= 1"
+          - name: api_duration
+            type: int64
+            constraint: ">= 1"
+
+    - name: multiple_policies
+      type: bool
+      direction: input
+      description: More than one policy ID is referenced by the session
+      data_constraint:
+        domain: integer
+        variable: policy_count
+        condition: "policy_count >= 2"
+        parameters:
+          - name: policy_count
+            type: int
+            constraint: ">= 0"
+
+    - name: policy_inactive
+      type: bool
+      direction: input
+      description: The policy IsInactive flag is true
+
+    - name: standard_mode
+      type: bool
+      direction: input
+      proof_auxiliary: true  # complement of is_per_api/partitions_enabled for Z3 data completeness
+      description: Policy uses standard mode (no PerAPI, no partitions) - master policy case
+      data_constraint:
+        domain: boolean
+        variable: policy_mode
+        condition: "!per_api && !partition_quota && !partition_rate && !partition_acl && !partition_complexity"
+        depends_on:
+          - per_api
+          - partition_quota
+          - partition_rate
+          - partition_acl
+          - partition_complexity
+
+    - name: per_api_and_partition_set
+      type: bool
+      direction: input
+      description: Policy has both PerAPI and partition flags set simultaneously
+      data_constraint:
+        domain: boolean
+        variable: policy_mode
+        condition: "per_api && (partition_quota || partition_rate || partition_acl || partition_complexity)"
+        depends_on:
+          - per_api
+          - partition_quota
+          - partition_rate
+          - partition_acl
+          - partition_complexity
+
+    - name: policies_all_missing
+      type: bool
+      direction: input
+      description: All referenced policy IDs are missing from the store
+      data_constraint:
+        domain: integer
+        variable: found_count
+        condition: "policy_count >= 2 && found_count == 0"
+        parameters:
+          - name: policy_count
+            type: int
+            constraint: ">= 0"
+          - name: found_count
+            type: int
+            constraint: ">= 0 && found_count <= policy_count"
+
+    - name: some_policies_found
+      type: bool
+      direction: input
+      proof_auxiliary: true  # complement of policies_all_missing for Z3 data completeness
+      description: At least one referenced policy was found when multiple exist
+      data_constraint:
+        domain: integer
+        variable: found_count
+        condition: "policy_count >= 2 && found_count >= 1"
+        parameters:
+          - name: policy_count
+            type: int
+            constraint: ">= 0"
+          - name: found_count
+            type: int
+            constraint: ">= 0 && found_count <= policy_count"
+
+    - name: no_policies_to_find
+      type: bool
+      direction: input
+      proof_auxiliary: true  # complement domain variable for policies_all_missing threshold
+      description: Fewer than 2 policies referenced so all_missing check is not applicable
+      data_constraint:
+        domain: integer
+        variable: found_count
+        condition: "policy_count <= 1"
+        parameters:
+          - name: policy_count
+            type: int
+            constraint: ">= 0"
+          - name: found_count
+            type: int
+            constraint: ">= 0 && found_count <= policy_count"
+
+    - name: policy_rate_equal
+      type: bool
+      direction: input
+      description: Policy rate limit equals current rate limit (same duration)
+      data_constraint:
+        domain: integer
+        variable: rate_comparison
+        condition: "policy_duration == api_duration"
+        parameters:
+          - name: policy_duration
+            type: int64
+            constraint: ">= 1"
+          - name: api_duration
+            type: int64
+            constraint: ">= 1"
+
+    - name: policy_rate_lower
+      type: bool
+      direction: input
+      proof_auxiliary: true  # complement of policy_rate_higher for Z3 data completeness
+      description: Policy has lower request rate than current API limit (longer duration)
+      data_constraint:
+        domain: integer
+        variable: rate_comparison
+        condition: "policy_duration > api_duration"
+        parameters:
+          - name: policy_duration
+            type: int64
+            constraint: ">= 1"
+          - name: api_duration
+            type: int64
+            constraint: ">= 1"
+
+    - name: store_available
+      type: bool
+      direction: input
+      description: The policy store is non-nil and reachable
+
+    # ==========================================
+    # OUTPUT VARIABLES (system effects)
+    # ==========================================
+    - name: session_cleared
+      type: bool
+      direction: output
+      description: Session quota/rate/complexity values were reset to zero
+      data_constraint:
+        domain: integer
+        variable: session_state
+        condition: "quota_max == 0 && quota_remaining == 0 && rate == 0 && per == 0 && max_query_depth == 0"
+        parameters:
+          - name: quota_max
+            type: int64
+            constraint: ">= 0"
+          - name: quota_remaining
+            type: int64
+            constraint: ">= 0"
+          - name: rate
+            type: int64
+            constraint: ">= 0"
+          - name: per
+            type: int64
+            constraint: ">= 0"
+          - name: max_query_depth
+            type: int
+            constraint: ">= 0"
+
+    - name: access_rights_merged
+      type: bool
+      direction: output
+      description: Access rights from policy were merged into session
+      properties:
+        merge: combine
+        key: api_id
+        nested:
+          allowed_urls:
+            type: "[]AccessSpec"
+            merge: union
+            key: url
+            deduplicate: true
+          versions:
+            type: "[]string"
+            merge: union
+            deduplicate: true
+          restricted_types:
+            type: "[]GraphQLType"
+            merge: intersection
+            key: type_name
+          allowed_types:
+            type: "[]GraphQLType"
+            merge: union
+            key: type_name
+          field_access_rights:
+            type: "[]FieldAccessRight"
+            merge: union
+            key: type_name+field_name
+
+    - name: rate_limit_applied
+      type: bool
+      direction: output
+      description: Rate limit values were applied to session and/or API limit
+      properties:
+        merge: highest
+        compare_by: duration
+        fields: [Rate, Per]
+        note: "Compares by duration (Per/Rate); shorter duration = higher rate wins"
+      data_constraint:
+        domain: integer
+        variable: result_rate
+        condition: "result_rate >= input_a_rate && result_rate >= input_b_rate && (result_rate == input_a_rate || result_rate == input_b_rate)"
+        parameters:
+          - name: result_rate
+            type: int64
+            constraint: ">= 0"
+          - name: input_a_rate
+            type: int64
+            constraint: ">= 0"
+          - name: input_b_rate
+            type: int64
+            constraint: ">= 0"
+
+    - name: quota_applied
+      type: bool
+      direction: output
+      description: Quota values were applied to session and/or API limit
+      properties:
+        merge: highest
+        compare_by: value
+        special:
+          "-1": unlimited
+          rule: "unlimited (-1) always wins via greaterThanInt64"
+      data_constraint:
+        domain: integer
+        variable: result_quota
+        condition: "result_quota == -1 || (result_quota >= input_a_quota && result_quota >= input_b_quota && (result_quota == input_a_quota || result_quota == input_b_quota))"
+        parameters:
+          - name: result_quota
+            type: int64
+            constraint: ">= -1"
+          - name: input_a_quota
+            type: int64
+            constraint: ">= -1"
+          - name: input_b_quota
+            type: int64
+            constraint: ">= -1"
+
+    - name: tags_merged
+      type: bool
+      direction: output
+      description: Policy tags were merged into session tags
+      properties:
+        merge: union
+        deduplicate: true
+        commutative: true
+
+    - name: metadata_merged
+      type: bool
+      direction: output
+      description: Policy metadata was merged into session metadata
+      properties:
+        merge: combine
+        key: metadata_key
+        note: "last-write-wins per key when policies overlap"
+
+    - name: error_reported
+      type: bool
+      direction: output
+      description: An error was returned to the caller
+
+    - name: session_inactive_set
+      type: bool
+      direction: output
+      description: Session IsInactive was set based on policy inactive status
+
+    - name: endpoints_merged
+      type: bool
+      direction: output
+      description: Endpoint-level rate limits were merged taking highest rate
+      properties:
+        merge: combine
+        key: path+method
+        nested:
+          rate_limit:
+            type: RateLimit
+            merge: highest
+            compare_by: duration
+            note: "Shorter duration wins; on equal duration, higher Rate wins"
+
+    - name: complexity_applied
+      type: bool
+      direction: output
+      description: MaxQueryDepth complexity limit was applied
+      properties:
+        merge: highest
+        compare_by: value
+        special:
+          "-1": unlimited
+          rule: "unlimited (-1) always wins via greaterThanInt"
+      data_constraint:
+        domain: integer
+        variable: result_depth
+        condition: "result_depth == -1 || (result_depth >= input_a_depth && result_depth >= input_b_depth && (result_depth == input_a_depth || result_depth == input_b_depth))"
+        parameters:
+          - name: result_depth
+            type: int
+            constraint: ">= -1"
+          - name: input_a_depth
+            type: int
+            constraint: ">= -1"
+          - name: input_b_depth
+            type: int
+            constraint: ">= -1"
+
+    - name: result_returned
+      type: bool
+      direction: output
+      description: A result (nil error or error) was returned to the caller
+
+    - name: metadata_order_independent
+      type: bool
+      direction: output
+      description: Metadata merge result is the same regardless of policy iteration order
+
+    - name: apply_time_bounded
+      type: bool
+      direction: output
+      description: Apply() completed within the performance bound (100ms for up to 50 policies)
+
+    # ==========================================
+    # OBLIGATION CLASS VARIABLES
+    # Variables supporting determinism, idempotency, commutativity,
+    # monotonicity, nil_safety, and encoding_safety obligation classes.
+    # ==========================================
+
+    # --- Determinism (SYS-REQ-055) ---
+    - name: single_api_has_policies
+      type: bool
+      direction: input
+      description: Among multiple AccessRights entries, exactly one API has policies applied to it
+
+    - name: session_fields_from_specific_api
+      type: bool
+      direction: output
+      description: Session-level fields (rate, quota, ACL) were set from the specific API that has policies, not from arbitrary map iteration
+
+    # --- Idempotency (SYS-REQ-056) ---
+    - name: apply_result_first
+      type: bool
+      direction: output
+      description: The session state snapshot after the first Apply() call
+
+    - name: apply_result_second
+      type: bool
+      direction: output
+      description: The session state snapshot after the second Apply() call on the same session
+
+    # --- Commutativity (SYS-REQ-057) ---
+    - name: merge_order_independent
+      type: bool
+      direction: output
+      description: The merged session state is identical regardless of the order in which policies were applied
+
+    # --- Rate limit determinism (SYS-REQ-058) ---
+    - name: rate_result_deterministic
+      type: bool
+      direction: output
+      description: Rate limit merge result is the same regardless of policy iteration order
+
+    # --- Rate limit commutativity (SYS-REQ-059) ---
+    - name: rate_merge_AB
+      type: bool
+      direction: output
+      description: Rate limit merge result when applying policies in order [A, B]
+
+    - name: rate_merge_BA
+      type: bool
+      direction: output
+      description: Rate limit merge result when applying policies in order [B, A]
+
+    # --- Rate limit monotonicity (SYS-REQ-060) ---
+    - name: policy_added
+      type: bool
+      direction: input
+      description: An additional policy has been added to the session's applied policies set
+
+    - name: new_rate
+      type: bool
+      direction: output
+      description: The effective rate limit after adding the new policy
+
+    - name: old_rate
+      type: bool
+      direction: output
+      description: The effective rate limit before adding the new policy
+
+    # --- Endpoint limit determinism (SYS-REQ-061) ---
+    - name: endpoint_result_deterministic
+      type: bool
+      direction: output
+      description: Endpoint-level rate limit merge result is the same regardless of policy iteration order
+
+    # --- Endpoint limit commutativity (SYS-REQ-062) ---
+    - name: endpoint_merge_AB
+      type: bool
+      direction: output
+      description: Endpoint limit merge result when applying policies in order [A, B]
+
+    - name: endpoint_merge_BA
+      type: bool
+      direction: output
+      description: Endpoint limit merge result when applying policies in order [B, A]
+
+    # --- Endpoint limit monotonicity (SYS-REQ-063) ---
+    - name: new_endpoint_rate
+      type: bool
+      direction: output
+      description: The effective per-endpoint rate limit after adding a new policy
+
+    - name: old_endpoint_rate
+      type: bool
+      direction: output
+      description: The effective per-endpoint rate limit before adding a new policy
+
+    # --- Nil safety - ClearSession (SYS-REQ-064) ---
+    - name: clear_session_requested
+      type: bool
+      direction: input
+      description: ClearSession has been called on a session
+
+    - name: nil_session_fields
+      type: bool
+      direction: input
+      description: The session has nil or zero-valued quota, rate limit, or complexity fields
+
+    - name: safe_clear_completion
+      type: bool
+      direction: output
+      description: ClearSession completed without panic or error when handling nil/zero fields
+
+    # --- Nil safety - store (SYS-REQ-065) ---
+    - name: any_operation_requested
+      type: bool
+      direction: input
+      description: Any policy engine operation (Apply, ClearSession, ApplyRateLimits, ApplyEndpointLevelLimits) has been called
+
+    - name: nil_store
+      type: bool
+      direction: input
+      description: The policy store pointer is nil
+
+    - name: nil_store_rejected
+      type: bool
+      direction: output
+      description: A nil-store condition was detected and the operation was rejected before any pointer dereference
+
+    # --- Encoding safety (SYS-REQ-066) ---
+    - name: rpc_data_load_requested
+      type: bool
+      direction: input
+      description: Policy data is being loaded via RPC using json.Marshal/json.Unmarshal
+
+    - name: encoding_roundtrip_safe
+      type: bool
+      direction: output
+      description: All policy fields survive JSON encoding round-trip without data loss or corruption

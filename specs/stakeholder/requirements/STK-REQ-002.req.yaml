@@ -1,0 +1,64 @@
+id: STK-REQ-002
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The policy engine shall correctly clear session state when requested, resetting quota, rate limit, and complexity values so that subsequent policy application starts from a clean baseline. Session clearing must handle missing policies gracefully.
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Session clearing is required before re-applying policies to prevent stale values from accumulating. Without proper clearing, policy updates would merge with leftover state, producing incorrect access decisions. This is especially critical after policy changes by administrators.
+tags:
+    - session-management
+    - policy-lifecycle
+variables: []
+traces:
+    implemented_by_extra:
+        - internal/policy/apply.go
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-04-27T06:25:20.754839Z"
+    reviewed_by: human:leonidbugaev
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-04-14T10:00:00Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:33Z"
+stakeholder:
+    persona: API platform administrator
+    story: As an API platform administrator, I need the policy engine to correctly clear session state so that policy changes take effect immediately without stale data.
+    acceptance_criteria:
+        - id: STK-REQ-002-AC-01
+          text: Given a session with existing quota, rate, and complexity values, when ClearSession is called with a valid policy, then all values are reset to zero
+          testable: true
+          derived_reqs:
+            - SYS-REQ-019
+        - id: STK-REQ-002-AC-02
+          text: Given a session referencing a missing policy, when ClearSession is called, then an error is returned
+          testable: true
+          derived_reqs:
+            - SYS-REQ-020
+    obligation_checklist:
+        - nominal
+        - error_handling
+        - nil_safety
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:33Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

@@ -1,0 +1,47 @@
+id: SYS-REQ-035
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: assumption
+fretish: the policy shall always satisfy !policy_rate_higher | !policy_rate_empty
+description: A policy cannot have a higher rate than the current limit if its rate is empty (zero). These are logically exclusive.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: A policy cannot have a higher rate than the current limit if its rate is empty (zero). These are logically exclusive.
+tags: []
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-003
+    verified_by_extra:
+        - FLIP:policy/tc-080
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-04-27T06:25:20.837896Z"
+    reviewed_by: human:leonidbugaev
+verification:
+    assurance_level: B
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: human:cli
+    created_at: "2026-03-28T13:29:56Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:34Z"
+obligation_class: rate_limit_boundary
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:34Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

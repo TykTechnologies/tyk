@@ -1,0 +1,71 @@
+id: STK-REQ-006
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: 'The policy engine shall be idle-safe: when no operation is requested, all outputs must remain false. The component shall not produce spurious state changes, errors, or results when idle. Additionally, the policy store must be available and non-nil before any operation is attempted.'
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: An idle-safe component prevents ghost state changes that could corrupt sessions between explicit operations. Store availability is a precondition for all operations; a nil store causes panics that crash the gateway process.
+tags:
+    - safety
+    - idle-state
+    - store-availability
+variables: []
+traces:
+    implemented_by_extra:
+        - internal/policy/apply.go
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-04-27T06:25:20.764146Z"
+    reviewed_by: human:leonidbugaev
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-04-14T10:00:00Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:33Z"
+stakeholder:
+    persona: Platform reliability engineer
+    story: As a platform reliability engineer, I need the policy engine to be idle-safe and store-aware so that it never produces spurious state changes when idle and never panics when the policy store is unavailable.
+    acceptance_criteria:
+        - id: STK-REQ-006-AC-01
+          text: Given no operation is requested, then all output variables remain false
+          testable: true
+          derived_reqs:
+            - SYS-REQ-027
+        - id: STK-REQ-006-AC-02
+          text: Given the policy store is nil or unavailable, when any operation is attempted, then an error is reported immediately
+          testable: true
+          derived_reqs:
+            - SYS-REQ-042
+        - id: STK-REQ-006-AC-03
+          text: Given a transition from idle to active and back, then state correctness is preserved
+          testable: true
+          derived_reqs:
+            - SYS-REQ-027
+            - SYS-REQ-029
+    obligation_checklist:
+        - nominal
+        - error_handling
+        - nil_safety
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:33Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

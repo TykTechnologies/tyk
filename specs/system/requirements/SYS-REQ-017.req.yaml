@@ -1,0 +1,50 @@
+id: SYS-REQ-017
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !apply_requested | error_reported | metadata_merged
+description: Apply must merge policy metadata into the session when no error occurs. When an error is reported, metadata must NOT be merged. Metadata carries custom key-value pairs used by middleware plugins.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Apply must merge policy metadata into the session when no error occurs. When an error is reported, metadata must NOT be merged. Metadata carries custom key-value pairs used by middleware plugins.
+tags: []
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-001
+        - STK-REQ-004
+    verified_by_extra:
+        - FLIP:policy/tc-025
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-04-27T06:25:20.800307Z"
+    reviewed_by: human:leonidbugaev
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: false
+    gaps_reviewed_at: "2026-04-27T06:26:19.418656Z"
+    gaps_reviewed_by: leonidbugaev
+history:
+    created_by: human:cli
+    created_at: "2026-03-28T13:28:42Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:34Z"
+obligation_class: policy_merge
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:34Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

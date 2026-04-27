@@ -10,6 +10,8 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+// Verifies: SYS-REQ-013 [example]
+// MCDC SYS-REQ-013: access_rights_merged=T, apply_requested=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
 func TestMergeAllowedURLs(t *testing.T) {
 	svc := policy.New(nil, nil, logrus.New())
 

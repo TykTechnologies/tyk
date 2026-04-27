@@ -1,0 +1,45 @@
+id: SYS-REQ-028
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: constraint
+fretish: the policy shall always satisfy !(error_reported & access_rights_merged)
+description: 'Mutual exclusivity: error_reported and access_rights_merged cannot both be true simultaneously. A policy application either succeeds (rights merged) or fails (error reported), never both.'
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: 'Mutual exclusivity: error_reported and access_rights_merged cannot both be true simultaneously. A policy application either succeeds (rights merged) or fails (error reported), never both.'
+tags: []
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-005
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-04-27T06:25:20.82312Z"
+    reviewed_by: human:leonidbugaev
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: human:cli
+    created_at: "2026-03-28T13:29:12Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:34Z"
+obligation_class: access_denied
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:34Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

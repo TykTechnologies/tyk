@@ -6,6 +6,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+// SYS-REQ-013
 // MergeAllowedURLs will merge s1 and s2 to produce a merged result.
 // It maintains order of keys in s1 and s2 as they are seen.
 // If the result is an empty set, nil is returned.
@@ -48,6 +49,7 @@ func MergeAllowedURLs(s1, s2 []user.AccessSpec) []user.AccessSpec {
 	return result
 }
 
+// SYS-REQ-013
 // appendIfMissing ensures dest slice is unique with new items.
 func appendIfMissing(dest []string, in ...string) []string {
 	for _, v := range in {
@@ -59,23 +61,7 @@ func appendIfMissing(dest []string, in ...string) []string {
 	return dest
 }
 
-// intersection gets intersection of the given two slices.
-func intersection(a []string, b []string) (inter []string) {
-	m := make(map[string]bool)
-
-	for _, item := range a {
-		m[item] = true
-	}
-
-	for _, item := range b {
-		if _, ok := m[item]; ok {
-			inter = append(inter, item)
-		}
-	}
-
-	return
-}
-
+// SYS-REQ-021, SYS-REQ-041
 // greaterThanInt64 checks whether first int64 value is bigger than second int64 value.
 // -1 means infinite and the biggest value.
 func greaterThanInt64(first, second int64) bool {
@@ -90,6 +76,7 @@ func greaterThanInt64(first, second int64) bool {
 	return first > second
 }
 
+// SYS-REQ-021, SYS-REQ-041
 // greaterThanInt checks whether first int value is bigger than second int value.
 // -1 means infinite and the biggest value.
 func greaterThanInt(first, second int) bool {

@@ -1,0 +1,51 @@
+id: SYS-REQ-019
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !clear_requested | !policy_found | error_reported | session_cleared
+description: ClearSession must reset quota/rate/complexity values when the referenced policy is found. Without clearing, stale session values would prevent policy updates from taking effect.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: ClearSession must reset quota/rate/complexity values when the referenced policy is found. Without clearing, stale session values would prevent policy updates from taking effect.
+tags: []
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-002
+    verified_by_extra:
+        - FLIP:policy/tc-027
+        - FLIP:policy/tc-028
+        - FLIP:policy/tc-029
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-04-27T06:25:20.80539Z"
+    reviewed_by: human:leonidbugaev
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: false
+    gaps_reviewed_at: "2026-04-27T06:26:19.418656Z"
+    gaps_reviewed_by: leonidbugaev
+history:
+    created_by: human:cli
+    created_at: "2026-03-28T13:28:53Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:34Z"
+obligation_class: nominal
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:34Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli
