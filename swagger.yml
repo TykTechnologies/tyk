@@ -5404,7 +5404,16 @@ components:
         use_standard_auth:
           type: boolean
         version_data:
-          $ref: '#/components/schemas/VersionData'
+          $ref: "#/components/schemas/VersionData"
+        error_overrides:
+          additionalProperties:
+            items:
+              $ref: "#/components/schemas/ErrorOverride"
+            type: array
+          nullable: true
+          type: object
+        error_overrides_disabled:
+          type: boolean
       type: object
     APILimit:
       properties:
@@ -6024,6 +6033,40 @@ components:
         certificate:
           type: string
         domain:
+          type: string
+      type: object
+    ErrorMatcher:
+      properties:
+        body_field:
+          type: string
+        body_value:
+          type: string
+        flag:
+          type: string
+        message_pattern:
+          type: string
+      type: object
+    ErrorOverride:
+      properties:
+        match:
+          $ref: '#/components/schemas/ErrorMatcher'
+        response:
+          $ref: '#/components/schemas/ErrorResponse'
+      type: object
+    ErrorResponse:
+      properties:
+        body:
+          type: string
+        headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        message:
+          type: string
+        status_code:
+          type: integer
+        template:
           type: string
       type: object
     EndPointMeta:
