@@ -231,7 +231,7 @@ type HardTimeoutMeta struct {
 	Method   string `bson:"method" json:"method"`
 	// Deprecated: Use TimeoutDuration instead.
 	TimeOut         int                      `bson:"timeout" json:"timeout"`
-	TimeoutDuration tyktime.ReadableDuration `bson:"timeout_duration" json:"timeout_duration"`
+	TimeoutDuration tyktime.ReadableDuration `bson:"timeout_duration,omitempty" json:"timeout_duration,omitempty"`
 }
 
 type TrackEndpointMeta struct {

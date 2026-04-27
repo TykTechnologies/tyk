@@ -1324,7 +1324,7 @@ type EnforceTimeout struct {
 	// Timeout is the configured timeout.
 	//
 	// Tyk classic API definition: `version_data.versions.extended_paths.hard_timeouts[].timeout_duration`.
-	Timeout tyktime.ReadableDuration `bson:"timeout" json:"timeout"`
+	Timeout tyktime.ReadableDuration `bson:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
 // Fill fills *EnforceTimeout from apidef.HardTimeoutMeta.
