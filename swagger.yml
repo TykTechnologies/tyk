@@ -1603,6 +1603,30 @@ paths:
       requestBody:
         content:
           application/json:
+            example:
+              openapi: 3.0.3
+              info: { title: MCP Proxy Sample, version: 1.0.0 }
+              paths: {}
+              components: {}
+              servers: [{ url: /mcp-sample/ }]
+              x-tyk-api-gateway:
+                info:
+                  name: mcp-sample
+                  state: { active: true }
+                server:
+                  listenPath: { strip: true, value: /mcp-sample/ }
+                  authentication:
+                    enabled: true
+                    securitySchemes:
+                      authToken: { enabled: true }
+                upstream:
+                  url: http://localhost:7878/mcp
+                middleware:
+                  global:
+                    contextVariables: { enabled: true }
+                    trafficLogs: { enabled: true }
+                  mcpTools: {}
+                  operations: {}
             schema:
               allOf:
               - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
@@ -1672,6 +1696,30 @@ paths:
       requestBody:
         content:
           application/json:
+            example:
+              openapi: 3.0.3
+              info: { title: MCP Proxy Sample, version: 1.0.0 }
+              paths: {}
+              components: {}
+              servers: [{ url: /mcp-sample/ }]
+              x-tyk-api-gateway:
+                info:
+                  name: mcp-sample
+                  state: { active: true }
+                server:
+                  listenPath: { strip: true, value: /mcp-sample/ }
+                  authentication:
+                    enabled: true
+                    securitySchemes:
+                      authToken: { enabled: true }
+                upstream:
+                  url: http://localhost:7878/mcp
+                middleware:
+                  global:
+                    contextVariables: { enabled: true }
+                    trafficLogs: { enabled: true }
+                  mcpTools: {}
+                  operations: {}
             schema:
               allOf:
               - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
