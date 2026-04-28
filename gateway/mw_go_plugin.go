@@ -15,7 +15,21 @@ import (
 	"github.com/TykTechnologies/tyk/goplugin"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/middleware"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"github.com/TykTechnologies/tyk/request"
+)
+
+var (
+	ErrResponseSucceed = errpack.New(
+		"response succeed",
+		errpack.WithType(errpack.TypeDomain),
+		errpack.WithLogLevel(logrus.TraceLevel),
+	)
+	ErrResponseErrorSent = errpack.New(
+		"plugin error",
+		errpack.WithType(errpack.TypeDomain),
+		errpack.WithLogLevel(logrus.DebugLevel),
+	)
 )
 
 // customResponseWriter is a wrapper around standard http.ResponseWriter
@@ -302,7 +316,7 @@ func (m *GoPluginMiddleware) handlePluginResponse(
 	}, rw.statusCodeSent, rw.getHttpResponse(r), false)
 
 	// no need to continue passing this request down to reverse proxy
-	return nil, middleware.StatusRespond
+	return ErrResponseSucceed, middleware.StatusRespond
 }
 
 func (m *GoPluginMiddleware) handleErrorResponse(
@@ -326,6 +340,10 @@ func (m *GoPluginMiddleware) handleErrorResponse(
 	// base middleware will report this error to analytics if needed
 	err := fmt.Errorf("plugin function sent error response code: %d", rw.statusCodeSent)
 	logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
+
+	if rw.responseSent {
+		err = fmt.Errorf("%w: %w", ErrResponseErrorSent, err)
+	}
 
 	return err, rw.statusCodeSent
 }

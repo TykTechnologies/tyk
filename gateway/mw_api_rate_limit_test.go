@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -8,6 +9,8 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/stretchr/testify/assert"
 
@@ -73,6 +76,82 @@ func TestRateLimitForAPI_EnabledForSpec(t *testing.T) {
 
 	rlDisabled := &RateLimitForAPI{BaseMiddleware: &BaseMiddleware{Spec: &apiSpecDisabled}}
 	assert.False(t, rlDisabled.EnabledForSpec())
+}
+
+func TestAPIRateLimitResponseHeaders(t *testing.T) {
+	limiters := []string{"Redis", "Sentinel", "DRL", "FixedWindow"}
+
+	for _, limiter := range limiters {
+		t.Run("API Rate limit headers for "+limiter, func(t *testing.T) {
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.RateLimitResponseHeaders = config.SourceRateLimits
+
+				switch limiter {
+				case "Redis":
+					globalConf.EnableRedisRollingLimiter = true
+				case "Sentinel":
+					globalConf.EnableSentinelRateLimiter = true
+				case "DRL":
+					globalConf.DRLEnableSentinelRateLimiter = true
+				case "FixedWindow":
+					globalConf.EnableFixedWindowRateLimiter = true
+				}
+			})
+			defer ts.Close()
+
+			var (
+				rateLimitRate float64 = 2
+				rateLimitPer  float64 = 10
+			)
+
+			_ = ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.APIID = "api-rate-limit-headers-test-" + limiter
+				spec.Proxy.ListenPath = "/api-rate-limit-headers-test"
+				spec.UseKeylessAccess = true
+				spec.GlobalRateLimit = apidef.GlobalRateLimit{
+					Disabled: false,
+					Rate:     rateLimitRate,
+					Per:      rateLimitPer,
+				}
+			})[0]
+
+			expectedRemaining1 := fmt.Sprintf("%d", int(rateLimitRate)-1)
+			expectedRemaining2 := fmt.Sprintf("%d", int(rateLimitRate)-2)
+
+			headersMatch1 := map[string]string{
+				header.XRateLimitLimit: fmt.Sprintf("%d", int(rateLimitRate)),
+			}
+			headersMatch2 := map[string]string{
+				header.XRateLimitLimit: fmt.Sprintf("%d", int(rateLimitRate)),
+			}
+
+			// For limiters that don't support Remaining (Sentinel, FixedWindow), it should be assigned to 0.
+			if limiter == "Redis" || limiter == "DRL" {
+				headersMatch1[header.XRateLimitRemaining] = expectedRemaining1
+				headersMatch2[header.XRateLimitRemaining] = expectedRemaining2
+			} else {
+				headersMatch1[header.XRateLimitRemaining] = "0"
+				headersMatch2[header.XRateLimitRemaining] = "0"
+			}
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{
+					Path:         "/api-rate-limit-headers-test",
+					Code:         http.StatusOK,
+					HeadersMatch: headersMatch1,
+				},
+				{
+					Path:         "/api-rate-limit-headers-test",
+					Code:         http.StatusOK,
+					HeadersMatch: headersMatch2,
+				},
+				{
+					Path: "/api-rate-limit-headers-test",
+					Code: http.StatusTooManyRequests,
+				},
+			}...)
+		})
+	}
 }
 
 func TestRLOpen(t *testing.T) {

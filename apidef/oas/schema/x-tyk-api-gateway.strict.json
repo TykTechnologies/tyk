@@ -13,6 +13,9 @@
     },
     "middleware": {
       "$ref": "#/definitions/X-Tyk-Middleware"
+    },
+    "errorOverrides": {
+      "$ref": "#/definitions/X-Tyk-ErrorOverrides"
     }
   },
   "required": [
@@ -2915,6 +2918,84 @@
         "url",
         "weight"
       ],
+      "additionalProperties": false
+    },
+    "X-Tyk-ErrorOverrides": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/X-Tyk-ErrorOverride"
+            }
+          }
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "X-Tyk-ErrorOverride": {
+      "type": "object",
+      "properties": {
+        "match": {
+          "$ref": "#/definitions/X-Tyk-ErrorMatcher"
+        },
+        "response": {
+          "$ref": "#/definitions/X-Tyk-ErrorResponse"
+        }
+      },
+      "required": [
+        "response"
+      ],
+      "additionalProperties": false
+    },
+    "X-Tyk-ErrorMatcher": {
+      "type": "object",
+      "properties": {
+        "flag": {
+          "type": "string"
+        },
+        "messagePattern": {
+          "type": "string"
+        },
+        "bodyField": {
+          "type": "string"
+        },
+        "bodyValue": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "X-Tyk-ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "statusCode": {
+          "type": "integer"
+        },
+        "body": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "template": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
       "additionalProperties": false
     }
   },

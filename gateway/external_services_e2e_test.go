@@ -538,3 +538,63 @@ func TestE2E_CompleteAPIFlowWithExternalServices(t *testing.T) {
 	assert.Equal(t, 30*time.Second, webhookClient.Timeout)
 	assert.Equal(t, 10*time.Second, healthClient.Timeout)
 }
+
+func TestE2E_VaultHotReload(t *testing.T) {
+	vaultData := map[string]string{
+		"cert_file": "/initial/cert.pem",
+		"key_file":  "/initial/key.pem",
+		"ca_file":   "/initial/ca.pem",
+	}
+
+	mockVault := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		response := map[string]interface{}{
+			"data": map[string]interface{}{
+				"data": map[string]interface{}{
+					"cert_file": vaultData["cert_file"],
+					"key_file":  vaultData["key_file"],
+					"ca_file":   vaultData["ca_file"],
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(response))
+	}))
+	defer mockVault.Close()
+
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.KV.Vault = config.VaultConfig{
+			Address:   mockVault.URL,
+			Token:     "test-token",
+			KVVersion: 2,
+		}
+		globalConf.ExternalServices = config.ExternalServiceConfig{
+			OAuth: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  true,
+					CertFile: "vault://secret/oauth.cert_file",
+					KeyFile:  "vault://secret/oauth.key_file",
+					CAFile:   "vault://secret/oauth.ca_file",
+				},
+			},
+		}
+	})
+	defer ts.Close()
+
+	require.NoError(t, ts.Gw.afterConfSetup())
+
+	conf := ts.Gw.GetConfig()
+	assert.Equal(t, "/initial/cert.pem", conf.ExternalServices.OAuth.MTLS.CertFile)
+	assert.Equal(t, "/initial/key.pem", conf.ExternalServices.OAuth.MTLS.KeyFile)
+	assert.Equal(t, "/initial/ca.pem", conf.ExternalServices.OAuth.MTLS.CAFile)
+
+	vaultData["cert_file"] = "/updated/cert.pem"
+	vaultData["key_file"] = "/updated/key.pem"
+	vaultData["ca_file"] = "/updated/ca.pem"
+
+	ts.Gw.DoReload()
+
+	conf = ts.Gw.GetConfig()
+	assert.Equal(t, "/updated/cert.pem", conf.ExternalServices.OAuth.MTLS.CertFile)
+	assert.Equal(t, "/updated/key.pem", conf.ExternalServices.OAuth.MTLS.KeyFile)
+	assert.Equal(t, "/updated/ca.pem", conf.ExternalServices.OAuth.MTLS.CAFile)
+}
