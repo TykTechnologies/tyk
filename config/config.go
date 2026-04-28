@@ -208,7 +208,19 @@ type StorageOptionsConf struct {
 	// Defaults to `false`.
 	CompressAPIDefinitions bool `json:"compress_api_definitions"`
 
-	// Maximum decompressed size (in bytes) for API definitions when using compression.
+	// When set to `true`, enables Zstd compression for policies stored in Redis RPC backups.
+	// This feature significantly reduces Redis memory usage in MDCB deployments where policies are cached locally on Data Plane Gateways.
+	// The Gateway can read both compressed and uncompressed formats for backward compatibility.
+	//
+	// You can safely enable this setting on existing deployments.
+	// The Gateway continues to load previously stored uncompressed backups and stores all new backups in compressed form.
+	//
+	// Note: The maximum decompressed size is controlled by `max_decompressed_size`.
+	//
+	// Defaults to `false`.
+	CompressPolicies bool `json:"compress_policies"`
+
+	// Maximum decompressed size (in bytes) for API definitions and Policies when using compression.
 	// This limit prevents memory exhaustion during decompression.
 	// Defaults to 104857600 (100MB).
 	MaxDecompressedSize int64 `json:"max_decompressed_size"`
