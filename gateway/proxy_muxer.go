@@ -211,7 +211,7 @@ func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router, conf
 func (m *proxyMux) handle404(w http.ResponseWriter, r *http.Request) {
 	if m.track404Logs {
 		requestMeta := fmt.Sprintf("%s %s %s", r.Method, r.URL.Path, r.Proto)
-		log.WithField("request", requestMeta).WithField("origin", r.RemoteAddr).
+		log.WithField("request", requestMeta).WithField("origin", r.RemoteAddr).WithField("host", r.Host).
 			Error(http.StatusText(http.StatusNotFound))
 	}
 
