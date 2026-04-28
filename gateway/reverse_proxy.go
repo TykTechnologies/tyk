@@ -1392,7 +1392,16 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		if p.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
 			hooks = append(hooks, NewLoggingSSEHook(p.logger))
 		}
+		if filterHook := NewMCPListFilterSSEHook(p.TykAPISpec.APIID, ses); filterHook != nil {
+			hooks = append(hooks, filterHook)
+		}
 		res.Body = NewSSETap(res.Body, hooks...)
+		// Hooks may modify event data, changing the body length. Remove
+		// Content-Length so the client doesn't expect the original size.
+		if len(hooks) > 0 {
+			res.Header.Del("Content-Length")
+			res.ContentLength = -1
+		}
 	}
 
 	if withCache {
@@ -1442,7 +1451,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 		res.Header.Set(header.Connection, "close")
 	}
 
-	p.TykAPISpec.sendRateLimitHeaders(ses, res)
+	p.Gw.limitHeaderFactory(res.Header).SendQuotas(ses, p.TykAPISpec.APIID)
 
 	copyHeader(rw.Header(), res.Header, p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 

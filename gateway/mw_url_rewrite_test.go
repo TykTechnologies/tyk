@@ -1314,10 +1314,11 @@ func TestValToStr(t *testing.T) {
 		12.22,              // float
 		float64(123452342), // float64
 		"abc,def",          // string url encode
+		13,                 // int
 	}
 
 	str := valToStr(example)
-	expected := "abc,456,12.22,123452342,abc%2Cdef"
+	expected := "abc,456,12.22,123452342,abc%2Cdef,13"
 
 	if str != expected {
 		t.Errorf("expected (%s) got (%s)", expected, str)
@@ -1341,18 +1342,18 @@ func TestLoopingUrl(t *testing.T) {
 }
 
 type mockKVStore struct {
-	secrets map[string]string
+	store map[string]string
 }
 
 func (m *mockKVStore) Get(key string) (string, error) {
-	if val, ok := m.secrets[key]; ok {
+	if val, ok := m.store[key]; ok {
 		return val, nil
 	}
 	return "", fmt.Errorf("secret not found: %s", key)
 }
 
 func (m *mockKVStore) Put(key, value string) error {
-	m.secrets[key] = value
+	m.store[key] = value
 	return nil
 }
 
@@ -1362,7 +1363,7 @@ func TestReplaceTykVariables(t *testing.T) {
 
 	// Mock Vault KV store
 	ts.Gw.vaultKVStore = &mockKVStore{
-		secrets: map[string]string{
+		store: map[string]string{
 			"kv-v2/layer1/layer2/dev.API_KEY": "vault_api_key_value",
 			"simplekey":                       "simple_vault_value",
 		},
@@ -1370,7 +1371,7 @@ func TestReplaceTykVariables(t *testing.T) {
 
 	// Mock Consul KV store
 	ts.Gw.consulKVStore = &mockKVStore{
-		secrets: map[string]string{
+		store: map[string]string{
 			"path/to/db_password": "consul_db_password_value",
 			"anotherkey":          "another_consul_value",
 		},

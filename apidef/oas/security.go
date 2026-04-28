@@ -318,6 +318,22 @@ func (j *JWT) Import(enable bool) {
 	}
 }
 
+// mergeStringFirst returns a slice with primary as the first element, followed by any
+// elements from existing that are not equal to primary. If primary is empty, existing
+// is returned unchanged.
+func mergeStringFirst(primary string, existing []string) []string {
+	if primary == "" {
+		return existing
+	}
+	result := []string{primary}
+	for _, c := range existing {
+		if c != primary {
+			result = append(result, c)
+		}
+	}
+	return result
+}
+
 func (j *JWT) Normalize() {
 	// copy the values of the new JWT validation
 	if j == nil {
@@ -391,15 +407,15 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 
 	existing := s.GetJWTConfiguration()
 	if existing != nil {
-		jwt.BasePolicyClaims = existing.BasePolicyClaims
-		jwt.SubjectClaims = existing.SubjectClaims
+		jwt.BasePolicyClaims = mergeStringFirst(jwt.PolicyFieldName, existing.BasePolicyClaims)
+		jwt.SubjectClaims = mergeStringFirst(jwt.IdentityBaseField, existing.SubjectClaims)
 		jwt.AllowedIssuers = existing.AllowedIssuers
 		jwt.AllowedAudiences = existing.AllowedAudiences
 		jwt.AllowedSubjects = existing.AllowedSubjects
 		jwt.JTIValidation.Enabled = existing.JTIValidation.Enabled
 
 		if existing.Scopes != nil {
-			jwt.Scopes.Claims = existing.Scopes.Claims
+			jwt.Scopes.Claims = mergeStringFirst(api.Scopes.JWT.ScopeClaimName, existing.Scopes.Claims)
 		}
 		if existing.CustomClaimValidation != nil {
 			jwt.CustomClaimValidation = existing.CustomClaimValidation

@@ -191,6 +191,10 @@ type ErrorClassification struct {
 
 	// CircuitBreakerState indicates the state of the circuit breaker (e.g., "OPEN", "HALF-OPEN")
 	CircuitBreakerState string
+
+	// TemplateData holds arbitrary key-value pairs passed to error override templates.
+	// Keys are exposed as top-level template variables (e.g. {{.InvalidParams}}).
+	TemplateData map[string]any
 }
 
 // NewErrorClassification creates a new ErrorClassification with the given flag and details.
@@ -229,5 +233,12 @@ func (ec *ErrorClassification) WithCircuitBreakerState(state string) *ErrorClass
 // WithUpstreamStatus sets the upstream HTTP status code and returns the classification for chaining.
 func (ec *ErrorClassification) WithUpstreamStatus(status int) *ErrorClassification {
 	ec.UpstreamStatus = status
+	return ec
+}
+
+// WithTemplateData sets arbitrary template variables and returns the classification for chaining.
+// The keys are exposed as top-level template variables in error override templates.
+func (ec *ErrorClassification) WithTemplateData(data map[string]any) *ErrorClassification {
+	ec.TemplateData = data
 	return ec
 }

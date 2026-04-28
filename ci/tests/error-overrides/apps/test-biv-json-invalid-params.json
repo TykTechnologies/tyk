@@ -1,0 +1,56 @@
+{
+  "name": "Test BIV - InvalidParams Template (JSON Parse Error)",
+  "api_id": "test-biv-json-invalid-params",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-biv-json-invalid-params/",
+    "target_url": "http://backend-ok:80",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default",
+        "use_extended_paths": true,
+        "extended_paths": {
+          "validate_json": [
+            {
+              "path": "validate",
+              "method": "POST",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {"type": "string"},
+                  "age": {"type": "integer"}
+                },
+                "required": ["name"]
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "error_overrides": {
+    "400": [
+      {
+        "match": {
+          "flag": "BIV"
+        },
+        "response": {
+          "status_code": 400,
+          "template": "error_validation_invalid_params",
+          "message": "Request body is not valid JSON",
+          "headers": {
+            "X-Error-Flag": "BIV",
+            "X-Override-Applied": "true"
+          }
+        }
+      }
+    ]
+  }
+}

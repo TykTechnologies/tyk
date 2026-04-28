@@ -4,11 +4,12 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
@@ -16,7 +17,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/agentprotocol"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/errors"
@@ -24,7 +24,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
-	"github.com/TykTechnologies/tyk/user"
 
 	_ "github.com/TykTechnologies/tyk/internal/mcp" // registers MCP VEM prefixes
 )
@@ -106,6 +105,10 @@ type APISpec struct {
 	// all primitives on every JSON-RPC request that doesn't match a VEM.
 	// This is a convenience flag that combines ToolsAllowListEnabled, ResourcesAllowListEnabled, and PromptsAllowListEnabled.
 	MCPAllowListEnabled bool
+
+	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
+	// Built from apidef.ErrorOverrides during gateway startup.
+	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
@@ -140,6 +143,16 @@ func (a *APISpec) GetTykExtension() *oas.XTykAPIGateway {
 		log.Warn("APISpec is an invalid OAS API")
 	}
 	return res
+}
+
+// GetCompiledErrorOverrides returns the compiled error overrides for O(1) lookup.
+func (a *APISpec) GetCompiledErrorOverrides() *CompiledErrorOverrides {
+	return a.compiledErrorOverrides.Load()
+}
+
+// SetCompiledErrorOverrides stores the compiled error overrides.
+func (a *APISpec) SetCompiledErrorOverrides(compiled *CompiledErrorOverrides) {
+	a.compiledErrorOverrides.Store(compiled)
 }
 
 // GetPRMConfig returns the Protected Resource Metadata configuration
@@ -303,6 +316,29 @@ func (a *APISpec) findRouteForOASPath(oasPath, method, actualPath, fullRequestPa
 	return route, pathParams, nil
 }
 
+// matchCandidatePath looks up the path item and operation from the OAS spec for a
+// candidate path+method, extracts path parameters from the actual request path, and
+// validates them against the operation's path parameter schemas. Returns the operation,
+// path params, and true if the candidate matches; false otherwise.
+// This is the shared disambiguation logic used by both validate request and mock response.
+func (a *APISpec) matchCandidatePath(oasPath, oasMethod, strippedPath string) (*openapi3.PathItem, *openapi3.Operation, map[string]string, bool) {
+	pathItem := a.OAS.Paths.Value(oasPath)
+	if pathItem == nil {
+		return nil, nil, nil, false
+	}
+	operation := pathItem.GetOperation(oasMethod)
+	if operation == nil {
+		return nil, nil, nil, false
+	}
+
+	pathParams := extractPathParams(oasPath, strippedPath)
+	if !pathParamsMatchOperation(pathParams, operation) {
+		return nil, nil, nil, false
+	}
+
+	return pathItem, operation, pathParams, true
+}
+
 // extractPathParams extracts path parameter values from actualPath based on the
 // OAS path pattern. For example, if oasPath is "/users/{id}" and actualPath is
 // "/users/123", it returns map[string]string{"id": "123"}.
@@ -339,20 +375,4 @@ func (a *APISpec) APIType() string {
 	default:
 		return "classic"
 	}
-}
-
-func (a *APISpec) sendRateLimitHeaders(session *user.SessionState, dest *http.Response) {
-	quotaMax, quotaRemaining, quotaRenews := int64(0), int64(0), int64(0)
-
-	if session != nil {
-		quotaMax, quotaRemaining, _, quotaRenews = session.GetQuotaLimitByAPIID(a.APIID)
-	}
-
-	if dest.Header == nil {
-		dest.Header = http.Header{}
-	}
-
-	dest.Header.Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-	dest.Header.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-	dest.Header.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 }

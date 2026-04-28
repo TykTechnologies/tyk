@@ -1217,9 +1217,20 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	gw.keyGen = DefaultKeyGenerator{Gw: gw}
 	gw.CoProcessInit()
-	gw.afterConfSetup()
+	if err := gw.afterConfSetup(); err != nil {
+		panic(err)
+	}
 
 	gw.SetConfig(gwConfig)
+
+	// Compile error override patterns for O(1) lookup in tests
+	// (In production, this is done in initialiseSystem() when !isRunningTests())
+	if len(gwConfig.ErrorOverrides) > 0 {
+		compiled := CompileErrorOverrides(gwConfig.ErrorOverrides)
+		if compiled != nil {
+			gw.SetCompiledErrorOverrides(compiled)
+		}
+	}
 
 	cli.Init(confPaths)
 

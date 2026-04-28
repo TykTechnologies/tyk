@@ -12,8 +12,20 @@ import (
 
 type EventMetaDefault = model.EventMetaDefault
 
+type CtxData = map[string]any
+
+const (
+	ctxDataKeyRateLimitLimit     = "rate_limit_limit"
+	ctxDataKeyRateLimitRemaining = "rate_limit_remaining"
+	ctxDataKeyRateLimitReset     = "rate_limit_reset"
+
+	ctxDataKeyQuotaLimit     = "quota_limit"
+	ctxDataKeyQuotaRemaining = "quota_remaining"
+	ctxDataKeyQuotaReset     = "quota_reset"
+)
+
 var (
-	ctxData = httpctx.NewValue[map[string]any](ctx.ContextData)
+	ctxData = httpctx.NewValue[CtxData](ctx.ContextData)
 
 	ctxGetData = ctxData.Get
 	ctxSetData = ctxData.Set
@@ -28,3 +40,14 @@ var (
 
 	EncodeRequestToEvent = event.EncodeRequestToEvent
 )
+
+func ctxGetOrCreateData(r *http.Request) CtxData {
+	data := ctxGetData(r)
+
+	if data == nil {
+		data = CtxData{}
+		ctxSetData(r, data)
+	}
+
+	return data
+}
