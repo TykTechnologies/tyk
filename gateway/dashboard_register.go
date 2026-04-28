@@ -266,7 +266,7 @@ func (h *HTTPDashboardHandler) attemptRegistration(ctx context.Context) (registe
 	h.Gw.ServiceNonce = val.Nonce
 	h.Gw.ServiceNonceMutex.Unlock()
 	dashLog.Debug("Registration Finished: Nonce Set: ", val.Nonce)
-	h.Gw.DoReloadWithRetry(ctx)
+	h.Gw.DoReload()
 
 	return true, nil
 }
