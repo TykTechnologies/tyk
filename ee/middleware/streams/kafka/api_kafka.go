@@ -14,23 +14,13 @@ type KafkaOffsetResetRequest struct {
 	Timestamp *int64 `json:"timestamp"` // Unix timestamp in milliseconds
 }
 
-func NewKafkaOffsetResetHandler(brokers []string, consumerGroup, topic string) http.HandlerFunc {
+func NewKafkaOffsetResetHandler(client sarama.Client, consumerGroup, topic string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req KafkaOffsetResetRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-
-		config := sarama.NewConfig()
-		config.Version = sarama.V2_0_0_0
-
-		client, err := sarama.NewClient(brokers, config)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer client.Close()
 
 		var targetOffset int64 = req.Offset
 

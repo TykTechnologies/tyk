@@ -94,11 +94,14 @@ require (
 require (
 	github.com/Azure/go-amqp v1.4.0
 	github.com/IBM/sarama v1.46.3
+	github.com/Jeffail/checkpoint v1.0.1
 	github.com/Jeffail/gabs/v2 v2.7.0
+	github.com/Jeffail/shutdown v1.0.0
 	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20250926102005-c54e73aae17d
 	github.com/TykTechnologies/opentelemetry v0.0.25
 	github.com/TykTechnologies/structviewer v1.2.0
 	github.com/alecthomas/kingpin/v2 v2.4.0
+	github.com/dustin/go-humanize v1.0.1
 	github.com/eclipse/paho.mqtt.golang v1.5.1
 	github.com/getkin/kin-openapi v0.133.0
 	github.com/go-playground/validator/v10 v10.30.1
@@ -123,7 +126,9 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/nats v0.37.0
 	github.com/testcontainers/testcontainers-go/modules/rabbitmq v0.36.0
 	github.com/tidwall/gjson v1.18.0
+	github.com/twmb/franz-go v1.18.1
 	github.com/warpstreamlabs/bento v1.16.2
+	github.com/xdg-go/scram v1.1.2
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.63.0
 	go.opentelemetry.io/contrib/instrumentation/runtime v0.67.0
 	go.opentelemetry.io/otel v1.43.0
@@ -180,9 +185,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.21.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.54.0 // indirect
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
-	github.com/Jeffail/checkpoint v1.0.1 // indirect
 	github.com/Jeffail/grok v1.1.0 // indirect
-	github.com/Jeffail/shutdown v1.0.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/semver/v3 v3.3.0 // indirect
@@ -300,7 +303,6 @@ require (
 	github.com/duckdb/duckdb-go-bindings/lib/linux-arm64 v0.10500.0 // indirect
 	github.com/duckdb/duckdb-go-bindings/lib/windows-amd64 v0.10500.0 // indirect
 	github.com/duckdb/duckdb-go/v2 v2.10500.0 // indirect
-	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.8.0 // indirect
 	github.com/eapache/go-resiliency v1.7.0 // indirect
 	github.com/eapache/go-xerial-snappy v0.0.0-20230731223053-c322873962e3 // indirect
@@ -539,7 +541,6 @@ require (
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/trinodb/trino-go-client v0.313.0 // indirect
-	github.com/twmb/franz-go v1.18.1 // indirect
 	github.com/twmb/franz-go/pkg/kmsg v1.9.0 // indirect
 	github.com/uber/jaeger-lib v2.4.2-0.20210604143007-135cf5605a6d+incompatible // indirect
 	github.com/urfave/cli/v2 v2.27.7 // indirect
@@ -550,7 +551,6 @@ require (
 	github.com/woodsbury/decimal128 v1.3.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
-	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect

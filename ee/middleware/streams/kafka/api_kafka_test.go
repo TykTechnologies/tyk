@@ -19,26 +19,10 @@ func TestKafkaOffsetResetHandler_InvalidJSON(t *testing.T) {
 	req := httptest.NewRequest("POST", "/streams/kafka/offset/reset", bytes.NewBufferString("{invalid json}"))
 	w := httptest.NewRecorder()
 
-	handler := NewKafkaOffsetResetHandler([]string{"invalid-broker:9092"}, "test-group", "test-topic")
+	handler := NewKafkaOffsetResetHandler(nil, "test-group", "test-topic")
 	handler(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-}
-
-func TestKafkaOffsetResetHandler_NoBrokers(t *testing.T) {
-	payload := KafkaOffsetResetRequest{
-		Partition: 0,
-		Offset:    100,
-	}
-	body, _ := json.Marshal(payload)
-	req := httptest.NewRequest("POST", "/streams/kafka/offset/reset", bytes.NewBuffer(body))
-	w := httptest.NewRecorder()
-
-	handler := NewKafkaOffsetResetHandler([]string{"invalid-broker:9092"}, "test-group", "test-topic")
-	handler(w, req)
-
-	// Should fail because broker is invalid
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
 func TestKafkaOffsetResetHandler_Integration(t *testing.T) {
@@ -77,8 +61,12 @@ func TestKafkaOffsetResetHandler_Integration(t *testing.T) {
 	partition, offset, err := producer.SendMessage(msg)
 	require.NoError(t, err, "Failed to send message")
 
+	client, err := sarama.NewClient(brokers, config)
+	require.NoError(t, err)
+	defer client.Close()
+
 	// Test commit offset
-	handler := NewKafkaOffsetResetHandler(brokers, consumerGroup, topic)
+	handler := NewKafkaOffsetResetHandler(client, consumerGroup, topic)
 
 	commitPayload := KafkaOffsetResetRequest{
 		Partition: partition,
@@ -92,10 +80,6 @@ func TestKafkaOffsetResetHandler_Integration(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code, "Commit failed: %s", w.Body.String())
 
 	// Verify the offset was committed
-	client, err := sarama.NewClient(brokers, config)
-	require.NoError(t, err)
-	defer client.Close()
-
 	coordinator, err := client.Coordinator(consumerGroup)
 	require.NoError(t, err)
 
