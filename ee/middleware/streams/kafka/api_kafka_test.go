@@ -1,4 +1,4 @@
-package gateway
+package kafka
 
 import (
 	"bytes"
@@ -11,17 +11,15 @@ import (
 )
 
 func TestKafkaOffsetResetHandler_InvalidJSON(t *testing.T) {
-	gw := &Gateway{}
 	req := httptest.NewRequest("POST", "/streams/kafka/offset/reset", bytes.NewBufferString("{invalid json}"))
 	w := httptest.NewRecorder()
 
-	gw.kafkaOffsetResetHandler(w, req)
+	KafkaOffsetResetHandler(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
 func TestKafkaOffsetResetHandler_NoBrokers(t *testing.T) {
-	gw := &Gateway{}
 	payload := KafkaOffsetResetRequest{
 		Brokers:       []string{"invalid-broker:9092"},
 		ConsumerGroup: "test-group",
@@ -33,7 +31,7 @@ func TestKafkaOffsetResetHandler_NoBrokers(t *testing.T) {
 	req := httptest.NewRequest("POST", "/streams/kafka/offset/reset", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
-	gw.kafkaOffsetResetHandler(w, req)
+	KafkaOffsetResetHandler(w, req)
 
 	// Should fail because broker is invalid
 	assert.Equal(t, http.StatusInternalServerError, w.Code)

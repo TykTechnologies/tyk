@@ -208,6 +208,7 @@ type franzKafkaReader struct {
 	regexPattern    bool
 	multiHeader     bool
 	batchPolicy     service.BatchPolicy
+	disableAutoCommit bool
 
 	reconnectOnUnknownTopic bool
 
@@ -441,6 +442,10 @@ func newFranzKafkaReaderFromConfig(conf *service.ParsedConfig, res *service.Reso
 	}
 
 	if f.rateLimit, err = conf.FieldString("rate_limit"); err != nil {
+		return nil, err
+	}
+
+	if f.disableAutoCommit, err = conf.FieldBool("disable_auto_commit"); err != nil {
 		return nil, err
 	}
 
@@ -832,7 +837,7 @@ func (f *franzKafkaReader) Connect(ctx context.Context) error {
 
 	var cl *kgo.Client
 	commitFn := func(r *kgo.Record) {}
-	if f.consumerGroup != "" {
+	if f.consumerGroup != "" && !f.disableAutoCommit {
 		commitFn = func(r *kgo.Record) {
 			if cl == nil {
 				return
@@ -864,10 +869,12 @@ func (f *franzKafkaReader) Connect(ctx context.Context) error {
 	}
 
 	if f.consumerGroup != "" {
-		clientOpts = append(clientOpts,
+		cgOpts := []kgo.Opt{
 			kgo.OnPartitionsRevoked(func(rctx context.Context, c *kgo.Client, m map[string][]int32) {
-				if commitErr := c.CommitMarkedOffsets(rctx); commitErr != nil {
-					f.log.Errorf("Commit error on partition revoke: %v", commitErr)
+				if !f.disableAutoCommit {
+					if commitErr := c.CommitMarkedOffsets(rctx); commitErr != nil {
+						f.log.Errorf("Commit error on partition revoke: %v", commitErr)
+					}
 				}
 				checkpoints.removeTopicPartitions(rctx, m)
 			}),
@@ -875,10 +882,13 @@ func (f *franzKafkaReader) Connect(ctx context.Context) error {
 				// No point trying to commit our offsets, just clean up our topic map
 				checkpoints.removeTopicPartitions(rctx, m)
 			}),
-			kgo.AutoCommitMarks(),
-			kgo.AutoCommitInterval(f.commitPeriod),
 			kgo.WithLogger(&kgoLogger{f.log}),
-		)
+		}
+
+		if !f.disableAutoCommit {
+			cgOpts = append(cgOpts, kgo.AutoCommitMarks(), kgo.AutoCommitInterval(f.commitPeriod))
+		}
+		clientOpts = append(clientOpts, cgOpts...)
 	}
 
 	if f.tlsConf != nil {

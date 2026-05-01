@@ -872,8 +872,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	// set up main API handlers
 	r.HandleFunc("/reload/group", gw.groupResetHandler).Methods("GET")
 	r.HandleFunc("/reload", gw.resetHandler(nil)).Methods("GET")
-	r.HandleFunc("/streams/kafka/offset/reset", gw.kafkaOffsetResetHandler).Methods("POST")
-	r.HandleFunc("/streams/kafka/offset/commit", gw.kafkaOffsetResetHandler).Methods("POST")
+	registerKafkaAPI(r)
 
 	if !gw.isRPCMode() {
 		versionsHandler := NewVersionHandler(gw.getAPIDefinition)

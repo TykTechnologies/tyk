@@ -1,4 +1,4 @@
-package gateway
+package kafka
 
 import (
 	"encoding/json"
@@ -17,7 +17,7 @@ type KafkaOffsetResetRequest struct {
 	Timestamp     *int64   `json:"timestamp"` // Unix timestamp in milliseconds
 }
 
-func (gw *Gateway) kafkaOffsetResetHandler(w http.ResponseWriter, r *http.Request) {
+func KafkaOffsetResetHandler(w http.ResponseWriter, r *http.Request) {
 	var req KafkaOffsetResetRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
