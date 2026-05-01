@@ -36,7 +36,7 @@ func NewKafkaOffsetResetHandler(brokers []string, consumerGroup, topic string) h
 
 		if req.Timestamp != nil {
 			// Fetch offset by timestamp
-			offsetReq := &sarama.OffsetRequest{}
+			offsetReq := &sarama.OffsetRequest{Version: 1}
 			offsetReq.AddBlock(topic, req.Partition, *req.Timestamp, 1)
 
 			broker, err := client.Leader(topic, req.Partition)
@@ -66,8 +66,9 @@ func NewKafkaOffsetResetHandler(brokers []string, consumerGroup, topic string) h
 		}
 
 		commitReq := &sarama.OffsetCommitRequest{
-			ConsumerGroup: consumerGroup,
-			Version:       2,
+			ConsumerGroup:           consumerGroup,
+			ConsumerGroupGeneration: sarama.GroupGenerationUndefined,
+			Version:                 2,
 		}
 		commitReq.AddBlock(topic, req.Partition, targetOffset, time.Now().UnixMilli(), "")
 
