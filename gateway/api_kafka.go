@@ -1,0 +1,92 @@
+package gateway
+
+import (
+	"encoding/json"
+	"net/http"
+	"time"
+
+	"github.com/IBM/sarama"
+)
+
+type KafkaOffsetResetRequest struct {
+	Brokers       []string `json:"brokers"`
+	ConsumerGroup string   `json:"consumer_group"`
+	Topic         string   `json:"topic"`
+	Partition     int32    `json:"partition"`
+	Offset        int64    `json:"offset"`
+	Timestamp     *int64   `json:"timestamp"` // Unix timestamp in milliseconds
+}
+
+func (gw *Gateway) kafkaOffsetResetHandler(w http.ResponseWriter, r *http.Request) {
+	var req KafkaOffsetResetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	config := sarama.NewConfig()
+	config.Version = sarama.V2_0_0_0
+
+	client, err := sarama.NewClient(req.Brokers, config)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer client.Close()
+
+	var targetOffset int64 = req.Offset
+
+	if req.Timestamp != nil {
+		// Fetch offset by timestamp
+		offsetReq := &sarama.OffsetRequest{}
+		offsetReq.AddBlock(req.Topic, req.Partition, *req.Timestamp, 1)
+
+		broker, err := client.Leader(req.Topic, req.Partition)
+		if err != nil {
+			http.Error(w, "failed to find partition leader: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		resp, err := broker.GetAvailableOffsets(offsetReq)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		block := resp.GetBlock(req.Topic, req.Partition)
+		if block == nil || len(block.Offsets) == 0 {
+			http.Error(w, "no offset found for timestamp", http.StatusNotFound)
+			return
+		}
+		targetOffset = block.Offsets[0]
+	}
+
+	coordinator, err := client.Coordinator(req.ConsumerGroup)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	commitReq := &sarama.OffsetCommitRequest{
+		ConsumerGroup: req.ConsumerGroup,
+		Version:       2,
+	}
+	commitReq.AddBlock(req.Topic, req.Partition, targetOffset, time.Now().UnixMilli(), "")
+
+	commitResp, err := coordinator.CommitOffset(commitReq)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := commitResp.Errors[req.Topic][req.Partition]; err != sarama.ErrNoError {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "success",
+		"offset": targetOffset,
+	})
+}
