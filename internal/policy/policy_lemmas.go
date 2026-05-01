@@ -289,3 +289,88 @@ func LemmaQuotaOffsetZero(q int) int {
 func LemmaAPIIDListLenNonNeg(ids []int) int {
 	return len(ids)
 }
+
+// ===========================================================================
+// SECTION 5 — Loop-invariant lemmas (Phase S.2c.1, range-over-slice)
+// ===========================================================================
+
+// LemmaCountActiveQuotas counts how many entries in `quotaMaxes` are strictly
+// positive (i.e. configure an enforceable quota). The accumulator is bounded
+// below by zero — a property the merge path in apply.go relies on when
+// summing per-API quota deltas. The loop invariant captures the bound and
+// is discharged by the Phase S.2c.1 range-over-slice lowering.
+//
+// Production motivation: applyState.didRateLimit and the per-policy
+// AccessRights iteration (apply.go:413, 420) walk the same slice/map
+// shape; the non-negative running count is the correctness floor for
+// any subsequent "len > 0" guard.
+//
+// reqproof:lemma count_active_quotas_nonneg func(quotaMaxes []int) bool {
+//   return LemmaCountActiveQuotas(quotaMaxes) >= 0
+// }
+func LemmaCountActiveQuotas(quotaMaxes []int) int {
+	count := 0
+	for _, qm := range quotaMaxes {
+		// reqproof:invariant count >= 0
+		if qm > 0 {
+			count = count + 1
+		} else {
+			count = count + 0
+		}
+	}
+	return count
+}
+
+// LemmaSumNonNegativeQuotas sums a slice of pre-validated non-negative
+// QuotaMax values. The post-condition (sum >= 0) is non-trivial because
+// Go's int can overflow; here we treat the SMT integer as unbounded
+// (matching the gosmt encoding) and prove the invariant under the
+// admin-API guarantee that each input is non-negative.
+//
+// Production motivation: the rate-limit merge path in apply.go
+// accumulates per-API QuotaMax fields when computing aggregate caps;
+// the running total must stay non-negative for downstream "remaining"
+// arithmetic to hold. This lemma is the slice-loop analogue of the
+// existing LemmaQuotaOffsetZero `q + 0 == q` identity.
+//
+// reqproof:lemma sum_nonneg_quotas_geq_zero func(quotaMaxes []int) bool {
+//   return LemmaSumNonNegativeQuotas(quotaMaxes) >= 0
+// }
+func LemmaSumNonNegativeQuotas(quotaMaxes []int) int {
+	sum := 0
+	for _, qm := range quotaMaxes {
+		// reqproof:invariant sum >= 0
+		if qm > 0 {
+			sum = sum + qm
+		} else {
+			sum = sum + 0
+		}
+	}
+	return sum
+}
+
+// LemmaCountUntilNegativeQuota mirrors a "stop at first invalid entry"
+// scan: walk a pre-validated list of QuotaMax values, counting them
+// until the first negative one (which would indicate an admin-API
+// validation regression). Uses an indexed loop with `break` — exercises
+// the Phase S.2c.4 break-helper synthesis. The post-condition `count >= 0`
+// holds whether the loop ran to completion or exited early.
+//
+// Production motivation: applyState consistency loops walk per-API
+// limits and short-circuit on the first malformed entry; the running
+// counter must stay non-negative regardless of where the scan halted.
+//
+// reqproof:lemma count_until_negative_quota_nonneg func(quotaMaxes []int) bool {
+//   return LemmaCountUntilNegativeQuota(quotaMaxes) >= 0
+// }
+func LemmaCountUntilNegativeQuota(quotaMaxes []int) int {
+	count := 0
+	for i := 0; i < len(quotaMaxes); i++ {
+		// reqproof:invariant count >= 0
+		count = count + 1
+		if quotaMaxes[i] < 0 {
+			break
+		}
+	}
+	return count
+}
