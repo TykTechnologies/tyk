@@ -104,6 +104,8 @@ type KafkaConfig struct {
 	Brokers       []string
 	Topic         string
 	ConsumerGroup string
+	TLS           map[string]interface{}
+	SASL          []interface{}
 }
 
 func extractKafkaConfig(config map[string]interface{}) *KafkaConfig {
@@ -127,18 +129,27 @@ func extractKafkaConfig(config map[string]interface{}) *KafkaConfig {
 			if cg, ok := kafkaConfig["consumer_group"].(string); ok {
 				consumerGroup = cg
 			}
+			var tlsConfig map[string]interface{}
+			if tlsMap, ok := kafkaConfig["tls"].(map[string]interface{}); ok {
+				tlsConfig = tlsMap
+			}
+			var saslConfig []interface{}
+			if saslList, ok := kafkaConfig["sasl"].([]interface{}); ok {
+				saslConfig = saslList
+			}
 			if len(brokers) > 0 && topic != "" && consumerGroup != "" {
 				return &KafkaConfig{
 					Brokers:       brokers,
 					Topic:         topic,
 					ConsumerGroup: consumerGroup,
+					TLS:           tlsConfig,
+					SASL:          saslConfig,
 				}
 			}
 		}
 	}
 	return nil
 }
-
 func GetKafkaConfig(streamConfig map[string]interface{}) *KafkaConfig {
 	if inputConfig, ok := streamConfig["input"].(map[string]interface{}); ok {
 		if kConfig := extractKafkaConfig(inputConfig); kConfig != nil {
