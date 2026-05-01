@@ -14,6 +14,8 @@ import (
 	_ "github.com/TykTechnologies/tyk/internal/portal"
 	_ "github.com/warpstreamlabs/bento/public/components/all"
 	"github.com/warpstreamlabs/bento/public/service"
+
+	_ "github.com/TykTechnologies/tyk/ee/middleware/streams/kafka"
 )
 
 // Stream is a wrapper around stream
