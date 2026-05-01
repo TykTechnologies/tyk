@@ -99,3 +99,62 @@ func GetHTTPPaths(streamConfig map[string]interface{}) []string {
 	}
 	return deduplicated
 }
+
+type KafkaConfig struct {
+	Brokers       []string
+	Topic         string
+	ConsumerGroup string
+}
+
+func extractKafkaConfig(config map[string]interface{}) *KafkaConfig {
+	for _, key := range []string{"tyk_kafka", "kafka_franz"} {
+		if kafkaConfig, ok := config[key].(map[string]interface{}); ok {
+			var brokers []string
+			if seedBrokers, ok := kafkaConfig["seed_brokers"].([]interface{}); ok {
+				for _, b := range seedBrokers {
+					if str, ok := b.(string); ok {
+						brokers = append(brokers, str)
+					}
+				}
+			}
+			var topic string
+			if topics, ok := kafkaConfig["topics"].([]interface{}); ok && len(topics) > 0 {
+				if str, ok := topics[0].(string); ok {
+					topic = str
+				}
+			}
+			var consumerGroup string
+			if cg, ok := kafkaConfig["consumer_group"].(string); ok {
+				consumerGroup = cg
+			}
+			if len(brokers) > 0 && topic != "" && consumerGroup != "" {
+				return &KafkaConfig{
+					Brokers:       brokers,
+					Topic:         topic,
+					ConsumerGroup: consumerGroup,
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func GetKafkaConfig(streamConfig map[string]interface{}) *KafkaConfig {
+	if inputConfig, ok := streamConfig["input"].(map[string]interface{}); ok {
+		if kConfig := extractKafkaConfig(inputConfig); kConfig != nil {
+			return kConfig
+		}
+		if brokerConfig, ok := inputConfig["broker"].(map[string]interface{}); ok {
+			if inputs, ok := brokerConfig["inputs"].([]interface{}); ok {
+				for _, input := range inputs {
+					if inputMap, ok := input.(map[string]interface{}); ok {
+						if kConfig := extractKafkaConfig(inputMap); kConfig != nil {
+							return kConfig
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil
+}

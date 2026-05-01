@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/TykTechnologies/tyk/ee/middleware/streams/kafka"
 	"github.com/gorilla/mux"
 )
 
@@ -58,6 +59,18 @@ func (sm *Manager) setUpOrDryRunStream(streamConfig any, streamID string) {
 			}
 		}
 		sm.listenPaths = append(sm.listenPaths, httpPaths...)
+
+		if kConfig := GetKafkaConfig(streamMap); kConfig != nil {
+			commitPath := fmt.Sprintf("/%s/kafka/offset/commit", streamID)
+			resetPath := fmt.Sprintf("/%s/kafka/offset/reset", streamID)
+
+			handler := kafka.NewKafkaOffsetResetHandler(kConfig.Brokers, kConfig.ConsumerGroup, kConfig.Topic)
+
+			sm.muxer.HandleFunc(commitPath, handler).Methods("POST")
+			sm.muxer.HandleFunc(resetPath, handler).Methods("POST")
+
+			sm.listenPaths = append(sm.listenPaths, commitPath, resetPath)
+		}
 	}
 }
 
