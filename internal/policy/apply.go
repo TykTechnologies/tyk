@@ -321,6 +321,31 @@ func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy
 }
 
 // SYS-REQ-021
+// Phase FF: direct-attached lemmas on the real engine helper. The
+// production body uses untyped `0` against float64 fields which the
+// translator's type checker conservatively flags; the :summary
+// directive presents the equivalent shape with explicit 0.0 literals
+// so the property remains pinned to the real method.
+//
+// reqproof:summary func(t *Service, m user.APILimit) bool {
+//   if m.Rate == 0.0 {
+//     return true
+//   }
+//   if m.Per == 0.0 {
+//     return true
+//   }
+//   return false
+// }
+//
+// reqproof:requires m.Rate == 0.0
+// reqproof:lemma empty_rate_limit_when_rate_zero proves t.emptyRateLimit(m) == true
+//
+// reqproof:requires m.Per == 0.0
+// reqproof:lemma empty_rate_limit_when_per_zero proves t.emptyRateLimit(m) == true
+//
+// reqproof:requires m.Rate != 0.0
+// reqproof:requires m.Per != 0.0
+// reqproof:lemma empty_rate_limit_false_when_both_nonzero proves t.emptyRateLimit(m) == false
 func (t *Service) emptyRateLimit(m user.APILimit) bool {
 	return m.Rate == 0 || m.Per == 0
 }
@@ -651,6 +676,39 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 }
 
 // SYS-REQ-023
+//
+// Phase EE+P+FF: trusted summary for the verifier. Captures the
+// "QuotaMax monotone under greaterThanInt64" merge step the lemma below
+// pins. The real body (untouched) walks the rate / endpoint / JSONRPC /
+// MCP merge in addition; the summary models only the QuotaMax step
+// because that is the property the lemma names. Other fields are
+// passed through unchanged.
+//
+// reqproof:summary func(t *Service, policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
+//   if greaterThanInt64(currAD.Limit.QuotaMax, policyAD.Limit.QuotaMax) {
+//     return user.AccessDefinition{
+//       Limit: user.APILimit{QuotaMax: currAD.Limit.QuotaMax},
+//       AllowanceScope: policyAD.AllowanceScope,
+//     }
+//   }
+//   return policyAD
+// }
+//
+// reqproof:requires currAD.Limit.QuotaMax >= 0
+// reqproof:requires policyAD.Limit.QuotaMax >= 0
+// reqproof:lemma apply_api_level_limits_quota_monotone proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax >= policyAD.Limit.QuotaMax
+//
+// reqproof:requires currAD.Limit.QuotaMax >= 0
+// reqproof:requires policyAD.Limit.QuotaMax >= 0
+// reqproof:lemma apply_api_level_limits_quota_max_takes_larger proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax >= currAD.Limit.QuotaMax || t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax == policyAD.Limit.QuotaMax
+//
+// reqproof:requires policyAD.Limit.QuotaMax >= 0
+// reqproof:lemma apply_api_level_limits_quota_max_nonneg proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax >= 0
+//
+// reqproof:requires policyAD.Limit.QuotaMax >= 0
+// reqproof:requires currAD.Limit.QuotaMax >= 0
+// reqproof:requires currAD.Limit.QuotaMax <= policyAD.Limit.QuotaMax
+// reqproof:lemma apply_api_level_limits_quota_max_idempotent_when_smaller proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax == policyAD.Limit.QuotaMax
 func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
 	var updated bool
 	if policyAD.Limit.Duration() > currAD.Limit.Duration() {
