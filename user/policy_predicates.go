@@ -1,17 +1,26 @@
-// lemmas_extra.go — completeness-sweep #201 additions to the user/ package.
-// These lemmas exercise the Phase S.2c.1 (range-over-slice) and Phase U
-// (by(...) library citations) translator paths against tiny pure helpers.
-// The helpers themselves are documentation of session/policy invariants
-// the gateway relies on; the // reqproof:lemma directives discharge each
-// invariant against Z3 / cvc5.
+// policy_predicates.go — completeness-sweep #201 additions to the user/
+// package. These predicate helpers exercise the Phase S.2c.1
+// (range-over-slice) and Phase U (by(...) library citations) translator
+// paths against tiny pure helpers. The helpers themselves are
+// documentation of session/policy invariants the gateway relies on;
+// the // reqproof:lemma directives discharge each invariant against
+// Z3 / cvc5.
 //
-// Why a separate file?
+// Why a separate file (and not inlined into session.go / policy.go)?
 //   * user/session.go, user/policy.go, user/mcp_access.go currently carry
-//     unstaged work; this file lets us add new lemma surface without
-//     touching any in-flight edits there.
+//     unstaged work; this file lets us add predicate surface without
+//     touching any in-flight edits there. Once those edits land, a
+//     follow-up can fold the helpers into the host files and delete this
+//     sidecar entirely.
 //   * All helpers here are pure, additive, and gated by ordinary Go
 //     visibility — they ship as production code (no //go:build tag) so
-//     downstream `proof verify-lemma` picks them up directly.
+//     downstream `verify-lemma` picks them up directly.
+//
+// Phase R.5 renamed this file from lemmas_extra.go to policy_predicates.go
+// so the filename describes the semantic role (predicate helpers) rather
+// than the verification machinery. The deferred phase-2 cleanup is to
+// fold these helpers into session.go / policy.go / mcp_access.go once
+// the dirty user/* working-tree edits land on master.
 //
 // Restricted Go subset (gosmt, Phase S.2c.1):
 //   * pure functions; if/else with else; for-range or indexed for+break

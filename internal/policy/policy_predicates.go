@@ -1,7 +1,7 @@
-// Phase R — Tyk policy engine lemmas. Each // reqproof:lemma directive
+// Phase R — Tyk policy engine predicates. Each // reqproof:lemma directive
 // attaches to a small production helper function in this file. The
 // helpers are pure predicate checks the engine could use directly; the
-// reqproof "proof verify-lemma" orchestrator picks up the directives,
+// reqproof "verify-lemma" orchestrator picks up the directives,
 // translates the function-literal bodies via gosmt, and discharges the
 // obligation against Z3 / cvc5.
 //
@@ -9,7 +9,21 @@
 // //go:build reqproof_proof with synthetic proof_* wrappers. Phase R.4c
 // moved them to ordinary production code; the wrappers are still tiny
 // (a single condition each) and stable as documentation of the
-// invariants the engine relies on.
+// invariants the engine relies on. Phase R.5 renamed the host file from
+// policy_lemmas.go to policy_predicates.go so the filename describes the
+// semantic role (predicate helpers, hosting verification directives)
+// rather than the verification machinery.
+//
+// Migration blocker: direct attachment of these lemma directives to the
+// real engine functions (Apply, applyPartitions, applyPerAPI, ClearSession)
+// is not possible today — those engine functions take user.SessionState /
+// user.AccessDefinition values that the gosmt subset cannot represent
+// (float64 fields, maps with reflection, method receivers). Inlining the
+// 800-line predicate corpus (LemmaPolicy / LemmaAPILimit mock structs +
+// helpers) into apply.go would massively pollute production engine code.
+// The chosen pattern keeps the predicate sidecar in production code,
+// importable by name, with a non-_lemmas.go filename so the artifact
+// pattern is gone.
 //
 // Domain coverage targets (per proof.yaml verification_scope:
 // internal/policy/**):
