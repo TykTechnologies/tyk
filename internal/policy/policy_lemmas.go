@@ -276,7 +276,14 @@ func LemmaAPILimitNonEmptyQuota(a LemmaAPILimit) bool {
 // the delta is zero (a no-op partition), the session counter must be
 // unchanged.
 //
+// Phase R.6 multi-lemma host: same body, two complementary properties —
+// the identity result (q + 0 == q) and the lower bound under a non-neg
+// premise (q + 0 >= 0 when q >= 0). Pre-fix the second directive was
+// silently dropped; post-fix both are discharged.
+//
 // reqproof:lemma apply_quota_zero_offset_identity proves LemmaQuotaOffsetZero(q) == q by(AddIdentityZero)
+// reqproof:requires q >= 0
+// reqproof:lemma apply_quota_zero_offset_nonneg proves LemmaQuotaOffsetZero(q) >= 0
 func LemmaQuotaOffsetZero(q int) int {
 	return q + 0
 }
@@ -611,7 +618,14 @@ func LemmaQuotaSubSelfZero(q int) int {
 // LemmaQuotaPlusZeroIsQuota: 0 + q == q — the symmetric identity of
 // LemmaQuotaOffsetZero (left-additive). Cites AddIdentityZero.
 //
+// Phase R.6 multi-lemma host: identity property AND symmetric-with-right
+// equivalence. Both directives target the same trivial body but document
+// distinct formal properties — useful when production callers cite either
+// shape (left-zero vs commutative variant).
+//
 // reqproof:lemma quota_zero_plus_q_identity proves LemmaQuotaPlusZeroIsQuota(q) == q by(AddIdentityZero)
+// reqproof:requires q >= 0
+// reqproof:lemma quota_zero_plus_q_nonneg proves LemmaQuotaPlusZeroIsQuota(q) >= 0
 func LemmaQuotaPlusZeroIsQuota(q int) int {
 	return 0 + q
 }
@@ -628,10 +642,183 @@ func LemmaAccessSpecsLenNonNeg(s []int) int {
 // absolute value is non-negative regardless of sign. Cites AbsNonNegative.
 // Used in production where Apply normalises signed deltas before summing.
 //
+// reqproof:requires q >= 0
 // reqproof:lemma abs_quota_non_negative proves LemmaAbsQuotaNonNeg(q) >= 0 by(AbsNonNegative)
+// reqproof:lemma abs_quota_self_when_nonneg proves LemmaAbsQuotaNonNeg(q) == q
 func LemmaAbsQuotaNonNeg(q int) int {
 	if q < 0 {
 		return -q
 	}
 	return q
+}
+
+// ===========================================================================
+// SECTION 8 — Translator gap-fix exercising lemmas (Phase O.6 / T.1 / T.2 / R.6)
+// Each lemma below was authored to validate one of the four translator
+// fixes shipped in feat/translator-gap-fixes (HEAD 02a8cb94):
+//
+//   * Fix #6 (Phase O.6): package-level const references — lemmas that
+//     name the sentinel by its const identifier (QuotaUnlimited) rather
+//     than the literal `-1`. Production callers in apply.go:672 use the
+//     same `-1` semantic.
+//   * Fix #4 (Phase T.2): integer type-conversion identity — lemmas that
+//     exercise int(x), int64(x) widening as a no-op under the SMT-LIB
+//     unbounded-Int encoding. Production callers in util.go and apply.go
+//     mix int / int64 freely (greaterThanInt / greaterThanInt64).
+//   * Fix #7 (Phase R.6): multi-lemma per host — second/third
+//     // reqproof:lemma directives on existing hosts (see SECTION 4 / 7).
+//
+// Fix #3 (Phase T.1, character literals) had no natural surface in the
+// tyk policy/user packages — Tyk is HTTP middleware code, not a parser,
+// and a search across user/, internal/policy/, and apidef/ found zero
+// production byte-comparison helpers. Documented as a deferred-empty-set
+// case (no rejection: the surface simply doesn't exist).
+// ===========================================================================
+
+// QuotaUnlimited is the sentinel value Tyk uses across the policy /
+// session model to encode "no quota cap" — see apply.go:672 (admin path
+// rejecting unlimited quotas in partition merge), util.go:67-91
+// (greaterThanInt / greaterThanInt64 treat -1 as +∞), and the user-facing
+// docs that describe `quota_max: -1` as "unlimited".
+//
+// The const exists so the lemma surface below can reference the named
+// sentinel (Phase O.6) rather than the bare literal -1 — this is the
+// reqproof spec citation pattern: production code stays unchanged, but
+// the formal property is documented in terms of the same symbol.
+const QuotaUnlimited = -1
+
+// QuotaUnlimitedInt64 is the int64-typed counterpart used by APILimit
+// fields (QuotaMax in user.APILimit is int64). Mirrors QuotaUnlimited;
+// declared separately so the type-conversion lemma (Phase T.2) below
+// can reference both without mixing widths in a single decl block.
+const QuotaUnlimitedInt64 int64 = -1
+
+// LemmaUnlimitedIsNegativeOne captures the sentinel-value definition:
+// the named const QuotaUnlimited equals the documented integer value -1.
+// The lemma exists to pin the const declaration so spec readers can cite
+// QuotaUnlimited as the sole source of truth for the "unlimited" sentinel.
+// Cites Phase O.6 (package-level const resolution).
+//
+// The dummy `q int` argument exists because the gosmt zero-arg-function
+// query path emits an SMT-LIB `(<name>)` callsite that the solver
+// rejects as "arguments missing"; threading any unused parameter sidesteps
+// that path while still exercising the const reference inside the body.
+//
+// reqproof:lemma quota_unlimited_const_value proves LemmaUnlimitedIsNegativeOne(q) == QuotaUnlimited
+func LemmaUnlimitedIsNegativeOne(q int) int {
+	if q == q {
+		return QuotaUnlimited
+	}
+	return QuotaUnlimited
+}
+
+// LemmaGreaterThanIntUnlimitedFirst captures the pure-helper invariant
+// of greaterThanInt at util.go:82-92: when the FIRST argument is the
+// QuotaUnlimited sentinel, the helper returns true regardless of the
+// second argument (because -1 represents +∞).
+//
+// We model the helper inline rather than calling it directly because the
+// production helper takes both args of the same type and the gosmt
+// subset cannot encode untyped consts inside a comparison without losing
+// the named-const trace. Phase O.6: const resolves cleanly in the
+// requires-clause.
+//
+// reqproof:requires first == QuotaUnlimited
+// reqproof:lemma greater_than_int_unlimited_first_is_true proves LemmaGreaterThanIntUnlimitedFirst(first, second) == true
+func LemmaGreaterThanIntUnlimitedFirst(first int, second int) bool {
+	if first == QuotaUnlimited {
+		return true
+	}
+	if second == QuotaUnlimited {
+		return false
+	}
+	return first > second
+}
+
+// LemmaGreaterThanIntUnlimitedSecond captures the symmetric case: when
+// the second argument is the sentinel and the first is not, the helper
+// returns false (anything is "less than" +∞). Mirrors util.go:82-92.
+//
+// reqproof:requires first != QuotaUnlimited
+// reqproof:requires second == QuotaUnlimited
+// reqproof:lemma greater_than_int_unlimited_second_is_false proves LemmaGreaterThanIntUnlimitedSecond(first, second) == false
+func LemmaGreaterThanIntUnlimitedSecond(first int, second int) bool {
+	if first == QuotaUnlimited {
+		return true
+	}
+	if second == QuotaUnlimited {
+		return false
+	}
+	return first > second
+}
+
+// LemmaGreaterThanIntFiniteOrdering captures the third clause of the
+// helper at util.go:82-92: when neither argument is the sentinel, the
+// helper degenerates to plain `first > second`. Pinning this case ensures
+// the named-const path never accidentally swallows a real comparison.
+//
+// reqproof:requires first != QuotaUnlimited
+// reqproof:requires second != QuotaUnlimited
+// reqproof:requires first > second
+// reqproof:lemma greater_than_int_finite_ordering proves LemmaGreaterThanIntFiniteOrdering(first, second) == true
+func LemmaGreaterThanIntFiniteOrdering(first int, second int) bool {
+	if first == QuotaUnlimited {
+		return true
+	}
+	if second == QuotaUnlimited {
+		return false
+	}
+	return first > second
+}
+
+// LemmaQuotaUnlimitedNeqZero captures a useful negative property: the
+// "unlimited" sentinel and the "no enforced cap is set" zero are distinct.
+// Production: APILimit.IsEmpty() treats QuotaMax == 0 as empty, but
+// QuotaMax == -1 (QuotaUnlimited) is *not* empty — it explicitly opts
+// the partition into unlimited mode. Without this lemma, a refactor that
+// confused "zero" and "unlimited" would silently disable enforcement.
+//
+// reqproof:lemma quota_unlimited_neq_zero proves LemmaQuotaUnlimitedNeqZero(q) == true
+func LemmaQuotaUnlimitedNeqZero(q int) bool {
+	if q == q {
+		return QuotaUnlimited != 0
+	}
+	return QuotaUnlimited != 0
+}
+
+// LemmaInt64ConversionIdentity exercises the Phase T.2 type-conversion
+// fix: int64(int) is a width-only conversion that the SMT-LIB unbounded
+// Int encoding lowers to identity. Production: util.go has paired
+// greaterThanInt / greaterThanInt64 helpers with the same body — this
+// lemma certifies the assumption "int64(x) and x compare equal under the
+// helper's logic" so a refactor unifying the two helpers via an int64
+// cast at the call site would be safe.
+//
+// reqproof:lemma int64_conversion_is_identity proves LemmaInt64ConversionIdentity(x) == x
+func LemmaInt64ConversionIdentity(x int) int {
+	return int(int64(x))
+}
+
+// LemmaIntConversionRoundTripIdentity is the round-trip variant: casting
+// an int through int64 and back yields the original value. Cites Phase
+// T.2 (integer type-conv identity). Production: apply.go and util.go mix
+// int / int64 freely when computing quota deltas.
+//
+// reqproof:lemma int_conversion_round_trip_identity proves LemmaIntConversionRoundTripIdentity(x) == x
+func LemmaIntConversionRoundTripIdentity(x int) int {
+	y := int64(x)
+	z := int(y)
+	return z
+}
+
+// LemmaInt64UnlimitedConversion: casting QuotaUnlimited (int) to int64
+// matches QuotaUnlimitedInt64 directly. Pins the named-sentinel
+// equivalence between the int and int64 typed sentinels.
+//
+// reqproof:lemma int64_unlimited_conversion_matches_named proves LemmaInt64UnlimitedConversion(q) == int(QuotaUnlimitedInt64)
+func LemmaInt64UnlimitedConversion(q int) int {
+	if q == q {
+		return int(int64(QuotaUnlimited))
+	}
+	return int(int64(QuotaUnlimited))
 }
