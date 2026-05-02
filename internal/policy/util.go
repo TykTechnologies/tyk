@@ -64,6 +64,24 @@ func appendIfMissing(dest []string, in ...string) []string {
 // SYS-REQ-021, SYS-REQ-041
 // greaterThanInt64 checks whether first int64 value is bigger than second int64 value.
 // -1 means infinite and the biggest value.
+//
+// Phase EE/DD migration: lemmas attached directly to the production helper
+// (no abstract proxy). Mirrors the int variant in greaterThanInt — same
+// three-property structure (first==unlimited, second==unlimited, finite
+// strict ordering). The body is gosmt-translatable as-is so no
+// // reqproof:summary directive is needed.
+//
+// reqproof:requires first == int64(QuotaUnlimited)
+// reqproof:lemma greater_than_int64_unlimited_first_is_true proves greaterThanInt64(first, second) == true
+//
+// reqproof:requires first != int64(QuotaUnlimited)
+// reqproof:requires second == int64(QuotaUnlimited)
+// reqproof:lemma greater_than_int64_unlimited_second_is_false proves greaterThanInt64(first, second) == false
+//
+// reqproof:requires first != int64(QuotaUnlimited)
+// reqproof:requires second != int64(QuotaUnlimited)
+// reqproof:requires first > second
+// reqproof:lemma greater_than_int64_finite_ordering proves greaterThanInt64(first, second) == true
 func greaterThanInt64(first, second int64) bool {
 	if first == -1 {
 		return true
