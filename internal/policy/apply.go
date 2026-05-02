@@ -5,9 +5,28 @@ import (
 	"fmt"
 
 	"github.com/samber/lo"
+
+	// Phase II: declare model.PolicyProvider as an opaque sort. The
+	// translator now lowers t.storage.PolicyByID(...) calls (and any
+	// other PolicyProvider method) to opaque function applications,
+	// enabling direct lemma attachment on engine methods that
+	// previously rejected at "unsupported call form" because the
+	// dispatch flowed through the interface.
+	//
+	// reqproof:abstract model.PolicyProvider sort=Opaque
+	"github.com/TykTechnologies/tyk/internal/model"
+
+	// Phase II: *logrus.Logger is wrapped through the LoggerProvider
+	// interface in the engine. The pure pointer-receiver call
+	// t.logger.Error(err) doesn't yet unlock under Phase II alone (the
+	// logger field is *logrus.Logger, not an interface), but the
+	// abstraction is registered so future probes that route logging
+	// through model.LoggerProvider (or sirupsen/logrus.FieldLogger)
+	// translate symmetrically with PolicyProvider.
+	//
+	// reqproof:abstract logrus.FieldLogger sort=Opaque
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -40,6 +59,18 @@ func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Se
 // SYS-REQ-019, SYS-REQ-020, SYS-REQ-049
 // ClearSession clears the quota, rate limit and complexity values so that partitioned policies can apply their values.
 // Otherwise, if the session has already a higher value, an applied policy will not win, and its values will be ignored.
+//
+// Phase II direct-attachment probe (2026-05-01): the body composes
+// three independent translator walls — opaque interface dispatch
+// (t.storage.PolicyByID, NEWLY UNLOCKED in Phase II), range-over-slice
+// over a method-call result (t.policyIds(session)), and pointer-field
+// mutation across many user.SessionState fields not present in the
+// existing :model directive (Smoothing, MaxQueryDepth, ...). Phase II
+// alone removes only the first wall; the other two require further
+// translator phases (range-with-loop-invariants on method-call results,
+// and a model expansion to cover all engine-touched fields). The
+// LemmaClearSession* helpers below remain the canonical attachment
+// surface until those phases ship.
 func (t *Service) ClearSession(session *user.SessionState) error {
 	if t.storage == nil {
 		return ErrNilPolicyStore
