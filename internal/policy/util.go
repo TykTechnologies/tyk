@@ -79,6 +79,18 @@ func greaterThanInt64(first, second int64) bool {
 // SYS-REQ-021, SYS-REQ-041
 // greaterThanInt checks whether first int value is bigger than second int value.
 // -1 means infinite and the biggest value.
+//
+// reqproof:requires first == QuotaUnlimited
+// reqproof:lemma greater_than_int_unlimited_first_is_true proves greaterThanInt(first, second) == true
+//
+// reqproof:requires first != QuotaUnlimited
+// reqproof:requires second == QuotaUnlimited
+// reqproof:lemma greater_than_int_unlimited_second_is_false proves greaterThanInt(first, second) == false
+//
+// reqproof:requires first != QuotaUnlimited
+// reqproof:requires second != QuotaUnlimited
+// reqproof:requires first > second
+// reqproof:lemma greater_than_int_finite_ordering proves greaterThanInt(first, second) == true
 func greaterThanInt(first, second int) bool {
 	if first == -1 {
 		return true
