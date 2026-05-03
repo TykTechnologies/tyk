@@ -71,11 +71,24 @@ func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Se
 // and a model expansion to cover all engine-touched fields). The
 // LemmaClearSession* helpers below remain the canonical attachment
 // surface until those phases ship.
+//
+// Phase JJ (2026-05-01): the // reqproof:loop-as [...]model.PolicyID
+// directive on the range-statement below substitutes the
+// t.policyIds(session) method-call result with a fresh opaque slice of
+// PolicyID, removing the second translator wall (range-over-method-
+// call). The remaining walls — pointer-field mutation across many
+// user.SessionState fields, and the lemma-attachment surface itself —
+// still resist direct attachment; the LemmaClearSession* helpers below
+// remain the canonical attachment surface. The annotation lands as
+// preparation work that future translator phases (a session-model
+// expansion + // reqproof:lemma-binding for engine methods) will
+// build on.
 func (t *Service) ClearSession(session *user.SessionState) error {
 	if t.storage == nil {
 		return ErrNilPolicyStore
 	}
 
+	// reqproof:loop-as []model.PolicyID
 	for _, polID := range t.policyIds(session) {
 		policy, ok := t.storage.PolicyByID(polID)
 
@@ -382,6 +395,16 @@ func (t *Service) emptyRateLimit(m user.APILimit) bool {
 }
 
 // SYS-REQ-013, SYS-REQ-014, SYS-REQ-015
+//
+// Phase JJ direct-attachment probe (2026-05-01): the
+// // reqproof:loop-as map[string]user.AccessDefinition directive on the
+// range-statement below removes the iteration-source wall, but a direct
+// lemma on applyPerAPI still hits the proof:scan model audit that
+// rejects `Policy.AccessRights` (a field not in the user.Policy
+// abstraction model). Adding `field AccessRights <type>` to the model
+// is a non-trivial extension because AccessRights is a map of struct
+// values; the LemmaApplyPerAPI* helpers below remain the canonical
+// attachment surface until that model expansion ships.
 func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
 	applyState *applyStatus) error {
 
@@ -390,6 +413,7 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 		return ErrMixedPartitionAndPerAPIPolicies
 	}
 
+	// reqproof:loop-as map[string]user.AccessDefinition
 	for apiID, accessRights := range policy.AccessRights {
 		idForScope := apiID
 		// check if we don't have limit on API level specified when policy was created
