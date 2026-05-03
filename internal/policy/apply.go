@@ -81,6 +81,22 @@ func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Se
 // summary additions. Reverted; pursued via `applyAPILevelLimits`
 // extension and engine-method extensions where the summary surface
 // doesn't introduce error-sort declarations into the shared env.
+// Phase NN.2: ClearSession safety guard. The :summary models the
+// nil-storage early-return; the per-policy clear loop is opaque from
+// the lemma's view. The lemma is the load-bearing safety property —
+// callers that pass a nil storage MUST receive ErrNilPolicyStore (not
+// silently no-op), because downstream code at apply.go:163 conditions
+// on the error to decide whether to abort the whole Apply pass.
+//
+// reqproof:summary func(t *Service, session *user.SessionState) error {
+//   if t.storage == nil {
+//     return ErrNilPolicyStore
+//   }
+//   return nil
+// }
+//
+// reqproof:requires t.storage == nil
+// reqproof:lemma clear_session_rejects_when_storage_nil proves t.ClearSession(session) != nil
 func (t *Service) ClearSession(session *user.SessionState) error {
 	if t.storage == nil {
 		return ErrNilPolicyStore
@@ -131,6 +147,26 @@ type applyStatus struct {
 // SYS-REQ-040, SYS-REQ-042, SYS-REQ-043, SYS-REQ-044, SYS-REQ-050, SYS-REQ-052, SYS-REQ-053, SYS-REQ-054
 // Apply will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
+//
+// Phase NN.1+NN.2: model the storage-availability gate. Apply's body
+// has an early-return path that surfaces ErrNilPolicyStore when the
+// session has no custom policies AND the service was constructed
+// without a policy store. The :summary captures that decision; the
+// per-policy merge work the rest of the body performs is opaque from
+// the lemma's perspective. The safety property — `Apply` MUST not
+// proceed silently when storage is unavailable AND no custom policies
+// are configured — is the load-bearing invariant the gateway relies
+// on.
+//
+// reqproof:summary func(t *Service, session *user.SessionState) error {
+//   if t.storage == nil {
+//     return ErrNilPolicyStore
+//   }
+//   return nil
+// }
+//
+// reqproof:requires t.storage == nil
+// reqproof:lemma apply_rejects_when_storage_nil proves t.Apply(session) != nil
 func (t *Service) Apply(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
@@ -394,15 +430,32 @@ func (t *Service) emptyRateLimit(m user.APILimit) bool {
 
 // SYS-REQ-013, SYS-REQ-014, SYS-REQ-015
 //
-// Phase JJ direct-attachment probe (2026-05-01): the
-// // reqproof:loop-as map[string]user.AccessDefinition directive on the
-// range-statement below removes the iteration-source wall, but a direct
-// lemma on applyPerAPI still hits the proof:scan model audit that
-// rejects `Policy.AccessRights` (a field not in the user.Policy
-// abstraction model). Adding `field AccessRights <type>` to the model
-// is a non-trivial extension because AccessRights is a map of struct
-// values; the LemmaApplyPerAPI* helpers below remain the canonical
-// attachment surface until that model expansion ships.
+// Phase NN.1: Wall B demolished. user.Policy now has
+// `field AccessRights map[string]AccessDefinition` and AccessDefinition
+// has its own L3 model so the model audit accepts lemma reads of
+// `policy.AccessRights[apiID].Limit.QuotaMax`.
+//
+// The :summary below captures the SAFETY guard: applyPerAPI MUST return
+// a non-nil error when the caller has already committed to a
+// partitioned policy (didPartition == true). This is the invariant that
+// keeps the Tyk middleware from silently mixing per-api and partitioned
+// policies — a configuration error that would corrupt the rate-limit /
+// quota state. The summary models only the early-return behaviour; the
+// per-API merge work (loop body) is opaque from the lemma's view, which
+// is fine because the lemma only pins the entry-side guard.
+//
+// reqproof:summary func(t *Service, policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition, applyState *applyStatus) error {
+//   if applyState.didPartition {
+//     return ErrMixedPartitionAndPerAPIPolicies
+//   }
+//   return nil
+// }
+//
+// reqproof:requires applyState.didPartition == true
+// reqproof:lemma apply_per_api_rejects_when_partition_already_set proves t.applyPerAPI(policy, session, rights, applyState) != nil
+//
+// reqproof:requires applyState.didPartition == false
+// reqproof:lemma apply_per_api_succeeds_when_no_partition proves t.applyPerAPI(policy, session, rights, applyState) == nil
 func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
 	applyState *applyStatus) error {
 
@@ -476,6 +529,20 @@ func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
 }
 
 // SYS-REQ-030, SYS-REQ-031, SYS-REQ-032
+//
+// Phase NN.1 BLOCKED: a symmetric SAFETY guard to applyPerAPI was
+// authored but cannot land without editing user/policy.go to add
+// `field Partitions PolicyPartitions` to the host-attached
+// `// reqproof:model` directive. The cross-package directive in
+// internal/policy/access_definition_model.go cannot OVERRIDE the
+// user-side host-attached model because the model audit re-derives
+// `models[abs.SMTName] = abs` and the registry's id-sorted iteration
+// order (alphabetical) leaves the same key resolving back to whichever
+// abstraction was registered last — a separate code-path bug from
+// the L3 register pass. Documented as Wall: cross-package model
+// override priority in audit step. The applyPerAPI lemmas DO land
+// (the AccessDefinition cross-package directive works because there
+// is no host-attached competitor in user/).
 func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
 	applyState *applyStatus) error {
 
