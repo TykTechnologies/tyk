@@ -72,17 +72,15 @@ func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Se
 // LemmaClearSession* helpers below remain the canonical attachment
 // surface until those phases ship.
 //
-// Phase JJ (2026-05-01): the // reqproof:loop-as [...]model.PolicyID
-// directive on the range-statement below substitutes the
-// t.policyIds(session) method-call result with a fresh opaque slice of
-// PolicyID, removing the second translator wall (range-over-method-
-// call). The remaining walls — pointer-field mutation across many
-// user.SessionState fields, and the lemma-attachment surface itself —
-// still resist direct attachment; the LemmaClearSession* helpers below
-// remain the canonical attachment surface. The annotation lands as
-// preparation work that future translator phases (a session-model
-// expansion + // reqproof:lemma-binding for engine methods) will
-// build on.
+// Phase MM direct-attachment probe (2026-05-01): error-returning
+// summary on ClearSession lands but contaminates the per-package
+// SMT preamble: declaring a summary that returns Error caused
+// previously-PROVED lemmas (apply_api_level_limits_*) to regress
+// to UNKNOWN with "unknown constant greaterThanInt64". Documented
+// as Wall: per-package SMT preamble cross-contamination from
+// summary additions. Reverted; pursued via `applyAPILevelLimits`
+// extension and engine-method extensions where the summary surface
+// doesn't introduce error-sort declarations into the shared env.
 func (t *Service) ClearSession(session *user.SessionState) error {
 	if t.storage == nil {
 		return ErrNilPolicyStore
@@ -740,9 +738,33 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 // passed through unchanged.
 //
 // reqproof:summary func(t *Service, policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
-//   if greaterThanInt64(currAD.Limit.QuotaMax, policyAD.Limit.QuotaMax) {
+//   if policyAD.Limit.QuotaMax == -1 {
+//     if greaterThanInt64(currAD.Limit.QuotaMax, policyAD.Limit.QuotaMax) {
+//       return user.AccessDefinition{
+//         Limit:          user.APILimit{QuotaMax: currAD.Limit.QuotaMax, QuotaRenewalRate: currAD.Limit.QuotaRenewalRate},
+//         AllowanceScope: currAD.AllowanceScope,
+//       }
+//     }
 //     return user.AccessDefinition{
-//       Limit: user.APILimit{QuotaMax: currAD.Limit.QuotaMax},
+//       Limit:          user.APILimit{QuotaMax: policyAD.Limit.QuotaMax, QuotaRenewalRate: 0},
+//       AllowanceScope: policyAD.AllowanceScope,
+//     }
+//   }
+//   if greaterThanInt64(currAD.Limit.QuotaMax, policyAD.Limit.QuotaMax) {
+//     if greaterThanInt64(currAD.Limit.QuotaRenewalRate, policyAD.Limit.QuotaRenewalRate) {
+//       return user.AccessDefinition{
+//         Limit:          user.APILimit{QuotaMax: currAD.Limit.QuotaMax, QuotaRenewalRate: currAD.Limit.QuotaRenewalRate},
+//         AllowanceScope: currAD.AllowanceScope,
+//       }
+//     }
+//     return user.AccessDefinition{
+//       Limit:          user.APILimit{QuotaMax: currAD.Limit.QuotaMax, QuotaRenewalRate: policyAD.Limit.QuotaRenewalRate},
+//       AllowanceScope: currAD.AllowanceScope,
+//     }
+//   }
+//   if greaterThanInt64(currAD.Limit.QuotaRenewalRate, policyAD.Limit.QuotaRenewalRate) {
+//     return user.AccessDefinition{
+//       Limit:          user.APILimit{QuotaMax: policyAD.Limit.QuotaMax, QuotaRenewalRate: currAD.Limit.QuotaRenewalRate},
 //       AllowanceScope: policyAD.AllowanceScope,
 //     }
 //   }
@@ -764,6 +786,25 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 // reqproof:requires currAD.Limit.QuotaMax >= 0
 // reqproof:requires currAD.Limit.QuotaMax <= policyAD.Limit.QuotaMax
 // reqproof:lemma apply_api_level_limits_quota_max_idempotent_when_smaller proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax == policyAD.Limit.QuotaMax
+//
+// Phase MM additions (2026-05-01) — three more behavioral guarantees on
+// applyAPILevelLimits. These lemmas extend coverage beyond QuotaMax to
+// QuotaRenewalRate and the unlimited-quota rule (QuotaMax == -1 forces
+// QuotaRenewalRate == 0).
+//
+// reqproof:requires policyAD.Limit.QuotaMax == -1
+// reqproof:lemma apply_api_level_limits_unlimited_zeros_renewal proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaRenewalRate == 0
+//
+// reqproof:requires policyAD.Limit.QuotaMax >= 0
+// reqproof:requires currAD.Limit.QuotaMax >= 0
+// reqproof:requires policyAD.Limit.QuotaRenewalRate >= 0
+// reqproof:requires currAD.Limit.QuotaRenewalRate >= 0
+// reqproof:lemma apply_api_level_limits_renewal_rate_monotone proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaRenewalRate >= policyAD.Limit.QuotaRenewalRate
+//
+// reqproof:requires policyAD.Limit.QuotaMax >= 0
+// reqproof:requires currAD.Limit.QuotaMax >= 0
+// reqproof:requires currAD.Limit.QuotaMax <= policyAD.Limit.QuotaMax
+// reqproof:lemma apply_api_level_limits_quota_max_nonneg_when_smaller proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax >= 0
 func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
 	var updated bool
 	if policyAD.Limit.Duration() > currAD.Limit.Duration() {
@@ -801,6 +842,14 @@ func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD use
 // SYS-REQ-023
 // ApplyEndpointLevelLimits combines policyEndpoints and currEndpoints and returns the combined value.
 // The returned endpoints would have the highest request rate from policyEndpoints and currEndpoints.
+//
+// Phase MM direct-attachment probe (2026-05-01): summary translation
+// rejects user.Endpoints (a []Endpoint slice type) at the lemma
+// signature level — E_QUALIFIED_TYPE_UNABSTRACTED. A
+// // reqproof:abstract directive on the slice type is required;
+// today that surface lands only for `sort=Opaque` (struct/iface) and
+// builtins, not user-defined slice aliases. Documented as Wall:
+// qualified-slice-type abstraction.
 func (t *Service) ApplyEndpointLevelLimits(policyEndpoints user.Endpoints, currEndpoints user.Endpoints) user.Endpoints {
 	currEPMap := currEndpoints.Map()
 	if len(currEPMap) == 0 {
@@ -1070,22 +1119,10 @@ func LemmaQuotaRemainingBounded(a LemmaAPILimit) bool {
 // SECTION 4 — Library-citation / arithmetic-identity lemmas
 // ===========================================================================
 
-// LemmaQuotaOffsetZero captures the q + 0 == q identity: applyPartitions
-// adds the policy's quota delta to the session's running counter; when
-// the delta is zero (a no-op partition), the session counter must be
-// unchanged.
-//
-// Phase R.6 multi-lemma host: same body, two complementary properties —
-// the identity result (q + 0 == q) and the lower bound under a non-neg
-// premise (q + 0 >= 0 when q >= 0). Pre-fix the second directive was
-// silently dropped; post-fix both are discharged.
-//
-// reqproof:lemma apply_quota_zero_offset_identity proves LemmaQuotaOffsetZero(q) == q by(AddIdentityZero)
-// reqproof:requires q >= 0
-// reqproof:lemma apply_quota_zero_offset_nonneg proves LemmaQuotaOffsetZero(q) >= 0
-func LemmaQuotaOffsetZero(q int) int {
-	return q + 0
-}
+// Phase MM migration: LemmaQuotaOffsetZero deleted. Pure arithmetic
+// identity (q + 0 == q) — no production behavior. Real merge-step
+// behavior is now covered by `apply_api_level_limits_quota_monotone`
+// and friends on Service.applyAPILevelLimits.
 
 // LemmaAPIIDListLenNonNeg captures the implicit non-negativity of
 // applyState.didRateLimit's length used by the apply.go:628 guard
@@ -1136,8 +1173,7 @@ func LemmaCountActiveQuotas(quotaMaxes []int) int {
 // Production motivation: the rate-limit merge path in apply.go
 // accumulates per-API QuotaMax fields when computing aggregate caps;
 // the running total must stay non-negative for downstream "remaining"
-// arithmetic to hold. This lemma is the slice-loop analogue of the
-// existing LemmaQuotaOffsetZero `q + 0 == q` identity.
+// arithmetic to hold.
 //
 // reqproof:lemma sum_nonneg_quotas_geq_zero func(quotaMaxes []int) bool {
 //   return LemmaSumNonNegativeQuotas(quotaMaxes) >= 0
@@ -1191,11 +1227,6 @@ func LemmaCountUntilNegativeQuota(quotaMaxes []int) int {
 // `sum + p` whenever `p > 0`. Cites SumOfNonNegativesIsNonNegative as the
 // step rule and AddIdentityZero for the skip branch.
 //
-// Production motivation: ApplyEndpointLevelLimits / ApplyJSONRPCMethodLimits
-// (apply.go:701, 747) iterate per-method/endpoint rate limits and effectively
-// accumulate per-keep summaries; the per-policy-positive-quota sum is the
-// floor for any subsequent "remaining" arithmetic.
-//
 // reqproof:lemma sum_positives_nonneg func(qs []int) bool {
 //   return LemmaSumPositivesNonNeg(qs) >= 0
 // }
@@ -1212,14 +1243,7 @@ func LemmaSumPositivesNonNeg(qs []int) int {
 	return sum
 }
 
-// LemmaCountZeroQuotas counts how many entries are exactly zero. The
-// running counter is monotone non-negative (count + 0 or count + 1), so
-// the loop invariant `count >= 0` is preserved every iteration. The
-// post-condition follows directly.
-//
-// Production motivation: APILimit.IsEmpty fanout — when scanning a slice
-// of APILimits, counting "fully-empty" entries is a precondition for
-// applyPerAPI's skip-empty optimisation (apply.go:413+).
+// LemmaCountZeroQuotas counts how many entries are exactly zero.
 //
 // reqproof:lemma count_zero_quotas_nonneg func(qs []int) bool {
 //   return LemmaCountZeroQuotas(qs) >= 0
@@ -1237,16 +1261,7 @@ func LemmaCountZeroQuotas(qs []int) int {
 	return count
 }
 
-// LemmaAllNonNegFlag is the boolean-monoid analogue of CountActive: it
-// AND-folds a per-element non-negativity predicate. The loop invariant is
-// "all-flag means every element scanned so far is non-negative". When the
-// flag is started true and only ANDed with `q >= 0`, the result is true
-// iff every element is non-negative. Phase S.2c.1 covers the fold; the
-// invariant is the boolean monoid `true` identity.
-//
-// Production motivation: admin-API validation walks per-API quota slices
-// and rejects any entry with QuotaMax < 0; this lemma certifies that the
-// aggregated flag matches the universal-quantifier interpretation.
+// LemmaAllNonNegFlag is the boolean-monoid analogue of CountActive.
 //
 // reqproof:lemma all_nonneg_flag_implies_each func(qs []int) bool {
 //   if LemmaAllNonNegFlag(qs) {
@@ -1267,10 +1282,8 @@ func LemmaAllNonNegFlag(qs []int) bool {
 	return flag
 }
 
-// LemmaSumZeroOnEmpty captures the additive-identity edge case for slice
-// folds: an empty slice produces zero. The lemma exists to give the
-// orchestrator a vacuous-loop case to translate, and to motivate the
-// AddIdentityZero citation in production fold helpers.
+// LemmaSumZeroOnEmpty captures the additive-identity edge case for
+// slice folds: an empty slice produces zero.
 //
 // reqproof:lemma sum_zero_on_empty func(qs []int) bool {
 //   return LemmaSumZeroOnEmpty(qs) >= 0
@@ -1284,11 +1297,7 @@ func LemmaSumZeroOnEmpty(qs []int) int {
 	return sum
 }
 
-// LemmaCountBoundedByLen is a doubly-bounded counter: the running count
-// is in [0, i+1] at iteration i, hence in [0, len(qs)] overall. Captures
-// the classical "count of matching elements is at most slice length"
-// pigeonhole. Bound matches what applyPerAPI uses to size its result
-// allocation (apply.go:413, `make([]X, 0, len(input))`).
+// LemmaCountBoundedByLen is a doubly-bounded counter.
 //
 // reqproof:lemma count_bounded_by_len func(qs []int) bool {
 //   return LemmaCountBoundedByLen(qs) >= 0
@@ -1306,13 +1315,8 @@ func LemmaCountBoundedByLen(qs []int) int {
 	return count
 }
 
-// LemmaSumOfPositivesPositive: when the entire slice is strictly positive
-// AND the slice is non-empty, the sum is strictly positive. We model the
-// premise via per-element guards and the invariant `sum >= 0`; the actual
-// strict-positivity post-condition cannot be discharged without a
-// non-empty witness, so this lemma returns the sum and we prove the
-// `sum >= 0` lower bound (the strict version is a Phase S.2c.5 monoid
-// lemma — captured as a follow-up in coverage gaps).
+// LemmaSumKnownPositiveNonNeg returns the sum and we prove the
+// `sum >= 0` lower bound.
 //
 // reqproof:lemma sum_known_positive_nonneg func(qs []int) bool {
 //   return LemmaSumKnownPositiveNonNeg(qs) >= 0
@@ -1330,10 +1334,7 @@ func LemmaSumKnownPositiveNonNeg(qs []int) int {
 	return sum
 }
 
-// LemmaFindFirstZeroBreak: scan with break-on-zero; counter is bounded
-// below by 0 regardless of where the loop exits. Exercises Phase S.2c.4
-// break-helper synthesis. Production analogue: applyState iterates per-
-// API limits and short-circuits on first all-zero APILimit.
+// LemmaFindFirstZeroBreak: scan with break-on-zero.
 //
 // reqproof:lemma find_first_zero_break_nonneg func(qs []int) bool {
 //   return LemmaFindFirstZeroBreak(qs) >= 0
@@ -1351,10 +1352,7 @@ func LemmaFindFirstZeroBreak(qs []int) int {
 }
 
 // LemmaCountUntilLargeBreak: count entries up to but not including the
-// first one exceeding a threshold. The break-out exits with a counter
-// guaranteed in [0, i]; the lemma certifies the lower bound. Production
-// analogue: gateway middlewares scan per-API quota lists and stop at the
-// first "impossibly large" entry to flag misconfig.
+// first one exceeding a threshold.
 //
 // reqproof:lemma count_until_large_break_nonneg func(qs []int, lim int) bool {
 //   return LemmaCountUntilLargeBreak(qs, lim) >= 0
@@ -1396,38 +1394,11 @@ func LemmaPolicyIDsLenNonNeg(ids []string) int {
 	return len(ids)
 }
 
-// LemmaQuotaRemainingMinusZero: a no-op QuotaRemaining decrement leaves
-// the counter unchanged. Captures the identity used by the Apply path
-// when a partition's quota delta is zero. Cites SubSelfIsZero via
-// AddIdentityZero (we use the additive form for compatibility).
-//
-// reqproof:lemma quota_remaining_minus_zero_identity proves LemmaQuotaRemainingMinusZero(q) == q by(AddIdentityZero)
-func LemmaQuotaRemainingMinusZero(q int) int {
-	return q - 0
-}
-
-// LemmaQuotaSubSelfZero: q - q == 0 — the post-ClearSession invariant when
-// a partitioned reset zeroes the quota counter. Cites SubSelfIsZero.
-//
-// reqproof:lemma quota_sub_self_is_zero proves LemmaQuotaSubSelfZero(q) == 0 by(SubSelfIsZero)
-func LemmaQuotaSubSelfZero(q int) int {
-	return q - q
-}
-
-// LemmaQuotaPlusZeroIsQuota: 0 + q == q — the symmetric identity of
-// LemmaQuotaOffsetZero (left-additive). Cites AddIdentityZero.
-//
-// Phase R.6 multi-lemma host: identity property AND symmetric-with-right
-// equivalence. Both directives target the same trivial body but document
-// distinct formal properties — useful when production callers cite either
-// shape (left-zero vs commutative variant).
-//
-// reqproof:lemma quota_zero_plus_q_identity proves LemmaQuotaPlusZeroIsQuota(q) == q by(AddIdentityZero)
-// reqproof:requires q >= 0
-// reqproof:lemma quota_zero_plus_q_nonneg proves LemmaQuotaPlusZeroIsQuota(q) >= 0
-func LemmaQuotaPlusZeroIsQuota(q int) int {
-	return 0 + q
-}
+// Phase MM migration: LemmaQuotaRemainingMinusZero, LemmaQuotaSubSelfZero,
+// LemmaQuotaPlusZeroIsQuota deleted. All three were pure arithmetic
+// identities (q-0==q, q-q==0, 0+q==q) with no production-behavior
+// content. Real merge/clear semantics is captured by direct lemmas
+// on Service.applyAPILevelLimits.
 
 // LemmaAccessSpecsLenNonNeg: the merged-result slice in MergeAllowedURLs
 // has non-negative length (util.go:13). Cites SliceLengthNonNegative.
@@ -1492,76 +1463,30 @@ const QuotaUnlimited = -1
 // can reference both without mixing widths in a single decl block.
 const QuotaUnlimitedInt64 int64 = -1
 
-// LemmaUnlimitedIsNegativeOne captures the sentinel-value definition:
-// the named const QuotaUnlimited equals the documented integer value -1.
-// The lemma exists to pin the const declaration so spec readers can cite
-// QuotaUnlimited as the sole source of truth for the "unlimited" sentinel.
-// Cites Phase O.6 (package-level const resolution).
-//
-// The dummy `q int` argument exists because the gosmt zero-arg-function
-// query path emits an SMT-LIB `(<name>)` callsite that the solver
-// rejects as "arguments missing"; threading any unused parameter sidesteps
-// that path while still exercising the const reference inside the body.
-//
-// reqproof:lemma quota_unlimited_const_value proves LemmaUnlimitedIsNegativeOne(q) == QuotaUnlimited
-func LemmaUnlimitedIsNegativeOne(q int) int {
-	if q == q {
-		return QuotaUnlimited
-	}
-	return QuotaUnlimited
-}
+// Phase MM migration: LemmaUnlimitedIsNegativeOne (proved sentinel
+// equality) and LemmaQuotaUnlimitedNeqZero (proved -1 != 0) deleted.
+// Their semantic content is subsumed by
+// `apply_api_level_limits_unlimited_zeros_renewal` (PROVED on
+// Service.applyAPILevelLimits) which proves the REAL behavior:
+// when policyAD.Limit.QuotaMax == -1 the result has
+// QuotaRenewalRate == 0. This is the production invariant that
+// motivated the trivial sentinel lemmas.
 
 // greater_than_int_* lemmas now attached directly to production
 // greaterThanInt in util.go (Phase CC migration).
 
-// LemmaQuotaUnlimitedNeqZero captures a useful negative property: the
-// "unlimited" sentinel and the "no enforced cap is set" zero are distinct.
-// Production: APILimit.IsEmpty() treats QuotaMax == 0 as empty, but
-// QuotaMax == -1 (QuotaUnlimited) is *not* empty — it explicitly opts
-// the partition into unlimited mode. Without this lemma, a refactor that
-// confused "zero" and "unlimited" would silently disable enforcement.
-//
-// reqproof:lemma quota_unlimited_neq_zero proves LemmaQuotaUnlimitedNeqZero(q) == true
-func LemmaQuotaUnlimitedNeqZero(q int) bool {
-	if q == q {
-		return QuotaUnlimited != 0
-	}
-	return QuotaUnlimited != 0
-}
+// Phase MM migration: LemmaInt64ConversionIdentity and
+// LemmaIntConversionRoundTripIdentity deleted. Both proved the
+// tautology `int(int64(x)) == x` — pure type-conversion identities
+// with no production-behavior content. The Phase T.2 translator
+// machinery they cited is exercised by every integer-typed lemma
+// (including the four PROVED applyAPILevelLimits ones); a dedicated
+// lemma adds nothing.
 
-// LemmaInt64ConversionIdentity exercises the Phase T.2 type-conversion
-// fix: int64(int) is a width-only conversion that the SMT-LIB unbounded
-// Int encoding lowers to identity. Production: util.go has paired
-// greaterThanInt / greaterThanInt64 helpers with the same body — this
-// lemma certifies the assumption "int64(x) and x compare equal under the
-// helper's logic" so a refactor unifying the two helpers via an int64
-// cast at the call site would be safe.
-//
-// reqproof:lemma int64_conversion_is_identity proves LemmaInt64ConversionIdentity(x) == x
-func LemmaInt64ConversionIdentity(x int) int {
-	return int(int64(x))
-}
-
-// LemmaIntConversionRoundTripIdentity is the round-trip variant: casting
-// an int through int64 and back yields the original value. Cites Phase
-// T.2 (integer type-conv identity). Production: apply.go and util.go mix
-// int / int64 freely when computing quota deltas.
-//
-// reqproof:lemma int_conversion_round_trip_identity proves LemmaIntConversionRoundTripIdentity(x) == x
-func LemmaIntConversionRoundTripIdentity(x int) int {
-	y := int64(x)
-	z := int(y)
-	return z
-}
-
-// LemmaInt64UnlimitedConversion: casting QuotaUnlimited (int) to int64
-// matches QuotaUnlimitedInt64 directly. Pins the named-sentinel
-// equivalence between the int and int64 typed sentinels.
-//
-// reqproof:lemma int64_unlimited_conversion_matches_named proves LemmaInt64UnlimitedConversion(q) == int(QuotaUnlimitedInt64)
-func LemmaInt64UnlimitedConversion(q int) int {
-	if q == q {
-		return int(int64(QuotaUnlimited))
-	}
-	return int(int64(QuotaUnlimited))
-}
+// Phase MM migration: LemmaInt64UnlimitedConversion deleted. The
+// lemma proved `int(int64(QuotaUnlimited)) == int(QuotaUnlimitedInt64)`
+// which is a tautological type-conversion identity — restates its
+// own body. The genuine production semantics (unlimited-quota →
+// renewal-rate-zero) is now covered directly by
+// `apply_api_level_limits_unlimited_zeros_renewal` on
+// Service.applyAPILevelLimits.
