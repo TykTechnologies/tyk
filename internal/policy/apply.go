@@ -955,15 +955,9 @@ type LemmaPolicy struct {
 	IsInactive         bool
 }
 
-// LemmaPolicyPartitions models the boolean partition flags for the
-// `partitions_enabled_iff_any` totality lemma.
-type LemmaPolicyPartitions struct {
-	Quota      bool
-	RateLimit  bool
-	Acl        bool
-	Complexity bool
-	PerAPI     bool
-}
+// Phase KK migration: LemmaPolicyPartitions removed (no remaining
+// helper depends on it; the lemma it hosted now lives directly on
+// user.PolicyPartitions.Enabled at user/policy.go).
 
 // LemmaAPILimit models the integer quota fields that drive Apply /
 // ClearSession decisions.
@@ -980,19 +974,9 @@ type LemmaAPILimit struct {
 // SECTION 1 — Policy struct invariants (4 lemmas, baseline arithmetic)
 // ===========================================================================
 
-// LemmaQuotaMaxNonNeg returns true when the policy's QuotaMax is
-// non-negative. Captures the storage-level invariant that the Apply path
-// relies on — admin API validation guarantees QuotaMax >= 0.
-//
-// reqproof:requires p.QuotaMax >= 0
-// reqproof:lemma quota_max_non_negative proves LemmaQuotaMaxNonNeg(p) == true
-func LemmaQuotaMaxNonNeg(p LemmaPolicy) bool {
-	if p.QuotaMax >= 0 {
-		return true
-	} else {
-		return false
-	}
-}
+// Phase KK migration: LemmaQuotaMaxNonNeg + quota_max_non_negative
+// removed. The equivalent is `policy_quota_max_valid_iff_nonneg` host-
+// attached to user.Policy.HasNonNegativeQuota at user/policy.go (PROVED).
 
 // LemmaQuotaRenewalRateNonNeg captures the second admin-validated field:
 // QuotaRenewalRate (a duration in seconds) is non-negative.
@@ -1007,38 +991,13 @@ func LemmaQuotaRenewalRateNonNeg(p LemmaPolicy) bool {
 	}
 }
 
-// LemmaRatePerPair captures the rate-per disjoint-zero invariant: a
-// "valid" policy with Rate>0 has Per>0 (the rate-limit subsystem treats
-// "either zero" as disabled — see user/session.go RateLimit.Duration()).
-//
-// reqproof:requires p.Rate > 0
-// reqproof:requires p.Per > 0
-// reqproof:lemma rate_per_pair_consistency proves LemmaRatePerPair(p) == true
-func LemmaRatePerPair(p LemmaPolicy) bool {
-	if p.Rate > 0 {
-		if p.Per > 0 {
-			return true
-		} else {
-			return false
-		}
-	} else {
-		return false
-	}
-}
+// Phase KK migration: LemmaRatePerPair + rate_per_pair_consistency
+// removed. The equivalent is `policy_rate_pair_consistency` host-
+// attached to user.Policy.HasConfiguredRate at user/policy.go (PROVED).
 
-// LemmaThrottleRetryNonNeg captures the ThrottleRetryLimit non-negativity
-// invariant: a negative retry budget would loop forever or skip retries
-// entirely.
-//
-// reqproof:requires p.ThrottleRetryLimit >= 0
-// reqproof:lemma throttle_retry_limit_non_negative proves LemmaThrottleRetryNonNeg(p) == true
-func LemmaThrottleRetryNonNeg(p LemmaPolicy) bool {
-	if p.ThrottleRetryLimit >= 0 {
-		return true
-	} else {
-		return false
-	}
-}
+// Phase KK migration: LemmaThrottleRetryNonNeg + throttle_retry_limit_non_negative
+// removed. The equivalent is `policy_throttle_configured_when_positive`
+// host-attached to user.Policy.HasConfiguredThrottle at user/policy.go (PROVED).
 
 // ===========================================================================
 // SECTION 2 — Apply determinism — guards the QuotaRenews fix
@@ -1070,22 +1029,9 @@ func LemmaClearSessionQuota(qm int, qr int) int {
 	}
 }
 
-// LemmaPartitionsEnabled captures the totality of partition classification
-// — the `all` branch in Apply (no partition set ⇒ apply everything) is
-// exactly the negation of the disjunction. Production:
-// PolicyPartitions.Enabled() at user/policy.go:67-69.
-//
-// reqproof:lemma partitions_enabled_iff_any proves LemmaPartitionsEnabled(pp) == true
-func LemmaPartitionsEnabled(pp LemmaPolicyPartitions) bool {
-	enabled := pp.Quota || pp.RateLimit || pp.Acl || pp.Complexity
-	if enabled == true {
-		return true
-	} else if enabled == false {
-		return true
-	} else {
-		return false
-	}
-}
+// Phase KK migration: LemmaPartitionsEnabled + partitions_enabled_iff_any
+// removed. The equivalent is `policy_partitions_enabled_iff_any_set`
+// host-attached to user.PolicyPartitions.Enabled at user/policy.go (PROVED).
 
 // ===========================================================================
 // SECTION 3 — Session / APILimit invariants
@@ -1112,58 +1058,13 @@ func LemmaQuotaRemainingBounded(a LemmaAPILimit) bool {
 	}
 }
 
-// LemmaAPILimitIsEmpty captures APILimit.IsEmpty() at user/session.go:137-179
-// — when every numeric field is the zero value, IsEmpty returns true.
-//
-// reqproof:requires a.Rate == 0
-// reqproof:requires a.Per == 0
-// reqproof:requires a.QuotaMax == 0
-// reqproof:requires a.QuotaRenews == 0
-// reqproof:requires a.QuotaRemaining == 0
-// reqproof:requires a.QuotaRenewalRate == 0
-// reqproof:lemma apilimit_is_empty_when_all_zero proves LemmaAPILimitIsEmpty(a) == true
-func LemmaAPILimitIsEmpty(a LemmaAPILimit) bool {
-	if a.Rate == 0 {
-		if a.Per == 0 {
-			if a.QuotaMax == 0 {
-				if a.QuotaRenews == 0 {
-					if a.QuotaRemaining == 0 {
-						if a.QuotaRenewalRate == 0 {
-							return true
-						} else {
-							return false
-						}
-					} else {
-						return false
-					}
-				} else {
-					return false
-				}
-			} else {
-				return false
-			}
-		} else {
-			return false
-		}
-	} else {
-		return false
-	}
-}
+// Phase KK migration: LemmaAPILimitIsEmpty + apilimit_is_empty_when_all_zero
+// removed. The equivalent is `apilimit_isempty_when_all_fields_zero`
+// host-attached to user.APILimit.IsAllZero at user/session.go (PROVED).
 
-// LemmaAPILimitNonEmptyQuota captures the negative case for
-// APILimit.IsEmpty(): if QuotaMax > 0 the limit is *not* empty. Guards a
-// class of bugs where partitioned policies with only quota set might be
-// treated as fully-empty and skipped during applyPerAPI.
-//
-// reqproof:requires a.QuotaMax > 0
-// reqproof:lemma apilimit_non_empty_when_quota_max_set proves LemmaAPILimitNonEmptyQuota(a) == false
-func LemmaAPILimitNonEmptyQuota(a LemmaAPILimit) bool {
-	if a.QuotaMax != 0 {
-		return false
-	} else {
-		return true
-	}
-}
+// Phase KK migration: LemmaAPILimitNonEmptyQuota + apilimit_non_empty_when_quota_max_set
+// removed. The equivalent is `apilimit_nonempty_when_quota_set` host-
+// attached to user.APILimit.HasQuotaConfigured at user/session.go (PROVED).
 
 // ===========================================================================
 // SECTION 4 — Library-citation / arithmetic-identity lemmas
