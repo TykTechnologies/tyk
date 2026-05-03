@@ -530,19 +530,47 @@ func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
 
 // SYS-REQ-030, SYS-REQ-031, SYS-REQ-032
 //
-// Phase NN.1 BLOCKED: a symmetric SAFETY guard to applyPerAPI was
-// authored but cannot land without editing user/policy.go to add
-// `field Partitions PolicyPartitions` to the host-attached
-// `// reqproof:model` directive. The cross-package directive in
-// internal/policy/access_definition_model.go cannot OVERRIDE the
-// user-side host-attached model because the model audit re-derives
-// `models[abs.SMTName] = abs` and the registry's id-sorted iteration
-// order (alphabetical) leaves the same key resolving back to whichever
-// abstraction was registered last — a separate code-path bug from
-// the L3 register pass. Documented as Wall: cross-package model
-// override priority in audit step. The applyPerAPI lemmas DO land
-// (the AccessDefinition cross-package directive works because there
-// is no host-attached competitor in user/).
+// Phase OO.1 UNBLOCKED: the symmetric SAFETY guard mirroring
+// applyPerAPI now lands. The audit-step cross-package model priority
+// fix in pkg/lemma/prover/orchestration.go (consume the registry's
+// id-keyed Entries() rather than re-deriving keys from filesystem
+// paths) lets the import-attached
+// `// reqproof:model user.Policy` / `user.PolicyPartitions` directives
+// in internal/policy/access_definition_model.go win the qualified
+// `user.X` slots in the audit `models` map.
+//
+// SAFETY shape: applyPartitions MUST return a non-nil error when the
+// caller has already committed to a per-API policy (didPerAPI ==
+// true) AND any partition flag is enabled. This is the dual of the
+// applyPerAPI safety guard and prevents Tyk middleware from silently
+// mixing partition and per-API policies (a configuration error that
+// would corrupt rate-limit / quota state).
+//
+// We re-state PolicyPartitions.Enabled() inline in the summary as
+// `policy.Partitions.Quota || policy.Partitions.RateLimit ||
+//  policy.Partitions.Acl || policy.Partitions.Complexity` — the
+// translator does not yet route method-call summaries through the
+// Phase EE summary substitution path for L3-modeled receivers, so
+// inlining the formula is the path that actually lowers cleanly.
+//
+// reqproof:summary func(t *Service, policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition, applyState *applyStatus) error {
+//   usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity
+//   if usePartitions && applyState.didPerAPI {
+//     return ErrMixedPartitionAndPerAPIPolicies
+//   }
+//   return nil
+// }
+//
+// reqproof:requires applyState.didPerAPI == false
+// reqproof:lemma apply_partitions_succeeds_when_no_per_api proves t.applyPartitions(policy, session, rights, applyState) == nil
+//
+// reqproof:requires applyState.didPerAPI == true
+// reqproof:requires policy.Partitions.Quota == true
+// reqproof:lemma apply_partitions_rejects_when_quota_partition_and_per_api proves t.applyPartitions(policy, session, rights, applyState) != nil
+//
+// reqproof:requires applyState.didPerAPI == true
+// reqproof:requires policy.Partitions.Acl == true
+// reqproof:lemma apply_partitions_rejects_when_acl_partition_and_per_api proves t.applyPartitions(policy, session, rights, applyState) != nil
 func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
 	applyState *applyStatus) error {
 
