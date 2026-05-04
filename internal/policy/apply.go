@@ -16,17 +16,34 @@ import (
 	// reqproof:abstract model.PolicyProvider sort=Opaque
 	"github.com/TykTechnologies/tyk/internal/model"
 
-	// Phase II: *logrus.Logger is wrapped through the LoggerProvider
-	// interface in the engine. The pure pointer-receiver call
-	// t.logger.Error(err) doesn't yet unlock under Phase II alone (the
-	// logger field is *logrus.Logger, not an interface), but the
-	// abstraction is registered so future probes that route logging
-	// through model.LoggerProvider (or sirupsen/logrus.FieldLogger)
-	// translate symmetrically with PolicyProvider.
-	//
-	// reqproof:abstract logrus.FieldLogger sort=Opaque
+	// reqproof:abstract logrus.Logger sort=Opaque
 	"github.com/sirupsen/logrus"
 
+	// reqproof:model user.AccessDefinition
+	//   field APIID string
+	//   field Limit user.APILimit
+	//   field AllowanceScope string
+	//   field DisableIntrospection bool
+	//
+	// reqproof:model user.Policy
+	//   field AccessRights map[string]user.AccessDefinition
+	//   field Partitions user.PolicyPartitions
+	//   field ID string
+	//   field Active bool
+	//   field IsInactive bool
+	//   field QuotaMax int64
+	//   field QuotaRenewalRate int64
+	//   field Rate float64
+	//   field Per float64
+	//   field ThrottleInterval float64
+	//   field ThrottleRetryLimit int
+	//
+	// reqproof:model user.PolicyPartitions
+	//   field Quota bool
+	//   field RateLimit bool
+	//   field Complexity bool
+	//   field Acl bool
+	//   field PerAPI bool
 	"github.com/TykTechnologies/tyk/user"
 )
 
