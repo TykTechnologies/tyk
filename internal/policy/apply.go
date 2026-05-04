@@ -91,7 +91,7 @@ func (t *Service) ClearSession(session *user.SessionState) error {
 		return ErrNilPolicyStore
 	}
 
-		for _, polID := range t.policyIds(session) {
+	for _, polID := range t.policyIds(session) {
 		policy, ok := t.storage.PolicyByID(polID)
 
 		if !ok {
