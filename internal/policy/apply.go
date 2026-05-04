@@ -553,6 +553,11 @@ func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
 // Phase EE summary substitution path for L3-modeled receivers, so
 // inlining the formula is the path that actually lowers cleanly.
 //
+// Phase UU.9 note: // reqproof:assume for method calls (value.Method(args))
+// requires translator key-format wiring that is not yet connected in the
+// UU.8 release — see expr.go translateMethodCall line 1533 which uses
+// `rSort_MethodName` key but the collector uses `AssumeTarget` verbatim.
+//
 // reqproof:summary func(t *Service, policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition, applyState *applyStatus) error {
 //   usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity
 //   if usePartitions && applyState.didPerAPI {
