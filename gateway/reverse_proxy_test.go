@@ -2228,27 +2228,12 @@ func TestTimeoutPrioritization(t *testing.T) {
 		sResp := "seconds response"
 		msResp := "milliseconds response"
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			var resp string
-			if strings.HasPrefix(r.URL.Path, "/timeout/seconds") {
-				time.Sleep(2 * time.Second)
-				resp = sResp
-			} else if strings.HasPrefix(r.URL.Path, "/success/seconds") {
-				time.Sleep(1 * time.Second)
-				resp = sResp
-			} else if strings.HasPrefix(r.URL.Path, "/timeout/milliseconds/1") {
-				time.Sleep(500 * time.Millisecond)
-				resp = msResp
-			} else if strings.HasPrefix(r.URL.Path, "/timeout/milliseconds/2") {
-				time.Sleep(3000 * time.Millisecond)
-				resp = msResp
-			} else if strings.HasPrefix(r.URL.Path, "/success/milliseconds") {
-				time.Sleep(500 * time.Millisecond)
-				resp = msResp
-			} else {
+			resp := getResponseForGivenURL(r, sResp, msResp)
+			if resp == "" {
 				w.WriteHeader(http.StatusNotFound)
 			}
 
-			w.Write([]byte(resp))
+			_, _ = w.Write([]byte(resp))
 		}))
 		defer upstream.Close()
 
@@ -2526,4 +2511,25 @@ func TestTimeoutPrioritization(t *testing.T) {
 			BodyMatch: upstreamTimeout,
 		})
 	})
+}
+
+func getResponseForGivenURL(r *http.Request, sResp string, msResp string) string {
+	if strings.HasPrefix(r.URL.Path, "/timeout/seconds") {
+		time.Sleep(2 * time.Second)
+		return sResp
+	} else if strings.HasPrefix(r.URL.Path, "/success/seconds") {
+		time.Sleep(1 * time.Second)
+		return sResp
+	} else if strings.HasPrefix(r.URL.Path, "/timeout/milliseconds/1") {
+		time.Sleep(500 * time.Millisecond)
+		return msResp
+	} else if strings.HasPrefix(r.URL.Path, "/timeout/milliseconds/2") {
+		time.Sleep(3000 * time.Millisecond)
+		return msResp
+	} else if strings.HasPrefix(r.URL.Path, "/success/milliseconds") {
+		time.Sleep(500 * time.Millisecond)
+		return msResp
+	}
+
+	return ""
 }
