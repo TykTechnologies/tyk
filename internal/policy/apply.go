@@ -880,6 +880,7 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 // reqproof:lemma apply_api_level_limits_quota_max_takes_larger proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax >= currAD.Limit.QuotaMax || t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax == policyAD.Limit.QuotaMax
 //
 // reqproof:requires policyAD.Limit.QuotaMax >= 0
+// reqproof:requires currAD.Limit.QuotaMax >= 0
 // reqproof:lemma apply_api_level_limits_quota_max_nonneg proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax >= 0
 //
 // reqproof:requires policyAD.Limit.QuotaMax >= 0
@@ -893,6 +894,7 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 // QuotaRenewalRate == 0).
 //
 // reqproof:requires policyAD.Limit.QuotaMax == -1
+// reqproof:requires currAD.Limit.QuotaMax >= 0
 // reqproof:lemma apply_api_level_limits_unlimited_zeros_renewal proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaRenewalRate == 0
 //
 // reqproof:requires policyAD.Limit.QuotaMax >= 0
@@ -1514,6 +1516,8 @@ func LemmaAccessSpecsLenNonNeg(s []int) int {
 //
 // reqproof:requires q >= 0
 // reqproof:lemma abs_quota_non_negative proves LemmaAbsQuotaNonNeg(q) >= 0 by(AbsNonNegative)
+//
+// reqproof:requires q >= 0
 // reqproof:lemma abs_quota_self_when_nonneg proves LemmaAbsQuotaNonNeg(q) == q
 func LemmaAbsQuotaNonNeg(q int) int {
 	if q < 0 {
