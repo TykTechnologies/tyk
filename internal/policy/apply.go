@@ -1085,36 +1085,13 @@ func LemmaQuotaRenewalRateNonNeg(p LemmaPolicy) bool {
 
 // LemmaThrottleRetryNonNeg migrated to user.Policy.HasConfiguredThrottle (PROVED).
 
-// ===========================================================================
-// SECTION 2 — Apply determinism — guards the QuotaRenews fix
-// ===========================================================================
-
-// LemmaQuotaRenewsAssign captures the post-fix `updateSessionRootVars`
-// invariant: with a single API the value flows through unchanged. The
-// lemma rejects any "other entry won the race" counterexample.
-//
-// reqproof:lemma quota_renews_deterministic_single_api proves LemmaQuotaRenewsAssign(qr) == qr
-func LemmaQuotaRenewsAssign(qr int) int {
-	sessionQuotaRenews := qr
-	return sessionQuotaRenews
-}
-
-// LemmaClearSessionQuota captures the partitioned ClearSession invariant:
-// after ClearSession on a quota-partitioned policy, QuotaRemaining is
-// exactly 0.
-//
-// reqproof:lemma clear_session_quota_zeros_remaining proves LemmaClearSessionQuota(qm, qr) == 0
-func LemmaClearSessionQuota(qm int, qr int) int {
-	quotaPartitioned := true
-	if quotaPartitioned {
-		out := 0
-		return out
-	} else {
-		return qr
-	}
-}
-
 // LemmaPartitionsEnabled migrated to user.PolicyPartitions.Enabled (PROVED).
+
+// DELETED in UU.18: LemmaQuotaRenewsAssign + lemma quota_renews_deterministic_single_api
+// (tautological identity function — no production callers).
+//
+// DELETED in UU.18: LemmaClearSessionQuota + lemma clear_session_quota_zeros_remaining
+// (tautological hardcoded-constant return — no production callers).
 
 // ===========================================================================
 // SECTION 3 — Session / APILimit invariants

@@ -212,10 +212,6 @@ func (r RateLimit) IsZero() bool {
 // reqproof:requires a.QuotaRenews == 0
 // reqproof:requires a.QuotaRemaining == 0
 // reqproof:requires a.QuotaRenewalRate == 0
-// reqproof:requires a.ThrottleInterval == 0.0
-// reqproof:requires a.ThrottleRetryLimit == 0
-// reqproof:requires a.MaxQueryDepth == 0
-// reqproof:requires a.SetBy == ""
 // reqproof:lemma apilimit_isempty_when_all_fields_zero func(a APILimit) bool {
 //   return a.Rate == 0.0 && a.Per == 0.0 && a.QuotaMax == 0 && a.QuotaRenews == 0 && a.QuotaRemaining == 0 && a.QuotaRenewalRate == 0
 // }
