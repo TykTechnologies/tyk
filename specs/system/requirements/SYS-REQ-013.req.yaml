@@ -5,14 +5,16 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !apply_requested | !policy_found | !org_matches | !is_per_api | access_rights_merged
-description: 'When Apply processes a valid per-API policy (found, org matches, per-API mode), access rights for each API must be merged into the session. Reads as: if apply requested AND policy found AND org matches AND is per-API, then access rights merged.'
+description: >-
+    When Apply processes a valid per-API policy (found, org matches, per-API mode), access rights for each API must be merged into the session. Reads as: if apply requested AND policy found AND org matches AND is per-API, then access rights merged.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: 'When Apply processes a valid per-API policy (found, org matches, per-API mode), access rights for each API must be merged into the session. Reads as: if apply requested AND policy found AND org matche'
+rationale: >-
+    When Apply processes a valid per-API policy (found, org matches, per-API mode), access rights for each API must be merged into the session. Reads as: if apply requested AND policy found AND org matche
 tags: []
 variables: []
 traces:

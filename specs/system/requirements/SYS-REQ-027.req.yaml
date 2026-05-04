@@ -5,14 +5,16 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !!apply_requested | !!clear_requested | !!rate_limit_apply_requested | !!endpoint_limit_apply_requested | (!session_cleared & !access_rights_merged & !rate_limit_applied & !quota_applied & !tags_merged & !metadata_merged & !error_reported & !session_inactive_set & !endpoints_merged & !complexity_applied & !result_returned)
-description: 'Idle state: When no operation is active (no apply, clear, rate limit, or endpoint operation requested), all outputs must be false. This prevents the component from producing spurious outputs when idle.'
+description: >-
+    Idle state: When no operation is active (no apply, clear, rate limit, or endpoint operation requested), all outputs must be false. This prevents the component from producing spurious outputs when idle.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: 'Idle state: When no operation is active (no apply, clear, rate limit, or endpoint operation requested), all outputs must be false. This prevents the component from producing spurious outputs when idle'
+rationale: >-
+    Idle state: When no operation is active (no apply, clear, rate limit, or endpoint operation requested), all outputs must be false. This prevents the component from producing spurious outputs when idle
 tags: []
 variables: []
 traces:

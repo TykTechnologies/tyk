@@ -5,14 +5,16 @@ priority: shall
 category: functional
 req_type: constraint
 fretish: the policy shall always satisfy !apply_requested | metadata_order_independent
-description: 'KNOWN LIMITATION: Metadata merge uses last-write-wins per key. When policies are iterated in different order, conflicting keys produce different results. This is a known non-determinism risk documented in vars as last-write-wins. The iteration order depends on the order of policy IDs in the session, which is controlled by the caller.'
+description: >-
+    KNOWN LIMITATION: Metadata merge uses last-write-wins per key. When policies are iterated in different order, conflicting keys produce different results. This is a known non-determinism risk documented in vars as last-write-wins. The iteration order depends on the order of policy IDs in the session, which is controlled by the caller.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: 'KNOWN LIMITATION: Metadata merge uses last-write-wins per key. When policies are iterated in different order, conflicting keys produce different results. This is a known non-determinism risk documente'
+rationale: >-
+    KNOWN LIMITATION: Metadata merge uses last-write-wins per key. When policies are iterated in different order, conflicting keys produce different results. This is a known non-determinism risk documente
 tags: []
 variables: []
 traces:

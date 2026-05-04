@@ -5,14 +5,16 @@ priority: shall
 category: functional
 req_type: assumption
 fretish: the policy shall always satisfy !policy_rate_equal | !policy_rate_higher
-description: 'Assumption: policy rate cannot be both equal and higher than current rate simultaneously.'
+description: >-
+    Assumption: policy rate cannot be both equal and higher than current rate simultaneously.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: 'Assumption: policy rate cannot be both equal and higher than current rate simultaneously.'
+rationale: >-
+    Assumption: policy rate cannot be both equal and higher than current rate simultaneously.
 tags: []
 variables: []
 traces:

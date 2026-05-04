@@ -5,7 +5,8 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: ""
-description: 'Retired: numbering gap placeholder'
+description: >-
+    Retired: numbering gap placeholder
 formalization_strategy: ""
 informal_verification:
     method: ""

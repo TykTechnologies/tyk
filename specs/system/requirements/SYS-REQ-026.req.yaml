@@ -5,14 +5,16 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !apply_requested | !error_reported | !quota_applied
-description: 'Contrapositive: When Apply reports an error, quotas must NOT be applied.'
+description: >-
+    Contrapositive: When Apply reports an error, quotas must NOT be applied.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: 'Contrapositive: When Apply reports an error, quotas must NOT be applied.'
+rationale: >-
+    Contrapositive: When Apply reports an error, quotas must NOT be applied.
 tags: []
 variables: []
 traces:

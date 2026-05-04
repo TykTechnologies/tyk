@@ -1,18 +1,5 @@
-// policy_predicates.go — genuine predicate helpers with real loop invariants
-// and standard-library lemma citations.
-//
-// These helpers document session/policy invariants that the gateway relies
-// on: non-negative tag-slice lengths (delegated via by(SliceLengthNonNegative)),
-// non-negative running counts from range-over-slice loops (proved with loop
-// invariants), and the break-early safety floor for tag scans.
-//
-// The helpers are pure, additive, and gated by ordinary Go visibility — they
-// ship as production code (no //go:build tag) so downstream verify-lemma
-// picks them up directly.
-//
-// Restricted Go subset (gosmt, Phase S.2c.1):
-//   * pure functions; if/else with else; for-range or indexed for+break
-//   * supported types: bool / int / string / slice; struct via field access
+// Predicate helpers for session/policy invariants.
+// Each helper carries a // reqproof:lemma directive.
 
 package user
 
@@ -37,8 +24,7 @@ func LemmaPolicyTagsLenNonNeg(tags []string) int {
 
 // LemmaCountNonEmptyTags counts how many of the given tags are non-empty
 // strings. The accumulator's loop invariant `count >= 0` is preserved by
-// the conditional increment; the post-condition holds because the loop
-// only ever adds 0 or 1 to a non-negative seed. Phase S.2c.1.
+// the conditional increment.
 //
 // Production motivation: TagsFromMetadata (session_tags.go:4) appends each
 // non-empty tag from metadata; the running count of "valid tags" is the
@@ -62,7 +48,7 @@ func LemmaCountNonEmptyTags(tags []string) int {
 
 // LemmaScanTagsBreakOnEmpty walks the tags and stops at the first empty
 // string; the running counter is bounded below by zero regardless of
-// where the loop exits. Exercises Phase S.2c.4 break-helper synthesis.
+// where the loop exits.
 //
 // Production motivation: gateway middlewares scan session.Tags for the
 // first malformed tag (empty / unparseable) to surface as a config

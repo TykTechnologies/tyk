@@ -17,7 +17,8 @@ informal_verification:
     evidence: ""
     verified: false
 component: policy
-rationale: 'COMPONENT OVERVIEW: The policy package implements Tyk API Gateway''s policy merging engine. It takes a session (API key) referencing one or more policies and applies those policies to the session, prod'
+rationale: >-
+    COMPONENT OVERVIEW: The policy package implements Tyk API Gateway's policy merging engine. It takes a session (API key) referencing one or more policies and applies those policies to the session, prod
 tags: []
 variables: []
 traces:

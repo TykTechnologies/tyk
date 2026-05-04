@@ -5,14 +5,16 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !rate_limit_apply_requested | !policy_rate_empty | !rate_limit_applied
-description: 'Contrapositive: ApplyRateLimits must NOT apply rate limits when the policy rate is empty (Rate=0 or Per=0). Applying zero rates would effectively disable the API.'
+description: >-
+    Contrapositive: ApplyRateLimits must NOT apply rate limits when the policy rate is empty (Rate=0 or Per=0). Applying zero rates would effectively disable the API.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: 'Contrapositive: ApplyRateLimits must NOT apply rate limits when the policy rate is empty (Rate=0 or Per=0). Applying zero rates would effectively disable the API.'
+rationale: >-
+    Contrapositive: ApplyRateLimits must NOT apply rate limits when the policy rate is empty (Rate=0 or Per=0). Applying zero rates would effectively disable the API.
 tags: []
 variables: []
 traces:

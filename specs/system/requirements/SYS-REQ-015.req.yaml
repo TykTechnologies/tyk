@@ -5,14 +5,16 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !apply_requested | !policy_found | !org_matches | !is_per_api | rate_limit_applied
-description: 'When Apply processes a valid per-API policy (found, org matches, per-API mode), rate limits must be applied. Reads as: if apply requested AND policy found AND org matches AND is per-API, then rate limit applied.'
+description: >-
+    When Apply processes a valid per-API policy (found, org matches, per-API mode), rate limits must be applied. Reads as: if apply requested AND policy found AND org matches AND is per-API, then rate limit applied.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: 'When Apply processes a valid per-API policy (found, org matches, per-API mode), rate limits must be applied. Reads as: if apply requested AND policy found AND org matches AND is per-API, then rate lim'
+rationale: >-
+    When Apply processes a valid per-API policy (found, org matches, per-API mode), rate limits must be applied. Reads as: if apply requested AND policy found AND org matches AND is per-API, then rate lim
 tags: []
 variables: []
 traces:

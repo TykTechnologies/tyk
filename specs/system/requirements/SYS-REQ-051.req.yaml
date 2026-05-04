@@ -5,7 +5,8 @@ priority: shall
 category: functional
 req_type: constraint
 fretish: the policy shall always satisfy !rate_limit_apply_requested | !policy_rate_higher | rate_limit_applied
-description: 'The greaterThanInt64 comparison function must correctly handle the -1 sentinel value as unlimited (always greatest). This ensures that when a policy specifies -1 for quota or rate, it always wins the merge regardless of the other value. SECURITY: A failure here could cause quota bypass if -1 is treated as less than a finite value.'
+description: >-
+    The greaterThanInt64 comparison function must correctly handle the -1 sentinel value as unlimited (always greatest). This ensures that when a policy specifies -1 for quota or rate, it always wins the merge regardless of the other value. SECURITY: A failure here could cause quota bypass if -1 is treated as less than a finite value.
 formalization_strategy: fretish
 informal_verification:
     method: ""

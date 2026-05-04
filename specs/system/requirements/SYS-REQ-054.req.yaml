@@ -5,7 +5,8 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !apply_requested | !multiple_policies | error_reported | !access_rights_merged | result_returned
-description: 'When multiple policies are applied and one uses per-API mode while another uses partition mode, Apply must report ErrMixedPartitionAndPerAPIPolicies. The cross-policy mode conflict is detected via the applyState didPerAPI/didPartition flags, not just within a single policy''s flags. SECURITY: Allowing mixed modes across policies could produce unpredictable merge results.'
+description: >-
+    When multiple policies are applied and one uses per-API mode while another uses partition mode, Apply must report ErrMixedPartitionAndPerAPIPolicies. The cross-policy mode conflict is detected via the applyState didPerAPI/didPartition flags, not just within a single policy's flags. SECURITY: Allowing mixed modes across policies could produce unpredictable merge results.
 formalization_strategy: fretish
 informal_verification:
     method: ""

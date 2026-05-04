@@ -5,14 +5,16 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !apply_requested | !error_reported | !rate_limit_applied
-description: 'Contrapositive: When Apply reports an error, rate limits must NOT be applied. Error state and successful application are mutually exclusive outcomes.'
+description: >-
+    Contrapositive: When Apply reports an error, rate limits must NOT be applied. Error state and successful application are mutually exclusive outcomes.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: 'Contrapositive: When Apply reports an error, rate limits must NOT be applied. Error state and successful application are mutually exclusive outcomes.'
+rationale: >-
+    Contrapositive: When Apply reports an error, rate limits must NOT be applied. Error state and successful application are mutually exclusive outcomes.
 tags: []
 variables: []
 traces:

@@ -5,14 +5,16 @@ priority: shall
 category: functional
 req_type: constraint
 fretish: the policy shall always satisfy !(error_reported & access_rights_merged)
-description: 'Mutual exclusivity: error_reported and access_rights_merged cannot both be true simultaneously. A policy application either succeeds (rights merged) or fails (error reported), never both.'
+description: >-
+    Mutual exclusivity: error_reported and access_rights_merged cannot both be true simultaneously. A policy application either succeeds (rights merged) or fails (error reported), never both.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: 'Mutual exclusivity: error_reported and access_rights_merged cannot both be true simultaneously. A policy application either succeeds (rights merged) or fails (error reported), never both.'
+rationale: >-
+    Mutual exclusivity: error_reported and access_rights_merged cannot both be true simultaneously. A policy application either succeeds (rights merged) or fails (error reported), never both.
 tags: []
 variables: []
 traces:

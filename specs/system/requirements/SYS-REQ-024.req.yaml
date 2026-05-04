@@ -5,14 +5,16 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !apply_requested | !error_reported | !access_rights_merged
-description: 'Contrapositive: When Apply reports an error, access rights must NOT be merged. A failed apply must leave the session unchanged to prevent partial (corrupted) state.'
+description: >-
+    Contrapositive: When Apply reports an error, access rights must NOT be merged. A failed apply must leave the session unchanged to prevent partial (corrupted) state.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: 'Contrapositive: When Apply reports an error, access rights must NOT be merged. A failed apply must leave the session unchanged to prevent partial (corrupted) state.'
+rationale: >-
+    Contrapositive: When Apply reports an error, access rights must NOT be merged. A failed apply must leave the session unchanged to prevent partial (corrupted) state.
 tags: []
 variables: []
 traces:

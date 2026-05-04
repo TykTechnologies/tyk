@@ -5,14 +5,16 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !apply_requested | !policy_found | !org_matches | !is_per_api | quota_applied
-description: 'When Apply processes a valid per-API policy (found, org matches, per-API mode), quota values must be applied. Reads as: if apply requested AND policy found AND org matches AND is per-API, then quota applied.'
+description: >-
+    When Apply processes a valid per-API policy (found, org matches, per-API mode), quota values must be applied. Reads as: if apply requested AND policy found AND org matches AND is per-API, then quota applied.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: 'When Apply processes a valid per-API policy (found, org matches, per-API mode), quota values must be applied. Reads as: if apply requested AND policy found AND org matches AND is per-API, then quota a'
+rationale: >-
+    When Apply processes a valid per-API policy (found, org matches, per-API mode), quota values must be applied. Reads as: if apply requested AND policy found AND org matches AND is per-API, then quota a
 tags: []
 variables: []
 traces:

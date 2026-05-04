@@ -5,14 +5,16 @@ priority: shall
 category: functional
 req_type: assumption
 fretish: the policy shall always satisfy store_available | !policy_found
-description: 'Assumption: if the store is unavailable, no policy can be found.'
+description: >-
+    Assumption: if the store is unavailable, no policy can be found.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: 'Assumption: if the store is unavailable, no policy can be found.'
+rationale: >-
+    Assumption: if the store is unavailable, no policy can be found.
 tags: []
 variables: []
 traces:

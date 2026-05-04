@@ -5,7 +5,8 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !apply_requested | !policy_inactive | session_inactive_set
-description: 'When multiple policies are applied, session.IsInactive is the logical OR of all policies'' IsInactive flags. If ANY policy marks itself inactive, the session becomes inactive. This is the conservative security choice: one inactive policy deactivates the entire session to prevent an active policy from overriding an administrative deactivation.'
+description: >-
+    When multiple policies are applied, session.IsInactive is the logical OR of all policies' IsInactive flags. If ANY policy marks itself inactive, the session becomes inactive. This is the conservative security choice: one inactive policy deactivates the entire session to prevent an active policy from overriding an administrative deactivation.
 formalization_strategy: fretish
 informal_verification:
     method: ""

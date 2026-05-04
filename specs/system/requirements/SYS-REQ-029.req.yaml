@@ -5,14 +5,16 @@ priority: shall
 category: functional
 req_type: constraint
 fretish: the policy shall always satisfy apply_requested | clear_requested | rate_limit_apply_requested | endpoint_limit_apply_requested | result_returned | !error_reported
-description: 'Completeness: Every operation either returns a result or the component is idle. No operation can silently fail without producing either a result or an error.'
+description: >-
+    Completeness: Every operation either returns a result or the component is idle. No operation can silently fail without producing either a result or an error.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: 'Completeness: Every operation either returns a result or the component is idle. No operation can silently fail without producing either a result or an error.'
+rationale: >-
+    Completeness: Every operation either returns a result or the component is idle. No operation can silently fail without producing either a result or an error.
 tags: []
 variables: []
 traces:

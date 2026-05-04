@@ -5,14 +5,16 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !rate_limit_apply_requested | policy_rate_empty | policy_rate_equal | !api_limit_empty | rate_limit_applied
-description: 'When the policy rate equals the current rate (same duration), the existing limit is preserved. This is a design decision: strict greater-than comparison means ties go to the existing value.'
+description: >-
+    When the policy rate equals the current rate (same duration), the existing limit is preserved. This is a design decision: strict greater-than comparison means ties go to the existing value.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: 'When the policy rate equals the current rate (same duration), the existing limit is preserved. This is a design decision: strict greater-than comparison means ties go to the existing value.'
+rationale: >-
+    When the policy rate equals the current rate (same duration), the existing limit is preserved. This is a design decision: strict greater-than comparison means ties go to the existing value.
 tags: []
 variables: []
 traces:

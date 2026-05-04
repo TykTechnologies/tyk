@@ -6,12 +6,7 @@ import (
 
 	"github.com/samber/lo"
 
-	// Phase II: declare model.PolicyProvider as an opaque sort. The
-	// translator now lowers t.storage.PolicyByID(...) calls (and any
-	// other PolicyProvider method) to opaque function applications,
-	// enabling direct lemma attachment on engine methods that
-	// previously rejected at "unsupported call form" because the
-	// dispatch flowed through the interface.
+	// PolicyProvider declared as opaque sort for lemma attachment.
 	//
 	// reqproof:abstract model.PolicyProvider sort=Opaque
 	"github.com/TykTechnologies/tyk/internal/model"
@@ -77,33 +72,10 @@ func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Se
 // ClearSession clears the quota, rate limit and complexity values so that partitioned policies can apply their values.
 // Otherwise, if the session has already a higher value, an applied policy will not win, and its values will be ignored.
 //
-// Phase II direct-attachment probe (2026-05-01): the body composes
-// three independent translator walls — opaque interface dispatch
-// (t.storage.PolicyByID, NEWLY UNLOCKED in Phase II), range-over-slice
-// over a method-call result (t.policyIds(session)), and pointer-field
-// mutation across many user.SessionState fields not present in the
-// existing :model directive (Smoothing, MaxQueryDepth, ...). Phase II
-// alone removes only the first wall; the other two require further
-// translator phases (range-with-loop-invariants on method-call results,
-// and a model expansion to cover all engine-touched fields). The
-// LemmaClearSession* helpers below remain the canonical attachment
-// surface until those phases ship.
-//
-// Phase MM direct-attachment probe (2026-05-01): error-returning
-// summary on ClearSession lands but contaminates the per-package
-// SMT preamble: declaring a summary that returns Error caused
-// previously-PROVED lemmas (apply_api_level_limits_*) to regress
-// to UNKNOWN with "unknown constant greaterThanInt64". Documented
-// as Wall: per-package SMT preamble cross-contamination from
-// summary additions. Reverted; pursued via `applyAPILevelLimits`
-// extension and engine-method extensions where the summary surface
-// doesn't introduce error-sort declarations into the shared env.
-// Phase NN.2: ClearSession safety guard. The :summary models the
-// nil-storage early-return; the per-policy clear loop is opaque from
-// the lemma's view. The lemma is the load-bearing safety property —
-// callers that pass a nil storage MUST receive ErrNilPolicyStore (not
-// silently no-op), because downstream code at apply.go:163 conditions
-// on the error to decide whether to abort the whole Apply pass.
+// ClearSession safety guard: the :summary models the nil-storage
+// early-return; the lemma is the load-bearing safety property —
+// callers that pass a nil storage MUST receive ErrNilPolicyStore
+// (not silently no-op).
 //
 // reqproof:summary func(t *Service, session *user.SessionState) error {
 //   if t.storage == nil {
@@ -119,8 +91,7 @@ func (t *Service) ClearSession(session *user.SessionState) error {
 		return ErrNilPolicyStore
 	}
 
-	// reqproof:loop-as []model.PolicyID
-	for _, polID := range t.policyIds(session) {
+		for _, polID := range t.policyIds(session) {
 		policy, ok := t.storage.PolicyByID(polID)
 
 		if !ok {
@@ -165,15 +136,9 @@ type applyStatus struct {
 // Apply will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 //
-// Phase NN.1+NN.2: model the storage-availability gate. Apply's body
-// has an early-return path that surfaces ErrNilPolicyStore when the
-// session has no custom policies AND the service was constructed
-// without a policy store. The :summary captures that decision; the
-// per-policy merge work the rest of the body performs is opaque from
-// the lemma's perspective. The safety property — `Apply` MUST not
-// proceed silently when storage is unavailable AND no custom policies
-// are configured — is the load-bearing invariant the gateway relies
-// on.
+// Apply safety property: the :summary captures the storage-availability
+// gate; Apply MUST not proceed silently when storage is unavailable
+// AND no custom policies are configured.
 //
 // reqproof:summary func(t *Service, session *user.SessionState) error {
 //   if t.storage == nil {
@@ -416,10 +381,7 @@ func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy
 }
 
 // SYS-REQ-021
-// Phase FF: direct-attached lemmas on the real engine helper. The
-// production body uses untyped `0` against float64 fields which the
-// translator's type checker conservatively flags; the :summary
-// directive presents the equivalent shape with explicit 0.0 literals
+// The :summary presents the equivalent shape with explicit 0.0 literals
 // so the property remains pinned to the real method.
 //
 // reqproof:summary func(t *Service, m user.APILimit) bool {
@@ -446,11 +408,6 @@ func (t *Service) emptyRateLimit(m user.APILimit) bool {
 }
 
 // SYS-REQ-013, SYS-REQ-014, SYS-REQ-015
-//
-// Phase NN.1: Wall B demolished. user.Policy now has
-// `field AccessRights map[string]AccessDefinition` and AccessDefinition
-// has its own L3 model so the model audit accepts lemma reads of
-// `policy.AccessRights[apiID].Limit.QuotaMax`.
 //
 // The :summary below captures the SAFETY guard: applyPerAPI MUST return
 // a non-nil error when the caller has already committed to a
@@ -481,7 +438,6 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 		return ErrMixedPartitionAndPerAPIPolicies
 	}
 
-	// reqproof:loop-as map[string]user.AccessDefinition
 	for apiID, accessRights := range policy.AccessRights {
 		idForScope := apiID
 		// check if we don't have limit on API level specified when policy was created
@@ -547,15 +503,6 @@ func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
 
 // SYS-REQ-030, SYS-REQ-031, SYS-REQ-032
 //
-// Phase OO.1 UNBLOCKED: the symmetric SAFETY guard mirroring
-// applyPerAPI now lands. The audit-step cross-package model priority
-// fix in pkg/lemma/prover/orchestration.go (consume the registry's
-// id-keyed Entries() rather than re-deriving keys from filesystem
-// paths) lets the import-attached
-// `// reqproof:model user.Policy` / `user.PolicyPartitions` directives
-// in internal/policy/access_definition_model.go win the qualified
-// `user.X` slots in the audit `models` map.
-//
 // SAFETY shape: applyPartitions MUST return a non-nil error when the
 // caller has already committed to a per-API policy (didPerAPI ==
 // true) AND any partition flag is enabled. This is the dual of the
@@ -563,17 +510,9 @@ func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
 // mixing partition and per-API policies (a configuration error that
 // would corrupt rate-limit / quota state).
 //
-// We re-state PolicyPartitions.Enabled() inline in the summary as
-// `policy.Partitions.Quota || policy.Partitions.RateLimit ||
-//  policy.Partitions.Acl || policy.Partitions.Complexity` — the
-// translator does not yet route method-call summaries through the
-// Phase EE summary substitution path for L3-modeled receivers, so
-// inlining the formula is the path that actually lowers cleanly.
-//
-// Phase UU.9 note: // reqproof:assume for method calls (value.Method(args))
-// requires translator key-format wiring that is not yet connected in the
-// UU.8 release — see expr.go translateMethodCall line 1533 which uses
-// `rSort_MethodName` key but the collector uses `AssumeTarget` verbatim.
+// PolicyPartitions.Enabled() is inlined in the summary because the
+// translator does not route method-call summaries for L3-modeled
+// receivers.
 //
 // reqproof:summary func(t *Service, policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition, applyState *applyStatus) error {
 //   usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity
@@ -847,12 +786,9 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 
 // SYS-REQ-023
 //
-// Phase EE+P+FF: trusted summary for the verifier. Captures the
-// "QuotaMax monotone under greaterThanInt64" merge step the lemma below
-// pins. The real body (untouched) walks the rate / endpoint / JSONRPC /
-// MCP merge in addition; the summary models only the QuotaMax step
-// because that is the property the lemma names. Other fields are
-// passed through unchanged.
+// The summary captures the "QuotaMax monotone under greaterThanInt64"
+// merge step; the real body walks additional merges but the summary
+// models only the QuotaMax step because that is the property the lemma names.
 //
 // reqproof:summary func(t *Service, policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
 //   if policyAD.Limit.QuotaMax == -1 {
@@ -905,8 +841,7 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 // reqproof:requires currAD.Limit.QuotaMax <= policyAD.Limit.QuotaMax
 // reqproof:lemma apply_api_level_limits_quota_max_idempotent_when_smaller proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax == policyAD.Limit.QuotaMax
 //
-// Phase MM additions (2026-05-01) — three more behavioral guarantees on
-// applyAPILevelLimits. These lemmas extend coverage beyond QuotaMax to
+// Behavioral guarantees extending coverage beyond QuotaMax to
 // QuotaRenewalRate and the unlimited-quota rule (QuotaMax == -1 forces
 // QuotaRenewalRate == 0).
 //
@@ -962,13 +897,6 @@ func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD use
 // ApplyEndpointLevelLimits combines policyEndpoints and currEndpoints and returns the combined value.
 // The returned endpoints would have the highest request rate from policyEndpoints and currEndpoints.
 //
-// Phase MM direct-attachment probe (2026-05-01): summary translation
-// rejects user.Endpoints (a []Endpoint slice type) at the lemma
-// signature level — E_QUALIFIED_TYPE_UNABSTRACTED. A
-// // reqproof:abstract directive on the slice type is required;
-// today that surface lands only for `sort=Opaque` (struct/iface) and
-// builtins, not user-defined slice aliases. Documented as Wall:
-// qualified-slice-type abstraction.
 func (t *Service) ApplyEndpointLevelLimits(policyEndpoints user.Endpoints, currEndpoints user.Endpoints) user.Endpoints {
 	currEPMap := currEndpoints.Map()
 	if len(currEPMap) == 0 {
@@ -1093,15 +1021,12 @@ func (t *Service) ApplyMCPPrimitiveLimits(policy, current []user.MCPPrimitiveLim
 
 // --- reqproof verification helpers (do not call from production code) ---
 //
-// The helpers below were previously hosted in policy_predicates.go. They are
-// pure predicate functions whose only purpose is to host // reqproof:lemma
-// directives discharged by the verify-lemma orchestrator (Phase R.5 / Phase
-// CC migration). They have no production callers — the engine functions in
+// Pure predicate functions whose only purpose is to host // reqproof:lemma
+// directives. They have no production callers — the engine functions in
 // the package above operate on user.SessionState / user.AccessDefinition
-// values that the gosmt restricted-Go subset cannot fully translate today
+// values that the restricted-Go subset cannot fully translate today
 // (float64 fields, methods on map values, reflection-driven JSON tags).
-//
-// Where Phase CC unblocked direct attachment to a real engine helper the
+// Where direct attachment to a real engine helper is possible the
 // directive lives on that helper instead — see greaterThanInt in util.go.
 
 
@@ -1123,9 +1048,8 @@ type LemmaPolicy struct {
 	IsInactive         bool
 }
 
-// Phase KK migration: LemmaPolicyPartitions removed (no remaining
-// helper depends on it; the lemma it hosted now lives directly on
-// user.PolicyPartitions.Enabled at user/policy.go).
+// LemmaPolicyPartitions removed — its lemma now lives on
+// user.PolicyPartitions.Enabled at user/policy.go.
 
 // LemmaAPILimit models the integer quota fields that drive Apply /
 // ClearSession decisions.
@@ -1139,12 +1063,10 @@ type LemmaAPILimit struct {
 }
 
 // ===========================================================================
-// SECTION 1 — Policy struct invariants (4 lemmas, baseline arithmetic)
+// SECTION 1 — Policy struct invariants
 // ===========================================================================
 
-// Phase KK migration: LemmaQuotaMaxNonNeg + quota_max_non_negative
-// removed. The equivalent is `policy_quota_max_valid_iff_nonneg` host-
-// attached to user.Policy.HasNonNegativeQuota at user/policy.go (PROVED).
+// LemmaQuotaMaxNonNeg migrated to user.Policy.HasNonNegativeQuota (PROVED).
 
 // LemmaQuotaRenewalRateNonNeg captures the second admin-validated field:
 // QuotaRenewalRate (a duration in seconds) is non-negative.
@@ -1159,13 +1081,9 @@ func LemmaQuotaRenewalRateNonNeg(p LemmaPolicy) bool {
 	}
 }
 
-// Phase KK migration: LemmaRatePerPair + rate_per_pair_consistency
-// removed. The equivalent is `policy_rate_pair_consistency` host-
-// attached to user.Policy.HasConfiguredRate at user/policy.go (PROVED).
+// LemmaRatePerPair migrated to user.Policy.HasConfiguredRate (PROVED).
 
-// Phase KK migration: LemmaThrottleRetryNonNeg + throttle_retry_limit_non_negative
-// removed. The equivalent is `policy_throttle_configured_when_positive`
-// host-attached to user.Policy.HasConfiguredThrottle at user/policy.go (PROVED).
+// LemmaThrottleRetryNonNeg migrated to user.Policy.HasConfiguredThrottle (PROVED).
 
 // ===========================================================================
 // SECTION 2 — Apply determinism — guards the QuotaRenews fix
@@ -1173,8 +1091,7 @@ func LemmaQuotaRenewalRateNonNeg(p LemmaPolicy) bool {
 
 // LemmaQuotaRenewsAssign captures the post-fix `updateSessionRootVars`
 // invariant: with a single API the value flows through unchanged. The
-// lemma rejects any "other entry won the race" counterexample. Production
-// fix: internal/policy/apply.go:627-651, commit 0542cb794.
+// lemma rejects any "other entry won the race" counterexample.
 //
 // reqproof:lemma quota_renews_deterministic_single_api proves LemmaQuotaRenewsAssign(qr) == qr
 func LemmaQuotaRenewsAssign(qr int) int {
@@ -1184,7 +1101,7 @@ func LemmaQuotaRenewsAssign(qr int) int {
 
 // LemmaClearSessionQuota captures the partitioned ClearSession invariant:
 // after ClearSession on a quota-partitioned policy, QuotaRemaining is
-// exactly 0. Production: ClearSession at apply.go:43-76.
+// exactly 0.
 //
 // reqproof:lemma clear_session_quota_zeros_remaining proves LemmaClearSessionQuota(qm, qr) == 0
 func LemmaClearSessionQuota(qm int, qr int) int {
@@ -1197,9 +1114,7 @@ func LemmaClearSessionQuota(qm int, qr int) int {
 	}
 }
 
-// Phase KK migration: LemmaPartitionsEnabled + partitions_enabled_iff_any
-// removed. The equivalent is `policy_partitions_enabled_iff_any_set`
-// host-attached to user.PolicyPartitions.Enabled at user/policy.go (PROVED).
+// LemmaPartitionsEnabled migrated to user.PolicyPartitions.Enabled (PROVED).
 
 // ===========================================================================
 // SECTION 3 — Session / APILimit invariants
@@ -1226,22 +1141,15 @@ func LemmaQuotaRemainingBounded(a LemmaAPILimit) bool {
 	}
 }
 
-// Phase KK migration: LemmaAPILimitIsEmpty + apilimit_is_empty_when_all_zero
-// removed. The equivalent is `apilimit_isempty_when_all_fields_zero`
-// host-attached to user.APILimit.IsAllZero at user/session.go (PROVED).
-
-// Phase KK migration: LemmaAPILimitNonEmptyQuota + apilimit_non_empty_when_quota_max_set
-// removed. The equivalent is `apilimit_nonempty_when_quota_set` host-
-// attached to user.APILimit.HasQuotaConfigured at user/session.go (PROVED).
+// LemmaAPILimitIsEmpty migrated to user.APILimit.IsAllZero (PROVED).
+// LemmaAPILimitNonEmptyQuota migrated to user.APILimit.HasQuotaConfigured (PROVED).
 
 // ===========================================================================
 // SECTION 4 — Library-citation / arithmetic-identity lemmas
 // ===========================================================================
 
-// Phase MM migration: LemmaQuotaOffsetZero deleted. Pure arithmetic
-// identity (q + 0 == q) — no production behavior. Real merge-step
-// behavior is now covered by `apply_api_level_limits_quota_monotone`
-// and friends on Service.applyAPILevelLimits.
+// LemmaQuotaOffsetZero deleted (pure arithmetic identity; real merge
+// behavior covered by apply_api_level_limits_* lemmas on Service).
 
 // LemmaAPIIDListLenNonNeg captures the implicit non-negativity of
 // applyState.didRateLimit's length used by the apply.go:628 guard
@@ -1253,14 +1161,13 @@ func LemmaAPIIDListLenNonNeg(ids []int) int {
 }
 
 // ===========================================================================
-// SECTION 5 — Loop-invariant lemmas (Phase S.2c.1, range-over-slice)
+// SECTION 5 — Loop-invariant lemmas (range-over-slice)
 // ===========================================================================
 
 // LemmaCountActiveQuotas counts how many entries in `quotaMaxes` are strictly
 // positive (i.e. configure an enforceable quota). The accumulator is bounded
 // below by zero — a property the merge path in apply.go relies on when
-// summing per-API quota deltas. The loop invariant captures the bound and
-// is discharged by the Phase S.2c.1 range-over-slice lowering.
+// summing per-API quota deltas.
 //
 // Production motivation: applyState.didRateLimit and the per-policy
 // AccessRights iteration (apply.go:413, 420) walk the same slice/map
@@ -1313,9 +1220,7 @@ func LemmaSumNonNegativeQuotas(quotaMaxes []int) int {
 // LemmaCountUntilNegativeQuota mirrors a "stop at first invalid entry"
 // scan: walk a pre-validated list of QuotaMax values, counting them
 // until the first negative one (which would indicate an admin-API
-// validation regression). Uses an indexed loop with `break` — exercises
-// the Phase S.2c.4 break-helper synthesis. The post-condition `count >= 0`
-// holds whether the loop ran to completion or exited early.
+// validation regression). Uses an indexed loop with `break`.
 //
 // Production motivation: applyState consistency loops walk per-API
 // limits and short-circuit on the first malformed entry; the running
@@ -1337,7 +1242,7 @@ func LemmaCountUntilNegativeQuota(quotaMaxes []int) int {
 }
 
 // ===========================================================================
-// SECTION 6 — Completeness sweep #201 (Phase S.2c.1 / S.2c.4 deeper coverage)
+// SECTION 6 — Completeness sweep (loop-invariant lemmas)
 // ===========================================================================
 
 // LemmaSumPositivesNonNeg accumulates only the strictly positive entries in
@@ -1489,9 +1394,7 @@ func LemmaCountUntilLargeBreak(qs []int, lim int) int {
 }
 
 // ===========================================================================
-// SECTION 7 — Phase U `by(...)` adoption (additional citations beyond the
-// existing 2 in SECTION 4). Each lemma below uses the simple `proves <expr>`
-// form so a trailing `by(<library-lemma>)` clause is syntactically allowed.
+// SECTION 7 — Library-citation lemmas with `by(...)` clauses
 // ===========================================================================
 
 // LemmaTagsSliceLenNonNeg: the running session.Tags slice length is
@@ -1513,11 +1416,9 @@ func LemmaPolicyIDsLenNonNeg(ids []string) int {
 	return len(ids)
 }
 
-// Phase MM migration: LemmaQuotaRemainingMinusZero, LemmaQuotaSubSelfZero,
-// LemmaQuotaPlusZeroIsQuota deleted. All three were pure arithmetic
-// identities (q-0==q, q-q==0, 0+q==q) with no production-behavior
-// content. Real merge/clear semantics is captured by direct lemmas
-// on Service.applyAPILevelLimits.
+// LemmaQuotaRemainingMinusZero, LemmaQuotaSubSelfZero,
+// LemmaQuotaPlusZeroIsQuota deleted (pure arithmetic identities;
+// real semantics covered by Service.applyAPILevelLimits lemmas).
 
 // LemmaAccessSpecsLenNonNeg: the merged-result slice in MergeAllowedURLs
 // has non-negative length (util.go:13). Cites SliceLengthNonNegative.
@@ -1544,26 +1445,7 @@ func LemmaAbsQuotaNonNeg(q int) int {
 }
 
 // ===========================================================================
-// SECTION 8 — Translator gap-fix exercising lemmas (Phase O.6 / T.1 / T.2 / R.6)
-// Each lemma below was authored to validate one of the four translator
-// fixes shipped in feat/translator-gap-fixes (HEAD 02a8cb94):
-//
-//   * Fix #6 (Phase O.6): package-level const references — lemmas that
-//     name the sentinel by its const identifier (QuotaUnlimited) rather
-//     than the literal `-1`. Production callers in apply.go:672 use the
-//     same `-1` semantic.
-//   * Fix #4 (Phase T.2): integer type-conversion identity — lemmas that
-//     exercise int(x), int64(x) widening as a no-op under the SMT-LIB
-//     unbounded-Int encoding. Production callers in util.go and apply.go
-//     mix int / int64 freely (greaterThanInt / greaterThanInt64).
-//   * Fix #7 (Phase R.6): multi-lemma per host — second/third
-//     // reqproof:lemma directives on existing hosts (see SECTION 4 / 7).
-//
-// Fix #3 (Phase T.1, character literals) had no natural surface in the
-// tyk policy/user packages — Tyk is HTTP middleware code, not a parser,
-// and a search across user/, internal/policy/, and apidef/ found zero
-// production byte-comparison helpers. Documented as a deferred-empty-set
-// case (no rejection: the surface simply doesn't exist).
+// SECTION 8 — Sentinel constants and type-conversion lemmas
 // ===========================================================================
 
 // QuotaUnlimited is the sentinel value Tyk uses across the policy /
@@ -1572,42 +1454,27 @@ func LemmaAbsQuotaNonNeg(q int) int {
 // (greaterThanInt / greaterThanInt64 treat -1 as +∞), and the user-facing
 // docs that describe `quota_max: -1` as "unlimited".
 //
-// The const exists so the lemma surface below can reference the named
-// sentinel (Phase O.6) rather than the bare literal -1 — this is the
-// reqproof spec citation pattern: production code stays unchanged, but
-// the formal property is documented in terms of the same symbol.
+// The const exists so the lemma surface can reference the named
+// sentinel rather than the bare literal -1 — production code stays
+// unchanged, but the formal property is documented in terms of the same symbol.
 const QuotaUnlimited = -1
 
 // QuotaUnlimitedInt64 is the int64-typed counterpart used by APILimit
-// fields (QuotaMax in user.APILimit is int64). Mirrors QuotaUnlimited;
-// declared separately so the type-conversion lemma (Phase T.2) below
-// can reference both without mixing widths in a single decl block.
+// fields (QuotaMax in user.APILimit is int64). Declared separately so
+// type-conversion lemmas can reference both without mixing widths.
 const QuotaUnlimitedInt64 int64 = -1
 
-// Phase MM migration: LemmaUnlimitedIsNegativeOne (proved sentinel
-// equality) and LemmaQuotaUnlimitedNeqZero (proved -1 != 0) deleted.
+// LemmaUnlimitedIsNegativeOne and LemmaQuotaUnlimitedNeqZero deleted.
 // Their semantic content is subsumed by
-// `apply_api_level_limits_unlimited_zeros_renewal` (PROVED on
-// Service.applyAPILevelLimits) which proves the REAL behavior:
-// when policyAD.Limit.QuotaMax == -1 the result has
-// QuotaRenewalRate == 0. This is the production invariant that
-// motivated the trivial sentinel lemmas.
+// apply_api_level_limits_unlimited_zeros_renewal on Service.
 
-// greater_than_int_* lemmas now attached directly to production
-// greaterThanInt in util.go (Phase CC migration).
+// greater_than_int_* lemmas now attached directly to the production
+// greaterThanInt helper in util.go.
 
-// Phase MM migration: LemmaInt64ConversionIdentity and
-// LemmaIntConversionRoundTripIdentity deleted. Both proved the
-// tautology `int(int64(x)) == x` — pure type-conversion identities
-// with no production-behavior content. The Phase T.2 translator
-// machinery they cited is exercised by every integer-typed lemma
-// (including the four PROVED applyAPILevelLimits ones); a dedicated
-// lemma adds nothing.
+// LemmaInt64ConversionIdentity and LemmaIntConversionRoundTripIdentity
+// deleted (pure type-conversion tautologies; every integer lemma
+// exercises the same machinery).
 
-// Phase MM migration: LemmaInt64UnlimitedConversion deleted. The
-// lemma proved `int(int64(QuotaUnlimited)) == int(QuotaUnlimitedInt64)`
-// which is a tautological type-conversion identity — restates its
-// own body. The genuine production semantics (unlimited-quota →
-// renewal-rate-zero) is now covered directly by
-// `apply_api_level_limits_unlimited_zeros_renewal` on
-// Service.applyAPILevelLimits.
+// LemmaInt64UnlimitedConversion deleted (tautological type-conversion
+// identity; real unlimited-quota semantics covered by
+// apply_api_level_limits_unlimited_zeros_renewal on Service).

@@ -5,7 +5,8 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: ""
-description: 'The policy engine shall be idle-safe: when no operation is requested, all outputs must remain false. The component shall not produce spurious state changes, errors, or results when idle. Additionally, the policy store must be available and non-nil before any operation is attempted.'
+description: >-
+    The policy engine shall be idle-safe: when no operation is requested, all outputs must remain false. The component shall not produce spurious state changes, errors, or results when idle. Additionally, the policy store must be available and non-nil before any operation is attempted.
 formalization_strategy: ""
 informal_verification:
     method: ""
