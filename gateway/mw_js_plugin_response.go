@@ -47,7 +47,13 @@ func (h *JSResponseMiddleware) Init(mwDef interface{}, spec *APISpec) error {
 	if !ok {
 		return errors.New("invalid middleware definition for JS response hook")
 	}
-	h.hookName = mwDefinition.Name
+	// Prefer the per-(file, name) runtime alias when set (goja path). Otto and
+	// any caller that hasn't gone through the goja loader keep using Name.
+	if mwDefinition.RuntimeHandlerName != "" {
+		h.hookName = mwDefinition.RuntimeHandlerName
+	} else {
+		h.hookName = mwDefinition.Name
+	}
 	h.spec = spec
 	return nil
 }

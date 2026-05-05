@@ -573,6 +573,12 @@ type MiddlewareDefinition struct {
 	PluginHash     string `bson:"plugin_hash,omitempty" json:"plugin_hash,omitempty"`
 	RequireSession bool   `bson:"require_session" json:"require_session"`
 	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
+
+	// RuntimeHandlerName is set by the gateway at API-load time when the JS
+	// driver rebrands handler globals to per-(file, name) unique aliases.
+	// Dispatch reads this when non-empty and falls back to Name otherwise.
+	// Transient — never serialized.
+	RuntimeHandlerName string `bson:"-" json:"-"`
 }
 
 // IDExtractorConfig specifies the configuration for ID extractor

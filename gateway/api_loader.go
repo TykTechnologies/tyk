@@ -262,22 +262,80 @@ func (gw *Gateway) processSpec(
 	if gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || isJSDriver(mwDriver)) {
 		logger.Debug("Loading JS Paths")
 		if mwDriver == apidef.JavaScriptDriver {
-			spec.GojaJSVM.LoadJSPaths(mwPaths, prefix)
+			// File-mount and bundle modes: load each middleware file with
+			// per-(file, name) handler-name isolation. The IIFE wrap inside
+			// LoadMiddlewareFile keeps each plugin's `var handler = ...`
+			// local and exposes only the per-alias global, so multi-file
+			// bundles (and multi-bundle composition) don't collide on the
+			// same JS-side identifier.
+			fileMiddlewares := []*apidef.MiddlewareDefinition{&mwAuthCheckFunc}
+			for i := range mwPreFuncs {
+				fileMiddlewares = append(fileMiddlewares, &mwPreFuncs[i])
+			}
+			for i := range mwPostFuncs {
+				fileMiddlewares = append(fileMiddlewares, &mwPostFuncs[i])
+			}
+			for i := range mwPostAuthCheckFuncs {
+				fileMiddlewares = append(fileMiddlewares, &mwPostAuthCheckFuncs[i])
+			}
+			for i := range mwResponseFuncs {
+				fileMiddlewares = append(fileMiddlewares, &mwResponseFuncs[i])
+			}
 
-			// Load inline code from MiddlewareDefinition.Code fields (goja only)
-			for _, md := range collectAllMiddleware(mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs) {
+			// Track which absolute paths we've already loaded so we don't
+			// double-compile when multiple manifest entries share a file.
+			loaded := make(map[string]struct{}, len(fileMiddlewares))
+			pathNames := make(map[string][]string)
+
+			for _, md := range fileMiddlewares {
+				if md.Name == "" || md.Path == "" || md.Code != "" {
+					continue
+				}
+				absPath := md.Path
+				if prefix != "" {
+					absPath = filepath.Join(prefix, absPath)
+				}
+				pathNames[absPath] = append(pathNames[absPath], md.Name)
+				md.RuntimeHandlerName = spec.GojaJSVM.AliasFor(absPath, md.Name)
+			}
+
+			for absPath, names := range pathNames {
+				if _, done := loaded[absPath]; done {
+					continue
+				}
+				loaded[absPath] = struct{}{}
+				if err := spec.GojaJSVM.LoadMiddlewareFile(absPath, names); err != nil {
+					logger.WithError(err).Errorf("Failed to load middleware file %q", absPath)
+				}
+			}
+			// Virtual endpoints are pre-loaded separately via
+			// preLoadVirtualMetaCodeGoja (see api_definition.go); their JS
+			// declares its own ResponseFunctionName which the dispatcher
+			// invokes by name — distinct from custom_middleware globals.
+
+			// Load inline code from MiddlewareDefinition.Code fields (goja only).
+			// Each inline middleware gets a unique synthetic path so its handler
+			// global is rebranded distinctly even if multiple inline entries
+			// happen to share the same Name (e.g. all use "handler").
+			inlineCounter := 0
+			loadInline := func(md *apidef.MiddlewareDefinition) {
 				if md.Code == "" {
-					continue
+					return
 				}
-				decoded, err := base64.StdEncoding.DecodeString(md.Code)
-				if err != nil {
-					logger.WithError(err).Errorf("Failed to decode inline code for middleware %q", md.Name)
-					continue
-				}
-				if err := spec.GojaJSVM.LoadScript(string(decoded)); err != nil {
-					logger.WithError(err).Errorf("Failed to compile inline code for middleware %q", md.Name)
-					continue
-				}
+				gw.loadInlineGojaMiddleware(spec, md, &inlineCounter, logger)
+			}
+			loadInline(&mwAuthCheckFunc)
+			for i := range mwPreFuncs {
+				loadInline(&mwPreFuncs[i])
+			}
+			for i := range mwPostFuncs {
+				loadInline(&mwPostFuncs[i])
+			}
+			for i := range mwPostAuthCheckFuncs {
+				loadInline(&mwPostAuthCheckFuncs[i])
+			}
+			for i := range mwResponseFuncs {
+				loadInline(&mwResponseFuncs[i])
 			}
 		} else {
 			spec.JSVM.LoadJSPaths(mwPaths, prefix)
@@ -358,7 +416,7 @@ func (gw *Gateway) processSpec(
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_Pre, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
-			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid.Copy()))
+			chainArray = append(chainArray, gw.createDynamicMiddleware(pickMiddlewareClassName(obj), true, obj.RequireSession, baseMid.Copy()))
 		}
 	}
 
@@ -445,7 +503,7 @@ func (gw *Gateway) processSpec(
 				logger.Info("----> Checking security policy: JS Plugin")
 				dynamicMW := &DynamicMiddleware{
 					BaseMiddleware:      baseMid.Copy(),
-					MiddlewareClassName: mwAuthCheckFunc.Name,
+					MiddlewareClassName: pickMiddlewareClassName(mwAuthCheckFunc),
 					Pre:                 true,
 					Auth:                true,
 				}
@@ -527,7 +585,7 @@ func (gw *Gateway) processSpec(
 					},
 				)
 			} else if isJSDriver(mwDriver) {
-				chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid.Copy()))
+				chainArray = append(chainArray, gw.createDynamicMiddleware(pickMiddlewareClassName(obj), false, obj.RequireSession, baseMid.Copy()))
 			} else {
 				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_PostKeyAuth, obj.Name, mwDriver, obj.RawBodyOnly, nil})
@@ -597,7 +655,7 @@ func (gw *Gateway) processSpec(
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_Post, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
-			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid.Copy()))
+			chainArray = append(chainArray, gw.createDynamicMiddleware(pickMiddlewareClassName(obj), false, obj.RequireSession, baseMid.Copy()))
 		}
 	}
 
@@ -1327,6 +1385,40 @@ func (gw *Gateway) enforceOrgDataAgeIfQuotasEnabled(spec *APISpec) {
 	spec.GlobalConfig.EnforceOrgDataAge = true
 	globalConf.EnforceOrgDataAge = true
 	gw.SetConfig(globalConf)
+}
+
+// loadInlineGojaMiddleware decodes the base64 inline JS for a goja-driven
+// middleware definition, compiles it under a unique synthetic path so its
+// handler global is rebranded distinctly, and stamps the resulting alias
+// onto md.RuntimeHandlerName for dispatch translation.
+//
+// counter is a per-API monotonically increasing counter that ensures distinct
+// synthetic paths even when several inline middleware in the same API def
+// happen to share the same Name.
+func (gw *Gateway) loadInlineGojaMiddleware(spec *APISpec, md *apidef.MiddlewareDefinition, counter *int, logger *logrus.Entry) {
+	decoded, err := base64.StdEncoding.DecodeString(md.Code)
+	if err != nil {
+		logger.WithError(err).Errorf("Failed to decode inline code for middleware %q", md.Name)
+		return
+	}
+	syntheticPath := fmt.Sprintf("__tyk_inline__/%s/%d/%s", spec.APIID, *counter, md.Name)
+	*counter++
+	if err := spec.GojaJSVM.LoadInlineMiddleware(syntheticPath, string(decoded), []string{md.Name}); err != nil {
+		logger.WithError(err).Errorf("Failed to compile inline code for middleware %q", md.Name)
+		return
+	}
+	md.RuntimeHandlerName = spec.GojaJSVM.AliasFor(syntheticPath, md.Name)
+}
+
+// pickMiddlewareClassName returns the JS-side identifier that dispatch should
+// use for a middleware definition. For goja-loaded middleware, it returns the
+// per-(file, name) alias stamped onto RuntimeHandlerName at API-load time.
+// For otto and any other case, it falls back to the original Name.
+func pickMiddlewareClassName(md apidef.MiddlewareDefinition) string {
+	if md.RuntimeHandlerName != "" {
+		return md.RuntimeHandlerName
+	}
+	return md.Name
 }
 
 // collectAllMiddleware gathers MiddlewareDefinition entries from the auth check hook
