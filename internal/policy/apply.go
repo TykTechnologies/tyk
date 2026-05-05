@@ -100,11 +100,15 @@ type applyStatus struct {
 // Apply will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 //
-// Phase UU.35: inline lemma on the storage-nil entry gate. Translating the
-// full body requires for-loop support (deferred, Phase H) so the proof
-// uses an invariant on the main policy-loop and simplifies opaque method
-// calls via assumes. See docs/help/translator-errors/E_FOR_LOOP_NO_INVARIANT.md
-// for details on the loop restriction.
+// Phase UU.36: the lemma remains UNKNOWN due to two pre-existing translator
+// bugs that the UU.36 fix did not address: (1) the `ok` variable from
+// `policy, ok := storage.PolicyByID(polID)` inside the loop body is not
+// tracked as loop state in the recursive helper; (2) the `storage` variable
+// has different SMT sorts (`PolicyProvider` vs `Store`) depending on the
+// code path. The translator fix (v34) eliminated the forall quantifier
+// emission for trivial `true` invariants and the `<nil>` sentinel in assume
+// call translation, but the SMT still has undefined `ok` and a sort mismatch
+// that cause solver UNKNOWN. See docs/internal/phase-uu36-decision-log.md.
 //
 // reqproof:assume policy.Service.ClearSession func(t *Service, session *user.SessionState) error { return nil }
 // reqproof:assume user.SessionState.GetCustomPolicies func(s *user.SessionState) ([]user.Policy, error) { return nil, errors.New("x") }
