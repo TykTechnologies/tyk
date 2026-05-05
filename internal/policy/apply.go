@@ -72,20 +72,6 @@ func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Se
 // ClearSession clears the quota, rate limit and complexity values so that partitioned policies can apply their values.
 // Otherwise, if the session has already a higher value, an applied policy will not win, and its values will be ignored.
 //
-// ClearSession safety guard: the :summary models the nil-storage
-// early-return; the lemma is the load-bearing safety property —
-// callers that pass a nil storage MUST receive ErrNilPolicyStore
-// (not silently no-op).
-//
-// reqproof:summary func(t *Service, session *user.SessionState) error {
-//   if t.storage == nil {
-//     return ErrNilPolicyStore
-//   }
-//   return nil
-// }
-//
-// reqproof:requires t.storage == nil
-// reqproof:lemma clear_session_rejects_when_storage_nil proves t.ClearSession(session) != nil
 func (t *Service) ClearSession(session *user.SessionState) error {
 	if t.storage == nil {
 		return ErrNilPolicyStore
@@ -136,19 +122,6 @@ type applyStatus struct {
 // Apply will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 //
-// Apply safety property: the :summary captures the storage-availability
-// gate; Apply MUST not proceed silently when storage is unavailable
-// AND no custom policies are configured.
-//
-// reqproof:summary func(t *Service, session *user.SessionState) error {
-//   if t.storage == nil {
-//     return ErrNilPolicyStore
-//   }
-//   return nil
-// }
-//
-// reqproof:requires t.storage == nil
-// reqproof:lemma apply_rejects_when_storage_nil proves t.Apply(session) != nil
 func (t *Service) Apply(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
@@ -381,55 +354,10 @@ func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy
 }
 
 // SYS-REQ-021
-// The :summary presents the equivalent shape with explicit 0.0 literals
-// so the property remains pinned to the real method.
-//
-// reqproof:summary func(t *Service, m user.APILimit) bool {
-//   if m.Rate == 0.0 {
-//     return true
-//   }
-//   if m.Per == 0.0 {
-//     return true
-//   }
-//   return false
-// }
-//
-// reqproof:requires m.Rate == 0.0
-// reqproof:lemma empty_rate_limit_when_rate_zero proves t.emptyRateLimit(m) == true
-//
-// reqproof:requires m.Per == 0.0
-// reqproof:lemma empty_rate_limit_when_per_zero proves t.emptyRateLimit(m) == true
-//
-// reqproof:requires m.Rate != 0.0
-// reqproof:requires m.Per != 0.0
-// reqproof:lemma empty_rate_limit_false_when_both_nonzero proves t.emptyRateLimit(m) == false
 func (t *Service) emptyRateLimit(m user.APILimit) bool {
 	return m.Rate == 0 || m.Per == 0
 }
 
-// SYS-REQ-013, SYS-REQ-014, SYS-REQ-015
-//
-// The :summary below captures the SAFETY guard: applyPerAPI MUST return
-// a non-nil error when the caller has already committed to a
-// partitioned policy (didPartition == true). This is the invariant that
-// keeps the Tyk middleware from silently mixing per-api and partitioned
-// policies — a configuration error that would corrupt the rate-limit /
-// quota state. The summary models only the early-return behaviour; the
-// per-API merge work (loop body) is opaque from the lemma's view, which
-// is fine because the lemma only pins the entry-side guard.
-//
-// reqproof:summary func(t *Service, policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition, applyState *applyStatus) error {
-//   if applyState.didPartition {
-//     return ErrMixedPartitionAndPerAPIPolicies
-//   }
-//   return nil
-// }
-//
-// reqproof:requires applyState.didPartition == true
-// reqproof:lemma apply_per_api_rejects_when_partition_already_set proves t.applyPerAPI(policy, session, rights, applyState) != nil
-//
-// reqproof:requires applyState.didPartition == false
-// reqproof:lemma apply_per_api_succeeds_when_no_partition proves t.applyPerAPI(policy, session, rights, applyState) == nil
 func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
 	applyState *applyStatus) error {
 
@@ -501,37 +429,6 @@ func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
 	}
 }
 
-// SYS-REQ-030, SYS-REQ-031, SYS-REQ-032
-//
-// SAFETY shape: applyPartitions MUST return a non-nil error when the
-// caller has already committed to a per-API policy (didPerAPI ==
-// true) AND any partition flag is enabled. This is the dual of the
-// applyPerAPI safety guard and prevents Tyk middleware from silently
-// mixing partition and per-API policies (a configuration error that
-// would corrupt rate-limit / quota state).
-//
-// PolicyPartitions.Enabled() is inlined in the summary because the
-// translator does not route method-call summaries for L3-modeled
-// receivers.
-//
-// reqproof:summary func(t *Service, policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition, applyState *applyStatus) error {
-//   usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity
-//   if usePartitions && applyState.didPerAPI {
-//     return ErrMixedPartitionAndPerAPIPolicies
-//   }
-//   return nil
-// }
-//
-// reqproof:requires applyState.didPerAPI == false
-// reqproof:lemma apply_partitions_succeeds_when_no_per_api proves t.applyPartitions(policy, session, rights, applyState) == nil
-//
-// reqproof:requires applyState.didPerAPI == true
-// reqproof:requires policy.Partitions.Quota == true
-// reqproof:lemma apply_partitions_rejects_when_quota_partition_and_per_api proves t.applyPartitions(policy, session, rights, applyState) != nil
-//
-// reqproof:requires applyState.didPerAPI == true
-// reqproof:requires policy.Partitions.Acl == true
-// reqproof:lemma apply_partitions_rejects_when_acl_partition_and_per_api proves t.applyPartitions(policy, session, rights, applyState) != nil
 func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
 	applyState *applyStatus) error {
 
@@ -784,81 +681,6 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 	}
 }
 
-// SYS-REQ-023
-//
-// The summary captures the "QuotaMax monotone under greaterThanInt64"
-// merge step; the real body walks additional merges but the summary
-// models only the QuotaMax step because that is the property the lemma names.
-//
-// reqproof:summary func(t *Service, policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
-//   if policyAD.Limit.QuotaMax == -1 {
-//     if greaterThanInt64(currAD.Limit.QuotaMax, policyAD.Limit.QuotaMax) {
-//       return user.AccessDefinition{
-//         Limit:          user.APILimit{QuotaMax: currAD.Limit.QuotaMax, QuotaRenewalRate: currAD.Limit.QuotaRenewalRate},
-//         AllowanceScope: currAD.AllowanceScope,
-//       }
-//     }
-//     return user.AccessDefinition{
-//       Limit:          user.APILimit{QuotaMax: policyAD.Limit.QuotaMax, QuotaRenewalRate: 0},
-//       AllowanceScope: policyAD.AllowanceScope,
-//     }
-//   }
-//   if greaterThanInt64(currAD.Limit.QuotaMax, policyAD.Limit.QuotaMax) {
-//     if greaterThanInt64(currAD.Limit.QuotaRenewalRate, policyAD.Limit.QuotaRenewalRate) {
-//       return user.AccessDefinition{
-//         Limit:          user.APILimit{QuotaMax: currAD.Limit.QuotaMax, QuotaRenewalRate: currAD.Limit.QuotaRenewalRate},
-//         AllowanceScope: currAD.AllowanceScope,
-//       }
-//     }
-//     return user.AccessDefinition{
-//       Limit:          user.APILimit{QuotaMax: currAD.Limit.QuotaMax, QuotaRenewalRate: policyAD.Limit.QuotaRenewalRate},
-//       AllowanceScope: currAD.AllowanceScope,
-//     }
-//   }
-//   if greaterThanInt64(currAD.Limit.QuotaRenewalRate, policyAD.Limit.QuotaRenewalRate) {
-//     return user.AccessDefinition{
-//       Limit:          user.APILimit{QuotaMax: policyAD.Limit.QuotaMax, QuotaRenewalRate: currAD.Limit.QuotaRenewalRate},
-//       AllowanceScope: policyAD.AllowanceScope,
-//     }
-//   }
-//   return policyAD
-// }
-//
-// reqproof:requires currAD.Limit.QuotaMax >= 0
-// reqproof:requires policyAD.Limit.QuotaMax >= 0
-// reqproof:lemma apply_api_level_limits_quota_monotone proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax >= policyAD.Limit.QuotaMax
-//
-// reqproof:requires currAD.Limit.QuotaMax >= 0
-// reqproof:requires policyAD.Limit.QuotaMax >= 0
-// reqproof:lemma apply_api_level_limits_quota_max_takes_larger proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax >= currAD.Limit.QuotaMax || t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax == policyAD.Limit.QuotaMax
-//
-// reqproof:requires policyAD.Limit.QuotaMax >= 0
-// reqproof:requires currAD.Limit.QuotaMax >= 0
-// reqproof:lemma apply_api_level_limits_quota_max_nonneg proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax >= 0
-//
-// reqproof:requires policyAD.Limit.QuotaMax >= 0
-// reqproof:requires currAD.Limit.QuotaMax >= 0
-// reqproof:requires currAD.Limit.QuotaMax <= policyAD.Limit.QuotaMax
-// reqproof:lemma apply_api_level_limits_quota_max_idempotent_when_smaller proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax == policyAD.Limit.QuotaMax
-//
-// Behavioral guarantees extending coverage beyond QuotaMax to
-// QuotaRenewalRate and the unlimited-quota rule (QuotaMax == -1 forces
-// QuotaRenewalRate == 0).
-//
-// reqproof:requires policyAD.Limit.QuotaMax == -1
-// reqproof:requires currAD.Limit.QuotaMax >= 0
-// reqproof:lemma apply_api_level_limits_unlimited_zeros_renewal proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaRenewalRate == 0
-//
-// reqproof:requires policyAD.Limit.QuotaMax >= 0
-// reqproof:requires currAD.Limit.QuotaMax >= 0
-// reqproof:requires policyAD.Limit.QuotaRenewalRate >= 0
-// reqproof:requires currAD.Limit.QuotaRenewalRate >= 0
-// reqproof:lemma apply_api_level_limits_renewal_rate_monotone proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaRenewalRate >= policyAD.Limit.QuotaRenewalRate
-//
-// reqproof:requires policyAD.Limit.QuotaMax >= 0
-// reqproof:requires currAD.Limit.QuotaMax >= 0
-// reqproof:requires currAD.Limit.QuotaMax <= policyAD.Limit.QuotaMax
-// reqproof:lemma apply_api_level_limits_quota_max_nonneg_when_smaller proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax >= 0
 func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
 	var updated bool
 	if policyAD.Limit.Duration() > currAD.Limit.Duration() {
@@ -1126,7 +948,7 @@ func LemmaQuotaRemainingBounded(a LemmaAPILimit) bool {
 // ===========================================================================
 
 // LemmaQuotaOffsetZero deleted (pure arithmetic identity; real merge
-// behavior covered by apply_api_level_limits_* lemmas on Service).
+// behavior covered by apply_api_level_limits_* lemmas on Service (deleted in UU.20).
 
 // LemmaAPIIDListLenNonNeg captures the implicit non-negativity of
 // applyState.didRateLimit's length used by the apply.go:628 guard
@@ -1443,7 +1265,7 @@ const QuotaUnlimitedInt64 int64 = -1
 
 // LemmaUnlimitedIsNegativeOne and LemmaQuotaUnlimitedNeqZero deleted.
 // Their semantic content is subsumed by
-// apply_api_level_limits_unlimited_zeros_renewal on Service.
+// apply_api_level_limits_unlimited_zeros_renewal on Service (deleted in UU.20).
 
 // greater_than_int_* lemmas now attached directly to the production
 // greaterThanInt helper in util.go.
@@ -1454,4 +1276,4 @@ const QuotaUnlimitedInt64 int64 = -1
 
 // LemmaInt64UnlimitedConversion deleted (tautological type-conversion
 // identity; real unlimited-quota semantics covered by
-// apply_api_level_limits_unlimited_zeros_renewal on Service).
+// apply_api_level_limits_unlimited_zeros_renewal on Service (deleted in UU.20).
