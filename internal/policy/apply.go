@@ -6,7 +6,9 @@ import (
 
 	"github.com/samber/lo"
 
+	// reqproof:abstract model.PolicyProvider sort=Opaque
 	"github.com/TykTechnologies/tyk/internal/model"
+	// reqproof:abstract logrus.Logger sort=Opaque
 	"github.com/sirupsen/logrus"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -326,6 +328,15 @@ func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy
 }
 
 // SYS-REQ-021
+// reqproof:requires m.Rate == 0.0
+// reqproof:lemma empty_rate_limit_when_rate_zero proves t.emptyRateLimit(m) == true
+//
+// reqproof:requires m.Per == 0.0
+// reqproof:lemma empty_rate_limit_when_per_zero proves t.emptyRateLimit(m) == true
+//
+// reqproof:requires m.Rate != 0.0
+// reqproof:requires m.Per != 0.0
+// reqproof:lemma empty_rate_limit_false_when_both_nonzero proves t.emptyRateLimit(m) == false
 func (t *Service) emptyRateLimit(m user.APILimit) bool {
 	return m.Rate == 0 || m.Per == 0
 }
