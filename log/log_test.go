@@ -12,7 +12,7 @@ import (
 
 func TestNewFormatter(t *testing.T) {
 	for _, typ := range []string{"text", "any_other_is_default", ""} {
-		textFormatter, ok := NewFormatter(typ).(*logrus.TextFormatter)
+		textFormatter, ok := NewFormatter(Format(typ)).(*logrus.TextFormatter)
 		assert.NotNil(t, textFormatter)
 		assert.True(t, ok)
 		assert.Equal(t, time.RFC3339, textFormatter.TimestampFormat)
@@ -84,7 +84,7 @@ func Test_SetupFormatter(t *testing.T) {
 
 		t.Run("text", func(t *testing.T) {
 			resetLogger(t)
-			SetupFormatter(string(FormatText))
+			SetupFormatter(FormatText)
 			f := formatters(t)
 			assert.Same(t, f.tyk, f.std)
 			assert.NotNil(t, f.std)
@@ -95,7 +95,7 @@ func Test_SetupFormatter(t *testing.T) {
 
 	t.Run("json formatter", func(t *testing.T) {
 		resetLogger(t)
-		SetupFormatter(string(FormatJson))
+		SetupFormatter(FormatJson)
 		f := formatters(t)
 		assert.Same(t, f.tyk, f.std)
 		assert.NotNil(t, f.std)
@@ -105,7 +105,7 @@ func Test_SetupFormatter(t *testing.T) {
 
 	t.Run("legacy formatter does not modify std logrus formatter", func(t *testing.T) {
 		resetLogger(t)
-		SetupFormatter(string(FormatLegacy))
+		SetupFormatter(FormatLegacy)
 		f := formatters(t)
 		assert.Nil(t, f.std)    // does not set formatter for std logger
 		assert.NotNil(t, f.tyk) // does not set formatter for std logger

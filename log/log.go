@@ -58,7 +58,7 @@ var logLevels = map[string]logrus.Level{
 }
 
 func setupGlobals() {
-	format := getenv("TYK_LOGFORMAT", "TYK_GW_LOGFORMAT")
+	format := Format(getenv("TYK_LOGFORMAT", "TYK_GW_LOGFORMAT"))
 	SetupFormatter(format)
 
 	logLevel := getenv("TYK_LOGLEVEL", "TYK_GW_LOGLEVEL")
@@ -70,11 +70,11 @@ func setupGlobals() {
 	rawLog.Formatter = new(RawFormatter)
 }
 
-func SetupFormatter(format string) {
+func SetupFormatter(format Format) {
 	log.Formatter = NewFormatter(format)
 
 	// non legacy formatter does not set up global logrus formatter
-	if Format(format) != FormatLegacy {
+	if format != FormatLegacy {
 		logrus.StandardLogger().Formatter = log.Formatter
 	}
 }
@@ -89,8 +89,8 @@ func GetRaw() *logrus.Logger {
 	return rawLog
 }
 
-func NewFormatter(format string) logrus.Formatter {
-	switch Format(format) {
+func NewFormatter(format Format) logrus.Formatter {
+	switch format {
 	case FormatLegacy:
 		return newFormatterLegacy()
 	case FormatJson:
