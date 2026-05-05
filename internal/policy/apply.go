@@ -7,7 +7,6 @@ import (
 	"github.com/samber/lo"
 
 	// reqproof:abstract model.PolicyProvider sort=Opaque
-	// reqproof:abstract model.PolicyID sort=Opaque
 	"github.com/TykTechnologies/tyk/internal/model"
 	// reqproof:abstract logrus.Logger sort=Opaque
 	"github.com/sirupsen/logrus"
@@ -144,7 +143,6 @@ func (t *Service) Apply(session *user.SessionState) error {
 		sessionInactiveState = false
 	}
 
-	// reqproof:invariant len(policyIDs) >= 0
 	for _, polID := range policyIDs {
 		policy, ok := storage.PolicyByID(polID)
 
@@ -868,3 +866,15 @@ func (t *Service) ApplyMCPPrimitiveLimits(policy, current []user.MCPPrimitiveLim
 }
 
 
+// Phase UU.26: exercise nested field write lowering in the real Tyk
+// codebase. The body writes through two levels of struct selectors
+// (ad.Limit.QuotaMax = v), which requires building a chain of struct
+// constructors. The lemma proves that if v >= 0, the returned struct's
+// QuotaMax >= 0.
+//
+// reqproof:requires v >= 0
+// reqproof:lemma field_write_quotamax_nonneg proves simpleFieldWrite(ad, v).Limit.QuotaMax >= 0
+func simpleFieldWrite(ad user.AccessDefinition, v int64) user.AccessDefinition {
+	ad.Limit.QuotaMax = v
+	return ad
+}
