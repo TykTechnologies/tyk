@@ -2233,7 +2233,8 @@ func TestTimeoutPrioritization(t *testing.T) {
 				w.WriteHeader(http.StatusNotFound)
 			}
 
-			_, _ = w.Write([]byte(resp))
+			_, err := w.Write([]byte(resp))
+			assert.Nil(t, err)
 		}))
 		defer upstream.Close()
 
