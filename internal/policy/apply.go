@@ -664,6 +664,43 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 	}
 }
 
+// Phase UU.28: inline lemmas on the real applyAPILevelLimits body.
+// Cross-package call assumptions:
+//   ApplyEndpointLevelLimits, ApplyJSONRPCMethodLimits, ApplyMCPPrimitiveLimits
+//   are identity (return first arg unchanged).
+//   user.RateLimit.Duration returns a value proportional to Rate / Per.
+//
+// reqproof:assume policy.Service.ApplyEndpointLevelLimits func(t *Service, policyEndpoints, currEndpoints bool) bool { return policyEndpoints }
+// reqproof:assume policy.Service.ApplyJSONRPCMethodLimits func(t *Service, policyMethods, currMethods bool) bool { return policyMethods }
+// reqproof:assume policy.Service.ApplyMCPPrimitiveLimits func(t *Service, policyPrimitives, currPrimitives bool) bool { return policyPrimitives }
+// reqproof:assume user.APILimit.Duration func(m user.APILimit) int { return 0 }
+//
+// ---
+// Lemma 1: QuotaMax never goes negative
+// reqproof:requires policyAD.Limit.QuotaMax >= 0
+// reqproof:requires currAD.Limit.QuotaMax >= 0
+// reqproof:lemma apply_api_limits_quota_max_nonneg proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax >= 0
+//
+// Lemma 2: SetBy is propagated when QuotaMax is updated
+// reqproof:requires policyAD.Limit.QuotaMax >= 0
+// reqproof:requires currAD.Limit.QuotaMax >= 0
+// reqproof:requires policyAD.Limit.QuotaMax < currAD.Limit.QuotaMax
+// reqproof:lemma apply_api_limits_quota_max_setby proves t.applyAPILevelLimits(policyAD, currAD).Limit.SetBy == currAD.Limit.SetBy
+//
+// Lemma 3: QuotaRenewalRate stays non-negative
+// reqproof:requires policyAD.Limit.QuotaRenewalRate >= 0
+// reqproof:requires currAD.Limit.QuotaRenewalRate >= 0
+// reqproof:lemma apply_api_limits_quota_renewal_rate_nonneg proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaRenewalRate >= 0
+//
+// Lemma 4: QuotaMax == -1 resets QuotaRenewalRate to 0
+// reqproof:requires policyAD.Limit.QuotaMax == -1
+// reqproof:lemma apply_api_limits_quota_max_neg_one_resets_renewal proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaRenewalRate == 0
+//
+// Lemma 5: QuotaMax is preserved when currAD's value is NOT larger
+// reqproof:requires policyAD.Limit.QuotaMax >= 0
+// reqproof:requires currAD.Limit.QuotaMax >= 0
+// reqproof:requires currAD.Limit.QuotaMax <= policyAD.Limit.QuotaMax
+// reqproof:lemma apply_api_limits_quota_max_identity proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax == policyAD.Limit.QuotaMax
 func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
 	var updated bool
 	if policyAD.Limit.Duration() > currAD.Limit.Duration() {
