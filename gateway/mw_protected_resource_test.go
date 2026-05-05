@@ -2,9 +2,11 @@ package gateway
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -805,10 +807,12 @@ func TestPRMMirrorMode_SuffixRoute(t *testing.T) {
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&doc))
 		got, _ := doc["resource"].(string)
 		assert.True(t, strings.HasSuffix(got, expectedResourcePrefix), "resource %q should end in %q", got, expectedResourcePrefix)
-		// Authorization servers come from upstream verbatim.
+		// Mirror mode redirects authorization_servers at Tyk's per-API
+		// AS-proxy URL so we can rewrite the RFC 8707 resource parameter.
 		authServers, _ := doc["authorization_servers"].([]any)
 		require.Len(t, authServers, 1)
-		assert.Equal(t, "https://auth.upstream.example/tenant", authServers[0])
+		asURL, _ := authServers[0].(string)
+		assert.Contains(t, asURL, "/__tyk-as/test", "authorization_servers should point at the Tyk AS proxy: %s", asURL)
 		// Pass-through fields are preserved.
 		assert.Equal(t, "https://upstream.example/docs", doc["resource_documentation"])
 	})
@@ -823,6 +827,147 @@ func TestPRMMirrorMode_SuffixRoute(t *testing.T) {
 			},
 		})
 	})
+}
+
+// TestPRMMirrorMode_OAuthProxy exercises the full mirror-mode OAuth flow:
+// PRM points clients at Tyk's AS proxy, the AS metadata endpoint serves
+// rewritten `authorization_endpoint`/`token_endpoint`, the authorize
+// handler 302s to upstream with the `resource` parameter rewritten from
+// gateway URL to upstream URL, and the token handler forwards POSTs with
+// the same rewrite. This is the path that fixes RFC 8707-strict ASes
+// (Notion).
+func TestPRMMirrorMode_OAuthProxy(t *testing.T) {
+	var (
+		authorizeHits int
+		tokenHits     int
+		lastResource  string
+	)
+
+	// httptest.NewServer assigns its URL during construction, but the
+	// handler we register needs that URL inside its responses (the
+	// upstream PRM doc points at its own AS, which is the same host).
+	// Construct first with a stub handler, then swap in the real one.
+	upstream := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	t.Cleanup(upstream.Close)
+	upstream.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/.well-known/oauth-protected-resource/v1/mcp/authv2":
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"resource":"https://upstream.example/v1/mcp/authv2","authorization_servers":["%s"]}`, upstream.URL)
+		case r.Method == http.MethodGet && r.URL.Path == "/.well-known/oauth-authorization-server":
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"issuer":"%s","authorization_endpoint":"%s/authorize","token_endpoint":"%s/token","registration_endpoint":"%s/register"}`,
+				upstream.URL, upstream.URL, upstream.URL, upstream.URL)
+		case r.Method == http.MethodGet && r.URL.Path == "/authorize":
+			authorizeHits++
+			lastResource = r.URL.Query().Get("resource")
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodPost && r.URL.Path == "/token":
+			tokenHits++
+			_ = r.ParseForm()
+			lastResource = r.PostFormValue("resource")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"access_token":"abc","token_type":"Bearer"}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const listenPath = "/jira/"
+	upstreamTarget := upstream.URL + "/v1/mcp/authv2"
+
+	oasDoc := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info:    &openapi3.Info{Title: "OAuth Proxy", Version: "1.0"},
+			Paths:   openapi3.NewPaths(),
+		},
+	}
+	oasDoc.SetTykExtension(&oas.XTykAPIGateway{
+		Info:     oas.Info{Name: "mcp-oauth-proxy-test", State: oas.State{Active: true}},
+		Upstream: oas.Upstream{URL: upstreamTarget},
+		Server: oas.Server{
+			ListenPath: oas.ListenPath{Value: listenPath, Strip: true},
+			Authentication: &oas.Authentication{
+				ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
+					Enabled: true,
+					Mode:    oas.PRMModeMirror,
+				},
+			},
+		},
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.MarkAsMCP()
+		spec.Proxy.ListenPath = listenPath
+		spec.Proxy.TargetURL = upstreamTarget
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+	})
+	ts.Gw.PRMCache().Invalidate(upstream.URL + "/.well-known/oauth-protected-resource/v1/mcp/authv2")
+
+	t.Run("AS metadata endpoint rewrites authorize/token URLs", func(t *testing.T) {
+		resp, _ := ts.Run(t, test.TestCase{
+			Method: http.MethodGet,
+			Path:   "/.well-known/oauth-authorization-server/__tyk-as/test",
+			Code:   http.StatusOK,
+		})
+		var meta map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&meta))
+		authzEP, _ := meta["authorization_endpoint"].(string)
+		tokenEP, _ := meta["token_endpoint"].(string)
+		assert.Contains(t, authzEP, "/__tyk-as/test/authorize")
+		assert.Contains(t, tokenEP, "/__tyk-as/test/token")
+		// Issuer is preserved verbatim from upstream.
+		assert.Equal(t, upstream.URL, meta["issuer"])
+	})
+
+	t.Run("authorize 302s with rewritten resource param", func(t *testing.T) {
+		gatewayResource := "http%3A%2F%2Fgateway%2Fjira%2F"
+		// Drive the request manually so we can inspect the redirect.
+		client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		}}
+		req, _ := http.NewRequest(http.MethodGet,
+			ts.URL+"/__tyk-as/test/authorize?response_type=code&client_id=cid&resource="+gatewayResource+"&state=s",
+			nil)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		_ = resp.Body.Close()
+		require.Equal(t, http.StatusFound, resp.StatusCode)
+		loc, err := resp.Location()
+		require.NoError(t, err)
+		assert.Equal(t, upstream.Listener.Addr().String(), loc.Host)
+		assert.Equal(t, upstreamTarget, loc.Query().Get("resource"),
+			"resource param must be rewritten to upstream URL")
+	})
+
+	t.Run("token forwards with rewritten resource", func(t *testing.T) {
+		gatewayResource := "http://gateway/jira/"
+		form := url.Values{}
+		form.Set("grant_type", "authorization_code")
+		form.Set("code", "abc")
+		form.Set("resource", gatewayResource)
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/__tyk-as/test/token", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode, "body=%s", string(body))
+		assert.Contains(t, string(body), `"access_token":"abc"`)
+		assert.Equal(t, upstreamTarget, lastResource,
+			"upstream token endpoint must see the upstream-URL resource value")
+	})
+
+	// authorize is only verified by the redirect URL (test client doesn't
+	// follow redirects on purpose, so upstream's /authorize never fires).
+	_ = authorizeHits
+	assert.Equal(t, 1, tokenHits, "upstream /token should have been hit once")
 }
 
 // TestAugmentMCPWWWAuthenticate covers the response-side header rewrite

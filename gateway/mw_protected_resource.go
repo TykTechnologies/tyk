@@ -82,34 +82,24 @@ func (m *PRMMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 }
 
 // serveMirroredPRM fetches the upstream's PRM doc, rewrites `resource` to
-// the gateway URL the client connected to, and writes it to w. The fetched
+// the gateway URL the client connected to, redirects `authorization_servers`
+// at Tyk's per-API AS-proxy URL so RFC 8707 `resource`-parameter rewriting
+// can intercept the OAuth flow, and writes the result to w. The fetched
 // document is cached per upstream URL with TTL.
 func (m *PRMMiddleware) serveMirroredPRM(w http.ResponseWriter, r *http.Request, prm *oas.ProtectedResourceMetadata) error {
-	upstreamPRMURL := prm.UpstreamPRMUrl
-	if upstreamPRMURL == "" {
-		derived, err := mcp.DeriveUpstreamPRMURL(m.Spec.Proxy.TargetURL)
-		if err != nil {
-			return fmt.Errorf("derive upstream PRM URL: %w", err)
-		}
-		upstreamPRMURL = derived
-	}
-
-	cache := m.Gw.PRMCache()
-	doc, ok := cache.Get(upstreamPRMURL)
-	if !ok {
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-		defer cancel()
-		fetched, err := mcp.FetchUpstreamPRM(ctx, http.DefaultClient, upstreamPRMURL)
-		if err != nil {
-			return err
-		}
-		cache.Put(upstreamPRMURL, fetched)
-		doc = fetched
+	doc, err := m.Gw.upstreamPRMDoc(r.Context(), m.Spec)
+	if err != nil {
+		return err
 	}
 
 	// Rewrite resource to the gateway URL — what the client connected to.
-	gatewayResource := gatewayResourceURL(r, m.Spec)
-	doc.SetResource(gatewayResource)
+	doc.SetResource(gatewayResourceURL(r, m.Spec))
+
+	// Redirect the AS to Tyk's per-API proxy so we can rewrite the
+	// `resource` parameter (RFC 8707) on its way to the upstream AS.
+	// Strict authorization servers (Notion) reject the gateway URL as
+	// `invalid_target` otherwise.
+	doc.Raw["authorization_servers"] = []any{mcpASProxyBaseURL(r, m.Spec)}
 
 	w.Header().Set(header.ContentType, "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -117,6 +107,38 @@ func (m *PRMMiddleware) serveMirroredPRM(w http.ResponseWriter, r *http.Request,
 		return fmt.Errorf("encode PRM: %w", err)
 	}
 	return nil
+}
+
+// upstreamPRMDoc returns a (cached) clone of the upstream's PRM document
+// for the given MCP API. Used by both PRM mirror serving and the AS-proxy
+// flow to derive the upstream authorization-server URL.
+func (gw *Gateway) upstreamPRMDoc(ctx context.Context, spec *APISpec) (*mcp.PRMDocument, error) {
+	prm := spec.GetPRMConfig()
+	if prm == nil {
+		return nil, fmt.Errorf("API %q has no PRM config", spec.APIID)
+	}
+	upstreamPRMURL := prm.UpstreamPRMUrl
+	if upstreamPRMURL == "" {
+		derived, err := mcp.DeriveUpstreamPRMURL(spec.Proxy.TargetURL)
+		if err != nil {
+			return nil, fmt.Errorf("derive upstream PRM URL: %w", err)
+		}
+		upstreamPRMURL = derived
+	}
+
+	cache := gw.PRMCache()
+	if doc, ok := cache.Get(upstreamPRMURL); ok {
+		return doc, nil
+	}
+
+	fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	doc, err := mcp.FetchUpstreamPRM(fetchCtx, http.DefaultClient, upstreamPRMURL)
+	if err != nil {
+		return nil, err
+	}
+	cache.Put(upstreamPRMURL, doc)
+	return doc, nil
 }
 
 // gatewayResourceURL builds the URL the MCP client thinks it's talking to:

@@ -978,6 +978,38 @@ func (gw *Gateway) registerMCPPRMSuffixRoutes(spec *APISpec, router *mux.Router)
 	router.HandleFunc(noSlash, handler).Methods(http.MethodGet)
 	router.HandleFunc(withSlash, handler).Methods(http.MethodGet)
 	mainLog.WithField("api_id", spec.APIID).Debugf("registered MCP PRM suffix route at %s", noSlash)
+
+	// Mirror mode also fronts the upstream's OAuth authorization server
+	// so we can rewrite the RFC 8707 `resource` parameter on the wire.
+	// Without this, strict ASes (Notion) reject the client's authorize
+	// request with `invalid_target` because mcp-remote sends the
+	// gateway URL as the resource (per the mirrored PRM doc) but the
+	// upstream AS only knows the upstream URL.
+	if prm.IsMirrorMode() {
+		gw.registerMCPASProxyRoutes(spec, router)
+	}
+}
+
+// registerMCPASProxyRoutes wires the per-API OAuth Authorization Server
+// proxy endpoints used by mirror-mode PRM. Three routes are registered
+// at gateway root so they're reachable independently of the API's
+// listen path:
+//
+//	GET  /.well-known/oauth-authorization-server/__tyk-as/<api-id>
+//	GET  /__tyk-as/<api-id>/authorize
+//	POST /__tyk-as/<api-id>/token
+//
+// The `.well-known` path-suffix variant is what mcp-remote computes from
+// the AS URL we advertise in the mirrored PRM doc.
+func (gw *Gateway) registerMCPASProxyRoutes(spec *APISpec, router *mux.Router) {
+	asMetadataPath := "/.well-known/oauth-authorization-server" + mcpASProxyPathPrefix + spec.APIID
+	authorizePath := mcpASProxyPathPrefix + spec.APIID + "/authorize"
+	tokenPath := mcpASProxyPathPrefix + spec.APIID + "/token"
+
+	router.HandleFunc(asMetadataPath, gw.serveASProxyMetadata(spec)).Methods(http.MethodGet)
+	router.HandleFunc(authorizePath, gw.authorizeProxyHandler(spec)).Methods(http.MethodGet)
+	router.HandleFunc(tokenPath, gw.tokenProxyHandler(spec)).Methods(http.MethodPost)
+	mainLog.WithField("api_id", spec.APIID).Debugf("registered MCP AS proxy routes under %s%s", mcpASProxyPathPrefix, spec.APIID)
 }
 
 // mcpPRMSuffixHandler returns the http.HandlerFunc that serves the PRM
