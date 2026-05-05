@@ -251,7 +251,7 @@ func (gw *Gateway) processSpec(
 	var mwDriver apidef.MiddlewareDriver
 
 	var prefix string
-	if !spec.CustomMiddlewareBundleDisabled && spec.CustomMiddlewareBundle != "" {
+	if !spec.CustomMiddlewareBundleDisabled && (spec.CustomMiddlewareBundle != "" || len(spec.CustomMiddlewareBundles) > 0) {
 		prefix = gw.getBundleDestPath(spec)
 	}
 

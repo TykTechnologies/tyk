@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -13,7 +14,7 @@ import (
 
 // TestGojaHandlerAliasIsDeterministic locks in the contract that AliasFor
 // produces the same alias for the same (path, name) inputs every time. The
-// dispatch path relies on this — both load-time wrap and runtime lookup
+// dispatch path relies on this — both load-time rebrand and runtime lookup
 // must agree on the global identifier.
 func TestGojaHandlerAliasIsDeterministic(t *testing.T) {
 	a1 := gojaHandlerAlias("/tmp/bundles/abc/plugin.js", "handler")
@@ -37,6 +38,9 @@ func TestGojaHandlerAliasIsDeterministic(t *testing.T) {
 // `var handler = ...` no longer overwrite each other inside the JSVM. The
 // IIFE wrap inserted by wrapMiddlewareSource keeps each plugin's vars local
 // to its closure and exposes only the per-(path, name) alias on globalThis.
+//
+// This is the test that proves PR #1's correctness for multi-file bundles
+// and the prerequisite for multi-bundle composition (PR #2).
 func TestGojaIIFEIsolatesMultiFileHandlers(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
@@ -141,4 +145,104 @@ func TestGojaRebrandSkipsNonMiddlewarePrograms(t *testing.T) {
 	got, err := vm.RunString(`supportLib;`)
 	require.NoError(t, err)
 	assert.Equal(t, "still-here", got.String(), "unaliased globals must survive replay")
+}
+
+// TestMergeBundleManifestAppendsHooks verifies the multi-bundle merge
+// correctly concatenates pre/post/post_key_auth/response arrays in
+// declaration order while rewriting each entry's Path so the api_loader's
+// prefix-join still resolves to the correct file.
+func TestMergeBundleManifestAppendsHooks(t *testing.T) {
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+	a := &apidef.BundleManifest{
+		CustomMiddleware: apidef.MiddlewareSection{
+			Driver: apidef.JavaScriptDriver,
+			Pre: []apidef.MiddlewareDefinition{
+				{Name: "handler", Path: "plugin.js"},
+			},
+			Post: []apidef.MiddlewareDefinition{
+				{Name: "handler", Path: "plugin.js"},
+			},
+		},
+	}
+	b := &apidef.BundleManifest{
+		CustomMiddleware: apidef.MiddlewareSection{
+			Driver: apidef.JavaScriptDriver,
+			Pre: []apidef.MiddlewareDefinition{
+				{Name: "handler", Path: "plugin.js"},
+			},
+			Response: []apidef.MiddlewareDefinition{
+				{Name: "handler", Path: "plugin.js"},
+			},
+		},
+	}
+
+	require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip"))
+	require.NoError(t, mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip"))
+
+	// pre: 1 from A, 1 from B, in order
+	require.Len(t, spec.CustomMiddleware.Pre, 2)
+	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Pre[0].Path, "bundle-a"), "first pre entry must be from bundle-a")
+	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Pre[1].Path, "bundle-b"), "second pre entry must be from bundle-b")
+
+	// post: only from A
+	require.Len(t, spec.CustomMiddleware.Post, 1)
+	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Post[0].Path, "bundle-a"))
+
+	// response: only from B
+	require.Len(t, spec.CustomMiddleware.Response, 1)
+	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Response[0].Path, "bundle-b"))
+
+	// driver propagated and consistent
+	assert.Equal(t, apidef.JavaScriptDriver, spec.CustomMiddleware.Driver)
+}
+
+// TestMergeBundleManifestRejectsDuplicateAuthCheck enforces the rule that
+// only one bundle may declare an auth_check hook per API.
+func TestMergeBundleManifestRejectsDuplicateAuthCheck(t *testing.T) {
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+	a := &apidef.BundleManifest{
+		CustomMiddleware: apidef.MiddlewareSection{
+			Driver:    apidef.JavaScriptDriver,
+			AuthCheck: apidef.MiddlewareDefinition{Name: "authA", Path: "plugin.js"},
+		},
+	}
+	b := &apidef.BundleManifest{
+		CustomMiddleware: apidef.MiddlewareSection{
+			Driver:    apidef.JavaScriptDriver,
+			AuthCheck: apidef.MiddlewareDefinition{Name: "authB", Path: "plugin.js"},
+		},
+	}
+
+	require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip"))
+	err := mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip")
+	require.Error(t, err, "second auth_check must be rejected")
+	assert.Contains(t, err.Error(), "auth_check")
+}
+
+// TestMergeBundleManifestRejectsDriverMismatch enforces driver uniformity
+// across composed bundles.
+func TestMergeBundleManifestRejectsDriverMismatch(t *testing.T) {
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+	a := &apidef.BundleManifest{
+		CustomMiddleware: apidef.MiddlewareSection{Driver: apidef.JavaScriptDriver},
+	}
+	b := &apidef.BundleManifest{
+		CustomMiddleware: apidef.MiddlewareSection{Driver: apidef.PythonDriver},
+	}
+
+	require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip"))
+	err := mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "driver")
+}
+
+// TestBundleSubdirNameStripsExtAndCollapsesSlashes verifies the per-bundle
+// directory name derivation is filesystem-safe and stable.
+func TestBundleSubdirNameStripsExtAndCollapsesSlashes(t *testing.T) {
+	assert.Equal(t, "correlation-id-1.4.0", bundleSubdirName("correlation-id-1.4.0.zip"))
+	assert.Equal(t, "platform__correlation-id-1.4.0", bundleSubdirName("platform/correlation-id-1.4.0.zip"))
+	assert.NotEmpty(t, bundleSubdirName("")) // fallback hash path
 }

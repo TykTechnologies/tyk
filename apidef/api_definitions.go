@@ -753,6 +753,14 @@ type APIDefinition struct {
 	DisableQuota                         bool                   `bson:"disable_quota" json:"disable_quota"`
 	CustomMiddleware                     MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
 	CustomMiddlewareBundle               string                 `bson:"custom_middleware_bundle" json:"custom_middleware_bundle"`
+	// CustomMiddlewareBundles is the multi-bundle replacement for
+	// CustomMiddlewareBundle. Each entry is a bundle filename resolved against
+	// the gateway's bundle_base_url. When non-empty it takes precedence over
+	// CustomMiddlewareBundle. Manifests from each bundle are merged into the
+	// effective custom_middleware section in declaration order — array hooks
+	// (pre/post/post_key_auth/response) concatenate; auth_check may be set by
+	// at most one bundle.
+	CustomMiddlewareBundles              []string               `bson:"custom_middleware_bundles,omitempty" json:"custom_middleware_bundles,omitempty"`
 	CustomMiddlewareBundleDisabled       bool                   `bson:"custom_middleware_bundle_disabled" json:"custom_middleware_bundle_disabled"`
 	CacheOptions                         CacheOptions           `bson:"cache_options" json:"cache_options"`
 	SessionLifetimeRespectsKeyExpiration bool                   `bson:"session_lifetime_respects_key_expiration" json:"session_lifetime_respects_key_expiration,omitempty"`
