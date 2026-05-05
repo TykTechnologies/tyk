@@ -65,9 +65,6 @@ func appendIfMissing(dest []string, in ...string) []string {
 // greaterThanInt64 checks whether first int64 value is bigger than second int64 value.
 // -1 means infinite and the biggest value.
 //
-// Lemmas attached directly to the production helper (no abstract proxy).
-// The body is gosmt-translatable as-is so no // reqproof:summary is needed.
-//
 // reqproof:requires first == int64(QuotaUnlimited)
 // reqproof:lemma greater_than_int64_unlimited_first_is_true proves greaterThanInt64(first, second) == true
 //

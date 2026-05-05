@@ -203,7 +203,7 @@ func (r RateLimit) IsZero() bool {
 
 // IsAllZero reports whether every numeric field of the APILimit is the
 // zero value. Equivalent to IsEmpty() restricted to the integer/float
-// fields gosmt can reason about; the hosted lemma asserts the natural
+// fields the lemma can reason about; it asserts the natural
 // "all zero ⇒ empty" direction.
 //
 // reqproof:requires a.Rate == 0.0
