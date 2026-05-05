@@ -66,6 +66,7 @@ type RateLimit struct {
 // reqproof:model
 // field Rate float64
 // field Per float64
+// field Smoothing bool
 // field ThrottleInterval float64
 // field ThrottleRetryLimit int
 // field MaxQueryDepth int
@@ -127,6 +128,10 @@ func (r RateLimit) Duration() time.Duration {
 //
 // reqproof:model
 // field Limit APILimit
+// field AllowanceScope string
+// field Endpoints bool
+// field JSONRPCMethods bool
+// field MCPPrimitives bool
 type AccessDefinition struct {
 	APIName              string                  `json:"api_name,omitzero" msg:"api_name"`
 	APIID                string                  `json:"api_id,omitzero" msg:"api_id"`
@@ -289,6 +294,8 @@ func (m Monitor) IsZero() bool {
 }
 
 // Endpoints is a collection of Endpoint.
+//
+// reqproof:abstract sort=Opaque
 type Endpoints []Endpoint
 
 // Len is used to implement sort interface.
