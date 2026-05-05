@@ -124,6 +124,9 @@ func (r RateLimit) Duration() time.Duration {
 // NOTE: when adding new fields it is required to map them from DBAccessDefinition
 // in the gateway/policy.go:19
 // TODO: is it possible to share fields?
+//
+// reqproof:model
+// field Limit APILimit
 type AccessDefinition struct {
 	APIName              string                  `json:"api_name,omitzero" msg:"api_name"`
 	APIID                string                  `json:"api_id,omitzero" msg:"api_id"`
