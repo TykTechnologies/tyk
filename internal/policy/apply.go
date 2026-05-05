@@ -664,20 +664,17 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 	}
 }
 
-// Phase UU.29: honest assumes for cross-package method calls used by
-// applyAPILevelLimits.
-//
-// Duration assume uses float64 division to model the real Duration()
-// body (time.Second * Per / Rate). With the old int{return 0} the
-// Duration branch was never entered; with Per/Rate the comparison
-// correctly identifies which limit has shorter duration (higher rate).
-//
-// Endpoint method assumes use || (bool OR) to model that the merged
-// result has the field when either input has it. Path A (real-body
-// lowering) failed because the methods take unmodeled types.
-//   ApplyEndpointLevelLimits    → policyEndpoints || currEndpoints
-//   ApplyJSONRPCMethodLimits    → policyMethods || currMethods
-//   ApplyMCPPrimitiveLimits     → policyPrimitives || currPrimitives
+// Phase UU.30: honest assumes for same-package method calls that the
+// translator cannot lower. These methods are concrete, same-package
+// functions whose bodies use types modeled as opaque/abstract (user.Endpoints)
+// or unmodeled cross-package types ([]user.JSONRPCMethodLimit,
+// []user.MCPPrimitiveLimit). The translator's collectPackageMethodBundles
+// fails to translate the bodies (opaque type method calls + unmodeled
+// qualified types), so they are never registered as callables. Even if we
+// force-registered them, the model maps AccessDefinition.{Endpoints,
+// JSONRPCMethods, MCPPrimitives} to bool, creating a sort mismatch with the
+// real method signatures. The bool assumes are the correct bridge: they
+// model "is the field populated?" semantics matching the model projection.
 //
 // reqproof:assume policy.Service.ApplyEndpointLevelLimits func(t *Service, policyEndpoints bool, currEndpoints bool) bool { return policyEndpoints || currEndpoints }
 // reqproof:assume policy.Service.ApplyJSONRPCMethodLimits func(t *Service, policyMethods bool, currMethods bool) bool { return policyMethods || currMethods }
