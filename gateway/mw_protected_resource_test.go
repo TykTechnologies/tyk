@@ -727,3 +727,171 @@ func TestPRMHappyPath_FullDiscoveryFlow(t *testing.T) {
 	assert.Equal(t, []string{scope1, scope2}, prmDoc.ScopesSupported,
 		"PRM must contain the configured scopes")
 }
+
+// TestPRMMirrorMode_SuffixRoute spins up a fake remote MCP that returns a
+// PRM doc at the path-suffix variant URL (the way Atlassian/Notion do it),
+// fronts it with a Tyk MCP API in mirror mode, and asserts that probes to
+// `<gateway>/.well-known/oauth-protected-resource<listen-path>` return the
+// upstream's doc with `resource` rewritten to the gateway URL — the exact
+// shape mcp-remote needs for RFC 9728 §3.3 origin validation to pass.
+func TestPRMMirrorMode_SuffixRoute(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/.well-known/oauth-protected-resource/v1/mcp/authv2" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{
+				"resource": "https://upstream.example/v1/mcp/authv2",
+				"authorization_servers": ["https://auth.upstream.example/tenant"],
+				"bearer_methods_supported": ["header"],
+				"scopes_supported": ["read:foo", "write:foo"],
+				"resource_documentation": "https://upstream.example/docs"
+			}`)
+			return
+		}
+		// Protocol traffic: 401 with bare bearer challenge.
+		w.Header().Set("WWW-Authenticate", `Bearer realm="OAuth"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	t.Cleanup(upstream.Close)
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const listenPath = "/jira/"
+
+	oasDoc := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info:    &openapi3.Info{Title: "MCP Mirror", Version: "1.0"},
+			Paths:   openapi3.NewPaths(),
+		},
+	}
+	oasDoc.SetTykExtension(&oas.XTykAPIGateway{
+		Info: oas.Info{Name: "mcp-mirror-test", State: oas.State{Active: true}},
+		Upstream: oas.Upstream{
+			URL: upstream.URL + "/v1/mcp/authv2",
+		},
+		Server: oas.Server{
+			ListenPath: oas.ListenPath{Value: listenPath, Strip: true},
+			Authentication: &oas.Authentication{
+				ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
+					Enabled: true,
+					Mode:    oas.PRMModeMirror,
+				},
+			},
+		},
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.MarkAsMCP()
+		spec.Proxy.ListenPath = listenPath
+		spec.Proxy.TargetURL = upstream.URL + "/v1/mcp/authv2"
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+	})
+
+	expectedResourcePrefix := "/jira/"
+
+	t.Run("suffix route without trailing slash", func(t *testing.T) {
+		ts.Gw.PRMCache().Invalidate(upstream.URL + "/.well-known/oauth-protected-resource/v1/mcp/authv2")
+
+		resp, _ := ts.Run(t, test.TestCase{
+			Method: http.MethodGet,
+			Path:   "/.well-known/oauth-protected-resource/jira",
+			Code:   http.StatusOK,
+		})
+
+		var doc map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&doc))
+		got, _ := doc["resource"].(string)
+		assert.True(t, strings.HasSuffix(got, expectedResourcePrefix), "resource %q should end in %q", got, expectedResourcePrefix)
+		// Authorization servers come from upstream verbatim.
+		authServers, _ := doc["authorization_servers"].([]any)
+		require.Len(t, authServers, 1)
+		assert.Equal(t, "https://auth.upstream.example/tenant", authServers[0])
+		// Pass-through fields are preserved.
+		assert.Equal(t, "https://upstream.example/docs", doc["resource_documentation"])
+	})
+
+	t.Run("suffix route with trailing slash", func(t *testing.T) {
+		ts.Run(t, test.TestCase{
+			Method: http.MethodGet,
+			Path:   "/.well-known/oauth-protected-resource/jira/",
+			Code:   http.StatusOK,
+			BodyMatchFunc: func(b []byte) bool {
+				return strings.Contains(string(b), `"authorization_servers"`)
+			},
+		})
+	})
+}
+
+// TestAugmentMCPWWWAuthenticate covers the response-side header rewrite
+// that adds `resource_metadata=<gateway-prm-url>` when the upstream's 401
+// challenge omits it.
+func TestAugmentMCPWWWAuthenticate(t *testing.T) {
+	mkSpec := func(mcp bool, prmEnabled bool) *APISpec {
+		s := &APISpec{
+			APIDefinition: &apidef.APIDefinition{IsOAS: true},
+		}
+		s.Proxy.ListenPath = "/jira/"
+		if mcp {
+			s.MarkAsMCP()
+		}
+		if prmEnabled {
+			s.OAS.SetTykExtension(&oas.XTykAPIGateway{
+				Server: oas.Server{
+					ListenPath: oas.ListenPath{Value: "/jira/"},
+					Authentication: &oas.Authentication{
+						ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
+							Enabled: true,
+							Mode:    oas.PRMModeMirror,
+						},
+					},
+				},
+			})
+		}
+		return s
+	}
+
+	mkResponse := func(status int, wwwAuth string) *http.Response {
+		req, _ := http.NewRequest(http.MethodPost, "http://gw.example/jira/", nil)
+		h := http.Header{}
+		if wwwAuth != "" {
+			h.Set(header.WWWAuthenticate, wwwAuth)
+		}
+		return &http.Response{StatusCode: status, Header: h, Request: req}
+	}
+
+	t.Run("appends resource_metadata when missing", func(t *testing.T) {
+		res := mkResponse(http.StatusUnauthorized, `Bearer realm="OAuth"`)
+		augmentMCPWWWAuthenticate(res, mkSpec(true, true))
+		got := res.Header.Get(header.WWWAuthenticate)
+		assert.Contains(t, got, `Bearer realm="OAuth"`)
+		assert.Contains(t, got, `resource_metadata="http://gw.example/.well-known/oauth-protected-resource/jira"`)
+	})
+
+	t.Run("preserves existing resource_metadata", func(t *testing.T) {
+		original := `Bearer realm="OAuth", resource_metadata="https://upstream.example/.well-known/oauth-protected-resource/x"`
+		res := mkResponse(http.StatusUnauthorized, original)
+		augmentMCPWWWAuthenticate(res, mkSpec(true, true))
+		assert.Equal(t, original, res.Header.Get(header.WWWAuthenticate))
+	})
+
+	t.Run("noop on non-401", func(t *testing.T) {
+		res := mkResponse(http.StatusOK, `Bearer realm="OAuth"`)
+		augmentMCPWWWAuthenticate(res, mkSpec(true, true))
+		assert.Equal(t, `Bearer realm="OAuth"`, res.Header.Get(header.WWWAuthenticate))
+	})
+
+	t.Run("noop on non-MCP", func(t *testing.T) {
+		res := mkResponse(http.StatusUnauthorized, `Bearer realm="OAuth"`)
+		augmentMCPWWWAuthenticate(res, mkSpec(false, true))
+		assert.Equal(t, `Bearer realm="OAuth"`, res.Header.Get(header.WWWAuthenticate))
+	})
+
+	t.Run("noop when PRM not configured", func(t *testing.T) {
+		res := mkResponse(http.StatusUnauthorized, `Bearer realm="OAuth"`)
+		augmentMCPWWWAuthenticate(res, mkSpec(true, false))
+		assert.Equal(t, `Bearer realm="OAuth"`, res.Header.Get(header.WWWAuthenticate))
+	})
+}

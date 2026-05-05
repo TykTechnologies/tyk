@@ -843,6 +843,68 @@ func TestProtectedResourceMetadata_Validate(t *testing.T) {
 		}
 		assert.NoError(t, prm.Validate(false))
 	})
+
+	t.Run("explicit static mode behaves like default", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled:              true,
+			Mode:                 PRMModeStatic,
+			Resource:             "https://api.example.com",
+			AuthorizationServers: []string{"https://auth.example.com"},
+		}
+		assert.NoError(t, prm.Validate(true))
+	})
+
+	t.Run("mirror mode skips static-field requirements", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled: true,
+			Mode:    PRMModeMirror,
+		}
+		assert.NoError(t, prm.Validate(true))
+		assert.True(t, prm.IsMirrorMode())
+	})
+
+	t.Run("mirror mode passes validation for non-MCP APIs (runtime no-op)", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled: true,
+			Mode:    PRMModeMirror,
+		}
+		assert.NoError(t, prm.Validate(false))
+	})
+
+	t.Run("unknown mode rejected", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled: true,
+			Mode:    "wat",
+		}
+		err := prm.Validate(true)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not recognised")
+	})
+}
+
+func TestProtectedResourceMetadata_IsMirrorMode(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		prm  *ProtectedResourceMetadata
+		want bool
+	}{
+		{"nil", nil, false},
+		{"disabled", &ProtectedResourceMetadata{Enabled: false, Mode: PRMModeMirror}, false},
+		{"enabled static", &ProtectedResourceMetadata{Enabled: true}, false},
+		{"enabled mirror", &ProtectedResourceMetadata{Enabled: true, Mode: PRMModeMirror}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, tc.prm.IsMirrorMode())
+		})
+	}
 }
 
 func TestProtectedResourceMetadata_GetWellKnownPath(t *testing.T) {

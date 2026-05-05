@@ -44,6 +44,7 @@ import (
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/service/core"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -292,9 +293,23 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		if targetToUse == target {
 			req.URL.Scheme = targetToUse.Scheme
 			req.URL.Host = targetToUse.Host
-			req.URL.Path = singleJoiningSlash(targetToUse.Path, req.URL.Path, spec.Proxy.DisableStripSlash)
+
+			// MCP/OAuth discovery probes (RFC 9728, RFC 8414) live at the
+			// upstream host root, never under the resource path. When the
+			// configured upstream URL embeds a path (e.g. https://x/v1/mcp),
+			// joining it with /.well-known/... would route discovery to the
+			// wrong location and break the OAuth dance for remote MCP
+			// upstreams. For MCP APIs only, route those probes to the host
+			// root.
+			joinPath := targetToUse.Path
+			if spec.IsMCP() && joinPath != "" && joinPath != "/" && mcp.IsHostRootDiscoveryPath(req.URL.Path) {
+				logger.Debug("MCP discovery path detected; routing to upstream host root")
+				joinPath = ""
+			}
+
+			req.URL.Path = singleJoiningSlash(joinPath, req.URL.Path, spec.Proxy.DisableStripSlash)
 			if req.URL.RawPath != "" {
-				req.URL.RawPath = singleJoiningSlash(targetToUse.Path, req.URL.RawPath, spec.Proxy.DisableStripSlash)
+				req.URL.RawPath = singleJoiningSlash(joinPath, req.URL.RawPath, spec.Proxy.DisableStripSlash)
 			}
 		}
 
@@ -425,6 +440,53 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	}
 
 	return transport
+}
+
+// augmentMCPWWWAuthenticate appends a `resource_metadata=` parameter to the
+// upstream's `WWW-Authenticate` header when the API is MCP, has PRM
+// enabled, and the upstream returned a bare Bearer challenge that didn't
+// already advertise its metadata URL. This is the hint MCP clients
+// (mcp-remote, Claude Desktop) need to find the gateway-served PRM doc
+// when the upstream itself doesn't include the parameter (e.g. Atlassian
+// Rovo as of 2026-Q2).
+//
+// No-op for non-MCP APIs, non-401 responses, or APIs without PRM
+// configured. Does not overwrite an existing `resource_metadata=` value.
+func augmentMCPWWWAuthenticate(res *http.Response, spec *APISpec) {
+	if res == nil || res.StatusCode != http.StatusUnauthorized {
+		return
+	}
+	if spec == nil || !spec.IsMCP() {
+		return
+	}
+	prm := spec.GetPRMConfig()
+	if prm == nil {
+		return
+	}
+	existing := res.Header.Get(header.WWWAuthenticate)
+	if existing == "" || strings.Contains(strings.ToLower(existing), "resource_metadata=") {
+		return
+	}
+
+	// Build the gateway-side PRM URL. We don't know the request scheme
+	// here (the response originates from the upstream), so we trust
+	// res.Request, which carries the original inbound URL via the
+	// reverse-proxy director.
+	if res.Request == nil || res.Request.URL == nil {
+		return
+	}
+	scheme := "http"
+	if res.Request.TLS != nil || strings.EqualFold(res.Request.URL.Scheme, "https") {
+		scheme = "https"
+	}
+	host := res.Request.Host
+	if host == "" {
+		host = res.Request.URL.Host
+	}
+	listen := strings.TrimRight(spec.Proxy.ListenPath, "/")
+	prmURL := fmt.Sprintf("%s://%s/.well-known/oauth-protected-resource%s", scheme, host, listen)
+
+	res.Header.Set(header.WWWAuthenticate, fmt.Sprintf(`%s, resource_metadata="%s"`, existing, prmURL))
 }
 
 func singleJoiningSlash(targetPath, subPath string, disableStripSlash bool) string {
@@ -1452,6 +1514,8 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	}
 
 	p.Gw.limitHeaderFactory(res.Header).SendQuotas(ses, p.TykAPISpec.APIID)
+
+	augmentMCPWWWAuthenticate(res, p.TykAPISpec)
 
 	copyHeader(rw.Header(), res.Header, p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 
