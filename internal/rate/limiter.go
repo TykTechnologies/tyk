@@ -8,13 +8,13 @@ import (
 )
 
 // Limiter returns the appropriate rate limiter as configured by gateway.
-func Limiter(gwConfig *config.Config, redis redis.UniversalClient) limiter.LimiterFunc {
-	name, ok := LimiterKind(gwConfig)
+func Limiter(gwConfig *config.Config, rClient redis.UniversalClient) limiter.Func {
+	name, ok := limiterKind(gwConfig)
 	if !ok {
 		return nil
 	}
 
-	res := limiter.NewLimiter(redis)
+	res := limiter.NewLimiter(rClient)
 
 	switch name {
 	case LimitLeakyBucket:
@@ -28,6 +28,15 @@ func Limiter(gwConfig *config.Config, redis redis.UniversalClient) limiter.Limit
 	}
 
 	return nil
+}
+
+// limiterKind returns the kind of rate limiter enabled by config.
+// This function is used for release builds.
+func limiterKind(c *config.Config) (string, bool) {
+	if c.EnableFixedWindowRateLimiter {
+		return LimitFixedWindow, true
+	}
+	return "", false
 }
 
 // LimiterKey returns a redis key name based on passed parameters.

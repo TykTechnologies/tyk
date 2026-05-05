@@ -954,7 +954,7 @@ func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
 		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
-	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
+	require.NoError(t, g.Gw.afterConfSetup()) // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
 	defer g.Close()
 
@@ -1003,7 +1003,7 @@ func TestGetApiDefinitions(t *testing.T) {
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
 		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
-	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
+	require.NoError(t, g.Gw.afterConfSetup()) // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
 	defer g.Close()
 
@@ -1048,7 +1048,7 @@ func TestGetPolicies(t *testing.T) {
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
 		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
-	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
+	require.NoError(t, g.Gw.afterConfSetup()) // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
 	defer g.Close()
 
@@ -1097,7 +1097,7 @@ func TestGetPolicies_Fails_With_Timeout(t *testing.T) {
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
 		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
-	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
+	require.NoError(t, g.Gw.afterConfSetup()) // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
 	defer g.Close()
 

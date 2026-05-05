@@ -1,0 +1,40 @@
+{
+  "name": "Test API Override Upstream with Field and Value Match",
+  "api_id": "test-api-override-upstream-match",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-api-override-upstream-match/",
+    "target_url": "http://backend-multi-error:5003/",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  },
+  "error_overrides": {
+    "500": [
+      {
+        "match": {
+          "body_field": "error.type",
+          "body_value": "database_timeout",
+          "message_pattern": "Connection.*lost"
+        },
+        "response": {
+          "status_code": 501,
+          "body": "{\"status\": \"override_all_match\"}",
+          "headers": {
+            "X-Error-Flag": "UPSTREAM-MATCH-FIELD-VALUE-API",
+            "X-Override-Applied": "true"
+          }
+        }
+      }
+    ]
+  }
+}

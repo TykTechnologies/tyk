@@ -18,6 +18,7 @@ import (
 
 // Mock certificate manager for integration testing
 type mockIntegrationCertificateManager struct {
+	certs.IdGetter
 	certificates   map[string]*tls.Certificate
 	caCertificates []string
 }

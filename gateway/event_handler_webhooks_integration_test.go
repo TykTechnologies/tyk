@@ -18,6 +18,7 @@ import (
 
 // Mock certificate manager for testing
 type mockWebhookCertificateManager struct {
+	certs.IdGetter
 	certificates   map[string]*tls.Certificate
 	caCertificates []string
 }

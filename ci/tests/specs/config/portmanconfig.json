@@ -122,6 +122,17 @@
           "name": "createApi.apiID"
         }
       ]
+    },
+    {
+      "openApiOperationIds": [
+        "createMCP"
+      ],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "key",
+          "name": "createMCP.apiID"
+        }
+      ]
     }
   ],
   "operationPreRequestScripts": [
@@ -145,7 +156,10 @@
         "patchApiOAS",
         "updateApiOAS",
         "downloadApiOASPublic",
-        "getPolicy"
+        "getPolicy",
+        "getMCP",
+        "updateMCP",
+        "deleteMCP"
       ],
       "scripts": [
         "file:config/prescript.js"
@@ -341,6 +355,32 @@
           "key": "api_id",
           "value": "{{createApi.apiID}}",
           "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "getMCP",
+        "updateMCP",
+        "deleteMCP"
+      ],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "apiID",
+          "value": "{{createMCP.apiID}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "updateMCP"
+      ],
+      "overwriteRequestBody": [
+        {
+          "overwrite": true,
+          "key": "x-tyk-api-gateway.info.id",
+          "value": "{{createMCP.apiID}}"
         }
       ]
     }

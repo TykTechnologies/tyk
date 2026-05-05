@@ -22,8 +22,10 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestRedisCacheMiddlewareUnit(t *testing.T) {
@@ -282,6 +284,79 @@ func TestRedisCacheMiddlewareV2(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRedisCacheMiddleware_RateLimitHeaders(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.RateLimitResponseHeaders = config.SourceQuotas
+	})
+	defer ts.Close()
+
+	ts.AddDynamicHandler("upstream-with-rl-headers", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set(header.XRateLimitLimit, "999")
+		w.Header().Set(header.XRateLimitRemaining, "998")
+		w.Header().Set(header.XRateLimitReset, "1234567890")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/cache-rl-test"
+		spec.Proxy.TargetURL = TestHttpAny + "/upstream-with-rl-headers"
+		spec.Proxy.StripListenPath = true
+		spec.UseKeylessAccess = false
+
+		spec.CacheOptions.CacheTimeout = 60
+		spec.CacheOptions.EnableCache = true
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			// Matching the stripped listen path and all subpaths
+			v.ExtendedPaths.Cached = []string{"/(.*)"}
+		})
+	})[0]
+
+	_, authKey := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{
+			api.APIID: {
+				APIName: api.Name,
+				APIID:   api.APIID,
+				Limit: user.APILimit{
+					QuotaMax:         10,
+					QuotaRenewalRate: 60,
+				},
+			},
+		}
+	})
+
+	authHeader := map[string]string{header.Authorization: authKey}
+
+	resp1, _ := ts.Run(t, []test.TestCase{
+		{
+			Headers: authHeader,
+			Path:    "/cache-rl-test",
+			Code:    http.StatusOK,
+			HeadersNotMatch: map[string]string{
+				cachedResponseHeader: "1",
+			},
+		},
+	}...)
+
+	assert.Equal(t, "10", resp1.Header.Get(header.XRateLimitLimit))
+	assert.Equal(t, "9", resp1.Header.Get(header.XRateLimitRemaining))
+	assert.Len(t, resp1.Header.Values(header.XRateLimitLimit), 1)
+
+	resp2, _ := ts.Run(t, []test.TestCase{
+		{
+			Headers: authHeader,
+			Path:    "/cache-rl-test",
+			Code:    http.StatusOK,
+			HeadersMatch: map[string]string{
+				cachedResponseHeader: "1",
+			},
+		},
+	}...)
+
+	assert.Equal(t, "10", resp2.Header.Get(header.XRateLimitLimit))
+	assert.Equal(t, "8", resp2.Header.Get(header.XRateLimitRemaining))
+	assert.Len(t, resp2.Header.Values(header.XRateLimitLimit), 1)
 }
 
 func Test_isSafeMethod(t *testing.T) {

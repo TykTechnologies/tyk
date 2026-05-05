@@ -425,6 +425,10 @@ func TestOAS_JWT(t *testing.T) {
 
 	var jwt JWT
 	Fill(t, &jwt, 0)
+	// Align single-value fields with slice[0] so round-trip is exact after merge logic
+	jwt.PolicyFieldName = jwt.BasePolicyClaims[0]
+	jwt.IdentityBaseField = jwt.SubjectClaims[0]
+	jwt.Scopes.ClaimName = jwt.Scopes.Claims[0]
 	oas.Extensions = map[string]interface{}{
 		ExtensionTykAPIGateway: &XTykAPIGateway{
 			Server: Server{
@@ -492,6 +496,194 @@ func TestOAS_JWT(t *testing.T) {
 	convertedOAS.fillJWT(api)
 
 	assert.Equal(t, oas, convertedOAS)
+}
+
+func TestMergeStringFirst(t *testing.T) {
+	tests := []struct {
+		name     string
+		primary  string
+		existing []string
+		expected []string
+	}{
+		{
+			name:     "primary not in existing, inserted at front",
+			primary:  "pol",
+			existing: []string{"other", "backup"},
+			expected: []string{"pol", "other", "backup"},
+		},
+		{
+			name:     "primary already first, no change",
+			primary:  "pol",
+			existing: []string{"pol", "backup"},
+			expected: []string{"pol", "backup"},
+		},
+		{
+			name:     "primary already present but not first, moved to front no duplication",
+			primary:  "pol",
+			existing: []string{"other", "pol", "backup"},
+			expected: []string{"pol", "other", "backup"},
+		},
+		{
+			name:     "primary empty, existing returned unchanged",
+			primary:  "",
+			existing: []string{"other", "backup"},
+			expected: []string{"other", "backup"},
+		},
+		{
+			name:     "primary empty and existing nil, returns nil",
+			primary:  "",
+			existing: nil,
+			expected: nil,
+		},
+		{
+			name:     "primary set and existing nil, returns slice with primary",
+			primary:  "pol",
+			existing: nil,
+			expected: []string{"pol"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := mergeStringFirst(tt.primary, tt.existing)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestFillJWT_MergeClassicIntoOASSlices(t *testing.T) {
+	const securityName = "jwtAuth"
+
+	makeOAS := func(basePolicyClaims, subjectClaims, scopeClaims []string) OAS {
+		o := OAS{}
+		o.Components = &openapi3.Components{
+			SecuritySchemes: openapi3.SecuritySchemes{
+				securityName: {Value: &openapi3.SecurityScheme{
+					Type: typeHTTP, Scheme: schemeBearer, BearerFormat: bearerFormatJWT,
+				}},
+			},
+		}
+		o.Security = openapi3.SecurityRequirements{{securityName: []string{}}}
+		o.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecuritySchemes: SecuritySchemes{
+						securityName: &JWT{
+							Enabled:          true,
+							BasePolicyClaims: basePolicyClaims,
+							SubjectClaims:    subjectClaims,
+							Scopes:           &Scopes{Claims: scopeClaims},
+						},
+					},
+				},
+			},
+		})
+		return o
+	}
+
+	makeAPI := func(policyField, identityField, scopeClaimName string) apidef.APIDefinition {
+		api := apidef.APIDefinition{}
+		api.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.JWTType: {Name: securityName},
+		}
+		api.EnableJWT = true
+		api.JWTPolicyFieldName = policyField
+		api.JWTIdentityBaseField = identityField
+		api.Scopes.JWT.ScopeClaimName = scopeClaimName
+		return api
+	}
+
+	tests := []struct {
+		name                     string
+		existingBasePolicyClaims []string
+		existingSubjectClaims    []string
+		existingScopeClaims      []string
+		classicPolicyField       string
+		classicIdentityField     string
+		classicScopeClaimName    string
+		wantBasePolicyClaims     []string
+		wantSubjectClaims        []string
+		wantScopeClaims          []string
+	}{
+		{
+			name:                     "classic value not in existing, prepended",
+			existingBasePolicyClaims: []string{"other", "backup"},
+			existingSubjectClaims:    []string{"uid", "email"},
+			existingScopeClaims:      []string{"roles", "perms"},
+			classicPolicyField:       "pol",
+			classicIdentityField:     "sub",
+			classicScopeClaimName:    "scope",
+			wantBasePolicyClaims:     []string{"pol", "other", "backup"},
+			wantSubjectClaims:        []string{"sub", "uid", "email"},
+			wantScopeClaims:          []string{"scope", "roles", "perms"},
+		},
+		{
+			name:                     "classic value already first, no change",
+			existingBasePolicyClaims: []string{"pol", "backup"},
+			existingSubjectClaims:    []string{"sub", "email"},
+			existingScopeClaims:      []string{"scope", "roles"},
+			classicPolicyField:       "pol",
+			classicIdentityField:     "sub",
+			classicScopeClaimName:    "scope",
+			wantBasePolicyClaims:     []string{"pol", "backup"},
+			wantSubjectClaims:        []string{"sub", "email"},
+			wantScopeClaims:          []string{"scope", "roles"},
+		},
+		{
+			name:                     "classic value present but not first, moved to front",
+			existingBasePolicyClaims: []string{"other", "pol"},
+			existingSubjectClaims:    []string{"email", "sub"},
+			existingScopeClaims:      []string{"roles", "scope"},
+			classicPolicyField:       "pol",
+			classicIdentityField:     "sub",
+			classicScopeClaimName:    "scope",
+			wantBasePolicyClaims:     []string{"pol", "other"},
+			wantSubjectClaims:        []string{"sub", "email"},
+			wantScopeClaims:          []string{"scope", "roles"},
+		},
+		{
+			name:                     "classic field empty, existing preserved",
+			existingBasePolicyClaims: []string{"other"},
+			existingSubjectClaims:    []string{"uid"},
+			existingScopeClaims:      []string{"roles"},
+			classicPolicyField:       "",
+			classicIdentityField:     "",
+			classicScopeClaimName:    "",
+			wantBasePolicyClaims:     []string{"other"},
+			wantSubjectClaims:        []string{"uid"},
+			wantScopeClaims:          []string{"roles"},
+		},
+		{
+			name:                     "no existing OAS config, seeded from classic",
+			existingBasePolicyClaims: nil,
+			existingSubjectClaims:    nil,
+			existingScopeClaims:      nil,
+			classicPolicyField:       "pol",
+			classicIdentityField:     "sub",
+			classicScopeClaimName:    "scope",
+			wantBasePolicyClaims:     []string{"pol"},
+			wantSubjectClaims:        []string{"sub"},
+			wantScopeClaims:          []string{"scope"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := makeOAS(tt.existingBasePolicyClaims, tt.existingSubjectClaims, tt.existingScopeClaims)
+			api := makeAPI(tt.classicPolicyField, tt.classicIdentityField, tt.classicScopeClaimName)
+
+			o.fillJWT(api)
+
+			got := o.GetJWTConfiguration()
+			assert.Equal(t, tt.wantBasePolicyClaims, got.BasePolicyClaims)
+			assert.Equal(t, tt.wantSubjectClaims, got.SubjectClaims)
+			if got.Scopes != nil {
+				assert.Equal(t, tt.wantScopeClaims, got.Scopes.Claims)
+			} else {
+				assert.Nil(t, tt.wantScopeClaims)
+			}
+		})
+	}
 }
 
 func TestOAS_Basic(t *testing.T) {

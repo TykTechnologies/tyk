@@ -496,6 +496,8 @@ func (a *APIDefinition) SetDisabledFlags() {
 	a.DoNotTrack = true
 
 	a.setEventHandlersDisabledFlags()
+
+	a.ErrorOverridesDisabled = true
 }
 
 func (a *APIDefinition) setEventHandlersDisabledFlags() {

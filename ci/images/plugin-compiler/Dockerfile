@@ -26,11 +26,6 @@ RUN --mount=type=cache,mode=0755,target=/go/pkg/mod \
 
 ADD . $TYK_GW_PATH
 
-# Provide a gateway test binary for testing plugin loading.
-RUN --mount=type=cache,mode=0755,target=/go/pkg/mod \
-    --mount=type=cache,mode=0755,target=/root/.cache/go-build \
-    GOBIN=/usr/local/bin go install -tags=goplugin -trimpath .
-
 ARG GITHUB_SHA
 ARG GITHUB_TAG
 ENV GITHUB_SHA=${GITHUB_SHA}
@@ -38,6 +33,14 @@ ENV GITHUB_TAG=${GITHUB_TAG}
 
 ARG BUILD_TAG
 ENV BUILD_TAG=${BUILD_TAG}
+
+ARG GOFIPS140
+ENV GOFIPS140=${GOFIPS140}
+
+# Provide a gateway test binary for testing plugin loading.
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod \
+    --mount=type=cache,mode=0755,target=/root/.cache/go-build \
+    GOBIN=/usr/local/bin go install -tags=goplugin${BUILD_TAG:+,$BUILD_TAG} -trimpath .
 
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
