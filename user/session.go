@@ -129,9 +129,9 @@ func (r RateLimit) Duration() time.Duration {
 // reqproof:model
 // field Limit APILimit
 // field AllowanceScope string
-// field Endpoints bool
-// field JSONRPCMethods bool
-// field MCPPrimitives bool
+// field Endpoints Endpoints
+// field JSONRPCMethods JSONRPCMethodLimit
+// field MCPPrimitives MCPPrimitiveLimit
 type AccessDefinition struct {
 	APIName              string                  `json:"api_name,omitzero" msg:"api_name"`
 	APIID                string                  `json:"api_id,omitzero" msg:"api_id"`

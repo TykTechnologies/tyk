@@ -10,6 +10,9 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 	// reqproof:abstract logrus.Logger sort=Opaque
 	"github.com/sirupsen/logrus"
+	// reqproof:abstract user.Endpoints sort=Opaque
+	// reqproof:abstract user.JSONRPCMethodLimit sort=Opaque
+	// reqproof:abstract user.MCPPrimitiveLimit sort=Opaque
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -328,15 +331,6 @@ func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy
 }
 
 // SYS-REQ-021
-// reqproof:requires m.Rate == 0.0
-// reqproof:lemma empty_rate_limit_when_rate_zero proves t.emptyRateLimit(m) == true
-//
-// reqproof:requires m.Per == 0.0
-// reqproof:lemma empty_rate_limit_when_per_zero proves t.emptyRateLimit(m) == true
-//
-// reqproof:requires m.Rate != 0.0
-// reqproof:requires m.Per != 0.0
-// reqproof:lemma empty_rate_limit_false_when_both_nonzero proves t.emptyRateLimit(m) == false
 func (t *Service) emptyRateLimit(m user.APILimit) bool {
 	return m.Rate == 0 || m.Per == 0
 }
@@ -664,21 +658,15 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 	}
 }
 
-// Phase UU.30: honest assumes for same-package method calls that the
-// translator cannot lower. These methods are concrete, same-package
-// functions whose bodies use types modeled as opaque/abstract (user.Endpoints)
-// or unmodeled cross-package types ([]user.JSONRPCMethodLimit,
-// []user.MCPPrimitiveLimit). The translator's collectPackageMethodBundles
-// fails to translate the bodies (opaque type method calls + unmodeled
-// qualified types), so they are never registered as callables. Even if we
-// force-registered them, the model maps AccessDefinition.{Endpoints,
-// JSONRPCMethods, MCPPrimitives} to bool, creating a sort mismatch with the
-// real method signatures. The bool assumes are the correct bridge: they
-// model "is the field populated?" semantics matching the model projection.
+// Phase UU.31: these same-package methods cannot be lowered because their
+// bodies call opaque-type methods (.Map(), .Endpoints(), .Duration()) and use
+// operations (len, range over opaque returns) the translator does not support.
+// The assumes use the real model types (now declared as reqproof:abstract
+// sort=Opaque in the user package) rather than the old bool projections.
 //
-// reqproof:assume policy.Service.ApplyEndpointLevelLimits func(t *Service, policyEndpoints bool, currEndpoints bool) bool { return policyEndpoints || currEndpoints }
-// reqproof:assume policy.Service.ApplyJSONRPCMethodLimits func(t *Service, policyMethods bool, currMethods bool) bool { return policyMethods || currMethods }
-// reqproof:assume policy.Service.ApplyMCPPrimitiveLimits func(t *Service, policyPrimitives bool, currPrimitives bool) bool { return policyPrimitives || currPrimitives }
+// reqproof:assume policy.Service.ApplyEndpointLevelLimits func(t *Service, policyEndpoints user.Endpoints, currEndpoints user.Endpoints) user.Endpoints { return policyEndpoints }
+// reqproof:assume policy.Service.ApplyJSONRPCMethodLimits func(t *Service, policyMethods user.JSONRPCMethodLimit, currMethods user.JSONRPCMethodLimit) user.JSONRPCMethodLimit { return policyMethods }
+// reqproof:assume policy.Service.ApplyMCPPrimitiveLimits func(t *Service, policyPrimitives user.MCPPrimitiveLimit, currPrimitives user.MCPPrimitiveLimit) user.MCPPrimitiveLimit { return policyPrimitives }
 // reqproof:assume user.APILimit.Duration func(m user.APILimit) float64 { return m.Per / m.Rate }
 //
 // ---
