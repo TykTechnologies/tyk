@@ -63,7 +63,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
-	logger "github.com/TykTechnologies/tyk/log"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/pkg/validator"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
@@ -79,10 +79,10 @@ import (
 var (
 	globalMu sync.Mutex
 
-	log       = logger.Get()
+	log       = tyklog.Get()
 	mainLog   = log.WithField("prefix", "main")
 	pubSubLog = log.WithField("prefix", "pub-sub")
-	rawLog    = logger.GetRaw()
+	rawLog    = tyklog.GetRaw()
 
 	memProfFile *os.File
 
@@ -1584,7 +1584,7 @@ func (gw *Gateway) initSystem() error {
 
 	// Initialize the appropriate log formatter
 	if !gw.isRunningTests() && os.Getenv("TYK_LOGFORMAT") == "" && !*cli.DebugMode {
-		log.Formatter = logger.NewFormatter(gwConfig.LogFormat)
+		tyklog.SetupFormatter(gwConfig.LogFormat)
 		mainLog.Debugf("Set log format to %q", gwConfig.LogFormat)
 	}
 
@@ -2077,7 +2077,7 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 	localStorage := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
 	localStorage.Connect()
 
-	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
+	logger := tyklog.Get().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		return storage.NewMdcbStorage(

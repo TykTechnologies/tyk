@@ -22,6 +22,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/cache"
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -149,7 +150,7 @@ func WithBackoffIntervals(maxElapsed, initial, max time.Duration) CertificateMan
 //	    WithBackoffIntervals(60*time.Second, 200*time.Millisecond, 5*time.Second))
 func NewCertificateManager(storageHandler storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
-		logger = logrus.New()
+		logger = tyklog.Get()
 	}
 
 	cm := &certificateManager{
@@ -182,7 +183,7 @@ func getOrgFromKeyID(key, certID string) string {
 
 func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
-		logger = logrus.New()
+		logger = tyklog.Get()
 	}
 	log := logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix})
 

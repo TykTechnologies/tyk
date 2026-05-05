@@ -1237,9 +1237,10 @@ type Config struct {
 	// If not set or left empty, it will default to `info`.
 	LogLevel string `json:"log_level"`
 
-	// You can now configure the log format to be either the standard or json format
-	// If not set or left empty, it will default to `standard`.
-	LogFormat string `json:"log_format"`
+	// LogFormat configures the output format of the logs.
+	// Allowed values are `text`, `json`, or `legacy`.
+	// If not set or left empty, it defaults to `text`.
+	LogFormat logger.Format `json:"log_format"`
 
 	// AccessLogs configures the output for access logs.
 	// If not configured, the access log is disabled.
