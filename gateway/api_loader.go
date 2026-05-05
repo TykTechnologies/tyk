@@ -322,6 +322,16 @@ func (gw *Gateway) processSpec(
 	gw.mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &CORSMiddleware{BaseMiddleware: baseMid.Copy()})
 
+	// MCPCallerAuth (RFC-API-TO-MCP-V7 §11): on Source APIDefs that have
+	// opted in via Server.AcceptMCPLoopCallers, establish channel-trust for
+	// in-process loop calls coming from a registered MCP Proxy. MUST run
+	// BEFORE mwPreFuncs so a buggy operator-configured pre-auth plugin
+	// cannot interpose between loop entry and trust establishment, and
+	// BEFORE the auth chain so the helper-as-FIRST contract (Phase B4) can
+	// observe the skip-auth flag. EnabledForSpec gates the no-op fast path
+	// for sources that have not opted in.
+	gw.mwAppendEnabled(&chainArray, &MCPCallerAuthMiddleware{BaseMiddleware: baseMid.Copy()})
+
 	for _, obj := range mwPreFuncs {
 		if mwDriver == apidef.GoPluginDriver {
 			gw.mwAppendEnabled(
@@ -518,6 +528,18 @@ func (gw *Gateway) processSpec(
 		gw.mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid.Copy()})
 	}
 
+	// MCP-Proxy request-phase MWs (RFC-API-TO-MCP-V7 §8.2 steps 2-3): on
+	// APIDefs carrying the Server.MCPProxy extension, drop any inbound
+	// X-Tyk-MCP-* headers (defence against agent spoofing of internal
+	// metadata) and dispatch the JSON-RPC envelope. MUST run AFTER auth
+	// (the agent's bearer is validated by the standard auth chain above)
+	// and BEFORE the URL-rewrite / transform / proxy steps further down,
+	// because MCPHandler sets the URL-rewrite target consumed by
+	// URLRewriteMiddleware. Strip MUST precede Handler so a forged
+	// X-Tyk-MCP-Context header from the agent never reaches dispatch.
+	gw.mwAppendEnabled(&chainArray, &StripInboundMCPHeadersMiddleware{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &MCPHandlerMiddleware{BaseMiddleware: baseMid.Copy()})
+
 	if spec.IsMCP() {
 		gw.mwAppendEnabled(&chainArray, &JSONRPCAccessControlMiddleware{baseMid.Copy()})
 		gw.mwAppendEnabled(&chainArray, &MCPAccessControlMiddleware{baseMid.Copy()})
@@ -711,6 +733,10 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var handler http.Handler
 		if r.URL.Hostname() == "self" {
 			httpctx.SetSelfLooping(r, true)
+			// RFC-API-TO-MCP-V7 §16 step 7: stamp the calling APIDef so source-side
+			// MCPCallerAuth can identify the immediate caller. Immediately-calling,
+			// not transitive — chained loops overwrite, never nest.
+			r = httpctx.SetCallingSpec(r, d.SH.Spec.APIDefinition)
 			if h, found := d.Gw.apisHandlesByID.Load(d.SH.Spec.APIID); found {
 				if chain, ok := h.(*ChainObject); ok {
 					handler = chain.ThisHandler
@@ -722,6 +748,10 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ctxSetVersionInfo(r, nil)
 
 			if targetAPI := d.Gw.fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
+				// RFC-API-TO-MCP-V7 §16 step 7: stamp the calling APIDef so source-side
+				// MCPCallerAuth can identify the immediate caller. Immediately-calling,
+				// not transitive — chained loops overwrite, never nest.
+				r = httpctx.SetCallingSpec(r, d.SH.Spec.APIDefinition)
 				if h, found := d.Gw.apisHandlesByID.Load(targetAPI.APIID); found {
 					if chain, ok := h.(*ChainObject); ok {
 						handler = chain.ThisHandler
@@ -754,6 +784,18 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		ctxIncLoopLevel(r, loopLevelLimit)
+		// RFC-API-TO-MCP-V7 §8.2 step 5 / §8.5: tyk:// loops bypass the
+		// reverse-proxy response-handler chain, so MCPProxyResponseWrap never
+		// sees mode (a) loopback responses. Detect MCP tools/call (id stash
+		// present) and capture the loop's writes into a buffer so we can emit
+		// the JSON-RPC envelope to the real client w. Non-MCP loops fall
+		// through unchanged.
+		if id, ok := shouldWrapMCPLoopResponse(r); ok {
+			cap := newMCPLoopCaptureWriter()
+			handler.ServeHTTP(cap, r)
+			emitMCPLoopEnvelope(w, cap, id)
+			return
+		}
 		handler.ServeHTTP(w, r)
 		return
 	}

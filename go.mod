@@ -117,6 +117,7 @@ require (
 	github.com/ohler55/ojg v1.26.9
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/samber/lo v1.50.0
+	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/testcontainers/testcontainers-go v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/kafka v0.37.0
@@ -509,7 +510,6 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/s2-streamstore/s2-sdk-go v0.13.3 // indirect
-	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/schollz/progressbar/v2 v2.15.0 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect

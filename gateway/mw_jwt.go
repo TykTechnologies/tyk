@@ -1051,6 +1051,10 @@ func (k *JWTMiddleware) getAuthType() string {
 }
 
 func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if skip, _ := skipAuthIfMarked(r); skip {
+		return nil, http.StatusOK
+	}
+
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
 	}

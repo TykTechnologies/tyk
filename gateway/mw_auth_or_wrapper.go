@@ -37,6 +37,10 @@ type AuthORWrapper struct {
 
 // ProcessRequest handles the OR logic for authentication
 func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if skip, _ := skipAuthIfMarked(r); skip {
+		return nil, http.StatusOK
+	}
+
 	// Determine processing mode (OAS-only feature)
 	processingMode := oas.SecurityProcessingModeLegacy
 	if a.Spec.IsOAS && a.Spec.OAS.GetTykExtension() != nil {

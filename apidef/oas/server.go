@@ -61,6 +61,25 @@ type Server struct {
 	//
 	// Tyk classic API definition: `listen_port`.
 	Port int `bson:"port,omitempty" json:"port,omitempty"`
+
+	// MCPProxy, when present, marks this APIDef as the public face of an MCP
+	// feature and aggregates one or more sources into a single MCP endpoint.
+	// See RFC-API-TO-MCP §7.
+	MCPProxy *MCPProxy `bson:"mcpProxy,omitempty" json:"mcpProxy,omitempty"`
+
+	// AcceptMCPLoopCallers — when true, this source APIDef's chain runs
+	// MCPCallerAuth first. When the call is a tyk:// loop from an APIDef
+	// (a) carrying the MCPProxy extension AND (b) whose APIID is present
+	// in this source's MCPProxies back-ref, MCPCallerAuth establishes
+	// channel trust and the source's normal auth is skipped. Load-bearing;
+	// see RFC-API-TO-MCP §7 / §11.
+	AcceptMCPLoopCallers bool `bson:"acceptMcpLoopCallers,omitempty" json:"acceptMcpLoopCallers,omitempty"`
+
+	// MCPProxies — back-reference list of MCP Proxy APIIDs that include
+	// this source. Maintained by lifecycle CRUD. Load-bearing: drives both
+	// the source-deletion guard AND the §11 channel-trust check.
+	// See RFC-API-TO-MCP §7 / §12.
+	MCPProxies []string `bson:"mcpProxies,omitempty" json:"mcpProxies,omitempty"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.
@@ -123,6 +142,7 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 
 	s.fillIPAccessControl(api)
 	s.fillBatchProcessing(api)
+	s.fillMCPProxy(api)
 }
 
 // ExtractTo extracts *Server into *apidef.APIDefinition.
@@ -187,6 +207,7 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 
 	s.extractIPAccessControlTo(api)
 	s.extractBatchProcessingTo(api)
+	s.extractMCPProxyTo(api)
 }
 
 // ListenPath is the base path on Tyk to which requests for this API
@@ -431,4 +452,24 @@ func (s *Server) extractBatchProcessingTo(api *apidef.APIDefinition) {
 	}
 
 	s.BatchProcessing.ExtractTo(api)
+}
+
+// fillMCPProxy is a no-op shim that matches the Fill convention used by
+// every other sibling on Server. The MCPProxy extension has no peer in
+// apidef.APIDefinition; its data lives on the OAS side only and round-trips
+// via JSON marshalling. AcceptMCPLoopCallers and MCPProxies are scalar /
+// slice fields on Server itself with no apidef peer either, so they have
+// no Fill/ExtractTo wiring.
+func (s *Server) fillMCPProxy(api apidef.APIDefinition) {
+	if s.MCPProxy != nil {
+		s.MCPProxy.Fill(api)
+	}
+}
+
+// extractMCPProxyTo is the ExtractTo counterpart to fillMCPProxy; see that
+// function's doc for why this is a no-op.
+func (s *Server) extractMCPProxyTo(api *apidef.APIDefinition) {
+	if s.MCPProxy != nil {
+		s.MCPProxy.ExtractTo(api)
+	}
 }

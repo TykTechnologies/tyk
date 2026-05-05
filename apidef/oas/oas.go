@@ -554,7 +554,12 @@ func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) e
 	compliantModeErr := s.validateCompliantModeAuthentication()
 	prmErr := s.validatePRM()
 
-	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr)
+	var mcpProxyErr error
+	if ext := s.GetTykExtension(); ext != nil && ext.Server.MCPProxy != nil {
+		mcpProxyErr = ext.Server.MCPProxy.Validate(ctx)
+	}
+
+	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, mcpProxyErr)
 }
 
 // Normalize converts the OAS api to a normalized state.

@@ -903,6 +903,14 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/mcps/{apiID}", gw.mcpGetHandler).Methods(http.MethodGet)
 		r.HandleFunc("/mcps/{apiID}", gw.validateMCP(gw.mcpUpdateHandler)).Methods(http.MethodPut)
 		r.HandleFunc("/mcps/{apiID}", gw.mcpDeleteHandler).Methods(http.MethodDelete)
+
+		// MCP Proxy (RFC-API-TO-MCP §12.1) — distinct from /mcps which
+		// serves the unrelated MCPPrimitive flow.
+		r.HandleFunc("/mcp-proxies", gw.mcpProxyListHandler).Methods(http.MethodGet)
+		r.HandleFunc("/mcp-proxies", gw.validateMCPProxy(gw.mcpProxyCreateHandler)).Methods(http.MethodPost)
+		r.HandleFunc("/mcp-proxies/{apiID}", gw.mcpProxyGetHandler).Methods(http.MethodGet)
+		r.HandleFunc("/mcp-proxies/{apiID}", gw.validateMCPProxy(gw.mcpProxyUpdateHandler)).Methods(http.MethodPut)
+		r.HandleFunc("/mcp-proxies/{apiID}", gw.mcpProxyDeleteHandler).Methods(http.MethodDelete)
 		r.HandleFunc("/health", gw.healthCheckhandler).Methods("GET")
 		r.HandleFunc("/policies", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/policies/{polID}", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
@@ -1140,6 +1148,17 @@ func (gw *Gateway) createResponseMiddlewareChain(
 	decorate := makeDefaultDecorator(log)
 
 	gw.responseMWAppendEnabled(&responseMWChain, decorate(&MCPListFilterResponseHandler{BaseTykResponseHandler: baseHandler}))
+	// MCPProxyResponseWrap (RFC-API-TO-MCP-V7 §8.2 step 5 / §8.5): wraps
+	// upstream HTTP responses for MCP tools/call invocations into the
+	// JSON-RPC 2.0 envelope expected by the agent. The handler's own
+	// Enabled() gates on IsMCP(); we additionally only register it when
+	// the MCPProxy extension is present so non-Proxy MCP APIs never
+	// receive the wrap behaviour.
+	if spec.IsOAS {
+		if ext := spec.OAS.GetTykExtension(); ext != nil && ext.Server.MCPProxy != nil {
+			gw.responseMWAppendEnabled(&responseMWChain, decorate(&MCPProxyResponseWrap{BaseTykResponseHandler: baseHandler}))
+		}
+	}
 	gw.responseMWAppendEnabled(&responseMWChain, decorate(&ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler}))
 	headerInjector := decorate(&HeaderInjector{BaseTykResponseHandler: baseHandler})
 	headerInjectorAdded := gw.responseMWAppendEnabled(&responseMWChain, headerInjector)

@@ -66,6 +66,10 @@ func (k *Oauth2KeyExists) getAuthType() string {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if skip, _ := skipAuthIfMarked(r); skip {
+		return nil, http.StatusOK
+	}
+
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
 	}

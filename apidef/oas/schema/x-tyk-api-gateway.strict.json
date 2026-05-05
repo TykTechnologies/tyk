@@ -1443,6 +1443,20 @@
             "https",
             "h2c"
           ]
+        },
+        "mcpProxy": {
+          "type": "object"
+        },
+        "acceptMcpLoopCallers": {
+          "type": "boolean"
+        },
+        "mcpProxies": {
+          "type": "array",
+          "items": [
+            {
+              "type": "string"
+            }
+          ]
         }
       },
       "required": [

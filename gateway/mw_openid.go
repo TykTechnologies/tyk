@@ -101,6 +101,10 @@ func (k *OpenIDMW) getAuthType() string {
 }
 
 func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if skip, _ := skipAuthIfMarked(r); skip {
+		return nil, http.StatusOK
+	}
+
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
 	}

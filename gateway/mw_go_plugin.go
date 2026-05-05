@@ -190,6 +190,10 @@ func (m *GoPluginMiddleware) goPluginFromRequest(r *http.Request) (*GoPluginMidd
 	return perPathPerMethodGoPlugin.(*GoPluginMiddleware), found
 }
 func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (err error, respCode int) {
+	if skip, _ := skipAuthIfMarked(r); skip {
+		return nil, http.StatusOK
+	}
+
 	handler, logger, successHandler, shouldSkip := m.resolvePluginHandler(r)
 	if shouldSkip {
 		return nil, http.StatusOK

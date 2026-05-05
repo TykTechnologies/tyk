@@ -1522,6 +1522,19 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 		return resp, code
 	}
 
+	// RFC §12.5: refuse to delete a source APIDef while any MCP Proxy still
+	// lists it in Server.MCPProxies. Without this gate, the next loop hop on
+	// the dependent proxy fails at runtime with source_not_loaded. Guard is
+	// OAS-aware (returns nil for non-OAS / non-source specs), so it's safe to
+	// call unconditionally for both classic and OAS DELETE paths.
+	if guardErr := SourceDeletionGuard(spec); guardErr.HasViolations() {
+		return mcpProxyRuntimeResponse{
+			Status:     "error",
+			Message:    guardErr.Error(),
+			Violations: guardErr.Violations,
+		}, http.StatusConflict
+	}
+
 	fs := afero.NewOsFs()
 
 	if spec.IsOAS {

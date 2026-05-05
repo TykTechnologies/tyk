@@ -53,6 +53,10 @@ func (hm *HTTPSignatureValidationMiddleware) getAuthType() string {
 }
 
 func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if skip, _ := skipAuthIfMarked(r); skip {
+		return nil, http.StatusOK
+	}
+
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
 	}
