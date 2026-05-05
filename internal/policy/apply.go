@@ -7,6 +7,7 @@ import (
 	"github.com/samber/lo"
 
 	// reqproof:abstract model.PolicyProvider sort=Opaque
+	// reqproof:abstract model.PolicyID sort=Opaque
 	"github.com/TykTechnologies/tyk/internal/model"
 	// reqproof:abstract logrus.Logger sort=Opaque
 	"github.com/sirupsen/logrus"
@@ -99,6 +100,23 @@ type applyStatus struct {
 // Apply will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 //
+// Phase UU.35: inline lemma on the storage-nil entry gate. Translating the
+// full body requires for-loop support (deferred, Phase H) so the proof
+// uses an invariant on the main policy-loop and simplifies opaque method
+// calls via assumes. See docs/help/translator-errors/E_FOR_LOOP_NO_INVARIANT.md
+// for details on the loop restriction.
+//
+// reqproof:assume policy.Service.ClearSession func(t *Service, session *user.SessionState) error { return nil }
+// reqproof:assume user.SessionState.GetCustomPolicies func(s *user.SessionState) ([]user.Policy, error) { return nil, errors.New("x") }
+// reqproof:assume policy.Store.PolicyIDs func(s *Store) []model.PolicyID { return nil }
+// reqproof:assume policy.Service.policyIds func(t *Service, session *user.SessionState) []model.PolicyID { return nil }
+// reqproof:assume policy.Store.PolicyByID func(s *Store, id model.PolicyID) (user.Policy, bool) { var p user.Policy; return p, false }
+// reqproof:assume policy.Service.Logger func(t *Service) *logrus.Entry { return nil }
+// reqproof:assume policy.Service.applyPerAPI func(t *Service, policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition, applyState *applyStatus) error { return nil }
+// reqproof:assume policy.Service.applyPartitions func(t *Service, policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition, applyState *applyStatus) error { return nil }
+// reqproof:assume policy.Service.updateSessionRootVars func(t *Service, session *user.SessionState, rights map[string]user.AccessDefinition, applyState applyStatus)
+// reqproof:requires t.storage == nil
+// reqproof:lemma apply_nil_storage_returns_err proves t.Apply(session) != nil
 func (t *Service) Apply(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
@@ -143,6 +161,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 		sessionInactiveState = false
 	}
 
+	// reqproof:invariant true
 	for _, polID := range policyIDs {
 		policy, ok := storage.PolicyByID(polID)
 
@@ -181,10 +200,12 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 		sessionInactiveState = sessionInactiveState || policy.IsInactive
 
+		// reqproof:invariant true
 		for _, tag := range policy.Tags {
 			tags[tag] = true
 		}
 
+		// reqproof:invariant true
 		for k, v := range policy.MetaData {
 			session.MetaData[k] = v
 		}
@@ -203,17 +224,20 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 	session.IsInactive = sessionInactiveState
 
+	// reqproof:invariant true
 	for _, tag := range session.Tags {
 		tags[tag] = true
 	}
 
 	// set tags
 	session.Tags = []string{}
+	// reqproof:invariant true
 	for tag := range tags {
 		session.Tags = appendIfMissing(session.Tags, tag)
 	}
 
 	if len(policyIDs) == 0 {
+		// reqproof:invariant true
 		for apiID, accessRight := range session.AccessRights {
 			// check if the api in the session has per api limit
 			if !accessRight.Limit.IsEmpty() {
@@ -225,6 +249,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 	distinctACL := make(map[string]bool)
 
+	// reqproof:invariant true
 	for _, v := range rights {
 		if v.Limit.SetBy != "" {
 			distinctACL[v.Limit.SetBy] = true
@@ -232,6 +257,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	// If some APIs had only ACL partitions, inherit rest from session level
+	// reqproof:invariant true
 	for k, v := range rights {
 		if !applyState.didAcl[k] {
 			delete(rights, k)
