@@ -3,6 +3,7 @@ package memorycache
 import (
 	"context"
 	"runtime"
+	"strconv"
 	"testing"
 	"time"
 
@@ -77,6 +78,51 @@ func BenchmarkCache_MemoryLeak(b *testing.B) {
 			time.Sleep(1 * time.Millisecond)
 		}
 	}
-	
 	b.ReportMetric(float64(cache.Count()), "items_left")
+}
+
+func TestCache_MemoryLeak_GC(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Use a short TTL so items expire quickly
+	ttl := 10 * time.Millisecond
+	cache := NewCache(ctx, ttl)
+
+	// 1. Force GC and record baseline memory
+	runtime.GC()
+	var m1 runtime.MemStats
+	runtime.ReadMemStats(&m1)
+
+	// 2. Add many items to the cache to simulate load
+	numItems := 100000
+	for i := 0; i < numItems; i++ {
+		cache.Set("key-"+strconv.Itoa(i), &Bucket{})
+	}
+
+	// 3. Record memory after adding items
+	var m2 runtime.MemStats
+	runtime.ReadMemStats(&m2)
+
+	// 4. Wait for items to expire and the cleanup timer to run.
+	// Note: startCleanupTimer enforces a minimum interval of 1 second,
+	// so we must wait slightly longer than 1 second.
+	time.Sleep(1500 * time.Millisecond)
+
+	// 5. Force GC to reclaim memory of the expired items
+	runtime.GC()
+
+	// 6. Record memory after GC
+	var m3 runtime.MemStats
+	runtime.ReadMemStats(&m3)
+
+	// Verify the cache is actually empty
+	assert.Equal(t, 0, cache.Count(), "cache should be empty after expiration")
+
+	// Verify memory was actually freed
+	freed := int64(m2.Alloc) - int64(m3.Alloc)
+	assert.True(t, freed > 0, "memory should be freed after GC")
+	
+	// Optional: Verify final memory is close to the baseline (allowing 2MB overhead)
+	assert.InDelta(t, float64(m1.Alloc), float64(m3.Alloc), float64(5*1024*1024), "memory should return close to baseline")
 }
