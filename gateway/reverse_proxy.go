@@ -555,6 +555,21 @@ func proxyTimeout(spec *APISpec) float64 {
 	return defaultProxyTimeout
 }
 
+// GetEnforcedTimeout checks APISpec versions for an endpoint level timeout value. If it's not configured
+// then it fallbacks to API level timeout.
+func (p *ReverseProxy) GetEnforcedTimeout(req *http.Request) (time.Duration, bool) {
+	endpointLevelEnforcedTimeout, isEndpointLevelTimeoutEnforced := p.GetHardTimeoutEnforcedSettings(p.TykAPISpec, req)
+	APILevelEnforcedTimeout, isAPILevelTimeoutEnforced := p.GetAPILevelEnforcedTimeoutSettings(p.TykAPISpec, req)
+
+	if isEndpointLevelTimeoutEnforced {
+		return endpointLevelEnforcedTimeout, true
+	} else if isAPILevelTimeoutEnforced {
+		return APILevelEnforcedTimeout, true
+	}
+
+	return 0, false
+}
+
 // GetHardTimeoutEnforcedSettings checks APISpec versions for a fine-grained timeout value.
 func (p *ReverseProxy) GetHardTimeoutEnforcedSettings(spec *APISpec, req *http.Request) (time.Duration, bool) {
 	if !spec.EnforcedTimeoutEnabled {
@@ -570,6 +585,17 @@ func (p *ReverseProxy) GetHardTimeoutEnforcedSettings(spec *APISpec, req *http.R
 		} else if urlSpec.HardTimeout.TimeOut > 0 {
 			return time.Duration(urlSpec.HardTimeout.TimeOut) * time.Second, true
 		}
+	}
+
+	return 0, false
+}
+
+// GetAPILevelEnforcedTimeoutSettings checks APISpec versions for an API level timeout value.
+func (p *ReverseProxy) GetAPILevelEnforcedTimeoutSettings(spec *APISpec, req *http.Request) (time.Duration, bool) {
+	vInfo, _ := spec.Version(req)
+
+	if vInfo.GlobalEnforceTimeout > 0 {
+		return time.Duration(vInfo.GlobalEnforceTimeout), true
 	}
 
 	return 0, false
@@ -1180,7 +1206,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	p.TykAPISpec.Lock()
 
-	enforcedTimeout, isTimeoutEnforced := p.GetHardTimeoutEnforcedSettings(p.TykAPISpec, outreq)
+	enforcedTimeout, isTimeoutEnforced := p.GetEnforcedTimeout(outreq)
 
 	// limit request time with context timeout
 	if isTimeoutEnforced {

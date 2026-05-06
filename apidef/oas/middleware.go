@@ -174,6 +174,10 @@ type Global struct {
 	// SkipQuotaReset indicates if quota limits should not be reset when creating or updating quotas for the API.
 	// Tyk classic API definition: `dont_set_quota_on_create`.
 	SkipQuotaReset bool `bson:"skipQuotaReset,omitempty" json:"skipQuotaReset,omitempty"`
+
+	// EnforceTimeout contains the configuration to enforced timeout for the API.
+	// Tyk classic API definition: `version_data.versions.global_enforced_timeout`.
+	EnforceTimeout *GlobalEnforceTimeout `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
 }
 
 // MarshalJSON is a custom JSON marshaller for the Global struct. It is implemented
@@ -306,6 +310,8 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	g.fillRequestSizeLimit(api)
 
 	g.fillSkips(api)
+
+	g.fillEnforceTimeout(api)
 }
 
 func (g *Global) fillTrafficLogs(api apidef.APIDefinition) {
@@ -424,6 +430,8 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	g.extractRequestSizeLimitTo(api)
 
 	g.extractSkipsTo(api)
+
+	g.extractEnforceTimeoutTo(api)
 }
 
 func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {
@@ -1308,7 +1316,7 @@ func (a *CachePlugin) ExtractTo(cm *apidef.CacheMeta) {
 	cm.Timeout = a.Timeout
 }
 
-// EnforceTimeout holds the configuration for enforcing request timeouts.
+// EnforceTimeout holds the configuration for enforcing request timeouts on endpoint level.
 type EnforceTimeout struct {
 	// Enabled is a boolean flag. If set to `true`, requests will enforce a configured timeout.
 	//
@@ -1349,6 +1357,35 @@ func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 	} else {
 		meta.TimeOut = et.Value
 	}
+}
+
+// GlobalEnforceTimeout holds the configuration for enforcing request timeouts on API level.
+type GlobalEnforceTimeout struct {
+	// Timeout specifies the maximum allowed duration for a request before it is forcibly terminated.
+	//
+	// Tyk classic API definition: `version_data.versions.global_enforced_timeout`.
+	Timeout tyktime.ReadableDuration `bson:"timeout,omitempty" json:"timeout,omitempty"`
+}
+
+// Fill fills *GlobalEnforceTimeout from apidef.APIDefinition.
+func (et *GlobalEnforceTimeout) Fill(api apidef.APIDefinition) {
+	if api.VersionData.Versions != nil {
+		if _, ok := api.VersionData.Versions[Main]; !ok {
+			return
+		}
+
+		et.Timeout = api.VersionData.Versions[Main].GlobalEnforceTimeout
+	}
+}
+
+// ExtractTo extracts *GlobalEnforceTimeout to *apidef.APIDefinition.
+func (et *GlobalEnforceTimeout) ExtractTo(api *apidef.APIDefinition) {
+	mainVersion := requireMainVersion(api)
+	defer func() {
+		updateMainVersion(api, mainVersion)
+	}()
+
+	mainVersion.GlobalEnforceTimeout = et.Timeout
 }
 
 // CustomPlugin configures custom plugin.
@@ -1956,4 +1993,24 @@ func (p *IgnoreCase) ExtractTo(api *apidef.APIDefinition) {
 	}()
 
 	mainVersion.IgnoreEndpointCase = p.Enabled
+}
+
+func (g *Global) fillEnforceTimeout(api apidef.APIDefinition) {
+	if g.EnforceTimeout == nil {
+		g.EnforceTimeout = &GlobalEnforceTimeout{}
+	}
+
+	g.EnforceTimeout.Fill(api)
+
+	if ShouldOmit(g.EnforceTimeout) {
+		g.EnforceTimeout = nil
+	}
+}
+
+func (g *Global) extractEnforceTimeoutTo(api *apidef.APIDefinition) {
+	if g.EnforceTimeout == nil {
+		return
+	}
+
+	g.EnforceTimeout.ExtractTo(api)
 }

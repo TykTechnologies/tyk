@@ -6,6 +6,7 @@ import (
 	"net"
 	"sort"
 	"strings"
+	"time"
 )
 
 type ValidationResult struct {
@@ -185,12 +186,27 @@ func (r *RuleValidateIPList) validateIPAddr(ips []string) []error {
 }
 
 var ErrInvalidTimeoutValue = errors.New("invalid timeout value")
+var ErrOutOfRangeTimeoutValue = errors.New("timeout must be between 1ms and 300s")
+var minTimeout = 1 * time.Millisecond
+var maxTimeout = 300 * time.Second
 
 type RuleValidateEnforceTimeout struct{}
 
 func (r *RuleValidateEnforceTimeout) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
 	if apiDef.VersionData.Versions != nil {
 		for _, vInfo := range apiDef.VersionData.Versions {
+
+			// Validate API level timeout
+			if vInfo.GlobalEnforceTimeout != 0 {
+				timeout := time.Duration(vInfo.GlobalEnforceTimeout)
+				if timeout < minTimeout || timeout > maxTimeout {
+					validationResult.IsValid = false
+					validationResult.AppendError(ErrOutOfRangeTimeoutValue)
+					return
+				}
+			}
+
+			// Validate endpoint level timeout
 			for _, hardTimeOutMeta := range vInfo.ExtendedPaths.HardTimeouts {
 				if hardTimeOutMeta.TimeOut < 0 || hardTimeOutMeta.TimeoutDuration < 0 {
 					validationResult.IsValid = false
