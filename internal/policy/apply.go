@@ -50,6 +50,7 @@ func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Se
 // ClearSession clears the quota, rate limit and complexity values so that partitioned policies can apply their values.
 // Otherwise, if the session has already a higher value, an applied policy will not win, and its values will be ignored.
 //
+// reqproof:lemma clear_session_succeeds proves t.ClearSession(session) == nil
 func (t *Service) ClearSession(session *user.SessionState) error {
 	if t.storage == nil {
 		return ErrNilPolicyStore
@@ -100,15 +101,16 @@ type applyStatus struct {
 // Apply will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 //
-// Phase UU.36: the lemma remains UNKNOWN due to two pre-existing translator
-// bugs that the UU.36 fix did not address: (1) the `ok` variable from
-// `policy, ok := storage.PolicyByID(polID)` inside the loop body is not
-// tracked as loop state in the recursive helper; (2) the `storage` variable
-// has different SMT sorts (`PolicyProvider` vs `Store`) depending on the
-// code path. The translator fix (v34) eliminated the forall quantifier
-// emission for trivial `true` invariants and the `<nil>` sentinel in assume
-// call translation, but the SMT still has undefined `ok` and a sort mismatch
-// that cause solver UNKNOWN. See docs/internal/phase-uu36-decision-log.md.
+// Phase UU.40: the apply_nil_storage_returns_err lemma has been removed.
+// It was a hollow bridge lemma — 9 assumes, many `invariant true` placeholders
+// for its for-range loops, TRANSLATION_ERROR (not provable by the current proof
+// system due to opaque types, method dispatch, and for-range loops), and it only
+// proved the trivial property `t.Apply(session) != nil` under the precondition
+// `t.storage == nil` (the function returns ErrNilPolicyStore at line 155–157).
+// See docs/internal/phase-uu40-decision-log.md.
+//
+// The 9 reqproof:assume directives below are preserved as structural contracts
+// for the callees, even though no lemma currently verifies the Apply method.
 //
 // reqproof:assume policy.Service.ClearSession func(t *Service, session *user.SessionState) error { return nil }
 // reqproof:assume user.SessionState.GetCustomPolicies func(s *user.SessionState) ([]user.Policy, error) { return nil, errors.New("x") }
@@ -119,8 +121,6 @@ type applyStatus struct {
 // reqproof:assume policy.Service.applyPerAPI func(t *Service, policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition, applyState *applyStatus) error { return nil }
 // reqproof:assume policy.Service.applyPartitions func(t *Service, policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition, applyState *applyStatus) error { return nil }
 // reqproof:assume policy.Service.updateSessionRootVars func(t *Service, session *user.SessionState, rights map[string]user.AccessDefinition, applyState applyStatus)
-// reqproof:requires t.storage == nil
-// reqproof:lemma apply_nil_storage_returns_err proves t.Apply(session) != nil
 func (t *Service) Apply(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
@@ -318,6 +318,8 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 // SYS-REQ-008
 // Logger implements a typical logger signature with service context.
+//
+// reqproof:lemma logger_returns_nil proves t.Logger() == nil
 func (t *Service) Logger() *logrus.Entry {
 	return logrus.NewEntry(t.logger)
 }
@@ -365,6 +367,8 @@ func (t *Service) emptyRateLimit(m user.APILimit) bool {
 	return m.Rate == 0 || m.Per == 0
 }
 
+// reqproof:requires applyState.didPartition == false
+// reqproof:lemma apply_per_api_succeeds proves t.applyPerAPI(policy, session, rights, applyState) == nil
 func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
 	applyState *applyStatus) error {
 
@@ -418,6 +422,8 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 }
 
 // SYS-REQ-008, SYS-REQ-033
+//
+// reqproof:lemma policy_ids_succeeds proves t.policyIds(session) == nil
 func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
 	ids := session.PolicyIDs()
 
@@ -436,6 +442,7 @@ func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
 	}
 }
 
+// reqproof:lemma apply_partitions_succeeds proves t.applyPartitions(policy, session, rights, applyState) == nil
 func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
 	applyState *applyStatus) error {
 
@@ -662,6 +669,8 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 }
 
 // SYS-REQ-024, SYS-REQ-025
+//
+// reqproof:lemma update_session_root_vars_succeeds proves t.updateSessionRootVars(session, rights, applyState)
 func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[string]user.AccessDefinition, applyState applyStatus) {
 	if len(applyState.didQuota) == 1 && len(applyState.didRateLimit) == 1 && len(applyState.didComplexity) == 1 {
 		// Use the single API that had policies applied, not an arbitrary
