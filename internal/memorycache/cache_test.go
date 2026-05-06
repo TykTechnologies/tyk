@@ -77,4 +77,6 @@ func BenchmarkCache_MemoryLeak(b *testing.B) {
 			time.Sleep(1 * time.Millisecond)
 		}
 	}
+	
+	b.ReportMetric(float64(cache.Count()), "items_left")
 }
