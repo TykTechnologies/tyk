@@ -10,27 +10,107 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func init() {
-	// json-logrus is added for benchmarks
-	formatterIndex["json-logrus"] = func() logrus.Formatter {
-		return &logrus.JSONFormatter{
-			TimestampFormat: time.RFC3339,
-		}
-	}
-}
-
 func TestNewFormatter(t *testing.T) {
-	textFormatter, ok := NewFormatter("").(*logrus.TextFormatter)
-	assert.NotNil(t, textFormatter)
-	assert.True(t, ok)
+	for _, typ := range []string{"text", "any_other_is_default", ""} {
+		textFormatter, ok := NewFormatter(Format(typ)).(*logrus.TextFormatter)
+		assert.NotNil(t, textFormatter)
+		assert.True(t, ok)
+		assert.Equal(t, time.RFC3339, textFormatter.TimestampFormat)
+	}
 
 	jsonFormatter, ok := NewFormatter("json").(*JSONFormatter)
 	assert.NotNil(t, jsonFormatter)
 	assert.True(t, ok)
+	assert.Equal(t, time.RFC3339, jsonFormatter.TimestampFormat)
 
-	jsonExtFormatter, ok := NewFormatter("json-logrus").(*logrus.JSONFormatter)
-	assert.NotNil(t, jsonExtFormatter)
+	legacyFormatter, ok := NewFormatter("legacy").(*logrus.TextFormatter)
 	assert.True(t, ok)
+	assert.NotNil(t, legacyFormatter)
+	assert.Equal(t, LegacyTimestampFormat, legacyFormatter.TimestampFormat)
+	assert.True(t, legacyFormatter.FullTimestamp)
+	assert.True(t, legacyFormatter.DisableColors)
+}
+
+func Test_SetupFormatter(t *testing.T) {
+	resetLogger := func(t *testing.T) {
+		t.Helper()
+
+		tykFormatter := log.Formatter
+		globalFormatter := logrus.StandardLogger().Formatter
+
+		log.Formatter = nil
+		logrus.StandardLogger().Formatter = nil
+
+		t.Cleanup(func() {
+			log.Formatter = tykFormatter
+			logrus.StandardLogger().Formatter = globalFormatter
+		})
+	}
+
+	type Formatters struct {
+		tyk logrus.Formatter
+		std logrus.Formatter
+	}
+
+	formatters := func(t *testing.T) Formatters {
+		t.Helper()
+
+		return Formatters{
+			std: logrus.StandardLogger().Formatter,
+			tyk: log.Formatter,
+		}
+	}
+
+	t.Run("empty or unknown or text value sets default text formatter; global tyk and global logrus formatters", func(t *testing.T) {
+		t.Run("empty", func(t *testing.T) {
+			resetLogger(t)
+			SetupFormatter("")
+			f := formatters(t)
+			assert.Same(t, f.tyk, f.std)
+			assert.NotNil(t, f.std)
+			assert.NotNil(t, f.tyk)
+			assert.Equal(t, newFormatterText(), f.tyk)
+		})
+
+		t.Run("any other", func(t *testing.T) {
+			resetLogger(t)
+			SetupFormatter("hwdp")
+			f := formatters(t)
+			assert.Same(t, f.tyk, f.std)
+			assert.NotNil(t, f.std)
+			assert.NotNil(t, f.tyk)
+			assert.Equal(t, newFormatterText(), f.tyk)
+		})
+
+		t.Run("text", func(t *testing.T) {
+			resetLogger(t)
+			SetupFormatter(FormatText)
+			f := formatters(t)
+			assert.Same(t, f.tyk, f.std)
+			assert.NotNil(t, f.std)
+			assert.NotNil(t, f.tyk)
+			assert.Equal(t, newFormatterText(), f.tyk)
+		})
+	})
+
+	t.Run("json formatter", func(t *testing.T) {
+		resetLogger(t)
+		SetupFormatter(FormatJson)
+		f := formatters(t)
+		assert.Same(t, f.tyk, f.std)
+		assert.NotNil(t, f.std)
+		assert.NotNil(t, f.tyk)
+		assert.Equal(t, newFormatterJson(), f.tyk)
+	})
+
+	t.Run("legacy formatter does not modify std logrus formatter", func(t *testing.T) {
+		resetLogger(t)
+		SetupFormatter(FormatLegacy)
+		f := formatters(t)
+		assert.Nil(t, f.std)    // does not set formatter for std logger
+		assert.NotNil(t, f.tyk) // does not set formatter for std logger
+		assert.Equal(t, newFormatterLegacy(), f.tyk)
+	})
 }
 
 type testFormatter struct{}
@@ -41,13 +121,13 @@ func (*testFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 
 func BenchmarkFormatter(b *testing.B) {
 	b.Run("json", func(b *testing.B) {
-		benchmarkFormatter(b, NewFormatter("json"))
+		benchmarkFormatter(b, newFormatterJson())
 	})
 	b.Run("json-logrus", func(b *testing.B) {
-		benchmarkFormatter(b, NewFormatter("json-logrus"))
+		benchmarkFormatter(b, newFormatterLogrusJson())
 	})
-	b.Run("default", func(b *testing.B) {
-		benchmarkFormatter(b, NewFormatter(""))
+	b.Run("text/default", func(b *testing.B) {
+		benchmarkFormatter(b, newFormatterText())
 	})
 	b.Run("none", func(b *testing.B) {
 		benchmarkFormatter(b, &testFormatter{})
