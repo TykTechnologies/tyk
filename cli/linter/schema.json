@@ -964,7 +964,7 @@
     },
     "log_format": {
       "type": "string",
-      "enum": ["", "standard", "json"]
+      "enum": ["", "text", "json", "legacy"]
     },
     "access_logs": {
       "type": ["object", "null"],
