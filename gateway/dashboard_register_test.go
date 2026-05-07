@@ -183,6 +183,101 @@ func TestRegister_Retries(t *testing.T) {
 	}
 }
 
+func Test_parseRegistrationResponse(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+		val        NodeResponse
+		wantNodeID string
+		wantOK     bool
+	}{
+		{
+			name:       "200 with valid NodeID",
+			statusCode: http.StatusOK,
+			val:        NodeResponse{Status: "OK", Message: map[string]any{"NodeID": "node-1"}},
+			wantNodeID: "node-1",
+			wantOK:     true,
+		},
+		{
+			name:       "409 with Status OK and valid NodeID",
+			statusCode: http.StatusConflict,
+			val:        NodeResponse{Status: "OK", Message: map[string]any{"NodeID": "node-already"}},
+			wantNodeID: "node-already",
+			wantOK:     true,
+		},
+		{
+			name:       "409 with Status not OK triggers retry",
+			statusCode: http.StatusConflict,
+			val:        NodeResponse{Status: "Error", Message: "lock contention"},
+			wantNodeID: "",
+			wantOK:     false,
+		},
+		{
+			name:       "non-map Message triggers retry",
+			statusCode: http.StatusOK,
+			val:        NodeResponse{Status: "OK", Message: "unexpected string"},
+			wantNodeID: "",
+			wantOK:     false,
+		},
+		{
+			name:       "nil Message triggers retry",
+			statusCode: http.StatusOK,
+			val:        NodeResponse{Status: "OK", Message: nil},
+			wantNodeID: "",
+			wantOK:     false,
+		},
+		{
+			name:       "map Message missing NodeID triggers retry",
+			statusCode: http.StatusOK,
+			val:        NodeResponse{Status: "OK", Message: map[string]any{"Other": "value"}},
+			wantNodeID: "",
+			wantOK:     false,
+		},
+		{
+			name:       "map Message with empty NodeID triggers retry",
+			statusCode: http.StatusOK,
+			val:        NodeResponse{Status: "OK", Message: map[string]any{"NodeID": ""}},
+			wantNodeID: "",
+			wantOK:     false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotNodeID, gotOK := parseRegistrationResponse(tc.statusCode, tc.val)
+			assert.Equal(t, tc.wantOK, gotOK)
+			assert.Equal(t, tc.wantNodeID, gotNodeID)
+		})
+	}
+}
+
+func TestAttemptRegistration_InvalidJSON(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte("not-valid-json"))
+		require.NoError(t, err)
+	}))
+	defer srv.Close()
+
+	h, close := newTestDashboardHandler(t, srv.URL)
+	defer close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := h.Register(ctx)
+	assert.Error(t, err)
+}
+
+func TestNewRequestWithContext_InvalidURL_Panics(t *testing.T) {
+	h, close := newTestDashboardHandler(t, "http://localhost")
+	defer close()
+
+	assert.Panics(t, func() {
+		h.newRequestWithContext(context.Background(), "INVALID METHOD", "://bad-url")
+	})
+}
+
 func Test_DashboardLifecycle(t *testing.T) {
 	var handler HTTPDashboardHandler
 
