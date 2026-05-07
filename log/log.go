@@ -14,6 +14,18 @@ var (
 	translations = make(map[string]string)
 )
 
+type Format string
+
+const (
+	FormatText   Format = "text"
+	FormatJson   Format = "json"
+	FormatLegacy Format = "legacy"
+)
+
+const (
+	LegacyTimestampFormat = "Jan 02 15:04:05"
+)
+
 // RawFormatter returns the logrus entry message as bytes.
 type RawFormatter struct{}
 
@@ -46,16 +58,25 @@ var logLevels = map[string]logrus.Level{
 }
 
 func setupGlobals() {
-	format := getenv("TYK_LOGFORMAT", "TYK_GW_LOGFORMAT")
-	logLevel := getenv("TYK_LOGLEVEL", "TYK_GW_LOGLEVEL")
+	format := Format(getenv("TYK_LOGFORMAT", "TYK_GW_LOGFORMAT"))
+	SetupFormatter(format)
 
-	log.Formatter = NewFormatter(format)
+	logLevel := getenv("TYK_LOGLEVEL", "TYK_GW_LOGLEVEL")
 
 	if level, ok := logLevels[logLevel]; ok {
 		log.Level = level
 	}
 
 	rawLog.Formatter = new(RawFormatter)
+}
+
+func SetupFormatter(format Format) {
+	log.Formatter = NewFormatter(format)
+
+	// non legacy formatter does not set up global logrus formatter
+	if format != FormatLegacy {
+		logrus.StandardLogger().Formatter = log.Formatter
+	}
 }
 
 // Get returns the default configured logger.
@@ -68,29 +89,43 @@ func GetRaw() *logrus.Logger {
 	return rawLog
 }
 
-// formatterIndex serves as a list of formatters supported.
-// it can be extended from test scope for benchmark purposes.
-var (
-	formatterIndex = map[string]func() logrus.Formatter{
-		"default": func() logrus.Formatter {
-			return &logrus.TextFormatter{
-				TimestampFormat: "Jan 02 15:04:05",
-				FullTimestamp:   true,
-				DisableColors:   true,
-			}
-		},
-		"json": func() logrus.Formatter {
-			return &JSONFormatter{
-				TimestampFormat: time.RFC3339,
-			}
-		},
+func NewFormatter(format Format) logrus.Formatter {
+	switch format {
+	case FormatLegacy:
+		return newFormatterLegacy()
+	case FormatJson:
+		return newFormatterJson()
+	case FormatText:
+		return newFormatterText()
+	default:
+		return newFormatterText()
 	}
-)
+}
 
-func NewFormatter(format string) logrus.Formatter {
-	ctor, ok := formatterIndex[format]
-	if !ok {
-		ctor, _ = formatterIndex["default"]
+func newFormatterText() logrus.Formatter {
+	return &logrus.TextFormatter{
+		TimestampFormat: time.RFC3339,
+		FullTimestamp:   true,
+		DisableColors:   true,
 	}
-	return ctor()
+}
+
+func newFormatterJson() logrus.Formatter {
+	return &JSONFormatter{
+		TimestampFormat: time.RFC3339,
+	}
+}
+
+func newFormatterLogrusJson() logrus.Formatter {
+	return &logrus.JSONFormatter{
+		TimestampFormat: time.RFC3339,
+	}
+}
+
+func newFormatterLegacy() logrus.Formatter {
+	return &logrus.TextFormatter{
+		TimestampFormat: LegacyTimestampFormat,
+		FullTimestamp:   true,
+		DisableColors:   true,
+	}
 }
