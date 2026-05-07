@@ -985,7 +985,7 @@ func (gw *Gateway) registerMCPPRMSuffixRoutes(spec *APISpec, router *mux.Router)
 	// request with `invalid_target` because mcp-remote sends the
 	// gateway URL as the resource (per the mirrored PRM doc) but the
 	// upstream AS only knows the upstream URL.
-	if prm.IsMirrorMode() {
+	if prm.IsMirrorMode(spec.IsMCP()) {
 		gw.registerMCPASProxyRoutes(spec, router)
 	}
 }
@@ -1025,7 +1025,7 @@ func (gw *Gateway) mcpPRMSuffixHandler(spec *APISpec) http.HandlerFunc {
 			http.NotFound(w, r)
 			return
 		}
-		if prm.IsMirrorMode() {
+		if prm.IsMirrorMode(spec.IsMCP()) {
 			if err := mw.serveMirroredPRM(w, r, prm); err != nil {
 				log.WithError(err).Warn("PRM mirror failed at suffix route")
 				http.Error(w, "upstream PRM unavailable", http.StatusBadGateway)

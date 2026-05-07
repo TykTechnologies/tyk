@@ -120,10 +120,14 @@ type ProtectedResourceMetadata struct {
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// Mode selects how Tyk produces the PRM document.
-	//   - "" or "static" (default): assemble the doc from the fields below.
+	//   - "static": assemble the doc from the fields below.
 	//   - "mirror": fetch the upstream's PRM doc, rewrite the `resource`
 	//     field to the gateway URL the client connects to, serve that.
 	//     Used for transparent proxying of OAuth-protected remote MCPs.
+	//
+	// When empty, the mode is inferred (see EffectiveMode): MCP APIs with
+	// no `resource` set default to mirror, everything else defaults to
+	// static. Set explicitly to override.
 	Mode string `bson:"mode,omitempty" json:"mode,omitempty"`
 
 	// UpstreamPRMUrl optionally overrides where mirror-mode fetches from.
@@ -148,17 +152,45 @@ type ProtectedResourceMetadata struct {
 	ScopesSupported []string `bson:"scopesSupported,omitempty" json:"scopesSupported,omitempty"`
 }
 
+// EffectiveMode resolves the PRM mode after applying defaults.
+//
+// When `Mode` is set explicitly it always wins. When it's empty the mode
+// is inferred from the configuration shape:
+//
+//   - `Resource` set → static (preserves the pre-mirror behaviour for
+//     anyone who configured static fields without an explicit mode).
+//   - `Resource` empty AND the API is MCP → mirror, so users who just
+//     `enabled: true` on an MCP API get auto-discovery for free.
+//   - `Resource` empty AND non-MCP → static (will fail validation as
+//     before — non-MCP APIs need either a resource or explicit
+//     `mode: "static"` with one).
+//
+// The shape-based default keeps existing static-mode users on the same
+// path while letting new MCP users skip the boilerplate.
+func (prm *ProtectedResourceMetadata) EffectiveMode(isMCP bool) string {
+	if prm == nil {
+		return ""
+	}
+	if prm.Mode != "" {
+		return prm.Mode
+	}
+	if prm.Resource == "" && isMCP {
+		return PRMModeMirror
+	}
+	return PRMModeStatic
+}
+
 // Validate validates the ProtectedResourceMetadata configuration.
-// When isMCP is true, static mode requires authorizationServers.
-// Mirror mode skips the static-field requirements — the upstream's PRM
-// supplies them at request time.
+// Static mode requires `resource`, and additionally requires
+// `authorizationServers` for MCP APIs. Mirror mode skips the static-field
+// requirements — the upstream's PRM supplies them at request time.
 func (prm *ProtectedResourceMetadata) Validate(isMCP bool) error {
 	if prm == nil || !prm.Enabled {
 		return nil
 	}
 
-	switch prm.Mode {
-	case "", PRMModeStatic:
+	switch prm.EffectiveMode(isMCP) {
+	case PRMModeStatic:
 		if prm.Resource == "" {
 			return errors.New("protectedResourceMetadata.resource is required when enabled")
 		}
@@ -178,9 +210,10 @@ func (prm *ProtectedResourceMetadata) Validate(isMCP bool) error {
 	return nil
 }
 
-// IsMirrorMode reports whether the PRM should mirror the upstream's doc.
-func (prm *ProtectedResourceMetadata) IsMirrorMode() bool {
-	return prm != nil && prm.Enabled && prm.Mode == PRMModeMirror
+// IsMirrorMode reports whether the PRM should mirror the upstream's doc,
+// applying the MCP-aware default for empty mode (see EffectiveMode).
+func (prm *ProtectedResourceMetadata) IsMirrorMode(isMCP bool) bool {
+	return prm != nil && prm.Enabled && prm.EffectiveMode(isMCP) == PRMModeMirror
 }
 
 // GetWellKnownPath returns the well-known path for the PRM endpoint,

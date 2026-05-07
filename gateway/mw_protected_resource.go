@@ -52,7 +52,7 @@ func (m *PRMMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	}
 
 	// Mirror mode: fetch from upstream, rewrite resource, serve.
-	if prm.IsMirrorMode() {
+	if prm.IsMirrorMode(m.Spec.IsMCP()) {
 		if err := m.serveMirroredPRM(w, r, prm); err != nil {
 			log.WithError(err).Warn("PRM mirror failed; passing through to upstream")
 			return nil, http.StatusOK

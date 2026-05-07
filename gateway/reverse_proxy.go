@@ -442,17 +442,28 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	return transport
 }
 
-// augmentMCPWWWAuthenticate appends a `resource_metadata=` parameter to the
-// upstream's `WWW-Authenticate` header when the API is MCP, has PRM
-// enabled, and the upstream returned a bare Bearer challenge that didn't
-// already advertise its metadata URL. This is the hint MCP clients
-// (mcp-remote, Claude Desktop) need to find the gateway-served PRM doc
-// when the upstream itself doesn't include the parameter (e.g. Atlassian
-// Rovo as of 2026-Q2).
+// augmentMCPWWWAuthenticate rewrites the upstream's `WWW-Authenticate`
+// header so its `resource_metadata=` parameter points at the gateway-
+// served PRM URL instead of the upstream's. MCP clients (mcp-remote,
+// Claude Desktop) follow that URL to learn which authorization server
+// protects the resource — and validate the doc's `resource` field
+// against the URL the client actually connected to (RFC 9728 §3.3).
+// Pointing them at the upstream's PRM (the default for spec-compliant
+// upstreams like Notion) makes that origin check fail, so we substitute
+// the gateway URL whenever PRM mirror mode is active for the API.
+//
+// If the upstream's challenge has no `resource_metadata=` at all (e.g.
+// Atlassian Rovo as of 2026-Q2), we append one. Either way the client
+// ends up pointed at our PRM endpoint.
+//
+// `inboundReq` must be the original inbound request (pre-director), so we
+// can build the metadata URL from the gateway's scheme/host — not the
+// upstream's, which is what `res.Request` carries after the proxy
+// director rewrites the URL.
 //
 // No-op for non-MCP APIs, non-401 responses, or APIs without PRM
-// configured. Does not overwrite an existing `resource_metadata=` value.
-func augmentMCPWWWAuthenticate(res *http.Response, spec *APISpec) {
+// configured.
+func augmentMCPWWWAuthenticate(res *http.Response, inboundReq *http.Request, spec *APISpec) {
 	if res == nil || res.StatusCode != http.StatusUnauthorized {
 		return
 	}
@@ -464,29 +475,35 @@ func augmentMCPWWWAuthenticate(res *http.Response, spec *APISpec) {
 		return
 	}
 	existing := res.Header.Get(header.WWWAuthenticate)
-	if existing == "" || strings.Contains(strings.ToLower(existing), "resource_metadata=") {
+	if existing == "" {
+		return
+	}
+	if inboundReq == nil {
 		return
 	}
 
-	// Build the gateway-side PRM URL. We don't know the request scheme
-	// here (the response originates from the upstream), so we trust
-	// res.Request, which carries the original inbound URL via the
-	// reverse-proxy director.
-	if res.Request == nil || res.Request.URL == nil {
-		return
-	}
-	scheme := "http"
-	if res.Request.TLS != nil || strings.EqualFold(res.Request.URL.Scheme, "https") {
-		scheme = "https"
-	}
-	host := res.Request.Host
-	if host == "" {
-		host = res.Request.URL.Host
+	scheme := httputil.RequestScheme(inboundReq)
+	host := inboundReq.Host
+	if host == "" && inboundReq.URL != nil {
+		host = inboundReq.URL.Host
 	}
 	listen := strings.TrimRight(spec.Proxy.ListenPath, "/")
 	prmURL := fmt.Sprintf("%s://%s/.well-known/oauth-protected-resource%s", scheme, host, listen)
 
-	res.Header.Set(header.WWWAuthenticate, fmt.Sprintf(`%s, resource_metadata="%s"`, existing, prmURL))
+	res.Header.Set(header.WWWAuthenticate, replaceOrAppendResourceMetadata(existing, prmURL))
+}
+
+// replaceOrAppendResourceMetadata returns a `WWW-Authenticate` value with
+// its `resource_metadata="…"` parameter set to `prmURL`. If the parameter
+// is already present (regardless of value), it's substituted in place;
+// otherwise the parameter is appended.
+func replaceOrAppendResourceMetadata(header, prmURL string) string {
+	rxResourceMetadata := regexp.MustCompile(`(?i)resource_metadata="[^"]*"`)
+	replacement := fmt.Sprintf(`resource_metadata="%s"`, prmURL)
+	if rxResourceMetadata.MatchString(header) {
+		return rxResourceMetadata.ReplaceAllString(header, replacement)
+	}
+	return header + ", " + replacement
 }
 
 func singleJoiningSlash(targetPath, subPath string, disableStripSlash bool) string {
@@ -1488,6 +1505,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// We should at least copy the status code in
 	inres.StatusCode = res.StatusCode
 	inres.ContentLength = res.ContentLength
+
+	// Augment the upstream's WWW-Authenticate (RFC 9728 hint for MCP
+	// clients) using the inbound request so we build the gateway URL,
+	// not the rewritten upstream one. Must run before HandleResponse,
+	// which copies res.Header into rw.Header.
+	augmentMCPWWWAuthenticate(res, logreq, p.TykAPISpec)
+
 	p.HandleResponse(rw, res, ses)
 	return ProxyResponse{UpstreamLatency: upstreamLatency, Response: inres}
 }
@@ -1514,8 +1538,6 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	}
 
 	p.Gw.limitHeaderFactory(res.Header).SendQuotas(ses, p.TykAPISpec.APIID)
-
-	augmentMCPWWWAuthenticate(res, p.TykAPISpec)
 
 	copyHeader(rw.Header(), res.Header, p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 

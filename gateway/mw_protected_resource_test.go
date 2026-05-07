@@ -1009,34 +1009,62 @@ func TestAugmentMCPWWWAuthenticate(t *testing.T) {
 
 	t.Run("appends resource_metadata when missing", func(t *testing.T) {
 		res := mkResponse(http.StatusUnauthorized, `Bearer realm="OAuth"`)
-		augmentMCPWWWAuthenticate(res, mkSpec(true, true))
+		augmentMCPWWWAuthenticate(res, res.Request, mkSpec(true, true))
 		got := res.Header.Get(header.WWWAuthenticate)
 		assert.Contains(t, got, `Bearer realm="OAuth"`)
 		assert.Contains(t, got, `resource_metadata="http://gw.example/.well-known/oauth-protected-resource/jira"`)
 	})
 
-	t.Run("preserves existing resource_metadata", func(t *testing.T) {
+	t.Run("overwrites upstream resource_metadata to gateway URL", func(t *testing.T) {
+		// MCP clients (RFC 9728 §3.3) validate the PRM doc's `resource`
+		// field against the URL they connected to (the gateway). If the
+		// upstream advertises its own URL via resource_metadata, the
+		// origin check fails. Mirror mode redirects the client at our
+		// own PRM endpoint instead.
 		original := `Bearer realm="OAuth", resource_metadata="https://upstream.example/.well-known/oauth-protected-resource/x"`
 		res := mkResponse(http.StatusUnauthorized, original)
-		augmentMCPWWWAuthenticate(res, mkSpec(true, true))
-		assert.Equal(t, original, res.Header.Get(header.WWWAuthenticate))
+		augmentMCPWWWAuthenticate(res, res.Request, mkSpec(true, true))
+		got := res.Header.Get(header.WWWAuthenticate)
+		assert.Contains(t, got, `Bearer realm="OAuth"`)
+		assert.Contains(t, got, `resource_metadata="http://gw.example/.well-known/oauth-protected-resource/jira"`)
+		assert.NotContains(t, got, "upstream.example")
 	})
 
 	t.Run("noop on non-401", func(t *testing.T) {
 		res := mkResponse(http.StatusOK, `Bearer realm="OAuth"`)
-		augmentMCPWWWAuthenticate(res, mkSpec(true, true))
+		augmentMCPWWWAuthenticate(res, res.Request, mkSpec(true, true))
 		assert.Equal(t, `Bearer realm="OAuth"`, res.Header.Get(header.WWWAuthenticate))
 	})
 
 	t.Run("noop on non-MCP", func(t *testing.T) {
 		res := mkResponse(http.StatusUnauthorized, `Bearer realm="OAuth"`)
-		augmentMCPWWWAuthenticate(res, mkSpec(false, true))
+		augmentMCPWWWAuthenticate(res, res.Request, mkSpec(false, true))
 		assert.Equal(t, `Bearer realm="OAuth"`, res.Header.Get(header.WWWAuthenticate))
 	})
 
-	t.Run("noop when PRM not configured", func(t *testing.T) {
+	t.Run("MCP API with no explicit PRM still augments (default mirror)", func(t *testing.T) {
+		// Mirror is the implicit default for MCP APIs without an
+		// explicit PRM block, so augmentation should fire.
 		res := mkResponse(http.StatusUnauthorized, `Bearer realm="OAuth"`)
-		augmentMCPWWWAuthenticate(res, mkSpec(true, false))
+		augmentMCPWWWAuthenticate(res, res.Request, mkSpec(true, false))
+		got := res.Header.Get(header.WWWAuthenticate)
+		assert.Contains(t, got, `resource_metadata="http://gw.example/.well-known/oauth-protected-resource/jira"`)
+	})
+
+	t.Run("noop when PRM explicitly disabled", func(t *testing.T) {
+		s := &APISpec{APIDefinition: &apidef.APIDefinition{IsOAS: true}}
+		s.Proxy.ListenPath = "/jira/"
+		s.MarkAsMCP()
+		s.OAS.SetTykExtension(&oas.XTykAPIGateway{
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{Value: "/jira/"},
+				Authentication: &oas.Authentication{
+					ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{Enabled: false},
+				},
+			},
+		})
+		res := mkResponse(http.StatusUnauthorized, `Bearer realm="OAuth"`)
+		augmentMCPWWWAuthenticate(res, res.Request, s)
 		assert.Equal(t, `Bearer realm="OAuth"`, res.Header.Get(header.WWWAuthenticate))
 	})
 }
