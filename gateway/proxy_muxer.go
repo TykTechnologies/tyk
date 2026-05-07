@@ -21,6 +21,7 @@ import (
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/tcp"
 
 	"github.com/gorilla/mux"
@@ -210,21 +211,21 @@ func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router, conf
 
 func (m *proxyMux) handle404(w http.ResponseWriter, r *http.Request) {
 	if m.track404Logs {
-		requestMeta := fmt.Sprintf("%s %s %s", r.Method, r.URL.Path, r.Proto)
-
-		conf := config.Global()
-		controlPort := conf.ControlAPIPort
-		if controlPort != 0 && controlPort != conf.ListenPort {
-			log.WithField("request", requestMeta).WithField("origin", r.RemoteAddr).WithField("host", r.Host).
-				Error(http.StatusText(http.StatusNotFound))
-		} else {
-			log.WithField("request", requestMeta).WithField("origin", r.RemoteAddr).
-				Error(http.StatusText(http.StatusNotFound))
-		}
+		entry := getLogEntryFor404(r)
+		entry.Error(http.StatusText(http.StatusNotFound))
 	}
 
 	w.WriteHeader(http.StatusNotFound)
 	_, _ = fmt.Fprint(w, http.StatusText(http.StatusNotFound))
+}
+
+func getLogEntryFor404(r *http.Request) *logrus.Entry {
+	requestMeta := fmt.Sprintf("%s %s %s", r.Method, r.URL.Path, r.Proto)
+	if !tyklog.IsLegacyFormatter(log.Formatter) {
+		return log.WithField("request", requestMeta).WithField("origin", r.RemoteAddr).WithField("host", r.Host)
+	}
+
+	return log.WithField("request", requestMeta).WithField("origin", r.RemoteAddr)
 }
 
 func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier, gw *Gateway) {
