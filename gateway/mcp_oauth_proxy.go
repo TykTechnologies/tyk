@@ -112,8 +112,8 @@ func (gw *Gateway) authorizeProxyHandler(spec *APISpec) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		realAuthorize, _ := metadata["authorization_endpoint"].(string)
-		if realAuthorize == "" {
+		realAuthorize, ok := metadata["authorization_endpoint"].(string)
+		if !ok || realAuthorize == "" {
 			http.Error(w, errUpstreamMissingAuthorizeEP, http.StatusBadGateway)
 			return
 		}
@@ -151,8 +151,8 @@ func (gw *Gateway) tokenProxyHandler(spec *APISpec) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		realToken, _ := metadata["token_endpoint"].(string)
-		if realToken == "" {
+		realToken, ok := metadata["token_endpoint"].(string)
+		if !ok || realToken == "" {
 			http.Error(w, errUpstreamMissingTokenEP, http.StatusBadGateway)
 			return
 		}
@@ -226,7 +226,10 @@ func (gw *Gateway) firstAuthorizationServer(ctx context.Context, spec *APISpec) 
 	if err != nil {
 		return "", err
 	}
-	servers, _ := doc.Raw["authorization_servers"].([]any)
+	servers, ok := doc.Raw["authorization_servers"].([]any)
+	if !ok {
+		return "", fmt.Errorf("upstream PRM has no authorization_servers")
+	}
 	for _, s := range servers {
 		if str, ok := s.(string); ok && str != "" {
 			return str, nil

@@ -740,13 +740,14 @@ func TestPRMMirrorMode_SuffixRoute(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/.well-known/oauth-protected-resource/v1/mcp/authv2" {
 			w.Header().Set("Content-Type", "application/json")
+			//nolint:errcheck // test fixture; HTTP response Write failure not actionable here
 			_, _ = io.WriteString(w, `{
 				"resource": "https://upstream.example/v1/mcp/authv2",
 				"authorization_servers": ["https://auth.upstream.example/tenant"],
 				"bearer_methods_supported": ["header"],
 				"scopes_supported": ["read:foo", "write:foo"],
 				"resource_documentation": "https://upstream.example/docs"
-			}`) //nolint:errcheck
+			}`)
 			return
 		}
 		// Protocol traffic: 401 with bare bearer challenge.
