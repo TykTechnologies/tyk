@@ -18,6 +18,17 @@ import (
 // enabled. The shape is `<gateway-root>/__tyk-as/<api-id>/...`.
 const mcpASProxyPathPrefix = "/__tyk-as/"
 
+// Bad-gateway error messages emitted when the upstream authorization
+// server is unreachable or its metadata document is missing/malformed.
+// Defined as constants to keep the three handlers in this file consistent.
+const (
+	errUpstreamASUnavailable       = "upstream authorization server unavailable"
+	errUpstreamASMetadataUnavail   = "upstream AS metadata unavailable"
+	errUpstreamMissingAuthorizeEP  = "upstream metadata missing authorization_endpoint"
+	errUpstreamMissingTokenEP      = "upstream metadata missing token_endpoint"
+	errInvalidUpstreamAuthorizeURL = "invalid upstream authorization_endpoint"
+)
+
 // mcpASProxyBaseURL builds the public URL Tyk advertises as the
 // authorization server in a mirrored PRM doc. It is per-API so each MCP
 // proxy gets its own scope under the gateway root.
@@ -47,6 +58,26 @@ func rewriteResourceParam(values url.Values, spec *APISpec) {
 	values.Set("resource", upstreamResourceURL(spec))
 }
 
+// resolveUpstreamASMetadata fetches the upstream's authorization-server
+// metadata document and writes the appropriate 502 error to w if either
+// resolving the AS URL or fetching its metadata fails. Returns ok=false
+// in those cases — the caller stops processing the request.
+func (gw *Gateway) resolveUpstreamASMetadata(w http.ResponseWriter, r *http.Request, spec *APISpec) (metadata map[string]any, ok bool) {
+	asURL, err := gw.firstAuthorizationServer(r.Context(), spec)
+	if err != nil {
+		log.WithError(err).Warn("AS proxy: cannot resolve upstream authorization server")
+		http.Error(w, errUpstreamASUnavailable, http.StatusBadGateway)
+		return nil, false
+	}
+	metadata, err = fetchUpstreamASMetadata(r.Context(), asURL)
+	if err != nil {
+		log.WithError(err).Warn("AS proxy: cannot fetch upstream metadata")
+		http.Error(w, errUpstreamASMetadataUnavail, http.StatusBadGateway)
+		return nil, false
+	}
+	return metadata, true
+}
+
 // serveASProxyMetadata fetches the upstream Authorization Server metadata
 // document, rewrites `authorization_endpoint` and `token_endpoint` to
 // point at Tyk's per-API proxy endpoints, and serves the result.
@@ -56,17 +87,8 @@ func rewriteResourceParam(values url.Values, spec *APISpec) {
 // rewrite there, and avoiding the proxy keeps the DCR flow minimal.
 func (gw *Gateway) serveASProxyMetadata(spec *APISpec) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		asURL, err := gw.firstAuthorizationServer(r.Context(), spec)
-		if err != nil {
-			log.WithError(err).Warn("AS proxy: cannot resolve upstream authorization server")
-			http.Error(w, "upstream authorization server unavailable", http.StatusBadGateway)
-			return
-		}
-
-		metadata, err := fetchUpstreamASMetadata(r.Context(), asURL)
-		if err != nil {
-			log.WithError(err).Warn("AS proxy: cannot fetch upstream metadata")
-			http.Error(w, "upstream AS metadata unavailable", http.StatusBadGateway)
+		metadata, ok := gw.resolveUpstreamASMetadata(w, r, spec)
+		if !ok {
 			return
 		}
 
@@ -84,42 +106,38 @@ func (gw *Gateway) serveASProxyMetadata(spec *APISpec) http.HandlerFunc {
 // parameter so the upstream AS recognises it.
 func (gw *Gateway) authorizeProxyHandler(spec *APISpec) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		asURL, err := gw.firstAuthorizationServer(r.Context(), spec)
-		if err != nil {
-			http.Error(w, "upstream authorization server unavailable", http.StatusBadGateway)
-			return
-		}
-		metadata, err := fetchUpstreamASMetadata(r.Context(), asURL)
-		if err != nil {
-			http.Error(w, "upstream AS metadata unavailable", http.StatusBadGateway)
+		metadata, ok := gw.resolveUpstreamASMetadata(w, r, spec)
+		if !ok {
 			return
 		}
 		realAuthorize, _ := metadata["authorization_endpoint"].(string)
 		if realAuthorize == "" {
-			http.Error(w, "upstream metadata missing authorization_endpoint", http.StatusBadGateway)
+			http.Error(w, errUpstreamMissingAuthorizeEP, http.StatusBadGateway)
 			return
 		}
-
 		target, err := url.Parse(realAuthorize)
 		if err != nil {
-			http.Error(w, "invalid upstream authorization_endpoint", http.StatusBadGateway)
+			http.Error(w, errInvalidUpstreamAuthorizeURL, http.StatusBadGateway)
 			return
 		}
 
-		q := r.URL.Query()
-		rewriteResourceParam(q, spec)
-		// Merge any query already present on the upstream authorize URL.
-		if upstreamQ := target.Query(); len(upstreamQ) > 0 {
-			for k, vs := range upstreamQ {
-				if _, ok := q[k]; !ok {
-					q[k] = vs
-				}
-			}
-		}
-		target.RawQuery = q.Encode()
-
+		target.RawQuery = mergedAuthorizeQuery(r.URL.Query(), target.Query(), spec).Encode()
 		http.Redirect(w, r, target.String(), http.StatusFound)
 	}
+}
+
+// mergedAuthorizeQuery returns the query string Tyk forwards to the
+// upstream authorize endpoint: the client's params with `resource`
+// rewritten to the upstream URL, plus any params that were preset on the
+// upstream's authorize URL itself (which the client wouldn't have sent).
+func mergedAuthorizeQuery(clientQ, upstreamQ url.Values, spec *APISpec) url.Values {
+	rewriteResourceParam(clientQ, spec)
+	for k, vs := range upstreamQ {
+		if _, present := clientQ[k]; !present {
+			clientQ[k] = vs
+		}
+	}
+	return clientQ
 }
 
 // tokenProxyHandler forwards the client's token request to the upstream
@@ -127,19 +145,13 @@ func (gw *Gateway) authorizeProxyHandler(spec *APISpec) http.HandlerFunc {
 // Returns the upstream response unmodified.
 func (gw *Gateway) tokenProxyHandler(spec *APISpec) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		asURL, err := gw.firstAuthorizationServer(r.Context(), spec)
-		if err != nil {
-			http.Error(w, "upstream authorization server unavailable", http.StatusBadGateway)
-			return
-		}
-		metadata, err := fetchUpstreamASMetadata(r.Context(), asURL)
-		if err != nil {
-			http.Error(w, "upstream AS metadata unavailable", http.StatusBadGateway)
+		metadata, ok := gw.resolveUpstreamASMetadata(w, r, spec)
+		if !ok {
 			return
 		}
 		realToken, _ := metadata["token_endpoint"].(string)
 		if realToken == "" {
-			http.Error(w, "upstream metadata missing token_endpoint", http.StatusBadGateway)
+			http.Error(w, errUpstreamMissingTokenEP, http.StatusBadGateway)
 			return
 		}
 
@@ -152,37 +164,53 @@ func (gw *Gateway) tokenProxyHandler(spec *APISpec) http.HandlerFunc {
 		rewriteResourceParam(r.PostForm, spec)
 		rewriteResourceParam(r.Form, spec)
 
-		body := r.PostForm.Encode()
-
 		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 		defer cancel()
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, realToken, strings.NewReader(body))
+		req, err := buildTokenRequest(ctx, r, realToken, r.PostForm.Encode())
 		if err != nil {
 			http.Error(w, "cannot build upstream token request", http.StatusInternalServerError)
 			return
 		}
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req.Header.Set("Accept", r.Header.Get("Accept"))
-		// Forward Authorization (e.g. confidential client credentials) if present.
-		if v := r.Header.Get("Authorization"); v != "" {
-			req.Header.Set("Authorization", v)
-		}
-
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			http.Error(w, "upstream token endpoint unreachable", http.StatusBadGateway)
 			return
 		}
 		defer resp.Body.Close()
-
-		for k, vs := range resp.Header {
-			for _, v := range vs {
-				w.Header().Add(k, v)
-			}
-		}
-		w.WriteHeader(resp.StatusCode)
-		_, _ = io.Copy(w, resp.Body)
+		writeUpstreamResponse(w, resp)
 	}
+}
+
+// buildTokenRequest constructs the upstream token-endpoint POST. Carries
+// over Accept and Authorization (for confidential clients with basic-auth
+// credentials) from the inbound request. The caller owns the context's
+// lifetime — typically WithTimeout + defer cancel() — so the in-flight
+// request isn't cancelled the moment this function returns.
+func buildTokenRequest(ctx context.Context, in *http.Request, tokenURL, body string) (*http.Request, error) {
+	out, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	out.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if v := in.Header.Get("Accept"); v != "" {
+		out.Header.Set("Accept", v)
+	}
+	if v := in.Header.Get("Authorization"); v != "" {
+		out.Header.Set("Authorization", v)
+	}
+	return out, nil
+}
+
+// writeUpstreamResponse mirrors an upstream response to the client: headers
+// verbatim, then status code, then body.
+func writeUpstreamResponse(w http.ResponseWriter, resp *http.Response) {
+	for k, vs := range resp.Header {
+		for _, v := range vs {
+			w.Header().Add(k, v)
+		}
+	}
+	w.WriteHeader(resp.StatusCode)
+	_, _ = io.Copy(w, resp.Body)
 }
 
 // firstAuthorizationServer derives the upstream's primary authorization
