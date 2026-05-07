@@ -157,16 +157,17 @@ type ProtectedResourceMetadata struct {
 // When `Mode` is set explicitly it always wins. When it's empty the mode
 // is inferred from the configuration shape:
 //
-//   - `Resource` set → static (preserves the pre-mirror behaviour for
-//     anyone who configured static fields without an explicit mode).
-//   - `Resource` empty AND the API is MCP → mirror, so users who just
-//     `enabled: true` on an MCP API get auto-discovery for free.
-//   - `Resource` empty AND non-MCP → static (will fail validation as
+//   - `Resource` or `AuthorizationServers` populated → static. Any
+//     static-field hint means the operator is partway through a static
+//     config; keep them on the static path so partial configs surface
+//     the "resource is required" / "authorizationServers is required"
+//     errors they'd expect.
+//   - Neither static field set AND the API is MCP → mirror, so users
+//     who just `enabled: true` on an MCP API get auto-discovery for
+//     free.
+//   - Neither field set AND non-MCP → static (will fail validation as
 //     before — non-MCP APIs need either a resource or explicit
 //     `mode: "static"` with one).
-//
-// The shape-based default keeps existing static-mode users on the same
-// path while letting new MCP users skip the boilerplate.
 func (prm *ProtectedResourceMetadata) EffectiveMode(isMCP bool) string {
 	if prm == nil {
 		return ""
@@ -174,7 +175,10 @@ func (prm *ProtectedResourceMetadata) EffectiveMode(isMCP bool) string {
 	if prm.Mode != "" {
 		return prm.Mode
 	}
-	if prm.Resource == "" && isMCP {
+	if prm.Resource != "" || len(prm.AuthorizationServers) > 0 {
+		return PRMModeStatic
+	}
+	if isMCP {
 		return PRMModeMirror
 	}
 	return PRMModeStatic

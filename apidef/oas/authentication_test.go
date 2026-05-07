@@ -932,6 +932,8 @@ func TestProtectedResourceMetadata_IsMirrorMode(t *testing.T) {
 		{"enabled explicit mirror non-MCP", &ProtectedResourceMetadata{Enabled: true, Mode: PRMModeMirror}, false, true},
 		{"enabled empty mode MCP no resource → mirror by default", &ProtectedResourceMetadata{Enabled: true}, true, true},
 		{"enabled empty mode MCP with resource → static", &ProtectedResourceMetadata{Enabled: true, Resource: "https://x"}, true, false},
+		{"enabled empty mode MCP with authorizationServers only → static (back-compat error path)",
+			&ProtectedResourceMetadata{Enabled: true, AuthorizationServers: []string{"https://auth"}}, true, false},
 		{"enabled empty mode non-MCP → static", &ProtectedResourceMetadata{Enabled: true}, false, false},
 		{"enabled explicit static", &ProtectedResourceMetadata{Enabled: true, Mode: PRMModeStatic, Resource: "https://x"}, true, false},
 	}
