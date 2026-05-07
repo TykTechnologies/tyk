@@ -844,48 +844,23 @@ func TestProtectedResourceMetadata_Validate(t *testing.T) {
 		assert.NoError(t, prm.Validate(false))
 	})
 
-	t.Run("explicit static mode behaves like default", func(t *testing.T) {
-		t.Parallel()
-		prm := &ProtectedResourceMetadata{
-			Enabled:              true,
-			Mode:                 PRMModeStatic,
-			Resource:             "https://api.example.com",
-			AuthorizationServers: []string{"https://auth.example.com"},
-		}
-		assert.NoError(t, prm.Validate(true))
-	})
-
-	t.Run("mirror mode skips static-field requirements", func(t *testing.T) {
-		t.Parallel()
-		prm := &ProtectedResourceMetadata{
-			Enabled: true,
-			Mode:    PRMModeMirror,
-		}
-		assert.NoError(t, prm.Validate(true))
-		assert.True(t, prm.IsMirrorMode(true))
-	})
-
-	t.Run("mirror mode passes validation for non-MCP APIs (runtime no-op)", func(t *testing.T) {
-		t.Parallel()
-		prm := &ProtectedResourceMetadata{
-			Enabled: true,
-			Mode:    PRMModeMirror,
-		}
-		assert.NoError(t, prm.Validate(false))
-	})
-
-	t.Run("MCP API with no resource and no mode defaults to mirror", func(t *testing.T) {
+	t.Run("MCP API with no static fields defaults to mirror (passes validation)", func(t *testing.T) {
 		t.Parallel()
 		prm := &ProtectedResourceMetadata{Enabled: true}
-		// Validate against the MCP-aware path: should pass because the
-		// effective mode resolves to mirror and mirror has no required
-		// static fields.
 		assert.NoError(t, prm.Validate(true))
 		assert.True(t, prm.IsMirrorMode(true))
-		assert.Equal(t, PRMModeMirror, prm.EffectiveMode(true))
 	})
 
-	t.Run("MCP API with resource set keeps static (back-compat)", func(t *testing.T) {
+	t.Run("non-MCP without resource still rejected (mirror is MCP-only)", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{Enabled: true}
+		err := prm.Validate(false)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "resource is required")
+		assert.False(t, prm.IsMirrorMode(false))
+	})
+
+	t.Run("MCP API with static fields keeps static behaviour", func(t *testing.T) {
 		t.Parallel()
 		prm := &ProtectedResourceMetadata{
 			Enabled:              true,
@@ -894,26 +869,6 @@ func TestProtectedResourceMetadata_Validate(t *testing.T) {
 		}
 		assert.NoError(t, prm.Validate(true))
 		assert.False(t, prm.IsMirrorMode(true))
-		assert.Equal(t, PRMModeStatic, prm.EffectiveMode(true))
-	})
-
-	t.Run("non-MCP without resource still rejected", func(t *testing.T) {
-		t.Parallel()
-		prm := &ProtectedResourceMetadata{Enabled: true}
-		err := prm.Validate(false)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "resource is required")
-	})
-
-	t.Run("unknown mode rejected", func(t *testing.T) {
-		t.Parallel()
-		prm := &ProtectedResourceMetadata{
-			Enabled: true,
-			Mode:    "wat",
-		}
-		err := prm.Validate(true)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not recognised")
 	})
 }
 
@@ -927,15 +882,13 @@ func TestProtectedResourceMetadata_IsMirrorMode(t *testing.T) {
 		want  bool
 	}{
 		{"nil", nil, true, false},
-		{"disabled even if mode mirror", &ProtectedResourceMetadata{Enabled: false, Mode: PRMModeMirror}, true, false},
-		{"enabled explicit mirror MCP", &ProtectedResourceMetadata{Enabled: true, Mode: PRMModeMirror}, true, true},
-		{"enabled explicit mirror non-MCP", &ProtectedResourceMetadata{Enabled: true, Mode: PRMModeMirror}, false, true},
-		{"enabled empty mode MCP no resource → mirror by default", &ProtectedResourceMetadata{Enabled: true}, true, true},
-		{"enabled empty mode MCP with resource → static", &ProtectedResourceMetadata{Enabled: true, Resource: "https://x"}, true, false},
-		{"enabled empty mode MCP with authorizationServers only → static (back-compat error path)",
+		{"disabled", &ProtectedResourceMetadata{Enabled: false}, true, false},
+		{"MCP API with no static fields → mirror", &ProtectedResourceMetadata{Enabled: true}, true, true},
+		{"MCP API with resource set → static", &ProtectedResourceMetadata{Enabled: true, Resource: "https://x"}, true, false},
+		{"MCP API with authorizationServers only → static",
 			&ProtectedResourceMetadata{Enabled: true, AuthorizationServers: []string{"https://auth"}}, true, false},
-		{"enabled empty mode non-MCP → static", &ProtectedResourceMetadata{Enabled: true}, false, false},
-		{"enabled explicit static", &ProtectedResourceMetadata{Enabled: true, Mode: PRMModeStatic, Resource: "https://x"}, true, false},
+		{"non-MCP API never resolves to mirror", &ProtectedResourceMetadata{Enabled: true}, false, false},
+		{"non-MCP with resource set → static", &ProtectedResourceMetadata{Enabled: true, Resource: "https://x"}, false, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

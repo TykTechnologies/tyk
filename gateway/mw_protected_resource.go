@@ -111,19 +111,16 @@ func (m *PRMMiddleware) serveMirroredPRM(w http.ResponseWriter, r *http.Request,
 
 // upstreamPRMDoc returns a (cached) clone of the upstream's PRM document
 // for the given MCP API. Used by both PRM mirror serving and the AS-proxy
-// flow to derive the upstream authorization-server URL.
+// flow to derive the upstream authorization-server URL. The PRM URL is
+// auto-derived from the API's upstream URL via the path-suffix variant
+// (RFC 9728 §3.1).
 func (gw *Gateway) upstreamPRMDoc(ctx context.Context, spec *APISpec) (*mcp.PRMDocument, error) {
-	prm := spec.GetPRMConfig()
-	if prm == nil {
+	if spec.GetPRMConfig() == nil {
 		return nil, fmt.Errorf("API %q has no PRM config", spec.APIID)
 	}
-	upstreamPRMURL := prm.UpstreamPRMUrl
-	if upstreamPRMURL == "" {
-		derived, err := mcp.DeriveUpstreamPRMURL(spec.Proxy.TargetURL)
-		if err != nil {
-			return nil, fmt.Errorf("derive upstream PRM URL: %w", err)
-		}
-		upstreamPRMURL = derived
+	upstreamPRMURL, err := mcp.DeriveUpstreamPRMURL(spec.Proxy.TargetURL)
+	if err != nil {
+		return nil, fmt.Errorf("derive upstream PRM URL: %w", err)
 	}
 
 	cache := gw.PRMCache()

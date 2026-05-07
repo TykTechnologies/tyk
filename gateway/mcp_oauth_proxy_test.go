@@ -51,7 +51,7 @@ func newMCPMirrorTest(t *testing.T, behavior func(w http.ResponseWriter, r *http
 			ListenPath: oas.ListenPath{Value: listenPath, Strip: true},
 			Authentication: &oas.Authentication{
 				ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
-					Enabled: true, Mode: oas.PRMModeMirror,
+					Enabled: true,
 				},
 			},
 		},
@@ -347,7 +347,7 @@ func TestRegisterMCPPRMSuffixRoutes_EarlyReturns(t *testing.T) {
 				s.OAS.SetTykExtension(&oas.XTykAPIGateway{
 					Server: oas.Server{
 						Authentication: &oas.Authentication{
-							ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{Enabled: true, Mode: oas.PRMModeMirror},
+							ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{Enabled: true},
 						},
 					},
 				})
@@ -411,7 +411,7 @@ func OAS_OAuthMirrorMode(listenPath string) oas.OAS {
 			ListenPath: oas.ListenPath{Value: listenPath, Strip: true},
 			Authentication: &oas.Authentication{
 				ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
-					Enabled: true, Mode: oas.PRMModeMirror,
+					Enabled: true,
 				},
 			},
 		},

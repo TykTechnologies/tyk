@@ -26,16 +26,6 @@ const (
 // DefaultPRMWellKnownPath is the default well-known path for OAuth 2.0 Protected Resource Metadata (RFC 9728).
 const DefaultPRMWellKnownPath = ".well-known/oauth-protected-resource"
 
-// PRM modes for ProtectedResourceMetadata.Mode. The default (empty/"static")
-// keeps the legacy behavior — Tyk serves a doc assembled from the static
-// fields on the API def. "mirror" makes Tyk fetch the upstream's PRM doc,
-// rewrite the resource field to the gateway URL, and serve that — the
-// pattern needed for transparent proxying of remote OAuth-protected MCPs.
-const (
-	PRMModeStatic = "static"
-	PRMModeMirror = "mirror"
-)
-
 // ValidateSecurityProcessingMode validates the security processing mode value.
 func ValidateSecurityProcessingMode(mode string) bool {
 	return mode == "" || mode == SecurityProcessingModeLegacy || mode == SecurityProcessingModeCompliant
@@ -115,26 +105,20 @@ type Authentication struct {
 
 // ProtectedResourceMetadata holds the configuration for OAuth 2.0 Protected Resource Metadata (RFC 9728).
 // It enables MCP clients to discover which authorization server protects this API resource.
+//
+// The serving mode is inferred from the configuration shape, not selected
+// explicitly:
+//   - When `Resource` or `AuthorizationServers` is set, Tyk runs in
+//     **static** mode — the PRM doc is assembled from the fields below.
+//   - When neither is set on an MCP API, Tyk runs in **mirror** mode —
+//     the upstream's PRM doc is fetched, its `resource` field rewritten
+//     to the gateway URL, and served. Used for transparent proxying of
+//     OAuth-protected remote MCP servers.
+//
+// On non-MCP APIs only static is meaningful; mirror is a no-op.
 type ProtectedResourceMetadata struct {
 	// Enabled activates the Protected Resource Metadata endpoint.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
-
-	// Mode selects how Tyk produces the PRM document.
-	//   - "static": assemble the doc from the fields below.
-	//   - "mirror": fetch the upstream's PRM doc, rewrite the `resource`
-	//     field to the gateway URL the client connects to, serve that.
-	//     Used for transparent proxying of OAuth-protected remote MCPs.
-	//
-	// When empty, the mode is inferred (see EffectiveMode): MCP APIs with
-	// no `resource` set default to mirror, everything else defaults to
-	// static. Set explicitly to override.
-	Mode string `bson:"mode,omitempty" json:"mode,omitempty"`
-
-	// UpstreamPRMUrl optionally overrides where mirror-mode fetches from.
-	// When empty, the URL is auto-derived from the API's upstream URL as
-	// `<upstream-scheme>://<upstream-host>/.well-known/oauth-protected-resource<upstream-path>`
-	// per RFC 9728 §3.1 path-suffix variant.
-	UpstreamPRMUrl string `bson:"upstreamPRMUrl,omitempty" json:"upstreamPRMUrl,omitempty"`
 
 	// WellKnownPath is the path at which the metadata document is served.
 	// Defaults to ".well-known/oauth-protected-resource" if empty.
@@ -152,36 +136,18 @@ type ProtectedResourceMetadata struct {
 	ScopesSupported []string `bson:"scopesSupported,omitempty" json:"scopesSupported,omitempty"`
 }
 
-// EffectiveMode resolves the PRM mode after applying defaults.
-//
-// When `Mode` is set explicitly it always wins. When it's empty the mode
-// is inferred from the configuration shape:
-//
-//   - `Resource` or `AuthorizationServers` populated → static. Any
-//     static-field hint means the operator is partway through a static
-//     config; keep them on the static path so partial configs surface
-//     the "resource is required" / "authorizationServers is required"
-//     errors they'd expect.
-//   - Neither static field set AND the API is MCP → mirror, so users
-//     who just `enabled: true` on an MCP API get auto-discovery for
-//     free.
-//   - Neither field set AND non-MCP → static (will fail validation as
-//     before — non-MCP APIs need either a resource or explicit
-//     `mode: "static"` with one).
-func (prm *ProtectedResourceMetadata) EffectiveMode(isMCP bool) string {
-	if prm == nil {
-		return ""
-	}
-	if prm.Mode != "" {
-		return prm.Mode
+// IsMirrorMode reports whether the PRM resolves to mirror mode for the
+// given API context. Mirror is the implicit default for MCP APIs whose
+// PRM doesn't configure any static fields (`Resource` or
+// `AuthorizationServers`); everything else is static.
+func (prm *ProtectedResourceMetadata) IsMirrorMode(isMCP bool) bool {
+	if prm == nil || !prm.Enabled {
+		return false
 	}
 	if prm.Resource != "" || len(prm.AuthorizationServers) > 0 {
-		return PRMModeStatic
+		return false
 	}
-	if isMCP {
-		return PRMModeMirror
-	}
-	return PRMModeStatic
+	return isMCP
 }
 
 // Validate validates the ProtectedResourceMetadata configuration.
@@ -192,32 +158,18 @@ func (prm *ProtectedResourceMetadata) Validate(isMCP bool) error {
 	if prm == nil || !prm.Enabled {
 		return nil
 	}
-
-	switch prm.EffectiveMode(isMCP) {
-	case PRMModeStatic:
-		if prm.Resource == "" {
-			return errors.New("protectedResourceMetadata.resource is required when enabled")
-		}
-
-		if isMCP && len(prm.AuthorizationServers) == 0 {
-			return errors.New("protectedResourceMetadata.authorizationServers must have at least one entry for MCP APIs")
-		}
-	case PRMModeMirror:
-		// Resource/authorizationServers come from the upstream PRM doc.
-		// Mirror mode is only meaningful for MCP APIs — the runtime
-		// (PRMMiddleware/registerMCPPRMSuffixRoutes) gates serving on
-		// IsMCP(); for non-MCP APIs the config is silently ignored.
-	default:
-		return fmt.Errorf("protectedResourceMetadata.mode %q is not recognised (allowed: %q, %q)", prm.Mode, PRMModeStatic, PRMModeMirror)
+	if prm.IsMirrorMode(isMCP) {
+		// Mirror mode: upstream supplies resource/authorizationServers
+		// at request time. Nothing to validate here.
+		return nil
 	}
-
+	if prm.Resource == "" {
+		return errors.New("protectedResourceMetadata.resource is required when enabled")
+	}
+	if isMCP && len(prm.AuthorizationServers) == 0 {
+		return errors.New("protectedResourceMetadata.authorizationServers must have at least one entry for MCP APIs")
+	}
 	return nil
-}
-
-// IsMirrorMode reports whether the PRM should mirror the upstream's doc,
-// applying the MCP-aware default for empty mode (see EffectiveMode).
-func (prm *ProtectedResourceMetadata) IsMirrorMode(isMCP bool) bool {
-	return prm != nil && prm.Enabled && prm.EffectiveMode(isMCP) == PRMModeMirror
 }
 
 // GetWellKnownPath returns the well-known path for the PRM endpoint,

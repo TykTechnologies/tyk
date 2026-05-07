@@ -777,7 +777,7 @@ func TestPRMMirrorMode_SuffixRoute(t *testing.T) {
 			Authentication: &oas.Authentication{
 				ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
 					Enabled: true,
-					Mode:    oas.PRMModeMirror,
+					
 				},
 			},
 		},
@@ -894,7 +894,7 @@ func TestPRMMirrorMode_OAuthProxy(t *testing.T) {
 			Authentication: &oas.Authentication{
 				ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
 					Enabled: true,
-					Mode:    oas.PRMModeMirror,
+					
 				},
 			},
 		},
@@ -989,7 +989,7 @@ func TestAugmentMCPWWWAuthenticate(t *testing.T) {
 					Authentication: &oas.Authentication{
 						ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
 							Enabled: true,
-							Mode:    oas.PRMModeMirror,
+							
 						},
 					},
 				},

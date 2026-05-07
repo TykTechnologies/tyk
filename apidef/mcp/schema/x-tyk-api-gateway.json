@@ -1370,12 +1370,6 @@
         "enabled": {
           "type": "boolean"
         },
-        "mode": {
-          "type": "string"
-        },
-        "upstreamPRMUrl": {
-          "type": "string"
-        },
         "wellKnownPath": {
           "type": "string"
         },

@@ -80,24 +80,3 @@ func TestValidateForMCP(t *testing.T) {
 	})
 }
 
-func TestProtectedResourceMetadata_EffectiveMode(t *testing.T) {
-	cases := []struct {
-		name  string
-		prm   *ProtectedResourceMetadata
-		isMCP bool
-		want  string
-	}{
-		{"nil", nil, true, ""},
-		{"explicit mirror wins over shape", &ProtectedResourceMetadata{Mode: PRMModeMirror, Resource: "x"}, true, PRMModeMirror},
-		{"explicit static wins over MCP default", &ProtectedResourceMetadata{Mode: PRMModeStatic}, true, PRMModeStatic},
-		{"empty + resource set → static", &ProtectedResourceMetadata{Resource: "x"}, true, PRMModeStatic},
-		{"empty + auth servers set → static", &ProtectedResourceMetadata{AuthorizationServers: []string{"x"}}, true, PRMModeStatic},
-		{"empty + neither + MCP → mirror", &ProtectedResourceMetadata{}, true, PRMModeMirror},
-		{"empty + neither + non-MCP → static", &ProtectedResourceMetadata{}, false, PRMModeStatic},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			assert.Equal(t, c.want, c.prm.EffectiveMode(c.isMCP))
-		})
-	}
-}
