@@ -33,21 +33,23 @@ func (d *PRMDocument) Resource() string {
 	if d == nil || d.Raw == nil {
 		return ""
 	}
-	v, _ := d.Raw["resource"].(string)
-	return v
+	if v, ok := d.Raw["resource"].(string); ok {
+		return v
+	}
+	return ""
 }
 
 // SetResource overwrites the document's resource field. Used to swap the
 // upstream's URL for the gateway URL the client connected to before
 // serving.
-func (d *PRMDocument) SetResource(url string) {
+func (d *PRMDocument) SetResource(resourceURL string) {
 	if d == nil {
 		return
 	}
 	if d.Raw == nil {
 		d.Raw = make(map[string]any)
 	}
-	d.Raw["resource"] = url
+	d.Raw["resource"] = resourceURL
 }
 
 // MarshalJSON returns the document's JSON encoding.
@@ -152,7 +154,10 @@ func FetchUpstreamPRM(ctx context.Context, client *http.Client, prmURL string) (
 	defer resp.Body.Close()
 
 	if resp.StatusCode/100 != 2 {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		if readErr != nil {
+			return nil, fmt.Errorf("upstream PRM returned %d (and body unreadable: %w)", resp.StatusCode, readErr)
+		}
 		return nil, fmt.Errorf("upstream PRM returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 

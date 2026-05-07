@@ -78,10 +78,10 @@ func stockUpstreamHandler(authorizeHits, tokenHits *int, lastResource *string) f
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/.well-known/oauth-protected-resource/v1/mcp/authv2":
 			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprintf(w, `{"resource":"https://upstream.example/v1/mcp/authv2","authorization_servers":["%s"]}`, upstream.URL)
+			_, _ = fmt.Fprintf(w, `{"resource":"https://upstream.example/v1/mcp/authv2","authorization_servers":["%s"]}`, upstream.URL) //nolint:errcheck
 		case r.Method == http.MethodGet && r.URL.Path == "/.well-known/oauth-authorization-server":
 			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprintf(w, `{"issuer":"%s","authorization_endpoint":"%s/authorize","token_endpoint":"%s/token"}`,
+			_, _ = fmt.Fprintf(w, `{"issuer":"%s","authorization_endpoint":"%s/authorize","token_endpoint":"%s/token"}`, //nolint:errcheck
 				upstream.URL, upstream.URL, upstream.URL)
 		case r.Method == http.MethodGet && r.URL.Path == "/authorize":
 			*authorizeHits++
@@ -89,10 +89,10 @@ func stockUpstreamHandler(authorizeHits, tokenHits *int, lastResource *string) f
 			w.WriteHeader(http.StatusOK)
 		case r.Method == http.MethodPost && r.URL.Path == "/token":
 			*tokenHits++
-			_ = r.ParseForm()
+			_ = r.ParseForm() //nolint:errcheck
 			*lastResource = r.PostFormValue("resource")
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"access_token":"abc"}`))
+			_, _ = w.Write([]byte(`{"access_token":"abc"}`)) //nolint:errcheck
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -129,11 +129,12 @@ func TestASProxy_AuthorizeRedirect_RewritesResource(t *testing.T) {
 
 	gatewayResource := "http%3A%2F%2Fgateway%2Fmcp-test%2F"
 	client := &http.Client{
-		CheckRedirect: func(req *http.Request, via []*http.Request) error { return http.ErrUseLastResponse },
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
 	}
-	req, _ := http.NewRequest(http.MethodGet,
+	req, errReq := http.NewRequest(http.MethodGet,
 		ts.URL+"/__tyk-as/test/authorize?response_type=code&client_id=cid&resource="+gatewayResource+"&state=s",
 		nil)
+	require.NoError(t, errReq)
 	resp, err := client.Do(req)
 	require.NoError(t, err)
 	_ = resp.Body.Close()
@@ -159,12 +160,14 @@ func TestASProxy_TokenForward_RewritesResource(t *testing.T) {
 	form.Set("grant_type", "authorization_code")
 	form.Set("code", "abc")
 	form.Set("resource", "http://gateway/mcp-test/")
-	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/__tyk-as/test/token", strings.NewReader(form.Encode()))
+	req, errReq := http.NewRequest(http.MethodPost, ts.URL+"/__tyk-as/test/token", strings.NewReader(form.Encode()))
+	require.NoError(t, errReq)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
-	body, _ := io.ReadAll(resp.Body)
+	body, errBody := io.ReadAll(resp.Body)
+	require.NoError(t, errBody)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode, "body=%s", string(body))
 	assert.Contains(t, string(body), `"access_token":"abc"`)
@@ -175,20 +178,21 @@ func TestASProxy_TokenForward_RewritesResource(t *testing.T) {
 
 func TestASProxy_AuthorizeBadGateway_WhenUpstreamMissingASEndpoint(t *testing.T) {
 	ts, _ := newMCPMirrorTest(t, func(w http.ResponseWriter, r *http.Request, upstream *httptest.Server) {
-		switch {
-		case r.URL.Path == "/.well-known/oauth-protected-resource/v1/mcp/authv2":
+		switch r.URL.Path {
+		case "/.well-known/oauth-protected-resource/v1/mcp/authv2":
 			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprintf(w, `{"resource":"x","authorization_servers":["%s"]}`, upstream.URL)
-		case r.URL.Path == "/.well-known/oauth-authorization-server":
+			_, _ = fmt.Fprintf(w, `{"resource":"x","authorization_servers":["%s"]}`, upstream.URL) //nolint:errcheck
+		case "/.well-known/oauth-authorization-server":
 			// Metadata returns no authorization_endpoint at all.
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"issuer":"x"}`))
+			_, _ = w.Write([]byte(`{"issuer":"x"}`)) //nolint:errcheck
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
 	})
 
-	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/__tyk-as/test/authorize?resource=x", nil)
+	req, errReq := http.NewRequest(http.MethodGet, ts.URL+"/__tyk-as/test/authorize?resource=x", nil)
+	require.NoError(t, errReq)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	_ = resp.Body.Close()
@@ -198,18 +202,18 @@ func TestASProxy_AuthorizeBadGateway_WhenUpstreamMissingASEndpoint(t *testing.T)
 func TestASProxy_TokenBadGateway_WhenUpstreamMetadataMissing(t *testing.T) {
 	ts, _ := newMCPMirrorTest(t, func(w http.ResponseWriter, r *http.Request, upstream *httptest.Server) {
 		// Upstream PRM responds, but AS metadata is missing.
-		switch {
-		case r.URL.Path == "/.well-known/oauth-protected-resource/v1/mcp/authv2":
+		if r.URL.Path == "/.well-known/oauth-protected-resource/v1/mcp/authv2" {
 			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprintf(w, `{"resource":"x","authorization_servers":["%s"]}`, upstream.URL)
-		default:
-			w.WriteHeader(http.StatusNotFound)
+			_, _ = fmt.Fprintf(w, `{"resource":"x","authorization_servers":["%s"]}`, upstream.URL) //nolint:errcheck
+			return
 		}
+		w.WriteHeader(http.StatusNotFound)
 	})
 
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
-	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/__tyk-as/test/token", strings.NewReader(form.Encode()))
+	req, errReq := http.NewRequest(http.MethodPost, ts.URL+"/__tyk-as/test/token", strings.NewReader(form.Encode()))
+	require.NoError(t, errReq)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
@@ -242,7 +246,7 @@ func TestFetchUpstreamASMetadata_PathSuffixVariant(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/.well-known/oauth-authorization-server/tenant" {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"issuer":"https://as","token_endpoint":"https://as/t"}`))
+			_, _ = w.Write([]byte(`{"issuer":"https://as","token_endpoint":"https://as/t"}`)) //nolint:errcheck
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -260,7 +264,7 @@ func TestFetchUpstreamASMetadata_PathPrefixVariant(t *testing.T) {
 		// Only respond at the path-prefix variant; the suffix one 404s.
 		if r.URL.Path == "/tenant/.well-known/oauth-authorization-server" {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"issuer":"https://as"}`))
+			_, _ = w.Write([]byte(`{"issuer":"https://as"}`)) //nolint:errcheck
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -276,7 +280,7 @@ func TestFetchUpstreamASMetadata_RootHostNoPath(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/.well-known/oauth-authorization-server" {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"issuer":"https://as"}`))
+			_, _ = w.Write([]byte(`{"issuer":"https://as"}`)) //nolint:errcheck
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -357,7 +361,7 @@ func TestRegisterMCPPRMSuffixRoutes_EarlyReturns(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
+		t.Run(c.name, func(_ *testing.T) {
 			// Should be a no-op — no panic, no error returned.
 			ts.Gw.registerMCPPRMSuffixRoutes(c.spec, nil)
 		})

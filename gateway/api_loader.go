@@ -1046,7 +1046,9 @@ func (gw *Gateway) mcpPRMSuffixHandler(spec *APISpec) http.HandlerFunc {
 			ScopesSupported:      prm.ScopesSupported,
 		}
 		w.Header().Set(header.ContentType, "application/json")
-		_ = json.NewEncoder(w).Encode(doc)
+		if err := json.NewEncoder(w).Encode(doc); err != nil {
+			log.WithError(err).Warn("PRM suffix-route handler: failed to encode response")
+		}
 	}
 }
 

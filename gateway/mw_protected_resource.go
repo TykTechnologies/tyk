@@ -86,7 +86,7 @@ func (m *PRMMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 // at Tyk's per-API AS-proxy URL so RFC 8707 `resource`-parameter rewriting
 // can intercept the OAuth flow, and writes the result to w. The fetched
 // document is cached per upstream URL with TTL.
-func (m *PRMMiddleware) serveMirroredPRM(w http.ResponseWriter, r *http.Request, prm *oas.ProtectedResourceMetadata) error {
+func (m *PRMMiddleware) serveMirroredPRM(w http.ResponseWriter, r *http.Request, _ *oas.ProtectedResourceMetadata) error {
 	doc, err := m.Gw.upstreamPRMDoc(r.Context(), m.Spec)
 	if err != nil {
 		return err

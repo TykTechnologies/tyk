@@ -746,7 +746,7 @@ func TestPRMMirrorMode_SuffixRoute(t *testing.T) {
 				"bearer_methods_supported": ["header"],
 				"scopes_supported": ["read:foo", "write:foo"],
 				"resource_documentation": "https://upstream.example/docs"
-			}`)
+			}`) //nolint:errcheck
 			return
 		}
 		// Protocol traffic: 401 with bare bearer challenge.
@@ -777,7 +777,6 @@ func TestPRMMirrorMode_SuffixRoute(t *testing.T) {
 			Authentication: &oas.Authentication{
 				ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
 					Enabled: true,
-					
 				},
 			},
 		},
@@ -853,10 +852,10 @@ func TestPRMMirrorMode_OAuthProxy(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/.well-known/oauth-protected-resource/v1/mcp/authv2":
 			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprintf(w, `{"resource":"https://upstream.example/v1/mcp/authv2","authorization_servers":["%s"]}`, upstream.URL)
+			_, _ = fmt.Fprintf(w, `{"resource":"https://upstream.example/v1/mcp/authv2","authorization_servers":["%s"]}`, upstream.URL) //nolint:errcheck
 		case r.Method == http.MethodGet && r.URL.Path == "/.well-known/oauth-authorization-server":
 			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprintf(w, `{"issuer":"%s","authorization_endpoint":"%s/authorize","token_endpoint":"%s/token","registration_endpoint":"%s/register"}`,
+			_, _ = fmt.Fprintf(w, `{"issuer":"%s","authorization_endpoint":"%s/authorize","token_endpoint":"%s/token","registration_endpoint":"%s/register"}`, //nolint:errcheck
 				upstream.URL, upstream.URL, upstream.URL, upstream.URL)
 		case r.Method == http.MethodGet && r.URL.Path == "/authorize":
 			authorizeHits++
@@ -864,10 +863,10 @@ func TestPRMMirrorMode_OAuthProxy(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 		case r.Method == http.MethodPost && r.URL.Path == "/token":
 			tokenHits++
-			_ = r.ParseForm()
+			_ = r.ParseForm() //nolint:errcheck
 			lastResource = r.PostFormValue("resource")
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"access_token":"abc","token_type":"Bearer"}`))
+			_, _ = w.Write([]byte(`{"access_token":"abc","token_type":"Bearer"}`)) //nolint:errcheck
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -894,7 +893,6 @@ func TestPRMMirrorMode_OAuthProxy(t *testing.T) {
 			Authentication: &oas.Authentication{
 				ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
 					Enabled: true,
-					
 				},
 			},
 		},
@@ -929,12 +927,13 @@ func TestPRMMirrorMode_OAuthProxy(t *testing.T) {
 	t.Run("authorize 302s with rewritten resource param", func(t *testing.T) {
 		gatewayResource := "http%3A%2F%2Fgateway%2Fjira%2F"
 		// Drive the request manually so we can inspect the redirect.
-		client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		client := &http.Client{CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
 		}}
-		req, _ := http.NewRequest(http.MethodGet,
+		req, errReq := http.NewRequest(http.MethodGet,
 			ts.URL+"/__tyk-as/test/authorize?response_type=code&client_id=cid&resource="+gatewayResource+"&state=s",
 			nil)
+		require.NoError(t, errReq)
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 		_ = resp.Body.Close()
@@ -952,11 +951,13 @@ func TestPRMMirrorMode_OAuthProxy(t *testing.T) {
 		form.Set("grant_type", "authorization_code")
 		form.Set("code", "abc")
 		form.Set("resource", gatewayResource)
-		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/__tyk-as/test/token", strings.NewReader(form.Encode()))
+		req, errReq := http.NewRequest(http.MethodPost, ts.URL+"/__tyk-as/test/token", strings.NewReader(form.Encode()))
+		require.NoError(t, errReq)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
-		body, _ := io.ReadAll(resp.Body)
+		body, errBody := io.ReadAll(resp.Body)
+		require.NoError(t, errBody)
 		_ = resp.Body.Close()
 		require.Equal(t, http.StatusOK, resp.StatusCode, "body=%s", string(body))
 		assert.Contains(t, string(body), `"access_token":"abc"`)
@@ -989,7 +990,6 @@ func TestAugmentMCPWWWAuthenticate(t *testing.T) {
 					Authentication: &oas.Authentication{
 						ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
 							Enabled: true,
-							
 						},
 					},
 				},
@@ -999,7 +999,10 @@ func TestAugmentMCPWWWAuthenticate(t *testing.T) {
 	}
 
 	mkResponse := func(status int, wwwAuth string) *http.Response {
-		req, _ := http.NewRequest(http.MethodPost, "http://gw.example/jira/", nil)
+		req, err := http.NewRequest(http.MethodPost, "http://gw.example/jira/", nil)
+		if err != nil {
+			t.Fatalf("build request: %v", err)
+		}
 		h := http.Header{}
 		if wwwAuth != "" {
 			h.Set(header.WWWAuthenticate, wwwAuth)

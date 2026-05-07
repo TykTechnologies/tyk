@@ -497,13 +497,13 @@ func augmentMCPWWWAuthenticate(res *http.Response, inboundReq *http.Request, spe
 // its `resource_metadata="…"` parameter set to `prmURL`. If the parameter
 // is already present (regardless of value), it's substituted in place;
 // otherwise the parameter is appended.
-func replaceOrAppendResourceMetadata(header, prmURL string) string {
+func replaceOrAppendResourceMetadata(headerValue, prmURL string) string {
 	rxResourceMetadata := regexp.MustCompile(`(?i)resource_metadata="[^"]*"`)
 	replacement := fmt.Sprintf(`resource_metadata="%s"`, prmURL)
-	if rxResourceMetadata.MatchString(header) {
-		return rxResourceMetadata.ReplaceAllString(header, replacement)
+	if rxResourceMetadata.MatchString(headerValue) {
+		return rxResourceMetadata.ReplaceAllString(headerValue, replacement)
 	}
-	return header + ", " + replacement
+	return headerValue + ", " + replacement
 }
 
 func singleJoiningSlash(targetPath, subPath string, disableStripSlash bool) string {

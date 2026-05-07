@@ -79,4 +79,3 @@ func TestValidateForMCP(t *testing.T) {
 		assert.NoError(t, o.Validate(context.Background()))
 	})
 }
-

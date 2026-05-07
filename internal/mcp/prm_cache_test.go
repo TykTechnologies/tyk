@@ -89,7 +89,7 @@ func TestFetchUpstreamPRM(t *testing.T) {
 			t.Errorf("missing MCP-Protocol-Version header")
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"resource":"https://upstream.example/v1/mcp","authorization_servers":["https://auth.example/t"]}`))
+		_, _ = w.Write([]byte(`{"resource":"https://upstream.example/v1/mcp","authorization_servers":["https://auth.example/t"]}`)) //nolint:errcheck
 	}))
 	t.Cleanup(stub.Close)
 
@@ -109,7 +109,7 @@ func TestFetchUpstreamPRM(t *testing.T) {
 func TestFetchUpstreamPRM_404(t *testing.T) {
 	stub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte("not found"))
+		_, _ = w.Write([]byte("not found")) //nolint:errcheck
 	}))
 	t.Cleanup(stub.Close)
 
@@ -129,7 +129,7 @@ func TestFetchUpstreamPRM_EmptyURL(t *testing.T) {
 func TestFetchUpstreamPRM_MalformedJSON(t *testing.T) {
 	stub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{not json`))
+		_, _ = w.Write([]byte(`{not json`)) //nolint:errcheck
 	}))
 	t.Cleanup(stub.Close)
 

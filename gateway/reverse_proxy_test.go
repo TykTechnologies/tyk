@@ -141,8 +141,10 @@ func TestReverseProxyMCPHostRootDiscovery(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	pathUpstream, _ := url.Parse("http://upstream.example/v1/mcp")
-	rootUpstream, _ := url.Parse("http://upstream.example/")
+	pathUpstream, errPath := url.Parse("http://upstream.example/v1/mcp")
+	require.NoError(t, errPath)
+	rootUpstream, errRoot := url.Parse("http://upstream.example/")
+	require.NoError(t, errRoot)
 
 	cases := []struct {
 		name    string

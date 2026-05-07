@@ -97,7 +97,9 @@ func (gw *Gateway) serveASProxyMetadata(spec *APISpec) http.HandlerFunc {
 		metadata["token_endpoint"] = base + "/token"
 
 		w.Header().Set(header.ContentType, "application/json")
-		_ = json.NewEncoder(w).Encode(metadata)
+		if err := json.NewEncoder(w).Encode(metadata); err != nil {
+			log.WithError(err).Warn("AS proxy: failed to encode metadata response")
+		}
 	}
 }
 
@@ -210,7 +212,9 @@ func writeUpstreamResponse(w http.ResponseWriter, resp *http.Response) {
 		}
 	}
 	w.WriteHeader(resp.StatusCode)
-	_, _ = io.Copy(w, resp.Body)
+	if _, err := io.Copy(w, resp.Body); err != nil {
+		log.WithError(err).Warn("AS proxy: failed copying upstream response body")
+	}
 }
 
 // firstAuthorizationServer derives the upstream's primary authorization
@@ -269,8 +273,12 @@ func fetchUpstreamASMetadata(ctx context.Context, asURL string) (map[string]any,
 			lastErr = err
 			continue
 		}
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
+		if readErr != nil {
+			lastErr = fmt.Errorf("AS metadata %s body read: %w", candidate, readErr)
+			continue
+		}
 		if resp.StatusCode/100 != 2 {
 			lastErr = fmt.Errorf("AS metadata %s returned %d", candidate, resp.StatusCode)
 			continue
