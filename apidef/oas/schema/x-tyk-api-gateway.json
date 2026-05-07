@@ -2356,7 +2356,8 @@
       "type": "object",
       "properties": {
         "timeout": {
-          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+          "type": "string",
+          "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
         }
       },
       "required": [
