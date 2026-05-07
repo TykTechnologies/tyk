@@ -207,7 +207,7 @@ func testRunner(t *testing.T, proxy *Proxy, hostname string, useSSL bool, testCa
 		proxyLn, err = tls.Listen("tcp", ":0", tlsConfig)
 
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err)
 			return
 		}
 	} else {
