@@ -56,6 +56,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/compression"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -171,6 +172,11 @@ type Gateway struct {
 	apiSpecs        []*APISpec
 	apisByID        map[string]*APISpec
 	apisHandlesByID *sync.Map
+
+	// prmCache memoises upstream Protected Resource Metadata (RFC 9728) docs
+	// for MCP APIs running in mirror mode. Lazily initialised on first use.
+	prmCacheOnce sync.Once
+	prmCache     *mcp.PRMCache
 
 	policies *model.Policies
 
@@ -309,6 +315,15 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 }
 
 // cacheCreate will create the caches in *Gateway.
+// PRMCache returns the gateway-wide Protected Resource Metadata cache used
+// by MCP mirror-mode PRM serving. Constructed lazily on first call.
+func (gw *Gateway) PRMCache() *mcp.PRMCache {
+	gw.prmCacheOnce.Do(func() {
+		gw.prmCache = mcp.NewPRMCache(0)
+	})
+	return gw.prmCache
+}
+
 func (gw *Gateway) cacheCreate() {
 	conf := gw.GetConfig()
 
