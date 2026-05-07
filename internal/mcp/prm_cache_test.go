@@ -118,3 +118,65 @@ func TestFetchUpstreamPRM_404(t *testing.T) {
 		t.Fatal("expected error on 404")
 	}
 }
+
+func TestFetchUpstreamPRM_EmptyURL(t *testing.T) {
+	_, err := FetchUpstreamPRM(context.Background(), http.DefaultClient, "")
+	if err == nil {
+		t.Fatal("expected error on empty URL")
+	}
+}
+
+func TestFetchUpstreamPRM_MalformedJSON(t *testing.T) {
+	stub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{not json`))
+	}))
+	t.Cleanup(stub.Close)
+
+	_, err := FetchUpstreamPRM(context.Background(), stub.Client(), stub.URL+"/x")
+	if err == nil {
+		t.Fatal("expected error on malformed JSON")
+	}
+}
+
+func TestPRMCacheInvalidate(t *testing.T) {
+	c := NewPRMCache(time.Hour)
+	c.Put("k", &PRMDocument{Raw: map[string]any{"resource": "https://x"}})
+	if _, ok := c.Get("k"); !ok {
+		t.Fatal("expected hit before invalidate")
+	}
+	c.Invalidate("k")
+	if _, ok := c.Get("k"); ok {
+		t.Fatal("expected miss after invalidate")
+	}
+}
+
+func TestPRMDocument_NilSafety(t *testing.T) {
+	var d *PRMDocument
+	if got := d.Resource(); got != "" {
+		t.Fatalf("nil doc Resource() should be empty, got %q", got)
+	}
+	d.SetResource("https://x") // must not panic
+	b, err := d.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) != "null" {
+		t.Fatalf("nil doc MarshalJSON should be null, got %s", string(b))
+	}
+}
+
+func TestPRMDocument_SetResourceInitsRaw(t *testing.T) {
+	d := &PRMDocument{}
+	d.SetResource("https://x")
+	if d.Resource() != "https://x" {
+		t.Fatalf("got %q", d.Resource())
+	}
+}
+
+func TestNewPRMCache_DefaultTTLOnZero(t *testing.T) {
+	c := NewPRMCache(0)
+	if c.ttl != DefaultPRMCacheTTL {
+		t.Fatalf("expected default TTL, got %v", c.ttl)
+	}
+}
