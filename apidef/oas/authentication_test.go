@@ -843,6 +843,59 @@ func TestProtectedResourceMetadata_Validate(t *testing.T) {
 		}
 		assert.NoError(t, prm.Validate(false))
 	})
+
+	t.Run("MCP API with no static fields defaults to mirror (passes validation)", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{Enabled: true}
+		assert.NoError(t, prm.Validate(true))
+		assert.True(t, prm.IsMirrorMode(true))
+	})
+
+	t.Run("non-MCP without resource still rejected (mirror is MCP-only)", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{Enabled: true}
+		err := prm.Validate(false)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "resource is required")
+		assert.False(t, prm.IsMirrorMode(false))
+	})
+
+	t.Run("MCP API with static fields keeps static behaviour", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled:              true,
+			Resource:             "https://api.example.com",
+			AuthorizationServers: []string{"https://auth.example.com"},
+		}
+		assert.NoError(t, prm.Validate(true))
+		assert.False(t, prm.IsMirrorMode(true))
+	})
+}
+
+func TestProtectedResourceMetadata_IsMirrorMode(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		prm   *ProtectedResourceMetadata
+		isMCP bool
+		want  bool
+	}{
+		{"nil", nil, true, false},
+		{"disabled", &ProtectedResourceMetadata{Enabled: false}, true, false},
+		{"MCP API with no static fields → mirror", &ProtectedResourceMetadata{Enabled: true}, true, true},
+		{"MCP API with resource set → static", &ProtectedResourceMetadata{Enabled: true, Resource: "https://x"}, true, false},
+		{"MCP API with authorizationServers only → static",
+			&ProtectedResourceMetadata{Enabled: true, AuthorizationServers: []string{"https://auth"}}, true, false},
+		{"non-MCP API never resolves to mirror", &ProtectedResourceMetadata{Enabled: true}, false, false},
+		{"non-MCP with resource set → static", &ProtectedResourceMetadata{Enabled: true, Resource: "https://x"}, false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, tc.prm.IsMirrorMode(tc.isMCP))
+		})
+	}
 }
 
 func TestProtectedResourceMetadata_GetWellKnownPath(t *testing.T) {
