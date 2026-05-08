@@ -729,7 +729,8 @@
           "minimum": 0
         },
         "timeout": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
         }
       },
       "required": [
