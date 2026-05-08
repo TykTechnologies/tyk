@@ -67,7 +67,18 @@ func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 		}
 	}
 
-	// TODO check the streaming client usage here
+	// `options.HttpClient.Transport` is mutated per-request by
+	// reverseProxyPreHandlerV2.PreHandle to wrap it in
+	// GraphQLEngineTransport so HTTP fetches in proxy-only mode capture
+	// the upstream response (TT-7808 et al). The same `options.HttpClient`
+	// flows into graphql_datasource as Factory.HTTPClient and into the
+	// SubscriptionClient as `c.httpClient`. The HTTP fetch path needs the
+	// wrapped Transport; the SubscriptionClient WS dial path does not (in
+	// fact it must avoid the wrapping, otherwise the WS Dial reaches
+	// gateway-internal TykRoundTripper assuming a Tyk-gateway request
+	// context). We pass `options.HttpClient` through as-is and let
+	// reverseProxyPreHandlerV2 mutate it; the WS dial side is handled by
+	// the v2 graphql-go-tools library at a higher layer.
 	configAdapter := adapter.NewGraphQLConfigAdapter(options.ApiDefinition,
 		adapter.WithHttpClient(options.HttpClient),
 		adapter.WithV2Schema(options.Schema),
@@ -186,6 +197,18 @@ func (e *EngineV3) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.
 		e.logger.Debug("error while unmarshalling GraphQL request", abstractlogger.Error(err))
 		return err, http.StatusBadRequest
 	}
+
+	// GraphQL-over-HTTP spec compliance:
+	// https://graphql.github.io/graphql-over-http/draft/
+	// `"variables": null` is equivalent to omitting the `variables` key —
+	// both mean "no variables". Apollo Rover (`rover dev`), Apollo Router,
+	// and other federation clients send `variables: null` during
+	// introspection. Downstream the value is fed to astjson.ParseObject,
+	// which only accepts a JSON object and rejects the literal `null` with
+	// `"failed to parse json object"`. Normalize the literal-null at the
+	// HTTP boundary so the rest of the pipeline sees an absent variables
+	// payload (matching the omitted-key case).
+	gqlRequest.Variables = normalizeNullVariables(gqlRequest.Variables)
 
 	e.ctxStoreRequestFunc(r, &gqlRequest)
 	if e.openTelemetry.Enabled && e.apiDefinition.DetailedTracing {

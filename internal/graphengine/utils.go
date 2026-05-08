@@ -1,6 +1,7 @@
 package graphengine
 
 import (
+	"bytes"
 	"errors"
 	"net"
 	"net/http"
@@ -15,6 +16,31 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 )
+
+// jsonNullLiteral is the four-byte JSON literal `null` used to detect a
+// `"variables": null` payload after json.Unmarshal stores it verbatim into
+// the Variables RawMessage.
+var jsonNullLiteral = []byte("null")
+
+// normalizeNullVariables returns nil when `raw` is the literal JSON `null`
+// (optionally surrounded by whitespace). Per the GraphQL-over-HTTP spec
+// (https://graphql.github.io/graphql-over-http/draft/), `"variables": null`
+// is equivalent to omitting the `variables` key — both mean "no variables".
+// Tyk's downstream pipeline (graphql-go-tools v2's astjson.ParseObject and
+// variablesvalidation.Validate) rejects the literal `null` with
+// `"failed to parse json object"`, so we strip it at the HTTP boundary.
+//
+// Apollo Rover (`rover dev`), Apollo Router, and many other federation
+// clients send `variables: null` during introspection; without this
+// normalization Tyk cannot serve as a federation v2 subgraph for those
+// clients.
+func normalizeNullVariables(raw []byte) []byte {
+	trimmed := bytes.TrimSpace(raw)
+	if bytes.Equal(trimmed, jsonNullLiteral) {
+		return nil
+	}
+	return raw
+}
 
 type TykVariableReplacer func(r *http.Request, in string, escape bool) string
 
@@ -31,7 +57,7 @@ func GetSchemaV1(engine Engine) (*graphql.Schema, error) {
 func GetSchemaV2(engine Engine) (*graphqlv2.Schema, error) {
 	switch engine.Version() {
 	case EngineVersionV3:
-		// Handle for tyk graph engine v3
+		return engine.(*EngineV3).schema, nil
 	}
 	return nil, errors.New("schema not supported for engine type")
 }
