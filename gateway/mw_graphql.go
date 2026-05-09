@@ -13,7 +13,6 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/astparser"
-	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/federation"
 
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 
@@ -130,35 +129,17 @@ func (m *GraphQLMiddleware) Init() {
 			},
 		})
 	} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion3Preview {
-		schemaStr := m.Spec.GraphQL.Schema
 		// Apollo Federation v2 schemas need the federation extensions
 		// (`_Entity` union, `_entities`, `_service`) injected before the schema
-		// is parsed so validation accepts incoming federation queries. UDG
-		// composes upstreams locally; proxy-only forwards `_entities` queries
-		// to an upstream subgraph or router, but Tyk still validates the
-		// operation against its known schema first. In both cases, augment
-		// the schema. For proxy-only we auto-detect federation by scanning
-		// for `@key` directives — no config flag.
-		if m.Spec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine {
-			var err error
-			schemaStr, err = federation.BuildFederationSchema(schemaStr, schemaStr)
-			if err != nil {
-				log.Errorf("Error while injecting federation schema: %v", err)
-				return
-			}
-		} else if m.Spec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly && schemaHasKeyDirective(schemaStr) {
-			// Apollo Federation v2 proxy-mode passthrough: when the customer's
-			// SDL declares `@key` types, Tyk forwards `_entities` queries to the
-			// upstream subgraph or router. Tyk still validates the operation
-			// against its known schema first, so we must inject the federation
-			// extensions (`_Entity` union, `_entities`, `_service`) here.
-			// Auto-detect from `@key` — no config flag.
-			augmented, err := federation.BuildFederationSchema(schemaStr, schemaStr)
-			if err != nil {
-				log.Errorf("Error while injecting federation schema: %v", err)
-				return
-			}
-			schemaStr = augmented
+		// is parsed so validation accepts incoming federation queries. The
+		// augmentation step is EE-gated: in CE builds the helper is a no-op
+		// that warns when `@key` directives are present; in EE/dev builds it
+		// performs the UDG and proxy-mode passthrough augmentation. The call
+		// site is build-tag-agnostic; the linker picks which body fires.
+		schemaStr, err := m.augmentFederationSchema(m.Spec.GraphQL.Schema, m.Spec.GraphQL.ExecutionMode)
+		if err != nil {
+			log.Errorf("Error while injecting federation schema: %v", err)
+			return
 		}
 
 		v2Schema, err := gqlv2.NewSchemaFromString(schemaStr)
