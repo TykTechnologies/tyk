@@ -1,0 +1,15 @@
+# rover supergraph compose config for Cast 2 (GraphQL/Hasura-style
+# upstream, auto-detect generated lookup). Same shape as rest.yaml — the
+# difference lives entirely inside Tyk: the configured upstream is a
+# GraphQL server instead of a REST one. The supergraph topology is
+# identical.
+federation_version: =2.5.0
+subgraphs:
+  users:
+    routing_url: ${TYK_URL}
+    schema:
+      subgraph_url: ${TYK_URL}
+  posts:
+    routing_url: ${STUB_URL}
+    schema:
+      subgraph_url: ${STUB_URL}
