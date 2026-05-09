@@ -1,4 +1,4 @@
-package enginev3
+package graphql_federation
 
 import (
 	"bytes"
@@ -15,6 +15,7 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/ast"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/astparser"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 

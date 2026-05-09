@@ -1,4 +1,4 @@
-package enginev3
+package graphql_federation
 
 import (
 	"bytes"
@@ -13,6 +13,7 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/astparser"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/plan"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/resolve"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -260,6 +261,10 @@ func (d *entitiesDataSource) Load(ctx context.Context, input []byte, w io.Writer
 	return json.NewEncoder(w).Encode(response)
 }
 
+// createEntitiesDataSource builds the federation `_entities` plan data source.
+// Returns the zero DataSourceConfiguration plus a nil error when the schema
+// has no `@key` types — the caller treats that as "not federated" and skips
+// appending.
 func createEntitiesDataSource(federatedSchema string, resolvers map[string]entityResolver) (plan.DataSourceConfiguration, error) {
 	doc, report := astparser.ParseGraphqlDocumentString(federatedSchema)
 	if report.HasErrors() {
@@ -386,37 +391,4 @@ func buildResolverForDataSource(ds apidef.GraphQLEngineDataSource, entityTypeNam
 		// _entities request/response shape.
 		return nil, nil
 	}
-}
-
-func keyedEntityTypes(sdl string) (map[string]bool, error) {
-	doc, report := astparser.ParseGraphqlDocumentString(sdl)
-	if report.HasErrors() {
-		return nil, report
-	}
-	out := map[string]bool{}
-	for i := range doc.ObjectTypeDefinitions {
-		def := doc.ObjectTypeDefinitions[i]
-		if !def.HasDirectives {
-			continue
-		}
-		for _, dRef := range def.Directives.Refs {
-			if doc.DirectiveNameString(dRef) == "key" {
-				out[doc.ObjectTypeDefinitionNameString(i)] = true
-				break
-			}
-		}
-	}
-	for i := range doc.ObjectTypeExtensions {
-		ext := doc.ObjectTypeExtensions[i]
-		if !ext.HasDirectives {
-			continue
-		}
-		for _, dRef := range ext.Directives.Refs {
-			if doc.DirectiveNameString(dRef) == "key" {
-				out[doc.ObjectTypeExtensionNameString(i)] = true
-				break
-			}
-		}
-	}
-	return out, nil
 }
