@@ -6,6 +6,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -106,7 +107,13 @@ func TestOAS_Security(t *testing.T) {
 	var convertedAPI apidef.APIDefinition // bundle enabled
 	oas.extractSecurityTo(&convertedAPI)
 
+	// SecurityRequirements / SecurityRequirementScopes mirror the OAS
+	// shape; fill builds an empty-scope requirement for every scheme
+	// in AuthConfigs, so the round-trip from a bare api into one with
+	// security context is asymmetric by design. Reset the two fields
+	// to compare the rest of the definition.
 	convertedAPI.SecurityRequirements = nil
+	convertedAPI.SecurityRequirementScopes = nil
 	assert.Equal(t, api, convertedAPI)
 }
 
@@ -1123,7 +1130,10 @@ func TestOAS_extractSecurityTo_ORLogic(t *testing.T) {
 		var api apidef.APIDefinition
 		oas.extractSecurityTo(&api)
 
-		assert.Nil(t, api.SecurityRequirements)
+		// Single requirement (AND): both schemes must appear in the one
+		// requirement entry so fill can re-emit them on round-trip.
+		require.Len(t, api.SecurityRequirements, 1)
+		assert.ElementsMatch(t, []string{"token-auth", "jwt-auth"}, api.SecurityRequirements[0])
 	})
 
 	t.Run("should handle empty Security", func(t *testing.T) {
@@ -1500,8 +1510,595 @@ func TestOAS_SecurityRequirements_RoundTrip(t *testing.T) {
 		var extractedAPI apidef.APIDefinition
 		oas.extractSecurityTo(&extractedAPI)
 
-		// Single requirement (AND logic) doesn't need explicit SecurityRequirements
-		assert.Nil(t, extractedAPI.SecurityRequirements)
+		// Single requirement (AND): SecurityRequirements lists every
+		// scheme in that one entry — fill needs this to preserve all
+		// schemes through the round-trip (without it, schemes with
+		// empty scopes get dropped by normalizeSecurityRequirements).
+		require.Len(t, extractedAPI.SecurityRequirements, 1)
+		assert.ElementsMatch(t, []string{"token-auth", "jwt-auth"}, extractedAPI.SecurityRequirements[0])
+	})
+}
+
+// TestOAS_SecurityScopes_RoundTrip pins that OAS Security Requirement
+// Objects preserve per-scheme scope arrays end-to-end through the
+// extract→fill cycle. The oauth2 scope-check middleware reads these
+// scopes from the OAS document to enforce required-scope coverage,
+// so dropping them would silently turn enforcement into a no-op.
+func TestOAS_SecurityScopes_RoundTrip(t *testing.T) {
+	buildOAS := func() OAS {
+		o := OAS{}
+		o.OpenAPI = "3.0.3"
+		o.Info = &openapi3.Info{Title: "scope-roundtrip", Version: "1.0"}
+		o.Paths = openapi3.NewPaths()
+		o.Components = &openapi3.Components{
+			SecuritySchemes: openapi3.SecuritySchemes{
+				"corpOAuth": &openapi3.SecuritySchemeRef{
+					Value: &openapi3.SecurityScheme{
+						Type: typeOAuth2,
+						Flows: &openapi3.OAuthFlows{
+							AuthorizationCode: &openapi3.OAuthFlow{
+								AuthorizationURL: "/oauth/authorize",
+								TokenURL:         "/oauth/token",
+								Scopes:           map[string]string{},
+							},
+						},
+					},
+				},
+				"jwtAuth": &openapi3.SecuritySchemeRef{
+					Value: &openapi3.SecurityScheme{
+						Type:         "http",
+						Scheme:       "bearer",
+						BearerFormat: "JWT",
+					},
+				},
+			},
+		}
+		o.Security = openapi3.SecurityRequirements{
+			{"jwtAuth": []string{}, "corpOAuth": []string{"api:access", "users:read"}},
+			{"jwtAuth": []string{}, "corpOAuth": []string{"admin"}},
+		}
+		o.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+					SecuritySchemes: SecuritySchemes{
+						"jwtAuth":   &JWT{Enabled: true, AuthSources: AuthSources{Header: &AuthSource{Enabled: true, Name: "Authorization"}}, SigningMethod: "rsa", Source: "anything", IdentityBaseField: "sub"},
+						"corpOAuth": &OAuth2{Enabled: true, ScopeCheck: &OAuth2ScopeCheck{Enabled: true, ScopeSource: OAuth2ScopeSourceGlobal}},
+					},
+				},
+			},
+		})
+		return o
+	}
+
+	t.Run("scopes survive extract→fill on an oauth2 scheme", func(t *testing.T) {
+		original := buildOAS()
+		var api apidef.APIDefinition
+		original.extractSecurityTo(&api)
+
+		require.NotEmpty(t, api.SecurityRequirementScopes,
+			"extractSecurityTo must populate SecurityRequirementScopes so scope arrays survive the round-trip")
+		require.Len(t, api.SecurityRequirementScopes, 2)
+		assert.Equal(t, []string{"api:access", "users:read"}, api.SecurityRequirementScopes[0]["corpOAuth"])
+		assert.Equal(t, []string{"admin"}, api.SecurityRequirementScopes[1]["corpOAuth"])
+
+		// Now fill back into a fresh OAS — the scope arrays must reappear verbatim.
+		var rebuilt OAS
+		rebuilt.OpenAPI = "3.0.3"
+		rebuilt.Info = &openapi3.Info{Title: "scope-roundtrip", Version: "1.0"}
+		rebuilt.Paths = openapi3.NewPaths()
+		rebuilt.Components = &openapi3.Components{SecuritySchemes: openapi3.SecuritySchemes{
+			"corpOAuth": original.Components.SecuritySchemes["corpOAuth"],
+			"jwtAuth":   original.Components.SecuritySchemes["jwtAuth"],
+		}}
+		rebuilt.SetTykExtension(&XTykAPIGateway{
+			Server: Server{Authentication: original.GetTykExtension().Server.Authentication},
+		})
+		rebuilt.fillSecurity(api)
+
+		require.Len(t, rebuilt.Security, 2,
+			"fillSecurity must emit one OAS Security Requirement per extracted requirement")
+		assert.Equal(t, []string{"api:access", "users:read"}, rebuilt.Security[0]["corpOAuth"],
+			"first alternative must restore its full scope array — losing scopes turns scope-check into a no-op")
+		assert.Equal(t, []string{"admin"}, rebuilt.Security[1]["corpOAuth"],
+			"second alternative must restore its scope")
+	})
+
+	t.Run("non-oauth schemes get empty scope arrays per OAS spec", func(t *testing.T) {
+		// OAS 3.0 §4.8.30.1: the scope list MUST be empty for security
+		// schemes other than oauth2 / openIdConnect. Even if upstream
+		// data nominally carries scopes for a JWT scheme, fill must
+		// emit the empty array.
+		original := buildOAS()
+		var api apidef.APIDefinition
+		original.extractSecurityTo(&api)
+
+		var rebuilt OAS
+		rebuilt.OpenAPI = "3.0.3"
+		rebuilt.Info = &openapi3.Info{Title: "scope-roundtrip", Version: "1.0"}
+		rebuilt.Paths = openapi3.NewPaths()
+		rebuilt.Components = &openapi3.Components{SecuritySchemes: openapi3.SecuritySchemes{
+			"corpOAuth": original.Components.SecuritySchemes["corpOAuth"],
+			"jwtAuth":   original.Components.SecuritySchemes["jwtAuth"],
+		}}
+		rebuilt.SetTykExtension(&XTykAPIGateway{
+			Server: Server{Authentication: original.GetTykExtension().Server.Authentication},
+		})
+		rebuilt.fillSecurity(api)
+
+		assert.Equal(t, []string{}, rebuilt.Security[0]["jwtAuth"],
+			"jwt scheme must emit an empty scope array — OAS forbids scopes on non-oauth schemes")
+	})
+
+	t.Run("legacy data without SecurityRequirementScopes falls back to empty scope arrays", func(t *testing.T) {
+		// Forward-compat: APIDefinition records written before this
+		// field existed have only SecurityRequirements set. Fill must
+		// still produce a valid OAS document (with empty scope arrays)
+		// rather than panic or drop the requirement entirely.
+		api := apidef.APIDefinition{
+			SecurityRequirements: [][]string{
+				{"jwtAuth", "corpOAuth"},
+			},
+		}
+		var rebuilt OAS
+		rebuilt.OpenAPI = "3.0.3"
+		rebuilt.Info = &openapi3.Info{Title: "legacy", Version: "1.0"}
+		rebuilt.Paths = openapi3.NewPaths()
+		rebuilt.Components = &openapi3.Components{SecuritySchemes: openapi3.SecuritySchemes{
+			"corpOAuth": &openapi3.SecuritySchemeRef{Value: &openapi3.SecurityScheme{Type: typeOAuth2,
+				Flows: &openapi3.OAuthFlows{AuthorizationCode: &openapi3.OAuthFlow{AuthorizationURL: "/oauth/authorize", TokenURL: "/oauth/token", Scopes: map[string]string{}}}}},
+			"jwtAuth": &openapi3.SecuritySchemeRef{Value: &openapi3.SecurityScheme{Type: "http", Scheme: "bearer"}},
+		}}
+		rebuilt.SetTykExtension(&XTykAPIGateway{
+			Server: Server{Authentication: &Authentication{
+				Enabled: true,
+				SecuritySchemes: SecuritySchemes{
+					"jwtAuth":   &JWT{Enabled: true},
+					"corpOAuth": &OAuth2{Enabled: true, ScopeCheck: &OAuth2ScopeCheck{Enabled: true}},
+				},
+			}},
+		})
+		require.NotPanics(t, func() { rebuilt.fillSecurity(api) })
+
+		require.Len(t, rebuilt.Security, 1)
+		assert.Equal(t, []string{}, rebuilt.Security[0]["jwtAuth"])
+		assert.Equal(t, []string{}, rebuilt.Security[0]["corpOAuth"])
+	})
+}
+
+// TestOAS_SecurityScopes_StalePersistence pins that extractSecurityTo
+// always reflects the current OAS Security shape — never a stale value
+// inherited from the APIDefinition it is writing into. The dashboard
+// hydrates the APIDefinition from Mongo before applying the operator's
+// edit, so SecurityRequirements and SecurityRequirementScopes both
+// carry the previous state on entry. Combined with bson:",omitempty",
+// any code path that fails to overwrite these fields lets a prior
+// value persist on disk and surface as enforced scopes the operator
+// just deleted.
+func TestOAS_SecurityScopes_StalePersistence(t *testing.T) {
+	// oauth2-only security scheme — keeps the test focused on the
+	// scope-array contract that the new SecurityRequirementScopes
+	// field is supposed to preserve.
+	buildOAS := func(security openapi3.SecurityRequirements) OAS {
+		o := OAS{}
+		o.OpenAPI = "3.0.3"
+		o.Info = &openapi3.Info{Title: "stale-scopes", Version: "1.0"}
+		o.Paths = openapi3.NewPaths()
+		o.Components = &openapi3.Components{
+			SecuritySchemes: openapi3.SecuritySchemes{
+				"corpOAuth": &openapi3.SecuritySchemeRef{
+					Value: &openapi3.SecurityScheme{
+						Type: typeOAuth2,
+						Flows: &openapi3.OAuthFlows{
+							AuthorizationCode: &openapi3.OAuthFlow{
+								AuthorizationURL: "/oauth/authorize",
+								TokenURL:         "/oauth/token",
+								Scopes:           map[string]string{},
+							},
+						},
+					},
+				},
+				"jwtAuth": &openapi3.SecuritySchemeRef{
+					Value: &openapi3.SecurityScheme{
+						Type: "http", Scheme: "bearer", BearerFormat: "JWT",
+					},
+				},
+			},
+		}
+		o.Security = security
+		o.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+					SecuritySchemes: SecuritySchemes{
+						"corpOAuth": &OAuth2{Enabled: true, ScopeCheck: &OAuth2ScopeCheck{Enabled: true, ScopeSource: OAuth2ScopeSourceGlobal}},
+						"jwtAuth":   &JWT{Enabled: true, AuthSources: AuthSources{Header: &AuthSource{Enabled: true, Name: "Authorization"}}, SigningMethod: "rsa", Source: "anything", IdentityBaseField: "sub"},
+					},
+				},
+			},
+		})
+		return o
+	}
+
+	// Scenario C — single-scheme, single-requirement: operator clears
+	// the scope from ["api:access"] to []. With the bug, the
+	// single-requirement branch assigns nil when scopes are empty;
+	// bson:",omitempty" then drops the field from the update payload
+	// and the stale stored value persists on disk.
+	t.Run("single-scheme single-requirement: cleared scope must not retain stale value", func(t *testing.T) {
+		original := buildOAS(openapi3.SecurityRequirements{
+			{"corpOAuth": []string{}},
+		})
+		api := apidef.APIDefinition{
+			SecurityRequirementScopes: []map[string][]string{
+				{"corpOAuth": {"api:access"}},
+			},
+		}
+
+		original.extractSecurityTo(&api)
+
+		require.Len(t, api.SecurityRequirementScopes, 1,
+			"extract must emit an explicit scope entry for the current OAS Security Requirement so the serialized payload overwrites any stale stored value")
+		assert.Empty(t, api.SecurityRequirementScopes[0]["corpOAuth"],
+			"scope was cleared in the OAS; the rebuilt scope map must reflect that — never the prior ['api:access']")
+	})
+
+	// Scenario E — operator removes the security block entirely. The
+	// stored APIDefinition still carries SecurityRequirementScopes from
+	// the previous save; without an explicit reset at the top of
+	// extractSecurityTo, the no-security early-return leaves that
+	// stale field untouched.
+	t.Run("security block removed: stale scopes must be cleared", func(t *testing.T) {
+		original := buildOAS(nil)
+		api := apidef.APIDefinition{
+			SecurityRequirements: [][]string{{"corpOAuth"}},
+			SecurityRequirementScopes: []map[string][]string{
+				{"corpOAuth": {"api:access"}},
+			},
+		}
+
+		original.extractSecurityTo(&api)
+
+		assert.Empty(t, api.SecurityRequirements,
+			"removing the OAS security block must clear SecurityRequirements")
+		assert.Empty(t, api.SecurityRequirementScopes,
+			"removing the OAS security block must clear SecurityRequirementScopes; otherwise the prior policy persists on disk")
+	})
+
+	// Scenario G — multi-requirement, lengths still match but every
+	// scope array is now empty. The reviewer's worst case: today the
+	// anyRequirementHasScopes guard skips the assignment when all
+	// scopes are empty, so stale per-alternative scopes are preserved
+	// on disk while the in-memory normalize helper cannot detect the
+	// mismatch.
+	t.Run("multi-requirement scopes cleared: stale per-alternative scopes must be cleared", func(t *testing.T) {
+		original := buildOAS(openapi3.SecurityRequirements{
+			{"corpOAuth": []string{}},
+			{"jwtAuth": []string{}},
+		})
+		api := apidef.APIDefinition{
+			SecurityRequirements: [][]string{{"corpOAuth"}, {"jwtAuth"}},
+			SecurityRequirementScopes: []map[string][]string{
+				{"corpOAuth": {"api:access"}},
+				{"jwtAuth": {}},
+			},
+		}
+
+		original.extractSecurityTo(&api)
+
+		require.Len(t, api.SecurityRequirementScopes, 2,
+			"extract must emit one scope entry per OAS Security Requirement")
+		assert.Empty(t, api.SecurityRequirementScopes[0]["corpOAuth"],
+			"alternative 0 lost its scope in OAS; extract must not retain the stale ['api:access']")
+		assert.Empty(t, api.SecurityRequirementScopes[1]["jwtAuth"],
+			"alternative 1 has no scopes in OAS; extract must reflect that")
+	})
+
+	// Scenario D — operator swaps one scope for another within the same
+	// single-scheme requirement. Extract must reflect the new scope; the
+	// prior value must not bleed through.
+	t.Run("single-scheme single-requirement: scope replaced must surface the new value", func(t *testing.T) {
+		original := buildOAS(openapi3.SecurityRequirements{
+			{"corpOAuth": []string{"users:read"}},
+		})
+		api := apidef.APIDefinition{
+			SecurityRequirementScopes: []map[string][]string{
+				{"corpOAuth": {"api:access"}},
+			},
+		}
+
+		original.extractSecurityTo(&api)
+
+		require.Len(t, api.SecurityRequirementScopes, 1)
+		assert.Equal(t, []string{"users:read"}, api.SecurityRequirementScopes[0]["corpOAuth"],
+			"extract must reflect the new scope, never the prior ['api:access']")
+	})
+
+	// Scenario F — operator shrinks a multi-requirement policy to a
+	// single-scheme single-requirement. Extract must reset the stale
+	// SecurityRequirements and shrink SecurityRequirementScopes to the
+	// new shape so the on-disk payload no longer carries the dropped
+	// alternative.
+	t.Run("multi-requirement shrunk to single: stale alternative cleared from both fields", func(t *testing.T) {
+		original := buildOAS(openapi3.SecurityRequirements{
+			{"corpOAuth": []string{"api:access"}},
+		})
+		api := apidef.APIDefinition{
+			SecurityRequirements: [][]string{{"corpOAuth"}, {"jwtAuth"}},
+			SecurityRequirementScopes: []map[string][]string{
+				{"corpOAuth": {"api:access"}},
+				{"jwtAuth": {}},
+			},
+		}
+
+		original.extractSecurityTo(&api)
+
+		assert.Empty(t, api.SecurityRequirements,
+			"single-scheme single-requirement leaves SecurityRequirements nil; fill rebuilds it from the scheme map at load time")
+		require.Len(t, api.SecurityRequirementScopes, 1,
+			"shrinking to one alternative must shrink SecurityRequirementScopes to match — the stale second entry must not survive")
+		assert.Equal(t, []string{"api:access"}, api.SecurityRequirementScopes[0]["corpOAuth"])
+	})
+
+	// Scenario H — operator extends a single-requirement policy into
+	// two alternatives. Extract emits the new multi-requirement shape;
+	// the previously-single SecurityRequirementScopes entry must not
+	// bleed into the new layout.
+	t.Run("single-requirement extended to multi: extract reflects the new shape", func(t *testing.T) {
+		original := buildOAS(openapi3.SecurityRequirements{
+			{"corpOAuth": []string{"api:access"}},
+			{"jwtAuth": []string{}},
+		})
+		api := apidef.APIDefinition{
+			SecurityRequirementScopes: []map[string][]string{
+				{"corpOAuth": {"api:access"}},
+			},
+		}
+
+		original.extractSecurityTo(&api)
+
+		require.Len(t, api.SecurityRequirements, 2)
+		require.Len(t, api.SecurityRequirementScopes, 2)
+		assert.Equal(t, []string{"api:access"}, api.SecurityRequirementScopes[0]["corpOAuth"])
+		assert.Empty(t, api.SecurityRequirementScopes[1]["jwtAuth"],
+			"the new second alternative carries no scopes")
+	})
+}
+
+// TestOAS_SecurityScopes_CompliantMode pins the save/load contract under
+// SecurityProcessingMode=compliant. Compliant mode (a) processes every
+// alternative in the OAS root `security:` array (not just the first like
+// legacy mode), (b) splits standard OAS auth and proprietary vendor auth
+// into two storage locations (s.Security vs Authentication.Security),
+// and (c) reconcatenates them on extract through the
+// appendFilteredOASSecurityRequirements / appendVendorSecurityRequirements
+// helpers. The tests below cover both the staleness contract introduced
+// in this story and the existing compliant-mode shape contract, to
+// guarantee the two interact correctly.
+func TestOAS_SecurityScopes_CompliantMode(t *testing.T) {
+	// buildCompliantOAS sets the authentication processing mode to
+	// compliant so extract takes the OAS+vendor split path
+	// (security.go::extractSecurityTo, "if processingMode ==
+	// SecurityProcessingModeCompliant" branch). The vendorSecurity
+	// slot is exposed so individual tests can mix proprietary
+	// (hmac / oauth) and standard schemes.
+	buildCompliantOAS := func(oasSecurity openapi3.SecurityRequirements, vendorSecurity [][]string) OAS {
+		o := OAS{}
+		o.OpenAPI = "3.0.3"
+		o.Info = &openapi3.Info{Title: "compliant-mode", Version: "1.0"}
+		o.Paths = openapi3.NewPaths()
+		o.Components = &openapi3.Components{
+			SecuritySchemes: openapi3.SecuritySchemes{
+				"corpOAuth": &openapi3.SecuritySchemeRef{
+					Value: &openapi3.SecurityScheme{
+						Type: typeOAuth2,
+						Flows: &openapi3.OAuthFlows{
+							AuthorizationCode: &openapi3.OAuthFlow{
+								AuthorizationURL: "/oauth/authorize",
+								TokenURL:         "/oauth/token",
+								Scopes:           map[string]string{},
+							},
+						},
+					},
+				},
+				"jwtAuth": &openapi3.SecuritySchemeRef{
+					Value: &openapi3.SecurityScheme{
+						Type: "http", Scheme: "bearer", BearerFormat: "JWT",
+					},
+				},
+			},
+		}
+		o.Security = oasSecurity
+		o.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
+					Security:               vendorSecurity,
+					SecuritySchemes: SecuritySchemes{
+						"corpOAuth": &OAuth2{Enabled: true, ScopeCheck: &OAuth2ScopeCheck{Enabled: true, ScopeSource: OAuth2ScopeSourceGlobal}},
+						"jwtAuth":   &JWT{Enabled: true, AuthSources: AuthSources{Header: &AuthSource{Enabled: true, Name: "Authorization"}}, SigningMethod: "rsa", Source: "anything", IdentityBaseField: "sub"},
+					},
+				},
+			},
+		})
+		return o
+	}
+
+	// Compliant-mode early-return: extractSecurityTo must reset both
+	// fields even when neither s.Security nor tykAuthentication.Security
+	// carries any entries, otherwise the prior stored values inherited
+	// from the dashboard's hydrated APIDefinition would resurface on
+	// reload. The legacy-mode equivalent is covered by
+	// TestOAS_SecurityScopes_StalePersistence/"security_block_removed";
+	// this case pins the same invariant for compliant mode.
+	t.Run("no security: stale fields cleared under compliant mode", func(t *testing.T) {
+		original := buildCompliantOAS(nil, nil)
+		api := apidef.APIDefinition{
+			SecurityRequirements: [][]string{{"corpOAuth"}, {"jwtAuth"}},
+			SecurityRequirementScopes: []map[string][]string{
+				{"corpOAuth": {"api:access"}},
+				{"jwtAuth": {}},
+			},
+		}
+
+		original.extractSecurityTo(&api)
+
+		assert.Empty(t, api.SecurityRequirements,
+			"compliant-mode early-return must clear SecurityRequirements")
+		assert.Empty(t, api.SecurityRequirementScopes,
+			"compliant-mode early-return must clear SecurityRequirementScopes")
+	})
+
+	// Compliant-mode multi-requirement OR: extract emits one scope
+	// entry per OAS Security Requirement, index-aligned with
+	// SecurityRequirements. The order of alternatives is preserved so
+	// the WWW-Authenticate challenge cites the first as authored.
+	t.Run("multi-requirement OR: scope-array order preserved through extract", func(t *testing.T) {
+		original := buildCompliantOAS(openapi3.SecurityRequirements{
+			{"corpOAuth": []string{"users:read"}},
+			{"corpOAuth": []string{"admin"}},
+		}, nil)
+		var api apidef.APIDefinition
+
+		original.extractSecurityTo(&api)
+
+		require.Len(t, api.SecurityRequirements, 2)
+		require.Len(t, api.SecurityRequirementScopes, 2)
+		assert.Equal(t, []string{"users:read"}, api.SecurityRequirementScopes[0]["corpOAuth"])
+		assert.Equal(t, []string{"admin"}, api.SecurityRequirementScopes[1]["corpOAuth"])
+	})
+
+	// Compliant-mode scope-cleared-on-all-alternatives: analog of
+	// scenario G in legacy mode. Lengths match, every scope is empty,
+	// so the old anyRequirementHasScopes guard would have skipped the
+	// SecurityRequirementScopes assignment and let the stale value
+	// persist on disk. Pins that compliant mode also writes the
+	// empty-shape slice.
+	t.Run("multi-requirement all scopes cleared: stale per-alternative scopes cleared", func(t *testing.T) {
+		original := buildCompliantOAS(openapi3.SecurityRequirements{
+			{"corpOAuth": []string{}},
+			{"jwtAuth": []string{}},
+		}, nil)
+		api := apidef.APIDefinition{
+			SecurityRequirements: [][]string{{"corpOAuth"}, {"jwtAuth"}},
+			SecurityRequirementScopes: []map[string][]string{
+				{"corpOAuth": {"api:access"}},
+				{"jwtAuth": {}},
+			},
+		}
+
+		original.extractSecurityTo(&api)
+
+		require.Len(t, api.SecurityRequirementScopes, 2,
+			"extract must emit one scope entry per OAS Security Requirement")
+		assert.Empty(t, api.SecurityRequirementScopes[0]["corpOAuth"],
+			"alternative 0's scope was cleared in OAS; extract must not retain ['api:access']")
+		assert.Empty(t, api.SecurityRequirementScopes[1]["jwtAuth"])
+	})
+
+	// Compliant-mode vendor-only: when the OAS root security: array
+	// is empty but tykAuthentication.Security carries proprietary
+	// requirements, extract emits the vendor entries with empty scope
+	// maps (vendor entries do not carry OAS scopes — see
+	// appendVendorSecurityRequirements). SecurityRequirementScopes
+	// stays index-aligned with SecurityRequirements.
+	t.Run("vendor-only security: scopes slice is index-aligned with empty maps", func(t *testing.T) {
+		original := buildCompliantOAS(nil, [][]string{{"hmac"}, {"oauth"}})
+		api := apidef.APIDefinition{
+			SecurityRequirementScopes: []map[string][]string{
+				{"corpOAuth": {"api:access"}},
+			},
+		}
+
+		original.extractSecurityTo(&api)
+
+		require.Len(t, api.SecurityRequirements, 2,
+			"vendor entries must appear in SecurityRequirements")
+		assert.Equal(t, []string{"hmac"}, api.SecurityRequirements[0])
+		assert.Equal(t, []string{"oauth"}, api.SecurityRequirements[1])
+		require.Len(t, api.SecurityRequirementScopes, 2,
+			"SecurityRequirementScopes must stay index-aligned with vendor entries")
+		assert.Empty(t, api.SecurityRequirementScopes[0],
+			"vendor entries carry no OAS scopes")
+		assert.Empty(t, api.SecurityRequirementScopes[1])
+	})
+
+	// Compliant-mode mixed (proprietary AND standard): when a vendor
+	// requirement bundles a proprietary scheme with a standard one
+	// (e.g. [hmac, jwtAuth]), the standard scheme must not be
+	// duplicated as a single-scheme OAS requirement. extract's
+	// appendFilteredOASSecurityRequirements drops the duplicate.
+	t.Run("mixed vendor AND standard: standard scheme not duplicated", func(t *testing.T) {
+		original := buildCompliantOAS(openapi3.SecurityRequirements{
+			{"jwtAuth": []string{}},
+		}, [][]string{{"hmac", "jwtAuth"}})
+		var api apidef.APIDefinition
+
+		original.extractSecurityTo(&api)
+
+		require.Len(t, api.SecurityRequirements, 1,
+			"the single-scheme OAS entry for jwtAuth must be filtered as a duplicate of the mixed vendor requirement")
+		assert.ElementsMatch(t, []string{"hmac", "jwtAuth"}, api.SecurityRequirements[0])
+		require.Len(t, api.SecurityRequirementScopes, 1,
+			"SecurityRequirementScopes must stay index-aligned with SecurityRequirements after filtering")
+		assert.Empty(t, api.SecurityRequirementScopes[0],
+			"vendor-mixed entry carries no OAS scopes")
+	})
+
+	// Compliant-mode OAS + vendor combined: pure OAS entries are
+	// appended first, then vendor entries. SecurityRequirementScopes
+	// carries the OAS scopes for the OAS entries and empty maps for
+	// the vendor entries.
+	t.Run("oas with scopes plus vendor: ordering and scope alignment preserved", func(t *testing.T) {
+		original := buildCompliantOAS(openapi3.SecurityRequirements{
+			{"corpOAuth": []string{"users:read"}},
+		}, [][]string{{"hmac"}})
+		var api apidef.APIDefinition
+
+		original.extractSecurityTo(&api)
+
+		require.Len(t, api.SecurityRequirements, 2)
+		assert.Equal(t, []string{"corpOAuth"}, api.SecurityRequirements[0])
+		assert.Equal(t, []string{"hmac"}, api.SecurityRequirements[1])
+		require.Len(t, api.SecurityRequirementScopes, 2)
+		assert.Equal(t, []string{"users:read"}, api.SecurityRequirementScopes[0]["corpOAuth"],
+			"OAS entry retains its scope")
+		assert.Empty(t, api.SecurityRequirementScopes[1],
+			"vendor entry has no OAS scope")
+	})
+
+	// Compliant-mode round-trip: extract → fill → extract on a
+	// non-trivial OR-of-AND policy produces the same in-memory shape.
+	// This pins that the fill side respects SecurityRequirementScopes
+	// alignment under compliant mode just as it does under legacy
+	// mode.
+	t.Run("round-trip preserves OR-of-AND shape and scopes", func(t *testing.T) {
+		original := buildCompliantOAS(openapi3.SecurityRequirements{
+			{"corpOAuth": []string{"users:read"}, "jwtAuth": []string{}},
+			{"corpOAuth": []string{"admin"}},
+		}, nil)
+		var api apidef.APIDefinition
+
+		original.extractSecurityTo(&api)
+
+		var rebuilt OAS
+		rebuilt.OpenAPI = "3.0.3"
+		rebuilt.Info = &openapi3.Info{Title: "compliant-mode", Version: "1.0"}
+		rebuilt.Paths = openapi3.NewPaths()
+		rebuilt.Components = &openapi3.Components{SecuritySchemes: original.Components.SecuritySchemes}
+		rebuilt.SetTykExtension(&XTykAPIGateway{
+			Server: Server{Authentication: original.GetTykExtension().Server.Authentication},
+		})
+		rebuilt.fillSecurity(api)
+
+		require.Len(t, rebuilt.Security, 2)
+		// The AND alternative must contain both schemes with the
+		// declared scopes — jwtAuth always with an empty array (OAS
+		// 3.0 §4.8.30.1 forbids scopes on non-oauth schemes).
+		assert.Equal(t, []string{"users:read"}, rebuilt.Security[0]["corpOAuth"])
+		assert.Equal(t, []string{}, rebuilt.Security[0]["jwtAuth"])
+		assert.Equal(t, []string{"admin"}, rebuilt.Security[1]["corpOAuth"])
 	})
 }
 
@@ -3542,4 +4139,68 @@ func TestTokenHasCertificateEnabled(t *testing.T) {
 		assert.False(t, oas.tokenHasCertificateEnabled("authToken1"))
 		assert.True(t, oas.tokenHasCertificateEnabled("authToken2"))
 	})
+}
+
+// TestExtractFillRoundTrip_SingleAlternativePreservesAllSchemes pins
+// that a single-alternative root `security:` with multiple schemes
+// (jwtAuth + corpOAuth, AND-required) survives extract→fill without
+// dropping schemes that carry empty scope lists. Regression: the
+// dashboard PUT round-trip saved
+// `[{jwtAuth: [], corpOAuth: [api:access]}]` but read back
+// `[{corpOAuth: [api:access]}]` — the gateway then wired AuthKey
+// instead of JWT and rejected every JWT-bearer request.
+func TestExtractFillRoundTrip_SingleAlternativePreservesAllSchemes(t *testing.T) {
+	s := &OAS{}
+	s.OpenAPI = "3.0.3"
+	s.Info = &openapi3.Info{Title: "rt", Version: "1.0"}
+	s.Paths = openapi3.NewPaths()
+	s.Components = &openapi3.Components{
+		SecuritySchemes: openapi3.SecuritySchemes{
+			"jwtAuth": &openapi3.SecuritySchemeRef{
+				Value: &openapi3.SecurityScheme{Type: "http", Scheme: "bearer", BearerFormat: "JWT"},
+			},
+			"corpOAuth": &openapi3.SecuritySchemeRef{
+				Value: &openapi3.SecurityScheme{
+					Type: "oauth2",
+					Flows: &openapi3.OAuthFlows{
+						AuthorizationCode: &openapi3.OAuthFlow{
+							AuthorizationURL: "/oauth/authorize",
+							TokenURL:         "/oauth/token",
+							Scopes:           map[string]string{"api:access": ""},
+						},
+					},
+				},
+			},
+		},
+	}
+	s.Security = openapi3.SecurityRequirements{
+		{"jwtAuth": []string{}, "corpOAuth": []string{"api:access"}},
+	}
+	s.SetTykExtension(&XTykAPIGateway{
+		Server: Server{
+			Authentication: &Authentication{
+				Enabled: true,
+				SecuritySchemes: SecuritySchemes{
+					"jwtAuth":   &JWT{Enabled: true, Source: "aHR0cDovL2tjL2NlcnRz"},
+					"corpOAuth": &OAuth2{Enabled: true, ScopeCheck: &OAuth2ScopeCheck{Enabled: true, ScopeSource: OAuth2ScopeSourceGlobal}},
+				},
+			},
+		},
+	})
+
+	api := apidef.APIDefinition{}
+	s.extractSecurityTo(&api)
+	// Wipe s.Security so fill rebuilds from api fields — mirrors the
+	// dashboard's GET-then-PUT-then-GET cycle.
+	s.Security = nil
+	s.fillSecurity(api)
+
+	require.Len(t, s.Security, 1, "single-alternative requirement must round-trip as one entry")
+	got := s.Security[0]
+	_, hasJWT := got["jwtAuth"]
+	_, hasOAuth := got["corpOAuth"]
+	assert.True(t, hasJWT, "jwtAuth must survive the round-trip — without it the gateway falls back to AuthKey")
+	assert.True(t, hasOAuth, "corpOAuth must survive the round-trip")
+	assert.Equal(t, []string{"api:access"}, got["corpOAuth"], "corpOAuth's scope list must be preserved")
+	assert.Empty(t, got["jwtAuth"], "jwtAuth's empty-scope shape must be preserved")
 }
