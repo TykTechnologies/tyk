@@ -1965,10 +1965,23 @@
       "type": "object",
       "description": "OAuth 2.0 security scheme container.",
       "properties": {
-        "enabled": { "type": "boolean" },
-        "header":  { "$ref": "#/definitions/X-Tyk-AuthSource" },
-        "cookie":  { "$ref": "#/definitions/X-Tyk-AuthSource" },
-        "query":   { "$ref": "#/definitions/X-Tyk-AuthSource" }
+        "enabled":    { "type": "boolean" },
+        "header":     { "$ref": "#/definitions/X-Tyk-AuthSource" },
+        "cookie":     { "$ref": "#/definitions/X-Tyk-AuthSource" },
+        "query":      { "$ref": "#/definitions/X-Tyk-AuthSource" },
+        "scopeCheck": { "$ref": "#/definitions/X-Tyk-OAuth2-ScopeCheck" }
+      },
+      "required": ["enabled"]
+    },
+    "X-Tyk-OAuth2-ScopeCheck": {
+      "type": "object",
+      "description": "OAS-native scope enforcement.",
+      "properties": {
+        "enabled":        { "type": "boolean" },
+        "claimNames":     { "type": "array", "items": { "type": "string" }, "description": "Ordered list of JWT claim names to read scopes from. The gateway reads each listed claim that is present and merges all scope values into one set. Scope alternatives are checked against this merged set. Defaults to [\"scope\", \"scp\"] when unset." },
+        "separator":      { "type": "string" },
+        "scopeSource":    { "type": "string", "enum": ["operation", "global", "union"] },
+        "scopes":         { "type": "array", "items": { "type": "array", "items": { "type": "string" } }, "description": "OR-of-AND alternatives. Outer list is OR (any satisfied alternative passes); each inner list is AND (every scope in that alternative must be present). Empty list is inert." }
       },
       "required": ["enabled"]
     },

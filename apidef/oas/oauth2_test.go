@@ -118,11 +118,12 @@ func TestOAuth2_RoundTripJSONPreservesEnabled(t *testing.T) {
 	raw, err := json.Marshal(original)
 	require.NoError(t, err)
 
-	// On unmarshal, the Tyk extension comes back as a raw map until the
-	// OAS is reconstituted via NewOASFromBytes / Initialize. With only
-	// the master Enabled toggle set, the scheme is shape-ambiguous with
-	// a legacy OAuth scheme so no map-probe disambiguator recognises
-	// it; this test asserts on the on-the-wire JSON shape directly.
+	// On unmarshal, the Tyk extension comes back as a raw map until
+	// the OAS is reconstituted via NewOASFromBytes / Initialize. With
+	// only the master Enabled toggle set, the scheme is shape-ambiguous
+	// with a legacy OAuth scheme, so the map-probe disambiguator does
+	// not recognise it. This test asserts on the on-the-wire JSON
+	// shape directly.
 	assert.Contains(t, string(raw), `"corpOAuth":{"enabled":true}`,
 		"the Tyk extension should serialise the oauth2 scheme with master Enabled set under its scheme name")
 }
@@ -183,3 +184,84 @@ func TestOAuth2_FillOAuth2OASSchemeCreatesComponents(t *testing.T) {
 	assert.Equal(t, typeOAuth2, ref.Value.Type)
 }
 
+func TestOAuth2_HasContentRecognisesScopeCheck(t *testing.T) {
+	// A scheme with Enabled=false but ScopeCheck configured still
+	// counts as "has content" so map-probe disambiguation can detect
+	// it as a new-style oauth2 scheme rather than a legacy OAuth one.
+	o := &OAuth2{ScopeCheck: &OAuth2ScopeCheck{Enabled: true, Scopes: [][]string{{"read"}}}}
+	assert.True(t, o.HasContent())
+}
+
+// TestOAuth2_FillPopulatesFlowScopesFromScopes pins that the scope-check
+// alternatives' scope strings propagate (flattened across alternatives,
+// deduplicated) into the materialised `flows.authorizationCode.scopes`
+// vocabulary on the OAS scheme. Operators declare scopes once; OAS
+// tooling and the gateway see the same vocabulary.
+func TestOAuth2_FillPopulatesFlowScopesFromScopes(t *testing.T) {
+	s := newOAuth2Fixture("corpOAuth")
+	cfg := s.GetTykExtension().Server.Authentication.SecuritySchemes["corpOAuth"].(*OAuth2)
+	cfg.ScopeCheck = &OAuth2ScopeCheck{
+		Enabled: true,
+		Scopes:  [][]string{{"read:billing", "write:billing"}, {"admin"}},
+	}
+
+	api := apidef.APIDefinition{AuthConfigs: map[string]apidef.AuthConfig{}}
+	s.fillSecurity(api)
+
+	ref := s.Components.SecuritySchemes["corpOAuth"]
+	require.NotNil(t, ref.Value.Flows)
+	require.NotNil(t, ref.Value.Flows.AuthorizationCode)
+	scopes := ref.Value.Flows.AuthorizationCode.Scopes
+	require.NotNil(t, scopes)
+	_, hasRead := scopes["read:billing"]
+	_, hasWrite := scopes["write:billing"]
+	_, hasAdmin := scopes["admin"]
+	assert.True(t, hasRead, "flows.scopes should contain read:billing")
+	assert.True(t, hasWrite, "flows.scopes should contain write:billing")
+	assert.True(t, hasAdmin, "flows.scopes should contain admin (from the second alternative)")
+}
+
+// TestOAuth2_FillSkipsScopesWhenScopeCheckDisabled pins that the scope
+// vocabulary is NOT polluted when scopeCheck is configured but disabled
+// — operator's `scopes` array only matters when scopeCheck.enabled is
+// true.
+func TestOAuth2_FillSkipsScopesWhenScopeCheckDisabled(t *testing.T) {
+	s := newOAuth2Fixture("corpOAuth")
+	cfg := s.GetTykExtension().Server.Authentication.SecuritySchemes["corpOAuth"].(*OAuth2)
+	cfg.ScopeCheck = &OAuth2ScopeCheck{
+		Enabled: false,
+		Scopes:  [][]string{{"read:billing"}},
+	}
+
+	api := apidef.APIDefinition{AuthConfigs: map[string]apidef.AuthConfig{}}
+	s.fillSecurity(api)
+
+	ref := s.Components.SecuritySchemes["corpOAuth"]
+	require.NotNil(t, ref.Value.Flows.AuthorizationCode)
+	_, hasRead := ref.Value.Flows.AuthorizationCode.Scopes["read:billing"]
+	assert.False(t, hasRead, "disabled scopeCheck should not pollute flows.scopes")
+}
+
+func TestOAuth2ScopeCheck_RoundTripJSONPreservesAllFields(t *testing.T) {
+	original := newOAuth2Fixture("corpOAuth")
+	cfg := original.GetTykExtension().Server.Authentication.SecuritySchemes["corpOAuth"].(*OAuth2)
+	cfg.ScopeCheck = &OAuth2ScopeCheck{
+		Enabled:     true,
+		ClaimNames:  []string{"scope", "scp", "permissions"},
+		Separator:   ",",
+		ScopeSource: OAuth2ScopeSourceUnion,
+		Scopes:      [][]string{{"read:billing", "write:billing"}, {"admin"}},
+	}
+
+	raw, err := json.Marshal(original)
+	require.NoError(t, err)
+
+	// scopeCheck must serialise with every field operator-set, including
+	// the OR-of-AND `scopes` shape (outer list = OR, inner list = AND).
+	str := string(raw)
+	assert.Contains(t, str, `"scopeCheck"`)
+	assert.Contains(t, str, `"claimNames":["scope","scp","permissions"]`)
+	assert.Contains(t, str, `"separator":","`)
+	assert.Contains(t, str, `"scopeSource":"union"`)
+	assert.Contains(t, str, `"scopes":[["read:billing","write:billing"],["admin"]]`)
+}

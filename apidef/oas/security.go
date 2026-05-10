@@ -1369,6 +1369,17 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 							continue
 						}
 
+						// The new oauth2 scheme is OAS-native and has no
+						// classic extraction; the gateway middleware reads
+						// it from OAS directly. Promote a raw-map entry to
+						// the typed view here so subsequent OAS reads (and
+						// the marshal-back-to-DB step) see the same shape,
+						// and skip the legacy OAuth / ExternalOAuth fallback.
+						if oauth2 := asOAuth2Scheme(securityScheme); oauth2 != nil {
+							s.getTykSecuritySchemes()[schemeName] = oauth2
+							continue
+						}
+
 						externalOAuth := &ExternalOAuth{}
 						if oauthVal, ok := securityScheme.(*ExternalOAuth); ok {
 							externalOAuth = oauthVal

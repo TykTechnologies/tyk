@@ -5,8 +5,9 @@ import (
 )
 
 // OAuth2 is the container for the new-style OAuth 2.0 security scheme.
-// It carries the master Enabled toggle and inherits the AuthSources
-// contract used by every Tyk security scheme.
+// It holds the master Enabled toggle, the AuthSources inheritance from
+// the standard Tyk security-scheme contract, and optional sub-blocks
+// (currently ScopeCheck) that enable specific OAuth-flow features.
 //
 // Stored under
 // x-tyk-api-gateway.server.authentication.securitySchemes[name].
@@ -18,13 +19,108 @@ type OAuth2 struct {
 	// AuthSources configures where the bearer token is read from
 	// (Authorization header by default; cookie / query alternatives).
 	AuthSources `bson:",inline" json:",inline"`
+
+	// ScopeCheck enables OAS-native scope enforcement. See
+	// OAuth2ScopeCheck for the full configuration contract.
+	ScopeCheck *OAuth2ScopeCheck `bson:"scopeCheck,omitempty" json:"scopeCheck,omitempty"`
 }
 
+// OAuth2ScopeCheck holds OAS-native scope enforcement configuration.
+//
+// Tyk supports three enforcement modes via ScopeSource:
+//
+//   - "union" (default): require both — the per-operation/primitive
+//     `security:` scopes AND the global Scopes alternatives. With
+//     Scopes empty (the common case), this collapses to the
+//     per-operation model. With Scopes set, every request must
+//     additionally satisfy one of the global alternatives.
+//   - "operation": the matched OAS operation's or matched MCP
+//     primitive's `security:` array drives the required-scope set.
+//     Scopes is ignored. Use to opt out of global baselines on a
+//     specific API.
+//   - "global": ignore per-operation declarations entirely; the
+//     Scopes alternatives apply uniformly to every request hitting
+//     this API. Useful for "every call needs `api:access`" policies.
+//
+// Scopes encodes an OR-of-AND grammar: the outer list is OR (any
+// satisfied alternative passes); each inner list is AND (every scope
+// in that alternative must be present on the token).
+type OAuth2ScopeCheck struct {
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// ClaimNames is the ordered list of JWT claim names to read scopes
+	// from. The gateway reads the value of every listed claim that is
+	// present on the token, parses each value into individual scopes
+	// (per Separator / JSON-array / comma-separated rules), and
+	// **merges** the results into one normalized scope set. Scopes
+	// alternatives are checked against the merged set — a scope is
+	// considered present if it appears in any listed claim.
+	//
+	// When ClaimNames is empty the gateway uses the default
+	// `["scope", "scp"]` so OAuth and OIDC tokens are both honored
+	// without operator config. There is no singular ClaimName field —
+	// callers always express the source as a list, even when it has
+	// one entry.
+	ClaimNames []string `bson:"claimNames,omitempty" json:"claimNames,omitempty"`
+
+	// Separator splits the claim's string value into individual
+	// scopes. Defaults to a single space (RFC 6749 §3.3). Set to ","
+	// for comma-separated IdPs.
+	Separator string `bson:"separator,omitempty" json:"separator,omitempty"`
+
+	// ScopeSource selects whether enforcement reads from per-operation
+	// `security:`, the global Scopes alternatives, or both. Defaults
+	// to "union" — both contribute, Scopes acts as a baseline added
+	// to every request.
+	ScopeSource string `bson:"scopeSource,omitempty" json:"scopeSource,omitempty"`
+
+	// Scopes is the global OR-of-AND alternative list. The outer list
+	// is OR — the caller passes if **any** alternative is satisfied.
+	// Each inner list is AND — the token must carry every scope in
+	// that alternative for it to be satisfied. Enforced when
+	// ScopeSource is "global" or "union" (the default); ignored when
+	// ScopeSource is "operation". An empty outer list (or all-empty
+	// alternatives) is inert — no enforcement runs.
+	Scopes [][]string `bson:"scopes,omitempty" json:"scopes,omitempty"`
+}
+
+// ScopeSource constants for OAuth2ScopeCheck.ScopeSource.
+const (
+	OAuth2ScopeSourceOperation = "operation"
+	OAuth2ScopeSourceGlobal    = "global"
+	OAuth2ScopeSourceUnion     = "union"
+)
+
+// Wire-protocol constants used in WWW-Authenticate challenges and JSON
+// failure bodies emitted by the oauth2 middleware.
+const (
+	// OAuth2ErrInsufficientScope is the RFC 6750 §3.1 error code
+	// returned when the token authenticated but lacks scopes required
+	// by the request.
+	OAuth2ErrInsufficientScope = "insufficient_scope"
+
+	// OAuth2ErrInvalidToken is the RFC 6750 §3.1 error code used when
+	// the token cannot be parsed or is otherwise unusable.
+	OAuth2ErrInvalidToken = "invalid_token"
+
+	// OAuth2AuthSchemeBearer is the authorization scheme prefix per
+	// RFC 6750 §2.1.
+	OAuth2AuthSchemeBearer = "Bearer"
+)
+
 // HasContent reports whether the OAuth2 block carries operator
-// configuration. With only the master toggle defined here, the toggle
-// state is the entire signal.
+// configuration. The master Enabled toggle qualifies, as does any
+// configured sub-block (e.g. scopeCheck). Sub-block presence lets the
+// map-probe disambiguator distinguish this scheme from a legacy OAuth
+// or ExternalOAuth scheme stored as a raw map.
 func (o *OAuth2) HasContent() bool {
-	return o != nil && o.Enabled
+	if o == nil {
+		return false
+	}
+	if o.Enabled {
+		return true
+	}
+	return o.ScopeCheck != nil
 }
 
 // IsEmpty is the inverse of HasContent. Used at fill time to decide
@@ -34,7 +130,9 @@ func (o *OAuth2) IsEmpty() bool {
 }
 
 // fillOAuth2 walks the configured Tyk security schemes and materialises
-// any pre-typed *OAuth2 entries into the public OAS document.
+// any *OAuth2 entries (typed or stored as a raw map after JSON round
+// trip) into the public OAS document. Raw maps are recognised by the
+// presence of an oauth2 sub-block key (see mapHasOAuth2SubBlock).
 func (s *OAS) fillOAuth2() {
 	tykAuth := s.getTykAuthentication()
 	if tykAuth == nil || tykAuth.SecuritySchemes == nil {
@@ -42,8 +140,8 @@ func (s *OAS) fillOAuth2() {
 	}
 
 	for name, scheme := range tykAuth.SecuritySchemes {
-		oauth2, ok := scheme.(*OAuth2)
-		if !ok {
+		oauth2 := asOAuth2Scheme(scheme)
+		if oauth2 == nil {
 			continue
 		}
 		if oauth2.IsEmpty() {
@@ -66,9 +164,62 @@ func (s *OAS) fillOAuth2() {
 	}
 }
 
-// fillOAuth2OASScheme materialises a minimal oauth2 OAS Components
-// entry for the named scheme with an empty
-// `flows.authorizationCode.scopes` map.
+// asOAuth2Scheme returns the typed *OAuth2 view of a raw security
+// scheme entry, or nil if the entry is not a new-style oauth2 scheme.
+// Distinguishing it from a legacy OAuth / ExternalOAuth map relies on
+// the presence of a sub-block key (e.g. scopeCheck). A raw
+// `{enabled:true}` map alone is shape-ambiguous with legacy schemes
+// and is not recognised here — operators who want the new oauth2
+// scheme must configure at least one sub-block.
+func asOAuth2Scheme(scheme interface{}) *OAuth2 {
+	if scheme == nil {
+		return nil
+	}
+	if v, ok := scheme.(*OAuth2); ok {
+		return v
+	}
+	m, ok := scheme.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	if !mapHasOAuth2SubBlock(m) {
+		return nil
+	}
+	out := &OAuth2{}
+	toStructIfMap(m, out)
+	return out
+}
+
+// mapHasOAuth2SubBlock reports whether a raw scheme map carries a
+// new-style oauth2 sub-block. Used by the map-probe disambiguator at
+// JSON round-trip time to distinguish the new-style scheme from a
+// legacy *OAuth map with no sub-blocks.
+//
+// IMPORTANT — sub-block keys must be enumerated explicitly. Stories
+// 04 (protectedResourceMetadata), 06 (tokenExchange), and 10
+// (introspection) add new sub-blocks; each must extend this list so
+// JSON round-trips with that sub-block alone (without scopeCheck)
+// still type as *OAuth2. Forgetting silently drops the typed view.
+func mapHasOAuth2SubBlock(m map[string]interface{}) bool {
+	for _, key := range oauth2SubBlockKeys {
+		if _, ok := m[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// oauth2SubBlockKeys lists the JSON keys that mark a raw scheme map
+// as a new-style oauth2 scheme. Extend when adding a sub-block.
+var oauth2SubBlockKeys = []string{
+	"scopeCheck",
+	// "protectedResourceMetadata" — TT-17175 (Story 04)
+	// "tokenExchange"             — TT-17177 (Story 06)
+	// "introspection"             — TT-17187 (Story 10)
+}
+
+// fillOAuth2OASScheme materialises the oauth2 OAS Components entry
+// for the named scheme.
 //
 // The OAS spec requires at least one flow on an oauth2 scheme, and
 // authorizationCode requires both authorizationUrl and tokenUrl. We
@@ -76,12 +227,28 @@ func (s *OAS) fillOAuth2() {
 // `https://example.com/…` URLs so the saved document doesn't claim
 // an unrelated host. Sub-blocks that bring real endpoints (token
 // exchange, introspection) override these at materialise time.
-func (s *OAS) fillOAuth2OASScheme(name string, _ *OAuth2) {
+//
+// The `flows.authorizationCode.scopes` vocabulary is populated from
+// the configured scope-check required scopes (so OAS tooling sees
+// the same vocabulary the gateway enforces); per-operation
+// `security:` declarations land in follow-up extensions.
+func (s *OAS) fillOAuth2OASScheme(name string, o *OAuth2) {
 	if s.Components == nil {
 		s.Components = &openapi3.Components{}
 	}
 	if s.Components.SecuritySchemes == nil {
 		s.Components.SecuritySchemes = make(openapi3.SecuritySchemes)
+	}
+	scopes := map[string]string{}
+	if o != nil && o.ScopeCheck != nil && o.ScopeCheck.Enabled {
+		for _, alt := range o.ScopeCheck.Scopes {
+			for _, sc := range alt {
+				if sc == "" {
+					continue
+				}
+				scopes[sc] = ""
+			}
+		}
 	}
 	s.Components.SecuritySchemes[name] = &openapi3.SecuritySchemeRef{
 		Value: &openapi3.SecurityScheme{
@@ -90,7 +257,7 @@ func (s *OAS) fillOAuth2OASScheme(name string, _ *OAuth2) {
 				AuthorizationCode: &openapi3.OAuthFlow{
 					AuthorizationURL: "/oauth/authorize",
 					TokenURL:         "/oauth/token",
-					Scopes:           map[string]string{},
+					Scopes:           scopes,
 				},
 			},
 		},
@@ -100,6 +267,11 @@ func (s *OAS) fillOAuth2OASScheme(name string, _ *OAuth2) {
 // GetTykOAuth2Config returns the typed *OAuth2 configuration for the
 // named security scheme, or nil when the scheme is not configured under
 // x-tyk-api-gateway as a new-style OAuth2 scheme.
+//
+// When the scheme entry is still a raw map (post-JSON round-trip and
+// pre-fill), this method materialises the typed view via the same
+// map-probe used by fillOAuth2 and caches the typed value back into
+// the map so subsequent calls are O(1).
 func (s *OAS) GetTykOAuth2Config(name string) *OAuth2 {
 	tykAuth := s.getTykAuthentication()
 	if tykAuth == nil || tykAuth.SecuritySchemes == nil {
@@ -109,9 +281,12 @@ func (s *OAS) GetTykOAuth2Config(name string) *OAuth2 {
 	if !ok {
 		return nil
 	}
-	oauth2, ok := scheme.(*OAuth2)
-	if !ok {
+	oauth2 := asOAuth2Scheme(scheme)
+	if oauth2 == nil {
 		return nil
+	}
+	if _, alreadyTyped := scheme.(*OAuth2); !alreadyTyped {
+		tykAuth.SecuritySchemes[name] = oauth2
 	}
 	return oauth2
 }
@@ -121,4 +296,3 @@ func (s *OAS) GetTykOAuth2Config(name string) *OAuth2 {
 func (s *OAS) IsOAuth2Scheme(name string) bool {
 	return s.GetTykOAuth2Config(name) != nil
 }
-
