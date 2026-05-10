@@ -186,6 +186,27 @@ func (a *APISpec) GetPRMConfig() *oas.ProtectedResourceMetadata {
 	return nil
 }
 
+// GetOAuth2Config returns a configured oauth2 security scheme on this
+// API, if any. Returns the scheme's name and the typed config.
+// Duplicate oauth2 schemes are not validated at load time (matching the
+// behaviour of every other auth scheme on this map); when more than one
+// is configured, the choice is map-iteration dependent.
+func (a *APISpec) GetOAuth2Config() (string, *oas.OAuth2) {
+	if !a.IsOAS {
+		return "", nil
+	}
+	ext := a.GetTykExtension()
+	if ext == nil || ext.Server.Authentication == nil {
+		return "", nil
+	}
+	for name := range ext.Server.Authentication.SecuritySchemes {
+		if cfg := a.OAS.GetTykOAuth2Config(name); cfg != nil {
+			return name, cfg
+		}
+	}
+	return "", nil
+}
+
 // FindSpecMatchesStatus checks if a URL spec has a specific status and returns the URLSpec for it.
 func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (*URLSpec, bool) {
 	matchPath, method := a.getMatchPathAndMethod(r, mode)
