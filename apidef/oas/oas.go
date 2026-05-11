@@ -718,7 +718,8 @@ func (s *OAS) validateCompliantModeAuthentication() error {
 }
 
 // validatePRM validates the Protected Resource Metadata configuration.
-// For non-MCP validation, resource is required when PRM is enabled.
+// For non-MCP validation, resource is required when PRM is enabled (the
+// MCP-aware path is handled by ValidateForMCP).
 func (s *OAS) validatePRM() error {
 	tykAuth := s.getTykAuthentication()
 	if tykAuth == nil {
@@ -726,6 +727,30 @@ func (s *OAS) validatePRM() error {
 	}
 
 	return tykAuth.ProtectedResourceMetadata.Validate(false)
+}
+
+// ValidateForMCP runs the same validation chain as Validate but treats
+// the document as an MCP API for PRM purposes. Use this from MCP-specific
+// admin endpoints (e.g. POST /tyk/mcps) where the empty-mode +
+// no-resource shape resolves to mirror, not static-with-missing-resource.
+func (s *OAS) ValidateForMCP(ctx context.Context, opts ...openapi3.ValidationOption) error {
+	validationOpts := opts
+	if s.T.IsOpenAPI3_1() {
+		validationOpts = make([]openapi3.ValidationOption, len(opts)+1)
+		copy(validationOpts, opts)
+		validationOpts[len(opts)] = openapi3.EnableJSONSchema2020Validation()
+	}
+
+	validationErr := s.T.Validate(ctx, validationOpts...)
+	securityErr := s.validateSecurity()
+	compliantModeErr := s.validateCompliantModeAuthentication()
+
+	var prmErr error
+	if tykAuth := s.getTykAuthentication(); tykAuth != nil {
+		prmErr = tykAuth.ProtectedResourceMetadata.Validate(true)
+	}
+
+	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr)
 }
 
 // APIDef holds both OAS and Classic forms of an API definition.

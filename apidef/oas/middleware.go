@@ -1339,7 +1339,7 @@ type EnforceTimeout struct {
 func (et *EnforceTimeout) Fill(meta apidef.HardTimeoutMeta) {
 	et.Enabled = !meta.Disabled
 
-	if meta.TimeoutDuration > 0 {
+	if meta.TimeoutDuration != 0 {
 		et.Timeout = meta.TimeoutDuration
 		et.Value = int(meta.TimeoutDuration.SecondsCeil())
 	} else {
@@ -1351,7 +1351,7 @@ func (et *EnforceTimeout) Fill(meta apidef.HardTimeoutMeta) {
 func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 	meta.Disabled = !et.Enabled
 
-	if et.Timeout > 0 {
+	if et.Timeout != 0 {
 		meta.TimeoutDuration = et.Timeout
 		meta.TimeOut = int(et.Timeout.SecondsCeil())
 	} else {
