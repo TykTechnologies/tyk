@@ -677,7 +677,7 @@ func TestLoadPoliciesFromDashboardAutoRecovery(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/register/node") {
 			registrationCount++
 			w.Header().Set("Content-Type", "application/json")
-			response := NodeResponseOK{
+			response := NodeResponse{
 				Status:  "ok",
 				Message: map[string]string{"NodeID": "test-node-id"},
 				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
@@ -879,7 +879,7 @@ func TestLoadPoliciesFromDashboardTimeoutSimulation(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/register/node") {
 			registrationCount++
 			w.Header().Set("Content-Type", "application/json")
-			response := NodeResponseOK{
+			response := NodeResponse{
 				Status:  "ok",
 				Message: map[string]string{"NodeID": "test-node-id"},
 				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
@@ -984,7 +984,7 @@ func TestLoadPoliciesFromDashboardNoNodeIDFound(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/register/node") {
 			registrationCount++
 			w.Header().Set("Content-Type", "application/json")
-			response := NodeResponseOK{
+			response := NodeResponse{
 				Status:  "ok",
 				Message: map[string]string{"NodeID": "test-node-id"},
 				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
@@ -1170,7 +1170,7 @@ func TestLoadPoliciesFromDashboardNetworkErrorRecovery(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/register/node") {
 			registrationCount++
 			w.Header().Set("Content-Type", "application/json")
-			response := NodeResponseOK{
+			response := NodeResponse{
 				Status:  "ok",
 				Message: map[string]string{"NodeID": "test-node-id"},
 				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
@@ -1299,7 +1299,7 @@ func TestLoadPoliciesFromDashboardLoadBalancerDrain(t *testing.T) {
 				if strings.Contains(r.URL.Path, "/register/node") {
 					registrationCount++
 					w.Header().Set("Content-Type", "application/json")
-					response := NodeResponseOK{
+					response := NodeResponse{
 						Status:  "ok",
 						Message: map[string]string{"NodeID": "test-node-id"},
 						Nonce:   fmt.Sprintf("nonce-%d", registrationCount),

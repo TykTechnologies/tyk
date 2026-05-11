@@ -215,6 +215,9 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			ExpireAt:      t,
 		}
 		recordGraphDetails(&record, r, response, e.Spec)
+		if e.Spec.IsMCP() {
+			recordMCPDetails(&record, r)
+		}
 
 		rawRequest := ""
 		rawResponse := ""
