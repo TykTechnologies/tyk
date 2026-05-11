@@ -14,6 +14,7 @@ import (
 	_ "github.com/warpstreamlabs/bento/public/components/io"
 	_ "github.com/warpstreamlabs/bento/public/components/kafka"
 	_ "github.com/warpstreamlabs/bento/public/components/nats"
+	_ "github.com/apache/thrift/lib/go/thrift" // TT-17190: Force upgrade to fix CVE-2026-41602
 	"github.com/warpstreamlabs/bento/public/service"
 
 	_ "github.com/TykTechnologies/tyk/internal/portal"
