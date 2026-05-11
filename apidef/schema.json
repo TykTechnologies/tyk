@@ -650,6 +650,10 @@
                       }
                     }
                   }
+                },
+                "global_enforce_timeout": {
+                  "type": "string",
+                  "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
                 }
               },
               "required": [
