@@ -358,6 +358,12 @@ func (gw *Gateway) processSpec(
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &PRMMiddleware{BaseMiddleware: baseMid.Copy()})
+	// REST-as-MCP: when a paired adapter dispatched this request via the
+	// `tyk://` loop primitive, install the proxy-derived session and let
+	// the auth band's normal middlewares observe a session-in-context
+	// (effectively skipping credential validation). No-op on direct REST
+	// clients. Active only on REST APIs with `server.mcp.enabled: true`.
+	gw.mwAppendEnabled(&chainArray, &MCPLoopAuthBypass{BaseMiddleware: baseMid.Copy()})
 
 	// Track auth middlewares for OR wrapper
 	var authMiddlewares []TykMiddleware
@@ -789,6 +795,25 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (gw *Gateway) findInternalHttpHandlerByNameOrID(apiNameOrID string) (handler http.Handler, targetAPI *APISpec, ok bool) {
+	// `id:<APIID>` forces an exact APIID match, bypassing fuzzy name
+	// resolution. This is required to address the synthetic MCP adapter
+	// (whose ID has the `__mcp-adapter` suffix) without collision risk
+	// against APIs whose Name happens to look similar.
+	if strings.HasPrefix(apiNameOrID, "id:") {
+		exactID := strings.TrimPrefix(apiNameOrID, "id:")
+		gw.apisMu.RLock()
+		targetAPI = gw.apisByID[exactID]
+		gw.apisMu.RUnlock()
+		if targetAPI == nil {
+			return nil, nil, false
+		}
+		h, found := gw.apisHandlesByID.Load(targetAPI.APIID)
+		if !found {
+			return nil, nil, false
+		}
+		return h.(*ChainObject).ThisHandler, targetAPI, true
+	}
+
 	targetAPI = gw.fuzzyFindAPI(apiNameOrID)
 	if targetAPI == nil {
 		return
@@ -1335,6 +1360,13 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 		}()
 	}
 
+	// Synthesise paired MCP adapter specs for any REST API marked
+	// `server.mcp.enabled: true`. The adapters live in tmpSpecRegister
+	// alongside the regular specs but are Internal — they are only ever
+	// reached via the `tyk://<adapter-id>` loop primitive from an
+	// operator-managed MCP proxy.
+	gw.synthesiseMCPAdapters(specs, tmpSpecRegister, tmpSpecHandles, apisByListen, &gs, muxer)
+
 	gw.DefaultProxyMux.swap(muxer, gw)
 
 	var specsToUnload []*APISpec
@@ -1365,6 +1397,11 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	gw.apisByID = tmpSpecRegister
 	gw.apisHandlesByID = tmpSpecHandles
+
+	// Rebuild the MCP pairing index (restAPIID → proxyAPIID) in full.
+	// Held under apisMu so MCPLoopAuthBypass and validateMCP observe a
+	// consistent view of apisByID / mcpPairing / mcpAdapter.
+	gw.rebuildMCPPairing(tmpSpecRegister)
 
 	gw.apisMu.Unlock()
 

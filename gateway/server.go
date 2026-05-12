@@ -180,6 +180,15 @@ type Gateway struct {
 
 	policies *model.Policies
 
+	// mcpPairing maps a REST APIID to the operator-managed MCP proxy APIID
+	// that is allowed to loop-call it. Rebuilt in full on every loadApps;
+	// read-only between reloads. Used by MCPLoopAuthBypass and validateMCP
+	// to enforce the 1:1 paired-proxy trust model.
+	mcpPairing map[string]string
+	// mcpAdapter maps a REST APIID to the synthetic adapter APIID
+	// (`<restID>__mcp-adapter`). Rebuilt in full on every loadApps.
+	mcpAdapter map[string]string
+
 	certUsageTracker *certUsageTracker // nil in non-RPC mode
 	pendingCerts     sync.Map          // certID -> struct{}, certs skipped due to tracker miss
 
