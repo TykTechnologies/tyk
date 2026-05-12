@@ -5,6 +5,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/mcp/pairing"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -17,19 +18,21 @@ import (
 //     outgoing request before dispatching it back through the REST chain.
 //     The flag is set by trusted in-process code; it never crosses a
 //     network boundary.
-//  2. This middleware re-checks the pairing index — gw.mcpPairing —
+//  2. This middleware re-checks the pairing index — pairing.Lookup —
 //     and refuses to honour the descriptor unless the proxyAPIID it
-//     names matches the proxy the gateway has admitted as the 1:1 caller
-//     for this REST API. A descriptor that was somehow forged or
-//     replayed against an unpaired REST API returns 403.
+//     names matches the proxy the gateway has admitted as the 1:1
+//     caller for this REST API. A descriptor that was somehow forged
+//     or replayed against an unpaired REST API returns 403.
 //
-// On a valid match, the middleware installs an in-memory session
-// derived from the proxy's identity. Subsequent auth middlewares
-// (AuthKey, JWT, etc.) see a session already in context — they remain
-// untouched and run normally for direct REST clients (no flag → no
-// bypass).
+// The middleware accepts a pairing.Lookup interface (instead of
+// reaching into the Gateway struct) so unit tests can supply a fake.
+// The gateway's *pairing.Index satisfies the interface in production.
 type MCPLoopAuthBypass struct {
 	*BaseMiddleware
+
+	// Pairing is the lookup the middleware consults. If nil at chain
+	// build time, ProcessRequest falls back to m.Gw.mcpPairing.
+	Pairing pairing.Lookup
 }
 
 // Name returns the middleware name.
@@ -58,33 +61,27 @@ func (m *MCPLoopAuthBypass) ProcessRequest(_ http.ResponseWriter, r *http.Reques
 		return nil, http.StatusOK
 	}
 
-	// Defence-in-depth: even if a flag was somehow forged, the pairing
-	// index disagrees unless an operator-admitted MCP proxy targets this
-	// REST API.
-	m.Gw.apisMu.RLock()
-	expectedProxy, paired := m.Gw.mcpPairing[m.Spec.APIID]
-	m.Gw.apisMu.RUnlock()
+	lookup := m.Pairing
+	if lookup == nil {
+		lookup = m.Gw.mcpPairing
+	}
 
+	expectedProxy, paired := lookup.ProxyForREST(m.Spec.APIID)
 	if !paired || expectedProxy != trust.ProxyAPIID {
 		m.Logger().WithFields(map[string]interface{}{
-			"rest_api_id":      m.Spec.APIID,
-			"flag_proxy_id":    trust.ProxyAPIID,
-			"flag_adapter_id":  trust.AdapterAPIID,
-			"expected_proxy":   expectedProxy,
-			"is_paired":        paired,
+			"rest_api_id":     m.Spec.APIID,
+			"flag_proxy_id":   trust.ProxyAPIID,
+			"flag_adapter_id": trust.AdapterAPIID,
+			"expected_proxy":  expectedProxy,
+			"is_paired":       paired,
 		}).Warn("MCPLoopAuthBypass: trust descriptor pairing mismatch — rejecting")
 		return errMCPLoopForgery, http.StatusForbidden
 	}
 
-	// Mint a minimal in-memory session that represents the paired
-	// proxy. Other middlewares see a session in context and skip their
-	// credential checks. Quota/rate-limit middlewares apply the
-	// configured limits keyed on this session.
 	session := makeMCPLoopSession(trust)
 	// Pass two trailing booleans so ctx.SetSession uses the explicit
-	// hashKey value rather than dereferencing config.Global() — keeps
-	// unit tests free of global-config setup. Production callers (the
-	// HashKeys-aware path) get the same effective result.
+	// hashKey rather than dereferencing config.Global() — keeps unit
+	// tests free of global-config setup.
 	ctx.SetSession(r, session, false, false, false)
 
 	return nil, http.StatusOK
@@ -108,8 +105,6 @@ func makeMCPLoopSession(trust *httpctx.MCPLoopTrust) *user.SessionState {
 	s := user.NewSessionState()
 	s.KeyID = "mcp-loop:" + trust.ProxyAPIID
 	s.Alias = "mcp-loop-paired-proxy"
-	// Mark the session metadata so any audit log emitted by the REST
-	// chain can attribute the request back to the proxy and adapter.
 	if s.MetaData == nil {
 		s.MetaData = map[string]interface{}{}
 	}

@@ -1,11 +1,9 @@
 package gateway
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,11 +12,17 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	mcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
+	"github.com/TykTechnologies/tyk/internal/mcp/pairing"
 )
 
-// buildTestAdapterSpec builds a minimal synthetic adapter APISpec by
-// hand — no loadApps, no chain, just enough for the unit tests in this
-// file to exercise the inline handler and the loop-auth-bypass logic.
+// The pure adapter primitives (envelope marshalling, argument
+// expansion, response wrapping) are unit-tested directly in
+// internal/mcp/adapter. The tests in this file exercise the
+// gateway-side chain shims and the MCPLoopAuthBypass middleware —
+// against fakes for the pairing index — so no live Gateway instance is
+// required.
+
 func buildTestAdapterSpec() *APISpec {
 	def := &apidef.APIDefinition{
 		APIID: oas.AdapterAPIID("rest-1"),
@@ -40,10 +44,7 @@ func buildTestAdapterSpec() *APISpec {
 				PathTemplate:   "/orders/{id}",
 				ParamLocations: map[string]string{"id": "path"},
 				InputSchema: map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"id": map[string]any{"type": "string"},
-					},
+					"type":     "object",
 					"required": []string{"id"},
 				},
 			},
@@ -51,74 +52,64 @@ func buildTestAdapterSpec() *APISpec {
 	}
 }
 
-func TestAdapterInline_Initialize(t *testing.T) {
+func TestAdapterInline_DispatchesEachMethod(t *testing.T) {
 	t.Parallel()
 
-	m := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: buildTestAdapterSpec()}}
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
+	cases := []struct {
+		name       string
+		method     string
+		assertBody func(t *testing.T, env map[string]any)
+	}{
+		{
+			name:   "initialize",
+			method: mcpadapter.MethodInitialize,
+			assertBody: func(t *testing.T, env map[string]any) {
+				res := env["result"].(map[string]any)
+				assert.Equal(t, mcpadapter.ProtocolVersion, res["protocolVersion"])
+			},
+		},
+		{
+			name:   "ping",
+			method: mcpadapter.MethodPing,
+			assertBody: func(t *testing.T, env map[string]any) {
+				assert.Empty(t, env["result"].(map[string]any))
+			},
+		},
+		{
+			name:   "tools/list",
+			method: "tools/list",
+			assertBody: func(t *testing.T, env map[string]any) {
+				tools := env["result"].(map[string]any)["tools"].([]any)
+				require.Len(t, tools, 1)
+				assert.Equal(t, "getOrder", tools[0].(map[string]any)["name"])
+			},
+		},
+	}
 
-	ok := m.handleAdapterInline(w, r, &JSONRPCRequest{
-		JSONRPC: apidef.JsonRPC20,
-		Method:  mcpMethodInitialize,
-		ID:      1,
-	})
-	require.True(t, ok)
-	assert.Equal(t, http.StatusOK, w.Code)
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			m := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: buildTestAdapterSpec()}}
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
 
-	var env map[string]any
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &env))
-	res, ok := env["result"].(map[string]any)
-	require.True(t, ok, "result must be an object")
-	assert.Equal(t, mcpAdapterProtocolVersion, res["protocolVersion"])
+			ok := m.handleAdapterInline(w, r, &JSONRPCRequest{
+				JSONRPC: apidef.JsonRPC20,
+				Method:  tc.method,
+				ID:      1,
+			})
+			require.True(t, ok)
+
+			var env map[string]any
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &env))
+			tc.assertBody(t, env)
+		})
+	}
 }
 
-func TestAdapterInline_ToolsList(t *testing.T) {
+func TestAdapterInline_NonAdapterFallsThrough(t *testing.T) {
 	t.Parallel()
-
-	m := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: buildTestAdapterSpec()}}
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
-
-	ok := m.handleAdapterInline(w, r, &JSONRPCRequest{
-		JSONRPC: apidef.JsonRPC20,
-		Method:  "tools/list",
-		ID:      2,
-	})
-	require.True(t, ok)
-
-	var env map[string]any
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &env))
-	res := env["result"].(map[string]any)
-	tools := res["tools"].([]any)
-	require.Len(t, tools, 1)
-	first := tools[0].(map[string]any)
-	assert.Equal(t, "getOrder", first["name"])
-}
-
-func TestAdapterInline_PingEmpty(t *testing.T) {
-	t.Parallel()
-
-	m := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: buildTestAdapterSpec()}}
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
-
-	ok := m.handleAdapterInline(w, r, &JSONRPCRequest{
-		JSONRPC: apidef.JsonRPC20,
-		Method:  mcpMethodPing,
-		ID:      3,
-	})
-	require.True(t, ok)
-
-	var env map[string]any
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &env))
-	res := env["result"].(map[string]any)
-	assert.Empty(t, res)
-}
-
-func TestAdapterInline_NotAdapterFallsThrough(t *testing.T) {
-	t.Parallel()
-
 	def := &apidef.APIDefinition{APIID: "regular", OrgID: "org-1"}
 	def.MarkAsMCP()
 	spec := &APISpec{APIDefinition: def} // IsSyntheticMCPAdapter false
@@ -127,151 +118,103 @@ func TestAdapterInline_NotAdapterFallsThrough(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
 
-	ok := m.handleAdapterInline(w, r, &JSONRPCRequest{Method: mcpMethodInitialize})
-	assert.False(t, ok, "non-adapter specs must not be handled inline")
+	ok := m.handleAdapterInline(w, r, &JSONRPCRequest{Method: mcpadapter.MethodInitialize})
+	assert.False(t, ok)
 	assert.Empty(t, w.Body.String())
 }
 
-func TestBuildAdapterUpstreamRequest_PathQueryBody(t *testing.T) {
+// loopAuthBypassTestCase covers MCPLoopAuthBypass's three branches
+// using a pairing.Static fake instead of the full Gateway plumbing.
+type loopAuthBypassTestCase struct {
+	name       string
+	pairing    pairing.Lookup
+	stampTrust *httpctx.MCPLoopTrust
+	wantCode   int
+	wantError  bool
+	wantSess   bool
+}
+
+func TestMCPLoopAuthBypass_Branches(t *testing.T) {
 	t.Parallel()
 
-	gw := &Gateway{}
-	spec := buildTestAdapterSpec()
-	// Augment with one body-field tool to exercise body.<field> expansion.
-	spec.DerivedTools = append(spec.DerivedTools, oas.DerivedTool{
-		Name:         "createOrder",
-		Method:       http.MethodPost,
-		PathTemplate: "/orders",
-		ParamLocations: map[string]string{
-			"sku":     "body.sku",
-			"qty":     "body.qty",
-			"trace":   "header",
-			"verbose": "query",
+	cases := []loopAuthBypassTestCase{
+		{
+			name:     "no-flag-passes-through",
+			pairing:  pairing.Static{"rest-1": "proxy-1"},
+			wantCode: http.StatusOK,
 		},
-	})
-
-	tool := findDerivedTool(spec.DerivedTools, "createOrder")
-	require.NotNil(t, tool)
-
-	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
-	args := map[string]any{
-		"sku":     "ABC",
-		"qty":     5,
-		"trace":   "trace-id-1",
-		"verbose": "true",
+		{
+			name:    "matched-flag-installs-session",
+			pairing: pairing.Static{"rest-1": "proxy-1"},
+			stampTrust: &httpctx.MCPLoopTrust{
+				ProxyAPIID:   "proxy-1",
+				RESTAPIID:    "rest-1",
+				AdapterAPIID: oas.AdapterAPIID("rest-1"),
+			},
+			wantCode: http.StatusOK,
+			wantSess: true,
+		},
+		{
+			name:    "mismatched-flag-returns-403",
+			pairing: pairing.Static{"rest-1": "proxy-real"},
+			stampTrust: &httpctx.MCPLoopTrust{
+				ProxyAPIID:   "proxy-forged",
+				RESTAPIID:    "rest-1",
+				AdapterAPIID: oas.AdapterAPIID("rest-1"),
+			},
+			wantCode:  http.StatusForbidden,
+			wantError: true,
+		},
+		{
+			name:    "no-pairing-record-returns-403",
+			pairing: pairing.Static{},
+			stampTrust: &httpctx.MCPLoopTrust{
+				ProxyAPIID:   "proxy-1",
+				RESTAPIID:    "rest-1",
+				AdapterAPIID: oas.AdapterAPIID("rest-1"),
+			},
+			wantCode:  http.StatusForbidden,
+			wantError: true,
+		},
 	}
-	req, err := gw.buildAdapterUpstreamRequest(parent, spec, tool, args)
-	require.NoError(t, err)
 
-	assert.Equal(t, http.MethodPost, req.Method)
-	assert.Equal(t, "/orders", req.URL.Path)
-	assert.Equal(t, "true", req.URL.Query().Get("verbose"))
-	assert.Equal(t, "trace-id-1", req.Header.Get("trace"))
-	assert.Equal(t, contentTypeJSON, req.Header.Get(headerContentType))
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			spec := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest-1"}}
+			spec.MCPExposure.Enabled = true
 
-	bodyBytes, err := readAllNoClose(req)
-	require.NoError(t, err)
-	var body map[string]any
-	require.NoError(t, json.Unmarshal(bodyBytes, &body))
-	assert.Equal(t, "ABC", body["sku"])
-	assert.EqualValues(t, 5, body["qty"])
-}
+			mw := &MCPLoopAuthBypass{
+				BaseMiddleware: &BaseMiddleware{Spec: spec},
+				Pairing:        tc.pairing,
+			}
 
-func TestBuildAdapterUpstreamRequest_PathParamSubstitution(t *testing.T) {
-	t.Parallel()
+			r := httptest.NewRequest(http.MethodGet, "/orders/42", nil)
+			if tc.stampTrust != nil {
+				httpctx.SetMCPLoopFromPairedProxy(r, tc.stampTrust)
+			}
 
-	gw := &Gateway{}
-	spec := buildTestAdapterSpec()
-	tool := findDerivedTool(spec.DerivedTools, "getOrder")
-	require.NotNil(t, tool)
+			w := httptest.NewRecorder()
+			err, code := mw.ProcessRequest(w, r, nil)
 
-	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
-	req, err := gw.buildAdapterUpstreamRequest(parent, spec, tool, map[string]any{"id": "42"})
-	require.NoError(t, err)
-	assert.Equal(t, "/orders/42", req.URL.Path)
-	assert.Equal(t, http.MethodGet, req.Method)
-}
-
-func TestBuildAdapterUpstreamRequest_MissingPathParam(t *testing.T) {
-	t.Parallel()
-
-	gw := &Gateway{}
-	spec := buildTestAdapterSpec()
-	tool := findDerivedTool(spec.DerivedTools, "getOrder")
-
-	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
-	_, err := gw.buildAdapterUpstreamRequest(parent, spec, tool, map[string]any{})
-	require.Error(t, err)
-}
-
-func TestMCPLoopAuthBypass_NoFlagPassesThrough(t *testing.T) {
-	t.Parallel()
-
-	gw := &Gateway{apisMu: sync.RWMutex{}, mcpPairing: map[string]string{}}
-	spec := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest-1"}}
-	spec.MCPExposure.Enabled = true
-
-	mw := &MCPLoopAuthBypass{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
-
-	r := httptest.NewRequest(http.MethodGet, "/orders/42", nil)
-	w := httptest.NewRecorder()
-	err, code := mw.ProcessRequest(w, r, nil)
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusOK, code)
-}
-
-func TestMCPLoopAuthBypass_MismatchedFlagReturns403(t *testing.T) {
-	t.Parallel()
-
-	gw := &Gateway{apisMu: sync.RWMutex{}, mcpPairing: map[string]string{"rest-1": "proxy-real"}}
-	spec := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest-1"}}
-	spec.MCPExposure.Enabled = true
-
-	mw := &MCPLoopAuthBypass{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
-
-	r := httptest.NewRequest(http.MethodGet, "/orders/42", nil)
-	httpctx.SetMCPLoopFromPairedProxy(r, &httpctx.MCPLoopTrust{
-		ProxyAPIID:   "proxy-forged",
-		RESTAPIID:    "rest-1",
-		AdapterAPIID: oas.AdapterAPIID("rest-1"),
-	})
-
-	w := httptest.NewRecorder()
-	err, code := mw.ProcessRequest(w, r, nil)
-	assert.Error(t, err)
-	assert.Equal(t, http.StatusForbidden, code)
-}
-
-func TestMCPLoopAuthBypass_MatchedFlagInstallsSession(t *testing.T) {
-	t.Parallel()
-
-	gw := &Gateway{apisMu: sync.RWMutex{}, mcpPairing: map[string]string{"rest-1": "proxy-1"}}
-	spec := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest-1"}}
-	spec.MCPExposure.Enabled = true
-
-	mw := &MCPLoopAuthBypass{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
-
-	r := httptest.NewRequest(http.MethodGet, "/orders/42", nil)
-	httpctx.SetMCPLoopFromPairedProxy(r, &httpctx.MCPLoopTrust{
-		ProxyAPIID:   "proxy-1",
-		RESTAPIID:    "rest-1",
-		AdapterAPIID: oas.AdapterAPIID("rest-1"),
-	})
-
-	w := httptest.NewRecorder()
-	err, code := mw.ProcessRequest(w, r, nil)
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusOK, code)
-
-	// Session must be installed.
-	session := ctxGetSession(r)
-	require.NotNil(t, session)
-	assert.Equal(t, "mcp-loop:proxy-1", session.KeyID)
+			assert.Equal(t, tc.wantCode, code)
+			if tc.wantError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			if tc.wantSess {
+				sess := ctxGetSession(r)
+				require.NotNil(t, sess, "matched flag must install a session")
+				assert.Equal(t, "mcp-loop:"+tc.stampTrust.ProxyAPIID, sess.KeyID)
+			}
+		})
+	}
 }
 
 func TestMCPLoopAuthBypass_EnabledForSpec(t *testing.T) {
 	t.Parallel()
-
 	exposed := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest"}}
 	exposed.MCPExposure.Enabled = true
 	plain := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest2"}}
@@ -280,14 +223,54 @@ func TestMCPLoopAuthBypass_EnabledForSpec(t *testing.T) {
 	assert.False(t, (&MCPLoopAuthBypass{BaseMiddleware: &BaseMiddleware{Spec: plain}}).EnabledForSpec())
 }
 
-// readAllNoClose drains the request body without consuming the closer
-// (so it can be re-read in production code). For tests we just need the
-// bytes.
-func readAllNoClose(req *http.Request) ([]byte, error) {
-	if req.Body == nil {
-		return nil, nil
+// TestComputeMCPPairing covers the pure pairing-rebuild logic without
+// any Gateway plumbing — it operates on the same APISpec map structure
+// the loader holds, but otherwise has no dependencies.
+func TestComputeMCPPairing(t *testing.T) {
+	t.Parallel()
+
+	rest := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-1"}}
+	rest.MCPExposure.Enabled = true
+
+	adapter := &APISpec{
+		APIDefinition:         &apidef.APIDefinition{APIID: oas.AdapterAPIID("rest-1"), OrgID: "org-1"},
+		IsSyntheticMCPAdapter: true,
+		SourceRESTAPIID:       "rest-1",
 	}
-	var buf bytes.Buffer
-	_, err := buf.ReadFrom(req.Body)
-	return buf.Bytes(), err
+
+	proxy := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "proxy-1", OrgID: "org-1"}}
+	proxy.Proxy.TargetURL = "tyk://" + oas.AdapterAPIID("rest-1")
+
+	specs := map[string]*APISpec{
+		rest.APIID:    rest,
+		adapter.APIID: adapter,
+		proxy.APIID:   proxy,
+	}
+
+	pairingMap, adapterMap := computeMCPPairing(specs)
+	assert.Equal(t, "proxy-1", pairingMap["rest-1"])
+	assert.Equal(t, oas.AdapterAPIID("rest-1"), adapterMap["rest-1"])
+}
+
+func TestComputeMCPPairing_CrossOrgRefused(t *testing.T) {
+	t.Parallel()
+
+	rest := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-A"}}
+	adapter := &APISpec{
+		APIDefinition:         &apidef.APIDefinition{APIID: oas.AdapterAPIID("rest-1"), OrgID: "org-A"},
+		IsSyntheticMCPAdapter: true,
+		SourceRESTAPIID:       "rest-1",
+	}
+	proxy := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "proxy-1", OrgID: "org-B"}}
+	proxy.Proxy.TargetURL = "tyk://" + oas.AdapterAPIID("rest-1")
+
+	specs := map[string]*APISpec{
+		rest.APIID:    rest,
+		adapter.APIID: adapter,
+		proxy.APIID:   proxy,
+	}
+
+	pairingMap, _ := computeMCPPairing(specs)
+	_, paired := pairingMap["rest-1"]
+	assert.False(t, paired, "cross-org pairing must be refused")
 }

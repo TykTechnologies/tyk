@@ -124,11 +124,8 @@ func (gw *Gateway) validatePairedMCPAdapterUpstream(r *http.Request, mcpObj *oas
 
 	gw.apisMu.RLock()
 	rest, ok := gw.apisByID[restAPIID]
-	pairingClone := make(map[string]string, len(gw.mcpPairing))
-	for k, v := range gw.mcpPairing {
-		pairingClone[k] = v
-	}
 	gw.apisMu.RUnlock()
+	pairingClone := gw.mcpPairing.PairingSnapshot()
 
 	if !ok || rest == nil || rest.APIDefinition == nil {
 		return "Paired REST API " + restAPIID + " is not loaded; create it first", http.StatusBadRequest

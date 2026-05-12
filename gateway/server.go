@@ -57,6 +57,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/internal/mcp/pairing"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -180,14 +181,13 @@ type Gateway struct {
 
 	policies *model.Policies
 
-	// mcpPairing maps a REST APIID to the operator-managed MCP proxy APIID
-	// that is allowed to loop-call it. Rebuilt in full on every loadApps;
-	// read-only between reloads. Used by MCPLoopAuthBypass and validateMCP
-	// to enforce the 1:1 paired-proxy trust model.
-	mcpPairing map[string]string
-	// mcpAdapter maps a REST APIID to the synthetic adapter APIID
-	// (`<restID>__mcp-adapter`). Rebuilt in full on every loadApps.
-	mcpAdapter map[string]string
+	// mcpPairing maintains the REST→proxy and REST→adapter mappings used
+	// by MCPLoopAuthBypass and validateMCP to enforce the 1:1
+	// paired-proxy trust model. Rebuilt in full on every loadApps;
+	// read-only between reloads. The underlying type is gateway-
+	// agnostic (internal/mcp/pairing) so middlewares can be unit-tested
+	// against a fake Lookup.
+	mcpPairing *pairing.Index
 
 	certUsageTracker *certUsageTracker // nil in non-RPC mode
 	pendingCerts     sync.Map          // certID -> struct{}, certs skipped due to tracker miss
@@ -289,6 +289,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.apisByID = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
+	gw.mcpPairing = pairing.New()
 
 	gw.policies = model.NewPolicies(
 		model.WithInternalCollision(func(customId string, ids []persistentmodel.ObjectID) {

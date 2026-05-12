@@ -32,7 +32,7 @@ const mcpAdapterListenPathPrefix = "/__tyk-mcp-adapter/"
 // source REST API, the error is logged and the loader continues.
 //
 // Returns the synthesised specs (caller registers them) — they are also
-// recorded in gw.mcpAdapter[restID] = adapterID.
+// recorded in the adapter map computed alongside the pairing index.
 func (gw *Gateway) synthesiseMCPAdapters(
 	specs []*APISpec,
 	tmpSpecRegister map[string]*APISpec,
@@ -41,7 +41,6 @@ func (gw *Gateway) synthesiseMCPAdapters(
 	gs *generalStores,
 	muxer *proxyMux,
 ) []*APISpec {
-	adapterMap := map[string]string{}
 	var synthesised []*APISpec
 
 	for _, rest := range specs {
@@ -64,8 +63,6 @@ func (gw *Gateway) synthesiseMCPAdapters(
 			"derived_count":  len(adapter.DerivedTools),
 		}).Debug("synthesised MCP adapter")
 
-		// Register in the in-flight maps so the rest of loadApps treats it
-		// like any other spec for lookup purposes.
 		tmpSpecRegister[adapter.APIID] = adapter
 
 		handle, err := gw.loadHTTPService(adapter, apisByListen, gs, muxer)
@@ -77,41 +74,46 @@ func (gw *Gateway) synthesiseMCPAdapters(
 		}
 		tmpSpecHandles.Store(adapter.APIID, handle)
 
-		adapterMap[rest.APIID] = adapter.APIID
 		synthesised = append(synthesised, adapter)
 	}
-
-	// Index update is delayed until after the public-spec loop so callers
-	// have the final view. Held under apisMu by the caller.
-	gw.mcpAdapter = adapterMap
 
 	return synthesised
 }
 
-// rebuildMCPPairing walks the in-flight spec register after both the
-// public-spec load and synthetic-adapter synthesis have completed, and
-// builds gw.mcpPairing — the restAPIID → proxyAPIID index used by
-// MCPLoopAuthBypass and validateMCP.
+// rebuildMCPPairing walks the in-flight spec register and replaces the
+// pairing index (gw.mcpPairing) atomically with fresh REST→proxy and
+// REST→adapter maps.
 //
 // A proxy is recognised by:
-//   - IsMCP() (operator marked it via /tyk/mcps)
-//   - Proxy.TargetURL has scheme `tyk` and host equal to an adapter APIID
-//     registered in tmpSpecRegister whose source REST API is in the same
-//     OrgID.
+//   - Proxy.TargetURL has scheme `tyk` and host equal to an adapter
+//     APIID registered in tmpSpecRegister
+//   - The candidate is not itself a synthetic adapter
+//   - REST/proxy OrgIDs match (cross-org targeting is refused; the
+//     admit-time validator should already have caught it, this is
+//     defence in depth)
 //
-// The 1:1 invariant (each adapter targeted by at most one proxy) is
-// enforced at admit time by validateMCP; this rebuilder simply records
-// the latest-wins pairing if it ever encounters a duplicate.
+// The 1:1 invariant is enforced at admit time by validateMCP; this
+// rebuilder simply records the latest-wins pairing if it ever sees a
+// duplicate.
 func (gw *Gateway) rebuildMCPPairing(tmpSpecRegister map[string]*APISpec) {
-	pairing := map[string]string{}
+	pairingMap, adapterMap := computeMCPPairing(tmpSpecRegister)
+	gw.mcpPairing.Set(pairingMap, adapterMap)
+}
 
-	for _, spec := range tmpSpecRegister {
+// computeMCPPairing is the pure (gateway-free) core of
+// rebuildMCPPairing — exported within the package for unit testing.
+// Returns (restID→proxyID, restID→adapterID).
+func computeMCPPairing(specs map[string]*APISpec) (pairing, adapter map[string]string) {
+	pairing = map[string]string{}
+	adapter = map[string]string{}
+
+	for _, spec := range specs {
 		if spec == nil || spec.APIDefinition == nil {
 			continue
 		}
-		// Adapter specs target REST APIs; do not consider them as
-		// proxies even though they share a tyk:// upstream shape.
 		if spec.IsSyntheticMCPAdapter {
+			// Record the adapter→REST mapping (key is the REST APIID).
+			adapter[spec.SourceRESTAPIID] = spec.APIID
 			continue
 		}
 		target := strings.TrimSpace(spec.Proxy.TargetURL)
@@ -122,27 +124,22 @@ func (gw *Gateway) rebuildMCPPairing(tmpSpecRegister map[string]*APISpec) {
 		if err != nil || u.Scheme != "tyk" {
 			continue
 		}
-
 		adapterID := strings.TrimPrefix(u.Host, "id:")
 		if !oas.IsAdapterAPIID(adapterID) {
 			continue
 		}
 		restID := oas.AdapterSourceAPIID(adapterID)
-		adapter, ok := tmpSpecRegister[adapterID]
-		rest, restOK := tmpSpecRegister[restID]
-		if !ok || !restOK || adapter == nil || rest == nil {
+		rest, restOK := specs[restID]
+		_, adapterOK := specs[adapterID]
+		if !adapterOK || !restOK || rest == nil {
 			continue
 		}
 		if rest.OrgID != spec.OrgID {
-			// Cross-org targeting — refuse to pair. validateMCP rejects
-			// this at admit time but we double-check at runtime as
-			// defence in depth.
 			continue
 		}
 		pairing[restID] = spec.APIID
 	}
-
-	gw.mcpPairing = pairing
+	return pairing, adapter
 }
 
 // buildAdapterSpec constructs an in-memory adapter APISpec paired with
@@ -171,31 +168,18 @@ func (gw *Gateway) buildAdapterSpec(rest *APISpec) (*APISpec, error) {
 
 	adapterAPIID := oas.AdapterAPIID(rest.APIID)
 
-	// Shallow-clone the source apidef so we don't share mutable state
-	// (specifically Proxy / VersionData / ExtendedPaths) with the REST
-	// spec. The fields we explicitly overwrite below are the ones that
-	// matter for adapter behaviour.
 	cloned := *rest.APIDefinition
 	cloned.APIID = adapterAPIID
 	cloned.Name = rest.Name + " [MCP adapter]"
 	cloned.Internal = true
 	cloned.MarkAsMCP()
-	// Listening path is never reachable (Internal:true), but
-	// loadHTTPService validates it as well-formed.
 	cloned.Proxy.ListenPath = mcpAdapterListenPathPrefix + rest.APIID + "/"
-	cloned.Proxy.TargetURL = "http://127.0.0.1/" // placeholder; chain short-circuits
-	// Reset the MCP exposure marker on the adapter — adapters are
-	// callees, not source REST APIs.
+	cloned.Proxy.TargetURL = "http://127.0.0.1/"
 	cloned.MCPExposure = apidef.MCPExposureConfig{}
-	// Make sure the adapter is keyless from the proxy's point of view —
-	// authentication happens at the operator-managed proxy in front, the
-	// adapter only ever receives in-process loop traffic.
 	cloned.UseKeylessAccess = true
 
 	adapter := &APISpec{
-		APIDefinition: &cloned,
-		// Carry the same OAS by reference — the adapter middleware reads
-		// the path/operation table to translate tools/call.
+		APIDefinition:         &cloned,
 		OAS:                   rest.OAS,
 		IsSyntheticMCPAdapter: true,
 		SourceRESTAPIID:       rest.APIID,
@@ -203,9 +187,6 @@ func (gw *Gateway) buildAdapterSpec(rest *APISpec) (*APISpec, error) {
 		GlobalConfig:          gw.GetConfig(),
 	}
 
-	// Initialise the same managers that MakeSpec installs on real
-	// specs. processSpec → APISpec.Init dereferences these later, so a
-	// nil here panics during loadHTTPService.
 	adapter.Health = &DefaultHealthChecker{Gw: gw, APIID: adapter.APIID}
 	adapter.AuthManager = &DefaultSessionManager{Gw: gw}
 	adapter.OrgSessionManager = &DefaultSessionManager{orgID: adapter.OrgID, Gw: gw}
