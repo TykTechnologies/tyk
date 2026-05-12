@@ -760,11 +760,14 @@
         "value": {
           "type": "integer",
           "minimum": 0
+        },
+        "timeout": {
+          "type": "string",
+          "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
         }
       },
       "required": [
-        "enabled",
-        "value"
+        "enabled"
       ],
       "additionalProperties": false
     },
