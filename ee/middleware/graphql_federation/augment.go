@@ -112,3 +112,44 @@ func keyedEntityTypes(sdl string) (map[string]bool, error) {
 	}
 	return out, nil
 }
+
+// countKeyDirectives walks the SDL and returns the per-type count of `@key`
+// directives. Used to reject the multi-@key case at API load time — the UDG
+// entity resolver only supports one key per type, and silently picking one
+// (which is what `entitySelectionInfo` used to do) hides config errors.
+func countKeyDirectives(sdl string) (map[string]int, error) {
+	doc, report := astparser.ParseGraphqlDocumentString(sdl)
+	if report.HasErrors() {
+		return nil, report
+	}
+	out := map[string]int{}
+	count := func(name string, hasDirectives bool, dirRefs []int) {
+		if !hasDirectives {
+			return
+		}
+		for _, dRef := range dirRefs {
+			if doc.DirectiveNameString(dRef) == "key" {
+				out[name]++
+			}
+		}
+	}
+	for i := range doc.ObjectTypeDefinitions {
+		def := doc.ObjectTypeDefinitions[i]
+		dirRefs := []int{}
+		if def.HasDirectives {
+			dirRefs = def.Directives.Refs
+		}
+		count(doc.ObjectTypeDefinitionNameString(i), def.HasDirectives, dirRefs)
+	}
+	for i := range doc.ObjectTypeExtensions {
+		ext := doc.ObjectTypeExtensions[i]
+		dirRefs := []int{}
+		if ext.HasDirectives {
+			dirRefs = ext.Directives.Refs
+		}
+		// Aggregate across base type and extensions: an extension's keys count
+		// alongside the base type's.
+		count(doc.ObjectTypeExtensionNameString(i), ext.HasDirectives, dirRefs)
+	}
+	return out, nil
+}

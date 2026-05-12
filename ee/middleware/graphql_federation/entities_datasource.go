@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"text/template"
+	"time"
 
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/ast"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/astparser"
@@ -16,6 +17,15 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
+
+// defaultRESTEntityTimeout caps a single REST entity resolve call. Without
+// this, a hung upstream would pin a Tyk worker indefinitely (the default
+// `http.Client{}` ships with no timeout). 30s matches typical API-gateway
+// upstream-timeout defaults; if the caller passes their own configured
+// `http.Client`, that one is used verbatim and the default does NOT apply.
+// TODO: surface this in `GraphQLEngineDataSourceConfigREST` so customers can
+// override per-data-source without replacing the gateway's http.Client.
+const defaultRESTEntityTimeout = 30 * time.Second
 
 // entityResolver fetches a fully resolved entity given its key representation.
 type entityResolver interface {
@@ -52,6 +62,22 @@ func (r *restEntityResolver) resolve(ctx context.Context, representation map[str
 	if method == "" {
 		method = http.MethodGet
 	}
+
+	// Always cap a single resolve call. The shared `http.Client` passed by the
+	// gateway is configured for the broader API surface and has no Timeout —
+	// without this, a hung upstream pins a worker indefinitely. We apply the
+	// cap via context so we don't have to mutate the shared client (which
+	// would race other callers).
+	client := r.Client
+	if client == nil {
+		client = &http.Client{Timeout: defaultRESTEntityTimeout}
+	}
+	if client.Timeout <= 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, defaultRESTEntityTimeout)
+		defer cancel()
+	}
+
 	req, err := http.NewRequestWithContext(ctx, method, urlBuf.String(), body)
 	if err != nil {
 		return nil, fmt.Errorf("build entity request: %w", err)
@@ -60,10 +86,6 @@ func (r *restEntityResolver) resolve(ctx context.Context, representation map[str
 		req.Header.Set(k, v)
 	}
 
-	client := r.Client
-	if client == nil {
-		client = http.DefaultClient
-	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("entity upstream call: %w", err)
@@ -329,6 +351,24 @@ func buildEntityResolvers(schemaSDL string, dataSources []apidef.GraphQLEngineDa
 	}
 	if len(entityTypes) == 0 {
 		return nil, nil
+	}
+	// Reject types declaring more than one `@key` directive. Silently picking
+	// one would surface as confusing runtime mismatches: the resolver's URL /
+	// query template renders against whichever key the loop saw last, so
+	// representations keyed by any other declared key fail with cryptic
+	// "missing key {{.object.X}}" errors at runtime. Mirrors how composite
+	// `@key(fields: "id name")` is rejected.
+	keyCounts, err := countKeyDirectives(schemaSDL)
+	if err != nil {
+		return nil, err
+	}
+	for typeName, count := range keyCounts {
+		if count > 1 {
+			return nil, fmt.Errorf(
+				"entity type %q declares multiple @key directives; only single-key entities are supported (declare a separate data source per key)",
+				typeName,
+			)
+		}
 	}
 	resolvers := map[string]entityResolver{}
 	for _, ds := range dataSources {

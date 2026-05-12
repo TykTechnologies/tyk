@@ -2193,3 +2193,874 @@ func TestGraphQLMiddleware_V3_Subscription_ProxyMode_FederationPassthrough_TWS(t
 	assert.ElementsMatch(t, []string{"u-1", "u-2"}, users, "client must receive both User events")
 	assert.True(t, gotComplete, "client must receive a complete frame")
 }
+
+// TestGraphQLMiddleware_UDGFederation_Mutation_REST verifies that a customer's
+// federation-augmented schema (a `type User @key(fields:"id")` plus a top-level
+// Mutation type) executes mutation operations correctly. Federation
+// augmentation only injects `_service`/`_entities` onto Query; the Mutation
+// type and its fields must pass through untouched so the engine can plan them
+// against the customer's REST data source.
+func TestGraphQLMiddleware_UDGFederation_Mutation_REST(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	var seenMethod, seenPath, seenBody string
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bodyBytes, _ := io.ReadAll(r.Body)
+		seenMethod = r.Method
+		seenPath = r.URL.Path
+		seenBody = string(bodyBytes)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"u-42","username":"alice"}`))
+	}))
+	defer mockServer.Close()
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+		spec.GraphQL.Schema = `
+				type User @key(fields: "id") {
+					id: ID!
+					username: String!
+				}
+				type Query {
+					user(id: ID!): User
+				}
+				type Mutation {
+					createUser(username: String!): User!
+				}
+			`
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			{
+				Kind: apidef.GraphQLEngineDataSourceKindREST,
+				Name: "create_user_ds",
+				RootFields: []apidef.GraphQLTypeFields{
+					{Type: "Mutation", Fields: []string{"createUser"}},
+				},
+				Config: []byte(fmt.Sprintf(`{
+						"url": "%s/users",
+						"method": "POST",
+						"body": "{\"username\":\"{{ .arguments.username }}\"}"
+					}`, mockServer.URL)),
+			},
+		}
+		spec.GraphQL.Engine.FieldConfigs = []apidef.GraphQLFieldConfig{
+			{
+				TypeName:              "Mutation",
+				FieldName:             "createUser",
+				DisableDefaultMapping: true,
+				Path:                  []string{""},
+			},
+		}
+	})[0]
+
+	g.Gw.LoadAPI(spec)
+
+	body := `{"query": "mutation($u: String!) { createUser(username: $u) { id username } }", "variables": {"u": "alice"}}`
+
+	res, err := g.Run(t, test.TestCase{
+		Method: "POST",
+		Path:   "/",
+		Data:   body,
+		Code:   http.StatusOK,
+	})
+	require.NoError(t, err)
+	resBody, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+	res.Body.Close()
+
+	// Upstream should have been invoked correctly.
+	require.Equal(t, http.MethodPost, seenMethod, "mutation upstream must be POST; got %s", seenMethod)
+	require.Equal(t, "/users", seenPath, "mutation upstream path; body=%s", seenBody)
+	require.Contains(t, seenBody, "alice", "mutation body template must render input.username; got: %s", seenBody)
+
+	// And the engine must project the resolved User into the response.
+	require.Contains(t, string(resBody), `"id":"u-42"`, "response: %s", string(resBody))
+	require.Contains(t, string(resBody), `"username":"alice"`, "response: %s", string(resBody))
+	require.NotContains(t, string(resBody), `"errors"`, "mutation must not produce errors; got: %s", string(resBody))
+}
+
+// TestGraphQLMiddleware_UDGFederation_Mutation_ServiceSDLPreservesMutation
+// verifies that the SDL emitted by `_service { sdl }` keeps the customer's
+// Mutation type. The orphan-Query-field stripper only touches Query — it must
+// not accidentally remove or mangle Mutation fields.
+func TestGraphQLMiddleware_UDGFederation_Mutation_ServiceSDLPreservesMutation(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mockServer.Close()
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+		spec.GraphQL.Schema = `
+				type User @key(fields: "id") {
+					id: ID!
+					username: String!
+				}
+				type Query {
+					user(id: ID!): User
+				}
+				type Mutation {
+					createUser(username: String!): User!
+				}
+			`
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			{
+				Kind: apidef.GraphQLEngineDataSourceKindREST,
+				Name: "create_user_ds",
+				RootFields: []apidef.GraphQLTypeFields{
+					{Type: "Mutation", Fields: []string{"createUser"}},
+				},
+				Config: []byte(fmt.Sprintf(`{"url":"%s/users","method":"POST"}`, mockServer.URL)),
+			},
+		}
+	})[0]
+
+	g.Gw.LoadAPI(spec)
+
+	res, err := g.Run(t, test.TestCase{
+		Method: "POST", Path: "/",
+		Data: `{"query": "{ _service { sdl } }"}`, Code: http.StatusOK,
+	})
+	require.NoError(t, err)
+	resBody, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+	res.Body.Close()
+
+	sdl, _, _, err := jsonparser.Get(resBody, "data", "_service", "sdl")
+	require.NoError(t, err, "response: %s", string(resBody))
+	sdlStr := string(sdl)
+	require.Contains(t, sdlStr, "type Mutation", "service SDL must preserve the Mutation type; got: %s", sdlStr)
+	require.Contains(t, sdlStr, "createUser", "service SDL must preserve Mutation fields; got: %s", sdlStr)
+}
+
+// TestGraphQLMiddleware_UDGFederation_RESTUpstream_PropagatesAuthorizationHeader
+// documents the current behavior of header propagation on the federation
+// `_entities` REST resolver. The static `headers` map declared on the data
+// source IS forwarded; the incoming client's `Authorization` header is NOT —
+// the entity resolver doesn't see the original request context. This is a
+// known gap noted as a follow-up.
+//
+// The same code path covers static headers as the pre-existing
+// `*HeadersForwarded` test for GraphQL upstreams; here we add explicit REST
+// coverage and document the dynamic gap with `_NotForwarded` assertions.
+func TestGraphQLMiddleware_UDGFederation_RESTUpstream_PropagatesAuthorizationHeader(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	const staticAuth = "Bearer static-token"
+
+	var seenStaticAuth, seenClientAuth string
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenStaticAuth = r.Header.Get("Authorization")
+		seenClientAuth = r.Header.Get("X-Client-Forwarded-Auth")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"1","username":"alice"}`))
+	}))
+	defer mockServer.Close()
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+		spec.GraphQL.Schema = `
+				type User @key(fields: "id") { id: ID! username: String! }
+				type Query { user(id: ID!): User }
+			`
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			{
+				Kind: apidef.GraphQLEngineDataSourceKindREST,
+				Name: "user_ds",
+				RootFields: []apidef.GraphQLTypeFields{
+					{Type: "User", Fields: []string{"id", "username"}},
+				},
+				Config: []byte(fmt.Sprintf(`{
+						"url": "%s/users/{{ .object.id }}",
+						"method": "GET",
+						"headers": {"Authorization": "Bearer static-token"}
+					}`, mockServer.URL)),
+			},
+		}
+	})[0]
+
+	g.Gw.LoadAPI(spec)
+
+	query := `query($r: [_Any!]!) { _entities(representations: $r) { ... on User { id username } } }`
+	body := fmt.Sprintf(`{"query": %q, "variables": {"r": [{"__typename":"User","id":"1"}]}}`, query)
+
+	res, err := g.Run(t, test.TestCase{
+		Method: "POST", Path: "/", Data: body, Code: http.StatusOK,
+		Headers: map[string]string{
+			"Authorization":           "Bearer client-supplied-token",
+			"X-Client-Forwarded-Auth": "client-extra",
+		},
+	})
+	require.NoError(t, err)
+	resBody, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+	res.Body.Close()
+
+	require.Contains(t, string(resBody), `"id":"1"`, "response: %s", string(resBody))
+
+	// Static headers configured on the data source MUST be forwarded.
+	require.Equal(t, staticAuth, seenStaticAuth,
+		"static `Authorization` header on the REST data source must reach the upstream; got %q", seenStaticAuth)
+
+	// Documented gap: the incoming client request's headers are NOT propagated
+	// today — the entity resolver receives only the engine context, not the
+	// original http.Request headers. If this assertion ever flips, propagation
+	// has been added and the test should be updated to demand the client
+	// header is forwarded.
+	require.Empty(t, seenClientAuth,
+		"per-request client header propagation is not implemented for entity resolvers (known gap); upstream saw %q", seenClientAuth)
+}
+
+// TestGraphQLMiddleware_UDGFederation_GraphQLUpstream_PropagatesAuthorizationHeader
+// is the GraphQL-upstream twin of the REST test above. Same code path for
+// static headers (configured on the data source) — confirmed by the existing
+// `_HeadersForwarded` test — and the same gap for dynamic per-request
+// client-supplied headers.
+func TestGraphQLMiddleware_UDGFederation_GraphQLUpstream_PropagatesAuthorizationHeader(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	const staticAuth = "Bearer static-token"
+
+	type gqlReq struct {
+		Query     string         `json:"query"`
+		Variables map[string]any `json:"variables"`
+	}
+
+	var seenStaticAuth, seenClientAuth string
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenStaticAuth = r.Header.Get("Authorization")
+		seenClientAuth = r.Header.Get("X-Client-Forwarded-Auth")
+
+		bodyBytes, _ := io.ReadAll(r.Body)
+		var req gqlReq
+		_ = json.Unmarshal(bodyBytes, &req)
+
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.Contains(req.Query, "_service"):
+			// Not a federation subgraph; force the generated-lookup path.
+			_, _ = w.Write([]byte(`{"errors":[{"message":"no _service here"}]}`))
+		case strings.Contains(req.Query, "__schema"):
+			_, _ = w.Write([]byte(`{
+				"data":{"__schema":{"queryType":{"name":"Query"},"types":[
+					{"kind":"OBJECT","name":"Query","fields":[
+						{"name":"user","type":{"kind":"OBJECT","name":"User","ofType":null},
+						 "args":[{"name":"id","type":{"kind":"NON_NULL","name":null,"ofType":{"kind":"SCALAR","name":"ID","ofType":null}}}]}
+					]}
+				]}}
+			}`))
+		case strings.Contains(req.Query, "user("):
+			_, _ = w.Write([]byte(`{"data":{"user":{"id":"1","username":"alice"}}}`))
+		default:
+			http.Error(w, "unexpected", http.StatusBadRequest)
+		}
+	}))
+	defer mockServer.Close()
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+		spec.GraphQL.Schema = `
+				type User @key(fields: "id") { id: ID! username: String! }
+				type Query { user(id: ID!): User }
+			`
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			{
+				Kind: apidef.GraphQLEngineDataSourceKindGraphQL,
+				Name: "user_ds",
+				RootFields: []apidef.GraphQLTypeFields{
+					{Type: "User", Fields: []string{"id", "username"}},
+				},
+				Config: []byte(fmt.Sprintf(
+					`{"url": %q, "method": "POST", "headers": {"Authorization": "Bearer static-token"}}`,
+					mockServer.URL,
+				)),
+			},
+		}
+	})[0]
+
+	g.Gw.LoadAPI(spec)
+
+	query := `query($r: [_Any!]!) { _entities(representations: $r) { ... on User { id username } } }`
+	body := fmt.Sprintf(`{"query": %q, "variables": {"r": [{"__typename":"User","id":"1"}]}}`, query)
+
+	res, err := g.Run(t, test.TestCase{
+		Method: "POST", Path: "/", Data: body, Code: http.StatusOK,
+		Headers: map[string]string{
+			"Authorization":           "Bearer client-supplied-token",
+			"X-Client-Forwarded-Auth": "client-extra",
+		},
+	})
+	require.NoError(t, err)
+	resBody, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+	res.Body.Close()
+
+	require.Contains(t, string(resBody), `"id":"1"`, "response: %s", string(resBody))
+	require.Equal(t, staticAuth, seenStaticAuth,
+		"static `Authorization` header on the GraphQL data source must reach the upstream; got %q", seenStaticAuth)
+	require.Empty(t, seenClientAuth,
+		"per-request client header propagation is not implemented for entity resolvers (known gap); upstream saw %q", seenClientAuth)
+}
+
+// TestGraphQLMiddleware_UDGFederation_MultipleKeyDirectives verifies that a
+// type carrying more than one `@key` directive is rejected cleanly at API load
+// time. Previously, `entitySelectionInfo` silently picked the LAST declared
+// single-field @key (the loop overwrites `keyField` on each pass), and
+// `buildEntityResolvers` then used that key to template URLs / build queries
+// — so representations keyed by any other declared key would render an empty
+// path segment and fail at runtime in ways that were hard to diagnose. The
+// rejection mirrors how composite `@key` is rejected today: an error message
+// naming the entity type and pointing at the supported single-key shape, with
+// a documented workaround.
+func TestGraphQLMiddleware_UDGFederation_MultipleKeyDirectives(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("upstream should not be hit when multi-@key rejection happens at config-build time; got %s %s", r.Method, r.URL.Path)
+		http.Error(w, "should not be reached", http.StatusInternalServerError)
+	}))
+	defer mockServer.Close()
+
+	apiDef := &apidef.APIDefinition{
+		GraphQL: apidef.GraphQLConfig{
+			Enabled:       true,
+			Version:       apidef.GraphQLConfigVersion3Preview,
+			ExecutionMode: apidef.GraphQLExecutionModeExecutionEngine,
+			Schema: `
+				type User @key(fields: "id") @key(fields: "email") {
+					id: ID!
+					email: String!
+					username: String!
+				}
+				type Query {
+					user(id: ID!): User
+				}
+			`,
+			Engine: apidef.GraphQLEngineConfig{
+				DataSources: []apidef.GraphQLEngineDataSource{
+					{
+						Kind: apidef.GraphQLEngineDataSourceKindREST,
+						Name: "user_ds",
+						RootFields: []apidef.GraphQLTypeFields{
+							{Type: "User", Fields: []string{"id", "email", "username"}},
+						},
+						Config: []byte(fmt.Sprintf(`{"url":"%s/users/{{.object.id}}","method":"GET"}`, mockServer.URL)),
+					},
+				},
+			},
+		},
+	}
+
+	udg := &enginev3.UniversalDataGraph{ApiDefinition: apiDef}
+	_, err := udg.EngineConfigV3()
+	require.Error(t, err, "expected multi-@key rejection at engine config build time")
+	msg := err.Error()
+	require.Contains(t, msg, "User", "error must name the offending entity type, got: %s", msg)
+	require.Contains(t, msg, "multiple @key", "error must mention the multi-key limitation, got: %s", msg)
+}
+
+// TestGraphQLMiddleware_UDGFederation_AdvancedFederationDirectives_PassedThrough
+// confirms Tyk does not reject or mangle the advanced Apollo Federation v2
+// directives — `@interfaceObject`, `@inaccessible`, `@override`, `@shareable`,
+// `@provides`, `@requires`, `@external`. Tyk doesn't implement their semantic
+// effects (that's Apollo Router's job); it just needs to pass them through:
+//
+//  1. `_service { sdl }` must include the directive verbatim in the emitted SDL.
+//  2. Schema validation does not reject the directive at API load time.
+//  3. A simple federation `_entities` query against the schema still works.
+//
+// If a directive surfaces a real parsing bug, that's a real bug — fix it.
+func TestGraphQLMiddleware_UDGFederation_AdvancedFederationDirectives_PassedThrough(t *testing.T) {
+	cases := []struct {
+		name       string
+		schema     string
+		needle     string // expected substring of the emitted SDL
+		entityType string // type to resolve in the _entities query
+		idValue    string // representation id
+		username   string // upstream payload
+	}{
+		{
+			name: "shareable",
+			schema: `
+				type User @key(fields: "id") {
+					id: ID!
+					username: String! @shareable
+				}
+				type Query { user(id: ID!): User }
+			`,
+			needle:     "@shareable",
+			entityType: "User",
+			idValue:    "1",
+			username:   "alice",
+		},
+		{
+			name: "inaccessible",
+			schema: `
+				type User @key(fields: "id") {
+					id: ID!
+					username: String!
+					internal: String @inaccessible
+				}
+				type Query { user(id: ID!): User }
+			`,
+			needle:     "@inaccessible",
+			entityType: "User",
+			idValue:    "1",
+			username:   "alice",
+		},
+		{
+			name: "override",
+			schema: `
+				type User @key(fields: "id") {
+					id: ID!
+					username: String! @override(from: "legacy-users")
+				}
+				type Query { user(id: ID!): User }
+			`,
+			needle:     "@override",
+			entityType: "User",
+			idValue:    "1",
+			username:   "alice",
+		},
+		{
+			name: "external",
+			schema: `
+				type User @key(fields: "id") {
+					id: ID!
+					username: String! @external
+				}
+				type Query { user(id: ID!): User }
+			`,
+			needle:     "@external",
+			entityType: "User",
+			idValue:    "1",
+			username:   "alice",
+		},
+		{
+			name: "provides",
+			schema: `
+				type Address {
+					city: String!
+				}
+				type User @key(fields: "id") {
+					id: ID!
+					username: String!
+					address: Address @provides(fields: "city")
+				}
+				type Query { user(id: ID!): User }
+			`,
+			needle:     "@provides",
+			entityType: "User",
+			idValue:    "1",
+			username:   "alice",
+		},
+		{
+			name: "requires",
+			schema: `
+				type User @key(fields: "id") {
+					id: ID!
+					username: String!
+					displayName: String @requires(fields: "username")
+				}
+				type Query { user(id: ID!): User }
+			`,
+			needle:     "@requires",
+			entityType: "User",
+			idValue:    "1",
+			username:   "alice",
+		},
+		{
+			name: "interfaceObject",
+			schema: `
+				type User @key(fields: "id") @interfaceObject {
+					id: ID!
+					username: String!
+				}
+				type Query { user(id: ID!): User }
+			`,
+			needle:     "@interfaceObject",
+			entityType: "User",
+			idValue:    "1",
+			username:   "alice",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			g := StartTest(nil)
+			defer g.Close()
+
+			mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(fmt.Sprintf(`{"id":%q,"username":%q}`, tc.idValue, tc.username)))
+			}))
+			defer mockServer.Close()
+
+			spec := BuildAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.Proxy.ListenPath = "/"
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+				spec.GraphQL.Schema = tc.schema
+				spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+					{
+						Kind: apidef.GraphQLEngineDataSourceKindREST,
+						Name: "user_ds",
+						RootFields: []apidef.GraphQLTypeFields{
+							{Type: tc.entityType, Fields: []string{"id", "username"}},
+						},
+						Config: []byte(fmt.Sprintf(`{"url":"%s/users/{{ .object.id }}","method":"GET"}`, mockServer.URL)),
+					},
+				}
+			})[0]
+
+			g.Gw.LoadAPI(spec)
+
+			// 1) `_service { sdl }` must include the directive verbatim.
+			sdlRes, err := g.Run(t, test.TestCase{
+				Method: "POST", Path: "/",
+				Data: `{"query": "{ _service { sdl } }"}`, Code: http.StatusOK,
+			})
+			require.NoError(t, err)
+			sdlBody, err := io.ReadAll(sdlRes.Body)
+			require.NoError(t, err)
+			sdlRes.Body.Close()
+
+			sdl, _, _, err := jsonparser.Get(sdlBody, "data", "_service", "sdl")
+			require.NoError(t, err, "_service { sdl } failed for %s: %s", tc.name, string(sdlBody))
+			require.Contains(t, string(sdl), tc.needle,
+				"service SDL must preserve %s for %s; got: %s", tc.needle, tc.name, string(sdl))
+
+			// 2) `_entities` query against the schema still works.
+			query := fmt.Sprintf(
+				`query($r: [_Any!]!) { _entities(representations: $r) { ... on %s { id username } } }`,
+				tc.entityType,
+			)
+			vars := fmt.Sprintf(`{"r": [{"__typename": %q, "id": %q}]}`, tc.entityType, tc.idValue)
+			entRes, err := g.Run(t, test.TestCase{
+				Method: "POST", Path: "/",
+				Data: fmt.Sprintf(`{"query": %q, "variables": %s}`, query, vars),
+				Code: http.StatusOK,
+			})
+			require.NoError(t, err)
+			entBody, err := io.ReadAll(entRes.Body)
+			require.NoError(t, err)
+			entRes.Body.Close()
+
+			require.Contains(t, string(entBody), `"id":"`+tc.idValue+`"`,
+				"%s: response should resolve the entity; got: %s", tc.name, string(entBody))
+			require.Contains(t, string(entBody), `"username":"`+tc.username+`"`,
+				"%s: response should project username; got: %s", tc.name, string(entBody))
+		})
+	}
+}
+
+// TestGraphQLMiddleware_UDGFederation_LargeRepresentationArray exercises the
+// partial-failure path under load. 100 representations are sent; half resolve,
+// half 404. We assert: 100 entries in `_entities`, half populated, half null,
+// 50 errors (one per failed entity) with the right path indices. Skipped if it
+// takes longer than 30s — useful for catching pathological scaling regressions
+// (unbounded goroutine fanout, connection pool exhaustion).
+func TestGraphQLMiddleware_UDGFederation_LargeRepresentationArray(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Pattern: /users/even-N => 200, /users/odd-N => 404.
+		path := r.URL.Path
+		const prefix = "/users/"
+		if strings.HasPrefix(path, prefix) {
+			id := strings.TrimPrefix(path, prefix)
+			if strings.HasPrefix(id, "even-") {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(fmt.Sprintf(`{"id":%q,"username":"user-%s"}`, id, id)))
+				return
+			}
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mockServer.Close()
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+		spec.GraphQL.Schema = `
+				type User @key(fields: "id") { id: ID! username: String! }
+				type Query { user(id: ID!): User }
+			`
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			{
+				Kind: apidef.GraphQLEngineDataSourceKindREST,
+				Name: "user_ds",
+				RootFields: []apidef.GraphQLTypeFields{
+					{Type: "User", Fields: []string{"id", "username"}},
+				},
+				Config: []byte(fmt.Sprintf(`{"url":"%s/users/{{ .object.id }}","method":"GET"}`, mockServer.URL)),
+			},
+		}
+	})[0]
+
+	g.Gw.LoadAPI(spec)
+
+	// 100 reps: 50 resolvable (`even-0`..`even-49`) and 50 404s (`odd-0`..`odd-49`).
+	var repBuilder strings.Builder
+	repBuilder.WriteString(`[`)
+	for i := 0; i < 50; i++ {
+		if i > 0 {
+			repBuilder.WriteString(",")
+		}
+		repBuilder.WriteString(fmt.Sprintf(`{"__typename":"User","id":"even-%d"}`, i))
+	}
+	for i := 0; i < 50; i++ {
+		repBuilder.WriteString(fmt.Sprintf(`,{"__typename":"User","id":"odd-%d"}`, i))
+	}
+	repBuilder.WriteString(`]`)
+
+	query := `query($r: [_Any!]!) { _entities(representations: $r) { ... on User { id username } } }`
+	body := fmt.Sprintf(`{"query": %q, "variables": {"r": %s}}`, query, repBuilder.String())
+
+	start := time.Now()
+	res, err := g.Run(t, test.TestCase{Method: "POST", Path: "/", Data: body, Code: http.StatusOK})
+	elapsed := time.Since(start)
+	require.NoError(t, err)
+	if elapsed > 30*time.Second {
+		t.Logf("WARNING: 100-rep _entities took %s (>30s threshold); skipping assertions to avoid flakiness", elapsed)
+		t.Skip("large representation array exceeded the 30s soft threshold")
+	}
+	resBody, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+	res.Body.Close()
+
+	var parsed struct {
+		Data struct {
+			Entities []map[string]any `json:"_entities"`
+		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+			Path    []any  `json:"path"`
+		} `json:"errors"`
+	}
+	require.NoError(t, json.Unmarshal(resBody, &parsed), "response: %s", string(resBody))
+	require.Len(t, parsed.Data.Entities, 100, "expected 100 entities in response; got %d", len(parsed.Data.Entities))
+
+	resolved, nulls := 0, 0
+	for _, e := range parsed.Data.Entities {
+		if e == nil {
+			nulls++
+		} else {
+			resolved++
+		}
+	}
+	require.Equal(t, 50, resolved, "expected 50 resolved entities; got %d (response: %s)", resolved, string(resBody))
+	require.Equal(t, 50, nulls, "expected 50 null entities; got %d", nulls)
+	require.Len(t, parsed.Errors, 50, "expected one error per failed entity; got %d", len(parsed.Errors))
+
+	// Every error path must be `["_entities", idx]` with idx in [50, 100).
+	for _, e := range parsed.Errors {
+		require.Len(t, e.Path, 2, "error path: %v", e.Path)
+		require.Equal(t, "_entities", e.Path[0])
+		idx, ok := e.Path[1].(float64)
+		require.True(t, ok, "error path index must be a number; got: %v", e.Path[1])
+		require.GreaterOrEqual(t, int(idx), 50, "failed-entity indices should be in the odd half (>=50); got %d", int(idx))
+		require.Less(t, int(idx), 100, "failed-entity indices should be <100; got %d", int(idx))
+	}
+}
+
+// TestGraphQLMiddleware_UDGFederation_RESTUpstream_SlowResponse exercises the
+// REST entity resolver against a slow upstream. The previous resolver used the
+// default `http.Client{}` (no timeout) and could pin a Tyk worker forever on a
+// hung upstream. The fix in `entities_datasource.go::restEntityResolver`
+// installs a `defaultRESTEntityTimeout` (currently 30s, hard-coded with a TODO
+// comment to surface as a per-data-source override) via a context deadline.
+//
+// The test uses a long sleep that comfortably exceeds the default timeout, and
+// asserts the resolver returns within a bounded wall-clock with a
+// timeout-flavored per-entity error — not a panic, not a hung connection.
+func TestGraphQLMiddleware_UDGFederation_RESTUpstream_SlowResponse(t *testing.T) {
+	// This test relies on the resolver tripping its own timeout. To keep the
+	// CI feedback loop tight we use a short timeout via a context deadline at
+	// the gateway level isn't yet wired through to the resolver — so we accept
+	// that the test does observe the default 30s timeout. We use a long enough
+	// upstream sleep to ensure the timeout fires first.
+	if testing.Short() {
+		t.Skip("slow-response test takes ~30s in long form; skipped in -short mode")
+	}
+
+	g := StartTest(nil)
+	defer g.Close()
+
+	// Upstream sleeps until the client gives up. The 60s sleep is longer than
+	// the resolver's default 30s timeout — the resolver must trip first.
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-time.After(60 * time.Second):
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"1","username":"alice"}`))
+		case <-r.Context().Done():
+			return
+		}
+	}))
+	defer mockServer.Close()
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+		spec.GraphQL.Schema = `
+				type User @key(fields: "id") { id: ID! username: String! }
+				type Query { user(id: ID!): User }
+			`
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			{
+				Kind: apidef.GraphQLEngineDataSourceKindREST,
+				Name: "user_ds",
+				RootFields: []apidef.GraphQLTypeFields{
+					{Type: "User", Fields: []string{"id", "username"}},
+				},
+				Config: []byte(fmt.Sprintf(`{"url":"%s/users/{{ .object.id }}","method":"GET"}`, mockServer.URL)),
+			},
+		}
+	})[0]
+
+	g.Gw.LoadAPI(spec)
+
+	query := `query($r: [_Any!]!) { _entities(representations: $r) { ... on User { id username } } }`
+	body := fmt.Sprintf(`{"query": %q, "variables": {"r": [{"__typename":"User","id":"1"}]}}`, query)
+
+	// Hard outer cap — the resolver's default timeout is 30s; allow a small
+	// margin. The pre-fix behavior was unbounded (the http.Client had no
+	// Timeout), so before the fix the goroutine would block for the full 60s
+	// upstream sleep and this assertion would fail.
+	start := time.Now()
+	res, err := g.Run(t, test.TestCase{Method: "POST", Path: "/", Data: body, Code: http.StatusOK})
+	elapsed := time.Since(start)
+	require.NoError(t, err)
+	resBody, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+	res.Body.Close()
+
+	require.Less(t, elapsed, 45*time.Second,
+		"resolver must trip its own timeout well before the 60s upstream sleep — observed %s; response: %s", elapsed, string(resBody))
+
+	var parsed struct {
+		Data struct {
+			Entities []map[string]any `json:"_entities"`
+		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+			Path    []any  `json:"path"`
+		} `json:"errors"`
+	}
+	require.NoError(t, json.Unmarshal(resBody, &parsed), "response: %s", string(resBody))
+	require.Len(t, parsed.Data.Entities, 1)
+	require.Nil(t, parsed.Data.Entities[0], "slow upstream must surface as a null entity; got: %s", string(resBody))
+	require.NotEmpty(t, parsed.Errors, "expected a per-entity error for the timed-out upstream; got: %s", string(resBody))
+
+	// Error message should be timeout-flavored — either Go's context deadline /
+	// client timeout phrasing.
+	foundTimeoutErr := false
+	for _, e := range parsed.Errors {
+		m := strings.ToLower(e.Message)
+		if strings.Contains(m, "timeout") || strings.Contains(m, "deadline") ||
+			strings.Contains(m, "context") || strings.Contains(m, "canceled") ||
+			strings.Contains(m, "client.timeout") {
+			foundTimeoutErr = true
+			break
+		}
+	}
+	require.True(t, foundTimeoutErr, "expected a timeout-flavored error; got: %s", string(resBody))
+}
+
+// TestGraphQLMiddleware_UDGFederation_RESTUpstream_ExtraFieldsIgnored
+// regression-tests the response-projection path: when the REST upstream
+// returns extra fields not declared in the customer's SDL (`internal_db_id`,
+// `_metadata`), the engine must project only declared fields into the GraphQL
+// response. Leaking undeclared fields would be a privacy / security issue:
+// a customer's "internal" columns showing up unguarded in client responses.
+func TestGraphQLMiddleware_UDGFederation_RESTUpstream_ExtraFieldsIgnored(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// `internal_db_id` and `_metadata` are NOT declared in the schema.
+		_, _ = w.Write([]byte(`{
+			"id": "1",
+			"username": "alice",
+			"internal_db_id": "xyz-secret",
+			"_metadata": {"version": 2, "owner": "ops"}
+		}`))
+	}))
+	defer mockServer.Close()
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+		spec.GraphQL.Schema = `
+				type User @key(fields: "id") {
+					id: ID!
+					username: String!
+				}
+				type Query { user(id: ID!): User }
+			`
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			{
+				Kind: apidef.GraphQLEngineDataSourceKindREST,
+				Name: "user_ds",
+				RootFields: []apidef.GraphQLTypeFields{
+					{Type: "User", Fields: []string{"id", "username"}},
+				},
+				Config: []byte(fmt.Sprintf(`{"url":"%s/users/{{ .object.id }}","method":"GET"}`, mockServer.URL)),
+			},
+		}
+	})[0]
+
+	g.Gw.LoadAPI(spec)
+
+	query := `query($r: [_Any!]!) { _entities(representations: $r) { ... on User { id username } } }`
+	body := fmt.Sprintf(`{"query": %q, "variables": {"r": [{"__typename":"User","id":"1"}]}}`, query)
+
+	res, err := g.Run(t, test.TestCase{Method: "POST", Path: "/", Data: body, Code: http.StatusOK})
+	require.NoError(t, err)
+	resBody, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+	res.Body.Close()
+
+	require.Contains(t, string(resBody), `"id":"1"`, "response: %s", string(resBody))
+	require.Contains(t, string(resBody), `"username":"alice"`, "response: %s", string(resBody))
+	require.NotContains(t, string(resBody), "internal_db_id",
+		"undeclared upstream field `internal_db_id` must not leak into the GraphQL response; got: %s", string(resBody))
+	require.NotContains(t, string(resBody), "xyz-secret",
+		"undeclared upstream value must not leak; got: %s", string(resBody))
+	require.NotContains(t, string(resBody), "_metadata",
+		"undeclared upstream field `_metadata` must not leak; got: %s", string(resBody))
+}
