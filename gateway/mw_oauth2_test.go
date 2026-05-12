@@ -239,9 +239,12 @@ func TestOAuth2_TokenSatisfiesAnyAlternative(t *testing.T) {
 var rfc6750BearerHeader = regexp.MustCompile(`^Bearer ([a-z_]+="[^"]*")(, [a-z_]+="[^"]*")*$`)
 
 func TestOAuth2_SetWWWAuthenticateInsufficientScope_HeaderShape(t *testing.T) {
-	m := &OAuth2Middleware{}
+	// A minimal spec with no PRM configured — appendResourceMetadataParam
+	// must then be a no-op, so the challenge stays exactly RFC 6750 §3.
+	m := &OAuth2Middleware{BaseMiddleware: &BaseMiddleware{Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}}}}
 	w := httptest.NewRecorder()
-	m.setWWWAuthenticateInsufficientScope(w, []string{"read:billing", "write:billing"})
+	r := httptest.NewRequest(http.MethodGet, "/billing", nil)
+	m.setWWWAuthenticateInsufficientScope(w, r, []string{"read:billing", "write:billing"})
 
 	got := w.Header().Get(header.WWWAuthenticate)
 	require.True(t, rfc6750BearerHeader.MatchString(got), "header %q must match RFC 6750 §3 form", got)
@@ -251,9 +254,10 @@ func TestOAuth2_SetWWWAuthenticateInsufficientScope_HeaderShape(t *testing.T) {
 }
 
 func TestOAuth2_SetWWWAuthenticateInsufficientToken_HeaderShape(t *testing.T) {
-	m := &OAuth2Middleware{}
+	m := &OAuth2Middleware{BaseMiddleware: &BaseMiddleware{Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}}}}
 	w := httptest.NewRecorder()
-	m.setWWWAuthenticateInsufficientToken(w, oas.OAuth2ErrInvalidToken, "missing bearer token")
+	r := httptest.NewRequest(http.MethodGet, "/x", nil)
+	m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "missing bearer token")
 
 	got := w.Header().Get(header.WWWAuthenticate)
 	require.True(t, rfc6750BearerHeader.MatchString(got), "header %q must match RFC 6750 §3 form", got)

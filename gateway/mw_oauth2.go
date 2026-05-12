@@ -76,13 +76,13 @@ func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request
 
 	rawToken := stripBearer(r.Header.Get(header.Authorization))
 	if rawToken == "" {
-		m.setWWWAuthenticateInsufficientToken(w, oas.OAuth2ErrInvalidToken, "missing bearer token")
+		m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "missing bearer token")
 		return errors.New("Authorization field missing"), http.StatusUnauthorized
 	}
 
 	claims, err := oauth2common.ParseUnverifiedClaims(rawToken)
 	if err != nil {
-		m.setWWWAuthenticateInsufficientToken(w, oas.OAuth2ErrInvalidToken, "token is not a parseable JWT")
+		m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "token is not a parseable JWT")
 		return fmt.Errorf("parsing inbound token claims: %w", err), http.StatusUnauthorized
 	}
 
@@ -96,7 +96,7 @@ func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request
 	cited := alternatives[0]
 	citedScopes := strings.Join(cited, " ")
 	m.fireScopeCheckFailedEvent(r, claims, alternatives, cited, cfg.ScopeCheck)
-	m.setWWWAuthenticateInsufficientScope(w, cited)
+	m.setWWWAuthenticateInsufficientScope(w, r, cited)
 
 	// MCP / JSON-RPC routes get the failure wrapped in a JSON-RPC 2.0
 	// error envelope by the chain's error handler (which keys off the
@@ -502,21 +502,38 @@ func (m *OAuth2Middleware) setWWWAuthenticate(w http.ResponseWriter, params [][2
 
 // setWWWAuthenticateInsufficientScope emits the RFC 6750 §3.1 challenge
 // for a scope-check rejection. The `scope=` parameter advertises the
-// required scope set so RFC 6750 / MCP-aware clients can step up.
-func (m *OAuth2Middleware) setWWWAuthenticateInsufficientScope(w http.ResponseWriter, scopes []string) {
+// required scope set so RFC 6750 / MCP-aware clients can step up; when
+// the API publishes a Protected Resource Metadata document a
+// `resource_metadata=` parameter (RFC 9728 §5.1) points clients at it so
+// they can discover the authorization server.
+func (m *OAuth2Middleware) setWWWAuthenticateInsufficientScope(w http.ResponseWriter, r *http.Request, scopes []string) {
 	scopesValue := strings.Join(scopes, " ")
-	m.setWWWAuthenticate(w, [][2]string{
+	params := [][2]string{
 		{"error", oas.OAuth2ErrInsufficientScope},
 		{"error_description", "missing required scope: " + scopesValue},
 		{"scope", scopesValue},
-	})
+	}
+	m.setWWWAuthenticate(w, m.appendResourceMetadataParam(r, params))
 }
 
-func (m *OAuth2Middleware) setWWWAuthenticateInsufficientToken(w http.ResponseWriter, code, desc string) {
-	m.setWWWAuthenticate(w, [][2]string{
+func (m *OAuth2Middleware) setWWWAuthenticateInsufficientToken(w http.ResponseWriter, r *http.Request, code, desc string) {
+	params := [][2]string{
 		{"error", code},
 		{"error_description", desc},
-	})
+	}
+	m.setWWWAuthenticate(w, m.appendResourceMetadataParam(r, params))
+}
+
+// appendResourceMetadataParam appends the RFC 9728 §5.1
+// `resource_metadata` auth-param to a Bearer challenge when this API
+// publishes a Protected Resource Metadata document (the new
+// oauth2.protectedResourceMetadata location, or the deprecated top-level
+// one). It is a no-op when no PRM is configured.
+func (m *OAuth2Middleware) appendResourceMetadataParam(r *http.Request, params [][2]string) [][2]string {
+	if url := prmMetadataURL(r, m.Spec); url != "" {
+		params = append(params, [2]string{"resource_metadata", url})
+	}
+	return params
 }
 
 // fireScopeCheckFailedEvent emits the OAuth2ScopeCheckFailed audit

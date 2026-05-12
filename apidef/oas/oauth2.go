@@ -25,6 +25,86 @@ type OAuth2 struct {
 	// ScopeCheck enables OAS-native scope enforcement. See
 	// OAuth2ScopeCheck for the full configuration contract.
 	ScopeCheck *OAuth2ScopeCheck `bson:"scopeCheck,omitempty" json:"scopeCheck,omitempty"`
+
+	// ProtectedResourceMetadata configures the OAuth 2.0 Protected
+	// Resource Metadata document (RFC 9728) published for this API.
+	// This is the new home for PRM — the deprecated top-level
+	// authentication.protectedResourceMetadata block keeps working, but
+	// when both are configured this one wins. See OAuth2PRM.
+	ProtectedResourceMetadata *OAuth2PRM `bson:"protectedResourceMetadata,omitempty" json:"protectedResourceMetadata,omitempty"`
+}
+
+// OAuth2PRM holds the OAuth 2.0 Protected Resource Metadata (RFC 9728)
+// configuration for the new-style oauth2 security scheme. It is the
+// static counterpart to the deprecated top-level
+// authentication.protectedResourceMetadata block; mirror mode (used for
+// transparent MCP proxying) stays on the old block.
+//
+// The `scopes_supported` advertised in the served document is the union
+// of:
+//   - ScopesSupported (operator-supplied manual additions),
+//   - every scope appearing in any alternative of the scheme's
+//     scopeCheck.Scopes block (definitionally supported — the gateway
+//     enforces them), and
+//   - when AutoDeriveScopes is nil or true (the default), every scope
+//     declared on the OAS document's per-operation / per-MCP-primitive
+//     `security:` arrays for this scheme.
+//
+// `bearer_methods_supported` is always advertised as ["header"] — Tyk
+// only accepts bearer tokens in the Authorization header (RFC 9728 §2).
+type OAuth2PRM struct {
+	// Enabled activates publishing of the PRM document.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// WellKnownPath is the path under the API listen path at which the
+	// document is served. Defaults to DefaultPRMWellKnownPath when empty.
+	WellKnownPath string `bson:"wellKnownPath,omitempty" json:"wellKnownPath,omitempty"`
+
+	// Resource is the canonical resource identifier this gateway
+	// protects. Surfaced as the `resource` field of the PRM document.
+	// May contain Tyk context variables, resolved at request time.
+	Resource string `bson:"resource,omitempty" json:"resource,omitempty"`
+
+	// AuthorizationServers is the list of issuer URLs published in the
+	// PRM document. Clients use these to discover where to obtain a
+	// token. At least one entry is required for MCP-proxy APIs.
+	AuthorizationServers []string `bson:"authorizationServers,omitempty" json:"authorizationServers,omitempty"`
+
+	// ScopesSupported lets the operator advertise scopes that aren't
+	// referenced by any operation's `security:` array (e.g. an
+	// audit-only scope). Merged with the scopeCheck.Scopes block and the
+	// auto-derived set (see AutoDeriveScopes).
+	ScopesSupported []string `bson:"scopesSupported,omitempty" json:"scopesSupported,omitempty"`
+
+	// AutoDeriveScopes toggles auto-derivation of advertised scopes from
+	// per-operation / per-MCP-primitive `security:` arrays. When nil or
+	// true (the default), declared scopes are added to the PRM
+	// `scopes_supported` set automatically. When false, only the
+	// operator-supplied ScopesSupported (plus the scopeCheck.Scopes
+	// baseline) are advertised — useful for tightly-controlled
+	// deployments where every advertised scope must be explicit.
+	AutoDeriveScopes *bool `bson:"autoDeriveScopes,omitempty" json:"autoDeriveScopes,omitempty"`
+}
+
+// GetWellKnownPath returns the configured well-known path or
+// DefaultPRMWellKnownPath when unset. Mirrors the defaulting rule used
+// by *ProtectedResourceMetadata so operators reading either struct see
+// identical behaviour.
+func (prm *OAuth2PRM) GetWellKnownPath() string {
+	if prm == nil || prm.WellKnownPath == "" {
+		return DefaultPRMWellKnownPath
+	}
+	return prm.WellKnownPath
+}
+
+// IsAutoDeriveScopes reports whether per-operation scope auto-derivation
+// is active. The zero value (nil) means enabled — auto-derivation is the
+// default; only an explicit false opts out.
+func (prm *OAuth2PRM) IsAutoDeriveScopes() bool {
+	if prm == nil || prm.AutoDeriveScopes == nil {
+		return true
+	}
+	return *prm.AutoDeriveScopes
 }
 
 // OAuth2ScopeCheck holds OAS-native scope enforcement configuration.
@@ -122,7 +202,7 @@ func (o *OAuth2) HasContent() bool {
 	if o.Enabled {
 		return true
 	}
-	return o.ScopeCheck != nil
+	return o.ScopeCheck != nil || o.ProtectedResourceMetadata != nil
 }
 
 // IsEmpty is the inverse of HasContent. Used at fill time to decide
@@ -215,7 +295,7 @@ func mapHasOAuth2SubBlock(m map[string]interface{}) bool {
 // as a new-style oauth2 scheme. Extend when adding a sub-block.
 var oauth2SubBlockKeys = []string{
 	"scopeCheck",
-	// "protectedResourceMetadata" — TT-17175 (Story 04)
+	"protectedResourceMetadata",
 	// "tokenExchange"             — TT-17177 (Story 06)
 	// "introspection"             — TT-17187 (Story 10)
 }
@@ -385,6 +465,60 @@ func (s *OAS) SortedOAuth2Scopes() []string {
 	out := make([]string, 0, len(set))
 	for k := range set {
 		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// OAuth2PRMScopesSupported returns the sorted `scopes_supported` list to
+// advertise in the Protected Resource Metadata document for the named
+// oauth2 scheme. It is the union of:
+//   - the operator-supplied prm.ScopesSupported list,
+//   - every scope appearing in any alternative of the scheme's
+//     scopeCheck.Scopes block (the gateway enforces these on every
+//     request, so they're definitionally supported), and
+//   - when prm.AutoDeriveScopes is nil/true (the default), every scope
+//     declared on a per-operation / per-MCP-primitive `security:`
+//     array — see DeriveOAuth2Scopes.
+//
+// Returns nil when the scheme is not a new-style oauth2 scheme or has no
+// PRM block configured.
+func (s *OAS) OAuth2PRMScopesSupported(schemeName string) []string {
+	cfg := s.GetTykOAuth2Config(schemeName)
+	if cfg == nil || cfg.ProtectedResourceMetadata == nil {
+		return nil
+	}
+	prm := cfg.ProtectedResourceMetadata
+
+	set := map[string]struct{}{}
+	add := func(sc string) {
+		if sc != "" {
+			set[sc] = struct{}{}
+		}
+	}
+
+	for _, sc := range prm.ScopesSupported {
+		add(sc)
+	}
+	if cfg.ScopeCheck != nil {
+		for _, alt := range cfg.ScopeCheck.Scopes {
+			for _, sc := range alt {
+				add(sc)
+			}
+		}
+	}
+	if prm.IsAutoDeriveScopes() {
+		for sc := range s.DeriveOAuth2Scopes() {
+			add(sc)
+		}
+	}
+
+	if len(set) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(set))
+	for sc := range set {
+		out = append(out, sc)
 	}
 	sort.Strings(out)
 	return out
