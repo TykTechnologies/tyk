@@ -22,31 +22,15 @@ func sampleMCPProxy() *MCPProxy {
 		ProtocolVersion: "2025-03-26",
 		Sources: []MCPSource{
 			{
-				SourceSlug:   "hello-svc",
-				BackendMode:  "loopback",
-				SourceAPIID:  "api-hello-123",
-				OASSourceHash: "sha256:deadbeef",
-				Tools: []MCPToolMapping{
-					{
-						ToolName:     "hello-svc__get_hello",
-						Method:       "GET",
-						PathTemplate: "/hello/{name}",
-						OperationID:  "getHello",
-						Description:  "Say hello.",
-						InputSchema:  json.RawMessage(`{"type":"object","properties":{"name":{"type":"string"}}}`),
-						OutputSchema: json.RawMessage(`{"type":"string"}`),
-						ParamLocations: map[string]string{
-							"name": "path",
-						},
-						Disabled: false,
-					},
-				},
+				SourceSlug:  "hello-svc",
+				BackendMode: "loopback",
+				SourceAPIID: "api-hello-123",
 			},
 			{
-				SourceSlug:    "users-svc",
-				BackendMode:   "upstream",
-				UpstreamURL:   "https://users.example.com/api/v1",
-				OASSourceHash: "sha256:cafebabe",
+				SourceSlug:  "users-svc",
+				BackendMode: "upstream",
+				UpstreamURL: "https://users.example.com/api/v1",
+				UpstreamOAS: json.RawMessage(`{"openapi":"3.1.0","info":{"title":"users","version":"1"},"paths":{}}`),
 				UpstreamServerVars: map[string]string{
 					"region": "eu-west-1",
 				},
@@ -62,15 +46,6 @@ func sampleMCPProxy() *MCPProxy {
 						TokenURL:          "https://idp.example.com/token",
 						Scopes:            []string{"read", "write"},
 						DefaultTTLSeconds: 3600,
-					},
-				},
-				Tools: []MCPToolMapping{
-					{
-						ToolName:     "users-svc__list_users",
-						Method:       "GET",
-						PathTemplate: "/users",
-						Description:  "List users.",
-						InputSchema:  json.RawMessage(`{"type":"object"}`),
 					},
 				},
 			},
@@ -282,47 +257,26 @@ func TestMCPProxy_Validate(t *testing.T) {
 			wantCodes: []string{MCPErrDuplicateSourceSlug},
 		},
 		{
-			name: "duplicate tool name across sources rejected",
-			proxy: &MCPProxy{
-				Sources: []MCPSource{
-					{
-						SourceSlug:  "a",
-						BackendMode: "loopback",
-						SourceAPIID: "api-a",
-						Tools:       []MCPToolMapping{{ToolName: "shared__op"}},
-					},
-					{
-						SourceSlug:  "b",
-						BackendMode: "loopback",
-						SourceAPIID: "api-b",
-						Tools:       []MCPToolMapping{{ToolName: "shared__op"}},
-					},
-				},
-			},
-			wantCodes: []string{MCPErrDuplicateToolName},
-		},
-		{
 			name: "multiple violations accumulate, do not short-circuit",
 			proxy: &MCPProxy{
 				Sources: []MCPSource{
 					{
 						SourceSlug:  "a",
 						BackendMode: "loopback", // missing SourceAPIID
-						Tools:       []MCPToolMapping{{ToolName: "dup"}},
 					},
 					{
 						SourceSlug:  "a", // dup slug
 						BackendMode: "upstream",
 						UpstreamURL: "https://{x}/", // placeholder
-						Tools:       []MCPToolMapping{{ToolName: "dup"}}, // dup tool
+						// missing UpstreamOAS triggers MCPErrUpstreamSourceMissingOAS
 					},
 				},
 			},
 			wantCodes: []string{
 				MCPErrLoopbackSourceMissingAPIID,
 				MCPErrUpstreamURLContainsPlaceholder,
+				MCPErrUpstreamSourceMissingOAS,
 				MCPErrDuplicateSourceSlug,
-				MCPErrDuplicateToolName,
 			},
 		},
 	}

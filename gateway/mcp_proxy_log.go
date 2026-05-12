@@ -88,19 +88,20 @@ func (c *captureWriter) Write(p []byte) (int, error) {
 	return c.ResponseWriter.Write(p)
 }
 
-// findSource walks the MCPProxy config for the named tool, mirroring
-// mcpproxy.Handler.findTool (which is unexported). The cfg outlives the
-// middleware so the pointer is safe to return.
-func findSource(cfg *oas.MCPProxy, toolName string) *oas.MCPSource {
-	if cfg == nil || toolName == "" {
+// findSource resolves the source binding for a tool name via the derived
+// catalogue (RFC-API-TO-MCP-V8 §6.2). The catalogue entry carries the
+// source slug; we walk cfg.Sources by slug.
+func findSource(cfg *oas.MCPProxy, catalogue map[string]*oas.MCPToolMapping, toolName string) *oas.MCPSource {
+	if cfg == nil || toolName == "" || catalogue == nil {
+		return nil
+	}
+	mapping, ok := catalogue[toolName]
+	if !ok || mapping == nil {
 		return nil
 	}
 	for i := range cfg.Sources {
-		s := &cfg.Sources[i]
-		for j := range s.Tools {
-			if s.Tools[j].ToolName == toolName {
-				return s
-			}
+		if cfg.Sources[i].SourceSlug == mapping.SourceSlug {
+			return &cfg.Sources[i]
 		}
 	}
 	return nil

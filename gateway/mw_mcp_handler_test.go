@@ -33,19 +33,6 @@ func makeMCPHandlerSpec(t *testing.T) *APISpec {
 						SourceSlug:  "hello-svc",
 						BackendMode: "loopback",
 						SourceAPIID: "hello-api-id",
-						Tools: []oas.MCPToolMapping{
-							{
-								ToolName:     "hello-svc__get_hello",
-								Method:       "GET",
-								PathTemplate: "/hello/{id}",
-								InputSchema: json.RawMessage(`{
-									"type":"object",
-									"required":["id"],
-									"properties":{"id":{"type":"string"}}
-								}`),
-								ParamLocations: map[string]string{"id": "path"},
-							},
-						},
 					},
 				},
 			},
@@ -196,19 +183,6 @@ func makeMCPHandlerSpecWithSources(t *testing.T) *APISpec {
 						SourceSlug:  "hello-svc",
 						BackendMode: "loopback",
 						SourceAPIID: "hello-api-id",
-						Tools: []oas.MCPToolMapping{
-							{
-								ToolName:     "hello-svc__get_hello",
-								Method:       "GET",
-								PathTemplate: "/hello/{id}",
-								InputSchema: json.RawMessage(`{
-									"type":"object",
-									"required":["id"],
-									"properties":{"id":{"type":"string"}}
-								}`),
-								ParamLocations: map[string]string{"id": "path"},
-							},
-						},
 					},
 					{
 						SourceSlug:  "users-svc",
@@ -217,19 +191,6 @@ func makeMCPHandlerSpecWithSources(t *testing.T) *APISpec {
 						UpstreamCred: &oas.UpstreamCred{
 							AuthType:    "bearer",
 							SecretValue: "tok",
-						},
-						Tools: []oas.MCPToolMapping{
-							{
-								ToolName:     "users-svc__get_users_id",
-								Method:       "GET",
-								PathTemplate: "/users/{id}",
-								InputSchema: json.RawMessage(`{
-									"type":"object",
-									"required":["id"],
-									"properties":{"id":{"type":"string"}}
-								}`),
-								ParamLocations: map[string]string{"id": "path"},
-							},
 						},
 					},
 				},

@@ -811,22 +811,16 @@ func mcpIntegMakeSourceSpec(apiID string, acceptLoop, keyless, mtls bool) *APISp
 
 // mcpIntegLoopbackSource constructs an MCPSource that maps a single tool
 // onto a path on the source APIDef.
-func mcpIntegLoopbackSource(slug, sourceAPIID, toolName, pathTemplate string) oas.MCPSource {
+func mcpIntegLoopbackSource(slug, sourceAPIID, _toolName, _pathTemplate string) oas.MCPSource {
+	// V8: tools are derived from the source APIDef's OAS at proxy load.
+	// Callers wanting a specific tool in the catalogue must seed the
+	// source APIDef's OAS with the corresponding operation; the
+	// _toolName / _pathTemplate args are retained for call-site
+	// readability but no longer materialised onto MCPSource.
 	return oas.MCPSource{
 		SourceSlug:  slug,
 		BackendMode: "loopback",
 		SourceAPIID: sourceAPIID,
-		Tools: []oas.MCPToolMapping{
-			{
-				ToolName:     toolName,
-				Method:       http.MethodGet,
-				PathTemplate: pathTemplate,
-				InputSchema:  json.RawMessage(`{"type":"object","properties":{"id":{"type":"string"}}}`),
-				ParamLocations: map[string]string{
-					"id": "path",
-				},
-			},
-		},
 	}
 }
 
@@ -864,32 +858,11 @@ func mcpIntegBuildLoadedProxySpec(t *testing.T) *APISpec {
 						SourceSlug:  "hello-svc",
 						BackendMode: "loopback",
 						SourceAPIID: "hello-api-id",
-						Tools: []oas.MCPToolMapping{
-							{
-								ToolName:     "hello-svc__get_hello",
-								Method:       http.MethodGet,
-								PathTemplate: "/hello",
-								InputSchema:  json.RawMessage(`{"type":"object"}`),
-							},
-						},
 					},
 					{
 						SourceSlug:  "users-svc",
 						BackendMode: "loopback",
 						SourceAPIID: "users-api-id",
-						Tools: []oas.MCPToolMapping{
-							{
-								ToolName:     "users-svc__get_users_id",
-								Method:       http.MethodGet,
-								PathTemplate: "/users/{id}",
-								InputSchema: json.RawMessage(`{
-									"type":"object",
-									"required":["id"],
-									"properties":{"id":{"type":"string"}}
-								}`),
-								ParamLocations: map[string]string{"id": "path"},
-							},
-						},
 					},
 				},
 			},
@@ -921,19 +894,7 @@ func mcpIntegBuildLoadedProxySpecWithUpstreamUsers(t *testing.T) *APISpec {
 							AuthType:    "bearer",
 							SecretValue: "tok-static",
 						},
-						Tools: []oas.MCPToolMapping{
-							{
-								ToolName:     "users-svc__get_users_id",
-								Method:       http.MethodGet,
-								PathTemplate: "/users/{id}",
-								InputSchema: json.RawMessage(`{
-									"type":"object",
-									"required":["id"],
-									"properties":{"id":{"type":"string"}}
-								}`),
-								ParamLocations: map[string]string{"id": "path"},
-							},
-						},
+						UpstreamOAS: json.RawMessage(`{"openapi":"3.1.0","info":{"title":"users","version":"1"},"paths":{"/users/{id}":{"get":{"operationId":"getUsersId","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"string"}}]}}}}`),
 					},
 				},
 			},

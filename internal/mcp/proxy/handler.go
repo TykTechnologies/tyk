@@ -24,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -80,14 +81,19 @@ type Handler struct {
 	cfg       *oas.MCPProxy
 	validator Validator
 
+	// catalogue is the runtime tool map built at proxy load by the
+	// gateway shell via oas.DeriveSourceTools (RFC-API-TO-MCP-V8 §6.2).
+	// Replaces V7's persisted Sources[*].Tools lookup. Keyed by the full
+	// namespaced tool name "<source-slug>__<op-name>". Read-only after
+	// NewHandler returns; the gateway swaps the entire Handler on reload
+	// rather than mutating this map in place.
+	catalogue map[string]*oas.MCPToolMapping
+
 	// urlRewrite is the gateway-side hook that stashes the URL-rewrite
-	// target on the request context. Defaults to a no-op when nil so the
-	// proxy package's unit tests can run without the gateway.
+	// target on the request context.
 	urlRewrite URLRewriteSetter
 
-	// proxyAPIID is the APIDef id of the MCP Proxy itself (the
-	// gateway-public face). Used to populate X-Tyk-MCP-Context on
-	// loopback hops.
+	// proxyAPIID is the APIDef id of the MCP Proxy itself.
 	proxyAPIID string
 }
 
@@ -105,6 +111,13 @@ func WithURLRewriteSetter(s URLRewriteSetter) HandlerOption {
 // X-Tyk-MCP-Context header on loopback hops.
 func WithProxyAPIID(id string) HandlerOption {
 	return func(h *Handler) { h.proxyAPIID = id }
+}
+
+// WithCatalogue installs the derived tool catalogue. Required for tools/list
+// and tools/call to return anything other than empty / -32601. The map
+// must not be mutated after handing it to NewHandler.
+func WithCatalogue(c map[string]*oas.MCPToolMapping) HandlerOption {
+	return func(h *Handler) { h.catalogue = c }
 }
 
 // NewHandler builds a Handler over the given MCPProxy config and
@@ -221,7 +234,7 @@ func (h *Handler) writePing(w http.ResponseWriter, id json.RawMessage) {
 	writeJSONRPCResult(w, id, map[string]any{})
 }
 
-// writeToolsList enumerates Sources[*].Tools filtered to Disabled==false.
+// writeToolsList enumerates the derived catalogue in deterministic order.
 // PoC: single page, no cursor.
 func (h *Handler) writeToolsList(w http.ResponseWriter, id json.RawMessage) {
 	type toolDescriptor struct {
@@ -230,41 +243,43 @@ func (h *Handler) writeToolsList(w http.ResponseWriter, id json.RawMessage) {
 		InputSchema json.RawMessage `json:"inputSchema"`
 	}
 
-	tools := make([]toolDescriptor, 0)
-	if h.cfg != nil {
-		for i := range h.cfg.Sources {
-			src := &h.cfg.Sources[i]
-			for j := range src.Tools {
-				t := &src.Tools[j]
-				if t.Disabled {
-					continue
-				}
-				tools = append(tools, toolDescriptor{
-					Name:        t.ToolName,
-					Description: t.Description,
-					InputSchema: t.InputSchema,
-				})
-			}
+	tools := make([]toolDescriptor, 0, len(h.catalogue))
+	names := make([]string, 0, len(h.catalogue))
+	for k := range h.catalogue {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		t := h.catalogue[name]
+		if t == nil {
+			continue
 		}
+		tools = append(tools, toolDescriptor{
+			Name:        t.ToolName,
+			Description: t.Description,
+			InputSchema: t.InputSchema,
+		})
 	}
 	writeJSONRPCResult(w, id, map[string]any{"tools": tools})
 }
 
-// findTool returns the source and mapping for a given tool name, or
-// (nil,nil) if not found.
+// findTool returns the source binding and mapping for a given tool name.
+// The mapping comes from the derived catalogue; the source is looked up on
+// cfg.Sources by the slug recorded on the mapping.
 func (h *Handler) findTool(name string) (*oas.MCPSource, *oas.MCPToolMapping) {
-	if h.cfg == nil {
+	if h.catalogue == nil || h.cfg == nil {
+		return nil, nil
+	}
+	mapping, ok := h.catalogue[name]
+	if !ok || mapping == nil {
 		return nil, nil
 	}
 	for i := range h.cfg.Sources {
-		src := &h.cfg.Sources[i]
-		for j := range src.Tools {
-			if src.Tools[j].ToolName == name {
-				return src, &src.Tools[j]
-			}
+		if h.cfg.Sources[i].SourceSlug == mapping.SourceSlug {
+			return &h.cfg.Sources[i], mapping
 		}
 	}
-	return nil, nil
+	return nil, mapping
 }
 
 // modeOf classifies a source.

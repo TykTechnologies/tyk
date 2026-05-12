@@ -45,49 +45,35 @@ type MCPSource struct {
 	UpstreamURL        string            `bson:"upstreamUrl,omitempty" json:"upstreamUrl,omitempty"`
 	UpstreamServerVars map[string]string `bson:"upstreamServerVars,omitempty" json:"upstreamServerVars,omitempty"`
 
+	// UpstreamOAS — raw OAS 3.1 document for BackendMode=="upstream". The
+	// derive pass at proxy load (see apidef/oas/mcp_proxy_derive.go) reads
+	// operations from here because there is no source APIDef to read from.
+	// Nil for BackendMode=="loopback".
+	UpstreamOAS json.RawMessage `bson:"upstreamOas,omitempty" json:"upstreamOas,omitempty"`
+
 	// UpstreamCred — outbound static credential for BackendMode=="upstream".
 	// Nil for keyless upstreams or BackendMode=="loopback".
 	UpstreamCred *UpstreamCred `bson:"upstreamCred,omitempty" json:"upstreamCred,omitempty"`
 
-	// OASSourceHash — sha256 over a structural digest of the source OAS.
-	// Used by GA's drift detection; persisted in PoC, otherwise unused.
-	OASSourceHash string `bson:"oasSourceHash" json:"oasSourceHash"`
-
 	// ServiceCred — GA-only field (service-credential injection). Persisted
 	// for forward compatibility; rejected at write-time in the PoC.
 	ServiceCred *ServiceCredRef `bson:"serviceCred,omitempty" json:"serviceCred,omitempty"`
-
-	// Tools — curated list of MCP tools this source contributes.
-	Tools []MCPToolMapping `bson:"tools" json:"tools"`
 }
 
-// MCPToolMapping is a single curated tool exposed under an MCPSource
-// (see RFC §7).
+// MCPToolMapping is the runtime-only descriptor for a derived MCP tool. It is
+// NOT persisted: no json/bson tags, never marshalled into stored APIDef
+// documents. Built at proxy load by DeriveSourceTools (see
+// mcp_proxy_derive.go) and consumed by the request-phase MCPHandler.
 type MCPToolMapping struct {
-	// ToolName — full namespaced name as exposed to agents:
-	// "<source-slug>__<op-name>". Globally unique within the Proxy.
-	ToolName string `bson:"toolName" json:"toolName"`
-
-	Method       string `bson:"method" json:"method"`             // HTTP method
-	PathTemplate string `bson:"pathTemplate" json:"pathTemplate"` // OAS path with {var}
-
-	// OperationID — source OAS operationId, when present. Empty when
-	// the source did not specify one and the path-fallback rule was used.
-	OperationID string `bson:"operationId,omitempty" json:"operationId,omitempty"`
-
-	Description string `bson:"description" json:"description"`
-
-	// InputSchema — preserved verbatim from OAS 3.1 (JSON Schema 2020-12).
-	InputSchema  json.RawMessage `bson:"inputSchema" json:"inputSchema"`
-	OutputSchema json.RawMessage `bson:"outputSchema,omitempty" json:"outputSchema,omitempty"`
-
-	// ParamLocations — derived map of arg-name → OAS in: location
-	// ("path"|"query"|"header"|"body").
-	ParamLocations map[string]string `bson:"paramLocations,omitempty" json:"paramLocations,omitempty"`
-
-	// Disabled — wizard toggle to suppress this tool from tools/list
-	// without deleting the mapping.
-	Disabled bool `bson:"disabled,omitempty" json:"disabled,omitempty"`
+	ToolName       string
+	SourceSlug     string
+	Method         string
+	PathTemplate   string
+	OperationID    string
+	Description    string
+	InputSchema    json.RawMessage
+	OutputSchema   json.RawMessage
+	ParamLocations map[string]string
 }
 
 // UpstreamCred is the outbound static credential applied by mode-(b)
@@ -163,13 +149,13 @@ func (e *MCPProxyValidationError) HasCode(code string) bool {
 // Error code constants exposed for callers that want to pattern-match
 // without string-typing.
 const (
-	MCPErrNotImplementedInPoC                   = "not_implemented_in_poc"
-	MCPErrUpstreamURLContainsPlaceholder        = "upstream_url_contains_placeholder"
-	MCPErrLoopbackSourceMissingAPIID            = "loopback_source_missing_source_api_id"
-	MCPErrDuplicateToolName                     = "duplicate_tool_name"
-	MCPErrDuplicateSourceSlug                   = "duplicate_source_slug"
-	MCPNotImplementedDetailServiceCred          = "service_cred"
-	MCPNotImplementedDetailUpstreamCredMTLS     = "upstream_cred_mtls"
+	MCPErrNotImplementedInPoC               = "not_implemented_in_poc"
+	MCPErrUpstreamURLContainsPlaceholder    = "upstream_url_contains_placeholder"
+	MCPErrLoopbackSourceMissingAPIID        = "loopback_source_missing_source_api_id"
+	MCPErrUpstreamSourceMissingOAS          = "upstream_source_missing_oas"
+	MCPErrDuplicateSourceSlug               = "duplicate_source_slug"
+	MCPNotImplementedDetailServiceCred      = "service_cred"
+	MCPNotImplementedDetailUpstreamCredMTLS = "upstream_cred_mtls"
 )
 
 // Validate runs the structural (no-runtime-state) subset of the MCP Proxy
@@ -189,7 +175,6 @@ func (m *MCPProxy) Validate(_ context.Context) error {
 	notImplDetails := map[string]struct{}{}
 
 	seenSlugs := map[string]struct{}{}
-	seenTools := map[string]struct{}{}
 
 	for i := range m.Sources {
 		src := &m.Sources[i]
@@ -208,6 +193,11 @@ func (m *MCPProxy) Validate(_ context.Context) error {
 				verr.Details = append(verr.Details,
 					fmt.Sprintf("sources[%d].upstreamUrl contains unresolved placeholder", i))
 			}
+			if len(src.UpstreamOAS) == 0 {
+				verr.Codes = append(verr.Codes, MCPErrUpstreamSourceMissingOAS)
+				verr.Details = append(verr.Details,
+					fmt.Sprintf("sources[%d].upstreamOas required for backendMode=upstream", i))
+			}
 		}
 
 		if src.BackendMode == "loopback" && src.SourceAPIID == "" {
@@ -223,20 +213,6 @@ func (m *MCPProxy) Validate(_ context.Context) error {
 					fmt.Sprintf("sources[%d].sourceSlug %q duplicates an earlier source", i, src.SourceSlug))
 			} else {
 				seenSlugs[src.SourceSlug] = struct{}{}
-			}
-		}
-
-		for j := range src.Tools {
-			name := src.Tools[j].ToolName
-			if name == "" {
-				continue
-			}
-			if _, dup := seenTools[name]; dup {
-				verr.Codes = append(verr.Codes, MCPErrDuplicateToolName)
-				verr.Details = append(verr.Details,
-					fmt.Sprintf("sources[%d].tools[%d].toolName %q duplicates an earlier tool", i, j, name))
-			} else {
-				seenTools[name] = struct{}{}
 			}
 		}
 	}

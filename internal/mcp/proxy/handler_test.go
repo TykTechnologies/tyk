@@ -14,11 +14,37 @@ import (
 )
 
 // fixture builds a two-source MCPProxy used across the table:
-// - "hello-svc" loopback with a single tool "hello-svc__get_hello"
-//   (GET /hello/{id}?lang=...&X-Trace-Id: header, no body)
-// - "weather" upstream with a single tool "weather__post_forecast"
-//   (POST /forecast with body args, plus a Disabled tool)
+//   - "hello-svc" loopback with a single tool "hello-svc__get_hello"
+//     (GET /hello/{id}?lang=...&X-Trace-Id: header, no body)
+//   - "weather" upstream with a single tool "weather__post_forecast"
+//     (POST /forecast with body args, plus a Disabled tool)
 func fixture() *oas.MCPProxy {
+	return &oas.MCPProxy{
+		ProtocolVersion: "2025-06-18",
+		Sources: []oas.MCPSource{
+			{
+				SourceSlug:  "hello-svc",
+				BackendMode: "loopback",
+				SourceAPIID: "hello-api-id",
+			},
+			{
+				SourceSlug:  "weather",
+				BackendMode: "upstream",
+				UpstreamURL: "https://upstream.example.com/api",
+				UpstreamCred: &oas.UpstreamCred{
+					AuthType:    "header",
+					HeaderName:  "X-API-Key",
+					SecretValue: "s3cret",
+				},
+			},
+		},
+	}
+}
+
+// fixtureCatalogue mirrors the V7 fixture's Tools listing as a runtime
+// catalogue (RFC-API-TO-MCP-V8 §6.2). The disabled tool from V7 is simply
+// absent — derive-at-load would never have emitted it.
+func fixtureCatalogue() map[string]*oas.MCPToolMapping {
 	helloSchema := json.RawMessage(`{
 		"type":"object",
 		"required":["id"],
@@ -30,63 +56,31 @@ func fixture() *oas.MCPProxy {
 	}`)
 	forecastSchema := json.RawMessage(`{
 		"type":"object",
-		"required":["lat","lon"],
 		"properties":{
 			"lat":{"type":"number"},
 			"lon":{"type":"number"}
 		}
 	}`)
-	disabledSchema := json.RawMessage(`{"type":"object"}`)
-
-	return &oas.MCPProxy{
-		ProtocolVersion: "2025-06-18",
-		Sources: []oas.MCPSource{
-			{
-				SourceSlug:  "hello-svc",
-				BackendMode: "loopback",
-				SourceAPIID: "hello-api-id",
-				Tools: []oas.MCPToolMapping{
-					{
-						ToolName:     "hello-svc__get_hello",
-						Method:       "GET",
-						PathTemplate: "/hello/{id}",
-						InputSchema:  helloSchema,
-						ParamLocations: map[string]string{
-							"id":         "path",
-							"lang":       "query",
-							"X-Trace-Id": "header",
-						},
-					},
-				},
+	return map[string]*oas.MCPToolMapping{
+		"hello-svc__get_hello": {
+			ToolName:     "hello-svc__get_hello",
+			SourceSlug:   "hello-svc",
+			Method:       "GET",
+			PathTemplate: "/hello/{id}",
+			InputSchema:  helloSchema,
+			ParamLocations: map[string]string{
+				"id":         "path",
+				"lang":       "query",
+				"X-Trace-Id": "header",
 			},
-			{
-				SourceSlug:  "weather",
-				BackendMode: "upstream",
-				UpstreamURL: "https://upstream.example.com/api",
-				UpstreamCred: &oas.UpstreamCred{
-					AuthType:    "header",
-					HeaderName:  "X-API-Key",
-					SecretValue: "s3cret",
-				},
-				Tools: []oas.MCPToolMapping{
-					{
-						ToolName:       "weather__post_forecast",
-						Method:         "POST",
-						PathTemplate:   "/forecast",
-						InputSchema:    forecastSchema,
-						ParamLocations: map[string]string{
-							// lat/lon have no entry → body-bound
-						},
-					},
-					{
-						ToolName:     "weather__disabled",
-						Method:       "GET",
-						PathTemplate: "/x",
-						InputSchema:  disabledSchema,
-						Disabled:     true,
-					},
-				},
-			},
+		},
+		"weather__post_forecast": {
+			ToolName:       "weather__post_forecast",
+			SourceSlug:     "weather",
+			Method:         "POST",
+			PathTemplate:   "/forecast",
+			InputSchema:    forecastSchema,
+			ParamLocations: map[string]string{},
 		},
 	}
 }
@@ -99,6 +93,7 @@ func newTestHandler(t *testing.T, captured **url.URL) *Handler {
 		fixture(),
 		DefaultValidator(),
 		WithProxyAPIID("proxy-api-id"),
+		WithCatalogue(fixtureCatalogue()),
 		WithURLRewriteSetter(func(r *http.Request, u *url.URL) *http.Request {
 			*captured = u
 			return r
@@ -453,16 +448,17 @@ func TestDispatch_ToolsCall_InternalError_SchemaCompile(t *testing.T) {
 				SourceSlug:  "broken",
 				BackendMode: "loopback",
 				SourceAPIID: "broken-api-id",
-				Tools: []oas.MCPToolMapping{
-					{
-						ToolName:     "broken__tool",
-						Method:       "GET",
-						PathTemplate: "/x",
-						// Not valid JSON at all -> Compile returns error.
-						InputSchema: json.RawMessage(`not-json`),
-					},
-				},
 			},
+		},
+	}
+	cat := map[string]*oas.MCPToolMapping{
+		"broken__tool": {
+			ToolName:     "broken__tool",
+			SourceSlug:   "broken",
+			Method:       "GET",
+			PathTemplate: "/x",
+			// Not valid JSON at all -> Compile returns error.
+			InputSchema: json.RawMessage(`not-json`),
 		},
 	}
 	var captured *url.URL
@@ -470,6 +466,7 @@ func TestDispatch_ToolsCall_InternalError_SchemaCompile(t *testing.T) {
 		p,
 		DefaultValidator(),
 		WithProxyAPIID("proxy-api-id"),
+		WithCatalogue(cat),
 		WithURLRewriteSetter(func(r *http.Request, u *url.URL) *http.Request {
 			captured = u
 			return r

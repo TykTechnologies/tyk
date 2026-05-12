@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	mcppkg "github.com/TykTechnologies/tyk/internal/mcp"
 	mcpproxy "github.com/TykTechnologies/tyk/internal/mcp/proxy"
@@ -28,8 +29,9 @@ import (
 type MCPHandlerMiddleware struct {
 	*BaseMiddleware
 
-	once    sync.Once
-	handler *mcpproxy.Handler
+	once      sync.Once
+	handler   *mcpproxy.Handler
+	catalogue map[string]*oas.MCPToolMapping
 }
 
 // Name returns the middleware name.
@@ -52,11 +54,15 @@ func (m *MCPHandlerMiddleware) EnabledForSpec() bool {
 }
 
 // init lazily builds the underlying mcpproxy.Handler. EnabledForSpec
-// having returned true is a precondition.
+// having returned true is a precondition. Builds the derived tool
+// catalogue (RFC-API-TO-MCP-V8 §6.2) by walking each source: for loopback
+// sources, reads the source APIDef's OAS from the gateway registry; for
+// upstream sources, parses the proxy-attached UpstreamOAS.
 func (m *MCPHandlerMiddleware) init() {
 	m.once.Do(func() {
 		ext := m.Spec.OAS.GetTykExtension()
 		cfg := ext.Server.MCPProxy
+		m.catalogue = buildMCPProxyCatalogue(m.Gw, cfg, m.Logger())
 		setter := mcpproxy.URLRewriteSetter(func(r *http.Request, u *url.URL) *http.Request {
 			ctxSetURLRewriteTarget(r, u)
 			return r
@@ -66,6 +72,7 @@ func (m *MCPHandlerMiddleware) init() {
 			mcpproxy.DefaultValidator(),
 			mcpproxy.WithProxyAPIID(m.Spec.APIID),
 			mcpproxy.WithURLRewriteSetter(setter),
+			mcpproxy.WithCatalogue(m.catalogue),
 		)
 	})
 }
@@ -122,7 +129,7 @@ func (m *MCPHandlerMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if logTC {
 		ext := m.Spec.OAS.GetTykExtension()
 		var cfg = ext.Server.MCPProxy
-		src := findSource(cfg, peeked.toolName)
+		src := findSource(cfg, m.catalogue, peeked.toolName)
 		authPath := deriveAuthPath(m.Gw, src)
 		captured := cw.buf.Bytes()
 		outcome := outcomeFromAction(action, err, captured)
