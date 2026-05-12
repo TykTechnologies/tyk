@@ -1926,7 +1926,20 @@
         "header":     { "$ref": "#/definitions/X-Tyk-AuthSource" },
         "cookie":     { "$ref": "#/definitions/X-Tyk-AuthSource" },
         "query":      { "$ref": "#/definitions/X-Tyk-AuthSource" },
-        "scopeCheck": { "$ref": "#/definitions/X-Tyk-OAuth2-ScopeCheck" }
+        "scopeCheck": { "$ref": "#/definitions/X-Tyk-OAuth2-ScopeCheck" },
+        "protectedResourceMetadata": { "$ref": "#/definitions/X-Tyk-OAuth2-PRM" }
+      },
+      "required": ["enabled"]
+    },
+    "X-Tyk-OAuth2-PRM": {
+      "type": "object",
+      "description": "OAuth 2.0 Protected Resource Metadata (RFC 9728) published for this API. New home for PRM; the deprecated top-level authentication.protectedResourceMetadata still works but this one wins when both are set.",
+      "properties": {
+        "enabled":              { "type": "boolean" },
+        "wellKnownPath":        { "type": "string", "description": "Path under the API listen path where the PRM document is served. Defaults to .well-known/oauth-protected-resource." },
+        "resource":             { "type": "string", "description": "Canonical resource identifier this gateway protects. Surfaced as the `resource` field of the PRM document." },
+        "authorizationServers": { "type": "array", "items": { "type": "string" }, "description": "Issuer URLs published in the PRM document. At least one entry is required for MCP-proxy APIs." },
+        "autoDeriveScopes":     { "type": "boolean", "description": "When unset or true (default), PRM `scopes_supported` is unioned at serve time with every scope referenced by any `security:` array (root, operations, MCP primitives). Set to false to advertise only the OpenAPI flows.scopes catalog." }
       },
       "required": ["enabled"]
     },

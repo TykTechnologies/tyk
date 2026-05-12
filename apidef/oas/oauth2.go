@@ -25,6 +25,60 @@ type OAuth2 struct {
 	// ScopeCheck enables OAS-native scope enforcement. See
 	// OAuth2ScopeCheck for the full configuration contract.
 	ScopeCheck *OAuth2ScopeCheck `bson:"scopeCheck,omitempty" json:"scopeCheck,omitempty"`
+
+	// ProtectedResourceMetadata configures the RFC 9728 PRM document.
+	// New home for PRM; wins over the deprecated top-level
+	// authentication.protectedResourceMetadata when both are set.
+	ProtectedResourceMetadata *OAuth2PRM `bson:"protectedResourceMetadata,omitempty" json:"protectedResourceMetadata,omitempty"`
+}
+
+// OAuth2PRM configures the RFC 9728 Protected Resource Metadata
+// document served for a new-style oauth2 security scheme — the static
+// counterpart to the deprecated top-level
+// authentication.protectedResourceMetadata block (mirror mode stays on
+// the old block). See OAuth2PRMScopesSupported for how the served
+// scopes_supported list is assembled.
+type OAuth2PRM struct {
+	// Enabled activates publishing of the PRM document.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// WellKnownPath is the path under the API listen path at which the
+	// document is served. Defaults to DefaultPRMWellKnownPath when empty.
+	WellKnownPath string `bson:"wellKnownPath,omitempty" json:"wellKnownPath,omitempty"`
+
+	// Resource is the canonical resource identifier this gateway
+	// protects. Surfaced as the `resource` field of the PRM document.
+	// May contain Tyk context variables, resolved at request time.
+	Resource string `bson:"resource,omitempty" json:"resource,omitempty"`
+
+	// AuthorizationServers is the list of issuer URLs published in the
+	// PRM document. Clients use these to discover where to obtain a
+	// token. At least one entry is required for MCP-proxy APIs.
+	AuthorizationServers []string `bson:"authorizationServers,omitempty" json:"authorizationServers,omitempty"`
+
+	// AutoDeriveScopes, when nil or true (default), unions the served
+	// scopes_supported with scopes from every `security:` array; false
+	// advertises only the `flows.<flow>.scopes` catalog. See
+	// OAuth2PRMScopesSupported.
+	AutoDeriveScopes *bool `bson:"autoDeriveScopes,omitempty" json:"autoDeriveScopes,omitempty"`
+}
+
+// GetWellKnownPath returns WellKnownPath, or DefaultPRMWellKnownPath
+// when unset.
+func (prm *OAuth2PRM) GetWellKnownPath() string {
+	if prm == nil || prm.WellKnownPath == "" {
+		return DefaultPRMWellKnownPath
+	}
+	return prm.WellKnownPath
+}
+
+// IsAutoDeriveScopes reports whether scope auto-derivation is active.
+// Nil (the zero value) means enabled; only an explicit false opts out.
+func (prm *OAuth2PRM) IsAutoDeriveScopes() bool {
+	if prm == nil || prm.AutoDeriveScopes == nil {
+		return true
+	}
+	return *prm.AutoDeriveScopes
 }
 
 // OAuth2ScopeCheck holds OAS-native scope enforcement configuration.
@@ -124,7 +178,7 @@ func (o *OAuth2) HasContent() bool {
 	if o.Enabled {
 		return true
 	}
-	return o.ScopeCheck != nil
+	return o.ScopeCheck != nil || o.ProtectedResourceMetadata != nil
 }
 
 // IsEmpty is the inverse of HasContent. Used at fill time to decide
@@ -212,23 +266,14 @@ func mapHasOAuth2SubBlock(m map[string]interface{}) bool {
 // as a OAS-native oauth2 scheme.
 var oauth2SubBlockKeys = []string{
 	"scopeCheck",
+	"protectedResourceMetadata",
 }
 
-// fillOAuth2OASScheme materialises the oauth2 OAS Components entry
-// for the named scheme.
-//
-// The OAS spec requires at least one flow on an oauth2 scheme, and
-// authorizationCode requires both authorizationUrl and tokenUrl. We
-// emit relative paths as placeholders rather than dummy external
-// `https://example.com/…` URLs so the saved document doesn't claim
-// an unrelated host. Sub-blocks that bring real endpoints (token
-// exchange, introspection) override these at materialise time.
-//
-// The `flows.authorizationCode.scopes` vocabulary is aggregated from
-// every scope name referenced for this scheme by the OAS root
-// `security:` array, so the catalog stays consistent with what the
-// gateway enforces. Preserves any existing operator-supplied
-// descriptions.
+// fillOAuth2OASScheme ensures an OAS Components security-scheme entry
+// exists for the named oauth2 scheme. An operator-authored component is
+// left untouched; otherwise a minimal skeleton is synthesised to satisfy
+// OAS validation (one flow; authorizationCode needs authorizationUrl +
+// tokenUrl). Relative placeholder paths avoid claiming an unrelated host.
 func (s *OAS) fillOAuth2OASScheme(name string, _ *OAuth2) {
 	if s.Components == nil {
 		s.Components = &openapi3.Components{}
@@ -237,22 +282,8 @@ func (s *OAS) fillOAuth2OASScheme(name string, _ *OAuth2) {
 		s.Components.SecuritySchemes = make(openapi3.SecuritySchemes)
 	}
 
-	existing := map[string]string{}
-	if ref, ok := s.Components.SecuritySchemes[name]; ok && ref != nil && ref.Value != nil &&
-		ref.Value.Flows != nil && ref.Value.Flows.AuthorizationCode != nil {
-		for k, v := range ref.Value.Flows.AuthorizationCode.Scopes {
-			existing[k] = v
-		}
-	}
-
-	scopes := map[string]string{}
-	for _, req := range s.Security {
-		for _, sc := range req[name] {
-			if sc == "" {
-				continue
-			}
-			scopes[sc] = existing[sc]
-		}
+	if ref, ok := s.Components.SecuritySchemes[name]; ok && ref != nil && ref.Value != nil {
+		return
 	}
 
 	s.Components.SecuritySchemes[name] = &openapi3.SecuritySchemeRef{
@@ -262,7 +293,7 @@ func (s *OAS) fillOAuth2OASScheme(name string, _ *OAuth2) {
 				AuthorizationCode: &openapi3.OAuthFlow{
 					AuthorizationURL: "/oauth/authorize",
 					TokenURL:         "/oauth/token",
-					Scopes:           scopes,
+					Scopes:           map[string]string{},
 				},
 			},
 		},
@@ -390,5 +421,75 @@ func (s *OAS) SortedOAuth2Scopes() []string {
 		out = append(out, k)
 	}
 	sort.Strings(out)
+	return out
+}
+
+// OAuth2PRMScopesSupported returns the sorted `scopes_supported` list
+// for the named oauth2 scheme: the operator-authored `flows.<flow>.scopes`
+// catalog, unioned (unless AutoDeriveScopes is false) with every scope
+// referenced by a `security:` array — see DeriveOAuth2Scopes. Read-only.
+// Returns nil when the scheme has no PRM block or resolves to no scopes.
+func (s *OAS) OAuth2PRMScopesSupported(schemeName string) []string {
+	cfg := s.GetTykOAuth2Config(schemeName)
+	if cfg == nil || cfg.ProtectedResourceMetadata == nil {
+		return nil
+	}
+	prm := cfg.ProtectedResourceMetadata
+
+	set := map[string]struct{}{}
+	add := func(sc string) {
+		if sc != "" {
+			set[sc] = struct{}{}
+		}
+	}
+
+	for sc := range s.oauth2SchemeCatalogScopes(schemeName) {
+		add(sc)
+	}
+	if prm.IsAutoDeriveScopes() {
+		for sc := range s.DeriveOAuth2Scopes() {
+			add(sc)
+		}
+	}
+
+	if len(set) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(set))
+	for sc := range set {
+		out = append(out, sc)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// oauth2SchemeCatalogScopes returns the scope names declared in the OAS
+// security scheme's flow `scopes` maps — the operator-authored
+// supported-scopes catalog. Scopes from every configured flow are
+// unioned. Returns an empty set when the scheme has no OAS component.
+func (s *OAS) oauth2SchemeCatalogScopes(name string) map[string]struct{} {
+	out := map[string]struct{}{}
+	if s.Components == nil || s.Components.SecuritySchemes == nil {
+		return out
+	}
+	ref, ok := s.Components.SecuritySchemes[name]
+	if !ok || ref == nil || ref.Value == nil || ref.Value.Flows == nil {
+		return out
+	}
+	for _, flow := range []*openapi3.OAuthFlow{
+		ref.Value.Flows.Implicit,
+		ref.Value.Flows.Password,
+		ref.Value.Flows.ClientCredentials,
+		ref.Value.Flows.AuthorizationCode,
+	} {
+		if flow == nil {
+			continue
+		}
+		for scope := range flow.Scopes {
+			if scope != "" {
+				out[scope] = struct{}{}
+			}
+		}
+	}
 	return out
 }

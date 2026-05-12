@@ -19,10 +19,16 @@ import (
 // prmResponseDocument represents the OAuth 2.0 Protected Resource Metadata
 // response document as defined in RFC 9728.
 type prmResponseDocument struct {
-	Resource             string   `json:"resource"`
-	AuthorizationServers []string `json:"authorization_servers,omitempty"`
-	ScopesSupported      []string `json:"scopes_supported,omitempty"`
+	Resource               string   `json:"resource"`
+	AuthorizationServers   []string `json:"authorization_servers,omitempty"`
+	ScopesSupported        []string `json:"scopes_supported,omitempty"`
+	BearerMethodsSupported []string `json:"bearer_methods_supported,omitempty"`
 }
+
+// prmBearerMethodsSupported is the fixed `bearer_methods_supported` —
+// Tyk only accepts bearer tokens in the Authorization header
+// (RFC 9728 §2 / RFC 6750 §2.1).
+var prmBearerMethodsSupported = []string{"header"}
 
 // PRMMiddleware intercepts GET requests to the PRM well-known path and serves
 // the OAuth 2.0 Protected Resource Metadata document (RFC 9728).
@@ -37,10 +43,22 @@ func (m *PRMMiddleware) Name() string {
 }
 
 func (m *PRMMiddleware) EnabledForSpec() bool {
+	if name, _ := m.Spec.GetOAuth2PRMConfig(); name != "" {
+		return true
+	}
 	return m.Spec.GetPRMConfig() != nil
 }
 
 func (m *PRMMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	// New location wins: when oauth2.protectedResourceMetadata is set it
+	// is the sole authority; the deprecated top-level block is not consulted.
+	if name, prm := m.Spec.GetOAuth2PRMConfig(); prm != nil {
+		if r.Method != http.MethodGet || r.URL.Path != oauth2PRMWellKnownPath(m.Spec, prm) {
+			return nil, http.StatusOK // pass through to next middleware
+		}
+		return m.serveOAuth2PRM(w, r, name, prm)
+	}
+
 	prm := m.Spec.GetPRMConfig()
 	if prm == nil {
 		return nil, http.StatusOK // pass through
@@ -79,6 +97,31 @@ func (m *PRMMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	}
 
 	return nil, middleware.StatusRespond // terminate chain — response already written
+}
+
+// serveOAuth2PRM assembles and writes the PRM document from the
+// new-style oauth2.protectedResourceMetadata block. `scopes_supported`
+// comes from OAS.OAuth2PRMScopesSupported; `bearer_methods_supported`
+// is always ["header"].
+func (m *PRMMiddleware) serveOAuth2PRM(w http.ResponseWriter, r *http.Request, name string, prm *oas.OAuth2PRM) (error, int) {
+	resource := prm.Resource
+	if resource != "" {
+		resource = m.Gw.ReplaceTykVariables(r, resource, false)
+	}
+
+	doc := prmResponseDocument{
+		Resource:               resource,
+		AuthorizationServers:   prm.AuthorizationServers,
+		ScopesSupported:        m.Spec.OAS.OAuth2PRMScopesSupported(name),
+		BearerMethodsSupported: prmBearerMethodsSupported,
+	}
+
+	w.Header().Set(header.ContentType, "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(doc); err != nil {
+		log.WithError(err).Error("Failed to encode PRM response document")
+	}
+	return nil, middleware.StatusRespond
 }
 
 // serveMirroredPRM fetches the upstream's PRM doc, rewrites `resource` to
@@ -156,17 +199,41 @@ func prmWellKnownPath(spec *APISpec, prm *oas.ProtectedResourceMetadata) string 
 	return path.Join(spec.Proxy.ListenPath, prm.GetWellKnownPath())
 }
 
+// oauth2PRMWellKnownPath returns the full well-known path for the
+// new-style oauth2.protectedResourceMetadata endpoint, prefixed with the
+// API's listen path.
+func oauth2PRMWellKnownPath(spec *APISpec, prm *oas.OAuth2PRM) string {
+	return path.Join(spec.Proxy.ListenPath, prm.GetWellKnownPath())
+}
+
+// prmMetadataURL returns the absolute URL of the PRM document this API
+// publishes — the new oauth2.protectedResourceMetadata location when
+// configured (it wins), otherwise the deprecated top-level block, or ""
+// when neither is configured. Used to fill the RFC 9728 §5.1
+// `resource_metadata` parameter on Bearer challenges.
+func prmMetadataURL(r *http.Request, spec *APISpec) string {
+	if spec == nil {
+		return ""
+	}
+	var wellKnown string
+	if _, prm := spec.GetOAuth2PRMConfig(); prm != nil {
+		wellKnown = oauth2PRMWellKnownPath(spec, prm)
+	} else if prm := spec.GetPRMConfig(); prm != nil {
+		wellKnown = prmWellKnownPath(spec, prm)
+	} else {
+		return ""
+	}
+	return fmt.Sprintf("%s://%s%s", httputil.RequestScheme(r), r.Host, wellKnown)
+}
+
 // setPRMWWWAuthenticateHeader sets the WWW-Authenticate header with a Bearer challenge
 // that includes the resource_metadata URL pointing to the PRM well-known endpoint.
 // This is a no-op if PRM is not enabled for the API spec.
 func setPRMWWWAuthenticateHeader(w http.ResponseWriter, r *http.Request, spec *APISpec) {
-	prm := spec.GetPRMConfig()
-	if prm == nil {
+	metadataURL := prmMetadataURL(r, spec)
+	if metadataURL == "" {
 		return
 	}
-
-	metadataURL := fmt.Sprintf("%s://%s%s", httputil.RequestScheme(r), r.Host, prmWellKnownPath(spec, prm))
-
 	w.Header().Set(header.WWWAuthenticate, fmt.Sprintf(`Bearer realm="tyk", resource_metadata="%s"`, metadataURL))
 }
 
