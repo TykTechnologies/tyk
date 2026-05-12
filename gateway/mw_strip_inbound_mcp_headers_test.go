@@ -61,7 +61,7 @@ func TestStripInboundMCPHeaders_EnabledForSpec(t *testing.T) {
 		o := oas.OAS{}
 		o.SetTykExtension(&oas.XTykAPIGateway{
 			Server: oas.Server{
-				MCPProxy: &oas.MCPProxy{ProtocolVersion: "2025-06-18"},
+				MCPProxy: &oas.MCPProxy{},
 			},
 		})
 		mw := &StripInboundMCPHeadersMiddleware{

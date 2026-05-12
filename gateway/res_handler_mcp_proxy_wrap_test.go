@@ -22,7 +22,7 @@ import (
 func buildMCPProxyWrapHandler(t *testing.T) *MCPProxyResponseWrap {
 	t.Helper()
 	o := oas.OAS{}
-	o.SetTykExtension(&oas.XTykAPIGateway{Server: oas.Server{MCPProxy: &oas.MCPProxy{ProtocolVersion: "2025-06-18"}}})
+	o.SetTykExtension(&oas.XTykAPIGateway{Server: oas.Server{MCPProxy: &oas.MCPProxy{}}})
 	return &MCPProxyResponseWrap{
 		BaseTykResponseHandler: BaseTykResponseHandler{
 			Spec: &APISpec{

@@ -19,7 +19,6 @@ import (
 // rejected at write-time.
 func sampleMCPProxy() *MCPProxy {
 	return &MCPProxy{
-		ProtocolVersion: "2025-03-26",
 		Sources: []MCPSource{
 			{
 				SourceSlug:  "hello-svc",
@@ -173,7 +172,6 @@ func TestMCPProxy_Validate(t *testing.T) {
 		{
 			name: "valid loopback + upstream passes",
 			proxy: &MCPProxy{
-				ProtocolVersion: "2025-03-26",
 				Sources: []MCPSource{
 					{SourceSlug: "a", BackendMode: "loopback", SourceAPIID: "api-a"},
 					{SourceSlug: "b", BackendMode: "upstream", UpstreamURL: "https://b.example.com"},

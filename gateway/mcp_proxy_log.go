@@ -91,7 +91,7 @@ func (c *captureWriter) Write(p []byte) (int, error) {
 // findSource resolves the source binding for a tool name via the derived
 // catalogue (RFC-API-TO-MCP-V8 §6.2). The catalogue entry carries the
 // source slug; we walk cfg.Sources by slug.
-func findSource(cfg *oas.MCPProxy, catalogue map[string]*oas.MCPToolMapping, toolName string) *oas.MCPSource {
+func findSource(cfg *oas.MCPProxy, catalogue map[string]*oas.MCPPrimitive, toolName string) *oas.MCPSource {
 	if cfg == nil || toolName == "" || catalogue == nil {
 		return nil
 	}

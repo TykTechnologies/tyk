@@ -31,7 +31,7 @@ type MCPHandlerMiddleware struct {
 
 	once      sync.Once
 	handler   *mcpproxy.Handler
-	catalogue map[string]*oas.MCPToolMapping
+	catalogue map[string]*oas.MCPPrimitive
 }
 
 // Name returns the middleware name.

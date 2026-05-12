@@ -20,7 +20,6 @@ import (
 //     (POST /forecast with body args, plus a Disabled tool)
 func fixture() *oas.MCPProxy {
 	return &oas.MCPProxy{
-		ProtocolVersion: "2025-06-18",
 		Sources: []oas.MCPSource{
 			{
 				SourceSlug:  "hello-svc",
@@ -44,7 +43,7 @@ func fixture() *oas.MCPProxy {
 // fixtureCatalogue mirrors the V7 fixture's Tools listing as a runtime
 // catalogue (RFC-API-TO-MCP-V8 §6.2). The disabled tool from V7 is simply
 // absent — derive-at-load would never have emitted it.
-func fixtureCatalogue() map[string]*oas.MCPToolMapping {
+func fixtureCatalogue() map[string]*oas.MCPPrimitive {
 	helloSchema := json.RawMessage(`{
 		"type":"object",
 		"required":["id"],
@@ -61,7 +60,7 @@ func fixtureCatalogue() map[string]*oas.MCPToolMapping {
 			"lon":{"type":"number"}
 		}
 	}`)
-	return map[string]*oas.MCPToolMapping{
+	return map[string]*oas.MCPPrimitive{
 		"hello-svc__get_hello": {
 			ToolName:     "hello-svc__get_hello",
 			SourceSlug:   "hello-svc",
@@ -442,7 +441,6 @@ func TestDispatch_ToolsCall_InternalError_SchemaCompile(t *testing.T) {
 	// Hand-built fixture: same shape as fixture() but with a deliberately
 	// invalid InputSchema so DefaultValidator().Compile returns an error.
 	p := &oas.MCPProxy{
-		ProtocolVersion: "2025-06-18",
 		Sources: []oas.MCPSource{
 			{
 				SourceSlug:  "broken",
@@ -451,7 +449,7 @@ func TestDispatch_ToolsCall_InternalError_SchemaCompile(t *testing.T) {
 			},
 		},
 	}
-	cat := map[string]*oas.MCPToolMapping{
+	cat := map[string]*oas.MCPPrimitive{
 		"broken__tool": {
 			ToolName:     "broken__tool",
 			SourceSlug:   "broken",

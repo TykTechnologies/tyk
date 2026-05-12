@@ -17,11 +17,13 @@ import (
 // camelCase for both json and bson, with acronym suffixes treated as plain
 // words (e.g., `apiId`, `url`).
 type MCPProxy struct {
-	// ProtocolVersion advertised in the initialize handshake.
-	ProtocolVersion string `bson:"protocolVersion" json:"protocolVersion"`
-
 	// Sources is the ordered list of source bindings. Order is alphabetical
 	// by SourceSlug, deterministic for tools/list output.
+	//
+	// The MCP protocol version advertised in the initialize handshake is a
+	// gateway-wide constant (see mcpproxy.ProtocolVersion); it is not
+	// surfaced on the per-proxy spec to avoid operators having to pin a
+	// version they have no reason to choose.
 	Sources []MCPSource `bson:"sources" json:"sources"`
 }
 
@@ -60,21 +62,12 @@ type MCPSource struct {
 	ServiceCred *ServiceCredRef `bson:"serviceCred,omitempty" json:"serviceCred,omitempty"`
 }
 
-// MCPToolMapping is the runtime-only descriptor for a derived MCP tool. It is
-// NOT persisted: no json/bson tags, never marshalled into stored APIDef
-// documents. Built at proxy load by DeriveSourceTools (see
-// mcp_proxy_derive.go) and consumed by the request-phase MCPHandler.
-type MCPToolMapping struct {
-	ToolName       string
-	SourceSlug     string
-	Method         string
-	PathTemplate   string
-	OperationID    string
-	Description    string
-	InputSchema    json.RawMessage
-	OutputSchema   json.RawMessage
-	ParamLocations map[string]string
-}
+// MCPToolMapping was the runtime-only tool descriptor in V8 draft 1. It is
+// removed under option 3 (see RFC-API-TO-MCP-V8 §0.2): the same role is now
+// played by *MCPPrimitive itself, which carries the persisted curation /
+// per-tool middleware fields *and* a block of json:"-" runtime-only fields
+// (ToolName / SourceSlug / Method / PathTemplate / InputSchema /
+// ParamLocations / ...) populated by DeriveSourceTools at proxy load.
 
 // UpstreamCred is the outbound static credential applied by mode-(b)
 // upstream sources (see RFC §7).

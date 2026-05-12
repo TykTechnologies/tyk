@@ -1,11 +1,72 @@
 package oas
 
-import "github.com/TykTechnologies/tyk/apidef"
+import (
+	"encoding/json"
+
+	"github.com/TykTechnologies/tyk/apidef"
+)
 
 // MCPPrimitive holds middleware configuration for MCP primitives (tools, resources, prompts).
 // It embeds Operation to reuse all standard middleware (rate limiting, transforms, caching, etc.).
+//
+// Dual purpose (RFC-API-TO-MCP-V8 §0.2 option 3):
+//
+//  1. Persisted: per-operation MCP semantics on a regular APIDef, under
+//     Middleware.McpTools / McpResources / McpPrompts. The Operation
+//     fields (Allow / Block / RateLimit / Transforms / etc.) round-trip
+//     through JSON/BSON exactly as before.
+//
+//  2. Runtime-only: when an MCP Proxy aggregates this APIDef as a
+//     source, the gateway populates the lower block of fields below at
+//     proxy load (DeriveSourceTools in mcp_proxy_derive.go). These fields
+//     are tagged json:"-" bson:"-" — they MUST NOT marshal. They carry
+//     the derived tool descriptor that mcpproxy.Handler consumes for
+//     tools/list and tools/call request reconstruction.
+//
+// A single struct serves both roles because their data is disjoint and
+// the runtime fields are explicitly non-persisted; nothing on the source
+// APIDef's persisted spec encodes the per-proxy namespacing or the
+// derived schema.
 type MCPPrimitive struct {
 	Operation
+
+	// --- runtime-only fields (populated at proxy load) ---
+
+	// ToolName is the full namespaced tool name as exposed to MCP
+	// clients: "<source-slug>__<op-name>". Globally unique within a
+	// proxy's catalogue.
+	ToolName string `json:"-" bson:"-"`
+
+	// SourceSlug identifies which MCP Proxy source contributed this
+	// tool. Used by mcpproxy.Handler.findTool to resolve back to the
+	// source binding (BackendMode, SourceAPIID, UpstreamURL, UpstreamCred).
+	SourceSlug string `json:"-" bson:"-"`
+
+	// Method is the HTTP method derived from the source OAS operation.
+	Method string `json:"-" bson:"-"`
+
+	// PathTemplate is the source OAS path with {var} placeholders.
+	PathTemplate string `json:"-" bson:"-"`
+
+	// OperationID is the source OAS operationId, when present.
+	OperationID string `json:"-" bson:"-"`
+
+	// Description is the source OAS operation description.
+	Description string `json:"-" bson:"-"`
+
+	// InputSchema is the synthesised JSON-Schema 2020-12 object schema
+	// covering the operation's parameters and JSON requestBody fields
+	// (RFC §6.3). Built once at proxy load.
+	InputSchema json.RawMessage `json:"-" bson:"-"`
+
+	// OutputSchema mirrors the source OAS response schema when one is
+	// declared in a way that survives derivation; empty otherwise.
+	OutputSchema json.RawMessage `json:"-" bson:"-"`
+
+	// ParamLocations maps argument name → OAS in: location
+	// ("path"|"query"|"header"|"body"). Consumed by request
+	// reconstruction in mcpproxy.Handler (RFC §8.3 step 3).
+	ParamLocations map[string]string `json:"-" bson:"-"`
 }
 
 // extractTransformResponseBodyTo overrides Operation to disable response body transformation.

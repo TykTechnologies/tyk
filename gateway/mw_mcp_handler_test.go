@@ -27,7 +27,6 @@ func makeMCPHandlerSpec(t *testing.T) *APISpec {
 	o.SetTykExtension(&oas.XTykAPIGateway{
 		Server: oas.Server{
 			MCPProxy: &oas.MCPProxy{
-				ProtocolVersion: "2025-06-18",
 				Sources: []oas.MCPSource{
 					{
 						SourceSlug:  "hello-svc",
@@ -177,7 +176,6 @@ func makeMCPHandlerSpecWithSources(t *testing.T) *APISpec {
 	o.SetTykExtension(&oas.XTykAPIGateway{
 		Server: oas.Server{
 			MCPProxy: &oas.MCPProxy{
-				ProtocolVersion: "2025-06-18",
 				Sources: []oas.MCPSource{
 					{
 						SourceSlug:  "hello-svc",

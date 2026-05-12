@@ -87,7 +87,7 @@ type Handler struct {
 	// namespaced tool name "<source-slug>__<op-name>". Read-only after
 	// NewHandler returns; the gateway swaps the entire Handler on reload
 	// rather than mutating this map in place.
-	catalogue map[string]*oas.MCPToolMapping
+	catalogue map[string]*oas.MCPPrimitive
 
 	// urlRewrite is the gateway-side hook that stashes the URL-rewrite
 	// target on the request context.
@@ -116,7 +116,7 @@ func WithProxyAPIID(id string) HandlerOption {
 // WithCatalogue installs the derived tool catalogue. Required for tools/list
 // and tools/call to return anything other than empty / -32601. The map
 // must not be mutated after handing it to NewHandler.
-func WithCatalogue(c map[string]*oas.MCPToolMapping) HandlerOption {
+func WithCatalogue(c map[string]*oas.MCPPrimitive) HandlerOption {
 	return func(h *Handler) { h.catalogue = c }
 }
 
@@ -198,13 +198,14 @@ func (h *Handler) Dispatch(w http.ResponseWriter, r *http.Request) (Action, erro
 	}
 }
 
+// ProtocolVersion is the MCP wire-version this build advertises in the
+// initialize handshake. Single gateway-wide constant; not per-proxy
+// (RFC-API-TO-MCP-V8 §7.1). Bumped alongside the MCP spec when Tyk picks
+// up a new revision.
+const ProtocolVersion = "2025-06-18"
+
 func (h *Handler) protocolVersion() string {
-	if h.cfg != nil && h.cfg.ProtocolVersion != "" {
-		return h.cfg.ProtocolVersion
-	}
-	// Conservative default — actual MCP spec versions are dated strings;
-	// the cfg-supplied value is authoritative in production.
-	return "2025-06-18"
+	return ProtocolVersion
 }
 
 func (h *Handler) writeInitialize(w http.ResponseWriter, id json.RawMessage) {
@@ -266,7 +267,7 @@ func (h *Handler) writeToolsList(w http.ResponseWriter, id json.RawMessage) {
 // findTool returns the source binding and mapping for a given tool name.
 // The mapping comes from the derived catalogue; the source is looked up on
 // cfg.Sources by the slug recorded on the mapping.
-func (h *Handler) findTool(name string) (*oas.MCPSource, *oas.MCPToolMapping) {
+func (h *Handler) findTool(name string) (*oas.MCPSource, *oas.MCPPrimitive) {
 	if h.catalogue == nil || h.cfg == nil {
 		return nil, nil
 	}
@@ -459,7 +460,7 @@ func (h *Handler) dispatchToolsCall(w http.ResponseWriter, r *http.Request, req 
 //
 //nolint:gocyclo // intentionally linear per RFC §8.3 step 3
 func buildRequestParts(
-	mapping *oas.MCPToolMapping,
+	mapping *oas.MCPPrimitive,
 	args map[string]interface{},
 ) (path string, query url.Values, headers map[string]string, body map[string]interface{}, err error) {
 	path = mapping.PathTemplate

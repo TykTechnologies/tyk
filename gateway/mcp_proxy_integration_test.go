@@ -835,8 +835,7 @@ func mcpIntegBuildProxyOAS(t *testing.T, apiID, name string, sources []oas.MCPSo
 	ext := o.GetTykExtension()
 	ext.Server.ListenPath = oas.ListenPath{Value: "/mcp/demo", Strip: true}
 	ext.Server.MCPProxy = &oas.MCPProxy{
-		ProtocolVersion: "2025-06-18",
-		Sources:         sources,
+		Sources: sources,
 	}
 	o.SetTykExtension(ext)
 	return o
@@ -852,7 +851,6 @@ func mcpIntegBuildLoadedProxySpec(t *testing.T) *APISpec {
 	o.SetTykExtension(&oas.XTykAPIGateway{
 		Server: oas.Server{
 			MCPProxy: &oas.MCPProxy{
-				ProtocolVersion: "2025-06-18",
 				Sources: []oas.MCPSource{
 					{
 						SourceSlug:  "hello-svc",
@@ -884,7 +882,6 @@ func mcpIntegBuildLoadedProxySpecWithUpstreamUsers(t *testing.T) *APISpec {
 	o.SetTykExtension(&oas.XTykAPIGateway{
 		Server: oas.Server{
 			MCPProxy: &oas.MCPProxy{
-				ProtocolVersion: "2025-06-18",
 				Sources: []oas.MCPSource{
 					{
 						SourceSlug:  "users-svc",
