@@ -265,3 +265,54 @@ func TestOAuth2ScopeCheck_RoundTripJSONPreservesAllFields(t *testing.T) {
 	assert.Contains(t, str, `"scopeSource":"union"`)
 	assert.Contains(t, str, `"scopes":[["read:billing","write:billing"],["admin"]]`)
 }
+
+func TestOAS_DeriveOAuth2Scopes_NoOAuth2Scheme(t *testing.T) {
+	s := &OAS{}
+	s.T.OpenAPI = "3.0.3"
+	s.T.Info = &openapi3.Info{Title: "test", Version: "1.0"}
+	s.T.Security = openapi3.SecurityRequirements{{"jwtAuth": {"x"}}}
+	assert.Empty(t, s.SortedOAuth2Scopes())
+}
+
+func TestOAS_DeriveOAuth2Scopes_RootPerOpAndMCP(t *testing.T) {
+	s := newOAuth2Fixture("corpOAuth")
+	s.T.Security = openapi3.SecurityRequirements{
+		{"corpOAuth": {"api:access"}},
+		{"jwtAuth": {"ignored"}},
+	}
+
+	s.Paths = openapi3.NewPaths()
+	pi := &openapi3.PathItem{}
+	pi.Get = &openapi3.Operation{Security: &openapi3.SecurityRequirements{
+		{"corpOAuth": {"users:read"}},
+		{"corpOAuth": {"users:all"}},
+	}}
+	s.Paths.Set("/users", pi)
+
+	ext := s.GetTykExtension()
+	ext.Middleware = &Middleware{
+		McpTools: MCPPrimitives{
+			"create_user": {Security: openapi3.SecurityRequirements{{"corpOAuth": {"users:write"}}}},
+		},
+		McpResources: MCPPrimitives{
+			"file": {Security: openapi3.SecurityRequirements{{"corpOAuth": {"files:read"}}}},
+		},
+	}
+
+	assert.Equal(t, []string{"api:access", "files:read", "users:all", "users:read", "users:write"}, s.SortedOAuth2Scopes())
+}
+
+func TestMCPPrimitive_RoundTripJSONPreservesSecurity(t *testing.T) {
+	p := &MCPPrimitive{Security: openapi3.SecurityRequirements{
+		{"corpOAuth": {"users:write", "audit:write"}},
+		{"corpOAuth": {"admin"}},
+	}}
+	b, err := json.Marshal(p)
+	require.NoError(t, err)
+
+	var out MCPPrimitive
+	require.NoError(t, json.Unmarshal(b, &out))
+	require.Len(t, out.Security, 2)
+	assert.Equal(t, []string{"users:write", "audit:write"}, out.Security[0]["corpOAuth"])
+	assert.Equal(t, []string{"admin"}, out.Security[1]["corpOAuth"])
+}

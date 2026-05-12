@@ -11,8 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -497,5 +499,262 @@ func TestOAuth2Middleware_CitesFirstDeclaredAlternativeOnly(t *testing.T) {
 		HeadersMatch: map[string]string{
 			header.WWWAuthenticate: `Bearer error="insufficient_scope", error_description="missing required scope: api:access", scope="api:access"`,
 		},
+	})
+}
+
+// ----------------------------------------------------------------------------
+// Per-operation / per-MCP-primitive scope check
+// ----------------------------------------------------------------------------
+
+func TestOAuth2_DedupPreserveOrder(t *testing.T) {
+	assert.Nil(t, dedupPreserveOrder(nil))
+	assert.Nil(t, dedupPreserveOrder([]string{"", ""}))
+	assert.Equal(t, []string{"b", "a", "c"}, dedupPreserveOrder([]string{"b", "a", "b", "", "c", "a"}))
+}
+
+func TestOAuth2_ScopeSource(t *testing.T) {
+	assert.Equal(t, oas.OAuth2ScopeSourceUnion, oauth2ScopeSource(nil))
+	assert.Equal(t, oas.OAuth2ScopeSourceUnion, oauth2ScopeSource(&oas.OAuth2{}))
+	assert.Equal(t, oas.OAuth2ScopeSourceUnion, oauth2ScopeSource(&oas.OAuth2{ScopeCheck: &oas.OAuth2ScopeCheck{ScopeSource: "bogus"}}))
+	assert.Equal(t, oas.OAuth2ScopeSourceGlobal, oauth2ScopeSource(&oas.OAuth2{ScopeCheck: &oas.OAuth2ScopeCheck{ScopeSource: oas.OAuth2ScopeSourceGlobal}}))
+	assert.Equal(t, oas.OAuth2ScopeSourceOperation, oauth2ScopeSource(&oas.OAuth2{ScopeCheck: &oas.OAuth2ScopeCheck{ScopeSource: oas.OAuth2ScopeSourceOperation}}))
+}
+
+func TestOAuth2_AppendOAuth2Alternatives(t *testing.T) {
+	names := map[string]struct{}{"corpOAuth": {}}
+	reqs := openapi3.SecurityRequirements{
+		{"corpOAuth": {"users:write", "audit:write"}},
+		{"corpOAuth": {"admin"}},
+		{"jwtAuth": {}}, // referenced by another scheme — contributes the empty AND-group
+	}
+	got := appendOAuth2Alternatives(nil, reqs, names)
+	require.Len(t, got, 3)
+	assert.Equal(t, []string{"users:write", "audit:write"}, got[0])
+	assert.Equal(t, []string{"admin"}, got[1])
+	assert.Nil(t, got[2])
+}
+
+// oauth2PerOpMW builds an OAuth2Middleware backed by an in-memory OAS
+// doc with a single oauth2 scheme ("corpOAuth"), the given scopeSource
+// and global Scopes, and listen path "/". Caller mutates doc.Paths /
+// the middleware block for per-op / per-primitive scenarios.
+func oauth2PerOpMW(scopeSource string, globalScopes [][]string) (*OAuth2Middleware, *oas.OAS) {
+	doc := oas.OAS{T: openapi3.T{
+		OpenAPI: "3.0.3",
+		Info:    &openapi3.Info{Title: "per-op", Version: "1.0"},
+		Paths:   openapi3.NewPaths(),
+	}}
+	sc := &oas.OAuth2ScopeCheck{Enabled: true, ScopeSource: scopeSource}
+	if len(globalScopes) > 0 {
+		sc.Scopes = globalScopes
+	}
+	doc.SetTykExtension(&oas.XTykAPIGateway{
+		Server: oas.Server{
+			Authentication: &oas.Authentication{
+				Enabled: true,
+				SecuritySchemes: oas.SecuritySchemes{
+					"corpOAuth": &oas.OAuth2{Enabled: true, ScopeCheck: sc},
+				},
+			},
+			ListenPath: oas.ListenPath{Value: "/", Strip: true},
+		},
+		Middleware: &oas.Middleware{},
+	})
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	spec.IsOAS = true
+	spec.OAS = doc
+	spec.Proxy.ListenPath = "/"
+	return &OAuth2Middleware{BaseMiddleware: &BaseMiddleware{Spec: spec}}, &spec.OAS
+}
+
+func reqWithPrimitive(method, path, primitiveName string) *http.Request {
+	r := httptest.NewRequest(method, path, nil)
+	if primitiveName != "" {
+		httpctx.SetJSONRPCRoutingState(r, &httpctx.JSONRPCRoutingState{PrimitiveName: primitiveName})
+	}
+	return r
+}
+
+func secReq(scopes ...string) openapi3.SecurityRequirement {
+	return openapi3.SecurityRequirement{"corpOAuth": scopes}
+}
+
+func TestOAuth2_RequiredScopeAlternatives_RESTOperation(t *testing.T) {
+	mw, doc := oauth2PerOpMW(oas.OAuth2ScopeSourceOperation, nil)
+	doc.Paths.Set("/users", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			Security:  &openapi3.SecurityRequirements{secReq("users:read")},
+			Responses: openapi3.NewResponses(),
+		},
+		Post: &openapi3.Operation{
+			Security:  &openapi3.SecurityRequirements{secReq("users:write"), secReq("users:all")},
+			Responses: openapi3.NewResponses(),
+		},
+	})
+	doc.Paths.Set("/open", &openapi3.PathItem{Get: &openapi3.Operation{Responses: openapi3.NewResponses()}})
+
+	assert.Equal(t, [][]string{{"users:read"}}, mw.requiredScopeAlternativesForRequest(httptest.NewRequest(http.MethodGet, "/users", nil)))
+	assert.Equal(t, [][]string{{"users:write"}, {"users:all"}}, mw.requiredScopeAlternativesForRequest(httptest.NewRequest(http.MethodPost, "/users", nil)))
+	// Operation without `security:` → nothing enforced under "operation".
+	assert.Nil(t, mw.requiredScopeAlternativesForRequest(httptest.NewRequest(http.MethodGet, "/open", nil)))
+	// Unmatched path → nothing enforced.
+	assert.Nil(t, mw.requiredScopeAlternativesForRequest(httptest.NewRequest(http.MethodGet, "/missing", nil)))
+}
+
+func TestOAuth2_RequiredScopeAlternatives_MCPPrimitive(t *testing.T) {
+	mw, doc := oauth2PerOpMW(oas.OAuth2ScopeSourceOperation, nil)
+	doc.GetTykMiddleware().McpTools = oas.MCPPrimitives{
+		"create_user": {Security: openapi3.SecurityRequirements{secReq("users:write"), secReq("users:all")}},
+	}
+	doc.GetTykMiddleware().McpResources = oas.MCPPrimitives{
+		"file": {Security: openapi3.SecurityRequirements{secReq("files:read")}},
+	}
+
+	assert.Equal(t, [][]string{{"users:write"}, {"users:all"}},
+		mw.requiredScopeAlternativesForRequest(reqWithPrimitive(http.MethodPost, "/", "create_user")))
+	assert.Equal(t, [][]string{{"files:read"}},
+		mw.requiredScopeAlternativesForRequest(reqWithPrimitive(http.MethodPost, "/", "file")))
+	// Non-tools/call (no primitive name) → nothing enforced.
+	assert.Nil(t, mw.requiredScopeAlternativesForRequest(reqWithPrimitive(http.MethodPost, "/", "")))
+	// Undeclared primitive → nothing enforced (no security: array).
+	assert.Nil(t, mw.requiredScopeAlternativesForRequest(reqWithPrimitive(http.MethodPost, "/", "delete_user")))
+}
+
+func TestOAuth2_RequiredScopeAlternatives_UnionAndOperationAndGlobal(t *testing.T) {
+	t.Run("union ANDs the global baseline onto each per-op alternative", func(t *testing.T) {
+		mw, doc := oauth2PerOpMW(oas.OAuth2ScopeSourceUnion, [][]string{{"api:access"}})
+		doc.Paths.Set("/users", &openapi3.PathItem{Get: &openapi3.Operation{
+			Security:  &openapi3.SecurityRequirements{secReq("users:read"), secReq("users:all")},
+			Responses: openapi3.NewResponses(),
+		}})
+		assert.Equal(t, [][]string{{"users:read", "api:access"}, {"users:all", "api:access"}},
+			mw.requiredScopeAlternativesForRequest(httptest.NewRequest(http.MethodGet, "/users", nil)))
+	})
+	t.Run("union with no per-op security falls back to the global list", func(t *testing.T) {
+		mw, doc := oauth2PerOpMW(oas.OAuth2ScopeSourceUnion, [][]string{{"api:access"}})
+		doc.Paths.Set("/open", &openapi3.PathItem{Get: &openapi3.Operation{Responses: openapi3.NewResponses()}})
+		assert.Equal(t, [][]string{{"api:access"}},
+			mw.requiredScopeAlternativesForRequest(httptest.NewRequest(http.MethodGet, "/open", nil)))
+	})
+	t.Run("operation ignores the global baseline", func(t *testing.T) {
+		mw, doc := oauth2PerOpMW(oas.OAuth2ScopeSourceOperation, [][]string{{"api:access"}})
+		doc.Paths.Set("/users", &openapi3.PathItem{Get: &openapi3.Operation{
+			Security:  &openapi3.SecurityRequirements{secReq("users:read")},
+			Responses: openapi3.NewResponses(),
+		}})
+		assert.Equal(t, [][]string{{"users:read"}},
+			mw.requiredScopeAlternativesForRequest(httptest.NewRequest(http.MethodGet, "/users", nil)))
+	})
+	t.Run("global ignores per-op security", func(t *testing.T) {
+		mw, doc := oauth2PerOpMW(oas.OAuth2ScopeSourceGlobal, [][]string{{"api:access"}})
+		doc.Paths.Set("/users", &openapi3.PathItem{Get: &openapi3.Operation{
+			Security:  &openapi3.SecurityRequirements{secReq("users:read")},
+			Responses: openapi3.NewResponses(),
+		}})
+		assert.Equal(t, [][]string{{"api:access"}},
+			mw.requiredScopeAlternativesForRequest(httptest.NewRequest(http.MethodGet, "/users", nil)))
+	})
+}
+
+// newOAuth2PerOpScopeCheckOAS builds an OAS API for end-to-end
+// per-operation scope-check tests: one path "/users" with GET and POST
+// operations carrying `security:` arrays for the "corpOAuth" oauth2
+// scheme.
+func newOAuth2PerOpScopeCheckOAS(listenPath, scopeSource string, globalScopes [][]string) oas.OAS {
+	doc := oas.OAS{T: openapi3.T{
+		OpenAPI: "3.0.3",
+		Info:    &openapi3.Info{Title: "oauth2-per-op", Version: "1.0"},
+		Paths:   openapi3.NewPaths(),
+	}}
+	doc.Paths.Set("/users", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			Security:  &openapi3.SecurityRequirements{secReq("users:read")},
+			Responses: openapi3.NewResponses(),
+		},
+		Post: &openapi3.Operation{
+			Security:  &openapi3.SecurityRequirements{secReq("users:write"), secReq("users:all")},
+			Responses: openapi3.NewResponses(),
+		},
+	})
+	doc.Paths.Set("/open", &openapi3.PathItem{Get: &openapi3.Operation{Responses: openapi3.NewResponses()}})
+	sc := &oas.OAuth2ScopeCheck{Enabled: true, ScopeSource: scopeSource}
+	if len(globalScopes) > 0 {
+		sc.Scopes = globalScopes
+	}
+	doc.SetTykExtension(&oas.XTykAPIGateway{
+		Info:     oas.Info{Name: "oauth2-per-op", State: oas.State{Active: true}},
+		Upstream: oas.Upstream{URL: TestHttpAny},
+		Server: oas.Server{
+			ListenPath: oas.ListenPath{Value: listenPath, Strip: true},
+			Authentication: &oas.Authentication{
+				Enabled: true,
+				SecuritySchemes: oas.SecuritySchemes{
+					"corpOAuth": &oas.OAuth2{Enabled: true, ScopeCheck: sc},
+				},
+			},
+		},
+	})
+	return doc
+}
+
+func TestOAuth2Middleware_PerOperationScopeCheck_EndToEnd(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	loadAPI := func(listenPath, source string, global [][]string) {
+		doc := newOAuth2PerOpScopeCheckOAS(listenPath, source, global)
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = true
+			spec.Proxy.ListenPath = listenPath
+			spec.IsOAS = true
+			spec.OAS = doc
+		})
+	}
+	bearer := func(scopes string) map[string]string {
+		return map[string]string{"Authorization": "Bearer " + makeUnverifiedJWT(t, jwt.MapClaims{"scope": scopes})}
+	}
+
+	t.Run("operation source — token has the operation scope", func(t *testing.T) {
+		loadAPI("/op1/", oas.OAuth2ScopeSourceOperation, nil)
+		ts.Run(t, test.TestCase{Method: http.MethodGet, Path: "/op1/users", Headers: bearer("users:read"), Code: http.StatusOK})
+	})
+	t.Run("operation source — token missing the operation scope → 403 cites it", func(t *testing.T) {
+		loadAPI("/op2/", oas.OAuth2ScopeSourceOperation, nil)
+		ts.Run(t, test.TestCase{
+			Method: http.MethodGet, Path: "/op2/users", Headers: bearer("other"), Code: http.StatusForbidden,
+			BodyMatch: `"error":"insufficient_scope".*"scope":"users:read"`,
+			HeadersMatch: map[string]string{
+				header.WWWAuthenticate: `Bearer error="insufficient_scope", error_description="missing required scope: users:read", scope="users:read"`,
+			},
+		})
+	})
+	t.Run("operation source — OR-of-AND alternatives", func(t *testing.T) {
+		loadAPI("/op3/", oas.OAuth2ScopeSourceOperation, nil)
+		ts.Run(t, test.TestCase{Method: http.MethodPost, Path: "/op3/users", Headers: bearer("users:write"), Code: http.StatusOK})
+		ts.Run(t, test.TestCase{Method: http.MethodPost, Path: "/op3/users", Headers: bearer("users:all"), Code: http.StatusOK})
+		ts.Run(t, test.TestCase{Method: http.MethodPost, Path: "/op3/users", Headers: bearer("users:write users:all"), Code: http.StatusOK})
+		ts.Run(t, test.TestCase{
+			Method: http.MethodPost, Path: "/op3/users", Headers: bearer("users:read"), Code: http.StatusForbidden,
+			BodyMatch:    `"scope":"users:write"`,
+			BodyNotMatch: `users:all`,
+		})
+	})
+	t.Run("operation source — operation with no security: is not enforced", func(t *testing.T) {
+		loadAPI("/op4/", oas.OAuth2ScopeSourceOperation, [][]string{{"api:access"}})
+		ts.Run(t, test.TestCase{Method: http.MethodGet, Path: "/op4/open", Code: http.StatusOK})
+	})
+	t.Run("union source — per-op AND global baseline both enforced", func(t *testing.T) {
+		loadAPI("/op5/", oas.OAuth2ScopeSourceUnion, [][]string{{"api:access"}})
+		ts.Run(t, test.TestCase{Method: http.MethodGet, Path: "/op5/users", Headers: bearer("api:access users:read"), Code: http.StatusOK})
+		ts.Run(t, test.TestCase{Method: http.MethodGet, Path: "/op5/users", Headers: bearer("api:access"), Code: http.StatusForbidden})
+		ts.Run(t, test.TestCase{Method: http.MethodGet, Path: "/op5/users", Headers: bearer("users:read"), Code: http.StatusForbidden})
+	})
+	t.Run("operation source — global baseline ignored", func(t *testing.T) {
+		loadAPI("/op6/", oas.OAuth2ScopeSourceOperation, [][]string{{"api:access"}})
+		ts.Run(t, test.TestCase{Method: http.MethodGet, Path: "/op6/users", Headers: bearer("users:read"), Code: http.StatusOK})
+	})
+	t.Run("global source — per-op ignored", func(t *testing.T) {
+		loadAPI("/op7/", oas.OAuth2ScopeSourceGlobal, [][]string{{"api:access"}})
+		ts.Run(t, test.TestCase{Method: http.MethodGet, Path: "/op7/users", Headers: bearer("api:access"), Code: http.StatusOK})
 	})
 }

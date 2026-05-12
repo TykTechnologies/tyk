@@ -1,6 +1,8 @@
 package oas
 
 import (
+	"sort"
+
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
@@ -295,4 +297,95 @@ func (s *OAS) GetTykOAuth2Config(name string) *OAuth2 {
 // new-style OAuth2 scheme.
 func (s *OAS) IsOAuth2Scheme(name string) bool {
 	return s.GetTykOAuth2Config(name) != nil
+}
+
+// collectOAuth2SchemeNames returns the set of configured OAuth2
+// security-scheme names (in the new-style oauth2-block sense).
+func (s *OAS) collectOAuth2SchemeNames() map[string]struct{} {
+	names := map[string]struct{}{}
+	tykAuth := s.getTykAuthentication()
+	if tykAuth == nil || tykAuth.SecuritySchemes == nil {
+		return names
+	}
+	for name, scheme := range tykAuth.SecuritySchemes {
+		if asOAuth2Scheme(scheme) != nil {
+			names[name] = struct{}{}
+		}
+	}
+	return names
+}
+
+// DeriveOAuth2Scopes returns the set of scopes declared across the OAS
+// document's `security:` arrays for every configured oauth2 scheme:
+// the root-level `security:`, each path operation's `security:`, and
+// every MCP primitive's `security:` (tools, resources, prompts).
+// Entries referencing non-oauth2 schemes are ignored. The result is a
+// set; callers needing a stable order use SortedOAuth2Scopes.
+func (s *OAS) DeriveOAuth2Scopes() map[string]struct{} {
+	scopes := map[string]struct{}{}
+	oauth2Names := s.collectOAuth2SchemeNames()
+	if len(oauth2Names) == 0 {
+		return scopes
+	}
+
+	collect := func(reqs openapi3.SecurityRequirements) {
+		for _, req := range reqs {
+			for schemeName, scopeList := range req {
+				if _, ok := oauth2Names[schemeName]; !ok {
+					continue
+				}
+				for _, sc := range scopeList {
+					if sc == "" {
+						continue
+					}
+					scopes[sc] = struct{}{}
+				}
+			}
+		}
+	}
+
+	collect(s.Security)
+
+	if s.Paths != nil {
+		for _, pathItem := range s.Paths.Map() {
+			if pathItem == nil {
+				continue
+			}
+			for _, op := range pathItem.Operations() {
+				if op == nil || op.Security == nil {
+					continue
+				}
+				collect(*op.Security)
+			}
+		}
+	}
+
+	if mw := s.GetTykMiddleware(); mw != nil {
+		walk := func(prims MCPPrimitives) {
+			for _, prim := range prims {
+				if prim == nil {
+					continue
+				}
+				collect(prim.Security)
+			}
+		}
+		walk(mw.McpTools)
+		walk(mw.McpResources)
+		walk(mw.McpPrompts)
+	}
+
+	return scopes
+}
+
+// SortedOAuth2Scopes returns DeriveOAuth2Scopes as a sorted, stable
+// list. Used to populate read-only "scopes this API advertises"
+// previews and the OAS Components security-scheme scope vocabulary.
+func (s *OAS) SortedOAuth2Scopes() []string {
+	set := s.DeriveOAuth2Scopes()
+	out := make([]string, 0, len(set))
+	for k := range set {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }

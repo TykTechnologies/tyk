@@ -1115,6 +1115,19 @@
         },
         "rateLimit": {
           "$ref": "#/definitions/X-Tyk-RateLimit"
+        },
+        "security": {
+          "type": "array",
+          "description": "Per-primitive OAS-style security requirements (OR-of-AND). Each item maps a security-scheme name to the list of scopes the inbound token must carry; the primitive is authorized when any one alternative is fully satisfied. Enforced by the oauth2 scope-check middleware when scopeSource resolves to \"operation\" or \"union\".",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     },
