@@ -43,7 +43,7 @@ x-tyk-api-gateway:
       enabled: true
       # expose: [getOrder, createOrder]  # optional allow-list; omit for expose-all
 ```
-The `mcp` block is a marker that tells the loader to synthesise a paired adapter. The classic-APIDefinition projection is `apidef.MCPExposureConfig` (`mcp_exposure.enabled`, `mcp_exposure.expose`). Default behaviour is to expose every operation in the source OAS; populate `expose` with the sanitised operationIds to whitelist. The REST API is **not** marked `IsMCP()`. It still serves REST traffic on its existing listenPath under its existing chain.
+The `mcp` block is a marker that tells the loader to synthesise a paired adapter. The classic-APIDefinition projection is `apidef.MCPExposureConfig` (`mcp_exposure.enabled`, `mcp_exposure.expose`). Default behaviour is to expose every operation in the source OAS; populate `expose` with the sanitised operationIds to whitelist. Operations marked `middleware.operations[<id>].internal.enabled: true` are unconditionally skipped — the operator's "internal-only" declaration outranks `expose`. The REST API is **not** marked `IsMCP()`. It still serves REST traffic on its existing listenPath under its existing chain.
 
 **Layer B — MCP Adapter (synthetic, in-memory, Internal).** When `loadApps` sees `mcp.enabled: true` on a loaded REST APISpec, `synthesiseMCPAdapters` (`gateway/mcp_synthesise_adapter.go`) constructs and registers a paired APISpec entirely in memory:
 - Deterministic APIID: `<rest-apiid>__mcp-server` (constant `oas.AdapterAPIIDSuffix`).

@@ -210,6 +210,29 @@ func TestDeriveSourceTools_MissingOperationID(t *testing.T) {
 	assert.Contains(t, warns[0].Reason, "missing operationId")
 }
 
+func TestDeriveSourceTools_SkipsInternalOperations(t *testing.T) {
+	t.Parallel()
+
+	srcOAS := makeTestOAS(t)
+	xtyk := &XTykAPIGateway{
+		Middleware: &Middleware{
+			Operations: Operations{
+				"getOrder": &Operation{Internal: &Internal{Enabled: true}},
+			},
+		},
+	}
+	srcOAS.SetTykExtension(xtyk)
+
+	tools, warns, err := DeriveSourceTools(srcOAS, nil)
+	require.NoError(t, err)
+	require.Len(t, tools, 1)
+	assert.Equal(t, "createOrder", tools[0].Name)
+
+	require.Len(t, warns, 1)
+	assert.Equal(t, "getOrder", warns[0].Operation)
+	assert.Contains(t, warns[0].Reason, "internal")
+}
+
 func TestDeriveSourceTools_NilOAS(t *testing.T) {
 	t.Parallel()
 

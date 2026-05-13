@@ -89,6 +89,21 @@ func DeriveSourceTools(srcOAS *OAS, expose []string) ([]DerivedTool, []DeriveWar
 		return tools, warnings, nil
 	}
 
+	// Operations marked `internal.enabled: true` in the Tyk extension are
+	// hidden from the public listenPath; the adapter loop bypasses that
+	// check, so we must filter them out at derivation time.
+	var internalOps map[string]bool
+	if ext := srcOAS.GetTykExtension(); ext != nil && ext.Middleware != nil {
+		for opID, op := range ext.Middleware.Operations {
+			if op != nil && op.Internal != nil && op.Internal.Enabled {
+				if internalOps == nil {
+					internalOps = map[string]bool{}
+				}
+				internalOps[opID] = true
+			}
+		}
+	}
+
 	type pathOp struct {
 		path string
 		item *openapi3.PathItem
@@ -112,6 +127,14 @@ func DeriveSourceTools(srcOAS *OAS, expose []string) ([]DerivedTool, []DeriveWar
 				warnings = append(warnings, DeriveWarning{
 					Operation: fmt.Sprintf("%s %s", mo.method, mo.path),
 					Reason:    "missing operationId",
+				})
+				continue
+			}
+
+			if internalOps[rawName] {
+				warnings = append(warnings, DeriveWarning{
+					Operation: rawName,
+					Reason:    "operation marked internal — skipped",
 				})
 				continue
 			}
