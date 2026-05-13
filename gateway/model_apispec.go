@@ -109,6 +109,21 @@ type APISpec struct {
 	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
 	// Built from apidef.ErrorOverrides during gateway startup.
 	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
+
+	// IsSyntheticMCPAdapter is true on the Internal adapter spec that was
+	// emitted in-memory by synthesiseMCPAdapter from a paired REST APISpec.
+	// Synthetic adapter specs have no storage entry, are skipped by the
+	// public muxer, and are addressable only via `tyk://<APIID>`.
+	IsSyntheticMCPAdapter bool
+
+	// SourceRESTAPIID is the APIID of the REST APISpec this adapter is paired
+	// with. Empty on non-adapter specs.
+	SourceRESTAPIID string
+
+	// DerivedTools is the runtime tool catalogue produced from the source
+	// REST OAS by oas.DeriveSourceTools at every loadApps. The adapter
+	// middleware uses it to translate `tools/call` into HTTP requests.
+	DerivedTools []oas.DerivedTool
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
