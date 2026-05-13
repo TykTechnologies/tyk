@@ -1399,6 +1399,8 @@
     },
     "X-Tyk-ProtectedResourceMetadata": {
       "type": "object",
+      "deprecated": true,
+      "description": "Deprecated. Use securitySchemes[<name>].oauth2.protectedResourceMetadata (X-Tyk-OAuth2-PRM) instead. The legacy top-level block is kept for downgrade safety and will be removed in a future major version.",
       "properties": {
         "enabled": {
           "type": "boolean"
