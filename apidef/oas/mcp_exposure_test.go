@@ -184,6 +184,58 @@ func TestDeriveSourceTools_ExposeAll(t *testing.T) {
 	assert.Equal(t, "body.amount", create.ParamLocations["amount"])
 }
 
+func TestDeriveSourceTools_NonObjectJSONBodiesUseWholeBodySchemaType(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		schemaType string
+	}{
+		{name: "array", schemaType: "array"},
+		{name: "string", schemaType: "string"},
+		{name: "number", schemaType: "number"},
+		{name: "boolean", schemaType: "boolean"},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := &openapi3.T{
+				OpenAPI: "3.0.3",
+				Info:    &openapi3.Info{Title: "Echo", Version: "1.0"},
+				Paths:   openapi3.NewPaths(),
+			}
+			doc.Paths.Set("/echo", &openapi3.PathItem{
+				Post: &openapi3.Operation{
+					OperationID: "echo" + tc.name,
+					RequestBody: &openapi3.RequestBodyRef{Value: &openapi3.RequestBody{
+						Required: true,
+						Content: openapi3.Content{
+							"application/json": &openapi3.MediaType{Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{
+								Type: &openapi3.Types{tc.schemaType},
+							}}},
+						},
+					}},
+				},
+			})
+
+			tools, warns, err := DeriveSourceTools(&OAS{T: *doc}, nil)
+			require.NoError(t, err)
+			assert.Empty(t, warns)
+			require.Len(t, tools, 1)
+
+			tool := tools[0]
+			assert.Equal(t, "body", tool.ParamLocations["body"])
+			props := tool.InputSchema["properties"].(map[string]any)
+			body := props["body"].(map[string]any)
+			assert.Equal(t, tc.schemaType, body["type"])
+			assert.Equal(t, []string{"body"}, tool.InputSchema["required"])
+		})
+	}
+}
+
 func TestDeriveSourceTools_ExposeList(t *testing.T) {
 	t.Parallel()
 

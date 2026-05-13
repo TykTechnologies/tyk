@@ -20,6 +20,7 @@ import (
 type SDKAdapter struct {
 	server   *mcpsdk.Server
 	callTool ToolCallFunc
+	handler  http.Handler
 
 	mu    sync.RWMutex
 	tools map[string]oas.DerivedTool
@@ -68,6 +69,7 @@ func NewSDKAdapter(config SDKServerConfig) (*SDKAdapter, error) {
 		callTool: config.CallTool,
 		tools:    map[string]oas.DerivedTool{},
 	}
+	adapter.handler = adapter.newStreamableHTTPHandler(defaultSDKAdapterStreamableHTTPOptions())
 	if err := adapter.UpdateTools(config.Tools); err != nil {
 		return nil, err
 	}
@@ -84,17 +86,26 @@ func (a *SDKAdapter) Server() *mcpsdk.Server {
 }
 
 // StreamableHTTPHandler returns a streamable HTTP handler backed by the
-// adapter's long-lived SDK server.
+// adapter's long-lived SDK server. Nil options return the adapter-owned,
+// stateful handler so initialized streamable sessions survive across gateway
+// requests. Non-nil options intentionally build a separate handler.
 func (a *SDKAdapter) StreamableHTTPHandler(opts *mcpsdk.StreamableHTTPOptions) http.Handler {
 	if opts == nil {
-		opts = &mcpsdk.StreamableHTTPOptions{
-			Stateless:    true,
-			JSONResponse: true,
-		}
+		return a.handler
 	}
+	return a.newStreamableHTTPHandler(opts)
+}
+
+func (a *SDKAdapter) newStreamableHTTPHandler(opts *mcpsdk.StreamableHTTPOptions) http.Handler {
 	return mcpsdk.NewStreamableHTTPHandler(func(*http.Request) *mcpsdk.Server {
 		return a.Server()
 	}, opts)
+}
+
+func defaultSDKAdapterStreamableHTTPOptions() *mcpsdk.StreamableHTTPOptions {
+	return &mcpsdk.StreamableHTTPOptions{
+		JSONResponse: true,
+	}
 }
 
 // UpdateTools replaces the adapter's derived tool catalogue in place. Added,

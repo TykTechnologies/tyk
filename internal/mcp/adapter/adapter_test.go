@@ -122,7 +122,7 @@ func TestBuildUpstreamRequest_MissingPathParam(t *testing.T) {
 	assert.Contains(t, err.Error(), "missing required path parameter")
 }
 
-func TestBuildUpstreamRequest_WholeBodyMustBeObject(t *testing.T) {
+func TestBuildUpstreamRequest_WholeBodyAllowsAnyJSONValue(t *testing.T) {
 	t.Parallel()
 	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
 	tool := &oas.DerivedTool{
@@ -132,8 +132,33 @@ func TestBuildUpstreamRequest_WholeBodyMustBeObject(t *testing.T) {
 		ParamLocations: map[string]string{"body": "body"},
 	}
 
-	_, err := BuildUpstreamRequest(parent, tool, "rest-1", map[string]any{"body": "not-an-object"})
-	require.Error(t, err)
+	cases := []struct {
+		name string
+		body any
+		want string
+	}{
+		{name: "object", body: map[string]any{"ok": true}, want: `{"ok":true}`},
+		{name: "array", body: []any{"a", float64(2), true}, want: `["a",2,true]`},
+		{name: "string", body: "not-an-object", want: `"not-an-object"`},
+		{name: "number", body: float64(42.5), want: `42.5`},
+		{name: "boolean", body: true, want: `true`},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			req, err := BuildUpstreamRequest(parent, tool, "rest-1", map[string]any{"body": tc.body})
+			require.NoError(t, err)
+			assert.Equal(t, "application/json", req.Header.Get("Content-Type"))
+
+			var b bytes.Buffer
+			_, err = b.ReadFrom(req.Body)
+			require.NoError(t, err)
+			assert.JSONEq(t, tc.want, b.String())
+		})
+	}
 }
 
 func TestRecorder_TruncationFlag(t *testing.T) {

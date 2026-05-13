@@ -3,9 +3,11 @@ package adapter
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -168,6 +170,128 @@ func TestSDKAdapter_UpdateToolsAdvertisesAndEmitsListChanged(t *testing.T) {
 	assert.Equal(t, "getOrder", list.Tools[0].Name)
 	assert.Equal(t, "fetch an order by id", list.Tools[0].Description)
 	assert.Equal(t, "listOrders", list.Tools[1].Name)
+}
+
+func TestSDKAdapter_StreamableHTTPHandlerNilOptionsReusesStatefulHandlerForListChanged(t *testing.T) {
+	t.Parallel()
+
+	adapter, err := NewSDKAdapter(SDKServerConfig{
+		Name:  "Orders [MCP adapter]",
+		Tools: sampleTools(),
+		CallTool: func(context.Context, *oas.DerivedTool, map[string]any) (*Recorder, error) {
+			return NewRecorder(), nil
+		},
+	})
+	require.NoError(t, err)
+
+	loopbackHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		adapter.StreamableHTTPHandler(nil).ServeHTTP(w, r)
+	})
+
+	changed := make(chan struct{}, 1)
+	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "adapter-streamable-test-client", Version: "v0.0.1"}, &mcpsdk.ClientOptions{
+		ToolListChangedHandler: func(context.Context, *mcpsdk.ToolListChangedRequest) {
+			changed <- struct{}{}
+		},
+	})
+	session, err := client.Connect(context.Background(), &mcpsdk.StreamableClientTransport{
+		Endpoint:   "http://mcp.test/mcp",
+		HTTPClient: &http.Client{Transport: loopbackRoundTripper{handler: loopbackHandler}},
+	}, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, session.Close()) })
+
+	init := session.InitializeResult()
+	require.NotNil(t, init.Capabilities.Tools)
+	assert.True(t, init.Capabilities.Tools.ListChanged)
+
+	require.NoError(t, adapter.UpdateTools([]oas.DerivedTool{
+		{
+			Name:           "getOrder",
+			Description:    "fetch an order by id",
+			Method:         http.MethodGet,
+			PathTemplate:   "/orders/{id}",
+			ParamLocations: map[string]string{"id": "path"},
+			InputSchema:    map[string]any{"type": "object", "properties": map[string]any{"id": map[string]any{"type": "string"}}},
+		},
+		{
+			Name:           "listOrders",
+			Description:    "list orders",
+			Method:         http.MethodGet,
+			PathTemplate:   "/orders",
+			ParamLocations: map[string]string{"limit": "query"},
+			InputSchema:    map[string]any{"type": "object", "properties": map[string]any{"limit": map[string]any{"type": "integer"}}},
+		},
+	}))
+	waitForToolListChanged(t, changed)
+}
+
+type loopbackRoundTripper struct {
+	handler http.Handler
+}
+
+func (rt loopbackRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	pr, pw := io.Pipe()
+	rw := &loopbackResponseWriter{
+		header:        http.Header{},
+		body:          pw,
+		status:        http.StatusOK,
+		headerWritten: make(chan struct{}),
+	}
+
+	go func() {
+		defer rw.finish()
+		rt.handler.ServeHTTP(rw, req)
+	}()
+
+	select {
+	case <-rw.headerWritten:
+		return &http.Response{
+			StatusCode: rw.status,
+			Status:     http.StatusText(rw.status),
+			Header:     rw.header.Clone(),
+			Body:       pr,
+			Request:    req,
+		}, nil
+	case <-req.Context().Done():
+		_ = pr.CloseWithError(req.Context().Err())
+		_ = pw.CloseWithError(req.Context().Err())
+		return nil, req.Context().Err()
+	}
+}
+
+type loopbackResponseWriter struct {
+	header http.Header
+	body   *io.PipeWriter
+
+	status        int
+	headerOnce    sync.Once
+	headerWritten chan struct{}
+}
+
+func (w *loopbackResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *loopbackResponseWriter) WriteHeader(status int) {
+	w.headerOnce.Do(func() {
+		w.status = status
+		close(w.headerWritten)
+	})
+}
+
+func (w *loopbackResponseWriter) Write(p []byte) (int, error) {
+	w.WriteHeader(http.StatusOK)
+	return w.body.Write(p)
+}
+
+func (w *loopbackResponseWriter) Flush() {
+	w.WriteHeader(http.StatusOK)
+}
+
+func (w *loopbackResponseWriter) finish() {
+	w.WriteHeader(w.status)
+	_ = w.body.Close()
 }
 
 func TestNewSDKStreamableHTTPHandler_HandlesInitializeAsJSON(t *testing.T) {

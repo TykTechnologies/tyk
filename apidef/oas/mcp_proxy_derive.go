@@ -315,7 +315,14 @@ func deriveParams(item *openapi3.PathItem, op *openapi3.Operation) (map[string]s
 				}
 			} else {
 				locs["body"] = "body"
-				props["body"] = map[string]any{"type": "object"}
+				bodyProp := map[string]any{"type": "object"}
+				if t := schemaType(body); t != "" {
+					bodyProp["type"] = t
+				}
+				if body.Description != "" {
+					bodyProp["description"] = body.Description
+				}
+				props["body"] = bodyProp
 				if rb.Required {
 					required = append(required, "body")
 				}

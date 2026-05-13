@@ -131,7 +131,10 @@ func BuildUpstreamRequest(
 	path := tool.PathTemplate
 	query := url.Values{}
 	headers := http.Header{}
-	var bodyJSON map[string]any
+	var (
+		bodyJSON any
+		hasBody  bool
+	)
 
 	for argName, raw := range args {
 		loc, known := tool.ParamLocations[argName]
@@ -146,16 +149,18 @@ func BuildUpstreamRequest(
 		case loc == "header":
 			headers.Set(argName, fmt.Sprint(raw))
 		case loc == "body":
-			m, ok := raw.(map[string]any)
-			if !ok {
-				return nil, fmt.Errorf("argument %q must be an object when whole-body", argName)
-			}
-			bodyJSON = m
+			bodyJSON = raw
+			hasBody = true
 		case strings.HasPrefix(loc, "body."):
-			if bodyJSON == nil {
-				bodyJSON = map[string]any{}
+			m, ok := bodyJSON.(map[string]any)
+			if !hasBody {
+				m = map[string]any{}
+				bodyJSON = m
+				hasBody = true
+			} else if !ok {
+				return nil, fmt.Errorf("argument %q cannot be combined with whole-body argument", argName)
 			}
-			bodyJSON[argName] = raw
+			m[argName] = raw
 		}
 	}
 
@@ -166,7 +171,7 @@ func BuildUpstreamRequest(
 	rawQuery := query.Encode()
 
 	var body io.Reader
-	if bodyJSON != nil {
+	if hasBody {
 		buf, err := json.Marshal(bodyJSON)
 		if err != nil {
 			return nil, fmt.Errorf("marshal body: %w", err)
