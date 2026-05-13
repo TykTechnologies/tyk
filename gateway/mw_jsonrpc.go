@@ -177,6 +177,21 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, middleware.StatusRespond //nolint:nilerr
 	}
 
+	// Synthetic MCP adapter short-circuit: initialize / ping / tools/list
+	// are answered inline from the derived tool catalogue. tools/call is
+	// translated into an HTTP request against the paired REST API via
+	// the tyk:// loop primitive. Neither path enters the VEM chain.
+	if m.Spec.IsSyntheticMCPAdapter {
+		if m.handleAdapterInline(w, r, rpcReq) {
+			return nil, middleware.StatusRespond
+		}
+		if m.Gw.handleAdapterToolsCall(w, r, m.Spec, rpcReq) {
+			return nil, middleware.StatusRespond
+		}
+		m.writeJSONRPCError(w, r, rpcReq.ID, mcp.JSONRPCMethodNotFound, "method not supported by MCP adapter", nil)
+		return nil, middleware.StatusRespond
+	}
+
 	// Route based on method
 	result, err := m.Spec.JSONRPCRouter.RouteMethod(
 		rpcReq.Method,

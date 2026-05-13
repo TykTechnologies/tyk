@@ -7,6 +7,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	neturl "net/url"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
@@ -68,9 +70,82 @@ func (gw *Gateway) validateMCP(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		// REST-as-MCP: when the proxy's upstream points at a synthetic
+		// adapter, verify the pairing is safe before accepting the
+		// proxy into storage. These checks are belt-and-braces with the
+		// runtime check in MCPLoopAuthBypass.
+		if errMsg, errCode := gw.validatePairedMCPAdapterUpstream(r, mcpObj); errMsg != "" {
+			doJSONWrite(w, errCode, apiError(errMsg))
+			return
+		}
+
 		r.Body = ioutil.NopCloser(bytes.NewReader(reqBodyInBytes))
 		next.ServeHTTP(w, r)
 	}
+}
+
+// validatePairedMCPAdapterUpstream enforces REST-as-MCP admit-time
+// invariants when an MCP proxy targets a synthetic adapter via a
+// `tyk://<adapterAPIID>` upstream URL. Returns ("", 0) when the upstream
+// does not address an adapter (and is therefore out of scope here).
+//
+// Checks:
+//
+//  1. The named REST APISpec exists in apisByID.
+//  2. That REST spec has `server.mcp.enabled: true`.
+//  3. The REST spec and the incoming proxy share an OrgID.
+//  4. No other admitted proxy already targets the same adapter (1:1).
+func (gw *Gateway) validatePairedMCPAdapterUpstream(r *http.Request, mcpObj *oas.OAS) (string, int) {
+	if mcpObj == nil {
+		return "", 0
+	}
+	ext := mcpObj.GetTykExtension()
+	if ext == nil {
+		return "", 0
+	}
+
+	// Only OAS-described upstream is the operator-managed proxy's
+	// `upstream.url`; pull it from the underlying apidef shape.
+	var temp apidef.APIDefinition
+	mcpObj.ExtractTo(&temp)
+	target := temp.Proxy.TargetURL
+	if target == "" {
+		return "", 0
+	}
+	u, err := neturl.Parse(target)
+	if err != nil || u.Scheme != "tyk" {
+		return "", 0
+	}
+	adapterID := strings.TrimPrefix(u.Host, "id:")
+	if !oas.IsAdapterAPIID(adapterID) {
+		return "", 0
+	}
+	restAPIID := oas.AdapterSourceAPIID(adapterID)
+
+	gw.apisMu.RLock()
+	rest, ok := gw.apisByID[restAPIID]
+	gw.apisMu.RUnlock()
+	pairingClone := gw.mcpPairing.PairingSnapshot()
+
+	if !ok || rest == nil || rest.APIDefinition == nil {
+		return "Paired REST API " + restAPIID + " is not loaded; create it first", http.StatusBadRequest
+	}
+	if !rest.APIDefinition.IsMCPExposed() {
+		return "Paired REST API " + restAPIID + " is not marked server.mcp.enabled=true", http.StatusBadRequest
+	}
+	if rest.APIDefinition.OrgID != temp.OrgID {
+		return "Paired REST API belongs to a different OrgID", http.StatusForbidden
+	}
+
+	// 1:1 invariant — reject if another proxy already targets this
+	// adapter, unless the request is updating the same proxy that
+	// already holds the pairing.
+	if existing, paired := pairingClone[restAPIID]; paired && existing != temp.APIID {
+		return "Paired REST API is already exposed by MCP proxy " + existing, http.StatusConflict
+	}
+
+	_ = r // r is only used for context elsewhere; keep parameter for future audit-logging.
+	return "", 0
 }
 
 func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int) {
@@ -102,7 +177,14 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 	}
 
 	oasObj.ExtractTo(&newDef)
-	newDef.MarkAsMCP()
+	// Only mark as MCP (which wires the JSON-RPC middleware on this
+	// spec) when this is a classic remote-MCP proxy. REST-as-MCP
+	// proxies are plain reverse-proxies whose upstream loops into a
+	// synthetic adapter — the adapter owns the JSON-RPC chain, the
+	// proxy is just an authenticated/rate-limited forwarder.
+	if !newDef.IsPairedMCPAdapterProxy() {
+		newDef.MarkAsMCP()
+	}
 
 	if validationErr := validateAPIDef(&newDef); validationErr != nil {
 		return *validationErr, http.StatusBadRequest
@@ -151,7 +233,7 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 		return resp, code
 	}
 
-	if !spec.IsMCP() {
+	if !spec.IsMCPManaged() {
 		return apiError("API is not an MCP Proxy"), http.StatusNotFound
 	}
 
@@ -161,7 +243,10 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 	}
 
 	oasObj.ExtractTo(&newDef)
-	newDef.MarkAsMCP()
+	// See handleAddMCP for the rationale.
+	if !newDef.IsPairedMCPAdapterProxy() {
+		newDef.MarkAsMCP()
+	}
 
 	if validationErr := validateAPIDef(&newDef); validationErr != nil {
 		return *validationErr, http.StatusBadRequest
@@ -185,7 +270,7 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 }
 
 func (gw *Gateway) handleGetMCPListOAS() (interface{}, int) {
-	return gw.handleGetOASList((*APISpec).IsMCP, false)
+	return gw.handleGetOASList(mcpManaged, false)
 }
 
 func (gw *Gateway) mcpListHandler(w http.ResponseWriter, _ *http.Request) {
@@ -237,7 +322,7 @@ func (gw *Gateway) handleDeleteMCP(apiID string, fs afero.Fs) (interface{}, int)
 		return resp, code
 	}
 
-	if !spec.IsMCP() {
+	if !spec.IsMCPManaged() {
 		return apiError("API is not an MCP Proxy"), http.StatusNotFound
 	}
 

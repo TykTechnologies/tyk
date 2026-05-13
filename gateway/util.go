@@ -161,6 +161,24 @@ func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
 		return true
 	}
 
+	// MCP-exposed REST specs always reload so the paired synthetic
+	// adapter is rebuilt from the latest OAS. Without this, edits to
+	// the source OAS that don't perturb the classic-apidef checksum
+	// (e.g. adding an operation) would be invisible to tools/list until
+	// a process restart.
+	if newSpec.APIDefinition != nil && newSpec.IsMCPExposed() {
+		return true
+	}
+
+	// Synthetic MCP adapter specs are rebuilt fresh by
+	// synthesiseMCPAdapters on every loadApps. The new APISpec pointer
+	// must own its own ChainObject (it carries fresh DerivedTools); the
+	// checksum-based fast-path would otherwise keep the previous chain
+	// and serve stale tools.
+	if newSpec.IsSyntheticMCPAdapter {
+		return true
+	}
+
 	if newSpec.hasVirtualEndpoint() {
 		return true
 	}
