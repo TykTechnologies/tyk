@@ -92,3 +92,10 @@ ci/tests/specs/policies
 # unknown json files
 /gateway/test.json
 /gateway/child-v1.json
+
+# Local-only MCP design notes (not part of this PR)
+/RFC-API-TO-MCP-V9-three-layer.md
+/docs/mcp-rest-as-mcp.md
+/docs/mcp-rest-as-mcp.ipynb
+/report.md
+/exampleOas.yaml
