@@ -97,14 +97,14 @@ func TestAdapterAPIIDHelpers(t *testing.T) {
 
 	rest := "abc123"
 	adapter := AdapterAPIID(rest)
-	assert.Equal(t, "abc123__mcp-adapter", adapter)
+	assert.Equal(t, "abc123__mcp-server", adapter)
 	assert.True(t, IsAdapterAPIID(adapter))
 	assert.False(t, IsAdapterAPIID(rest))
 	assert.False(t, IsAdapterAPIID(AdapterAPIIDSuffix))
 	assert.Equal(t, rest, AdapterSourceAPIID(adapter))
 	assert.Equal(t, "", AdapterSourceAPIID(rest))
-	assert.Equal(t, "abc123__mcp-adapter", AdapterLoopHost(rest))
-	assert.Equal(t, "tyk://abc123__mcp-adapter", AdapterLoopURL(rest))
+	assert.Equal(t, "abc123__mcp-server", AdapterLoopHost(rest))
+	assert.Equal(t, "tyk://abc123__mcp-server", AdapterLoopURL(rest))
 }
 
 func makeTestOAS(t *testing.T) *OAS {

@@ -1477,7 +1477,7 @@ const (
 // reads Enabled and synthesises a paired Internal adapter spec at load time.
 type MCPExposureConfig struct {
 	// Enabled marks this REST API as MCP-callable. The loader emits a paired
-	// adapter spec with APIID "<this-apiid>__mcp-adapter".
+	// adapter spec with APIID "<this-apiid>__mcp-server".
 	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
 	// Curation selects which operations become tools. Empty defaults to
 	// MCPCurationExposeAll.
@@ -1491,7 +1491,7 @@ func (a *APIDefinition) IsMCPExposed() bool {
 
 // IsPairedMCPAdapterProxy returns true if this API is a REST-as-MCP proxy
 // whose upstream loops into a synthetic adapter — recognised by a
-// `tyk://<rest-id>__mcp-adapter` upstream URL.
+// `tyk://<rest-id>__mcp-server` upstream URL.
 //
 // REST-as-MCP proxies are *not* IsMCP() (the JSON-RPC middleware lives on
 // the adapter, not on the proxy itself), but they belong to the MCP
@@ -1511,7 +1511,7 @@ func (a *APIDefinition) IsPairedMCPAdapterProxy() bool {
 		host = host[:i]
 	}
 	host = strings.TrimPrefix(host, "id:")
-	const adapterSuffix = "__mcp-adapter"
+	const adapterSuffix = "__mcp-server"
 	return strings.HasSuffix(host, adapterSuffix) && len(host) > len(adapterSuffix)
 }
 

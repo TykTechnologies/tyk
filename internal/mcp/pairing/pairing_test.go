@@ -12,7 +12,7 @@ func TestIndex_SetAndLookup(t *testing.T) {
 	idx := New()
 	idx.Set(
 		map[string]string{"rest-1": "proxy-1"},
-		map[string]string{"rest-1": "rest-1__mcp-adapter"},
+		map[string]string{"rest-1": "rest-1__mcp-server"},
 	)
 
 	proxy, ok := idx.ProxyForREST("rest-1")
@@ -21,7 +21,7 @@ func TestIndex_SetAndLookup(t *testing.T) {
 
 	adapter, ok := idx.AdapterForREST("rest-1")
 	assert.True(t, ok)
-	assert.Equal(t, "rest-1__mcp-adapter", adapter)
+	assert.Equal(t, "rest-1__mcp-server", adapter)
 
 	_, ok = idx.ProxyForREST("missing")
 	assert.False(t, ok)

@@ -797,7 +797,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (gw *Gateway) findInternalHttpHandlerByNameOrID(apiNameOrID string) (handler http.Handler, targetAPI *APISpec, ok bool) {
 	// `id:<APIID>` forces an exact APIID match, bypassing fuzzy name
 	// resolution. This is required to address the synthetic MCP adapter
-	// (whose ID has the `__mcp-adapter` suffix) without collision risk
+	// (whose ID has the `__mcp-server` suffix) without collision risk
 	// against APIs whose Name happens to look similar.
 	if strings.HasPrefix(apiNameOrID, "id:") {
 		exactID := strings.TrimPrefix(apiNameOrID, "id:")

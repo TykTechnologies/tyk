@@ -46,7 +46,7 @@ x-tyk-api-gateway:
 The REST API is **not** marked `IsMCP()`. It still serves REST traffic on its existing listenPath under its existing chain. The `mcp` block is a marker that tells the loader to synthesise a paired adapter.
 
 **Layer B — MCP Adapter (synthetic, in-memory, Internal).** When `loadApps` sees `mcp.enabled: true` on a loaded REST APISpec, it constructs and registers a paired APISpec entirely in memory:
-- Deterministic API ID: `<rest-apiid>__mcp-adapter`.
+- Deterministic API ID: `<rest-apiid>__mcp-server`.
 - `Internal: true` (skipped by the public muxer per `gateway/api_loader.go:196`).
 - Chain: `JSONRPCMiddleware` (existing) followed by a new `MCPAdapterMiddleware` that handles `initialize`, `ping`, `tools/list`, and `tools/call` inline (no per-tool VEMs).
 - Holds `Middleware.McpTools` populated by `oas.DeriveSourceTools` (`apidef/oas/mcp_proxy_derive.go:42`) from the REST API's OAS, filtered by curation.
@@ -65,14 +65,14 @@ x-tyk-api-gateway:
     global:
       rate_limit: { rate: 10, per: 1 }
   upstream:
-    url: tyk://id:7da15d555e0346975780a6bc28a37d67__mcp-adapter
+    url: tyk://id:7da15d555e0346975780a6bc28a37d67__mcp-server
 ```
-The `mcpCreateHandler` admit path calls `MarkAsMCP()` (`apidef/api_definitions.go:1457`), so `IsMCP()` returns true and `JSONRPCMiddleware` is wired into the chain via the existing gate at `gateway/mw_jsonrpc.go:61`. The proxy holds **all** agent-side concerns: authentication scheme, rate limits, quotas, observability tags. Its upstream is the synthetic adapter via `tyk://id:<X>__mcp-adapter`.
+The `mcpCreateHandler` admit path calls `MarkAsMCP()` (`apidef/api_definitions.go:1457`), so `IsMCP()` returns true and `JSONRPCMiddleware` is wired into the chain via the existing gate at `gateway/mw_jsonrpc.go:61`. The proxy holds **all** agent-side concerns: authentication scheme, rate limits, quotas, observability tags. Its upstream is the synthetic adapter via `tyk://id:<X>__mcp-server`.
 
 **Request flow for `tools/call`:**
 
 1. Agent → `POST /mcp/orders/` with JSON-RPC envelope and Tyk key. Proxy chain runs unchanged: auth middleware authenticates, rate-limit/quota middleware enforce agent-side limits, session lands in request context.
-2. Proxy reverse-proxies the JSON-RPC envelope to `tyk://id:<X>__mcp-adapter`. The loop primitive at `gateway/api_loader.go:715` dispatches into the adapter's chain.
+2. Proxy reverse-proxies the JSON-RPC envelope to `tyk://id:<X>__mcp-server`. The loop primitive at `gateway/api_loader.go:715` dispatches into the adapter's chain.
 3. Adapter's `JSONRPCMiddleware` parses the envelope; `MCPAdapterMiddleware` resolves the tool by name from `Middleware.McpTools`, expands `arguments` into path / query / header / body per the tool's `ParamLocations`, builds an HTTP request matching the source operation, sets a new context flag `httpctx.SetMCPLoopFromPairedProxy(req, callerProxyAPIID)`, and loops to `tyk://id:<rest-apiid>`.
 4. REST chain runs. A new tiny middleware `MCPLoopAuthBypass` is inserted at the top of the auth band (`gateway/api_loader.go:367-528`). It reads the trust flag; if present and `gw.mcpPairing[restAPIID] == callerProxyAPIID`, it marks the request as session-pre-authorised and skips credential validation. If the flag is present but pairing does not match, it returns 403 (defence-in-depth forgery catch). If the flag is absent, normal auth runs (REST clients are unaffected).
 5. Rate-limit, quota, validation, transforms, plugins, post-plugins, upstream all run normally with the proxy's session in context. Rate limits stack: agent-facing at the proxy, server-facing on the REST chain (lower of the two effectively governs; see §2.3 for the session-shape nuance).
@@ -96,7 +96,7 @@ The `mcpCreateHandler` admit path calls `MarkAsMCP()` (`apidef/api_definitions.g
 - **Session-shape coupling between proxy and REST API.** Tyk rate limits are session-keyed; a session minted by the proxy carries `access_rights[proxyAPIID]` but not necessarily `access_rights[restAPIID]`. Three sub-cases (documented in §4.3): (a) policy grants both → both per-API limits stack; (b) policy grants only the proxy → REST falls back to its global limit if set, otherwise no REST-side limit; (c) operator wants only the proxy to govern → leave the REST global limit unset and grant only the proxy. Surprising for operators new to MCP. **Mitigation:** documentation; example policies for both single-tier and stacked configurations.
 - **`tools/call` returning a 4xx/5xx from the REST chain becomes an MCP `isError: true` envelope.** Surprising if the proxy's rate limit is loose and the REST API's rate limit is tight — agent gets MCP-shaped 429s instead of HTTP-shaped ones. **Mitigation:** documentation guides operators to set proxy limits ≤ REST limits in normal cases; the JSON-RPC error code field (`error.code`) carries the original HTTP status for clients that want to disambiguate.
 - **Streaming or large REST responses.** MCP's single-shot `result.content` envelope cannot represent chunked HTTP responses well. **Mitigation:** v1 buffers; payloads above a configured threshold get a `_meta.truncated: true` tag. Streaming MCP responses (server-sent events) are a v2 concern.
-- **`fuzzyFindAPI` host disambiguation.** `tyk://<host>` resolution at `gateway/api_loader.go:723-739` matches on name *or* APIID. To address the synthetic adapter unambiguously we adopt the convention `tyk://id:<X>__mcp-adapter` and add an exact-match branch that fires when the host has the `id:` prefix, falling back to fuzzy matching otherwise. **Mitigation:** trivial code change, exhaustive test for collision cases.
+- **`fuzzyFindAPI` host disambiguation.** `tyk://<host>` resolution at `gateway/api_loader.go:723-739` matches on name *or* APIID. To address the synthetic adapter unambiguously we adopt the convention `tyk://id:<X>__mcp-server` and add an exact-match branch that fires when the host has the `id:` prefix, falling back to fuzzy matching otherwise. **Mitigation:** trivial code change, exhaustive test for collision cases.
 
 ### 2.4. Alternatives Considered
 
@@ -125,14 +125,14 @@ The `mcpCreateHandler` admit path calls `MarkAsMCP()` (`apidef/api_definitions.g
 | `gateway/api_definition.go:1789` (`extractMCPPrimitivesToPaths`) | When the spec is the synthetic adapter, call `DeriveSourceTools` against the source REST OAS and populate `Middleware.McpTools` in memory before `ExtractPrimitivesToExtendedPaths` runs. |
 | `gateway/api_definition.go:1835` (`initMCPConfiguration`) | Construct `JSONRPCRouter` for the adapter as today; existing call site at line 1841 already does this for `IsMCP()` specs. |
 | `gateway/api_definition.go:2497` (`populateMCPPrimitivesMap`) | No change. Already keys off `Middleware.McpTools`; runs naturally for the synthetic adapter. |
-| `gateway/api_loader.go` (new function `synthesiseMCPAdapter`) | After the public-spec load loop in `loadApps`, walk loaded REST specs whose OAS sets `mcp.enabled: true` and synthesise the paired adapter spec. Register it in `gw.apisByID` and `gw.apisHandlesByID` with `Internal: true`. ID format: `<rest-apiid>__mcp-adapter`. |
+| `gateway/api_loader.go` (new function `synthesiseMCPAdapter`) | After the public-spec load loop in `loadApps`, walk loaded REST specs whose OAS sets `mcp.enabled: true` and synthesise the paired adapter spec. Register it in `gw.apisByID` and `gw.apisHandlesByID` with `Internal: true`. ID format: `<rest-apiid>__mcp-server`. |
 | `gateway/api_loader.go:715` (loop primitive) | No change. Add only an exact-match branch in `findInternalHttpHandlerByNameOrID` (`:791`) that fires when host has `id:` prefix to avoid `fuzzyFindAPI` name-collision risk. |
 | `gateway/api_loader.go:367-528` (auth band) | Insert a new tiny middleware `MCPLoopAuthBypass` at the top of the band. ~30 LOC; only active on REST APIs marked `mcp.enabled: true`. |
 | `gateway/mw_mcp_loop_auth_bypass.go` (new file) | New middleware. Reads `httpctx.GetMCPLoopFromPairedProxy(req)`; if absent → next. If present, look up `gw.mcpPairing[thisRESTAPIID]`; if it equals `callerProxyAPIID` → mark session-pre-authorised, return next. If mismatch → 403. |
 | `gateway/mw_jsonrpc.go:61` (`EnabledForSpec`) | No change to the gate. Inside `ProcessRequest` (line 161) inline-handle `initialize`, `ping`, `tools/list` for adapter specs (synthetic responses); leave `tools/call` to dispatch through `MCPAdapterMiddleware`. |
 | `gateway/mw_mcp_adapter.go` (new file) | New middleware. For `tools/call`: resolve tool by name from `spec.Middleware.McpTools`, expand arguments per `ParamLocations`, build HTTP request, set `httpctx.SetMCPLoopFromPairedProxy(newReq, callerProxyAPIID, restAPIID)`, set `newReq.URL = tyk://id:<rest-apiid>`, dispatch via existing loop. Wrap response as MCP `result` envelope. |
 | `gateway/mcp_proxy_catalogue.go` (current PoC, 125 lines) | **Delete.** References non-existent `oas.MCPProxy` symbol. Its responsibility is replaced by `synthesiseMCPAdapter`. |
-| `gateway/mcp_api.go:43` (`validateMCP`) | Extend admit-time validation: when proxy `upstream.url` is `tyk://id:<X>__mcp-adapter`, verify (a) REST APISpec `<X>` exists in the org, (b) it has `mcp.enabled: true`, (c) no other proxy in the org targets the same adapter (1:1 invariant), (d) OrgID match. |
+| `gateway/mcp_api.go:43` (`validateMCP`) | Extend admit-time validation: when proxy `upstream.url` is `tyk://id:<X>__mcp-server`, verify (a) REST APISpec `<X>` exists in the org, (b) it has `mcp.enabled: true`, (c) no other proxy in the org targets the same adapter (1:1 invariant), (d) OrgID match. |
 | `gateway/server.go:916-920` (`/tyk/mcps` routes) | No change. Existing CRUD handles the proxy. |
 | `gateway/server.go:1385-1393` (`syncResourcesWithReload`) | No change. The marker on the REST API and the `IsMCP()` flag on the proxy do not introduce new resource kinds. |
 | `gateway/gateway.go` (Gateway struct) | Add `mcpPairing map[string]string` (restAPIID → proxyAPIID) and `mcpAdapter map[string]string` (restAPIID → adapterAPIID). Rebuilt in full on every `loadApps` after specs are loaded. |
@@ -190,7 +190,7 @@ Breakdown:
 
 ### 4.3. Training/Documentation Needs
 
-- New operator guide: "Expose a Tyk-managed REST API as MCP." Includes the two-file YAML walkthrough, the `tyk://id:<X>__mcp-adapter` convention, agent-client configuration examples (Claude Desktop, Cursor).
+- New operator guide: "Expose a Tyk-managed REST API as MCP." Includes the two-file YAML walkthrough, the `tyk://id:<X>__mcp-server` convention, agent-client configuration examples (Claude Desktop, Cursor).
 - Rate-limit guide: explicit documentation of the three sub-cases (proxy-only, REST-global fallback, stacked) with example session policies for each.
 - Security guide: explanation of the paired-proxy trust model, what `MCPLoopAuthBypass` does, what the pairing-index check protects against.
 - Existing PoC documentation (`docs/mcp-proxy-poc.md`) is **deprecated** and should be replaced wholesale.

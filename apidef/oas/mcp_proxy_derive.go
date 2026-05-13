@@ -342,8 +342,8 @@ func schemaType(s *openapi3.Schema) string {
 
 // AdapterAPIIDSuffix is the deterministic suffix appended to the source
 // REST APIID to form the synthetic adapter APIID, e.g.
-// "abc123" -> "abc123__mcp-adapter".
-const AdapterAPIIDSuffix = "__mcp-adapter"
+// "abc123" -> "abc123__mcp-server".
+const AdapterAPIIDSuffix = "__mcp-server"
 
 // AdapterAPIID returns the deterministic APIID for the synthetic adapter
 // paired with the given REST API.
@@ -368,7 +368,7 @@ func AdapterSourceAPIID(id string) string {
 
 // AdapterLoopHost returns the host portion of the tyk:// URL used by an
 // MCP proxy to address its paired adapter unambiguously, e.g.
-// "abc123__mcp-adapter". The deterministic AdapterAPIIDSuffix ensures
+// "abc123__mcp-server". The deterministic AdapterAPIIDSuffix ensures
 // exact-APIID matching in the gateway's loopback resolver wins before
 // any fuzzy name-based match could collide.
 func AdapterLoopHost(restAPIID string) string {

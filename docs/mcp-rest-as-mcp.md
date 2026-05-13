@@ -88,10 +88,10 @@ x-tyk-api-gateway:
     global:
       rate_limit: { rate: 10, per: 1 }
   upstream:
-    url: tyk://<rest-api-id>__mcp-adapter
+    url: tyk://<rest-api-id>__mcp-server
 ```
 
-The `tyk://<rest-api-id>__mcp-adapter` host is the deterministic
+The `tyk://<rest-api-id>__mcp-server` host is the deterministic
 synthetic adapter ID. Note: `/tyk/mcps` is the unified management
 endpoint for both classic remote-MCP proxies (which are marked
 `IsMCP()` and run their own JSON-RPC chain) and REST-as-MCP proxies

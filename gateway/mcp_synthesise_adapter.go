@@ -14,14 +14,14 @@ import (
 // synthesised adapter spec. Adapter specs are Internal so this path is
 // never reachable from the public muxer; the prefix is only there to
 // satisfy listen-path validation in loadHTTPService.
-const mcpAdapterListenPathPrefix = "/__tyk-mcp-adapter/"
+const mcpAdapterListenPathPrefix = "/__tyk-mcp-server/"
 
 // synthesiseMCPAdapters walks the loaded REST APISpec set and, for every
 // spec whose OAS marker `server.mcp.enabled: true` is set, emits a paired
 // Internal adapter APISpec into tmpSpecRegister and tmpSpecHandles.
 //
 // Adapter specs:
-//   - have deterministic APIID `<rest-apiid>__mcp-adapter`
+//   - have deterministic APIID `<rest-apiid>__mcp-server`
 //   - inherit OrgID from the source REST spec (multi-tenant safety)
 //   - are Internal:true (skipped by the public muxer per api_loader.go:196)
 //   - are MarkedAsMCP() so JSONRPCMiddleware wires into the chain
