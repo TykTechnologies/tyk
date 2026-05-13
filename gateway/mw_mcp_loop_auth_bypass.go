@@ -33,6 +33,11 @@ type MCPLoopAuthBypass struct {
 	// Pairing is the lookup the middleware consults. If nil at chain
 	// build time, ProcessRequest falls back to m.Gw.mcpPairing.
 	Pairing pairing.Lookup
+
+	// AdapterPairing is the adapter lookup the middleware consults. If nil,
+	// ProcessRequest uses Pairing when it also implements pairing.AdapterLookup,
+	// then falls back to m.Gw.mcpPairing.
+	AdapterPairing pairing.AdapterLookup
 }
 
 // Name returns the middleware name.
@@ -66,14 +71,33 @@ func (m *MCPLoopAuthBypass) ProcessRequest(_ http.ResponseWriter, r *http.Reques
 		lookup = m.Gw.mcpPairing
 	}
 
+	adapterLookup := m.AdapterPairing
+	if adapterLookup == nil {
+		if typed, ok := lookup.(pairing.AdapterLookup); ok {
+			adapterLookup = typed
+		}
+	}
+	if adapterLookup == nil && m.Gw != nil {
+		adapterLookup = m.Gw.mcpPairing
+	}
+
 	expectedProxy, paired := lookup.ProxyForREST(m.Spec.APIID)
-	if !paired || expectedProxy != trust.ProxyAPIID {
+	expectedAdapter, adapterPaired := "", false
+	if adapterLookup != nil {
+		expectedAdapter, adapterPaired = adapterLookup.AdapterForREST(m.Spec.APIID)
+	}
+	if trust.RESTAPIID != m.Spec.APIID ||
+		!paired || expectedProxy != trust.ProxyAPIID ||
+		!adapterPaired || expectedAdapter != trust.AdapterAPIID {
 		m.Logger().WithFields(map[string]interface{}{
-			"rest_api_id":     m.Spec.APIID,
-			"flag_proxy_id":   trust.ProxyAPIID,
-			"flag_adapter_id": trust.AdapterAPIID,
-			"expected_proxy":  expectedProxy,
-			"is_paired":       paired,
+			"rest_api_id":       m.Spec.APIID,
+			"flag_rest_api_id":  trust.RESTAPIID,
+			"flag_proxy_id":     trust.ProxyAPIID,
+			"flag_adapter_id":   trust.AdapterAPIID,
+			"expected_proxy":    expectedProxy,
+			"expected_adapter":  expectedAdapter,
+			"is_paired":         paired,
+			"is_adapter_paired": adapterPaired,
 		}).Warn("MCPLoopAuthBypass: trust descriptor pairing mismatch — rejecting")
 		return errMCPLoopForgery, http.StatusForbidden
 	}
@@ -83,6 +107,8 @@ func (m *MCPLoopAuthBypass) ProcessRequest(_ http.ResponseWriter, r *http.Reques
 	// hashKey rather than dereferencing config.Global() — keeps unit
 	// tests free of global-config setup.
 	ctx.SetSession(r, session, false, false, false)
+	httpctx.SetMCPLoopPreAuthorized(r, true)
+	ctxSetRequestStatus(r, StatusOkAndIgnore)
 
 	return nil, http.StatusOK
 }

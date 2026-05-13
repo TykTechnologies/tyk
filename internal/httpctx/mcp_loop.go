@@ -1,6 +1,7 @@
 package httpctx
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/ctx"
@@ -29,6 +30,14 @@ type MCPLoopTrust struct {
 
 var mcpLoopTrustValue = NewValue[*MCPLoopTrust](ctx.MCPLoopFromPairedProxy)
 
+type mcpLoopPreAuthorizedKey struct{}
+
+var mcpLoopPreAuthorizedValue = NewValue[bool](mcpLoopPreAuthorizedKey{})
+
+type mcpProxyCallerAPIIDKey struct{}
+
+var mcpProxyCallerAPIIDValue = NewValue[string](mcpProxyCallerAPIIDKey{})
+
 // SetMCPLoopFromPairedProxy stamps the trust descriptor on a request
 // that an adapter middleware is about to dispatch through the loop
 // primitive. Pass nil to clear.
@@ -41,4 +50,45 @@ func SetMCPLoopFromPairedProxy(r *http.Request, trust *MCPLoopTrust) {
 // loop.
 func GetMCPLoopFromPairedProxy(r *http.Request) *MCPLoopTrust {
 	return mcpLoopTrustValue.Get(r)
+}
+
+// SetMCPLoopPreAuthorized marks a request whose in-process MCP loop trust
+// descriptor was validated by gateway middleware.
+func SetMCPLoopPreAuthorized(r *http.Request, preAuthorized bool) {
+	mcpLoopPreAuthorizedValue.Set(r, preAuthorized)
+}
+
+// IsMCPLoopPreAuthorized reports whether the MCP loop trust descriptor on the
+// request has been validated by gateway middleware.
+func IsMCPLoopPreAuthorized(r *http.Request) bool {
+	return mcpLoopPreAuthorizedValue.Get(r)
+}
+
+// SetMCPProxyCallerAPIID stores the proxy APIID that internally called a
+// synthetic REST-as-MCP adapter.
+func SetMCPProxyCallerAPIID(r *http.Request, proxyAPIID string) {
+	mcpProxyCallerAPIIDValue.Set(r, proxyAPIID)
+}
+
+// GetMCPProxyCallerAPIID returns the proxy APIID that internally called a
+// synthetic REST-as-MCP adapter.
+func GetMCPProxyCallerAPIID(r *http.Request) string {
+	return mcpProxyCallerAPIIDValue.Get(r)
+}
+
+// ContextWithMCPProxyCallerAPIID returns a context carrying the proxy APIID
+// that internally called a synthetic REST-as-MCP adapter.
+func ContextWithMCPProxyCallerAPIID(parent context.Context, proxyAPIID string) context.Context {
+	return context.WithValue(parent, mcpProxyCallerAPIIDKey{}, proxyAPIID)
+}
+
+// MCPProxyCallerAPIIDFromContext returns the proxy APIID that internally called
+// a synthetic REST-as-MCP adapter.
+func MCPProxyCallerAPIIDFromContext(parent context.Context) string {
+	if val := parent.Value(mcpProxyCallerAPIIDKey{}); val != nil {
+		if proxyAPIID, ok := val.(string); ok {
+			return proxyAPIID
+		}
+	}
+	return ""
 }

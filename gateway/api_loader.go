@@ -526,6 +526,8 @@ func (gw *Gateway) processSpec(
 		gw.mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid.Copy()})
 	}
 
+	gw.mwAppendEnabled(&chainArray, &MCPLoopAuthRestore{BaseMiddleware: baseMid.Copy()})
+
 	if spec.IsMCP() {
 		gw.mwAppendEnabled(&chainArray, &JSONRPCAccessControlMiddleware{baseMid.Copy()})
 		gw.mwAppendEnabled(&chainArray, &MCPAccessControlMiddleware{baseMid.Copy()})
@@ -767,7 +769,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if d.SH.Spec.target.Scheme == "tyk" {
-		handler, _, found := d.Gw.findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
+		handler, targetAPI, found := d.Gw.findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
 
 		if !found {
 			handler := ErrorHandler{d.SH.Base()}
@@ -787,6 +789,9 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		d.SH.Spec.SanitizeProxyPaths(r)
 		ctxSetInternalRedirectTarget(r, targetUrl)
 		ctxSetVersionInfo(r, nil)
+		if targetAPI != nil && targetAPI.IsSyntheticMCPAdapter && targetAPI.APIID == oas.AdapterAPIID(targetAPI.SourceRESTAPIID) {
+			httpctx.SetMCPProxyCallerAPIID(r, d.SH.Spec.APIID)
+		}
 		handler.ServeHTTP(w, r)
 		return
 	}

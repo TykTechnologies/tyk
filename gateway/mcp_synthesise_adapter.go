@@ -98,8 +98,8 @@ func (gw *Gateway) synthesiseMCPAdapters(
 //     defence in depth)
 //
 // The 1:1 invariant is enforced at admit time by validateMCP; this
-// rebuilder simply records the latest-wins pairing if it ever sees a
-// duplicate.
+// rebuilder treats duplicate proxy targets as ambiguous and records no
+// pairing for that REST API.
 func (gw *Gateway) rebuildMCPPairing(tmpSpecRegister map[string]*APISpec) {
 	pairingMap, adapterMap := computeMCPPairing(tmpSpecRegister)
 	gw.mcpPairing.Set(pairingMap, adapterMap)
@@ -111,6 +111,7 @@ func (gw *Gateway) rebuildMCPPairing(tmpSpecRegister map[string]*APISpec) {
 func computeMCPPairing(specs map[string]*APISpec) (pairing, adapter map[string]string) {
 	pairing = map[string]string{}
 	adapter = map[string]string{}
+	ambiguous := map[string]bool{}
 
 	for _, spec := range specs {
 		if spec == nil || spec.APIDefinition == nil {
@@ -140,6 +141,14 @@ func computeMCPPairing(specs map[string]*APISpec) (pairing, adapter map[string]s
 			continue
 		}
 		if rest.OrgID != spec.OrgID {
+			continue
+		}
+		if ambiguous[restID] {
+			continue
+		}
+		if existing, exists := pairing[restID]; exists && existing != spec.APIID {
+			delete(pairing, restID)
+			ambiguous[restID] = true
 			continue
 		}
 		pairing[restID] = spec.APIID
@@ -237,6 +246,13 @@ func (gw *Gateway) callMCPAdapterTool(ctx context.Context, spec *APISpec, tool *
 	proxyAPIID, paired := gw.mcpPairing.ProxyForREST(spec.SourceRESTAPIID)
 	if !paired {
 		return nil, fmt.Errorf("no MCP proxy paired with this REST API")
+	}
+	callerProxyAPIID := httpctx.MCPProxyCallerAPIIDFromContext(ctx)
+	if callerProxyAPIID == "" {
+		return nil, fmt.Errorf("caller proxy is not recorded for MCP adapter tool call")
+	}
+	if callerProxyAPIID != proxyAPIID {
+		return nil, fmt.Errorf("caller proxy %q does not match admitted paired proxy %q", callerProxyAPIID, proxyAPIID)
 	}
 
 	httpctx.SetMCPLoopFromPairedProxy(upstreamReq, &httpctx.MCPLoopTrust{

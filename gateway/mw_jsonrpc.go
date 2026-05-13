@@ -166,6 +166,19 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, http.StatusOK
 	}
 
+	// Synthetic MCP adapters are owned by the official Go MCP SDK streamable
+	// HTTP handler. Route the full transport surface before the generic
+	// JSON-RPC parser so GET streams and DELETE session closes work.
+	if m.Spec.IsSyntheticMCPAdapter {
+		if m.Spec.MCPSDKAdapter == nil {
+			http.Error(w, "MCP SDK adapter is not initialised", http.StatusInternalServerError)
+			return nil, middleware.StatusRespond
+		}
+		ensureMCPStreamableAccept(r)
+		m.Spec.MCPSDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(w, r)
+		return nil, middleware.StatusRespond
+	}
+
 	// Validate request type
 	if !m.validateJSONRPCRequest(r) {
 		return nil, http.StatusOK
@@ -176,20 +189,6 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		// Error response already written by readAndParseJSONRPC
 		return nil, middleware.StatusRespond //nolint:nilerr
-	}
-
-	// Synthetic MCP adapter short-circuit: initialize / ping / tools/list
-	// and tools/call are owned by the official Go MCP SDK server. The SDK
-	// handles MCP lifecycle, notifications, and JSON-RPC envelopes; the tool
-	// handler still loops into the paired REST API via Tyk internals.
-	if m.Spec.IsSyntheticMCPAdapter {
-		if m.Spec.MCPSDKAdapter == nil {
-			m.writeJSONRPCError(w, r, rpcReq.ID, mcp.JSONRPCInternalError, "MCP SDK adapter is not initialised", nil)
-			return nil, middleware.StatusRespond
-		}
-		ensureMCPStreamableAccept(r)
-		m.Spec.MCPSDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(w, r)
-		return nil, middleware.StatusRespond
 	}
 
 	// Route based on method
