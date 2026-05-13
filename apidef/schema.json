@@ -10,6 +10,21 @@
     "is_site": {
       "type": "boolean"
     },
+    "mcp_exposure": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "curation": {
+          "type": "string"
+        }
+      }
+    },
     "uptime_tests": {
       "type": [
         "object",
