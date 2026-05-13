@@ -1463,15 +1463,6 @@ func (a *APIDefinition) MarkAsMCP() {
 	a.SetProtocol(JsonRPC20, AppProtocolMCP)
 }
 
-// MCP curation modes for REST-as-MCP exposure.
-const (
-	// MCPCurationExposeAll exposes every operation in the source OAS as a tool.
-	MCPCurationExposeAll = "expose-all"
-	// MCPCurationStrictOptIn only exposes operations whose tool name appears in the
-	// Middleware.McpTools map on the OAS.
-	MCPCurationStrictOptIn = "strict-opt-in"
-)
-
 // MCPExposureConfig is the apidef-side persistence of the OAS
 // `server.mcp` marker. It does not itself wire any middleware — the loader
 // reads Enabled and synthesises a paired Internal adapter spec at load time.
@@ -1479,9 +1470,11 @@ type MCPExposureConfig struct {
 	// Enabled marks this REST API as MCP-callable. The loader emits a paired
 	// adapter spec with APIID "<this-apiid>__mcp-server".
 	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
-	// Curation selects which operations become tools. Empty defaults to
-	// MCPCurationExposeAll.
-	Curation string `bson:"curation,omitempty" json:"curation,omitempty"`
+	// Expose is an optional allow-list of sanitised operationIds. When nil
+	// or empty, every operation in the source OAS becomes a tool ("expose
+	// all" default). When non-empty, only operations whose sanitised
+	// operationId appears in the list are exposed.
+	Expose []string `bson:"expose,omitempty" json:"expose,omitempty"`
 }
 
 // IsMCPExposed returns true if the REST API is marked for MCP exposure.

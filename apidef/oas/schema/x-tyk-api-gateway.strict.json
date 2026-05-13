@@ -2716,12 +2716,9 @@
         "enabled": {
           "type": "boolean"
         },
-        "curation": {
-          "type": "string",
-          "enum": [
-            "expose-all",
-            "strict-opt-in"
-          ]
+        "expose": {
+          "type": "array",
+          "items": { "type": "string" }
         }
       },
       "required": [

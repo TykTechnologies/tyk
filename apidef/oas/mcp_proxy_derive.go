@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
-
-	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // DerivedTool is the runtime descriptor the adapter needs to translate
@@ -62,15 +60,21 @@ type DeriveWarning struct {
 // yield the same outputs. It is called fresh on every reload — no
 // snapshot is persisted.
 //
-// Curation rules:
-//   - If curation is empty or len(curation) == 0, every operation
-//     becomes a tool ("expose-all").
-//   - Otherwise, only operations whose sanitised name is present as a
-//     key in curation are exposed ("strict-opt-in").
+// Exposure rules:
+//   - If expose is nil or empty, every operation becomes a tool (default).
+//   - Otherwise, only operations whose sanitised name appears in expose
+//     are emitted.
 //
 // Tools are returned in deterministic (alphabetical-by-name) order so
 // reload-to-reload diffs are stable.
-func DeriveSourceTools(srcOAS *OAS, curation MCPPrimitives) ([]DerivedTool, []DeriveWarning, error) {
+func DeriveSourceTools(srcOAS *OAS, expose []string) ([]DerivedTool, []DeriveWarning, error) {
+	var exposeSet map[string]struct{}
+	if len(expose) > 0 {
+		exposeSet = make(map[string]struct{}, len(expose))
+		for _, name := range expose {
+			exposeSet[SanitizeToolName(name)] = struct{}{}
+		}
+	}
 	if srcOAS == nil {
 		return nil, nil, fmt.Errorf("source OAS is nil")
 	}
@@ -129,8 +133,10 @@ func DeriveSourceTools(srcOAS *OAS, curation MCPPrimitives) ([]DerivedTool, []De
 				continue
 			}
 
-			if !shouldExpose(name, curation) {
-				continue
+			if exposeSet != nil {
+				if _, ok := exposeSet[name]; !ok {
+					continue
+				}
 			}
 
 			seen[name] = true
@@ -182,14 +188,6 @@ func operationDescription(op *openapi3.Operation) string {
 		return op.Summary
 	}
 	return op.Description
-}
-
-func shouldExpose(name string, curation MCPPrimitives) bool {
-	if len(curation) == 0 {
-		return true
-	}
-	_, ok := curation[name]
-	return ok
 }
 
 var toolNameInvalid = regexp.MustCompile(`[^A-Za-z0-9_.-]`)
@@ -381,7 +379,3 @@ func AdapterLoopURL(restAPIID string) string {
 	return "tyk://" + AdapterLoopHost(restAPIID)
 }
 
-// _ ensures apidef is imported even if a build pares back DerivedTool's
-// users — DerivedTool is consumed by the gateway loader which uses
-// apidef.MCPCurationExposeAll etc.
-var _ = apidef.MCPCurationExposeAll

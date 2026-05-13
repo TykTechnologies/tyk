@@ -150,12 +150,7 @@ func (gw *Gateway) buildAdapterSpec(rest *APISpec) (*APISpec, error) {
 		return nil, fmt.Errorf("nil source REST spec")
 	}
 
-	var curation oas.MCPPrimitives
-	if ext := rest.OAS.GetTykExtension(); ext != nil && ext.Middleware != nil {
-		curation = ext.Middleware.McpTools
-	}
-
-	tools, warns, err := oas.DeriveSourceTools(&rest.OAS, curation)
+	tools, warns, err := oas.DeriveSourceTools(&rest.OAS, rest.APIDefinition.MCPExposure.Expose)
 	if err != nil {
 		return nil, fmt.Errorf("derive tools: %w", err)
 	}

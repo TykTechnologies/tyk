@@ -12,26 +12,26 @@ import "github.com/TykTechnologies/tyk/apidef"
 //
 // The actual MCP listener (auth, rate-limit, etc.) is a separate operator-
 // managed APIDef POSTed to /tyk/mcps whose upstream URL is
-// `tyk://id:<rest-apiid>__mcp-server`.
+// `tyk://<rest-apiid>__mcp-server`.
 type MCP struct {
 	// Enabled marks this REST API as MCP-callable.
 	Enabled bool `bson:"enabled" json:"enabled"`
 
-	// Curation selects which operations become tools.
-	// Allowed values: "expose-all" (default), "strict-opt-in".
-	// When "strict-opt-in", only operations whose sanitized operationId
-	// appears as a key in Middleware.McpTools are exposed.
-	Curation string `bson:"curation,omitempty" json:"curation,omitempty"`
+	// Expose is an optional allow-list of sanitised operationIds. When nil
+	// or empty, every operation in the source OAS becomes a tool ("expose
+	// all" default). When non-empty, only operations whose sanitised
+	// operationId appears in the list are exposed.
+	Expose []string `bson:"expose,omitempty" json:"expose,omitempty"`
 }
 
 // Fill fills *MCP from apidef.APIDefinition.
 func (m *MCP) Fill(api apidef.APIDefinition) {
 	m.Enabled = api.MCPExposure.Enabled
-	m.Curation = api.MCPExposure.Curation
+	m.Expose = api.MCPExposure.Expose
 }
 
 // ExtractTo extracts *MCP into *apidef.APIDefinition.
 func (m *MCP) ExtractTo(api *apidef.APIDefinition) {
 	api.MCPExposure.Enabled = m.Enabled
-	api.MCPExposure.Curation = m.Curation
+	api.MCPExposure.Expose = m.Expose
 }

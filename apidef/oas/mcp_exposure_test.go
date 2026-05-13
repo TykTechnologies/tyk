@@ -18,8 +18,8 @@ func TestMCP_FillExtractRoundTrip(t *testing.T) {
 		in   MCP
 	}{
 		{name: "default-empty", in: MCP{}},
-		{name: "enabled-expose-all", in: MCP{Enabled: true, Curation: "expose-all"}},
-		{name: "enabled-strict-opt-in", in: MCP{Enabled: true, Curation: "strict-opt-in"}},
+		{name: "enabled-expose-all", in: MCP{Enabled: true}},
+		{name: "enabled-with-expose-list", in: MCP{Enabled: true, Expose: []string{"getOrder", "createOrder"}}},
 	}
 
 	for _, tc := range cases {
@@ -42,14 +42,14 @@ func TestServer_MCPRoundTrip(t *testing.T) {
 	t.Parallel()
 
 	original := Server{
-		MCP: &MCP{Enabled: true, Curation: "strict-opt-in"},
+		MCP: &MCP{Enabled: true, Expose: []string{"getOrder"}},
 	}
 
 	var api apidef.APIDefinition
 	original.ExtractTo(&api)
 
 	assert.True(t, api.MCPExposure.Enabled)
-	assert.Equal(t, "strict-opt-in", api.MCPExposure.Curation)
+	assert.Equal(t, []string{"getOrder"}, api.MCPExposure.Expose)
 	assert.True(t, api.IsMCPExposed())
 
 	var got Server
@@ -62,7 +62,7 @@ func TestServer_MCPRoundTrip(t *testing.T) {
 func TestServer_MCPOmittedWhenDisabled(t *testing.T) {
 	t.Parallel()
 
-	// Disabled with no curation should round-trip to nil MCP so the
+	// Disabled with no expose list should round-trip to nil MCP so the
 	// omitempty marshalling keeps the OAS document clean.
 	original := Server{MCP: &MCP{}}
 
@@ -184,12 +184,10 @@ func TestDeriveSourceTools_ExposeAll(t *testing.T) {
 	assert.Equal(t, "body.amount", create.ParamLocations["amount"])
 }
 
-func TestDeriveSourceTools_StrictOptIn(t *testing.T) {
+func TestDeriveSourceTools_ExposeList(t *testing.T) {
 	t.Parallel()
 
-	curation := MCPPrimitives{"getOrder": &MCPPrimitive{}}
-
-	tools, _, err := DeriveSourceTools(makeTestOAS(t), curation)
+	tools, _, err := DeriveSourceTools(makeTestOAS(t), []string{"getOrder"})
 	require.NoError(t, err)
 	require.Len(t, tools, 1)
 	assert.Equal(t, "getOrder", tools[0].Name)

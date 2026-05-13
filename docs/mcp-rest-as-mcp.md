@@ -51,17 +51,16 @@ x-tyk-api-gateway:
           name: Authorization
     mcp:
       enabled: true
-      curation: expose-all    # or strict-opt-in
+      # expose: [getOrder, createOrder]   # optional allow-list of operationIds
   upstream:
     url: http://orders.internal:8080
 ```
 
-**Curation modes:**
+**Exposure:**
 
-- `expose-all` (default): every operation with an `operationId` becomes
-  a tool.
-- `strict-opt-in`: only operations whose sanitised name is listed under
-  `middleware.mcpTools` are exposed.
+- Default: every operation with an `operationId` becomes a tool.
+- Optional `expose` array: provide a whitelist of sanitised operationIds;
+  only operations whose name appears in `expose` are emitted.
 
 Apply the change (`PUT /tyk/apis/oas/<id>`). The gateway emits the
 paired adapter on the next reload. No further action on the REST API.

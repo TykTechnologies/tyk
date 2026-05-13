@@ -20,8 +20,12 @@
         "enabled": {
           "type": "boolean"
         },
-        "curation": {
-          "type": "string"
+        "expose": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": { "type": "string" }
         }
       }
     },
