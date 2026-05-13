@@ -46,7 +46,7 @@ func (m *MCPLoopAuthBypass) EnabledForSpec() bool {
 	if m.Spec == nil || m.Spec.APIDefinition == nil {
 		return false
 	}
-	return m.Spec.APIDefinition.IsMCPExposed()
+	return m.Spec.IsMCPExposed()
 }
 
 // ProcessRequest reads the trust descriptor and either short-circuits

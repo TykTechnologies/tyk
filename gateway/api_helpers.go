@@ -46,7 +46,7 @@ func mcpManaged(s *APISpec) bool {
 	if s.IsSyntheticMCPAdapter {
 		return false
 	}
-	return s.APIDefinition.IsMCPManaged()
+	return s.IsMCPManaged()
 }
 
 var (

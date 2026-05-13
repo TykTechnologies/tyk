@@ -130,10 +130,10 @@ func (gw *Gateway) validatePairedMCPAdapterUpstream(r *http.Request, mcpObj *oas
 	if !ok || rest == nil || rest.APIDefinition == nil {
 		return "Paired REST API " + restAPIID + " is not loaded; create it first", http.StatusBadRequest
 	}
-	if !rest.APIDefinition.IsMCPExposed() {
+	if !rest.IsMCPExposed() {
 		return "Paired REST API " + restAPIID + " is not marked server.mcp.enabled=true", http.StatusBadRequest
 	}
-	if rest.APIDefinition.OrgID != temp.OrgID {
+	if rest.OrgID != temp.OrgID {
 		return "Paired REST API belongs to a different OrgID", http.StatusForbidden
 	}
 

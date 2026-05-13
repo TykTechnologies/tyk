@@ -24,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
+	mcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
 
 	_ "github.com/TykTechnologies/tyk/internal/mcp" // registers MCP VEM prefixes
 )
@@ -124,6 +125,11 @@ type APISpec struct {
 	// REST OAS by oas.DeriveSourceTools at every loadApps. The adapter
 	// middleware uses it to translate `tools/call` into HTTP requests.
 	DerivedTools []oas.DerivedTool
+
+	// MCPSDKAdapter owns the long-lived SDK server for this synthetic adapter.
+	// It is reused across reloads so connected MCP clients can receive
+	// tools/list_changed notifications when DerivedTools changes.
+	MCPSDKAdapter *mcpadapter.SDKAdapter
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.

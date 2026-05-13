@@ -1,13 +1,17 @@
 package gateway
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	mcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
 )
 
 // mcpAdapterListenPathPrefix is the listen path stem given to every
@@ -41,13 +45,14 @@ func (gw *Gateway) synthesiseMCPAdapters(
 	gs *generalStores,
 	muxer *proxyMux,
 ) []*APISpec {
+
 	var synthesised []*APISpec
 
 	for _, rest := range specs {
 		if rest == nil || rest.APIDefinition == nil {
 			continue
 		}
-		if !rest.APIDefinition.IsMCPExposed() {
+		if !rest.IsMCPExposed() {
 			continue
 		}
 
@@ -150,7 +155,7 @@ func (gw *Gateway) buildAdapterSpec(rest *APISpec) (*APISpec, error) {
 		return nil, fmt.Errorf("nil source REST spec")
 	}
 
-	tools, warns, err := oas.DeriveSourceTools(&rest.OAS, rest.APIDefinition.MCPExposure.Expose)
+	tools, warns, err := oas.DeriveSourceTools(&rest.OAS, rest.MCPExposure.Expose)
 	if err != nil {
 		return nil, fmt.Errorf("derive tools: %w", err)
 	}
@@ -182,9 +187,70 @@ func (gw *Gateway) buildAdapterSpec(rest *APISpec) (*APISpec, error) {
 		GlobalConfig:          gw.GetConfig(),
 	}
 
+	sdkAdapter, err := gw.buildOrUpdateMCPSDKAdapter(adapter, tools)
+	if err != nil {
+		return nil, fmt.Errorf("build SDK adapter: %w", err)
+	}
+	adapter.MCPSDKAdapter = sdkAdapter
+
 	adapter.Health = &DefaultHealthChecker{Gw: gw, APIID: adapter.APIID}
 	adapter.AuthManager = &DefaultSessionManager{Gw: gw}
 	adapter.OrgSessionManager = &DefaultSessionManager{orgID: adapter.OrgID, Gw: gw}
 
 	return adapter, nil
+}
+
+func (gw *Gateway) buildOrUpdateMCPSDKAdapter(adapter *APISpec, tools []oas.DerivedTool) (*mcpadapter.SDKAdapter, error) {
+	var existing *mcpadapter.SDKAdapter
+	gw.apisMu.RLock()
+	if cur := gw.apisByID[adapter.APIID]; cur != nil {
+		existing = cur.MCPSDKAdapter
+	}
+	gw.apisMu.RUnlock()
+
+	if existing != nil {
+		return existing, existing.UpdateTools(tools)
+	}
+
+	return mcpadapter.NewSDKAdapter(mcpadapter.SDKServerConfig{
+		Name:  adapter.Name,
+		Tools: tools,
+		CallTool: func(ctx context.Context, tool *oas.DerivedTool, args map[string]any) (*mcpadapter.Recorder, error) {
+			return gw.callMCPAdapterTool(ctx, adapter, tool, args)
+		},
+	})
+}
+
+func (gw *Gateway) callMCPAdapterTool(ctx context.Context, spec *APISpec, tool *oas.DerivedTool, args map[string]any) (*mcpadapter.Recorder, error) {
+	parent, err := http.NewRequestWithContext(ctx, http.MethodPost, "/", nil)
+	if err != nil {
+		return nil, err
+	}
+	upstreamReq, err := mcpadapter.BuildUpstreamRequest(parent, tool, spec.SourceRESTAPIID, args)
+	if err != nil {
+		return nil, err
+	}
+
+	if gw.mcpPairing == nil {
+		return nil, fmt.Errorf("MCP pairing index is not initialised")
+	}
+	proxyAPIID, paired := gw.mcpPairing.ProxyForREST(spec.SourceRESTAPIID)
+	if !paired {
+		return nil, fmt.Errorf("no MCP proxy paired with this REST API")
+	}
+
+	httpctx.SetMCPLoopFromPairedProxy(upstreamReq, &httpctx.MCPLoopTrust{
+		ProxyAPIID:   proxyAPIID,
+		RESTAPIID:    spec.SourceRESTAPIID,
+		AdapterAPIID: spec.APIID,
+	})
+
+	handler, _, ok := gw.findInternalHttpHandlerByNameOrID(spec.SourceRESTAPIID)
+	if !ok {
+		return nil, fmt.Errorf("paired REST API handler not found")
+	}
+
+	rec := mcpadapter.NewRecorder()
+	handler.ServeHTTP(rec, upstreamReq)
+	return rec, nil
 }

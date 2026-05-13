@@ -18,6 +18,7 @@ import (
 
 const (
 	contentTypeJSON   = "application/json"
+	headerAccept      = "Accept"
 	headerContentType = "Content-Type"
 )
 
@@ -178,17 +179,16 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Synthetic MCP adapter short-circuit: initialize / ping / tools/list
-	// are answered inline from the derived tool catalogue. tools/call is
-	// translated into an HTTP request against the paired REST API via
-	// the tyk:// loop primitive. Neither path enters the VEM chain.
+	// and tools/call are owned by the official Go MCP SDK server. The SDK
+	// handles MCP lifecycle, notifications, and JSON-RPC envelopes; the tool
+	// handler still loops into the paired REST API via Tyk internals.
 	if m.Spec.IsSyntheticMCPAdapter {
-		if m.handleAdapterInline(w, r, rpcReq) {
+		if m.Spec.MCPSDKAdapter == nil {
+			m.writeJSONRPCError(w, r, rpcReq.ID, mcp.JSONRPCInternalError, "MCP SDK adapter is not initialised", nil)
 			return nil, middleware.StatusRespond
 		}
-		if m.Gw.handleAdapterToolsCall(w, r, m.Spec, rpcReq) {
-			return nil, middleware.StatusRespond
-		}
-		m.writeJSONRPCError(w, r, rpcReq.ID, mcp.JSONRPCMethodNotFound, "method not supported by MCP adapter", nil)
+		ensureMCPStreamableAccept(r)
+		m.Spec.MCPSDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(w, r)
 		return nil, middleware.StatusRespond
 	}
 
@@ -215,6 +215,16 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Return StatusOK to allow chain to continue to DummyProxyHandler, which will handle the redirect
 	return nil, http.StatusOK
+}
+
+func ensureMCPStreamableAccept(r *http.Request) {
+	accept := r.Header.Get(headerAccept)
+	required := []string{contentTypeJSON, "text/event-stream"}
+	for _, mediaType := range required {
+		if !strings.Contains(accept, mediaType) {
+			r.Header.Add(headerAccept, mediaType)
+		}
+	}
 }
 
 // writeJSONRPCError writes a JSON-RPC 2.0 error response.

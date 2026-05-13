@@ -811,7 +811,11 @@ func (gw *Gateway) findInternalHttpHandlerByNameOrID(apiNameOrID string) (handle
 		if !found {
 			return nil, nil, false
 		}
-		return h.(*ChainObject).ThisHandler, targetAPI, true
+		chain, ok := h.(*ChainObject)
+		if !ok || chain == nil {
+			return nil, nil, false
+		}
+		return chain.ThisHandler, targetAPI, true
 	}
 
 	targetAPI = gw.fuzzyFindAPI(apiNameOrID)
@@ -824,7 +828,11 @@ func (gw *Gateway) findInternalHttpHandlerByNameOrID(apiNameOrID string) (handle
 		return nil, nil, false
 	}
 
-	return h.(*ChainObject).ThisHandler, targetAPI, true
+	chain, ok := h.(*ChainObject)
+	if !ok || chain == nil {
+		return nil, nil, false
+	}
+	return chain.ThisHandler, targetAPI, true
 }
 
 func (gw *Gateway) loadGlobalApps() {
