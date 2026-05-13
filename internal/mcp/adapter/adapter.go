@@ -4,10 +4,10 @@
 // recorder used to wrap the looped REST response as an MCP
 // `result.content[]` envelope.
 //
-// The package is consumed by gateway/mw_mcp_adapter.go (a thin
-// chain-aware shim) and by the gateway's loader/synthesiser. Splitting
-// it out keeps the gateway package free of MCP protocol details and
-// makes the protocol-level logic independently testable.
+// The package is consumed by the gateway's loader/synthesiser and the
+// SDK-backed synthetic adapter. Splitting it out keeps the gateway package
+// free of MCP protocol details and makes the protocol-level logic
+// independently testable.
 package adapter
 
 import (
@@ -123,6 +123,7 @@ func BuildUpstreamRequest(
 	restAPIID string,
 	args map[string]any,
 ) (*http.Request, error) {
+
 	if tool == nil {
 		return nil, fmt.Errorf("nil tool")
 	}
@@ -266,17 +267,20 @@ func ToolResultEnvelope(rec *Recorder) map[string]any {
 
 // JSONRPCResult marshals a JSON-RPC 2.0 success envelope.
 func JSONRPCResult(id any, result any) []byte {
-	b, _ := json.Marshal(map[string]any{
+	b, err := json.Marshal(map[string]any{
 		"jsonrpc": apidef.JsonRPC20,
 		"id":      id,
 		"result":  result,
 	})
+	if err != nil {
+		return JSONRPCError(id, JSONRPCInternalError, err.Error())
+	}
 	return b
 }
 
 // JSONRPCError marshals a JSON-RPC 2.0 error envelope.
 func JSONRPCError(id any, code int, message string) []byte {
-	b, _ := json.Marshal(map[string]any{
+	b, err := json.Marshal(map[string]any{
 		"jsonrpc": apidef.JsonRPC20,
 		"id":      id,
 		"error": map[string]any{
@@ -284,6 +288,9 @@ func JSONRPCError(id any, code int, message string) []byte {
 			"message": message,
 		},
 	})
+	if err != nil {
+		return []byte(`{"jsonrpc":"2.0","error":{"code":-32603,"message":"internal error"},"id":null}`)
+	}
 	return b
 }
 
@@ -291,5 +298,7 @@ func JSONRPCError(id any, code int, message string) []byte {
 func WriteJSON(w http.ResponseWriter, body []byte) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(body)
+	if _, err := w.Write(body); err != nil {
+		return
+	}
 }

@@ -104,7 +104,8 @@ func TestBuildUpstreamRequest_BodyFields(t *testing.T) {
 	assert.Equal(t, "application/json", req.Header.Get("Content-Type"))
 
 	var b bytes.Buffer
-	_, _ = b.ReadFrom(req.Body)
+	_, err = b.ReadFrom(req.Body)
+	require.NoError(t, err)
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(b.Bytes(), &body))
 	assert.Equal(t, "ABC", body["sku"])
@@ -139,9 +140,11 @@ func TestRecorder_TruncationFlag(t *testing.T) {
 	t.Parallel()
 	rec := NewRecorder()
 	// Write just under and just over the cap.
-	rec.Write(bytes.Repeat([]byte("a"), BodyTruncationBytes-10))
+	_, err := rec.Write(bytes.Repeat([]byte("a"), BodyTruncationBytes-10))
+	require.NoError(t, err)
 	assert.False(t, rec.Truncated())
-	rec.Write(bytes.Repeat([]byte("b"), 100))
+	_, err = rec.Write(bytes.Repeat([]byte("b"), 100))
+	require.NoError(t, err)
 	assert.True(t, rec.Truncated())
 	assert.Equal(t, BodyTruncationBytes, len(rec.Body()))
 }
@@ -151,7 +154,8 @@ func TestRecorder_StatusAndContentType(t *testing.T) {
 	rec := NewRecorder()
 	rec.Header().Set("Content-Type", "application/json")
 	rec.WriteHeader(http.StatusTeapot)
-	rec.Write([]byte(`{"ok":true}`))
+	_, err := rec.Write([]byte(`{"ok":true}`))
+	require.NoError(t, err)
 
 	assert.Equal(t, http.StatusTeapot, rec.Status())
 	assert.Equal(t, "application/json", rec.ContentType())
@@ -163,7 +167,8 @@ func TestToolResultEnvelope(t *testing.T) {
 	rec := NewRecorder()
 	rec.Header().Set("Content-Type", "application/json")
 	rec.WriteHeader(http.StatusBadRequest)
-	rec.Write([]byte(`{"error":"x"}`))
+	_, err := rec.Write([]byte(`{"error":"x"}`))
+	require.NoError(t, err)
 
 	env := ToolResultEnvelope(rec)
 	assert.True(t, env["isError"].(bool))
@@ -177,7 +182,8 @@ func TestToolResultEnvelope(t *testing.T) {
 func TestToolResultEnvelope_Truncation(t *testing.T) {
 	t.Parallel()
 	rec := NewRecorder()
-	rec.Write(bytes.Repeat([]byte("x"), BodyTruncationBytes+1))
+	_, err := rec.Write(bytes.Repeat([]byte("x"), BodyTruncationBytes+1))
+	require.NoError(t, err)
 	env := ToolResultEnvelope(rec)
 	meta := env["_meta"].(map[string]any)
 	assert.Equal(t, true, meta["truncated"])

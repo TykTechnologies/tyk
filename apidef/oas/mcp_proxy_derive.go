@@ -104,11 +104,6 @@ func DeriveSourceTools(srcOAS *OAS, expose []string) ([]DerivedTool, []DeriveWar
 		}
 	}
 
-	type pathOp struct {
-		path string
-		item *openapi3.PathItem
-	}
-
 	pathKeys := make([]string, 0, len(srcOAS.Paths.Map()))
 	for k := range srcOAS.Paths.Map() {
 		pathKeys = append(pathKeys, k)
@@ -401,4 +396,3 @@ func AdapterLoopHost(restAPIID string) string {
 func AdapterLoopURL(restAPIID string) string {
 	return "tyk://" + AdapterLoopHost(restAPIID)
 }
-
