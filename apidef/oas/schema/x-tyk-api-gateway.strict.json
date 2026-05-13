@@ -1255,6 +1255,9 @@
         "enabled": {
           "type": "boolean"
         },
+        "prmMigratedToOAuth2": {
+          "type": "boolean"
+        },
         "stripAuthorizationData": {
           "type": "boolean"
         },

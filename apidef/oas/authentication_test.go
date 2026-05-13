@@ -968,3 +968,43 @@ func TestProtectedResourceMetadata_JSON(t *testing.T) {
 		assert.NotContains(t, raw, "scopesSupported")
 	})
 }
+
+func TestAuthentication_PRMMigratedToOAuth2_RoundTrip(t *testing.T) {
+	t.Parallel()
+
+	t.Run("survives marshal/unmarshal", func(t *testing.T) {
+		t.Parallel()
+		auth := &Authentication{PRMMigratedToOAuth2: true}
+
+		data, err := json.Marshal(auth)
+		assert.NoError(t, err)
+
+		var decoded Authentication
+		assert.NoError(t, json.Unmarshal(data, &decoded))
+		assert.True(t, decoded.PRMMigratedToOAuth2)
+	})
+
+	t.Run("omitted when zero", func(t *testing.T) {
+		t.Parallel()
+		auth := &Authentication{Enabled: true}
+
+		data, err := json.Marshal(auth)
+		assert.NoError(t, err)
+
+		var raw map[string]interface{}
+		assert.NoError(t, json.Unmarshal(data, &raw))
+		assert.NotContains(t, raw, "prmMigratedToOAuth2")
+	})
+
+	t.Run("forward-compat: unknown adjacent field is ignored", func(t *testing.T) {
+		t.Parallel()
+		// Simulates a newer dashboard writing a marker field that an
+		// older gateway has never seen.
+		payload := []byte(`{"enabled":true,"prmMigratedToOAuth2":true,"somethingNewerStillUnknownToUs":42}`)
+
+		var decoded Authentication
+		assert.NoError(t, json.Unmarshal(payload, &decoded))
+		assert.True(t, decoded.Enabled)
+		assert.True(t, decoded.PRMMigratedToOAuth2)
+	})
+}

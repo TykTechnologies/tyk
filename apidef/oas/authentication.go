@@ -99,6 +99,16 @@ type Authentication struct {
 	// authorization server to use for accessing the API.
 	ProtectedResourceMetadata *ProtectedResourceMetadata `bson:"protectedResourceMetadata,omitempty" json:"protectedResourceMetadata,omitempty"`
 
+	// PRMMigratedToOAuth2 is a dashboard-managed marker recording that
+	// the one-shot migration copying the deprecated top-level
+	// `protectedResourceMetadata` block into the new
+	// `securitySchemes[<name>].oauth2.protectedResourceMetadata` location
+	// has been applied to this API definition. The gateway ignores it;
+	// it exists solely to make the dashboard migration idempotent and
+	// to honour an operator who has deleted the new block (the marker
+	// prevents the migration from re-populating it on the next restart).
+	PRMMigratedToOAuth2 bool `bson:"prmMigratedToOAuth2,omitempty" json:"prmMigratedToOAuth2,omitempty"`
+
 	// CertificateAuth represents certificate-based authentication configuration.
 	CertificateAuth *CertificateAuth `bson:"certificateAuth,omitempty" json:"certificateAuth,omitempty"`
 }
