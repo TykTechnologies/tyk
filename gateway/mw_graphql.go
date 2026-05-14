@@ -233,6 +233,18 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	defer ctxSetGraphQLRequest(r, &gqlRequest)
+<<<<<<< HEAD
+=======
+	if conf := m.Gw.GetConfig(); conf.OpenTelemetry.Enabled && m.Spec.DetailedTracing && m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion2 {
+		ctx, span := m.Gw.TracerProvider.Tracer().Start(r.Context(), "GraphqlMiddleware Validation")
+		defer span.End()
+		*r = *r.WithContext(ctx)
+		return m.validateRequestWithOtel(r.Context(), w, &gqlRequest)
+	} else {
+		return m.validateRequest(w, &gqlRequest)
+	}
+}
+>>>>>>> 86b69f8de... [TT-11119] "Error socket hang up" for GQL proxy with OTel. (#5978)
 
 	normalizationResult, err := gqlRequest.Normalize(m.Spec.GraphQLExecutor.Schema)
 	if err != nil {
