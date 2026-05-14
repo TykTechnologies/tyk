@@ -72,7 +72,7 @@ func BenchmarkCache_MemoryLeak(b *testing.B) {
 		// We use a small string to avoid excessive allocation overhead from string formatting
 		// But we need unique keys.
 		cache.Set(string(rune(i)), nil)
-		
+
 		// Periodically yield to allow the cleanup goroutine to run
 		if i%1000 == 0 {
 			time.Sleep(1 * time.Millisecond)
@@ -122,7 +122,7 @@ func TestCache_MemoryLeak_GC(t *testing.T) {
 	// Verify memory was actually freed
 	freed := int64(m2.Alloc) - int64(m3.Alloc)
 	assert.True(t, freed > 0, "memory should be freed after GC")
-	
+
 	// Optional: Verify final memory is close to the baseline (allowing 2MB overhead)
 	assert.InDelta(t, float64(m1.Alloc), float64(m3.Alloc), float64(5*1024*1024), "memory should return close to baseline")
 }
