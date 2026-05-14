@@ -212,6 +212,11 @@ func TestToolResultEnvelope_Truncation(t *testing.T) {
 	env := ToolResultEnvelope(rec)
 	meta := env["_meta"].(map[string]any)
 	assert.Equal(t, true, meta["truncated"])
+	content := env["content"].([]any)[0].(map[string]any)
+	text := content["text"].(string)
+	assert.Contains(t, text, "Tyk truncated the upstream response")
+	assert.Contains(t, text, "The content below is incomplete.")
+	assert.True(t, strings.HasSuffix(text, strings.Repeat("x", BodyTruncationBytes)))
 }
 
 func TestJSONRPCResultRoundTrip(t *testing.T) {

@@ -25,9 +25,12 @@ import (
 
 // BodyTruncationBytes is the maximum size of an upstream response body
 // the adapter inlines into the MCP `result.content[]` envelope. Bodies
-// larger than this are truncated and the envelope is tagged
-// `_meta.truncated: true`.
+// larger than this are truncated, tagged `_meta.truncated: true`, and
+// prefixed with a visible notice in `content` so models do not treat
+// partial data as complete.
 const BodyTruncationBytes = 1 << 20 // 1 MiB
+
+const truncationNotice = "Tyk truncated the upstream response after 1048576 bytes. The content below is incomplete."
 
 // Method names the adapter answers inline. The mcp package does not
 // declare these as constants; they are spec-level identifiers.
@@ -263,11 +266,25 @@ func ToolResultEnvelope(rec *Recorder) map[string]any {
 	}
 	return map[string]any{
 		"content": []any{
-			map[string]any{"type": "text", "text": string(rec.Body())},
+			map[string]any{"type": "text", "text": ToolResultText(rec)},
 		},
 		"isError": rec.Status() >= 400,
 		"_meta":   meta,
 	}
+}
+
+// ToolResultText returns the text content exposed to the MCP client. When
+// the recorder truncated the upstream response, prepend a visible notice so
+// LLM-facing clients do not receive partial data as if it were complete.
+func ToolResultText(rec *Recorder) string {
+	body := string(rec.Body())
+	if !rec.Truncated() {
+		return body
+	}
+	if body == "" {
+		return truncationNotice
+	}
+	return truncationNotice + "\n\n" + body
 }
 
 // JSONRPCResult marshals a JSON-RPC 2.0 success envelope.

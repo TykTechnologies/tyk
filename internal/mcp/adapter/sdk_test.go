@@ -1,6 +1,7 @@
 package adapter
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -118,6 +119,22 @@ func TestNewSDKServer_CallToolDispatchesDerivedTool(t *testing.T) {
 	assert.Equal(t, "application/json", result.Meta["upstreamContentType"])
 	require.Len(t, result.Content, 1)
 	assert.Equal(t, `{"ok":true}`, result.Content[0].(*mcpsdk.TextContent).Text)
+}
+
+func TestSDKToolResult_TruncationNoticeIsVisible(t *testing.T) {
+	t.Parallel()
+
+	rec := NewRecorder()
+	rec.Header().Set("Content-Type", "application/json")
+	_, err := rec.Write(bytes.Repeat([]byte("{"), BodyTruncationBytes+1))
+	require.NoError(t, err)
+
+	result := SDKToolResult(rec)
+	assert.Equal(t, true, result.Meta["truncated"])
+	require.Len(t, result.Content, 1)
+	text := result.Content[0].(*mcpsdk.TextContent).Text
+	assert.Contains(t, text, "Tyk truncated the upstream response")
+	assert.Contains(t, text, "The content below is incomplete.")
 }
 
 func TestSDKAdapter_UpdateToolsAdvertisesAndEmitsListChanged(t *testing.T) {

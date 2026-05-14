@@ -237,7 +237,7 @@ func SDKToolResult(rec *Recorder) *mcpsdk.CallToolResult {
 	return &mcpsdk.CallToolResult{
 		Meta: meta,
 		Content: []mcpsdk.Content{
-			&mcpsdk.TextContent{Text: string(rec.Body())},
+			&mcpsdk.TextContent{Text: ToolResultText(rec)},
 		},
 		IsError: rec.Status() >= 400,
 	}
