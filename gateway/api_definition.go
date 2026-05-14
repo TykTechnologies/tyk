@@ -774,7 +774,7 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 		loader.ReadFromURIFunc = openapi3.ReadFromFile
 
 		var oasFilepath string
-		if def.IsMCP() {
+		if def.IsMCPManaged() {
 			oasFilepath = a.GetMCPFilepath(filePath)
 		} else {
 			oasFilepath = a.GetOASFilepath(filePath)

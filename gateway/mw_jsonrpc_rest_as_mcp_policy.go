@@ -24,6 +24,7 @@ type restAsMCPPolicyContext struct {
 	accessDef  user.AccessDefinition
 	hasAccess  bool
 	rpcReq     *JSONRPCRequest
+	route      jsonrpc.RouteResult
 	listConfig *mcp.ListFilterConfig
 }
 
@@ -53,7 +54,12 @@ func (m *JSONRPCMiddleware) prepareRESTAsMCPPolicy(w http.ResponseWriter, r *htt
 		return nil, false
 	}
 
-	policyCtx := &restAsMCPPolicyContext{rpcReq: rpcReq}
+	route, responded := m.routeSyntheticAdapterJSONRPC(w, r, rpcReq)
+	if responded {
+		return nil, true
+	}
+
+	policyCtx := &restAsMCPPolicyContext{rpcReq: rpcReq, route: route}
 	policyCtx.setJSONRPCState(r)
 
 	proxyAPIID := httpctx.GetMCPProxyCallerAPIID(r)
@@ -89,6 +95,21 @@ func (m *JSONRPCMiddleware) prepareRESTAsMCPPolicy(w http.ResponseWriter, r *htt
 	return policyCtx, false
 }
 
+func (m *JSONRPCMiddleware) routeSyntheticAdapterJSONRPC(w http.ResponseWriter, r *http.Request, rpcReq *JSONRPCRequest) (jsonrpc.RouteResult, bool) {
+	router := m.Spec.JSONRPCRouter
+	if router == nil {
+		router = mcp.NewRouter()
+	}
+
+	result, err := router.RouteMethod(rpcReq.Method, rpcReq.Params, m.Spec.MCPPrimitives)
+	if err != nil {
+		m.writeJSONRPCError(w, r, rpcReq.ID, mcp.JSONRPCInvalidParams, err.Error(), nil)
+		return jsonrpc.RouteResult{}, true
+	}
+
+	return result, false
+}
+
 func (m *JSONRPCMiddleware) parseSyntheticAdapterJSONRPC(r *http.Request) (*JSONRPCRequest, bool) {
 	if r.Method != http.MethodPost {
 		return nil, false
@@ -117,46 +138,20 @@ func (m *JSONRPCMiddleware) parseSyntheticAdapterJSONRPC(r *http.Request) (*JSON
 
 func (c *restAsMCPPolicyContext) setJSONRPCState(r *http.Request) {
 	primitiveType := primitiveTypeForMethod(c.rpcReq.Method)
-	primitiveName := primitiveNameForMethod(c.rpcReq.Method, c.rpcReq.Params)
 
 	httpctx.SetJSONRPCRoutingState(r, &httpctx.JSONRPCRoutingState{
 		Method:        c.rpcReq.Method,
 		Params:        c.rpcReq.Params,
 		ID:            c.rpcReq.ID,
 		OriginalPath:  r.URL.Path,
+		VEMChain:      c.route.VEMChain,
 		PrimitiveType: primitiveType,
-		PrimitiveName: primitiveName,
+		PrimitiveName: c.route.PrimitiveName,
 	})
 
 	ctxSetMCPMethod(r, c.rpcReq.Method)
 	ctxSetMCPPrimitiveType(r, primitiveType)
-	ctxSetMCPPrimitiveName(r, primitiveName)
-}
-
-func primitiveNameForMethod(method string, params json.RawMessage) string {
-	switch method {
-	case mcp.MethodToolsCall, mcp.MethodPromptsGet:
-		return stringParam(params, mcp.ParamKeyName)
-	case mcp.MethodResourcesRead:
-		return stringParam(params, mcp.ParamKeyURI)
-	default:
-		return method
-	}
-}
-
-func stringParam(params json.RawMessage, key string) string {
-	if len(params) == 0 {
-		return ""
-	}
-
-	var obj map[string]any
-	if err := json.Unmarshal(params, &obj); err != nil {
-		return ""
-	}
-	if val, ok := obj[key].(string); ok {
-		return val
-	}
-	return ""
+	ctxSetMCPPrimitiveName(r, c.route.PrimitiveName)
 }
 
 func (m *JSONRPCMiddleware) deniesRESTAsMCPMethod(w http.ResponseWriter, r *http.Request, policyCtx *restAsMCPPolicyContext) bool {
@@ -194,21 +189,14 @@ func (m *JSONRPCMiddleware) enforceRESTAsMCPEndpointRateLimits(w http.ResponseWr
 	if !policyCtx.hasAccess {
 		return false
 	}
-	if m.enforceRESTAsMCPEndpointRateLimit(w, r, policyCtx, jsonrpc.MethodVEMPrefix+policyCtx.rpcReq.Method) {
-		return true
+
+	for _, vemPath := range policyCtx.route.VEMChain {
+		if m.enforceRESTAsMCPEndpointRateLimit(w, r, policyCtx, vemPath) {
+			return true
+		}
 	}
 
-	state := httpctx.GetJSONRPCRoutingState(r)
-	if state == nil || state.PrimitiveType == "" || state.PrimitiveName == "" {
-		return false
-	}
-
-	prefix := vemPrefixForPrimitiveType(state.PrimitiveType)
-	if prefix == "" {
-		return false
-	}
-
-	return m.enforceRESTAsMCPEndpointRateLimit(w, r, policyCtx, prefix+state.PrimitiveName)
+	return false
 }
 
 func (m *JSONRPCMiddleware) enforceRESTAsMCPEndpointRateLimit(w http.ResponseWriter, r *http.Request, policyCtx *restAsMCPPolicyContext, vemPath string) bool {

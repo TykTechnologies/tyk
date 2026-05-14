@@ -683,6 +683,9 @@ func TestRESTAsMCPPolicy_FiltersToolsListResponse(t *testing.T) {
 
 func TestRESTAsMCPPolicy_EndpointRateLimitBlocksToolCall(t *testing.T) {
 	spec := buildTestAdapterSpec()
+	spec.MCPPrimitives = map[string]string{
+		"tool:getOrder": "/mcp-tool:orders.lookup",
+	}
 	var err error
 	spec.MCPSDKAdapter, err = mcpadapter.NewSDKAdapter(mcpadapter.SDKServerConfig{
 		Name:  spec.Name,
@@ -707,11 +710,15 @@ func TestRESTAsMCPPolicy_EndpointRateLimitBlocksToolCall(t *testing.T) {
 
 	accessDef := user.AccessDefinition{
 		APIID: "proxy-1",
-		MCPPrimitives: []user.MCPPrimitiveLimit{
-			{Type: mcp.PrimitiveTypeTool, Name: "getOrder", Limit: user.RateLimit{Rate: 1, Per: 60}},
+		Endpoints: user.Endpoints{
+			{
+				Path: "/mcp-tool:orders.lookup",
+				Methods: user.EndpointMethods{
+					{Name: http.MethodPost, Limit: user.RateLimit{Rate: 1, Per: 60}},
+				},
+			},
 		},
 	}
-	synthesizeMCPEndpoints(&accessDef)
 	session := &user.SessionState{
 		KeyID: "rest-as-mcp-rate-limit-key",
 		AccessRights: map[string]user.AccessDefinition{
