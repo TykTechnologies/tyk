@@ -1390,9 +1390,7 @@
         }
       },
       "required": [
-        "enabled",
-        "resource",
-        "authorizationServers"
+        "enabled"
       ]
     },
     "X-Tyk-Server": {

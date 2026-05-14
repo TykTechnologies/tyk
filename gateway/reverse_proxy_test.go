@@ -132,6 +132,80 @@ func TestReverseProxyRetainHost(t *testing.T) {
 	}
 }
 
+// TestReverseProxyMCPHostRootDiscovery verifies that for MCP APIs whose
+// upstream URL embeds a path, OAuth/MCP discovery probes (.well-known/...)
+// are routed to the upstream HOST ROOT instead of being prefixed with the
+// upstream path. Non-MCP APIs and root-upstream MCP APIs must keep the
+// existing behaviour.
+func TestReverseProxyMCPHostRootDiscovery(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	pathUpstream, errPath := url.Parse("http://upstream.example/v1/mcp")
+	require.NoError(t, errPath)
+	rootUpstream, errRoot := url.Parse("http://upstream.example/")
+	require.NoError(t, errRoot)
+
+	cases := []struct {
+		name    string
+		target  *url.URL
+		isMCP   bool
+		inPath  string
+		wantURL string
+	}{
+		{
+			"mcp-protocol-traffic-keeps-prefix",
+			pathUpstream, true, "/",
+			"http://upstream.example/v1/mcp",
+		},
+		{
+			"mcp-prm-discovery-bypasses-prefix",
+			pathUpstream, true, "/.well-known/oauth-protected-resource",
+			"http://upstream.example/.well-known/oauth-protected-resource",
+		},
+		{
+			"mcp-prm-discovery-with-suffix-bypasses-prefix",
+			pathUpstream, true, "/.well-known/oauth-protected-resource/v1/mcp",
+			"http://upstream.example/.well-known/oauth-protected-resource/v1/mcp",
+		},
+		{
+			"mcp-as-discovery-bypasses-prefix",
+			pathUpstream, true, "/.well-known/oauth-authorization-server",
+			"http://upstream.example/.well-known/oauth-authorization-server",
+		},
+		{
+			"non-mcp-keeps-prefix-on-well-known",
+			pathUpstream, false, "/.well-known/oauth-protected-resource",
+			"http://upstream.example/v1/mcp/.well-known/oauth-protected-resource",
+		},
+		{
+			"mcp-with-root-upstream-unchanged",
+			rootUpstream, true, "/.well-known/oauth-protected-resource",
+			"http://upstream.example/.well-known/oauth-protected-resource",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+			if tc.isMCP {
+				spec.MarkAsMCP()
+			}
+
+			req := TestReq(t, http.MethodGet, "http://orig.example"+tc.inPath, nil)
+			req.URL.Path = tc.inPath
+
+			proxy := ts.Gw.TykNewSingleHostReverseProxy(tc.target, spec, nil)
+			proxy.Director(req)
+
+			got := req.URL.Scheme + "://" + req.URL.Host + req.URL.Path
+			if got != tc.wantURL {
+				t.Fatalf("wanted url %q, got %q", tc.wantURL, got)
+			}
+		})
+	}
+}
+
 type configTestReverseProxyDnsCache struct {
 	*testing.T
 
