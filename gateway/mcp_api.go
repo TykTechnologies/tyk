@@ -59,13 +59,16 @@ func (gw *Gateway) validateMCP(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// MCP-aware validate: PRM is checked with isMCP=true so the
-		// empty-mode + no-resource shape resolves to mirror (auto) rather
-		// than static-with-missing-resource. This lets users enable PRM
-		// on a remote MCP API with a single `enabled: true` line.
-		if err = mcpObj.ValidateForMCP(r.Context(), oas.GetValidationOptionsFromConfig(gw.GetConfig().OAS)...); err != nil {
+		if err = mcpObj.Validate(r.Context(), oas.GetValidationOptionsFromConfig(gw.GetConfig().OAS)...); err != nil {
 			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 			return
+		}
+
+		if tykExt := mcpObj.GetTykExtension(); tykExt != nil && tykExt.Server.Authentication != nil {
+			if err = tykExt.Server.Authentication.ProtectedResourceMetadata.Validate(true); err != nil {
+				doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+				return
+			}
 		}
 
 		r.Body = ioutil.NopCloser(bytes.NewReader(reqBodyInBytes))

@@ -105,17 +105,6 @@ type Authentication struct {
 
 // ProtectedResourceMetadata holds the configuration for OAuth 2.0 Protected Resource Metadata (RFC 9728).
 // It enables MCP clients to discover which authorization server protects this API resource.
-//
-// The serving mode is inferred from the configuration shape, not selected
-// explicitly:
-//   - When `Resource` or `AuthorizationServers` is set, Tyk runs in
-//     **static** mode — the PRM doc is assembled from the fields below.
-//   - When neither is set on an MCP API, Tyk runs in **mirror** mode —
-//     the upstream's PRM doc is fetched, its `resource` field rewritten
-//     to the gateway URL, and served. Used for transparent proxying of
-//     OAuth-protected remote MCP servers.
-//
-// On non-MCP APIs only static is meaningful; mirror is a no-op.
 type ProtectedResourceMetadata struct {
 	// Enabled activates the Protected Resource Metadata endpoint.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
@@ -125,8 +114,6 @@ type ProtectedResourceMetadata struct {
 	WellKnownPath string `bson:"wellKnownPath,omitempty" json:"wellKnownPath,omitempty"`
 
 	// Resource is the resource identifier (the API's resource URL).
-	// Required for static mode. Ignored in mirror mode (rewritten to the
-	// gateway URL at request time).
 	Resource string `bson:"resource,omitempty" json:"resource,omitempty"`
 
 	// AuthorizationServers is the list of authorization server URLs that can issue tokens for this resource.
@@ -136,39 +123,21 @@ type ProtectedResourceMetadata struct {
 	ScopesSupported []string `bson:"scopesSupported,omitempty" json:"scopesSupported,omitempty"`
 }
 
-// IsMirrorMode reports whether the PRM resolves to mirror mode for the
-// given API context. Mirror is the implicit default for MCP APIs whose
-// PRM doesn't configure any static fields (`Resource` or
-// `AuthorizationServers`); everything else is static.
-func (prm *ProtectedResourceMetadata) IsMirrorMode(isMCP bool) bool {
-	if prm == nil || !prm.Enabled {
-		return false
-	}
-	if prm.Resource != "" || len(prm.AuthorizationServers) > 0 {
-		return false
-	}
-	return isMCP
-}
-
 // Validate validates the ProtectedResourceMetadata configuration.
-// Static mode requires `resource`, and additionally requires
-// `authorizationServers` for MCP APIs. Mirror mode skips the static-field
-// requirements — the upstream's PRM supplies them at request time.
+// When isMCP is true, authorizationServers must have at least one entry.
 func (prm *ProtectedResourceMetadata) Validate(isMCP bool) error {
 	if prm == nil || !prm.Enabled {
 		return nil
 	}
-	if prm.IsMirrorMode(isMCP) {
-		// Mirror mode: upstream supplies resource/authorizationServers
-		// at request time. Nothing to validate here.
-		return nil
-	}
+
 	if prm.Resource == "" {
 		return errors.New("protectedResourceMetadata.resource is required when enabled")
 	}
+
 	if isMCP && len(prm.AuthorizationServers) == 0 {
 		return errors.New("protectedResourceMetadata.authorizationServers must have at least one entry for MCP APIs")
 	}
+
 	return nil
 }
 

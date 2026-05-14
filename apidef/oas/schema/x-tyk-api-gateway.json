@@ -1327,7 +1327,8 @@
         }
       },
       "required": [
-        "enabled"
+        "enabled",
+        "resource"
       ]
     },
     "X-Tyk-Server": {
