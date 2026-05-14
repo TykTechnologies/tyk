@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -84,6 +85,20 @@ func (gw *Gateway) validateMCP(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+func pairedMCPAdapterTarget(target string) (adapterID, restAPIID string, ok bool) {
+	u, err := neturl.Parse(strings.TrimSpace(target))
+	if err != nil || u.Scheme != "tyk" {
+		return "", "", false
+	}
+
+	adapterID = strings.TrimPrefix(u.Host, "id:")
+	if !oas.IsAdapterAPIID(adapterID) {
+		return "", "", false
+	}
+
+	return adapterID, oas.AdapterSourceAPIID(adapterID), true
+}
+
 // validatePairedMCPAdapterUpstream enforces REST-as-MCP admit-time
 // invariants when an MCP proxy targets a synthetic adapter via a
 // `tyk://<adapterAPIID>` upstream URL. Returns ("", 0) when the upstream
@@ -112,15 +127,10 @@ func (gw *Gateway) validatePairedMCPAdapterUpstream(r *http.Request, mcpObj *oas
 	if target == "" {
 		return "", 0
 	}
-	u, err := neturl.Parse(target)
-	if err != nil || u.Scheme != "tyk" {
+	_, restAPIID, ok := pairedMCPAdapterTarget(target)
+	if !ok {
 		return "", 0
 	}
-	adapterID := strings.TrimPrefix(u.Host, "id:")
-	if !oas.IsAdapterAPIID(adapterID) {
-		return "", 0
-	}
-	restAPIID := oas.AdapterSourceAPIID(adapterID)
 
 	gw.apisMu.RLock()
 	rest, ok := gw.apisByID[restAPIID]
@@ -146,6 +156,54 @@ func (gw *Gateway) validatePairedMCPAdapterUpstream(r *http.Request, mcpObj *oas
 
 	_ = r // r is only used for context elsewhere; keep parameter for future audit-logging.
 	return "", 0
+}
+
+func (gw *Gateway) alignPairedMCPProxyGatewayTags(apiDef *apidef.APIDefinition, oasObj *oas.OAS) error {
+	if apiDef == nil || oasObj == nil {
+		return nil
+	}
+
+	_, restAPIID, ok := pairedMCPAdapterTarget(apiDef.Proxy.TargetURL)
+	if !ok {
+		return nil
+	}
+
+	rest := gw.getApiSpec(restAPIID)
+	if rest == nil || rest.APIDefinition == nil {
+		return fmt.Errorf("paired REST API %s is not loaded; create it first", restAPIID)
+	}
+
+	apiDef.TagsDisabled = rest.TagsDisabled
+	apiDef.Tags = append([]string(nil), rest.Tags...)
+
+	ext := oasObj.GetTykExtension()
+	if ext == nil {
+		return nil
+	}
+	if ext.Server.GatewayTags == nil {
+		ext.Server.GatewayTags = &oas.GatewayTags{}
+	}
+	ext.Server.GatewayTags.Enabled = !apiDef.TagsDisabled
+	ext.Server.GatewayTags.Tags = append([]string(nil), apiDef.Tags...)
+
+	return nil
+}
+
+func (gw *Gateway) pairedMCPProxyForREST(restAPIID string) (string, bool) {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+
+	for _, spec := range gw.apisByID {
+		if spec == nil || spec.APIDefinition == nil || !spec.IsMCPManaged() || spec.IsSyntheticMCPAdapter {
+			continue
+		}
+		_, sourceRESTAPIID, ok := pairedMCPAdapterTarget(spec.Proxy.TargetURL)
+		if ok && sourceRESTAPIID == restAPIID {
+			return spec.APIID, true
+		}
+	}
+
+	return "", false
 }
 
 func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int) {
@@ -203,6 +261,10 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
+	if err := gw.alignPairedMCPProxyGatewayTags(&newDef, &oasObj); err != nil {
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
 	newDef.IsOAS = true
 	oasObj.GetTykExtension().Info.ID = newDef.APIID
 	err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
@@ -257,6 +319,10 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 	}
 
 	if err := gw.handleOASServersForUpdate(spec, &newDef, &oasObj); err != nil {
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
+	if err := gw.alignPairedMCPProxyGatewayTags(&newDef, &oasObj); err != nil {
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
@@ -327,8 +393,14 @@ func (gw *Gateway) handleDeleteMCP(apiID string, fs afero.Fs) (interface{}, int)
 	}
 
 	if err := deleteAPIFiles(apiID, "mcp", gw.GetConfig().AppPath, fs); err != nil {
-		log.Warning("Delete failed: ", err)
-		return apiError(errMsgDeleteFailed), http.StatusInternalServerError
+		if !spec.IsPairedMCPAdapterProxy() {
+			log.Warning("Delete failed: ", err)
+			return apiError(errMsgDeleteFailed), http.StatusInternalServerError
+		}
+		if err = deleteAPIFiles(apiID, "oas", gw.GetConfig().AppPath, fs); err != nil {
+			log.Warning("Delete failed: ", err)
+			return apiError(errMsgDeleteFailed), http.StatusInternalServerError
+		}
 	}
 
 	handleBaseVersionCleanup(gw, spec, apiID, fs)

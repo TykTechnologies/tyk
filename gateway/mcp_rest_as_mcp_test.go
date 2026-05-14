@@ -12,16 +12,22 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/drl"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	tykctx "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	mcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
 	"github.com/TykTechnologies/tyk/internal/mcp/pairing"
 	"github.com/TykTechnologies/tyk/internal/middleware"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // The pure adapter primitives (envelope marshalling, argument
@@ -512,4 +518,230 @@ func TestCallMCPAdapterTool_RequiresActualCallerProxyToMatchPairing(t *testing.T
 	_, err := gw.callMCPAdapterTool(ctx, spec, tool, map[string]any{"id": "42"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "caller proxy")
+}
+
+func TestHandleDeleteAPI_RefusesRESTSourceWithPairedMCPProxy(t *testing.T) {
+	t.Parallel()
+
+	gw := &Gateway{}
+	gw.config.Store(config.Config{AppPath: t.TempDir()})
+
+	rest := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-1", IsOAS: true}}
+	proxyDef := &apidef.APIDefinition{APIID: "proxy-1", OrgID: "org-1"}
+	proxyDef.Proxy.TargetURL = "tyk://" + oas.AdapterAPIID("rest-1")
+	proxy := &APISpec{APIDefinition: proxyDef}
+
+	gw.apisByID = map[string]*APISpec{
+		rest.APIID:  rest,
+		proxy.APIID: proxy,
+	}
+
+	obj, code := gw.handleDeleteAPI("rest-1")
+
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Contains(t, obj.(apiStatusMessage).Message, "proxy-1")
+}
+
+func TestHandleDeleteMCP_DeletesPairedProxyPersistedWithOASSuffix(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	require.NoError(t, fs.MkdirAll("/apps", 0755))
+	require.NoError(t, afero.WriteFile(fs, "/apps/proxy-1.json", []byte(`{}`), 0644))
+	require.NoError(t, afero.WriteFile(fs, "/apps/proxy-1-oas.json", []byte(`{}`), 0644))
+
+	gw := &Gateway{}
+	gw.config.Store(config.Config{AppPath: "/apps"})
+
+	proxyDef := &apidef.APIDefinition{APIID: "proxy-1", OrgID: "org-1"}
+	proxyDef.Proxy.TargetURL = "tyk://" + oas.AdapterAPIID("rest-1")
+	gw.apisByID = map[string]*APISpec{
+		proxyDef.APIID: {APIDefinition: proxyDef},
+	}
+
+	_, code := gw.handleDeleteMCP("proxy-1", fs)
+
+	assert.Equal(t, http.StatusOK, code)
+	_, err := fs.Stat("/apps/proxy-1.json")
+	assert.Error(t, err)
+	_, err = fs.Stat("/apps/proxy-1-oas.json")
+	assert.Error(t, err)
+}
+
+func TestAlignPairedMCPProxyGatewayTags_CopiesSourceRESTTags(t *testing.T) {
+	t.Parallel()
+
+	gw := &Gateway{}
+	gw.apisByID = map[string]*APISpec{
+		"rest-1": {APIDefinition: &apidef.APIDefinition{
+			APIID:        "rest-1",
+			OrgID:        "org-1",
+			TagsDisabled: false,
+			Tags:         []string{"edge-a", "edge-b"},
+		}},
+	}
+
+	proxyDef := &apidef.APIDefinition{APIID: "proxy-1", OrgID: "org-1"}
+	proxyDef.Proxy.TargetURL = "tyk://" + oas.AdapterAPIID("rest-1")
+	oasObj := &oas.OAS{}
+	oasObj.SetTykExtension(&oas.XTykAPIGateway{})
+
+	require.NoError(t, gw.alignPairedMCPProxyGatewayTags(proxyDef, oasObj))
+
+	assert.False(t, proxyDef.TagsDisabled)
+	assert.Equal(t, []string{"edge-a", "edge-b"}, proxyDef.Tags)
+	require.NotNil(t, oasObj.GetTykExtension().Server.GatewayTags)
+	assert.True(t, oasObj.GetTykExtension().Server.GatewayTags.Enabled)
+	assert.Equal(t, []string{"edge-a", "edge-b"}, oasObj.GetTykExtension().Server.GatewayTags.Tags)
+}
+
+func TestRESTAsMCPPolicy_DeniesBlockedToolBeforeSDK(t *testing.T) {
+	t.Parallel()
+
+	spec := buildTestAdapterSpec()
+	called := false
+	var err error
+	spec.MCPSDKAdapter, err = mcpadapter.NewSDKAdapter(mcpadapter.SDKServerConfig{
+		Name:  spec.Name,
+		Tools: spec.DerivedTools,
+		CallTool: func(_ context.Context, _ *oas.DerivedTool, _ map[string]any) (*mcpadapter.Recorder, error) {
+			called = true
+			return mcpadapter.NewRecorder(), nil
+		},
+	})
+	require.NoError(t, err)
+
+	gw := &Gateway{}
+	gw.apisByID = map[string]*APISpec{
+		"proxy-1": {APIDefinition: &apidef.APIDefinition{APIID: "proxy-1", OrgID: "org-1"}},
+	}
+
+	session := &user.SessionState{
+		KeyID: "key-1",
+		AccessRights: map[string]user.AccessDefinition{
+			"proxy-1": {
+				APIID: "proxy-1",
+				MCPAccessRights: user.MCPAccessRights{
+					Tools: user.AccessControlRules{Blocked: []string{"getOrder"}},
+				},
+			},
+		},
+	}
+
+	r := httptest.NewRequest(http.MethodPost, "/mcp/", strings.NewReader(`{
+		"jsonrpc":"2.0",
+		"id":1,
+		"method":"tools/call",
+		"params":{"name":"getOrder","arguments":{"id":"42"}}
+	}`))
+	r.Header.Set("Content-Type", "application/json")
+	httpctx.SetMCPProxyCallerAPIID(r, "proxy-1")
+	tykctx.SetSession(r, session, false, false, false)
+
+	w := httptest.NewRecorder()
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
+	err, code := mw.ProcessRequest(w, r, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, middleware.StatusRespond, code)
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	assert.Contains(t, w.Body.String(), "tool 'getOrder' is not available")
+	assert.False(t, called)
+	assert.Equal(t, "tools/call", ctxGetMCPMethod(r))
+	assert.Equal(t, "tool", ctxGetMCPPrimitiveType(r))
+	assert.Equal(t, "getOrder", ctxGetMCPPrimitiveName(r))
+}
+
+func TestRESTAsMCPPolicy_FiltersToolsListResponse(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{
+		"jsonrpc":"2.0",
+		"id":1,
+		"result":{"tools":[{"name":"getOrder"},{"name":"deleteOrder"}]}
+	}`)
+	capture := newCapturedResponseWriter()
+	capture.Header().Set("Content-Type", "application/json")
+	_, err := capture.Write(body)
+	require.NoError(t, err)
+
+	policyCtx := &restAsMCPPolicyContext{
+		hasAccess:  true,
+		listConfig: mcp.ListFilterConfigs["tools"],
+		accessDef: user.AccessDefinition{
+			MCPAccessRights: user.MCPAccessRights{
+				Tools: user.AccessControlRules{Allowed: []string{"getOrder"}},
+			},
+		},
+	}
+
+	policyCtx.filterListResponse(capture)
+
+	assert.Contains(t, capture.body.String(), "getOrder")
+	assert.NotContains(t, capture.body.String(), "deleteOrder")
+}
+
+func TestRESTAsMCPPolicy_EndpointRateLimitBlocksToolCall(t *testing.T) {
+	spec := buildTestAdapterSpec()
+	var err error
+	spec.MCPSDKAdapter, err = mcpadapter.NewSDKAdapter(mcpadapter.SDKServerConfig{
+		Name:  spec.Name,
+		Tools: spec.DerivedTools,
+		CallTool: func(_ context.Context, _ *oas.DerivedTool, _ map[string]any) (*mcpadapter.Recorder, error) {
+			return mcpadapter.NewRecorder(), nil
+		},
+	})
+	require.NoError(t, err)
+
+	var cfg config.Config
+	require.NoError(t, config.WriteDefault("", &cfg))
+	drlManager := &drl.DRL{RequestTokenValue: 1}
+	drlManager.SetCurrentTokenValue(1)
+
+	gw := &Gateway{ctx: context.Background()}
+	gw.config.Store(cfg)
+	gw.SessionLimiter = NewSessionLimiter(context.Background(), &cfg, drlManager, &cfg.ExternalServices)
+	gw.apisByID = map[string]*APISpec{
+		"proxy-1": {APIDefinition: &apidef.APIDefinition{APIID: "proxy-1", OrgID: "org-1"}},
+	}
+
+	accessDef := user.AccessDefinition{
+		APIID: "proxy-1",
+		MCPPrimitives: []user.MCPPrimitiveLimit{
+			{Type: mcp.PrimitiveTypeTool, Name: "getOrder", Limit: user.RateLimit{Rate: 1, Per: 60}},
+		},
+	}
+	synthesizeMCPEndpoints(&accessDef)
+	session := &user.SessionState{
+		KeyID: "rest-as-mcp-rate-limit-key",
+		AccessRights: map[string]user.AccessDefinition{
+			"proxy-1": accessDef,
+		},
+	}
+
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
+	makeRequest := func() *http.Request {
+		r := httptest.NewRequest(http.MethodPost, "/mcp/", strings.NewReader(`{
+			"jsonrpc":"2.0",
+			"id":1,
+			"method":"tools/call",
+			"params":{"name":"getOrder","arguments":{"id":"42"}}
+		}`))
+		r.Header.Set("Content-Type", "application/json")
+		httpctx.SetMCPProxyCallerAPIID(r, "proxy-1")
+		tykctx.SetSession(r, session, false, false, false)
+		return r
+	}
+
+	first := httptest.NewRecorder()
+	err, code := mw.ProcessRequest(first, makeRequest(), nil)
+	require.NoError(t, err)
+	assert.Equal(t, middleware.StatusRespond, code)
+
+	second := httptest.NewRecorder()
+	err, code = mw.ProcessRequest(second, makeRequest(), nil)
+	require.NoError(t, err)
+	assert.Equal(t, middleware.StatusRespond, code)
+	assert.Equal(t, http.StatusTooManyRequests, second.Code)
+	assert.Contains(t, second.Body.String(), "Rate Limit Exceeded")
 }

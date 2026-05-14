@@ -1462,7 +1462,7 @@ func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefini
 	}
 
 	suffix := "-oas"
-	if apiDef.IsMCP() {
+	if apiDef.IsMCPManaged() {
 		suffix = "-mcp"
 	}
 
@@ -1525,6 +1525,10 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 	fs := afero.NewOsFs()
 
 	if spec.IsOAS {
+		if proxyID, paired := gw.pairedMCPProxyForREST(apiID); paired {
+			return apiError("REST API is exposed by MCP proxy " + proxyID + "; delete the MCP proxy first"), http.StatusConflict
+		}
+
 		if err := deleteAPIFiles(apiID, "oas", gw.GetConfig().AppPath, fs); err != nil {
 			log.Warning("Delete failed: ", err)
 			return apiError("Delete failed"), http.StatusInternalServerError

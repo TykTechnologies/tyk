@@ -174,8 +174,7 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			http.Error(w, "MCP SDK adapter is not initialised", http.StatusInternalServerError)
 			return nil, middleware.StatusRespond
 		}
-		ensureMCPStreamableAccept(r)
-		m.Spec.MCPSDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(w, r)
+		m.serveSyntheticMCPAdapter(w, r)
 		return nil, middleware.StatusRespond
 	}
 
