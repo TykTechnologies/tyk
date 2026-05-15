@@ -52,3 +52,11 @@ func TestCoprocessSessionState_PostExpiry_RoundTrip(t *testing.T) {
 		})
 	}
 }
+
+func TestProtoSessionState_Nil(t *testing.T) {
+	assert.Nil(t, ProtoSessionState(nil))
+}
+
+func TestTykSessionState_Nil(t *testing.T) {
+	assert.Nil(t, TykSessionState(nil))
+}
