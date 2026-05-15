@@ -1073,7 +1073,7 @@ func (s *OAS) isInOASComponents(schemeName string) bool {
 // isProprietarySchemeType checks if a SecurityScheme type is proprietary
 func (s *OAS) isProprietarySchemeType(scheme interface{}) bool {
 	switch scheme.(type) {
-	case *JWT, *Token, *Basic, *OAuth, *ExternalOAuth:
+	case *JWT, *Token, *Basic, *OAuth, *ExternalOAuth, *OAuth2:
 		return false // Standard OAS types
 	case *CustomPluginAuthentication:
 		return true // Proprietary
@@ -1114,6 +1114,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	s.fillBasic(api)
 	s.fillOAuth(api)
 	s.fillExternalOAuth(api)
+	s.fillOAuth2()
 
 	// Handle security requirements based on processing mode (OAS-only feature)
 	processingMode := SecurityProcessingModeLegacy
