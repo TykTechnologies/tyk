@@ -87,3 +87,72 @@ func SortByPathLength(in openapi3.Paths) []PathItem {
 
 	return ExtractPaths(in, paths)
 }
+
+func PathToRegex(path string, params openapi3.Parameters) string {
+	varRegex := regexp.MustCompile(`\{([^}]+)\}`)
+
+	regexPath := varRegex.ReplaceAllStringFunc(path, func(match string) string {
+		paramName := match[1 : len(match)-1]
+		paramType, explicitPattern := GetParamDetails(params, paramName)
+
+		var pattern string
+		if explicitPattern != "" {
+			pattern = strings.TrimPrefix(explicitPattern, "^")
+			pattern = strings.TrimSuffix(pattern, "$")
+		} else {
+			pattern = getRegexPatternForType(paramType)
+		}
+
+		return pattern
+	})
+
+	return regexPath
+}
+
+func GetParamDetails(params openapi3.Parameters, paramName string) (string, string) {
+	for _, paramRef := range params {
+		if paramRef == nil || paramRef.Value == nil {
+			continue
+		}
+
+		if paramRef.Value.Name == paramName {
+			if paramRef.Value.Schema != nil && paramRef.Value.Schema.Value != nil {
+				schema := paramRef.Value.Schema.Value
+				var paramType string
+				if schema.Type != nil && len(*schema.Type) > 0 {
+					paramType = (*schema.Type)[0]
+				}
+				return paramType, schema.Pattern
+			}
+
+			if paramRef.Value.Content != nil {
+				for _, mediaType := range paramRef.Value.Content {
+					if mediaType.Schema != nil && mediaType.Schema.Value != nil {
+						schema := mediaType.Schema.Value
+						var paramType string
+						if schema.Type != nil && len(*schema.Type) > 0 {
+							paramType = (*schema.Type)[0]
+						}
+						return paramType, schema.Pattern
+					}
+				}
+			}
+		}
+	}
+	return "", ""
+}
+
+func getRegexPatternForType(paramType string) string {
+	switch paramType {
+	case "integer":
+		return `[-+]?\d+`
+	case "number":
+		return `[-+]?[0-9]*\.?[0-9]+`
+	case "boolean":
+		return `(?:true|false)`
+	case "string":
+		return `[^/]+`
+	default:
+		return `[^/]+`
+	}
+}
