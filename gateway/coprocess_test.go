@@ -13,6 +13,15 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"context"
+	"fmt"
+	"os"
+	"runtime"
+	"strconv"
+	"strings"
+	"sync"
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func Test_getIDExtractor(t *testing.T) {
@@ -368,4 +377,128 @@ func TestValidateDriver(t *testing.T) {
 
 	supportedDrivers = originalSupportedDrivers
 	loadedDrivers = originalLoadedDrivers
+}
+
+func getRSS() int64 {
+	data, err := os.ReadFile("/proc/self/status")
+	if err != nil {
+		return 0
+	}
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "VmRSS:") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				rss, _ := strconv.ParseInt(parts[1], 10, 64)
+				return rss * 1024 // Convert KB to bytes
+			}
+		}
+	}
+	return 0
+}
+
+func TestCoProcess_MemoryFragmentation_Long(t *testing.T) {
+	// 1. Create a Massive Session Object
+	session := &user.SessionState{
+		MetaData:     make(map[string]interface{}),
+		AccessRights: make(map[string]user.AccessDefinition),
+	}
+
+	for i := 0; i < 5000; i++ {
+		key := fmt.Sprintf("key_%d", i)
+		session.MetaData[key] = fmt.Sprintf("value_%d_with_some_extra_padding_to_make_it_larger", i)
+		session.AccessRights[key] = user.AccessDefinition{
+			APIName:  fmt.Sprintf("api_%d", i),
+			APIID:    fmt.Sprintf("api_id_%d", i),
+			Versions: []string{"Default"},
+			AllowedURLs: []user.AccessSpec{
+				{
+					URL:     fmt.Sprintf("/path/%d", i),
+					Methods: []string{"GET", "POST"},
+				},
+			},
+		}
+	}
+
+	// 2. Setup the CoProcessor
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "test-api",
+			OrgID: "test-org",
+		},
+	}
+
+	mw := &CoProcessMiddleware{
+		BaseMiddleware: &BaseMiddleware{
+			Spec: spec,
+		},
+		HookType: coprocess.HookType_Post,
+		HookName: "TestHook",
+	}
+
+	c := &CoProcessor{
+		Middleware: mw,
+	}
+
+	req, _ := http.NewRequest("GET", "http://example.com/test", nil)
+	// Add session to context
+	reqCtx := context.WithValue(req.Context(), ctx.SessionData, session)
+	req = req.WithContext(reqCtx)
+
+	// Force initial GC to get a clean baseline
+	runtime.GC()
+
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	initialHeap := m.HeapAlloc
+	initialRSS := getRSS()
+
+	if initialRSS == 0 {
+		t.Skip("Skipping test because VmRSS could not be read (not on Linux?)")
+	}
+
+	// 3. Simulate Allocation Churn Concurrently
+	iterations := 500000
+	concurrency := 10
+	var wg sync.WaitGroup
+
+	for w := 0; w < concurrency; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < iterations; i++ {
+				obj, err := c.BuildObject(req, nil, spec)
+				require.NoError(t, err)
+				_ = obj
+				
+				// IMPORTANT: Uncomment the following lines if testing with the sync.Pool fix (PR #8124)
+				// if obj != nil {
+				// 	ReleaseCoprocessObject(obj)
+				// }
+
+				// 4. Force Garbage Collection periodically
+				if i%1000 == 0 {
+					runtime.GC()
+				}
+			}
+		}()
+	}
+	wg.Wait()
+
+	// Final GC
+	runtime.GC()
+	runtime.ReadMemStats(&m)
+	finalHeap := m.HeapAlloc
+	finalRSS := getRSS()
+
+	t.Logf("Initial Heap: %d bytes", initialHeap)
+	t.Logf("Final Heap: %d bytes", finalHeap)
+	t.Logf("Initial RSS: %d bytes", initialRSS)
+	t.Logf("Final RSS: %d bytes", finalRSS)
+
+	heapDiff := int64(finalHeap) - int64(initialHeap)
+	rssDiff := int64(finalRSS) - int64(initialRSS)
+
+	t.Logf("Heap Diff: %d bytes", heapDiff)
+	t.Logf("RSS Diff: %d bytes", rssDiff)
 }
