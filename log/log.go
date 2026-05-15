@@ -129,3 +129,9 @@ func newFormatterLegacy() logrus.Formatter {
 		DisableColors:   true,
 	}
 }
+
+func IsLegacyFormatter(formatter logrus.Formatter) bool {
+	textFormatter, ok := formatter.(*logrus.TextFormatter)
+
+	return ok && textFormatter.TimestampFormat == LegacyTimestampFormat
+}
