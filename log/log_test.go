@@ -29,6 +29,7 @@ func TestNewFormatter(t *testing.T) {
 	assert.Equal(t, LegacyTimestampFormat, legacyFormatter.TimestampFormat)
 	assert.True(t, legacyFormatter.FullTimestamp)
 	assert.True(t, legacyFormatter.DisableColors)
+	assert.True(t, IsLegacyFormatter(legacyFormatter))
 }
 
 func Test_SetupFormatter(t *testing.T) {
