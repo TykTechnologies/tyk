@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/buger/jsonparser"
 
@@ -457,8 +459,9 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				}
 
 				_, _ = g.Run(t, test.TestCase{
-					Data: request,
-					Code: http.StatusInternalServerError,
+					Data:          request,
+					Code:          http.StatusOK,
+					BodyMatchFunc: assertReviewsSubgraphResponse(t),
 				})
 			})
 		})
@@ -1418,6 +1421,97 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 	})
 }
 
+// TestGraphQLMiddleware_AcceptsNullVariables regression-tests the GraphQL-over-
+// HTTP spec compliance bug where Tyk rejected request bodies that contained
+// `"variables": null` with HTTP 400 ("failed to parse json object"). Per the
+// spec (https://graphql.github.io/graphql-over-http/draft/), a literal-null
+// `variables` value is equivalent to omitting the key — both mean "no
+// variables". Apollo Rover (`rover dev`), Apollo Router, and several other
+// canonical clients send `variables: null` during introspection, so rejecting
+// it broke real-world federation interop. The fix lives in
+// internal/graphengine/engine_v3.go (and v2/v1) at the unmarshal boundary.
+func TestGraphQLMiddleware_AcceptsNullVariables(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mockServer.Close()
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+		spec.GraphQL.Schema = `
+				type User @key(fields: "id") {
+					id: ID!
+					username: String!
+				}
+				type Query {
+					user(id: ID!): User
+				}
+			`
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			{
+				Kind: apidef.GraphQLEngineDataSourceKindREST,
+				Name: "user_ds",
+				RootFields: []apidef.GraphQLTypeFields{
+					{
+						Type:   "User",
+						Fields: []string{"id", "username"},
+					},
+				},
+				Config: []byte(fmt.Sprintf(`{
+						"url": "%s/users/{{ .object.id }}",
+						"method": "GET"
+					}`, mockServer.URL)),
+			},
+		}
+	})[0]
+
+	g.Gw.LoadAPI(spec)
+
+	// All four of these MUST be treated identically per the spec: each
+	// represents "no variables for this operation". The query introspects
+	// `__schema.queryType.name` because it requires no upstream resolver
+	// and exercises the full request pipeline (unmarshal -> normalize ->
+	// validate -> resolve) on every CE-compilable schema.
+	cases := []struct {
+		name string
+		body string
+	}{
+		{name: "variables omitted", body: `{"query": "{ __schema { queryType { name } } }"}`},
+		{name: "variables null", body: `{"query": "{ __schema { queryType { name } } }", "variables": null}`},
+		{name: "variables empty object", body: `{"query": "{ __schema { queryType { name } } }", "variables": {}}`},
+		{name: "variables null with operationName null", body: `{"query": "{ __schema { queryType { name } } }", "variables": null, "operationName": null}`},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := g.Run(t, test.TestCase{
+				Method: "POST",
+				Path:   "/",
+				Data:   tc.body,
+				Code:   http.StatusOK,
+			})
+			require.NoError(t, err)
+
+			resBody, err := io.ReadAll(res.Body)
+			require.NoError(t, err)
+			res.Body.Close()
+
+			name, dataType, _, err := jsonparser.Get(resBody, "data", "__schema", "queryType", "name")
+			require.NoError(t, err, "response missing data.__schema.queryType.name for %s: %s", tc.name, string(resBody))
+			require.Equal(t, jsonparser.String, dataType, "data.__schema.queryType.name must be a string: %s", string(resBody))
+			require.Equal(t, "Query", string(name), "case %s: queryType name must be Query; got: %s", tc.name, string(name))
+		})
+	}
+}
+
 func TestNeedsGraphQLExecutionEngine(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -1714,6 +1808,493 @@ input StringQueryOperatorInput {
 }
 
 scalar Upload`
+
+// TestGraphQLMiddleware_V3_Subscription_GraphQLUpstream_TWS is the V3
+// subscription smoke test. It boots a Tyk V3 UDG API fronting a single
+// GraphQL upstream that speaks `graphql-transport-ws` and validates the
+// V3 plumbing pieces visible from the gateway boundary:
+//
+//  1. WS upgrade with subprotocol `graphql-transport-ws` succeeds against a
+//     V3 (Preview) UDG API. The gateway's WS gate accepts it and Tyk's
+//     subscription handler completes the connection_init/connection_ack
+//     handshake — proving WebsocketOnBeforeStart is wired (otherwise the
+//     handshake throws on the missing hook for a non-keyless API).
+//  2. A subscribe frame whose operation violates the depth-limit access
+//     definition is rejected with a `{"type":"error", ...}` frame BEFORE
+//     any upstream dial happens — proving the V3 hook adapter
+//     (graphqlV2WebsocketBeforeStart) calls into the depth-limit check
+//     against the v2-typed Request and v2 Schema correctly.
+//
+// We deliberately do NOT exercise the upstream subscription dial path here
+// because graphql-go-tools v2's CustomExecutionEngineV2Executor.Execute
+// uses an Async resolver path that frees the resolveContext via deferred
+// pool-Put before the resolver event loop processes the addSubscription
+// event — racing the WebSocket upstream Dial reading the (now nil-out) ctx
+// and panicking inside xcontext.detachedContext.Value. That is an upstream
+// library lifetime bug, not a Tyk bug; the next agent (federation +
+// subscription test matrix) will need a workaround there. Phase 1 plumbing
+// — the scope of this task — is verified by (1) and (2) above and the unit
+// tests in apidef/adapter/gqlengineadapter/enginev3 for the default
+// subprotocol flip (Task 3).
+func TestGraphQLMiddleware_V3_Subscription_GraphQLUpstream_TWS(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	// Tyk's WebSocket gate is off by default — turn it on so the gateway
+	// will accept WS upgrades from clients.
+	cfg := g.Gw.GetConfig()
+	cfg.HttpServerOptions.EnableWebSockets = true
+	g.Gw.SetConfig(cfg)
+
+	const tws = "graphql-transport-ws"
+
+	// Mock upstream GraphQL subscription server. We never expect the
+	// gateway to actually dial this server in the depth-limit subtest
+	// (the hook fails first), but configuring a real upstream URL is
+	// required for BuildAndLoadAPI to compose a valid GraphQL data
+	// source. The handshake-only subtest also exercises the gateway-side
+	// WS handling without ever issuing a `subscribe`, so the upstream
+	// dial path is similarly never triggered.
+	upstreamUpgrader := websocket.Upgrader{
+		Subprotocols: []string{tws},
+		CheckOrigin:  func(r *http.Request) bool { return true },
+	}
+	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upstreamUpgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upstream upgrade failed: %v", err)
+			return
+		}
+		defer conn.Close()
+		// We only need to keep the connection open; the gateway must
+		// not actually subscribe upstream in either subtest below.
+		_, _, _ = conn.ReadMessage()
+	}))
+	defer upstreamServer.Close()
+
+	// Subscription returns a Message type with a nested `body` field so we
+	// can craft a depth-2 subscribe operation (`subscription { messages
+	// { body } }`) and assert the depth-limit hook rejects it when the
+	// session caps depth at 1. A scalar `String!` subscription would
+	// always be depth-1 and never trip the limit.
+	schema := `
+		type Query { dummy: String }
+		type Message { body: String! }
+		type Subscription { messages: Message! }
+	`
+
+	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+		spec.GraphQL.Schema = schema
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			{
+				Kind: apidef.GraphQLEngineDataSourceKindGraphQL,
+				Name: "messages_ds",
+				RootFields: []apidef.GraphQLTypeFields{
+					{Type: "Subscription", Fields: []string{"messages"}},
+					{Type: "Query", Fields: []string{"dummy"}},
+				},
+				// Leave subscription_type empty — V3's flipped default should
+				// pick `graphql-transport-ws` automatically. The default-flip
+				// itself is unit-tested in
+				// apidef/adapter/gqlengineadapter/enginev3.
+				Config: []byte(fmt.Sprintf(`{
+					"url": %q,
+					"method": "POST"
+				}`, upstreamServer.URL)),
+			},
+		}
+	})[0]
+
+	baseURL := strings.Replace(g.URL, "http://", "ws://", 1)
+
+	t.Run("graphql-transport-ws upgrade and connection_init/ack handshake", func(t *testing.T) {
+		// Keyless API: connection_init must be acked without an auth
+		// session. The hook is short-circuited (`shouldCheck = false`)
+		// for keyless APIs but must not panic on a nil session — that's
+		// the regression risk this subtest covers.
+		clientConn, _, err := websocket.DefaultDialer.Dial(baseURL, http.Header{
+			header.SecWebSocketProtocol: {tws},
+		})
+		require.NoError(t, err, "client dial Tyk")
+		defer clientConn.Close()
+
+		require.NoError(t, clientConn.SetReadDeadline(time.Now().Add(5*time.Second)))
+		require.NoError(t, clientConn.WriteMessage(websocket.TextMessage, []byte(`{"type":"connection_init"}`)))
+		_, ackMsg, err := clientConn.ReadMessage()
+		require.NoError(t, err, "client read connection_ack")
+		assert.Contains(t, string(ackMsg), `"type":"connection_ack"`, "expected connection_ack from Tyk; got: %s", string(ackMsg))
+	})
+
+	t.Run("WebsocketOnBeforeStart depth-limit check rejects subscribe", func(t *testing.T) {
+		// Switch to keyed access for this subtest so the depth-limit
+		// check actually runs (it bypasses keyless).
+		api.UseKeylessAccess = false
+		g.Gw.LoadAPI(api)
+		// Restore at end so the previous subtest's expectations are
+		// not affected if subtests get reordered later.
+		defer func() {
+			api.UseKeylessAccess = true
+			g.Gw.LoadAPI(api)
+		}()
+
+		_, directKey := g.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				api.APIID: {
+					APIID:   api.APIID,
+					APIName: api.Name,
+					Limit:   user.APILimit{MaxQueryDepth: 1},
+				},
+			}
+		})
+
+		// graphql-transport-ws subprotocol so the gateway routes
+		// the `subscribe` through the V3 graphqlV2WebsocketBeforeStart
+		// adapter. The depth-limit check should fire BEFORE any
+		// upstream subscription dial.
+		clientConn, _, err := websocket.DefaultDialer.Dial(baseURL, http.Header{
+			header.SecWebSocketProtocol: {tws},
+			header.Authorization:        {directKey},
+		})
+		require.NoError(t, err, "client dial Tyk with auth")
+		defer clientConn.Close()
+
+		require.NoError(t, clientConn.SetReadDeadline(time.Now().Add(5*time.Second)))
+		require.NoError(t, clientConn.WriteMessage(websocket.TextMessage, []byte(`{"type":"connection_init"}`)))
+		_, ackMsg, err := clientConn.ReadMessage()
+		require.NoError(t, err, "client read connection_ack")
+		require.Contains(t, string(ackMsg), `"type":"connection_ack"`)
+
+		// Send a subscribe whose query depth (2: `messages` ->
+		// `body`) exceeds the configured MaxQueryDepth=1. The hook
+		// should return GraphQLDepthLimitExceededErr; the websocket
+		// framing layer turns that into an `{"type":"error", ...}`
+		// frame BEFORE any upstream subscription dial happens.
+		const subID = "sub-1"
+		subFrame := fmt.Sprintf(`{"id":%q,"type":"subscribe","payload":{"query":"subscription { messages { body } }"}}`, subID)
+		require.NoError(t, clientConn.WriteMessage(websocket.TextMessage, []byte(subFrame)))
+
+		require.NoError(t, clientConn.SetReadDeadline(time.Now().Add(5*time.Second)))
+		_, errMsg, err := clientConn.ReadMessage()
+		require.NoError(t, err, "client read error frame")
+		// `graphql-transport-ws` framing wraps errors as
+		// {"id":"...","type":"error","payload":[...]}; the payload
+		// list contains the depth-limit message produced by the V3
+		// hook adapter.
+		require.Contains(t, string(errMsg), `"type":"error"`, "expected error frame; got: %s", string(errMsg))
+		require.Contains(t, string(errMsg), "depth limit exceeded", "error frame must mention depth limit; got: %s", string(errMsg))
+	})
+}
+
+// TestGraphQLMiddleware_V3_Subscription_GraphQLUpstream_TWS_FullEventFlow
+// drives the full subscription happy path end-to-end: a Tyk V3 UDG API in
+// front of a graphql-transport-ws upstream, a client subscribes through
+// Tyk, the upstream emits three `next` frames followed by `complete`, and
+// the test asserts each frame is delivered to the client in order with the
+// expected payload, that `complete` arrives, and that no panic occurs.
+//
+// This was previously gated off because graphql-go-tools/v2's
+// CustomExecutionEngineV2Executor.Execute Free()'d the resolveContext via
+// a deferred pool-Put before the resolver event loop processed the
+// addSubscription event, causing a use-after-free in the upstream
+// WebSocket dial path. The fix in graphql-go-tools/v2/pkg/graphql/
+// execution_engine_v2.go:Resolve clones the resolveContext before passing
+// it to AsyncResolveGraphQLSubscription so the queued event holds an
+// isolated *resolve.Context.
+func TestGraphQLMiddleware_V3_Subscription_GraphQLUpstream_TWS_FullEventFlow(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	cfg := g.Gw.GetConfig()
+	cfg.HttpServerOptions.EnableWebSockets = true
+	g.Gw.SetConfig(cfg)
+
+	const tws = "graphql-transport-ws"
+
+	// Mock graphql-transport-ws upstream that, on receiving a `subscribe`
+	// frame, emits exactly three `next` frames followed by a `complete`.
+	upstreamUpgrader := websocket.Upgrader{
+		Subprotocols: []string{tws},
+		CheckOrigin:  func(r *http.Request) bool { return true },
+	}
+	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upstreamUpgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upstream upgrade failed: %v", err)
+			return
+		}
+		defer conn.Close()
+
+		// connection_init / connection_ack handshake.
+		_, initMsg, err := conn.ReadMessage()
+		if err != nil || !strings.Contains(string(initMsg), `"type":"connection_init"`) {
+			return
+		}
+		if err := conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"connection_ack"}`)); err != nil {
+			return
+		}
+
+		// First subscribe — emit three next frames, then complete.
+		_, subMsg, err := conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		subID, _ := jsonparser.GetString(subMsg, "id")
+		if subID == "" {
+			return
+		}
+		for i := 1; i <= 3; i++ {
+			next := fmt.Sprintf(`{"id":%q,"type":"next","payload":{"data":{"messages":{"body":"msg-%d"}}}}`, subID, i)
+			if err := conn.WriteMessage(websocket.TextMessage, []byte(next)); err != nil {
+				return
+			}
+		}
+		_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf(`{"id":%q,"type":"complete"}`, subID)))
+
+		// Drain whatever the client sends next (a complete from Tyk on
+		// teardown is fine) until the connection is closed.
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}))
+	defer upstreamServer.Close()
+
+	schema := `
+		type Query { dummy: String }
+		type Message { body: String! }
+		type Subscription { messages: Message! }
+	`
+
+	g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+		spec.GraphQL.Schema = schema
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			{
+				Kind: apidef.GraphQLEngineDataSourceKindGraphQL,
+				Name: "messages_ds",
+				RootFields: []apidef.GraphQLTypeFields{
+					{Type: "Subscription", Fields: []string{"messages"}},
+					{Type: "Query", Fields: []string{"dummy"}},
+				},
+				Config: []byte(fmt.Sprintf(`{
+					"url": %q,
+					"method": "POST"
+				}`, upstreamServer.URL)),
+			},
+		}
+	})
+
+	baseURL := strings.Replace(g.URL, "http://", "ws://", 1)
+
+	clientConn, _, err := websocket.DefaultDialer.Dial(baseURL, http.Header{
+		header.SecWebSocketProtocol: {tws},
+	})
+	require.NoError(t, err, "client dial Tyk")
+	defer clientConn.Close()
+
+	require.NoError(t, clientConn.SetReadDeadline(time.Now().Add(10*time.Second)))
+	require.NoError(t, clientConn.WriteMessage(websocket.TextMessage, []byte(`{"type":"connection_init"}`)))
+	_, ackMsg, err := clientConn.ReadMessage()
+	require.NoError(t, err, "client read connection_ack")
+	require.Contains(t, string(ackMsg), `"type":"connection_ack"`)
+
+	const subID = "sub-full"
+	subFrame := fmt.Sprintf(`{"id":%q,"type":"subscribe","payload":{"query":"subscription { messages { body } }"}}`, subID)
+	require.NoError(t, clientConn.WriteMessage(websocket.TextMessage, []byte(subFrame)))
+
+	// Read three `next` frames and one `complete` frame, with a 10s
+	// overall budget. The resolver dispatches per-subscription updates
+	// concurrently (via Resolver.triggerUpdatePool.Submit), so the three
+	// `next` frames can race relative to one another — assert set
+	// equality rather than strict ordering.
+	var (
+		nextPayloads []string
+		gotComplete  bool
+	)
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) && (len(nextPayloads) < 3 || !gotComplete) {
+		require.NoError(t, clientConn.SetReadDeadline(time.Now().Add(2*time.Second)))
+		_, msg, err := clientConn.ReadMessage()
+		if err != nil {
+			t.Fatalf("client read failed after %d nexts (complete=%v): %v", len(nextPayloads), gotComplete, err)
+		}
+		typ, _ := jsonparser.GetString(msg, "type")
+		switch typ {
+		case "next":
+			body, _ := jsonparser.GetString(msg, "payload", "data", "messages", "body")
+			nextPayloads = append(nextPayloads, body)
+		case "complete":
+			gotComplete = true
+		case "error":
+			t.Fatalf("subscription returned error frame: %s", string(msg))
+		}
+	}
+
+	assert.ElementsMatch(t, []string{"msg-1", "msg-2", "msg-3"}, nextPayloads, "client must receive all three next frames")
+	assert.True(t, gotComplete, "client must receive a complete frame")
+}
+
+// TestGraphQLMiddleware_V3_Subscription_HeadersForwarded asserts that
+// headers configured on a UDG GraphQL data source propagate to the
+// upstream WebSocket upgrade request when a subscription is started.
+//
+// The mock upstream's HTTP handler inspects `X-Test-Auth` BEFORE upgrading
+// — if it's missing or wrong, the upgrade fails and the gateway-side
+// subscription never receives an event. The client therefore proves
+// header forwarding by successfully receiving the `next` frame.
+//
+// Mirrors the V2 "should send configured headers upstream" subscription
+// test pattern but exercises the V3 graphqldatasource subscription client.
+func TestGraphQLMiddleware_V3_Subscription_HeadersForwarded(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	cfg := g.Gw.GetConfig()
+	cfg.HttpServerOptions.EnableWebSockets = true
+	g.Gw.SetConfig(cfg)
+
+	const tws = "graphql-transport-ws"
+	const expectedAuth = "Bearer abc"
+
+	upstreamUpgrader := websocket.Upgrader{
+		Subprotocols: []string{tws},
+		CheckOrigin:  func(r *http.Request) bool { return true },
+	}
+	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Reject the WS upgrade up-front when the auth header is missing
+		// or wrong. The V3 graphqldatasource subscription client passes
+		// data-source `headers` through to its underlying http upgrade.
+		if r.Header.Get("X-Test-Auth") != expectedAuth {
+			http.Error(w, "missing or wrong X-Test-Auth header", http.StatusUnauthorized)
+			return
+		}
+
+		conn, err := upstreamUpgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upstream upgrade failed: %v", err)
+			return
+		}
+		defer conn.Close()
+
+		_, initMsg, err := conn.ReadMessage()
+		if err != nil || !strings.Contains(string(initMsg), `"type":"connection_init"`) {
+			return
+		}
+		if err := conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"connection_ack"}`)); err != nil {
+			return
+		}
+
+		_, subMsg, err := conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		subID, _ := jsonparser.GetString(subMsg, "id")
+		if subID == "" {
+			return
+		}
+		_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf(
+			`{"id":%q,"type":"next","payload":{"data":{"messages":{"body":"auth-ok"}}}}`,
+			subID,
+		)))
+		_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf(`{"id":%q,"type":"complete"}`, subID)))
+
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}))
+	defer upstreamServer.Close()
+
+	schema := `
+		type Query { dummy: String }
+		type Message { body: String! }
+		type Subscription { messages: Message! }
+	`
+
+	g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+		spec.GraphQL.Schema = schema
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			{
+				Kind: apidef.GraphQLEngineDataSourceKindGraphQL,
+				Name: "messages_ds",
+				RootFields: []apidef.GraphQLTypeFields{
+					{Type: "Subscription", Fields: []string{"messages"}},
+					{Type: "Query", Fields: []string{"dummy"}},
+				},
+				Config: []byte(fmt.Sprintf(`{
+					"url": %q,
+					"method": "POST",
+					"headers": {"X-Test-Auth": "Bearer abc"}
+				}`, upstreamServer.URL)),
+			},
+		}
+	})
+
+	baseURL := strings.Replace(g.URL, "http://", "ws://", 1)
+
+	clientConn, _, err := websocket.DefaultDialer.Dial(baseURL, http.Header{
+		header.SecWebSocketProtocol: {tws},
+	})
+	require.NoError(t, err, "client dial Tyk")
+	defer clientConn.Close()
+
+	require.NoError(t, clientConn.SetReadDeadline(time.Now().Add(10*time.Second)))
+	require.NoError(t, clientConn.WriteMessage(websocket.TextMessage, []byte(`{"type":"connection_init"}`)))
+	_, ackMsg, err := clientConn.ReadMessage()
+	require.NoError(t, err, "client read connection_ack")
+	require.Contains(t, string(ackMsg), `"type":"connection_ack"`)
+
+	const subID = "sub-headers"
+	subFrame := fmt.Sprintf(`{"id":%q,"type":"subscribe","payload":{"query":"subscription { messages { body } }"}}`, subID)
+	require.NoError(t, clientConn.WriteMessage(websocket.TextMessage, []byte(subFrame)))
+
+	var (
+		gotNext     bool
+		nextBody    string
+		gotComplete bool
+	)
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) && (!gotNext || !gotComplete) {
+		require.NoError(t, clientConn.SetReadDeadline(time.Now().Add(2*time.Second)))
+		_, msg, err := clientConn.ReadMessage()
+		if err != nil {
+			t.Fatalf("client read failed (gotNext=%v complete=%v): %v", gotNext, gotComplete, err)
+		}
+		typ, _ := jsonparser.GetString(msg, "type")
+		switch typ {
+		case "next":
+			gotNext = true
+			nextBody, _ = jsonparser.GetString(msg, "payload", "data", "messages", "body")
+		case "complete":
+			gotComplete = true
+		case "error":
+			// If the upstream upgrade is rejected for missing the auth
+			// header, the resolver propagates an error frame back. Surface
+			// the payload so a regression is easy to diagnose.
+			t.Fatalf("subscription returned error frame (header forwarding likely broken): %s", string(msg))
+		}
+	}
+
+	require.True(t, gotNext, "client must receive a next frame — header forwarding likely broken if not")
+	assert.Equal(t, "auth-ok", nextBody, "next payload must come from the auth-ok branch")
+	assert.True(t, gotComplete, "client must receive a complete frame")
+}
 
 const (
 	gqlContinentQuery = `

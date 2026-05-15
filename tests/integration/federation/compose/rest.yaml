@@ -1,0 +1,21 @@
+# rover supergraph compose config for Cast 1 (REST upstream) and Cast 3
+# (partial-failure). The Tyk subgraph is the one with `subgraph_url` set
+# to the live Tyk listen path; rover fetches its SDL from `_service { sdl }`
+# so this file only needs to know the URL — the customer SDL travels
+# inside the live gateway.
+#
+# Scenario scripts substitute the ${TYK_URL} and ${STUB_URL} envvars via
+# `envsubst` before invoking rover.
+#
+# federation_version is pinned to the version the casts were recorded
+# against. Bump in lockstep with router/router.yaml if rolling forward.
+federation_version: =2.5.0
+subgraphs:
+  users:
+    routing_url: ${TYK_URL}
+    schema:
+      subgraph_url: ${TYK_URL}
+  posts:
+    routing_url: ${STUB_URL}
+    schema:
+      subgraph_url: ${STUB_URL}

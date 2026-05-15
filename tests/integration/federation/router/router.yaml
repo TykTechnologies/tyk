@@ -1,0 +1,19 @@
+# Apollo Router config used by every scenario in this harness.
+#
+# - include_subgraph_errors.all = true is required for Cast 3 to surface
+#   the per-entity 404 from Tyk back through the router; without it the
+#   router redacts subgraph error bodies.
+# - No subscription block: subscriptions through Apollo Router require
+#   a GraphOS commercial license (APOLLO_KEY / APOLLO_GRAPH_REF). Cast
+#   6 (subscriptions through the router) is intentionally not in this
+#   harness; see the PR description for context.
+# - Listen address is overridden on the command line by scenario scripts
+#   so they can pick a free port.
+include_subgraph_errors:
+  all: true
+
+# Lift the default subgraph timeout for slow CI machines. Real cast was
+# under 1s end to end.
+traffic_shaping:
+  all:
+    timeout: 30s

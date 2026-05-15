@@ -1,0 +1,15 @@
+# rover supergraph compose config for Cast 4 (proxy-mode passthrough).
+# Tyk sits in front of the stub Python subgraph and re-emits its SDL
+# (with @link auto-prepended) on `_service { sdl }`. From rover's point
+# of view the subgraph IS Tyk; the stub is invisible behind it.
+#
+# The second subgraph is intentionally absent from this scenario — Cast
+# 4 just verifies that Apollo Router can talk to a Tyk proxy fronting an
+# existing federated subgraph. If you want a multi-subgraph topology,
+# use both-positions.yaml.
+federation_version: =2.5.0
+subgraphs:
+  users:
+    routing_url: ${TYK_URL}
+    schema:
+      subgraph_url: ${TYK_URL}

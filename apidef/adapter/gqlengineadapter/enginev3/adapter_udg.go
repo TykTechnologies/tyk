@@ -3,10 +3,12 @@ package enginev3
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/graphql_datasource"
 	kafkadatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/kafka_datasource"
 	restdatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/rest_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/staticdatasource"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/plan"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -24,7 +26,15 @@ type UniversalDataGraph struct {
 func (u *UniversalDataGraph) EngineConfigV3() (*graphql.EngineV2Configuration, error) {
 	var err error
 	if u.Schema == nil {
-		u.Schema, err = parseSchema(u.ApiDefinition.GraphQL.Schema)
+		// The federation-aware schema augmentation is performed via the
+		// registered FederationProvider (EE only). CE's no-op provider returns
+		// the schema unchanged.
+		schemaStr := u.ApiDefinition.GraphQL.Schema
+		schemaStr, err = GetFederationProvider().AugmentSchema(schemaStr, u.ApiDefinition.GraphQL.ExecutionMode)
+		if err != nil {
+			return nil, err
+		}
+		u.Schema, err = parseSchema(schemaStr)
 		if err != nil {
 			return nil, err
 		}
@@ -37,6 +47,60 @@ func (u *UniversalDataGraph) EngineConfigV3() (*graphql.EngineV2Configuration, e
 	datsSources, err := u.engineConfigV2DataSources()
 	if err != nil {
 		return nil, err
+	}
+
+	// Federation hooks. The provider is registered in EE/dev builds via
+	// `gateway/mw_graphql_federation_ee.go::init`. CE builds use the no-op
+	// provider, which returns an empty entities data source (Factory == nil)
+	// and the customer's raw SDL — so the federation-internal data sources are
+	// not appended in CE.
+	provider := GetFederationProvider()
+
+	federatedSchemaSDL := string(u.Schema.Document())
+	entitiesDS, err := provider.BuildEntitiesDataSource(federatedSchemaSDL, u.ApiDefinition, u.HttpClient)
+	if err != nil {
+		return nil, err
+	}
+
+	if entitiesDS.Factory != nil {
+		datsSources = append(datsSources, entitiesDS)
+
+		// Add service datasource. ChildNodes for `_Service.sdl` are populated below by
+		// determineChildNodes against the federation-augmented schema, so the planner
+		// knows this data source can resolve `sdl` selections under `_service`.
+		serviceDataSource := plan.DataSourceConfiguration{
+			RootNodes: []plan.TypeField{
+				{
+					TypeName:   "Query",
+					FieldNames: []string{"_service"},
+				},
+			},
+			Factory: &staticdatasource.Factory{},
+			Custom: staticdatasource.ConfigJSON(staticdatasource.Configuration{
+				// Emit the federation-aware SDL: ServiceSDL preserves an explicit
+				// `@link` if the customer wrote one, auto-prepends a v2 `@link`
+				// when the SDL has `@key` but no version declaration, or returns
+				// the SDL untouched when there's nothing federation-shaped. For
+				// federation subgraphs it also strips any Query field that isn't
+				// backed by a data source — those would otherwise be routed to
+				// Tyk by Apollo Router and fail with "Failed to fetch from
+				// Subgraph at path 'query.<field>'".
+				Data: `{"_service":{"sdl":` + strconv.Quote(provider.ServiceSDL(u.ApiDefinition.GraphQL.Schema, u.ApiDefinition.GraphQL.Engine.DataSources)) + `}}`,
+			}),
+		}
+		datsSources = append(datsSources, serviceDataSource)
+
+		// Auto-populate ChildNodes for the entities and service data sources by
+		// walking the federation-augmented schema. We slice the just-appended
+		// federation-internal data sources in place — `determineChildNodes`
+		// mutates `ChildNodes` on each element, and the sub-slice shares
+		// backing storage with `datsSources` so the mutations propagate. The
+		// user data sources were already processed inside
+		// engineConfigV2DataSources; re-running them here would duplicate
+		// entries.
+		if err := u.determineChildNodes(datsSources[len(datsSources)-2:]); err != nil {
+			return nil, err
+		}
 	}
 
 	conf.SetFieldConfigurations(fieldConfigs)

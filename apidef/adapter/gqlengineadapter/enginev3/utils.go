@@ -136,11 +136,19 @@ func createGraphQLDataSourceFactory(params createGraphQLDataSourceFactoryParams)
 }
 
 func graphqlDataSourceWebSocketProtocol(subscriptionType apidef.SubscriptionType) string {
-	wsProtocol := graphqldatasource.ProtocolGraphQLWS
-	if subscriptionType == apidef.GQLSubscriptionTransportWS {
-		wsProtocol = graphqldatasource.ProtocolGraphQLTWS
+	// V3 default flip: when no `subscription_type` is configured on a GraphQL
+	// data source, V3 defaults to `graphql-transport-ws` (the modern Apollo
+	// subprotocol) rather than the legacy `graphql-ws`. V3 is Preview-labeled,
+	// so this is not a back-compat concern; explicit `graphql-ws` /
+	// `graphql-transport-ws` / `sse` settings are still respected as written.
+	switch subscriptionType {
+	case apidef.GQLSubscriptionWS:
+		return graphqldatasource.ProtocolGraphQLWS
+	case apidef.GQLSubscriptionTransportWS:
+		return graphqldatasource.ProtocolGraphQLTWS
+	default:
+		return graphqldatasource.ProtocolGraphQLTWS
 	}
-	return wsProtocol
 }
 
 func createArgumentConfigurationsForArgumentNames(argumentNames ...string) plan.ArgumentsConfigurations {

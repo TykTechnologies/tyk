@@ -137,6 +137,10 @@ func (e *EngineV1) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.
 		return err, http.StatusBadRequest
 	}
 
+	// GraphQL-over-HTTP spec: `"variables": null` == omitted variables key.
+	// See normalizeNullVariables for the full rationale.
+	gqlRequest.Variables = normalizeNullVariables(gqlRequest.Variables)
+
 	e.ctxStoreRequestFunc(r, &gqlRequest)
 	return e.graphqlRequestProcessor.ProcessRequest(r.Context(), w, r)
 }

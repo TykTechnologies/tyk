@@ -1,0 +1,20 @@
+# rover supergraph compose config for Cast 5: Tyk in BOTH positions
+# inside the same supergraph.
+#
+# Topology (left to right, request flow):
+#
+#   client -> apollo-router -> users-subgraph    (Tyk #1, UDG/REST upstream)
+#                          \-> posts-subgraph    (Tyk #2, proxyOnly fronting Python stub)
+#
+# Both ${TYK_URL} (subgraph) and ${TYK_PROXY_URL} (proxy) are populated
+# by the scenario script before rover runs.
+federation_version: =2.5.0
+subgraphs:
+  users:
+    routing_url: ${TYK_URL}
+    schema:
+      subgraph_url: ${TYK_URL}
+  posts:
+    routing_url: ${TYK_PROXY_URL}
+    schema:
+      subgraph_url: ${TYK_PROXY_URL}
