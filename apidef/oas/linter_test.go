@@ -105,6 +105,11 @@ func TestXTykGateway_Lint(t *testing.T) {
 			settings.Middleware.Global.TrafficLogs.Plugins[i].RequireSession = false
 		}
 
+		for _, operation := range settings.Middleware.Operations {
+			operation.EnforceTimeout.Value = 2
+			operation.EnforceTimeout.Timeout = ReadableDuration(2 * time.Second)
+		}
+
 		settings.Upstream.Authentication = &UpstreamAuth{
 			Enabled:   false,
 			BasicAuth: nil,
