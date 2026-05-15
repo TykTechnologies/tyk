@@ -1705,7 +1705,7 @@ func TestFromDashboardServiceAutoRecovery(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/register/node") {
 			registrationCount++
 			w.Header().Set("Content-Type", "application/json")
-			response := NodeResponseOK{
+			response := NodeResponse{
 				Status:  "ok",
 				Message: map[string]string{"NodeID": "test-node-id"},
 				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
@@ -1893,7 +1893,7 @@ func TestFromDashboardServiceNoNodeIDFound(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/register/node") {
 			registrationCount++
 			w.Header().Set("Content-Type", "application/json")
-			response := NodeResponseOK{
+			response := NodeResponse{
 				Status:  "ok",
 				Message: map[string]string{"NodeID": "test-node-id"},
 				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
@@ -2079,7 +2079,7 @@ func TestFromDashboardServiceNetworkErrorRecovery(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/register/node") {
 			registrationCount++
 			w.Header().Set("Content-Type", "application/json")
-			response := NodeResponseOK{
+			response := NodeResponse{
 				Status:  "ok",
 				Message: map[string]string{"NodeID": "test-node-id"},
 				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
