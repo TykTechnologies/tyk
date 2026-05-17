@@ -45,12 +45,36 @@ type DerivedTool struct {
 	InputSchema map[string]any `json:"inputSchema"`
 }
 
+const (
+	// MCPPrimitiveTypeTool is the only primitive type emitted in v1.
+	MCPPrimitiveTypeTool = "tool"
+	// MCPPrimitiveTypeResource is reserved for a future resource catalogue.
+	MCPPrimitiveTypeResource = "resource"
+)
+
+// DerivedPrimitive is the internal primitive-aware catalogue entry used by the
+// REST-to-MCP derivation layer. V1 emits only tool primitives; resources are
+// reserved for v2 without changing this catalogue shape again.
+type DerivedPrimitive struct {
+	Type string      `json:"type"`
+	Tool DerivedTool `json:"tool,omitempty"`
+}
+
 // DeriveWarning describes a non-fatal issue encountered while deriving
 // tools — for example, a collision between two operationIds after
 // sanitisation, or a parameter type that could not be represented.
 type DeriveWarning struct {
 	Operation string
+	Method    string
+	Path      string
 	Reason    string
+}
+
+// DeriveSourcePrimitives walks a REST OAS document and produces the internal
+// primitive catalogue for the synthetic MCP adapter. V1 emits only tool
+// primitives.
+func DeriveSourcePrimitives(srcOAS *OAS) ([]DerivedPrimitive, []DeriveWarning, error) {
+	return deriveSourcePrimitives(srcOAS, nil)
 }
 
 // DeriveSourceTools walks a REST OAS document and produces a runtime
@@ -68,6 +92,25 @@ type DeriveWarning struct {
 // Tools are returned in deterministic (alphabetical-by-name) order so
 // reload-to-reload diffs are stable.
 func DeriveSourceTools(srcOAS *OAS, expose []string) ([]DerivedTool, []DeriveWarning, error) {
+	primitives, warnings, err := deriveSourcePrimitives(srcOAS, expose)
+	if err != nil {
+		return nil, warnings, err
+	}
+	return ToolPrimitives(primitives), warnings, nil
+}
+
+// ToolPrimitives projects tool primitives into SDK-facing DerivedTool entries.
+func ToolPrimitives(primitives []DerivedPrimitive) []DerivedTool {
+	tools := make([]DerivedTool, 0, len(primitives))
+	for _, primitive := range primitives {
+		if primitive.Type == MCPPrimitiveTypeTool {
+			tools = append(tools, primitive.Tool)
+		}
+	}
+	return tools
+}
+
+func deriveSourcePrimitives(srcOAS *OAS, expose []string) ([]DerivedPrimitive, []DeriveWarning, error) {
 	var exposeSet map[string]struct{}
 	if len(expose) > 0 {
 		exposeSet = make(map[string]struct{}, len(expose))
@@ -80,29 +123,16 @@ func DeriveSourceTools(srcOAS *OAS, expose []string) ([]DerivedTool, []DeriveWar
 	}
 
 	var (
-		tools    []DerivedTool
-		warnings []DeriveWarning
-		seen     = map[string]bool{}
+		primitives []DerivedPrimitive
+		warnings   []DeriveWarning
+		seen       = map[string]bool{}
 	)
 
 	if srcOAS.Paths == nil {
-		return tools, warnings, nil
+		return primitives, warnings, nil
 	}
 
-	// Operations marked `internal.enabled: true` in the Tyk extension are
-	// hidden from the public listenPath; the adapter loop bypasses that
-	// check, so we must filter them out at derivation time.
-	var internalOps map[string]bool
-	if ext := srcOAS.GetTykExtension(); ext != nil && ext.Middleware != nil {
-		for opID, op := range ext.Middleware.Operations {
-			if op != nil && op.Internal != nil && op.Internal.Enabled {
-				if internalOps == nil {
-					internalOps = map[string]bool{}
-				}
-				internalOps[opID] = true
-			}
-		}
-	}
+	visibility := sourceOperationVisibilityFromOAS(srcOAS)
 
 	pathKeys := make([]string, 0, len(srcOAS.Paths.Map()))
 	for k := range srcOAS.Paths.Map() {
@@ -121,15 +151,19 @@ func DeriveSourceTools(srcOAS *OAS, expose []string) ([]DerivedTool, []DeriveWar
 			if rawName == "" {
 				warnings = append(warnings, DeriveWarning{
 					Operation: fmt.Sprintf("%s %s", mo.method, mo.path),
+					Method:    mo.method,
+					Path:      mo.path,
 					Reason:    "missing operationId",
 				})
 				continue
 			}
 
-			if internalOps[rawName] {
+			if reason := visibility.skipReason(rawName); reason != "" {
 				warnings = append(warnings, DeriveWarning{
 					Operation: rawName,
-					Reason:    "operation marked internal — skipped",
+					Method:    mo.method,
+					Path:      mo.path,
+					Reason:    reason,
 				})
 				continue
 			}
@@ -138,6 +172,8 @@ func DeriveSourceTools(srcOAS *OAS, expose []string) ([]DerivedTool, []DeriveWar
 			if name == "" {
 				warnings = append(warnings, DeriveWarning{
 					Operation: rawName,
+					Method:    mo.method,
+					Path:      mo.path,
 					Reason:    "operationId sanitises to empty string",
 				})
 				continue
@@ -146,6 +182,8 @@ func DeriveSourceTools(srcOAS *OAS, expose []string) ([]DerivedTool, []DeriveWar
 			if seen[name] {
 				warnings = append(warnings, DeriveWarning{
 					Operation: rawName,
+					Method:    mo.method,
+					Path:      mo.path,
 					Reason:    "tool name collision after sanitisation",
 				})
 				continue
@@ -161,20 +199,74 @@ func DeriveSourceTools(srcOAS *OAS, expose []string) ([]DerivedTool, []DeriveWar
 
 			locs, schema := deriveParams(item, mo.op)
 
-			tools = append(tools, DerivedTool{
-				Name:           name,
-				Description:    operationDescription(mo.op),
-				Method:         mo.method,
-				PathTemplate:   mo.path,
-				ParamLocations: locs,
-				InputSchema:    schema,
+			primitives = append(primitives, DerivedPrimitive{
+				Type: MCPPrimitiveTypeTool,
+				Tool: DerivedTool{
+					Name:           name,
+					Description:    operationDescription(mo.op),
+					Method:         mo.method,
+					PathTemplate:   mo.path,
+					ParamLocations: locs,
+					InputSchema:    schema,
+				},
 			})
 		}
 	}
 
-	sort.Slice(tools, func(i, j int) bool { return tools[i].Name < tools[j].Name })
+	sort.Slice(primitives, func(i, j int) bool { return primitives[i].Tool.Name < primitives[j].Tool.Name })
 
-	return tools, warnings, nil
+	return primitives, warnings, nil
+}
+
+type sourceOperationVisibility struct {
+	allowListEnabled bool
+	allowed          map[string]bool
+	blocked          map[string]bool
+	internal         map[string]bool
+}
+
+func sourceOperationVisibilityFromOAS(srcOAS *OAS) sourceOperationVisibility {
+	visibility := sourceOperationVisibility{
+		allowed:  map[string]bool{},
+		blocked:  map[string]bool{},
+		internal: map[string]bool{},
+	}
+	if srcOAS == nil {
+		return visibility
+	}
+	ext := srcOAS.GetTykExtension()
+	if ext == nil || ext.Middleware == nil {
+		return visibility
+	}
+	for opID, op := range ext.Middleware.Operations {
+		if op == nil {
+			continue
+		}
+		if op.Allow != nil && op.Allow.Enabled {
+			visibility.allowListEnabled = true
+			visibility.allowed[opID] = true
+		}
+		if op.Block != nil && op.Block.Enabled {
+			visibility.blocked[opID] = true
+		}
+		if op.Internal != nil && op.Internal.Enabled {
+			visibility.internal[opID] = true
+		}
+	}
+	return visibility
+}
+
+func (v sourceOperationVisibility) skipReason(operationID string) string {
+	if v.internal[operationID] {
+		return "operation marked internal - skipped"
+	}
+	if v.blocked[operationID] {
+		return "operation marked blocked - skipped"
+	}
+	if v.allowListEnabled && !v.allowed[operationID] {
+		return "operation not in source allow-list - skipped"
+	}
+	return ""
 }
 
 type derivedOp struct {

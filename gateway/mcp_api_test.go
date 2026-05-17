@@ -9,11 +9,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/mcp/pairing"
 )
 
 func TestExtractMCPObjFromReq(t *testing.T) {
@@ -502,6 +505,80 @@ func TestValidateMCP_EdgeCases(t *testing.T) {
 		assert.True(t, nextCalled, "next handler should be called for DELETE")
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
+}
+
+func pairedMCPProxyOAS(proxyID, orgID, restID string) *oas.OAS {
+	doc := &oas.OAS{T: openapi3.T{
+		OpenAPI: "3.0.3",
+		Info:    &openapi3.Info{Title: proxyID, Version: "1.0.0"},
+		Paths:   openapi3.NewPaths(),
+	}}
+	doc.SetTykExtension(&oas.XTykAPIGateway{
+		Info: oas.Info{
+			ID:    proxyID,
+			OrgID: orgID,
+			Name:  proxyID,
+			State: oas.State{Active: true},
+		},
+		Server: oas.Server{
+			ListenPath: oas.ListenPath{Value: "/" + proxyID + "/"},
+		},
+		Upstream: oas.Upstream{URL: oas.AdapterLoopURL(restID)},
+	})
+	return doc
+}
+
+func TestValidatePairedMCPAdapterUpstream_AllowsUnmarkedRESTSource(t *testing.T) {
+	t.Parallel()
+
+	gw := &Gateway{
+		apisByID: map[string]*APISpec{
+			"rest-1": {APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-1"}},
+		},
+		mcpPairing: pairing.New(),
+	}
+
+	msg, code := gw.validatePairedMCPAdapterUpstream(httptest.NewRequest(http.MethodPost, "/tyk/mcps", nil), pairedMCPProxyOAS("proxy-1", "org-1", "rest-1"))
+
+	assert.Empty(t, msg)
+	assert.Zero(t, code)
+}
+
+func TestValidatePairedMCPAdapterUpstream_AllowsMultipleSameOrgProxies(t *testing.T) {
+	t.Parallel()
+
+	idx := pairing.New()
+	idx.Set(
+		map[string]string{"rest-1": oas.AdapterAPIID("rest-1")},
+		map[string]map[string]struct{}{"rest-1": {"proxy-1": {}}},
+	)
+	gw := &Gateway{
+		apisByID: map[string]*APISpec{
+			"rest-1": {APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-1"}},
+		},
+		mcpPairing: idx,
+	}
+
+	msg, code := gw.validatePairedMCPAdapterUpstream(httptest.NewRequest(http.MethodPost, "/tyk/mcps", nil), pairedMCPProxyOAS("proxy-2", "org-1", "rest-1"))
+
+	assert.Empty(t, msg)
+	assert.Zero(t, code)
+}
+
+func TestValidatePairedMCPAdapterUpstream_RejectsCrossOrgProxy(t *testing.T) {
+	t.Parallel()
+
+	gw := &Gateway{
+		apisByID: map[string]*APISpec{
+			"rest-1": {APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-1"}},
+		},
+		mcpPairing: pairing.New(),
+	}
+
+	msg, code := gw.validatePairedMCPAdapterUpstream(httptest.NewRequest(http.MethodPost, "/tyk/mcps", nil), pairedMCPProxyOAS("proxy-1", "org-2", "rest-1"))
+
+	assert.Equal(t, http.StatusForbidden, code)
+	assert.Contains(t, msg, "different OrgID")
 }
 
 func TestHandleGetMCPListOAS(t *testing.T) {

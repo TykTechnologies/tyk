@@ -669,18 +669,14 @@ type APIDefinition struct {
 	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
 	JsonRpcVersion      string         `bson:"json_rpc_version,omitempty" json:"json_rpc_version,omitempty"`
 	ApplicationProtocol string         `bson:"application_protocol,omitempty" json:"application_protocol,omitempty"`
-	// MCPExposure marks a REST API as MCP-callable. When Enabled is true the
-	// gateway loader synthesises a paired adapter spec (Layer B) so that an
-	// operator-managed MCP proxy can route agent tools/call into this API.
-	MCPExposure      MCPExposureConfig `bson:"mcp_exposure,omitempty" json:"mcp_exposure,omitempty"`
-	APIID            string            `bson:"api_id" json:"api_id"`
-	OrgID            string            `bson:"org_id" json:"org_id"`
-	UseKeylessAccess bool              `bson:"use_keyless" json:"use_keyless"`
-	UseOauth2        bool              `bson:"use_oauth2" json:"use_oauth2"`
-	ExternalOAuth    ExternalOAuth     `bson:"external_oauth" json:"external_oauth"`
-	UseOpenID        bool              `bson:"use_openid" json:"use_openid"`
-	OpenIDOptions    OpenIDOptions     `bson:"openid_options" json:"openid_options"`
-	Oauth2Meta       struct {
+	APIID               string         `bson:"api_id" json:"api_id"`
+	OrgID               string         `bson:"org_id" json:"org_id"`
+	UseKeylessAccess    bool           `bson:"use_keyless" json:"use_keyless"`
+	UseOauth2           bool           `bson:"use_oauth2" json:"use_oauth2"`
+	ExternalOAuth       ExternalOAuth  `bson:"external_oauth" json:"external_oauth"`
+	UseOpenID           bool           `bson:"use_openid" json:"use_openid"`
+	OpenIDOptions       OpenIDOptions  `bson:"openid_options" json:"openid_options"`
+	Oauth2Meta          struct {
 		AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
@@ -1455,25 +1451,6 @@ func (a *APIDefinition) IsMCP() bool {
 // MarkAsMCP configures the API definition as a Model Context Protocol (MCP) API.
 func (a *APIDefinition) MarkAsMCP() {
 	a.SetProtocol(JsonRPC20, AppProtocolMCP)
-}
-
-// MCPExposureConfig is the apidef-side persistence of the OAS
-// `server.mcp` marker. It does not itself wire any middleware — the loader
-// reads Enabled and synthesises a paired Internal adapter spec at load time.
-type MCPExposureConfig struct {
-	// Enabled marks this REST API as MCP-callable. The loader emits a paired
-	// adapter spec with APIID "<this-apiid>__mcp-server".
-	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
-	// Expose is an optional allow-list of sanitised operationIds. When nil
-	// or empty, every operation in the source OAS becomes a tool ("expose
-	// all" default). When non-empty, only operations whose sanitised
-	// operationId appears in the list are exposed.
-	Expose []string `bson:"expose,omitempty" json:"expose,omitempty"`
-}
-
-// IsMCPExposed returns true if the REST API is marked for MCP exposure.
-func (a *APIDefinition) IsMCPExposed() bool {
-	return a.MCPExposure.Enabled
 }
 
 // IsPairedMCPAdapterProxy returns true if this API is a REST-as-MCP proxy

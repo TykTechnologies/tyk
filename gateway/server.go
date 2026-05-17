@@ -181,9 +181,9 @@ type Gateway struct {
 
 	policies *model.Policies
 
-	// mcpPairing maintains the REST→proxy and REST→adapter mappings used
-	// by MCPLoopAuthBypass and validateMCP to enforce the 1:1
-	// paired-proxy trust model. Rebuilt in full on every loadApps;
+	// mcpPairing maintains the REST→allowed-proxy-set and REST→adapter mappings
+	// used by MCPLoopAuthBypass to enforce the paired-proxy trust model.
+	// Rebuilt in full on every loadApps;
 	// read-only between reloads. The underlying type is gateway-
 	// agnostic (internal/mcp/pairing) so middlewares can be unit-tested
 	// against a fake Lookup.

@@ -49,14 +49,6 @@ type Server struct {
 	// Tyk classic API definition: `enable_batch_request_support`.
 	BatchProcessing *BatchProcessing `bson:"batchProcessing,omitempty" json:"batchProcessing,omitempty"`
 
-	// MCP marks a REST API as MCP-callable. When MCP.Enabled is true the
-	// gateway loader synthesises a paired Internal adapter spec; an
-	// operator-managed MCP proxy APIDef (POSTed to /tyk/mcps) then routes
-	// agent tools/call into this API.
-	//
-	// Tyk classic API definition: `mcp_exposure`.
-	MCP *MCP `bson:"mcp,omitempty" json:"mcp,omitempty"`
-
 	// Protocol configures the HTTP protocol used by the API.
 	// Possible values are:
 	// - "http": Standard HTTP/1.1 protocol
@@ -131,7 +123,6 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 
 	s.fillIPAccessControl(api)
 	s.fillBatchProcessing(api)
-	s.fillMCP(api)
 }
 
 // ExtractTo extracts *Server into *apidef.APIDefinition.
@@ -196,7 +187,6 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 
 	s.extractIPAccessControlTo(api)
 	s.extractBatchProcessingTo(api)
-	s.extractMCPTo(api)
 }
 
 // ListenPath is the base path on Tyk to which requests for this API
@@ -441,27 +431,4 @@ func (s *Server) extractBatchProcessingTo(api *apidef.APIDefinition) {
 	}
 
 	s.BatchProcessing.ExtractTo(api)
-}
-
-func (s *Server) fillMCP(api apidef.APIDefinition) {
-	if s.MCP == nil {
-		s.MCP = &MCP{}
-	}
-
-	s.MCP.Fill(api)
-
-	if ShouldOmit(s.MCP) {
-		s.MCP = nil
-	}
-}
-
-func (s *Server) extractMCPTo(api *apidef.APIDefinition) {
-	if s.MCP == nil {
-		s.MCP = &MCP{}
-		defer func() {
-			s.MCP = nil
-		}()
-	}
-
-	s.MCP.ExtractTo(api)
 }

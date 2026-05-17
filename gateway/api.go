@@ -1525,8 +1525,8 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 	fs := afero.NewOsFs()
 
 	if spec.IsOAS {
-		if proxyID, paired := gw.pairedMCPProxyForREST(apiID); paired {
-			return apiError("REST API is exposed by MCP proxy " + proxyID + "; delete the MCP proxy first"), http.StatusConflict
+		if proxyIDs := gw.pairedMCPProxiesForREST(apiID); len(proxyIDs) > 0 {
+			return apiError("REST API is exposed by MCP proxies " + strings.Join(proxyIDs, ", ") + "; delete the MCP proxies first"), http.StatusConflict
 		}
 
 		if err := deleteAPIFiles(apiID, "oas", gw.GetConfig().AppPath, fs); err != nil {

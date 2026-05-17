@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	neturl "net/url"
+	"sort"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -107,9 +108,7 @@ func pairedMCPAdapterTarget(target string) (adapterID, restAPIID string, ok bool
 // Checks:
 //
 //  1. The named REST APISpec exists in apisByID.
-//  2. That REST spec has `server.mcp.enabled: true`.
-//  3. The REST spec and the incoming proxy share an OrgID.
-//  4. No other admitted proxy already targets the same adapter (1:1).
+//  2. The REST spec and the incoming proxy share an OrgID.
 func (gw *Gateway) validatePairedMCPAdapterUpstream(r *http.Request, mcpObj *oas.OAS) (string, int) {
 	if mcpObj == nil {
 		return "", 0
@@ -135,23 +134,12 @@ func (gw *Gateway) validatePairedMCPAdapterUpstream(r *http.Request, mcpObj *oas
 	gw.apisMu.RLock()
 	rest, ok := gw.apisByID[restAPIID]
 	gw.apisMu.RUnlock()
-	pairingClone := gw.mcpPairing.PairingSnapshot()
 
 	if !ok || rest == nil || rest.APIDefinition == nil {
 		return "Paired REST API " + restAPIID + " is not loaded; create it first", http.StatusBadRequest
 	}
-	if !rest.IsMCPExposed() {
-		return "Paired REST API " + restAPIID + " is not marked server.mcp.enabled=true", http.StatusBadRequest
-	}
 	if rest.OrgID != temp.OrgID {
 		return "Paired REST API belongs to a different OrgID", http.StatusForbidden
-	}
-
-	// 1:1 invariant — reject if another proxy already targets this
-	// adapter, unless the request is updating the same proxy that
-	// already holds the pairing.
-	if existing, paired := pairingClone[restAPIID]; paired && existing != temp.APIID {
-		return "Paired REST API is already exposed by MCP proxy " + existing, http.StatusConflict
 	}
 
 	_ = r // r is only used for context elsewhere; keep parameter for future audit-logging.
@@ -189,21 +177,23 @@ func (gw *Gateway) alignPairedMCPProxyGatewayTags(apiDef *apidef.APIDefinition, 
 	return nil
 }
 
-func (gw *Gateway) pairedMCPProxyForREST(restAPIID string) (string, bool) {
+func (gw *Gateway) pairedMCPProxiesForREST(restAPIID string) []string {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
 
+	var proxies []string
 	for _, spec := range gw.apisByID {
 		if spec == nil || spec.APIDefinition == nil || !spec.IsMCPManaged() || spec.IsSyntheticMCPAdapter {
 			continue
 		}
 		_, sourceRESTAPIID, ok := pairedMCPAdapterTarget(spec.Proxy.TargetURL)
 		if ok && sourceRESTAPIID == restAPIID {
-			return spec.APIID, true
+			proxies = append(proxies, spec.APIID)
 		}
 	}
 
-	return "", false
+	sort.Strings(proxies)
+	return proxies
 }
 
 func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int) {

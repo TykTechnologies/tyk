@@ -1,70 +1,78 @@
-// Package pairing maintains the 1:1 mapping between an MCP proxy APIID
-// and the source REST APIID it loops into via a synthetic adapter.
+// Package pairing maintains the mapping between source REST APIIDs,
+// synthetic adapter APIIDs, and the MCP proxy APIIDs admitted to call them.
 //
 // The package is gateway-agnostic. It exposes a concrete Index struct
-// (the writer side, used by the loader on every reload) and two narrow
-// interfaces (Lookup, AdapterLookup) consumed by middlewares and admit-
-// time validators so they can be unit-tested without instantiating a
-// Gateway.
+// (the writer side, used by the loader on every reload) and narrow
+// interfaces consumed by middlewares so they can be unit-tested without
+// instantiating a Gateway.
 package pairing
 
-import "sync"
+import (
+	"sort"
+	"sync"
+)
 
-// Lookup answers "is this REST APIID paired with that MCP proxy?".
-// Middlewares accept this interface so a test fake can supply a fixed
-// mapping without standing up the full Gateway.
+// AllowedProxySet maps restAPIID to the proxy APIIDs admitted to call it.
+type AllowedProxySet map[string]map[string]struct{}
+
+// Lookup answers "is this MCP proxy admitted to call that REST APIID?".
+// Middlewares accept this interface so a test fake can supply a fixed mapping
+// without standing up the full Gateway.
 type Lookup interface {
-	// ProxyForREST returns the operator-managed MCP proxy APIID that is
-	// admitted to loop into the given REST APIID, and a bool indicating
-	// whether any pairing was recorded.
-	ProxyForREST(restAPIID string) (proxyAPIID string, ok bool)
+	// ProxyAllowedForREST reports whether proxyAPIID is admitted to loop into
+	// restAPIID through the shared synthetic adapter.
+	ProxyAllowedForREST(restAPIID, proxyAPIID string) bool
 }
 
-// AdapterLookup answers "what is the synthetic adapter APIID paired
-// with this REST APIID?". Useful for diagnostics and admin endpoints.
+// AdapterLookup answers "what is the synthetic adapter APIID paired with this
+// REST APIID?". Useful for diagnostics and admin endpoints.
 type AdapterLookup interface {
 	AdapterForREST(restAPIID string) (adapterAPIID string, ok bool)
 }
 
-// Index is the canonical pairing store. It is safe for concurrent read
-// after Set has been called; callers must not call Set concurrently
-// with reads. The gateway pattern is: rebuild a fresh Index under the
-// reload lock, then atomically swap.
+// Index is the canonical pairing store. It is safe for concurrent read after
+// Set has been called; callers must not call Set concurrently with reads. The
+// gateway pattern is: rebuild a fresh Index under the reload lock, then
+// atomically swap.
 type Index struct {
-	mu      sync.RWMutex
-	pairing map[string]string // restAPIID → proxyAPIID
-	adapter map[string]string // restAPIID → adapterAPIID
+	mu sync.RWMutex
+
+	adapter        map[string]string // restAPIID -> adapterAPIID
+	allowedProxies AllowedProxySet   // restAPIID -> proxy APIID set
 }
 
 // New returns an empty Index ready for Set.
 func New() *Index {
 	return &Index{
-		pairing: map[string]string{},
-		adapter: map[string]string{},
+		adapter:        map[string]string{},
+		allowedProxies: AllowedProxySet{},
 	}
 }
 
-// Set replaces both maps atomically. The maps are taken over by the
-// Index; callers must not retain references.
-func (i *Index) Set(pairing, adapter map[string]string) {
+// Set replaces both maps atomically.
+func (i *Index) Set(adapter map[string]string, allowedProxies AllowedProxySet) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	if pairing == nil {
-		pairing = map[string]string{}
-	}
 	if adapter == nil {
 		adapter = map[string]string{}
 	}
-	i.pairing = pairing
-	i.adapter = adapter
+	if allowedProxies == nil {
+		allowedProxies = AllowedProxySet{}
+	}
+	i.adapter = cloneAdapterMap(adapter)
+	i.allowedProxies = cloneAllowedProxySet(allowedProxies)
 }
 
-// ProxyForREST satisfies Lookup.
-func (i *Index) ProxyForREST(restAPIID string) (string, bool) {
+// ProxyAllowedForREST satisfies Lookup.
+func (i *Index) ProxyAllowedForREST(restAPIID, proxyAPIID string) bool {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
-	v, ok := i.pairing[restAPIID]
-	return v, ok
+	proxies, ok := i.allowedProxies[restAPIID]
+	if !ok {
+		return false
+	}
+	_, ok = proxies[proxyAPIID]
+	return ok
 }
 
 // AdapterForREST satisfies AdapterLookup.
@@ -75,24 +83,65 @@ func (i *Index) AdapterForREST(restAPIID string) (string, bool) {
 	return v, ok
 }
 
-// PairingSnapshot returns a defensive copy of the proxy mapping. Used
-// by validateMCP at admit time to enforce the 1:1 invariant.
-func (i *Index) PairingSnapshot() map[string]string {
+// AllowedProxiesForREST returns the admitted proxy APIIDs for restAPIID in
+// deterministic order.
+func (i *Index) AllowedProxiesForREST(restAPIID string) ([]string, bool) {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
-	out := make(map[string]string, len(i.pairing))
-	for k, v := range i.pairing {
+	proxies, ok := i.allowedProxies[restAPIID]
+	if !ok {
+		return nil, false
+	}
+	out := make([]string, 0, len(proxies))
+	for proxyID := range proxies {
+		out = append(out, proxyID)
+	}
+	sort.Strings(out)
+	return out, true
+}
+
+// AllowedProxiesSnapshot returns a defensive copy of the allowed proxy mapping.
+func (i *Index) AllowedProxiesSnapshot() map[string]map[string]bool {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	out := make(map[string]map[string]bool, len(i.allowedProxies))
+	for restID, proxies := range i.allowedProxies {
+		out[restID] = make(map[string]bool, len(proxies))
+		for proxyID := range proxies {
+			out[restID][proxyID] = true
+		}
+	}
+	return out
+}
+
+// Static is a Lookup implementation backed by a fixed map. Convenient for tests.
+type Static AllowedProxySet
+
+// ProxyAllowedForREST satisfies Lookup.
+func (s Static) ProxyAllowedForREST(restAPIID, proxyAPIID string) bool {
+	proxies, ok := s[restAPIID]
+	if !ok {
+		return false
+	}
+	_, ok = proxies[proxyAPIID]
+	return ok
+}
+
+func cloneAdapterMap(in map[string]string) map[string]string {
+	out := make(map[string]string, len(in))
+	for k, v := range in {
 		out[k] = v
 	}
 	return out
 }
 
-// Static is a Lookup implementation backed by a fixed map. Convenient
-// for tests.
-type Static map[string]string
-
-// ProxyForREST satisfies Lookup.
-func (s Static) ProxyForREST(restAPIID string) (string, bool) {
-	v, ok := s[restAPIID]
-	return v, ok
+func cloneAllowedProxySet(in AllowedProxySet) AllowedProxySet {
+	out := make(AllowedProxySet, len(in))
+	for restID, proxies := range in {
+		out[restID] = make(map[string]struct{}, len(proxies))
+		for proxyID := range proxies {
+			out[restID][proxyID] = struct{}{}
+		}
+	}
+	return out
 }

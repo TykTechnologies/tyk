@@ -17,12 +17,13 @@ func (m *MCPLoopAuthRestore) Name() string {
 	return "MCPLoopAuthRestore"
 }
 
-// EnabledForSpec returns true only on REST APIs that opted into MCP exposure.
+// EnabledForSpec returns true on non-MCP, non-synthetic APIs where
+// MCPLoopAuthBypass may have installed a temporary bypass status.
 func (m *MCPLoopAuthRestore) EnabledForSpec() bool {
 	if m.Spec == nil || m.Spec.APIDefinition == nil {
 		return false
 	}
-	return m.Spec.IsMCPExposed()
+	return !m.Spec.IsMCP() && !m.Spec.IsSyntheticMCPAdapter
 }
 
 // ProcessRequest restores StatusOk so downstream/global REST middlewares do not

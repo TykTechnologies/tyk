@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	mcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
+	mcppairing "github.com/TykTechnologies/tyk/internal/mcp/pairing"
 )
 
 // mcpAdapterListenPathPrefix is the listen path stem given to every
@@ -20,17 +21,17 @@ import (
 // satisfy listen-path validation in loadHTTPService.
 const mcpAdapterListenPathPrefix = "/__tyk-mcp-server/"
 
-// synthesiseMCPAdapters walks the loaded REST APISpec set and, for every
-// spec whose OAS marker `server.mcp.enabled: true` is set, emits a paired
-// Internal adapter APISpec into tmpSpecRegister and tmpSpecHandles.
+// synthesiseMCPAdapters walks loaded MCP-managed proxies and, for every unique
+// `tyk://<rest-api-id>__mcp-server` upstream target, emits one shared Internal
+// adapter APISpec into tmpSpecRegister and tmpSpecHandles.
 //
 // Adapter specs:
 //   - have deterministic APIID `<rest-apiid>__mcp-server`
 //   - inherit OrgID from the source REST spec (multi-tenant safety)
 //   - are Internal:true (skipped by the public muxer per api_loader.go:196)
 //   - are MarkedAsMCP() so JSONRPCMiddleware wires into the chain
-//   - carry a fresh DerivedTools slice produced from the REST OAS via
-//     oas.DeriveSourceTools — pure, gateway-agnostic, run on every reload
+//   - carry a fresh primitive catalogue produced from the REST OAS — pure,
+//     gateway-agnostic, run on every reload
 //
 // The function is best-effort per spec: if derivation fails for one
 // source REST API, the error is logged and the loader continues.
@@ -48,11 +49,9 @@ func (gw *Gateway) synthesiseMCPAdapters(
 
 	var synthesised []*APISpec
 
-	for _, rest := range specs {
+	for _, restID := range referencedMCPAdapterRESTIDs(tmpSpecRegister) {
+		rest := tmpSpecRegister[restID]
 		if rest == nil || rest.APIDefinition == nil {
-			continue
-		}
-		if !rest.IsMCPExposed() {
 			continue
 		}
 
@@ -63,9 +62,10 @@ func (gw *Gateway) synthesiseMCPAdapters(
 			continue
 		}
 		mainLog.WithFields(map[string]interface{}{
-			"rest_api_id":    rest.APIID,
-			"adapter_api_id": adapter.APIID,
-			"derived_count":  len(adapter.DerivedTools),
+			"rest_api_id":     rest.APIID,
+			"adapter_api_id":  adapter.APIID,
+			"primitive_count": len(adapter.DerivedPrimitives),
+			"tool_count":      len(adapter.DerivedTools),
 		}).Debug("synthesised MCP adapter")
 
 		tmpSpecRegister[adapter.APIID] = adapter
@@ -85,9 +85,9 @@ func (gw *Gateway) synthesiseMCPAdapters(
 	return synthesised
 }
 
-// rebuildMCPPairing walks the in-flight spec register and replaces the
-// pairing index (gw.mcpPairing) atomically with fresh REST→proxy and
-// REST→adapter maps.
+// rebuildMCPPairing walks the in-flight spec register and replaces the pairing
+// index (gw.mcpPairing) atomically with fresh REST→adapter and REST→allowed
+// proxy maps.
 //
 // A proxy is recognised by:
 //   - Proxy.TargetURL has scheme `tyk` and host equal to an adapter
@@ -96,30 +96,27 @@ func (gw *Gateway) synthesiseMCPAdapters(
 //   - REST/proxy OrgIDs match (cross-org targeting is refused; the
 //     admit-time validator should already have caught it, this is
 //     defence in depth)
-//
-// The 1:1 invariant is enforced at admit time by validateMCP; this
-// rebuilder treats duplicate proxy targets as ambiguous and records no
-// pairing for that REST API.
 func (gw *Gateway) rebuildMCPPairing(tmpSpecRegister map[string]*APISpec) {
-	pairingMap, adapterMap := computeMCPPairing(tmpSpecRegister)
-	gw.mcpPairing.Set(pairingMap, adapterMap)
+	allowedProxies, adapterMap := computeMCPPairing(tmpSpecRegister)
+	gw.mcpPairing.Set(adapterMap, allowedProxies)
 }
 
 // computeMCPPairing is the pure (gateway-free) core of
 // rebuildMCPPairing — exported within the package for unit testing.
-// Returns (restID→proxyID, restID→adapterID).
-func computeMCPPairing(specs map[string]*APISpec) (pairing, adapter map[string]string) {
-	pairing = map[string]string{}
+// Returns (restID→allowed proxy set, restID→adapterID).
+func computeMCPPairing(specs map[string]*APISpec) (allowedProxies mcppairing.AllowedProxySet, adapter map[string]string) {
+	allowedProxies = mcppairing.AllowedProxySet{}
 	adapter = map[string]string{}
-	ambiguous := map[string]bool{}
 
 	for _, spec := range specs {
 		if spec == nil || spec.APIDefinition == nil {
 			continue
 		}
 		if spec.IsSyntheticMCPAdapter {
-			// Record the adapter→REST mapping (key is the REST APIID).
 			adapter[spec.SourceRESTAPIID] = spec.APIID
+			continue
+		}
+		if !spec.IsMCPManaged() {
 			continue
 		}
 		target := strings.TrimSpace(spec.Proxy.TargetURL)
@@ -143,17 +140,55 @@ func computeMCPPairing(specs map[string]*APISpec) (pairing, adapter map[string]s
 		if rest.OrgID != spec.OrgID {
 			continue
 		}
-		if ambiguous[restID] {
-			continue
+		if allowedProxies[restID] == nil {
+			allowedProxies[restID] = map[string]struct{}{}
 		}
-		if existing, exists := pairing[restID]; exists && existing != spec.APIID {
-			delete(pairing, restID)
-			ambiguous[restID] = true
-			continue
-		}
-		pairing[restID] = spec.APIID
+		allowedProxies[restID][spec.APIID] = struct{}{}
 	}
-	return pairing, adapter
+	return allowedProxies, adapter
+}
+
+func referencedMCPAdapterRESTIDs(specs map[string]*APISpec) []string {
+	set := referencedMCPAdapterRESTIDSet(specs)
+	ids := make([]string, 0, len(set))
+	for restID := range set {
+		ids = append(ids, restID)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func referencedMCPAdapterRESTIDSet(specs map[string]*APISpec) map[string]struct{} {
+	out := map[string]struct{}{}
+	for _, spec := range specs {
+		if spec == nil || spec.APIDefinition == nil || spec.IsSyntheticMCPAdapter || !spec.IsMCPManaged() {
+			continue
+		}
+		_, restID, ok := pairedMCPAdapterTarget(spec.Proxy.TargetURL)
+		if !ok {
+			continue
+		}
+		rest := specs[restID]
+		if rest == nil || rest.APIDefinition == nil {
+			continue
+		}
+		if rest.OrgID != spec.OrgID {
+			continue
+		}
+		out[restID] = struct{}{}
+	}
+	return out
+}
+
+func referencedMCPAdapterRESTIDSetFromSpecs(specs []*APISpec) map[string]struct{} {
+	byID := make(map[string]*APISpec, len(specs))
+	for _, spec := range specs {
+		if spec == nil || spec.APIDefinition == nil {
+			continue
+		}
+		byID[spec.APIID] = spec
+	}
+	return referencedMCPAdapterRESTIDSet(byID)
 }
 
 // buildAdapterSpec constructs an in-memory adapter APISpec paired with
@@ -164,16 +199,20 @@ func (gw *Gateway) buildAdapterSpec(rest *APISpec) (*APISpec, error) {
 		return nil, fmt.Errorf("nil source REST spec")
 	}
 
-	tools, warns, err := oas.DeriveSourceTools(&rest.OAS, rest.MCPExposure.Expose)
+	primitives, warns, err := oas.DeriveSourcePrimitives(&rest.OAS)
 	if err != nil {
-		return nil, fmt.Errorf("derive tools: %w", err)
+		return nil, fmt.Errorf("derive MCP primitives: %w", err)
 	}
 	for _, w := range warns {
 		mainLog.WithFields(map[string]interface{}{
 			"rest_api_id": rest.APIID,
 			"operation":   w.Operation,
+			"method":      w.Method,
+			"path":        w.Path,
+			"reason":      w.Reason,
 		}).Warnf("MCP tool derivation warning: %s", w.Reason)
 	}
+	tools := oas.ToolPrimitives(primitives)
 
 	adapterAPIID := oas.AdapterAPIID(rest.APIID)
 
@@ -184,7 +223,6 @@ func (gw *Gateway) buildAdapterSpec(rest *APISpec) (*APISpec, error) {
 	cloned.MarkAsMCP()
 	cloned.Proxy.ListenPath = mcpAdapterListenPathPrefix + rest.APIID + "/"
 	cloned.Proxy.TargetURL = "http://127.0.0.1/"
-	cloned.MCPExposure = apidef.MCPExposureConfig{}
 	cloned.UseKeylessAccess = true
 
 	adapter := &APISpec{
@@ -192,6 +230,7 @@ func (gw *Gateway) buildAdapterSpec(rest *APISpec) (*APISpec, error) {
 		OAS:                   rest.OAS,
 		IsSyntheticMCPAdapter: true,
 		SourceRESTAPIID:       rest.APIID,
+		DerivedPrimitives:     primitives,
 		DerivedTools:          tools,
 		GlobalConfig:          gw.GetConfig(),
 	}
@@ -243,20 +282,16 @@ func (gw *Gateway) callMCPAdapterTool(ctx context.Context, spec *APISpec, tool *
 	if gw.mcpPairing == nil {
 		return nil, fmt.Errorf("MCP pairing index is not initialised")
 	}
-	proxyAPIID, paired := gw.mcpPairing.ProxyForREST(spec.SourceRESTAPIID)
-	if !paired {
-		return nil, fmt.Errorf("no MCP proxy paired with this REST API")
-	}
 	callerProxyAPIID := httpctx.MCPProxyCallerAPIIDFromContext(ctx)
 	if callerProxyAPIID == "" {
 		return nil, fmt.Errorf("caller proxy is not recorded for MCP adapter tool call")
 	}
-	if callerProxyAPIID != proxyAPIID {
-		return nil, fmt.Errorf("caller proxy %q does not match admitted paired proxy %q", callerProxyAPIID, proxyAPIID)
+	if !gw.mcpPairing.ProxyAllowedForREST(spec.SourceRESTAPIID, callerProxyAPIID) {
+		return nil, fmt.Errorf("caller proxy %q is not admitted for REST API %q", callerProxyAPIID, spec.SourceRESTAPIID)
 	}
 
 	httpctx.SetMCPLoopFromPairedProxy(upstreamReq, &httpctx.MCPLoopTrust{
-		ProxyAPIID:   proxyAPIID,
+		ProxyAPIID:   callerProxyAPIID,
 		RESTAPIID:    spec.SourceRESTAPIID,
 		AdapterAPIID: spec.APIID,
 	})

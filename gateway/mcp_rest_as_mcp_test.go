@@ -72,7 +72,6 @@ func buildRESTSpecForSDKAdapterTest(description string) *APISpec {
 		Name:  "orders",
 		OrgID: "org-1",
 	}
-	def.MCPExposure.Enabled = true
 
 	return &APISpec{
 		APIDefinition: def,
@@ -126,20 +125,24 @@ func waitForGatewayToolListChanged(t *testing.T, changed <-chan struct{}) {
 }
 
 type testMCPPairing struct {
-	proxy   map[string]string
+	proxies map[string]map[string]struct{}
 	adapter map[string]string
 }
 
 func newTestMCPPairing(restID, proxyID, adapterID string) testMCPPairing {
 	return testMCPPairing{
-		proxy:   map[string]string{restID: proxyID},
+		proxies: map[string]map[string]struct{}{restID: {proxyID: {}}},
 		adapter: map[string]string{restID: adapterID},
 	}
 }
 
-func (p testMCPPairing) ProxyForREST(restAPIID string) (string, bool) {
-	v, ok := p.proxy[restAPIID]
-	return v, ok
+func (p testMCPPairing) ProxyAllowedForREST(restAPIID, proxyAPIID string) bool {
+	proxies, ok := p.proxies[restAPIID]
+	if !ok {
+		return false
+	}
+	_, ok = proxies[proxyAPIID]
+	return ok
 }
 
 func (p testMCPPairing) AdapterForREST(restAPIID string) (string, bool) {
@@ -270,7 +273,7 @@ func TestMCPLoopAuthBypass_Branches(t *testing.T) {
 	cases := []loopAuthBypassTestCase{
 		{
 			name:     "no-flag-passes-through",
-			pairing:  pairing.Static{"rest-1": "proxy-1"},
+			pairing:  pairing.Static{"rest-1": {"proxy-1": {}}},
 			wantCode: http.StatusOK,
 		},
 		{
@@ -335,7 +338,6 @@ func TestMCPLoopAuthBypass_Branches(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			spec := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest-1"}}
-			spec.MCPExposure.Enabled = true
 
 			mw := &MCPLoopAuthBypass{
 				BaseMiddleware: &BaseMiddleware{Spec: spec},
@@ -369,7 +371,6 @@ func TestMCPLoopAuthBypass_PreAuthorizesThenRestoreClearsBypassStatus(t *testing
 	t.Parallel()
 
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest-1"}}
-	spec.MCPExposure.Enabled = true
 
 	r := httptest.NewRequest(http.MethodGet, "/orders/42", nil)
 	httpctx.SetMCPLoopFromPairedProxy(r, &httpctx.MCPLoopTrust{
@@ -398,12 +399,17 @@ func TestMCPLoopAuthBypass_PreAuthorizesThenRestoreClearsBypassStatus(t *testing
 
 func TestMCPLoopAuthBypass_EnabledForSpec(t *testing.T) {
 	t.Parallel()
-	exposed := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest"}}
-	exposed.MCPExposure.Enabled = true
-	plain := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest2"}}
+	plainREST := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest"}}
+	mcpProxy := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "mcp"}}
+	mcpProxy.MarkAsMCP()
+	adapter := &APISpec{
+		APIDefinition:         &apidef.APIDefinition{APIID: oas.AdapterAPIID("rest")},
+		IsSyntheticMCPAdapter: true,
+	}
 
-	assert.True(t, (&MCPLoopAuthBypass{BaseMiddleware: &BaseMiddleware{Spec: exposed}}).EnabledForSpec())
-	assert.False(t, (&MCPLoopAuthBypass{BaseMiddleware: &BaseMiddleware{Spec: plain}}).EnabledForSpec())
+	assert.True(t, (&MCPLoopAuthBypass{BaseMiddleware: &BaseMiddleware{Spec: plainREST}}).EnabledForSpec())
+	assert.False(t, (&MCPLoopAuthBypass{BaseMiddleware: &BaseMiddleware{Spec: mcpProxy}}).EnabledForSpec())
+	assert.False(t, (&MCPLoopAuthBypass{BaseMiddleware: &BaseMiddleware{Spec: adapter}}).EnabledForSpec())
 }
 
 // TestComputeMCPPairing covers the pure pairing-rebuild logic without
@@ -413,7 +419,6 @@ func TestComputeMCPPairing(t *testing.T) {
 	t.Parallel()
 
 	rest := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-1"}}
-	rest.MCPExposure.Enabled = true
 
 	adapter := &APISpec{
 		APIDefinition:         &apidef.APIDefinition{APIID: oas.AdapterAPIID("rest-1"), OrgID: "org-1"},
@@ -430,8 +435,8 @@ func TestComputeMCPPairing(t *testing.T) {
 		proxy.APIID:   proxy,
 	}
 
-	pairingMap, adapterMap := computeMCPPairing(specs)
-	assert.Equal(t, "proxy-1", pairingMap["rest-1"])
+	allowed, adapterMap := computeMCPPairing(specs)
+	assert.Contains(t, allowed["rest-1"], "proxy-1")
 	assert.Equal(t, oas.AdapterAPIID("rest-1"), adapterMap["rest-1"])
 }
 
@@ -453,12 +458,49 @@ func TestComputeMCPPairing_CrossOrgRefused(t *testing.T) {
 		proxy.APIID:   proxy,
 	}
 
-	pairingMap, _ := computeMCPPairing(specs)
-	_, paired := pairingMap["rest-1"]
+	allowed, _ := computeMCPPairing(specs)
+	_, paired := allowed["rest-1"]
 	assert.False(t, paired, "cross-org pairing must be refused")
 }
 
-func TestComputeMCPPairing_DuplicateProxyTargetsRefused(t *testing.T) {
+func TestReferencedMCPAdapterRESTIDs_AreProxyDriven(t *testing.T) {
+	t.Parallel()
+
+	referencedREST := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-1"}}
+	unreferencedREST := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest-2", OrgID: "org-1"}}
+
+	proxy := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "proxy-1", OrgID: "org-1"}}
+	proxy.Proxy.TargetURL = "tyk://" + oas.AdapterAPIID("rest-1")
+
+	crossOrgProxy := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "proxy-cross", OrgID: "org-2"}}
+	crossOrgProxy.Proxy.TargetURL = "tyk://" + oas.AdapterAPIID("rest-1")
+
+	specs := map[string]*APISpec{
+		referencedREST.APIID:   referencedREST,
+		unreferencedREST.APIID: unreferencedREST,
+		proxy.APIID:            proxy,
+		crossOrgProxy.APIID:    crossOrgProxy,
+	}
+
+	assert.Equal(t, []string{"rest-1"}, referencedMCPAdapterRESTIDs(specs))
+}
+
+func TestReferencedMCPAdapterRESTIDs_RemainsAfterOneProxyRemoved(t *testing.T) {
+	t.Parallel()
+
+	rest := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-1"}}
+	proxy2 := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "proxy-2", OrgID: "org-1"}}
+	proxy2.Proxy.TargetURL = "tyk://" + oas.AdapterAPIID("rest-1")
+
+	specsAfterReload := map[string]*APISpec{
+		rest.APIID:   rest,
+		proxy2.APIID: proxy2,
+	}
+
+	assert.Equal(t, []string{"rest-1"}, referencedMCPAdapterRESTIDs(specsAfterReload))
+}
+
+func TestComputeMCPPairing_DuplicateProxyTargetsAllowed(t *testing.T) {
 	t.Parallel()
 
 	rest := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-1"}}
@@ -479,18 +521,22 @@ func TestComputeMCPPairing_DuplicateProxyTargetsRefused(t *testing.T) {
 		proxy2.APIID:  proxy2,
 	}
 
-	pairingMap, adapterMap := computeMCPPairing(specs)
-	_, paired := pairingMap["rest-1"]
-	assert.False(t, paired, "duplicate proxy targets for one REST API must be ambiguous")
+	allowed, adapterMap := computeMCPPairing(specs)
+	require.Contains(t, allowed, "rest-1")
+	assert.Contains(t, allowed["rest-1"], "proxy-1")
+	assert.Contains(t, allowed["rest-1"], "proxy-2")
 	assert.Equal(t, oas.AdapterAPIID("rest-1"), adapterMap["rest-1"])
 }
 
-func TestCallMCPAdapterTool_RequiresActualCallerProxyToMatchPairing(t *testing.T) {
+func TestCallMCPAdapterTool_RequiresActualCallerProxyToBeAllowed(t *testing.T) {
 	t.Parallel()
 
 	adapterID := oas.AdapterAPIID("rest-1")
 	idx := pairing.New()
-	idx.Set(map[string]string{"rest-1": "proxy-real"}, map[string]string{"rest-1": adapterID})
+	idx.Set(
+		map[string]string{"rest-1": adapterID},
+		map[string]map[string]struct{}{"rest-1": {"proxy-real": {}, "proxy-other": {}}},
+	)
 
 	gw := &Gateway{mcpPairing: idx, apisHandlesByID: new(sync.Map)}
 	gw.apisByID = map[string]*APISpec{
@@ -517,7 +563,11 @@ func TestCallMCPAdapterTool_RequiresActualCallerProxyToMatchPairing(t *testing.T
 	ctx := httpctx.ContextWithMCPProxyCallerAPIID(context.Background(), "proxy-forged")
 	_, err := gw.callMCPAdapterTool(ctx, spec, tool, map[string]any{"id": "42"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "caller proxy")
+	assert.Contains(t, err.Error(), "not admitted")
+
+	ctx = httpctx.ContextWithMCPProxyCallerAPIID(context.Background(), "proxy-other")
+	_, err = gw.callMCPAdapterTool(ctx, spec, tool, map[string]any{"id": "42"})
+	require.NoError(t, err)
 }
 
 func TestHandleDeleteAPI_RefusesRESTSourceWithPairedMCPProxy(t *testing.T) {
@@ -530,16 +580,117 @@ func TestHandleDeleteAPI_RefusesRESTSourceWithPairedMCPProxy(t *testing.T) {
 	proxyDef := &apidef.APIDefinition{APIID: "proxy-1", OrgID: "org-1"}
 	proxyDef.Proxy.TargetURL = "tyk://" + oas.AdapterAPIID("rest-1")
 	proxy := &APISpec{APIDefinition: proxyDef}
+	proxy2Def := &apidef.APIDefinition{APIID: "proxy-2", OrgID: "org-1"}
+	proxy2Def.Proxy.TargetURL = "tyk://" + oas.AdapterAPIID("rest-1")
+	proxy2 := &APISpec{APIDefinition: proxy2Def}
 
 	gw.apisByID = map[string]*APISpec{
-		rest.APIID:  rest,
-		proxy.APIID: proxy,
+		rest.APIID:   rest,
+		proxy.APIID:  proxy,
+		proxy2.APIID: proxy2,
 	}
 
 	obj, code := gw.handleDeleteAPI("rest-1")
 
 	assert.Equal(t, http.StatusConflict, code)
 	assert.Contains(t, obj.(apiStatusMessage).Message, "proxy-1")
+	assert.Contains(t, obj.(apiStatusMessage).Message, "proxy-2")
+}
+
+func TestCallMCPAdapterTool_ForwardsQueryParamsThroughJSONRPC(t *testing.T) {
+	t.Parallel()
+
+	adapterID := oas.AdapterAPIID("rest-1")
+	idx := pairing.New()
+	idx.Set(
+		map[string]string{"rest-1": adapterID},
+		map[string]map[string]struct{}{"rest-1": {"proxy-1": {}}},
+	)
+
+	gw := &Gateway{mcpPairing: idx, apisHandlesByID: new(sync.Map)}
+	gw.apisByID = map[string]*APISpec{
+		"rest-1": {APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-1"}},
+	}
+	gw.apisHandlesByID.Store("rest-1", &ChainObject{
+		ThisHandler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/orders", r.URL.Path)
+			assert.Equal(t, "open", r.URL.Query().Get("status"))
+			assert.Equal(t, "25", r.URL.Query().Get("limit"))
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		}),
+	})
+
+	spec := &APISpec{
+		APIDefinition:         &apidef.APIDefinition{APIID: adapterID, Name: "orders [MCP adapter]", OrgID: "org-1"},
+		IsSyntheticMCPAdapter: true,
+		SourceRESTAPIID:       "rest-1",
+		DerivedTools: []oas.DerivedTool{
+			{
+				Name:           "listOrders",
+				Method:         http.MethodGet,
+				PathTemplate:   "/orders",
+				ParamLocations: map[string]string{"status": "query", "limit": "query"},
+				InputSchema: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"status": map[string]any{"type": "string"},
+						"limit":  map[string]any{"type": "integer"},
+					},
+				},
+			},
+		},
+	}
+	var err error
+	spec.MCPSDKAdapter, err = mcpadapter.NewSDKAdapter(mcpadapter.SDKServerConfig{
+		Name:  spec.Name,
+		Tools: spec.DerivedTools,
+		CallTool: func(ctx context.Context, tool *oas.DerivedTool, args map[string]any) (*mcpadapter.Recorder, error) {
+			return gw.callMCPAdapterTool(ctx, spec, tool, args)
+		},
+	})
+	require.NoError(t, err)
+
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
+	serve := func(body string, sessionID string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodPost, "/mcp/", strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("Accept", "application/json, text/event-stream")
+		if sessionID != "" {
+			r.Header.Set("Mcp-Session-Id", sessionID)
+		}
+		httpctx.SetMCPProxyCallerAPIID(r, "proxy-1")
+
+		w := httptest.NewRecorder()
+		err, code := mw.ProcessRequest(w, r, nil)
+		require.NoError(t, err)
+		assert.Equal(t, middleware.StatusRespond, code)
+		return w
+	}
+
+	init := serve(`{
+		"jsonrpc":"2.0",
+		"id":0,
+		"method":"initialize",
+		"params":{
+			"protocolVersion":"2025-06-18",
+			"clientInfo":{"name":"gateway-query-test","version":"v0.0.1"},
+			"capabilities":{}
+		}
+	}`, "")
+	require.Equal(t, http.StatusOK, init.Code)
+	sessionID := init.Header().Get("Mcp-Session-Id")
+	require.NotEmpty(t, sessionID)
+
+	w := serve(`{
+		"jsonrpc":"2.0",
+		"id":1,
+		"method":"tools/call",
+		"params":{"name":"listOrders","arguments":{"status":"open","limit":25}}
+	}`, sessionID)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `{\"ok\":true}`)
 }
 
 func TestHandleDeleteMCP_DeletesPairedProxyPersistedWithOASSuffix(t *testing.T) {

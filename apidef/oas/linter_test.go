@@ -89,9 +89,6 @@ func TestXTykGateway_Lint(t *testing.T) {
 		}
 		settings.Server.Protocol = "http"
 		settings.Server.Port = 3000
-		if settings.Server.MCP != nil {
-			settings.Server.MCP.Expose = []string{"sample"}
-		}
 		for i := range settings.Server.EventHandlers {
 			settings.Server.EventHandlers[i].Kind = event.WebhookKind
 			settings.Server.EventHandlers[i].Webhook.Method = http.MethodPost

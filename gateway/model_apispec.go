@@ -121,9 +121,12 @@ type APISpec struct {
 	// with. Empty on non-adapter specs.
 	SourceRESTAPIID string
 
-	// DerivedTools is the runtime tool catalogue produced from the source
-	// REST OAS by oas.DeriveSourceTools at every loadApps. The adapter
-	// middleware uses it to translate `tools/call` into HTTP requests.
+	// DerivedPrimitives is the internal primitive catalogue produced from the
+	// source REST OAS at every loadApps. V1 emits tool primitives only.
+	DerivedPrimitives []oas.DerivedPrimitive
+
+	// DerivedTools is the SDK-facing tool projection of DerivedPrimitives. The
+	// adapter middleware uses it to translate `tools/call` into HTTP requests.
 	DerivedTools []oas.DerivedTool
 
 	// MCPSDKAdapter owns the long-lived SDK server for this synthetic adapter.

@@ -20,8 +20,7 @@ import (
 //     network boundary.
 //  2. This middleware re-checks the pairing index — pairing.Lookup —
 //     and refuses to honour the descriptor unless the proxyAPIID it
-//     names matches the proxy the gateway has admitted as the 1:1
-//     caller for this REST API. A descriptor that was somehow forged
+//     names is in the allowed caller set for this REST API. A descriptor that was somehow forged
 //     or replayed against an unpaired REST API returns 403.
 //
 // The middleware accepts a pairing.Lookup interface (instead of
@@ -45,13 +44,13 @@ func (m *MCPLoopAuthBypass) Name() string {
 	return "MCPLoopAuthBypass"
 }
 
-// EnabledForSpec returns true only on REST APIs that opted into MCP
-// exposure. Non-MCP-exposed APIs do not need this middleware.
+// EnabledForSpec returns true on non-MCP, non-synthetic APIs. The middleware is
+// a no-op unless an in-process MCP loop trust descriptor is present.
 func (m *MCPLoopAuthBypass) EnabledForSpec() bool {
 	if m.Spec == nil || m.Spec.APIDefinition == nil {
 		return false
 	}
-	return m.Spec.IsMCPExposed()
+	return !m.Spec.IsMCP() && !m.Spec.IsSyntheticMCPAdapter
 }
 
 // ProcessRequest reads the trust descriptor and either short-circuits
@@ -67,7 +66,7 @@ func (m *MCPLoopAuthBypass) ProcessRequest(_ http.ResponseWriter, r *http.Reques
 	}
 
 	lookup := m.Pairing
-	if lookup == nil {
+	if lookup == nil && m.Gw != nil {
 		lookup = m.Gw.mcpPairing
 	}
 
@@ -81,22 +80,21 @@ func (m *MCPLoopAuthBypass) ProcessRequest(_ http.ResponseWriter, r *http.Reques
 		adapterLookup = m.Gw.mcpPairing
 	}
 
-	expectedProxy, paired := lookup.ProxyForREST(m.Spec.APIID)
+	proxyAllowed := lookup != nil && lookup.ProxyAllowedForREST(m.Spec.APIID, trust.ProxyAPIID)
 	expectedAdapter, adapterPaired := "", false
 	if adapterLookup != nil {
 		expectedAdapter, adapterPaired = adapterLookup.AdapterForREST(m.Spec.APIID)
 	}
 	if trust.RESTAPIID != m.Spec.APIID ||
-		!paired || expectedProxy != trust.ProxyAPIID ||
+		!proxyAllowed ||
 		!adapterPaired || expectedAdapter != trust.AdapterAPIID {
 		m.Logger().WithFields(map[string]interface{}{
 			"rest_api_id":       m.Spec.APIID,
 			"flag_rest_api_id":  trust.RESTAPIID,
 			"flag_proxy_id":     trust.ProxyAPIID,
 			"flag_adapter_id":   trust.AdapterAPIID,
-			"expected_proxy":    expectedProxy,
+			"is_proxy_allowed":  proxyAllowed,
 			"expected_adapter":  expectedAdapter,
-			"is_paired":         paired,
 			"is_adapter_paired": adapterPaired,
 		}).Warn("MCPLoopAuthBypass: trust descriptor pairing mismatch — rejecting")
 		return errMCPLoopForgery, http.StatusForbidden

@@ -361,8 +361,7 @@ func (gw *Gateway) processSpec(
 	// REST-as-MCP: when a paired adapter dispatched this request via the
 	// `tyk://` loop primitive, install the proxy-derived session and let
 	// the auth band's normal middlewares observe a session-in-context
-	// (effectively skipping credential validation). No-op on direct REST
-	// clients. Active only on REST APIs with `server.mcp.enabled: true`.
+	// (effectively skipping credential validation). No-op on direct REST clients.
 	gw.mwAppendEnabled(&chainArray, &MCPLoopAuthBypass{BaseMiddleware: baseMid.Copy()})
 
 	// Track auth middlewares for OR wrapper
@@ -1321,6 +1320,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	muxer.setRouter(port, "", router, gw.GetConfig())
 	gs := gw.prepareStorage()
 	shouldTrace := trace.IsEnabled()
+	mcpAdapterSourceRESTIDs := referencedMCPAdapterRESTIDSetFromSpecs(specs)
 
 	for _, spec := range specs {
 		func() {
@@ -1341,7 +1341,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 				spec.Proxy.ListenPath = converted
 			}
 
-			if currSpec := gw.getApiSpec(spec.APIID); !shouldReloadSpec(currSpec, spec) {
+			_, isMCPAdapterSource := mcpAdapterSourceRESTIDs[spec.APIID]
+			if currSpec := gw.getApiSpec(spec.APIID); !isMCPAdapterSource && !shouldReloadSpec(currSpec, spec) {
 				tmpSpecRegister[spec.APIID] = currSpec
 			} else {
 				tmpSpecRegister[spec.APIID] = spec
@@ -1373,11 +1374,10 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 		}()
 	}
 
-	// Synthesise paired MCP adapter specs for any REST API marked
-	// `server.mcp.enabled: true`. The adapters live in tmpSpecRegister
+	// Synthesise shared MCP adapter specs for REST APIs referenced by
+	// operator-managed MCP proxies. The adapters live in tmpSpecRegister
 	// alongside the regular specs but are Internal — they are only ever
-	// reached via the `tyk://<adapter-id>` loop primitive from an
-	// operator-managed MCP proxy.
+	// reached via the `tyk://<adapter-id>` loop primitive.
 	gw.synthesiseMCPAdapters(specs, tmpSpecRegister, tmpSpecHandles, apisByListen, &gs, muxer)
 
 	gw.DefaultProxyMux.swap(muxer, gw)
@@ -1411,7 +1411,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	gw.apisByID = tmpSpecRegister
 	gw.apisHandlesByID = tmpSpecHandles
 
-	// Rebuild the MCP pairing index (restAPIID → proxyAPIID) in full.
+	// Rebuild the MCP pairing index (restAPIID → adapterAPIID and allowed
+	// proxy set) in full.
 	// Held under apisMu so MCPLoopAuthBypass and validateMCP observe a
 	// consistent view of apisByID / mcpPairing / mcpAdapter.
 	gw.rebuildMCPPairing(tmpSpecRegister)
