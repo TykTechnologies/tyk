@@ -657,12 +657,12 @@ func (p *ReverseProxy) GetHardTimeoutEnforcedSettings(spec *APISpec, req *http.R
 
 	vInfo, _ := spec.Version(req)
 	versionPaths := spec.RxPaths[vInfo.Name]
-	urlSpec, found := spec.FindSpecMatchesStatus(req, versionPaths, HardTimeout)
+	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
-		if urlSpec.HardTimeout.TimeoutDuration > 0 {
-			return time.Duration(urlSpec.HardTimeout.TimeoutDuration), true
-		} else if urlSpec.HardTimeout.TimeOut > 0 {
-			return time.Duration(urlSpec.HardTimeout.TimeOut) * time.Second, true
+		intMeta, ok := meta.(*int)
+		if ok && *intMeta > 0 {
+			p.logger.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
+			return true, float64(*intMeta)
 		}
 	}
 

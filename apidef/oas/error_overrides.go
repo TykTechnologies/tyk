@@ -13,7 +13,7 @@ import (
 // 2. The internal 'apidef' structures use snake_case to maintain compatibility with Tyk's
 // Classic API definitions and 'tyk.conf'.
 
-// ErrorOverrides defines the OAS extension configuration for error overrides.
+// ErrorOverrides defines the configuration for error response overrides.
 type ErrorOverrides struct {
 	// Enabled determines if error overrides are active for this API.
 	// Maps to Tyk classic API definition: `error_overrides_disabled`
