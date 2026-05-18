@@ -3,7 +3,6 @@ package streams
 import (
 	"context"
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -28,20 +27,13 @@ type Stream struct {
 }
 
 // NewStream creates a new stream without initializing it
-func NewStream(allowUnsafe []string) *Stream {
-	logger := logrus.New()
-	logger.Out = log.Writer()
-	logger.Formatter = &logrus.TextFormatter{
-		FullTimestamp: true,
-	}
-	logger.Level = logrus.DebugLevel
-
+func NewStream(allowUnsafe []string, logger *logrus.Entry) *Stream {
 	if len(allowUnsafe) > 0 {
 		logger.Warnf("Allowing unsafe components: %v", allowUnsafe)
 	}
 
 	return &Stream{
-		log:           logger,
+		log:           logger.Logger,
 		allowedUnsafe: allowUnsafe,
 	}
 }

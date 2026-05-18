@@ -60,7 +60,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
-	logger "github.com/TykTechnologies/tyk/log"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -74,10 +74,10 @@ import (
 var (
 	globalMu sync.Mutex
 
-	log       = logger.Get()
+	log       = tyklog.Get()
 	mainLog   = log.WithField("prefix", "main")
 	pubSubLog = log.WithField("prefix", "pub-sub")
-	rawLog    = logger.GetRaw()
+	rawLog    = tyklog.GetRaw()
 
 	memProfFile *os.File
 
@@ -219,7 +219,8 @@ type Gateway struct {
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw := &Gateway{
 		DefaultProxyMux: &proxyMux{
-			again: again.New(),
+			again:        again.New(),
+			track404Logs: config.Track404Logs,
 		},
 		ctx: ctx,
 	}
@@ -1456,7 +1457,7 @@ func (gw *Gateway) initSystem() error {
 
 	// Initialize the appropriate log formatter
 	if !gw.isRunningTests() && os.Getenv("TYK_LOGFORMAT") == "" && !*cli.DebugMode {
-		log.Formatter = logger.NewFormatter(gwConfig.LogFormat)
+		tyklog.SetupFormatter(gwConfig.LogFormat)
 		mainLog.Debugf("Set log format to %q", gwConfig.LogFormat)
 	}
 
@@ -1886,7 +1887,7 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 	localStorage := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
 	localStorage.Connect()
 
-	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
+	logger := tyklog.Get().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		return storage.NewMdcbStorage(
@@ -2010,13 +2011,17 @@ func Start() {
 		defer trace.Close()
 	}
 
-	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry,
+	// Use gw.GetConfig() to ensure we get the config loaded from the --conf
+	// flag path (set in initSystem), not the stale local gwConfig which may
+	// have been loaded from the default tyk.conf before initSystem ran.
+	otelCfg := gw.GetConfig()
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &otelCfg.OpenTelemetry,
 		gw.GetNodeID(),
 		VERSION,
-		gw.GetConfig().SlaveOptions.UseRPC,
-		gw.GetConfig().SlaveOptions.GroupID,
-		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
-		gw.GetConfig().DBAppConfOptions.Tags)
+		otelCfg.SlaveOptions.UseRPC,
+		otelCfg.SlaveOptions.GroupID,
+		otelCfg.DBAppConfOptions.NodeIsSegmented,
+		otelCfg.DBAppConfOptions.Tags)
 
 	gw.start()
 
@@ -2235,7 +2240,9 @@ func (gw *Gateway) setupPortsWhitelist() {
 
 func (gw *Gateway) startServer() {
 	// Ensure that Control listener and default http listener running on first start
-	muxer := &proxyMux{}
+	muxer := &proxyMux{
+		track404Logs: gw.GetConfig().Track404Logs,
+	}
 
 	router := mux.NewRouter()
 	gw.loadControlAPIEndpoints(router)

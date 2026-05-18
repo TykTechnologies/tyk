@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"net/http"
 	"net/url"
 	"sync"
@@ -14,9 +13,9 @@ import (
 	"github.com/sirupsen/logrus"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
-	"github.com/TykTechnologies/tyk/internal/uuid"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"github.com/TykTechnologies/tyk/storage"
 )
 

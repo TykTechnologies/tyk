@@ -94,7 +94,7 @@ func (sm *Manager) createStream(streamID string, config map[string]interface{}) 
 		},
 	}
 
-	stream := NewStream(sm.mw.allowedUnsafe)
+	stream := NewStream(sm.mw.allowedUnsafe, sm.mw.Logger())
 	err := stream.Start(config, &HandleFuncAdapter{
 		StreamMiddleware: sm.mw,
 		StreamID:         streamFullID,
