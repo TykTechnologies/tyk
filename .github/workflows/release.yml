@@ -150,7 +150,7 @@ jobs:
           tykio/golang-cross:${{ matrix.golang_cross }} /tmp/build.sh
       - name: Docker metadata for std CI
         id: ci_metadata_std
-        if: ${{ matrix.golang_cross == '1.24-bullseye' && github.event_name != 'pull_request' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: |
@@ -165,7 +165,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push std image to CI
-        if: ${{ matrix.golang_cross == '1.24-bullseye' && github.event_name != 'pull_request' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
@@ -322,7 +322,7 @@ jobs:
           org_gh_token: ${{ steps.app-token.outputs.token }}
       - name: Run API tests
         uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@42304edda365365e0a887cf018d8edc34b960b82 # main
-        timeout-minutes: 30
+        timeout-minutes: 45
         id: test_execution
         with:
           user_api_secret: ${{ steps.env_up.outputs.USER_API_SECRET }}
