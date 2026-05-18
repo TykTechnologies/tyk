@@ -336,6 +336,7 @@ func (t *Service) emptyRateLimit(m user.APILimit) bool {
 	return m.Rate == 0 || m.Per == 0
 }
 
+// SYS-REQ-013, SYS-REQ-014, SYS-REQ-015
 func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
 	applyState *applyStatus) error {
 
@@ -407,6 +408,7 @@ func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
 	}
 }
 
+// SYS-REQ-030, SYS-REQ-031, SYS-REQ-032
 func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
 	applyState *applyStatus) error {
 
@@ -706,6 +708,7 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 // reqproof:requires currAD.Limit.Rate == 100.0
 // reqproof:requires currAD.Limit.Per == 1.0
 // reqproof:lemma apply_api_limits_duration_branch_sets_per proves t.applyAPILevelLimits(policyAD, currAD).Limit.Per == 1.0
+// SYS-REQ-016, SYS-REQ-017, SYS-REQ-018
 func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
 	var updated bool
 	if policyAD.Limit.Duration() > currAD.Limit.Duration() {
@@ -872,7 +875,7 @@ func (t *Service) ApplyMCPPrimitiveLimits(policy, current []user.MCPPrimitiveLim
 // (ad.Limit.QuotaMax = v), which requires building a chain of struct
 // constructors. The lemma proves that if v >= 0, the returned struct's
 // QuotaMax >= 0.
-//
+// SYS-REQ-035
 // reqproof:requires v >= 0
 // reqproof:lemma field_write_quotamax_nonneg proves simpleFieldWrite(ad, v).Limit.QuotaMax >= 0
 func simpleFieldWrite(ad user.AccessDefinition, v int64) user.AccessDefinition {

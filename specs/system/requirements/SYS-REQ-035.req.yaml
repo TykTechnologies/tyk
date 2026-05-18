@@ -22,8 +22,9 @@ traces:
         - FLIP:policy/tc-080
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.837896Z"
+    reviewed_at: "2026-05-18T15:12:33.556713Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:2e2686300dd0346cda6161e4c778245c98c7c93475c4f08d0bc518ef4c0cd13b
 verification:
     assurance_level: B
     formalization_status: valid
@@ -32,6 +33,17 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
+    impact_reviews:
+        - requirement: SYS-REQ-035
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:2e2686300dd0346cda6161e4c778245c98c7c93475c4f08d0bc518ef4c0cd13b
+          approval_fingerprint: sha256:783a6b5f6e2315b6ed4acb1f5364330c0720484951bd845076fbb601b1dc8476
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:12:01Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:29:56Z"

@@ -5,16 +5,14 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !rate_limit_apply_requested | !policy_rate_empty | !rate_limit_applied
-description: >-
-    Contrapositive: ApplyRateLimits must NOT apply rate limits when the policy rate is empty (Rate=0 or Per=0). Applying zero rates would effectively disable the API.
+description: 'Contrapositive: ApplyRateLimits must NOT apply rate limits when the policy rate is empty (Rate=0 or Per=0). Applying zero rates would effectively disable the API.'
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: >-
-    Contrapositive: ApplyRateLimits must NOT apply rate limits when the policy rate is empty (Rate=0 or Per=0). Applying zero rates would effectively disable the API.
+rationale: 'Contrapositive: ApplyRateLimits must NOT apply rate limits when the policy rate is empty (Rate=0 or Per=0). Applying zero rates would effectively disable the API.'
 tags: []
 variables: []
 traces:
@@ -26,8 +24,9 @@ traces:
         - FLIP:policy/tc-037
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.810777Z"
+    reviewed_at: "2026-05-18T15:10:03.463063Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:797e46c1e35220d27e6b8bc05106a9fce91a769660f981033677d4a27982f2a9
 verification:
     assurance_level: A
     formalization_status: valid
@@ -36,14 +35,29 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
-    gaps_reviewed_at: "2026-04-27T06:26:19.418656Z"
+    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
     gaps_reviewed_by: leonidbugaev
+    impact_reviews:
+        - requirement: SYS-REQ-022
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:797e46c1e35220d27e6b8bc05106a9fce91a769660f981033677d4a27982f2a9
+          approval_fingerprint: sha256:e4d35f1a84bf6a0f02fa33e0b34e28ecdc35127c12781bb13449c8c097ce1ec3
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:12:01Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:53Z"
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:34Z"
 obligation_class: rate_limit_boundary
+obligation_checklist:
+    - rate_limit_boundary
+    - determinism
+    - nil_safety
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:34Z"

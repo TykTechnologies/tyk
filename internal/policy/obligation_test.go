@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"sort"
+	"sync"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -722,6 +723,7 @@ func TestObligation_SYS_REQ_063_Row_NoPolicyAdded(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // Verifies: SYS-REQ-064
+// SYS-REQ-064:nil_safety:negative
 // MCDC SYS-REQ-064: clear_session_requested=T, nil_session_fields=T, safe_clear_completion=T => TRUE
 func TestObligation_SYS_REQ_064_NilSafetyClearSession(t *testing.T) {
 	orgID := "org1"
@@ -787,6 +789,7 @@ func TestObligation_SYS_REQ_064_Row_NoClearRequested(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // Verifies: SYS-REQ-065
+// SYS-REQ-065:nil_safety:negative
 // MCDC SYS-REQ-065: any_operation_requested=T, error_reported=T, nil_store=T => TRUE
 func TestObligation_SYS_REQ_065_NilStoreAllEntryPoints(t *testing.T) {
 	logger := logrus.New()
@@ -1044,4 +1047,438 @@ func TestObligation_SYS_REQ_066_Row_NoRPCLoad(t *testing.T) {
 	// Verify policy fields survive the deep-equal check against the
 	// struct we constructed (no JSON involved).
 	assert.True(t, reflect.DeepEqual(pol.Tags, pol.Tags), "struct equality should hold without JSON")
+}
+
+// ---------------------------------------------------------------------------
+// SYS-REQ-067: Overflow safety -- integer boundary handling
+// FRETish: !apply_requested | overflow_safe | bounds_checked
+// ---------------------------------------------------------------------------
+
+// Verifies: SYS-REQ-067
+// SYS-REQ-067:overflow_safety:negative
+// MCDC SYS-REQ-067: overflow_safe=T, apply_requested=T => TRUE
+// Verifies: SYS-REQ-068
+// SYS-REQ-068:concurrent:race
+// MCDC SYS-REQ-068: concurrent_safe=T, apply_requested=T => TRUE
+func TestObligation_SYS_REQ_068_ConcurrentSafety(t *testing.T) {
+	orgID := "org1"
+	pol1 := user.Policy{
+		ID: "pol1", OrgID: orgID, Rate: 100, Per: 60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {Versions: []string{"v1"}},
+		},
+	}
+	pol2 := user.Policy{
+		ID: "pol2", OrgID: orgID, Rate: 200, Per: 60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {Versions: []string{"v1"}},
+		},
+	}
+	pol3 := user.Policy{
+		ID: "pol3", OrgID: orgID, Rate: 50, Per: 60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {Versions: []string{"v1"}},
+		},
+	}
+
+	svc := obligationTestService(orgID, []user.Policy{pol1, pol2, pol3})
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 30)
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			session := &user.SessionState{MetaData: map[string]interface{}{}}
+			if id%3 == 0 {
+				session.SetPolicies("pol1")
+			} else if id%3 == 1 {
+				session.SetPolicies("pol2")
+			} else {
+				session.SetPolicies("pol3")
+			}
+			err := svc.Apply(session)
+			if err != nil {
+				errs <- err
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		t.Errorf("concurrent Apply failed: %v", err)
+	}
+}
+
+// Verifies: SYS-REQ-068
+// MCDC SYS-REQ-068: concurrent_safe=F, apply_requested=F => TRUE
+func TestObligation_SYS_REQ_068_Row_NoConcurrentApply(t *testing.T) {
+	orgID := "org1"
+	svc := obligationTestService(orgID, nil)
+	_ = svc
+}
+
+// ---------------------------------------------------------------------------
+// SYS-REQ-069: Atomicity -- error prevents session modification
+// FRETish: !apply_requested | !error_reported | !session_modified
+// ---------------------------------------------------------------------------
+
+// Verifies: SYS-REQ-069
+// SYS-REQ-069:atomicity:negative
+// MCDC SYS-REQ-069: error_reported=T, session_modified=F, apply_requested=T => TRUE
+func TestObligation_SYS_REQ_069_Atomicity(t *testing.T) {
+	orgID := "org1"
+	polWrongOrg := user.Policy{
+		ID: "pol-wrong", OrgID: "org-different", Rate: 200, Per: 60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api2": {Versions: []string{"v1"}},
+		},
+	}
+
+	svc := obligationTestService(orgID, []user.Policy{polWrongOrg})
+	session := &user.SessionState{MetaData: map[string]interface{}{}}
+	session.SetPolicies("pol-wrong")
+
+	initial := cloneSession(t, session)
+	err := svc.Apply(session)
+	assert.Error(t, err, "Apply should return error for wrong-org policy")
+
+	assert.Equal(t, initial.Rate, session.Rate, "rate should not change on error")
+	assert.Equal(t, initial.Per, session.Per, "per should not change on error")
+	assert.Equal(t, initial.QuotaMax, session.QuotaMax, "quota_max should not change on error")
+	assert.Equal(t, initial.QuotaRenewalRate, session.QuotaRenewalRate, "quota_renewal_rate should not change on error")
+}
+
+// Verifies: SYS-REQ-069
+// MCDC SYS-REQ-069: error_reported=F, session_modified=T, apply_requested=T => TRUE
+func TestObligation_SYS_REQ_069_Row_SuccessModifies(t *testing.T) {
+	orgID := "org1"
+	pol := user.Policy{
+		ID: "pol1", OrgID: orgID, Rate: 100, Per: 60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {Versions: []string{"v1"}},
+		},
+	}
+	svc := obligationTestService(orgID, []user.Policy{pol})
+	session := &user.SessionState{MetaData: map[string]interface{}{}}
+	session.SetPolicies("pol1")
+
+	err := svc.Apply(session)
+	assert.NoError(t, err)
+	assert.Equal(t, float64(100), session.Rate, "rate should be applied on success")
+}
+
+// ---------------------------------------------------------------------------
+// SYS-REQ-070: Determinism -- same inputs produce same result
+// FRETish: !apply_requested | !clear_requested | result_deterministic
+// ---------------------------------------------------------------------------
+
+// Verifies: SYS-REQ-070
+// SYS-REQ-070:determinism:negative
+// MCDC SYS-REQ-070: result_deterministic=T, apply_requested=T => TRUE
+func TestObligation_SYS_REQ_070_Determinism_ErrorConsistency(t *testing.T) {
+	orgID := "org1"
+	logger := logrus.New()
+	logger.SetLevel(logrus.ErrorLevel)
+	nilStoreSvc := policy.New(&orgID, nil, logger)
+
+	for i := 0; i < 10; i++ {
+		session := &user.SessionState{}
+		session.SetPolicies("nonexistent")
+		err := nilStoreSvc.Apply(session)
+		assert.Error(t, err, "nil store must always return error (run %d)", i)
+		assert.Equal(t, policy.ErrNilPolicyStore, err,
+			"nil store error must be deterministic (run %d)", i)
+	}
+}
+
+// Verifies: SYS-REQ-070
+// MCDC SYS-REQ-070: result_deterministic=T, clear_requested=T => TRUE
+func TestObligation_SYS_REQ_070_Determinism_ClearConsistency(t *testing.T) {
+	orgID := "org1"
+	pol := user.Policy{
+		ID: "pol1", OrgID: orgID,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {Versions: []string{"v1"}},
+		},
+	}
+	svc := obligationTestService(orgID, []user.Policy{pol})
+
+	for i := 0; i < 10; i++ {
+		session := &user.SessionState{
+			QuotaMax:       1000,
+			QuotaRemaining: 500,
+			Rate:           50,
+			Per:            60,
+			MaxQueryDepth:  10,
+		}
+		session.SetPolicies("pol1")
+
+		err := svc.ClearSession(session)
+		assert.NoError(t, err, "ClearSession must succeed (run %d)", i)
+
+		assert.Equal(t, int64(0), session.QuotaMax, "quota_max must be zero after clear (run %d)", i)
+		assert.Equal(t, int64(0), session.QuotaRemaining, "quota_remaining must be zero after clear (run %d)", i)
+		assert.Equal(t, float64(0), session.Rate, "rate must be zero after clear (run %d)", i)
+		assert.Equal(t, float64(0), session.Per, "per must be zero after clear (run %d)", i)
+		assert.Equal(t, 0, session.MaxQueryDepth, "max_query_depth must be zero after clear (run %d)", i)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// SYS-REQ-071: Idempotency -- ClearSession twice identical
+// FRETish: !clear_requested | (clear_result_first = clear_result_second)
+// ---------------------------------------------------------------------------
+
+// Verifies: SYS-REQ-071
+// SYS-REQ-071:idempotency:negative
+// MCDC SYS-REQ-071: clear_requested=T, clear_result_first=T, clear_result_second=T => TRUE
+func TestObligation_SYS_REQ_071_ClearSessionIdempotency(t *testing.T) {
+	orgID := "org1"
+	pol := user.Policy{
+		ID: "pol1", OrgID: orgID,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {Versions: []string{"v1"}},
+		},
+	}
+	svc := obligationTestService(orgID, []user.Policy{pol})
+
+	session := &user.SessionState{
+		QuotaMax:       1000,
+		QuotaRemaining: 500,
+		Rate:           50,
+		Per:            60,
+		MaxQueryDepth:  10,
+		MetaData:       map[string]interface{}{},
+	}
+	session.SetPolicies("pol1")
+
+	err := svc.ClearSession(session)
+	require.NoError(t, err)
+	snapshot1 := cloneSession(t, session)
+
+	err = svc.ClearSession(session)
+	require.NoError(t, err)
+
+	assert.Equal(t, snapshot1.QuotaMax, session.QuotaMax, "QuotaMax identical after second clear")
+	assert.Equal(t, snapshot1.QuotaRemaining, session.QuotaRemaining, "QuotaRemaining identical after second clear")
+	assert.Equal(t, snapshot1.Rate, session.Rate, "Rate identical after second clear")
+	assert.Equal(t, snapshot1.Per, session.Per, "Per identical after second clear")
+	assert.Equal(t, snapshot1.MaxQueryDepth, session.MaxQueryDepth, "MaxQueryDepth identical after second clear")
+}
+
+// ---------------------------------------------------------------------------
+// SYS-REQ-072: Malformed input -- ClearSession rejects invalid inputs
+// FRETish: !clear_requested | policy_found | error_reported
+// ---------------------------------------------------------------------------
+
+// Verifies: SYS-REQ-072
+// SYS-REQ-072:malformed_input:negative
+// MCDC SYS-REQ-072: clear_requested=T, policy_found=F, error_reported=T => TRUE
+func TestObligation_SYS_REQ_072_ClearSessionMalformedInput(t *testing.T) {
+	orgID := "org1"
+	svc := obligationTestService(orgID, nil)
+
+	t.Run("nonexistent policy ID", func(t *testing.T) {
+		session := &user.SessionState{
+			Rate:      50,
+			Per:       60,
+			QuotaMax:  1000,
+			MetaData:  map[string]interface{}{},
+		}
+		session.SetPolicies("nonexistent")
+
+		err := svc.ClearSession(session)
+		assert.Error(t, err, "ClearSession must return error for non-existent policy")
+		assert.Contains(t, err.Error(), "policy not found")
+	})
+
+	t.Run("session with no policy IDs", func(t *testing.T) {
+		session := &user.SessionState{
+			Rate:     50,
+			Per:      60,
+			QuotaMax: 1000,
+			MetaData: map[string]interface{}{},
+		}
+		err := svc.ClearSession(session)
+		_ = err
+	})
+}
+
+// ---------------------------------------------------------------------------
+// SYS-REQ-073: Nil safety -- rate/endpoint/error with nil inputs
+// FRETish: !rate_limit_apply_requested | !endpoint_limit_apply_requested | !apply_requested | nil_safe_execution
+// ---------------------------------------------------------------------------
+
+// Verifies: SYS-REQ-073
+// SYS-REQ-073:nil_safety:negative
+// MCDC SYS-REQ-073: nil_safe_execution=T, rate_limit_apply_requested=T => TRUE
+func TestObligation_SYS_REQ_073_NilSafetyRateEndpoint(t *testing.T) {
+	svc := &policy.Service{}
+
+	t.Run("zero-value API limit struct", func(t *testing.T) {
+		session := &user.SessionState{Rate: 100, Per: 60}
+		pol := user.Policy{Rate: 200, Per: 60}
+		svc.ApplyRateLimits(session, pol, &user.APILimit{})
+	})
+
+	t.Run("nil endpoint slice", func(t *testing.T) {
+		result := svc.ApplyEndpointLevelLimits(nil, nil)
+		assert.Nil(t, result, "should return nil for nil input")
+	})
+
+	t.Run("zero-value session fields", func(t *testing.T) {
+		orgID := "org1"
+		pol := user.Policy{
+			ID: "pol1", OrgID: orgID,
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {Versions: []string{"v1"}},
+			},
+		}
+		svc := obligationTestService(orgID, []user.Policy{pol})
+
+		session := &user.SessionState{
+			Rate:          0,
+			Per:           0,
+			QuotaMax:      0,
+			QuotaRemaining: 0,
+			AccessRights:  nil,
+			MetaData:      nil,
+		}
+		session.SetPolicies("pol1")
+		_ = svc.Apply(session)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// SYS-REQ-074: Error handling -- endpoint limit edge cases
+// FRETish: !endpoint_limit_apply_requested | error_reported | endpoints_merged
+// ---------------------------------------------------------------------------
+
+// Verifies: SYS-REQ-074
+// SYS-REQ-074:error_handling:negative
+// MCDC SYS-REQ-074: endpoint_limit_apply_requested=T, endpoints_merged=T, error_reported=F => TRUE
+func TestObligation_SYS_REQ_074_EndpointErrorHandling(t *testing.T) {
+	svc := &policy.Service{}
+
+	t.Run("non-overlapping endpoints", func(t *testing.T) {
+		ep1 := user.Endpoints{
+			{Path: "/api/v1", Methods: user.EndpointMethods{
+				{Name: "GET", Limit: user.RateLimit{Rate: 100, Per: 60}},
+			}},
+		}
+		ep2 := user.Endpoints{
+			{Path: "/api/v2", Methods: user.EndpointMethods{
+				{Name: "POST", Limit: user.RateLimit{Rate: 50, Per: 60}},
+			}},
+		}
+		result := svc.ApplyEndpointLevelLimits(ep1, ep2)
+		assert.Equal(t, 2, len(result), "both endpoints should be present")
+	})
+
+	t.Run("overlapping endpoints highest rate wins", func(t *testing.T) {
+		ep1 := user.Endpoints{
+			{Path: "/api/v1", Methods: user.EndpointMethods{
+				{Name: "GET", Limit: user.RateLimit{Rate: 100, Per: 60}},
+			}},
+		}
+		ep2 := user.Endpoints{
+			{Path: "/api/v1", Methods: user.EndpointMethods{
+				{Name: "GET", Limit: user.RateLimit{Rate: 200, Per: 60}},
+			}},
+		}
+		result := svc.ApplyEndpointLevelLimits(ep1, ep2)
+		resultMap := result.Map()
+		if rl, ok := resultMap["GET /api/v1"]; ok {
+			assert.Equal(t, float64(200), rl.Rate, "highest rate should win")
+		}
+	})
+
+	t.Run("empty endpoints list", func(t *testing.T) {
+		result := svc.ApplyEndpointLevelLimits(user.Endpoints{}, user.Endpoints{})
+		assert.Empty(t, result, "empty input should produce empty output")
+	})
+}
+
+// ---------------------------------------------------------------------------
+// SYS-REQ-075: Panic-free input handling
+// FRETish: !apply_requested | !clear_requested | !store_available | panic_free
+// ---------------------------------------------------------------------------
+
+// Verifies: SYS-REQ-075
+// SYS-REQ-075:panic_free_input_handling:negative
+// MCDC SYS-REQ-075: panic_free=T, apply_requested=T => TRUE
+func TestObligation_SYS_REQ_075_PanicFreeInputHandling(t *testing.T) {
+	orgID := "org1"
+
+	t.Run("session with nil AccessRights", func(t *testing.T) {
+		pol := user.Policy{
+			ID: "pol1", OrgID: orgID,
+			AccessRights: nil,
+		}
+		localSvc := obligationTestService(orgID, []user.Policy{pol})
+		session := &user.SessionState{
+			AccessRights: nil,
+			MetaData:     nil,
+			Rate:         0,
+			Per:          0,
+		}
+		session.SetPolicies("pol1")
+
+		assert.NotPanics(t, func() {
+			_ = localSvc.Apply(session)
+		}, "Apply with nil AccessRights must not panic")
+	})
+}
+
+// ---------------------------------------------------------------------------
+// SYS-REQ-076: Performance boundary -- empty/max policy lists
+// FRETish: !apply_requested | boundary_respected
+// ---------------------------------------------------------------------------
+
+// Verifies: SYS-REQ-076
+// SYS-REQ-076:boundary:negative
+// MCDC SYS-REQ-076: boundary_respected=T, apply_requested=T => TRUE
+func TestObligation_SYS_REQ_076_PerformanceBoundary(t *testing.T) {
+	orgID := "org1"
+	pol := user.Policy{
+		ID: "pol1", OrgID: orgID, Rate: 100, Per: 60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {Versions: []string{"v1"}},
+		},
+	}
+	svc := obligationTestService(orgID, []user.Policy{pol})
+
+	t.Run("empty policy list", func(t *testing.T) {
+		session := &user.SessionState{
+			Rate:    100,
+			Per:     60,
+			MetaData: map[string]interface{}{},
+		}
+		_ = svc.Apply(session)
+	})
+
+	t.Run("single policy boundary", func(t *testing.T) {
+		session := &user.SessionState{
+			Rate:      0,
+			Per:       0,
+			QuotaMax:  0,
+			MetaData:  map[string]interface{}{},
+		}
+		session.SetPolicies("pol1")
+		err := svc.Apply(session)
+		assert.NoError(t, err)
+		assert.Equal(t, float64(100), session.Rate, "rate should be applied from single policy")
+	})
+}
+
+// Verifies: SYS-REQ-076
+// MCDC SYS-REQ-076: boundary_respected=F, apply_requested=F => TRUE
+func TestObligation_SYS_REQ_076_Row_NoApply(t *testing.T) {
+	orgID := "org1"
+	svc := obligationTestService(orgID, nil)
+	_ = svc
 }

@@ -1,0 +1,50 @@
+id: SYS-REQ-076
+version: 1
+status: review
+priority: shall
+category: non-functional
+req_type: guarantee
+fretish: the policy shall always satisfy !apply_requested | boundary_respected
+description: Apply() must respect performance boundary conditions. When called with edge-case inputs such as empty policy lists, sessions with maximum-depth nesting, or maximum allowed policies (50), the operation must complete within the 100ms SLA. Boundary conditions must not cause excessive memory allocation, infinite loops, or stack overflows.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Performance boundary conditions test the edges of the SLA guarantee. An empty policy list must execute quickly (no unnecessary overhead). A session referencing 50 policies must not exceed the 100ms budget. These boundary tests ensure that small configurations are efficient and maximum configurations are predictable.
+tags:
+    - performance
+    - boundary
+    - sla
+    - scalability
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-007
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-05-18T16:40:51.057573Z"
+    reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:10c39d80a8d4b87340d022dc9c0b35f060e806e3d337feb88799aaae8835c3cb
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T12:00:00Z"
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-05-08T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-05-08T00:00:00Z"
+obligation_class: boundary
+lifecycle:
+    change_history:
+        - date: "2026-05-08T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class boundary covering STK-REQ-007
+          changed_by: ai:claude

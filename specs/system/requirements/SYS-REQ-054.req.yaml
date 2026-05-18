@@ -5,8 +5,7 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !apply_requested | !multiple_policies | error_reported | !access_rights_merged | result_returned
-description: >-
-    When multiple policies are applied and one uses per-API mode while another uses partition mode, Apply must report ErrMixedPartitionAndPerAPIPolicies. The cross-policy mode conflict is detected via the applyState didPerAPI/didPartition flags, not just within a single policy's flags. SECURITY: Allowing mixed modes across policies could produce unpredictable merge results.
+description: 'When multiple policies are applied and one uses per-API mode while another uses partition mode, Apply must report ErrMixedPartitionAndPerAPIPolicies. The cross-policy mode conflict is detected via the applyState didPerAPI/didPartition flags, not just within a single policy''s flags. SECURITY: Allowing mixed modes across policies could produce unpredictable merge results.'
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -21,8 +20,9 @@ traces:
         - STK-REQ-005
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.874382Z"
+    reviewed_at: "2026-05-18T15:10:03.51506Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:4b429a2804bcb247151746b44a4fa7e0158bc5bc7ca5f4d9359b07767aaa1de9
 verification:
     assurance_level: B
     formalization_status: valid
@@ -31,8 +31,19 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
-    gaps_reviewed_at: "2026-04-27T06:26:19.418656Z"
+    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
     gaps_reviewed_by: leonidbugaev
+    impact_reviews:
+        - requirement: SYS-REQ-054
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:4b429a2804bcb247151746b44a4fa7e0158bc5bc7ca5f4d9359b07767aaa1de9
+          approval_fingerprint: sha256:4b97bf07fbf845a061154690cdf44ae0e9ef435166d90bda4d264d5ef1f96bca
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:12:09Z"
 history:
     created_by: human:cli
     created_at: "2026-04-19T15:30:02Z"

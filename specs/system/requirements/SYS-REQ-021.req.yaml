@@ -5,15 +5,14 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !rate_limit_apply_requested | policy_rate_empty | api_limit_empty | policy_rate_higher | policy_rate_equal | rate_limit_applied
-description: >-
-    ApplyRateLimits must apply policy rate limits when: policy rate is non-empty AND not equal to current AND (current API limit is empty OR policy allows higher rate). The highest-rate-wins rule ensures the most permissive policy governs. Equal rates preserve the existing limit (see SYS-REQ-041).
+description: 'ApplyRateLimits must apply policy rate limits when: policy rate is non-empty AND not equal to current AND (current API limit is empty OR policy allows higher rate). The highest-rate-wins rule ensures the most permissive policy governs. Equal rates preserve the existing limit (see SYS-REQ-041).'
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: "ApplyRateLimits must apply policy rate limits when: policy rate is non-empty AND not equal to current AND (current API limit is empty OR policy allows higher rate). The highest-rate-wins rule ensures "
+rationale: 'ApplyRateLimits must apply policy rate limits when: policy rate is non-empty AND not equal to current AND (current API limit is empty OR policy allows higher rate). The highest-rate-wins rule ensures '
 tags: []
 variables: []
 traces:
@@ -26,8 +25,9 @@ traces:
         - FLIP:policy/tc-035
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.808987Z"
+    reviewed_at: "2026-05-18T16:32:57.438734Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:2f766222d905aef89f91a206c4455cb568d7f7715754fab7b522c5fee01f5511
 verification:
     assurance_level: A
     formalization_status: valid
@@ -36,14 +36,43 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
-    gaps_reviewed_at: "2026-04-27T06:26:19.418656Z"
+    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
     gaps_reviewed_by: leonidbugaev
+    impact_reviews:
+        - requirement: SYS-REQ-021
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:2f766222d905aef89f91a206c4455cb568d7f7715754fab7b522c5fee01f5511
+          approval_fingerprint: sha256:eb057d97f7ab86b1bf0f3e8d359a4daf69669ab7e267029d6a9610d00e2a1802
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:12:01Z"
+        - requirement: SYS-REQ-021
+          artifact: internal/policy/util.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:2f766222d905aef89f91a206c4455cb568d7f7715754fab7b522c5fee01f5511
+          approval_fingerprint: sha256:eb057d97f7ab86b1bf0f3e8d359a4daf69669ab7e267029d6a9610d00e2a1802
+          artifact_fingerprint: sha256:e7c53482815efd8e708c449e82dfe958b6f957acb864490402c7aca5fbf9a9fc
+          reviewed_at: "2026-05-18T15:12:01Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:53Z"
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:34Z"
 obligation_class: nominal
+obligation_checklist:
+    - nominal
+    - rate_limit_boundary
+    - determinism
+    - overflow_safety
+    - monotonicity
+    - nil_safety
+    - commutativity
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:34Z"

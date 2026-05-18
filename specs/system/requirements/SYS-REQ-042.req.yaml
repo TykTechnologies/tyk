@@ -20,8 +20,9 @@ traces:
         - STK-REQ-006
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.851702Z"
+    reviewed_at: "2026-05-18T15:10:03.496723Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:64462a97333c9d97032a9bf448a93ffbe373ddbc0340b91d8ee3b9706e1f1a27
 verification:
     assurance_level: A
     formalization_status: valid
@@ -30,14 +31,29 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
-    gaps_reviewed_at: "2026-04-27T06:26:19.418656Z"
+    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
     gaps_reviewed_by: leonidbugaev
+    impact_reviews:
+        - requirement: SYS-REQ-042
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:64462a97333c9d97032a9bf448a93ffbe373ddbc0340b91d8ee3b9706e1f1a27
+          approval_fingerprint: sha256:731e5c4916ec26df1bbdd0ecc7fbdf326b005fe4c0140e1309e0fb1616c2698d
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:12:01Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T17:44:05Z"
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:34Z"
 obligation_class: error_handling
+obligation_checklist:
+    - error_handling
+    - nil_safety
+    - panic_free_input_handling
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:34Z"

@@ -22,8 +22,9 @@ traces:
         - internal/policy/apply.go
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.754839Z"
+    reviewed_at: "2026-05-18T16:32:57.419399Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:0010d196f06cddee7701323c97f8043d908ae1068db00b3a73129559f4340bb2
 verification:
     assurance_level: A
     formalization_status: ""
@@ -32,11 +33,29 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
+    impact_reviews:
+        - requirement: STK-REQ-002
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: consistent with existing implementation with no authored change needed'
+          base: origin/master
+          requirement_fingerprint: sha256:0010d196f06cddee7701323c97f8043d908ae1068db00b3a73129559f4340bb2
+          approval_fingerprint: sha256:cfba12e8b8081c62e58dbdbec55b92e5cb8ecfabd4dd71eebd9e3afb877ea818
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:11:12Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:33Z"
+obligation_checklist:
+    - nominal
+    - error_handling
+    - nil_safety
+    - determinism
+    - idempotency
+    - malformed_input
 stakeholder:
     persona: API platform administrator
     story: As an API platform administrator, I need the policy engine to correctly clear session state so that policy changes take effect immediately without stale data.
@@ -51,10 +70,6 @@ stakeholder:
           testable: true
           derived_reqs:
             - SYS-REQ-020
-    obligation_checklist:
-        - nominal
-        - error_handling
-        - nil_safety
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

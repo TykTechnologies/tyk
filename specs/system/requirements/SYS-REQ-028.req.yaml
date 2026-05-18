@@ -5,16 +5,14 @@ priority: shall
 category: functional
 req_type: constraint
 fretish: the policy shall always satisfy !(error_reported & access_rights_merged)
-description: >-
-    Mutual exclusivity: error_reported and access_rights_merged cannot both be true simultaneously. A policy application either succeeds (rights merged) or fails (error reported), never both.
+description: 'Mutual exclusivity: error_reported and access_rights_merged cannot both be true simultaneously. A policy application either succeeds (rights merged) or fails (error reported), never both.'
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: >-
-    Mutual exclusivity: error_reported and access_rights_merged cannot both be true simultaneously. A policy application either succeeds (rights merged) or fails (error reported), never both.
+rationale: 'Mutual exclusivity: error_reported and access_rights_merged cannot both be true simultaneously. A policy application either succeeds (rights merged) or fails (error reported), never both.'
 tags: []
 variables: []
 traces:
@@ -22,8 +20,9 @@ traces:
         - STK-REQ-005
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.82312Z"
+    reviewed_at: "2026-05-18T15:10:03.478403Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:f80d869ca8f37be953fa5cd2cabe1171e537afab8155622bc87335dc76b00c5b
 verification:
     assurance_level: A
     formalization_status: valid
@@ -32,12 +31,28 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
+    impact_reviews:
+        - requirement: SYS-REQ-028
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:f80d869ca8f37be953fa5cd2cabe1171e537afab8155622bc87335dc76b00c5b
+          approval_fingerprint: sha256:190227b99f89bd63769049e51780c30267cfda2765d4bfdd0f222dfe01b7f85e
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:12:01Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:29:12Z"
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:34Z"
 obligation_class: access_denied
+obligation_checklist:
+    - access_denied
+    - determinism
+    - atomicity
+    - panic_free_input_handling
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:34Z"

@@ -23,8 +23,9 @@ traces:
         - internal/policy/apply.go
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.750411Z"
+    reviewed_at: "2026-05-18T16:32:57.148778Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
 verification:
     assurance_level: A
     formalization_status: ""
@@ -33,11 +34,35 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
+    impact_reviews:
+        - requirement: STK-REQ-001
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: consistent with existing implementation with no authored change needed'
+          base: origin/master
+          requirement_fingerprint: sha256:9545f07c778d3297855a68eca411818d074f4a372ae89d15c01734fea5dfac8a
+          approval_fingerprint: sha256:9cdf6fc9e16adb4b65e748377c1b9d41cc2ea2a099c72f8a6c3e3262f47917c3
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:11:12Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:33Z"
+obligation_checklist:
+    - nominal
+    - error_handling
+    - malformed_input
+    - boundary
+    - access_denied
+    - policy_merge
+    - determinism
+    - idempotency
+    - commutativity
+    - overflow_safety
+    - concurrent
+    - atomicity
 stakeholder:
     persona: API platform administrator
     story: As an API platform administrator, I need the policy engine to correctly apply access control policies to sessions so that API consumers get the right permissions, rate limits, and quotas.
@@ -80,16 +105,6 @@ stakeholder:
           testable: true
           derived_reqs:
             - SYS-REQ-011
-    obligation_checklist:
-        - nominal
-        - error_handling
-        - malformed_input
-        - boundary
-        - access_denied
-        - policy_merge
-        - determinism
-        - idempotency
-        - commutativity
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

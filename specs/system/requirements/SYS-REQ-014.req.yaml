@@ -5,16 +5,14 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !apply_requested | !policy_found | !org_matches | !is_per_api | quota_applied
-description: >-
-    When Apply processes a valid per-API policy (found, org matches, per-API mode), quota values must be applied. Reads as: if apply requested AND policy found AND org matches AND is per-API, then quota applied.
+description: 'When Apply processes a valid per-API policy (found, org matches, per-API mode), quota values must be applied. Reads as: if apply requested AND policy found AND org matches AND is per-API, then quota applied.'
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: >-
-    When Apply processes a valid per-API policy (found, org matches, per-API mode), quota values must be applied. Reads as: if apply requested AND policy found AND org matches AND is per-API, then quota a
+rationale: 'When Apply processes a valid per-API policy (found, org matches, per-API mode), quota values must be applied. Reads as: if apply requested AND policy found AND org matches AND is per-API, then quota a'
 tags: []
 variables: []
 traces:
@@ -27,8 +25,9 @@ traces:
         - FLIP:policy/tc-019
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.794783Z"
+    reviewed_at: "2026-05-18T15:10:03.442714Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:060395f0a07630a86e688b8aa50fd6b6d7e93c2b5d1ac778a40a308c1c3418e6
 verification:
     assurance_level: A
     formalization_status: valid
@@ -37,14 +36,29 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
-    gaps_reviewed_at: "2026-04-27T06:26:19.418656Z"
+    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
     gaps_reviewed_by: leonidbugaev
+    impact_reviews:
+        - requirement: SYS-REQ-014
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:060395f0a07630a86e688b8aa50fd6b6d7e93c2b5d1ac778a40a308c1c3418e6
+          approval_fingerprint: sha256:ca1b5667650cb93895724ebe168f169b8071885cd9f9fa21af278d7619475316
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:11:45Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:42Z"
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:34Z"
 obligation_class: nominal
+obligation_checklist:
+    - nominal
+    - determinism
+    - idempotency
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:34Z"

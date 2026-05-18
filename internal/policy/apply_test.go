@@ -1296,6 +1296,9 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 }
 
 // Verifies: STK-REQ-001, STK-REQ-005, STK-REQ-007, SYS-REQ-008, SYS-REQ-010, SYS-REQ-011, SYS-REQ-012, SYS-REQ-013, SYS-REQ-014, SYS-REQ-015, SYS-REQ-025, SYS-REQ-026, SYS-REQ-027, SYS-REQ-030, SYS-REQ-032 [example]
+// SYS-REQ-010:error_handling:negative
+// SYS-REQ-011:error_handling:negative
+// SYS-REQ-012:malformed_input:negative
 // MCDC STK-REQ-001: N/A
 // MCDC STK-REQ-005: N/A
 // MCDC STK-REQ-007: N/A

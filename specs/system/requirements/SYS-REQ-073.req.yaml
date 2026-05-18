@@ -1,0 +1,52 @@
+id: SYS-REQ-073
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !rate_limit_apply_requested | !endpoint_limit_apply_requested | !apply_requested | nil_safe_execution
+description: Rate limit application, endpoint limit merging, and error handling must be nil-safe. Nil or invalid session fields, nil policy references, and nil API limit structs must not cause panics or undefined behavior. Each operation must check inputs before dereferencing and return errors gracefully for nil/invalid inputs.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Nil safety for rate limit and endpoint operations is critical because gateway middleware may construct partial sessions or API limit structs. A nil map, nil slice, or zero-valued struct must not cause a panic that crashes the gateway process. This extends the nil safety guarantees of SYS-REQ-064/065 to rate limit and endpoint limit operations.
+tags:
+    - nil-safety
+    - rate-limiting
+    - endpoint-limits
+    - error-handling
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-003
+        - STK-REQ-004
+        - STK-REQ-005
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-05-18T16:40:51.049762Z"
+    reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:837725cadd473ce94fe5bcb4af89ebf360fc0a3c714de9753f06c7da5e1be0d7
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T12:00:00Z"
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-05-08T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-05-08T00:00:00Z"
+obligation_class: nil_safety
+lifecycle:
+    change_history:
+        - date: "2026-05-08T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class nil_safety covering STK-REQ-003, STK-REQ-004, STK-REQ-005
+          changed_by: ai:claude

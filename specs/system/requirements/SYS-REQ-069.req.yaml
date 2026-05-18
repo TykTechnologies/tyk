@@ -1,0 +1,52 @@
+id: SYS-REQ-069
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !apply_requested | !error_reported | !session_modified
+description: Policy application shall be all-or-nothing. When Apply encounters an error during processing of any policy in a multi-policy session, no policy fields shall be merged into the session. Partial application is a security risk because it could grant access rights based on a subset of applicable policies.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: If an error occurs during the processing of the second policy in a three-policy session, but the first policy's fields have already been merged, the session enters a corrupted state. Atomicity ensures that either all policies are applied or none are, maintaining session integrity.
+tags:
+    - atomicity
+    - error-handling
+    - security
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-001
+        - STK-REQ-005
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-05-18T16:40:51.040658Z"
+    reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:acc772c57bf03157206ab89a80d8c2e0a306d2ea5835ebf15fd5a674a2f7ba9c
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T12:00:00Z"
+        ai_generated: true
+    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
+    gaps_reviewed_by: leonidbugaev
+history:
+    created_by: ai:claude
+    created_at: "2026-05-08T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-05-08T00:00:00Z"
+obligation_class: atomicity
+lifecycle:
+    change_history:
+        - date: "2026-05-08T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class atomicity covering STK-REQ-001, STK-REQ-005
+          changed_by: ai:claude

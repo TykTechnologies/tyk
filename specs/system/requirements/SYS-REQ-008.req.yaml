@@ -22,8 +22,9 @@ traces:
         - FLIP:policy/tc-004
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.78139Z"
+    reviewed_at: "2026-05-18T15:10:03.048833Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
 verification:
     assurance_level: A
     formalization_status: valid
@@ -32,14 +33,70 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
-    gaps_reviewed_at: "2026-04-27T06:26:19.418656Z"
+    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
     gaps_reviewed_by: leonidbugaev
+    impact_reviews:
+        - requirement: SYS-REQ-008
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy internal tracing: no authored change needed for existing implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
+          approval_fingerprint: sha256:7f805274a0d61c89f9ecc9d5548deaddb48e24513275505f1983c3ded31032d6
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:10:50Z"
+        - requirement: SYS-REQ-008
+          artifact: internal/policy/rpc.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy internal tracing: no authored change needed for existing implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
+          approval_fingerprint: sha256:7f805274a0d61c89f9ecc9d5548deaddb48e24513275505f1983c3ded31032d6
+          artifact_fingerprint: sha256:0e40b705cf492ffa91ab4835d6a5b94cbf3d7e27f230b77a28a5b451b564d32b
+          reviewed_at: "2026-05-18T15:10:50Z"
+        - requirement: SYS-REQ-008
+          artifact: internal/policy/store.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy internal tracing: no authored change needed for existing implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
+          approval_fingerprint: sha256:7f805274a0d61c89f9ecc9d5548deaddb48e24513275505f1983c3ded31032d6
+          artifact_fingerprint: sha256:0b871001e1125f3881afd6636a98e162038ff80ce43c764e0288c1b418f818d7
+          reviewed_at: "2026-05-18T15:10:50Z"
+        - requirement: SYS-REQ-008
+          artifact: internal/policy/store_map.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy internal tracing: no authored change needed for existing implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
+          approval_fingerprint: sha256:7f805274a0d61c89f9ecc9d5548deaddb48e24513275505f1983c3ded31032d6
+          artifact_fingerprint: sha256:7a7b1601bc4fd3d7ecac375ab6e5044dc9a444cc21e67f9b9f2a195a8cecb967
+          reviewed_at: "2026-05-18T15:10:50Z"
+        - requirement: SYS-REQ-008
+          artifact: internal/policy/store_mock.gen.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy internal tracing: no authored change needed for existing implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:f71d7198cf2334f050ef15f4c5c5bb3236637e49455d6a3a687c9fe3b7d6ac60
+          approval_fingerprint: sha256:7f805274a0d61c89f9ecc9d5548deaddb48e24513275505f1983c3ded31032d6
+          artifact_fingerprint: sha256:40369f57926e217e9147ef3143864b6835f8d80b51beed9d873730f1c494e88f
+          reviewed_at: "2026-05-18T15:10:50Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:13Z"
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:34Z"
 obligation_class: nominal
+obligation_checklist:
+    - nominal
+    - error_handling
+    - determinism
+    - atomicity
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:34Z"

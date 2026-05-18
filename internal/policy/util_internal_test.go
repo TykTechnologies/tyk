@@ -56,6 +56,7 @@ func TestPolicyByID_NonACLType(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-048 [boundary]
+// SYS-REQ-048:boundary:negative
 // MCDC SYS-REQ-048: apply_requested=T, result_returned=T => TRUE
 func TestApplyMCPPrimitiveLimits_DurationMerge(t *testing.T) {
 	// Covers: apply.go:791 both branches of the compound condition

@@ -78,6 +78,7 @@ func TestMCDC_SYS_REQ_040_Row3_Violation(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-040
+// SYS-REQ-040:error_handling:negative
 // MCDC SYS-REQ-040: apply_requested=T, error_reported=T, policies_all_missing=T => TRUE
 func TestMCDC_SYS_REQ_040_Row4_ErrorReported(t *testing.T) {
 	// Row 4: apply requested, all policies missing, error IS reported.
@@ -99,6 +100,8 @@ func TestMCDC_SYS_REQ_040_Row4_ErrorReported(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // Verifies: SYS-REQ-042
+// SYS-REQ-042:nil_safety:negative
+// SYS-REQ-042:error_handling:negative
 func TestMCDC_SYS_REQ_042_NilStore(t *testing.T) {
 	// Witnesses the core case: apply requested, store nil, error reported.
 	logger := logrus.New()

@@ -1,0 +1,52 @@
+id: SYS-REQ-067
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !apply_requested | overflow_safe | bounds_checked
+description: All integer arithmetic in policy application shall be bounded and overflow-safe. Rate limit, quota, and complexity calculations use int64 values that could overflow during comparison or assignment. The system must handle edge-case values near INT64_MAX and INT64_MIN without producing incorrect results due to integer overflow.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Integer overflow in rate limit or quota calculations could produce incorrect access control decisions. For example, adding two large int64 values could wrap to negative, granting unrestricted access. All arithmetic in the policy engine uses comparison operators and single-assignment, which are inherently safe from overflow, but this requirement formalizes the expectation.
+tags:
+    - overflow-safety
+    - integer
+    - security
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-001
+        - STK-REQ-003
+        - STK-REQ-004
+        - STK-REQ-007
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-05-18T16:40:50.918166Z"
+    reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:f7d5fcd0de6050df7ade04440e977df430141565b1fee5505903d21825bf6865
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T12:00:00Z"
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-05-08T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-05-08T00:00:00Z"
+obligation_class: overflow_safety
+lifecycle:
+    change_history:
+        - date: "2026-05-08T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class overflow_safety covering STK-REQ-001, STK-REQ-003, STK-REQ-004, STK-REQ-007
+          changed_by: ai:claude

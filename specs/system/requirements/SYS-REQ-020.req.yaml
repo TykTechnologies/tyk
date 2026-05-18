@@ -23,8 +23,9 @@ traces:
         - FLIP:policy/tc-031
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.807129Z"
+    reviewed_at: "2026-05-18T15:10:03.457569Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:b40f687c3fe30f09474c9fa3043f37ac272afe5863de18814b1dffe8cb137ed6
 verification:
     assurance_level: A
     formalization_status: valid
@@ -33,14 +34,30 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
-    gaps_reviewed_at: "2026-04-27T06:26:19.418656Z"
+    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
     gaps_reviewed_by: leonidbugaev
+    impact_reviews:
+        - requirement: SYS-REQ-020
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:b40f687c3fe30f09474c9fa3043f37ac272afe5863de18814b1dffe8cb137ed6
+          approval_fingerprint: sha256:285ce57ce07df5d19c443bced4ed07b9bebe087694cbcb5b0c3a7e33c23ffd31
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:12:01Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:53Z"
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:34Z"
 obligation_class: error_handling
+obligation_checklist:
+    - error_handling
+    - nil_safety
+    - determinism
+    - malformed_input
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:34Z"

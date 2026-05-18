@@ -352,6 +352,7 @@ variables:
         domain: integer
         variable: session_state
         condition: "quota_max == 0 && quota_remaining == 0 && rate == 0 && per == 0 && max_query_depth == 0"
+        assignment: "(and (= quota_max 0) (= quota_remaining 0) (= rate 0) (= per 0) (= max_query_depth 0))"
         parameters:
           - name: quota_max
             type: int64
@@ -366,7 +367,7 @@ variables:
             type: int64
             constraint: ">= 0"
           - name: max_query_depth
-            type: int
+            type: int64
             constraint: ">= 0"
 
     - name: access_rights_merged
@@ -667,3 +668,66 @@ variables:
       type: bool
       direction: output
       description: All policy fields survive JSON encoding round-trip without data loss or corruption
+
+    # --- Overflow safety (SYS-REQ-067) ---
+    - name: overflow_safe
+      type: bool
+      direction: output
+      description: All integer operations are overflow-safe and produce correct results for edge-case values
+
+    - name: bounds_checked
+      type: bool
+      direction: output
+      description: All numeric comparisons and assignments are bounds-checked to prevent overflow
+
+    # --- Concurrent safety (SYS-REQ-068) ---
+    - name: concurrent_safe
+      type: bool
+      direction: output
+      description: Concurrent calls to Apply with different sessions do not produce data races or corrupt shared state
+
+    - name: data_race_free
+      type: bool
+      direction: output
+      description: No data races occur when Apply is called concurrently on different sessions
+
+    # --- Atomicity (SYS-REQ-069) ---
+    - name: session_modified
+      type: bool
+      direction: output
+      description: Session state was modified by the policy application operation
+
+    # --- Determinism (SYS-REQ-070) ---
+    - name: result_deterministic
+      type: bool
+      direction: output
+      description: All policy engine operations produce deterministic results given identical inputs
+
+    # --- ClearSession idempotency (SYS-REQ-071) ---
+    - name: clear_result_first
+      type: bool
+      direction: output
+      description: The session state after the first ClearSession call
+
+    - name: clear_result_second
+      type: bool
+      direction: output
+      description: The session state after the second ClearSession call on the same session
+
+    # --- Nil safety for rate/endpoint/error operations (SYS-REQ-073) ---
+    - name: nil_safe_execution
+      type: bool
+      direction: output
+      description: Rate limit, endpoint limit, and error handling operations complete safely with nil or invalid inputs
+
+    # --- Panic-free input handling (SYS-REQ-075) ---
+    - name: panic_free
+      type: bool
+      direction: output
+      description: All policy engine entry points handle edge-case inputs without panicking
+
+    # --- Performance boundary (SYS-REQ-076) ---
+    - name: boundary_respected
+      type: bool
+      direction: output
+      description: Apply() respects performance boundary conditions including empty and maximum policy lists

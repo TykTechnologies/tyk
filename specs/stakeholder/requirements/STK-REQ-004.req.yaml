@@ -22,8 +22,9 @@ traces:
         - internal/policy/apply.go
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.758561Z"
+    reviewed_at: "2026-05-18T16:32:57.427056Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:1d5eec6c37c06ccf2c7db5454ba77e19fe7091ecfa64ae1b8c391fab27aef1cd
 verification:
     assurance_level: A
     formalization_status: ""
@@ -32,11 +33,32 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
+    impact_reviews:
+        - requirement: STK-REQ-004
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: consistent with existing implementation with no authored change needed'
+          base: origin/master
+          requirement_fingerprint: sha256:1d5eec6c37c06ccf2c7db5454ba77e19fe7091ecfa64ae1b8c391fab27aef1cd
+          approval_fingerprint: sha256:7bf43faab9b4e17955b85ceef290a9c2df35178244d7b75af8763537c8153e87
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:11:12Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:33Z"
+obligation_checklist:
+    - nominal
+    - rate_limit_boundary
+    - policy_merge
+    - determinism
+    - commutativity
+    - monotonicity
+    - overflow_safety
+    - error_handling
+    - nil_safety
 stakeholder:
     persona: API platform administrator
     story: As an API platform administrator, I need endpoint-level rate limits to be merged per path+method so that fine-grained traffic control works correctly across multiple policies.
@@ -51,13 +73,6 @@ stakeholder:
           testable: true
           derived_reqs:
             - SYS-REQ-023
-    obligation_checklist:
-        - nominal
-        - rate_limit_boundary
-        - policy_merge
-        - determinism
-        - commutativity
-        - monotonicity
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

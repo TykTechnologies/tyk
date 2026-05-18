@@ -22,8 +22,9 @@ traces:
         - internal/policy/apply.go
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.76615Z"
+    reviewed_at: "2026-05-18T16:32:57.433754Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:53af367edb595eadaf726520ca3cdcf360f52c66893deb5343ba1c52714588d1
 verification:
     assurance_level: A
     formalization_status: ""
@@ -32,11 +33,28 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
+    impact_reviews:
+        - requirement: STK-REQ-007
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: consistent with existing implementation with no authored change needed'
+          base: origin/master
+          requirement_fingerprint: sha256:53af367edb595eadaf726520ca3cdcf360f52c66893deb5343ba1c52714588d1
+          approval_fingerprint: sha256:4b444c9ec10c3effa036920ee016989689a5a17ddf065ab82b58725322957bd9
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:11:12Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:33Z"
+obligation_checklist:
+    - nominal
+    - encoding_safety
+    - boundary
+    - determinism
+    - overflow_safety
 stakeholder:
     persona: Platform reliability engineer
     story: As a platform reliability engineer, I need the policy engine to complete Apply() within 100ms for up to 50 policies so that API gateway latency SLAs are maintained.
@@ -51,9 +69,6 @@ stakeholder:
           testable: true
           derived_reqs:
             - SYS-REQ-044
-    obligation_checklist:
-        - nominal
-        - encoding_safety
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

@@ -5,16 +5,14 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !apply_requested | !error_reported | !access_rights_merged
-description: >-
-    Contrapositive: When Apply reports an error, access rights must NOT be merged. A failed apply must leave the session unchanged to prevent partial (corrupted) state.
+description: 'Contrapositive: When Apply reports an error, access rights must NOT be merged. A failed apply must leave the session unchanged to prevent partial (corrupted) state.'
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: >-
-    Contrapositive: When Apply reports an error, access rights must NOT be merged. A failed apply must leave the session unchanged to prevent partial (corrupted) state.
+rationale: 'Contrapositive: When Apply reports an error, access rights must NOT be merged. A failed apply must leave the session unchanged to prevent partial (corrupted) state.'
 tags: []
 variables: []
 traces:
@@ -25,8 +23,9 @@ traces:
         - FLIP:policy/tc-040
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.814586Z"
+    reviewed_at: "2026-05-18T15:10:03.468341Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:b7cb01418bcc845eb828e86eb29e3bf393652389b237ef481d88db4105372152
 verification:
     assurance_level: A
     formalization_status: valid
@@ -35,14 +34,29 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
-    gaps_reviewed_at: "2026-04-27T06:26:19.418656Z"
+    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
     gaps_reviewed_by: leonidbugaev
+    impact_reviews:
+        - requirement: SYS-REQ-024
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:b7cb01418bcc845eb828e86eb29e3bf393652389b237ef481d88db4105372152
+          approval_fingerprint: sha256:236553b26943776c5d4e6800b7936b63dc4b04d3143cfb0ef5775025ae0baa4d
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:12:01Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:29:03Z"
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:34Z"
 obligation_class: access_denied
+obligation_checklist:
+    - access_denied
+    - error_handling
+    - atomicity
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:34Z"

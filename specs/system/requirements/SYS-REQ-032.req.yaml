@@ -25,8 +25,9 @@ traces:
         - FLIP:policy/tc-077
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.831229Z"
+    reviewed_at: "2026-05-18T15:10:03.487662Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:05a43a48a0801ebff0f39206d9f0ef91b2547622169012b40db6f3e83cf6b5f5
 verification:
     assurance_level: A
     formalization_status: valid
@@ -35,14 +36,29 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
-    gaps_reviewed_at: "2026-04-27T06:26:19.418656Z"
+    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
     gaps_reviewed_by: leonidbugaev
+    impact_reviews:
+        - requirement: SYS-REQ-032
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:05a43a48a0801ebff0f39206d9f0ef91b2547622169012b40db6f3e83cf6b5f5
+          approval_fingerprint: sha256:3cf0b1fa816a3ea83c15cc5135f838c168d648e5dd6cffda2c411b0888929b50
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:11:45Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:29:22Z"
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:34Z"
 obligation_class: nominal
+obligation_checklist:
+    - nominal
+    - determinism
+    - boundary
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:34Z"

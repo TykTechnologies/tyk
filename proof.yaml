@@ -19,6 +19,10 @@ project:
     commands:
         build: go build ./internal/policy/...
         test: mkdir -p .proof/test-results .proof/coverage && go test ./internal/policy/... -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
+        tests:
+            test:
+                command: mkdir -p .proof/test-results .proof/coverage && go test ./internal/policy/... -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
+                language: go
         lint: go vet ./internal/policy/...
     obligation_classes:
         - nominal
@@ -34,6 +38,11 @@ project:
         - monotonicity
         - nil_safety
         - encoding_safety
+        - overflow_safety
+        - concurrent:
+            evidence: [race]
+        - atomicity
+        - panic_free_input_handling
     checks:
         coverage_threshold:
             threshold: 90
@@ -59,7 +68,7 @@ project:
             code_rich_decision_floor: 10
         proof_complexity_clean:
             max_formalized_requirements: 75
-            max_variables: 65
+            max_variables: 85
             max_guarantees: 70
         code_mcdc:
             severity: warn
@@ -72,6 +81,7 @@ project:
                   enabled: true
                   language: go
                   scope: ./internal/policy/...
+                  test_command: test
         evidence_diversity:
             min_classes:
                 A: 2

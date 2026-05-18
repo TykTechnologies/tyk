@@ -5,8 +5,7 @@ priority: shall
 category: functional
 req_type: constraint
 fretish: the policy shall always satisfy !apply_requested | !policy_found | !org_matches | quota_applied
-description: >-
-    When a policy specifies QuotaMax = -1 (unlimited), the merged quota must always be -1 regardless of other policies quota values. The -1 sentinel always wins via greaterThanInt64. SECURITY: Failing to propagate unlimited quota could cause premature quota exhaustion for users who should have unlimited access.
+description: 'When a policy specifies QuotaMax = -1 (unlimited), the merged quota must always be -1 regardless of other policies quota values. The -1 sentinel always wins via greaterThanInt64. SECURITY: Failing to propagate unlimited quota could cause premature quota exhaustion for users who should have unlimited access.'
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -22,8 +21,9 @@ traces:
         - STK-REQ-005
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.870566Z"
+    reviewed_at: "2026-05-18T15:10:03.51015Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:ae63309404bee72a8dfe84449962b1e42d4fe0a08f52669cc4122347c1442ecd
 verification:
     assurance_level: B
     formalization_status: valid
@@ -32,6 +32,17 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
+    impact_reviews:
+        - requirement: SYS-REQ-052
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:ae63309404bee72a8dfe84449962b1e42d4fe0a08f52669cc4122347c1442ecd
+          approval_fingerprint: sha256:e9e0a25e355c4f9962de55046466a41e890e95b9ad058374dc313025fa3799e3
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:11:45Z"
 history:
     created_by: human:cli
     created_at: "2026-04-19T15:29:29Z"

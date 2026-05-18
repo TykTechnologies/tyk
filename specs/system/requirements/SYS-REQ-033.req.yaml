@@ -17,8 +17,7 @@ informal_verification:
     evidence: ""
     verified: false
 component: policy
-rationale: >-
-    COMPONENT OVERVIEW: The policy package implements Tyk API Gateway's policy merging engine. It takes a session (API key) referencing one or more policies and applies those policies to the session, prod
+rationale: 'COMPONENT OVERVIEW: The policy package implements Tyk API Gateway''s policy merging engine. It takes a session (API key) referencing one or more policies and applies those policies to the session, prod'
 tags: []
 variables: []
 traces:
@@ -28,8 +27,9 @@ traces:
         - FLIP:policy/tc-078
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.833124Z"
+    reviewed_at: "2026-05-18T15:10:03.490034Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:054dbf188c831d55a1f3dbf47f979877e71355108f7c8944d17e94fe2ae67c9c
 verification:
     assurance_level: A
     formalization_status: valid
@@ -38,12 +38,26 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
+    impact_reviews:
+        - requirement: SYS-REQ-033
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:054dbf188c831d55a1f3dbf47f979877e71355108f7c8944d17e94fe2ae67c9c
+          approval_fingerprint: sha256:1a42049fa6da4d15e470f78967e2d7633a28fc54bd286952a3446b26be0bd79e
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:11:45Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:29:33Z"
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:34Z"
 obligation_class: nominal
+obligation_checklist:
+    - nominal
+    - error_handling
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:34Z"

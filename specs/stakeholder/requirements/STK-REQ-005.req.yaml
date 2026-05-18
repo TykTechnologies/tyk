@@ -23,8 +23,9 @@ traces:
         - internal/policy/apply.go
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.760549Z"
+    reviewed_at: "2026-05-18T16:32:57.429494Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
 verification:
     assurance_level: A
     formalization_status: ""
@@ -33,11 +34,31 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
+    impact_reviews:
+        - requirement: STK-REQ-005
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: consistent with existing implementation with no authored change needed'
+          base: origin/master
+          requirement_fingerprint: sha256:f37bfd28bbcc786ebfcc9910339d4c8c9e2ebb046828faa411b4e45d81b0cea3
+          approval_fingerprint: sha256:bfae1d18fe1cfc1497dfff5d1c51788d568bde3b4c626360badf0776b45d98b7
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:11:12Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:33Z"
+obligation_checklist:
+    - nominal
+    - error_handling
+    - access_denied
+    - malformed_input
+    - atomicity
+    - determinism
+    - nil_safety
+    - panic_free_input_handling
 stakeholder:
     persona: Security engineer
     story: As a security engineer, I need the policy engine to enforce strict error atomicity so that a failed policy application never partially modifies the session, which could grant unauthorized access.
@@ -71,11 +92,6 @@ stakeholder:
           testable: true
           derived_reqs:
             - SYS-REQ-028
-    obligation_checklist:
-        - nominal
-        - error_handling
-        - access_denied
-        - malformed_input
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

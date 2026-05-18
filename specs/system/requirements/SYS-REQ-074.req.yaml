@@ -1,0 +1,51 @@
+id: SYS-REQ-074
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !endpoint_limit_apply_requested | error_reported | endpoints_merged
+description: ApplyEndpointLevelLimits must gracefully handle error conditions. When invalid endpoint data is provided, an appropriate error must be returned and the session must not be modified. Error scenarios include nil endpoint slices, malformed endpoint definitions, and incompatible endpoint configurations.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Endpoint-level limit operations may receive incomplete or invalid data from upstream configuration sources. Graceful error handling prevents partial endpoint limit application that could cause incorrect per-endpoint rate limiting decisions.
+tags:
+    - error-handling
+    - endpoint-limits
+    - graceful-degradation
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-004
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-05-18T16:40:51.053165Z"
+    reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:8c7dcc7594c1c5ddeff5bfc690c1f80296a41cd93c0ca315422e6baaf3cc9303
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T12:00:00Z"
+        ai_generated: true
+    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
+    gaps_reviewed_by: leonidbugaev
+history:
+    created_by: ai:claude
+    created_at: "2026-05-08T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-05-08T00:00:00Z"
+obligation_class: error_handling
+lifecycle:
+    change_history:
+        - date: "2026-05-08T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class error_handling covering STK-REQ-004
+          changed_by: ai:claude

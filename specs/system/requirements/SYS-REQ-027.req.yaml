@@ -5,16 +5,14 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the policy shall always satisfy !!apply_requested | !!clear_requested | !!rate_limit_apply_requested | !!endpoint_limit_apply_requested | (!session_cleared & !access_rights_merged & !rate_limit_applied & !quota_applied & !tags_merged & !metadata_merged & !error_reported & !session_inactive_set & !endpoints_merged & !complexity_applied & !result_returned)
-description: >-
-    Idle state: When no operation is active (no apply, clear, rate limit, or endpoint operation requested), all outputs must be false. This prevents the component from producing spurious outputs when idle.
+description: 'Idle state: When no operation is active (no apply, clear, rate limit, or endpoint operation requested), all outputs must be false. This prevents the component from producing spurious outputs when idle.'
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: policy
-rationale: >-
-    Idle state: When no operation is active (no apply, clear, rate limit, or endpoint operation requested), all outputs must be false. This prevents the component from producing spurious outputs when idle
+rationale: 'Idle state: When no operation is active (no apply, clear, rate limit, or endpoint operation requested), all outputs must be false. This prevents the component from producing spurious outputs when idle'
 tags: []
 variables: []
 traces:
@@ -37,8 +35,9 @@ traces:
         - FLIP:policy/tc-058
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-04-27T06:25:20.821317Z"
+    reviewed_at: "2026-05-18T15:19:31.646556Z"
     reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:c4373f81072505545594fe13017285e4d932720c7a20b8224838746384a38a2a
 verification:
     assurance_level: B
     formalization_status: valid
@@ -47,14 +46,29 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
-    gaps_reviewed_at: "2026-04-27T06:26:19.418656Z"
+    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
     gaps_reviewed_by: leonidbugaev
+    impact_reviews:
+        - requirement: SYS-REQ-027
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:c4373f81072505545594fe13017285e4d932720c7a20b8224838746384a38a2a
+          approval_fingerprint: sha256:b358a2e6d435e9fa24765dc1cb7295470acf48ce20c73d2fd4314f9668b8f1f3
+          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
+          reviewed_at: "2026-05-18T15:12:01Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:29:03Z"
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:34Z"
 obligation_class: nominal
+obligation_checklist:
+    - nominal
+    - determinism
+    - panic_free_input_handling
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:34Z"

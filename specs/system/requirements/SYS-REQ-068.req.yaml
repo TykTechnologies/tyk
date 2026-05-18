@@ -1,0 +1,49 @@
+id: SYS-REQ-068
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !apply_requested | concurrent_safe | data_race_free
+description: Concurrent calls to Apply() with different sessions shall not produce data races or corrupt shared state. The policy engine uses a per-service store that is read during Apply, and concurrent reads must not interfere with each other. While Apply does not mutate the store, it reads policy data that could be modified concurrently by store updates.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: In production, the gateway handles multiple API requests concurrently. If Apply is called concurrently on different sessions while the store is being updated, the shared store access must be safe. The implementation currently uses sync.RWMutex-protected store access but this requirement makes the concurrent safety expectation explicit.
+tags:
+    - concurrent-safety
+    - thread-safety
+    - data-race
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-001
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-05-18T16:40:51.037898Z"
+    reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:1c966e24e0d2f3eb4f77baaad068c27656b1c93a0844709ef8d5c905e1821653
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T12:00:00Z"
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-05-08T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-05-08T00:00:00Z"
+obligation_class: concurrent
+lifecycle:
+    change_history:
+        - date: "2026-05-08T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class concurrent covering STK-REQ-001
+          changed_by: ai:claude

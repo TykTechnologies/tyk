@@ -978,6 +978,8 @@ func TestMCDCClosure_Intersection(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-019, SYS-REQ-020 [boundary]
+// SYS-REQ-019:nil_safety:negative
+// SYS-REQ-020:error_handling:negative
 // MCDC SYS-REQ-019: clear_requested=T, error_reported=F, policy_found=T, session_cleared=T => TRUE
 // MCDC SYS-REQ-020: clear_requested=T, error_reported=F, policy_found=T => TRUE
 func TestMCDCClosure_ClearSession_Partitioned(t *testing.T) {
@@ -1108,6 +1110,7 @@ func TestMCDCClosure_Apply_LastUpdated(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-008, SYS-REQ-042 [boundary]
+// SYS-REQ-042:nil_safety:negative
 // MCDC SYS-REQ-008: apply_requested=T, result_returned=F => FALSE
 // MCDC SYS-REQ-042: apply_requested=T, error_reported=T, store_available=F => TRUE
 func TestMCDCClosure_Apply_NilLoggerClearSessionError(t *testing.T) {
@@ -2372,6 +2375,7 @@ func TestMCDCClosure_UpdateSessionRootVars_RightsLookupFalse(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-008, SYS-REQ-042 [boundary]
+// SYS-REQ-042:nil_safety:negative
 // MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
 // MCDC SYS-REQ-042: apply_requested=T, error_reported=F, store_available=T => TRUE
 func TestMCDCClosure_Apply_CustomPoliciesWithNilStore(t *testing.T) {
