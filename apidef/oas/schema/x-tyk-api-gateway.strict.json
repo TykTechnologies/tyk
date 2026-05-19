@@ -621,6 +621,9 @@
         },
         "skipQuotaReset": {
           "type": "boolean"
+        },
+        "enforceTimeout": {
+          "$ref": "#/definitions/X-Tyk-GlobalEnforceTimeout"
         }
       },
       "additionalProperties": false
@@ -2494,6 +2497,19 @@
       "required": [
         "enabled",
         "value"
+      ],
+      "additionalProperties": false
+    },
+    "X-Tyk-GlobalEnforceTimeout": {
+      "type": "object",
+      "properties": {
+        "timeout": {
+          "type": "string",
+          "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
+        }
+      },
+      "required": [
+        "timeout"
       ],
       "additionalProperties": false
     },
