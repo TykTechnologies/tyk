@@ -30,10 +30,8 @@ type AdapterLookup interface {
 	AdapterForREST(restAPIID string) (adapterAPIID string, ok bool)
 }
 
-// Index is the canonical pairing store. It is safe for concurrent read after
-// Set has been called; callers must not call Set concurrently with reads. The
-// gateway pattern is: rebuild a fresh Index under the reload lock, then
-// atomically swap.
+// Index is the canonical pairing store. Set and reads are safe to call
+// concurrently; Set replaces the visible maps atomically under the index lock.
 type Index struct {
 	mu sync.RWMutex
 

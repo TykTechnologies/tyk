@@ -570,6 +570,49 @@ func TestCallMCPAdapterTool_RequiresActualCallerProxyToBeAllowed(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestCallMCPAdapterTool_UsesExactSourceRESTAPIID(t *testing.T) {
+	t.Parallel()
+
+	adapterID := oas.AdapterAPIID("rest-source")
+	idx := pairing.New()
+	idx.Set(
+		map[string]string{"rest-source": adapterID},
+		map[string]map[string]struct{}{"rest-source": {"proxy-1": {}}},
+	)
+
+	gw := &Gateway{mcpPairing: idx, apisHandlesByID: new(sync.Map)}
+	gw.apisByID = map[string]*APISpec{
+		"shadow": {APIDefinition: &apidef.APIDefinition{
+			APIID: "shadow",
+			Name:  "rest-source",
+			OrgID: "org-1",
+		}},
+	}
+	gw.apisHandlesByID.Store("shadow", &ChainObject{
+		ThisHandler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusTeapot)
+		}),
+	})
+
+	spec := &APISpec{
+		APIDefinition:         &apidef.APIDefinition{APIID: adapterID, OrgID: "org-1"},
+		IsSyntheticMCPAdapter: true,
+		SourceRESTAPIID:       "rest-source",
+	}
+	tool := &oas.DerivedTool{
+		Name:           "listOrders",
+		Method:         http.MethodGet,
+		PathTemplate:   "/orders",
+		ParamLocations: map[string]string{},
+	}
+
+	ctx := httpctx.ContextWithMCPProxyCallerAPIID(context.Background(), "proxy-1")
+	_, err := gw.callMCPAdapterTool(ctx, spec, tool, nil)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "paired REST API handler not found")
+}
+
 func TestHandleDeleteAPI_RefusesRESTSourceWithPairedMCPProxy(t *testing.T) {
 	t.Parallel()
 
@@ -617,7 +660,8 @@ func TestCallMCPAdapterTool_ForwardsQueryParamsThroughJSONRPC(t *testing.T) {
 			assert.Equal(t, "open", r.URL.Query().Get("status"))
 			assert.Equal(t, "25", r.URL.Query().Get("limit"))
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"ok":true}`))
+			_, err := w.Write([]byte(`{"ok":true}`))
+			require.NoError(t, err)
 		}),
 	})
 

@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -15,11 +13,18 @@ import (
 	mcppairing "github.com/TykTechnologies/tyk/internal/mcp/pairing"
 )
 
-// mcpAdapterListenPathPrefix is the listen path stem given to every
-// synthesised adapter spec. Adapter specs are Internal so this path is
-// never reachable from the public muxer; the prefix is only there to
-// satisfy listen-path validation in loadHTTPService.
-const mcpAdapterListenPathPrefix = "/__tyk-mcp-server/"
+const (
+	// mcpAdapterListenPathPrefix is the listen path stem given to every
+	// synthesised adapter spec. Adapter specs are Internal so this path is
+	// never reachable from the public muxer; the prefix is only there to
+	// satisfy listen-path validation in loadHTTPService.
+	mcpAdapterListenPathPrefix = "/__tyk-mcp-server/"
+	mcpLoopExactIDPrefix       = "id:"
+)
+
+func exactMCPAPILoopTarget(apiID string) string {
+	return mcpLoopExactIDPrefix + apiID
+}
 
 // synthesiseMCPAdapters walks loaded MCP-managed proxies and, for every unique
 // `tyk://<rest-api-id>__mcp-server` upstream target, emits one shared Internal
@@ -39,7 +44,6 @@ const mcpAdapterListenPathPrefix = "/__tyk-mcp-server/"
 // Returns the synthesised specs (caller registers them) — they are also
 // recorded in the adapter map computed alongside the pairing index.
 func (gw *Gateway) synthesiseMCPAdapters(
-	specs []*APISpec,
 	tmpSpecRegister map[string]*APISpec,
 	tmpSpecHandles *sync.Map,
 	apisByListen map[string]int,
@@ -119,19 +123,10 @@ func computeMCPPairing(specs map[string]*APISpec) (allowedProxies mcppairing.All
 		if !spec.IsMCPManaged() {
 			continue
 		}
-		target := strings.TrimSpace(spec.Proxy.TargetURL)
-		if target == "" {
+		adapterID, restID, ok := pairedMCPAdapterTarget(spec.Proxy.TargetURL)
+		if !ok {
 			continue
 		}
-		u, err := url.Parse(target)
-		if err != nil || u.Scheme != "tyk" {
-			continue
-		}
-		adapterID := strings.TrimPrefix(u.Host, "id:")
-		if !oas.IsAdapterAPIID(adapterID) {
-			continue
-		}
-		restID := oas.AdapterSourceAPIID(adapterID)
 		rest, restOK := specs[restID]
 		_, adapterOK := specs[adapterID]
 		if !adapterOK || !restOK || rest == nil {
@@ -199,25 +194,53 @@ func (gw *Gateway) buildAdapterSpec(rest *APISpec) (*APISpec, error) {
 		return nil, fmt.Errorf("nil source REST spec")
 	}
 
-	primitives, warns, err := oas.DeriveSourcePrimitives(&rest.OAS)
+	catalogue, err := deriveMCPAdapterCatalogue(rest)
 	if err != nil {
-		return nil, fmt.Errorf("derive MCP primitives: %w", err)
+		return nil, err
 	}
-	for _, w := range warns {
+	logMCPAdapterDeriveWarnings(rest.APIID, catalogue.warnings)
+
+	adapter := gw.newSyntheticMCPAdapterSpec(rest, catalogue)
+	if err := gw.attachSyntheticMCPAdapterRuntime(adapter, catalogue.tools); err != nil {
+		return nil, err
+	}
+
+	return adapter, nil
+}
+
+type mcpAdapterCatalogue struct {
+	primitives []oas.DerivedPrimitive
+	tools      []oas.DerivedTool
+	warnings   []oas.DeriveWarning
+}
+
+func deriveMCPAdapterCatalogue(rest *APISpec) (mcpAdapterCatalogue, error) {
+	primitives, warnings, err := oas.DeriveSourcePrimitives(&rest.OAS)
+	if err != nil {
+		return mcpAdapterCatalogue{}, fmt.Errorf("derive MCP primitives: %w", err)
+	}
+	return mcpAdapterCatalogue{
+		primitives: primitives,
+		tools:      oas.ToolPrimitives(primitives),
+		warnings:   warnings,
+	}, nil
+}
+
+func logMCPAdapterDeriveWarnings(restAPIID string, warnings []oas.DeriveWarning) {
+	for _, w := range warnings {
 		mainLog.WithFields(map[string]interface{}{
-			"rest_api_id": rest.APIID,
+			"rest_api_id": restAPIID,
 			"operation":   w.Operation,
 			"method":      w.Method,
 			"path":        w.Path,
 			"reason":      w.Reason,
 		}).Warnf("MCP tool derivation warning: %s", w.Reason)
 	}
-	tools := oas.ToolPrimitives(primitives)
+}
 
-	adapterAPIID := oas.AdapterAPIID(rest.APIID)
-
+func (gw *Gateway) newSyntheticMCPAdapterSpec(rest *APISpec, catalogue mcpAdapterCatalogue) *APISpec {
 	cloned := *rest.APIDefinition
-	cloned.APIID = adapterAPIID
+	cloned.APIID = oas.AdapterAPIID(rest.APIID)
 	cloned.Name = rest.Name + " [MCP adapter]"
 	cloned.Internal = true
 	cloned.MarkAsMCP()
@@ -225,27 +248,27 @@ func (gw *Gateway) buildAdapterSpec(rest *APISpec) (*APISpec, error) {
 	cloned.Proxy.TargetURL = "http://127.0.0.1/"
 	cloned.UseKeylessAccess = true
 
-	adapter := &APISpec{
+	return &APISpec{
 		APIDefinition:         &cloned,
 		OAS:                   rest.OAS,
 		IsSyntheticMCPAdapter: true,
 		SourceRESTAPIID:       rest.APIID,
-		DerivedPrimitives:     primitives,
-		DerivedTools:          tools,
+		DerivedPrimitives:     catalogue.primitives,
+		DerivedTools:          catalogue.tools,
 		GlobalConfig:          gw.GetConfig(),
 	}
+}
 
+func (gw *Gateway) attachSyntheticMCPAdapterRuntime(adapter *APISpec, tools []oas.DerivedTool) error {
 	sdkAdapter, err := gw.buildOrUpdateMCPSDKAdapter(adapter, tools)
 	if err != nil {
-		return nil, fmt.Errorf("build SDK adapter: %w", err)
+		return fmt.Errorf("build SDK adapter: %w", err)
 	}
 	adapter.MCPSDKAdapter = sdkAdapter
-
 	adapter.Health = &DefaultHealthChecker{Gw: gw, APIID: adapter.APIID}
 	adapter.AuthManager = &DefaultSessionManager{Gw: gw}
 	adapter.OrgSessionManager = &DefaultSessionManager{orgID: adapter.OrgID, Gw: gw}
-
-	return adapter, nil
+	return nil
 }
 
 func (gw *Gateway) buildOrUpdateMCPSDKAdapter(adapter *APISpec, tools []oas.DerivedTool) (*mcpadapter.SDKAdapter, error) {
@@ -296,7 +319,7 @@ func (gw *Gateway) callMCPAdapterTool(ctx context.Context, spec *APISpec, tool *
 		AdapterAPIID: spec.APIID,
 	})
 
-	handler, _, ok := gw.findInternalHttpHandlerByNameOrID(spec.SourceRESTAPIID)
+	handler, _, ok := gw.findInternalHttpHandlerByNameOrID(exactMCPAPILoopTarget(spec.SourceRESTAPIID))
 	if !ok {
 		return nil, fmt.Errorf("paired REST API handler not found")
 	}

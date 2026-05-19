@@ -2,6 +2,7 @@ package oas
 
 import (
 	"fmt"
+	"net/http"
 	"regexp"
 	"sort"
 	"strings"
@@ -50,6 +51,42 @@ const (
 	MCPPrimitiveTypeTool = "tool"
 	// MCPPrimitiveTypeResource is reserved for a future resource catalogue.
 	MCPPrimitiveTypeResource = "resource"
+)
+
+const (
+	// DerivedParamLocationPath identifies a path-template argument.
+	DerivedParamLocationPath = "path"
+	// DerivedParamLocationQuery identifies a query-string argument.
+	DerivedParamLocationQuery = "query"
+	// DerivedParamLocationHeader identifies a header argument.
+	DerivedParamLocationHeader = "header"
+	// DerivedParamLocationBody identifies the whole request body argument.
+	DerivedParamLocationBody = "body"
+	// DerivedParamLocationBodyPrefix identifies a single JSON body field.
+	DerivedParamLocationBodyPrefix = DerivedParamLocationBody + "."
+)
+
+const (
+	schemaKeyType        = "type"
+	schemaKeyProperties  = "properties"
+	schemaKeyRequired    = "required"
+	schemaKeyDescription = "description"
+
+	schemaTypeString  = "string"
+	schemaTypeInteger = "integer"
+	schemaTypeNumber  = "number"
+	schemaTypeBoolean = "boolean"
+	schemaTypeArray   = "array"
+	schemaTypeObject  = "object"
+)
+
+const (
+	warningMissingOperationID      = "missing operationId"
+	warningEmptySanitizedToolName  = "operationId sanitises to empty string"
+	warningToolNameCollision       = "tool name collision after sanitisation"
+	warningOperationMarkedInternal = "operation marked internal - skipped"
+	warningOperationMarkedBlocked  = "operation marked blocked - skipped"
+	warningOperationNotSourceAllow = "operation not in source allow-list - skipped"
 )
 
 // DerivedPrimitive is the internal primitive-aware catalogue entry used by the
@@ -111,13 +148,6 @@ func ToolPrimitives(primitives []DerivedPrimitive) []DerivedTool {
 }
 
 func deriveSourcePrimitives(srcOAS *OAS, expose []string) ([]DerivedPrimitive, []DeriveWarning, error) {
-	var exposeSet map[string]struct{}
-	if len(expose) > 0 {
-		exposeSet = make(map[string]struct{}, len(expose))
-		for _, name := range expose {
-			exposeSet[SanitizeToolName(name)] = struct{}{}
-		}
-	}
 	if srcOAS == nil {
 		return nil, nil, fmt.Errorf("source OAS is nil")
 	}
@@ -126,6 +156,7 @@ func deriveSourcePrimitives(srcOAS *OAS, expose []string) ([]DerivedPrimitive, [
 		primitives []DerivedPrimitive
 		warnings   []DeriveWarning
 		seen       = map[string]bool{}
+		exposeSet  = buildExposeSet(expose)
 	)
 
 	if srcOAS.Paths == nil {
@@ -133,89 +164,104 @@ func deriveSourcePrimitives(srcOAS *OAS, expose []string) ([]DerivedPrimitive, [
 	}
 
 	visibility := sourceOperationVisibilityFromOAS(srcOAS)
-
-	pathKeys := make([]string, 0, len(srcOAS.Paths.Map()))
-	for k := range srcOAS.Paths.Map() {
-		pathKeys = append(pathKeys, k)
-	}
-	sort.Strings(pathKeys)
-
-	for _, p := range pathKeys {
+	for _, p := range sortedPathKeys(srcOAS.Paths) {
 		item := srcOAS.Paths.Map()[p]
 		if item == nil {
 			continue
 		}
 
 		for _, mo := range methodOperations(p, item) {
-			rawName := mo.op.OperationID
-			if rawName == "" {
-				warnings = append(warnings, DeriveWarning{
-					Operation: fmt.Sprintf("%s %s", mo.method, mo.path),
-					Method:    mo.method,
-					Path:      mo.path,
-					Reason:    "missing operationId",
-				})
-				continue
+			primitive, warning, ok := deriveOperationPrimitive(item, mo, exposeSet, visibility, seen)
+			if warning != nil {
+				warnings = append(warnings, *warning)
 			}
-
-			if reason := visibility.skipReason(rawName); reason != "" {
-				warnings = append(warnings, DeriveWarning{
-					Operation: rawName,
-					Method:    mo.method,
-					Path:      mo.path,
-					Reason:    reason,
-				})
-				continue
+			if ok {
+				primitives = append(primitives, primitive)
 			}
-
-			name := SanitizeToolName(rawName)
-			if name == "" {
-				warnings = append(warnings, DeriveWarning{
-					Operation: rawName,
-					Method:    mo.method,
-					Path:      mo.path,
-					Reason:    "operationId sanitises to empty string",
-				})
-				continue
-			}
-
-			if seen[name] {
-				warnings = append(warnings, DeriveWarning{
-					Operation: rawName,
-					Method:    mo.method,
-					Path:      mo.path,
-					Reason:    "tool name collision after sanitisation",
-				})
-				continue
-			}
-
-			if exposeSet != nil {
-				if _, ok := exposeSet[name]; !ok {
-					continue
-				}
-			}
-
-			seen[name] = true
-
-			locs, schema := deriveParams(item, mo.op)
-
-			primitives = append(primitives, DerivedPrimitive{
-				Type: MCPPrimitiveTypeTool,
-				Tool: DerivedTool{
-					Name:           name,
-					Description:    operationDescription(mo.op),
-					Method:         mo.method,
-					PathTemplate:   mo.path,
-					ParamLocations: locs,
-					InputSchema:    schema,
-				},
-			})
 		}
 	}
 
 	sort.Slice(primitives, func(i, j int) bool { return primitives[i].Tool.Name < primitives[j].Tool.Name })
 
 	return primitives, warnings, nil
+}
+
+func buildExposeSet(expose []string) map[string]struct{} {
+	if len(expose) == 0 {
+		return nil
+	}
+
+	exposeSet := make(map[string]struct{}, len(expose))
+	for _, name := range expose {
+		exposeSet[SanitizeToolName(name)] = struct{}{}
+	}
+	return exposeSet
+}
+
+func sortedPathKeys(paths *openapi3.Paths) []string {
+	keys := make([]string, 0, len(paths.Map()))
+	for k := range paths.Map() {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func deriveOperationPrimitive(
+	item *openapi3.PathItem,
+	mo derivedOp,
+	exposeSet map[string]struct{},
+	visibility sourceOperationVisibility,
+	seen map[string]bool,
+) (DerivedPrimitive, *DeriveWarning, bool) {
+
+	rawName := mo.op.OperationID
+	if rawName == "" {
+		return DerivedPrimitive{}, deriveWarning(mo, fmt.Sprintf("%s %s", mo.method, mo.path), warningMissingOperationID), false
+	}
+
+	if reason := visibility.skipReason(rawName); reason != "" {
+		return DerivedPrimitive{}, deriveWarning(mo, rawName, reason), false
+	}
+
+	name := SanitizeToolName(rawName)
+	if name == "" {
+		return DerivedPrimitive{}, deriveWarning(mo, rawName, warningEmptySanitizedToolName), false
+	}
+
+	if seen[name] {
+		return DerivedPrimitive{}, deriveWarning(mo, rawName, warningToolNameCollision), false
+	}
+
+	if exposeSet != nil {
+		if _, ok := exposeSet[name]; !ok {
+			return DerivedPrimitive{}, nil, false
+		}
+	}
+
+	seen[name] = true
+	locs, schema := deriveParams(item, mo.op)
+
+	return DerivedPrimitive{
+		Type: MCPPrimitiveTypeTool,
+		Tool: DerivedTool{
+			Name:           name,
+			Description:    operationDescription(mo.op),
+			Method:         mo.method,
+			PathTemplate:   mo.path,
+			ParamLocations: locs,
+			InputSchema:    schema,
+		},
+	}, nil, true
+}
+
+func deriveWarning(mo derivedOp, operation, reason string) *DeriveWarning {
+	return &DeriveWarning{
+		Operation: operation,
+		Method:    mo.method,
+		Path:      mo.path,
+		Reason:    reason,
+	}
 }
 
 type sourceOperationVisibility struct {
@@ -258,13 +304,13 @@ func sourceOperationVisibilityFromOAS(srcOAS *OAS) sourceOperationVisibility {
 
 func (v sourceOperationVisibility) skipReason(operationID string) string {
 	if v.internal[operationID] {
-		return "operation marked internal - skipped"
+		return warningOperationMarkedInternal
 	}
 	if v.blocked[operationID] {
-		return "operation marked blocked - skipped"
+		return warningOperationMarkedBlocked
 	}
 	if v.allowListEnabled && !v.allowed[operationID] {
-		return "operation not in source allow-list - skipped"
+		return warningOperationNotSourceAllow
 	}
 	return ""
 }
@@ -282,14 +328,14 @@ func methodOperations(p string, item *openapi3.PathItem) []derivedOp {
 			ops = append(ops, derivedOp{method: method, path: p, op: op})
 		}
 	}
-	add("GET", item.Get)
-	add("PUT", item.Put)
-	add("POST", item.Post)
-	add("DELETE", item.Delete)
-	add("OPTIONS", item.Options)
-	add("HEAD", item.Head)
-	add("PATCH", item.Patch)
-	add("TRACE", item.Trace)
+	add(http.MethodGet, item.Get)
+	add(http.MethodPut, item.Put)
+	add(http.MethodPost, item.Post)
+	add(http.MethodDelete, item.Delete)
+	add(http.MethodOptions, item.Options)
+	add(http.MethodHead, item.Head)
+	add(http.MethodPatch, item.Patch)
+	add(http.MethodTrace, item.Trace)
 	return ops
 }
 
@@ -302,7 +348,7 @@ func operationDescription(op *openapi3.Operation) string {
 
 var toolNameInvalid = regexp.MustCompile(`[^A-Za-z0-9_.-]`)
 
-// SanitizeToolName lowercases and strips characters MCP clients dislike.
+// SanitizeToolName strips characters MCP clients dislike.
 // The result is restricted to [A-Za-z0-9_.-]; consecutive runs of invalid
 // characters collapse into a single underscore. Leading/trailing
 // underscores are trimmed.
@@ -322,116 +368,11 @@ func SanitizeToolName(raw string) string {
 // returns (paramLocations, inputSchema). The schema follows the JSON
 // Schema draft-07 dialect that MCP clients expect for tool inputs.
 func deriveParams(item *openapi3.PathItem, op *openapi3.Operation) (map[string]string, map[string]any) {
-	locs := map[string]string{}
-	props := map[string]any{}
-	required := []string{}
-
-	addParam := func(param *openapi3.Parameter) {
-		if param == nil || param.Name == "" {
-			return
-		}
-		var loc string
-		switch param.In {
-		case openapi3.ParameterInPath:
-			loc = "path"
-		case openapi3.ParameterInQuery:
-			loc = "query"
-		case openapi3.ParameterInHeader:
-			loc = "header"
-		default:
-			return
-		}
-		locs[param.Name] = loc
-
-		schema := map[string]any{"type": "string"}
-		if param.Schema != nil && param.Schema.Value != nil {
-			if t := schemaType(param.Schema.Value); t != "" {
-				schema["type"] = t
-			}
-			if d := param.Description; d != "" {
-				schema["description"] = d
-			}
-		}
-		props[param.Name] = schema
-		if param.Required {
-			required = append(required, param.Name)
-		}
-	}
-
-	for _, p := range item.Parameters {
-		if p != nil {
-			addParam(p.Value)
-		}
-	}
-	for _, p := range op.Parameters {
-		if p != nil {
-			addParam(p.Value)
-		}
-	}
-
-	if op.RequestBody != nil && op.RequestBody.Value != nil {
-		rb := op.RequestBody.Value
-		// Pick first JSON-ish content type.
-		var media *openapi3.MediaType
-		for ct, m := range rb.Content {
-			if strings.Contains(ct, "json") {
-				media = m
-				break
-			}
-		}
-		if media != nil && media.Schema != nil && media.Schema.Value != nil {
-			body := media.Schema.Value
-			if body.Type != nil && body.Type.Is("object") && len(body.Properties) > 0 {
-				bodyRequired := map[string]bool{}
-				for _, name := range body.Required {
-					bodyRequired[name] = true
-				}
-				for name, ref := range body.Properties {
-					if _, clash := locs[name]; clash {
-						continue
-					}
-					locs[name] = "body." + name
-					field := map[string]any{"type": "string"}
-					if ref != nil && ref.Value != nil {
-						if t := schemaType(ref.Value); t != "" {
-							field["type"] = t
-						}
-						if ref.Value.Description != "" {
-							field["description"] = ref.Value.Description
-						}
-					}
-					props[name] = field
-					if bodyRequired[name] {
-						required = append(required, name)
-					}
-				}
-			} else {
-				locs["body"] = "body"
-				bodyProp := map[string]any{"type": "object"}
-				if t := schemaType(body); t != "" {
-					bodyProp["type"] = t
-				}
-				if body.Description != "" {
-					bodyProp["description"] = body.Description
-				}
-				props["body"] = bodyProp
-				if rb.Required {
-					required = append(required, "body")
-				}
-			}
-		}
-	}
-
-	sort.Strings(required)
-
-	schema := map[string]any{
-		"type":       "object",
-		"properties": props,
-	}
-	if len(required) > 0 {
-		schema["required"] = required
-	}
-	return locs, schema
+	params := newDerivedParams()
+	params.addParameters(item.Parameters)
+	params.addParameters(op.Parameters)
+	params.addRequestBody(op.RequestBody)
+	return params.locations, params.inputSchema()
 }
 
 func schemaType(s *openapi3.Schema) string {
@@ -439,20 +380,202 @@ func schemaType(s *openapi3.Schema) string {
 		return ""
 	}
 	switch {
-	case s.Type.Is("string"):
-		return "string"
-	case s.Type.Is("integer"):
-		return "integer"
-	case s.Type.Is("number"):
-		return "number"
-	case s.Type.Is("boolean"):
-		return "boolean"
-	case s.Type.Is("array"):
-		return "array"
-	case s.Type.Is("object"):
-		return "object"
+	case s.Type.Is(schemaTypeString):
+		return schemaTypeString
+	case s.Type.Is(schemaTypeInteger):
+		return schemaTypeInteger
+	case s.Type.Is(schemaTypeNumber):
+		return schemaTypeNumber
+	case s.Type.Is(schemaTypeBoolean):
+		return schemaTypeBoolean
+	case s.Type.Is(schemaTypeArray):
+		return schemaTypeArray
+	case s.Type.Is(schemaTypeObject):
+		return schemaTypeObject
 	}
 	return ""
+}
+
+type derivedParams struct {
+	locations map[string]string
+	props     map[string]any
+	required  map[string]struct{}
+}
+
+func newDerivedParams() derivedParams {
+	return derivedParams{
+		locations: map[string]string{},
+		props:     map[string]any{},
+		required:  map[string]struct{}{},
+	}
+}
+
+func (p *derivedParams) addParameters(params openapi3.Parameters) {
+	for _, ref := range params {
+		if ref != nil {
+			p.addParameter(ref.Value)
+		}
+	}
+}
+
+func (p *derivedParams) addParameter(param *openapi3.Parameter) {
+	if param == nil || param.Name == "" {
+		return
+	}
+
+	location := parameterLocation(param.In)
+	if location == "" {
+		return
+	}
+
+	p.locations[param.Name] = location
+	p.props[param.Name] = schemaForParameter(param)
+	if param.Required {
+		p.required[param.Name] = struct{}{}
+	}
+}
+
+func parameterLocation(in string) string {
+	switch in {
+	case openapi3.ParameterInPath:
+		return DerivedParamLocationPath
+	case openapi3.ParameterInQuery:
+		return DerivedParamLocationQuery
+	case openapi3.ParameterInHeader:
+		return DerivedParamLocationHeader
+	default:
+		return ""
+	}
+}
+
+func schemaForParameter(param *openapi3.Parameter) map[string]any {
+	schema := map[string]any{schemaKeyType: schemaTypeString}
+	if param.Schema != nil && param.Schema.Value != nil {
+		schema = schemaForOpenAPISchema(param.Schema.Value, schemaTypeString)
+	}
+	if param.Description != "" {
+		schema[schemaKeyDescription] = param.Description
+	}
+	return schema
+}
+
+func (p *derivedParams) addRequestBody(ref *openapi3.RequestBodyRef) {
+	if ref == nil || ref.Value == nil {
+		return
+	}
+
+	rb := ref.Value
+	media := selectJSONMediaType(rb.Content)
+	if media == nil || media.Schema == nil || media.Schema.Value == nil {
+		return
+	}
+
+	body := media.Schema.Value
+	if body.Type != nil && body.Type.Is(schemaTypeObject) && len(body.Properties) > 0 {
+		p.addRequestBodyFields(body)
+		return
+	}
+
+	p.locations[DerivedParamLocationBody] = DerivedParamLocationBody
+	p.props[DerivedParamLocationBody] = schemaForOpenAPISchema(body, schemaTypeObject)
+	if rb.Required {
+		p.required[DerivedParamLocationBody] = struct{}{}
+	}
+}
+
+func (p *derivedParams) addRequestBodyFields(body *openapi3.Schema) {
+	bodyRequired := make(map[string]struct{}, len(body.Required))
+	for _, name := range body.Required {
+		bodyRequired[name] = struct{}{}
+	}
+
+	for _, name := range sortedSchemaPropertyNames(body.Properties) {
+		if _, clash := p.locations[name]; clash {
+			continue
+		}
+
+		p.locations[name] = DerivedParamLocationBodyPrefix + name
+		p.props[name] = schemaForSchemaRef(body.Properties[name], schemaTypeString)
+		if _, required := bodyRequired[name]; required {
+			p.required[name] = struct{}{}
+		}
+	}
+}
+
+func selectJSONMediaType(content openapi3.Content) *openapi3.MediaType {
+	if len(content) == 0 {
+		return nil
+	}
+
+	for ct, media := range content {
+		if strings.EqualFold(ct, contentTypeJSON) {
+			return media
+		}
+	}
+
+	jsonTypes := make([]string, 0, len(content))
+	for ct := range content {
+		if strings.Contains(strings.ToLower(ct), "json") {
+			jsonTypes = append(jsonTypes, ct)
+		}
+	}
+	sort.Strings(jsonTypes)
+	for _, ct := range jsonTypes {
+		if media := content[ct]; media != nil {
+			return media
+		}
+	}
+	return nil
+}
+
+func sortedSchemaPropertyNames(props openapi3.Schemas) []string {
+	names := make([]string, 0, len(props))
+	for name := range props {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func schemaForSchemaRef(ref *openapi3.SchemaRef, fallbackType string) map[string]any {
+	if ref == nil || ref.Value == nil {
+		return map[string]any{schemaKeyType: fallbackType}
+	}
+	return schemaForOpenAPISchema(ref.Value, fallbackType)
+}
+
+func schemaForOpenAPISchema(src *openapi3.Schema, fallbackType string) map[string]any {
+	schema := map[string]any{schemaKeyType: fallbackType}
+	if src == nil {
+		return schema
+	}
+	if t := schemaType(src); t != "" {
+		schema[schemaKeyType] = t
+	}
+	if src.Description != "" {
+		schema[schemaKeyDescription] = src.Description
+	}
+	return schema
+}
+
+func (p *derivedParams) inputSchema() map[string]any {
+	schema := map[string]any{
+		schemaKeyType:       schemaTypeObject,
+		schemaKeyProperties: p.props,
+	}
+	if len(p.required) > 0 {
+		schema[schemaKeyRequired] = sortedRequiredNames(p.required)
+	}
+	return schema
+}
+
+func sortedRequiredNames(required map[string]struct{}) []string {
+	names := make([]string, 0, len(required))
+	for name := range required {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // AdapterAPIIDSuffix is the deterministic suffix appended to the source

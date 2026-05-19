@@ -44,6 +44,34 @@ func extractMCPObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	return reqBodyInBytes, &mcpObj, nil
 }
 
+type mcpProxyDefinition struct {
+	apiDef apidef.APIDefinition
+	oasObj oas.OAS
+}
+
+func decodeMCPProxyDefinition(reqBody io.Reader) (*mcpProxyDefinition, error) {
+	var parsed mcpProxyDefinition
+	if err := json.NewDecoder(reqBody).Decode(&parsed.oasObj); err != nil {
+		log.Error("Couldn't decode MCP OAS object: ", err)
+		return nil, ErrRequestMalformed
+	}
+
+	parsed.oasObj.ExtractTo(&parsed.apiDef)
+	parsed.markRemoteMCPProxy()
+	return &parsed, nil
+}
+
+func (d *mcpProxyDefinition) markRemoteMCPProxy() {
+	// Only mark as MCP (which wires the JSON-RPC middleware on this
+	// spec) when this is a classic remote-MCP proxy. REST-as-MCP
+	// proxies are plain reverse-proxies whose upstream loops into a
+	// synthetic adapter — the adapter owns the JSON-RPC chain, the
+	// proxy is just an authenticated/rate-limited forwarder.
+	if !d.apiDef.IsPairedMCPAdapterProxy() {
+		d.apiDef.MarkAsMCP()
+	}
+}
+
 func (gw *Gateway) validateMCP(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqBodyInBytes, mcpObj, err := extractMCPObjFromReq(r.Body)
@@ -92,7 +120,7 @@ func pairedMCPAdapterTarget(target string) (adapterID, restAPIID string, ok bool
 		return "", "", false
 	}
 
-	adapterID = strings.TrimPrefix(u.Host, "id:")
+	adapterID = strings.TrimPrefix(u.Host, mcpLoopExactIDPrefix)
 	if !oas.IsAdapterAPIID(adapterID) {
 		return "", "", false
 	}
@@ -197,11 +225,6 @@ func (gw *Gateway) pairedMCPProxiesForREST(restAPIID string) []string {
 }
 
 func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int) {
-	var (
-		newDef apidef.APIDefinition
-		oasObj oas.OAS
-	)
-
 	versionParams := lib.NewVersionQueryParameters(r.URL.Query())
 	err := versionParams.Validate(func() (bool, string) {
 		baseApiID := versionParams.Get(lib.BaseAPIID)
@@ -219,26 +242,18 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&oasObj); err != nil {
-		log.Error("Couldn't decode MCP OAS object: ", err)
+	parsed, err := decodeMCPProxyDefinition(r.Body)
+	if err != nil {
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
+	newDef := &parsed.apiDef
+	oasObj := &parsed.oasObj
 
-	oasObj.ExtractTo(&newDef)
-	// Only mark as MCP (which wires the JSON-RPC middleware on this
-	// spec) when this is a classic remote-MCP proxy. REST-as-MCP
-	// proxies are plain reverse-proxies whose upstream loops into a
-	// synthetic adapter — the adapter owns the JSON-RPC chain, the
-	// proxy is just an authenticated/rate-limited forwarder.
-	if !newDef.IsPairedMCPAdapterProxy() {
-		newDef.MarkAsMCP()
-	}
-
-	if validationErr := validateAPIDef(&newDef); validationErr != nil {
+	if validationErr := validateAPIDef(newDef); validationErr != nil {
 		return *validationErr, http.StatusBadRequest
 	}
 
-	if errResp, errCode := ensureAndValidateAPIID(&newDef); errResp != nil {
+	if errResp, errCode := ensureAndValidateAPIID(newDef); errResp != nil {
 		return errResp, errCode
 	}
 
@@ -247,17 +262,17 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 		versionParams.Get(lib.NewVersionName),
 	)
 
-	if err := gw.handleOASServersForNewAPI(&newDef, &oasObj, versioningParams); err != nil {
+	if err := gw.handleOASServersForNewAPI(newDef, oasObj, versioningParams); err != nil {
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
-	if err := gw.alignPairedMCPProxyGatewayTags(&newDef, &oasObj); err != nil {
+	if err := gw.alignPairedMCPProxyGatewayTags(newDef, oasObj); err != nil {
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
 	newDef.IsOAS = true
 	oasObj.GetTykExtension().Info.ID = newDef.APIID
-	err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
+	err, errCode := gw.writeOASAndAPIDefToFile(fs, newDef, oasObj)
 	if err != nil {
 		return apiError(err.Error()), errCode
 	}
@@ -270,11 +285,6 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 }
 
 func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (interface{}, int) {
-	var (
-		newDef apidef.APIDefinition
-		oasObj oas.OAS
-	)
-
 	if err := sanitize.ValidatePathComponent(apiID); err != nil {
 		log.Errorf("Invalid API ID %q: %v", apiID, err)
 		return apiError("Invalid API ID"), http.StatusBadRequest
@@ -289,18 +299,14 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 		return apiError("API is not an MCP Proxy"), http.StatusNotFound
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&oasObj); err != nil {
-		log.Error("Couldn't decode MCP OAS object: ", err)
+	parsed, err := decodeMCPProxyDefinition(r.Body)
+	if err != nil {
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
+	newDef := &parsed.apiDef
+	oasObj := &parsed.oasObj
 
-	oasObj.ExtractTo(&newDef)
-	// See handleAddMCP for the rationale.
-	if !newDef.IsPairedMCPAdapterProxy() {
-		newDef.MarkAsMCP()
-	}
-
-	if validationErr := validateAPIDef(&newDef); validationErr != nil {
+	if validationErr := validateAPIDef(newDef); validationErr != nil {
 		return *validationErr, http.StatusBadRequest
 	}
 
@@ -308,16 +314,16 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 		return resp, code
 	}
 
-	if err := gw.handleOASServersForUpdate(spec, &newDef, &oasObj); err != nil {
+	if err := gw.handleOASServersForUpdate(spec, newDef, oasObj); err != nil {
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
-	if err := gw.alignPairedMCPProxyGatewayTags(&newDef, &oasObj); err != nil {
+	if err := gw.alignPairedMCPProxyGatewayTags(newDef, oasObj); err != nil {
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
 	newDef.IsOAS = true
-	err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
+	err, errCode := gw.writeOASAndAPIDefToFile(fs, newDef, oasObj)
 	if err != nil {
 		return apiError(err.Error()), errCode
 	}

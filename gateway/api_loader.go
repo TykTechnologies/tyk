@@ -1378,7 +1378,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	// operator-managed MCP proxies. The adapters live in tmpSpecRegister
 	// alongside the regular specs but are Internal — they are only ever
 	// reached via the `tyk://<adapter-id>` loop primitive.
-	gw.synthesiseMCPAdapters(specs, tmpSpecRegister, tmpSpecHandles, apisByListen, &gs, muxer)
+	gw.synthesiseMCPAdapters(tmpSpecRegister, tmpSpecHandles, apisByListen, &gs, muxer)
 
 	gw.DefaultProxyMux.swap(muxer, gw)
 

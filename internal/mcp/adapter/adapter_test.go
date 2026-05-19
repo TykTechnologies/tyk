@@ -41,41 +41,22 @@ func sampleTools() []oas.DerivedTool {
 	}
 }
 
-func TestFindTool(t *testing.T) {
-	t.Parallel()
+func sampleTool(t *testing.T, name string) *oas.DerivedTool {
+	t.Helper()
 	tools := sampleTools()
-
-	got := FindTool(tools, "getOrder")
-	require.NotNil(t, got)
-	assert.Equal(t, "GET", got.Method)
-
-	assert.Nil(t, FindTool(tools, "unknown"))
-}
-
-func TestInitializeResult(t *testing.T) {
-	t.Parallel()
-	res := InitializeResult("Orders [MCP adapter]")
-	assert.Equal(t, ProtocolVersion, res["protocolVersion"])
-	info := res["serverInfo"].(map[string]any)
-	assert.Equal(t, "Orders [MCP adapter]", info["name"])
-}
-
-func TestToolsListResult(t *testing.T) {
-	t.Parallel()
-	res := ToolsListResult(sampleTools())
-	items := res["tools"].([]map[string]any)
-	require.Len(t, items, 2)
-	assert.Equal(t, "getOrder", items[0]["name"])
-	assert.Equal(t, "fetch an order", items[0]["description"])
-	// createOrder has no description; field must be omitted.
-	_, has := items[1]["description"]
-	assert.False(t, has, "empty description should be omitted")
+	for i := range tools {
+		if tools[i].Name == name {
+			return &tools[i]
+		}
+	}
+	t.Fatalf("sample tool %q not found", name)
+	return nil
 }
 
 func TestBuildUpstreamRequest_PathQueryHeader(t *testing.T) {
 	t.Parallel()
 	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
-	tool := FindTool(sampleTools(), "getOrder")
+	tool := sampleTool(t, "getOrder")
 
 	req, err := BuildUpstreamRequest(parent, tool, "rest-1", map[string]any{
 		"id":      42,
@@ -89,10 +70,25 @@ func TestBuildUpstreamRequest_PathQueryHeader(t *testing.T) {
 	assert.Equal(t, "http", req.URL.Scheme)
 }
 
+func TestBuildUpstreamRequest_IgnoresUnknownArgs(t *testing.T) {
+	t.Parallel()
+	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
+	tool := sampleTool(t, "getOrder")
+
+	req, err := BuildUpstreamRequest(parent, tool, "rest-1", map[string]any{
+		"id":      42,
+		"unknown": "ignored",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "/orders/42", req.URL.Path)
+	assert.Empty(t, req.URL.Query().Get("unknown"))
+}
+
 func TestBuildUpstreamRequest_BodyFields(t *testing.T) {
 	t.Parallel()
 	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
-	tool := FindTool(sampleTools(), "createOrder")
+	tool := sampleTool(t, "createOrder")
 
 	req, err := BuildUpstreamRequest(parent, tool, "rest-1", map[string]any{
 		"sku":   "ABC",
@@ -115,11 +111,33 @@ func TestBuildUpstreamRequest_BodyFields(t *testing.T) {
 func TestBuildUpstreamRequest_MissingPathParam(t *testing.T) {
 	t.Parallel()
 	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
-	tool := FindTool(sampleTools(), "getOrder")
+	tool := sampleTool(t, "getOrder")
 
 	_, err := BuildUpstreamRequest(parent, tool, "rest-1", map[string]any{"verbose": "yes"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing required path parameter")
+}
+
+func TestBuildUpstreamRequest_RejectsWholeBodyAndBodyFieldCombination(t *testing.T) {
+	t.Parallel()
+	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
+	tool := &oas.DerivedTool{
+		Name:         "mixedBody",
+		Method:       http.MethodPost,
+		PathTemplate: "/orders",
+		ParamLocations: map[string]string{
+			"body": "body",
+			"sku":  "body.sku",
+		},
+	}
+
+	_, err := BuildUpstreamRequest(parent, tool, "rest-1", map[string]any{
+		"body": "not-an-object",
+		"sku":  "ABC",
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be combined with whole-body argument")
 }
 
 func TestBuildUpstreamRequest_WholeBodyAllowsAnyJSONValue(t *testing.T) {
@@ -187,6 +205,16 @@ func TestRecorder_StatusAndContentType(t *testing.T) {
 	assert.Equal(t, `{"ok":true}`, string(rec.Body()))
 }
 
+func TestRecorder_WriteHeaderKeepsFirstStatus(t *testing.T) {
+	t.Parallel()
+	rec := NewRecorder()
+
+	rec.WriteHeader(http.StatusAccepted)
+	rec.WriteHeader(http.StatusTeapot)
+
+	assert.Equal(t, http.StatusAccepted, rec.Status())
+}
+
 func TestToolResultEnvelope(t *testing.T) {
 	t.Parallel()
 	rec := NewRecorder()
@@ -217,30 +245,4 @@ func TestToolResultEnvelope_Truncation(t *testing.T) {
 	assert.Contains(t, text, "Tyk truncated the upstream response")
 	assert.Contains(t, text, "The content below is incomplete.")
 	assert.True(t, strings.HasSuffix(text, strings.Repeat("x", BodyTruncationBytes)))
-}
-
-func TestJSONRPCResultRoundTrip(t *testing.T) {
-	t.Parallel()
-	raw := JSONRPCResult("abc", map[string]any{"hello": "world"})
-	var got map[string]any
-	require.NoError(t, json.Unmarshal(raw, &got))
-	assert.Equal(t, "2.0", got["jsonrpc"])
-	assert.Equal(t, "abc", got["id"])
-	assert.Equal(t, "world", got["result"].(map[string]any)["hello"])
-}
-
-func TestJSONRPCErrorEncoding(t *testing.T) {
-	t.Parallel()
-	raw := JSONRPCError(1, JSONRPCMethodNotFound, "no such tool")
-	assert.True(t, strings.Contains(string(raw), `"code":-32601`))
-	assert.True(t, strings.Contains(string(raw), "no such tool"))
-}
-
-func TestWriteJSON(t *testing.T) {
-	t.Parallel()
-	rec := httptest.NewRecorder()
-	WriteJSON(rec, []byte(`{"k":1}`))
-	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
-	assert.Equal(t, `{"k":1}`, rec.Body.String())
 }

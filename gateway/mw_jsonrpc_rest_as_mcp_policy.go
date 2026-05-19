@@ -17,6 +17,16 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+const (
+	mcpListFilterTools             = "tools"
+	mcpListFilterPrompts           = "prompts"
+	mcpListFilterResources         = "resources"
+	mcpListFilterResourceTemplates = "resourceTemplates"
+
+	jsonrpcRateLimitExceededMessage = "Rate Limit Exceeded"
+	jsonrpcInternalErrorMessage     = "Internal Server Error"
+)
+
 type restAsMCPPolicyContext struct {
 	proxyAPIID string
 	proxySpec  *APISpec
@@ -61,38 +71,49 @@ func (m *JSONRPCMiddleware) prepareRESTAsMCPPolicy(w http.ResponseWriter, r *htt
 
 	policyCtx := &restAsMCPPolicyContext{rpcReq: rpcReq, route: route}
 	policyCtx.setJSONRPCState(r)
+	m.loadRESTAsMCPPolicyCaller(r, policyCtx)
 
+	if !m.deniesRESTAsMCPPolicies(w, r, policyCtx) {
+		policyCtx.listConfig = listConfigForMCPMethod(rpcReq.Method)
+		return policyCtx, false
+	}
+
+	return policyCtx, true
+}
+
+func (m *JSONRPCMiddleware) loadRESTAsMCPPolicyCaller(r *http.Request, policyCtx *restAsMCPPolicyContext) {
 	proxyAPIID := httpctx.GetMCPProxyCallerAPIID(r)
 	if proxyAPIID == "" || m.Gw == nil {
-		return policyCtx, false
+		return
 	}
 
 	policyCtx.proxyAPIID = proxyAPIID
 	policyCtx.proxySpec = m.Gw.getApiSpec(proxyAPIID)
 	policyCtx.session = ctxGetSession(r)
 	if policyCtx.proxySpec == nil || policyCtx.session == nil {
-		return policyCtx, false
+		return
 	}
 
 	accessDef, found := policyCtx.session.AccessRights[proxyAPIID]
 	if !found {
-		return policyCtx, false
+		return
 	}
+
 	policyCtx.accessDef = accessDef
 	policyCtx.hasAccess = true
+}
 
+func (m *JSONRPCMiddleware) deniesRESTAsMCPPolicies(w http.ResponseWriter, r *http.Request, policyCtx *restAsMCPPolicyContext) bool {
 	if m.deniesRESTAsMCPMethod(w, r, policyCtx) {
-		return policyCtx, true
+		return true
 	}
 	if m.deniesRESTAsMCPPrimitive(w, r, policyCtx) {
-		return policyCtx, true
+		return true
 	}
 	if m.enforceRESTAsMCPEndpointRateLimits(w, r, policyCtx) {
-		return policyCtx, true
+		return true
 	}
-
-	policyCtx.listConfig = listConfigForMCPMethod(rpcReq.Method)
-	return policyCtx, false
+	return false
 }
 
 func (m *JSONRPCMiddleware) routeSyntheticAdapterJSONRPC(w http.ResponseWriter, r *http.Request, rpcReq *JSONRPCRequest) (jsonrpc.RouteResult, bool) {
@@ -204,49 +225,59 @@ func (m *JSONRPCMiddleware) enforceRESTAsMCPEndpointRateLimit(w http.ResponseWri
 		return false
 	}
 
+	rateReq := restAsMCPRateLimitRequest(r, vemPath)
+	if _, ok := m.Gw.SessionLimiter.RateLimitInfo(rateReq, policyCtx.proxySpec, policyCtx.accessDef.Endpoints); !ok {
+		return false
+	}
+
+	reason := m.Gw.SessionLimiter.ForwardMessage(
+		rateReq,
+		policyCtx.session,
+		restAsMCPRateLimitKey(r, policyCtx),
+		"",
+		true,
+		false,
+		policyCtx.proxySpec,
+		false,
+		restAsMCPRateLimitHeaderSender(m.Gw, w),
+	)
+
+	return writeRESTAsMCPRateLimitResult(w, policyCtx.rpcReq.ID, reason)
+}
+
+func restAsMCPRateLimitRequest(r *http.Request, vemPath string) *http.Request {
 	rateReq := r.Clone(r.Context())
 	copiedURL := *r.URL
 	copiedURL.Path = vemPath
 	copiedURL.RawPath = ""
 	rateReq.URL = &copiedURL
 	rateReq.Method = http.MethodPost
+	return rateReq
+}
 
-	if _, ok := m.Gw.SessionLimiter.RateLimitInfo(rateReq, policyCtx.proxySpec, policyCtx.accessDef.Endpoints); !ok {
-		return false
+func restAsMCPRateLimitKey(r *http.Request, policyCtx *restAsMCPPolicyContext) string {
+	if token := ctxGetAuthToken(r); token != "" {
+		return token
 	}
+	return policyCtx.session.KeyID
+}
 
-	rateLimitKey := ctxGetAuthToken(r)
-	if rateLimitKey == "" {
-		rateLimitKey = policyCtx.session.KeyID
+func restAsMCPRateLimitHeaderSender(gw *Gateway, w http.ResponseWriter) rate.HeaderSender {
+	if gw.limitHeaderFactory == nil {
+		return nil
 	}
+	return gw.limitHeaderFactory(w.Header())
+}
 
-	var sender rate.HeaderSender
-	if m.Gw.limitHeaderFactory == nil {
-		sender = nil
-	} else {
-		sender = m.Gw.limitHeaderFactory(w.Header())
-	}
-
-	reason := m.Gw.SessionLimiter.ForwardMessage(
-		rateReq,
-		policyCtx.session,
-		rateLimitKey,
-		"",
-		true,
-		false,
-		policyCtx.proxySpec,
-		false,
-		sender,
-	)
-
+func writeRESTAsMCPRateLimitResult(w http.ResponseWriter, requestID any, reason sessionFailReason) bool {
 	switch reason {
 	case sessionFailNone:
 		return false
 	case sessionFailRateLimit:
-		jsonrpcerrors.WriteJSONRPCError(w, policyCtx.rpcReq.ID, http.StatusTooManyRequests, "Rate Limit Exceeded")
+		jsonrpcerrors.WriteJSONRPCError(w, requestID, http.StatusTooManyRequests, jsonrpcRateLimitExceededMessage)
 		return true
 	default:
-		jsonrpcerrors.WriteJSONRPCError(w, policyCtx.rpcReq.ID, http.StatusInternalServerError, "Internal Server Error")
+		jsonrpcerrors.WriteJSONRPCError(w, requestID, http.StatusInternalServerError, jsonrpcInternalErrorMessage)
 		return true
 	}
 }
@@ -254,13 +285,13 @@ func (m *JSONRPCMiddleware) enforceRESTAsMCPEndpointRateLimit(w http.ResponseWri
 func listConfigForMCPMethod(method string) *mcp.ListFilterConfig {
 	switch method {
 	case mcp.MethodToolsList:
-		return mcp.ListFilterConfigs["tools"]
+		return mcp.ListFilterConfigs[mcpListFilterTools]
 	case mcp.MethodPromptsList:
-		return mcp.ListFilterConfigs["prompts"]
+		return mcp.ListFilterConfigs[mcpListFilterPrompts]
 	case mcp.MethodResourcesList:
-		return mcp.ListFilterConfigs["resources"]
+		return mcp.ListFilterConfigs[mcpListFilterResources]
 	case mcp.MethodResourcesTemplatesList:
-		return mcp.ListFilterConfigs["resourceTemplates"]
+		return mcp.ListFilterConfigs[mcpListFilterResourceTemplates]
 	default:
 		return nil
 	}
