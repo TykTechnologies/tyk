@@ -6,13 +6,14 @@
 # - amd64
 version: 2
 builds:
-  - id: ee-amd64
+  - id: fips-amd64
     flags:
-      - -tags=goplugin,ee
+      - -tags=goplugin,ee,fips
       - -trimpath
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
       - CC=gcc
+      - GOFIPS140=v1.0.0
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
@@ -23,13 +24,14 @@ builds:
     goarch:
       - amd64
     binary: tyk
-  - id: ee-arm64
+  - id: fips-arm64
     flags:
-      - -tags=goplugin,ee
+      - -tags=goplugin,ee,fips
       - -trimpath
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
       - CC=aarch64-linux-gnu-gcc
+      - GOFIPS140=v1.0.0
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
@@ -40,13 +42,14 @@ builds:
     goarch:
       - arm64
     binary: tyk
-  - id: ee-s390x
+  - id: fips-s390x
     flags:
-      - -tags=goplugin,ee
+      - -tags=goplugin,ee,fips
       - -trimpath
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
       - CC=s390x-linux-gnu-gcc
+      - GOFIPS140=v1.0.0
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
@@ -109,17 +112,17 @@ builds:
       - s390x
     binary: tyk
 nfpms:
-  - id: ee
+  - id: fips
     vendor: "Tyk Technologies Ltd"
     homepage: "https://tyk.io"
     maintainer: "Tyk <info@tyk.io>"
-    description: Tyk API Gateway Enterprise Edition written in Go, supporting REST, GraphQL, TCP and gRPC protocols
-    package_name: tyk-gateway-ee
+    description: Tyk API Gateway Enterprise Edition written in Go, supporting REST, GraphQL, TCP and gRPC protocols Built with FIPS 140-3 compliant cryptography
+    package_name: tyk-gateway-fips
     file_name_template: "{{ .ConventionalFileName }}"
     ids:
-      - ee-amd64
-      - ee-arm64
-      - ee-s390x
+      - fips-amd64
+      - fips-arm64
+      - fips-s390x
     formats:
       - deb
       - rpm
@@ -228,9 +231,9 @@ nfpms:
         key_file: tyk.io.signing.key
         type: origin
 publishers:
-  - name: ee
+  - name: fips
     ids:
-      - ee
+      - fips
     env:
       - PACKAGECLOUD_TOKEN={{ .Env.PACKAGECLOUD_TOKEN }}
     cmd: packagecloud publish --debvers "{{ .Env.DEBVERS }}" --rpmvers "{{ .Env.RPMVERS }}" tyk/tyk-ee-unstable {{ .ArtifactPath }}
