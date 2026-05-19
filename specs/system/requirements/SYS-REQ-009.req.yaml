@@ -20,9 +20,9 @@ traces:
         - STK-REQ-001
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-05-18T16:32:57.43596Z"
+    reviewed_at: "2026-05-19T17:10:21.995283Z"
     reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:d6e6f245d8dad6a04d079641ff539941ff7b5ce7339506db0073cb645d8fb8a9
+    reviewed_fingerprint: sha256:8558ce7b1ec0799ab4fe254a1d8e5421a5e70fcafc62071d7344e3160e71e794
 verification:
     assurance_level: A
     formalization_status: ""

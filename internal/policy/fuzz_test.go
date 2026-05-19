@@ -20,6 +20,7 @@ import (
 // ---------------------------------------------------------------------------
 // Exercises the sentinel -1 (unlimited) handling and finite ordering with
 // edge int64 values: MaxInt64, MinInt64, -1, 0, and everything between.
+// Verifies: SYS-REQ-021, SYS-REQ-041
 func FuzzGreaterThanInt64(f *testing.F) {
 	seeds := [][2]int64{
 		{-1, 0},                // sentinel wins
@@ -48,6 +49,7 @@ func FuzzGreaterThanInt64(f *testing.F) {
 // ---------------------------------------------------------------------------
 // FuzzGreaterThanInt
 // ---------------------------------------------------------------------------
+// Verifies: SYS-REQ-021, SYS-REQ-041
 func FuzzGreaterThanInt(f *testing.F) {
 	seeds := [][2]int{
 		{-1, 0},
@@ -73,6 +75,7 @@ func FuzzGreaterThanInt(f *testing.F) {
 // Writes a random int64 into AccessDefinition.Limit.QuotaMax.
 // The Z3 lemma assumes v >= 0; we fuzz negative v to find callers that
 // bypass the precondition.
+// Verifies: SYS-REQ-035
 func FuzzSimpleFieldWrite(f *testing.F) {
 	f.Add(int64(0))
 	f.Add(int64(-1))
@@ -98,6 +101,7 @@ func FuzzSimpleFieldWrite(f *testing.F) {
 // This function does float64 rate/per arithmetic (Duration()), int64
 // comparison (greaterThanInt64), and negative-sentinel handling.  It is the
 // most arithmetic-dense function in the Apply pipeline.
+// Verifies: SYS-REQ-016, SYS-REQ-017, SYS-REQ-018
 func FuzzApplyAPILevelLimits(f *testing.F) {
 	type row struct {
 		pQmax, pQrate int64
@@ -167,6 +171,7 @@ func FuzzApplyAPILevelLimits(f *testing.F) {
 // to Duration() which converts to time.Duration(int64), creating a float64→
 // int64 conversion edge that can produce implementation-defined values for
 // Inf/NaN/very-large inputs.
+// Verifies: SYS-REQ-021, SYS-REQ-022, SYS-REQ-041, SYS-REQ-051
 func FuzzApplyRateLimits(f *testing.F) {
 	type row struct {
 		sRate, sPer, pRate, pPer, aRate, aPer float64
@@ -216,6 +221,7 @@ func FuzzApplyRateLimits(f *testing.F) {
 // Exercises ClearSession -> policy lookup -> applyPerAPI/applyPartitions.
 // Random policy and session values exercise the full comparison and
 // assignment code paths.
+// Verifies: SYS-REQ-008, SYS-REQ-010, SYS-REQ-011, SYS-REQ-012, SYS-REQ-013, SYS-REQ-014, SYS-REQ-015, SYS-REQ-016, SYS-REQ-017, SYS-REQ-018, SYS-REQ-021, SYS-REQ-022, SYS-REQ-024, SYS-REQ-025, SYS-REQ-026, SYS-REQ-027, SYS-REQ-028, SYS-REQ-029, SYS-REQ-030, SYS-REQ-031, SYS-REQ-032, SYS-REQ-033, SYS-REQ-040, SYS-REQ-042, SYS-REQ-044, SYS-REQ-050, SYS-REQ-052, SYS-REQ-053, SYS-REQ-054, SYS-REQ-057, SYS-REQ-058, SYS-REQ-059, SYS-REQ-061, SYS-REQ-062
 func FuzzApplyMain(f *testing.F) {
 	type row struct {
 		pRate, pPer                  float64
@@ -283,6 +289,7 @@ func FuzzApplyMain(f *testing.F) {
 // Partition policies exercise a different branch: the per-API loops vs.
 // session-level fields, and the usePartitions flag toggles which fields
 // are copied.
+// Verifies: SYS-REQ-030, SYS-REQ-031, SYS-REQ-032
 func FuzzApplyPartition(f *testing.F) {
 	type row struct {
 		pRate, pPer            float64
@@ -346,6 +353,7 @@ func FuzzApplyPartition(f *testing.F) {
 // ---------------------------------------------------------------------------
 // FuzzApplyPerAPI — Exercise the per-API branch (Partitions.PerAPI = true)
 // ---------------------------------------------------------------------------
+// Verifies: SYS-REQ-013, SYS-REQ-014, SYS-REQ-015
 func FuzzApplyPerAPI(f *testing.F) {
 	seeds := []struct {
 		pRate, pPer float64

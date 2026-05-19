@@ -26,9 +26,9 @@ traces:
         - STK-REQ-007
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-05-18T16:40:51.043346Z"
+    reviewed_at: "2026-05-19T17:10:22.416189Z"
     reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:be117a90fb87df5c068e99e6278d445967b5346533b2c5c3e68078326a9139a2
+    reviewed_fingerprint: sha256:c7e3810b6c543e46361709b17a2e2218001ee66391e0a42de8b80cc801c887bc
 verification:
     assurance_level: A
     formalization_status: ""

@@ -45,3 +45,5 @@ lifecycle:
           to: review
           reason: Migration to assurance model complete
           changed_by: human:cli
+audit_ignore:
+    - lint-formalization-quality

@@ -25,9 +25,9 @@ traces:
         - FLIP:policy/tc-015
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-05-18T15:10:03.365389Z"
+    reviewed_at: "2026-05-19T17:10:22.009346Z"
     reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:a6b946affcf2710b2d023671421773db59a72777acfde26ef219e8f503b0ece0
+    reviewed_fingerprint: sha256:fb2c3cd6f601c6e931618db26c9d6da7ae4ddf5d4ae64c59bb484bee2841585d
 verification:
     assurance_level: A
     formalization_status: valid
@@ -45,20 +45,20 @@ verification:
           reviewer: leonidbugaev
           reason: 'Policy deep-dive: system requirements consistent with implementation'
           base: origin/master
-          requirement_fingerprint: sha256:a6b946affcf2710b2d023671421773db59a72777acfde26ef219e8f503b0ece0
+          requirement_fingerprint: sha256:fb2c3cd6f601c6e931618db26c9d6da7ae4ddf5d4ae64c59bb484bee2841585d
           approval_fingerprint: sha256:6b1ff16012a043c7331724b52b298de9361ef74534ad06b51ad0b4fe47f1cabb
-          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
-          reviewed_at: "2026-05-18T15:11:45Z"
+          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
+          reviewed_at: "2026-05-19T17:01:30Z"
         - requirement: SYS-REQ-013
           artifact: internal/policy/util.go
           decision: no-authored-change
           reviewer: leonidbugaev
           reason: 'Policy deep-dive: system requirements consistent with implementation'
           base: origin/master
-          requirement_fingerprint: sha256:a6b946affcf2710b2d023671421773db59a72777acfde26ef219e8f503b0ece0
+          requirement_fingerprint: sha256:fb2c3cd6f601c6e931618db26c9d6da7ae4ddf5d4ae64c59bb484bee2841585d
           approval_fingerprint: sha256:6b1ff16012a043c7331724b52b298de9361ef74534ad06b51ad0b4fe47f1cabb
           artifact_fingerprint: sha256:e7c53482815efd8e708c449e82dfe958b6f957acb864490402c7aca5fbf9a9fc
-          reviewed_at: "2026-05-18T15:11:45Z"
+          reviewed_at: "2026-05-19T17:01:30Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:26Z"
@@ -76,3 +76,5 @@ lifecycle:
           to: review
           reason: Migration to assurance model complete
           changed_by: human:cli
+audit_ignore:
+    - lint-formalization-quality

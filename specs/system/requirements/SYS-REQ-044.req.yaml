@@ -20,9 +20,9 @@ traces:
         - STK-REQ-007
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-05-18T15:10:03.501483Z"
+    reviewed_at: "2026-05-19T17:10:22.247511Z"
     reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:5af6e4f6e60b7c6e68571f5f74a447c2368dc60acc00380cc3ecfba10e730df9
+    reviewed_fingerprint: sha256:9b53ca0ad7d8365ce672ea91998156d1c7003ce7dcb46ed000ab2d99da281f2d
 verification:
     assurance_level: B
     formalization_status: valid
@@ -38,10 +38,10 @@ verification:
           reviewer: leonidbugaev
           reason: 'Policy deep-dive: system requirements consistent with implementation'
           base: origin/master
-          requirement_fingerprint: sha256:5af6e4f6e60b7c6e68571f5f74a447c2368dc60acc00380cc3ecfba10e730df9
+          requirement_fingerprint: sha256:9b53ca0ad7d8365ce672ea91998156d1c7003ce7dcb46ed000ab2d99da281f2d
           approval_fingerprint: sha256:1a52717c8944b04073129e34f637bf0eb742e1175a227fbc4cc06f5c9b1e8600
-          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
-          reviewed_at: "2026-05-18T15:12:09Z"
+          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
+          reviewed_at: "2026-05-19T17:01:30Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T17:44:09Z"

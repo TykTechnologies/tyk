@@ -22,9 +22,9 @@ traces:
         - internal/policy/apply.go
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-05-18T16:32:57.424207Z"
+    reviewed_at: "2026-05-19T17:10:21.373089Z"
     reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:b411053e28b37693a2c2e4c6b31ddfa1bd8fd418cc94b510f67d2166e0976074
+    reviewed_fingerprint: sha256:184277cd9d7748e4a83dfbe764b5de02f2574bee24b6931f63ca5bf5c8b14fa9
 verification:
     assurance_level: A
     formalization_status: ""
@@ -38,12 +38,12 @@ verification:
           artifact: internal/policy/apply.go
           decision: no-authored-change
           reviewer: leonidbugaev
-          reason: 'Policy deep-dive: consistent with existing implementation with no authored change needed'
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
           base: origin/master
-          requirement_fingerprint: sha256:b411053e28b37693a2c2e4c6b31ddfa1bd8fd418cc94b510f67d2166e0976074
+          requirement_fingerprint: sha256:184277cd9d7748e4a83dfbe764b5de02f2574bee24b6931f63ca5bf5c8b14fa9
           approval_fingerprint: sha256:eb4db3d224e55fa46b72b522f2c5bb6ebdabd55261db5afe635e57b5edf3d0df
-          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
-          reviewed_at: "2026-05-18T15:11:12Z"
+          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
+          reviewed_at: "2026-05-19T17:01:30Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"

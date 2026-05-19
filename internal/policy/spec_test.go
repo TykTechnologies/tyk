@@ -110,6 +110,7 @@ func TestSpec_ClearSession(t *testing.T) {
 // MCDC STK-REQ-005: N/A
 // MCDC SYS-REQ-024: access_rights_merged=T, apply_requested=T, error_reported=F => TRUE
 // MCDC SYS-REQ-028: access_rights_merged=T, error_reported=F => TRUE
+// SYS-REQ-028:atomicity:negative
 func TestSpec_MutualExclusivity_ErrorAndAccess(t *testing.T) {
 	orgID := "org1"
 
@@ -1268,6 +1269,7 @@ func TestSpec_Issue1_TagsNotMergedOnError(t *testing.T) {
 
 // Verifies: SYS-REQ-017 [malformed]
 // MCDC SYS-REQ-017: apply_requested=T, error_reported=F, metadata_merged=T => TRUE
+// SYS-REQ-017:error_handling:negative
 func TestSpec_Issue1_MetadataNotMergedOnError(t *testing.T) {
 	orgID := "org1"
 
@@ -1347,6 +1349,7 @@ func TestSpec_Issue2_AllPoliciesMissing(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-041 [boundary]
+// SYS-REQ-041:boundary:negative
 // MCDC SYS-REQ-041: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=T, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func TestSpec_Issue3_EqualRateLimits(t *testing.T) {
 	t.Run("equal duration does NOT overwrite", func(t *testing.T) {
@@ -1492,6 +1495,8 @@ func TestSpec_Issue6_MetadataIterationOrder(t *testing.T) {
 // Verifies: STK-REQ-007, SYS-REQ-044 [boundary]
 // MCDC STK-REQ-007: N/A
 // MCDC SYS-REQ-044: apply_requested=T, apply_time_bounded=T => TRUE
+// SYS-REQ-044:boundary:negative
+// SYS-REQ-044:overflow_safety:negative
 func TestSpec_Issue7_PerformanceBound(t *testing.T) {
 	orgID := "org1"
 
@@ -1677,6 +1682,7 @@ func TestSpec_InactivePolicy_ORAccumulation(t *testing.T) {
 
 // Verifies: SYS-REQ-054 [malformed]
 // MCDC SYS-REQ-054: access_rights_merged=T, apply_requested=T, error_reported=T, multiple_policies=T, result_returned=F => TRUE
+// SYS-REQ-012:error_handling:negative
 func TestSpec_MixedModeAcrossPolicies(t *testing.T) {
 	orgID := "org1"
 	perAPIPol := user.Policy{

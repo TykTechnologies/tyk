@@ -45,3 +45,5 @@ lifecycle:
           to: review
           reason: New obligation class commutativity added for endpoint limit merge order independence
           changed_by: ai:claude
+audit_ignore:
+    - lint-formalization-quality

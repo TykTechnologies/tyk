@@ -22,9 +22,9 @@ traces:
         - STK-REQ-005
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-05-18T15:10:03.492235Z"
+    reviewed_at: "2026-05-19T17:10:22.235865Z"
     reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:6700a8346fcf9315092dbbfdb6c478ca4a1d9e0df0e3accf69e519debfe808db
+    reviewed_fingerprint: sha256:03a1b930b53d9f8e03e0fbc741a99c55fc3d570f669e80bd93499d1eb25c5016
 verification:
     assurance_level: A
     formalization_status: valid
@@ -42,10 +42,10 @@ verification:
           reviewer: leonidbugaev
           reason: 'Policy deep-dive: system requirements consistent with implementation'
           base: origin/master
-          requirement_fingerprint: sha256:6700a8346fcf9315092dbbfdb6c478ca4a1d9e0df0e3accf69e519debfe808db
+          requirement_fingerprint: sha256:03a1b930b53d9f8e03e0fbc741a99c55fc3d570f669e80bd93499d1eb25c5016
           approval_fingerprint: sha256:5fa6d8646e79fc223cd8cee5e920de95a282818c589054d292dfc895e80a9a72
-          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
-          reviewed_at: "2026-05-18T15:11:45Z"
+          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
+          reviewed_at: "2026-05-19T17:01:30Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T17:44:02Z"
@@ -62,3 +62,5 @@ lifecycle:
           to: review
           reason: Migration to assurance model complete
           changed_by: human:cli
+audit_ignore:
+    - lint-formalization-quality

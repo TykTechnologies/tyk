@@ -781,6 +781,7 @@ func TestMCDC_SYS_REQ_031_Row6_PerAPI(t *testing.T) {
 // Verifies: SYS-REQ-032
 // MCDC SYS-REQ-032: apply_requested=T, complexity_applied=F, is_per_api=T, org_matches=T, policy_found=T => FALSE
 // MCDC SYS-REQ-032: apply_requested=T, complexity_applied=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
+// SYS-REQ-032:boundary:negative
 func TestMCDC_SYS_REQ_032_PerAPI_Complexity(t *testing.T) {
 	// In per-API mode, MaxQueryDepth from the policy-level gets applied via APILimit()
 	// when the per-API access right has an empty limit. The policy's MaxQueryDepth

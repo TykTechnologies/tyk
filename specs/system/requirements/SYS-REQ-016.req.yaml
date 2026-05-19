@@ -23,9 +23,9 @@ traces:
         - FLIP:policy/tc-024
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-05-18T15:10:03.447557Z"
+    reviewed_at: "2026-05-19T17:10:22.123978Z"
     reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:f5ee6caa810cb29ffa5ffdd64e8a4346c84dcf348ca06cfed41c8cc806f982ee
+    reviewed_fingerprint: sha256:f21a79b052c444ce9934a994babb0d0408b09f9be63334f083c01be12569f417
 verification:
     assurance_level: A
     formalization_status: valid
@@ -43,10 +43,10 @@ verification:
           reviewer: leonidbugaev
           reason: 'Policy deep-dive: system requirements consistent with implementation'
           base: origin/master
-          requirement_fingerprint: sha256:f5ee6caa810cb29ffa5ffdd64e8a4346c84dcf348ca06cfed41c8cc806f982ee
+          requirement_fingerprint: sha256:f21a79b052c444ce9934a994babb0d0408b09f9be63334f083c01be12569f417
           approval_fingerprint: sha256:b977f1a71831ac74de4a1a27688ee7a97f191205dd6b2fb308f3bc90063e9059
-          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
-          reviewed_at: "2026-05-18T15:11:45Z"
+          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
+          reviewed_at: "2026-05-19T17:01:30Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:42Z"

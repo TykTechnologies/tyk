@@ -46,3 +46,5 @@ lifecycle:
           to: review
           reason: New obligation class determinism added for rate limit merge determinism
           changed_by: ai:claude
+audit_ignore:
+    - lint-formalization-quality

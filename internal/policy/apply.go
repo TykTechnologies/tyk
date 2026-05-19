@@ -38,6 +38,8 @@ const QuotaUnlimited = -1
 const QuotaUnlimitedInt64 int64 = -1
 
 // SYS-REQ-008, SYS-REQ-042
+// reqproof:requires orgID != nil
+// reqproof:ensures return != nil
 func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Service {
 	return &Service{
 		orgID:   orgID,
@@ -101,6 +103,10 @@ type applyStatus struct {
 // will overwrite the session state to use the policy values.
 //
 func (t *Service) Apply(session *user.SessionState) error {
+	if session == nil {
+		return errors.New("nil session")
+	}
+
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
 	if session.MetaData == nil {
@@ -298,6 +304,10 @@ func (t *Service) Logger() *logrus.Entry {
 // The limits get written if either are empty.
 // The limits get written if filled and policyLimits allows a higher request rate.
 func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy, apiLimits *user.APILimit) {
+	if apiLimits == nil {
+		return
+	}
+
 	policyLimits := policy.APILimit()
 	if t.emptyRateLimit(policyLimits) {
 		return
@@ -554,6 +564,11 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 					session.QuotaRenewalRate = policy.QuotaRenewalRate
 				}
 			}
+			// QuotaUnlimited sentinel: when QuotaMax is -1, renewal rate must be 0.
+			if policy.QuotaMax == QuotaUnlimited {
+				ar.Limit.QuotaRenewalRate = 0
+				session.QuotaRenewalRate = 0
+			}
 		}
 
 		if !usePartitions || policy.Partitions.RateLimit {
@@ -618,6 +633,10 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		if !usePartitions || policy.Partitions.Quota {
 			session.QuotaMax = policy.QuotaMax
 			session.QuotaRenewalRate = policy.QuotaRenewalRate
+			// QuotaUnlimited sentinel: when QuotaMax is -1, renewal rate must be 0.
+			if policy.QuotaMax == QuotaUnlimited {
+				session.QuotaRenewalRate = 0
+			}
 		}
 	}
 

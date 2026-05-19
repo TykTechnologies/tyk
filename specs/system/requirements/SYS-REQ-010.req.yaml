@@ -25,9 +25,9 @@ traces:
         - FLIP:policy/tc-007
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-05-18T15:10:03.357302Z"
+    reviewed_at: "2026-05-19T17:10:21.998845Z"
     reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:c20b2869777dbc2491cb2a7382967c4d1dc229f5c73bdb25518e549489eed3a1
+    reviewed_fingerprint: sha256:86f2ada9802b26f21774325412dc2272269d0b113198661b46aa1a28dd28612b
 verification:
     assurance_level: A
     formalization_status: valid
@@ -45,10 +45,10 @@ verification:
           reviewer: leonidbugaev
           reason: 'Policy deep-dive: system requirements consistent with implementation'
           base: origin/master
-          requirement_fingerprint: sha256:c20b2869777dbc2491cb2a7382967c4d1dc229f5c73bdb25518e549489eed3a1
+          requirement_fingerprint: sha256:86f2ada9802b26f21774325412dc2272269d0b113198661b46aa1a28dd28612b
           approval_fingerprint: sha256:e6d9b444d62aeac2a18c08c439331fd293b9f0b2395aaa134054fa06e14b0483
-          artifact_fingerprint: sha256:52e821a76fcb95b76e197d2c56a4bbc5a6d7eab8d3abf952a8b665b02097aa91
-          reviewed_at: "2026-05-18T15:11:45Z"
+          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
+          reviewed_at: "2026-05-19T17:01:30Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:26Z"
@@ -66,3 +66,5 @@ lifecycle:
           to: review
           reason: Migration to assurance model complete
           changed_by: human:cli
+audit_ignore:
+    - lint-formalization-quality

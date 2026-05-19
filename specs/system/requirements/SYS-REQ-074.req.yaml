@@ -23,9 +23,9 @@ traces:
         - STK-REQ-004
     documented_by_extra:
         - README.md
-    reviewed_at: "2026-05-18T16:40:51.053165Z"
+    reviewed_at: "2026-05-19T17:10:22.427756Z"
     reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:8c7dcc7594c1c5ddeff5bfc690c1f80296a41cd93c0ca315422e6baaf3cc9303
+    reviewed_fingerprint: sha256:7c4ef7edbac32e4f5f9a64be7933b7d889800f53b44be4c4a374626f9c738e60
 verification:
     assurance_level: A
     formalization_status: ""
