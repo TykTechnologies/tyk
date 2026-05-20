@@ -187,6 +187,7 @@ func (r *RuleValidateIPList) validateIPAddr(ips []string) []error {
 
 var ErrInvalidTimeoutValue = errors.New("invalid timeout value")
 var ErrOutOfRangeTimeoutValue = errors.New("timeout must be between 1ms and 300s")
+var ErrInvalidMsTimeoutValue = errors.New("timeout in milliseconds cannot contain decimals")
 var minTimeout = 1 * time.Millisecond
 var maxTimeout = 300 * time.Second
 
@@ -203,6 +204,10 @@ func (r *RuleValidateEnforceTimeout) Validate(apiDef *APIDefinition, validationR
 					validationResult.IsValid = false
 					validationResult.AppendError(ErrOutOfRangeTimeoutValue)
 					return
+				}
+				if timeout%1000000 != 0 {
+					validationResult.IsValid = false
+					validationResult.AppendError(ErrInvalidMsTimeoutValue)
 				}
 			}
 

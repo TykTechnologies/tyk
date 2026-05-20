@@ -2586,6 +2586,100 @@ func TestTimeoutPrioritization(t *testing.T) {
 			BodyMatch: upstreamTimeout,
 		})
 	})
+
+	t.Run("API level enforced timeout", func(t *testing.T) {
+		sResp := "seconds response"
+		msResp := "milliseconds response"
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			resp := getResponseForGivenURL(r, sResp, msResp)
+			if resp == "" {
+				w.WriteHeader(http.StatusNotFound)
+			}
+
+			_, err := w.Write([]byte(resp))
+			assert.Nil(t, err)
+		}))
+		defer upstream.Close()
+
+		t.Run("API level timeout configured - should timeout endpoints in the API after configured time", func(t *testing.T) {
+			api := BuildAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = upstream.URL
+				spec.UseKeylessAccess = true
+				UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+					version.GlobalEnforceTimeout = tyktime.ReadableDuration(1500 * time.Millisecond)
+				})
+			})[0]
+
+			ts.Gw.LoadAPI(api)
+
+			_, _ = ts.Run(t, test.TestCases{
+				{
+					Method:    http.MethodGet,
+					Path:      "/timeout/seconds",
+					Code:      http.StatusGatewayTimeout,
+					BodyMatch: upstreamTimeout,
+				},
+				{
+					Method:    http.MethodGet,
+					Path:      "/success/seconds",
+					Code:      http.StatusOK,
+					BodyMatch: sResp,
+				},
+				{
+					Method:    http.MethodGet,
+					Path:      "/timeout/milliseconds/1",
+					Code:      http.StatusOK,
+					BodyMatch: msResp,
+				},
+				{
+					Method:    http.MethodGet,
+					Path:      "/timeout/milliseconds/2",
+					Code:      http.StatusGatewayTimeout,
+					BodyMatch: upstreamTimeout,
+				},
+				{
+					Method:    http.MethodGet,
+					Path:      "/success/milliseconds",
+					Code:      http.StatusOK,
+					BodyMatch: msResp,
+				},
+			}...)
+		})
+
+		t.Run("API level and endpoint timeout configured - endpoint should be prioritized", func(t *testing.T) {
+			api := BuildAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = upstream.URL
+				spec.UseKeylessAccess = true
+				spec.EnforcedTimeoutEnabled = true
+				UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+					version.GlobalEnforceTimeout = tyktime.ReadableDuration(1500 * time.Millisecond)
+					version.UseExtendedPaths = true
+					version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+						{
+							Disabled:        false,
+							Path:            "/success/seconds",
+							Method:          http.MethodGet,
+							TimeoutDuration: tyktime.ReadableDuration(600 * time.Millisecond),
+						},
+					}
+				})
+			})[0]
+
+			ts.Gw.LoadAPI(api)
+
+			_, _ = ts.Run(t, test.TestCases{
+				{
+					Method:    http.MethodGet,
+					Path:      "/success/seconds",
+					Code:      http.StatusGatewayTimeout,
+					BodyMatch: upstreamTimeout,
+				},
+			}...)
+		})
+
+	})
 }
 
 func getResponseForGivenURL(r *http.Request, sResp string, msResp string) string {

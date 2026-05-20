@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
 func TestValidationResult_HasErrors(t *testing.T) {
@@ -405,6 +408,84 @@ func TestRuleValidateEnforceTimeout_Validate(t *testing.T) {
 					TimeOut:  10,
 				},
 			}),
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, runValidationTest(tc.apiDef, ruleSet, tc.result))
+	}
+}
+
+func TestRuleValidateEnforceTimeout_GlobalEnforceTimeout(t *testing.T) {
+	ruleSet := ValidationRuleSet{
+		&RuleValidateEnforceTimeout{},
+	}
+
+	getAPIDef := func(globalEnforceTimeout tyktime.ReadableDuration) *APIDefinition {
+		return &APIDefinition{
+			VersionData: VersionData{
+				Versions: map[string]VersionInfo{
+					"Default": {
+						Name:                 "Default",
+						GlobalEnforceTimeout: globalEnforceTimeout,
+					},
+				},
+			},
+		}
+	}
+
+	testCases := []struct {
+		name   string
+		apiDef *APIDefinition
+		result ValidationResult
+	}{
+		{
+			name:   "valid global enforce timeout",
+			apiDef: getAPIDef(tyktime.ReadableDuration(5 * time.Second)),
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
+		{
+			name:   "global enforce timeout disabled",
+			apiDef: getAPIDef(0),
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
+		{
+			name:   "global enforce timeout below 1ms",
+			apiDef: getAPIDef(tyktime.ReadableDuration(500 * time.Microsecond)),
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrOutOfRangeTimeoutValue},
+			},
+		},
+		{
+			name:   "global enforce timeout above 300s",
+			apiDef: getAPIDef(tyktime.ReadableDuration(301 * time.Second)),
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrOutOfRangeTimeoutValue},
+			},
+		},
+		{
+			name:   "global enforce timeout in milliseconds cannot contain decimals",
+			apiDef: getAPIDef(tyktime.ReadableDuration(1200 * time.Microsecond)), // 1.2ms
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrInvalidMsTimeoutValue},
+			},
+		},
+		{
+			name:   "global enforce timeout in seconds can contain decimals",
+			apiDef: getAPIDef(tyktime.ReadableDuration(1200 * time.Millisecond)), // 1.2s
 			result: ValidationResult{
 				IsValid: true,
 				Errors:  nil,
