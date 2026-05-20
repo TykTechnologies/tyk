@@ -1,6 +1,7 @@
 package httputil_test
 
 import (
+	"fmt"
 	"regexp"
 	"testing"
 
@@ -183,4 +184,75 @@ func TestMatchPaths(t *testing.T) {
 			assert.Equal(t, tt.isErr, err != nil)
 		})
 	}
+}
+
+// TestPreparePathRegexp_FixedOutputs verifies that PreparePathRegexp produces
+// consistent output for a fixed table of (pattern, prefix, suffix) inputs.
+func TestPreparePathRegexp_FixedOutputs(t *testing.T) {
+	tests := []struct {
+		pattern string
+		prefix  bool
+		suffix  bool
+		want    string
+	}{
+		{"/users", true, false, "^/users"},
+		{"/users", true, true, "^/users$"},
+		{"/users/{id}", true, false, "^/users/([^/]+)"},
+		{"/users/{id}", true, true, "^/users/([^/]+)$"},
+		{"users", false, false, "users"},
+		{"users", false, true, "users$"},
+		{"/items/*", true, false, "^/items/.*"},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(fmt.Sprintf("%s prefix=%v suffix=%v", tc.pattern, tc.prefix, tc.suffix), func(t *testing.T) {
+			got := httputil.PreparePathRegexp(tc.pattern, tc.prefix, tc.suffix)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+// T5 — eviction at the configured cap, with recomputation correctness.
+func TestPathRegexpCache_EvictsAtCap(t *testing.T) {
+	httputil.SetPathRegexpCacheSize(2, nil)
+	t.Cleanup(func() { httputil.SetPathRegexpCacheSize(5000, nil) })
+
+	first := "/route-0"
+	wantFirst := httputil.PreparePathRegexp(first, true, false)
+	httputil.PreparePathRegexp("/route-1", true, false)
+	httputil.PreparePathRegexp("/route-2", true, false)
+
+	got := httputil.PreparePathRegexp(first, true, false)
+	assert.Equal(t, wantFirst, got, "evicted entry should recompute to same value")
+}
+
+// T7b — SetPathRegexpCacheSize behavior across n>0, n=-1, n=0.
+func TestSetPathRegexpCacheSize(t *testing.T) {
+	t.Cleanup(func() { httputil.SetPathRegexpCacheSize(5000, nil) })
+
+	t.Run("bounded", func(t *testing.T) {
+		httputil.SetPathRegexpCacheSize(10, nil)
+		first := "/bounded-0"
+		want := httputil.PreparePathRegexp(first, true, false)
+		for i := 1; i < 12; i++ {
+			httputil.PreparePathRegexp(fmt.Sprintf("/bounded-%d", i), true, false)
+		}
+		got := httputil.PreparePathRegexp(first, true, false)
+		assert.Equal(t, want, got, "evicted entry should recompute identically")
+	})
+
+	t.Run("unbounded_negative", func(t *testing.T) {
+		httputil.SetPathRegexpCacheSize(-1, nil)
+		for i := 0; i < 5001; i++ {
+			httputil.PreparePathRegexp(fmt.Sprintf("/u-%d", i), true, false)
+		}
+	})
+
+	t.Run("unbounded_zero", func(t *testing.T) {
+		httputil.SetPathRegexpCacheSize(0, nil)
+		for i := 0; i < 5001; i++ {
+			httputil.PreparePathRegexp(fmt.Sprintf("/z-%d", i), true, false)
+		}
+	})
 }

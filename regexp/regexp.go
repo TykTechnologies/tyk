@@ -1,27 +1,187 @@
-/*
-Package regexp implmenets API of Go's native "regexp" but with caching results in memory
-*/
+// Package regexp wraps Go's standard "regexp" with a process-wide
+// bounded LRU. Intended for Tyk gateway internals.
+//
+// The cached *regexp.Regexp is shared across all callers and MUST NOT
+// be mutated. Read-only methods (Match*, Find*, ReplaceAll*, String,
+// NumSubexp, SubexpNames, LiteralPrefix) are safe for concurrent use
+// since Go 1.12.
+//
+// External consumers (Tyk plugins, sibling repos) should use the
+// standard library regexp package directly unless they specifically
+// need to share Tyk's gateway-wide compile cache.
 package regexp
 
 import (
+	"fmt"
 	"io"
 	"regexp"
 	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
-var (
-	compileCache                 = newRegexpCache(defaultCacheItemTTL, true, regexp.Compile)
-	compilePOSIXCache            = newRegexpCache(defaultCacheItemTTL, true, regexp.CompilePOSIX)
-	matchStringCache             = newRegexpStrRetBoolCache(defaultCacheItemTTL, true)
-	matchCache                   = newRegexpByteRetBoolCache(defaultCacheItemTTL, true)
-	replaceAllStringCache        = newRegexpStrStrRetStrCache(defaultCacheItemTTL, true)
-	replaceAllLiteralStringCache = newRegexpStrStrRetStrCache(defaultCacheItemTTL, true)
-	replaceAllStringFuncCache    = newRegexpStrFuncRetStrCache(defaultCacheItemTTL, true)
-	findStringSubmatchCache      = newRegexpStrRetSliceStrCache(defaultCacheItemTTL, true)
-	findAllStringCache           = newRegexpStrIntRetSliceStrCache(defaultCacheItemTTL, true)
-	findAllStringSubmatchCache   = newRegexpStrIntRetSliceSliceStrCache(defaultCacheItemTTL, true)
+const (
+	defaultCacheTTL              = 60 * time.Second
+	defaultEvictionLogInterval   = 5 * time.Minute
 )
+
+// LogFunc receives the rate-limited eviction-summary log lines.
+// Compatible with logrus's Warnf signature.
+type LogFunc func(format string, args ...interface{})
+
+// CacheOptions tunes the package-level regex caches. Values <=0 / 0 fall
+// back to package defaults so callers can pass a zero-valued options
+// struct safely.
+type CacheOptions struct {
+	TTL        time.Duration // <=0 → 60s
+	MaxEntries int           // 0 → 5000; <0 → unbounded
+	Enabled    bool
+	Log        LogFunc // nil → eviction summaries dropped
+}
+
+var (
+	compileCache                 atomic.Pointer[regexpCache]
+	compilePOSIXCache            atomic.Pointer[regexpCache]
+	matchStringCache             atomic.Pointer[regexpStrRetBoolCache]
+	matchCache                   atomic.Pointer[regexpByteRetBoolCache]
+	replaceAllStringCache        atomic.Pointer[regexpStrStrRetStrCache]
+	replaceAllLiteralStringCache atomic.Pointer[regexpStrStrRetStrCache]
+	replaceAllStringFuncCache    atomic.Pointer[regexpStrFuncRetStrCache]
+	findStringSubmatchCache      atomic.Pointer[regexpStrRetSliceStrCache]
+	findAllStringCache           atomic.Pointer[regexpStrIntRetSliceStrCache]
+	findAllStringSubmatchCache   atomic.Pointer[regexpStrIntRetSliceSliceStrCache]
+)
+
+func init() {
+	applyCacheConfig(CacheOptions{Enabled: true})
+}
+
+// Configure (re)builds the package-level caches from opts. Intended for
+// one-shot gateway startup wiring; safe to call again from tests.
+func Configure(opts CacheOptions) {
+	applyCacheConfig(opts)
+}
+
+// CompileCacheLen returns the current entry count of the compile cache.
+// Intended for tests that need to assert eviction behavior.
+func CompileCacheLen() int {
+	if c := compileCache.Load(); c != nil {
+		return c.lru.Len()
+	}
+	return 0
+}
+
+// Reset toggles the cache-enabled flag and purges all entries. Bounds
+// (TTL/MaxEntries) are fixed at Configure time and not affected here.
+func Reset(isEnabled bool) {
+	compileCache.Load().reset(isEnabled)
+	compilePOSIXCache.Load().reset(isEnabled)
+	matchStringCache.Load().reset(isEnabled)
+	matchCache.Load().reset(isEnabled)
+	replaceAllStringCache.Load().reset(isEnabled)
+	replaceAllLiteralStringCache.Load().reset(isEnabled)
+	replaceAllStringFuncCache.Load().reset(isEnabled)
+	findStringSubmatchCache.Load().reset(isEnabled)
+	findAllStringCache.Load().reset(isEnabled)
+	findAllStringSubmatchCache.Load().reset(isEnabled)
+}
+
+// prevReporter tracks the last evictionLogger so its ticker can be stopped
+// when applyCacheConfig is called again (test isolation).
+var prevReporter atomic.Pointer[evictionLogger]
+
+// applyCacheConfig (re)builds all package caches and, if opts.Log is set,
+// starts the eviction-summary ticker.
+func applyCacheConfig(opts CacheOptions) {
+	ttl := opts.TTL
+	if ttl <= 0 {
+		ttl = defaultCacheTTL
+	}
+	maxEntries := opts.MaxEntries
+	if maxEntries == 0 {
+		maxEntries = defaultCacheMaxEntries
+	}
+
+	if old := prevReporter.Swap(nil); old != nil {
+		old.stop()
+	}
+
+	rep := newEvictionLogger(opts.Log)
+
+	compileCache.Store(newRegexpCache(ttl, maxEntries, opts.Enabled, "compile", rep, regexp.Compile))
+	compilePOSIXCache.Store(newRegexpCache(ttl, maxEntries, opts.Enabled, "compilePOSIX", rep, regexp.CompilePOSIX))
+	matchStringCache.Store(newRegexpStrRetBoolCache(ttl, maxEntries, opts.Enabled, "matchString", rep))
+	matchCache.Store(newRegexpByteRetBoolCache(ttl, maxEntries, opts.Enabled, "match", rep))
+	replaceAllStringCache.Store(newRegexpStrStrRetStrCache(ttl, maxEntries, opts.Enabled, "replaceAllString", rep))
+	replaceAllLiteralStringCache.Store(newRegexpStrStrRetStrCache(ttl, maxEntries, opts.Enabled, "replaceAllLiteralString", rep))
+	replaceAllStringFuncCache.Store(newRegexpStrFuncRetStrCache(ttl, maxEntries, opts.Enabled, "replaceAllStringFunc", rep))
+	findStringSubmatchCache.Store(newRegexpStrRetSliceStrCache(ttl, maxEntries, opts.Enabled, "findStringSubmatch", rep))
+	findAllStringCache.Store(newRegexpStrIntRetSliceStrCache(ttl, maxEntries, opts.Enabled, "findAllString", rep))
+	findAllStringSubmatchCache.Store(newRegexpStrIntRetSliceSliceStrCache(ttl, maxEntries, opts.Enabled, "findAllStringSubmatch", rep))
+
+	if opts.Log != nil {
+		rep.start(defaultEvictionLogInterval)
+		prevReporter.Store(rep)
+	}
+}
+
+// evictionLogger aggregates eviction counts per cache name and emits one
+// summary log line per tick. Safe for concurrent use.
+type evictionLogger struct {
+	counts sync.Map // string -> *atomic.Int64
+	log    LogFunc
+	ticker atomic.Pointer[time.Ticker]
+}
+
+func newEvictionLogger(log LogFunc) *evictionLogger {
+	return &evictionLogger{log: log}
+}
+
+func (e *evictionLogger) record(name string) {
+	v, ok := e.counts.Load(name)
+	if !ok {
+		v, _ = e.counts.LoadOrStore(name, new(atomic.Int64))
+	}
+	v.(*atomic.Int64).Add(1)
+}
+
+// tick drains counters and emits a single log line if any are non-zero.
+// Exposed for tests that drive the ticker deterministically.
+func (e *evictionLogger) tick() {
+	if e.log == nil {
+		return
+	}
+	var summary []string
+	e.counts.Range(func(k, v any) bool {
+		n := v.(*atomic.Int64).Swap(0)
+		if n > 0 {
+			summary = append(summary, fmt.Sprintf("cache=%s n=%d", k.(string), n))
+		}
+		return true
+	})
+	if len(summary) == 0 {
+		return
+	}
+	e.log("regex cache: evicted entries in last interval — %s. Raise RegexpCacheMaxEntries above your distinct-pattern working set to eliminate recompile cost.", strings.Join(summary, ", "))
+}
+
+func (e *evictionLogger) start(interval time.Duration) {
+	t := time.NewTicker(interval)
+	e.ticker.Store(t)
+	go func() {
+		for range t.C {
+			e.tick()
+		}
+	}()
+}
+
+func (e *evictionLogger) stop() {
+	if t := e.ticker.Swap(nil); t != nil {
+		t.Stop()
+	}
+}
 
 // Regexp is a wrapper around regexp.Regexp but with caching
 type Regexp struct {
@@ -29,32 +189,14 @@ type Regexp struct {
 	FromCache bool
 }
 
-// ResetCache resets cache to initial state
-func ResetCache(ttl time.Duration, isEnabled bool) {
-	if ttl == 0 {
-		ttl = defaultCacheItemTTL
-	}
-
-	compileCache.reset(ttl, isEnabled)
-	compilePOSIXCache.reset(ttl, isEnabled)
-	matchStringCache.reset(ttl, isEnabled)
-	matchCache.reset(ttl, isEnabled)
-	replaceAllStringCache.reset(ttl, isEnabled)
-	replaceAllLiteralStringCache.reset(ttl, isEnabled)
-	replaceAllStringFuncCache.reset(ttl, isEnabled)
-	findStringSubmatchCache.reset(ttl, isEnabled)
-	findAllStringCache.reset(ttl, isEnabled)
-	findAllStringSubmatchCache.reset(ttl, isEnabled)
-}
-
 // Compile does the same as regexp.Compile but returns cached *Regexp instead.
 func Compile(expr string) (*Regexp, error) {
-	return compileCache.do(expr)
+	return compileCache.Load().do(expr)
 }
 
 // CompilePOSIX does the same as regexp.CompilePOSIX but returns cached *Regexp instead.
 func CompilePOSIX(expr string) (*Regexp, error) {
-	return compilePOSIXCache.do(expr)
+	return compilePOSIXCache.Load().do(expr)
 }
 
 // MustCompile is the same as regexp.MustCompile but returns cached *Regexp instead.
@@ -175,7 +317,7 @@ func (re *Regexp) MatchString(s string) bool {
 	if re.Regexp == nil {
 		return false
 	}
-	return matchStringCache.do(re.Regexp, s, re.Regexp.MatchString)
+	return matchStringCache.Load().do(re.Regexp, s, re.Regexp.MatchString)
 }
 
 // Match reports whether the Regexp matches the byte slice b.
@@ -183,7 +325,7 @@ func (re *Regexp) Match(b []byte) bool {
 	if re.Regexp == nil {
 		return false
 	}
-	return matchCache.do(re.Regexp, b, re.Regexp.Match)
+	return matchCache.Load().do(re.Regexp, b, re.Regexp.Match)
 }
 
 // ReplaceAllString is the same as regexp.Regexp.ReplaceAllString but returns cached result instead.
@@ -191,7 +333,7 @@ func (re *Regexp) ReplaceAllString(src, repl string) string {
 	if re.Regexp == nil {
 		return ""
 	}
-	return replaceAllStringCache.do(re.Regexp, src, repl, re.Regexp.ReplaceAllString)
+	return replaceAllStringCache.Load().do(re.Regexp, src, repl, re.Regexp.ReplaceAllString)
 }
 
 // ReplaceAllLiteralString is the same as regexp.Regexp.ReplaceAllLiteralString but returns cached result instead.
@@ -199,7 +341,7 @@ func (re *Regexp) ReplaceAllLiteralString(src, repl string) string {
 	if re.Regexp == nil {
 		return ""
 	}
-	return replaceAllLiteralStringCache.do(re.Regexp, src, repl, re.Regexp.ReplaceAllLiteralString)
+	return replaceAllLiteralStringCache.Load().do(re.Regexp, src, repl, re.Regexp.ReplaceAllLiteralString)
 }
 
 // ReplaceAllStringFunc is the same as regexp.Regexp.ReplaceAllStringFunc but returns cached result instead.
@@ -207,7 +349,7 @@ func (re *Regexp) ReplaceAllStringFunc(src string, repl func(string) string) str
 	if re.Regexp == nil {
 		return ""
 	}
-	return replaceAllStringFuncCache.do(re.Regexp, src, repl, re.Regexp.ReplaceAllStringFunc)
+	return replaceAllStringFuncCache.Load().do(re.Regexp, src, repl, re.Regexp.ReplaceAllStringFunc)
 }
 
 // ReplaceAll is the same as regexp.Regexp.ReplaceAll but returns cached result instead.
@@ -322,7 +464,7 @@ func (re *Regexp) FindStringSubmatch(s string) []string {
 	if re.Regexp == nil {
 		return []string{}
 	}
-	return findStringSubmatchCache.do(re.Regexp, s, re.Regexp.FindStringSubmatch)
+	return findStringSubmatchCache.Load().do(re.Regexp, s, re.Regexp.FindStringSubmatch)
 }
 
 // FindStringSubmatchIndex is the same as regexp.Regexp.FindStringSubmatchIndex but returns cached result instead.
@@ -365,7 +507,7 @@ func (re *Regexp) FindAllString(s string, n int) []string {
 	if re.Regexp == nil {
 		return []string{}
 	}
-	return findAllStringCache.do(re.Regexp, s, n, re.Regexp.FindAllString)
+	return findAllStringCache.Load().do(re.Regexp, s, n, re.Regexp.FindAllString)
 }
 
 // FindAllStringIndex is the same as regexp.Regexp.FindAllStringIndex but returns cached result instead.
@@ -400,7 +542,7 @@ func (re *Regexp) FindAllStringSubmatch(s string, n int) [][]string {
 	if re.Regexp == nil {
 		return [][]string{}
 	}
-	return findAllStringSubmatchCache.do(re.Regexp, s, n, re.Regexp.FindAllStringSubmatch)
+	return findAllStringSubmatchCache.Load().do(re.Regexp, s, n, re.Regexp.FindAllStringSubmatch)
 }
 
 // FindAllStringSubmatchIndex is the same as regexp.Regexp.FindAllStringSubmatchIndex but returns cached result instead.

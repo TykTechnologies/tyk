@@ -1173,6 +1173,12 @@ type Config struct {
 	// The default is 60 seconds. This must be a positive value. If you set to 0 this uses the default value.
 	RegexpCacheExpire int32 `json:"regexp_cache_expire"`
 
+	// RegexpCacheMaxEntries caps the per-cache LRU size for the regex compile
+	// caches. Defaults to 5000 when unset (0). Set explicitly to a negative
+	// value to opt into the legacy unbounded cache; this is only safe when
+	// distinct compiled patterns are naturally bounded by API/session shape.
+	RegexpCacheMaxEntries int `json:"regexp_cache_max_entries"`
+
 	// Tyk can cache some data locally, this can speed up lookup times on a single node and lower the number of connections and operations being done on Redis. It will however introduce a slight delay when updating or modifying keys as the cache must expire.
 	// This does not affect rate limiting.
 	LocalSessionCache LocalSessionCacheConf `json:"local_session_cache"`

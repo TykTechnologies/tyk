@@ -369,3 +369,33 @@ func TestValidateDriver(t *testing.T) {
 	supportedDrivers = originalSupportedDrivers
 	loadedDrivers = originalLoadedDrivers
 }
+
+// T7 — CustomMiddlewareResponseHook.Init wires the BaseMiddleware logger
+// before any request handling can race against it. The 37 panics/day on
+// the customer's prod were caused by Copy() running before this wiring;
+// the fix is the SetName("CoProcessMiddleware") call inside Init.
+func TestCustomMiddlewareResponseHook_Init_WiresLogger(t *testing.T) {
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	gw := &Gateway{}
+	h := &CustomMiddlewareResponseHook{
+		BaseTykResponseHandler: BaseTykResponseHandler{Spec: spec, Gw: gw},
+	}
+
+	err := h.Init(apidef.MiddlewareDefinition{Name: "test"}, spec)
+	require.NoError(t, err)
+
+	require.NotNil(t, h.mw, "Init should populate the embedded CoProcessMiddleware")
+	require.NotNil(t, h.mw.BaseMiddleware, "Init should populate BaseMiddleware")
+
+	logger := h.mw.BaseMiddleware.Logger()
+	require.NotNil(t, logger, "Init must wire the logger before any request path runs")
+	assert.Equal(t, "CoProcessMiddleware", logger.Data["mw"],
+		"SetName(\"CoProcessMiddleware\") must have run inside Init")
+
+	// Copy() — the original panic site — must now produce a non-nil logger
+	// with the same mw tag.
+	copied := h.mw.BaseMiddleware.Copy()
+	require.NotNil(t, copied)
+	require.NotNil(t, copied.logger, "Copy() output must inherit the wired logger")
+	assert.Equal(t, "CoProcessMiddleware", copied.logger.Data["mw"])
+}

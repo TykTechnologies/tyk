@@ -318,15 +318,19 @@ func NewBaseMiddleware(gw *Gateway, spec *APISpec, proxy ReturningHttpHandler, l
 	return baseMid
 }
 
-// Copy provides a new BaseMiddleware with it's own logger scope (copy).
-// The Spec, Proxy and Gw values are not copied.
+// Copy returns a BaseMiddleware with its own logger scope. Spec, Proxy and
+// Gw are shared. loggerMu guards t.logger against concurrent mutation by
+// SetName / Logger / SetRequestLogger.
 func (t *BaseMiddleware) Copy() *BaseMiddleware {
-	return &BaseMiddleware{
-		logger: t.logger.Dup(),
-		Spec:   t.Spec,
-		Proxy:  t.Proxy,
-		Gw:     t.Gw,
+	t.loggerMu.Lock()
+	logger := t.logger
+	t.loggerMu.Unlock()
+
+	var dupedLogger *logrus.Entry
+	if logger != nil {
+		dupedLogger = logger.Dup()
 	}
+	return &BaseMiddleware{logger: dupedLogger, Spec: t.Spec, Proxy: t.Proxy, Gw: t.Gw}
 }
 
 // Base serves to provide the full BaseMiddleware API. It's part of the TykMiddleware interface.

@@ -5,15 +5,77 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/gorilla/mux"
-
-	"github.com/TykTechnologies/tyk/internal/maps"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 )
 
-// routeCache holds the raw routes as they are mapped from mux parameters to regular expressions.
-// e.g. `/foo/{id}` becomes `^/foo/([^/]+)$` or similar.
-var pathRegexpCache = maps.NewStringMap()
+const (
+	defaultPathRegexpCacheSize = 5000
+	defaultEvictionLogInterval = 5 * time.Minute
+)
+
+// LogFunc receives rate-limited eviction-summary log lines.
+type LogFunc func(format string, args ...interface{})
+
+// pathRegexpCache maps mux-style routes to compiled regex source.
+// Pure LRU (ttl=0): cold entries are evicted by recency under cap pressure.
+var pathRegexpCache atomic.Pointer[expirable.LRU[string, string]]
+
+func init() {
+	pathRegexpCache.Store(expirable.NewLRU[string, string](defaultPathRegexpCacheSize, nil, 0))
+}
+
+// SetPathRegexpCacheSize replaces the path-regexp cache with one bounded
+// at n entries. n<=0 disables size-based eviction. Pass log non-nil to
+// enable a rate-limited eviction-summary log; nil drops eviction events.
+// Intended for one-shot gateway-startup wiring.
+func SetPathRegexpCacheSize(n int, log LogFunc) {
+	if n < 0 {
+		n = 0
+	}
+	var onEvict expirable.EvictCallback[string, string]
+	if log != nil {
+		rep := newPathEvictionReporter(log)
+		rep.start(defaultEvictionLogInterval)
+		onEvict = func(_ string, _ string) { rep.record() }
+	}
+	pathRegexpCache.Store(expirable.NewLRU[string, string](n, onEvict, 0))
+}
+
+// pathEvictionReporter aggregates eviction counts and emits one summary
+// log line per tick.
+type pathEvictionReporter struct {
+	count atomic.Int64
+	log   LogFunc
+}
+
+func newPathEvictionReporter(log LogFunc) *pathEvictionReporter {
+	return &pathEvictionReporter{log: log}
+}
+
+func (r *pathEvictionReporter) record() {
+	r.count.Add(1)
+}
+
+func (r *pathEvictionReporter) tick() {
+	n := r.count.Swap(0)
+	if n == 0 {
+		return
+	}
+	r.log("path-regexp cache: evicted %d entries in last interval. Raise RegexpCacheMaxEntries above your distinct-route working set to eliminate recompile cost.", n)
+}
+
+func (r *pathEvictionReporter) start(interval time.Duration) {
+	t := time.NewTicker(interval)
+	go func() {
+		for range t.C {
+			r.tick()
+		}
+	}()
+}
 
 // apiLandIDsRegex matches mux-style parameters like `{id}`.
 var apiLangIDsRegex = regexp.MustCompile(`{([^}]+)}`)
@@ -28,8 +90,8 @@ var apiLangIDsRegex = regexp.MustCompile(`{([^}]+)}`)
 func PreparePathRegexp(pattern string, prefix bool, suffix bool) string {
 	// Construct cache key from pattern and flags
 	key := fmt.Sprintf("%s:%v:%v", pattern, prefix, suffix)
-	val, ok := pathRegexpCache.Get(key)
-	if ok {
+	lru := pathRegexpCache.Load()
+	if val, ok := lru.Get(key); ok {
 		return val
 	}
 
@@ -57,7 +119,7 @@ func PreparePathRegexp(pattern string, prefix bool, suffix bool) string {
 	}
 
 	// Save cache for following invocations.
-	pathRegexpCache.Set(key, pattern)
+	lru.Add(key, pattern)
 
 	return pattern
 }

@@ -75,6 +75,7 @@ require (
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/xeipuuv/gojsonschema v1.2.0
 	golang.org/x/crypto v0.49.0
+	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/net v0.52.0
 	golang.org/x/sync v0.20.0
 	google.golang.org/grpc v1.80.0
