@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
@@ -215,8 +216,8 @@ func TestPreparePathRegexp_FixedOutputs(t *testing.T) {
 
 // T5 — eviction at the configured cap, with recomputation correctness.
 func TestPathRegexpCache_EvictsAtCap(t *testing.T) {
-	httputil.SetPathRegexpCacheSize(2, nil)
-	t.Cleanup(func() { httputil.SetPathRegexpCacheSize(5000, nil) })
+	httputil.ConfigurePathRegexpCache(cache.LRUOptions{MaxEntries: 2})
+	t.Cleanup(func() { httputil.ConfigurePathRegexpCache(cache.LRUOptions{}) })
 
 	first := "/route-0"
 	wantFirst := httputil.PreparePathRegexp(first, true, false)
@@ -227,12 +228,15 @@ func TestPathRegexpCache_EvictsAtCap(t *testing.T) {
 	assert.Equal(t, wantFirst, got, "evicted entry should recompute to same value")
 }
 
-// T7b — SetPathRegexpCacheSize behavior across n>0, n=-1, n=0.
-func TestSetPathRegexpCacheSize(t *testing.T) {
-	t.Cleanup(func() { httputil.SetPathRegexpCacheSize(5000, nil) })
+// T7b — ConfigurePathRegexpCache behavior across MaxEntries values.
+//   - MaxEntries>0 enforces a cap
+//   - MaxEntries<0 disables size eviction (unbounded)
+//   - MaxEntries==0 selects the default cap (DefaultLRUMaxEntries)
+func TestConfigurePathRegexpCache(t *testing.T) {
+	t.Cleanup(func() { httputil.ConfigurePathRegexpCache(cache.LRUOptions{}) })
 
 	t.Run("bounded", func(t *testing.T) {
-		httputil.SetPathRegexpCacheSize(10, nil)
+		httputil.ConfigurePathRegexpCache(cache.LRUOptions{MaxEntries: 10})
 		first := "/bounded-0"
 		want := httputil.PreparePathRegexp(first, true, false)
 		for i := 1; i < 12; i++ {
@@ -243,14 +247,14 @@ func TestSetPathRegexpCacheSize(t *testing.T) {
 	})
 
 	t.Run("unbounded_negative", func(t *testing.T) {
-		httputil.SetPathRegexpCacheSize(-1, nil)
+		httputil.ConfigurePathRegexpCache(cache.LRUOptions{MaxEntries: -1})
 		for i := 0; i < 5001; i++ {
 			httputil.PreparePathRegexp(fmt.Sprintf("/u-%d", i), true, false)
 		}
 	})
 
-	t.Run("unbounded_zero", func(t *testing.T) {
-		httputil.SetPathRegexpCacheSize(0, nil)
+	t.Run("default_zero", func(t *testing.T) {
+		httputil.ConfigurePathRegexpCache(cache.LRUOptions{MaxEntries: 0})
 		for i := 0; i < 5001; i++ {
 			httputil.PreparePathRegexp(fmt.Sprintf("/z-%d", i), true, false)
 		}

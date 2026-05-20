@@ -12,34 +12,23 @@
 package regexp
 
 import (
-	"fmt"
 	"io"
 	"regexp"
 	"strconv"
-	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
+
+	internalcache "github.com/TykTechnologies/tyk/internal/cache"
 )
 
-const (
-	defaultCacheTTL              = 60 * time.Second
-	defaultEvictionLogInterval   = 5 * time.Minute
-)
+const defaultCacheTTL = 60 * time.Second
 
-// LogFunc receives the rate-limited eviction-summary log lines.
-// Compatible with logrus's Warnf signature.
-type LogFunc func(format string, args ...interface{})
+// LogFunc aliases the shared LRU eviction LogFunc.
+type LogFunc = internalcache.LogFunc
 
-// CacheOptions tunes the package-level regex caches. Values <=0 / 0 fall
-// back to package defaults so callers can pass a zero-valued options
-// struct safely.
-type CacheOptions struct {
-	TTL        time.Duration // <=0 → 60s
-	MaxEntries int           // 0 → 5000; <0 → unbounded
-	Enabled    bool
-	Log        LogFunc // nil → eviction summaries dropped
-}
+// CacheOptions aliases internalcache.LRUOptions; kept as the public type
+// for code already wired against this package.
+type CacheOptions = internalcache.LRUOptions
 
 var (
 	compileCache                 atomic.Pointer[regexpCache]
@@ -88,9 +77,18 @@ func Reset(isEnabled bool) {
 	findAllStringSubmatchCache.Load().reset(isEnabled)
 }
 
-// prevReporter tracks the last evictionLogger so its ticker can be stopped
-// when applyCacheConfig is called again (test isolation).
-var prevReporter atomic.Pointer[evictionLogger]
+// ResetCache is the pre-TT-17049 entry point. Kept as a thin shim so
+// out-of-tree callers (plugins, sibling repos) keep compiling; ttl is
+// now fixed at Configure time and the argument is ignored.
+//
+// Deprecated: use Reset(isEnabled).
+func ResetCache(_ time.Duration, isEnabled bool) {
+	Reset(isEnabled)
+}
+
+// prevReporter tracks the last EvictionLogger so its goroutine can be
+// stopped when applyCacheConfig is called again.
+var prevReporter atomic.Pointer[internalcache.EvictionLogger]
 
 // applyCacheConfig (re)builds all package caches and, if opts.Log is set,
 // starts the eviction-summary ticker.
@@ -99,16 +97,13 @@ func applyCacheConfig(opts CacheOptions) {
 	if ttl <= 0 {
 		ttl = defaultCacheTTL
 	}
-	maxEntries := opts.MaxEntries
-	if maxEntries == 0 {
-		maxEntries = defaultCacheMaxEntries
-	}
+	maxEntries := internalcache.ResolveMaxEntries(opts)
 
 	if old := prevReporter.Swap(nil); old != nil {
-		old.stop()
+		old.Stop()
 	}
 
-	rep := newEvictionLogger(opts.Log)
+	rep := internalcache.NewEvictionLogger("regex cache", opts.Log)
 
 	compileCache.Store(newRegexpCache(ttl, maxEntries, opts.Enabled, "compile", rep, regexp.Compile))
 	compilePOSIXCache.Store(newRegexpCache(ttl, maxEntries, opts.Enabled, "compilePOSIX", rep, regexp.CompilePOSIX))
@@ -122,64 +117,8 @@ func applyCacheConfig(opts CacheOptions) {
 	findAllStringSubmatchCache.Store(newRegexpStrIntRetSliceSliceStrCache(ttl, maxEntries, opts.Enabled, "findAllStringSubmatch", rep))
 
 	if opts.Log != nil {
-		rep.start(defaultEvictionLogInterval)
+		rep.Start(internalcache.DefaultEvictionLogInterval)
 		prevReporter.Store(rep)
-	}
-}
-
-// evictionLogger aggregates eviction counts per cache name and emits one
-// summary log line per tick. Safe for concurrent use.
-type evictionLogger struct {
-	counts sync.Map // string -> *atomic.Int64
-	log    LogFunc
-	ticker atomic.Pointer[time.Ticker]
-}
-
-func newEvictionLogger(log LogFunc) *evictionLogger {
-	return &evictionLogger{log: log}
-}
-
-func (e *evictionLogger) record(name string) {
-	v, ok := e.counts.Load(name)
-	if !ok {
-		v, _ = e.counts.LoadOrStore(name, new(atomic.Int64))
-	}
-	v.(*atomic.Int64).Add(1)
-}
-
-// tick drains counters and emits a single log line if any are non-zero.
-// Exposed for tests that drive the ticker deterministically.
-func (e *evictionLogger) tick() {
-	if e.log == nil {
-		return
-	}
-	var summary []string
-	e.counts.Range(func(k, v any) bool {
-		n := v.(*atomic.Int64).Swap(0)
-		if n > 0 {
-			summary = append(summary, fmt.Sprintf("cache=%s n=%d", k.(string), n))
-		}
-		return true
-	})
-	if len(summary) == 0 {
-		return
-	}
-	e.log("regex cache: evicted entries in last interval — %s. Raise RegexpCacheMaxEntries above your distinct-pattern working set to eliminate recompile cost.", strings.Join(summary, ", "))
-}
-
-func (e *evictionLogger) start(interval time.Duration) {
-	t := time.NewTicker(interval)
-	e.ticker.Store(t)
-	go func() {
-		for range t.C {
-			e.tick()
-		}
-	}()
-}
-
-func (e *evictionLogger) stop() {
-	if t := e.ticker.Swap(nil); t != nil {
-		t.Stop()
 	}
 }
 

@@ -6,12 +6,14 @@ import (
 	"time"
 
 	"github.com/hashicorp/golang-lru/v2/expirable"
+
+	internalcache "github.com/TykTechnologies/tyk/internal/cache"
 )
 
 const (
 	maxKeySize             = 1024
 	maxValueSize           = 2048
-	defaultCacheMaxEntries = 5000
+	defaultCacheMaxEntries = internalcache.DefaultLRUMaxEntries
 )
 
 // cache wraps an expirable.LRU. maxEntries<=0 disables size eviction;
@@ -25,12 +27,12 @@ type cache struct {
 // evictionReporter records the number of entries evicted from a named cache.
 // Implementations must be safe for concurrent use.
 type evictionReporter interface {
-	record(name string)
+	Record(bucket string)
 }
 
 type noopReporter struct{}
 
-func (noopReporter) record(string) {}
+func (noopReporter) Record(string) {}
 
 func newCache(ttl time.Duration, isEnabled bool) *cache {
 	return newCacheWithSize(ttl, defaultCacheMaxEntries, isEnabled, "", nil)
@@ -43,7 +45,7 @@ func newCacheWithSize(ttl time.Duration, maxEntries int, isEnabled bool, name st
 	if reporter == nil {
 		reporter = noopReporter{}
 	}
-	onEvict := func(_ string, _ any) { reporter.record(name) }
+	onEvict := func(_ string, _ any) { reporter.Record(name) }
 	c := &cache{
 		lru: expirable.NewLRU[string, any](maxEntries, onEvict, ttl),
 	}
@@ -52,10 +54,10 @@ func newCacheWithSize(ttl time.Duration, maxEntries int, isEnabled bool, name st
 }
 
 func (c *cache) enabled() bool {
-	return c.isEnabled.Load() && c.lru != nil
+	return c.isEnabled.Load()
 }
 
-func (c *cache) add(key string, value interface{}) {
+func (c *cache) add(key string, value any) {
 	c.lru.Add(key, value)
 }
 

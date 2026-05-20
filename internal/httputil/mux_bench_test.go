@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 // BenchmarkPreparePathRegexp_Hit measures hot-path lookup cost when the
 // prepared pattern is already cached.
 func BenchmarkPreparePathRegexp_Hit(b *testing.B) {
-	httputil.SetPathRegexpCacheSize(5000, nil)
+	httputil.ConfigurePathRegexpCache(cache.LRUOptions{MaxEntries: 5000})
 
 	const n = 100
 	keys := make([]string, n)

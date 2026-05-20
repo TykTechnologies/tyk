@@ -6,75 +6,46 @@ import (
 	"regexp"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/golang-lru/v2/expirable"
-)
 
-const (
-	defaultPathRegexpCacheSize = 5000
-	defaultEvictionLogInterval = 5 * time.Minute
+	"github.com/TykTechnologies/tyk/internal/cache"
 )
-
-// LogFunc receives rate-limited eviction-summary log lines.
-type LogFunc func(format string, args ...interface{})
 
 // pathRegexpCache maps mux-style routes to compiled regex source.
 // Pure LRU (ttl=0): cold entries are evicted by recency under cap pressure.
 var pathRegexpCache atomic.Pointer[expirable.LRU[string, string]]
 
+// prevReporter tracks the EvictionLogger backing the current cache so its
+// goroutine can be stopped when ConfigurePathRegexpCache is called again.
+var prevReporter atomic.Pointer[cache.EvictionLogger]
+
 func init() {
-	pathRegexpCache.Store(expirable.NewLRU[string, string](defaultPathRegexpCacheSize, nil, 0))
+	pathRegexpCache.Store(expirable.NewLRU[string, string](cache.DefaultLRUMaxEntries, nil, 0))
 }
 
-// SetPathRegexpCacheSize replaces the path-regexp cache with one bounded
-// at n entries. n<=0 disables size-based eviction. Pass log non-nil to
-// enable a rate-limited eviction-summary log; nil drops eviction events.
-// Intended for one-shot gateway-startup wiring.
-func SetPathRegexpCacheSize(n int, log LogFunc) {
-	if n < 0 {
-		n = 0
+// ConfigurePathRegexpCache replaces the path-regexp cache with one
+// configured by opts. opts.TTL is ignored (this is a pure-LRU cache).
+// Use opts.Unbounded=true to disable size eviction; otherwise opts.MaxEntries
+// drives the cap (0 → DefaultLRUMaxEntries). Intended for one-shot
+// gateway-startup wiring (and config reload).
+func ConfigurePathRegexpCache(opts cache.LRUOptions) {
+	n := cache.ResolveMaxEntries(opts)
+
+	if old := prevReporter.Swap(nil); old != nil {
+		old.Stop()
 	}
+
 	var onEvict expirable.EvictCallback[string, string]
-	if log != nil {
-		rep := newPathEvictionReporter(log)
-		rep.start(defaultEvictionLogInterval)
-		onEvict = func(_ string, _ string) { rep.record() }
+	if opts.Log != nil {
+		rep := cache.NewEvictionLogger("path-regexp cache", opts.Log)
+		rep.Start(cache.DefaultEvictionLogInterval)
+		prevReporter.Store(rep)
+		onEvict = func(_ string, _ string) { rep.Record("") }
 	}
+
 	pathRegexpCache.Store(expirable.NewLRU[string, string](n, onEvict, 0))
-}
-
-// pathEvictionReporter aggregates eviction counts and emits one summary
-// log line per tick.
-type pathEvictionReporter struct {
-	count atomic.Int64
-	log   LogFunc
-}
-
-func newPathEvictionReporter(log LogFunc) *pathEvictionReporter {
-	return &pathEvictionReporter{log: log}
-}
-
-func (r *pathEvictionReporter) record() {
-	r.count.Add(1)
-}
-
-func (r *pathEvictionReporter) tick() {
-	n := r.count.Swap(0)
-	if n == 0 {
-		return
-	}
-	r.log("path-regexp cache: evicted %d entries in last interval. Raise RegexpCacheMaxEntries above your distinct-route working set to eliminate recompile cost.", n)
-}
-
-func (r *pathEvictionReporter) start(interval time.Duration) {
-	t := time.NewTicker(interval)
-	go func() {
-		for range t.C {
-			r.tick()
-		}
-	}()
 }
 
 // apiLandIDsRegex matches mux-style parameters like `{id}`.

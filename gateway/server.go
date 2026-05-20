@@ -1880,20 +1880,26 @@ func (gw *Gateway) afterConfSetup() error {
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	gw.initGenericEventHandlers()
-	if conf.RegexpCacheMaxEntries < 0 {
-		mainLog.Warnf("regex cache: size eviction disabled (RegexpCacheMaxEntries=%d). "+
-			"Safe only if your pattern keyspace is naturally bounded by API config. "+
-			"User-driven pattern cardinality (e.g., per-session templated regex from "+
-			"coprocess plugins) can OOM the gateway. Prefer raising the cap above your "+
-			"working set instead of disabling eviction.", conf.RegexpCacheMaxEntries)
+	configureAutoMaxProcs(conf.DisableAutoMaxProcs)
+
+	maxEntries := conf.RegexpCacheMaxEntries
+	if maxEntries < 0 {
+		mainLog.Warnf("regex cache: RegexpCacheMaxEntries=%d is invalid; "+
+			"use disable_regexp_cache_bound=true to opt out of size eviction. Treating as default.", maxEntries)
+		maxEntries = 0
 	}
-	regexp.Configure(regexp.CacheOptions{
+	if conf.DisableRegexpCacheBound {
+		mainLog.Warnf("regex cache: size eviction disabled. Risk: user-driven pattern cardinality can OOM the gateway.")
+	}
+	cacheOpts := cache.LRUOptions{
 		TTL:        time.Second * time.Duration(conf.RegexpCacheExpire),
-		MaxEntries: conf.RegexpCacheMaxEntries,
+		MaxEntries: maxEntries,
+		Unbounded:  conf.DisableRegexpCacheBound,
 		Enabled:    !conf.DisableRegexpCache,
 		Log:        mainLog.Warnf,
-	})
-	httputil.SetPathRegexpCacheSize(conf.RegexpCacheMaxEntries, mainLog.Warnf)
+	}
+	regexp.Configure(cacheOpts)
+	httputil.ConfigurePathRegexpCache(cacheOpts)
 
 	if conf.HealthCheckEndpointName == "" {
 		conf.HealthCheckEndpointName = "hello"
@@ -2137,8 +2143,6 @@ func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) stor
 }
 
 func Start() {
-	configureAutoMaxProcs()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

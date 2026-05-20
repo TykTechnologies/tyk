@@ -1,35 +1,19 @@
 package gateway
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// T8
-func TestAutoMaxProcsEnabled(t *testing.T) {
-	cases := []struct {
-		env  string
-		want bool
-	}{
-		{"0", false},
-		{"false", false},
-		{"no", false},
-		{"off", false},
-		{"disabled", false},
-		{"FALSE", false},
-		{"  0  ", false},
-		{"", true},
-		{"1", true},
-		{"true", true},
-		{"anything", true},
-	}
-
-	for _, tc := range cases {
-		tc := tc
-		t.Run(tc.env, func(t *testing.T) {
-			t.Setenv("TYK_GW_AUTOMAXPROCS", tc.env)
-			assert.Equal(t, tc.want, autoMaxProcsEnabled())
-		})
-	}
+// TestConfigureAutoMaxProcs_DisableShortCircuits confirms the early-return
+// guard: when disable=true, GOMAXPROCS must remain at whatever the runtime
+// already chose. Anything else would mean automaxprocs.Set ran despite the
+// disable flag.
+func TestConfigureAutoMaxProcs_DisableShortCircuits(t *testing.T) {
+	before := runtime.GOMAXPROCS(0)
+	configureAutoMaxProcs(true)
+	after := runtime.GOMAXPROCS(0)
+	assert.Equal(t, before, after, "disable=true must skip automaxprocs.Set")
 }
