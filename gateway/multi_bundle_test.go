@@ -1,15 +1,18 @@
 package gateway
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // TestGojaHandlerAliasIsDeterministic locks in the contract that AliasFor
@@ -148,20 +151,27 @@ func TestGojaRebrandSkipsNonMiddlewarePrograms(t *testing.T) {
 }
 
 // TestMergeBundleManifestAppendsHooks verifies the multi-bundle merge
-// correctly concatenates pre/post/post_key_auth/response arrays in
-// declaration order while rewriting each entry's Path so the api_loader's
-// prefix-join still resolves to the correct file.
+// concatenates every array hook (pre/post/post_key_auth/response) in
+// declaration order across bundles and within each bundle, and that each
+// entry's Path is prefixed with the bundle's subdir so api_loader's
+// prefix-join resolves to the correct file.
 func TestMergeBundleManifestAppendsHooks(t *testing.T) {
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 
+	// Two entries per hook in bundle A so that within-bundle order is also
+	// asserted, not just A-before-B order.
 	a := &apidef.BundleManifest{
 		CustomMiddleware: apidef.MiddlewareSection{
 			Driver: apidef.JavaScriptDriver,
 			Pre: []apidef.MiddlewareDefinition{
-				{Name: "handler", Path: "plugin.js"},
+				{Name: "preA1", Path: "plugin.js"},
+				{Name: "preA2", Path: "plugin.js"},
 			},
 			Post: []apidef.MiddlewareDefinition{
-				{Name: "handler", Path: "plugin.js"},
+				{Name: "postA1", Path: "plugin.js"},
+			},
+			PostKeyAuth: []apidef.MiddlewareDefinition{
+				{Name: "pkaA1", Path: "plugin.js"},
 			},
 		},
 	}
@@ -169,10 +179,14 @@ func TestMergeBundleManifestAppendsHooks(t *testing.T) {
 		CustomMiddleware: apidef.MiddlewareSection{
 			Driver: apidef.JavaScriptDriver,
 			Pre: []apidef.MiddlewareDefinition{
-				{Name: "handler", Path: "plugin.js"},
+				{Name: "preB1", Path: "plugin.js"},
+			},
+			PostKeyAuth: []apidef.MiddlewareDefinition{
+				{Name: "pkaB1", Path: "plugin.js"},
+				{Name: "pkaB2", Path: "plugin.js"},
 			},
 			Response: []apidef.MiddlewareDefinition{
-				{Name: "handler", Path: "plugin.js"},
+				{Name: "respB1", Path: "plugin.js"},
 			},
 		},
 	}
@@ -180,21 +194,79 @@ func TestMergeBundleManifestAppendsHooks(t *testing.T) {
 	require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip"))
 	require.NoError(t, mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip"))
 
-	// pre: 1 from A, 1 from B, in order
-	require.Len(t, spec.CustomMiddleware.Pre, 2)
-	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Pre[0].Path, "bundle-a"), "first pre entry must be from bundle-a")
-	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Pre[1].Path, "bundle-b"), "second pre entry must be from bundle-b")
+	// pre: A's two then B's one, all path-prefixed by their bundle subdir.
+	require.Len(t, spec.CustomMiddleware.Pre, 3)
+	assert.Equal(t, []string{"preA1", "preA2", "preB1"}, []string{
+		spec.CustomMiddleware.Pre[0].Name,
+		spec.CustomMiddleware.Pre[1].Name,
+		spec.CustomMiddleware.Pre[2].Name,
+	})
+	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Pre[0].Path, "bundle-a"))
+	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Pre[1].Path, "bundle-a"))
+	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Pre[2].Path, "bundle-b"))
 
-	// post: only from A
+	// post_key_auth: A's one then B's two (the hook type used by real
+	// auth-aware plugins and previously not covered).
+	require.Len(t, spec.CustomMiddleware.PostKeyAuth, 3)
+	assert.Equal(t, []string{"pkaA1", "pkaB1", "pkaB2"}, []string{
+		spec.CustomMiddleware.PostKeyAuth[0].Name,
+		spec.CustomMiddleware.PostKeyAuth[1].Name,
+		spec.CustomMiddleware.PostKeyAuth[2].Name,
+	})
+	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.PostKeyAuth[0].Path, "bundle-a"))
+	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.PostKeyAuth[2].Path, "bundle-b"))
+
+	// post: only from A.
 	require.Len(t, spec.CustomMiddleware.Post, 1)
 	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Post[0].Path, "bundle-a"))
 
-	// response: only from B
+	// response: only from B.
 	require.Len(t, spec.CustomMiddleware.Response, 1)
 	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Response[0].Path, "bundle-b"))
 
-	// driver propagated and consistent
+	// driver propagated and consistent across both bundles.
 	assert.Equal(t, apidef.JavaScriptDriver, spec.CustomMiddleware.Driver)
+}
+
+// TestMergeBundleManifestPreservesInlineCode verifies that middleware
+// definitions carrying inline Code (with empty Path) survive the merge
+// unchanged — no spurious subdir prefix is prepended to an empty Path,
+// and the Code payload reaches the merged section verbatim. This is the
+// v1 Plugin Studio hot path.
+func TestMergeBundleManifestPreservesInlineCode(t *testing.T) {
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+	const inlineSrc = "dmFyIHg9MTsK" // "var x=1;\n" base64
+
+	manifest := &apidef.BundleManifest{
+		CustomMiddleware: apidef.MiddlewareSection{
+			Driver: apidef.JavaScriptDriver,
+			Pre: []apidef.MiddlewareDefinition{
+				{Name: "inlineHandler", Code: inlineSrc},                 // inline, no Path
+				{Name: "fileHandler", Path: "plugin.js"},                  // file-mounted, gets prefixed
+				{Name: "mixedHandler", Path: "plugin.js", Code: inlineSrc}, // both — Path still rewrites
+			},
+		},
+	}
+
+	require.NoError(t, mergeBundleManifest(spec, manifest, "bundle-a", "bundle-a.zip"))
+
+	require.Len(t, spec.CustomMiddleware.Pre, 3)
+
+	// Inline-only: Path remains empty (no "bundle-a/" prefix on nothing),
+	// Code passes through verbatim.
+	assert.Empty(t, spec.CustomMiddleware.Pre[0].Path, "inline-Code entry must not get a subdir prefix on empty Path")
+	assert.Equal(t, inlineSrc, spec.CustomMiddleware.Pre[0].Code)
+
+	// File-only: Path gets the subdir prefix as usual.
+	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Pre[1].Path, "bundle-a"))
+	assert.Empty(t, spec.CustomMiddleware.Pre[1].Code)
+
+	// Mixed: Path still rewrites, Code still passes through. The Code field
+	// takes precedence at execution time, but the merge step doesn't pick a
+	// side — both fields survive intact.
+	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Pre[2].Path, "bundle-a"))
+	assert.Equal(t, inlineSrc, spec.CustomMiddleware.Pre[2].Code)
 }
 
 // TestMergeBundleManifestRejectsDuplicateAuthCheck enforces the rule that
@@ -245,6 +317,90 @@ func TestBundleSubdirNameStripsExtAndCollapsesSlashes(t *testing.T) {
 	assert.Equal(t, "correlation-id-1.4.0", bundleSubdirName("correlation-id-1.4.0.zip"))
 	assert.Equal(t, "platform__correlation-id-1.4.0", bundleSubdirName("platform/correlation-id-1.4.0.zip"))
 	assert.NotEmpty(t, bundleSubdirName("")) // fallback hash path
+}
+
+// TestLoadBundleWithFs_CommaSeparatedMergesBothBundles wires the end-to-end
+// selection rule: a comma-separated CustomMiddlewareBundle value enters the
+// merge path (not the legacy single-bundle path) and produces a spec whose
+// CustomMiddleware section holds hooks from every named bundle, each with
+// its per-bundle subdir prefix. Both bundles are pre-staged on the in-memory
+// FS so loadOneBundleForMerge takes the "existing bundle" branch and we can
+// skip signature verification with SkipVerifyExistingPluginBundle.
+func TestLoadBundleWithFs_CommaSeparatedMergesBothBundles(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.BundleBaseURL = "http://bundles.local/"
+		globalConf.SkipVerifyExistingPluginBundle = true
+	})
+	defer ts.Close()
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID:                  "multi-bundle-e2e",
+			CustomMiddlewareBundle: "bundle-a.zip,bundle-b.zip",
+		},
+	}
+
+	rootPath := ts.Gw.getBundleDestPath(spec)
+	subdirA := bundleSubdirName("bundle-a.zip")
+	subdirB := bundleSubdirName("bundle-b.zip")
+
+	memFs := afero.NewMemMapFs()
+	require.NoError(t, memFs.MkdirAll(filepath.Join(rootPath, subdirA), 0755))
+	require.NoError(t, memFs.MkdirAll(filepath.Join(rootPath, subdirB), 0755))
+
+	// Bundle A: one pre hook + one post hook.
+	manifestA, err := memFs.Create(filepath.Join(rootPath, subdirA, "manifest.json"))
+	require.NoError(t, err)
+	_, err = manifestA.WriteString(`{
+		"file_list": ["plugin.js"],
+		"custom_middleware": {
+			"driver": "javascript",
+			"pre":  [{"name": "preA",  "path": "plugin.js"}],
+			"post": [{"name": "postA", "path": "plugin.js"}]
+		},
+		"checksum": "deadbeef",
+		"signature": ""
+	}`)
+	require.NoError(t, err)
+	require.NoError(t, manifestA.Close())
+
+	// Bundle B: one pre hook + one response hook.
+	manifestB, err := memFs.Create(filepath.Join(rootPath, subdirB, "manifest.json"))
+	require.NoError(t, err)
+	_, err = manifestB.WriteString(`{
+		"file_list": ["plugin.js"],
+		"custom_middleware": {
+			"driver": "javascript",
+			"pre":      [{"name": "preB",      "path": "plugin.js"}],
+			"response": [{"name": "responseB", "path": "plugin.js"}]
+		},
+		"checksum": "deadbeef",
+		"signature": ""
+	}`)
+	require.NoError(t, err)
+	require.NoError(t, manifestB.Close())
+
+	require.NoError(t, ts.Gw.loadBundleWithFs(spec, memFs))
+
+	// pre: A first, B second.
+	require.Len(t, spec.CustomMiddleware.Pre, 2)
+	assert.Equal(t, "preA", spec.CustomMiddleware.Pre[0].Name)
+	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Pre[0].Path, subdirA))
+	assert.Equal(t, "preB", spec.CustomMiddleware.Pre[1].Name)
+	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Pre[1].Path, subdirB))
+
+	// post: only from A.
+	require.Len(t, spec.CustomMiddleware.Post, 1)
+	assert.Equal(t, "postA", spec.CustomMiddleware.Post[0].Name)
+	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Post[0].Path, subdirA))
+
+	// response: only from B.
+	require.Len(t, spec.CustomMiddleware.Response, 1)
+	assert.Equal(t, "responseB", spec.CustomMiddleware.Response[0].Name)
+	assert.True(t, strings.HasPrefix(spec.CustomMiddleware.Response[0].Path, subdirB))
+
+	// Uniform driver propagated.
+	assert.Equal(t, apidef.JavaScriptDriver, spec.CustomMiddleware.Driver)
 }
 
 // TestParseBundleNames locks the comma-separated CustomMiddlewareBundle
