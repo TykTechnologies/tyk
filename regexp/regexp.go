@@ -46,6 +46,9 @@ func init() {
 // Configure (re)builds the package-level caches from opts. Intended for
 // one-shot gateway startup wiring; safe to call again from tests.
 func Configure(opts CacheOptions) {
+	if opts.TTL <= 0 {
+		opts.TTL = defaultCacheTTL
+	}
 	applyCacheConfig(opts)
 }
 
@@ -75,12 +78,14 @@ var prevReporter atomic.Pointer[internalcache.EvictionLogger]
 
 // applyCacheConfig (re)builds all package caches and, if opts.Log is set,
 // starts the eviction-summary ticker.
+//
+// opts.TTL is passed through verbatim. ttl=0 disables the expirable.LRU
+// cleanup goroutine (golang-lru/v2 has no Close); init() relies on this
+// to avoid leaking goroutines when Configure() later replaces the
+// bootstrap caches. Public callers go through Configure(), which fills
+// in the default TTL.
 func applyCacheConfig(opts CacheOptions) {
 	ttl := opts.TTL
-	if ttl <= 0 {
-		ttl = defaultCacheTTL
-	}
-
 	maxEntries := internalcache.ResolveMaxEntries(opts)
 	if old := prevReporter.Swap(nil); old != nil {
 		old.Stop()
