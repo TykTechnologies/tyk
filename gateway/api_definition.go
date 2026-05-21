@@ -227,7 +227,15 @@ func (s *APISpec) Unload() {
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
 func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 	if s.IsOAS {
-		err := s.OAS.Validate(context.Background(), oas.GetValidationOptionsFromConfig(oasConfig)...)
+		var err error
+		if s.IsMCP() {
+			// MCP-aware path: empty-mode + no-resource PRM config
+			// resolves to mirror, so users can enable mirror by just
+			// marking the API as MCP without any static fields.
+			err = s.OAS.ValidateForMCP(context.Background(), oas.GetValidationOptionsFromConfig(oasConfig)...)
+		} else {
+			err = s.OAS.Validate(context.Background(), oas.GetValidationOptionsFromConfig(oasConfig)...)
+		}
 		if err != nil {
 			return err
 		}

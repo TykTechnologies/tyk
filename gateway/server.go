@@ -56,6 +56,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/compression"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -63,7 +64,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
-	logger "github.com/TykTechnologies/tyk/log"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/pkg/validator"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
@@ -79,10 +80,10 @@ import (
 var (
 	globalMu sync.Mutex
 
-	log       = logger.Get()
+	log       = tyklog.Get()
 	mainLog   = log.WithField("prefix", "main")
 	pubSubLog = log.WithField("prefix", "pub-sub")
-	rawLog    = logger.GetRaw()
+	rawLog    = tyklog.GetRaw()
 
 	memProfFile *os.File
 
@@ -172,6 +173,11 @@ type Gateway struct {
 	apisByID        map[string]*APISpec
 	apisHandlesByID *sync.Map
 
+	// prmCache memoises upstream Protected Resource Metadata (RFC 9728) docs
+	// for MCP APIs running in mirror mode. Lazily initialised on first use.
+	prmCacheOnce sync.Once
+	prmCache     *mcp.PRMCache
+
 	policies *model.Policies
 
 	certUsageTracker *certUsageTracker // nil in non-RPC mode
@@ -252,7 +258,8 @@ type Gateway struct {
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw := &Gateway{
 		DefaultProxyMux: &proxyMux{
-			again: again.New(),
+			again:        again.New(),
+			track404Logs: config.Track404Logs,
 		},
 		ctx: ctx,
 	}
@@ -309,6 +316,15 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 }
 
 // cacheCreate will create the caches in *Gateway.
+// PRMCache returns the gateway-wide Protected Resource Metadata cache used
+// by MCP mirror-mode PRM serving. Constructed lazily on first call.
+func (gw *Gateway) PRMCache() *mcp.PRMCache {
+	gw.prmCacheOnce.Do(func() {
+		gw.prmCache = mcp.NewPRMCache(0)
+	})
+	return gw.prmCache
+}
+
 func (gw *Gateway) cacheCreate() {
 	conf := gw.GetConfig()
 
@@ -1594,7 +1610,7 @@ func (gw *Gateway) initSystem() error {
 
 	// Initialize the appropriate log formatter
 	if !gw.isRunningTests() && os.Getenv("TYK_LOGFORMAT") == "" && !*cli.DebugMode {
-		log.Formatter = logger.NewFormatter(gwConfig.LogFormat)
+		tyklog.SetupFormatter(gwConfig.LogFormat)
 		mainLog.Debugf("Set log format to %q", gwConfig.LogFormat)
 	}
 
@@ -2087,7 +2103,7 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 	localStorage := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
 	localStorage.Connect()
 
-	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
+	logger := tyklog.Get().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		return storage.NewMdcbStorage(
@@ -2438,7 +2454,9 @@ func (gw *Gateway) setupPortsWhitelist() {
 
 func (gw *Gateway) startServer() {
 	// Ensure that Control listener and default http listener running on first start
-	muxer := &proxyMux{}
+	muxer := &proxyMux{
+		track404Logs: gw.GetConfig().Track404Logs,
+	}
 
 	router := mux.NewRouter()
 	gw.loadControlAPIEndpoints(router)

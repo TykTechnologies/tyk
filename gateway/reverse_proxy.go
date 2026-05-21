@@ -44,6 +44,7 @@ import (
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/service/core"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -292,9 +293,23 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		if targetToUse == target {
 			req.URL.Scheme = targetToUse.Scheme
 			req.URL.Host = targetToUse.Host
-			req.URL.Path = singleJoiningSlash(targetToUse.Path, req.URL.Path, spec.Proxy.DisableStripSlash)
+
+			// MCP/OAuth discovery probes (RFC 9728, RFC 8414) live at the
+			// upstream host root, never under the resource path. When the
+			// configured upstream URL embeds a path (e.g. https://x/v1/mcp),
+			// joining it with /.well-known/... would route discovery to the
+			// wrong location and break the OAuth dance for remote MCP
+			// upstreams. For MCP APIs only, route those probes to the host
+			// root.
+			joinPath := targetToUse.Path
+			if spec.IsMCP() && joinPath != "" && joinPath != "/" && mcp.IsHostRootDiscoveryPath(req.URL.Path) {
+				logger.Debug("MCP discovery path detected; routing to upstream host root")
+				joinPath = ""
+			}
+
+			req.URL.Path = singleJoiningSlash(joinPath, req.URL.Path, spec.Proxy.DisableStripSlash)
 			if req.URL.RawPath != "" {
-				req.URL.RawPath = singleJoiningSlash(targetToUse.Path, req.URL.RawPath, spec.Proxy.DisableStripSlash)
+				req.URL.RawPath = singleJoiningSlash(joinPath, req.URL.RawPath, spec.Proxy.DisableStripSlash)
 			}
 		}
 
@@ -427,6 +442,70 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	return transport
 }
 
+// augmentMCPWWWAuthenticate rewrites the upstream's `WWW-Authenticate`
+// header so its `resource_metadata=` parameter points at the gateway-
+// served PRM URL instead of the upstream's. MCP clients (mcp-remote,
+// Claude Desktop) follow that URL to learn which authorization server
+// protects the resource — and validate the doc's `resource` field
+// against the URL the client actually connected to (RFC 9728 §3.3).
+// Pointing them at the upstream's PRM (the default for spec-compliant
+// upstreams like Notion) makes that origin check fail, so we substitute
+// the gateway URL whenever PRM mirror mode is active for the API.
+//
+// If the upstream's challenge has no `resource_metadata=` at all (e.g.
+// Atlassian Rovo as of 2026-Q2), we append one. Either way the client
+// ends up pointed at our PRM endpoint.
+//
+// `inboundReq` must be the original inbound request (pre-director), so we
+// can build the metadata URL from the gateway's scheme/host — not the
+// upstream's, which is what `res.Request` carries after the proxy
+// director rewrites the URL.
+//
+// No-op for non-MCP APIs, non-401 responses, or APIs without PRM
+// configured.
+func augmentMCPWWWAuthenticate(res *http.Response, inboundReq *http.Request, spec *APISpec) {
+	if res == nil || res.StatusCode != http.StatusUnauthorized {
+		return
+	}
+	if spec == nil || !spec.IsMCP() {
+		return
+	}
+	prm := spec.GetPRMConfig()
+	if prm == nil {
+		return
+	}
+	existing := res.Header.Get(header.WWWAuthenticate)
+	if existing == "" {
+		return
+	}
+	if inboundReq == nil {
+		return
+	}
+
+	scheme := httputil.RequestScheme(inboundReq)
+	host := inboundReq.Host
+	if host == "" && inboundReq.URL != nil {
+		host = inboundReq.URL.Host
+	}
+	listen := strings.TrimRight(spec.Proxy.ListenPath, "/")
+	prmURL := fmt.Sprintf("%s://%s/.well-known/oauth-protected-resource%s", scheme, host, listen)
+
+	res.Header.Set(header.WWWAuthenticate, replaceOrAppendResourceMetadata(existing, prmURL))
+}
+
+// replaceOrAppendResourceMetadata returns a `WWW-Authenticate` value with
+// its `resource_metadata="…"` parameter set to `prmURL`. If the parameter
+// is already present (regardless of value), it's substituted in place;
+// otherwise the parameter is appended.
+func replaceOrAppendResourceMetadata(headerValue, prmURL string) string {
+	rxResourceMetadata := regexp.MustCompile(`(?i)resource_metadata="[^"]*"`)
+	replacement := fmt.Sprintf(`resource_metadata="%s"`, prmURL)
+	if rxResourceMetadata.MatchString(headerValue) {
+		return rxResourceMetadata.ReplaceAllString(headerValue, replacement)
+	}
+	return headerValue + ", " + replacement
+}
+
 func singleJoiningSlash(targetPath, subPath string, disableStripSlash bool) string {
 	if disableStripSlash && (len(subPath) == 0 || subPath == "/") {
 		return targetPath
@@ -555,26 +634,24 @@ func proxyTimeout(spec *APISpec) float64 {
 	return defaultProxyTimeout
 }
 
-// CheckHardTimeoutEnforced checks APISpec versions for a fine grained timeout
-// value. The value is defined in seconds, but we're using float64 to enable
-// sub-second durations for tests. Changing to int would break that behaviour.
-func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, float64) {
+// GetHardTimeoutEnforcedSettings checks APISpec versions for a fine-grained timeout value.
+func (p *ReverseProxy) GetHardTimeoutEnforcedSettings(spec *APISpec, req *http.Request) (time.Duration, bool) {
 	if !spec.EnforcedTimeoutEnabled {
-		return false, 0
+		return 0, false
 	}
 
 	vInfo, _ := spec.Version(req)
 	versionPaths := spec.RxPaths[vInfo.Name]
-	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
+	urlSpec, found := spec.FindSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
-		intMeta, ok := meta.(*int)
-		if ok && *intMeta > 0 {
-			p.logger.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
-			return true, float64(*intMeta)
+		if urlSpec.HardTimeout.TimeoutDuration > 0 {
+			return time.Duration(urlSpec.HardTimeout.TimeoutDuration), true
+		} else if urlSpec.HardTimeout.TimeOut > 0 {
+			return time.Duration(urlSpec.HardTimeout.TimeOut) * time.Second, true
 		}
 	}
 
-	return false, 0
+	return 0, false
 }
 
 func (p *ReverseProxy) CheckHeaderInRemoveList(hdr string, spec *APISpec, req *http.Request) bool {
@@ -1182,11 +1259,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	p.TykAPISpec.Lock()
 
-	isTimeoutEnforced, enforcedTimeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, outreq)
+	enforcedTimeout, isTimeoutEnforced := p.GetHardTimeoutEnforcedSettings(p.TykAPISpec, outreq)
 
 	// limit request time with context timeout
 	if isTimeoutEnforced {
-		timeoutContext, cancel := context.WithTimeout(outreq.Context(), time.Duration(enforcedTimeout)*time.Second)
+		timeoutContext, cancel := context.WithTimeout(outreq.Context(), enforcedTimeout)
 		defer cancel()
 
 		outreq = outreq.WithContext(timeoutContext)
@@ -1426,6 +1503,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// We should at least copy the status code in
 	inres.StatusCode = res.StatusCode
 	inres.ContentLength = res.ContentLength
+
+	// Augment the upstream's WWW-Authenticate (RFC 9728 hint for MCP
+	// clients) using the inbound request so we build the gateway URL,
+	// not the rewritten upstream one. Must run before HandleResponse,
+	// which copies res.Header into rw.Header.
+	augmentMCPWWWAuthenticate(res, logreq, p.TykAPISpec)
+
 	p.HandleResponse(rw, res, ses)
 	return ProxyResponse{UpstreamLatency: upstreamLatency, Response: inres}
 }

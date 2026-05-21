@@ -779,11 +779,14 @@
         "value": {
           "type": "integer",
           "minimum": 0
+        },
+        "timeout": {
+          "type": "string",
+          "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
         }
       },
       "required": [
-        "enabled",
-        "value"
+        "enabled"
       ],
       "additionalProperties": false
     },
@@ -1318,6 +1321,9 @@
                 },
                 {
                   "$ref": "#/definitions/X-Tyk-ExternalOAuth"
+                },
+                {
+                  "$ref": "#/definitions/X-Tyk-OAuth2"
                 }
               ]
             }
@@ -1400,8 +1406,7 @@
         }
       },
       "required": [
-        "enabled",
-        "resource"
+        "enabled"
       ],
       "additionalProperties": false
     },
@@ -2014,6 +2019,28 @@
               "$ref": "#/definitions/X-Tyk-OAuthProvider"
             }
           ]
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "X-Tyk-OAuth2": {
+      "type": "object",
+      "description": "OAuth 2.0 security scheme container.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "header": {
+          "$ref": "#/definitions/X-Tyk-AuthSource"
+        },
+        "cookie": {
+          "$ref": "#/definitions/X-Tyk-AuthSource"
+        },
+        "query": {
+          "$ref": "#/definitions/X-Tyk-AuthSource"
         }
       },
       "required": [

@@ -172,18 +172,55 @@ func (a *APISpec) SetCompiledErrorOverrides(compiled *CompiledErrorOverrides) {
 }
 
 // GetPRMConfig returns the Protected Resource Metadata configuration
-// if the API is an OAS API Definition (OAS API, MCP Proxy, Stream API) with PRM enabled.
-// Returns nil otherwise.
+// for the API.
+//
+// Resolution order:
+//  1. If the OAS doc has an explicit `protectedResourceMetadata` block with
+//     `enabled: true`, return it as configured.
+//  2. If the API is MCP and no explicit PRM block is provided (or the
+//     authentication block is missing entirely), synthesise a default
+//     `enabled: true, mode: ""` so mirror mode kicks in automatically.
+//     The empty-mode + no-resource shape resolves to mirror in
+//     EffectiveMode, so users can put Tyk in front of a remote MCP with
+//     zero PRM-specific config.
+//  3. Otherwise return nil — the API has no PRM serving.
 func (a *APISpec) GetPRMConfig() *oas.ProtectedResourceMetadata {
 	ext := a.GetTykExtension()
+	var prm *oas.ProtectedResourceMetadata
+	if ext != nil && ext.Server.Authentication != nil {
+		prm = ext.Server.Authentication.ProtectedResourceMetadata
+	}
+
+	if prm != nil && prm.Enabled {
+		return prm
+	}
+
+	// MCP-only default: mirror without any explicit PRM config.
+	if prm == nil && a.IsMCP() {
+		return &oas.ProtectedResourceMetadata{Enabled: true}
+	}
+	return nil
+}
+
+// GetOAuth2Config returns a configured oauth2 security scheme on this
+// API, if any. Returns the scheme's name and the typed config.
+// Duplicate oauth2 schemes are not validated at load time (matching the
+// behaviour of every other auth scheme on this map); when more than one
+// is configured, the choice is map-iteration dependent.
+func (a *APISpec) GetOAuth2Config() (string, *oas.OAuth2) {
+	if !a.IsOAS {
+		return "", nil
+	}
+	ext := a.GetTykExtension()
 	if ext == nil || ext.Server.Authentication == nil {
-		return nil
+		return "", nil
 	}
-	prm := ext.Server.Authentication.ProtectedResourceMetadata
-	if prm == nil || !prm.Enabled {
-		return nil
+	for name := range ext.Server.Authentication.SecuritySchemes {
+		if cfg := a.OAS.GetTykOAuth2Config(name); cfg != nil {
+			return name, cfg
+		}
 	}
-	return prm
+	return "", nil
 }
 
 // FindSpecMatchesStatus checks if a URL spec has a specific status and returns the URLSpec for it.

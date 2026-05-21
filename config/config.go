@@ -611,10 +611,12 @@ type HttpServerOptionsConfig struct {
 	// Start your Gateway HTTP server on specific server name
 	ServerName string `json:"server_name"`
 
-	// Minimum TLS version. Possible values: https://tyk.io/docs/api-management/certificates#supported-tls-versions
+	// Minimum TLS version is inherited from Go library, but can be overridden here.
+	// For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-&-cipher-suites
 	MinVersion uint16 `json:"min_version"`
 
-	// Maximum TLS version.
+	// Maximum TLS version is inherited from Go library, but can be overridden here.
+	// For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-&-cipher-suites
 	MaxVersion uint16 `json:"max_version"`
 
 	// When mTLS enabled, this option allows to skip client CA announcement in the TLS handshake.
@@ -1237,9 +1239,10 @@ type Config struct {
 	// If not set or left empty, it will default to `info`.
 	LogLevel string `json:"log_level"`
 
-	// You can now configure the log format to be either the standard or json format
-	// If not set or left empty, it will default to `standard`.
-	LogFormat string `json:"log_format"`
+	// LogFormat configures the output format of the logs.
+	// Allowed values are `text`, `json`, or `legacy`.
+	// If not set or left empty, it defaults to `text`.
+	LogFormat logger.Format `json:"log_format"`
 
 	// AccessLogs configures the output for access logs.
 	// If not configured, the access log is disabled.
@@ -1406,7 +1409,9 @@ type Config struct {
 	// JWKS holds the configuration for Tyk JWKS functionalities
 	JWKS JWKSConfig `json:"jwks"`
 
-	// AllowUnsafePolicyIds allows unsafe policy identifiers
+	// AllowUnsafePolicyIds allows the use of non-standard characters in policy identifiers (default: false).
+	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
+	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
 	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
 }
 
