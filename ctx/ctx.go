@@ -75,6 +75,12 @@ const (
 	MCPPrimitiveName
 	// JSONRPCErrorCode stores the JSON-RPC error code for metrics dimensions.
 	JSONRPCErrorCode
+	// MCPLoopFromPairedProxy holds the trust descriptor stamped by an
+	// MCP adapter middleware on a request that is about to loop back
+	// through the paired REST API. It carries (ProxyAPIID, RESTAPIID)
+	// so MCPLoopAuthBypass can verify the pairing index before
+	// short-circuiting REST-side authentication.
+	MCPLoopFromPairedProxy
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {

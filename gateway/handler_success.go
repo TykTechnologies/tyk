@@ -322,7 +322,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(s.Spec.GraphQL.Schema))
 		}
 
-		if s.Spec.IsMCP() {
+		if s.Spec.IsMCPManaged() {
 			recordMCPDetails(&record, r)
 		}
 

@@ -24,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
+	mcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
 
 	_ "github.com/TykTechnologies/tyk/internal/mcp" // registers MCP VEM prefixes
 )
@@ -109,6 +110,33 @@ type APISpec struct {
 	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
 	// Built from apidef.ErrorOverrides during gateway startup.
 	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
+
+	// IsSyntheticMCPAdapter is true on the Internal adapter spec that was
+	// emitted in-memory by synthesiseMCPAdapter from a paired REST APISpec.
+	// Synthetic adapter specs have no storage entry, are skipped by the
+	// public muxer, and are addressable only via `tyk://<APIID>`.
+	IsSyntheticMCPAdapter bool
+
+	// SourceRESTAPIID is the APIID of the REST APISpec this adapter is paired
+	// with. Empty on non-adapter specs.
+	SourceRESTAPIID string
+
+	// DerivedPrimitives is the internal primitive catalogue produced from the
+	// source REST OAS at every loadApps. V1 emits tool primitives only.
+	DerivedPrimitives []oas.DerivedPrimitive
+
+	// DerivedTools is the SDK-facing tool projection of DerivedPrimitives. The
+	// adapter middleware uses it to translate `tools/call` into HTTP requests.
+	DerivedTools []oas.DerivedTool
+
+	// MCPProxyToolViews maps caller proxy APIID to the proxy-specific REST-as-MCP
+	// tool view exposed through this shared synthetic adapter.
+	MCPProxyToolViews map[string]oas.MCPToolView
+
+	// MCPSDKAdapter owns the long-lived SDK server for this synthetic adapter.
+	// It is reused across reloads so connected MCP clients can receive
+	// tools/list_changed notifications when DerivedTools changes.
+	MCPSDKAdapter *mcpadapter.SDKAdapter
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.

@@ -32,8 +32,25 @@ func typeCheckFunc(name string, predicate apiFilterFunc) apiTypeCheck {
 	}
 }
 
+// mcpManaged is the broadened MCP-management predicate. It returns true
+// for both classic MCP proxies (IsMCP, used for remote MCPs) and
+// REST-as-MCP proxies whose upstream targets a synthetic adapter.
+// `/tyk/mcps` handlers use this to surface either kind.
+//
+// Synthetic adapter specs are excluded — they are gateway-internal
+// implementation detail with no operator-facing CRUD.
+func mcpManaged(s *APISpec) bool {
+	if s == nil || s.APIDefinition == nil {
+		return false
+	}
+	if s.IsSyntheticMCPAdapter {
+		return false
+	}
+	return s.IsMCPManaged()
+}
+
 var (
-	mcpTypeCheck = typeCheckFunc("MCP Proxy", (*APISpec).IsMCP)
+	mcpTypeCheck = typeCheckFunc("MCP Proxy", mcpManaged)
 )
 
 func (gw *Gateway) setBaseAPIIDHeader(w http.ResponseWriter, oasObj *oas.OAS) {

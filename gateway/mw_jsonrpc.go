@@ -18,6 +18,7 @@ import (
 
 const (
 	contentTypeJSON   = "application/json"
+	headerAccept      = "Accept"
 	headerContentType = "Content-Type"
 )
 
@@ -165,6 +166,18 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, http.StatusOK
 	}
 
+	// Synthetic MCP adapters are owned by the official Go MCP SDK streamable
+	// HTTP handler. Route the full transport surface before the generic
+	// JSON-RPC parser so GET streams and DELETE session closes work.
+	if m.Spec.IsSyntheticMCPAdapter {
+		if m.Spec.MCPSDKAdapter == nil {
+			http.Error(w, "MCP SDK adapter is not initialised", http.StatusInternalServerError)
+			return nil, middleware.StatusRespond
+		}
+		m.serveSyntheticMCPAdapter(w, r)
+		return nil, middleware.StatusRespond
+	}
+
 	// Validate request type
 	if !m.validateJSONRPCRequest(r) {
 		return nil, http.StatusOK
@@ -200,6 +213,16 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Return StatusOK to allow chain to continue to DummyProxyHandler, which will handle the redirect
 	return nil, http.StatusOK
+}
+
+func ensureMCPStreamableAccept(r *http.Request) {
+	accept := r.Header.Get(headerAccept)
+	required := []string{contentTypeJSON, "text/event-stream"}
+	for _, mediaType := range required {
+		if !strings.Contains(accept, mediaType) {
+			r.Header.Add(headerAccept, mediaType)
+		}
+	}
 }
 
 // writeJSONRPCError writes a JSON-RPC 2.0 error response.

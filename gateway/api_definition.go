@@ -225,7 +225,7 @@ func (s *APISpec) Unload() {
 func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 	if s.IsOAS {
 		var err error
-		if s.IsMCP() {
+		if s.IsMCPManaged() {
 			// MCP-aware path: empty-mode + no-resource PRM config
 			// resolves to mirror, so users can enable mirror by just
 			// marking the API as MCP without any static fields.
@@ -774,7 +774,7 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 		loader.ReadFromURIFunc = openapi3.ReadFromFile
 
 		var oasFilepath string
-		if def.IsMCP() {
+		if def.IsMCPManaged() {
 			oasFilepath = a.GetMCPFilepath(filePath)
 		} else {
 			oasFilepath = a.GetOASFilepath(filePath)

@@ -57,6 +57,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/internal/mcp/pairing"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -180,6 +181,14 @@ type Gateway struct {
 
 	policies *model.Policies
 
+	// mcpPairing maintains the REST→allowed-proxy-set and REST→adapter mappings
+	// used by MCPLoopAuthBypass to enforce the paired-proxy trust model.
+	// Rebuilt in full on every loadApps;
+	// read-only between reloads. The underlying type is gateway-
+	// agnostic (internal/mcp/pairing) so middlewares can be unit-tested
+	// against a fake Lookup.
+	mcpPairing *pairing.Index
+
 	certUsageTracker *certUsageTracker // nil in non-RPC mode
 	pendingCerts     sync.Map          // certID -> struct{}, certs skipped due to tracker miss
 
@@ -281,6 +290,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.apisByID = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
+	gw.mcpPairing = pairing.New()
 
 	gw.policies = model.NewPolicies(
 		model.WithInternalCollision(func(customId string, ids []persistentmodel.ObjectID) {

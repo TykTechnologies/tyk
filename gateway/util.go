@@ -161,6 +161,15 @@ func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
 		return true
 	}
 
+	// Synthetic MCP adapter specs are rebuilt fresh by
+	// synthesiseMCPAdapters on every loadApps. The new APISpec pointer
+	// must own its own ChainObject (it carries a fresh primitive catalogue); the
+	// checksum-based fast-path would otherwise keep the previous chain
+	// and serve stale tools.
+	if newSpec.IsSyntheticMCPAdapter {
+		return true
+	}
+
 	if newSpec.hasVirtualEndpoint() {
 		return true
 	}
