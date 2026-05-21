@@ -38,7 +38,6 @@ func TestCache_Purge(t *testing.T) {
 	}
 }
 
-// T1
 func TestCache_EvictsAtCap(t *testing.T) {
 	c := newCacheWithSize(0, 5, true, "", nil)
 
@@ -57,7 +56,6 @@ func TestCache_EvictsAtCap(t *testing.T) {
 	}
 }
 
-// T2
 func TestCache_TTLEviction(t *testing.T) {
 	c := newCacheWithSize(50*time.Millisecond, 100, true, "", nil)
 
@@ -76,7 +74,6 @@ func TestCache_TTLEviction(t *testing.T) {
 	}
 }
 
-// T3
 func TestCache_NoTTL(t *testing.T) {
 	c := newCacheWithSize(0, 100, true, "", nil)
 
@@ -89,9 +86,9 @@ func TestCache_NoTTL(t *testing.T) {
 	}
 }
 
-// T4 — Configure must apply both knobs to the live package caches:
-// the MaxEntries cap enforces eviction at 100, and the TTL drives
-// time-based expiry.
+// TestConfigure_AppliesOpts verifies Configure applies both knobs to the
+// live package caches: the MaxEntries cap enforces eviction at 100, and
+// the TTL drives time-based expiry.
 func TestConfigure_AppliesOpts(t *testing.T) {
 	t.Cleanup(func() {
 		applyCacheConfig(CacheOptions{Enabled: true})
@@ -105,7 +102,7 @@ func TestConfigure_AppliesOpts(t *testing.T) {
 		})
 
 		for i := 0; i < 101; i++ {
-			if _, err := Compile(fmt.Sprintf("^t4-size-%d-.*$", i)); err != nil {
+			if _, err := Compile(fmt.Sprintf("^size-%d-.*$", i)); err != nil {
 				t.Fatalf("Compile #%d failed: %v", i, err)
 			}
 		}
@@ -122,7 +119,7 @@ func TestConfigure_AppliesOpts(t *testing.T) {
 			Enabled:    true,
 		})
 
-		if _, err := Compile("^t4-ttl-victim.*$"); err != nil {
+		if _, err := Compile("^ttl-victim.*$"); err != nil {
 			t.Fatalf("Compile failed: %v", err)
 		}
 		if got := CompileCacheLen(); got != 1 {
@@ -132,7 +129,7 @@ func TestConfigure_AppliesOpts(t *testing.T) {
 		time.Sleep(300 * time.Millisecond)
 
 		// Force lazy expiration before reading Len() — see TestCache_TTLEviction.
-		_, _ = Compile("^t4-ttl-victim.*$")
+		_, _ = Compile("^ttl-victim.*$")
 		// That Get-then-miss re-inserts the entry; subtract to verify TTL
 		// drained the original under-the-hood by recompiling and asserting
 		// only the fresh entry remains.

@@ -16,7 +16,6 @@ import (
 	tykregexp "github.com/TykTechnologies/tyk/regexp"
 )
 
-// T7
 func TestGateway_afterConfSetup_RegexpCache(t *testing.T) {
 	t.Cleanup(func() {
 		// Restore package defaults for other tests in the binary.
@@ -28,7 +27,7 @@ func TestGateway_afterConfSetup_RegexpCache(t *testing.T) {
 		require.NoError(t, gw.afterConfSetup())
 
 		for i := 0; i < 5001; i++ {
-			_, _ = tykregexp.Compile(fmt.Sprintf("^t7-default-%d-.*$", i))
+			_, _ = tykregexp.Compile(fmt.Sprintf("^default-%d-.*$", i))
 		}
 		assert.Equal(t, 5000, tykregexp.CompileCacheLen(),
 			"MaxEntries=0 should select default cap of 5000")
@@ -39,7 +38,7 @@ func TestGateway_afterConfSetup_RegexpCache(t *testing.T) {
 		require.NoError(t, gw.afterConfSetup())
 
 		for i := 0; i < 101; i++ {
-			_, _ = tykregexp.Compile(fmt.Sprintf("^t7-100-%d-.*$", i))
+			_, _ = tykregexp.Compile(fmt.Sprintf("^cap100-%d-.*$", i))
 		}
 		assert.Equal(t, 100, tykregexp.CompileCacheLen(),
 			"MaxEntries=100 should cap the cache at 100 entries")
@@ -51,7 +50,7 @@ func TestGateway_afterConfSetup_RegexpCache(t *testing.T) {
 
 		const n = 5001
 		for i := 0; i < n; i++ {
-			_, _ = tykregexp.Compile(fmt.Sprintf("^t7-unbnd-%d-.*$", i))
+			_, _ = tykregexp.Compile(fmt.Sprintf("^unbnd-%d-.*$", i))
 		}
 		assert.Equal(t, n, tykregexp.CompileCacheLen(),
 			"DisableRegexpCacheBound=true should disable size eviction")
@@ -62,7 +61,7 @@ func TestGateway_afterConfSetup_RegexpCache(t *testing.T) {
 		require.NoError(t, gw.afterConfSetup())
 
 		for i := 0; i < 5001; i++ {
-			_, _ = tykregexp.Compile(fmt.Sprintf("^t7-neg-%d-.*$", i))
+			_, _ = tykregexp.Compile(fmt.Sprintf("^neg-%d-.*$", i))
 		}
 		assert.Equal(t, 5000, tykregexp.CompileCacheLen(),
 			"negative MaxEntries (without DisableRegexpCacheBound) should fall back to the default cap")
@@ -78,7 +77,7 @@ func TestGateway_afterConfSetup_RegexpCache(t *testing.T) {
 		}, context.Background())
 		require.NoError(t, gw.afterConfSetup())
 
-		_, err := tykregexp.Compile("^t8-ttl-victim.*$")
+		_, err := tykregexp.Compile("^ttl-victim.*$")
 		require.NoError(t, err)
 		require.Equal(t, 1, tykregexp.CompileCacheLen(),
 			"entry should be present immediately after Compile")
@@ -87,14 +86,15 @@ func TestGateway_afterConfSetup_RegexpCache(t *testing.T) {
 		// Force lazy expiration: the Get path drops expired entries
 		// deterministically, while Len() reflects only what the bucket
 		// sweeper has already reaped.
-		_, _ = tykregexp.Compile("^t8-ttl-victim.*$")
+		_, _ = tykregexp.Compile("^ttl-victim.*$")
 
 		assert.Equal(t, 1, tykregexp.CompileCacheLen(),
 			"after TTL expiry, only the freshly-recompiled entry should remain")
 	})
 }
 
-// T8c — warning log fires when DisableRegexpCacheBound is set.
+// TestAfterConfSetup_WarnsOnDisableRegexpCacheBound verifies that a
+// warning log fires when DisableRegexpCacheBound is set.
 func TestAfterConfSetup_WarnsOnDisableRegexpCacheBound(t *testing.T) {
 	t.Cleanup(func() {
 		tykregexp.Configure(tykregexp.CacheOptions{Enabled: true})
@@ -117,8 +117,9 @@ func TestAfterConfSetup_WarnsOnDisableRegexpCacheBound(t *testing.T) {
 	assert.True(t, found, "expected warning log about disabled size eviction")
 }
 
-// T8d — warning log fires when RegexpCacheMaxEntries is negative
-// (deprecation path that points users to DisableRegexpCacheBound).
+// TestAfterConfSetup_WarnsOnNegativeMaxEntries verifies that a warning
+// log fires when RegexpCacheMaxEntries is negative (deprecation path
+// pointing users to DisableRegexpCacheBound).
 func TestAfterConfSetup_WarnsOnNegativeMaxEntries(t *testing.T) {
 	t.Cleanup(func() {
 		tykregexp.Configure(tykregexp.CacheOptions{Enabled: true})

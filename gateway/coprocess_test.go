@@ -370,10 +370,11 @@ func TestValidateDriver(t *testing.T) {
 	loadedDrivers = originalLoadedDrivers
 }
 
-// T7 — CustomMiddlewareResponseHook.Init wires the BaseMiddleware logger
-// before any request handling can race against it. The 37 panics/day on
-// the customer's prod were caused by Copy() running before this wiring;
-// the fix is the SetName("CoProcessMiddleware") call inside Init.
+// TestCustomMiddlewareResponseHook_Init_WiresLogger verifies that
+// CustomMiddlewareResponseHook.Init wires the BaseMiddleware logger
+// before any request handling can race against it. Production panics
+// were caused by Copy() running before this wiring; the fix is the
+// SetName("CoProcessMiddleware") call inside Init.
 func TestCustomMiddlewareResponseHook_Init_WiresLogger(t *testing.T) {
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	gw := &Gateway{}

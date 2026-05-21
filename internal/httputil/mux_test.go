@@ -214,7 +214,8 @@ func TestPreparePathRegexp_FixedOutputs(t *testing.T) {
 	}
 }
 
-// T5 — eviction at the configured cap, with recomputation correctness.
+// TestPathRegexpCache_EvictsAtCap verifies eviction at the configured
+// cap, with recomputation correctness on a re-fetched key.
 func TestPathRegexpCache_EvictsAtCap(t *testing.T) {
 	httputil.ConfigurePathRegexpCache(cache.LRUOptions{MaxEntries: 2})
 	t.Cleanup(func() { httputil.ConfigurePathRegexpCache(cache.LRUOptions{}) })
@@ -228,35 +229,49 @@ func TestPathRegexpCache_EvictsAtCap(t *testing.T) {
 	assert.Equal(t, wantFirst, got, "evicted entry should recompute to same value")
 }
 
-// T7b — ConfigurePathRegexpCache behavior across MaxEntries values.
-//   - MaxEntries>0 enforces a cap
-//   - MaxEntries<0 disables size eviction (unbounded)
-//   - MaxEntries==0 selects the default cap (DefaultLRUMaxEntries)
+// TestConfigurePathRegexpCache covers ConfigurePathRegexpCache behavior
+// across MaxEntries values per cache.ResolveMaxEntries semantics:
+//   - MaxEntries > 0 enforces a cap of exactly that size.
+//   - MaxEntries <= 0 (without Unbounded) clamps to DefaultLRUMaxEntries;
+//     it does NOT disable size eviction.
+//   - Unbounded: true is the only way to disable size eviction.
 func TestConfigurePathRegexpCache(t *testing.T) {
 	t.Cleanup(func() { httputil.ConfigurePathRegexpCache(cache.LRUOptions{}) })
 
 	t.Run("bounded", func(t *testing.T) {
 		httputil.ConfigurePathRegexpCache(cache.LRUOptions{MaxEntries: 10})
-		first := "/bounded-0"
-		want := httputil.PreparePathRegexp(first, true, false)
-		for i := 1; i < 12; i++ {
+		for i := 0; i < 12; i++ {
 			httputil.PreparePathRegexp(fmt.Sprintf("/bounded-%d", i), true, false)
 		}
-		got := httputil.PreparePathRegexp(first, true, false)
-		assert.Equal(t, want, got, "evicted entry should recompute identically")
+		assert.Equal(t, 10, httputil.PathRegexpCacheLen(),
+			"cache should cap at MaxEntries=10")
 	})
 
-	t.Run("unbounded_negative", func(t *testing.T) {
+	t.Run("negative_clamps_to_default", func(t *testing.T) {
 		httputil.ConfigurePathRegexpCache(cache.LRUOptions{MaxEntries: -1})
-		for i := 0; i < 5001; i++ {
-			httputil.PreparePathRegexp(fmt.Sprintf("/u-%d", i), true, false)
+		for i := 0; i < cache.DefaultLRUMaxEntries+1; i++ {
+			httputil.PreparePathRegexp(fmt.Sprintf("/neg-%d", i), true, false)
 		}
+		assert.Equal(t, cache.DefaultLRUMaxEntries, httputil.PathRegexpCacheLen(),
+			"negative MaxEntries should clamp to DefaultLRUMaxEntries, not disable eviction")
 	})
 
-	t.Run("default_zero", func(t *testing.T) {
+	t.Run("zero_clamps_to_default", func(t *testing.T) {
 		httputil.ConfigurePathRegexpCache(cache.LRUOptions{MaxEntries: 0})
-		for i := 0; i < 5001; i++ {
-			httputil.PreparePathRegexp(fmt.Sprintf("/z-%d", i), true, false)
+		for i := 0; i < cache.DefaultLRUMaxEntries+1; i++ {
+			httputil.PreparePathRegexp(fmt.Sprintf("/zero-%d", i), true, false)
 		}
+		assert.Equal(t, cache.DefaultLRUMaxEntries, httputil.PathRegexpCacheLen(),
+			"zero MaxEntries should clamp to DefaultLRUMaxEntries")
+	})
+
+	t.Run("unbounded", func(t *testing.T) {
+		httputil.ConfigurePathRegexpCache(cache.LRUOptions{Unbounded: true})
+		n := cache.DefaultLRUMaxEntries + 100
+		for i := 0; i < n; i++ {
+			httputil.PreparePathRegexp(fmt.Sprintf("/unb-%d", i), true, false)
+		}
+		assert.Equal(t, n, httputil.PathRegexpCacheLen(),
+			"Unbounded should allow growth past DefaultLRUMaxEntries")
 	})
 }
