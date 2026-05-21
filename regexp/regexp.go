@@ -5,10 +5,6 @@
 // be mutated. Read-only methods (Match*, Find*, ReplaceAll*, String,
 // NumSubexp, SubexpNames, LiteralPrefix) are safe for concurrent use
 // since Go 1.12.
-//
-// External consumers (Tyk plugins, sibling repos) should use the
-// standard library regexp package directly unless they specifically
-// need to share Tyk's gateway-wide compile cache.
 package regexp
 
 import (
@@ -53,15 +49,6 @@ func Configure(opts CacheOptions) {
 	applyCacheConfig(opts)
 }
 
-// CompileCacheLen returns the current entry count of the compile cache.
-// Intended for tests that need to assert eviction behavior.
-func CompileCacheLen() int {
-	if c := compileCache.Load(); c != nil {
-		return c.lru.Len()
-	}
-	return 0
-}
-
 // Reset toggles the cache-enabled flag and purges all entries. Bounds
 // (TTL/MaxEntries) are fixed at Configure time and not affected here.
 func Reset(isEnabled bool) {
@@ -77,10 +64,6 @@ func Reset(isEnabled bool) {
 	findAllStringSubmatchCache.Load().reset(isEnabled)
 }
 
-// ResetCache is the pre-TT-17049 entry point. Kept as a thin shim so
-// out-of-tree callers (plugins, sibling repos) keep compiling; ttl is
-// now fixed at Configure time and the argument is ignored.
-//
 // Deprecated: use Reset(isEnabled).
 func ResetCache(_ time.Duration, isEnabled bool) {
 	Reset(isEnabled)
@@ -97,8 +80,8 @@ func applyCacheConfig(opts CacheOptions) {
 	if ttl <= 0 {
 		ttl = defaultCacheTTL
 	}
-	maxEntries := internalcache.ResolveMaxEntries(opts)
 
+	maxEntries := internalcache.ResolveMaxEntries(opts)
 	if old := prevReporter.Swap(nil); old != nil {
 		old.Stop()
 	}

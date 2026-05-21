@@ -25,11 +25,7 @@ func init() {
 	pathRegexpCache.Store(expirable.NewLRU[string, string](cache.DefaultLRUMaxEntries, nil, 0))
 }
 
-// ConfigurePathRegexpCache replaces the path-regexp cache with one
-// configured by opts. opts.TTL is ignored (this is a pure-LRU cache).
-// Use opts.Unbounded=true to disable size eviction; otherwise opts.MaxEntries
-// drives the cap (0 → DefaultLRUMaxEntries). Intended for one-shot
-// gateway-startup wiring (and config reload).
+// ConfigurePathRegexpCache replaces the path-regexp cache with one configured by opts.
 func ConfigurePathRegexpCache(opts cache.LRUOptions) {
 	n := cache.ResolveMaxEntries(opts)
 

@@ -16,9 +16,7 @@ const (
 	defaultCacheMaxEntries = internalcache.DefaultLRUMaxEntries
 )
 
-// cache wraps an expirable.LRU. maxEntries<=0 disables size eviction;
-// ttl=0 disables TTL eviction (no sweep goroutine spawned). Both bounds
-// are fixed at construction.
+// cache wraps an expirable.LRU.
 type cache struct {
 	lru       *expirable.LRU[string, any]
 	isEnabled atomic.Bool
@@ -42,14 +40,18 @@ func newCacheWithSize(ttl time.Duration, maxEntries int, isEnabled bool, name st
 	if maxEntries < 0 {
 		maxEntries = 0
 	}
+
 	if reporter == nil {
 		reporter = noopReporter{}
 	}
+
 	onEvict := func(_ string, _ any) { reporter.Record(name) }
 	c := &cache{
 		lru: expirable.NewLRU[string, any](maxEntries, onEvict, ttl),
 	}
+
 	c.isEnabled.Store(isEnabled)
+
 	return c
 }
 

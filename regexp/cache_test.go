@@ -107,7 +107,7 @@ func TestConfigure_AppliesOpts(t *testing.T) {
 			}
 		}
 
-		if got := CompileCacheLen(); got != 100 {
+		if got := compileCache.Load().lru.Len(); got != 100 {
 			t.Fatalf("expected compileCache.Len=100, got %d", got)
 		}
 	})
@@ -122,7 +122,7 @@ func TestConfigure_AppliesOpts(t *testing.T) {
 		if _, err := Compile("^ttl-victim.*$"); err != nil {
 			t.Fatalf("Compile failed: %v", err)
 		}
-		if got := CompileCacheLen(); got != 1 {
+		if got := compileCache.Load().lru.Len(); got != 1 {
 			t.Fatalf("expected Len=1 immediately after Compile, got %d", got)
 		}
 
@@ -133,7 +133,7 @@ func TestConfigure_AppliesOpts(t *testing.T) {
 		// That Get-then-miss re-inserts the entry; subtract to verify TTL
 		// drained the original under-the-hood by recompiling and asserting
 		// only the fresh entry remains.
-		if got := CompileCacheLen(); got != 1 {
+		if got := compileCache.Load().lru.Len(); got != 1 {
 			t.Fatalf("expected exactly the re-compiled entry, got Len=%d", got)
 		}
 	})
