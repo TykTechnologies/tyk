@@ -59,7 +59,7 @@ tags:
 - description: |
     Manage MCP (Model Context Protocol) Proxies on Tyk Gateway. MCP Proxies are
     defined as Tyk OAS documents that include MCP-specific configuration in the
-    `x-tyk-api-gateway` extension. All create/update requests are validated against
+    Tyk Vendor Extension (`x-tyk-api-gateway`). All create/update requests are validated against
     the MCP JSON schema; a Gateway reload is required for changes to take effect.
   name: MCP Proxies
 - description: |
@@ -1569,7 +1569,7 @@ paths:
   /tyk/mcps:
     get:
       description: List all MCP Proxy definitions on this Tyk Gateway. Each entry
-        is a Tyk OAS document whose `x-tyk-api-gateway` extension marks it as an
+        is a Tyk OAS document whose Tyk Vendor Extension extension marks it as an
         MCP Proxy definition.
       operationId: listMCPs
       responses:
@@ -1595,7 +1595,7 @@ paths:
     post:
       description: |
         Create an MCP Proxy definition from a Tyk OAS document. The payload must
-        contain the `x-tyk-api-gateway` extension with MCP configuration and is
+        contain the Tyk Vendor Extension (`x-tyk-api-gateway`) extension with MCP configuration and is
         validated against the MCP JSON schema (`/tyk/schema?type=mcp`) before being
         stored. The Gateway must be reloaded (`POST /tyk/reload`) for the new MCP
         Proxy definition to take effect.
@@ -7437,14 +7437,14 @@ components:
           format: double
           type: number
         post_expiry_action:
-          description: Defines the action to take on a key in Redis after it expires. Valid values are "retain" and "delete".
+          description: Defines the action to take on a Session in Redis after it expires. Valid values are "retain" and "delete".
           example: delete
           type: string
           enum:
             - retain
             - delete
         post_expiry_grace_period:
-          description: Duration in seconds to retain a key in Redis after it expires. Used with post_expiry_action "retain". Set to -1 to retain indefinitely.
+          description: Duration in seconds to retain a Session in Redis after it expires. Used with post_expiry_action "retain". Set to -1 to retain indefinitely.
           example: 0
           format: int64
           type: integer
@@ -7956,14 +7956,14 @@ components:
           format: double
           type: number
         post_expiry_action:
-          description: Defines the action to take on a key in Redis after it expires. Valid values are "retain" and "delete".
+          description: Defines the action to take on a Session in Redis after it expires. Valid values are "retain" and "delete".
           example: delete
           type: string
           enum:
             - retain
             - delete
         post_expiry_grace_period:
-          description: Duration in seconds to retain a key in Redis after it expires. Used with post_expiry_action "retain". Set to -1 to retain indefinitely.
+          description: Duration in seconds to retain a Session in Redis after it expires. Used with post_expiry_action "retain". Set to -1 to retain indefinitely.
           example: 0
           format: int64
           type: integer

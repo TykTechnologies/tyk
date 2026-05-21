@@ -615,6 +615,41 @@
                       "id": "http://jsonschema.net/version_data/versions/versionInfoProperty/paths/white_list"
                     }
                   }
+                },
+                "extended_paths": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "hard_timeouts": {
+                      "type": [
+                        "array",
+                        "null"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "disabled": {
+                            "type": "boolean"
+                          },
+                          "path": {
+                            "type": "string"
+                          },
+                          "method": {
+                            "type": "string"
+                          },
+                          "timeout": {
+                            "type": "integer"
+                          },
+                          "timeout_duration": {
+                            "type": "string",
+                            "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
+                          }
+                        }
+                      }
+                    }
+                  }
                 }
               },
               "required": [
