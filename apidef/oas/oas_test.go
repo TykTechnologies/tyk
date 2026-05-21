@@ -312,6 +312,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	vInfo.GlobalResponseHeadersDisabled = false
 	vInfo.UseExtendedPaths = false
 	vInfo.GlobalSizeLimitDisabled = false
+	vInfo.GlobalEnforceTimeout = 0
 
 	vInfo.ExtendedPaths.Clear()
 
