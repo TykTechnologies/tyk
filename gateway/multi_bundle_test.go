@@ -242,8 +242,8 @@ func TestMergeBundleManifestPreservesInlineCode(t *testing.T) {
 		CustomMiddleware: apidef.MiddlewareSection{
 			Driver: apidef.JavaScriptDriver,
 			Pre: []apidef.MiddlewareDefinition{
-				{Name: "inlineHandler", Code: inlineSrc},                 // inline, no Path
-				{Name: "fileHandler", Path: "plugin.js"},                  // file-mounted, gets prefixed
+				{Name: "inlineHandler", Code: inlineSrc},                   // inline, no Path
+				{Name: "fileHandler", Path: "plugin.js"},                   // file-mounted, gets prefixed
 				{Name: "mixedHandler", Path: "plugin.js", Code: inlineSrc}, // both — Path still rewrites
 			},
 		},
@@ -317,6 +317,87 @@ func TestBundleSubdirNameStripsExtAndCollapsesSlashes(t *testing.T) {
 	assert.Equal(t, "correlation-id-1.4.0", bundleSubdirName("correlation-id-1.4.0.zip"))
 	assert.Equal(t, "platform__correlation-id-1.4.0", bundleSubdirName("platform/correlation-id-1.4.0.zip"))
 	assert.NotEmpty(t, bundleSubdirName("")) // fallback hash path
+}
+
+// TestLoadBundleWithFs_EarlyReturns covers the three short-circuit branches
+// at the top of loadBundleWithFs: management node, bundle explicitly disabled,
+// and empty CustomMiddlewareBundle (which is the no-bundles case after the
+// parseBundleNames refactor). All three must return nil without touching the
+// filesystem.
+func TestLoadBundleWithFs_EarlyReturns(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("management node skips bundle loading", func(t *testing.T) {
+		conf := ts.Gw.GetConfig()
+		conf.ManagementNode = true
+		ts.Gw.SetConfig(conf)
+		defer func() {
+			conf.ManagementNode = false
+			ts.Gw.SetConfig(conf)
+		}()
+
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{CustomMiddlewareBundle: "anything.zip"}}
+		assert.NoError(t, ts.Gw.loadBundleWithFs(spec, afero.NewMemMapFs()))
+	})
+
+	t.Run("disabled flag skips bundle loading", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{
+			CustomMiddlewareBundle:         "anything.zip",
+			CustomMiddlewareBundleDisabled: true,
+		}}
+		assert.NoError(t, ts.Gw.loadBundleWithFs(spec, afero.NewMemMapFs()))
+	})
+
+	t.Run("empty bundle field is a no-op", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{CustomMiddlewareBundle: ""}}
+		assert.NoError(t, ts.Gw.loadBundleWithFs(spec, afero.NewMemMapFs()))
+	})
+
+	t.Run("bundle field with only commas parses to nothing", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{CustomMiddlewareBundle: ", , "}}
+		assert.NoError(t, ts.Gw.loadBundleWithFs(spec, afero.NewMemMapFs()))
+	})
+}
+
+// TestLoadInlineGojaMiddleware covers the inline-Code load path: a valid
+// base64 payload populates RuntimeHandlerName and bumps the counter; bad
+// base64 logs an error and leaves both untouched. This is the v1 Plugin
+// Studio path so the error-handling contract deserves a regression test.
+func TestLoadInlineGojaMiddleware(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "inline-loader-test"
+		spec.CustomMiddleware.Driver = apidef.JavaScriptDriver
+	})[0]
+	spec.GojaJSVM.Init(spec, logrus.NewEntry(log), ts.Gw)
+	require.True(t, spec.GojaJSVM.Initialized())
+
+	t.Run("valid base64 populates RuntimeHandlerName and bumps counter", func(t *testing.T) {
+		md := &apidef.MiddlewareDefinition{
+			Name: "handler",
+			Code: "dmFyIGhhbmRsZXIgPSAxOw==", // "var handler = 1;"
+		}
+		counter := 0
+		ts.Gw.loadInlineGojaMiddleware(spec, md, &counter, logrus.NewEntry(log))
+
+		assert.NotEmpty(t, md.RuntimeHandlerName, "valid inline code must register and stamp the alias")
+		assert.Equal(t, 1, counter, "counter must increment after a successful load")
+	})
+
+	t.Run("invalid base64 leaves alias empty and does not crash", func(t *testing.T) {
+		md := &apidef.MiddlewareDefinition{
+			Name: "broken",
+			Code: "not-valid-base64!!!",
+		}
+		counter := 7
+		ts.Gw.loadInlineGojaMiddleware(spec, md, &counter, logrus.NewEntry(log))
+
+		assert.Empty(t, md.RuntimeHandlerName, "bad base64 must not stamp an alias")
+		assert.Equal(t, 7, counter, "counter must not advance on decode failure")
+	})
 }
 
 // TestLoadBundleWithFs_CommaSeparatedMergesBothBundles wires the end-to-end

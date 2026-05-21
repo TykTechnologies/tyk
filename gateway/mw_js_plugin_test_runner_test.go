@@ -419,30 +419,33 @@ func TestPluginTestRunner_RequestValidation(t *testing.T) {
 		assert.Contains(t, rec.Body.String(), "invalid request body")
 	})
 
+	mustMarshal := func(t *testing.T, v any) []byte {
+		t.Helper()
+		body, err := json.Marshal(v)
+		require.NoError(t, err)
+		return body
+	}
+
 	t.Run("missing code", func(t *testing.T) {
-		body, _ := json.Marshal(pluginTestRunnerRequest{HookType: "pre", OrgID: "o1"})
-		rec := post(t, body)
+		rec := post(t, mustMarshal(t, pluginTestRunnerRequest{HookType: "pre", OrgID: "o1"}))
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 		assert.Contains(t, rec.Body.String(), "code is required")
 	})
 
 	t.Run("invalid hook_type", func(t *testing.T) {
-		body, _ := json.Marshal(pluginTestRunnerRequest{Code: "void 0;", HookType: "bogus", OrgID: "o1"})
-		rec := post(t, body)
+		rec := post(t, mustMarshal(t, pluginTestRunnerRequest{Code: "void 0;", HookType: "bogus", OrgID: "o1"}))
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 		assert.Contains(t, rec.Body.String(), "invalid hook_type")
 	})
 
 	t.Run("missing org_id", func(t *testing.T) {
-		body, _ := json.Marshal(pluginTestRunnerRequest{Code: "void 0;", HookType: "pre"})
-		rec := post(t, body)
+		rec := post(t, mustMarshal(t, pluginTestRunnerRequest{Code: "void 0;", HookType: "pre"}))
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 		assert.Contains(t, rec.Body.String(), "org_id is required")
 	})
 
 	t.Run("response hook without response payload", func(t *testing.T) {
-		body, _ := json.Marshal(pluginTestRunnerRequest{Code: "void 0;", HookType: "response", OrgID: "o1"})
-		rec := post(t, body)
+		rec := post(t, mustMarshal(t, pluginTestRunnerRequest{Code: "void 0;", HookType: "response", OrgID: "o1"}))
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 		assert.Contains(t, rec.Body.String(), "response is required")
 	})
