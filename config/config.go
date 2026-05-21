@@ -1118,6 +1118,10 @@ type Config struct {
 	//to finish before shutting down the server. Defaults to 30 seconds.
 	GracefulShutdownTimeoutDuration int `json:"graceful_shutdown_timeout_duration"`
 
+	// GracefulShutdownDelaySeconds sets how many seconds the gateway will wait before proceeding with a graceful shutdown.
+	// During delay and shutdown the readiness endpoint will respond with 503 StatusServiceUnavailable.
+	GracefulShutdownDelaySeconds int `json:"graceful_shutdown_delay_seconds"`
+
 	// Change the expiry time of a refresh token. By default 14 days (in seconds).
 	OauthRefreshExpire int64 `json:"oauth_refresh_token_expire"`
 

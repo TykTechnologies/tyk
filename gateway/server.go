@@ -197,6 +197,9 @@ type Gateway struct {
 	// OnConnect this is a callback which is called whenever we transition redis Disconnected to connected
 	OnConnect func()
 
+	// shuttingDown tracks whether the gateway has received a termination signal and is initiating its graceful shutdown sequence.
+	shuttingDown atomic.Bool
+
 	// SessionID is the unique session id which is used while connecting to dashboard to prevent multiple node allocation.
 	SessionID string
 
@@ -2170,6 +2173,18 @@ func Start() {
 	go func() {
 		sig := <-sigChan
 		mainLog.Infof("Shutdown signal received: %v. Initiating graceful shutdown...", sig)
+
+		gw.shuttingDown.Store(true)
+		if gwConfig.GracefulShutdownDelaySeconds > 0 {
+			mainLog.Infof("Delaying graceful shutdown for %d seconds", gwConfig.GracefulShutdownDelaySeconds)
+
+			select {
+			case <-time.After(time.Duration(gwConfig.GracefulShutdownDelaySeconds) * time.Second):
+			case sig2 := <-sigChan:
+				mainLog.Infof("Second shutdown signal received: %v. Bypassing delay", sig2)
+			}
+		}
+
 		cancel()
 
 		// we need to set default cfg value here as the ctx is created before the afterconf is executed
