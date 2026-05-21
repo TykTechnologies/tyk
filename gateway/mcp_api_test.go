@@ -533,7 +533,7 @@ func TestValidatePairedMCPAdapterUpstream_AllowsUnmarkedRESTSource(t *testing.T)
 
 	gw := &Gateway{
 		apisByID: map[string]*APISpec{
-			"rest-1": {APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-1"}},
+			"rest-1": {APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-1", IsOAS: true}},
 		},
 		mcpPairing: pairing.New(),
 	}
@@ -542,6 +542,28 @@ func TestValidatePairedMCPAdapterUpstream_AllowsUnmarkedRESTSource(t *testing.T)
 
 	assert.Empty(t, msg)
 	assert.Zero(t, code)
+}
+
+func TestValidatePairedMCPAdapterUpstream_RejectsClassicRESTSource(t *testing.T) {
+	t.Parallel()
+
+	gw := &Gateway{
+		apisByID: map[string]*APISpec{
+			"rest-1": {
+				APIDefinition: &apidef.APIDefinition{
+					APIID: "rest-1",
+					OrgID: "org-1",
+					IsOAS: false,
+				},
+			},
+		},
+		mcpPairing: pairing.New(),
+	}
+
+	msg, code := gw.validatePairedMCPAdapterUpstream(httptest.NewRequest(http.MethodPost, "/tyk/mcps", nil), pairedMCPProxyOAS("proxy-1", "org-1", "rest-1"))
+
+	assert.Equal(t, http.StatusBadRequest, code)
+	assert.Contains(t, msg, "Classic")
 }
 
 func TestValidatePairedMCPAdapterUpstream_AllowsMultipleSameOrgProxies(t *testing.T) {
@@ -554,7 +576,7 @@ func TestValidatePairedMCPAdapterUpstream_AllowsMultipleSameOrgProxies(t *testin
 	)
 	gw := &Gateway{
 		apisByID: map[string]*APISpec{
-			"rest-1": {APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-1"}},
+			"rest-1": {APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-1", IsOAS: true}},
 		},
 		mcpPairing: idx,
 	}

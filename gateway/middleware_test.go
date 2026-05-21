@@ -23,6 +23,7 @@ import (
 	ctxpkg "github.com/TykTechnologies/tyk/ctx"
 	headers2 "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -986,6 +987,21 @@ func TestRecordAccessLog_APIType(t *testing.T) {
 			validate: func(t *testing.T, fields logrus.Fields) {
 				assert.Equal(t, "oas", fields["api_type"])
 				assert.NotContains(t, fields, "mcp_method")
+			},
+		},
+		{
+			name: "source REST call from MCP proxy includes source tag",
+			givenAPIDef: func(s *APISpec) {
+				s.IsOAS = true
+			},
+			givenSetup: func(req *http.Request) {
+				httpctx.SetMCPProxyCallerAPIID(req, "proxy-1")
+			},
+			validate: func(t *testing.T, fields logrus.Fields) {
+				t.Helper()
+
+				assert.Equal(t, "oas", fields["api_type"])
+				assert.Equal(t, "source-mcp-proxy-proxy-1", fields["mcp_source_proxy"])
 			},
 		},
 		{

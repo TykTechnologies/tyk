@@ -9,14 +9,15 @@ import (
 	"sort"
 	"sync"
 
+	sdkjsonrpc "github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
 
 // SDKAdapter owns one long-lived SDK server and its current derived tool set.
-// Updating the tool set mutates the server in place, allowing connected MCP
-// clients to receive tools/list_changed notifications from the SDK.
+// Updating the tool set mutates the server in place; list-change notifications
+// are intentionally not advertised for REST-as-MCP adapters.
 type SDKAdapter struct {
 	server   *mcpsdk.Server
 	callTool ToolCallFunc
@@ -51,15 +52,15 @@ func NewSDKServer(config SDKServerConfig) (*mcpsdk.Server, error) {
 	return newSDKServer(config, false)
 }
 
-// NewSDKAdapter builds a stateful SDK-backed adapter. Its server advertises
-// tools/list_changed support, and UpdateTools mutates that same server so
-// connected clients can be notified when the derived catalogue changes.
+// NewSDKAdapter builds a stateful SDK-backed adapter. Its server does not
+// advertise tools/list_changed; clients discover catalogue changes by reload or
+// reconnect.
 func NewSDKAdapter(config SDKServerConfig) (*SDKAdapter, error) {
 	server, err := newSDKServer(SDKServerConfig{
 		Name:     config.Name,
 		Version:  config.Version,
 		CallTool: config.CallTool,
-	}, true)
+	}, false)
 	if err != nil {
 		return nil, err
 	}
@@ -126,8 +127,8 @@ func defaultSDKAdapterStreamableHTTPOptions() *mcpsdk.StreamableHTTPOptions {
 }
 
 // UpdateTools replaces the adapter's derived tool catalogue in place. Added,
-// removed, and changed tools are applied through the SDK server so it emits
-// coalesced tools/list_changed notifications to connected sessions.
+// removed, and changed tools are applied through the SDK server; capabilities
+// keep list-change notifications disabled.
 func (a *SDKAdapter) UpdateTools(tools []oas.DerivedTool) error {
 	if a == nil || a.server == nil {
 		return fmt.Errorf("nil SDK adapter")
@@ -211,6 +212,9 @@ func (a *SDKAdapter) addTool(tool oas.DerivedTool) {
 
 		rec, err := a.callToolForRequest(ctx, &tool, args)
 		if err != nil {
+			if IsInvalidParams(err) {
+				return nil, &sdkjsonrpc.Error{Code: sdkjsonrpc.CodeInvalidParams, Message: err.Error()}
+			}
 			return nil, err
 		}
 		if rec == nil {

@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	ctxpkg "github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -494,6 +495,17 @@ func TestRecordMCPDetails(t *testing.T) {
 		assert.Empty(t, rec.MCPStats.PrimitiveType)
 		assert.Empty(t, rec.MCPStats.PrimitiveName)
 	})
+}
+
+func TestRecordMCPSourceProxyTag(t *testing.T) {
+	req, err := http.NewRequestWithContext(context.Background(), "GET", "/orders", nil)
+	assert.NoError(t, err)
+	httpctx.SetMCPProxyCallerAPIID(req, "proxy-1")
+
+	rec := analytics.AnalyticsRecord{Tags: []string{"source"}}
+	recordMCPSourceProxyTag(&rec, req)
+
+	assert.Equal(t, []string{"source", "source-mcp-proxy-proxy-1"}, rec.Tags)
 }
 
 func TestSuccessHandler_classifyUpstreamError(t *testing.T) {

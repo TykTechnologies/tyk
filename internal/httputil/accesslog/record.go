@@ -9,6 +9,7 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 
@@ -157,6 +158,15 @@ func (a *Record) WithMCP(req *http.Request) *Record {
 	}
 	if code := ctx.GetJSONRPCErrorCode(req); code != 0 {
 		a.fields["mcp_error_code"] = code
+	}
+	return a
+}
+
+// WithMCPSourceProxy adds the source REST observability tag for requests
+// internally looped from a REST-as-MCP proxy.
+func (a *Record) WithMCPSourceProxy(req *http.Request) *Record {
+	if proxyID := httpctx.GetMCPProxyCallerAPIID(req); proxyID != "" {
+		a.fields["mcp_source_proxy"] = "source-mcp-proxy-" + proxyID
 	}
 	return a
 }

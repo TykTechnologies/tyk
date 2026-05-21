@@ -71,6 +71,7 @@ func buildRESTSpecForSDKAdapterTest(description string) *APISpec {
 		APIID: "rest-1",
 		Name:  "orders",
 		OrgID: "org-1",
+		IsOAS: true,
 	}
 
 	return &APISpec{
@@ -81,7 +82,7 @@ func buildRESTSpecForSDKAdapterTest(description string) *APISpec {
 				Info:    &openapi3.Info{Title: "orders", Version: "1.0.0"},
 				Paths: openapi3.NewPaths(openapi3.WithPath("/orders/{id}", &openapi3.PathItem{
 					Get: &openapi3.Operation{
-						OperationID: "getOrder",
+						OperationID: "get_order",
 						Summary:     description,
 						Parameters: openapi3.Parameters{
 							&openapi3.ParameterRef{Value: &openapi3.Parameter{
@@ -114,13 +115,13 @@ func connectGatewaySDKServer(t *testing.T, server *mcpsdk.Server, opts *mcpsdk.C
 	return clientSession
 }
 
-func waitForGatewayToolListChanged(t *testing.T, changed <-chan struct{}) {
+func assertNoGatewayToolListChanged(t *testing.T, changed <-chan struct{}) {
 	t.Helper()
 
 	select {
 	case <-changed:
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for tools/list_changed notification")
+		t.Fatal("unexpected tools/list_changed notification")
+	case <-time.After(100 * time.Millisecond):
 	}
 }
 
@@ -186,7 +187,7 @@ func TestSyntheticAdapterProcessRequest_UsesSDKAdapter(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &env))
 	result := env["result"].(map[string]any)
 	tools := result["capabilities"].(map[string]any)["tools"].(map[string]any)
-	assert.Equal(t, true, tools["listChanged"])
+	assert.NotContains(t, tools, "listChanged")
 }
 
 func TestSyntheticAdapterProcessRequest_RoutesStreamableMethodsToSDKAdapter(t *testing.T) {
@@ -247,12 +248,12 @@ func TestBuildAdapterSpec_ReusesSDKAdapterAndUpdatesTools(t *testing.T) {
 	adapter2, err := gw.buildAdapterSpec(restUpdated)
 	require.NoError(t, err)
 	require.Same(t, adapter1.MCPSDKAdapter, adapter2.MCPSDKAdapter)
-	waitForGatewayToolListChanged(t, changed)
+	assertNoGatewayToolListChanged(t, changed)
 
 	list, err := session.ListTools(context.Background(), &mcpsdk.ListToolsParams{})
 	require.NoError(t, err)
 	require.Len(t, list.Tools, 1)
-	assert.Equal(t, "getOrder", list.Tools[0].Name)
+	assert.Equal(t, "get_order", list.Tools[0].Name)
 	assert.Equal(t, "fetch an order by id", list.Tools[0].Description)
 }
 
@@ -285,7 +286,7 @@ func TestBuildAdapterSpec_ReusedSDKAdapterUsesUpdatedToolViewsForCalls(t *testin
 
 	initialProxy := buildMCPProxySpecForToolViewTest("proxy-a", "org-1", rest.APIID, &oas.TykMCPServer{
 		Primitives: []oas.TykMCPServerPrimitive{
-			{Source: oas.TykMCPServerSource{OperationID: "listOrders"}, Allow: boolPtr(true)},
+			{Source: oas.TykMCPServerSource{OperationID: "list_orders"}, Allow: boolPtr(true)},
 		},
 	})
 	adapter1, err := gw.buildAdapterSpecForProxies(rest, map[string]*APISpec{
@@ -297,7 +298,7 @@ func TestBuildAdapterSpec_ReusedSDKAdapterUsesUpdatedToolViewsForCalls(t *testin
 
 	updatedProxy := buildMCPProxySpecForToolViewTest("proxy-a", "org-1", rest.APIID, &oas.TykMCPServer{
 		Primitives: []oas.TykMCPServerPrimitive{
-			{Source: oas.TykMCPServerSource{OperationID: "createOrder"}, Name: "create_order", Allow: boolPtr(true)},
+			{Source: oas.TykMCPServerSource{OperationID: "create_order_source"}, Name: "create_order", Allow: boolPtr(true)},
 		},
 	})
 	adapter2, err := gw.buildAdapterSpecForProxies(rest, map[string]*APISpec{
@@ -704,6 +705,77 @@ func TestCallMCPAdapterTool_UsesExactSourceRESTAPIID(t *testing.T) {
 	assert.Contains(t, err.Error(), "paired REST API handler not found")
 }
 
+func TestCallMCPAdapterTool_RunsSourceRESTMiddlewareChain(t *testing.T) {
+	t.Parallel()
+
+	adapterID := oas.AdapterAPIID("rest-1")
+	idx := pairing.New()
+	idx.Set(
+		map[string]string{"rest-1": adapterID},
+		map[string]map[string]struct{}{"rest-1": {"proxy-1": {}}},
+	)
+
+	var order []string
+	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		order = append(order, "upstream")
+		assert.Equal(t, "/orders/42", r.URL.Path)
+		assert.Equal(t, "transformed", r.Header.Get("X-Request-Transform"))
+		assert.Equal(t, "plugin", r.Header.Get("X-Plugin"))
+		assert.Equal(t, "per-tool", r.Header.Get("X-Per-Tool"))
+		w.Header().Set("X-Upstream", "seen")
+		w.WriteHeader(http.StatusCreated)
+	})
+	requestTransform := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			order = append(order, "request-transform")
+			r.Header.Set("X-Request-Transform", "transformed")
+			next.ServeHTTP(w, r)
+		})
+	}
+	plugin := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			order = append(order, "plugin")
+			r.Header.Set("X-Plugin", "plugin")
+			next.ServeHTTP(w, r)
+		})
+	}
+	perTool := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			order = append(order, "per-tool")
+			r.Header.Set("X-Per-Tool", "per-tool")
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	gw := &Gateway{mcpPairing: idx, apisHandlesByID: new(sync.Map)}
+	gw.apisByID = map[string]*APISpec{
+		"rest-1": {APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-1"}},
+	}
+	gw.apisHandlesByID.Store("rest-1", &ChainObject{
+		ThisHandler: requestTransform(plugin(perTool(upstream))),
+	})
+
+	spec := &APISpec{
+		APIDefinition:         &apidef.APIDefinition{APIID: adapterID, OrgID: "org-1"},
+		IsSyntheticMCPAdapter: true,
+		SourceRESTAPIID:       "rest-1",
+	}
+	tool := &oas.DerivedTool{
+		Name:           "getOrder",
+		Method:         http.MethodGet,
+		PathTemplate:   "/orders/{id}",
+		ParamLocations: map[string]string{"id": "path"},
+	}
+
+	ctx := httpctx.ContextWithMCPProxyCallerAPIID(context.Background(), "proxy-1")
+	rec, err := gw.callMCPAdapterTool(ctx, spec, tool, map[string]any{"id": "42"})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, rec.Status())
+	assert.Equal(t, "seen", rec.Header().Get("X-Upstream"))
+	assert.Equal(t, []string{"request-transform", "plugin", "per-tool", "upstream"}, order)
+}
+
 func TestHandleDeleteAPI_RefusesRESTSourceWithPairedMCPProxy(t *testing.T) {
 	t.Parallel()
 
@@ -762,7 +834,7 @@ func TestCallMCPAdapterTool_ForwardsQueryParamsThroughJSONRPC(t *testing.T) {
 		SourceRESTAPIID:       "rest-1",
 		DerivedTools: []oas.DerivedTool{
 			{
-				Name:           "listOrders",
+				Name:           "list_orders",
 				Method:         http.MethodGet,
 				PathTemplate:   "/orders",
 				ParamLocations: map[string]string{"status": "query", "limit": "query"},
@@ -821,11 +893,115 @@ func TestCallMCPAdapterTool_ForwardsQueryParamsThroughJSONRPC(t *testing.T) {
 		"jsonrpc":"2.0",
 		"id":1,
 		"method":"tools/call",
-		"params":{"name":"listOrders","arguments":{"status":"open","limit":25}}
+		"params":{"name":"list_orders","arguments":{"status":"open","limit":25}}
 	}`, sessionID)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), `{\"ok\":true}`)
+}
+
+func TestRESTAsMCPToolCall_RejectsUnknownArgumentsBeforeSourceChain(t *testing.T) {
+	t.Parallel()
+
+	adapterID := oas.AdapterAPIID("rest-1")
+	idx := pairing.New()
+	idx.Set(
+		map[string]string{"rest-1": adapterID},
+		map[string]map[string]struct{}{"rest-1": {"proxy-1": {}}},
+	)
+
+	called := false
+	gw := &Gateway{mcpPairing: idx, apisHandlesByID: new(sync.Map)}
+	gw.apisByID = map[string]*APISpec{
+		"rest-1": {APIDefinition: &apidef.APIDefinition{APIID: "rest-1", OrgID: "org-1"}},
+	}
+	gw.apisHandlesByID.Store("rest-1", &ChainObject{
+		ThisHandler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			called = true
+			w.WriteHeader(http.StatusOK)
+		}),
+	})
+
+	spec := buildTestAdapterSpec()
+	spec.SourceRESTAPIID = "rest-1"
+	var err error
+	spec.MCPSDKAdapter, err = mcpadapter.NewSDKAdapter(mcpadapter.SDKServerConfig{
+		Name:  spec.Name,
+		Tools: spec.DerivedTools,
+		CallTool: func(ctx context.Context, tool *oas.DerivedTool, args map[string]any) (*mcpadapter.Recorder, error) {
+			return gw.callMCPAdapterTool(ctx, spec, tool, args)
+		},
+	})
+	require.NoError(t, err)
+
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
+	serve := func(body string, sessionID string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodPost, "/mcp/", strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("Accept", "application/json, text/event-stream")
+		if sessionID != "" {
+			r.Header.Set("Mcp-Session-Id", sessionID)
+		}
+		httpctx.SetMCPProxyCallerAPIID(r, "proxy-1")
+
+		w := httptest.NewRecorder()
+		err, code := mw.ProcessRequest(w, r, nil)
+		require.NoError(t, err)
+		assert.Equal(t, middleware.StatusRespond, code)
+		return w
+	}
+
+	init := serve(`{
+		"jsonrpc":"2.0",
+		"id":0,
+		"method":"initialize",
+		"params":{
+			"protocolVersion":"2025-06-18",
+			"clientInfo":{"name":"gateway-unknown-args-test","version":"v0.0.1"},
+			"capabilities":{}
+		}
+	}`, "")
+	require.Equal(t, http.StatusOK, init.Code)
+	sessionID := init.Header().Get("Mcp-Session-Id")
+	require.NotEmpty(t, sessionID)
+
+	w := serve(`{
+		"jsonrpc":"2.0",
+		"id":1,
+		"method":"tools/call",
+		"params":{"name":"getOrder","arguments":{"id":"42","unknown":"x"}}
+	}`, sessionID)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"code":-32602`)
+	assert.Contains(t, w.Body.String(), `unknown argument`)
+	assert.False(t, called)
+}
+
+func TestRESTAsMCPAdapter_RejectsNonPOSTMethods(t *testing.T) {
+	t.Parallel()
+
+	spec := buildTestAdapterSpec()
+	var err error
+	spec.MCPSDKAdapter, err = mcpadapter.NewSDKAdapter(mcpadapter.SDKServerConfig{
+		Name:  spec.Name,
+		Tools: spec.DerivedTools,
+		CallTool: func(context.Context, *oas.DerivedTool, map[string]any) (*mcpadapter.Recorder, error) {
+			return mcpadapter.NewRecorder(), nil
+		},
+	})
+	require.NoError(t, err)
+
+	r := httptest.NewRequest(http.MethodGet, "/mcp/", nil)
+	w := httptest.NewRecorder()
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: &Gateway{}}}
+
+	err, code := mw.ProcessRequest(w, r, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, middleware.StatusRespond, code)
+	assert.Equal(t, http.StatusMethodNotAllowed, w.Code)
+	assert.Equal(t, http.MethodPost, w.Header().Get("Allow"))
 }
 
 func TestDeriveMCPAdapterCatalogue_BuildsProxySpecificToolViewsAndUnion(t *testing.T) {
@@ -835,7 +1011,7 @@ func TestDeriveMCPAdapterCatalogue_BuildsProxySpecificToolViewsAndUnion(t *testi
 	proxyA := buildMCPProxySpecForToolViewTest("proxy-a", "org-1", rest.APIID, &oas.TykMCPServer{
 		Primitives: []oas.TykMCPServerPrimitive{
 			{
-				Source:      oas.TykMCPServerSource{OperationID: "createOrder"},
+				Source:      oas.TykMCPServerSource{OperationID: "create_order_source"},
 				Name:        "create_order",
 				Allow:       boolPtr(true),
 				Description: "Place a new order",
@@ -847,7 +1023,7 @@ func TestDeriveMCPAdapterCatalogue_BuildsProxySpecificToolViewsAndUnion(t *testi
 	})
 	proxyB := buildMCPProxySpecForToolViewTest("proxy-b", "org-1", rest.APIID, &oas.TykMCPServer{
 		Primitives: []oas.TykMCPServerPrimitive{
-			{Source: oas.TykMCPServerSource{OperationID: "listOrders"}, Allow: boolPtr(true)},
+			{Source: oas.TykMCPServerSource{OperationID: "list_orders"}, Allow: boolPtr(true)},
 		},
 	})
 
@@ -858,16 +1034,16 @@ func TestDeriveMCPAdapterCatalogue_BuildsProxySpecificToolViewsAndUnion(t *testi
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []string{"create_order", "listOrders"}, derivedToolNames(catalogue.tools))
+	assert.Equal(t, []string{"create_order", "list_orders"}, derivedToolNames(catalogue.tools))
 	require.Contains(t, catalogue.proxyToolViews, "proxy-a")
 	assert.Equal(t, []string{"create_order"}, catalogue.proxyToolViews["proxy-a"].ToolNames())
 	require.Contains(t, catalogue.proxyToolViews, "proxy-b")
-	assert.Equal(t, []string{"listOrders"}, catalogue.proxyToolViews["proxy-b"].ToolNames())
+	assert.Equal(t, []string{"list_orders"}, catalogue.proxyToolViews["proxy-b"].ToolNames())
 
 	createTool, ok := catalogue.proxyToolViews["proxy-a"].ToolByName("create_order")
 	require.True(t, ok)
-	assert.Equal(t, "createOrder", createTool.OperationID)
-	assert.Equal(t, "createOrder", createTool.CanonicalName)
+	assert.Equal(t, "create_order_source", createTool.OperationID)
+	assert.Equal(t, "create_order_source", createTool.CanonicalName)
 	props := createTool.InputSchema["properties"].(map[string]any)
 	customerID := props["customer_id"].(map[string]any)
 	assert.Equal(t, "Customer placing the order", customerID["description"])
@@ -1086,12 +1262,12 @@ func TestValidatePairedMCPAdapterUpstream_RejectsAliasConflictAcrossSameOrgProxi
 	rest := buildRESTSpecForMCPToolViewTest()
 	existing := buildMCPProxySpecForToolViewTest("proxy-existing", "org-1", rest.APIID, &oas.TykMCPServer{
 		Primitives: []oas.TykMCPServerPrimitive{
-			{Source: oas.TykMCPServerSource{OperationID: "listOrders"}, Name: "orders"},
+			{Source: oas.TykMCPServerSource{OperationID: "list_orders"}, Name: "orders"},
 		},
 	})
 	incoming := buildMCPProxyOASForToolViewTest("proxy-incoming", "org-1", rest.APIID, &oas.TykMCPServer{
 		Primitives: []oas.TykMCPServerPrimitive{
-			{Source: oas.TykMCPServerSource{OperationID: "createOrder"}, Name: "orders"},
+			{Source: oas.TykMCPServerSource{OperationID: "create_order_source"}, Name: "orders"},
 		},
 	})
 	gw := &Gateway{}
@@ -1113,7 +1289,7 @@ func TestAPISpecValidate_AllowsMCPServerExtensionOnPairedProxy(t *testing.T) {
 
 	doc := buildMCPProxyOASForToolViewTest("proxy-a", "org-1", "rest-views", &oas.TykMCPServer{
 		Primitives: []oas.TykMCPServerPrimitive{
-			{Source: oas.TykMCPServerSource{OperationID: "createOrder"}, Allow: boolPtr(true)},
+			{Source: oas.TykMCPServerSource{OperationID: "create_order_source"}, Allow: boolPtr(true)},
 		},
 	})
 
@@ -1349,6 +1525,7 @@ func buildRESTSpecForMCPToolViewTest() *APISpec {
 		APIID: "rest-views",
 		Name:  "orders",
 		OrgID: "org-1",
+		IsOAS: true,
 	}
 
 	return &APISpec{
@@ -1359,7 +1536,7 @@ func buildRESTSpecForMCPToolViewTest() *APISpec {
 				Info:    &openapi3.Info{Title: "orders", Version: "1.0.0"},
 				Paths: openapi3.NewPaths(openapi3.WithPath("/orders", &openapi3.PathItem{
 					Get: &openapi3.Operation{
-						OperationID: "listOrders",
+						OperationID: "list_orders",
 						Summary:     "list orders",
 						Parameters: openapi3.Parameters{
 							&openapi3.ParameterRef{Value: &openapi3.Parameter{
@@ -1370,7 +1547,7 @@ func buildRESTSpecForMCPToolViewTest() *APISpec {
 						},
 					},
 					Post: &openapi3.Operation{
-						OperationID: "createOrder",
+						OperationID: "create_order_source",
 						Summary:     "create order",
 						Parameters: openapi3.Parameters{
 							&openapi3.ParameterRef{Value: &openapi3.Parameter{

@@ -500,6 +500,7 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 	accessLog.WithApiKey(req, hashKeys, gw.obfuscateKey)
 	accessLog.WithRequest(req, latency)
 	accessLog.WithResponse(resp)
+	accessLog.WithMCPSourceProxy(req)
 
 	// Add error classification if present (only on error requests)
 	if errClass := ctx.GetErrorClassification(req); errClass != nil {

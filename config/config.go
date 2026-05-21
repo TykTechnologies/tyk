@@ -351,6 +351,7 @@ type AccessLogsConfig struct {
 	// - `mcp_primitive_type` will include the MCP primitive type (MCP APIs only).
 	// - `mcp_primitive_name` will include the MCP primitive name (MCP APIs only).
 	// - `mcp_error_code` will include the JSON-RPC error code (MCP APIs only).
+	// - `mcp_source_proxy` will include source-mcp-proxy-<proxyID> for source REST calls looped from REST-as-MCP proxies.
 	Template []string `json:"template"`
 }
 

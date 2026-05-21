@@ -52,6 +52,14 @@ type DerivedTool struct {
 	//   - "body.<field>"  (a single JSON body field)
 	ParamLocations map[string]string `json:"-"`
 
+	// ParamSourceNames maps each MCP-facing argument name back to the
+	// original REST parameter or body field name.
+	ParamSourceNames map[string]string `json:"-"`
+
+	// RequestBodyContentType is the selected source request body media type.
+	// Empty means JSON/default.
+	RequestBodyContentType string `json:"-"`
+
 	// InputSchema is the JSON schema published in tools/list to describe
 	// the tool's accepted arguments. Built from the operation's
 	// parameters + requestBody.
@@ -94,11 +102,14 @@ const (
 
 const (
 	warningMissingOperationID      = "missing operationId"
-	warningEmptySanitizedToolName  = "operationId sanitises to empty string"
-	warningToolNameCollision       = "tool name collision after sanitisation"
 	warningOperationMarkedInternal = "operation marked internal - skipped"
 	warningOperationMarkedBlocked  = "operation marked blocked - skipped"
 	warningOperationNotSourceAllow = "operation not in source allow-list - skipped"
+)
+
+const (
+	maxMCPToolNameLength      = 64
+	contentTypeFormURLEncoded = "application/x-www-form-urlencoded"
 )
 
 // DerivedPrimitive is the internal primitive-aware catalogue entry used by the
@@ -110,8 +121,8 @@ type DerivedPrimitive struct {
 }
 
 // DeriveWarning describes a non-fatal issue encountered while deriving
-// tools — for example, a collision between two operationIds after
-// sanitisation, or a parameter type that could not be represented.
+// tools — for example, a missing operationId or a source operation excluded by
+// visibility controls.
 type DeriveWarning struct {
 	Operation string
 	Method    string
@@ -135,7 +146,7 @@ func DeriveSourcePrimitives(srcOAS *OAS) ([]DerivedPrimitive, []DeriveWarning, e
 //
 // Exposure rules:
 //   - If expose is nil or empty, every operation becomes a tool (default).
-//   - Otherwise, only operations whose sanitised name appears in expose
+//   - Otherwise, only operations whose validated tool name appears in expose
 //     are emitted.
 //
 // Tools are returned in deterministic (alphabetical-by-name) order so
@@ -183,7 +194,10 @@ func deriveSourcePrimitives(srcOAS *OAS, expose []string) ([]DerivedPrimitive, [
 		}
 
 		for _, mo := range methodOperations(p, item) {
-			primitive, warning, ok := deriveOperationPrimitive(item, mo, exposeSet, visibility, seen)
+			primitive, warning, ok, err := deriveOperationPrimitive(item, mo, exposeSet, visibility, seen)
+			if err != nil {
+				return nil, warnings, err
+			}
 			if warning != nil {
 				warnings = append(warnings, *warning)
 			}
@@ -205,7 +219,7 @@ func buildExposeSet(expose []string) map[string]struct{} {
 
 	exposeSet := make(map[string]struct{}, len(expose))
 	for _, name := range expose {
-		exposeSet[SanitizeToolName(name)] = struct{}{}
+		exposeSet[name] = struct{}{}
 	}
 	return exposeSet
 }
@@ -225,49 +239,51 @@ func deriveOperationPrimitive(
 	exposeSet map[string]struct{},
 	visibility sourceOperationVisibility,
 	seen map[string]bool,
-) (DerivedPrimitive, *DeriveWarning, bool) {
+) (DerivedPrimitive, *DeriveWarning, bool, error) {
 
 	rawName := mo.op.OperationID
 	if rawName == "" {
-		return DerivedPrimitive{}, deriveWarning(mo, fmt.Sprintf("%s %s", mo.method, mo.path), warningMissingOperationID), false
+		return DerivedPrimitive{}, deriveWarning(mo, fmt.Sprintf("%s %s", mo.method, mo.path), warningMissingOperationID), false, nil
 	}
 
 	if reason := visibility.skipReason(rawName); reason != "" {
-		return DerivedPrimitive{}, deriveWarning(mo, rawName, reason), false
+		return DerivedPrimitive{}, deriveWarning(mo, rawName, reason), false, nil
 	}
 
-	name := SanitizeToolName(rawName)
-	if name == "" {
-		return DerivedPrimitive{}, deriveWarning(mo, rawName, warningEmptySanitizedToolName), false
+	name := rawName
+	if err := ValidateMCPToolName(name); err != nil {
+		return DerivedPrimitive{}, nil, false, fmt.Errorf("operationId %q: %w", rawName, err)
 	}
 
 	if seen[name] {
-		return DerivedPrimitive{}, deriveWarning(mo, rawName, warningToolNameCollision), false
+		return DerivedPrimitive{}, nil, false, fmt.Errorf("duplicate tool name %q", name)
 	}
 
 	if exposeSet != nil {
 		if _, ok := exposeSet[name]; !ok {
-			return DerivedPrimitive{}, nil, false
+			return DerivedPrimitive{}, nil, false, nil
 		}
 	}
 
 	seen[name] = true
-	locs, schema := deriveParams(item, mo.op)
+	locs, sourceNames, bodyContentType, schema := deriveParams(item, mo.op)
 
 	return DerivedPrimitive{
 		Type: MCPPrimitiveTypeTool,
 		Tool: DerivedTool{
-			OperationID:    rawName,
-			SourceKey:      operationIDSourceKey(rawName),
-			CanonicalName:  name,
-			Name:           name,
-			Description:    operationDescription(mo.op),
-			Method:         mo.method,
-			PathTemplate:   mo.path,
-			ParamLocations: locs,
-			InputSchema:    schema,
+			OperationID:            rawName,
+			SourceKey:              operationIDSourceKey(rawName),
+			CanonicalName:          name,
+			Name:                   name,
+			Description:            operationDescription(mo.op),
+			Method:                 mo.method,
+			PathTemplate:           mo.path,
+			ParamLocations:         locs,
+			ParamSourceNames:       sourceNames,
+			RequestBodyContentType: bodyContentType,
+			InputSchema:            schema,
 		},
-	}, nil, true
+	}, nil, true, nil
 }
 
 func deriveWarning(mo derivedOp, operation, reason string) *DeriveWarning {
@@ -361,9 +377,29 @@ func operationDescription(op *openapi3.Operation) string {
 	return op.Description
 }
 
-var toolNameInvalid = regexp.MustCompile(`[^A-Za-z0-9_.-]`)
+var (
+	toolNameInvalid = regexp.MustCompile(`[^A-Za-z0-9_.-]`)
+	toolNameValid   = regexp.MustCompile(`^[a-z0-9_]+$`)
+)
+
+// ValidateMCPToolName enforces the gateway REST-as-MCP tool-name contract.
+func ValidateMCPToolName(name string) error {
+	if name == "" {
+		return fmt.Errorf("invalid tool name: name is required")
+	}
+	if len(name) > maxMCPToolNameLength {
+		return fmt.Errorf("invalid tool name %q: exceeds maximum length of %d", name, maxMCPToolNameLength)
+	}
+	if !toolNameValid.MatchString(name) {
+		return fmt.Errorf("invalid tool name %q: use lowercase letters, digits, and underscores only", name)
+	}
+	return nil
+}
 
 // SanitizeToolName strips characters MCP clients dislike.
+//
+// Deprecated: REST-as-MCP tool derivation validates tool names instead of
+// silently sanitising them.
 // The result is restricted to [A-Za-z0-9_.-]; consecutive runs of invalid
 // characters collapse into a single underscore. Leading/trailing
 // underscores are trimmed.
@@ -379,15 +415,17 @@ func SanitizeToolName(raw string) string {
 	return strings.Trim(cleaned, "_")
 }
 
-// deriveParams walks an operation's parameters and requestBody and
-// returns (paramLocations, inputSchema). The schema follows the JSON
-// Schema draft-07 dialect that MCP clients expect for tool inputs.
-func deriveParams(item *openapi3.PathItem, op *openapi3.Operation) (map[string]string, map[string]any) {
+// deriveParams walks an operation's parameters and requestBody and returns
+// (paramLocations, paramSourceNames, requestBodyContentType, inputSchema). The
+// schema follows the JSON Schema draft-07 dialect that MCP clients expect for
+// tool inputs.
+func deriveParams(item *openapi3.PathItem, op *openapi3.Operation) (map[string]string, map[string]string, string, map[string]any) {
 	params := newDerivedParams()
 	params.addParameters(item.Parameters)
 	params.addParameters(op.Parameters)
 	params.addRequestBody(op.RequestBody)
-	return params.locations, params.inputSchema()
+	locations, sourceNames, schema := params.build()
+	return locations, sourceNames, params.requestBodyContentType, schema
 }
 
 func schemaType(s *openapi3.Schema) string {
@@ -411,18 +449,20 @@ func schemaType(s *openapi3.Schema) string {
 	return ""
 }
 
+type derivedParam struct {
+	sourceName string
+	location   string
+	schema     map[string]any
+	required   bool
+}
+
 type derivedParams struct {
-	locations map[string]string
-	props     map[string]any
-	required  map[string]struct{}
+	params                 []derivedParam
+	requestBodyContentType string
 }
 
 func newDerivedParams() derivedParams {
-	return derivedParams{
-		locations: map[string]string{},
-		props:     map[string]any{},
-		required:  map[string]struct{}{},
-	}
+	return derivedParams{}
 }
 
 func (p *derivedParams) addParameters(params openapi3.Parameters) {
@@ -443,11 +483,12 @@ func (p *derivedParams) addParameter(param *openapi3.Parameter) {
 		return
 	}
 
-	p.locations[param.Name] = location
-	p.props[param.Name] = schemaForParameter(param)
-	if param.Required {
-		p.required[param.Name] = struct{}{}
-	}
+	p.addOrReplace(derivedParam{
+		sourceName: param.Name,
+		location:   location,
+		schema:     schemaForParameter(param),
+		required:   param.Required,
+	})
 }
 
 func parameterLocation(in string) string {
@@ -480,10 +521,11 @@ func (p *derivedParams) addRequestBody(ref *openapi3.RequestBodyRef) {
 	}
 
 	rb := ref.Value
-	media := selectJSONMediaType(rb.Content)
+	media, contentType := selectRequestBodyMediaType(rb.Content)
 	if media == nil || media.Schema == nil || media.Schema.Value == nil {
 		return
 	}
+	p.requestBodyContentType = contentType
 
 	body := media.Schema.Value
 	if body.Type != nil && body.Type.Is(schemaTypeObject) && len(body.Properties) > 0 {
@@ -491,11 +533,12 @@ func (p *derivedParams) addRequestBody(ref *openapi3.RequestBodyRef) {
 		return
 	}
 
-	p.locations[DerivedParamLocationBody] = DerivedParamLocationBody
-	p.props[DerivedParamLocationBody] = schemaForOpenAPISchema(body, schemaTypeObject)
-	if rb.Required {
-		p.required[DerivedParamLocationBody] = struct{}{}
-	}
+	p.addOrReplace(derivedParam{
+		sourceName: DerivedParamLocationBody,
+		location:   DerivedParamLocationBody,
+		schema:     schemaForOpenAPISchema(body, schemaTypeObject),
+		required:   rb.Required,
+	})
 }
 
 func (p *derivedParams) addRequestBodyFields(body *openapi3.Schema) {
@@ -505,16 +548,76 @@ func (p *derivedParams) addRequestBodyFields(body *openapi3.Schema) {
 	}
 
 	for _, name := range sortedSchemaPropertyNames(body.Properties) {
-		if _, clash := p.locations[name]; clash {
-			continue
-		}
+		_, required := bodyRequired[name]
+		p.addOrReplace(derivedParam{
+			sourceName: name,
+			location:   DerivedParamLocationBodyPrefix + name,
+			schema:     schemaForSchemaRef(body.Properties[name], schemaTypeString),
+			required:   required,
+		})
+	}
+}
 
-		p.locations[name] = DerivedParamLocationBodyPrefix + name
-		p.props[name] = schemaForSchemaRef(body.Properties[name], schemaTypeString)
-		if _, required := bodyRequired[name]; required {
-			p.required[name] = struct{}{}
+func (p *derivedParams) addOrReplace(param derivedParam) {
+	for i, existing := range p.params {
+		if existing.sourceName == param.sourceName && existing.location == param.location {
+			p.params[i] = param
+			return
 		}
 	}
+	p.params = append(p.params, param)
+}
+
+func (p *derivedParams) build() (map[string]string, map[string]string, map[string]any) {
+	nameCounts := make(map[string]int, len(p.params))
+	for _, param := range p.params {
+		nameCounts[param.sourceName]++
+	}
+
+	locations := make(map[string]string, len(p.params))
+	sourceNames := make(map[string]string, len(p.params))
+	props := make(map[string]any, len(p.params))
+	required := map[string]struct{}{}
+
+	for _, param := range p.params {
+		name := exposedParamName(param, nameCounts[param.sourceName] > 1)
+		locations[name] = param.location
+		sourceNames[name] = param.sourceName
+		props[name] = param.schema
+		if param.required {
+			required[name] = struct{}{}
+		}
+	}
+
+	schema := map[string]any{
+		schemaKeyType:       schemaTypeObject,
+		schemaKeyProperties: props,
+	}
+	if len(required) > 0 {
+		schema[schemaKeyRequired] = sortedRequiredNames(required)
+	}
+	return locations, sourceNames, schema
+}
+
+func exposedParamName(param derivedParam, collides bool) string {
+	if !collides || isBodyParamLocation(param.location) {
+		return param.sourceName
+	}
+	return param.location + "_" + param.sourceName
+}
+
+func isBodyParamLocation(location string) bool {
+	return location == DerivedParamLocationBody || strings.HasPrefix(location, DerivedParamLocationBodyPrefix)
+}
+
+func selectRequestBodyMediaType(content openapi3.Content) (*openapi3.MediaType, string) {
+	if media := selectJSONMediaType(content); media != nil {
+		return media, contentTypeJSON
+	}
+	if media := selectFormURLEncodedMediaType(content); media != nil {
+		return media, contentTypeFormURLEncoded
+	}
+	return nil, ""
 }
 
 func selectJSONMediaType(content openapi3.Content) *openapi3.MediaType {
@@ -537,6 +640,23 @@ func selectJSONMediaType(content openapi3.Content) *openapi3.MediaType {
 	sort.Strings(jsonTypes)
 	for _, ct := range jsonTypes {
 		if media := content[ct]; media != nil {
+			return media
+		}
+	}
+	return nil
+}
+
+func selectFormURLEncodedMediaType(content openapi3.Content) *openapi3.MediaType {
+	if len(content) == 0 {
+		return nil
+	}
+	for ct, media := range content {
+		if strings.EqualFold(strings.TrimSpace(ct), contentTypeFormURLEncoded) {
+			return media
+		}
+	}
+	for ct, media := range content {
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(ct)), contentTypeFormURLEncoded+";") {
 			return media
 		}
 	}
@@ -569,17 +689,6 @@ func schemaForOpenAPISchema(src *openapi3.Schema, fallbackType string) map[strin
 	}
 	if src.Description != "" {
 		schema[schemaKeyDescription] = src.Description
-	}
-	return schema
-}
-
-func (p *derivedParams) inputSchema() map[string]any {
-	schema := map[string]any{
-		schemaKeyType:       schemaTypeObject,
-		schemaKeyProperties: p.props,
-	}
-	if len(p.required) > 0 {
-		schema[schemaKeyRequired] = sortedRequiredNames(p.required)
 	}
 	return schema
 }
@@ -748,11 +857,9 @@ func buildMCPToolViewSelection(config *TykMCPServer, catalogue mcpToolViewCatalo
 			}
 			selection.overrides[sourceKey] = primitive
 
-			if primitive.Allow != nil {
+			if primitive.Allow != nil && *primitive.Allow {
 				explicitAllow = true
-				if *primitive.Allow {
-					selection.sourceKeys = append(selection.sourceKeys, sourceKey)
-				}
+				selection.sourceKeys = append(selection.sourceKeys, sourceKey)
 			}
 		}
 	}
@@ -816,21 +923,26 @@ func deriveConfiguredPathMethodTool(srcOAS *OAS, primitive TykMCPServerPrimitive
 		return DerivedTool{}, fmt.Errorf("%s primitive source %s %s references non-exposable operation because source allow-list requires operationId", ExtensionTykMCPServer, method, path)
 	}
 
-	name := SanitizeToolName(primitive.Name)
+	name := strings.TrimSpace(primitive.Name)
 	if name == "" {
 		return DerivedTool{}, fmt.Errorf("%s primitive source %s %s name is required for operations without operationId", ExtensionTykMCPServer, method, path)
 	}
+	if err := ValidateMCPToolName(name); err != nil {
+		return DerivedTool{}, fmt.Errorf("%s primitive source %s %s: %w", ExtensionTykMCPServer, method, path, err)
+	}
 
-	locs, schema := deriveParams(item, mo.op)
+	locs, sourceNames, bodyContentType, schema := deriveParams(item, mo.op)
 	return DerivedTool{
-		SourceKey:      pathMethodSourceKey(method, path),
-		CanonicalName:  name,
-		Name:           name,
-		Description:    operationDescription(mo.op),
-		Method:         method,
-		PathTemplate:   path,
-		ParamLocations: locs,
-		InputSchema:    schema,
+		SourceKey:              pathMethodSourceKey(method, path),
+		CanonicalName:          name,
+		Name:                   name,
+		Description:            operationDescription(mo.op),
+		Method:                 method,
+		PathTemplate:           path,
+		ParamLocations:         locs,
+		ParamSourceNames:       sourceNames,
+		RequestBodyContentType: bodyContentType,
+		InputSchema:            schema,
 	}, nil
 }
 
@@ -901,13 +1013,9 @@ func validateMCPToolViewParameterOverrides(tool DerivedTool, primitive TykMCPSer
 
 func applyMCPToolViewOverride(tool *DerivedTool, override TykMCPServerPrimitive) error {
 	if override.Name != "" {
-		name := SanitizeToolName(override.Name)
-		if name == "" {
-			sourceKey, _, err := mcpPrimitiveSourceKey(override.Source)
-			if err != nil {
-				sourceKey = "<invalid source>"
-			}
-			return fmt.Errorf("%s primitive %q name sanitises to empty string", ExtensionTykMCPServer, sourceKey)
+		name := strings.TrimSpace(override.Name)
+		if err := ValidateMCPToolName(name); err != nil {
+			return fmt.Errorf("%s primitive %q: %w", ExtensionTykMCPServer, sourceKeyForMCPPrimitiveMessage(override), err)
 		}
 		tool.Name = name
 	}
@@ -915,11 +1023,93 @@ func applyMCPToolViewOverride(tool *DerivedTool, override TykMCPServerPrimitive)
 		tool.Description = override.Description
 	}
 	for _, param := range override.Parameters {
+		paramName := param.Param
+		if param.Name != "" {
+			if err := renameMCPToolParameter(tool, param.Param, param.Name); err != nil {
+				return fmt.Errorf("%s primitive %q: %w", ExtensionTykMCPServer, sourceKeyForMCPPrimitiveMessage(override), err)
+			}
+			paramName = param.Name
+		}
 		if param.Description != "" {
-			setMCPToolParameterDescription(tool, param.Param, param.Description)
+			setMCPToolParameterDescription(tool, paramName, param.Description)
 		}
 	}
 	return nil
+}
+
+func sourceKeyForMCPPrimitiveMessage(primitive TykMCPServerPrimitive) string {
+	sourceKey, _, err := mcpPrimitiveSourceKey(primitive.Source)
+	if err != nil {
+		return "<invalid source>"
+	}
+	return sourceKey
+}
+
+func renameMCPToolParameter(tool *DerivedTool, oldName, newName string) error {
+	newName = strings.TrimSpace(newName)
+	if newName == "" {
+		return fmt.Errorf("parameter override %q has empty name", oldName)
+	}
+	if oldName == newName {
+		return nil
+	}
+
+	location, ok := tool.ParamLocations[oldName]
+	if !ok {
+		return fmt.Errorf("parameter override references unknown parameter %q", oldName)
+	}
+	if _, duplicate := tool.ParamLocations[newName]; duplicate {
+		return fmt.Errorf("parameter override renames %q to duplicate parameter %q", oldName, newName)
+	}
+
+	delete(tool.ParamLocations, oldName)
+	tool.ParamLocations[newName] = location
+
+	if tool.ParamSourceNames == nil {
+		tool.ParamSourceNames = map[string]string{}
+	}
+	sourceName := tool.ParamSourceNames[oldName]
+	if sourceName == "" {
+		sourceName = oldName
+	}
+	delete(tool.ParamSourceNames, oldName)
+	tool.ParamSourceNames[newName] = sourceName
+
+	renameMCPToolInputSchemaParameter(tool, oldName, newName)
+	return nil
+}
+
+func renameMCPToolInputSchemaParameter(tool *DerivedTool, oldName, newName string) {
+	if tool.InputSchema == nil {
+		return
+	}
+
+	props, ok := tool.InputSchema[schemaKeyProperties].(map[string]any)
+	if ok {
+		if prop, exists := props[oldName]; exists {
+			delete(props, oldName)
+			props[newName] = prop
+		}
+	}
+
+	switch required := tool.InputSchema[schemaKeyRequired].(type) {
+	case []string:
+		for i, name := range required {
+			if name == oldName {
+				required[i] = newName
+			}
+		}
+		sort.Strings(required)
+	case []any:
+		for i, name := range required {
+			if name == oldName {
+				required[i] = newName
+			}
+		}
+		sort.Slice(required, func(i, j int) bool {
+			return fmt.Sprint(required[i]) < fmt.Sprint(required[j])
+		})
+	}
 }
 
 func setMCPToolParameterDescription(tool *DerivedTool, paramName, description string) {
@@ -950,6 +1140,13 @@ func cloneDerivedTool(tool DerivedTool) DerivedTool {
 			locations[k] = v
 		}
 		tool.ParamLocations = locations
+	}
+	if tool.ParamSourceNames != nil {
+		sourceNames := make(map[string]string, len(tool.ParamSourceNames))
+		for k, v := range tool.ParamSourceNames {
+			sourceNames[k] = v
+		}
+		tool.ParamSourceNames = sourceNames
 	}
 	tool.InputSchema = cloneMapAny(tool.InputSchema)
 	return tool

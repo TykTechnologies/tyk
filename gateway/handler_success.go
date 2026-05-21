@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
@@ -176,6 +177,17 @@ func recordMCPDetails(rec *analytics.AnalyticsRecord, r *http.Request) {
 	}
 }
 
+const mcpSourceProxyTagPrefix = "source-mcp-proxy-"
+
+func recordMCPSourceProxyTag(rec *analytics.AnalyticsRecord, r *http.Request) {
+	if rec == nil || r == nil {
+		return
+	}
+	if proxyID := httpctx.GetMCPProxyCallerAPIID(r); proxyID != "" {
+		rec.Tags = append(rec.Tags, mcpSourceProxyTagPrefix+proxyID)
+	}
+}
+
 const traceTagPrefix = "trace-id-"
 
 func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []string {
@@ -316,6 +328,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		}
 
 		recordGraphDetails(&record, r, responseCopy, s.Spec)
+		recordMCPSourceProxyTag(&record, r)
 		// skip tagging subgraph requests for graphpump, it only handles generated supergraph requests
 		if s.Spec.GraphQL.Enabled && s.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
 			record.Tags = append(record.Tags, "tyk-graph-analytics")

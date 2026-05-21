@@ -40,6 +40,12 @@ type restAsMCPPolicyContext struct {
 }
 
 func (m *JSONRPCMiddleware) serveSyntheticMCPAdapter(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+
 	policyCtx, responded := m.prepareRESTAsMCPPolicy(w, r)
 	if responded {
 		return

@@ -25,12 +25,13 @@ func TestTykMCPServerExtension_JSONRoundTrip(t *testing.T) {
 		},
 		"x-tyk-mcp-server":{
 			"primitives":[{
-				"source":{"operationId":"createOrder"},
+				"source":{"operationId":"create_order_source"},
 				"name":"create_order",
 				"allow":true,
 				"description":"Place a new order for a customer",
 				"parameters":[{
 					"param":"customer_id",
+					"name":"customer",
 					"description":"Unique identifier of the customer placing the order"
 				}]
 			}]
@@ -43,12 +44,13 @@ func TestTykMCPServerExtension_JSONRoundTrip(t *testing.T) {
 	ext := doc.GetTykMCPServerExtension()
 	require.NotNil(t, ext)
 	require.Len(t, ext.Primitives, 1)
-	assert.Equal(t, "createOrder", ext.Primitives[0].Source.OperationID)
+	assert.Equal(t, "create_order_source", ext.Primitives[0].Source.OperationID)
 	assert.Equal(t, "create_order", ext.Primitives[0].Name)
 	require.NotNil(t, ext.Primitives[0].Allow)
 	assert.True(t, *ext.Primitives[0].Allow)
 	require.Len(t, ext.Primitives[0].Parameters, 1)
 	assert.Equal(t, "customer_id", ext.Primitives[0].Parameters[0].Param)
+	assert.Equal(t, "customer", ext.Primitives[0].Parameters[0].Name)
 
 	out, err := json.Marshal(&doc)
 	require.NoError(t, err)
@@ -89,11 +91,11 @@ func TestDeriveMCPToolView_AppliesExplicitAllowAliasesAndDescriptionOverrides(t 
 	src := newDeriveTestOAS(openapi3.NewPaths(
 		openapi3.WithPath("/orders", &openapi3.PathItem{
 			Get: &openapi3.Operation{
-				OperationID: "listOrders",
+				OperationID: "list_orders",
 				Summary:     "list orders",
 			},
 			Post: &openapi3.Operation{
-				OperationID: "createOrder",
+				OperationID: "create_order_source",
 				Summary:     "create order",
 				Parameters: openapi3.Parameters{
 					&openapi3.ParameterRef{Value: &openapi3.Parameter{
@@ -110,13 +112,14 @@ func TestDeriveMCPToolView_AppliesExplicitAllowAliasesAndDescriptionOverrides(t 
 	view, warnings, err := DeriveMCPToolView(src, &TykMCPServer{
 		Primitives: []TykMCPServerPrimitive{
 			{
-				Source:      TykMCPServerSource{OperationID: "createOrder"},
+				Source:      TykMCPServerSource{OperationID: "create_order_source"},
 				Name:        "create_order",
 				Allow:       boolPtr(true),
 				Description: "Place a new order for a customer",
 				Parameters: []TykMCPServerParameter{
 					{
 						Param:       "customer_id",
+						Name:        "customer",
 						Description: "Unique identifier of the customer placing the order",
 					},
 				},
@@ -128,14 +131,15 @@ func TestDeriveMCPToolView_AppliesExplicitAllowAliasesAndDescriptionOverrides(t 
 	require.Len(t, view.Tools, 1)
 
 	tool := view.Tools[0]
-	assert.Equal(t, "createOrder", tool.OperationID)
-	assert.Equal(t, "createOrder", tool.CanonicalName)
+	assert.Equal(t, "create_order_source", tool.OperationID)
+	assert.Equal(t, "create_order_source", tool.CanonicalName)
 	assert.Equal(t, "create_order", tool.Name)
 	assert.Equal(t, "Place a new order for a customer", tool.Description)
-	assert.Equal(t, map[string]string{"customer_id": DerivedParamLocationQuery}, tool.ParamLocations)
+	assert.Equal(t, map[string]string{"customer": DerivedParamLocationQuery}, tool.ParamLocations)
+	assert.Equal(t, map[string]string{"customer": "customer_id"}, tool.ParamSourceNames)
 
 	props := tool.InputSchema["properties"].(map[string]any)
-	customer := props["customer_id"].(map[string]any)
+	customer := props["customer"].(map[string]any)
 	assert.Equal(t, "Unique identifier of the customer placing the order", customer["description"])
 }
 
@@ -144,15 +148,15 @@ func TestDeriveMCPToolView_PrimitivesWithoutAllowDoNotRestrictExposure(t *testin
 
 	src := newDeriveTestOAS(openapi3.NewPaths(
 		openapi3.WithPath("/orders", &openapi3.PathItem{
-			Get:  &openapi3.Operation{OperationID: "listOrders", Summary: "list orders"},
-			Post: &openapi3.Operation{OperationID: "createOrder", Summary: "create order"},
+			Get:  &openapi3.Operation{OperationID: "list_orders", Summary: "list orders"},
+			Post: &openapi3.Operation{OperationID: "create_order_source", Summary: "create order"},
 		}),
 	))
 
 	view, warnings, err := DeriveMCPToolView(src, &TykMCPServer{
 		Primitives: []TykMCPServerPrimitive{
 			{
-				Source:      TykMCPServerSource{OperationID: "createOrder"},
+				Source:      TykMCPServerSource{OperationID: "create_order_source"},
 				Name:        "create_order",
 				Description: "Place a new order",
 			},
@@ -161,31 +165,53 @@ func TestDeriveMCPToolView_PrimitivesWithoutAllowDoNotRestrictExposure(t *testin
 	require.NoError(t, err)
 	assert.Empty(t, warnings)
 	require.Len(t, view.Tools, 2)
-	assert.Equal(t, []string{"create_order", "listOrders"}, view.ToolNames())
+	assert.Equal(t, []string{"create_order", "list_orders"}, view.ToolNames())
 }
 
-func TestDeriveMCPToolView_AnyAllowFieldEnablesExplicitAllowMode(t *testing.T) {
+func TestDeriveMCPToolView_AllowTrueEnablesExplicitAllowMode(t *testing.T) {
 	t.Parallel()
 
 	src := newDeriveTestOAS(openapi3.NewPaths(
 		openapi3.WithPath("/orders", &openapi3.PathItem{
-			Get:    &openapi3.Operation{OperationID: "listOrders", Summary: "list orders"},
-			Post:   &openapi3.Operation{OperationID: "createOrder", Summary: "create order"},
-			Delete: &openapi3.Operation{OperationID: "deleteOrder", Summary: "delete order"},
+			Get:    &openapi3.Operation{OperationID: "list_orders", Summary: "list orders"},
+			Post:   &openapi3.Operation{OperationID: "create_order", Summary: "create order"},
+			Delete: &openapi3.Operation{OperationID: "delete_order", Summary: "delete order"},
 		}),
 	))
 
 	view, warnings, err := DeriveMCPToolView(src, &TykMCPServer{
 		Primitives: []TykMCPServerPrimitive{
-			{Source: TykMCPServerSource{OperationID: "listOrders"}, Allow: boolPtr(false)},
-			{Source: TykMCPServerSource{OperationID: "createOrder"}, Allow: boolPtr(true)},
-			{Source: TykMCPServerSource{OperationID: "deleteOrder"}},
+			{Source: TykMCPServerSource{OperationID: "list_orders"}, Allow: boolPtr(false)},
+			{Source: TykMCPServerSource{OperationID: "create_order"}, Allow: boolPtr(true)},
+			{Source: TykMCPServerSource{OperationID: "delete_order"}},
 		},
 	})
 	require.NoError(t, err)
 	assert.Empty(t, warnings)
 	require.Len(t, view.Tools, 1)
-	assert.Equal(t, []string{"createOrder"}, view.ToolNames())
+	assert.Equal(t, []string{"create_order"}, view.ToolNames())
+}
+
+func TestDeriveMCPToolView_AllowFalseOnlyDoesNotRestrictExposure(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get:    &openapi3.Operation{OperationID: "list_orders", Summary: "list orders"},
+			Post:   &openapi3.Operation{OperationID: "create_order", Summary: "create order"},
+			Delete: &openapi3.Operation{OperationID: "delete_order", Summary: "delete order"},
+		}),
+	))
+
+	view, warnings, err := DeriveMCPToolView(src, &TykMCPServer{
+		Primitives: []TykMCPServerPrimitive{
+			{Source: TykMCPServerSource{OperationID: "list_orders"}, Allow: boolPtr(false)},
+			{Source: TykMCPServerSource{OperationID: "delete_order"}, Allow: boolPtr(false)},
+		},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, warnings)
+	assert.Equal(t, []string{"create_order", "delete_order", "list_orders"}, view.ToolNames())
 }
 
 func TestDeriveMCPToolView_PathMethodSourceForOperationWithoutOperationID(t *testing.T) {
@@ -239,8 +265,8 @@ func TestDeriveMCPToolView_DefaultsToAllCanonicalTools(t *testing.T) {
 
 	src := newDeriveTestOAS(openapi3.NewPaths(
 		openapi3.WithPath("/orders", &openapi3.PathItem{
-			Get:  &openapi3.Operation{OperationID: "listOrders"},
-			Post: &openapi3.Operation{OperationID: "createOrder"},
+			Get:  &openapi3.Operation{OperationID: "list_orders"},
+			Post: &openapi3.Operation{OperationID: "create_order"},
 		}),
 	))
 
@@ -248,7 +274,7 @@ func TestDeriveMCPToolView_DefaultsToAllCanonicalTools(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, warnings)
 	require.Len(t, view.Tools, 2)
-	assert.Equal(t, []string{"createOrder", "listOrders"}, view.ToolNames())
+	assert.Equal(t, []string{"create_order", "list_orders"}, view.ToolNames())
 }
 
 func TestDeriveMCPToolView_ValidationFailures(t *testing.T) {
@@ -257,7 +283,7 @@ func TestDeriveMCPToolView_ValidationFailures(t *testing.T) {
 	src := newDeriveTestOAS(openapi3.NewPaths(
 		openapi3.WithPath("/orders", &openapi3.PathItem{
 			Get: &openapi3.Operation{
-				OperationID: "listOrders",
+				OperationID: "list_orders",
 				Parameters: openapi3.Parameters{
 					&openapi3.ParameterRef{Value: &openapi3.Parameter{
 						Name:   "status",
@@ -266,7 +292,7 @@ func TestDeriveMCPToolView_ValidationFailures(t *testing.T) {
 					}},
 				},
 			},
-			Post: &openapi3.Operation{OperationID: "createOrder"},
+			Post: &openapi3.Operation{OperationID: "create_order"},
 		}),
 	))
 
@@ -277,28 +303,28 @@ func TestDeriveMCPToolView_ValidationFailures(t *testing.T) {
 	}{
 		{
 			name: "unknown operationId source",
-			cfg:  &TykMCPServer{Primitives: []TykMCPServerPrimitive{{Source: TykMCPServerSource{OperationID: "missingOrder"}, Name: "missing", Allow: boolPtr(true)}}},
-			want: "missingOrder",
+			cfg:  &TykMCPServer{Primitives: []TykMCPServerPrimitive{{Source: TykMCPServerSource{OperationID: "missing_order"}, Name: "missing", Allow: boolPtr(true)}}},
+			want: "missing_order",
 		},
 		{
 			name: "duplicate exposed names",
 			cfg: &TykMCPServer{Primitives: []TykMCPServerPrimitive{
-				{Source: TykMCPServerSource{OperationID: "listOrders"}, Name: "orders", Allow: boolPtr(true)},
-				{Source: TykMCPServerSource{OperationID: "createOrder"}, Name: "orders", Allow: boolPtr(true)},
+				{Source: TykMCPServerSource{OperationID: "list_orders"}, Name: "orders", Allow: boolPtr(true)},
+				{Source: TykMCPServerSource{OperationID: "create_order"}, Name: "orders", Allow: boolPtr(true)},
 			}},
 			want: "duplicate exposed tool name",
 		},
 		{
 			name: "unknown parameter override",
 			cfg: &TykMCPServer{Primitives: []TykMCPServerPrimitive{
-				{Source: TykMCPServerSource{OperationID: "listOrders"}, Parameters: []TykMCPServerParameter{{Param: "customer_id", Description: "customer"}}},
+				{Source: TykMCPServerSource{OperationID: "list_orders"}, Parameters: []TykMCPServerParameter{{Param: "customer_id", Description: "customer"}}},
 			}},
 			want: "customer_id",
 		},
 		{
 			name: "source requires one selector",
 			cfg: &TykMCPServer{Primitives: []TykMCPServerPrimitive{
-				{Source: TykMCPServerSource{OperationID: "listOrders", Path: "/orders", Method: "GET"}, Name: "orders", Allow: boolPtr(true)},
+				{Source: TykMCPServerSource{OperationID: "list_orders", Path: "/orders", Method: "GET"}, Name: "orders", Allow: boolPtr(true)},
 			}},
 			want: "exactly one source selector",
 		},

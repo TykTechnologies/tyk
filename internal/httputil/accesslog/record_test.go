@@ -13,6 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	tykcxt "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
@@ -358,6 +359,15 @@ func TestWithMCP_BuilderChaining(t *testing.T) {
 	record := accesslog.NewRecord()
 	result := record.WithMCP(req)
 	assert.Same(t, record, result, "WithMCP should return the same Record for chaining")
+}
+
+func TestWithMCPSourceProxy(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/orders", nil)
+	httpctx.SetMCPProxyCallerAPIID(req, "proxy-1")
+
+	fields := accesslog.NewRecord().WithMCPSourceProxy(req).Fields(nil)
+
+	assert.Equal(t, "source-mcp-proxy-proxy-1", fields["mcp_source_proxy"])
 }
 
 func TestRecord_TemplateFiltering(t *testing.T) {

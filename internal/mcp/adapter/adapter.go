@@ -12,6 +12,7 @@ package adapter
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,7 +32,8 @@ const BodyTruncationBytes = 1 << 20 // 1 MiB
 const (
 	headerContentType          = "Content-Type"
 	contentTypeApplicationJSON = "application/json"
-	truncationNotice           = "Tyk truncated the upstream response after 1048576 bytes. The content below is incomplete."
+	contentTypeFormURLEncoded  = "application/x-www-form-urlencoded"
+	truncationNotice           = "Tyk truncated the upstream response after 1048576 bytes. The content above is incomplete."
 )
 
 const (
@@ -65,6 +67,25 @@ func BuildUpstreamRequest(
 	return builder.build(args)
 }
 
+// InvalidParamsError marks client-supplied MCP call arguments that should be
+// surfaced as JSON-RPC -32602 InvalidParams.
+type InvalidParamsError struct {
+	message string
+}
+
+func (e *InvalidParamsError) Error() string { return e.message }
+
+func invalidParamsf(format string, args ...any) error {
+	return &InvalidParamsError{message: fmt.Sprintf(format, args...)}
+}
+
+// IsInvalidParams reports whether err should be returned as JSON-RPC
+// InvalidParams.
+func IsInvalidParams(err error) bool {
+	var invalid *InvalidParamsError
+	return errors.As(err, &invalid)
+}
+
 type upstreamRequestBuilder struct {
 	parent   *http.Request
 	tool     *oas.DerivedTool
@@ -88,6 +109,9 @@ func newUpstreamRequestBuilder(parent *http.Request, tool *oas.DerivedTool, rest
 }
 
 func (b *upstreamRequestBuilder) build(args map[string]any) (*http.Request, error) {
+	if err := b.rejectUnknownArgs(args); err != nil {
+		return nil, err
+	}
 	if err := b.rejectMixedBodyArgs(args); err != nil {
 		return nil, err
 	}
@@ -103,10 +127,19 @@ func (b *upstreamRequestBuilder) build(args map[string]any) (*http.Request, erro
 	}
 
 	if strings.Contains(b.path, "{") {
-		return nil, fmt.Errorf("missing required path parameter in %q", b.tool.PathTemplate)
+		return nil, invalidParamsf("missing required path parameter in %q", b.tool.PathTemplate)
 	}
 
 	return b.request()
+}
+
+func (b *upstreamRequestBuilder) rejectUnknownArgs(args map[string]any) error {
+	for argName := range args {
+		if _, known := b.tool.ParamLocations[argName]; !known {
+			return invalidParamsf("unknown argument %q", argName)
+		}
+	}
+	return nil
 }
 
 func (b *upstreamRequestBuilder) rejectMixedBodyArgs(args map[string]any) error {
@@ -125,19 +158,20 @@ func (b *upstreamRequestBuilder) rejectMixedBodyArgs(args map[string]any) error 
 		}
 	}
 	if hasWholeBody && bodyFieldArg != "" {
-		return fmt.Errorf("argument %q cannot be combined with whole-body argument", bodyFieldArg)
+		return invalidParamsf("argument %q cannot be combined with whole-body argument", bodyFieldArg)
 	}
 	return nil
 }
 
 func (b *upstreamRequestBuilder) applyArg(argName, loc string, raw any) error {
+	sourceName := b.sourceName(argName)
 	switch {
 	case loc == oas.DerivedParamLocationPath:
-		b.applyPathArg(argName, raw)
+		b.applyPathArg(sourceName, raw)
 	case loc == oas.DerivedParamLocationQuery:
-		b.query.Set(argName, fmt.Sprint(raw))
+		b.query.Set(sourceName, fmt.Sprint(raw))
 	case loc == oas.DerivedParamLocationHeader:
-		b.headers.Set(argName, fmt.Sprint(raw))
+		b.headers.Set(sourceName, fmt.Sprint(raw))
 	case loc == oas.DerivedParamLocationBody:
 		b.bodyJSON = raw
 		b.hasBody = true
@@ -145,6 +179,15 @@ func (b *upstreamRequestBuilder) applyArg(argName, loc string, raw any) error {
 		return b.applyBodyFieldArg(argName, loc, raw)
 	}
 	return nil
+}
+
+func (b *upstreamRequestBuilder) sourceName(argName string) string {
+	if b.tool.ParamSourceNames != nil {
+		if sourceName := b.tool.ParamSourceNames[argName]; sourceName != "" {
+			return sourceName
+		}
+	}
+	return argName
 }
 
 func (b *upstreamRequestBuilder) applyPathArg(argName string, raw any) {
@@ -159,10 +202,13 @@ func (b *upstreamRequestBuilder) applyBodyFieldArg(argName, loc string, raw any)
 		b.bodyJSON = bodyFields
 		b.hasBody = true
 	} else if !ok {
-		return fmt.Errorf("argument %q cannot be combined with whole-body argument", argName)
+		return invalidParamsf("argument %q cannot be combined with whole-body argument", argName)
 	}
 
-	fieldName := strings.TrimPrefix(loc, oas.DerivedParamLocationBodyPrefix)
+	fieldName := b.sourceName(argName)
+	if fieldName == "" {
+		fieldName = strings.TrimPrefix(loc, oas.DerivedParamLocationBodyPrefix)
+	}
 	if fieldName == "" {
 		fieldName = argName
 	}
@@ -173,9 +219,9 @@ func (b *upstreamRequestBuilder) applyBodyFieldArg(argName, loc string, raw any)
 func (b *upstreamRequestBuilder) request() (*http.Request, error) {
 	var body io.Reader
 	if b.hasBody {
-		buf, err := json.Marshal(b.bodyJSON)
+		buf, err := b.marshalBody()
 		if err != nil {
-			return nil, fmt.Errorf("marshal body: %w", err)
+			return nil, err
 		}
 		body = bytes.NewReader(buf)
 	}
@@ -189,7 +235,7 @@ func (b *upstreamRequestBuilder) request() (*http.Request, error) {
 	}
 	copyHeaders(req.Header, b.headers)
 	if body != nil {
-		req.Header.Set(headerContentType, contentTypeApplicationJSON)
+		req.Header.Set(headerContentType, b.requestBodyContentType())
 	}
 
 	// Host = source REST APIID so downstream code that reads it sees a
@@ -198,6 +244,43 @@ func (b *upstreamRequestBuilder) request() (*http.Request, error) {
 	req.URL.Scheme = "http"
 	req.Host = ""
 	return req, nil
+}
+
+func (b *upstreamRequestBuilder) marshalBody() ([]byte, error) {
+	if b.isFormURLEncodedBody() {
+		return []byte(encodeFormBody(b.bodyJSON)), nil
+	}
+	buf, err := json.Marshal(b.bodyJSON)
+	if err != nil {
+		return nil, fmt.Errorf("marshal body: %w", err)
+	}
+	return buf, nil
+}
+
+func (b *upstreamRequestBuilder) requestBodyContentType() string {
+	if b.isFormURLEncodedBody() {
+		return contentTypeFormURLEncoded
+	}
+	return contentTypeApplicationJSON
+}
+
+func (b *upstreamRequestBuilder) isFormURLEncodedBody() bool {
+	return strings.EqualFold(strings.TrimSpace(b.tool.RequestBodyContentType), contentTypeFormURLEncoded)
+}
+
+func encodeFormBody(body any) string {
+	values := url.Values{}
+	switch v := body.(type) {
+	case map[string]any:
+		for key, value := range v {
+			values.Set(key, fmt.Sprint(value))
+		}
+	case url.Values:
+		return v.Encode()
+	default:
+		values.Set(oas.DerivedParamLocationBody, fmt.Sprint(v))
+	}
+	return values.Encode()
 }
 
 func copyHeaders(dst, src http.Header) {
@@ -295,5 +378,5 @@ func ToolResultText(rec *Recorder) string {
 	if body == "" {
 		return truncationNotice
 	}
-	return truncationNotice + "\n\n" + body
+	return body + "\n\n" + truncationNotice
 }

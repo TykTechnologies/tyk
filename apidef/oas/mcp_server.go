@@ -13,9 +13,9 @@ type TykMCPServer struct {
 }
 
 // TykMCPServerPrimitive selects and overrides one source REST primitive in a
-// proxy-specific MCP view. If no primitive has allow set, the proxy exposes all
-// source-derived primitives and applies entries here as metadata overrides. If
-// any primitive has allow set, only primitives with allow:true are exposed.
+// proxy-specific MCP view. If no primitive has allow:true, the proxy exposes
+// all source-derived primitives and applies entries here as metadata overrides.
+// If any primitive has allow:true, only allow:true primitives are exposed.
 type TykMCPServerPrimitive struct {
 	Source      TykMCPServerSource      `bson:"source,omitempty" json:"source,omitempty"`
 	Name        string                  `bson:"name,omitempty" json:"name,omitempty"`
@@ -33,10 +33,11 @@ type TykMCPServerSource struct {
 	Method      string `bson:"method,omitempty" json:"method,omitempty"`
 }
 
-// TykMCPServerParameter overrides the MCP-facing description of one derived
-// input argument. Param names refer to derived argument names.
+// TykMCPServerParameter overrides one derived MCP input argument. Param names
+// refer to derived argument names; Name is the caller-facing replacement.
 type TykMCPServerParameter struct {
 	Param       string `bson:"param,omitempty" json:"param,omitempty"`
+	Name        string `bson:"name,omitempty" json:"name,omitempty"`
 	Description string `bson:"description,omitempty" json:"description,omitempty"`
 }
 

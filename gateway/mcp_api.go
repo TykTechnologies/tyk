@@ -169,6 +169,9 @@ func (gw *Gateway) validatePairedMCPAdapterUpstream(r *http.Request, mcpObj *oas
 	if rest.OrgID != temp.OrgID {
 		return "Paired REST API belongs to a different OrgID", http.StatusForbidden
 	}
+	if !rest.IsOAS {
+		return "Paired REST API " + restAPIID + " is a Classic API; REST-as-MCP sources must be Tyk OAS APIs", http.StatusBadRequest
+	}
 
 	view, _, err := oas.DeriveMCPToolView(&rest.OAS, mcpObj.GetTykMCPServerExtension())
 	if err != nil {

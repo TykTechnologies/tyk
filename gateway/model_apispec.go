@@ -134,8 +134,8 @@ type APISpec struct {
 	MCPProxyToolViews map[string]oas.MCPToolView
 
 	// MCPSDKAdapter owns the long-lived SDK server for this synthetic adapter.
-	// It is reused across reloads so connected MCP clients can receive
-	// tools/list_changed notifications when DerivedTools changes.
+	// It is reused across reloads while advertising a static tool list; clients
+	// discover REST-as-MCP catalogue changes by reconnecting after reload.
 	MCPSDKAdapter *mcpadapter.SDKAdapter
 }
 
