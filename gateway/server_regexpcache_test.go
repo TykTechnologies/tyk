@@ -21,6 +21,12 @@ func TestAfterConfSetup_WarnsOnDisableRegexpCacheBound(t *testing.T) {
 		tykregexp.Configure(tykregexp.CacheOptions{Enabled: true})
 	})
 
+	// Other tests that go through StartTest drop the level to Error,
+	// which silences the Warn entries this test is checking for.
+	origLevel := log.GetLevel()
+	log.SetLevel(logrus.WarnLevel)
+	defer log.SetLevel(origLevel)
+
 	hook := &logrustest.Hook{}
 	log.AddHook(hook)
 	defer log.ReplaceHooks(make(logrus.LevelHooks))
@@ -45,6 +51,10 @@ func TestAfterConfSetup_WarnsOnNegativeMaxEntries(t *testing.T) {
 	t.Cleanup(func() {
 		tykregexp.Configure(tykregexp.CacheOptions{Enabled: true})
 	})
+
+	origLevel := log.GetLevel()
+	log.SetLevel(logrus.WarnLevel)
+	defer log.SetLevel(origLevel)
 
 	hook := &logrustest.Hook{}
 	log.AddHook(hook)

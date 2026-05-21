@@ -1899,7 +1899,7 @@ func (gw *Gateway) afterConfSetup() error {
 		Log:        mainLog.Warnf,
 	}
 	regexp.Configure(cacheOpts)
-	httputil.ConfigurePathRegexpCache(cacheOpts)
+	httputil.ConfigurePathRegexpCache(maxEntries, conf.DisableRegexpCacheBound, mainLog.Warnf)
 
 	if conf.HealthCheckEndpointName == "" {
 		conf.HealthCheckEndpointName = "hello"

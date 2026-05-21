@@ -25,17 +25,24 @@ func init() {
 	pathRegexpCache.Store(expirable.NewLRU[string, string](cache.DefaultLRUMaxEntries, nil, 0))
 }
 
-// ConfigurePathRegexpCache replaces the path-regexp cache with one configured by opts.
-func ConfigurePathRegexpCache(opts cache.LRUOptions) {
-	n := cache.ResolveMaxEntries(opts)
+// ConfigurePathRegexpCache replaces the path-regexp cache. Pure LRU (no TTL,
+// always enabled) — path keys are bounded by API-definition shape.
+func ConfigurePathRegexpCache(maxEntries int, unbounded bool, log cache.LogFunc) {
+	n := maxEntries
+	switch {
+	case unbounded:
+		n = 0
+	case n <= 0:
+		n = cache.DefaultLRUMaxEntries
+	}
 
 	if old := prevReporter.Swap(nil); old != nil {
 		old.Stop()
 	}
 
 	var onEvict expirable.EvictCallback[string, string]
-	if opts.Log != nil {
-		rep := cache.NewEvictionLogger("path-regexp cache", opts.Log)
+	if log != nil {
+		rep := cache.NewEvictionLogger("path-regexp cache", log)
 		rep.Start(cache.DefaultEvictionLogInterval)
 		prevReporter.Store(rep)
 		onEvict = func(_ string, _ string) { rep.Record("") }
