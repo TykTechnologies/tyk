@@ -775,7 +775,7 @@ func bundleSubdirName(bundleName string) string {
 	clean = strings.ReplaceAll(clean, "\\", "__")
 	if clean == "" {
 		// Fallback: hash the original name so we always produce *something*.
-		sum := md5.Sum([]byte(bundleName))
+		sum := sha256.Sum256([]byte(bundleName))
 		return fmt.Sprintf("bundle_%x", sum[:6])
 	}
 	return clean

@@ -1,7 +1,7 @@
 package gateway
 
 import (
-	"crypto/sha1"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -319,7 +319,7 @@ func (j *GojaJSVM) LoadJSPaths(paths []string, prefix string) {
 // declared at (path, name). The hash prefix prevents collisions across paths
 // while keeping the original name suffix as a debugging aid.
 func gojaHandlerAlias(path, name string) string {
-	sum := sha1.Sum([]byte(path + "::" + name))
+	sum := sha256.Sum256([]byte(path + "::" + name))
 	return fmt.Sprintf("__tyk_h_%x_%s", sum[:6], sanitizeJSIdent(name))
 }
 
