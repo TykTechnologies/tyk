@@ -30,6 +30,7 @@ type evictionReporter interface {
 
 type noopReporter struct{}
 
+// Record satisfies evictionReporter when reporting is disabled.
 func (noopReporter) Record(string) {}
 
 func newCache(ttl time.Duration, isEnabled bool) *cache {
@@ -68,7 +69,9 @@ func (c *cache) add(key string, value any) {
 // safe for concurrent use since Go 1.12.
 func (c *cache) getRegexp(key string) (*regexp.Regexp, bool) {
 	if v, ok := c.lru.Get(key); ok {
-		return v.(*regexp.Regexp), true
+		if r, ok := v.(*regexp.Regexp); ok {
+			return r, true
+		}
 	}
 
 	return nil, false
@@ -76,7 +79,9 @@ func (c *cache) getRegexp(key string) (*regexp.Regexp, bool) {
 
 func (c *cache) getString(key string) (string, bool) {
 	if v, ok := c.lru.Get(key); ok {
-		return v.(string), true
+		if s, ok := v.(string); ok {
+			return s, true
+		}
 	}
 
 	return "", false
@@ -84,7 +89,9 @@ func (c *cache) getString(key string) (string, bool) {
 
 func (c *cache) getStrSlice(key string) ([]string, bool) {
 	if v, ok := c.lru.Get(key); ok {
-		return v.([]string), true
+		if s, ok := v.([]string); ok {
+			return s, true
+		}
 	}
 
 	return []string{}, false
@@ -92,7 +99,9 @@ func (c *cache) getStrSlice(key string) ([]string, bool) {
 
 func (c *cache) getStrSliceOfSlices(key string) ([][]string, bool) {
 	if v, ok := c.lru.Get(key); ok {
-		return v.([][]string), true
+		if s, ok := v.([][]string); ok {
+			return s, true
+		}
 	}
 
 	return [][]string{}, false
@@ -100,7 +109,9 @@ func (c *cache) getStrSliceOfSlices(key string) ([][]string, bool) {
 
 func (c *cache) getBool(key string) (bool, bool) {
 	if v, ok := c.lru.Get(key); ok {
-		return v.(bool), true
+		if b, ok := v.(bool); ok {
+			return b, true
+		}
 	}
 
 	return false, false

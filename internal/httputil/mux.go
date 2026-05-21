@@ -15,14 +15,16 @@ import (
 
 // pathRegexpCache maps mux-style routes to compiled regex source.
 // Pure LRU (ttl=0): cold entries are evicted by recency under cap pressure.
-var pathRegexpCache atomic.Pointer[expirable.LRU[string, string]]
+var pathRegexpCache = newDefaultPathRegexpCache()
 
 // prevReporter tracks the EvictionLogger backing the current cache so its
 // goroutine can be stopped when ConfigurePathRegexpCache is called again.
 var prevReporter atomic.Pointer[cache.EvictionLogger]
 
-func init() {
-	pathRegexpCache.Store(expirable.NewLRU[string, string](cache.DefaultLRUMaxEntries, nil, 0))
+func newDefaultPathRegexpCache() *atomic.Pointer[expirable.LRU[string, string]] {
+	var p atomic.Pointer[expirable.LRU[string, string]]
+	p.Store(expirable.NewLRU[string, string](cache.DefaultLRUMaxEntries, nil, 0))
+	return &p
 }
 
 // ConfigurePathRegexpCache replaces the path-regexp cache. Pure LRU (no TTL,
@@ -45,7 +47,7 @@ func ConfigurePathRegexpCache(maxEntries int, unbounded bool, log cache.LogFunc)
 		rep := cache.NewEvictionLogger("path-regexp cache", log)
 		rep.Start(cache.DefaultEvictionLogInterval)
 		prevReporter.Store(rep)
-		onEvict = func(_ string, _ string) { rep.Record("") }
+		onEvict = func(_, _ string) { rep.Record("") }
 	}
 
 	pathRegexpCache.Store(expirable.NewLRU[string, string](n, onEvict, 0))

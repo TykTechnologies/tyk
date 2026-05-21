@@ -64,7 +64,7 @@ func TestEvictionLogger_SingleCounter(t *testing.T) {
 }
 
 // TestEvictionLogger_NilLog drops Tick output when no LogFunc is wired.
-func TestEvictionLogger_NilLog(t *testing.T) {
+func TestEvictionLogger_NilLog(_ *testing.T) {
 	rep := NewEvictionLogger("x", nil)
 	rep.Record("a")
 	rep.Tick()

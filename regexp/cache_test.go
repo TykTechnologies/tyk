@@ -213,7 +213,7 @@ func TestCache_ConcurrentReads_SharedRegex(t *testing.T) {
 // TestCache_ConcurrentResetAndReads verifies Reset()'s atomic.Bool toggle
 // (cache.isEnabled) plus lru.Purge() do not race with concurrent
 // enabled()/Compile() calls on the hot path. Run under -race.
-func TestCache_ConcurrentResetAndReads(t *testing.T) {
+func TestCache_ConcurrentResetAndReads(_ *testing.T) {
 	Reset(true)
 
 	const readers = 50
@@ -257,7 +257,7 @@ func TestCache_ConcurrentResetAndReads(t *testing.T) {
 // in applyCacheConfig against concurrent hot-path Load()s. The new cache
 // instance must take over cleanly without tearing reads on the old one.
 // Run under -race.
-func TestCache_ConcurrentConfigureAndReads(t *testing.T) {
+func TestCache_ConcurrentConfigureAndReads(_ *testing.T) {
 	applyCacheConfig(CacheOptions{Enabled: true})
 
 	const readers = 50
@@ -297,7 +297,7 @@ func TestCache_ConcurrentConfigureAndReads(t *testing.T) {
 	wg.Wait()
 }
 
-func TestCache_RaceDistinctKeys(t *testing.T) {
+func TestCache_RaceDistinctKeys(_ *testing.T) {
 	const n = 50
 	c := newCache(time.Minute, true)
 

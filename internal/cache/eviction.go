@@ -67,7 +67,11 @@ func (e *EvictionLogger) Record(bucket string) {
 		v, _ = e.counts.LoadOrStore(bucket, new(atomic.Int64))
 	}
 
-	v.(*atomic.Int64).Add(1)
+	counter, ok := v.(*atomic.Int64)
+	if !ok {
+		return
+	}
+	counter.Add(1)
 }
 
 // Tick drains counters and emits a single log line if any are non-zero.
@@ -83,9 +87,17 @@ func (e *EvictionLogger) Tick() {
 
 	var pairs []pair
 	e.counts.Range(func(k, v any) bool {
-		n := v.(*atomic.Int64).Swap(0)
+		counter, ok := v.(*atomic.Int64)
+		if !ok {
+			return true
+		}
+		key, ok := k.(string)
+		if !ok {
+			return true
+		}
+		n := counter.Swap(0)
 		if n > 0 {
-			pairs = append(pairs, pair{k.(string), n})
+			pairs = append(pairs, pair{key, n})
 		}
 		return true
 	})
