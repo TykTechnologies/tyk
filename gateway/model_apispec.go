@@ -129,6 +129,10 @@ type APISpec struct {
 	// adapter middleware uses it to translate `tools/call` into HTTP requests.
 	DerivedTools []oas.DerivedTool
 
+	// MCPProxyToolViews maps caller proxy APIID to the proxy-specific REST-as-MCP
+	// tool view exposed through this shared synthetic adapter.
+	MCPProxyToolViews map[string]oas.MCPToolView
+
 	// MCPSDKAdapter owns the long-lived SDK server for this synthetic adapter.
 	// It is reused across reloads so connected MCP clients can receive
 	// tools/list_changed notifications when DerivedTools changes.

@@ -19,7 +19,19 @@ import (
 // body.<field>), and the synthesised input JSON schema that is served
 // back on `tools/list`.
 type DerivedTool struct {
-	// Name is the sanitised operationId — the tool name agents call.
+	// OperationID is the source REST operationId this tool calls.
+	OperationID string `json:"-"`
+
+	// SourceKey identifies the source operation even when operationId is
+	// absent. OperationId-backed tools use "operationId:<id>"; path+method
+	// fallbacks use "http:<METHOD> <PATH>".
+	SourceKey string `json:"-"`
+
+	// CanonicalName is the source-derived MCP tool name before any proxy-side
+	// alias is applied.
+	CanonicalName string `json:"-"`
+
+	// Name is the MCP tool name agents call.
 	Name string `json:"name"`
 
 	// Description is taken from the OAS operation summary or description.
@@ -245,6 +257,9 @@ func deriveOperationPrimitive(
 	return DerivedPrimitive{
 		Type: MCPPrimitiveTypeTool,
 		Tool: DerivedTool{
+			OperationID:    rawName,
+			SourceKey:      operationIDSourceKey(rawName),
+			CanonicalName:  name,
 			Name:           name,
 			Description:    operationDescription(mo.op),
 			Method:         mo.method,
@@ -576,6 +591,397 @@ func sortedRequiredNames(required map[string]struct{}) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// MCPToolView is the proxy-specific list of MCP tools exposed by one
+// REST-as-MCP proxy. Tool entries retain their canonical source operation
+// fields so aliases can be mapped back before issuing REST requests.
+type MCPToolView struct {
+	Tools []DerivedTool `json:"tools,omitempty"`
+}
+
+// ToolNames returns visible tool names in view order.
+func (v MCPToolView) ToolNames() []string {
+	names := make([]string, 0, len(v.Tools))
+	for _, tool := range v.Tools {
+		names = append(names, tool.Name)
+	}
+	return names
+}
+
+// ToolByName returns the visible tool descriptor for a caller-facing name.
+func (v MCPToolView) ToolByName(name string) (DerivedTool, bool) {
+	for _, tool := range v.Tools {
+		if tool.Name == name {
+			return tool, true
+		}
+	}
+	return DerivedTool{}, false
+}
+
+// DeriveMCPToolView builds a proxy-specific MCP tool view from source REST
+// primitives and an optional x-tyk-mcp-server extension.
+func DeriveMCPToolView(srcOAS *OAS, config *TykMCPServer) (MCPToolView, []DeriveWarning, error) {
+	primitives, warnings, err := DeriveSourcePrimitives(srcOAS)
+	if err != nil {
+		return MCPToolView{}, warnings, err
+	}
+
+	tools := ToolPrimitives(primitives)
+	configuredPathTools, err := deriveConfiguredPathMethodTools(srcOAS, config, tools)
+	if err != nil {
+		return MCPToolView{}, warnings, err
+	}
+	tools = append(tools, configuredPathTools...)
+
+	view, err := BuildMCPToolView(tools, config)
+	return view, warnings, err
+}
+
+// BuildMCPToolView applies a proxy-side x-tyk-mcp-server extension to a
+// canonical source tool catalogue.
+func BuildMCPToolView(canonical []DerivedTool, config *TykMCPServer) (MCPToolView, error) {
+	catalogue := newMCPToolViewCatalogue(canonical)
+	selection, err := buildMCPToolViewSelection(config, catalogue)
+	if err != nil {
+		return MCPToolView{}, err
+	}
+
+	view := MCPToolView{Tools: make([]DerivedTool, 0, len(selection.sourceKeys))}
+	seenNames := make(map[string]string, len(selection.sourceKeys))
+	for _, sourceKey := range selection.sourceKeys {
+		tool := cloneDerivedTool(catalogue.bySourceKey[sourceKey])
+		if override, ok := selection.overrides[sourceKey]; ok {
+			if err := applyMCPToolViewOverride(&tool, override); err != nil {
+				return MCPToolView{}, err
+			}
+		}
+
+		if existing, duplicate := seenNames[tool.Name]; duplicate {
+			return MCPToolView{}, fmt.Errorf("duplicate exposed tool name %q for sources %q and %q", tool.Name, existing, sourceKey)
+		}
+		seenNames[tool.Name] = sourceKey
+		view.Tools = append(view.Tools, tool)
+	}
+
+	sort.Slice(view.Tools, func(i, j int) bool { return view.Tools[i].Name < view.Tools[j].Name })
+	return view, nil
+}
+
+const (
+	sourceSelectorOperationID = "operationId"
+	sourceSelectorPathMethod  = "path+method"
+)
+
+type mcpToolViewCatalogue struct {
+	tools       []DerivedTool
+	bySourceKey map[string]DerivedTool
+}
+
+type mcpToolViewSelection struct {
+	sourceKeys []string
+	overrides  map[string]TykMCPServerPrimitive
+}
+
+func newMCPToolViewCatalogue(tools []DerivedTool) mcpToolViewCatalogue {
+	catalogue := mcpToolViewCatalogue{
+		tools:       make([]DerivedTool, 0, len(tools)),
+		bySourceKey: make(map[string]DerivedTool, len(tools)),
+	}
+	for _, tool := range tools {
+		normalised := normaliseCanonicalTool(tool)
+		if normalised.SourceKey == "" {
+			continue
+		}
+		if _, exists := catalogue.bySourceKey[normalised.SourceKey]; exists {
+			continue
+		}
+		catalogue.tools = append(catalogue.tools, normalised)
+		catalogue.bySourceKey[normalised.SourceKey] = normalised
+	}
+	return catalogue
+}
+
+func normaliseCanonicalTool(tool DerivedTool) DerivedTool {
+	if tool.CanonicalName == "" {
+		tool.CanonicalName = tool.Name
+	}
+	if tool.SourceKey == "" && tool.OperationID != "" {
+		tool.SourceKey = operationIDSourceKey(tool.OperationID)
+	}
+	if tool.SourceKey == "" && tool.Method != "" && tool.PathTemplate != "" {
+		tool.SourceKey = pathMethodSourceKey(tool.Method, tool.PathTemplate)
+	}
+	if tool.SourceKey == "" && tool.OperationID == "" {
+		tool.OperationID = tool.CanonicalName
+		if tool.OperationID != "" {
+			tool.SourceKey = operationIDSourceKey(tool.OperationID)
+		}
+	}
+	return tool
+}
+
+func buildMCPToolViewSelection(config *TykMCPServer, catalogue mcpToolViewCatalogue) (mcpToolViewSelection, error) {
+	selection := mcpToolViewSelection{
+		overrides: map[string]TykMCPServerPrimitive{},
+	}
+	explicitAllow := false
+
+	if config != nil {
+		seenSourceKeys := map[string]struct{}{}
+		for _, primitive := range config.Primitives {
+			sourceKey, _, err := mcpPrimitiveSourceKey(primitive.Source)
+			if err != nil {
+				return selection, err
+			}
+			tool, ok := catalogue.bySourceKey[sourceKey]
+			if !ok {
+				return selection, fmt.Errorf("%s primitive references non-exposable source %q", ExtensionTykMCPServer, sourceKey)
+			}
+			if _, duplicate := seenSourceKeys[sourceKey]; duplicate {
+				return selection, fmt.Errorf("%s has duplicate primitive source %q", ExtensionTykMCPServer, sourceKey)
+			}
+			seenSourceKeys[sourceKey] = struct{}{}
+
+			if err := validateMCPToolViewParameterOverrides(tool, primitive); err != nil {
+				return selection, err
+			}
+			selection.overrides[sourceKey] = primitive
+
+			if primitive.Allow != nil {
+				explicitAllow = true
+				if *primitive.Allow {
+					selection.sourceKeys = append(selection.sourceKeys, sourceKey)
+				}
+			}
+		}
+	}
+
+	if explicitAllow {
+		return selection, nil
+	}
+
+	selection.sourceKeys = make([]string, 0, len(catalogue.tools))
+	for _, tool := range catalogue.tools {
+		selection.sourceKeys = append(selection.sourceKeys, tool.SourceKey)
+	}
+	return selection, nil
+}
+
+func deriveConfiguredPathMethodTools(srcOAS *OAS, config *TykMCPServer, canonical []DerivedTool) ([]DerivedTool, error) {
+	if config == nil || len(config.Primitives) == 0 {
+		return nil, nil
+	}
+
+	catalogue := newMCPToolViewCatalogue(canonical)
+	var tools []DerivedTool
+	seen := map[string]struct{}{}
+	for _, primitive := range config.Primitives {
+		sourceKey, selector, err := mcpPrimitiveSourceKey(primitive.Source)
+		if err != nil {
+			return nil, err
+		}
+		if selector != sourceSelectorPathMethod {
+			continue
+		}
+		if _, duplicate := seen[sourceKey]; duplicate {
+			continue
+		}
+		seen[sourceKey] = struct{}{}
+		if _, exists := catalogue.bySourceKey[sourceKey]; exists {
+			continue
+		}
+
+		tool, err := deriveConfiguredPathMethodTool(srcOAS, primitive)
+		if err != nil {
+			return nil, err
+		}
+		tools = append(tools, tool)
+	}
+	return tools, nil
+}
+
+func deriveConfiguredPathMethodTool(srcOAS *OAS, primitive TykMCPServerPrimitive) (DerivedTool, error) {
+	path := strings.TrimSpace(primitive.Source.Path)
+	method := strings.ToUpper(strings.TrimSpace(primitive.Source.Method))
+	item, mo, ok := sourceOperationByPathMethod(srcOAS, path, method)
+	if !ok {
+		return DerivedTool{}, fmt.Errorf("%s primitive source %s %s references unknown source operation", ExtensionTykMCPServer, method, path)
+	}
+	if mo.op.OperationID != "" {
+		return DerivedTool{}, fmt.Errorf("%s primitive source %s %s has operationId %q; use source.operationId", ExtensionTykMCPServer, method, path, mo.op.OperationID)
+	}
+	visibility := sourceOperationVisibilityFromOAS(srcOAS)
+	if visibility.allowListEnabled {
+		return DerivedTool{}, fmt.Errorf("%s primitive source %s %s references non-exposable operation because source allow-list requires operationId", ExtensionTykMCPServer, method, path)
+	}
+
+	name := SanitizeToolName(primitive.Name)
+	if name == "" {
+		return DerivedTool{}, fmt.Errorf("%s primitive source %s %s name is required for operations without operationId", ExtensionTykMCPServer, method, path)
+	}
+
+	locs, schema := deriveParams(item, mo.op)
+	return DerivedTool{
+		SourceKey:      pathMethodSourceKey(method, path),
+		CanonicalName:  name,
+		Name:           name,
+		Description:    operationDescription(mo.op),
+		Method:         method,
+		PathTemplate:   path,
+		ParamLocations: locs,
+		InputSchema:    schema,
+	}, nil
+}
+
+func sourceOperationByPathMethod(srcOAS *OAS, path, method string) (*openapi3.PathItem, derivedOp, bool) {
+	if srcOAS == nil || srcOAS.Paths == nil {
+		return nil, derivedOp{}, false
+	}
+	item := srcOAS.Paths.Map()[path]
+	if item == nil {
+		return nil, derivedOp{}, false
+	}
+	for _, mo := range methodOperations(path, item) {
+		if strings.EqualFold(mo.method, method) {
+			return item, mo, true
+		}
+	}
+	return nil, derivedOp{}, false
+}
+
+func mcpPrimitiveSourceKey(source TykMCPServerSource) (string, string, error) {
+	operationID := strings.TrimSpace(source.OperationID)
+	path := strings.TrimSpace(source.Path)
+	method := strings.TrimSpace(source.Method)
+	hasOperationID := operationID != ""
+	hasPathMethod := path != "" || method != ""
+
+	if hasOperationID == hasPathMethod {
+		return "", "", fmt.Errorf("%s primitive source must specify exactly one source selector: operationId or path+method", ExtensionTykMCPServer)
+	}
+	if hasOperationID {
+		return operationIDSourceKey(operationID), sourceSelectorOperationID, nil
+	}
+	if path == "" || method == "" {
+		return "", "", fmt.Errorf("%s primitive source path+method selector requires both path and method", ExtensionTykMCPServer)
+	}
+	return pathMethodSourceKey(method, path), sourceSelectorPathMethod, nil
+}
+
+func operationIDSourceKey(operationID string) string {
+	return "operationId:" + operationID
+}
+
+func pathMethodSourceKey(method, path string) string {
+	return fmt.Sprintf("http:%s %s", strings.ToUpper(strings.TrimSpace(method)), strings.TrimSpace(path))
+}
+
+func validateMCPToolViewParameterOverrides(tool DerivedTool, primitive TykMCPServerPrimitive) error {
+	sourceKey, _, err := mcpPrimitiveSourceKey(primitive.Source)
+	if err != nil {
+		return err
+	}
+
+	seen := map[string]struct{}{}
+	for _, param := range primitive.Parameters {
+		if param.Param == "" {
+			return fmt.Errorf("%s primitive %q has parameter override missing param", ExtensionTykMCPServer, sourceKey)
+		}
+		if _, duplicate := seen[param.Param]; duplicate {
+			return fmt.Errorf("%s primitive %q has duplicate parameter override %q", ExtensionTykMCPServer, sourceKey, param.Param)
+		}
+		seen[param.Param] = struct{}{}
+		if _, ok := tool.ParamLocations[param.Param]; !ok {
+			return fmt.Errorf("%s primitive %q references unknown parameter %q", ExtensionTykMCPServer, sourceKey, param.Param)
+		}
+	}
+	return nil
+}
+
+func applyMCPToolViewOverride(tool *DerivedTool, override TykMCPServerPrimitive) error {
+	if override.Name != "" {
+		name := SanitizeToolName(override.Name)
+		if name == "" {
+			sourceKey, _, err := mcpPrimitiveSourceKey(override.Source)
+			if err != nil {
+				sourceKey = "<invalid source>"
+			}
+			return fmt.Errorf("%s primitive %q name sanitises to empty string", ExtensionTykMCPServer, sourceKey)
+		}
+		tool.Name = name
+	}
+	if override.Description != "" {
+		tool.Description = override.Description
+	}
+	for _, param := range override.Parameters {
+		if param.Description != "" {
+			setMCPToolParameterDescription(tool, param.Param, param.Description)
+		}
+	}
+	return nil
+}
+
+func setMCPToolParameterDescription(tool *DerivedTool, paramName, description string) {
+	if tool.InputSchema == nil {
+		tool.InputSchema = map[string]any{schemaKeyType: schemaTypeObject}
+	}
+
+	props, ok := tool.InputSchema[schemaKeyProperties].(map[string]any)
+	if !ok {
+		props = map[string]any{}
+		tool.InputSchema[schemaKeyProperties] = props
+	}
+
+	prop, ok := props[paramName].(map[string]any)
+	if !ok {
+		prop = map[string]any{}
+		props[paramName] = prop
+	}
+	prop[schemaKeyDescription] = description
+}
+
+func cloneDerivedTool(tool DerivedTool) DerivedTool {
+	tool = normaliseCanonicalTool(tool)
+
+	if tool.ParamLocations != nil {
+		locations := make(map[string]string, len(tool.ParamLocations))
+		for k, v := range tool.ParamLocations {
+			locations[k] = v
+		}
+		tool.ParamLocations = locations
+	}
+	tool.InputSchema = cloneMapAny(tool.InputSchema)
+	return tool
+}
+
+func cloneMapAny(src map[string]any) map[string]any {
+	if src == nil {
+		return nil
+	}
+
+	dst := make(map[string]any, len(src))
+	for k, v := range src {
+		dst[k] = cloneAny(v)
+	}
+	return dst
+}
+
+func cloneAny(src any) any {
+	switch v := src.(type) {
+	case map[string]any:
+		return cloneMapAny(v)
+	case []any:
+		out := make([]any, len(v))
+		for i := range v {
+			out[i] = cloneAny(v[i])
+		}
+		return out
+	case []string:
+		return append([]string(nil), v...)
+	default:
+		return v
+	}
 }
 
 // AdapterAPIIDSuffix is the deterministic suffix appended to the source

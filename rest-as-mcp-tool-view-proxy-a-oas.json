@@ -1,0 +1,45 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "MCP tool view A",
+    "version": "1.0.0"
+  },
+  "paths": {},
+  "x-tyk-api-gateway": {
+    "info": {
+      "id": "mcp-tool-view-a",
+      "orgId": "validation-org",
+      "name": "mcp-tool-view-a",
+      "state": {
+        "active": true
+      }
+    },
+    "server": {
+      "listenPath": {
+        "value": "/mcp-tool-view-a/",
+        "strip": true
+      }
+    },
+    "upstream": {
+      "url": "tyk://rest-tool-view-live__mcp-server"
+    }
+  },
+  "x-tyk-mcp-server": {
+    "primitives": [
+      {
+        "source": {
+          "operationId": "createOrder"
+        },
+        "name": "create_order",
+        "allow": true,
+        "description": "Place a new order for a customer",
+        "parameters": [
+          {
+            "param": "customer_id",
+            "description": "Unique identifier of the customer placing the order"
+          }
+        ]
+      }
+    ]
+  }
+}

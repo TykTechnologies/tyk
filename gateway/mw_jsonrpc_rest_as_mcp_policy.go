@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
@@ -54,6 +55,7 @@ func (m *JSONRPCMiddleware) serveSyntheticMCPAdapter(w http.ResponseWriter, r *h
 
 	capture := newCapturedResponseWriter()
 	handler.ServeHTTP(capture, r)
+	m.rewriteRESTAsMCPToolListForProxy(policyCtx, capture)
 	policyCtx.filterListResponse(capture)
 	capture.flushTo(w)
 }
@@ -315,6 +317,70 @@ func (c *restAsMCPPolicyContext) filterListResponse(res *capturedResponseWriter)
 	res.body.Reset()
 	res.body.Write(body)
 	res.header.Set("Content-Length", strconv.Itoa(len(body)))
+}
+
+func (m *JSONRPCMiddleware) rewriteRESTAsMCPToolListForProxy(policyCtx *restAsMCPPolicyContext, res *capturedResponseWriter) {
+	if m == nil || m.Spec == nil || policyCtx == nil || policyCtx.rpcReq == nil {
+		return
+	}
+	if policyCtx.rpcReq.Method != mcp.MethodToolsList || policyCtx.proxyAPIID == "" || len(m.Spec.MCPProxyToolViews) == 0 {
+		return
+	}
+
+	view, ok := m.Spec.MCPProxyToolViews[policyCtx.proxyAPIID]
+	if !ok {
+		return
+	}
+
+	body, ok := toolListBodyForView(res.body.Bytes(), view)
+	if !ok {
+		return
+	}
+
+	res.body.Reset()
+	res.body.Write(body)
+	res.header.Set("Content-Length", strconv.Itoa(len(body)))
+}
+
+func toolListBodyForView(body []byte, view oas.MCPToolView) ([]byte, bool) {
+	if len(body) == 0 {
+		return nil, false
+	}
+
+	var env map[string]any
+	if err := json.Unmarshal(body, &env); err != nil {
+		return nil, false
+	}
+	result, ok := env["result"].(map[string]any)
+	if !ok {
+		return nil, false
+	}
+
+	tools := make([]any, 0, len(view.Tools))
+	for _, tool := range view.Tools {
+		tools = append(tools, toolListEntry(tool))
+	}
+	result["tools"] = tools
+
+	rewritten, err := json.Marshal(env)
+	if err != nil {
+		return nil, false
+	}
+	return rewritten, true
+}
+
+func toolListEntry(tool oas.DerivedTool) map[string]any {
+	entry := map[string]any{
+		"name":        tool.Name,
+		"inputSchema": tool.InputSchema,
+	}
+	if entry["inputSchema"] == nil {
+		entry["inputSchema"] = map[string]any{"type": "object"}
+	}
+	if tool.Description != "" {
+		entry["description"] = tool.Description
+	}
+	return entry
 }
 
 type capturedResponseWriter struct {

@@ -1,0 +1,37 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "MCP tool view B",
+    "version": "1.0.0"
+  },
+  "paths": {},
+  "x-tyk-api-gateway": {
+    "info": {
+      "id": "mcp-tool-view-b",
+      "orgId": "validation-org",
+      "name": "mcp-tool-view-b",
+      "state": {
+        "active": true
+      }
+    },
+    "server": {
+      "listenPath": {
+        "value": "/mcp-tool-view-b/",
+        "strip": true
+      }
+    },
+    "upstream": {
+      "url": "tyk://rest-tool-view-live__mcp-server"
+    }
+  },
+  "x-tyk-mcp-server": {
+    "primitives": [
+      {
+        "source": {
+          "operationId": "listOrders"
+        },
+        "allow": true
+      }
+    ]
+  }
+}

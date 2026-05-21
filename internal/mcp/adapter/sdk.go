@@ -85,6 +85,23 @@ func (a *SDKAdapter) Server() *mcpsdk.Server {
 	return a.server
 }
 
+// UpdateCallTool replaces the gateway callback used by tool handlers. This is
+// needed when a long-lived SDK adapter is reused across gateway reloads and the
+// adapter spec pointer has changed.
+func (a *SDKAdapter) UpdateCallTool(callTool ToolCallFunc) error {
+	if a == nil {
+		return fmt.Errorf("nil SDK adapter")
+	}
+	if callTool == nil {
+		return fmt.Errorf("adapter SDK server requires CallTool")
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.callTool = callTool
+	return nil
+}
+
 // StreamableHTTPHandler returns a streamable HTTP handler backed by the
 // adapter's long-lived SDK server. Nil options return the adapter-owned,
 // stateful handler so initialized streamable sessions survive across gateway
@@ -192,7 +209,7 @@ func (a *SDKAdapter) addTool(tool oas.DerivedTool) {
 			return nil, err
 		}
 
-		rec, err := a.callTool(ctx, &tool, args)
+		rec, err := a.callToolForRequest(ctx, &tool, args)
 		if err != nil {
 			return nil, err
 		}
@@ -202,6 +219,17 @@ func (a *SDKAdapter) addTool(tool oas.DerivedTool) {
 
 		return SDKToolResult(rec), nil
 	})
+}
+
+func (a *SDKAdapter) callToolForRequest(ctx context.Context, tool *oas.DerivedTool, args map[string]any) (*Recorder, error) {
+	a.mu.RLock()
+	callTool := a.callTool
+	a.mu.RUnlock()
+
+	if callTool == nil {
+		return nil, fmt.Errorf("adapter SDK server requires CallTool")
+	}
+	return callTool(ctx, tool, args)
 }
 
 // NewSDKStreamableHTTPHandler builds an SDK streamable HTTP handler for the

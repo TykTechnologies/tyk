@@ -88,6 +88,7 @@ func (m *MCPLoopAuthBypass) ProcessRequest(_ http.ResponseWriter, r *http.Reques
 	if trust.RESTAPIID != m.Spec.APIID ||
 		!proxyAllowed ||
 		!adapterPaired || expectedAdapter != trust.AdapterAPIID {
+
 		m.Logger().WithFields(map[string]interface{}{
 			"rest_api_id":       m.Spec.APIID,
 			"flag_rest_api_id":  trust.RESTAPIID,

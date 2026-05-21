@@ -1,0 +1,74 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "REST tool view validation",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/orders": {
+      "get": {
+        "operationId": "listOrders",
+        "summary": "List orders",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createOrder",
+        "summary": "Create order",
+        "parameters": [
+          {
+            "name": "customer_id",
+            "in": "query",
+            "description": "Source customer identifier",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    }
+  },
+  "x-tyk-api-gateway": {
+    "info": {
+      "id": "rest-tool-view-live",
+      "orgId": "validation-org",
+      "name": "rest-tool-view-live",
+      "state": {
+        "active": true
+      }
+    },
+    "server": {
+      "listenPath": {
+        "value": "/rest-tool-view-live/",
+        "strip": true
+      }
+    },
+    "upstream": {
+      "url": "http://127.0.0.1:19082"
+    }
+  }
+}

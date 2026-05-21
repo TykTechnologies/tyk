@@ -59,7 +59,7 @@ func (gw *Gateway) synthesiseMCPAdapters(
 			continue
 		}
 
-		adapter, err := gw.buildAdapterSpec(rest)
+		adapter, err := gw.buildAdapterSpecForProxies(rest, tmpSpecRegister)
 		if err != nil {
 			mainLog.WithError(err).WithField("rest_api_id", rest.APIID).
 				Error("failed to synthesise MCP adapter spec")
@@ -190,11 +190,15 @@ func referencedMCPAdapterRESTIDSetFromSpecs(specs []*APISpec) map[string]struct{
 // the given REST APISpec. The returned spec is ready to be passed to
 // loadHTTPService — no further mutation is required.
 func (gw *Gateway) buildAdapterSpec(rest *APISpec) (*APISpec, error) {
+	return gw.buildAdapterSpecForProxies(rest, nil)
+}
+
+func (gw *Gateway) buildAdapterSpecForProxies(rest *APISpec, specs map[string]*APISpec) (*APISpec, error) {
 	if rest == nil || rest.APIDefinition == nil {
 		return nil, fmt.Errorf("nil source REST spec")
 	}
 
-	catalogue, err := deriveMCPAdapterCatalogue(rest)
+	catalogue, err := deriveMCPAdapterCatalogueForProxies(rest, specs)
 	if err != nil {
 		return nil, err
 	}
@@ -209,21 +213,123 @@ func (gw *Gateway) buildAdapterSpec(rest *APISpec) (*APISpec, error) {
 }
 
 type mcpAdapterCatalogue struct {
-	primitives []oas.DerivedPrimitive
-	tools      []oas.DerivedTool
-	warnings   []oas.DeriveWarning
+	primitives     []oas.DerivedPrimitive
+	tools          []oas.DerivedTool
+	warnings       []oas.DeriveWarning
+	proxyToolViews map[string]oas.MCPToolView
 }
 
-func deriveMCPAdapterCatalogue(rest *APISpec) (mcpAdapterCatalogue, error) {
+func deriveMCPAdapterCatalogueForProxies(rest *APISpec, specs map[string]*APISpec) (mcpAdapterCatalogue, error) {
 	primitives, warnings, err := oas.DeriveSourcePrimitives(&rest.OAS)
 	if err != nil {
 		return mcpAdapterCatalogue{}, fmt.Errorf("derive MCP primitives: %w", err)
 	}
+	canonicalTools := oas.ToolPrimitives(primitives)
+	proxyViews, err := deriveMCPProxyToolViews(rest, specs)
+	if err != nil {
+		return mcpAdapterCatalogue{}, err
+	}
+
+	tools, err := unionMCPProxyToolViewTools(canonicalTools, proxyViews)
+	if err != nil {
+		return mcpAdapterCatalogue{}, err
+	}
+
 	return mcpAdapterCatalogue{
-		primitives: primitives,
-		tools:      oas.ToolPrimitives(primitives),
-		warnings:   warnings,
+		primitives:     primitives,
+		tools:          tools,
+		warnings:       warnings,
+		proxyToolViews: proxyViews,
 	}, nil
+}
+
+func deriveMCPProxyToolViews(rest *APISpec, specs map[string]*APISpec) (map[string]oas.MCPToolView, error) {
+	if rest == nil || rest.APIDefinition == nil || len(specs) == 0 {
+		return nil, nil
+	}
+
+	proxyIDs := sortedMCPProxyIDsForREST(rest, specs)
+	if len(proxyIDs) == 0 {
+		return nil, nil
+	}
+
+	views := make(map[string]oas.MCPToolView, len(proxyIDs))
+	for _, proxyID := range proxyIDs {
+		proxy := specs[proxyID]
+		view, _, err := oas.DeriveMCPToolView(&rest.OAS, proxy.OAS.GetTykMCPServerExtension())
+		if err != nil {
+			return nil, fmt.Errorf("build MCP tool view for proxy %q: %w", proxy.APIID, err)
+		}
+		views[proxy.APIID] = view
+	}
+	return views, nil
+}
+
+func sortedMCPProxyIDsForREST(rest *APISpec, specs map[string]*APISpec) []string {
+	ids := make([]string, 0, len(specs))
+	for _, spec := range specs {
+		if spec == nil || spec.APIDefinition == nil || spec.IsSyntheticMCPAdapter || !spec.IsMCPManaged() {
+			continue
+		}
+		_, restID, ok := pairedMCPAdapterTarget(spec.Proxy.TargetURL)
+		if !ok || restID != rest.APIID || spec.OrgID != rest.OrgID {
+			continue
+		}
+		ids = append(ids, spec.APIID)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func unionMCPProxyToolViewTools(canonicalTools []oas.DerivedTool, proxyViews map[string]oas.MCPToolView) ([]oas.DerivedTool, error) {
+	if len(proxyViews) == 0 {
+		return canonicalTools, nil
+	}
+
+	byName := map[string]oas.DerivedTool{}
+	for proxyID, view := range proxyViews {
+		for _, tool := range view.Tools {
+			if existing, ok := byName[tool.Name]; ok {
+				if derivedToolSourceIdentity(existing) != derivedToolSourceIdentity(tool) {
+					return nil, fmt.Errorf("MCP tool alias conflict for %q: proxy %q maps to %s, already mapped to %s", tool.Name, proxyID, derivedToolSourceIdentityForMessage(tool), derivedToolSourceIdentityForMessage(existing))
+				}
+				continue
+			}
+			byName[tool.Name] = tool
+		}
+	}
+
+	names := make([]string, 0, len(byName))
+	for name := range byName {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	tools := make([]oas.DerivedTool, 0, len(names))
+	for _, name := range names {
+		tools = append(tools, byName[name])
+	}
+	return tools, nil
+}
+
+func derivedToolSourceIdentity(tool oas.DerivedTool) string {
+	if tool.SourceKey != "" {
+		return tool.SourceKey
+	}
+	if tool.OperationID != "" {
+		return "operationId:" + tool.OperationID
+	}
+	return tool.Name
+}
+
+func derivedToolSourceIdentityForMessage(tool oas.DerivedTool) string {
+	if tool.OperationID != "" {
+		return fmt.Sprintf("operationId %q", tool.OperationID)
+	}
+	if tool.SourceKey != "" {
+		return fmt.Sprintf("source %q", tool.SourceKey)
+	}
+	return fmt.Sprintf("tool %q", tool.Name)
 }
 
 func logMCPAdapterDeriveWarnings(restAPIID string, warnings []oas.DeriveWarning) {
@@ -255,6 +361,7 @@ func (gw *Gateway) newSyntheticMCPAdapterSpec(rest *APISpec, catalogue mcpAdapte
 		SourceRESTAPIID:       rest.APIID,
 		DerivedPrimitives:     catalogue.primitives,
 		DerivedTools:          catalogue.tools,
+		MCPProxyToolViews:     catalogue.proxyToolViews,
 		GlobalConfig:          gw.GetConfig(),
 	}
 }
@@ -280,24 +387,30 @@ func (gw *Gateway) buildOrUpdateMCPSDKAdapter(adapter *APISpec, tools []oas.Deri
 	gw.apisMu.RUnlock()
 
 	if existing != nil {
+		if err := existing.UpdateCallTool(gw.mcpAdapterCallToolFunc(adapter)); err != nil {
+			return nil, err
+		}
 		return existing, existing.UpdateTools(tools)
 	}
 
 	return mcpadapter.NewSDKAdapter(mcpadapter.SDKServerConfig{
-		Name:  adapter.Name,
-		Tools: tools,
-		CallTool: func(ctx context.Context, tool *oas.DerivedTool, args map[string]any) (*mcpadapter.Recorder, error) {
-			return gw.callMCPAdapterTool(ctx, adapter, tool, args)
-		},
+		Name:     adapter.Name,
+		Tools:    tools,
+		CallTool: gw.mcpAdapterCallToolFunc(adapter),
 	})
 }
 
-func (gw *Gateway) callMCPAdapterTool(ctx context.Context, spec *APISpec, tool *oas.DerivedTool, args map[string]any) (*mcpadapter.Recorder, error) {
-	parent, err := http.NewRequestWithContext(ctx, http.MethodPost, "/", nil)
-	if err != nil {
-		return nil, err
+func (gw *Gateway) mcpAdapterCallToolFunc(adapter *APISpec) mcpadapter.ToolCallFunc {
+	return func(ctx context.Context, tool *oas.DerivedTool, args map[string]any) (*mcpadapter.Recorder, error) {
+		return gw.callMCPAdapterTool(ctx, adapter, tool, args)
 	}
-	upstreamReq, err := mcpadapter.BuildUpstreamRequest(parent, tool, spec.SourceRESTAPIID, args)
+}
+
+func (gw *Gateway) callMCPAdapterTool(ctx context.Context, spec *APISpec, tool *oas.DerivedTool, args map[string]any) (*mcpadapter.Recorder, error) {
+	if tool == nil {
+		return nil, fmt.Errorf("nil tool")
+	}
+	parent, err := http.NewRequestWithContext(ctx, http.MethodPost, "/", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -311,6 +424,16 @@ func (gw *Gateway) callMCPAdapterTool(ctx context.Context, spec *APISpec, tool *
 	}
 	if !gw.mcpPairing.ProxyAllowedForREST(spec.SourceRESTAPIID, callerProxyAPIID) {
 		return nil, fmt.Errorf("caller proxy %q is not admitted for REST API %q", callerProxyAPIID, spec.SourceRESTAPIID)
+	}
+
+	resolvedTool, err := mcpAdapterToolForCaller(spec, callerProxyAPIID, tool)
+	if err != nil {
+		return nil, err
+	}
+
+	upstreamReq, err := mcpadapter.BuildUpstreamRequest(parent, resolvedTool, spec.SourceRESTAPIID, args)
+	if err != nil {
+		return nil, err
 	}
 
 	httpctx.SetMCPLoopFromPairedProxy(upstreamReq, &httpctx.MCPLoopTrust{
@@ -327,4 +450,34 @@ func (gw *Gateway) callMCPAdapterTool(ctx context.Context, spec *APISpec, tool *
 	rec := mcpadapter.NewRecorder()
 	handler.ServeHTTP(rec, upstreamReq)
 	return rec, nil
+}
+
+func mcpAdapterToolForCaller(spec *APISpec, callerProxyAPIID string, requested *oas.DerivedTool) (*oas.DerivedTool, error) {
+	if spec == nil {
+		return nil, fmt.Errorf("nil adapter spec")
+	}
+	if requested == nil {
+		return nil, fmt.Errorf("nil tool")
+	}
+
+	if spec.MCPProxyToolViews != nil {
+		view, ok := spec.MCPProxyToolViews[callerProxyAPIID]
+		if !ok {
+			return nil, fmt.Errorf("caller proxy %q has no MCP tool view", callerProxyAPIID)
+		}
+		visibleTool, ok := view.ToolByName(requested.Name)
+		if !ok {
+			return nil, fmt.Errorf("tool %q is not exposed for caller proxy %q", requested.Name, callerProxyAPIID)
+		}
+		return canonicalMCPAdapterTool(visibleTool), nil
+	}
+
+	return canonicalMCPAdapterTool(*requested), nil
+}
+
+func canonicalMCPAdapterTool(tool oas.DerivedTool) *oas.DerivedTool {
+	if tool.CanonicalName != "" {
+		tool.Name = tool.CanonicalName
+	}
+	return &tool
 }
