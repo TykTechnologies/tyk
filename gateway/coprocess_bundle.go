@@ -449,6 +449,22 @@ func (gw *Gateway) getHashedBundleName(bundleName string) (string, error) {
 	return fmt.Sprintf("%x", bundleNameHash.Sum(nil)), nil
 }
 
+// parseBundleNames splits spec.CustomMiddlewareBundle on commas, trims
+// whitespace, and drops empty entries. A bare filename (no comma) yields a
+// one-element slice equal to the input; an empty input yields nil.
+func parseBundleNames(s string) []string {
+	if s == "" {
+		return nil
+	}
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // loadBundle configures the gateway to load a custom middleware bundle based on the provided API specification.
 // It verifies the existence, integrity, and configuration of the bundle, applying it to the spec if validation succeeds.
 // Returns an error if the bundle cannot be loaded, validated, or is disabled in the spec.
@@ -459,14 +475,15 @@ func (gw *Gateway) loadBundle(spec *APISpec) error {
 // loadBundleWithFs loads and validates one or more middleware bundles for the
 // given API specification using the provided filesystem.
 //
-// Selection rule (backward compatible):
-//   - If spec.CustomMiddlewareBundles is non-empty, every entry is fetched,
-//     unpacked into its own subdirectory under the API's bundle root, and
-//     its manifest merged into spec.CustomMiddleware.
-//   - Otherwise, if spec.CustomMiddlewareBundle is set, the legacy
-//     single-bundle path is used unchanged — same on-disk layout, same
-//     AddToSpec replacement semantics. Existing deployments continue to
-//     behave identically.
+// spec.CustomMiddlewareBundle accepts either a single bundle filename or a
+// comma-separated list of filenames, each resolved against the gateway's
+// bundle_base_url. Selection rule (backward compatible):
+//   - A single bare filename (no comma) takes the legacy single-bundle path
+//     unchanged — same on-disk layout, same AddToSpec replacement semantics.
+//     Existing deployments continue to behave identically.
+//   - Two or more comma-separated names take the multi-bundle merge path:
+//     each entry is fetched, unpacked into its own subdirectory under the
+//     API's bundle root, and its manifest merged into spec.CustomMiddleware.
 //
 // Returns an error if any bundle cannot be fetched, saved, or verified.
 func (gw *Gateway) loadBundleWithFs(spec *APISpec, bundleFs afero.Fs) error {
@@ -477,25 +494,18 @@ func (gw *Gateway) loadBundleWithFs(spec *APISpec, bundleFs afero.Fs) error {
 		return nil
 	}
 
-	bundleNames := spec.CustomMiddlewareBundles
-	if len(bundleNames) == 0 && spec.CustomMiddlewareBundle != "" {
-		// Legacy single-bundle path — preserve exactly to avoid changing
-		// on-disk layout, hashing, or AddToSpec replacement semantics.
-		return gw.loadSingleBundle(spec, bundleFs)
-	}
+	bundleNames := parseBundleNames(spec.CustomMiddlewareBundle)
 	if len(bundleNames) == 0 {
 		return nil
+	}
+	// Single bare filename → preserve the legacy path exactly so existing
+	// deployments keep their on-disk layout and hashing.
+	if len(bundleNames) == 1 && bundleNames[0] == spec.CustomMiddlewareBundle {
+		return gw.loadSingleBundle(spec, bundleFs)
 	}
 
 	if gw.GetConfig().BundleBaseURL == "" {
 		return bundleError(spec, nil, "No bundle base URL set, skipping bundle")
-	}
-
-	if spec.CustomMiddlewareBundle != "" {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-			"api_id": spec.APIID,
-		}).Warning("Both custom_middleware_bundle and custom_middleware_bundles are set; the singular field is ignored.")
 	}
 
 	rootPath := gw.getBundleDestPath(spec)

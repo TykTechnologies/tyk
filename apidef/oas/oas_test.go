@@ -342,7 +342,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Method",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Operation",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Variables[0]",
-		"APIDefinition.CustomMiddlewareBundles[0]",
 		"APIDefinition.AuthProvider.Name",
 		"APIDefinition.AuthProvider.StorageEngine",
 		"APIDefinition.AuthProvider.Meta[0]",

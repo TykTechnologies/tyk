@@ -246,3 +246,15 @@ func TestBundleSubdirNameStripsExtAndCollapsesSlashes(t *testing.T) {
 	assert.Equal(t, "platform__correlation-id-1.4.0", bundleSubdirName("platform/correlation-id-1.4.0.zip"))
 	assert.NotEmpty(t, bundleSubdirName("")) // fallback hash path
 }
+
+// TestParseBundleNames locks the comma-separated CustomMiddlewareBundle
+// contract: a bare name parses to one entry, whitespace is trimmed, empty
+// segments are dropped, and a blank input yields nil.
+func TestParseBundleNames(t *testing.T) {
+	assert.Nil(t, parseBundleNames(""))
+	assert.Equal(t, []string{"a.zip"}, parseBundleNames("a.zip"))
+	assert.Equal(t, []string{"a.zip", "b.zip"}, parseBundleNames("a.zip,b.zip"))
+	assert.Equal(t, []string{"a.zip", "b.zip"}, parseBundleNames(" a.zip , b.zip "))
+	assert.Equal(t, []string{"a.zip"}, parseBundleNames("a.zip,"))
+	assert.Nil(t, parseBundleNames(", , "))
+}

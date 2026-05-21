@@ -711,8 +711,6 @@ func TestCustomPlugins_InlineCodeRoundtrip(t *testing.T) {
 				FunctionName:   "myHandler",
 				Path:           "/path/to/plugin.js",
 				Code:           "dmFyIHg9MTsK",
-				PluginID:       "plugin-001",
-				PluginHash:     "sha256:abcdef",
 				RawBodyOnly:    true,
 				RequireSession: true,
 			},
@@ -729,15 +727,13 @@ func TestCustomPlugins_InlineCodeRoundtrip(t *testing.T) {
 		assert.Equal(t, original, result)
 	})
 
-	t.Run("Code PluginID PluginHash survive roundtrip", func(t *testing.T) {
+	t.Run("Code survives roundtrip", func(t *testing.T) {
 		t.Parallel()
 		plugins := CustomPlugins{
 			{
 				Enabled:      true,
 				FunctionName: "inlineFunc",
 				Code:         "dmFyIHg9MTsK",
-				PluginID:     "abc123",
-				PluginHash:   "sha256:deadbeef",
 			},
 		}
 
@@ -746,8 +742,6 @@ func TestCustomPlugins_InlineCodeRoundtrip(t *testing.T) {
 		plugins.ExtractTo(mwDefs)
 
 		assert.Equal(t, "dmFyIHg9MTsK", mwDefs[0].Code)
-		assert.Equal(t, "abc123", mwDefs[0].PluginID)
-		assert.Equal(t, "sha256:deadbeef", mwDefs[0].PluginHash)
 		assert.Equal(t, "inlineFunc", mwDefs[0].Name)
 		assert.False(t, mwDefs[0].Disabled)
 
@@ -766,8 +760,6 @@ func TestCustomPlugins_InlineCodeRoundtrip(t *testing.T) {
 				FunctionName: "inlineOnly",
 				Path:         "",
 				Code:         "dmFyIHg9MTsK",
-				PluginID:     "id-no-path",
-				PluginHash:   "sha256:1234",
 			},
 		}
 
@@ -802,8 +794,6 @@ func TestCustomPlugins_InlineCodeRoundtrip(t *testing.T) {
 
 		assert.Equal(t, "/path/to/plugin.js", mwDefs[0].Path)
 		assert.Empty(t, mwDefs[0].Code)
-		assert.Empty(t, mwDefs[0].PluginID)
-		assert.Empty(t, mwDefs[0].PluginHash)
 		assert.True(t, mwDefs[0].RawBodyOnly)
 
 		var result CustomPlugins

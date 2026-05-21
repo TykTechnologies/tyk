@@ -571,8 +571,6 @@ type MiddlewareDefinition struct {
 	Name           string `bson:"name" json:"name"`
 	Path           string `bson:"path" json:"path"`
 	Code           string `bson:"code,omitempty" json:"code,omitempty"`
-	PluginID       string `bson:"plugin_id,omitempty" json:"plugin_id,omitempty"`
-	PluginHash     string `bson:"plugin_hash,omitempty" json:"plugin_hash,omitempty"`
 	RequireSession bool   `bson:"require_session" json:"require_session"`
 	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
 
@@ -754,15 +752,15 @@ type APIDefinition struct {
 	DisableRateLimit                     bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
 	DisableQuota                         bool                   `bson:"disable_quota" json:"disable_quota"`
 	CustomMiddleware                     MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
+	// CustomMiddlewareBundle is the bundle filename (or comma-separated list of
+	// bundle filenames) resolved against the gateway's bundle_base_url. A single
+	// name takes the legacy single-bundle load path unchanged. Two or more
+	// comma-separated names enable multi-bundle composition: each bundle is
+	// fetched into its own subdirectory under the API's bundle root, and the
+	// manifests are merged into the effective custom_middleware section in
+	// declaration order — array hooks (pre/post/post_key_auth/response)
+	// concatenate; auth_check may be set by at most one bundle.
 	CustomMiddlewareBundle               string                 `bson:"custom_middleware_bundle" json:"custom_middleware_bundle"`
-	// CustomMiddlewareBundles is the multi-bundle replacement for
-	// CustomMiddlewareBundle. Each entry is a bundle filename resolved against
-	// the gateway's bundle_base_url. When non-empty it takes precedence over
-	// CustomMiddlewareBundle. Manifests from each bundle are merged into the
-	// effective custom_middleware section in declaration order — array hooks
-	// (pre/post/post_key_auth/response) concatenate; auth_check may be set by
-	// at most one bundle.
-	CustomMiddlewareBundles              []string               `bson:"custom_middleware_bundles,omitempty" json:"custom_middleware_bundles,omitempty"`
 	CustomMiddlewareBundleDisabled       bool                   `bson:"custom_middleware_bundle_disabled" json:"custom_middleware_bundle_disabled"`
 	CacheOptions                         CacheOptions           `bson:"cache_options" json:"cache_options"`
 	SessionLifetimeRespectsKeyExpiration bool                   `bson:"session_lifetime_respects_key_expiration" json:"session_lifetime_respects_key_expiration,omitempty"`

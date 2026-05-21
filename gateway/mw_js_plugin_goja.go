@@ -22,7 +22,7 @@ import (
 // its closure. Each named handler is exposed under a deterministic global
 // alias derived from (file path, manifest name); dispatch invokes the alias
 // rather than the original name. This lets multiple files — and multiple
-// bundles, when CustomMiddlewareBundles is used — declare handlers under
+// bundles, when CustomMiddlewareBundle is a comma-separated list — declare handlers under
 // the same JS-side name without colliding with each other's globals or
 // breaking closures that reference the var lexically.
 type GojaJSVM struct {
