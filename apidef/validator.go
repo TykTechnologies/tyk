@@ -214,7 +214,7 @@ func (r *RuleValidateEnforceTimeout) Validate(apiDef *APIDefinition, validationR
 			// Validate endpoint level timeout
 			for _, hardTimeOutMeta := range vInfo.ExtendedPaths.HardTimeouts {
 				timeoutDuration := time.Duration(hardTimeOutMeta.TimeoutDuration)
-				if hardTimeOutMeta.TimeOut < 0 || timeoutDuration < minTimeout {
+				if hardTimeOutMeta.TimeOut < 0 || (timeoutDuration != 0 && timeoutDuration < minTimeout) {
 					validationResult.IsValid = false
 					validationResult.AppendError(ErrInvalidTimeoutValue)
 					return
