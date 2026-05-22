@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -343,6 +344,66 @@ func TestDeriveMCPToolView_ValidationFailures(t *testing.T) {
 			t.Parallel()
 
 			_, _, err := DeriveMCPToolView(src, tc.cfg)
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
+func TestDeriveMCPToolView_RejectsInvalidParameterOverrideNames(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: "list_orders",
+				Parameters: openapi3.Parameters{
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{
+						Name:   "status",
+						In:     openapi3.ParameterInQuery,
+						Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()},
+					}},
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{
+						Name:   "customer_id",
+						In:     openapi3.ParameterInQuery,
+						Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()},
+					}},
+				},
+			},
+		}),
+	))
+
+	cases := []struct {
+		name         string
+		overrideName string
+		want         string
+	}{
+		{name: "uppercase", overrideName: "Status", want: "use lowercase letters, digits, and underscores only"},
+		{name: "hyphen", overrideName: "order-status", want: "use lowercase letters, digits, and underscores only"},
+		{name: "slash", overrideName: "order/status", want: "use lowercase letters, digits, and underscores only"},
+		{name: "dot", overrideName: "order.status", want: "use lowercase letters, digits, and underscores only"},
+		{name: "space", overrideName: "order status", want: "use lowercase letters, digits, and underscores only"},
+		{name: "empty after trim", overrideName: "   ", want: "name is required"},
+		{name: "too long", overrideName: strings.Repeat("a", maxMCPToolNameLength+1), want: "exceeds maximum length"},
+		{name: "duplicate after rename", overrideName: "customer_id", want: "duplicate parameter"},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, _, err := DeriveMCPToolView(src, &TykMCPServer{
+				Primitives: []TykMCPServerPrimitive{
+					{
+						Source: TykMCPServerSource{OperationID: "list_orders"},
+						Parameters: []TykMCPServerParameter{
+							{Param: "status", Name: tc.overrideName},
+						},
+					},
+				},
+			})
 
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.want)

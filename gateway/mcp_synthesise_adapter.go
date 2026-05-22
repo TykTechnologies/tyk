@@ -2,15 +2,18 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
 	"sync"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	tykctx "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	mcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
 	mcppairing "github.com/TykTechnologies/tyk/internal/mcp/pairing"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const (
@@ -428,6 +431,10 @@ func (gw *Gateway) callMCPAdapterTool(ctx context.Context, spec *APISpec, tool *
 
 	resolvedTool, err := mcpAdapterToolForCaller(spec, callerProxyAPIID, tool)
 	if err != nil {
+		var notExposed *mcpToolNotExposedError
+		if errors.As(err, &notExposed) {
+			logMCPAdapterToolNotExposed(ctx, spec, notExposed)
+		}
 		return nil, err
 	}
 
@@ -452,6 +459,41 @@ func (gw *Gateway) callMCPAdapterTool(ctx context.Context, spec *APISpec, tool *
 	return rec, nil
 }
 
+func logMCPAdapterToolNotExposed(ctx context.Context, spec *APISpec, err *mcpToolNotExposedError) {
+	if err == nil {
+		return
+	}
+
+	fields := map[string]interface{}{
+		"tool_name":    err.toolName,
+		"proxy_api_id": err.proxyAPIID,
+	}
+	if spec != nil {
+		fields["source_rest_api_id"] = spec.SourceRESTAPIID
+		if spec.APIDefinition != nil {
+			fields["adapter_api_id"] = spec.APIID
+		}
+	}
+	if sessionKey := mcpAdapterSessionKeyFromContext(ctx); sessionKey != "" {
+		fields["session_key"] = sessionKey
+	}
+
+	mainLog.WithFields(fields).Warn("MCP tool is not exposed for caller proxy")
+}
+
+func mcpAdapterSessionKeyFromContext(parent context.Context) string {
+	if parent == nil {
+		return ""
+	}
+	if session, ok := parent.Value(tykctx.SessionData).(*user.SessionState); ok && session != nil {
+		return session.KeyID
+	}
+	if key, ok := parent.Value(tykctx.AuthToken).(string); ok {
+		return key
+	}
+	return ""
+}
+
 func mcpAdapterToolForCaller(spec *APISpec, callerProxyAPIID string, requested *oas.DerivedTool) (*oas.DerivedTool, error) {
 	if spec == nil {
 		return nil, fmt.Errorf("nil adapter spec")
@@ -467,12 +509,21 @@ func mcpAdapterToolForCaller(spec *APISpec, callerProxyAPIID string, requested *
 		}
 		visibleTool, ok := view.ToolByName(requested.Name)
 		if !ok {
-			return nil, fmt.Errorf("tool %q is not exposed for caller proxy %q", requested.Name, callerProxyAPIID)
+			return nil, &mcpToolNotExposedError{toolName: requested.Name, proxyAPIID: callerProxyAPIID}
 		}
 		return canonicalMCPAdapterTool(visibleTool), nil
 	}
 
 	return canonicalMCPAdapterTool(*requested), nil
+}
+
+type mcpToolNotExposedError struct {
+	toolName   string
+	proxyAPIID string
+}
+
+func (e *mcpToolNotExposedError) Error() string {
+	return fmt.Sprintf("tool %q is not exposed for caller proxy %q", e.toolName, e.proxyAPIID)
 }
 
 func canonicalMCPAdapterTool(tool oas.DerivedTool) *oas.DerivedTool {

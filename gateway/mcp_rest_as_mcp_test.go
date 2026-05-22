@@ -12,6 +12,8 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1254,6 +1256,61 @@ func TestCallMCPAdapterTool_RejectsToolHiddenFromCallerProxy(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not exposed")
 	assert.False(t, called)
+}
+
+func TestCallMCPAdapterTool_LogsToolHiddenFromCallerProxy(t *testing.T) {
+	logger, hook := logrustest.NewNullLogger()
+	previousMainLog := mainLog
+	mainLog = logger.WithField("prefix", "test")
+	t.Cleanup(func() { mainLog = previousMainLog })
+
+	adapterID := oas.AdapterAPIID("rest-1")
+	idx := pairing.New()
+	idx.Set(
+		map[string]string{"rest-1": adapterID},
+		map[string]map[string]struct{}{"rest-1": {"proxy-a": {}}},
+	)
+
+	gw := &Gateway{mcpPairing: idx}
+	visible := oas.DerivedTool{
+		OperationID:    "listOrders",
+		CanonicalName:  "listOrders",
+		Name:           "listOrders",
+		Method:         http.MethodGet,
+		PathTemplate:   "/orders",
+		ParamLocations: map[string]string{},
+	}
+	hidden := oas.DerivedTool{
+		OperationID:    "getOrder",
+		CanonicalName:  "getOrder",
+		Name:           "getOrder",
+		Method:         http.MethodGet,
+		PathTemplate:   "/orders/{id}",
+		ParamLocations: map[string]string{"id": "path"},
+	}
+	spec := &APISpec{
+		APIDefinition:         &apidef.APIDefinition{APIID: adapterID, OrgID: "org-1"},
+		IsSyntheticMCPAdapter: true,
+		SourceRESTAPIID:       "rest-1",
+		MCPProxyToolViews: map[string]oas.MCPToolView{
+			"proxy-a": {Tools: []oas.DerivedTool{visible}},
+		},
+	}
+
+	ctx := httpctx.ContextWithMCPProxyCallerAPIID(context.Background(), "proxy-a")
+	ctx = context.WithValue(ctx, tykctx.SessionData, &user.SessionState{KeyID: "agent-key-1"})
+	_, err := gw.callMCPAdapterTool(ctx, spec, &hidden, map[string]any{"id": "42"})
+
+	require.Error(t, err)
+	require.Len(t, hook.Entries, 1)
+	entry := hook.LastEntry()
+	assert.Equal(t, logrus.WarnLevel, entry.Level)
+	assert.Contains(t, entry.Message, "MCP tool is not exposed")
+	assert.Equal(t, "getOrder", entry.Data["tool_name"])
+	assert.Equal(t, "proxy-a", entry.Data["proxy_api_id"])
+	assert.Equal(t, "rest-1", entry.Data["source_rest_api_id"])
+	assert.Equal(t, adapterID, entry.Data["adapter_api_id"])
+	assert.Equal(t, "agent-key-1", entry.Data["session_key"])
 }
 
 func TestValidatePairedMCPAdapterUpstream_RejectsAliasConflictAcrossSameOrgProxies(t *testing.T) {

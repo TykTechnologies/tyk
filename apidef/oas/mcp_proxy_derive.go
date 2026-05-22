@@ -1047,8 +1047,8 @@ func sourceKeyForMCPPrimitiveMessage(primitive TykMCPServerPrimitive) string {
 
 func renameMCPToolParameter(tool *DerivedTool, oldName, newName string) error {
 	newName = strings.TrimSpace(newName)
-	if newName == "" {
-		return fmt.Errorf("parameter override %q has empty name", oldName)
+	if err := ValidateMCPToolName(newName); err != nil {
+		return fmt.Errorf("parameter override %q: %w", oldName, err)
 	}
 	if oldName == newName {
 		return nil
