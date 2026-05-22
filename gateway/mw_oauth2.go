@@ -15,6 +15,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/oauth2common"
 )
@@ -197,10 +198,12 @@ func (m *OAuth2Middleware) perOperationScopeAlternatives(r *http.Request) [][]st
 	// empty, so no per-primitive enforcement runs for them. A primitive
 	// whose scopeCheck is disabled contributes nothing.
 	if state := httpctx.GetJSONRPCRoutingState(r); state != nil && state.PrimitiveName != "" && mw != nil {
-		for _, prims := range []oas.MCPPrimitives{mw.McpTools, mw.McpResources, mw.McpPrompts} {
-			if prim, ok := prims[state.PrimitiveName]; ok && prim != nil && scopeCheckEnabled(prim.ScopeCheck) {
-				out = appendOAuth2Alternatives(out, prim.Security, oauth2Names)
-			}
+		// Keyed by type as well as name — tool/resource/prompt names
+		// share no namespace, so a same-named primitive of another
+		// type must not contribute its scopes here.
+		prims := mcpPrimitivesForType(mw, state.PrimitiveType)
+		if prim, ok := prims[state.PrimitiveName]; ok && prim != nil && scopeCheckEnabled(prim.ScopeCheck) {
+			out = appendOAuth2Alternatives(out, prim.Security, oauth2Names)
 		}
 	}
 
@@ -212,6 +215,21 @@ func (m *OAuth2Middleware) perOperationScopeAlternatives(r *http.Request) [][]st
 	}
 
 	return out
+}
+
+// mcpPrimitivesForType returns the primitive map matching the routing
+// state's primitive type, or nil for a non-primitive method.
+func mcpPrimitivesForType(mw *oas.Middleware, primitiveType string) oas.MCPPrimitives {
+	switch primitiveType {
+	case mcp.PrimitiveTypeTool:
+		return mw.McpTools
+	case mcp.PrimitiveTypeResource:
+		return mw.McpResources
+	case mcp.PrimitiveTypePrompt:
+		return mw.McpPrompts
+	default:
+		return nil
+	}
 }
 
 // scopeCheckEnabled reports whether the operation-level scope check is

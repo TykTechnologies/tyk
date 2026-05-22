@@ -16,6 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -728,10 +729,13 @@ func oauth2PerOpMW(scopeSource string, globalScopes [][]string) (*OAuth2Middlewa
 	return &OAuth2Middleware{BaseMiddleware: &BaseMiddleware{Spec: spec}}, &spec.OAS
 }
 
-func reqWithPrimitive(method, path, primitiveName string) *http.Request {
-	r := httptest.NewRequest(method, path, nil)
+func reqWithTypedPrimitive(primitiveType, primitiveName string) *http.Request {
+	r := httptest.NewRequest(http.MethodPost, "/", nil)
 	if primitiveName != "" {
-		httpctx.SetJSONRPCRoutingState(r, &httpctx.JSONRPCRoutingState{PrimitiveName: primitiveName})
+		httpctx.SetJSONRPCRoutingState(r, &httpctx.JSONRPCRoutingState{
+			PrimitiveType: primitiveType,
+			PrimitiveName: primitiveName,
+		})
 	}
 	return r
 }
@@ -867,13 +871,41 @@ func TestOAuth2_RequiredScopeAlternatives_MCPPrimitive(t *testing.T) {
 	buildOASRouterForTest(t, mw)
 
 	assert.Equal(t, [][]string{{"users:write"}, {"users:all"}},
-		mw.requiredScopeAlternativesForRequest(reqWithPrimitive(http.MethodPost, "/", "create_user")))
+		mw.requiredScopeAlternativesForRequest(reqWithTypedPrimitive(mcp.PrimitiveTypeTool, "create_user")))
 	assert.Equal(t, [][]string{{"files:read"}},
-		mw.requiredScopeAlternativesForRequest(reqWithPrimitive(http.MethodPost, "/", "file")))
+		mw.requiredScopeAlternativesForRequest(reqWithTypedPrimitive(mcp.PrimitiveTypeResource, "file")))
 	// Non-tools/call (no primitive name) → nothing enforced.
-	assert.Nil(t, mw.requiredScopeAlternativesForRequest(reqWithPrimitive(http.MethodPost, "/", "")))
+	assert.Nil(t, mw.requiredScopeAlternativesForRequest(reqWithTypedPrimitive(mcp.PrimitiveTypeTool, "")))
 	// Undeclared primitive → nothing enforced (no security: array).
-	assert.Nil(t, mw.requiredScopeAlternativesForRequest(reqWithPrimitive(http.MethodPost, "/", "delete_user")))
+	assert.Nil(t, mw.requiredScopeAlternativesForRequest(reqWithTypedPrimitive(mcp.PrimitiveTypeTool, "delete_user")))
+}
+
+// TestOAuth2_RequiredScopeAlternatives_MCPPrimitiveTypeCollision pins
+// that a primitive resolves by name AND type: tool/resource/prompt
+// names share no namespace, so name-only matching leaks scopes across.
+func TestOAuth2_RequiredScopeAlternatives_MCPPrimitiveTypeCollision(t *testing.T) {
+	mw, doc := oauth2PerOpMW(oas.OAuth2ScopeSourceOperation, nil)
+	mwBlock := doc.GetTykMiddleware()
+	mwBlock.McpTools = oas.MCPPrimitives{
+		"search": {
+			Operation: oas.Operation{ScopeCheck: &oas.ScopeCheck{Enabled: true}},
+			Security:  openapi3.SecurityRequirements{secReq("tools:exec")},
+		},
+	}
+	mwBlock.McpResources = oas.MCPPrimitives{
+		"search": {
+			Operation: oas.Operation{ScopeCheck: &oas.ScopeCheck{Enabled: true}},
+			Security:  openapi3.SecurityRequirements{secReq("files:read")},
+		},
+	}
+	buildOASRouterForTest(t, mw)
+
+	assert.Equal(t, [][]string{{"tools:exec"}},
+		mw.requiredScopeAlternativesForRequest(reqWithTypedPrimitive(mcp.PrimitiveTypeTool, "search")),
+		"a tools/call must enforce only the tool's scopes, not the same-named resource's")
+	assert.Equal(t, [][]string{{"files:read"}},
+		mw.requiredScopeAlternativesForRequest(reqWithTypedPrimitive(mcp.PrimitiveTypeResource, "search")),
+		"a resources/read must enforce only the resource's scopes")
 }
 
 func TestOAuth2_RequiredScopeAlternatives_UnionAndOperationAndGlobal(t *testing.T) {
@@ -971,7 +1003,7 @@ func TestOAuth2_PerMCPPrimitiveScopeCheckDisabled(t *testing.T) {
 		},
 	}
 	buildOASRouterForTest(t, mw)
-	assert.Nil(t, mw.requiredScopeAlternativesForRequest(reqWithPrimitive(http.MethodPost, "/", "create_user")))
+	assert.Nil(t, mw.requiredScopeAlternativesForRequest(reqWithTypedPrimitive(mcp.PrimitiveTypeTool, "create_user")))
 }
 
 // newOAuth2PerOpScopeCheckOAS builds an OAS API for end-to-end
