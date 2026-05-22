@@ -32,8 +32,15 @@ func typeCheckFunc(name string, predicate apiFilterFunc) apiTypeCheck {
 	}
 }
 
+func mcpManaged(spec *APISpec) bool {
+	if spec == nil || spec.APIDefinition == nil {
+		return false
+	}
+	return spec.IsMCPManaged()
+}
+
 var (
-	mcpTypeCheck = typeCheckFunc("MCP Proxy", (*APISpec).IsMCP)
+	mcpTypeCheck = typeCheckFunc("MCP Proxy", mcpManaged)
 )
 
 func (gw *Gateway) setBaseAPIIDHeader(w http.ResponseWriter, oasObj *oas.OAS) {

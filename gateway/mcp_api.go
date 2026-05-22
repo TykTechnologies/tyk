@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	neturl "net/url"
+	"sort"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
@@ -19,7 +23,10 @@ import (
 	lib "github.com/TykTechnologies/tyk/lib/apidef"
 )
 
-const errMsgDeleteFailed = "Delete failed"
+const (
+	errMsgDeleteFailed   = "Delete failed"
+	mcpLoopExactIDPrefix = "id:"
+)
 
 // extractMCPObjFromReq extracts and parses MCP Proxy definition from request body.
 func extractMCPObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
@@ -38,6 +45,34 @@ func extractMCPObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	mcpObj.T = *t
 
 	return reqBodyInBytes, &mcpObj, nil
+}
+
+type mcpProxyDefinition struct {
+	apiDef apidef.APIDefinition
+	oasObj oas.OAS
+}
+
+func decodeMCPProxyDefinition(reqBody io.Reader) (*mcpProxyDefinition, error) {
+	var parsed mcpProxyDefinition
+	if err := json.NewDecoder(reqBody).Decode(&parsed.oasObj); err != nil {
+		log.Error("Couldn't decode MCP OAS object: ", err)
+		return nil, ErrRequestMalformed
+	}
+
+	parsed.oasObj.ExtractTo(&parsed.apiDef)
+	parsed.markRemoteMCPProxy()
+	return &parsed, nil
+}
+
+func (d *mcpProxyDefinition) markRemoteMCPProxy() {
+	// Only mark as MCP (which wires the JSON-RPC middleware on this
+	// spec) when this is a classic remote-MCP proxy. REST-as-MCP
+	// proxies are plain reverse-proxies whose upstream loops into a
+	// synthetic adapter — the adapter owns the JSON-RPC chain, the
+	// proxy is just an authenticated/rate-limited forwarder.
+	if !d.apiDef.IsPairedMCPAdapterProxy() {
+		d.apiDef.MarkAsMCP()
+	}
 }
 
 func (gw *Gateway) validateMCP(next http.HandlerFunc) http.HandlerFunc {
@@ -68,17 +103,189 @@ func (gw *Gateway) validateMCP(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		// REST-as-MCP: when the proxy's upstream points at a synthetic
+		// adapter, verify the pairing is safe before accepting the
+		// proxy into storage. These checks are belt-and-braces with the
+		// runtime check in MCPLoopAuthBypass.
+		if errMsg, errCode := gw.validatePairedMCPAdapterUpstream(r, mcpObj); errMsg != "" {
+			doJSONWrite(w, errCode, apiError(errMsg))
+			return
+		}
+
 		r.Body = ioutil.NopCloser(bytes.NewReader(reqBodyInBytes))
 		next.ServeHTTP(w, r)
 	}
 }
 
-func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int) {
-	var (
-		newDef apidef.APIDefinition
-		oasObj oas.OAS
-	)
+func pairedMCPAdapterTarget(target string) (adapterID, restAPIID string, ok bool) {
+	u, err := neturl.Parse(strings.TrimSpace(target))
+	if err != nil || u.Scheme != "tyk" {
+		return "", "", false
+	}
 
+	adapterID = strings.TrimPrefix(u.Host, mcpLoopExactIDPrefix)
+	if !oas.IsAdapterAPIID(adapterID) {
+		return "", "", false
+	}
+
+	return adapterID, oas.AdapterSourceAPIID(adapterID), true
+}
+
+// validatePairedMCPAdapterUpstream enforces REST-as-MCP admit-time
+// invariants when an MCP proxy targets a synthetic adapter via a
+// `tyk://<adapterAPIID>` upstream URL. Returns ("", 0) when the upstream
+// does not address an adapter (and is therefore out of scope here).
+//
+// Checks:
+//
+//  1. The named REST APISpec exists in apisByID.
+//  2. The REST spec and the incoming proxy share an OrgID.
+func (gw *Gateway) validatePairedMCPAdapterUpstream(r *http.Request, mcpObj *oas.OAS) (string, int) {
+	if mcpObj == nil {
+		return "", 0
+	}
+	ext := mcpObj.GetTykExtension()
+	if ext == nil {
+		return "", 0
+	}
+
+	// Only OAS-described upstream is the operator-managed proxy's
+	// `upstream.url`; pull it from the underlying apidef shape.
+	var temp apidef.APIDefinition
+	mcpObj.ExtractTo(&temp)
+	target := temp.Proxy.TargetURL
+	if target == "" {
+		return "", 0
+	}
+	_, restAPIID, ok := pairedMCPAdapterTarget(target)
+	if !ok {
+		return "", 0
+	}
+
+	gw.apisMu.RLock()
+	rest, ok := gw.apisByID[restAPIID]
+	gw.apisMu.RUnlock()
+
+	if !ok || rest == nil || rest.APIDefinition == nil {
+		return "Paired REST API " + restAPIID + " is not loaded; create it first", http.StatusBadRequest
+	}
+	if rest.OrgID != temp.OrgID {
+		return "Paired REST API belongs to a different OrgID", http.StatusForbidden
+	}
+	if !rest.IsOAS {
+		return "Paired REST API " + restAPIID + " is a Classic API; REST-as-MCP sources must be Tyk OAS APIs", http.StatusBadRequest
+	}
+
+	view, _, err := oas.DeriveMCPToolView(&rest.OAS, mcpObj.GetTykMCPServerExtension())
+	if err != nil {
+		return err.Error(), http.StatusBadRequest
+	}
+	if err := gw.validateMCPToolViewAliasConflicts(temp.APIID, temp.OrgID, restAPIID, view); err != nil {
+		return err.Error(), http.StatusBadRequest
+	}
+
+	_ = r // r is only used for context elsewhere; keep parameter for future audit-logging.
+	return "", 0
+}
+
+func (gw *Gateway) validateMCPToolViewAliasConflicts(incomingProxyAPIID, orgID, restAPIID string, incomingView oas.MCPToolView) error {
+	incomingByName := mcpToolViewSourceIDsByName(incomingView)
+	if len(incomingByName) == 0 {
+		return nil
+	}
+
+	gw.apisMu.RLock()
+
+	proxyIDs := make([]string, 0, len(gw.apisByID))
+	proxiesByID := make(map[string]*APISpec, len(gw.apisByID))
+	rest := gw.apisByID[restAPIID]
+	for _, spec := range gw.apisByID {
+		if spec == nil || spec.APIDefinition == nil || spec.APIID == incomingProxyAPIID || !spec.IsMCPManaged() {
+			continue
+		}
+		_, sourceRESTAPIID, ok := pairedMCPAdapterTarget(spec.Proxy.TargetURL)
+		if !ok || sourceRESTAPIID != restAPIID || spec.OrgID != orgID {
+			continue
+		}
+		proxyIDs = append(proxyIDs, spec.APIID)
+		proxiesByID[spec.APIID] = spec
+	}
+	gw.apisMu.RUnlock()
+
+	if rest == nil {
+		return nil
+	}
+
+	sort.Strings(proxyIDs)
+
+	for _, proxyID := range proxyIDs {
+		spec := proxiesByID[proxyID]
+		existingView, _, err := oas.DeriveMCPToolView(&rest.OAS, spec.OAS.GetTykMCPServerExtension())
+		if err != nil {
+			return fmt.Errorf("build MCP tool view for existing proxy %q: %w", spec.APIID, err)
+		}
+		existingByName := mcpToolViewSourceIDsByName(existingView)
+		for name, incomingSourceID := range incomingByName {
+			existingSourceID, ok := existingByName[name]
+			if ok && existingSourceID != incomingSourceID {
+				return fmt.Errorf("MCP tool alias conflict for %q: incoming proxy maps to source %q, proxy %q maps to source %q", name, incomingSourceID, spec.APIID, existingSourceID)
+			}
+		}
+	}
+
+	return nil
+}
+
+func mcpToolViewSourceIDsByName(view oas.MCPToolView) map[string]string {
+	out := make(map[string]string, len(view.Tools))
+	for _, tool := range view.Tools {
+		out[tool.Name] = derivedToolSourceIdentity(tool)
+	}
+	return out
+}
+
+func derivedToolSourceIdentity(tool oas.DerivedTool) string {
+	if tool.SourceKey != "" {
+		return tool.SourceKey
+	}
+	if tool.OperationID != "" {
+		return "operationId:" + tool.OperationID
+	}
+	return tool.Name
+}
+
+func (gw *Gateway) alignPairedMCPProxyGatewayTags(apiDef *apidef.APIDefinition, oasObj *oas.OAS) error {
+	if apiDef == nil || oasObj == nil {
+		return nil
+	}
+
+	_, restAPIID, ok := pairedMCPAdapterTarget(apiDef.Proxy.TargetURL)
+	if !ok {
+		return nil
+	}
+
+	rest := gw.getApiSpec(restAPIID)
+	if rest == nil || rest.APIDefinition == nil {
+		return fmt.Errorf("paired REST API %s is not loaded; create it first", restAPIID)
+	}
+
+	apiDef.TagsDisabled = rest.TagsDisabled
+	apiDef.Tags = append([]string(nil), rest.Tags...)
+
+	ext := oasObj.GetTykExtension()
+	if ext == nil {
+		return nil
+	}
+	if ext.Server.GatewayTags == nil {
+		ext.Server.GatewayTags = &oas.GatewayTags{}
+	}
+	ext.Server.GatewayTags.Enabled = !apiDef.TagsDisabled
+	ext.Server.GatewayTags.Tags = append([]string(nil), apiDef.Tags...)
+
+	return nil
+}
+
+func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int) {
 	versionParams := lib.NewVersionQueryParameters(r.URL.Query())
 	err := versionParams.Validate(func() (bool, string) {
 		baseApiID := versionParams.Get(lib.BaseAPIID)
@@ -96,19 +303,18 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&oasObj); err != nil {
-		log.Error("Couldn't decode MCP OAS object: ", err)
+	parsed, err := decodeMCPProxyDefinition(r.Body)
+	if err != nil {
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
+	newDef := &parsed.apiDef
+	oasObj := &parsed.oasObj
 
-	oasObj.ExtractTo(&newDef)
-	newDef.MarkAsMCP()
-
-	if validationErr := validateAPIDef(&newDef); validationErr != nil {
+	if validationErr := validateAPIDef(newDef); validationErr != nil {
 		return *validationErr, http.StatusBadRequest
 	}
 
-	if errResp, errCode := ensureAndValidateAPIID(&newDef); errResp != nil {
+	if errResp, errCode := ensureAndValidateAPIID(newDef); errResp != nil {
 		return errResp, errCode
 	}
 
@@ -117,13 +323,17 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 		versionParams.Get(lib.NewVersionName),
 	)
 
-	if err := gw.handleOASServersForNewAPI(&newDef, &oasObj, versioningParams); err != nil {
+	if err := gw.handleOASServersForNewAPI(newDef, oasObj, versioningParams); err != nil {
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
+	if err := gw.alignPairedMCPProxyGatewayTags(newDef, oasObj); err != nil {
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
 	newDef.IsOAS = true
 	oasObj.GetTykExtension().Info.ID = newDef.APIID
-	err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
+	err, errCode := gw.writeOASAndAPIDefToFile(fs, newDef, oasObj)
 	if err != nil {
 		return apiError(err.Error()), errCode
 	}
@@ -136,11 +346,6 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 }
 
 func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (interface{}, int) {
-	var (
-		newDef apidef.APIDefinition
-		oasObj oas.OAS
-	)
-
 	if err := sanitize.ValidatePathComponent(apiID); err != nil {
 		log.Errorf("Invalid API ID %q: %v", apiID, err)
 		return apiError("Invalid API ID"), http.StatusBadRequest
@@ -151,19 +356,18 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 		return resp, code
 	}
 
-	if !spec.IsMCP() {
+	if !spec.IsMCPManaged() {
 		return apiError("API is not an MCP Proxy"), http.StatusNotFound
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&oasObj); err != nil {
-		log.Error("Couldn't decode MCP OAS object: ", err)
+	parsed, err := decodeMCPProxyDefinition(r.Body)
+	if err != nil {
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
+	newDef := &parsed.apiDef
+	oasObj := &parsed.oasObj
 
-	oasObj.ExtractTo(&newDef)
-	newDef.MarkAsMCP()
-
-	if validationErr := validateAPIDef(&newDef); validationErr != nil {
+	if validationErr := validateAPIDef(newDef); validationErr != nil {
 		return *validationErr, http.StatusBadRequest
 	}
 
@@ -171,12 +375,16 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 		return resp, code
 	}
 
-	if err := gw.handleOASServersForUpdate(spec, &newDef, &oasObj); err != nil {
+	if err := gw.handleOASServersForUpdate(spec, newDef, oasObj); err != nil {
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
+	if err := gw.alignPairedMCPProxyGatewayTags(newDef, oasObj); err != nil {
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
 	newDef.IsOAS = true
-	err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
+	err, errCode := gw.writeOASAndAPIDefToFile(fs, newDef, oasObj)
 	if err != nil {
 		return apiError(err.Error()), errCode
 	}
@@ -185,7 +393,7 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 }
 
 func (gw *Gateway) handleGetMCPListOAS() (interface{}, int) {
-	return gw.handleGetOASList((*APISpec).IsMCP, false)
+	return gw.handleGetOASList(mcpManaged, false)
 }
 
 func (gw *Gateway) mcpListHandler(w http.ResponseWriter, _ *http.Request) {
@@ -237,13 +445,19 @@ func (gw *Gateway) handleDeleteMCP(apiID string, fs afero.Fs) (interface{}, int)
 		return resp, code
 	}
 
-	if !spec.IsMCP() {
+	if !spec.IsMCPManaged() {
 		return apiError("API is not an MCP Proxy"), http.StatusNotFound
 	}
 
 	if err := deleteAPIFiles(apiID, "mcp", gw.GetConfig().AppPath, fs); err != nil {
-		log.Warning("Delete failed: ", err)
-		return apiError(errMsgDeleteFailed), http.StatusInternalServerError
+		if !spec.IsPairedMCPAdapterProxy() {
+			log.Warning("Delete failed: ", err)
+			return apiError(errMsgDeleteFailed), http.StatusInternalServerError
+		}
+		if err = deleteAPIFiles(apiID, "oas", gw.GetConfig().AppPath, fs); err != nil {
+			log.Warning("Delete failed: ", err)
+			return apiError(errMsgDeleteFailed), http.StatusInternalServerError
+		}
 	}
 
 	handleBaseVersionCleanup(gw, spec, apiID, fs)

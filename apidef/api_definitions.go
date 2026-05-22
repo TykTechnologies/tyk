@@ -7,28 +7,23 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"text/template"
 	"time"
 
 	"github.com/clbanning/mxj"
 	"github.com/lonelycode/osin"
-
-	"github.com/TykTechnologies/storage/persistent/model"
-
-	"github.com/TykTechnologies/tyk/internal/event"
-
-	"github.com/TykTechnologies/tyk/internal/reflect"
-	tyktime "github.com/TykTechnologies/tyk/internal/time"
-
 	"golang.org/x/oauth2"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
+	"github.com/TykTechnologies/storage/persistent/model"
 
+	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
-
-	"github.com/TykTechnologies/tyk/regexp"
-
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/regexp"
 )
 
 type AuthProviderCode string
@@ -1458,6 +1453,39 @@ func (a *APIDefinition) IsMCP() bool {
 // MarkAsMCP configures the API definition as a Model Context Protocol (MCP) API.
 func (a *APIDefinition) MarkAsMCP() {
 	a.SetProtocol(JsonRPC20, AppProtocolMCP)
+}
+
+// IsPairedMCPAdapterProxy returns true if this API is a REST-as-MCP proxy
+// whose upstream loops into a synthetic adapter — recognised by a
+// `tyk://<rest-id>__mcp-server` upstream URL.
+//
+// REST-as-MCP proxies are *not* IsMCP() (the JSON-RPC middleware lives on
+// the adapter, not on the proxy itself), but they belong to the MCP
+// management surface — `/tyk/mcps` lists, gets, updates, and deletes
+// them alongside remote-MCP proxies.
+func (a *APIDefinition) IsPairedMCPAdapterProxy() bool {
+	if a == nil {
+		return false
+	}
+	t := strings.TrimSpace(a.Proxy.TargetURL)
+	const scheme = "tyk://"
+	if !strings.HasPrefix(t, scheme) {
+		return false
+	}
+	host := strings.TrimPrefix(t, scheme)
+	if i := strings.IndexAny(host, "/?"); i != -1 {
+		host = host[:i]
+	}
+	host = strings.TrimPrefix(host, "id:")
+	const adapterSuffix = "__mcp-server"
+	return strings.HasSuffix(host, adapterSuffix) && len(host) > len(adapterSuffix)
+}
+
+// IsMCPManaged returns true for APIs that belong to the MCP management
+// surface — both classic MCP proxies (IsMCP()) and REST-as-MCP proxies
+// that loop into a synthetic adapter.
+func (a *APIDefinition) IsMCPManaged() bool {
+	return a.IsMCP() || a.IsPairedMCPAdapterProxy()
 }
 
 // IsChildAPI returns true if this API is a child API in a versioning hierarchy.
