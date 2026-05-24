@@ -108,6 +108,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		} else {
 			response = e.writeTemplateErrorResponse(w, r, errMsg, errCode)
 		}
+	} else if captured := ctxGetCapturedResponse(r); captured != nil {
+		// An upstream middleware (currently goplugin) already wrote the wire
+		// response and stashed its captured *http.Response. Use it so the
+		// analytics RawResponse reflects the real bytes the client received
+		// instead of the zero-value sentinel "HTTP/0.0 000 status code 0".
+		response = captured
 	}
 
 	// Calculate latency for error responses (needed for both API metrics and analytics).

@@ -305,6 +305,13 @@ func (m *GoPluginMiddleware) handlePluginResponse(
 
 	// check if response code was an error one
 	if rw.statusCodeSent >= http.StatusBadRequest {
+		// Stash the wrapped writer's *http.Response so ErrorHandler.HandleError
+		// can use it for the analytics RawResponse. Without this, HandleError
+		// runs with writeResponse=false (so it won't clobber the plugin's wire
+		// response, see #7985) and serializes a zero-value *http.Response
+		// into RawResponse: "HTTP/0.0 000 status code 0\r\nContent-Length: 0".
+		// See gateway/handler_error.go for the consumer side.
+		ctxSetCapturedResponse(r, rw.getHttpResponse(r))
 		return m.handleErrorResponse(r, rw, logger)
 	}
 

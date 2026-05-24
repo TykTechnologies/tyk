@@ -75,6 +75,12 @@ const (
 	MCPPrimitiveName
 	// JSONRPCErrorCode stores the JSON-RPC error code for metrics dimensions.
 	JSONRPCErrorCode
+	// CapturedResponse holds a *http.Response that was constructed by an
+	// upstream middleware (currently goplugin) from a wrapped ResponseWriter.
+	// ErrorHandler.HandleError reads this when writeResponse=false to populate
+	// the analytics RawResponse, instead of serializing a zero-value
+	// http.Response (which renders as "HTTP/0.0 000 status code 0").
+	CapturedResponse
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
