@@ -312,7 +312,7 @@ func TestGetLogEntryForRequest_TraceAndSpanIDs(t *testing.T) {
 
 				ts.Gw.TracerProvider = otel.InitOpenTelemetry(
 					ts.Gw.ctx,
-					log,
+					log.AsLogrus(),
 					&globalConf.OpenTelemetry,
 					"test-gateway",
 					"1.0.0",
