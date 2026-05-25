@@ -10,12 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/internal/scheduler"
+	tyklog "github.com/TykTechnologies/tyk/log"
 )
 
 func TestScheduler_Break(t *testing.T) {
 	logger, _ := logrus.NewNullLogger()
 
-	s := scheduler.NewScheduler(logger)
+	s := scheduler.NewScheduler(tyklog.Wrap(logger))
 
 	assert.NotEmpty(t, s)
 
@@ -31,7 +32,7 @@ func TestScheduler_Break(t *testing.T) {
 func TestScheduler_Close(t *testing.T) {
 	logger, _ := logrus.NewNullLogger()
 
-	s := scheduler.NewScheduler(logger)
+	s := scheduler.NewScheduler(tyklog.Wrap(logger))
 	defer s.Close()
 
 	job := scheduler.NewJob("test", func() error {
@@ -67,7 +68,7 @@ func TestScheduler_Job_Errors(t *testing.T) {
 				return tc.err
 			}, 1)
 
-			runner := scheduler.NewScheduler(logger)
+			runner := scheduler.NewScheduler(tyklog.Wrap(logger))
 			go runner.Start(ctx, job)
 
 			time.Sleep(time.Millisecond)
