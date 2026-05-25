@@ -35,6 +35,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/policy"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/tcp"
 	"github.com/TykTechnologies/tyk/test"
@@ -1687,7 +1688,7 @@ func TestPoliciesCollisionMessage(t *testing.T) {
 	mock.SetLevel(logrus.WarnLevel)
 
 	originGlobalLogger := log
-	log = mock
+	log = tyklog.Wrap(mock)
 	t.Cleanup(func() {
 		log = originGlobalLogger
 	})
