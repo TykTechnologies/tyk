@@ -273,7 +273,7 @@ type APIDefinitionLoader struct {
 // keyed to the Api version name, which is determined during routing to speed up lookups
 func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry) (*APISpec, error) {
 	if logger == nil {
-		logger = logrus.NewEntry(log).WithFields(logrus.Fields{
+		logger = log.WithFields(logrus.Fields{
 			"api_id": def.APIID,
 			"org_id": def.OrgID,
 			"name":   def.Name,

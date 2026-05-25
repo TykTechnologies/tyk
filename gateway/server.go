@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	htmltemplate "html/template"
+	"io"
 	"io/ioutil"
 	stdlog "log"
 	"log/syslog"
@@ -1297,7 +1298,7 @@ func (gw *Gateway) DoReloadWithError() error {
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
 		gw.GlobalEventsJSVM.DeInit()
-		gw.GlobalEventsJSVM.Init(nil, logrus.NewEntry(log), gw)
+		gw.GlobalEventsJSVM.Init(nil, log.NewEntry(), gw)
 	}
 
 	// Re-initialize global event handlers to ensure they persist across reloads
@@ -1544,8 +1545,9 @@ func (gw *Gateway) reloadURLStructure(done func()) {
 	gw.reloadQueue <- done
 }
 
-func (gw *Gateway) setupLogger() {
+func (gw *Gateway) setupLogger(builder *tyklog.Builder) {
 	gwConfig := gw.GetConfig()
+
 	if gwConfig.UseSentry {
 		mainLog.Debug("Enabling Sentry support")
 
@@ -1568,7 +1570,7 @@ func (gw *Gateway) setupLogger() {
 
 		if err == nil {
 			hook.Timeout = 0
-			log.Hooks.Add(hook)
+			builder.AddHook(hook)
 			rawLog.Hooks.Add(hook)
 		}
 		mainLog.Debug("Sentry hook active")
@@ -1581,7 +1583,7 @@ func (gw *Gateway) setupLogger() {
 			syslog.LOG_INFO, "")
 
 		if err == nil {
-			log.Hooks.Add(hook)
+			builder.AddHook(hook)
 			rawLog.Hooks.Add(hook)
 		}
 		mainLog.Debug("Syslog hook active")
@@ -1592,7 +1594,7 @@ func (gw *Gateway) setupLogger() {
 		hook := grayloghook.NewGraylogHook(gwConfig.GraylogNetworkAddr,
 			map[string]interface{}{"tyk-module": "gateway"})
 
-		log.Hooks.Add(hook)
+		builder.AddHook(hook)
 		rawLog.Hooks.Add(hook)
 
 		mainLog.Debug("Graylog hook active")
@@ -1618,7 +1620,7 @@ func (gw *Gateway) setupLogger() {
 			hook = logstashhook.New(conn, logstashhook.DefaultFormatter(logrus.Fields{
 				"type": appName,
 			}))
-			log.Hooks.Add(hook)
+			builder.AddHook(hook)
 			rawLog.Hooks.Add(hook)
 			mainLog.Debug("Logstash hook active")
 		}
@@ -1626,7 +1628,7 @@ func (gw *Gateway) setupLogger() {
 
 	if gwConfig.UseRedisLog {
 		hook := gw.newRedisHook()
-		log.Hooks.Add(hook)
+		builder.AddHook(hook)
 		rawLog.Hooks.Add(hook)
 
 		mainLog.Debug("Redis log hook active")
@@ -1637,43 +1639,9 @@ func (gw *Gateway) initSystem() error {
 	globalMu.Lock()
 	defer globalMu.Unlock()
 
+	defer tyklog.Flush()
+
 	gwConfig := gw.GetConfig()
-
-	// Initialize the appropriate log formatter
-	if !gw.isRunningTests() && os.Getenv("TYK_LOGFORMAT") == "" && !*cli.DebugMode {
-		tyklog.SetupFormatter(gwConfig.LogFormat)
-		mainLog.Debugf("Set log format to %q", gwConfig.LogFormat)
-	}
-
-	// if TYK_LOGLEVEL is not set, config will be read here.
-	if os.Getenv("TYK_LOGLEVEL") == "" && !*cli.DebugMode {
-		level := strings.ToLower(gwConfig.LogLevel)
-		switch level {
-		case "", "info":
-			// default, do nothing
-		case "error":
-			log.Level = logrus.ErrorLevel
-		case "warn":
-			log.Level = logrus.WarnLevel
-		case "debug":
-			log.Level = logrus.DebugLevel
-		default:
-			mainLog.Fatalf("Invalid log level %q specified in config, must be error, warn, debug or info. ", level)
-		}
-		mainLog.Debugf("Set log level to %q", log.Level)
-	}
-
-	if gw.isRunningTests() && os.Getenv("TYK_LOGLEVEL") == "" {
-		// `go test` without TYK_LOGLEVEL set defaults to no log
-		// output
-		log.SetLevel(logrus.ErrorLevel)
-		log.SetOutput(ioutil.Discard)
-		gorpc.SetErrorLogger(func(string, ...interface{}) {})
-		stdlog.SetOutput(ioutil.Discard)
-	} else if *cli.DebugMode {
-		log.Level = logrus.DebugLevel
-		mainLog.Debug("Enabling debug-level output")
-	}
 
 	if *cli.Conf != "" {
 		mainLog.Debugf("Using %s for configuration", *cli.Conf)
@@ -1741,8 +1709,40 @@ func (gw *Gateway) initSystem() error {
 		}
 	}
 
-	// Enable all the loggers
-	gw.setupLogger()
+	tyklog.Setup(func(b *tyklog.Builder) {
+		stdlog.SetOutput(io.Discard)
+
+		logFormat := tyklog.CoalesceEnvOrDefault(tyklog.FormatText, gwConfig.LogFormat, tyklog.EnvTykLogformat, tyklog.EnvTykGwLogformat)
+		formatter := tyklog.NewFormatter(logFormat)
+
+		b.AddSink(tyklog.NewSink(os.Stderr, formatter, tyklog.NewGteAcceptor(logrus.ErrorLevel)))
+		b.AddSink(tyklog.NewSink(os.Stdout, formatter, tyklog.NewLtAcceptor(logrus.ErrorLevel)))
+
+		if logLevel := tyklog.CoalesceEnv(gwConfig.LogLevel, tyklog.EnvTykLoglevel, tyklog.EnvTykGwLoglevel); logLevel != "" {
+			if level, ok := logLevel.LogrusLevel(); !ok {
+				mainLog.Fatalf("Invalid log level %q specified in config, must be error, warn, debug or info. ", level)
+			} else {
+				b.WithLevel(level)
+			}
+			mainLog.Debugf("Set log level to %q", log.GetLevel())
+		}
+
+		if gw.isRunningTests() && os.Getenv(tyklog.EnvTykLoglevel) == "" {
+			// `go test` without TYK_LOGLEVEL set defaults to no log
+			// output
+			b.WithLevel(logrus.ErrorLevel)
+			b.WithDiscardOutput()
+			gorpc.SetErrorLogger(func(string, ...interface{}) {})
+			stdlog.SetOutput(io.Discard)
+		} else if *cli.DebugMode {
+			b.WithLevel(logrus.DebugLevel)
+			mainLog.Debug("Enabling debug-level output")
+		}
+
+		// Enable all the loggers
+		gw.setupLogger(b)
+	})
+
 	mainLog.Info("PIDFile location set to: ", gwConfig.PIDFileLocation)
 
 	if err := writePIDFile(gw.GetConfig().PIDFileLocation); err != nil {
