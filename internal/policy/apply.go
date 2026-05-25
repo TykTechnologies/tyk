@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/internal/model"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -19,13 +20,13 @@ var (
 // Service represents the implementation for apply policies logic.
 type Service struct {
 	storage model.PolicyProvider
-	logger  *logrus.Logger
+	logger  tyklog.Logger
 
 	// used for validation if not empty
 	orgID *string
 }
 
-func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Service {
+func New(orgID *string, storage model.PolicyProvider, logger tyklog.Logger) *Service {
 	return &Service{
 		orgID:   orgID,
 		storage: storage,
@@ -259,7 +260,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 // Logger implements a typical logger signature with service context.
 func (t *Service) Logger() *logrus.Entry {
-	return logrus.NewEntry(t.logger)
+	return t.logger.NewEntry()
 }
 
 // ApplyRateLimits will write policy limits to session and apiLimits.

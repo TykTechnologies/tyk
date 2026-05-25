@@ -21,7 +21,6 @@ import (
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/tcp"
 
 	"github.com/gorilla/mux"
@@ -223,7 +222,7 @@ func (m *proxyMux) handle404(w http.ResponseWriter, r *http.Request) {
 
 func getLogEntryFor404(r *http.Request) *logrus.Entry {
 	requestMeta := fmt.Sprintf("%s %s %s", r.Method, r.URL.Path, r.Proto)
-	if !tyklog.IsLegacyFormatter(log.Formatter) {
+	if !log.IsLegacyFormatter() {
 		return log.WithField("request", requestMeta).WithField("origin", r.RemoteAddr).WithField("host", r.Host)
 	}
 

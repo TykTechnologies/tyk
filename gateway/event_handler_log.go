@@ -3,6 +3,7 @@ package gateway
 import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/sirupsen/logrus"
 )
 
@@ -14,7 +15,7 @@ type LogEventMessage interface {
 // LogMessageEventHandler is a sample Event Handler
 type LogMessageEventHandler struct {
 	conf   apidef.LogEventHandlerConf
-	logger *logrus.Logger
+	logger tyklog.Logger
 	Gw     *Gateway `json:"-"`
 }
 

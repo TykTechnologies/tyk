@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	tyklog "github.com/TykTechnologies/tyk/log"
 )
 
 var (
@@ -24,7 +24,7 @@ var (
 func (ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
 
 	if logger == nil {
-		logger = log
+		logger = log.AsLogrus()
 	}
 	def := &apidef.APIDefinition{
 		EventHandlers: apidef.EventHandlerMetaConfig{
@@ -49,7 +49,7 @@ func (ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
 			eventHandlerInstance, err := ts.Gw.EventHandlerByName(handlerConf, spec)
 			logEventHandler, ok := eventHandlerInstance.(*LogMessageEventHandler)
 			if ok {
-				logEventHandler.logger = logger
+				logEventHandler.logger = tyklog.Wrap(logger)
 			}
 
 			if err != nil {
