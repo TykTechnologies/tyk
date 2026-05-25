@@ -17,22 +17,22 @@ import (
 // This hook intercepts those events and applies the same access-control
 // filtering as MCPListFilterResponseHandler does for regular HTTP responses.
 type MCPListFilterSSEHook struct {
-	apiID string
-	ses   *user.SessionState
+	spec *APISpec
+	ses  *user.SessionState
 }
 
 // NewMCPListFilterSSEHook creates a hook that filters list response events
-// based on the session's MCPAccessRights for the given API.
-// Returns nil if no filtering is needed (nil session or no ACL rules).
-func NewMCPListFilterSSEHook(apiID string, ses *user.SessionState) *MCPListFilterSSEHook {
-	if ses == nil {
+// based on OAS middleware rules and session access rights for the given API.
+// Returns nil if no filtering is needed.
+func NewMCPListFilterSSEHook(spec *APISpec, ses *user.SessionState) *MCPListFilterSSEHook {
+	if spec == nil {
 		return nil
 	}
-	accessDef, ok := ses.AccessRights[apiID]
-	if !ok || accessDef.MCPAccessRights.IsEmpty() {
+
+	if !hasMCPDiscoveryFiltering(spec, ses) {
 		return nil
 	}
-	return &MCPListFilterSSEHook{apiID: apiID, ses: ses}
+	return &MCPListFilterSSEHook{spec: spec, ses: ses}
 }
 
 // FilterEvent inspects an SSE event. If it contains a JSON-RPC list response,
@@ -93,15 +93,38 @@ func (h *MCPListFilterSSEHook) filterSSEData(data []byte) ([]byte, bool) {
 	}
 
 	cfg := mcp.InferListConfigFromResult(result)
-	if cfg == nil {
-		return nil, false
+	if cfg != nil {
+		ruleSets := effectiveMCPListRuleSets(h.spec, h.ses, cfg)
+		if len(ruleSets) == 0 {
+			return nil, false
+		}
+		return mcp.FilterParsedJSONRPCWithRuleSets(&envelope, result, cfg, ruleSets)
 	}
 
-	accessDef := h.ses.AccessRights[h.apiID]
-	rules := cfg.RulesFrom(accessDef.MCPAccessRights)
-	if rules.IsEmpty() {
+	ruleSets := effectiveJSONRPCMethodRuleSets(h.spec, h.ses)
+	if len(ruleSets) == 0 {
 		return nil, false
 	}
+	return mcp.FilterInitializeCapabilitiesParsed(&envelope, result, ruleSets)
+}
 
-	return mcp.FilterParsedJSONRPC(&envelope, result, cfg, rules)
+func hasMCPDiscoveryFiltering(spec *APISpec, ses *user.SessionState) bool {
+	if !oasPrimitiveRules(spec, mcp.ListFilterConfigs["tools"]).IsEmpty() ||
+		!oasPrimitiveRules(spec, mcp.ListFilterConfigs["prompts"]).IsEmpty() ||
+		!oasPrimitiveRules(spec, mcp.ListFilterConfigs["resources"]).IsEmpty() ||
+		!oasJSONRPCMethodRules(spec).IsEmpty() {
+
+		return true
+	}
+
+	if spec == nil || ses == nil {
+		return false
+	}
+
+	accessDef, ok := ses.AccessRights[spec.APIID]
+	if !ok {
+		return false
+	}
+
+	return !accessDef.MCPAccessRights.IsEmpty() || !accessDef.JSONRPCMethodsAccessRights.IsEmpty()
 }

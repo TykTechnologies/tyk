@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/user"
@@ -34,6 +35,14 @@ func buildMCPListFilterHandler(apiID string, isMCP bool) *MCPListFilterResponseH
 			},
 		},
 	}
+}
+
+func buildMCPListFilterHandlerWithMiddleware(apiID string, middleware *oas.Middleware) *MCPListFilterResponseHandler {
+	h := buildMCPListFilterHandler(apiID, true)
+	h.Spec.OAS.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: middleware,
+	})
+	return h
 }
 
 // makeToolsListResponse builds a JSON-RPC 2.0 response with a tools/list result.
@@ -575,6 +584,258 @@ func TestMCPListFilterResponseHandler_HandleResponse(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMCPListFilterResponseHandler_HandleResponse_MiddlewarePrimitiveFiltering(t *testing.T) {
+	tools := []map[string]any{
+		{"name": "get_weather"},
+		{"name": "get_forecast"},
+		{"name": "execute_query"},
+		{"name": "admin_reset"},
+	}
+
+	tests := []struct {
+		name       string
+		primitives oas.MCPPrimitives
+		want       []string
+	}{
+		{
+			name: "allow rules limit tools/list discovery",
+			primitives: oas.MCPPrimitives{
+				"get_weather":   {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+				"get_forecast":  {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+				"execute_query": {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+			},
+			want: []string{"get_weather", "get_forecast", "execute_query"},
+		},
+		{
+			name: "block rules remove tools/list discovery entries",
+			primitives: oas.MCPPrimitives{
+				"admin_reset": {Operation: oas.Operation{Block: &oas.Allowance{Enabled: true}}},
+			},
+			want: []string{"get_weather", "get_forecast", "execute_query"},
+		},
+		{
+			name: "block takes precedence over allow for middleware rules",
+			primitives: oas.MCPPrimitives{
+				"get_weather": {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+				"admin_reset": {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}, Block: &oas.Allowance{Enabled: true}}},
+			},
+			want: []string{"get_weather"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := buildMCPListFilterHandlerWithMiddleware("api-1", &oas.Middleware{
+				McpTools: tt.primitives,
+			})
+			rw := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+			httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{
+				Method: mcp.MethodToolsList,
+				ID:     1,
+			})
+
+			res := makeHTTPResponse(makeToolsListResponse(tools, ""))
+			require.NoError(t, h.HandleResponse(rw, res, req, nil))
+
+			body := readResponseBody(t, res)
+			assert.Equal(t, tt.want, extractToolNames(t, body))
+		})
+	}
+}
+
+func TestMCPListFilterResponseHandler_HandleResponse_MiddlewareResourceAndPromptFiltering(t *testing.T) {
+	t.Run("resources/list applies middleware resource wildcard", func(t *testing.T) {
+		h := buildMCPListFilterHandlerWithMiddleware("api-1", &oas.Middleware{
+			McpResources: oas.MCPPrimitives{
+				"file:///public/*": {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+			},
+		})
+		rw := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+		httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{
+			Method: mcp.MethodResourcesList,
+			ID:     1,
+		})
+
+		res := makeHTTPResponse(makeResourcesListResponse([]map[string]any{
+			{"uri": "file:///public/readme.md"},
+			{"uri": "file:///private/keys.txt"},
+		}))
+		require.NoError(t, h.HandleResponse(rw, res, req, nil))
+
+		body := readResponseBody(t, res)
+		assert.Equal(t, []string{"file:///public/readme.md"}, extractResourceURIs(t, body))
+	})
+
+	t.Run("resources/templates/list applies exact middleware resource names", func(t *testing.T) {
+		h := buildMCPListFilterHandlerWithMiddleware("api-1", &oas.Middleware{
+			McpResources: oas.MCPPrimitives{
+				"file://{path}": {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+			},
+		})
+		rw := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+		httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{
+			Method: mcp.MethodResourcesTemplatesList,
+			ID:     1,
+		})
+
+		res := makeHTTPResponse(makeResourceTemplatesListResponse([]map[string]any{
+			{"uriTemplate": "file://{path}"},
+			{"uriTemplate": "db://{schema}/{table}"},
+		}))
+		require.NoError(t, h.HandleResponse(rw, res, req, nil))
+
+		body := readResponseBody(t, res)
+		assert.Equal(t, []string{"file://{path}"}, extractResourceTemplateURIs(t, body))
+	})
+
+	t.Run("prompts/list applies middleware prompt rules", func(t *testing.T) {
+		h := buildMCPListFilterHandlerWithMiddleware("api-1", &oas.Middleware{
+			McpPrompts: oas.MCPPrimitives{
+				"summarise": {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+			},
+		})
+		rw := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+		httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{
+			Method: mcp.MethodPromptsList,
+			ID:     1,
+		})
+
+		res := makeHTTPResponse(makePromptsListResponse([]map[string]any{
+			{"name": "summarise"},
+			{"name": "translate"},
+		}))
+		require.NoError(t, h.HandleResponse(rw, res, req, nil))
+
+		body := readResponseBody(t, res)
+		assert.Equal(t, []string{"summarise"}, extractPromptNames(t, body))
+	})
+}
+
+func TestMCPListFilterResponseHandler_HandleResponse_MiddlewareAndPolicyCompose(t *testing.T) {
+	h := buildMCPListFilterHandlerWithMiddleware("api-1", &oas.Middleware{
+		McpTools: oas.MCPPrimitives{
+			"get_weather":   {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+			"get_forecast":  {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+			"execute_query": {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+		},
+	})
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{
+		Method: mcp.MethodToolsList,
+		ID:     1,
+	})
+
+	session := &user.SessionState{
+		AccessRights: map[string]user.AccessDefinition{
+			"api-1": {
+				APIID: "api-1",
+				MCPAccessRights: user.MCPAccessRights{
+					Tools: user.AccessControlRules{
+						Allowed: []string{"get_weather", "get_forecast"},
+					},
+				},
+			},
+		},
+	}
+
+	res := makeHTTPResponse(makeToolsListResponse([]map[string]any{
+		{"name": "get_weather"},
+		{"name": "get_forecast"},
+		{"name": "execute_query"},
+		{"name": "admin_reset"},
+	}, ""))
+	require.NoError(t, h.HandleResponse(rw, res, req, session))
+
+	body := readResponseBody(t, res)
+	assert.Equal(t, []string{"get_weather", "get_forecast"}, extractToolNames(t, body))
+}
+
+func TestMCPListFilterResponseHandler_HandleResponse_InitializeCapabilitiesFiltering(t *testing.T) {
+	makeInitializeResponse := func() []byte {
+		return makeJSONRPCResponse(1, map[string]any{
+			"protocolVersion": "2025-03-26",
+			"capabilities": map[string]any{
+				"tools":     map[string]any{"listChanged": true},
+				"resources": map[string]any{"subscribe": true},
+				"prompts":   map[string]any{},
+				"sampling":  map[string]any{},
+			},
+			"serverInfo": map[string]any{
+				"name":    "test",
+				"version": "1.0.0",
+			},
+		})
+	}
+
+	extractCapabilityKeys := func(t *testing.T, body []byte) map[string]json.RawMessage {
+		t.Helper()
+		var envelope mcp.JSONRPCResponse
+		require.NoError(t, json.Unmarshal(body, &envelope))
+
+		var result map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(envelope.Result, &result))
+
+		var capabilities map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(result["capabilities"], &capabilities))
+		return capabilities
+	}
+
+	t.Run("session method block removes sampling capability", func(t *testing.T) {
+		h := buildMCPListFilterHandler("api-1", true)
+		rw := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+		httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{
+			Method: "initialize",
+			ID:     1,
+		})
+		session := &user.SessionState{
+			AccessRights: map[string]user.AccessDefinition{
+				"api-1": {
+					APIID: "api-1",
+					JSONRPCMethodsAccessRights: user.AccessControlRules{
+						Blocked: []string{mcp.MethodSamplingCreate},
+					},
+				},
+			},
+		}
+
+		res := makeHTTPResponse(makeInitializeResponse())
+		require.NoError(t, h.HandleResponse(rw, res, req, session))
+
+		capabilities := extractCapabilityKeys(t, readResponseBody(t, res))
+		assert.NotContains(t, capabilities, "sampling")
+		assert.Contains(t, capabilities, "tools")
+	})
+
+	t.Run("OAS method block removes tools capability", func(t *testing.T) {
+		h := buildMCPListFilterHandlerWithMiddleware("api-1", &oas.Middleware{
+			Operations: oas.Operations{
+				"json-rpc-method:" + mcp.MethodToolsList: {
+					Block: &oas.Allowance{Enabled: true},
+				},
+			},
+		})
+		rw := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+		httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{
+			Method: "initialize",
+			ID:     1,
+		})
+
+		res := makeHTTPResponse(makeInitializeResponse())
+		require.NoError(t, h.HandleResponse(rw, res, req, nil))
+
+		capabilities := extractCapabilityKeys(t, readResponseBody(t, res))
+		assert.NotContains(t, capabilities, "tools")
+		assert.Contains(t, capabilities, "sampling")
+	})
 }
 
 func TestMCPListFilterResponseHandler_HandleResponse_PromptsListFiltering(t *testing.T) {
