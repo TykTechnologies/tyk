@@ -925,7 +925,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 			chainObj = chain.(*ChainObject)
 		}
 	} else {
-		chainObj = gw.processSpec(spec, apisByListen, gs, logrus.NewEntry(log))
+		chainObj = gw.processSpec(spec, apisByListen, gs, log.NewEntry())
 	}
 
 	if chainObj.Skip {

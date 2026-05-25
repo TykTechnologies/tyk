@@ -21,6 +21,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/httpclient"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -358,7 +359,7 @@ func templateFuncAsRFC3339() func(time.Time) string {
 	}
 }
 
-func templateFuncAsRFC3339FromString(log *logrus.Logger) func(string) string {
+func templateFuncAsRFC3339FromString(log tyklog.Logger) func(string) string {
 	return func(s string) string {
 		t, err := time.Parse("2006-01-02 15:04:05.999999 -0700 MST", s)
 		if err == nil {

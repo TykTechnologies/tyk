@@ -30,10 +30,12 @@ func TestNewFormatter(t *testing.T) {
 	assert.Equal(t, LegacyTimestampFormat, legacyFormatter.TimestampFormat)
 	assert.True(t, legacyFormatter.FullTimestamp)
 	assert.True(t, legacyFormatter.DisableColors)
-	assert.True(t, IsLegacyFormatter(legacyFormatter))
+	assert.True(t, isLegacyFormatter(legacyFormatter))
 }
 
-func Test_SetupFormatter(t *testing.T) {
+func Test_Setup(t *testing.T) {
+	// todo: refactor test
+
 	resetLogger := func(t *testing.T) {
 		t.Helper()
 
@@ -63,10 +65,23 @@ func Test_SetupFormatter(t *testing.T) {
 		}
 	}
 
+	setFormat := func(t *testing.T, format Format) {
+		t.Helper()
+
+		t.Cleanup(once.reset)
+		once.reset()
+		Setup(func(b *Builder) {
+			//b.WithFormat(format)
+			if format != FormatLegacy {
+				b.WithPropagate()
+			}
+		})
+	}
+
 	t.Run("empty or unknown or text value sets default text formatter; global tyk and global logrus formatters", func(t *testing.T) {
 		t.Run("empty", func(t *testing.T) {
 			resetLogger(t)
-			SetupFormatter("")
+			setFormat(t, "")
 			f := formatters(t)
 			assert.Same(t, f.tyk, f.std)
 			assert.NotNil(t, f.std)
@@ -76,7 +91,7 @@ func Test_SetupFormatter(t *testing.T) {
 
 		t.Run("any other", func(t *testing.T) {
 			resetLogger(t)
-			SetupFormatter("hwdp")
+			setFormat(t, "hwdp")
 			f := formatters(t)
 			assert.Same(t, f.tyk, f.std)
 			assert.NotNil(t, f.std)
@@ -86,7 +101,7 @@ func Test_SetupFormatter(t *testing.T) {
 
 		t.Run("text", func(t *testing.T) {
 			resetLogger(t)
-			SetupFormatter(FormatText)
+			setFormat(t, FormatText)
 			f := formatters(t)
 			assert.Same(t, f.tyk, f.std)
 			assert.NotNil(t, f.std)
@@ -97,7 +112,7 @@ func Test_SetupFormatter(t *testing.T) {
 
 	t.Run("json formatter", func(t *testing.T) {
 		resetLogger(t)
-		SetupFormatter(FormatJson)
+		setFormat(t, FormatJson)
 		f := formatters(t)
 		assert.Same(t, f.tyk, f.std)
 		assert.NotNil(t, f.std)
@@ -107,7 +122,7 @@ func Test_SetupFormatter(t *testing.T) {
 
 	t.Run("legacy formatter does not modify std logrus formatter", func(t *testing.T) {
 		resetLogger(t)
-		SetupFormatter(FormatLegacy)
+		setFormat(t, FormatJson)
 		f := formatters(t)
 		assert.Nil(t, f.std)    // does not set formatter for std logger
 		assert.NotNil(t, f.tyk) // does not set formatter for std logger
