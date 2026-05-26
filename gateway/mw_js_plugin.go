@@ -16,14 +16,15 @@ import (
 	"time"
 
 	"github.com/robertkrimen/otto"
-	_ "github.com/robertkrimen/otto/underscore"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/middleware"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/user"
 
-	"github.com/sirupsen/logrus"
+	_ "github.com/robertkrimen/otto/underscore"
 )
 
 // Lets the user override and return a response from middleware
@@ -388,7 +389,7 @@ func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry, gw *Gateway) {
 	}
 
 	j.Log = logger // use the global logger by default
-	j.RawLog = rawLog
+	j.RawLog = tyklog.GetRaw()
 }
 
 func (j *JSVM) DeInit() {

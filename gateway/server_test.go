@@ -2175,3 +2175,103 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 	assert.GreaterOrEqual(t, policyCount, succeedOnCall,
 		"policy endpoint should have been retried at least %d times", succeedOnCall)
 }
+
+func Test_setupLogger(t *testing.T) {
+	t.Skip()
+
+	// todo: cover with tests
+	//resetLogger := func(t *testing.T) {
+	//	t.Helper()
+	//
+	//	tykFormatter := log.Formatter
+	//	globalFormatter := logrus.StandardLogger().Formatter
+	//
+	//	log.Formatter = nil
+	//	logrus.StandardLogger().Formatter = nil
+	//
+	//	t.Cleanup(func() {
+	//		log.Formatter = tykFormatter
+	//		logrus.StandardLogger().Formatter = globalFormatter
+	//	})
+	//}
+	//
+	//type Formatters struct {
+	//	tyk logrus.Formatter
+	//	std logrus.Formatter
+	//}
+	//
+	//formatters := func(t *testing.T) Formatters {
+	//	t.Helper()
+	//
+	//	return Formatters{
+	//		std: logrus.StandardLogger().Formatter,
+	//		tyk: log.Formatter,
+	//	}
+	//}
+	//
+	//setFormat := func(t *testing.T, format Format) {
+	//	t.Helper()
+	//
+	//	t.Cleanup(func() {
+	//		once.reset(false)
+	//	})
+	//	once.reset(false)
+	//	Setup(func(b *Builder) {
+	//		//b.WithFormat(format)
+	//		if format != FormatLegacy {
+	//			b.WithPropagate()
+	//		}
+	//	})
+	//}
+	//
+	//t.Run("empty or unknown or text value sets default text formatter; global tyk and global logrus formatters", func(t *testing.T) {
+	//	t.Run("empty", func(t *testing.T) {
+	//		resetLogger(t)
+	//		setFormat(t, "")
+	//		f := formatters(t)
+	//		assert.Same(t, f.tyk, f.std)
+	//		assert.NotNil(t, f.std)
+	//		assert.NotNil(t, f.tyk)
+	//		assert.Equal(t, newFormatterText(), f.tyk)
+	//	})
+	//
+	//	t.Run("any other", func(t *testing.T) {
+	//		resetLogger(t)
+	//		setFormat(t, "hwdp")
+	//		f := formatters(t)
+	//		assert.Same(t, f.tyk, f.std)
+	//		assert.NotNil(t, f.std)
+	//		assert.NotNil(t, f.tyk)
+	//		assert.Equal(t, newFormatterText(), f.tyk)
+	//	})
+	//
+	//	t.Run("text", func(t *testing.T) {
+	//		resetLogger(t)
+	//		setFormat(t, FormatText)
+	//		f := formatters(t)
+	//		assert.Same(t, f.tyk, f.std)
+	//		assert.NotNil(t, f.std)
+	//		assert.NotNil(t, f.tyk)
+	//		assert.Equal(t, newFormatterText(), f.tyk)
+	//	})
+	//})
+	//
+	//t.Run("json formatter", func(t *testing.T) {
+	//	resetLogger(t)
+	//	setFormat(t, FormatJson)
+	//	f := formatters(t)
+	//	assert.Same(t, f.tyk, f.std)
+	//	assert.NotNil(t, f.std)
+	//	assert.NotNil(t, f.tyk)
+	//	assert.Equal(t, newFormatterJson(), f.tyk)
+	//})
+	//
+	//t.Run("legacy formatter does not modify std logrus formatter", func(t *testing.T) {
+	//	resetLogger(t)
+	//	setFormat(t, FormatJson)
+	//	f := formatters(t)
+	//	assert.Nil(t, f.std)    // does not set formatter for std logger
+	//	assert.NotNil(t, f.tyk) // does not set formatter for std logger
+	//	assert.Equal(t, newFormatterLegacy(), f.tyk)
+	//})
+}
