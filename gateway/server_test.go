@@ -2329,7 +2329,7 @@ func TestAfterConfSetup_AllowUnsafeBodyTransformTemplatePathsWarning(t *testing.
 func Test_setupLogger(t *testing.T) {
 	t.Skip()
 
-	// todo: cover with tests
+	// todo: cover with tests and adopt prev behaviour
 	//resetLogger := func(t *testing.T) {
 	//	t.Helper()
 	//
