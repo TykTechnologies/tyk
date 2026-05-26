@@ -1,6 +1,7 @@
 package log
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"testing"
@@ -33,103 +34,6 @@ func TestNewFormatter(t *testing.T) {
 	assert.True(t, isLegacyFormatter(legacyFormatter))
 }
 
-func Test_Setup(t *testing.T) {
-	// todo: refactor test
-
-	resetLogger := func(t *testing.T) {
-		t.Helper()
-
-		tykFormatter := log.Formatter
-		globalFormatter := logrus.StandardLogger().Formatter
-
-		log.Formatter = nil
-		logrus.StandardLogger().Formatter = nil
-
-		t.Cleanup(func() {
-			log.Formatter = tykFormatter
-			logrus.StandardLogger().Formatter = globalFormatter
-		})
-	}
-
-	type Formatters struct {
-		tyk logrus.Formatter
-		std logrus.Formatter
-	}
-
-	formatters := func(t *testing.T) Formatters {
-		t.Helper()
-
-		return Formatters{
-			std: logrus.StandardLogger().Formatter,
-			tyk: log.Formatter,
-		}
-	}
-
-	setFormat := func(t *testing.T, format Format) {
-		t.Helper()
-
-		t.Cleanup(once.reset)
-		once.reset()
-		Setup(func(b *Builder) {
-			//b.WithFormat(format)
-			if format != FormatLegacy {
-				b.WithPropagate()
-			}
-		})
-	}
-
-	t.Run("empty or unknown or text value sets default text formatter; global tyk and global logrus formatters", func(t *testing.T) {
-		t.Run("empty", func(t *testing.T) {
-			resetLogger(t)
-			setFormat(t, "")
-			f := formatters(t)
-			assert.Same(t, f.tyk, f.std)
-			assert.NotNil(t, f.std)
-			assert.NotNil(t, f.tyk)
-			assert.Equal(t, newFormatterText(), f.tyk)
-		})
-
-		t.Run("any other", func(t *testing.T) {
-			resetLogger(t)
-			setFormat(t, "hwdp")
-			f := formatters(t)
-			assert.Same(t, f.tyk, f.std)
-			assert.NotNil(t, f.std)
-			assert.NotNil(t, f.tyk)
-			assert.Equal(t, newFormatterText(), f.tyk)
-		})
-
-		t.Run("text", func(t *testing.T) {
-			resetLogger(t)
-			setFormat(t, FormatText)
-			f := formatters(t)
-			assert.Same(t, f.tyk, f.std)
-			assert.NotNil(t, f.std)
-			assert.NotNil(t, f.tyk)
-			assert.Equal(t, newFormatterText(), f.tyk)
-		})
-	})
-
-	t.Run("json formatter", func(t *testing.T) {
-		resetLogger(t)
-		setFormat(t, FormatJson)
-		f := formatters(t)
-		assert.Same(t, f.tyk, f.std)
-		assert.NotNil(t, f.std)
-		assert.NotNil(t, f.tyk)
-		assert.Equal(t, newFormatterJson(), f.tyk)
-	})
-
-	t.Run("legacy formatter does not modify std logrus formatter", func(t *testing.T) {
-		resetLogger(t)
-		setFormat(t, FormatJson)
-		f := formatters(t)
-		assert.Nil(t, f.std)    // does not set formatter for std logger
-		assert.NotNil(t, f.tyk) // does not set formatter for std logger
-		assert.Equal(t, newFormatterLegacy(), f.tyk)
-	})
-}
-
 type testFormatter struct{}
 
 func (*testFormatter) Format(entry *logrus.Entry) ([]byte, error) {
@@ -137,6 +41,23 @@ func (*testFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 }
 
 func BenchmarkFormatter(b *testing.B) {
+	benchmarkFormatter := func(b *testing.B, formatter logrus.Formatter) {
+		b.Helper()
+
+		logger := logrus.New()
+		logger.Out = io.Discard
+		logger.Formatter = formatter
+
+		err := errors.New("Test error value")
+
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i <= b.N; i++ {
+			logger.WithError(err).WithField("prefix", "test").Info("This is a typical log message")
+		}
+	}
+
 	b.Run("json", func(b *testing.B) {
 		benchmarkFormatter(b, newFormatterJson())
 	})
@@ -149,21 +70,6 @@ func BenchmarkFormatter(b *testing.B) {
 	b.Run("none", func(b *testing.B) {
 		benchmarkFormatter(b, &testFormatter{})
 	})
-}
-
-func benchmarkFormatter(b *testing.B, formatter logrus.Formatter) {
-	logger := logrus.New()
-	logger.Out = io.Discard
-	logger.Formatter = formatter
-
-	err := errors.New("Test error value")
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for i := 0; i <= b.N; i++ {
-		logger.WithError(err).WithField("prefix", "test").Info("This is a typical log message")
-	}
 }
 
 func TestJSONFormatterErrorHandling(t *testing.T) {
@@ -213,6 +119,101 @@ func TestJSONFormatterErrorHandling(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotContains(t, string(output), "logrus_error")
 	})
+}
+
+func resetState(emOut io.Writer) {
+	once.reset(false)
+
+	tmpLoggerHook = &tmpLogsCollector{}
+
+	tmpLogger = logrus.New()
+	tmpLogger.SetOutput(io.Discard)
+	tmpLogger.AddHook(tmpLoggerHook)
+
+	log = &loggerWrapper{Logger: tmpLogger}
+
+	emergencyLogger = logrus.New()
+	emergencyLogger.SetOutput(emOut)
+	emergencyLogger.SetFormatter(&RawFormatter{})
+}
+
+func TestSetup_ExecutionAndProxy(t *testing.T) {
+	resetState(io.Discard)
+
+	log.Info("pre-setup log")
+	assert.Len(t, tmpLoggerHook.entries, 1)
+
+	Setup(func(_ *Builder) {})
+
+	assert.Empty(t, tmpLoggerHook.entries)
+	assert.NotEqual(t, tmpLogger, log.Logger)
+}
+
+func TestSetup_PanicsOnMultipleCalls(t *testing.T) {
+	resetState(io.Discard)
+
+	Setup(func(_ *Builder) {})
+
+	assert.Panics(t, func() {
+		Setup(func(_ *Builder) {})
+	})
+}
+
+func TestFlush_WithoutSetup(t *testing.T) {
+	emBuf := &bytes.Buffer{}
+	resetState(emBuf)
+
+	log.Info("fatal startup error")
+	assert.Len(t, tmpLoggerHook.entries, 1)
+
+	Flush()
+
+	assert.Empty(t, tmpLoggerHook.entries)
+	assert.Contains(t, emBuf.String(), "fatal startup error")
+}
+
+func TestFlush_AfterSetup(t *testing.T) {
+	emBuf := &bytes.Buffer{}
+	resetState(emBuf)
+
+	Setup(func(_ *Builder) {})
+
+	log.Info("post-setup log")
+
+	Flush()
+
+	assert.Empty(t, emBuf.String())
+}
+
+func TestGetAndGetRaw(t *testing.T) {
+	resetState(io.Discard)
+
+	logger := Get()
+	assert.NotNil(t, logger)
+	assert.Equal(t, log, logger)
+
+	rawLogger := GetRaw()
+	assert.NotNil(t, rawLogger)
+	assert.Equal(t, rawLog, rawLogger)
+}
+
+func TestIsLegacyFormatter(t *testing.T) {
+	legacyFmt := newFormatterLegacy()
+	assert.True(t, isLegacyFormatter(legacyFmt))
+
+	textFmt := newFormatterText()
+	assert.False(t, isLegacyFormatter(textFmt))
+
+	jsonFmt := newFormatterJson()
+	assert.False(t, isLegacyFormatter(jsonFmt))
+}
+
+func TestWrap(t *testing.T) {
+	l := logrus.New()
+	wrapped := Wrap(l)
+
+	assert.NotNil(t, wrapped)
+	assert.Equal(t, l, wrapped.AsLogrus())
 }
 
 func Test_removeHook(t *testing.T) {
