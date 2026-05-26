@@ -2180,8 +2180,6 @@ func Start() {
 
 			select {
 			case <-time.After(time.Duration(gwConfig.GracefulShutdownDelaySeconds) * time.Second):
-			case sig2 := <-sigChan:
-				mainLog.Infof("Second shutdown signal received: %v. Bypassing delay", sig2)
 			}
 		}
 
