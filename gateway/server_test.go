@@ -2179,7 +2179,7 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 func Test_setupLogger(t *testing.T) {
 	t.Skip()
 
-	// todo: cover with tests
+	// todo: cover with tests and adopt prev behaviour
 	//resetLogger := func(t *testing.T) {
 	//	t.Helper()
 	//
