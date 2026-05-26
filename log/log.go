@@ -22,13 +22,13 @@ const (
 )
 
 var (
-	tmpLogger              = logrus.New()
 	tmpLoggerHook          = &tmpLogsCollector{}
+	emergencyLogger        = newEmergencyLogger()
+	tmpLogger              = newTmpLogger(tmpLoggerHook, emergencyLogger)
 	log                    = &loggerWrapper{tmpLogger}
-	rawLog                 = logrus.New()
+	rawLog                 = newRawLog()
 	translations           = make(map[string]string)
 	once                   = invokeOnce{}
-	emergencyLogger        = logrus.New()
 	_               Logger = new(loggerWrapper)
 )
 
@@ -42,15 +42,15 @@ type (
 	LegacyLogger interface {
 
 		// NewEntry
-		// Deprecated stop using direct logrus structures.
+		// Deprecated. Stop using direct logrus structures.
 		NewEntry() *logrus.Entry
 
 		// AsLogrus
-		// Deprecated stop using direct logrus structures..
+		// Deprecated. Stop using direct logrus structures.
 		AsLogrus() *logrus.Logger
 
 		// GetLevel
-		// Deprecated stop using direct logrus structures..
+		// Deprecated. Stop using direct logrus structures.
 		GetLevel() logrus.Level
 	}
 
@@ -61,6 +61,30 @@ type (
 	}
 )
 
+func newRawLog() *logrus.Logger {
+	var l = logrus.New()
+	l.SetFormatter(&RawFormatter{})
+	return l
+}
+
+func newEmergencyLogger() *logrus.Logger {
+	l := logrus.New()
+	l.SetOutput(os.Stderr)
+	l.SetFormatter(&logrus.TextFormatter{})
+	return l
+}
+
+func newTmpLogger(tmpLoggerHook *tmpLogsCollector, emergencyLogger *logrus.Logger) *logrus.Logger {
+	l := logrus.New()
+	l.SetOutput(io.Discard)
+	l.AddHook(tmpLoggerHook)
+	l.ExitFunc = func(code int) {
+		tmpLoggerHook.Proxy(emergencyLogger)
+		os.Exit(code)
+	}
+	return l
+}
+
 // RawFormatter returns the logrus entry message as bytes.
 type RawFormatter struct{}
 
@@ -69,26 +93,11 @@ func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	return []byte(entry.Message), nil
 }
 
-//nolint:gochecknoinits
-func init() {
-	emergencyLogger.SetOutput(os.Stderr)
-	emergencyLogger.SetFormatter(&logrus.TextFormatter{})
-
-	tmpLogger.SetOutput(io.Discard)
-	tmpLogger.AddHook(tmpLoggerHook)
-	tmpLogger.ExitFunc = func(code int) {
-		tmpLoggerHook.Proxy(emergencyLogger)
-		os.Exit(code)
-	}
-
-	rawLog.Formatter = &RawFormatter{}
-}
-
 func Setup(f func(b *Builder)) {
 	once.Must(func() {
 		var builder Builder
 		f(&builder)
-		logger := builder.Build()
+		logger := builder.BuildAndPropagate()
 
 		log = &loggerWrapper{logger}
 		tmpLoggerHook.Proxy(logger)
@@ -195,10 +204,12 @@ func (s *invokeOnce) Do(fn func(executed bool)) {
 	fn(s.value)
 }
 
-func (s *invokeOnce) reset() {
+// reset's value of invoke once runner
+// create for testing purposes
+func (s *invokeOnce) reset(value bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.value = false
+	s.value = value
 }
 
 var _ logrus.Hook = new(tmpLogsCollector)

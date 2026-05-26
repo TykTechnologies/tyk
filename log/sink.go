@@ -72,13 +72,13 @@ func (fn AcceptorFn) Accept(entry *logrus.Entry) bool {
 	return fn(entry)
 }
 
-func NewGteAcceptor(level logrus.Level) Acceptor {
+func NewAcceptorGte(level logrus.Level) Acceptor {
 	return AcceptorFn(func(e *logrus.Entry) bool {
 		return e.Level >= level
 	})
 }
 
-func NewLtAcceptor(level logrus.Level) Acceptor {
+func NewAcceptorLt(level logrus.Level) Acceptor {
 	return AcceptorFn(func(e *logrus.Entry) bool {
 		return e.Level < level
 	})
