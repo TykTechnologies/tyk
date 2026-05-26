@@ -2,6 +2,7 @@ package log
 
 import (
 	"io"
+	"os"
 
 	"github.com/sirupsen/logrus"
 )
@@ -35,6 +36,14 @@ func (b *Builder) AddHook(hook logrus.Hook) {
 // AddSink adds sink.
 func (b *Builder) AddSink(sink Sink) {
 	b.sinks = append(b.sinks, sink)
+}
+
+// AddSinkSplitByLevel adds default split by level.
+// AddSink or AddDefaultSplit can be used.
+// These methods are mutually excluded.
+func (b *Builder) AddSinkSplitByLevel(level logrus.Level, formatter logrus.Formatter) {
+	b.AddSink(NewSink(os.Stderr, formatter, NewAcceptorGte(level)))
+	b.AddSink(NewSink(os.Stdout, formatter, NewAcceptorLt(level)))
 }
 
 // WithPropagate propagates logger.
