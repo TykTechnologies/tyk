@@ -1555,8 +1555,7 @@ func (gw *Gateway) setupLogger(builder *tyklog.Builder) {
 	formatter := tyklog.NewFormatter(logFormat)
 
 	// split one stream into two separate streams
-	builder.AddSink(tyklog.NewSink(os.Stderr, formatter, tyklog.NewAcceptorGte(logrus.ErrorLevel)))
-	builder.AddSink(tyklog.NewSink(os.Stdout, formatter, tyklog.NewAcceptorLt(logrus.ErrorLevel)))
+	builder.AddSinkSplitByLevel(logrus.ErrorLevel, formatter)
 
 	// precedence: TYK_LOGLEVEL > TYK_GW_LOGLEVEL > config.LogLevel
 	// if provided value is not valid -> Fatal
