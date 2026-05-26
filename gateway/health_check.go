@@ -237,7 +237,6 @@ func (gw *Gateway) readinessHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if gw.shuttingDown.Load() {
-		mainLog.Warning("[Readiness] Gateway is shutting down")
 		doJSONWrite(w, http.StatusServiceUnavailable, apiError("Gateway is shutting down"))
 		return
 	}
