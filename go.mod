@@ -96,7 +96,7 @@ require (
 	github.com/IBM/sarama v1.46.3
 	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20250926102005-c54e73aae17d
-	github.com/TykTechnologies/opentelemetry v0.0.25
+	github.com/TykTechnologies/opentelemetry v0.0.26-0.20260521112223-3b0d024e6090
 	github.com/TykTechnologies/structviewer v1.2.0
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/dop251/goja v0.0.0-20241024094426-79f3a7efcdbd
