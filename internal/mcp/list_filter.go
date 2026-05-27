@@ -73,6 +73,13 @@ func ExtractStringField(raw json.RawMessage, field string) string {
 // only items that are permitted. Items whose name field cannot be extracted are
 // included (fail-open for malformed data).
 func FilterItems(items []json.RawMessage, nameField string, rules user.AccessControlRules) []json.RawMessage {
+	return FilterItemsWithRuleSets(items, nameField, []user.AccessControlRules{rules})
+}
+
+// FilterItemsWithRuleSets applies multiple access-control rule sets to a slice
+// of JSON items. An item is included only when every non-empty rule set permits
+// it. This composes allow lists as an intersection and block lists as a union.
+func FilterItemsWithRuleSets(items []json.RawMessage, nameField string, ruleSets []user.AccessControlRules) []json.RawMessage {
 	filtered := make([]json.RawMessage, 0, len(items))
 	for _, item := range items {
 		name := ExtractStringField(item, nameField)
@@ -82,8 +89,7 @@ func FilterItems(items []json.RawMessage, nameField string, rules user.AccessCon
 			continue
 		}
 
-		// CheckAccessControlRules returns true if denied.
-		if !CheckAccessControlRules(rules, name) {
+		if !CheckAccessControlRuleSets(ruleSets, name) {
 			filtered = append(filtered, item)
 		}
 	}
@@ -115,6 +121,13 @@ func ReencodeEnvelope(envelope *JSONRPCResponse, result map[string]json.RawMessa
 // Returns (nil, false) when any parsing or marshalling step fails, signalling
 // that the caller should pass through the original body unmodified.
 func FilterJSONRPCBody(body []byte, cfg *ListFilterConfig, rules user.AccessControlRules) ([]byte, bool) {
+	return FilterJSONRPCBodyWithRuleSets(body, cfg, []user.AccessControlRules{rules})
+}
+
+// FilterJSONRPCBodyWithRuleSets parses a JSON-RPC response body, filters the
+// list items according to the given config and rule sets, and returns the
+// re-encoded body.
+func FilterJSONRPCBodyWithRuleSets(body []byte, cfg *ListFilterConfig, ruleSets []user.AccessControlRules) ([]byte, bool) {
 	var envelope JSONRPCResponse
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		return nil, false
@@ -129,13 +142,19 @@ func FilterJSONRPCBody(body []byte, cfg *ListFilterConfig, rules user.AccessCont
 		return nil, false
 	}
 
-	return FilterParsedJSONRPC(&envelope, result, cfg, rules)
+	return FilterParsedJSONRPCWithRuleSets(&envelope, result, cfg, ruleSets)
 }
 
 // FilterParsedJSONRPC filters items in an already-parsed JSON-RPC result and
 // re-encodes the envelope. Returns (nil, false) when the array key is missing,
 // items cannot be parsed, or re-encoding fails.
 func FilterParsedJSONRPC(envelope *JSONRPCResponse, result map[string]json.RawMessage, cfg *ListFilterConfig, rules user.AccessControlRules) ([]byte, bool) {
+	return FilterParsedJSONRPCWithRuleSets(envelope, result, cfg, []user.AccessControlRules{rules})
+}
+
+// FilterParsedJSONRPCWithRuleSets filters items in an already-parsed JSON-RPC
+// result using multiple rule sets and re-encodes the envelope.
+func FilterParsedJSONRPCWithRuleSets(envelope *JSONRPCResponse, result map[string]json.RawMessage, cfg *ListFilterConfig, ruleSets []user.AccessControlRules) ([]byte, bool) {
 	itemsRaw, exists := result[cfg.ArrayKey]
 	if !exists {
 		return nil, false
@@ -146,7 +165,7 @@ func FilterParsedJSONRPC(envelope *JSONRPCResponse, result map[string]json.RawMe
 		return nil, false
 	}
 
-	filtered := FilterItems(items, cfg.NameField, rules)
+	filtered := FilterItemsWithRuleSets(items, cfg.NameField, ruleSets)
 
 	newBody, err := ReencodeEnvelope(envelope, result, cfg.ArrayKey, filtered)
 	if err != nil {
@@ -169,6 +188,108 @@ func InferListConfigFromResult(result map[string]json.RawMessage) *ListFilterCon
 		}
 	}
 	return nil
+}
+
+// InitializeCapabilityMethods maps initialize response capability keys to the
+// JSON-RPC methods that make the capability usable.
+var InitializeCapabilityMethods = map[string][]string{
+	"tools":     {MethodToolsList, MethodToolsCall},
+	"resources": {MethodResourcesList, MethodResourcesTemplatesList, MethodResourcesRead},
+	"prompts":   {MethodPromptsList, MethodPromptsGet},
+	"sampling":  {MethodSamplingCreate},
+}
+
+// FilterInitializeCapabilitiesBody removes initialize response capabilities
+// whose backing JSON-RPC methods are denied by any rule set.
+func FilterInitializeCapabilitiesBody(body []byte, ruleSets []user.AccessControlRules) ([]byte, bool) {
+	var envelope JSONRPCResponse
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, false
+	}
+
+	if envelope.Result == nil {
+		return nil, false
+	}
+
+	var result map[string]json.RawMessage
+	if err := json.Unmarshal(envelope.Result, &result); err != nil {
+		return nil, false
+	}
+
+	return FilterInitializeCapabilitiesParsed(&envelope, result, ruleSets)
+}
+
+// FilterInitializeCapabilitiesParsed removes denied capabilities in an
+// already-parsed initialize result and re-encodes the response envelope.
+func FilterInitializeCapabilitiesParsed(envelope *JSONRPCResponse, result map[string]json.RawMessage, ruleSets []user.AccessControlRules) ([]byte, bool) {
+	capabilitiesRaw, exists := result["capabilities"]
+	if !exists {
+		return nil, false
+	}
+
+	var capabilities map[string]json.RawMessage
+	if err := json.Unmarshal(capabilitiesRaw, &capabilities); err != nil {
+		return nil, false
+	}
+
+	changed := false
+	for capability, methods := range InitializeCapabilityMethods {
+		if _, exists := capabilities[capability]; !exists {
+			continue
+		}
+
+		if AnyMethodDenied(ruleSets, methods) {
+			delete(capabilities, capability)
+			changed = true
+		}
+	}
+
+	if !changed {
+		return nil, false
+	}
+
+	capabilitiesBytes, err := json.Marshal(capabilities)
+	if err != nil {
+		return nil, false
+	}
+	result["capabilities"] = capabilitiesBytes
+
+	resultBytes, err := json.Marshal(result)
+	if err != nil {
+		return nil, false
+	}
+	envelope.Result = resultBytes
+
+	newBody, err := json.Marshal(envelope)
+	if err != nil {
+		return nil, false
+	}
+	return newBody, true
+}
+
+// AnyMethodDenied returns true when any of the provided methods is denied by
+// any non-empty rule set.
+func AnyMethodDenied(ruleSets []user.AccessControlRules, methods []string) bool {
+	for _, method := range methods {
+		if CheckAccessControlRuleSets(ruleSets, method) {
+			return true
+		}
+	}
+	return false
+}
+
+// CheckAccessControlRuleSets evaluates multiple allow/block rule sets against
+// a name. It returns true if any non-empty rule set denies the name.
+func CheckAccessControlRuleSets(ruleSets []user.AccessControlRules, name string) bool {
+	for _, rules := range ruleSets {
+		if rules.IsEmpty() {
+			continue
+		}
+		if CheckAccessControlRules(rules, name) {
+			return true
+		}
+	}
+	return false
 }
 
 // CheckAccessControlRules evaluates allow/block lists against a name.
