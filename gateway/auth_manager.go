@@ -122,8 +122,13 @@ func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 }
 
 // UpdateSession updates the session state in the storage engine
-func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState,
-	resetTTLTo int64, hashed bool) error {
+func (b *DefaultSessionManager) UpdateSession(
+	keyName string,
+	session *user.SessionState,
+	resetTTLTo int64,
+	hashed bool,
+) error {
+
 	defer b.clearCacheForKey(keyName, hashed)
 
 	v, err := json.Marshal(session)
@@ -132,12 +137,20 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 		return err
 	}
 
-	// sync update
-	if hashed {
-		keyName = b.store.GetKeyPrefix() + keyName
-		err = b.store.SetRawKey(keyName, string(v), resetTTLTo)
+	if session.IsNew() {
+		if hashed {
+			keyName = b.store.GetKeyPrefix() + keyName
+			err = b.store.SetRawKey(keyName, string(v), resetTTLTo)
+		} else {
+			err = b.store.SetKey(keyName, string(v), resetTTLTo)
+		}
 	} else {
-		err = b.store.SetKey(keyName, string(v), resetTTLTo)
+		if hashed {
+			keyName = b.store.GetKeyPrefix() + keyName
+			err = b.store.SetRawKeyEx(keyName, string(v), resetTTLTo)
+		} else {
+			err = b.store.SetKeyEx(keyName, string(v), resetTTLTo)
+		}
 	}
 
 	return err

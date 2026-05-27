@@ -10,6 +10,7 @@ import (
 type DummyStorage struct {
 	Data      map[string]string
 	IndexList map[string][]string
+	SetExHandlerNoImplemented
 }
 
 // NewDummyStorage creates and returns a new instance of DummyStorage.
