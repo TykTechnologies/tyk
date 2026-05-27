@@ -74,24 +74,24 @@ func oasPrimitiveRules(spec *APISpec, cfg *mcp.ListFilterConfig) user.AccessCont
 
 	switch cfg.ArrayKey {
 	case "tools":
-		return rulesFromOASMCPPrimitives(middleware.McpTools, false)
+		return rulesFromOASMCPPrimitives(middleware.McpTools)
 	case "prompts":
-		return rulesFromOASMCPPrimitives(middleware.McpPrompts, false)
+		return rulesFromOASMCPPrimitives(middleware.McpPrompts)
 	case "resources", "resourceTemplates":
-		return rulesFromOASMCPPrimitives(middleware.McpResources, true)
+		return rulesFromOASMCPPrimitives(middleware.McpResources)
 	default:
 		return user.AccessControlRules{}
 	}
 }
 
-func rulesFromOASMCPPrimitives(primitives oas.MCPPrimitives, resourcePatterns bool) user.AccessControlRules {
+func rulesFromOASMCPPrimitives(primitives oas.MCPPrimitives) user.AccessControlRules {
 	var rules user.AccessControlRules
 	for name, primitive := range primitives {
 		if primitive == nil {
 			continue
 		}
 
-		pattern := oasPrimitivePattern(name, resourcePatterns)
+		pattern := oasPrimitivePattern(name)
 		if primitive.Block != nil && primitive.Block.Enabled {
 			rules.Blocked = append(rules.Blocked, pattern)
 		}
@@ -102,11 +102,20 @@ func rulesFromOASMCPPrimitives(primitives oas.MCPPrimitives, resourcePatterns bo
 	return rules
 }
 
-func oasPrimitivePattern(name string, resourcePatterns bool) string {
-	if resourcePatterns && strings.HasSuffix(name, "/*") {
-		return stdregexp.QuoteMeta(strings.TrimSuffix(name, "*")) + ".*"
+func oasPrimitivePattern(name string) string {
+	if !strings.Contains(name, "*") {
+		return stdregexp.QuoteMeta(name)
 	}
-	return stdregexp.QuoteMeta(name)
+
+	parts := strings.Split(name, "*")
+	var pattern strings.Builder
+	for i, part := range parts {
+		if i > 0 {
+			pattern.WriteString(".*")
+		}
+		pattern.WriteString(stdregexp.QuoteMeta(part))
+	}
+	return pattern.String()
 }
 
 func oasJSONRPCMethodRules(spec *APISpec) user.AccessControlRules {

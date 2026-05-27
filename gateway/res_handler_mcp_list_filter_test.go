@@ -623,6 +623,20 @@ func TestMCPListFilterResponseHandler_HandleResponse_MiddlewarePrimitiveFilterin
 			},
 			want: []string{"get_weather"},
 		},
+		{
+			name: "allow wildcard star discovers all tools",
+			primitives: oas.MCPPrimitives{
+				"*": {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+			},
+			want: []string{"get_weather", "get_forecast", "execute_query", "admin_reset"},
+		},
+		{
+			name: "allow wildcard suffix discovers matching tools",
+			primitives: oas.MCPPrimitives{
+				"get_*": {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+			},
+			want: []string{"get_weather", "get_forecast"},
+		},
 	}
 
 	for _, tt := range tests {
