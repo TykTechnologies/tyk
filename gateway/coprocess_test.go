@@ -1,10 +1,18 @@
 package gateway
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
+
+	b3prop "go.opentelemetry.io/contrib/propagators/b3"
+	gotel "go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/stretchr/testify/require"
 
@@ -13,6 +21,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func Test_getIDExtractor(t *testing.T) {
@@ -368,4 +377,104 @@ func TestValidateDriver(t *testing.T) {
 
 	supportedDrivers = originalSupportedDrivers
 	loadedDrivers = originalLoadedDrivers
+}
+
+func newMinimalCoProcessor() *CoProcessor {
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{})
+	return &CoProcessor{
+		Middleware: &CoProcessMiddleware{
+			BaseMiddleware: &BaseMiddleware{
+				Gw: gw,
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{},
+				},
+			},
+			HookType: coprocess.HookType_Pre,
+		},
+	}
+}
+
+func withPropagator(t *testing.T, p propagation.TextMapPropagator) {
+	t.Helper()
+	prev := gotel.GetTextMapPropagator()
+	gotel.SetTextMapPropagator(p)
+	t.Cleanup(func() { gotel.SetTextMapPropagator(prev) })
+}
+
+func buildObjectWithSpan(t *testing.T, sc trace.SpanContext) *coprocess.Object {
+	t.Helper()
+	ctx := trace.ContextWithSpanContext(context.Background(), sc)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/test", nil)
+	require.NoError(t, err)
+
+	cp := newMinimalCoProcessor()
+	object, err := cp.BuildObject(req, nil, cp.Middleware.Spec)
+	require.NoError(t, err)
+	require.NotNil(t, object)
+	return object
+}
+
+func makeSpanContext(t *testing.T) (sc trace.SpanContext, tid trace.TraceID, sid trace.SpanID) {
+	t.Helper()
+	var err error
+	tid, err = trace.TraceIDFromHex("4bf92f3577b34da6a3ce929d0e0e4736")
+	require.NoError(t, err)
+	sid, err = trace.SpanIDFromHex("00f067aa0ba902b7")
+	require.NoError(t, err)
+	sc = trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    tid,
+		SpanID:     sid,
+		TraceFlags: trace.FlagsSampled,
+		Remote:     true,
+	})
+	return sc, tid, sid
+}
+
+func TestBuildObjectInjectsTraceParent_W3C(t *testing.T) {
+	withPropagator(t, propagation.TraceContext{})
+
+	sc, tid, sid := makeSpanContext(t)
+	object := buildObjectWithSpan(t, sc)
+
+	tp, ok := object.Metadata["traceparent"]
+	require.True(t, ok)
+
+	expected := fmt.Sprintf("00-%s-%s-%s", tid.String(), sid.String(), trace.FlagsSampled.String())
+	assert.Equal(t, expected, tp)
+
+	parts := strings.Split(tp, "-")
+	assert.Len(t, parts, 4)
+	assert.Equal(t, "00", parts[0])
+	assert.Equal(t, tid.String(), parts[1])
+	assert.Equal(t, sid.String(), parts[2])
+}
+
+func TestBuildObjectInjectsTraceParent_B3(t *testing.T) {
+	withPropagator(t, b3prop.New(b3prop.WithInjectEncoding(b3prop.B3MultipleHeader)))
+
+	sc, tid, sid := makeSpanContext(t)
+	object := buildObjectWithSpan(t, sc)
+
+	assert.Equal(t, tid.String(), object.Metadata["x-b3-traceid"])
+	assert.Equal(t, sid.String(), object.Metadata["x-b3-spanid"])
+	assert.Equal(t, "1", object.Metadata["x-b3-sampled"])
+
+	_, hasTraceparent := object.Metadata["traceparent"]
+	assert.False(t, hasTraceparent)
+}
+
+func TestBuildObjectNoTraceHeadersWhenNoSpan(t *testing.T) {
+	withPropagator(t, propagation.TraceContext{})
+
+	req, err := http.NewRequest(http.MethodGet, "/test", nil)
+	require.NoError(t, err)
+
+	cp := newMinimalCoProcessor()
+	object, err := cp.BuildObject(req, nil, cp.Middleware.Spec)
+	require.NoError(t, err)
+	require.NotNil(t, object)
+
+	_, hasTraceparent := object.Metadata["traceparent"]
+	assert.False(t, hasTraceparent)
 }

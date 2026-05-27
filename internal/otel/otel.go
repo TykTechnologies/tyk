@@ -6,6 +6,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	gotel "go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+
 	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -147,4 +150,15 @@ func AddTraceID(ctx context.Context, w http.ResponseWriter) {
 	}
 
 	addTraceIDToResponseHeader(w, traceID)
+}
+
+// InjectTraceContext returns the active trace context as a string map using the
+// globally configured propagator. Returns nil if no span is active.
+func InjectTraceContext(ctx context.Context) map[string]string {
+	carrier := propagation.MapCarrier{}
+	gotel.GetTextMapPropagator().Inject(ctx, carrier)
+	if len(carrier) == 0 {
+		return nil
+	}
+	return map[string]string(carrier)
 }

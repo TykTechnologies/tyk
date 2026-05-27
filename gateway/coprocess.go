@@ -19,6 +19,7 @@ import (
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/middleware"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/user"
 	"github.com/sirupsen/logrus"
 )
@@ -156,6 +157,16 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 			object.Session = ProtoSessionState(session)
 			// For compatibility purposes:
 			object.Metadata = object.Session.Metadata
+		}
+	}
+
+	// Inject trace context headers into object metadata:
+	if traceHeaders := otel.InjectTraceContext(req.Context()); len(traceHeaders) > 0 {
+		if object.Metadata == nil {
+			object.Metadata = make(map[string]string)
+		}
+		for k, v := range traceHeaders {
+			object.Metadata[k] = v
 		}
 	}
 
