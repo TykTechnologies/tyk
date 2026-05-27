@@ -29,7 +29,7 @@ require (
 	github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
-	github.com/TykTechnologies/storage v0.0.0-20260527150039-a2a20aae3035
+	github.com/TykTechnologies/storage v1.3.1
 	github.com/TykTechnologies/tyk-pump v1.14.1-rc1.0.20260424072310-bad4cd383b57
 	github.com/akutz/memconn v0.1.0
 	github.com/bshuster-repo/logrus-logstash-hook v1.1.0
@@ -630,3 +630,5 @@ require (
 replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
 
 replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.92.1-0.20260211103127-0004a8367058
+
+replace github.com/TykTechnologies/storage => github.com/TykTechnologies/storage v0.0.0-20260527150039-a2a20aae3035 // todo: remove before merge to master
