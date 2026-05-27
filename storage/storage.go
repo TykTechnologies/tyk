@@ -51,6 +51,7 @@ type Handler interface {
 	RemoveFromList(string, string) error
 	AppendToSet(string, string)
 	Exists(string) (bool, error)
+	SetExHandler
 }
 
 type AnalyticsHandler interface {
@@ -59,4 +60,21 @@ type AnalyticsHandler interface {
 	GetAndDeleteSet(string) []interface{}
 	SetExp(string, int64) error   // Set key expiration
 	GetExp(string) (int64, error) // Returns expiry of a key
+}
+
+type SetExHandler interface {
+	// SetKeyEx sets key if key already exists.
+	SetKeyEx(string, string, int64) error
+	// SetRawKeyEx sets raw key if key already exists.
+	SetRawKeyEx(string, string, int64) error
+}
+
+type SetExHandlerNoImplemented struct{}
+
+func (s3 SetExHandlerNoImplemented) SetKeyEx(_ string, _ string, _ int64) error {
+	return errors.New("SetKeyEx not implemented")
+}
+
+func (s3 SetExHandlerNoImplemented) SetRawKeyEx(_ string, _ string, _ int64) error {
+	return errors.New("SetRawKeyEx not implemented")
 }

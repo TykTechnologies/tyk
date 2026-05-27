@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/mavricknz/ldap"
+
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 // LDAPStorageHandler implements storage.Handler, this is a read-only implementation to access keys from an LDAP service
@@ -16,6 +18,7 @@ type LDAPStorageHandler struct {
 	SessionAttributeName string
 	SearchString         string
 	store                *ldap.LDAPConnection
+	storage.SetExHandlerNoImplemented
 }
 
 func (l *LDAPStorageHandler) LoadConfFromMeta(meta map[string]interface{}) {
