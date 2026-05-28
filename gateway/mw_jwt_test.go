@@ -58,6 +58,7 @@ jQIDAQAB!!!!
 
 func createJWTSession() *user.SessionState {
 	session := user.NewSessionState()
+	session.SetIsNew(true)
 	session.Rate = 1000000.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix() - 10
