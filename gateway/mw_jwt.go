@@ -1605,6 +1605,7 @@ func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg 
 
 	policy, ok := gw.policies.PolicyByID(polId)
 	session := user.SessionState{}
+	session.SetIsNew(true)
 
 	if !ok {
 		return session.Clone(), errors.New("Policy not found")

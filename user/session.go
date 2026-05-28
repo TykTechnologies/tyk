@@ -353,7 +353,9 @@ type SessionState struct {
 	isNew bool
 }
 
-func NewSessionState() *SessionState {
+type NewSessionStateOpt func(*SessionState)
+
+func NewSessionState(opts ...NewSessionStateOpt) *SessionState {
 	return &SessionState{}
 }
 
@@ -640,4 +642,10 @@ func (em EndpointsMap) Endpoints() Endpoints {
 	sort.Sort(endpoints)
 
 	return endpoints
+}
+
+func WithNew() NewSessionStateOpt {
+	return func(s *SessionState) {
+		s.isNew = true
+	}
 }

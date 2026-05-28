@@ -217,12 +217,12 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 			"inbound-key": b.Gw.obfuscateKey(keyName),
 			"err":         err,
 		}).Debug("Could not get session detail, key not found")
-		return user.SessionState{}, false
+		return *user.NewSessionState(), false
 	}
 	session := &user.SessionState{}
 	if err := json.Unmarshal([]byte(jsonKeyVal), &session); err != nil {
 		log.Error("Couldn't unmarshal session object (may be cache miss): ", err)
-		return user.SessionState{}, false
+		return *user.NewSessionState(), false
 	}
 	session.KeyID = keyId
 	return session.Clone(), true
