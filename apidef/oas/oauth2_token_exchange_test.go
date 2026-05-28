@@ -113,7 +113,7 @@ func TestOAuth2Exchange_IsActive(t *testing.T) {
 		want bool
 	}{
 		{"nil", nil, false},
-		{"absent enabled defaults to active", &OAuth2Exchange{}, true},
+		{"absent enabled is inactive", &OAuth2Exchange{}, false},
 		{"explicit true", &OAuth2Exchange{Enabled: boolPtr(true)}, true},
 		{"explicit false", &OAuth2Exchange{Enabled: boolPtr(false)}, false},
 	}

@@ -248,33 +248,28 @@ type OAuth2DefaultTarget struct {
 //
 // Resolution chain at request time (most-specific wins):
 //
-//  1. ex.Scopes (explicit per-op list) — used as-is.
+//  1. ex.Enabled == true && len(Scopes) > 0 — explicit per-op list.
 //  2. ex.Enabled == true && len(Scopes) == 0 — inferred from the
 //     matched operation's `security:` requirement (the oauth2 scope
 //     list the inbound check enforces). Kills the duplication for the
 //     "exchange asks for the same authority the caller proved" case
 //     (RFC 8693 §4.5.5).
-//  3. provider.DefaultTarget.Scopes — fallback when neither above
-//     applies. Audience is resolved the same way (op override →
-//     provider default).
+//  3. provider.DefaultTarget — fallback when no per-op block is active.
+//     Audience is resolved the same way (op override → provider default).
 //
-// Enabled is *bool to preserve back-compat:
-//   - nil (field absent in JSON) — pre-existing behavior: explicit
-//     Audience / Scopes are used; no inference.
-//   - true — opt in to the inferred-scopes fallback above.
-//   - false — block is inactive; resolution falls through to the
-//     provider's defaultTarget.
+// Enabled must be explicitly set to true to activate the block.
+// Absent (nil) or false both mean inactive, consistent with all other
+// per-operation middleware in Tyk.
 type OAuth2Exchange struct {
 	Enabled  *bool    `bson:"enabled,omitempty" json:"enabled,omitempty"`
 	Audience string   `bson:"audience,omitempty" json:"audience,omitempty"`
 	Scopes   []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
 }
 
-// IsActive reports whether this per-op exchange block should
-// participate in resolution. A block is active unless the operator
-// explicitly set Enabled=false.
+// IsActive reports whether this per-op exchange block is active.
+// Requires explicit Enabled=true; nil or false both mean inactive.
 func (e *OAuth2Exchange) IsActive() bool {
-	return e != nil && (e.Enabled == nil || *e.Enabled)
+	return e != nil && e.Enabled != nil && *e.Enabled
 }
 
 // InfersScopesFromSecurity reports whether the block opts into the

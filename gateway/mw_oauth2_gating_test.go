@@ -119,7 +119,7 @@ func buildOAuth2ExchangeAPI(idpIss, idpEndpoint string, listenPath string) strin
 			},
 			"middleware": {
 				"operations": {
-					"getMail": {"exchange": {"scopes": ["users:read"]}}
+					"getMail": {"exchange": {"enabled": true, "scopes": ["users:read"]}}
 				}
 			}
 		}

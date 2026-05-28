@@ -182,7 +182,6 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 
 	var parsed struct {
 		AccessToken string `json:"access_token"`
-		ExpiresIn   int64  `json:"expires_in"`
 	}
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		return "", fmt.Errorf("decoding exchange response: %w", err)
