@@ -1,6 +1,12 @@
 package storage
 
-import "testing"
+import (
+	"testing"
+
+	logrus "github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/assert"
+)
 
 func Test_TokenOrg(t *testing.T) {
 	tcs := []struct {
@@ -38,4 +44,40 @@ func Test_TokenOrg(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_HandlerAtomicNoImplemented(t *testing.T) {
+	defaultLogger := log
+
+	logger, hook := logrustest.NewNullLogger()
+	log = logger
+	t.Cleanup(func() {
+		log = defaultLogger
+	})
+
+	var storage HandlerAtomicNoImplemented
+
+	t.Run("DeleteKeyAtomic", func(t *testing.T) {
+		storage.DeleteKeyAtomic("")
+		entry := hook.LastEntry()
+		assert.Equal(t, logrus.ErrorLevel, entry.Level)
+		assert.Contains(t, entry.Message, "DeleteKeyAtomic")
+		assert.Contains(t, entry.Message, "not implemented")
+	})
+
+	t.Run("DeleteRawKeyAtomic", func(t *testing.T) {
+		storage.DeleteRawKeyAtomic("")
+		entry := hook.LastEntry()
+		assert.Equal(t, logrus.ErrorLevel, entry.Level)
+		assert.Contains(t, entry.Message, "DeleteRawKeyAtomic")
+		assert.Contains(t, entry.Message, "not implemented")
+	})
+
+	t.Run("SetRawKeyAtomic", func(t *testing.T) {
+		assert.Error(t, storage.SetRawKeyAtomic("", "", 0))
+	})
+
+	t.Run("SetKeyAtomic", func(t *testing.T) {
+		assert.Error(t, storage.SetKeyAtomic("", "", 0))
+	})
 }
