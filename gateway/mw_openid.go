@@ -203,6 +203,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		// Create it
 		logger.Debug("Key does not exist, creating")
 		session = user.SessionState{}
+		session.SetIsNew(true)
 
 		if !useScope {
 			// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
