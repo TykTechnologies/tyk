@@ -91,7 +91,7 @@ func (r *RedisCluster) DeleteRawKeyAtomic(keyName string) bool {
 		log.WithError(err).Error("Error trying to delete raw key")
 	}
 
-	return err != nil && ok
+	return err == nil && ok
 }
 
 func (r *RedisCluster) getConnectionHandler() *ConnectionHandler {
