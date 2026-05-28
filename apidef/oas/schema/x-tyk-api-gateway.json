@@ -1381,6 +1381,9 @@
         "batchProcessing": {
           "$ref": "#/definitions/X-Tyk-BatchProcessing"
         },
+        "mcp": {
+          "$ref": "#/definitions/X-Tyk-MCP"
+        },
         "port": {
           "type": "integer",
           "minimum": 1,
@@ -2597,6 +2600,21 @@
       "properties": {
         "enabled": {
           "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-MCP": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "expose": {
+          "type": "array",
+          "items": { "type": "string" }
         }
       },
       "required": [
