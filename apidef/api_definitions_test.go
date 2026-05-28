@@ -250,6 +250,28 @@ func TestSchema(t *testing.T) {
 	}
 }
 
+func TestSchema_SecurityRequirementScopes(t *testing.T) {
+	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
+
+	spec := DummyAPI()
+	spec.SecurityRequirementScopes = []map[string][]string{
+		{"jwt1": {}, "oauth2_scheme": {"read:pets", "write:pets"}},
+		{"oauth2_scheme": {"admin"}},
+	}
+
+	goLoader := gojsonschema.NewGoLoader(spec)
+	result, err := gojsonschema.Validate(schemaLoader, goLoader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !result.Valid() {
+		for _, e := range result.Errors() {
+			t.Error(e)
+		}
+	}
+}
+
 func TestStringRegexMap(t *testing.T) {
 	var v StringRegexMap
 	assert.True(t, v.Empty())
