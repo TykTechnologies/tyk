@@ -322,7 +322,7 @@ func newIntrospectionCache(gw *Gateway) *introspectionCache {
 
 type introspectionCache struct {
 	*storage.RedisCluster
-	storage.SetExHandlerNoImplemented
+	storage.HandlerAtomicNoImplemented
 }
 
 func (c *introspectionCache) GetRes(token string) (jwt.MapClaims, bool) {

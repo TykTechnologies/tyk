@@ -229,21 +229,23 @@ func TestGoPluginMWs(t *testing.T) {
 				Code:      http.StatusOK,
 				BodyMatch: `"action":"deleted"`,
 			},
+			// two instant writes with the same key is not possible
 			{
 				Path:    "/goplugin-custom-plugin-auth/plugin_hit",
-				Headers: map[string]string{"Authorization": "abc"},
+				Headers: map[string]string{"Authorization": "abc2"},
 				Code:    http.StatusOK,
 				HeadersMatch: map[string]string{
 					"X-Initial-URI":   "/goplugin-custom-plugin-auth/plugin_hit",
 					"X-Auth-Result":   "OK",
-					"X-Session-Alias": "abc-session",
+					"X-Session-Alias": "abc2-session",
 					"X-Plugin-Data":   "my-plugin-config",
 				},
 				BodyMatch: `"message":"post message"`,
 			},
+			// todo: ask if it's not a problem |> the only one test that failed is this one
 			{
 				Method:    "DELETE",
-				Path:      "/tyk/keys/abc",
+				Path:      "/tyk/keys/abc2",
 				AdminAuth: true,
 				Code:      http.StatusOK,
 				BodyMatch: `"action":"deleted"`,

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -33,7 +34,7 @@ func MyPluginPre(rw http.ResponseWriter, r *http.Request) {
 func MyPluginAuthCheck(rw http.ResponseWriter, r *http.Request) {
 	// perform auth (only one token "abc" is allowed)
 	token := r.Header.Get(header.Authorization)
-	if token != "abc" {
+	if !(token == "abc" || token == "abc2") {
 		rw.Header().Add(header.XAuthResult, "failed")
 		rw.WriteHeader(http.StatusForbidden)
 		_, _ = rw.Write([]byte("auth failed"))
@@ -43,7 +44,7 @@ func MyPluginAuthCheck(rw http.ResponseWriter, r *http.Request) {
 	// create session
 	session := &user.SessionState{
 		OrgID: "default",
-		Alias: "abc-session",
+		Alias: fmt.Sprintf("%s-session", token),
 		KeyID: token,
 	}
 

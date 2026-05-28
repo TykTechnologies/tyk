@@ -442,7 +442,7 @@ func TestDeleteRawKeysWithAllowanceScope(t *testing.T) {
 type countingStorageHandler struct {
 	deleteRawKeyMutex *sync.Mutex
 	deleteRawKeyCount int
-	storage.SetExHandlerNoImplemented
+	storage.HandlerAtomicNoImplemented
 }
 
 func newCountingStorageHandler() *countingStorageHandler {

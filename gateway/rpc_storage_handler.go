@@ -117,7 +117,7 @@ type RPCStorageHandler struct {
 	SuppressRegister bool
 	DoReload         func()
 	Gw               *Gateway `json:"-"`
-	storage.SetExHandlerNoImplemented
+	storage.HandlerAtomicNoImplemented
 }
 
 //go:generate mockgen -typed -source=$FILE -destination=../internal/policy/store_mock.gen.go -package policy . RPCDataLoader

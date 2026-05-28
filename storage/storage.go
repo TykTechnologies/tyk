@@ -73,20 +73,22 @@ type HandlerAtomic interface {
 	DeleteRawKeyAtomic(key string) bool
 }
 
-type SetExHandlerNoImplemented struct{}
+type HandlerAtomicNoImplemented struct{}
 
-func (s3 SetExHandlerNoImplemented) SetKeyAtomic(_ string, _ string, _ int64) error {
+func (s3 HandlerAtomicNoImplemented) SetKeyAtomic(_ string, _ string, _ int64) error {
 	return errors.New("SetKeyAtomic not implemented")
 }
 
-func (s3 SetExHandlerNoImplemented) SetRawKeyAtomic(_ string, _ string, _ int64) error {
+func (s3 HandlerAtomicNoImplemented) SetRawKeyAtomic(_ string, _ string, _ int64) error {
 	return errors.New("SetRawKeyAtomic not implemented")
 }
 
-func (s3 SetExHandlerNoImplemented) DeleteKeyAtomic(_ string) bool {
-	panic("not implemented")
+func (s3 HandlerAtomicNoImplemented) DeleteKeyAtomic(_ string) bool {
+	log.Error("DeleteKeyAtomic: not implemented")
+	return false
 }
 
-func (s3 SetExHandlerNoImplemented) DeleteRawKeyAtomic(_ string) bool {
-	panic("not implemented")
+func (s3 HandlerAtomicNoImplemented) DeleteRawKeyAtomic(_ string) bool {
+	log.Error("DeleteRawKeyAtomic: not implemented")
+	return false
 }

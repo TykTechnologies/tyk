@@ -18,7 +18,7 @@ type LDAPStorageHandler struct {
 	SessionAttributeName string
 	SearchString         string
 	store                *ldap.LDAPConnection
-	storage.SetExHandlerNoImplemented
+	storage.HandlerAtomicNoImplemented
 }
 
 func (l *LDAPStorageHandler) LoadConfFromMeta(meta map[string]interface{}) {
