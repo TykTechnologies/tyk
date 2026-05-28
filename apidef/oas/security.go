@@ -1089,6 +1089,15 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 		s.GetTykExtension().Server.Authentication = tykAuthentication
 	}
 
+	// SecurityRequirementScopes is the source of truth for OAS root
+	// security: shape. Mongo's omitempty semantics don't clear stored
+	// fields when an update sends nil, so a prior multi-requirement
+	// extract can leave SecurityRequirements at a stale length even
+	// after the operator shrinks the policy. Normalize here so fill
+	// emits exactly the alternatives the operator declared on the
+	// most recent save.
+	api.SecurityRequirements = normalizeSecurityRequirements(api.SecurityRequirements, api.SecurityRequirementScopes)
+
 	// Detect existing contract before Fill to preserve backwards compatibility
 	// Old contract: token.enableClientCertificate; New contract: certificateAuth.enabled
 	tokenSchemeName := api.AuthConfigs[apidef.AuthTokenType].Name
@@ -1132,7 +1141,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 		vendorSecurity := [][]string{}
 
 		if len(api.SecurityRequirements) > 0 {
-			for _, requirement := range api.SecurityRequirements {
+			for i, requirement := range api.SecurityRequirements {
 				hasProprietaryAuth := false
 				hasStandardAuth := false
 				oasReq := openapi3.NewSecurityRequirement()
@@ -1145,7 +1154,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 						vendorReq = append(vendorReq, schemeName)
 					} else {
 						hasStandardAuth = true
-						oasReq[schemeName] = []string{}
+						oasReq[schemeName] = s.requirementScopes(api.SecurityRequirementScopes, i, schemeName)
 					}
 				}
 
@@ -1186,7 +1195,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 			s.Security = make(openapi3.SecurityRequirements, 0, len(api.SecurityRequirements))
 			vendorSecurity := [][]string{}
 
-			for _, requirement := range api.SecurityRequirements {
+			for i, requirement := range api.SecurityRequirements {
 				secReq := openapi3.NewSecurityRequirement()
 				vendorReq := []string{}
 
@@ -1194,7 +1203,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 					if s.isProprietaryAuthScheme(schemeName) {
 						vendorReq = append(vendorReq, schemeName)
 					} else {
-						secReq[schemeName] = []string{}
+						secReq[schemeName] = s.requirementScopes(api.SecurityRequirementScopes, i, schemeName)
 					}
 				}
 
@@ -1210,12 +1219,14 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 				tykAuthentication.Security = vendorSecurity
 			}
 		} else if len(tykAuthentication.SecuritySchemes) > 0 {
-			// When no explicit requirements, create from schemes
-			// Only add non-proprietary schemes to OAS security
+			// When no explicit requirements, create from schemes. Restore
+			// per-scheme scope arrays from the single-requirement entry in
+			// SecurityRequirementScopes when present so legacy-mode APIs
+			// with one OAS Security Requirement still round-trip scopes.
 			secReq := openapi3.NewSecurityRequirement()
 			for name := range tykAuthentication.SecuritySchemes {
 				if !s.isProprietaryAuthScheme(name) {
-					secReq[name] = []string{}
+					secReq[name] = s.requirementScopes(api.SecurityRequirementScopes, 0, name)
 				}
 			}
 			if len(secReq) > 0 {
@@ -1249,6 +1260,13 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
+	// The OAS document is the source of truth for these two fields.
+	// Reset before rebuilding so a removed security: block clears
+	// prior state instead of inheriting it from the API definition
+	// the dashboard hydrated from storage.
+	api.SecurityRequirements = nil
+	api.SecurityRequirementScopes = nil
+
 	// Extract security requirements based on processing mode (OAS-only feature)
 	processingMode := SecurityProcessingModeLegacy
 	tykAuth := s.getTykAuthentication()
@@ -1269,25 +1287,54 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	if processingMode == SecurityProcessingModeCompliant {
 		// Concatenate OAS security with vendor extension security
 		api.SecurityRequirements = make([][]string, 0)
+		scopesAccum := make([]map[string][]string, 0)
 
 		// Identify standard auth schemes that appear in mixed vendor requirements
 		// to avoid duplicating them in OAS security
 		mixedVendorSchemes := s.identifyMixedVendorAuthSchemes()
 
 		// Add OAS security requirements, filtering out duplicates
-		s.appendFilteredOASSecurityRequirements(&api.SecurityRequirements, mixedVendorSchemes)
+		s.appendFilteredOASSecurityRequirements(&api.SecurityRequirements, &scopesAccum, mixedVendorSchemes)
 
 		// Add vendor extension security requirements
-		s.appendVendorSecurityRequirements(&api.SecurityRequirements)
+		s.appendVendorSecurityRequirements(&api.SecurityRequirements, &scopesAccum)
+
+		api.SecurityRequirementScopes = scopesAccum
 	} else if len(s.Security) > 1 {
 		api.SecurityRequirements = make([][]string, 0, len(s.Security))
+		scopesAccum := make([]map[string][]string, 0, len(s.Security))
 		for _, requirement := range s.Security {
 			schemes := make([]string, 0, len(requirement))
-			for schemeName := range requirement {
+			scopes := make(map[string][]string, len(requirement))
+			for schemeName, schemeScopes := range requirement {
 				schemes = append(schemes, schemeName)
+				scopes[schemeName] = append([]string{}, schemeScopes...)
 			}
 			api.SecurityRequirements = append(api.SecurityRequirements, schemes)
+			scopesAccum = append(scopesAccum, scopes)
 		}
+		api.SecurityRequirementScopes = scopesAccum
+	} else if len(s.Security) == 1 {
+		requirement := s.Security[0]
+		scopes := make(map[string][]string, len(requirement))
+		schemes := make([]string, 0, len(requirement))
+		for schemeName, schemeScopes := range requirement {
+			schemes = append(schemes, schemeName)
+			scopes[schemeName] = append([]string{}, schemeScopes...)
+		}
+		if len(requirement) > 1 {
+			// Multi-scheme single requirement: enumerate every scheme in
+			// SecurityRequirements so fill emits the same AND shape.
+			// normalizeSecurityRequirements would otherwise drop schemes
+			// with empty scopes by rebuilding from scope-map keys alone.
+			api.SecurityRequirements = [][]string{schemes}
+		} else {
+			// Single-scheme single requirement: fill rebuilds via the
+			// scheme's own appendSecurity call, so SecurityRequirements
+			// stays nil.
+			api.SecurityRequirements = nil
+		}
+		api.SecurityRequirementScopes = []map[string][]string{scopes}
 	}
 
 	// Process security requirements based on processing mode:
@@ -1366,6 +1413,17 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 					case v.Type == typeOAuth2:
 						securityScheme := s.getTykSecurityScheme(schemeName)
 						if securityScheme == nil {
+							continue
+						}
+
+						// The new oauth2 scheme is OAS-native and has no
+						// classic extraction; the gateway middleware reads
+						// it from OAS directly. Promote a raw-map entry to
+						// the typed view here so subsequent OAS reads (and
+						// the marshal-back-to-DB step) see the same shape,
+						// and skip the legacy OAuth / ExternalOAuth fallback.
+						if oauth2 := asOAuth2Scheme(securityScheme); oauth2 != nil {
+							s.getTykSecuritySchemes()[schemeName] = oauth2
 							continue
 						}
 
@@ -1751,13 +1809,15 @@ func (s *OAS) identifyMixedVendorAuthSchemes() map[string]bool {
 // skipping any single-scheme requirements that are already part of mixed vendor requirements.
 // This prevents duplication when a scheme like "jwtAuth" appears both in OAS security
 // as a single requirement and in vendor security as part of a mixed requirement.
-func (s *OAS) appendFilteredOASSecurityRequirements(apiSecurityReqs *[][]string, mixedVendorSchemes map[string]bool) {
+func (s *OAS) appendFilteredOASSecurityRequirements(apiSecurityReqs *[][]string, apiSecurityScopes *[]map[string][]string, mixedVendorSchemes map[string]bool) {
 	for _, requirement := range s.Security {
 		schemes := make([]string, 0, len(requirement))
+		scopes := make(map[string][]string, len(requirement))
 		skip := false
 
-		for schemeName := range requirement {
+		for schemeName, schemeScopes := range requirement {
 			schemes = append(schemes, schemeName)
+			scopes[schemeName] = append([]string{}, schemeScopes...)
 			// Skip single-scheme requirements that are in mixed vendor requirements
 			if len(requirement) == 1 && mixedVendorSchemes[schemeName] {
 				skip = true
@@ -1767,15 +1827,84 @@ func (s *OAS) appendFilteredOASSecurityRequirements(apiSecurityReqs *[][]string,
 
 		if !skip {
 			*apiSecurityReqs = append(*apiSecurityReqs, schemes)
+			*apiSecurityScopes = append(*apiSecurityScopes, scopes)
 		}
 	}
 }
 
+// normalizeSecurityRequirements realigns SecurityRequirements when it
+// disagrees with SecurityRequirementScopes on the alternative count
+// — the case where the operator shrinks a multi-requirement policy
+// down to fewer alternatives and a stale SecurityRequirements value
+// would otherwise leak through fill as extra empty alternatives.
+//
+// The helper only enriches an existing requirement list. When the
+// list is empty it returns nil unchanged: a stale scope map must not
+// be allowed to manufacture a requirement that the current OAS no
+// longer declares, otherwise a single leftover scope entry would
+// resurrect a deleted scheme on the next fill.
+func normalizeSecurityRequirements(reqs [][]string, scopes []map[string][]string) [][]string {
+	if len(reqs) == 0 || len(scopes) == 0 || len(reqs) == len(scopes) {
+		return reqs
+	}
+	out := make([][]string, 0, len(scopes))
+	for _, scopeMap := range scopes {
+		schemes := make([]string, 0, len(scopeMap))
+		for name := range scopeMap {
+			schemes = append(schemes, name)
+		}
+		out = append(out, schemes)
+	}
+	return out
+}
+
+// requirementScopes returns the scope array to emit on the OAS Security
+// Requirement Object for the named scheme at requirement index i. OAS 3.0
+// §4.8.30.1 restricts non-empty scope arrays to oauth2 and openIdConnect
+// schemes; anything else round-trips with an empty array even if upstream
+// data nominally carries scopes. When SecurityRequirementScopes is empty
+// or has no entry for this scheme/index, an empty array is returned —
+// matching the contract of every other auth scheme that has no scope
+// concept.
+func (s *OAS) requirementScopes(scopes []map[string][]string, i int, schemeName string) []string {
+	if !s.schemeUsesScopes(schemeName) {
+		return []string{}
+	}
+	if i < 0 || i >= len(scopes) {
+		return []string{}
+	}
+	out := scopes[i][schemeName]
+	if out == nil {
+		return []string{}
+	}
+	return append([]string{}, out...)
+}
+
+// schemeUsesScopes reports whether the OAS security scheme with the given
+// name is an oauth2 or openIdConnect scheme, the only two types for which
+// OAS permits non-empty scope arrays on a Security Requirement Object.
+func (s *OAS) schemeUsesScopes(schemeName string) bool {
+	if s.Components == nil || s.Components.SecuritySchemes == nil {
+		return false
+	}
+	ref, ok := s.Components.SecuritySchemes[schemeName]
+	if !ok || ref == nil || ref.Value == nil {
+		return false
+	}
+	return ref.Value.Type == typeOAuth2 || ref.Value.Type == "openIdConnect"
+}
+
 // appendVendorSecurityRequirements adds vendor extension security requirements
-// to the API definition if they exist.
-func (s *OAS) appendVendorSecurityRequirements(apiSecurityReqs *[][]string) {
+// to the API definition if they exist. Vendor entries do not carry OAS scope
+// arrays, so an empty scope map is appended to keep index-alignment with the
+// scheme-name slice.
+func (s *OAS) appendVendorSecurityRequirements(apiSecurityReqs *[][]string, apiSecurityScopes *[]map[string][]string) {
 	tykAuth := s.getTykAuthentication()
-	if tykAuth != nil && len(tykAuth.Security) > 0 {
-		*apiSecurityReqs = append(*apiSecurityReqs, tykAuth.Security...)
+	if tykAuth == nil {
+		return
+	}
+	for _, vendorReq := range tykAuth.Security {
+		*apiSecurityReqs = append(*apiSecurityReqs, vendorReq)
+		*apiSecurityScopes = append(*apiSecurityScopes, map[string][]string{})
 	}
 }

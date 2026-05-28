@@ -2022,6 +2022,41 @@
         },
         "query": {
           "$ref": "#/definitions/X-Tyk-AuthSource"
+        },
+        "scopeCheck": {
+          "$ref": "#/definitions/X-Tyk-OAuth2-ScopeCheck"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "X-Tyk-OAuth2-ScopeCheck": {
+      "type": "object",
+      "description": "Token-side knobs for OAS-native scope enforcement. Required scopes themselves live in the OAS root security: array.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "claimNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ordered list of JWT claim names to read scopes from. The gateway reads each listed claim that is present and merges all scope values into one set. Alternatives drawn from OAS root security: are checked against this merged set. Defaults to [\"scope\", \"scp\"] when unset."
+        },
+        "separator": {
+          "type": "string"
+        },
+        "scopeSource": {
+          "type": "string",
+          "enum": [
+            "operation",
+            "global",
+            "union"
+          ],
+          "description": "Selects whether enforcement reads per-operation security:, root security:, or both. Defaults to \"union\"."
         }
       },
       "required": [

@@ -11,15 +11,30 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/user"
 )
+
+func buildMCPListFilterSSESpec(apiID string, middleware *oas.Middleware) *APISpec {
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID:               apiID,
+			ApplicationProtocol: apidef.AppProtocolMCP,
+		},
+	}
+	if middleware != nil {
+		spec.OAS.SetTykExtension(&oas.XTykAPIGateway{Middleware: middleware})
+	}
+	return spec
+}
 
 func TestNewMCPListFilterSSEHook(t *testing.T) {
 	apiID := "test-api"
 
 	t.Run("nil session returns nil", func(t *testing.T) {
-		hook := NewMCPListFilterSSEHook(apiID, nil)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), nil)
 		assert.Nil(t, hook)
 	})
 
@@ -29,7 +44,7 @@ func TestNewMCPListFilterSSEHook(t *testing.T) {
 				apiID: {},
 			},
 		}
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		assert.Nil(t, hook)
 	})
 
@@ -43,7 +58,7 @@ func TestNewMCPListFilterSSEHook(t *testing.T) {
 				},
 			},
 		}
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		assert.Nil(t, hook)
 	})
 
@@ -57,9 +72,87 @@ func TestNewMCPListFilterSSEHook(t *testing.T) {
 				},
 			},
 		}
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		assert.NotNil(t, hook)
 	})
+}
+
+func TestMCPListFilterSSEHook_MiddlewarePrimitiveFiltering(t *testing.T) {
+	spec := buildMCPListFilterSSESpec("test-api", &oas.Middleware{
+		McpTools: oas.MCPPrimitives{
+			"get_weather":   {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+			"get_forecast":  {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+			"execute_query": {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+		},
+	})
+	hook := NewMCPListFilterSSEHook(spec, nil)
+	require.NotNil(t, hook)
+
+	event := &SSEEvent{
+		Event: "message",
+		Data:  []string{`{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"get_weather"},{"name":"get_forecast"},{"name":"execute_query"},{"name":"admin_reset"}]}}`},
+	}
+
+	allowed, modified := hook.FilterEvent(event)
+	assert.True(t, allowed)
+	require.NotNil(t, modified)
+
+	var envelope mcp.JSONRPCResponse
+	require.NoError(t, json.Unmarshal([]byte(modified.Data[0]), &envelope))
+	var result map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(envelope.Result, &result))
+	var tools []map[string]any
+	require.NoError(t, json.Unmarshal(result["tools"], &tools))
+
+	names := make([]string, 0, len(tools))
+	for _, tool := range tools {
+		names = append(names, tool["name"].(string))
+	}
+	assert.Equal(t, []string{"get_weather", "get_forecast", "execute_query"}, names)
+}
+
+func TestMCPListFilterSSEHook_MiddlewareAndPolicyCompose(t *testing.T) {
+	apiID := "test-api"
+	spec := buildMCPListFilterSSESpec(apiID, &oas.Middleware{
+		McpTools: oas.MCPPrimitives{
+			"get_weather":   {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+			"get_forecast":  {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+			"execute_query": {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+		},
+	})
+	ses := &user.SessionState{
+		AccessRights: map[string]user.AccessDefinition{
+			apiID: {
+				MCPAccessRights: user.MCPAccessRights{
+					Tools: user.AccessControlRules{Allowed: []string{"get_weather", "get_forecast"}},
+				},
+			},
+		},
+	}
+	hook := NewMCPListFilterSSEHook(spec, ses)
+	require.NotNil(t, hook)
+
+	event := &SSEEvent{
+		Event: "message",
+		Data:  []string{`{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"get_weather"},{"name":"get_forecast"},{"name":"execute_query"},{"name":"admin_reset"}]}}`},
+	}
+
+	allowed, modified := hook.FilterEvent(event)
+	assert.True(t, allowed)
+	require.NotNil(t, modified)
+
+	var envelope mcp.JSONRPCResponse
+	require.NoError(t, json.Unmarshal([]byte(modified.Data[0]), &envelope))
+	var result map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(envelope.Result, &result))
+	var tools []map[string]any
+	require.NoError(t, json.Unmarshal(result["tools"], &tools))
+
+	names := make([]string, 0, len(tools))
+	for _, tool := range tools {
+		names = append(names, tool["name"].(string))
+	}
+	assert.Equal(t, []string{"get_weather", "get_forecast"}, names)
 }
 
 func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
@@ -116,7 +209,7 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 		ses := makeSession(user.AccessControlRules{
 			Allowed: []string{"get_weather", "get_forecast"},
 		})
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		event := &SSEEvent{
@@ -136,7 +229,7 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 		ses := makeSession(user.AccessControlRules{
 			Blocked: []string{"set_alert", "delete_alert"},
 		})
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		event := &SSEEvent{
@@ -155,7 +248,7 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 		ses := makeSession(user.AccessControlRules{
 			Allowed: []string{"get_.*"},
 		})
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		event := &SSEEvent{
@@ -176,7 +269,7 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 			Allowed: []string{"set_alert"},
 			Blocked: []string{"set_alert"},
 		})
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		event := &SSEEvent{
@@ -196,7 +289,7 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 		ses := makeSession(user.AccessControlRules{
 			Allowed: []string{"get_weather"},
 		})
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 
 		result := map[string]any{
 			"tools":      []map[string]any{{"name": "get_weather"}, {"name": "set_alert"}},
@@ -224,7 +317,7 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 
 	t.Run("passes through non-message event types", func(t *testing.T) {
 		ses := makeSession(user.AccessControlRules{Allowed: []string{"get_weather"}})
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 
 		event := &SSEEvent{
 			Event: "error",
@@ -238,7 +331,7 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 
 	t.Run("passes through non-list JSON-RPC responses", func(t *testing.T) {
 		ses := makeSession(user.AccessControlRules{Allowed: []string{"get_weather"}})
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 
 		// A tools/call response has "content", not "tools"
 		result := map[string]any{
@@ -264,7 +357,7 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 
 	t.Run("passes through error responses", func(t *testing.T) {
 		ses := makeSession(user.AccessControlRules{Allowed: []string{"get_weather"}})
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 
 		errObj := map[string]any{"code": -32600, "message": "invalid request"}
 		errBytes, _ := json.Marshal(errObj) //nolint:errcheck
@@ -284,7 +377,7 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 
 	t.Run("passes through empty data", func(t *testing.T) {
 		ses := makeSession(user.AccessControlRules{Allowed: []string{"get_weather"}})
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 
 		event := &SSEEvent{Data: []string{}}
 		allowed, modified := hook.FilterEvent(event)
@@ -294,7 +387,7 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 
 	t.Run("passes through malformed JSON", func(t *testing.T) {
 		ses := makeSession(user.AccessControlRules{Allowed: []string{"get_weather"}})
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 
 		event := &SSEEvent{Data: []string{`{not valid json`}}
 		allowed, modified := hook.FilterEvent(event)
@@ -306,7 +399,7 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 		ses := makeSession(user.AccessControlRules{
 			Allowed: []string{"get_weather"},
 		})
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		event := &SSEEvent{
@@ -328,7 +421,7 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 		ses := makeSession(user.AccessControlRules{
 			Allowed: []string{"get_weather"},
 		})
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		event := &SSEEvent{
@@ -345,7 +438,7 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 
 	t.Run("empty result object passes through", func(t *testing.T) {
 		ses := makeSession(user.AccessControlRules{Allowed: []string{"get_weather"}})
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 
 		// Result exists but has no list key.
 		envelope := map[string]any{
@@ -365,7 +458,7 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 		ses := makeSession(user.AccessControlRules{
 			Allowed: []string{"get_weather"},
 		})
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 
 		// Split JSON across multiple data: lines (valid per SSE spec)
 		fullJSON := makeToolsListData([]string{"get_weather", "set_alert"})
@@ -395,7 +488,7 @@ func TestMCPListFilterSSEHook_PromptFiltering(t *testing.T) {
 			},
 		},
 	}
-	hook := NewMCPListFilterSSEHook(apiID, ses)
+	hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 	require.NotNil(t, hook)
 
 	result := map[string]any{
@@ -435,7 +528,7 @@ func TestMCPListFilterSSEHook_ResourceTemplateFiltering(t *testing.T) {
 			},
 		},
 	}
-	hook := NewMCPListFilterSSEHook(apiID, ses)
+	hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 	require.NotNil(t, hook)
 
 	result := map[string]any{
@@ -502,7 +595,7 @@ func TestMCPListFilterSSEHook_OutOfOrderFrames(t *testing.T) {
 			user.AccessControlRules{Allowed: []string{"allowed_tool"}},
 			user.AccessControlRules{Allowed: []string{"allowed_prompt"}},
 		)
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		toolsData := makeJSONRPCResponse(1, "tools", []map[string]any{
@@ -536,7 +629,7 @@ func TestMCPListFilterSSEHook_OutOfOrderFrames(t *testing.T) {
 			user.AccessControlRules{Allowed: []string{"get_weather"}},
 			user.AccessControlRules{},
 		)
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		// Non-list response (tools/call result)
@@ -586,7 +679,7 @@ func TestMCPListFilterSSEHook_OutOfOrderFrames(t *testing.T) {
 			user.AccessControlRules{Allowed: []string{"tool_a"}},
 			user.AccessControlRules{},
 		)
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		toolsData := makeJSONRPCResponse(1, "tools", []map[string]any{
@@ -612,7 +705,7 @@ func TestMCPListFilterSSEHook_OutOfOrderFrames(t *testing.T) {
 			user.AccessControlRules{Allowed: []string{"allowed"}},
 			user.AccessControlRules{},
 		)
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		toolsData := makeJSONRPCResponse(1, "tools", []map[string]any{
@@ -637,7 +730,7 @@ func TestMCPListFilterSSEHook_OutOfOrderFrames(t *testing.T) {
 			user.AccessControlRules{Allowed: []string{"tool_.*"}},
 			user.AccessControlRules{},
 		)
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		// Events with non-sequential IDs (could happen with reconnection)
@@ -687,7 +780,7 @@ func TestMCPListFilterSSEHook_OutOfOrderFrames(t *testing.T) {
 			user.AccessControlRules{Allowed: []string{"allowed"}},
 			user.AccessControlRules{},
 		)
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		toolsData := makeJSONRPCResponse(1, "tools", []map[string]any{
@@ -721,7 +814,7 @@ func TestMCPListFilterSSEHook_OutOfOrderFrames(t *testing.T) {
 			user.AccessControlRules{Allowed: []string{"tool_1"}},
 			user.AccessControlRules{},
 		)
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		tools1 := makeJSONRPCResponse(1, "tools", []map[string]any{
@@ -760,7 +853,7 @@ func TestMCPListFilterSSEHook_OutOfOrderFrames(t *testing.T) {
 				},
 			},
 		}
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		toolsData := makeJSONRPCResponse(1, "tools", []map[string]any{
@@ -804,7 +897,7 @@ func TestMCPListFilterSSEHook_OutOfOrderFrames(t *testing.T) {
 			user.AccessControlRules{Allowed: []string{"first_.*"}},
 			user.AccessControlRules{},
 		)
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		// Both use JSON-RPC id: 1
@@ -838,7 +931,7 @@ func TestMCPListFilterSSEHook_OutOfOrderFrames(t *testing.T) {
 			user.AccessControlRules{Allowed: []string{"tiny"}},
 			user.AccessControlRules{},
 		)
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		toolsData := makeJSONRPCResponse(1, "tools", []map[string]any{
@@ -864,7 +957,7 @@ func TestMCPListFilterSSEHook_OutOfOrderFrames(t *testing.T) {
 			user.AccessControlRules{Allowed: []string{"allowed"}},
 			user.AccessControlRules{},
 		)
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		toolsData := makeJSONRPCResponse(1, "tools", []map[string]any{
@@ -892,7 +985,7 @@ func TestMCPListFilterSSEHook_OutOfOrderFrames(t *testing.T) {
 			user.AccessControlRules{Allowed: []string{"page_.*"}},
 			user.AccessControlRules{},
 		)
-		hook := NewMCPListFilterSSEHook(apiID, ses)
+		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 		require.NotNil(t, hook)
 
 		// First page
@@ -967,7 +1060,7 @@ func benchmarkSSEHook(b *testing.B, numTools int, rules user.AccessControlRules)
 			},
 		},
 	}
-	hook := NewMCPListFilterSSEHook(apiID, ses)
+	hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 	event := generateSSEToolsEvent(numTools)
 
 	b.ResetTimer()
@@ -1016,7 +1109,7 @@ func BenchmarkSSEHook_NonListEvent(b *testing.B) {
 			},
 		},
 	}
-	hook := NewMCPListFilterSSEHook(apiID, ses)
+	hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 	// A tools/call result — should pass through without parsing.
 	result := map[string]any{"content": []map[string]any{{"type": "text", "text": "hello"}}}
 	resultBytes, _ := json.Marshal(result) //nolint:errcheck
@@ -1043,7 +1136,7 @@ func benchmarkSSETapEndToEnd(b *testing.B, numTools int, rules user.AccessContro
 			},
 		},
 	}
-	hook := NewMCPListFilterSSEHook(apiID, ses)
+	hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
 
 	// Build the raw SSE bytes as the upstream would send them.
 	event := generateSSEToolsEvent(numTools)
