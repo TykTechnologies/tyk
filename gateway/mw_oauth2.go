@@ -53,7 +53,13 @@ func (m *OAuth2Middleware) EnabledForSpec() bool {
 	if cfg == nil || !cfg.Enabled {
 		return false
 	}
-	return cfg.ScopeCheck != nil && cfg.ScopeCheck.Enabled
+	if cfg.ScopeCheck != nil && cfg.ScopeCheck.Enabled {
+		return true
+	}
+	if cfg.TokenExchange != nil && cfg.TokenExchange.Enabled {
+		return true
+	}
+	return false
 }
 
 func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
@@ -62,58 +68,151 @@ func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	_, cfg := m.Spec.GetOAuth2Config()
-	if cfg == nil || cfg.ScopeCheck == nil || !cfg.ScopeCheck.Enabled {
+	if cfg == nil {
+		return nil, http.StatusOK
+	}
+	scopeCheckActive := cfg.ScopeCheck != nil && cfg.ScopeCheck.Enabled
+	exchangeActive := cfg.TokenExchange != nil && cfg.TokenExchange.Enabled
+	if !scopeCheckActive && !exchangeActive {
 		return nil, http.StatusOK
 	}
 
-	alternatives := m.requiredScopeAlternativesForRequest(r)
-	if len(alternatives) == 0 {
-		// Nothing to enforce for this request (no per-op `security:`,
-		// no root `security:`, or the resolved requirement is vacuous).
-		return nil, http.StatusOK
+	var alternatives [][]string
+	if scopeCheckActive {
+		alternatives = m.requiredScopeAlternativesForRequest(r)
 	}
 
+	// Both gates read the inbound Bearer + parsed claims. A request
+	// needs a usable bearer when scope-check is enforcing (has at
+	// least one alternative) OR when exchange is enabled — passing an
+	// empty / unparseable subject_token to the IdP would surface as a
+	// confusing 502 exchange_failed instead of an honest 401 missing
+	// bearer. Reject missing / malformed tokens before reaching the
+	// downstream EE middleware.
+	needsBearer := exchangeActive || (scopeCheckActive && len(alternatives) > 0)
 	rawToken := stripBearer(r.Header.Get(header.Authorization))
+	var claims jwt.MapClaims
 	if rawToken == "" {
-		m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "missing bearer token")
-		return errors.New("Authorization field missing"), http.StatusUnauthorized
+		if needsBearer {
+			m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "missing bearer token")
+			return errors.New("Authorization field missing"), http.StatusUnauthorized
+		}
+	} else {
+		c, err := oauth2common.ParseUnverifiedClaims(rawToken)
+		if err != nil {
+			if needsBearer {
+				m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "token is not a parseable JWT")
+				return fmt.Errorf("parsing inbound token claims: %w", err), http.StatusUnauthorized
+			}
+		} else {
+			claims = c
+		}
 	}
 
-	claims, err := oauth2common.ParseUnverifiedClaims(rawToken)
-	if err != nil {
-		m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "token is not a parseable JWT")
-		return fmt.Errorf("parsing inbound token claims: %w", err), http.StatusUnauthorized
+	if scopeCheckActive && len(alternatives) > 0 && !tokenSatisfiesAnyAlternative(claims, cfg.ScopeCheck, alternatives) {
+		// The first declared alternative is cited on the challenge —
+		// listing every alternative would leak intent (a
+		// service-account scope shouldn't be advertised to a
+		// user-token caller).
+		cited := alternatives[0]
+		citedScopes := strings.Join(cited, " ")
+		m.fireScopeCheckFailedEvent(r, claims, alternatives, cited, cfg.ScopeCheck)
+		m.setWWWAuthenticateInsufficientScope(w, r, cited)
+
+		// MCP / JSON-RPC routes get the failure wrapped in a JSON-RPC
+		// 2.0 error envelope by the chain's error handler (which keys
+		// off the routing state). REST routes get the RFC 6750-style
+		// JSON body written inline.
+		if m.Spec.IsMCP() && httpctx.GetJSONRPCRoutingState(r) != nil {
+			return errors.New(oas.OAuth2ErrInsufficientScope), http.StatusForbidden
+		}
+
+		body, _ := json.Marshal(map[string]interface{}{
+			"error":             oas.OAuth2ErrInsufficientScope,
+			"error_description": "token does not satisfy required scopes: " + citedScopes,
+			"scope":             citedScopes,
+		})
+		w.Header().Set(header.ContentType, header.ApplicationJSON)
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write(body)
+		return nil, middleware.StatusRespond
 	}
 
-	if tokenSatisfiesAnyAlternative(claims, cfg.ScopeCheck, alternatives) {
-		return nil, http.StatusOK
+	// Hand off to the EE TokenExchangeMiddleware (when configured) via
+	// request-context state. The chain runs the EE middleware after
+	// this one; on OSS builds it is replaced with a noop that prints a
+	// one-time warning when an operator has configured
+	// tokenExchange.enabled=true.
+	if exchangeActive {
+		oauth2common.SetState(r, &oauth2common.State{
+			Claims:               claims,
+			RawToken:             rawToken,
+			OASConfig:            cfg,
+			APIID:                m.Spec.APIID,
+			MatchedOperationID:   m.matchedOperationIDForRequest(r),
+			MatchedPrimitiveName: matchedPrimitiveNameForRequest(r),
+			InferredScopes:       m.inferredScopesForRequest(r),
+		})
 	}
+	return nil, http.StatusOK
+}
 
-	// The first declared alternative is cited on the challenge — listing
-	// every alternative would leak intent (a service-account scope
-	// shouldn't be advertised to a user-token caller).
-	cited := alternatives[0]
-	citedScopes := strings.Join(cited, " ")
-	m.fireScopeCheckFailedEvent(r, claims, alternatives, cited, cfg.ScopeCheck)
-	m.setWWWAuthenticateInsufficientScope(w, r, cited)
-
-	// MCP / JSON-RPC routes get the failure wrapped in a JSON-RPC 2.0
-	// error envelope by the chain's error handler (which keys off the
-	// routing state). REST routes get the RFC 6750-style JSON body
-	// written inline.
-	if m.Spec.IsMCP() && httpctx.GetJSONRPCRoutingState(r) != nil {
-		return errors.New(oas.OAuth2ErrInsufficientScope), http.StatusForbidden
+// matchedOperationIDForRequest returns the OAS operationId that the
+// gateway's router resolved for this request, or "" when no path/method
+// matched (or this isn't an OAS API).
+func (m *OAuth2Middleware) matchedOperationIDForRequest(r *http.Request) string {
+	if op := m.findOASOperation(r); op != nil {
+		return op.OperationID
 	}
+	return ""
+}
 
-	body, _ := json.Marshal(map[string]interface{}{
-		"error":             oas.OAuth2ErrInsufficientScope,
-		"error_description": "token does not satisfy required scopes: " + citedScopes,
-		"scope":             citedScopes,
-	})
-	w.Header().Set(header.ContentType, header.ApplicationJSON)
-	w.WriteHeader(http.StatusForbidden)
-	_, _ = w.Write(body)
-	return nil, middleware.StatusRespond
+// matchedPrimitiveNameForRequest returns the JSONRPC primitive name
+// (MCP tool / resource / prompt) resolved upstream by the JSONRPC
+// middleware, or "" when this isn't a JSONRPC request.
+func matchedPrimitiveNameForRequest(r *http.Request) string {
+	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
+		return state.PrimitiveName
+	}
+	return ""
+}
+
+// inferredScopesForRequest returns the union of all scope alternatives
+// for the request — used for outbound exchange.scopes inference per
+// RFC 8693 §4.5.5: multiple alternatives in `security:` (OR-of-AND)
+// all contribute, since the gateway already passes the inbound check
+// on at least one alternative and can't tell at exchange time which
+// alternative the caller satisfied.
+func (m *OAuth2Middleware) inferredScopesForRequest(r *http.Request) []string {
+	return flattenScopeAlternatives(m.requiredScopeAlternativesForRequest(r))
+}
+
+// flattenScopeAlternatives merges every alternative of the OR-of-AND
+// requirement into one deduplicated flat list, preserving first-seen
+// order across alternatives.
+func flattenScopeAlternatives(alts [][]string) []string {
+	if len(alts) == 0 {
+		return nil
+	}
+	var merged []string
+	for _, alt := range alts {
+		merged = append(merged, alt...)
+	}
+	return dedupPreserveOrder(merged)
+}
+
+// dedupPreserveOrder returns s with duplicates removed, preserving
+// first-seen order.
+func dedupPreserveOrder(s []string) []string {
+	seen := make(map[string]struct{}, len(s))
+	out := s[:0:0]
+	for _, v := range s {
+		if _, ok := seen[v]; !ok {
+			seen[v] = struct{}{}
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // requiredScopeAlternativesForRequest resolves the OR-of-AND scope

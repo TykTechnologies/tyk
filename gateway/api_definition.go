@@ -236,6 +236,9 @@ func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 		if err != nil {
 			return err
 		}
+		if err := s.OAS.ValidateOAuth2Schemes(); err != nil {
+			return err
+		}
 	}
 
 	// For tcp services we need to make sure we can bind to the port.
@@ -770,8 +773,30 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 	nestDef := model.MergedAPI{APIDefinition: &def}
 	if def.IsOAS {
 		loader := openapi3.NewLoader()
-		// use openapi3.ReadFromFile as ReadFromURIFunc since the default implementation cache spec based on file path.
-		loader.ReadFromURIFunc = openapi3.ReadFromFile
+		// Wrap the URI reader so replaceSecrets runs on the OAS bytes
+		// before the openapi3 loader parses them. Without this wrap,
+		// `env://` / `secrets://` / `vault://` / `consul://` prefixes
+		// inside the x-tyk-api-gateway extension (e.g. on the new
+		// oauth2 scheme's clientSecret fields) would land in the
+		// in-memory struct unresolved. The classic apidef file already
+		// gets replaceSecrets applied above; this extends the same
+		// coverage to the OAS companion file.
+		//
+		// Scoped to local-file reads (empty or "file" scheme): a
+		// remote `$ref` URL points at content the operator does NOT
+		// necessarily trust to dereference into their own secret
+		// store, so resolving `vault://...` in remote-fetched bytes
+		// would be an injection vector.
+		loader.ReadFromURIFunc = func(l *openapi3.Loader, uri *url.URL) ([]byte, error) {
+			b, err := openapi3.ReadFromFile(l, uri)
+			if err != nil {
+				return nil, err
+			}
+			if uri == nil || uri.Scheme == "" || uri.Scheme == "file" {
+				return a.replaceSecrets(b), nil
+			}
+			return b, nil
+		}
 
 		var oasFilepath string
 		if def.IsMCP() {

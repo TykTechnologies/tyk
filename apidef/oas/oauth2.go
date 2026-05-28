@@ -1,9 +1,12 @@
 package oas
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/getkin/kin-openapi/openapi3"
+
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
 // OAuth2 is the container for the OAS-native OAuth 2.0 security scheme.
@@ -30,6 +33,12 @@ type OAuth2 struct {
 	// New home for PRM; wins over the deprecated top-level
 	// authentication.protectedResourceMetadata when both are set.
 	ProtectedResourceMetadata *OAuth2PRM `bson:"protectedResourceMetadata,omitempty" json:"protectedResourceMetadata,omitempty"`
+
+	// TokenExchange enables RFC 8693 token exchange. Inbound user
+	// tokens are exchanged at the matched provider's IdP for a
+	// backend-audienced token before being forwarded upstream. See
+	// OAuth2TokenExchange for the full configuration contract.
+	TokenExchange *OAuth2TokenExchange `bson:"tokenExchange,omitempty" json:"tokenExchange,omitempty"`
 }
 
 // OAuth2PRM configures the RFC 9728 Protected Resource Metadata
@@ -142,6 +151,139 @@ type ScopeCheck struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 }
 
+// OAuth2TokenExchange holds RFC 8693 token exchange configuration for
+// this scheme. When Enabled, the gateway dispatches inbound tokens to
+// one of the configured providers based on the inbound `iss` claim and
+// posts an RFC 8693 token-exchange request to that provider's
+// tokenEndpoint. The exchanged token replaces the Authorization header
+// on the request before it is forwarded upstream.
+type OAuth2TokenExchange struct {
+	// Enabled is the master switch for token exchange on this scheme.
+	// When false, the block is inert.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// Providers is the list of IdP entries this scheme can exchange
+	// against. Provider selection at request time is by inbound `iss`
+	// claim match against Providers[i].Issuers — see SelectExchangeProvider
+	// in internal/oauth2common.
+	Providers []OAuth2TokenExchangeProvider `bson:"providers,omitempty" json:"providers,omitempty"`
+}
+
+// OAuth2TokenExchangeProvider configures a single IdP provider entry.
+// Multi-provider per API is supported via a list of entries; selection
+// at request time is by inbound `iss` claim match against Issuers.
+type OAuth2TokenExchangeProvider struct {
+	// Name is an operator-chosen identifier for this provider. Used in
+	// audit logs. Must be non-empty and unique within Providers.
+	Name string `bson:"name" json:"name"`
+
+	// Issuers is the set of inbound token `iss` values routed to this
+	// provider. Multi-realm Keycloak, multi-tenant Auth0, and
+	// URL-synonym deployments all benefit from listing several issuers
+	// on one provider. Issuers must be unique across the whole
+	// Providers list so dispatch is deterministic.
+	Issuers []string `bson:"issuers,omitempty" json:"issuers,omitempty"`
+
+	// TokenEndpoint is the IdP token endpoint where Tyk POSTs the
+	// RFC 8693 exchange request. Must accept
+	// `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`.
+	TokenEndpoint string `bson:"tokenEndpoint,omitempty" json:"tokenEndpoint,omitempty"`
+
+	// ClientAuth selects how Tyk authenticates as a confidential
+	// client to the IdP on the exchange call.
+	ClientAuth *OAuth2ClientAuth `bson:"clientAuth,omitempty" json:"clientAuth,omitempty"`
+
+	// DefaultTarget is the fallback target (audience + scopes) used
+	// when the matched operation has no per-op exchange override.
+	DefaultTarget *OAuth2DefaultTarget `bson:"defaultTarget,omitempty" json:"defaultTarget,omitempty"`
+
+	// Timeout caps each HTTP call to this provider's tokenEndpoint.
+	// Format is Tyk's standard ReadableDuration ("100ms", "5s", "30s").
+	// When zero/unset the runtime applies a 15-second default.
+	Timeout tyktime.ReadableDuration `bson:"timeout,omitempty" json:"timeout,omitempty"`
+
+	// CustomParams are operator-supplied form parameters appended to
+	// every RFC 8693 exchange request to this provider's tokenEndpoint.
+	// Useful for IdP-specific extensions like Keycloak Identity
+	// Brokering's `requested_issuer`.
+	//
+	// Keys that would shadow gateway-managed RFC 8693 / OAuth2 wire
+	// values (grant_type, subject_token, audience, scope, …) are
+	// rejected at API-load time — see ValidateOAuth2Schemes and
+	// oauth2ReservedExchangeFormKeys.
+	//
+	// Values accept env://, secrets://, vault://, consul:// prefixes
+	// resolved at gateway runtime.
+	CustomParams map[string]string `bson:"customParams,omitempty" json:"customParams,omitempty"`
+}
+
+// OAuth2ClientAuth describes how Tyk authenticates as a confidential
+// client to the IdP token endpoint.
+//
+// ClientSecret accepts env://, secrets://, vault://, consul:// prefixes
+// resolved at gateway runtime via gateway/api_definition.go.
+type OAuth2ClientAuth struct {
+	// Method selects the client-auth scheme. Supported values:
+	//   - "client_secret_basic" (RFC 6749 §2.3.1) — credentials in the
+	//     HTTP Authorization header.
+	//   - "client_secret_post" (RFC 6749 §2.3.1) — credentials in the
+	//     form body.
+	// Empty string defaults to client_secret_basic.
+	Method   string `bson:"method,omitempty" json:"method,omitempty"`
+	ClientID string `bson:"clientId,omitempty" json:"clientId,omitempty"`
+	// ClientSecret accepts env://, secrets://, vault://, consul:// prefixes.
+	ClientSecret string `bson:"clientSecret,omitempty" json:"clientSecret,omitempty"`
+}
+
+// OAuth2DefaultTarget is the fallback (audience, scopes) the exchange
+// uses when an operation omits its own exchange.audience or
+// exchange.scopes.
+type OAuth2DefaultTarget struct {
+	Audience string   `bson:"audience,omitempty" json:"audience,omitempty"`
+	Scopes   []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
+}
+
+// OAuth2Exchange is the per-operation override for the outbound
+// exchanged token's audience and scopes.
+//
+// Resolution chain at request time (most-specific wins):
+//
+//  1. ex.Scopes (explicit per-op list) — used as-is.
+//  2. ex.Enabled == true && len(Scopes) == 0 — inferred from the
+//     matched operation's `security:` requirement (the oauth2 scope
+//     list the inbound check enforces). Kills the duplication for the
+//     "exchange asks for the same authority the caller proved" case
+//     (RFC 8693 §4.5.5).
+//  3. provider.DefaultTarget.Scopes — fallback when neither above
+//     applies. Audience is resolved the same way (op override →
+//     provider default).
+//
+// Enabled is *bool to preserve back-compat:
+//   - nil (field absent in JSON) — pre-existing behavior: explicit
+//     Audience / Scopes are used; no inference.
+//   - true — opt in to the inferred-scopes fallback above.
+//   - false — block is inactive; resolution falls through to the
+//     provider's defaultTarget.
+type OAuth2Exchange struct {
+	Enabled  *bool    `bson:"enabled,omitempty" json:"enabled,omitempty"`
+	Audience string   `bson:"audience,omitempty" json:"audience,omitempty"`
+	Scopes   []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
+}
+
+// IsActive reports whether this per-op exchange block should
+// participate in resolution. A block is active unless the operator
+// explicitly set Enabled=false.
+func (e *OAuth2Exchange) IsActive() bool {
+	return e != nil && (e.Enabled == nil || *e.Enabled)
+}
+
+// InfersScopesFromSecurity reports whether the block opts into the
+// "infer scopes from inbound `security:` requirement when Scopes is
+// empty" fallback. Requires explicit Enabled=true.
+func (e *OAuth2Exchange) InfersScopesFromSecurity() bool {
+	return e != nil && e.Enabled != nil && *e.Enabled && len(e.Scopes) == 0
+}
+
 // ScopeSource constants for OAuth2ScopeCheck.ScopeSource.
 const (
 	OAuth2ScopeSourceOperation = "operation"
@@ -150,21 +292,145 @@ const (
 )
 
 // Wire-protocol constants used in WWW-Authenticate challenges and JSON
-// failure bodies emitted by the oauth2 middleware.
+// failure bodies emitted by the oauth2 middleware, plus RFC 8693 form
+// keys / grant URNs / token-type URNs used by the token-exchange
+// runtime in internal/oauth2common and
+// ee/middleware/oauth2tokenexchange. apidef/oas owns these because it
+// is the upstream-most package — those packages import apidef/oas,
+// which forbids the reverse arrow.
 const (
-	// OAuth2ErrInsufficientScope is the RFC 6750 §3.1 error code
-	// returned when the token authenticated but lacks scopes required
-	// by the request.
+	// RFC 6750 §3.1 error codes.
 	OAuth2ErrInsufficientScope = "insufficient_scope"
+	OAuth2ErrInvalidToken      = "invalid_token"
 
-	// OAuth2ErrInvalidToken is the RFC 6750 §3.1 error code used when
-	// the token cannot be parsed or is otherwise unusable.
-	OAuth2ErrInvalidToken = "invalid_token"
+	// Token-exchange and provider-dispatch error codes (used in
+	// WWW-Authenticate challenges and JSON bodies).
+	OAuth2ErrExchangeFailed     = "exchange_failed"
+	OAuth2ErrNoMatchingProvider = "no_matching_provider"
+	OAuth2ErrMisconfigured      = "misconfigured"
 
 	// OAuth2AuthSchemeBearer is the authorization scheme prefix per
 	// RFC 6750 §2.1.
 	OAuth2AuthSchemeBearer = "Bearer"
+
+	// RFC 8693 token-exchange + OAuth2 client-auth form keys.
+	OAuth2FormGrantType           = "grant_type"
+	OAuth2FormSubjectToken        = "subject_token"
+	OAuth2FormSubjectTokenType    = "subject_token_type"
+	OAuth2FormRequestedTokenType  = "requested_token_type"
+	OAuth2FormAudience            = "audience"
+	OAuth2FormResource            = "resource"
+	OAuth2FormScope               = "scope"
+	OAuth2FormActorToken          = "actor_token"
+	OAuth2FormActorTokenType      = "actor_token_type"
+	OAuth2FormClientID            = "client_id"
+	OAuth2FormClientSecret        = "client_secret"
+	OAuth2FormClientAssertion     = "client_assertion"
+	OAuth2FormClientAssertionType = "client_assertion_type"
+
+	// RFC 8693 grant URN.
+	OAuth2GrantTypeTokenExchange = "urn:ietf:params:oauth:grant-type:token-exchange"
+
+	// RFC 8693 token-type URNs.
+	OAuth2TokenTypeAccessToken = "urn:ietf:params:oauth:token-type:access_token"
+	OAuth2TokenTypeJWT         = "urn:ietf:params:oauth:token-type:jwt"
+
+	// OAuth2ClientAuth.Method values.
+	OAuth2ClientAuthBasic = "client_secret_basic"
+	OAuth2ClientAuthPost  = "client_secret_post"
 )
+
+// oauth2ReservedExchangeFormKeys are the RFC 8693 / OAuth2 client-auth
+// form parameters Tyk owns on the wire. Operators cannot override them
+// via Provider.CustomParams — doing so would break the standard wire
+// shape and could be used to forge subject_token / audience values.
+var oauth2ReservedExchangeFormKeys = map[string]struct{}{
+	OAuth2FormGrantType:           {},
+	OAuth2FormSubjectToken:        {},
+	OAuth2FormSubjectTokenType:    {},
+	OAuth2FormRequestedTokenType:  {},
+	OAuth2FormAudience:            {},
+	OAuth2FormResource:            {},
+	OAuth2FormScope:               {},
+	OAuth2FormActorToken:          {},
+	OAuth2FormActorTokenType:      {},
+	OAuth2FormClientID:            {},
+	OAuth2FormClientSecret:        {},
+	OAuth2FormClientAssertion:     {},
+	OAuth2FormClientAssertionType: {},
+}
+
+// ValidateOAuth2Schemes enforces invariants on every configured
+// new-style oauth2 scheme. Called at API-load time so misconfigured
+// definitions fail loud at startup rather than at first request.
+//
+// Token-exchange invariants:
+//   - When tokenExchange.enabled is true, providers[] must be non-empty.
+//   - Provider names are non-empty and unique within the scheme.
+//   - Provider.CustomParams cannot shadow reserved wire keys.
+//   - Issuers must not overlap across providers — dispatch by inbound
+//     `iss` would otherwise be non-deterministic.
+//   - Every provider has a non-empty tokenEndpoint and a non-empty
+//     clientAuth.clientId; an empty row at save time indicates the
+//     operator forgot to fill it in.
+func (s *OAS) ValidateOAuth2Schemes() error {
+	tykAuth := s.getTykAuthentication()
+	if tykAuth == nil || tykAuth.SecuritySchemes == nil {
+		return nil
+	}
+	for name, scheme := range tykAuth.SecuritySchemes {
+		cfg := asOAuth2Scheme(scheme)
+		if cfg == nil || cfg.IsEmpty() {
+			continue
+		}
+		if err := validateOAuth2TokenExchange(name, cfg.TokenExchange); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateOAuth2TokenExchange(schemeName string, te *OAuth2TokenExchange) error {
+	if te == nil || !te.Enabled {
+		return nil
+	}
+	if len(te.Providers) == 0 {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.enabled is true but providers[] is empty", schemeName)
+	}
+	seenNames := make(map[string]struct{}, len(te.Providers))
+	issuerOwner := make(map[string]string, len(te.Providers))
+	for i := range te.Providers {
+		p := &te.Providers[i]
+		if p.Name == "" {
+			return fmt.Errorf("oauth2 scheme %q: tokenExchange.providers[%d].name is required", schemeName, i)
+		}
+		if _, dup := seenNames[p.Name]; dup {
+			return fmt.Errorf("oauth2 scheme %q: duplicate tokenExchange.provider name %q", schemeName, p.Name)
+		}
+		seenNames[p.Name] = struct{}{}
+		if p.TokenEndpoint == "" {
+			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q has empty tokenEndpoint", schemeName, p.Name)
+		}
+		if p.ClientAuth == nil || p.ClientAuth.ClientID == "" {
+			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q has empty clientAuth.clientId", schemeName, p.Name)
+		}
+		for _, iss := range p.Issuers {
+			if iss == "" {
+				continue
+			}
+			if owner, dup := issuerOwner[iss]; dup {
+				return fmt.Errorf("oauth2 scheme %q: duplicate issuer %q configured on tokenExchange.providers %q and %q", schemeName, iss, owner, p.Name)
+			}
+			issuerOwner[iss] = p.Name
+		}
+		for key := range p.CustomParams {
+			if _, reserved := oauth2ReservedExchangeFormKeys[key]; reserved {
+				return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q customParams cannot override reserved RFC 8693 wire key %q", schemeName, p.Name, key)
+			}
+		}
+	}
+	return nil
+}
 
 // HasContent reports whether the OAuth2 block carries operator
 // configuration. The master Enabled toggle qualifies, as does any
@@ -178,7 +444,7 @@ func (o *OAuth2) HasContent() bool {
 	if o.Enabled {
 		return true
 	}
-	return o.ScopeCheck != nil || o.ProtectedResourceMetadata != nil
+	return o.ScopeCheck != nil || o.ProtectedResourceMetadata != nil || o.TokenExchange != nil
 }
 
 // IsEmpty is the inverse of HasContent. Used at fill time to decide
@@ -267,6 +533,8 @@ func mapHasOAuth2SubBlock(m map[string]interface{}) bool {
 var oauth2SubBlockKeys = []string{
 	"scopeCheck",
 	"protectedResourceMetadata",
+	"tokenExchange",
+	// "introspection"             — TT-17187 (Story 10)
 }
 
 // fillOAuth2OASScheme ensures an OAS Components security-scheme entry
