@@ -253,14 +253,28 @@ func (s *OAS) Initialize() {
 		case typeAPIKey:
 			s.getTykTokenAuth(name)
 		case typeOAuth2:
-			// For OAuth2, we need to check the Tyk extension data to determine
-			// if it is a standard OAuth or external OAuth provider.
+			// The OAS-side type discriminator `oauth2` is shared by three
+			// Tyk-side schemes: legacy `*OAuth` (Tyk's own OAuth2 server),
+			// `*ExternalOAuth` (introspection / providers), and the new
+			// `*OAuth2` (this scheme). Disambiguate by inspecting the
+			// Tyk-extension shape, in priority order:
+			//   1) If already typed, use it directly.
+			//   2) If the map carries a new oauth2 sub-block (e.g.
+			//      scopeCheck), bind to *OAuth2 — without this branch
+			//      the legacy fallback would convert the new scheme's
+			//      map into a *OAuth and silently drop the sub-block.
+			//   3) Else if it has providers[] like ExternalOAuth, bind there.
+			//   4) Otherwise treat as legacy *OAuth.
 			securityScheme := s.getTykSecurityScheme(name)
 			if securityScheme == nil {
 				continue
 			}
 
-			// Check if the scheme has providers configured (indicates ExternalOAuth)
+			if oauth2 := asOAuth2Scheme(securityScheme); oauth2 != nil {
+				s.getTykSecuritySchemes()[name] = oauth2
+				continue
+			}
+
 			externalOAuth := &ExternalOAuth{}
 			if _, ok := securityScheme.(*ExternalOAuth); ok {
 				s.getTykExternalOAuthAuth(name)
