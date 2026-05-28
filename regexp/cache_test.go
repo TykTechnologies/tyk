@@ -308,10 +308,10 @@ func (r *countReporter) Record(_ string) { r.n.Add(1) }
 // the reporter count tracks real size evictions, not just callback calls.
 func TestCache_EvictionReporter_BoundedCountsSizeEvictions(t *testing.T) {
 	rep := &countReporter{}
-	const cap = 5
-	c := newCacheWithSize(0, cap, true, "compile", rep)
+	const capacity = 5
+	c := newCacheWithSize(0, capacity, true, "compile", rep)
 
-	for i := 0; i <= cap; i++ {
+	for i := 0; i <= capacity; i++ {
 		c.add(fmt.Sprintf("key-%d", i), fmt.Sprintf("val-%d", i))
 	}
 
@@ -319,12 +319,41 @@ func TestCache_EvictionReporter_BoundedCountsSizeEvictions(t *testing.T) {
 	if _, ok := c.getString("key-0"); ok {
 		t.Fatal("expected key-0 to be evicted from cache")
 	}
-	if got := c.lru.Len(); got != cap {
-		t.Fatalf("expected Len=%d after %d adds, got %d", cap, cap+1, got)
+	if got := c.lru.Len(); got != capacity {
+		t.Fatalf("expected Len=%d after %d adds, got %d", capacity, capacity+1, got)
 	}
 	// Reporter count matches the real eviction.
 	if got := rep.n.Load(); got != 1 {
 		t.Fatalf("expected 1 size eviction reported, got %d", got)
+	}
+}
+
+// TestCache_EvictionReporter_BoundedWithTTL_CountsOnlySizeEvictions is the
+// key regression test for the original bug: a bounded cache with a short TTL
+// will have entries expire naturally, but those TTL expirations must not
+// increment the reporter. Only the one overflow add should be counted.
+func TestCache_EvictionReporter_BoundedWithTTL_CountsOnlySizeEvictions(t *testing.T) {
+	rep := &countReporter{}
+	const capacity = 5
+	c := newCacheWithSize(50*time.Millisecond, capacity, true, "compile", rep)
+
+	// One size eviction: the (capacity+1)th add overflows the cap.
+	for i := 0; i <= capacity; i++ {
+		c.add(fmt.Sprintf("key-%d", i), fmt.Sprintf("val-%d", i))
+	}
+	if got := rep.n.Load(); got != 1 {
+		t.Fatalf("expected 1 size eviction, got %d", got)
+	}
+
+	// Wait for TTL to expire every remaining entry.
+	time.Sleep(300 * time.Millisecond)
+	for i := 0; i <= capacity; i++ {
+		c.getString(fmt.Sprintf("key-%d", i))
+	}
+
+	// TTL expirations must not have added to the count.
+	if got := rep.n.Load(); got != 1 {
+		t.Fatalf("expected count still 1 after TTL expiry, got %d (TTL evictions must not be counted)", got)
 	}
 }
 

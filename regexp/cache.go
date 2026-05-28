@@ -18,8 +18,9 @@ const (
 
 // cache wraps an expirable.LRU.
 type cache struct {
-	lru       *expirable.LRU[string, any]
-	isEnabled atomic.Bool
+	lru         *expirable.LRU[string, any]
+	isEnabled   atomic.Bool
+	onSizeEvict func()
 }
 
 // evictionReporter records the number of entries evicted from a named cache.
@@ -27,11 +28,6 @@ type cache struct {
 type evictionReporter interface {
 	Record(bucket string)
 }
-
-type noopReporter struct{}
-
-// Record satisfies evictionReporter when reporting is disabled.
-func (noopReporter) Record(string) {}
 
 func newCache(ttl time.Duration, isEnabled bool) *cache {
 	return newCacheWithSize(ttl, defaultCacheMaxEntries, isEnabled, "", nil)
@@ -42,19 +38,14 @@ func newCacheWithSize(ttl time.Duration, maxEntries int, isEnabled bool, name st
 		maxEntries = 0
 	}
 
-	if reporter == nil {
-		reporter = noopReporter{}
+	var onSizeEvict func()
+	if reporter != nil {
+		onSizeEvict = func() { reporter.Record(name) }
 	}
 
-	// Only wire the reporter when a size bound is in effect. maxEntries=0 means
-	// unbounded (LRU eviction disabled); the only callbacks that would fire are
-	// TTL expirations — normal cache aging, not size pressure worth logging.
-	var onEvict expirable.EvictCallback[string, any]
-	if maxEntries > 0 {
-		onEvict = func(_ string, _ any) { reporter.Record(name) }
-	}
 	c := &cache{
-		lru: expirable.NewLRU[string, any](maxEntries, onEvict, ttl),
+		lru:         expirable.NewLRU[string, any](maxEntries, nil, ttl),
+		onSizeEvict: onSizeEvict,
 	}
 
 	c.isEnabled.Store(isEnabled)
@@ -67,7 +58,9 @@ func (c *cache) enabled() bool {
 }
 
 func (c *cache) add(key string, value any) {
-	c.lru.Add(key, value)
+	if c.lru.Add(key, value) && c.onSizeEvict != nil {
+		c.onSizeEvict()
+	}
 }
 
 // getRegexp returns the cached *regexp.Regexp shared across all callers.

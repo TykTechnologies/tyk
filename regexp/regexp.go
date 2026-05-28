@@ -30,16 +30,16 @@ type CacheOptions = internalcache.LRUOptions
 // so the hot path never observes a nil Load(). Configure() and tests
 // replace them via .Store() in applyCacheConfig.
 var (
-	compileCache                 = newAtomicCache(newRegexpCache(0, defaultCacheMaxEntries, true, "compile", noopReporter{}, regexp.Compile))
-	compilePOSIXCache            = newAtomicCache(newRegexpCache(0, defaultCacheMaxEntries, true, "compilePOSIX", noopReporter{}, regexp.CompilePOSIX))
-	matchStringCache             = newAtomicCache(newRegexpStrRetBoolCache(0, defaultCacheMaxEntries, true, "matchString", noopReporter{}))
-	matchCache                   = newAtomicCache(newRegexpByteRetBoolCache(0, defaultCacheMaxEntries, true, "match", noopReporter{}))
-	replaceAllStringCache        = newAtomicCache(newRegexpStrStrRetStrCache(0, defaultCacheMaxEntries, true, "replaceAllString", noopReporter{}))
-	replaceAllLiteralStringCache = newAtomicCache(newRegexpStrStrRetStrCache(0, defaultCacheMaxEntries, true, "replaceAllLiteralString", noopReporter{}))
-	replaceAllStringFuncCache    = newAtomicCache(newRegexpStrFuncRetStrCache(0, defaultCacheMaxEntries, true, "replaceAllStringFunc", noopReporter{}))
-	findStringSubmatchCache      = newAtomicCache(newRegexpStrRetSliceStrCache(0, defaultCacheMaxEntries, true, "findStringSubmatch", noopReporter{}))
-	findAllStringCache           = newAtomicCache(newRegexpStrIntRetSliceStrCache(0, defaultCacheMaxEntries, true, "findAllString", noopReporter{}))
-	findAllStringSubmatchCache   = newAtomicCache(newRegexpStrIntRetSliceSliceStrCache(0, defaultCacheMaxEntries, true, "findAllStringSubmatch", noopReporter{}))
+	compileCache                 = newAtomicCache(newRegexpCache(0, defaultCacheMaxEntries, true, "compile", nil, regexp.Compile))
+	compilePOSIXCache            = newAtomicCache(newRegexpCache(0, defaultCacheMaxEntries, true, "compilePOSIX", nil, regexp.CompilePOSIX))
+	matchStringCache             = newAtomicCache(newRegexpStrRetBoolCache(0, defaultCacheMaxEntries, true, "matchString", nil))
+	matchCache                   = newAtomicCache(newRegexpByteRetBoolCache(0, defaultCacheMaxEntries, true, "match", nil))
+	replaceAllStringCache        = newAtomicCache(newRegexpStrStrRetStrCache(0, defaultCacheMaxEntries, true, "replaceAllString", nil))
+	replaceAllLiteralStringCache = newAtomicCache(newRegexpStrStrRetStrCache(0, defaultCacheMaxEntries, true, "replaceAllLiteralString", nil))
+	replaceAllStringFuncCache    = newAtomicCache(newRegexpStrFuncRetStrCache(0, defaultCacheMaxEntries, true, "replaceAllStringFunc", nil))
+	findStringSubmatchCache      = newAtomicCache(newRegexpStrRetSliceStrCache(0, defaultCacheMaxEntries, true, "findStringSubmatch", nil))
+	findAllStringCache           = newAtomicCache(newRegexpStrIntRetSliceStrCache(0, defaultCacheMaxEntries, true, "findAllString", nil))
+	findAllStringSubmatchCache   = newAtomicCache(newRegexpStrIntRetSliceSliceStrCache(0, defaultCacheMaxEntries, true, "findAllStringSubmatch", nil))
 )
 
 func newAtomicCache[T any](v *T) *atomic.Pointer[T] {

@@ -280,10 +280,11 @@ func TestConfigurePathRegexpCache(t *testing.T) {
 		logFunc := func(format string, args ...any) {
 			logged = append(logged, fmt.Sprintf(format, args...))
 		}
-		// Wire a real logger but unbounded=true: reporter must not be created.
+		// Verify the !unbounded guard prevents EvictionLogger creation: with
+		// unbounded=true the reporter is never wired, so no log lines are
+		// produced even when a non-nil LogFunc is passed. Note: this test does
+		// not exercise the 5-minute ticker path; it proves the guard itself.
 		httputil.ConfigurePathRegexpCache(0, true, logFunc)
-		// Add more entries than the default cap to guarantee size eviction would
-		// fire if the reporter were wired.
 		for i := 0; i < cache.DefaultLRUMaxEntries+100; i++ {
 			httputil.PreparePathRegexp(fmt.Sprintf("/unb-log-%d", i), true, false)
 		}
