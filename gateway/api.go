@@ -593,6 +593,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 			}
 		}
 	} else {
+		newSession.SetIsNew(true)
 		// POST path (create). Reject a user-supplied custom key ID that would
 		// be unreachable at auth time: CheckSessionAndIdentityForValidKey uses
 		// `len(key) < MinTokenLength` (see middleware.go), so storing a key
