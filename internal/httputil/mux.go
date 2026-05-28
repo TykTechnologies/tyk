@@ -43,7 +43,7 @@ func ConfigurePathRegexpCache(maxEntries int, unbounded bool, log cache.LogFunc)
 	}
 
 	var onEvict expirable.EvictCallback[string, string]
-	if log != nil {
+	if !unbounded && log != nil {
 		rep := cache.NewEvictionLogger("path-regexp cache", log)
 		rep.Start(cache.DefaultEvictionLogInterval)
 		prevReporter.Store(rep)

@@ -274,4 +274,19 @@ func TestConfigurePathRegexpCache(t *testing.T) {
 		assert.Equal(t, n, httputil.PathRegexpCacheLen(),
 			"unbounded should allow growth past DefaultLRUMaxEntries")
 	})
+
+	t.Run("unbounded_no_eviction_log", func(t *testing.T) {
+		var logged []string
+		logFunc := func(format string, args ...any) {
+			logged = append(logged, fmt.Sprintf(format, args...))
+		}
+		// Wire a real logger but unbounded=true: reporter must not be created.
+		httputil.ConfigurePathRegexpCache(0, true, logFunc)
+		// Add more entries than the default cap to guarantee size eviction would
+		// fire if the reporter were wired.
+		for i := 0; i < cache.DefaultLRUMaxEntries+100; i++ {
+			httputil.PreparePathRegexp(fmt.Sprintf("/unb-log-%d", i), true, false)
+		}
+		assert.Empty(t, logged, "unbounded cache must not produce eviction log lines")
+	})
 }
