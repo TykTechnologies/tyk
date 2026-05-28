@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -295,6 +296,59 @@ func TestCache_ConcurrentConfigureAndReads(_ *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	close(stop)
 	wg.Wait()
+}
+
+type countReporter struct{ n atomic.Int64 }
+
+func (r *countReporter) Record(_ string) { r.n.Add(1) }
+
+// TestCache_EvictionReporter_BoundedCountsSizeEvictions verifies that pushing
+// a bounded cache past its cap both removes the LRU entry from the cache and
+// increments the reporter exactly once. Checking the entry is gone confirms
+// the reporter count tracks real size evictions, not just callback calls.
+func TestCache_EvictionReporter_BoundedCountsSizeEvictions(t *testing.T) {
+	rep := &countReporter{}
+	const cap = 5
+	c := newCacheWithSize(0, cap, true, "compile", rep)
+
+	for i := 0; i <= cap; i++ {
+		c.add(fmt.Sprintf("key-%d", i), fmt.Sprintf("val-%d", i))
+	}
+
+	// Entry actually evicted from the cache.
+	if _, ok := c.getString("key-0"); ok {
+		t.Fatal("expected key-0 to be evicted from cache")
+	}
+	if got := c.lru.Len(); got != cap {
+		t.Fatalf("expected Len=%d after %d adds, got %d", cap, cap+1, got)
+	}
+	// Reporter count matches the real eviction.
+	if got := rep.n.Load(); got != 1 {
+		t.Fatalf("expected 1 size eviction reported, got %d", got)
+	}
+}
+
+// TestCache_EvictionReporter_UnboundedSilencesTTLEvictions verifies that
+// TTL expirations on an unbounded cache (maxEntries=0) remove the entry from
+// the cache but do NOT increment the reporter. The reporter measures LRU size
+// pressure; TTL aging is expected and should not appear in the eviction log.
+func TestCache_EvictionReporter_UnboundedSilencesTTLEvictions(t *testing.T) {
+	rep := &countReporter{}
+	c := newCacheWithSize(50*time.Millisecond, 0, true, "compile", rep)
+
+	c.add("k", "v")
+	time.Sleep(300 * time.Millisecond)
+	// Drive the lazy expiry path; entry must be gone (TTL did its job).
+	if _, ok := c.getString("k"); ok {
+		t.Fatal("expected k to be expired")
+	}
+	if got := c.lru.Len(); got != 0 {
+		t.Fatalf("expected Len=0 after TTL expiry, got %d", got)
+	}
+	// TTL expiry must not be reported as a size eviction.
+	if got := rep.n.Load(); got != 0 {
+		t.Fatalf("expected 0 eviction reports for unbounded cache TTL expiry, got %d", got)
+	}
 }
 
 func TestCache_RaceDistinctKeys(_ *testing.T) {

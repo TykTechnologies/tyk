@@ -46,7 +46,13 @@ func newCacheWithSize(ttl time.Duration, maxEntries int, isEnabled bool, name st
 		reporter = noopReporter{}
 	}
 
-	onEvict := func(_ string, _ any) { reporter.Record(name) }
+	// Only wire the reporter when a size bound is in effect. maxEntries=0 means
+	// unbounded (LRU eviction disabled); the only callbacks that would fire are
+	// TTL expirations — normal cache aging, not size pressure worth logging.
+	var onEvict expirable.EvictCallback[string, any]
+	if maxEntries > 0 {
+		onEvict = func(_ string, _ any) { reporter.Record(name) }
+	}
 	c := &cache{
 		lru: expirable.NewLRU[string, any](maxEntries, onEvict, ttl),
 	}
