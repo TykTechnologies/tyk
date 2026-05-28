@@ -129,6 +129,20 @@ func (mr *MockHandlerMockRecorder) DeleteKey(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteKey", reflect.TypeOf((*MockHandler)(nil).DeleteKey), arg0)
 }
 
+// DeleteKeyAtomic mocks base method.
+func (m *MockHandler) DeleteKeyAtomic(key string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteKeyAtomic", key)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// DeleteKeyAtomic indicates an expected call of DeleteKeyAtomic.
+func (mr *MockHandlerMockRecorder) DeleteKeyAtomic(key any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteKeyAtomic", reflect.TypeOf((*MockHandler)(nil).DeleteKeyAtomic), key)
+}
+
 // DeleteKeys mocks base method.
 func (m *MockHandler) DeleteKeys(arg0 []string) bool {
 	m.ctrl.T.Helper()
@@ -155,6 +169,20 @@ func (m *MockHandler) DeleteRawKey(arg0 string) bool {
 func (mr *MockHandlerMockRecorder) DeleteRawKey(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRawKey", reflect.TypeOf((*MockHandler)(nil).DeleteRawKey), arg0)
+}
+
+// DeleteRawKeyAtomic mocks base method.
+func (m *MockHandler) DeleteRawKeyAtomic(key string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteRawKeyAtomic", key)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// DeleteRawKeyAtomic indicates an expected call of DeleteRawKeyAtomic.
+func (mr *MockHandlerMockRecorder) DeleteRawKeyAtomic(key any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRawKeyAtomic", reflect.TypeOf((*MockHandler)(nil).DeleteRawKeyAtomic), key)
 }
 
 // DeleteRawKeys mocks base method.
@@ -473,6 +501,20 @@ func (mr *MockHandlerMockRecorder) SetKey(arg0, arg1, arg2 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetKey", reflect.TypeOf((*MockHandler)(nil).SetKey), arg0, arg1, arg2)
 }
 
+// SetKeyAtomic mocks base method.
+func (m *MockHandler) SetKeyAtomic(arg0, arg1 string, arg2 int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetKeyAtomic", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetKeyAtomic indicates an expected call of SetKeyAtomic.
+func (mr *MockHandlerMockRecorder) SetKeyAtomic(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetKeyAtomic", reflect.TypeOf((*MockHandler)(nil).SetKeyAtomic), arg0, arg1, arg2)
+}
+
 // SetRawKey mocks base method.
 func (m *MockHandler) SetRawKey(arg0, arg1 string, arg2 int64) error {
 	m.ctrl.T.Helper()
@@ -485,6 +527,20 @@ func (m *MockHandler) SetRawKey(arg0, arg1 string, arg2 int64) error {
 func (mr *MockHandlerMockRecorder) SetRawKey(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetRawKey", reflect.TypeOf((*MockHandler)(nil).SetRawKey), arg0, arg1, arg2)
+}
+
+// SetRawKeyAtomic mocks base method.
+func (m *MockHandler) SetRawKeyAtomic(arg0, arg1 string, arg2 int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetRawKeyAtomic", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetRawKeyAtomic indicates an expected call of SetRawKeyAtomic.
+func (mr *MockHandlerMockRecorder) SetRawKeyAtomic(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetRawKeyAtomic", reflect.TypeOf((*MockHandler)(nil).SetRawKeyAtomic), arg0, arg1, arg2)
 }
 
 // SetRollingWindow mocks base method.

@@ -33,6 +33,10 @@ var (
 	ErrStorageConn = fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
 )
 
+var (
+	_ Handler = (*RedisCluster)(nil)
+)
+
 // RedisCluster is a storage manager that uses the redis database.
 type RedisCluster struct {
 	KeyPrefix   string
@@ -51,6 +55,43 @@ type RedisCluster struct {
 	listStorage      model.List
 	setStorage       model.Set
 	sortedSetStorage model.SortedSet
+}
+
+// SetKeyAtomic will update a key value in the store if value already exist.
+func (r *RedisCluster) SetKeyAtomic(keyName, session string, timeout int64) error {
+	return r.SetRawKeyAtomic(r.fixKey(keyName), session, timeout)
+}
+
+// SetRawKeyAtomic will update a raw key value in the store if value already exist.
+func (r *RedisCluster) SetRawKeyAtomic(keyName, session string, timeout int64) error {
+	storage, err := r.kv()
+
+	if err != nil {
+		return err
+	}
+
+	_, err = storage.SetAtomic(context.Background(), keyName, session, time.Duration(timeout)*time.Second)
+	return err
+}
+
+func (r *RedisCluster) DeleteKeyAtomic(keyName string) bool {
+	return r.DeleteRawKeyAtomic(r.fixKey(keyName))
+}
+
+func (r *RedisCluster) DeleteRawKeyAtomic(keyName string) bool {
+	storage, err := r.kv()
+
+	if err != nil {
+		return false
+	}
+
+	ok, err := storage.DeleteAtomic(context.Background(), keyName)
+
+	if err != nil {
+		log.WithError(err).Error("Error trying to delete raw key")
+	}
+
+	return err != nil && ok
 }
 
 func (r *RedisCluster) getConnectionHandler() *ConnectionHandler {

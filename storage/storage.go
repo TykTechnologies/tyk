@@ -51,6 +51,7 @@ type Handler interface {
 	RemoveFromList(string, string) error
 	AppendToSet(string, string)
 	Exists(string) (bool, error)
+	HandlerAtomic
 }
 
 type AnalyticsHandler interface {
@@ -59,4 +60,33 @@ type AnalyticsHandler interface {
 	GetAndDeleteSet(string) []interface{}
 	SetExp(string, int64) error   // Set key expiration
 	GetExp(string) (int64, error) // Returns expiry of a key
+}
+
+type HandlerAtomic interface {
+	// SetKeyAtomic sets key if key already exists.
+	SetKeyAtomic(string, string, int64) error
+	// SetRawKeyAtomic sets raw key if key already exists.
+	SetRawKeyAtomic(string, string, int64) error
+	// DeleteKeyAtomic deletes key and sets tombstone to sequential set.
+	DeleteKeyAtomic(key string) bool
+	// DeleteRawKeyAtomic deletes raw key and sets tombstone to sequential set.
+	DeleteRawKeyAtomic(key string) bool
+}
+
+type SetExHandlerNoImplemented struct{}
+
+func (s3 SetExHandlerNoImplemented) SetKeyAtomic(_ string, _ string, _ int64) error {
+	return errors.New("SetKeyAtomic not implemented")
+}
+
+func (s3 SetExHandlerNoImplemented) SetRawKeyAtomic(_ string, _ string, _ int64) error {
+	return errors.New("SetRawKeyAtomic not implemented")
+}
+
+func (s3 SetExHandlerNoImplemented) DeleteKeyAtomic(_ string) bool {
+	panic("not implemented")
+}
+
+func (s3 SetExHandlerNoImplemented) DeleteRawKeyAtomic(_ string) bool {
+	panic("not implemented")
 }

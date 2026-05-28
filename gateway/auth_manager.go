@@ -122,8 +122,13 @@ func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 }
 
 // UpdateSession updates the session state in the storage engine
-func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState,
-	resetTTLTo int64, hashed bool) error {
+func (b *DefaultSessionManager) UpdateSession(
+	keyName string,
+	session *user.SessionState,
+	resetTTLTo int64,
+	hashed bool,
+) error {
+
 	defer b.clearCacheForKey(keyName, hashed)
 
 	v, err := json.Marshal(session)
@@ -132,12 +137,11 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 		return err
 	}
 
-	// sync update
 	if hashed {
 		keyName = b.store.GetKeyPrefix() + keyName
-		err = b.store.SetRawKey(keyName, string(v), resetTTLTo)
+		err = b.store.SetRawKeyAtomic(keyName, string(v), resetTTLTo)
 	} else {
-		err = b.store.SetKey(keyName, string(v), resetTTLTo)
+		err = b.store.SetKeyAtomic(keyName, string(v), resetTTLTo)
 	}
 
 	return err
@@ -148,11 +152,11 @@ func (b *DefaultSessionManager) RemoveSession(orgID string, keyName string, hash
 	defer b.clearCacheForKey(keyName, hashed)
 
 	if hashed {
-		return b.store.DeleteRawKey(b.store.GetKeyPrefix() + keyName)
+		return b.store.DeleteRawKeyAtomic(b.store.GetKeyPrefix() + keyName)
 	} else {
 		// support both old and new key hashing
-		res1 := b.store.DeleteKey(keyName)
-		res2 := b.store.DeleteKey(b.Gw.generateToken(orgID, keyName))
+		res1 := b.store.DeleteKeyAtomic(keyName)
+		res2 := b.store.DeleteKeyAtomic(b.Gw.generateToken(orgID, keyName))
 		return res1 || res2
 	}
 }

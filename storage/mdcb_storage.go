@@ -12,6 +12,7 @@ type MdcbStorage struct {
 	rpc           Handler
 	logger        *logrus.Entry
 	OnRPCCertPull func(key string, val string) error
+	SetExHandlerNoImplemented
 }
 
 const (
