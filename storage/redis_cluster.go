@@ -85,7 +85,12 @@ func (r *RedisCluster) DeleteRawKeyAtomic(keyName string) bool {
 		return false
 	}
 
-	ok, err := storage.DeleteAtomic(context.Background(), keyName)
+	ok, err := storage.DeleteAtomic(context.Background(), keyName, func(option *model.DeleteAtomicOption) {
+		// https://tyktech.atlassian.net/browse/TT-16259
+		// TTL should be set to the MAX UPSTREAM TTL (max TTL depends on a project and upstream).
+		// The only problem is that creating the same key is not impossible after the TTL passes.
+		option.TTL = time.Minute
+	})
 
 	if err != nil {
 		log.WithError(err).Error("Error trying to delete raw key")
