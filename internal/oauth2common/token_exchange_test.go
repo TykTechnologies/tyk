@@ -118,11 +118,13 @@ func TestMergeTargetForProvider_NilWhenNoAudienceResolvable(t *testing.T) {
 func TestState_RoundTripsThroughRequestContext(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	state := &State{
-		Claims:             jwt.MapClaims{"iss": "https://idp"},
-		RawToken:           "abc.def.ghi",
-		APIID:              "api-1",
-		MatchedOperationID: "getMail",
-		InferredScopes:     []string{"users:read"},
+		Claims:               jwt.MapClaims{"iss": "https://idp"},
+		RawToken:             "abc.def.ghi",
+		APIID:                "api-1",
+		MatchedOperationID:   "getMail",
+		MatchedPrimitiveName: "search",
+		MatchedPrimitiveType: "tool",
+		InferredScopes:       []string{"users:read"},
 	}
 	SetState(r, state)
 
@@ -131,6 +133,8 @@ func TestState_RoundTripsThroughRequestContext(t *testing.T) {
 	assert.Equal(t, "abc.def.ghi", got.RawToken)
 	assert.Equal(t, "api-1", got.APIID)
 	assert.Equal(t, "getMail", got.MatchedOperationID)
+	assert.Equal(t, "search", got.MatchedPrimitiveName)
+	assert.Equal(t, "tool", got.MatchedPrimitiveType)
 	assert.Equal(t, []string{"users:read"}, got.InferredScopes)
 	assert.Equal(t, "https://idp", got.Claims["iss"])
 }

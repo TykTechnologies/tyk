@@ -16,6 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/oauth2common"
 )
 
@@ -57,12 +58,28 @@ func (m *Middleware) runExchange(r *http.Request, st *oauth2common.State) (oauth
 	return out, nil
 }
 
-// findActivePrimitive returns the first primitive in tools/resources/prompts with the given name and active exchange.
-func findActivePrimitive(mw *oas.Middleware, name string) *oas.MCPPrimitive {
-	for _, prims := range []oas.MCPPrimitives{mw.McpTools, mw.McpResources, mw.McpPrompts} {
-		if prim, ok := prims[name]; ok && prim != nil && prim.Exchange.IsActive() {
-			return prim
+// findActivePrimitive returns the primitive with the given name and active exchange
+// from the map that matches primitiveType. Tool, resource, and prompt names occupy
+// independent namespaces; lookup without a type falls back to searching all maps.
+func findActivePrimitive(mw *oas.Middleware, name, primitiveType string) *oas.MCPPrimitive {
+	var prims oas.MCPPrimitives
+	switch primitiveType {
+	case mcp.PrimitiveTypeTool:
+		prims = mw.McpTools
+	case mcp.PrimitiveTypeResource:
+		prims = mw.McpResources
+	case mcp.PrimitiveTypePrompt:
+		prims = mw.McpPrompts
+	default:
+		for _, ps := range []oas.MCPPrimitives{mw.McpTools, mw.McpResources, mw.McpPrompts} {
+			if prim, ok := ps[name]; ok && prim != nil && prim.Exchange.IsActive() {
+				return prim
+			}
 		}
+		return nil
+	}
+	if prim, ok := prims[name]; ok && prim != nil && prim.Exchange.IsActive() {
+		return prim
 	}
 	return nil
 }
@@ -70,7 +87,7 @@ func findActivePrimitive(mw *oas.Middleware, name string) *oas.MCPPrimitive {
 // exchangeWouldFire reports whether an exchange target exists for this request (RFC 8693 §4.8).
 func (m *Middleware) exchangeWouldFire(st *oauth2common.State, cfg *oas.OAuth2) bool {
 	if mw := m.Spec.OAS.GetTykMiddleware(); mw != nil {
-		if st.MatchedPrimitiveName != "" && findActivePrimitive(mw, st.MatchedPrimitiveName) != nil {
+		if st.MatchedPrimitiveName != "" && findActivePrimitive(mw, st.MatchedPrimitiveName, st.MatchedPrimitiveType) != nil {
 			return true
 		}
 		if st.MatchedOperationID != "" {
@@ -93,7 +110,7 @@ func (m *Middleware) exchangeWouldFire(st *oauth2common.State, cfg *oas.OAuth2) 
 func (m *Middleware) resolveExchangeTarget(st *oauth2common.State, provider *oas.OAuth2TokenExchangeProvider) *oauth2common.Target {
 	if mw := m.Spec.OAS.GetTykMiddleware(); mw != nil {
 		if st.MatchedPrimitiveName != "" {
-			if prim := findActivePrimitive(mw, st.MatchedPrimitiveName); prim != nil {
+			if prim := findActivePrimitive(mw, st.MatchedPrimitiveName, st.MatchedPrimitiveType); prim != nil {
 				return oauth2common.MergeTargetForProvider(prim.Exchange, provider, st.InferredScopes)
 			}
 		}
