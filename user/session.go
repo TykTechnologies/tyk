@@ -353,9 +353,7 @@ type SessionState struct {
 	isRestored bool
 }
 
-type NewSessionStateOpt func(*SessionState)
-
-func NewSessionState(opts ...NewSessionStateOpt) *SessionState {
+func NewSessionState() *SessionState {
 	return &SessionState{}
 }
 

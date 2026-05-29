@@ -1,6 +1,10 @@
 package storage
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func Test_TokenOrg(t *testing.T) {
 	tcs := []struct {
@@ -38,4 +42,17 @@ func Test_TokenOrg(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_SetExHandlerNoImplemented(t *testing.T) {
+	// sonar
+	var s SetExHandlerNoImplemented
+
+	t.Run("SetKeyEx", func(t *testing.T) {
+		assert.Error(t, s.SetKeyEx("", "", 0))
+	})
+
+	t.Run("SetRawKeyEx", func(t *testing.T) {
+		assert.Error(t, s.SetRawKeyEx("", "", 0))
+	})
 }
