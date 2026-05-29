@@ -10,7 +10,6 @@ import (
 type DummyStorage struct {
 	Data      map[string]string
 	IndexList map[string][]string
-	SetExHandlerNoImplemented
 }
 
 // NewDummyStorage creates and returns a new instance of DummyStorage.
@@ -46,6 +45,22 @@ func (s *DummyStorage) GetRawKey(key string) (string, error) {
 		return "", fmt.Errorf("key not found: %s", key)
 	}
 	return value, nil
+}
+
+// SetKeyEx assigns a value to a key in DummyStorage ONLY if the key already exists.
+func (s *DummyStorage) SetKeyEx(key, value string, _ int64) error {
+	if _, exists := s.Data[key]; exists {
+		s.Data[key] = value
+	}
+	return nil
+}
+
+// SetRawKeyEx stores a value with a specified key in DummyStorage ONLY if the key already exists.
+func (s *DummyStorage) SetRawKeyEx(key, value string, _ int64) error {
+	if _, exists := s.Data[key]; exists {
+		s.Data[key] = value
+	}
+	return nil
 }
 
 // SetRawKey stores a value with a specified key in the DummyStorage.

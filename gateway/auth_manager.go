@@ -137,7 +137,7 @@ func (b *DefaultSessionManager) UpdateSession(
 		return err
 	}
 
-	if session.IsNew() {
+	if !session.IsRestored() {
 		if hashed {
 			keyName = b.store.GetKeyPrefix() + keyName
 			err = b.store.SetRawKey(keyName, string(v), resetTTLTo)
@@ -225,6 +225,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 		return *user.NewSessionState(), false
 	}
 	session.KeyID = keyId
+	session.MarkAsRestored()
 	return session.Clone(), true
 }
 
