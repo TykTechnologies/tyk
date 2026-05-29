@@ -16,8 +16,7 @@ const (
 	DefaultIdPTimeout = 15 * time.Second
 )
 
-// BaseMiddleware is the subset of the gateway's BaseMiddleware that
-// this package needs. Defined as an interface to avoid importing gateway (circular import).
+// BaseMiddleware is the gateway.BaseMiddleware surface this package needs (avoids circular import).
 type BaseMiddleware interface {
 	model.LoggerProvider
 }

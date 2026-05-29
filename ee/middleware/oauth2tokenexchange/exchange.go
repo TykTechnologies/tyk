@@ -32,7 +32,7 @@ func (m *Middleware) runExchange(r *http.Request, st *oauth2common.State) (oauth
 		return out, nil
 	}
 
-	iss, _ := st.Claims["iss"].(string)
+	iss, _ := st.Claims[oas.OAuth2ClaimIss].(string)
 	provider := oauth2common.SelectExchangeProvider(cfg.TokenExchange.Providers, iss)
 	if provider == nil {
 		return out, &oauth2common.NoMatchingProviderError{Iss: iss}
@@ -203,43 +203,43 @@ func (m *Middleware) writeJSONError(w http.ResponseWriter, r *http.Request, stat
 
 // writeExchangeFailedResponse renders a 502 for an IdP-side exchange failure.
 func (m *Middleware) writeExchangeFailedResponse(w http.ResponseWriter, r *http.Request, err error) {
-	body := map[string]string{"error": oas.OAuth2ErrExchangeFailed}
+	body := map[string]string{oas.OAuth2FieldError: oas.OAuth2ErrExchangeFailed}
 	if oe, ok := err.(*oauth2common.ExchangeFailedError); ok {
 		if oe.IdpError != "" {
-			body["idp_error"] = oe.IdpError
+			body[oas.OAuth2FieldIdpError] = oe.IdpError
 		}
 		if oe.Description != "" {
-			body["idp_error_description"] = oe.Description
+			body[oas.OAuth2FieldIdpErrorDescription] = oe.Description
 		}
 	} else {
-		body["idp_error_description"] = err.Error()
+		body[oas.OAuth2FieldIdpErrorDescription] = err.Error()
 	}
 	m.writeJSONError(w, r, http.StatusBadGateway, [][2]string{
-		{"error", oas.OAuth2ErrExchangeFailed},
-		{"error_description", body["idp_error_description"]},
+		{oas.OAuth2FieldError, oas.OAuth2ErrExchangeFailed},
+		{oas.OAuth2FieldErrorDescription, body[oas.OAuth2FieldIdpErrorDescription]},
 	}, body)
 }
 
 // writeNoMatchingProviderResponse renders a 403 when no provider matches the inbound iss.
 func (m *Middleware) writeNoMatchingProviderResponse(w http.ResponseWriter, r *http.Request, oe *oauth2common.NoMatchingProviderError) {
 	m.writeJSONError(w, r, http.StatusForbidden, [][2]string{
-		{"error", oas.OAuth2ErrNoMatchingProvider},
-		{"error_description", oe.Error()},
+		{oas.OAuth2FieldError, oas.OAuth2ErrNoMatchingProvider},
+		{oas.OAuth2FieldErrorDescription, oe.Error()},
 	}, map[string]string{
-		"error":             oas.OAuth2ErrNoMatchingProvider,
-		"error_description": oe.Error(),
-		"iss":               oe.Iss,
+		oas.OAuth2FieldError:            oas.OAuth2ErrNoMatchingProvider,
+		oas.OAuth2FieldErrorDescription: oe.Error(),
+		oas.OAuth2ClaimIss:              oe.Iss,
 	})
 }
 
 // writeMisconfigResponse renders a 500 for an incomplete exchange configuration.
 func (m *Middleware) writeMisconfigResponse(w http.ResponseWriter, r *http.Request, me *oauth2common.MisconfigError) {
 	m.writeJSONError(w, r, http.StatusInternalServerError, [][2]string{
-		{"error", oas.OAuth2ErrMisconfigured},
-		{"error_description", me.Error()},
+		{oas.OAuth2FieldError, oas.OAuth2ErrMisconfigured},
+		{oas.OAuth2FieldErrorDescription, me.Error()},
 	}, map[string]string{
-		"error":             oas.OAuth2ErrMisconfigured,
-		"error_description": me.Error(),
+		oas.OAuth2FieldError:            oas.OAuth2ErrMisconfigured,
+		oas.OAuth2FieldErrorDescription: me.Error(),
 	})
 }
 
@@ -250,7 +250,7 @@ func (m *Middleware) setExchangeWWWAuthenticate(w http.ResponseWriter, r *http.R
 		authParams = append(authParams, fmt.Sprintf("%s=%q", kv[0], kv[1]))
 	}
 	if u := m.prmAbsoluteURL(r); u != "" {
-		authParams = append(authParams, fmt.Sprintf("resource_metadata=%q", u))
+		authParams = append(authParams, fmt.Sprintf("%s=%q", oas.OAuth2FieldResourceMetadata, u))
 	}
 	w.Header().Set(header.WWWAuthenticate, oas.OAuth2AuthSchemeBearer+" "+strings.Join(authParams, ", "))
 }

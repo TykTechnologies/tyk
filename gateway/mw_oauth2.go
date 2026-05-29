@@ -128,9 +128,9 @@ func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request
 		}
 
 		body, _ := json.Marshal(map[string]interface{}{
-			"error":             oas.OAuth2ErrInsufficientScope,
-			"error_description": "token does not satisfy required scopes: " + citedScopes,
-			"scope":             citedScopes,
+			oas.OAuth2FieldError:            oas.OAuth2ErrInsufficientScope,
+			oas.OAuth2FieldErrorDescription: "token does not satisfy required scopes: " + citedScopes,
+			"scope":                         citedScopes,
 		})
 		w.Header().Set(header.ContentType, header.ApplicationJSON)
 		w.WriteHeader(http.StatusForbidden)
@@ -618,8 +618,8 @@ func (m *OAuth2Middleware) setWWWAuthenticate(w http.ResponseWriter, params [][2
 func (m *OAuth2Middleware) setWWWAuthenticateInsufficientScope(w http.ResponseWriter, r *http.Request, scopes []string) {
 	scopesValue := strings.Join(scopes, " ")
 	params := [][2]string{
-		{"error", oas.OAuth2ErrInsufficientScope},
-		{"error_description", "missing required scope: " + scopesValue},
+		{oas.OAuth2FieldError, oas.OAuth2ErrInsufficientScope},
+		{oas.OAuth2FieldErrorDescription, "missing required scope: " + scopesValue},
 		{"scope", scopesValue},
 	}
 	m.setWWWAuthenticate(w, m.appendResourceMetadataParam(r, params))
@@ -627,8 +627,8 @@ func (m *OAuth2Middleware) setWWWAuthenticateInsufficientScope(w http.ResponseWr
 
 func (m *OAuth2Middleware) setWWWAuthenticateInsufficientToken(w http.ResponseWriter, r *http.Request, code, desc string) {
 	params := [][2]string{
-		{"error", code},
-		{"error_description", desc},
+		{oas.OAuth2FieldError, code},
+		{oas.OAuth2FieldErrorDescription, desc},
 	}
 	m.setWWWAuthenticate(w, m.appendResourceMetadataParam(r, params))
 }
@@ -638,7 +638,7 @@ func (m *OAuth2Middleware) setWWWAuthenticateInsufficientToken(w http.ResponseWr
 // document (see prmMetadataURL); no-op otherwise.
 func (m *OAuth2Middleware) appendResourceMetadataParam(r *http.Request, params [][2]string) [][2]string {
 	if url := prmMetadataURL(r, m.Spec); url != "" {
-		params = append(params, [2]string{"resource_metadata", url})
+		params = append(params, [2]string{oas.OAuth2FieldResourceMetadata, url})
 	}
 	return params
 }

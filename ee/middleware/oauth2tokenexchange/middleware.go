@@ -17,23 +17,19 @@ import (
 	"github.com/TykTechnologies/tyk/internal/oauth2common"
 )
 
-// Middleware implements the EE-side TokenExchangeMiddleware.
 type Middleware struct {
 	Spec model.MergedAPI
 	Base BaseMiddleware
 }
 
-// NewMiddleware returns a new Middleware.
 func NewMiddleware(base BaseMiddleware, spec model.MergedAPI) *Middleware {
 	return &Middleware{Base: base, Spec: spec}
 }
 
-// Logger returns a logger with the middleware name attached.
 func (m *Middleware) Logger() *logrus.Entry {
 	return m.Base.Logger().WithField("mw", m.Name())
 }
 
-// Name returns the canonical name for this middleware.
 func (m *Middleware) Name() string {
 	return MiddlewareName
 }
@@ -70,10 +66,7 @@ func (m *Middleware) lookupOAuth2Config() *oas.OAuth2 {
 	return nil
 }
 
-// errExchangeRendered wraps middleware.ErrResponseRendered so the gateway
-// chain dispatcher skips HandleError after the exchange middleware already
-// wrote a structured JSON error body.
-var errExchangeRendered = fmt.Errorf("%w: oauth2 exchange failure response written", middleware.ErrResponseRendered)
+var errExchangeRendered = fmt.Errorf("%w: oauth2 exchange", middleware.ErrResponseRendered)
 
 // ProcessRequest runs the RFC 8693 exchange; no-ops when no State is set or exchange is disabled.
 func (m *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {

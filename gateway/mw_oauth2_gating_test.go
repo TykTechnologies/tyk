@@ -44,7 +44,7 @@ func fakeIdP(t *testing.T, requireBasic bool) (*httptest.Server, *int32) {
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"access_token":      access,
 			"issued_token_type": oas.OAuth2TokenTypeAccessToken,
-			"token_type":        "Bearer",
+			"token_type":        oas.OAuth2AuthSchemeBearer,
 			"expires_in":        300,
 		})
 	}))

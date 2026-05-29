@@ -51,13 +51,11 @@ func GetState(r *http.Request) *State {
 type exchangeDoneCtxKey struct{}
 
 // MarkExchangeDone prevents re-running the exchange for MCP fan-out sub-requests.
-// Same shared-pointer contract as SetState.
 func MarkExchangeDone(r *http.Request) {
 	ctx := context.WithValue(r.Context(), exchangeDoneCtxKey{}, true)
 	*r = *r.WithContext(ctx)
 }
 
-// IsExchangeDone reports whether the flag is set on the request's context.
 func IsExchangeDone(r *http.Request) bool {
 	v, _ := r.Context().Value(exchangeDoneCtxKey{}).(bool)
 	return v
