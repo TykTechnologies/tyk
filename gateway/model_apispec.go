@@ -161,12 +161,12 @@ func (a *APISpec) SetCompiledErrorOverrides(compiled *CompiledErrorOverrides) {
 // Resolution order:
 //  1. If the OAS doc has an explicit `protectedResourceMetadata` block with
 //     `enabled: true`, return it as configured.
-//  2. If the API is MCP and no explicit PRM block is provided (or the
+//  2. If the API is MCP-managed and no explicit PRM block is provided (or the
 //     authentication block is missing entirely), synthesise a default
 //     `enabled: true, mode: ""` so mirror mode kicks in automatically.
 //     The empty-mode + no-resource shape resolves to mirror in
-//     EffectiveMode, so users can put Tyk in front of a remote MCP with
-//     zero PRM-specific config.
+//     EffectiveMode, so users can put Tyk in front of an MCP-managed API
+//     with zero PRM-specific config.
 //  3. Otherwise return nil — the API has no PRM serving.
 func (a *APISpec) GetPRMConfig() *oas.ProtectedResourceMetadata {
 	ext := a.GetTykExtension()
@@ -179,8 +179,8 @@ func (a *APISpec) GetPRMConfig() *oas.ProtectedResourceMetadata {
 		return prm
 	}
 
-	// MCP-only default: mirror without any explicit PRM config.
-	if prm == nil && a.IsMCP() {
+	// MCP-managed default: mirror without any explicit PRM config.
+	if prm == nil && a.IsMCPManaged() {
 		return &oas.ProtectedResourceMetadata{Enabled: true}
 	}
 	return nil

@@ -951,13 +951,13 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 
 // registerMCPPRMSuffixRoutes wires up the host-root well-known URL
 // (`<root>/.well-known/oauth-protected-resource<listen-path>`) that
-// RFC 9728 §3.1 says clients probe. Only attaches when the API is MCP and
-// has PRM enabled — for all other APIs this is a no-op.
+// RFC 9728 §3.1 says clients probe. Only attaches when the API is MCP-managed
+// and has PRM enabled — for all other APIs this is a no-op.
 //
 // mcp-remote strips the trailing slash off the listen path before building
 // the probe URL, so we register both with and without the trailing slash.
 func (gw *Gateway) registerMCPPRMSuffixRoutes(spec *APISpec, router *mux.Router) {
-	if spec == nil || !spec.IsMCP() {
+	if spec == nil || !spec.IsMCPManaged() {
 		return
 	}
 	prm := spec.GetPRMConfig()
@@ -985,7 +985,7 @@ func (gw *Gateway) registerMCPPRMSuffixRoutes(spec *APISpec, router *mux.Router)
 	// request with `invalid_target` because mcp-remote sends the
 	// gateway URL as the resource (per the mirrored PRM doc) but the
 	// upstream AS only knows the upstream URL.
-	if prm.IsMirrorMode(spec.IsMCP()) {
+	if prm.IsMirrorMode(spec.IsMCPManaged()) {
 		gw.registerMCPASProxyRoutes(spec, router)
 	}
 }
@@ -1025,7 +1025,7 @@ func (gw *Gateway) mcpPRMSuffixHandler(spec *APISpec) http.HandlerFunc {
 			http.NotFound(w, r)
 			return
 		}
-		if prm.IsMirrorMode(spec.IsMCP()) {
+		if prm.IsMirrorMode(spec.IsMCPManaged()) {
 			if err := mw.serveMirroredPRM(w, r, prm); err != nil {
 				log.WithError(err).Warn("PRM mirror failed at suffix route")
 				http.Error(w, "upstream PRM unavailable", http.StatusBadGateway)

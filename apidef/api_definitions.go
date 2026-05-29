@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"text/template"
 	"time"
 
@@ -1458,6 +1459,37 @@ func (a *APIDefinition) IsMCP() bool {
 // MarkAsMCP configures the API definition as a Model Context Protocol (MCP) API.
 func (a *APIDefinition) MarkAsMCP() {
 	a.SetProtocol(JsonRPC20, AppProtocolMCP)
+}
+
+// IsPairedMCPAdapterProxy returns true if this API is a REST-as-MCP proxy
+// whose upstream loops into a deterministic synthetic adapter API ID.
+func (a *APIDefinition) IsPairedMCPAdapterProxy() bool {
+	if a == nil {
+		return false
+	}
+
+	target := strings.TrimSpace(a.Proxy.TargetURL)
+	const scheme = "tyk://"
+	if !strings.HasPrefix(target, scheme) {
+		return false
+	}
+
+	host := strings.TrimPrefix(target, scheme)
+	if i := strings.IndexAny(host, "/?"); i != -1 {
+		host = host[:i]
+	}
+	host = strings.TrimPrefix(host, "id:")
+
+	const adapterSuffix = "__mcp-server"
+	return strings.HasSuffix(host, adapterSuffix) && len(host) > len(adapterSuffix)
+}
+
+// IsMCPManaged reports whether this API belongs to the MCP management surface.
+func (a *APIDefinition) IsMCPManaged() bool {
+	if a == nil {
+		return false
+	}
+	return a.IsMCP() || a.IsPairedMCPAdapterProxy()
 }
 
 // IsChildAPI returns true if this API is a child API in a versioning hierarchy.

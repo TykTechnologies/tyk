@@ -91,6 +91,38 @@ func TestGetPRMConfig(t *testing.T) {
 	})
 }
 
+func TestPRMMiddleware_UsesMirrorModeForPairedMCPProxy(t *testing.T) {
+	doc := pairedMCPProxyOAS("proxy-1", "org-1", "rest-1")
+	doc.GetTykExtension().Server.Authentication = &oas.Authentication{
+		ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{Enabled: true},
+	}
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "proxy-1",
+			OrgID: "org-1",
+			IsOAS: true,
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/proxy-1/",
+				TargetURL:  oas.AdapterLoopURL("rest-1"),
+			},
+		},
+		OAS: *doc,
+	}
+	require.False(t, spec.IsMCP())
+	require.True(t, spec.IsMCPManaged())
+	require.NotNil(t, spec.GetPRMConfig())
+
+	mw := &PRMMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: &Gateway{}}}
+	req := httptest.NewRequest(http.MethodGet, "http://gateway.example/proxy-1/.well-known/oauth-protected-resource", nil)
+	rec := httptest.NewRecorder()
+
+	err, status := mw.ProcessRequest(rec, req, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, status)
+	assert.Empty(t, strings.TrimSpace(rec.Body.String()))
+}
+
 func TestPRMWellKnownEndpoint(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
