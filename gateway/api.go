@@ -940,7 +940,6 @@ func (gw *Gateway) feedKeyListingWorkers(c context.Context, keys []string, jobs 
 
 func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 	sess := &user.SessionState{}
-	sess.SetIsNew(true)
 	err := json.Unmarshal([]byte(sessionString), sess)
 	if err != nil {
 		log.WithError(err).WithField("keyName", keyName).Error("Failed to unmarshal session state during key update")
