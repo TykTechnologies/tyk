@@ -236,9 +236,6 @@ func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 		if err != nil {
 			return err
 		}
-		if err := s.OAS.ValidateOAuth2Schemes(); err != nil {
-			return err
-		}
 	}
 
 	// For tcp services we need to make sure we can bind to the port.

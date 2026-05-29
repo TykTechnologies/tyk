@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -304,4 +305,105 @@ func newOAuth2WithTokenExchange(name string, te *OAuth2TokenExchange) *OAS {
 	tykAuth := s.getTykAuthentication()
 	tykAuth.SecuritySchemes[name] = got
 	return s
+}
+
+// TestOAS_Validate_TokenExchange and TestOAS_ValidateForMCP_TokenExchange pin
+// that token-exchange validation errors surface through the top-level
+// OAS.Validate and OAS.ValidateForMCP chains respectively — not only when
+// ValidateOAuth2Schemes is called directly. They would fail if the
+// ValidateOAuth2Schemes() call was removed from either chain.
+func TestOAS_Validate_TokenExchange(t *testing.T) {
+	validProvider := OAuth2TokenExchangeProvider{
+		Name:          "primary",
+		Issuers:       []string{"https://idp.example.com"},
+		TokenEndpoint: "https://idp.example.com/token",
+		ClientAuth:    &OAuth2ClientAuth{ClientID: "tyk-gw"},
+	}
+
+	tests := []struct {
+		name      string
+		te        *OAuth2TokenExchange
+		wantErr   string
+	}{
+		{
+			name:    "valid single provider passes",
+			te:      &OAuth2TokenExchange{Enabled: true, Providers: []OAuth2TokenExchangeProvider{validProvider}},
+			wantErr: "",
+		},
+		{
+			name:    "disabled block with no providers passes",
+			te:      &OAuth2TokenExchange{Enabled: false},
+			wantErr: "",
+		},
+		{
+			name:    "enabled with no providers is rejected",
+			te:      &OAuth2TokenExchange{Enabled: true},
+			wantErr: "providers[] is empty",
+		},
+		{
+			name: "duplicate provider name is rejected",
+			te: &OAuth2TokenExchange{
+				Enabled: true,
+				Providers: []OAuth2TokenExchangeProvider{
+					{Name: "dup", Issuers: []string{"https://a"}, TokenEndpoint: "https://a/token", ClientAuth: &OAuth2ClientAuth{ClientID: "c"}},
+					{Name: "dup", Issuers: []string{"https://b"}, TokenEndpoint: "https://b/token", ClientAuth: &OAuth2ClientAuth{ClientID: "c"}},
+				},
+			},
+			wantErr: `duplicate tokenExchange.provider name "dup"`,
+		},
+		{
+			name: "overlapping issuers across providers is rejected",
+			te: &OAuth2TokenExchange{
+				Enabled: true,
+				Providers: []OAuth2TokenExchangeProvider{
+					{Name: "a", Issuers: []string{"https://shared"}, TokenEndpoint: "https://a/token", ClientAuth: &OAuth2ClientAuth{ClientID: "c"}},
+					{Name: "b", Issuers: []string{"https://shared"}, TokenEndpoint: "https://b/token", ClientAuth: &OAuth2ClientAuth{ClientID: "c"}},
+				},
+			},
+			wantErr: "duplicate issuer",
+		},
+		{
+			name: "reserved customParams key is rejected",
+			te: &OAuth2TokenExchange{
+				Enabled: true,
+				Providers: []OAuth2TokenExchangeProvider{
+					{Name: "p", TokenEndpoint: "https://a/token", ClientAuth: &OAuth2ClientAuth{ClientID: "c"},
+						CustomParams: map[string]string{OAuth2FormGrantType: "bad"}},
+				},
+			},
+			wantErr: "reserved RFC 8693 wire key",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newOAuth2WithTokenExchange("corpOAuth", tt.te)
+			err := s.Validate(context.Background())
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestOAS_ValidateForMCP_TokenExchange(t *testing.T) {
+	t.Run("misconfigured token exchange is also rejected by ValidateForMCP", func(t *testing.T) {
+		s := newOAuth2WithTokenExchange("corpOAuth", &OAuth2TokenExchange{Enabled: true})
+		err := s.ValidateForMCP(context.Background())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "providers[] is empty")
+	})
+
+	t.Run("valid token exchange passes ValidateForMCP", func(t *testing.T) {
+		s := newOAuth2WithTokenExchange("corpOAuth", &OAuth2TokenExchange{
+			Enabled: true,
+			Providers: []OAuth2TokenExchangeProvider{
+				{Name: "p", Issuers: []string{"https://idp"}, TokenEndpoint: "https://idp/token", ClientAuth: &OAuth2ClientAuth{ClientID: "c"}},
+			},
+		})
+		assert.NoError(t, s.ValidateForMCP(context.Background()))
+	})
 }
