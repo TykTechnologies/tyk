@@ -2105,11 +2105,25 @@
             "type": "string"
           },
           "description": "Operator-supplied form parameters appended to every RFC 8693 exchange request. Reserved RFC 8693 / OAuth2 wire keys (grant_type, subject_token, audience, scope, actor_token, client_id, ...) are rejected at API-load time."
+        },
+        "cache": {
+          "$ref": "#/definitions/X-Tyk-OAuth2-ExchangeCache"
         }
       },
       "required": [
         "name"
       ]
+    },
+    "X-Tyk-OAuth2-ExchangeCache": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "mode": { "type": "string", "enum": ["derived", "static"] },
+        "maxTimeout": { "type": "string", "description": "Upper bound on cache TTL for derived mode (e.g. \"5m\")." },
+        "timeout": { "type": "string", "description": "Fixed TTL for static mode (e.g. \"2m\")." },
+        "safetyMargin": { "type": "string", "description": "Shaved from the computed TTL to avoid serving near-expired tokens. Defaults to 30s." }
+      },
+      "required": ["enabled"]
     },
     "X-Tyk-OAuth2-ClientAuth": {
       "type": "object",
