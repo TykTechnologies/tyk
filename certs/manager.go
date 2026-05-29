@@ -22,6 +22,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/cache"
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -156,7 +157,7 @@ func WithBackoffIntervals(maxElapsed, initial, max time.Duration) CertificateMan
 //	    WithBackoffIntervals(60*time.Second, 200*time.Millisecond, 5*time.Second))
 func NewCertificateManager(storageHandler storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
-		logger = logrus.New()
+		logger = tyklog.Get()
 	}
 
 	cm := &certificateManager{
@@ -189,7 +190,7 @@ func getOrgFromKeyID(key, certID string) string {
 
 func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
-		logger = logrus.New()
+		logger = tyklog.Get()
 	}
 	log := logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix})
 
@@ -603,6 +604,39 @@ func (c *certificateManager) fetchCertificateWithRetry(id string, sharedBackoff 
 	return val, err
 }
 
+// appendEmbeddedPEM resolves a single inline-PEM cert ID, caches it under a
+// content-derived key, and appends it (or nil on parse failure) to out.
+//
+// The cache prefix isolates these entries from SHA256-keyed Redis cert IDs
+// (`embedded-pem-` contains a dash, which never appears in hex). We never
+// persist embedded PEMs into the underlying storage: they are ephemeral
+// content supplied by the API definition, or, in the future, by a
+// secret-store substitution layer.
+func (c *certificateManager) appendEmbeddedPEM(id string, mode CertificateType, out *[]*tls.Certificate) {
+	rawCert := []byte(strings.TrimSpace(id))
+	cacheKey := embeddedPEMCacheKeyPrefix + tykcrypto.HexSHA256(rawCert)
+
+	if cached, found := c.cache.Get(cacheKey); found {
+		if cert, ok := cached.(*tls.Certificate); ok && isCertCanBeListed(cert, mode) {
+			*out = append(*out, cert)
+		}
+		return
+	}
+
+	parsedCert, parseErr := ParsePEMCertificate(rawCert, c.secret)
+	if parseErr != nil {
+		// Never log the PEM body — it may contain a private key.
+		c.logger.WithError(parseErr).Error("Error parsing embedded PEM certificate")
+		*out = append(*out, nil)
+		return
+	}
+
+	c.cache.Set(cacheKey, parsedCert, cache.DefaultExpiration)
+	if isCertCanBeListed(parsedCert, mode) {
+		*out = append(*out, parsedCert)
+	}
+}
+
 func (c *certificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
 	var cert *tls.Certificate
 	var rawCert []byte
@@ -634,28 +668,7 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 		// content supplied by the API definition (or, in the future, by a
 		// secret-store substitution layer).
 		if IsPEMContent(id) {
-			rawCert := []byte(strings.TrimSpace(id))
-			cacheKey := embeddedPEMCacheKeyPrefix + tykcrypto.HexSHA256(rawCert)
-
-			if cached, found := c.cache.Get(cacheKey); found {
-				if isCertCanBeListed(cached.(*tls.Certificate), mode) {
-					out = append(out, cached.(*tls.Certificate))
-				}
-				continue
-			}
-
-			parsedCert, parseErr := ParsePEMCertificate(rawCert, c.secret)
-			if parseErr != nil {
-				// Never log the PEM body — it may contain a private key.
-				c.logger.WithError(parseErr).Error("Error parsing embedded PEM certificate")
-				out = append(out, nil)
-				continue
-			}
-
-			c.cache.Set(cacheKey, parsedCert, cache.DefaultExpiration)
-			if isCertCanBeListed(parsedCert, mode) {
-				out = append(out, parsedCert)
-			}
+			c.appendEmbeddedPEM(id, mode, &out)
 			continue
 		}
 

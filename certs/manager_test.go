@@ -259,153 +259,169 @@ func TestToCertificateBasics(t *testing.T) {
 	assert.Equal(t, meta.IsCA, basics.IsCA)
 }
 
-// TestList_EmbeddedPEM verifies that CertificateManager.List accepts inline
-// PEM strings in addition to certificate IDs and file paths. This is the new
-// loading mode required to enable KV/secret-store substitution at API-load
-// time without persisting certificates in Redis.
-func TestList_EmbeddedPEM(t *testing.T) {
-	m := newManager()
+// The following test functions all verify CertificateManager.List accepts
+// inline PEM strings in addition to certificate IDs and file paths. They are
+// split into independent top-level functions (rather than a single test with
+// many t.Run subtests) to keep individual cognitive complexity low.
 
+// requireSingleCert is a tiny helper that asserts the single-cert case shape.
+func requireSingleCert(t *testing.T, certs []*tls.Certificate) *tls.Certificate {
+	t.Helper()
+	if len(certs) != 1 {
+		t.Fatalf("expected 1 cert, got %d", len(certs))
+	}
+	if certs[0] == nil {
+		t.Fatal("expected cert, got nil")
+	}
+	return certs[0]
+}
+
+func TestList_EmbeddedPEM_SingleCert(t *testing.T) {
+	m := newManager()
+	certPem, _ := genCertificateFromCommonName("embedded", false)
+
+	certs := m.List([]string{string(certPem)}, CertificatePublic)
+
+	cert := requireSingleCert(t, certs)
+	assert.Equal(t, "embedded", leafSubjectName(cert))
+}
+
+func TestList_EmbeddedPEM_CombinedCertKey_ResolvesAsPrivate(t *testing.T) {
+	m := newManager()
 	certPem, keyPem := genCertificateFromCommonName("embedded", false)
 	combinedPem := append(append([]byte{}, certPem...), keyPem...)
 
-	t.Run("single cert from embedded PEM", func(t *testing.T) {
-		certs := m.List([]string{string(certPem)}, CertificatePublic)
-		if len(certs) != 1 {
-			t.Fatalf("expected 1 cert, got %d", len(certs))
-		}
-		if certs[0] == nil {
-			t.Fatal("expected cert, got nil")
-		}
-		assert.Equal(t, "embedded", leafSubjectName(certs[0]))
-	})
+	certs := m.List([]string{string(combinedPem)}, CertificatePrivate)
 
-	t.Run("combined cert+key embedded PEM resolves as private", func(t *testing.T) {
-		certs := m.List([]string{string(combinedPem)}, CertificatePrivate)
-		if len(certs) != 1 {
-			t.Fatalf("expected 1 cert, got %d", len(certs))
-		}
-		if certs[0] == nil {
-			t.Fatal("expected cert, got nil")
-		}
-		assert.Equal(t, "embedded", leafSubjectName(certs[0]))
-		assert.False(t, isPrivateKeyEmpty(certs[0]), "private key should be present")
-	})
+	cert := requireSingleCert(t, certs)
+	assert.Equal(t, "embedded", leafSubjectName(cert))
+	assert.False(t, isPrivateKeyEmpty(cert), "private key should be present")
+}
 
-	t.Run("mixed batch: file, storage ID, embedded PEM", func(t *testing.T) {
-		mixManager := newManager()
+func TestList_EmbeddedPEM_MixedBatch(t *testing.T) {
+	m := newManager()
 
-		filePem, _ := genCertificateFromCommonName("file", false)
-		dir, err := ioutil.TempDir("", "certs-embedded-mix")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(dir)
-		filePath := filepath.Join(dir, "cert.pem")
-		if err := ioutil.WriteFile(filePath, filePem, 0666); err != nil {
-			t.Fatal(err)
-		}
+	filePem, _ := genCertificateFromCommonName("file", false)
+	dir, err := ioutil.TempDir("", "certs-embedded-mix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	filePath := filepath.Join(dir, "cert.pem")
+	if err := ioutil.WriteFile(filePath, filePem, 0666); err != nil {
+		t.Fatal(err)
+	}
 
-		storagePem, _ := genCertificateFromCommonName("storage", false)
-		storageID, err := mixManager.Add(storagePem, "")
-		if err != nil {
-			t.Fatal(err)
-		}
+	storagePem, _ := genCertificateFromCommonName("storage", false)
+	storageID, err := m.Add(storagePem, "")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		embeddedPem, _ := genCertificateFromCommonName("embedded-mix", false)
+	embeddedPem, _ := genCertificateFromCommonName("embedded-mix", false)
 
-		certs := mixManager.List([]string{filePath, storageID, string(embeddedPem)}, CertificatePublic)
-		if len(certs) != 3 {
-			t.Fatalf("expected 3 certs, got %d", len(certs))
-		}
-		assert.Equal(t, "file", leafSubjectName(certs[0]))
-		assert.Equal(t, "storage", leafSubjectName(certs[1]))
-		assert.Equal(t, "embedded-mix", leafSubjectName(certs[2]))
-	})
+	certs := m.List([]string{filePath, storageID, string(embeddedPem)}, CertificatePublic)
+	if len(certs) != 3 {
+		t.Fatalf("expected 3 certs, got %d", len(certs))
+	}
+	assert.Equal(t, "file", leafSubjectName(certs[0]))
+	assert.Equal(t, "storage", leafSubjectName(certs[1]))
+	assert.Equal(t, "embedded-mix", leafSubjectName(certs[2]))
+}
 
-	t.Run("leading and trailing whitespace tolerated", func(t *testing.T) {
-		padded := "\n\n  " + string(certPem) + "\n\n  "
-		certs := m.List([]string{padded}, CertificatePublic)
-		if len(certs) != 1 || certs[0] == nil {
-			t.Fatal("expected one non-nil cert")
-		}
-		assert.Equal(t, "embedded", leafSubjectName(certs[0]))
-	})
+func TestList_EmbeddedPEM_LeadingTrailingWhitespace(t *testing.T) {
+	m := newManager()
+	certPem, _ := genCertificateFromCommonName("embedded", false)
 
-	t.Run("CRLF line endings tolerated", func(t *testing.T) {
-		crlf := strings.ReplaceAll(string(certPem), "\n", "\r\n")
-		certs := m.List([]string{crlf}, CertificatePublic)
-		if len(certs) != 1 || certs[0] == nil {
-			t.Fatal("expected one non-nil cert")
-		}
-		assert.Equal(t, "embedded", leafSubjectName(certs[0]))
-	})
+	padded := "\n\n  " + string(certPem) + "\n\n  "
+	certs := m.List([]string{padded}, CertificatePublic)
 
-	t.Run("malformed PEM body returns nil", func(t *testing.T) {
-		bad := "-----BEGIN CERTIFICATE-----\nnot-base64-data\n-----END CERTIFICATE-----"
-		certs := m.List([]string{bad}, CertificatePublic)
-		if len(certs) != 1 {
-			t.Fatalf("expected 1 entry, got %d", len(certs))
-		}
-		assert.Nil(t, certs[0], "malformed PEM must yield nil entry")
-	})
+	cert := requireSingleCert(t, certs)
+	assert.Equal(t, "embedded", leafSubjectName(cert))
+}
 
-	t.Run("truncated PEM returns nil", func(t *testing.T) {
-		bad := "-----BEGIN CERTIFICATE-----\nMIIB"
-		certs := m.List([]string{bad}, CertificatePublic)
-		if len(certs) != 1 {
-			t.Fatalf("expected 1 entry, got %d", len(certs))
-		}
-		assert.Nil(t, certs[0], "truncated PEM must yield nil entry")
-	})
+func TestList_EmbeddedPEM_CRLFLineEndings(t *testing.T) {
+	m := newManager()
+	certPem, _ := genCertificateFromCommonName("embedded", false)
 
-	t.Run("cache key uses content hash, not raw PEM string", func(t *testing.T) {
-		cacheManager := newManager()
-		pem2, _ := genCertificateFromCommonName("cache-test", false)
-		before := cacheManager.cache.Count()
+	crlf := strings.ReplaceAll(string(certPem), "\n", "\r\n")
+	certs := m.List([]string{crlf}, CertificatePublic)
 
-		certs := cacheManager.List([]string{string(pem2)}, CertificatePublic)
-		if len(certs) != 1 || certs[0] == nil {
-			t.Fatal("expected one non-nil cert on first call")
-		}
-		after1 := cacheManager.cache.Count()
-		assert.Equal(t, before+1, after1, "first call should add one cache entry")
+	cert := requireSingleCert(t, certs)
+	assert.Equal(t, "embedded", leafSubjectName(cert))
+}
 
-		certs = cacheManager.List([]string{string(pem2)}, CertificatePublic)
-		if len(certs) != 1 || certs[0] == nil {
-			t.Fatal("expected one non-nil cert on second call")
-		}
-		after2 := cacheManager.cache.Count()
-		assert.Equal(t, after1, after2, "second call with same PEM should hit cache (no new entry)")
+func TestList_EmbeddedPEM_MalformedBodyReturnsNil(t *testing.T) {
+	m := newManager()
+	bad := "-----BEGIN CERTIFICATE-----\nnot-base64-data\n-----END CERTIFICATE-----"
 
-		expectedKey := embeddedPEMCacheKeyPrefix + tykcrypto.HexSHA256([]byte(strings.TrimSpace(string(pem2))))
-		cached, found := cacheManager.cache.Get(expectedKey)
-		assert.True(t, found, "cache should hold entry under embedded-pem-<sha256> key")
-		assert.NotNil(t, cached)
+	certs := m.List([]string{bad}, CertificatePublic)
 
-		_, foundRaw := cacheManager.cache.Get(string(pem2))
-		assert.False(t, foundRaw, "raw PEM string must not be used as cache key")
-	})
+	if len(certs) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(certs))
+	}
+	assert.Nil(t, certs[0], "malformed PEM must yield nil entry")
+}
 
-	t.Run("multi-cert chain PEM resolves both certificates", func(t *testing.T) {
-		leafPem, _ := genCertificateFromCommonName("leaf", false)
-		intermediatePem, _ := genCertificateFromCommonName("intermediate", false)
-		chain := append(append([]byte{}, leafPem...), intermediatePem...)
-		certs := m.List([]string{string(chain)}, CertificatePublic)
-		if len(certs) != 1 || certs[0] == nil {
-			t.Fatal("expected one non-nil cert")
-		}
-		assert.Len(t, certs[0].Certificate, 2, "chain should contain leaf + intermediate")
-	})
+func TestList_EmbeddedPEM_TruncatedReturnsNil(t *testing.T) {
+	m := newManager()
+	bad := "-----BEGIN CERTIFICATE-----\nMIIB"
 
-	t.Run("CertPool with embedded CA PEM", func(t *testing.T) {
-		caPem, _ := genCertificateFromCommonName("ca-embedded", false)
-		pool := m.CertPool([]string{string(caPem)})
-		if pool == nil {
-			t.Fatal("expected non-nil pool")
-		}
-		// pool.Subjects() is deprecated but acceptable here for a population check.
-		subjects := pool.Subjects()
-		assert.GreaterOrEqual(t, len(subjects), 1, "pool should contain at least the embedded CA")
-	})
+	certs := m.List([]string{bad}, CertificatePublic)
+
+	if len(certs) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(certs))
+	}
+	assert.Nil(t, certs[0], "truncated PEM must yield nil entry")
+}
+
+func TestList_EmbeddedPEM_CacheKeyUsesContentHash(t *testing.T) {
+	m := newManager()
+	pem2, _ := genCertificateFromCommonName("cache-test", false)
+	before := m.cache.Count()
+
+	// First call: populates cache.
+	requireSingleCert(t, m.List([]string{string(pem2)}, CertificatePublic))
+	after1 := m.cache.Count()
+	assert.Equal(t, before+1, after1, "first call should add one cache entry")
+
+	// Second call: must hit cache (no new entry).
+	requireSingleCert(t, m.List([]string{string(pem2)}, CertificatePublic))
+	after2 := m.cache.Count()
+	assert.Equal(t, after1, after2, "second call with same PEM should hit cache (no new entry)")
+
+	// Cache key derived from SHA256 of trimmed content, not the raw string.
+	expectedKey := embeddedPEMCacheKeyPrefix + tykcrypto.HexSHA256([]byte(strings.TrimSpace(string(pem2))))
+	cached, found := m.cache.Get(expectedKey)
+	assert.True(t, found, "cache should hold entry under embedded-pem-<sha256> key")
+	assert.NotNil(t, cached)
+
+	_, foundRaw := m.cache.Get(string(pem2))
+	assert.False(t, foundRaw, "raw PEM string must not be used as cache key")
+}
+
+func TestList_EmbeddedPEM_MultiCertChain(t *testing.T) {
+	m := newManager()
+	leafPem, _ := genCertificateFromCommonName("leaf", false)
+	intermediatePem, _ := genCertificateFromCommonName("intermediate", false)
+	chain := append(append([]byte{}, leafPem...), intermediatePem...)
+
+	certs := m.List([]string{string(chain)}, CertificatePublic)
+
+	cert := requireSingleCert(t, certs)
+	assert.Len(t, cert.Certificate, 2, "chain should contain leaf + intermediate")
+}
+
+func TestList_EmbeddedPEM_CertPoolWithEmbeddedCA(t *testing.T) {
+	m := newManager()
+	caPem, _ := genCertificateFromCommonName("ca-embedded", false)
+
+	pool := m.CertPool([]string{string(caPem)})
+
+	if pool == nil {
+		t.Fatal("expected non-nil pool")
+	}
+	// pool.Subjects() is deprecated but acceptable here for a population check.
+	subjects := pool.Subjects()
+	assert.GreaterOrEqual(t, len(subjects), 1, "pool should contain at least the embedded CA")
 }

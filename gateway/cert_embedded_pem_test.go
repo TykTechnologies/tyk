@@ -56,7 +56,7 @@ func TestEmbeddedPEM_ClientCertificates(t *testing.T) {
 
 	t.Run("client with embedded-PEM-pinned cert is accepted", func(t *testing.T) {
 		tlsConfig := GetTLSConfig(&clientCert, serverCertPem)
-		tlsConfig.GetClientCertificate = func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+		tlsConfig.GetClientCertificate = func(_ *tls.CertificateRequestInfo) (*tls.Certificate, error) {
 			return &clientCert, nil
 		}
 		httpClient := &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
@@ -87,10 +87,14 @@ func TestEmbeddedPEM_UpstreamCertificates(t *testing.T) {
 	ts.Gw.dialCtxFn = test.LocalDialer()
 
 	_, _, combinedClientPEM, clientCert := crypto.GenCertificate(&x509.Certificate{}, false)
-	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
+	leaf, err := x509.ParseCertificate(clientCert.Certificate[0])
+	require.NoError(t, err)
+	clientCert.Leaf = leaf
 
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(fmt.Sprintf("request host is %s", r.Host)))
+		if _, err := w.Write([]byte(fmt.Sprintf("request host is %s", r.Host))); err != nil {
+			t.Logf("upstream write failed: %v", err)
+		}
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -105,7 +109,8 @@ func TestEmbeddedPEM_UpstreamCertificates(t *testing.T) {
 	upstream.StartTLS()
 	defer upstream.Close()
 
-	upstreamURL, _ := url.Parse(upstream.URL)
+	upstreamURL, err := url.Parse(upstream.URL)
+	require.NoError(t, err)
 
 	globalConf := ts.Gw.GetConfig()
 	globalConf.ProxySSLInsecureSkipVerify = true
