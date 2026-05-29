@@ -643,9 +643,3 @@ func (em EndpointsMap) Endpoints() Endpoints {
 
 	return endpoints
 }
-
-func WithNew() NewSessionStateOpt {
-	return func(s *SessionState) {
-		s.isNew = true
-	}
-}
