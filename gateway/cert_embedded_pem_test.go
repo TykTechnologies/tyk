@@ -92,7 +92,7 @@ func TestEmbeddedPEM_UpstreamCertificates(t *testing.T) {
 	clientCert.Leaf = leaf
 
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, err := w.Write([]byte(fmt.Sprintf("request host is %s", r.Host))); err != nil {
+		if _, err := fmt.Fprintf(w, "request host is %s", r.Host); err != nil {
 			t.Logf("upstream write failed: %v", err)
 		}
 		w.WriteHeader(http.StatusOK)
