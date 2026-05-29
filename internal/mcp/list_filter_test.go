@@ -234,6 +234,41 @@ func TestFilterItems(t *testing.T) {
 	})
 }
 
+func TestFilterItemsWithRuleSets(t *testing.T) {
+	items := []json.RawMessage{
+		json.RawMessage(`{"name":"get_weather"}`),
+		json.RawMessage(`{"name":"get_forecast"}`),
+		json.RawMessage(`{"name":"execute_query"}`),
+		json.RawMessage(`{"name":"admin_reset"}`),
+	}
+
+	t.Run("allow lists compose as intersection", func(t *testing.T) {
+		result := FilterItemsWithRuleSets(items, "name", []user.AccessControlRules{
+			{Allowed: []string{"get_weather", "get_forecast", "execute_query"}},
+			{Allowed: []string{"get_weather", "get_forecast"}},
+		})
+
+		names := make([]string, 0, len(result))
+		for _, item := range result {
+			names = append(names, ExtractStringField(item, "name"))
+		}
+		assert.Equal(t, []string{"get_weather", "get_forecast"}, names)
+	})
+
+	t.Run("block lists compose as union", func(t *testing.T) {
+		result := FilterItemsWithRuleSets(items, "name", []user.AccessControlRules{
+			{Blocked: []string{"admin_reset"}},
+			{Blocked: []string{"execute_query"}},
+		})
+
+		names := make([]string, 0, len(result))
+		for _, item := range result {
+			names = append(names, ExtractStringField(item, "name"))
+		}
+		assert.Equal(t, []string{"get_weather", "get_forecast"}, names)
+	})
+}
+
 func TestFilterJSONRPCBody(t *testing.T) {
 	t.Run("batch JSON-RPC array passes through (returns false)", func(t *testing.T) {
 		// JSON-RPC batch = top-level array. Not supported for filtering.
@@ -281,6 +316,29 @@ func TestFilterJSONRPCBody(t *testing.T) {
 		assert.Contains(t, names, "résumé_tool")
 		assert.Contains(t, names, "normal_tool")
 	})
+}
+
+func TestFilterInitializeCapabilitiesBody(t *testing.T) {
+	body := []byte(`{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-26","capabilities":{"tools":{"listChanged":true},"resources":{"subscribe":true},"prompts":{},"sampling":{}},"serverInfo":{"name":"test","version":"1.0.0"}}}`)
+
+	result, ok := FilterInitializeCapabilitiesBody(body, []user.AccessControlRules{
+		{Blocked: []string{MethodSamplingCreate, MethodToolsList}},
+	})
+	require.True(t, ok)
+
+	var envelope JSONRPCResponse
+	require.NoError(t, json.Unmarshal(result, &envelope))
+
+	var responseResult map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(envelope.Result, &responseResult))
+
+	var capabilities map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(responseResult["capabilities"], &capabilities))
+
+	assert.NotContains(t, capabilities, "sampling")
+	assert.NotContains(t, capabilities, "tools")
+	assert.Contains(t, capabilities, "resources")
+	assert.Contains(t, capabilities, "prompts")
 }
 
 func TestInferListConfigFromResult(t *testing.T) {
