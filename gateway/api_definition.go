@@ -516,12 +516,14 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 }
 
 var envRegex = regexp.MustCompile(`env://([^"]+)`)
+var fileRegex = regexp.MustCompile(`file://([^"]+)`)
 
 const (
 	prefixEnv       = "env://"
 	prefixSecrets   = "secrets://"
 	prefixConsul    = "consul://"
 	prefixVault     = "vault://"
+	prefixFile      = "file://"
 	prefixKeys      = "tyk-apis"
 	vaultSecretPath = "secret/data/"
 )
@@ -560,6 +562,12 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 	if strings.Contains(input, prefixVault) {
 		if err := a.replaceVaultSecrets(&input); err != nil {
 			log.WithError(err).Error("Couldn't replace vault secrets")
+		}
+	}
+
+	if strings.Contains(input, prefixFile) {
+		if err := replaceFileSecrets(&input); err != nil {
+			log.WithError(err).Error("Couldn't replace file secrets")
 		}
 	}
 
@@ -623,6 +631,29 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 	}
 
 	return nil
+}
+
+func replaceFileSecrets(input *string) error {
+	matches := fileRegex.FindAllStringSubmatch(*input, -1)
+	seen := map[string]bool{}
+	var firstErr error
+	for _, m := range matches {
+		if seen[m[0]] {
+			continue
+		}
+		seen[m[0]] = true
+		val, err := ResolveFileKV("", m[1], true)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			log.WithError(err).Errorf("file KV: failed to read secret file %q", m[1])
+
+			continue
+		}
+		*input = strings.Replace(*input, m[0], val, -1)
+	}
+	return firstErr
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.

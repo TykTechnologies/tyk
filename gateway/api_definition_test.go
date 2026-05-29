@@ -22,6 +22,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
@@ -1660,6 +1661,45 @@ func TestReplaceSecrets(t *testing.T) {
 	assert.Equal(t, "Şenharputlu", api2.AuthConfigs[apidef.AuthTokenType].AuthHeaderName)
 	assert.Equal(t, "Ghiur", api1.JWTSigningMethod)
 	assert.Equal(t, "Ghiur", api2.AuthConfigs[apidef.OAuthType].AuthHeaderName)
+}
+
+func TestReplaceSecretsFileScheme(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("replaces file:// reference with file contents", func(t *testing.T) {
+		dir := t.TempDir()
+		f := filepath.Join(dir, "jwt-secret")
+		require.NoError(t, os.WriteFile(f, []byte("my-jwt-signing-key\n"), 0600))
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "file-kv-1"
+			spec.JWTSource = "file://" + f
+		})
+
+		api := ts.Gw.getApiSpec("file-kv-1")
+		require.NotNil(t, api)
+		assert.Equal(t, "my-jwt-signing-key", api.JWTSource)
+	})
+
+	t.Run("multiple file:// references in one definition are all replaced", func(t *testing.T) {
+		dir := t.TempDir()
+		f1 := filepath.Join(dir, "source")
+		f2 := filepath.Join(dir, "method")
+		require.NoError(t, os.WriteFile(f1, []byte("source-value"), 0600))
+		require.NoError(t, os.WriteFile(f2, []byte("method-value"), 0600))
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "file-kv-2"
+			spec.JWTSource = "file://" + f1
+			spec.JWTSigningMethod = "file://" + f2
+		})
+
+		api := ts.Gw.getApiSpec("file-kv-2")
+		require.NotNil(t, api)
+		assert.Equal(t, "source-value", api.JWTSource)
+		assert.Equal(t, "method-value", api.JWTSigningMethod)
+	})
 }
 
 func TestInternalEndpointMW_TT_11126(t *testing.T) {
