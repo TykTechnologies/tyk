@@ -121,20 +121,7 @@ func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State
 		if fetchErr != nil {
 			return "", 0, fetchErr
 		}
-
-		safetyMargin := time.Duration(provider.Cache.SafetyMargin)
-		if safetyMargin == 0 {
-			safetyMargin = oauth2common.DefaultSafetyMargin
-		}
-
-		var ttl time.Duration
-		switch provider.Cache.Mode {
-		case oas.OAuth2CacheModeStatic:
-			ttl = oauth2common.StaticTTL(time.Duration(provider.Cache.Timeout), expiresIn, safetyMargin)
-		default:
-			ttl = oauth2common.DerivedTTL(expiresIn, inboundRemaining(st), time.Duration(provider.Cache.MaxTimeout), safetyMargin)
-		}
-		return tok, ttl, nil
+		return tok, cacheTTL(provider.Cache, expiresIn, inboundRemaining(st)), nil
 	})
 	if err != nil {
 		return "", err
@@ -149,6 +136,19 @@ func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State
 	}
 
 	return token, nil
+}
+
+// cacheTTL derives the cache entry lifetime for the provider's cache mode,
+// defaulting the safety margin when none is configured.
+func cacheTTL(cache *oas.OAuth2ExchangeCache, expiresIn, inboundRemaining time.Duration) time.Duration {
+	safetyMargin := time.Duration(cache.SafetyMargin)
+	if safetyMargin == 0 {
+		safetyMargin = oauth2common.DefaultSafetyMargin
+	}
+	if cache.Mode == oas.OAuth2CacheModeStatic {
+		return oauth2common.StaticTTL(time.Duration(cache.Timeout), expiresIn, safetyMargin)
+	}
+	return oauth2common.DerivedTTL(expiresIn, inboundRemaining, time.Duration(cache.MaxTimeout), safetyMargin)
 }
 
 // findActivePrimitive returns the first primitive in tools/resources/prompts with the given name and active exchange.

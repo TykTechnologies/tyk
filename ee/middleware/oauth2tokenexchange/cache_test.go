@@ -88,15 +88,9 @@ func (c *missCountingCache) Get(key string) (string, time.Duration, bool) {
 }
 
 func TestSingleFlightCache_ConcurrentFollowerReportsMiss(t *testing.T) {
-	// Regression test: a singleflight follower (goroutine that arrives while the
-	// leader is already fetching) must report hit=false, not hit=true.
-	//
-	// Synchronisation:
-	//   getCalled is signalled by every Get that returns a miss. We wait for
-	//   exactly two miss signals before releasing the fetch, which guarantees
-	//   both goroutines have called Get → missed → entered group.Do before the
-	//   leader returns. The follower is therefore a true singleflight waiter,
-	//   not a cache hit.
+	// A singleflight follower (arrives while the leader is fetching) must report
+	// hit=false. Waiting for two miss signals on getCalled before releasing the
+	// fetch guarantees both goroutines entered group.Do as true waiters.
 	getCalled := make(chan struct{}, 2)
 	fc := &missCountingCache{
 		fakeCache: fakeCache{items: map[string]string{}},

@@ -82,13 +82,9 @@ func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request
 		alternatives = m.requiredScopeAlternativesForRequest(r)
 	}
 
-	// Both gates read the inbound Bearer + parsed claims. A request
-	// needs a usable bearer when scope-check is enforcing (has at
-	// least one alternative) OR when exchange is enabled — passing an
-	// empty / unparseable subject_token to the IdP would surface as a
-	// confusing 502 exchange_failed instead of an honest 401 missing
-	// bearer. Reject missing / malformed tokens before reaching the
-	// downstream EE middleware.
+	// A usable bearer is required when scope-check is enforcing or exchange is
+	// enabled; reject missing/malformed tokens here so the IdP call doesn't turn
+	// an absent subject_token into a confusing 502 instead of an honest 401.
 	needsBearer := exchangeActive || (scopeCheckActive && len(alternatives) > 0)
 	rawToken := stripBearer(r.Header.Get(header.Authorization))
 	var claims jwt.MapClaims
@@ -138,11 +134,8 @@ func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request
 		return nil, middleware.StatusRespond
 	}
 
-	// Hand off to the EE TokenExchangeMiddleware (when configured) via
-	// request-context state. The chain runs the EE middleware after
-	// this one; on OSS builds it is replaced with a noop that prints a
-	// one-time warning when an operator has configured
-	// tokenExchange.enabled=true.
+	// Hand off to the EE TokenExchangeMiddleware (next in the chain) via
+	// request-context state; on OSS builds that middleware is a warn-once noop.
 	if exchangeActive {
 		oauth2common.SetState(r, &oauth2common.State{
 			Claims:               claims,
