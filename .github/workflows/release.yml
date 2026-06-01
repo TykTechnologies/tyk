@@ -174,7 +174,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          sbom: true
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -210,7 +209,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: ${{ startsWith(github.ref, 'refs/tags') }}
@@ -340,7 +338,6 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/s390x
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          sbom: true
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -374,7 +371,6 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/s390x
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: ${{ startsWith(github.ref, 'refs/tags') }}
