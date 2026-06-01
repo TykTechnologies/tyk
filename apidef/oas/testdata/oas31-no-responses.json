@@ -1,0 +1,19 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OAS 3.1 No Responses",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://example.com/api"
+    }
+  ],
+  "paths": {
+    "/x-code-samples": {
+      "get": {
+        "operationId": "getSamples"
+      }
+    }
+  }
+}
