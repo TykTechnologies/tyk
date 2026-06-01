@@ -3298,6 +3298,22 @@ func ctxGetCacheOptions(r *http.Request) *cacheOptions {
 	return key
 }
 
+// ctxSetCapturedResponse stashes a *http.Response built from a wrapped
+// ResponseWriter so a downstream consumer (currently ErrorHandler.HandleError)
+// can use it for analytics RawResponse when writeResponse=false.
+func ctxSetCapturedResponse(r *http.Request, resp *http.Response) {
+	setCtxValue(r, ctx.CapturedResponse, resp)
+}
+
+// ctxGetCapturedResponse returns a *http.Response previously stashed via
+// ctxSetCapturedResponse, or nil if none.
+func ctxGetCapturedResponse(r *http.Request) *http.Response {
+	if v, ok := r.Context().Value(ctx.CapturedResponse).(*http.Response); ok {
+		return v
+	}
+	return nil
+}
+
 func ctxGetSession(r *http.Request) *user.SessionState {
 	return ctx.GetSession(r)
 }

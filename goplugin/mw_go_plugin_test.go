@@ -5,10 +5,15 @@ package goplugin_test
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk-pump/serializer"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
@@ -19,6 +24,8 @@ import (
 	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
 )
+
+const analyticsKeyName = "tyk-system-analytics"
 
 func goPluginFilename() string {
 	if test.IsRaceEnabled() {
@@ -884,4 +891,73 @@ func TestGoPlugin_DontWriteBodyInCaseIfPluginRespondsWith4xxOrHigher(t *testing.
 			}...)
 		})
 	})
+}
+
+// TestGoPlugin_AnalyticsRawResponseCapturesPluginResponse pins the fix for
+// https://github.com/TykTechnologies/tyk/issues/8242.
+//
+// Before the fix: when a goplugin "pre" middleware writes a >= 400 status with
+// a body, the request is correctly served on the wire but the resulting
+// analytics record's RawResponse is the base64 of a zero-value *http.Response,
+// which decodes to the sentinel string "HTTP/0.0 000 status code 0\r\n
+// Content-Length: 0\r\n\r\n". The 2xx admit path captures the real response
+// via customResponseWriter.getHttpResponse; the 4xx reject path used to drop
+// it. ErrorHandler.HandleError now reads the captured response from the
+// request context when writeResponse=false, so RawResponse reflects the real
+// status/headers/body the plugin emitted.
+func TestGoPlugin_AnalyticsRawResponseCapturesPluginResponse(t *testing.T) {
+	ts := gateway.StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		spec.Proxy.ListenPath = "/test-api/"
+		spec.UseKeylessAccess = true
+		spec.UseStandardAuth = false
+		spec.EnableDetailedRecording = true
+		spec.CustomMiddleware = apidef.MiddlewareSection{
+			Driver: apidef.GoPluginDriver,
+			Pre: []apidef.MiddlewareDefinition{
+				{
+					Name: "RejectWithBody",
+					Path: goPluginFilename(),
+				},
+			},
+		}
+	})
+
+	// The test gateway defaults to the msgpack serializer (empty SerializerType),
+	// whose key suffix is "". Use the public NewAnalyticsSerializer to decode
+	// records since the gateway's instance is package-private.
+	analyticsSerializer := serializer.NewAnalyticsSerializer("")
+	redisAnalyticsKeyName := analyticsKeyName + analyticsSerializer.GetSuffix()
+
+	// Drain any records from earlier subtests.
+	_ = ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+
+	_, err := ts.Run(t, test.TestCase{
+		Path: "/test-api/get",
+		Code: http.StatusForbidden,
+	})
+	require.NoError(t, err)
+
+	ts.Gw.Analytics.Flush()
+	results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+	require.Len(t, results, 1, "expected exactly one analytics record")
+
+	var record analytics.AnalyticsRecord
+	require.NoError(t, analyticsSerializer.Decode([]byte(results[0].(string)), &record))
+
+	assert.Equal(t, http.StatusForbidden, record.ResponseCode,
+		"analytics ResponseCode should reflect the plugin's status")
+
+	raw, err := base64.StdEncoding.DecodeString(record.RawResponse)
+	require.NoError(t, err)
+
+	rawStr := string(raw)
+	assert.False(t, strings.HasPrefix(rawStr, "HTTP/0.0 000"),
+		"RawResponse must not be the zero-value sentinel, got: %q", rawStr)
+	assert.True(t, strings.HasPrefix(rawStr, "HTTP/1.1 403 "),
+		"RawResponse should start with the plugin's HTTP/1.1 403 status line, got: %q", rawStr)
+	assert.Contains(t, rawStr, "hello",
+		"RawResponse should contain the body the plugin wrote, got: %q", rawStr)
 }
