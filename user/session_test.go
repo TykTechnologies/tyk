@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1722,4 +1723,213 @@ func TestSessionState_Lifetime_PostExpiry_BypassesRespectKeyExpiration(t *testin
 			tc.wantFn(t, got)
 		})
 	}
+}
+
+// TestSessionState_ConcurrentClone tests that cloning a session while another goroutine
+// modifies it does not cause a race condition or panic.
+func TestSessionState_ConcurrentClone(t *testing.T) {
+	session := NewSessionState()
+	session.AccessRights = map[string]AccessDefinition{
+		"api1": {APIID: "api1"},
+	}
+	session.MetaData = map[string]interface{}{
+		"key1": "value1",
+	}
+	session.OauthKeys = map[string]string{
+		"oauth1": "token1",
+	}
+
+	var wg sync.WaitGroup
+	iterations := 1000
+
+	// Writer goroutines - modify the session
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				session.lockForWrite()
+				session.AccessRights["api2"] = AccessDefinition{APIID: "api2"}
+				session.MetaData["key2"] = "value2"
+				session.OauthKeys["oauth2"] = "token2"
+				session.unlockForWrite()
+			}
+		}(i)
+	}
+
+	// Reader goroutines - clone the session
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				cloned := session.Clone()
+				// Verify the clone has its own maps
+				assert.NotNil(t, cloned.AccessRights)
+				assert.NotNil(t, cloned.MetaData)
+				assert.NotNil(t, cloned.OauthKeys)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+}
+
+// TestSessionState_CloneIsolation tests that modifying a cloned session
+// does not affect the original session.
+func TestSessionState_CloneIsolation(t *testing.T) {
+	original := NewSessionState()
+	original.AccessRights = map[string]AccessDefinition{
+		"api1": {APIID: "api1"},
+	}
+	original.MetaData = map[string]interface{}{
+		"key1": "value1",
+	}
+	original.OauthKeys = map[string]string{
+		"oauth1": "token1",
+	}
+	original.ApplyPolicies = []string{"policy1"}
+	original.Tags = []string{"tag1"}
+
+	cloned := original.Clone()
+
+	// Modify the clone
+	cloned.lockForWrite()
+	cloned.AccessRights["api2"] = AccessDefinition{APIID: "api2"}
+	cloned.MetaData["key2"] = "value2"
+	cloned.OauthKeys["oauth2"] = "token2"
+	cloned.unlockForWrite()
+	cloned.ApplyPolicies = append(cloned.ApplyPolicies, "policy2")
+	cloned.Tags = append(cloned.Tags, "tag2")
+
+	// Verify original is unchanged
+	assert.Len(t, original.AccessRights, 1)
+	assert.Len(t, original.MetaData, 1)
+	assert.Len(t, original.OauthKeys, 1)
+	assert.Len(t, original.ApplyPolicies, 1)
+	assert.Len(t, original.Tags, 1)
+
+	// Verify clone has the modifications
+	assert.Len(t, cloned.AccessRights, 2)
+	assert.Len(t, cloned.MetaData, 2)
+	assert.Len(t, cloned.OauthKeys, 2)
+	assert.Len(t, cloned.ApplyPolicies, 2)
+	assert.Len(t, cloned.Tags, 2)
+}
+
+// TestSessionState_ConcurrentMapAccess tests concurrent read/write access to session maps
+func TestSessionState_ConcurrentMapAccess(t *testing.T) {
+	session := NewSessionState()
+	session.AccessRights = map[string]AccessDefinition{}
+	session.MetaData = map[string]interface{}{}
+	session.OauthKeys = map[string]string{}
+
+	var wg sync.WaitGroup
+	iterations := 500
+
+	// Multiple writers
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				session.lockForWrite()
+				session.AccessRights["api"+string(rune(id))] = AccessDefinition{APIID: "api"}
+				session.MetaData["key"+string(rune(id))] = "value"
+				session.OauthKeys["oauth"+string(rune(id))] = "token"
+				session.unlockForWrite()
+			}
+		}(i)
+	}
+
+	// Multiple readers (via Clone)
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				_ = session.Clone()
+			}
+		}()
+	}
+
+	wg.Wait()
+}
+
+// TestSessionState_NilMutexHandling tests that sessions with nil mutex are handled correctly
+func TestSessionState_NilMutexHandling(t *testing.T) {
+	// Create a session without using NewSessionState (simulating old sessions)
+	session := SessionState{
+		AccessRights: map[string]AccessDefinition{
+			"api1": {APIID: "api1"},
+		},
+		MetaData: map[string]interface{}{
+			"key1": "value1",
+		},
+	}
+
+	// Clone should initialize the mutex if nil
+	cloned := session.Clone()
+	assert.NotNil(t, cloned.mu)
+
+	// Should be able to use the cloned session safely
+	cloned.lockForWrite()
+	cloned.AccessRights["api2"] = AccessDefinition{APIID: "api2"}
+	cloned.unlockForWrite()
+
+	assert.Len(t, cloned.AccessRights, 2)
+}
+
+// TestSessionState_CloneWithNilMaps tests cloning when maps are nil
+func TestSessionState_CloneWithNilMaps(t *testing.T) {
+	session := NewSessionState()
+	// Don't initialize maps
+
+	cloned := session.Clone()
+
+	// Should not panic and should have nil maps
+	assert.Nil(t, cloned.AccessRights)
+	assert.Nil(t, cloned.MetaData)
+	assert.Nil(t, cloned.OauthKeys)
+	assert.Nil(t, cloned.ApplyPolicies)
+	assert.Nil(t, cloned.Tags)
+}
+
+// TestSessionState_CloneHasOwnMutex tests that cloned sessions have their own mutex
+func TestSessionState_CloneHasOwnMutex(t *testing.T) {
+	original := NewSessionState()
+	original.AccessRights = map[string]AccessDefinition{
+		"api1": {APIID: "api1"},
+	}
+
+	cloned := original.Clone()
+
+	// The cloned session should have its own mutex
+	assert.NotNil(t, cloned.mu)
+
+	// Both should be independently lockable without deadlock
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		original.lockForWrite()
+		defer original.unlockForWrite()
+		original.AccessRights["api2"] = AccessDefinition{APIID: "api2"}
+	}()
+
+	go func() {
+		defer wg.Done()
+		cloned.lockForWrite()
+		defer cloned.unlockForWrite()
+		cloned.AccessRights["api3"] = AccessDefinition{APIID: "api3"}
+	}()
+
+	wg.Wait()
+
+	// Verify both sessions were modified independently
+	assert.Contains(t, original.AccessRights, "api2")
+	assert.NotContains(t, original.AccessRights, "api3")
+	assert.Contains(t, cloned.AccessRights, "api3")
+	assert.NotContains(t, cloned.AccessRights, "api2")
 }

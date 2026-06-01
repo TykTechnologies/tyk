@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -348,10 +349,20 @@ type SessionState struct {
 	// modified holds the hint if a session has been modified for update.
 	// use Touch() to set it, and IsModified() to get it.
 	modified bool
+
+	// isRestored
+	// The flag holds information if session was restored or not.
+	// Use MarkAsRestored() to mark session as restored, and IsRestored() to get it.
+	isRestored bool
+
+	// mu protects concurrent access to map fields (AccessRights, OauthKeys, MetaData)
+	mu *sync.RWMutex
 }
 
 func NewSessionState() *SessionState {
-	return &SessionState{}
+	return &SessionState{
+		mu: &sync.RWMutex{},
+	}
 }
 
 // APILimit returns an user.APILimit from the session data.
@@ -386,17 +397,48 @@ func (s *SessionState) IsModified() bool {
 	return s.modified
 }
 
-// Clone  returns a fresh copy of s
+// Clone returns a fresh copy of s with thread-safe map cloning
 func (s SessionState) Clone() SessionState {
-	// Simple vales are cloned by value
+	// Initialize mutex if nil (for sessions created before this change)
+	if s.mu == nil {
+		s.mu = &sync.RWMutex{}
+	}
+
+	// Acquire read lock to safely read map fields
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Simple values are cloned by value
 	newSession := s
+
+	// Deep clone map fields while holding the read lock
 	newSession.AccessRights = maps.Clone(s.AccessRights)
 	newSession.OauthKeys = maps.Clone(s.OauthKeys)
-	newSession.ApplyPolicies = slices.Clone(s.ApplyPolicies)
 	newSession.MetaData = maps.Clone(s.MetaData)
+
+	// Clone slice fields
+	newSession.ApplyPolicies = slices.Clone(s.ApplyPolicies)
 	newSession.Tags = slices.Clone(s.Tags)
 
+	// Give the clone its own mutex
+	newSession.mu = &sync.RWMutex{}
+
 	return newSession
+}
+
+// lockForWrite acquires the write lock for map field modifications
+func (s *SessionState) lockForWrite() {
+	if s.mu == nil {
+		s.mu = &sync.RWMutex{}
+	}
+	s.mu.Lock()
+}
+
+// unlockForWrite releases the write lock
+func (s *SessionState) unlockForWrite() {
+	if s.mu != nil {
+		s.mu.Unlock()
+	}
 }
 
 func (s *SessionState) MD5Hash() string {
