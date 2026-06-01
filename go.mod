@@ -631,4 +631,4 @@ replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 =>
 
 replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.92.1-0.20260211103127-0004a8367058
 
-replace github.com/TykTechnologies/storage => github.com/TykTechnologies/storage v0.0.0-20260601093719-c313062824d4 // todo: remove before merge to master
+replace github.com/TykTechnologies/storage => github.com/TykTechnologies/storage v0.0.0-20260601101308-a5fb7c875ace // todo: remove before merge to master
