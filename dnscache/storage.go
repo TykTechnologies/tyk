@@ -6,8 +6,9 @@ import (
 
 	"fmt"
 
-	cache "github.com/pmylund/go-cache"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 // DnsCacheItem represents single record in cache
@@ -21,8 +22,10 @@ type DnsCacheStorage struct {
 }
 
 func NewDnsCacheStorage(expiration, checkInterval time.Duration) *DnsCacheStorage {
-	storage := DnsCacheStorage{cache.New(expiration, checkInterval)}
-	return &storage
+	storage := &DnsCacheStorage{
+		cache: cache.NewCache(expiration, checkInterval),
+	}
+	return storage
 }
 
 // Items returns map of non expired dns cache items
