@@ -60,6 +60,11 @@ type DerivedTool struct {
 	// original REST parameter or body field name.
 	ParamSourceNames map[string]string `json:"-"`
 
+	// ParamOrder lists MCP-facing argument names in source derivation order.
+	// The adapter uses it when emitting ordered request components such as
+	// query strings.
+	ParamOrder []string `json:"-"`
+
 	// RequestBodyContentType is the selected source request body media type.
 	// Empty means JSON/default.
 	RequestBodyContentType string `json:"-"`
@@ -302,7 +307,7 @@ func deriveOperationPrimitive(
 	}
 
 	seen[name] = true
-	locs, sourceNames, bodyContentType, schema, err := deriveParams(item, mo.op)
+	locs, sourceNames, order, bodyContentType, schema, err := deriveParams(item, mo.op)
 	if err != nil {
 		return DerivedPrimitive{}, nil, false, fmt.Errorf("operationId %q: %w", rawName, err)
 	}
@@ -320,6 +325,7 @@ func deriveOperationPrimitive(
 			PathTemplate:           mo.path,
 			ParamLocations:         locs,
 			ParamSourceNames:       sourceNames,
+			ParamOrder:             order,
 			RequestBodyContentType: bodyContentType,
 			InputSchema:            schema,
 			Annotations:            defaultDerivedToolAnnotations(mo.method, mo.op, name),
@@ -512,13 +518,13 @@ func SanitizeToolName(raw string) string {
 // (paramLocations, paramSourceNames, requestBodyContentType, inputSchema). The
 // emitted schemas intentionally use a small JSON Schema subset that is valid
 // under MCP's default JSON Schema 2020-12 interpretation.
-func deriveParams(item *openapi3.PathItem, op *openapi3.Operation) (map[string]string, map[string]string, string, map[string]any, error) {
+func deriveParams(item *openapi3.PathItem, op *openapi3.Operation) (map[string]string, map[string]string, []string, string, map[string]any, error) {
 	params := newDerivedParams()
 	params.addParameters(item.Parameters)
 	params.addParameters(op.Parameters)
 	params.addRequestBody(op.RequestBody)
-	locations, sourceNames, schema, err := params.build()
-	return locations, sourceNames, params.requestBodyContentType, schema, err
+	locations, sourceNames, order, schema, err := params.build()
+	return locations, sourceNames, order, params.requestBodyContentType, schema, err
 }
 
 func schemaType(s *openapi3.Schema) string {
@@ -667,7 +673,7 @@ func (p *derivedParams) addOrReplace(param derivedParam) {
 	p.params = append(p.params, param)
 }
 
-func (p *derivedParams) build() (map[string]string, map[string]string, map[string]any, error) {
+func (p *derivedParams) build() (map[string]string, map[string]string, []string, map[string]any, error) {
 	nameCounts := make(map[string]int, len(p.params))
 	for _, param := range p.params {
 		nameCounts[param.sourceName]++
@@ -676,15 +682,17 @@ func (p *derivedParams) build() (map[string]string, map[string]string, map[strin
 	locations := make(map[string]string, len(p.params))
 	sourceNames := make(map[string]string, len(p.params))
 	props := make(map[string]any, len(p.params))
+	order := make([]string, 0, len(p.params))
 	required := map[string]struct{}{}
 
 	for _, param := range p.params {
 		name := exposedParamName(param, nameCounts[param.sourceName] > 1)
 		if _, duplicate := locations[name]; duplicate {
-			return nil, nil, nil, fmt.Errorf("duplicate exposed parameter name %q", name)
+			return nil, nil, nil, nil, fmt.Errorf("duplicate exposed parameter name %q", name)
 		}
 		locations[name] = param.location
 		sourceNames[name] = param.sourceName
+		order = append(order, name)
 		props[name] = param.schema
 		if param.required {
 			required[name] = struct{}{}
@@ -698,7 +706,7 @@ func (p *derivedParams) build() (map[string]string, map[string]string, map[strin
 	if len(required) > 0 {
 		schema[schemaKeyRequired] = sortedRequiredNames(required)
 	}
-	return locations, sourceNames, schema, nil
+	return locations, sourceNames, order, schema, nil
 }
 
 func exposedParamName(param derivedParam, collides bool) string {
@@ -1121,7 +1129,7 @@ func deriveConfiguredPathMethodTool(srcOAS *OAS, primitive TykMCPServerPrimitive
 		return DerivedTool{}, fmt.Errorf("%s primitive source %s %s: %w", ExtensionTykMCPServer, method, path, err)
 	}
 
-	locs, sourceNames, bodyContentType, schema, err := deriveParams(item, mo.op)
+	locs, sourceNames, order, bodyContentType, schema, err := deriveParams(item, mo.op)
 	if err != nil {
 		return DerivedTool{}, fmt.Errorf("source %s %s: %w", method, path, err)
 	}
@@ -1135,6 +1143,7 @@ func deriveConfiguredPathMethodTool(srcOAS *OAS, primitive TykMCPServerPrimitive
 		PathTemplate:           path,
 		ParamLocations:         locs,
 		ParamSourceNames:       sourceNames,
+		ParamOrder:             order,
 		RequestBodyContentType: bodyContentType,
 		InputSchema:            schema,
 		Annotations:            defaultDerivedToolAnnotations(method, mo.op, name),
@@ -1299,8 +1308,17 @@ func renameMCPToolParameter(tool *DerivedTool, oldName, newName string) error {
 	delete(tool.ParamSourceNames, oldName)
 	tool.ParamSourceNames[newName] = sourceName
 
+	renameMCPToolParameterOrder(tool, oldName, newName)
 	renameMCPToolInputSchemaParameter(tool, oldName, newName)
 	return nil
+}
+
+func renameMCPToolParameterOrder(tool *DerivedTool, oldName, newName string) {
+	for i, name := range tool.ParamOrder {
+		if name == oldName {
+			tool.ParamOrder[i] = newName
+		}
+	}
 }
 
 func renameMCPToolInputSchemaParameter(tool *DerivedTool, oldName, newName string) {
@@ -1371,6 +1389,9 @@ func cloneDerivedTool(tool DerivedTool) DerivedTool {
 			sourceNames[k] = v
 		}
 		tool.ParamSourceNames = sourceNames
+	}
+	if tool.ParamOrder != nil {
+		tool.ParamOrder = append([]string(nil), tool.ParamOrder...)
 	}
 	tool.InputSchema = cloneMapAny(tool.InputSchema)
 	tool.Annotations = cloneDerivedToolAnnotations(tool.Annotations)
