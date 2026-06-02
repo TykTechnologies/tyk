@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	neturl "net/url"
 	"sort"
 	"strings"
 
@@ -102,17 +101,7 @@ func (gw *Gateway) validateMCP(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func pairedMCPAdapterTarget(target string) (adapterID, restAPIID string, ok bool) {
-	u, err := neturl.Parse(strings.TrimSpace(target))
-	if err != nil || u.Scheme != "tyk" {
-		return "", "", false
-	}
-
-	adapterID = strings.TrimPrefix(u.Host, "id:")
-	if !oas.IsAdapterAPIID(adapterID) {
-		return "", "", false
-	}
-
-	return adapterID, oas.AdapterSourceAPIID(adapterID), true
+	return oas.ParseAdapterTarget(strings.TrimSpace(target))
 }
 
 func (gw *Gateway) validatePairedMCPAdapterUpstream(_ *http.Request, mcpObj *oas.OAS) (string, int) {

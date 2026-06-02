@@ -81,6 +81,9 @@ func TestTykMCPServerExtension_ValidatePlacement(t *testing.T) {
 	doc.GetTykExtension().Upstream.URL = AdapterLoopURL("rest-1")
 	require.NoError(t, doc.ValidateForMCP(context.Background()))
 
+	doc.GetTykExtension().Upstream.URL = AdapterFallbackLoopURL("rest-1")
+	require.NoError(t, doc.ValidateForMCP(context.Background()))
+
 	err = doc.Validate(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "MCP proxies")

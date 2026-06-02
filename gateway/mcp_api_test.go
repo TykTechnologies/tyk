@@ -551,6 +551,65 @@ func restSourceSpec(apiID, orgID string, isOAS bool) *APISpec {
 	}
 }
 
+func TestPairedMCPAdapterTarget(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		target        string
+		wantAdapterID string
+		wantRestAPIID string
+		wantOK        bool
+	}{
+		{
+			name:          "accepts canonical mcp path",
+			target:        "tyk://rest-1/mcp",
+			wantAdapterID: "rest-1",
+			wantRestAPIID: "rest-1",
+			wantOK:        true,
+		},
+		{
+			name:          "accepts id-prefixed host",
+			target:        "tyk://id:rest-1/mcp/",
+			wantAdapterID: "rest-1",
+			wantRestAPIID: "rest-1",
+			wantOK:        true,
+		},
+		{
+			name:          "accepts fallback suffix target",
+			target:        "tyk://rest-1__mcp-server",
+			wantAdapterID: "rest-1__mcp-server",
+			wantRestAPIID: "rest-1",
+			wantOK:        true,
+		},
+		{
+			name:   "rejects non mcp path",
+			target: "tyk://rest-1/not-mcp",
+		},
+		{
+			name:   "rejects non tyk scheme",
+			target: "https://rest-1/mcp",
+		},
+		{
+			name:   "rejects empty source api id",
+			target: "tyk:///mcp",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			adapterID, restAPIID, ok := pairedMCPAdapterTarget(tt.target)
+
+			assert.Equal(t, tt.wantAdapterID, adapterID)
+			assert.Equal(t, tt.wantRestAPIID, restAPIID)
+			assert.Equal(t, tt.wantOK, ok)
+		})
+	}
+}
+
 func TestValidatePairedMCPAdapterUpstream(t *testing.T) {
 	t.Parallel()
 

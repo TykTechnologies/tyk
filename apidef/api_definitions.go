@@ -1480,26 +1480,62 @@ func (a *APIDefinition) MarkAsMCP() {
 }
 
 // IsPairedMCPAdapterProxy returns true if this API is a REST-as-MCP proxy
-// whose upstream loops into a deterministic synthetic adapter API ID.
+// whose upstream loops into a REST-as-MCP adapter target for a REST API.
 func (a *APIDefinition) IsPairedMCPAdapterProxy() bool {
 	if a == nil {
 		return false
 	}
 
-	target := strings.TrimSpace(a.Proxy.TargetURL)
-	const scheme = "tyk://"
-	if !strings.HasPrefix(target, scheme) {
+	host, path, ok := parseMCPAdapterTarget(a.Proxy.TargetURL)
+	if !ok {
 		return false
 	}
-
-	host := strings.TrimPrefix(target, scheme)
-	if i := strings.IndexAny(host, "/?"); i != -1 {
-		host = host[:i]
+	if isMCPAdapterFallbackHost(host) {
+		return path == "" || path == "/"
 	}
-	host = strings.TrimPrefix(host, "id:")
+	return isMCPAdapterLoopPath(path)
+}
 
-	const adapterSuffix = "__mcp-server"
-	return strings.HasSuffix(host, adapterSuffix) && len(host) > len(adapterSuffix)
+func isMCPAdapterLoopPath(path string) bool {
+	return path == "/mcp" || path == "/mcp/"
+}
+
+func isMCPAdapterFallbackHost(host string) bool {
+	const suffix = "__mcp-server"
+	return strings.HasSuffix(host, suffix) && len(host) > len(suffix)
+}
+
+func parseMCPAdapterTarget(target string) (host, path string, ok bool) {
+	target = strings.TrimSpace(target)
+	const scheme = "tyk://"
+	if !strings.HasPrefix(target, scheme) {
+		return "", "", false
+	}
+
+	rest := strings.TrimPrefix(target, scheme)
+	rest = strings.TrimPrefix(rest, "id:")
+	if rest == "" {
+		return "", "", false
+	}
+
+	hostEnd := len(rest)
+	if i := strings.IndexAny(rest, "/?#"); i != -1 {
+		hostEnd = i
+	}
+	host = rest[:hostEnd]
+	if host == "" {
+		return "", "", false
+	}
+
+	if hostEnd < len(rest) && rest[hostEnd] == '/' {
+		pathEnd := len(rest)
+		if i := strings.IndexAny(rest[hostEnd:], "?#"); i != -1 {
+			pathEnd = hostEnd + i
+		}
+		path = rest[hostEnd:pathEnd]
+	}
+
+	return host, path, true
 }
 
 // IsMCPManaged reports whether this API belongs to the MCP management surface.

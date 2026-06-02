@@ -3,8 +3,6 @@ package oas
 import (
 	"encoding/json"
 	"fmt"
-	neturl "net/url"
-	"strings"
 )
 
 // TykMCPServer configures a REST-as-MCP proxy's caller-facing primitive view.
@@ -131,10 +129,6 @@ func (s *OAS) validateMCPServerExtensionPlacement(isMCP bool) error {
 }
 
 func isMCPServerAdapterTarget(target string) bool {
-	u, err := neturl.Parse(strings.TrimSpace(target))
-	if err != nil || u.Scheme != "tyk" {
-		return false
-	}
-
-	return IsAdapterAPIID(strings.TrimPrefix(u.Host, "id:"))
+	_, _, ok := ParseAdapterTarget(target)
+	return ok
 }

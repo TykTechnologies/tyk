@@ -19,6 +19,26 @@ func newDeriveTestOAS(paths *openapi3.Paths) *OAS {
 	}
 }
 
+func TestAdapterLoopURLUsesMCPPath(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "tyk://rest-1/mcp", AdapterLoopURL("rest-1"))
+}
+
+func TestAdapterLoopURLForSourceFallsBackWhenSourceHasMCPPath(t *testing.T) {
+	t.Parallel()
+
+	regular := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{Get: &openapi3.Operation{OperationID: "list_orders"}}),
+	))
+	withMCPPath := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/mcp", &openapi3.PathItem{Post: &openapi3.Operation{OperationID: "mcp_endpoint"}}),
+	))
+
+	assert.Equal(t, "tyk://rest-1/mcp", AdapterLoopURLForSource("rest-1", regular))
+	assert.Equal(t, "tyk://rest-1__mcp-server", AdapterLoopURLForSource("rest-1", withMCPPath))
+}
+
 func TestDeriveSourcePrimitives_SkipsMissingOperationIDAndEmitsToolPrimitive(t *testing.T) {
 	t.Parallel()
 

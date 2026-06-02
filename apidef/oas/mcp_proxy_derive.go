@@ -1189,25 +1189,32 @@ func cloneAny(src any) any {
 	}
 }
 
-// AdapterAPIIDSuffix is the deterministic suffix appended to the source
-// REST APIID to form the synthetic adapter APIID, e.g.
-// "abc123" -> "abc123__mcp-server".
-const AdapterAPIIDSuffix = "__mcp-server"
+const (
+	// AdapterLoopPath is the default path marker used in tyk:// URLs to
+	// address the REST-as-MCP adapter paired with the source REST API in
+	// the URL host.
+	AdapterLoopPath = "/mcp"
 
-// AdapterAPIID returns the deterministic APIID for the synthetic adapter
-// paired with the given REST API.
+	// AdapterAPIIDSuffix is the fallback suffix appended to the source REST
+	// APIID to form a synthetic adapter host when the source OAS already has
+	// a real /mcp endpoint.
+	AdapterAPIIDSuffix = "__mcp-server"
+)
+
+// AdapterAPIID returns the fallback synthetic adapter APIID paired with the
+// given REST API.
 func AdapterAPIID(restAPIID string) string {
 	return restAPIID + AdapterAPIIDSuffix
 }
 
-// IsAdapterAPIID reports whether an APIID is the deterministic adapter
-// ID derived from some REST APIID via AdapterAPIID.
+// IsAdapterAPIID reports whether an APIID is the fallback synthetic adapter ID
+// derived from some REST APIID via AdapterAPIID.
 func IsAdapterAPIID(id string) bool {
 	return strings.HasSuffix(id, AdapterAPIIDSuffix) && len(id) > len(AdapterAPIIDSuffix)
 }
 
-// AdapterSourceAPIID returns the REST APIID corresponding to an adapter
-// APIID, or "" if id is not an adapter ID.
+// AdapterSourceAPIID returns the REST APIID corresponding to a fallback
+// synthetic adapter APIID, or "" if id is not an adapter ID.
 func AdapterSourceAPIID(id string) string {
 	if !IsAdapterAPIID(id) {
 		return ""
@@ -1215,17 +1222,103 @@ func AdapterSourceAPIID(id string) string {
 	return strings.TrimSuffix(id, AdapterAPIIDSuffix)
 }
 
+// IsAdapterLoopPath reports whether a tyk:// URL path addresses the
+// REST-as-MCP adapter.
+func IsAdapterLoopPath(path string) bool {
+	return path == AdapterLoopPath || path == AdapterLoopPath+"/"
+}
+
+// SourceHasAdapterLoopPath reports whether the source OAS already defines the
+// default REST-as-MCP adapter path.
+func SourceHasAdapterLoopPath(srcOAS *OAS) bool {
+	if srcOAS == nil || srcOAS.Paths == nil {
+		return false
+	}
+	return srcOAS.Paths.Value(AdapterLoopPath) != nil || srcOAS.Paths.Value(AdapterLoopPath+"/") != nil
+}
+
 // AdapterLoopHost returns the host portion of the tyk:// URL used by an
-// MCP proxy to address its paired adapter unambiguously, e.g.
-// "abc123__mcp-server". The deterministic AdapterAPIIDSuffix ensures
-// exact-APIID matching in the gateway's loopback resolver wins before
-// any fuzzy name-based match could collide.
+// MCP proxy to address its REST source API.
 func AdapterLoopHost(restAPIID string) string {
-	return AdapterAPIID(restAPIID)
+	return restAPIID
 }
 
 // AdapterLoopURL returns the full tyk:// URL an MCP proxy should set as
 // its upstream to dispatch into the paired adapter.
 func AdapterLoopURL(restAPIID string) string {
-	return "tyk://" + AdapterLoopHost(restAPIID)
+	return "tyk://" + AdapterLoopHost(restAPIID) + AdapterLoopPath
+}
+
+// AdapterFallbackLoopHost returns the fallback host portion of the tyk:// URL
+// used when the source REST OAS already defines /mcp.
+func AdapterFallbackLoopHost(restAPIID string) string {
+	return AdapterAPIID(restAPIID)
+}
+
+// AdapterFallbackLoopURL returns the fallback tyk:// URL an MCP proxy should
+// use when the source REST OAS already defines /mcp.
+func AdapterFallbackLoopURL(restAPIID string) string {
+	return "tyk://" + AdapterFallbackLoopHost(restAPIID)
+}
+
+// AdapterLoopURLForSource returns the canonical adapter target for the source
+// OAS, falling back to a synthetic adapter host when /mcp is already a source
+// endpoint.
+func AdapterLoopURLForSource(restAPIID string, srcOAS *OAS) string {
+	if SourceHasAdapterLoopPath(srcOAS) {
+		return AdapterFallbackLoopURL(restAPIID)
+	}
+	return AdapterLoopURL(restAPIID)
+}
+
+// ParseAdapterTarget extracts the adapter host and REST source APIID from a
+// REST-as-MCP tyk:// adapter target.
+func ParseAdapterTarget(target string) (adapterID, restAPIID string, ok bool) {
+	host, path, ok := parseTykAdapterTarget(target)
+	if !ok {
+		return "", "", false
+	}
+	if IsAdapterAPIID(host) {
+		if path != "" && path != "/" {
+			return "", "", false
+		}
+		return host, AdapterSourceAPIID(host), true
+	}
+	if IsAdapterLoopPath(path) {
+		return host, host, true
+	}
+	return "", "", false
+}
+
+func parseTykAdapterTarget(target string) (host, path string, ok bool) {
+	target = strings.TrimSpace(target)
+	const scheme = "tyk://"
+	if !strings.HasPrefix(target, scheme) {
+		return "", "", false
+	}
+
+	rest := strings.TrimPrefix(target, scheme)
+	rest = strings.TrimPrefix(rest, "id:")
+	if rest == "" {
+		return "", "", false
+	}
+
+	hostEnd := len(rest)
+	if i := strings.IndexAny(rest, "/?#"); i != -1 {
+		hostEnd = i
+	}
+	host = rest[:hostEnd]
+	if host == "" {
+		return "", "", false
+	}
+
+	if hostEnd < len(rest) && rest[hostEnd] == '/' {
+		pathEnd := len(rest)
+		if i := strings.IndexAny(rest[hostEnd:], "?#"); i != -1 {
+			pathEnd = hostEnd + i
+		}
+		path = rest[hostEnd:pathEnd]
+	}
+
+	return host, path, true
 }
