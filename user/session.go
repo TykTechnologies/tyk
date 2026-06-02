@@ -349,7 +349,9 @@ type SessionState struct {
 	// use Touch() to set it, and IsModified() to get it.
 	modified bool
 
-	// isRestored marks
+	// isRestored
+	// The flag holds information if session was restored or not.
+	// Use MarkAsRestored() to mark session as restored, and IsRestored() to get it.
 	isRestored bool
 }
 
