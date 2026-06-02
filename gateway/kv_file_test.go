@@ -173,9 +173,6 @@ func TestResolveFileKV(t *testing.T) {
 
 	t.Run("relative key without basePath returns descriptive error", func(t *testing.T) {
 		// A short name like "my-cert" makes no sense without a base directory.
-		// Without this guard the call would silently try to open "my-cert" relative
-		// to the process working directory, fail, and return an empty string with no
-		// useful context in the error message.
 		_, err := ResolveFileKV("", "my-cert")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "base_path")
@@ -192,8 +189,6 @@ func TestResolveFileKV(t *testing.T) {
 	})
 
 	t.Run("absolute path works even when basePath is set", func(t *testing.T) {
-		// basePath is a resolver for relative names, not a jail.
-		// If the caller provides an absolute path it is used as-is.
 		dir := t.TempDir()
 		f := filepath.Join(dir, "secret")
 		require.NoError(t, os.WriteFile(f, []byte("abs-value"), 0600))
@@ -237,9 +232,7 @@ func TestResolveFileKV(t *testing.T) {
 		require.NoError(t, os.Mkdir(dataDir, 0700))
 		require.NoError(t, os.WriteFile(filepath.Join(dataDir, "my-key"), []byte("secret-from-k8s"), 0600))
 
-		// Create ..data symlink pointing to the timestamped dir
 		require.NoError(t, os.Symlink("..2024_01_01_00_00_00", filepath.Join(dir, "..data")))
-		// Create my-key symlink pointing through ..data
 		require.NoError(t, os.Symlink("..data/my-key", filepath.Join(dir, "my-key")))
 
 		val, err := ResolveFileKV(dir, "my-key")
@@ -248,7 +241,6 @@ func TestResolveFileKV(t *testing.T) {
 	})
 
 	t.Run("picks up rotated k8s secret via symlink update", func(t *testing.T) {
-		// Initial mount
 		dir := t.TempDir()
 		v1Dir := filepath.Join(dir, "..2024_01_01_00_00_00")
 		require.NoError(t, os.Mkdir(v1Dir, 0700))
