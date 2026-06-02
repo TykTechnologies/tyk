@@ -182,7 +182,28 @@ func TestDeriveSourceTools_DerivesFormURLEncodedRequestBody(t *testing.T) {
 	assert.Equal(t, []string{"sku"}, tools[0].InputSchema["required"])
 }
 
-func TestDeriveSourceTools_RejectsInvalidToolNames(t *testing.T) {
+func TestDeriveSourceTools_AllowsMCPCompatibleOperationIDNames(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/camel", &openapi3.PathItem{
+			Get: &openapi3.Operation{OperationID: "createOrder"},
+		}),
+		openapi3.WithPath("/hyphen", &openapi3.PathItem{
+			Get: &openapi3.Operation{OperationID: "create-order"},
+		}),
+		openapi3.WithPath("/dot", &openapi3.PathItem{
+			Get: &openapi3.Operation{OperationID: "create.order"},
+		}),
+	))
+
+	tools, _, err := DeriveSourceTools(src, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"create-order", "create.order", "createOrder"}, toolNames(tools))
+}
+
+func TestDeriveSourceTools_RejectsInvalidExposedToolNames(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -190,9 +211,8 @@ func TestDeriveSourceTools_RejectsInvalidToolNames(t *testing.T) {
 		operationID string
 		want        string
 	}{
-		{name: "uppercase", operationID: "createOrder", want: "invalid tool name"},
-		{name: "hyphen", operationID: "create-order", want: "invalid tool name"},
-		{name: "dot", operationID: "create.order", want: "invalid tool name"},
+		{name: "space", operationID: "create order", want: "invalid tool name"},
+		{name: "slash", operationID: "create/order", want: "invalid tool name"},
 		{name: "too long", operationID: strings.Repeat("a", 65), want: "64"},
 	}
 
@@ -227,6 +247,14 @@ func TestDeriveSourceTools_RejectsDuplicateToolNames(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate tool name")
+}
+
+func toolNames(tools []DerivedTool) []string {
+	names := make([]string, 0, len(tools))
+	for _, tool := range tools {
+		names = append(names, tool.Name)
+	}
+	return names
 }
 
 func TestDeriveSourceTools_PrefixesParameterNameCollisions(t *testing.T) {

@@ -147,6 +147,37 @@ func TestDeriveMCPToolView_AppliesExplicitAllowAliasesAndDescriptionOverrides(t 
 	assert.Equal(t, "Unique identifier of the customer placing the order", customer["description"])
 }
 
+func TestDeriveMCPToolView_AllowsAliasForInvalidSourceOperationIDName(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Post: &openapi3.Operation{
+				OperationID: "create order",
+				Summary:     "create order",
+			},
+		}),
+	))
+
+	view, warnings, err := DeriveMCPToolView(src, &TykMCPServer{
+		Primitives: []TykMCPServerPrimitive{
+			{
+				Source: TykMCPServerSource{OperationID: "create order"},
+				Name:   "create_order",
+				Allow:  boolPtr(true),
+			},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, warnings)
+	require.Len(t, view.Tools, 1)
+	assert.Equal(t, "create order", view.Tools[0].OperationID)
+	assert.Equal(t, "operationId:create order", view.Tools[0].SourceKey)
+	assert.Equal(t, "create order", view.Tools[0].CanonicalName)
+	assert.Equal(t, "create_order", view.Tools[0].Name)
+}
+
 func TestDeriveMCPToolView_PrimitivesWithoutAllowDoNotRestrictExposure(t *testing.T) {
 	t.Parallel()
 
@@ -382,11 +413,8 @@ func TestDeriveMCPToolView_RejectsInvalidParameterOverrideNames(t *testing.T) {
 		overrideName string
 		want         string
 	}{
-		{name: "uppercase", overrideName: "Status", want: "use lowercase letters, digits, and underscores only"},
-		{name: "hyphen", overrideName: "order-status", want: "use lowercase letters, digits, and underscores only"},
-		{name: "slash", overrideName: "order/status", want: "use lowercase letters, digits, and underscores only"},
-		{name: "dot", overrideName: "order.status", want: "use lowercase letters, digits, and underscores only"},
-		{name: "space", overrideName: "order status", want: "use lowercase letters, digits, and underscores only"},
+		{name: "slash", overrideName: "order/status", want: "use ASCII letters, digits, underscores, hyphens, and dots only"},
+		{name: "space", overrideName: "order status", want: "use ASCII letters, digits, underscores, hyphens, and dots only"},
 		{name: "empty after trim", overrideName: "   ", want: "name is required"},
 		{name: "too long", overrideName: strings.Repeat("a", maxMCPToolNameLength+1), want: "exceeds maximum length"},
 		{name: "duplicate after rename", overrideName: "customer_id", want: "duplicate parameter"},

@@ -163,7 +163,11 @@ func DeriveSourceTools(srcOAS *OAS, expose []string) ([]DerivedTool, []DeriveWar
 	if err != nil {
 		return nil, warnings, err
 	}
-	return ToolPrimitives(primitives), warnings, nil
+	tools := ToolPrimitives(primitives)
+	if err := validateDerivedToolNames(tools); err != nil {
+		return nil, warnings, err
+	}
+	return tools, warnings, nil
 }
 
 // ToolPrimitives projects tool primitives into SDK-facing DerivedTool entries.
@@ -258,9 +262,6 @@ func deriveOperationPrimitive(
 	}
 
 	name := rawName
-	if err := ValidateMCPToolName(name); err != nil {
-		return DerivedPrimitive{}, nil, false, fmt.Errorf("operationId %q: %w", rawName, err)
-	}
 
 	if seen[name] {
 		return DerivedPrimitive{}, nil, false, fmt.Errorf("duplicate tool name %q", name)
@@ -386,7 +387,7 @@ func operationDescription(op *openapi3.Operation) string {
 
 var (
 	toolNameInvalid = regexp.MustCompile(`[^A-Za-z0-9_.-]`)
-	toolNameValid   = regexp.MustCompile(`^[a-z0-9_]+$`)
+	toolNameValid   = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 )
 
 // ValidateMCPToolName enforces the gateway REST-as-MCP tool-name contract.
@@ -398,7 +399,29 @@ func ValidateMCPToolName(name string) error {
 		return fmt.Errorf("invalid tool name %q: exceeds maximum length of %d", name, maxMCPToolNameLength)
 	}
 	if !toolNameValid.MatchString(name) {
-		return fmt.Errorf("invalid tool name %q: use lowercase letters, digits, and underscores only", name)
+		return fmt.Errorf("invalid tool name %q: use ASCII letters, digits, underscores, hyphens, and dots only", name)
+	}
+	return nil
+}
+
+func validateDerivedToolNames(tools []DerivedTool) error {
+	for _, tool := range tools {
+		if err := validateDerivedToolName(tool); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateDerivedToolName(tool DerivedTool) error {
+	if err := ValidateMCPToolName(tool.Name); err != nil {
+		if tool.OperationID != "" {
+			return fmt.Errorf("operationId %q: %w", tool.OperationID, err)
+		}
+		if tool.SourceKey != "" {
+			return fmt.Errorf("source %q: %w", tool.SourceKey, err)
+		}
+		return err
 	}
 	return nil
 }
@@ -772,6 +795,9 @@ func BuildMCPToolView(canonical []DerivedTool, config *TykMCPServer) (MCPToolVie
 			if err := applyMCPToolViewOverride(&tool, override); err != nil {
 				return MCPToolView{}, err
 			}
+		}
+		if err := validateDerivedToolName(tool); err != nil {
+			return MCPToolView{}, err
 		}
 
 		if existing, duplicate := seenNames[tool.Name]; duplicate {

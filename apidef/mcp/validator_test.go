@@ -598,6 +598,70 @@ func TestValidateMCPObject_RestrictedMiddleware(t *testing.T) {
 	}
 }
 
+func TestValidateMCPObject_WithTykMCPServerExtension(t *testing.T) {
+	t.Parallel()
+
+	validDoc := []byte(`{
+		"openapi": "3.0.3",
+		"info": {"title": "MCP Proxy", "version": "1.0.0"},
+		"paths": {},
+		"x-tyk-api-gateway": {
+			"info": {
+				"name": "mcp-proxy",
+				"state": {"active": true}
+			},
+			"upstream": {"url": "tyk://rest-1/mcp"},
+			"server": {
+				"listenPath": {"value": "/mcp-proxy"}
+			}
+		},
+		"x-tyk-mcp-server": {
+			"primitives": [{
+				"source": {"operationId": "createOrder"},
+				"name": "createOrder",
+				"allow": true,
+				"description": "Create an order",
+				"parameters": [{
+					"param": "customer_id",
+					"name": "customerId",
+					"description": "Customer identifier"
+				}]
+			}]
+		}
+	}`)
+
+	assert.NoError(t, ValidateMCPObject(validDoc, "3.0.3"))
+
+	invalidDoc := []byte(`{
+		"openapi": "3.0.3",
+		"info": {"title": "MCP Proxy", "version": "1.0.0"},
+		"paths": {},
+		"x-tyk-api-gateway": {
+			"info": {
+				"name": "mcp-proxy",
+				"state": {"active": true}
+			},
+			"upstream": {"url": "tyk://rest-1/mcp"},
+			"server": {
+				"listenPath": {"value": "/mcp-proxy"}
+			}
+		},
+		"x-tyk-mcp-server": {
+			"primitives": [{
+				"source": {"operationId": "createOrder"},
+				"name": "createOrder",
+				"allow": "yes"
+			}]
+		}
+	}`)
+
+	err := ValidateMCPObject(invalidDoc, "3.0.3")
+	assert.Error(t, err)
+	if err != nil {
+		assert.Contains(t, err.Error(), "x-tyk-mcp-server.primitives.0.allow")
+	}
+}
+
 func TestGetMCPSchema_ContainsMCPExtensions(t *testing.T) {
 	t.Parallel()
 
@@ -612,5 +676,14 @@ func TestGetMCPSchema_ContainsMCPExtensions(t *testing.T) {
 		// Verify x-tyk-api-gateway property exists
 		_, _, _, err = jsonparser.Get(schema, keyProperties, ExtensionTykAPIGateway)
 		assert.NoError(t, err, "x-tyk-api-gateway should be present in MCP schema")
+	})
+
+	t.Run("MCP schema contains x-tyk-mcp-server extension", func(t *testing.T) {
+		t.Parallel()
+		schema, err := GetMCPSchema("3.0")
+		assert.NoError(t, err)
+
+		_, _, _, err = jsonparser.Get(schema, keyProperties, ExtensionTykMCPServer)
+		assert.NoError(t, err, "x-tyk-mcp-server should be present in MCP schema")
 	})
 }
