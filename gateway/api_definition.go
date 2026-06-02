@@ -665,7 +665,7 @@ func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
 		// Strip the surrounding quotes since the replacement sits
 		// inside an existing JSON string already.
 		escaped := string(jsonBytes[1 : len(jsonBytes)-1])
-		*input = strings.Replace(*input, m[0], escaped, -1)
+		*input = strings.ReplaceAll(*input, m[0], escaped)
 	}
 	return firstErr
 }

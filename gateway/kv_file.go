@@ -10,7 +10,7 @@ import (
 // ResolveFileKV reads the contents of a file at the given key path and returns it as a string.
 // When basePath is empty the key is used directly as a file path, with no restrictions.
 func ResolveFileKV(basePath, key string) (string, error) {
-	path := key
+	var path string
 
 	switch {
 	case filepath.IsAbs(key):
