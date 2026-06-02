@@ -18,10 +18,7 @@ import (
 // K8s AtomicWriter symlinks (the "..data" indirection used by secret volume mounts) are
 // resolved transparently via filepath.EvalSymlinks before the file is read, so secret
 // rotations are picked up on every call.
-//
-// If stripNewline is true, trailing \r\n and \n characters are removed from the result,
-// which matches the typical behaviour of K8s secret mounts.
-func ResolveFileKV(basePath, key string, stripNewline bool) (string, error) {
+func ResolveFileKV(basePath, key string) (string, error) {
 	path := key
 
 	if basePath != "" {
@@ -50,10 +47,8 @@ func ResolveFileKV(basePath, key string, stripNewline bool) (string, error) {
 		return "", fmt.Errorf("file KV: cannot read file %q: %w", resolved, err)
 	}
 
-	result := string(data)
-	if stripNewline {
-		result = strings.TrimRight(result, "\r\n")
-	}
+	// Secret files often have whitespaces
+	result := strings.TrimSpace(string(data))
 
 	return result, nil
 }

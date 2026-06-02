@@ -2038,7 +2038,7 @@ func (gw *Gateway) kvStore(value string) (string, error) {
 	if strings.HasPrefix(value, "file://") {
 		path := strings.TrimPrefix(value, "file://")
 		log.Debugf("Retrieving file KV from %s", path)
-		return ResolveFileKV("", path, true)
+		return ResolveFileKV("", path)
 	}
 
 	return value, nil

@@ -642,7 +642,7 @@ func replaceFileSecrets(input *string) error {
 			continue
 		}
 		seen[m[0]] = true
-		val, err := ResolveFileKV("", m[1], true)
+		val, err := ResolveFileKV("", m[1])
 		if err != nil {
 			if firstErr == nil {
 				firstErr = err

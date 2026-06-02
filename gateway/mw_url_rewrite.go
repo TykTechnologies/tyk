@@ -340,7 +340,8 @@ func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]in
 
 		case fileLabel:
 
-			val, err := ResolveFileKV("", key, true)
+			bp := gw.GetConfig().KV.File.BasePath
+			val, err := ResolveFileKV(bp, key)
 			if err != nil {
 				in = emptyStringFn(key, in, v)
 				continue

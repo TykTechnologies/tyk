@@ -42,7 +42,7 @@ func TestResolveFileKV(t *testing.T) {
 		f := filepath.Join(dir, "secret.txt")
 		require.NoError(t, os.WriteFile(f, []byte("my-secret-value"), 0600))
 
-		val, err := ResolveFileKV("", f, false)
+		val, err := ResolveFileKV("", f)
 		require.NoError(t, err)
 		assert.Equal(t, "my-secret-value", val)
 	})
@@ -52,7 +52,7 @@ func TestResolveFileKV(t *testing.T) {
 		f := filepath.Join(dir, "secret.txt")
 		require.NoError(t, os.WriteFile(f, []byte("my-secret-value\n"), 0600))
 
-		val, err := ResolveFileKV("", f, true)
+		val, err := ResolveFileKV("", f)
 		require.NoError(t, err)
 		assert.Equal(t, "my-secret-value", val)
 	})
@@ -62,7 +62,7 @@ func TestResolveFileKV(t *testing.T) {
 		f := filepath.Join(dir, "secret.txt")
 		require.NoError(t, os.WriteFile(f, []byte("my-secret-value\r\n"), 0600))
 
-		val, err := ResolveFileKV("", f, true)
+		val, err := ResolveFileKV("", f)
 		require.NoError(t, err)
 		assert.Equal(t, "my-secret-value", val)
 	})
@@ -73,13 +73,13 @@ func TestResolveFileKV(t *testing.T) {
 		pem := "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJ\n-----END CERTIFICATE-----\n"
 		require.NoError(t, os.WriteFile(f, []byte(pem), 0600))
 
-		val, err := ResolveFileKV("", f, true)
+		val, err := ResolveFileKV("", f)
 		require.NoError(t, err)
 		assert.Equal(t, "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJ\n-----END CERTIFICATE-----", val)
 	})
 
 	t.Run("returns error for non-existent file", func(t *testing.T) {
-		_, err := ResolveFileKV("", "/nonexistent/path/secret.txt", false)
+		_, err := ResolveFileKV("", "/nonexistent/path/secret.txt")
 		assert.Error(t, err)
 	})
 
@@ -88,28 +88,28 @@ func TestResolveFileKV(t *testing.T) {
 		f := filepath.Join(dir, "api-key")
 		require.NoError(t, os.WriteFile(f, []byte("the-api-key"), 0600))
 
-		val, err := ResolveFileKV(dir, "api-key", true)
+		val, err := ResolveFileKV(dir, "api-key")
 		require.NoError(t, err)
 		assert.Equal(t, "the-api-key", val)
 	})
 
 	t.Run("rejects absolute path when basePath is set", func(t *testing.T) {
 		dir := t.TempDir()
-		_, err := ResolveFileKV(dir, "/etc/passwd", false)
+		_, err := ResolveFileKV(dir, "/etc/passwd")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "absolute")
 	})
 
 	t.Run("rejects dotdot traversal when basePath is set", func(t *testing.T) {
 		dir := t.TempDir()
-		_, err := ResolveFileKV(dir, "../etc/passwd", false)
+		_, err := ResolveFileKV(dir, "../etc/passwd")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "traversal")
 	})
 
 	t.Run("rejects embedded dotdot traversal", func(t *testing.T) {
 		dir := t.TempDir()
-		_, err := ResolveFileKV(dir, "subdir/../../etc/passwd", false)
+		_, err := ResolveFileKV(dir, "subdir/../../etc/passwd")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "traversal")
 	})
@@ -119,7 +119,7 @@ func TestResolveFileKV(t *testing.T) {
 		f := filepath.Join(dir, "secret")
 		require.NoError(t, os.WriteFile(f, []byte("value"), 0600))
 
-		val, err := ResolveFileKV("", f, true)
+		val, err := ResolveFileKV("", f)
 		require.NoError(t, err)
 		assert.Equal(t, "value", val)
 	})
@@ -139,7 +139,7 @@ func TestResolveFileKV(t *testing.T) {
 		// Create my-key symlink pointing through ..data
 		require.NoError(t, os.Symlink("..data/my-key", filepath.Join(dir, "my-key")))
 
-		val, err := ResolveFileKV(dir, "my-key", true)
+		val, err := ResolveFileKV(dir, "my-key")
 		require.NoError(t, err)
 		assert.Equal(t, "secret-from-k8s", val)
 	})
@@ -153,7 +153,7 @@ func TestResolveFileKV(t *testing.T) {
 		require.NoError(t, os.Symlink("..2024_01_01_00_00_00", filepath.Join(dir, "..data")))
 		require.NoError(t, os.Symlink("..data/my-key", filepath.Join(dir, "my-key")))
 
-		val, err := ResolveFileKV(dir, "my-key", true)
+		val, err := ResolveFileKV(dir, "my-key")
 		require.NoError(t, err)
 		assert.Equal(t, "old-secret", val)
 
@@ -164,7 +164,7 @@ func TestResolveFileKV(t *testing.T) {
 		require.NoError(t, os.Remove(filepath.Join(dir, "..data")))
 		require.NoError(t, os.Symlink("..2024_06_01_00_00_00", filepath.Join(dir, "..data")))
 
-		val, err = ResolveFileKV(dir, "my-key", true)
+		val, err = ResolveFileKV(dir, "my-key")
 		require.NoError(t, err)
 		assert.Equal(t, "new-secret", val)
 	})
