@@ -18,7 +18,7 @@ func ResolveFileKV(basePath, key string) (string, error) {
 	case basePath != "":
 		joined := filepath.Join(basePath, key)
 		rel, err := filepath.Rel(basePath, joined)
-		if err != nil || strings.HasPrefix(rel, "..") {
+		if err != nil || !filepath.IsLocal(rel) {
 			return "", fmt.Errorf("file KV: path traversal detected in key %q", key)
 		}
 		path = joined
@@ -36,13 +36,23 @@ func ResolveFileKV(basePath, key string) (string, error) {
 		return "", fmt.Errorf("file KV: cannot resolve path %q: %w", path, err)
 	}
 
+	// Re-verify after symlink resolution: a symlink inside basePath can point
+	// outside (symlink escape).
+	if basePath != "" && !filepath.IsAbs(key) {
+		canonicalBase, err := filepath.EvalSymlinks(basePath)
+		if err != nil {
+			canonicalBase = basePath
+		}
+		rel, err := filepath.Rel(canonicalBase, resolved)
+		if err != nil || !filepath.IsLocal(rel) {
+			return "", fmt.Errorf("file KV: symlink escape detected for key %q: resolved to %q which is outside base_path", key, resolved)
+		}
+	}
+
 	data, err := os.ReadFile(resolved)
 	if err != nil {
 		return "", fmt.Errorf("file KV: cannot read file %q: %w", resolved, err)
 	}
 
-	// Secret files often have whitespaces
-	result := strings.TrimSpace(string(data))
-
-	return result, nil
+	return strings.TrimRight(string(data), "\r\n"), nil
 }

@@ -212,6 +212,19 @@ func TestResolveFileKV(t *testing.T) {
 		assert.Contains(t, err.Error(), "traversal")
 	})
 
+	t.Run("rejects symlink that escapes basePath after EvalSymlinks", func(t *testing.T) {
+		base := t.TempDir()
+		target := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(target, "passwd"), []byte("root:x:0:0"), 0600))
+
+		// Create a symlink inside base/ pointing outside to target/passwd
+		require.NoError(t, os.Symlink(filepath.Join(target, "passwd"), filepath.Join(base, "evil-link")))
+
+		_, err := ResolveFileKV(base, "evil-link")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "symlink escape")
+	})
+
 	t.Run("allows absolute path when basePath is empty", func(t *testing.T) {
 		dir := t.TempDir()
 		f := filepath.Join(dir, "secret")
