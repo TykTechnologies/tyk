@@ -1714,13 +1714,34 @@ func TestReplaceSecretsFileScheme(t *testing.T) {
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.APIID = "file-kv-3"
-			// Relative key — resolved as base_path/jwt-secret
 			spec.JWTSource = "file://jwt-secret"
 		})
 
 		api := ts.Gw.getApiSpec("file-kv-3")
 		require.NotNil(t, api)
 		assert.Equal(t, "key-from-mount", api.JWTSource)
+	})
+
+	t.Run("multi-line PEM content is valid JSON after substitution", func(t *testing.T) {
+		dir := t.TempDir()
+		pem := "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJ\n-----END CERTIFICATE-----"
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "tls.crt"), []byte(pem+"\n"), 0600))
+
+		ts := StartTest(func(conf *config.Config) {
+			conf.KV.File.BasePath = dir
+		})
+		defer ts.Close()
+
+		// If the replacement is not JSON-escaped, the literal newlines in the PEM
+		// produce invalid JSON and BuildAndLoadAPI silently loads nothing.
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "file-kv-pem"
+			spec.JWTSource = "file://tls.crt"
+		})
+
+		api := ts.Gw.getApiSpec("file-kv-pem")
+		require.NotNil(t, api)
+		assert.Equal(t, pem, api.JWTSource)
 	})
 }
 

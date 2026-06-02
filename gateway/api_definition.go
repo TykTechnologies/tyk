@@ -649,10 +649,23 @@ func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
 				firstErr = err
 			}
 			log.WithError(err).Errorf("file KV: failed to read secret file %q", m[1])
-
 			continue
 		}
-		*input = strings.Replace(*input, m[0], val, -1)
+		// JSON-escape the value before injecting it into the raw JSON document.
+		// Without this, multi-line content (e.g. PEM certificates) produces
+		// literal newlines inside a JSON string, which is invalid JSON.
+		jsonBytes, err := json.Marshal(val)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			log.WithError(err).Errorf("file KV: failed to JSON-encode value for %q", m[1])
+			continue
+		}
+		// Strip the surrounding quotes since the replacement sits
+		// inside an existing JSON string already.
+		escaped := string(jsonBytes[1 : len(jsonBytes)-1])
+		*input = strings.Replace(*input, m[0], escaped, -1)
 	}
 	return firstErr
 }
