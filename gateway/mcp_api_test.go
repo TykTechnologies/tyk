@@ -12,6 +12,8 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -742,6 +744,49 @@ func TestValidatePairedMCPAdapterUpstream(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, code)
 		assert.Contains(t, msg, "alias conflict")
 	})
+}
+
+func TestValidatePairedMCPAdapterUpstream_LogsDeriveWarnings(t *testing.T) {
+	logger, hook := logrustest.NewNullLogger()
+	logger.SetLevel(logrus.WarnLevel)
+	originalLog := log
+	log = logger
+	t.Cleanup(func() {
+		log = originalLog
+	})
+
+	rest := restSourceSpec("rest-1", "org-1", true)
+	rest.OAS.Paths = openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get: &openapi3.Operation{OperationID: "list_orders", Summary: "list orders"},
+		}),
+		openapi3.WithPath("/skipped", &openapi3.PathItem{
+			Get: &openapi3.Operation{Summary: "missing operation id"},
+		}),
+	)
+	gw := &Gateway{apisByID: map[string]*APISpec{
+		"rest-1": rest,
+	}}
+
+	msg, code := gw.validatePairedMCPAdapterUpstream(httptest.NewRequest(http.MethodPost, "/tyk/mcps", nil), pairedMCPProxyOAS("proxy-1", "org-1", "rest-1"))
+
+	require.Empty(t, msg)
+	require.Zero(t, code)
+
+	var warningEntry *logrus.Entry
+	for _, entry := range hook.AllEntries() {
+		if entry.Level == logrus.WarnLevel && entry.Message == "REST-as-MCP derivation warning" {
+			warningEntry = entry
+			break
+		}
+	}
+	require.NotNil(t, warningEntry)
+	assert.Equal(t, "proxy-1", warningEntry.Data["api_id"])
+	assert.Equal(t, "rest-1", warningEntry.Data["rest_api_id"])
+	assert.Equal(t, "GET /skipped", warningEntry.Data["operation"])
+	assert.Equal(t, "GET", warningEntry.Data["method"])
+	assert.Equal(t, "/skipped", warningEntry.Data["path"])
+	assert.Equal(t, "missing operationId", warningEntry.Data["reason"])
 }
 
 func TestHandleGetMCPListOAS_IncludesPairedProxy(t *testing.T) {

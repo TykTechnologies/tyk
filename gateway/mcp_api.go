@@ -13,6 +13,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -131,7 +132,8 @@ func (gw *Gateway) validatePairedMCPAdapterUpstream(_ *http.Request, mcpObj *oas
 		return "Paired REST API " + restAPIID + " is a Classic API; REST-as-MCP sources must be Tyk OAS APIs", http.StatusBadRequest
 	}
 
-	view, _, err := oas.DeriveMCPToolView(&rest.OAS, mcpObj.GetTykMCPServerExtension())
+	view, warnings, err := oas.DeriveMCPToolView(&rest.OAS, mcpObj.GetTykMCPServerExtension())
+	logMCPDeriveWarnings(incoming.APIID, restAPIID, warnings)
 	if err != nil {
 		return err.Error(), http.StatusBadRequest
 	}
@@ -169,7 +171,8 @@ func (gw *Gateway) validateMCPToolViewAliasConflicts(incomingProxyAPIID, orgID, 
 
 	sort.Slice(proxies, func(i, j int) bool { return proxies[i].APIID < proxies[j].APIID })
 	for _, spec := range proxies {
-		existingView, _, err := oas.DeriveMCPToolView(&rest.OAS, spec.OAS.GetTykMCPServerExtension())
+		existingView, warnings, err := oas.DeriveMCPToolView(&rest.OAS, spec.OAS.GetTykMCPServerExtension())
+		logMCPDeriveWarnings(spec.APIID, restAPIID, warnings)
 		if err != nil {
 			return fmt.Errorf("build MCP tool view for existing proxy %q: %w", spec.APIID, err)
 		}
@@ -183,6 +186,19 @@ func (gw *Gateway) validateMCPToolViewAliasConflicts(incomingProxyAPIID, orgID, 
 	}
 
 	return nil
+}
+
+func logMCPDeriveWarnings(proxyAPIID, restAPIID string, warnings []oas.DeriveWarning) {
+	for _, warning := range warnings {
+		log.WithFields(logrus.Fields{
+			"api_id":      proxyAPIID,
+			"rest_api_id": restAPIID,
+			"operation":   warning.Operation,
+			"method":      warning.Method,
+			"path":        warning.Path,
+			"reason":      warning.Reason,
+		}).Warn("REST-as-MCP derivation warning")
+	}
 }
 
 func mcpToolViewSourceIDsByName(view oas.MCPToolView) map[string]string {

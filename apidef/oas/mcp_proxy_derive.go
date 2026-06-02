@@ -274,7 +274,10 @@ func deriveOperationPrimitive(
 	}
 
 	seen[name] = true
-	locs, sourceNames, bodyContentType, schema := deriveParams(item, mo.op)
+	locs, sourceNames, bodyContentType, schema, err := deriveParams(item, mo.op)
+	if err != nil {
+		return DerivedPrimitive{}, nil, false, fmt.Errorf("operationId %q: %w", rawName, err)
+	}
 
 	return DerivedPrimitive{
 		Type: MCPPrimitiveTypeTool,
@@ -449,13 +452,13 @@ func SanitizeToolName(raw string) string {
 // (paramLocations, paramSourceNames, requestBodyContentType, inputSchema). The
 // schema follows the JSON Schema draft-07 dialect that MCP clients expect for
 // tool inputs.
-func deriveParams(item *openapi3.PathItem, op *openapi3.Operation) (map[string]string, map[string]string, string, map[string]any) {
+func deriveParams(item *openapi3.PathItem, op *openapi3.Operation) (map[string]string, map[string]string, string, map[string]any, error) {
 	params := newDerivedParams()
 	params.addParameters(item.Parameters)
 	params.addParameters(op.Parameters)
 	params.addRequestBody(op.RequestBody)
-	locations, sourceNames, schema := params.build()
-	return locations, sourceNames, params.requestBodyContentType, schema
+	locations, sourceNames, schema, err := params.build()
+	return locations, sourceNames, params.requestBodyContentType, schema, err
 }
 
 func schemaType(s *openapi3.Schema) string {
@@ -598,7 +601,7 @@ func (p *derivedParams) addOrReplace(param derivedParam) {
 	p.params = append(p.params, param)
 }
 
-func (p *derivedParams) build() (map[string]string, map[string]string, map[string]any) {
+func (p *derivedParams) build() (map[string]string, map[string]string, map[string]any, error) {
 	nameCounts := make(map[string]int, len(p.params))
 	for _, param := range p.params {
 		nameCounts[param.sourceName]++
@@ -611,6 +614,9 @@ func (p *derivedParams) build() (map[string]string, map[string]string, map[strin
 
 	for _, param := range p.params {
 		name := exposedParamName(param, nameCounts[param.sourceName] > 1)
+		if _, duplicate := locations[name]; duplicate {
+			return nil, nil, nil, fmt.Errorf("duplicate exposed parameter name %q", name)
+		}
 		locations[name] = param.location
 		sourceNames[name] = param.sourceName
 		props[name] = param.schema
@@ -626,7 +632,7 @@ func (p *derivedParams) build() (map[string]string, map[string]string, map[strin
 	if len(required) > 0 {
 		schema[schemaKeyRequired] = sortedRequiredNames(required)
 	}
-	return locations, sourceNames, schema
+	return locations, sourceNames, schema, nil
 }
 
 func exposedParamName(param derivedParam, collides bool) string {
@@ -965,7 +971,10 @@ func deriveConfiguredPathMethodTool(srcOAS *OAS, primitive TykMCPServerPrimitive
 		return DerivedTool{}, fmt.Errorf("%s primitive source %s %s: %w", ExtensionTykMCPServer, method, path, err)
 	}
 
-	locs, sourceNames, bodyContentType, schema := deriveParams(item, mo.op)
+	locs, sourceNames, bodyContentType, schema, err := deriveParams(item, mo.op)
+	if err != nil {
+		return DerivedTool{}, fmt.Errorf("source %s %s: %w", method, path, err)
+	}
 	return DerivedTool{
 		SourceKey:              pathMethodSourceKey(method, path),
 		CanonicalName:          name,

@@ -295,6 +295,40 @@ func TestDeriveMCPToolView_PathMethodSourceForOperationWithoutOperationID(t *tes
 	assert.Equal(t, map[string]string{"status": DerivedParamLocationQuery}, tool.ParamLocations)
 }
 
+func TestDeriveMCPToolView_PathMethodSourceRejectsDuplicateExposedParameterNames(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				Summary: "list orders",
+				Parameters: openapi3.Parameters{
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{Name: "x", In: openapi3.ParameterInQuery, Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()}}},
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{Name: "x", In: openapi3.ParameterInHeader, Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()}}},
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{Name: "header_x", In: openapi3.ParameterInHeader, Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()}}},
+				},
+			},
+		}),
+	))
+
+	_, _, err := DeriveMCPToolView(src, &TykMCPServer{
+		Primitives: []TykMCPServerPrimitive{
+			{
+				Source: TykMCPServerSource{
+					Path:   "/orders",
+					Method: "GET",
+				},
+				Name:  "list_orders",
+				Allow: boolPtr(true),
+			},
+		},
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "source GET /orders")
+	assert.Contains(t, err.Error(), `duplicate exposed parameter name "header_x"`)
+}
+
 func TestDeriveMCPToolView_DefaultsToAllCanonicalTools(t *testing.T) {
 	t.Parallel()
 

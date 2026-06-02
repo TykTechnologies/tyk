@@ -302,3 +302,26 @@ func TestDeriveSourceTools_PrefixesParameterNameCollisions(t *testing.T) {
 	assert.Contains(t, props, "header_id")
 	assert.Contains(t, props, "id")
 }
+
+func TestDeriveSourceTools_RejectsDuplicateExposedParameterNames(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: "get_order",
+				Parameters: openapi3.Parameters{
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{Name: "x", In: openapi3.ParameterInQuery, Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()}}},
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{Name: "x", In: openapi3.ParameterInHeader, Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()}}},
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{Name: "header_x", In: openapi3.ParameterInHeader, Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()}}},
+				},
+			},
+		}),
+	))
+
+	_, _, err := DeriveSourceTools(src, nil)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `operationId "get_order"`)
+	assert.Contains(t, err.Error(), `duplicate exposed parameter name "header_x"`)
+}
