@@ -32,3 +32,10 @@ func RequestScheme(r *http.Request) string {
 	}
 	return "https"
 }
+
+// IsCORSPreflightRequest function determines if an HTTP request is a CORS preflight request.
+// It returns true if the request's method is OPTIONS and the Access-Control-Request-Method header is present
+// and not empty, which are the conditions for a standard preflight request. Otherwise, it returns false.
+func IsCORSPreflightRequest(r *http.Request) bool {
+	return r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != ""
+}

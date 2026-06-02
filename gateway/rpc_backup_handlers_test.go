@@ -7,6 +7,7 @@ import (
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/compression"
 )
 
 func TestSaveRPCDefinitionsBackup(t *testing.T) {
@@ -124,9 +125,22 @@ func BenchmarkSaveRPCDefinitionsBackup(b *testing.B) {
 	}
 }
 
-func TestDecompressAPIBackup(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
+// runDecompressBackupTests is a shared helper that runs the full decompression
+// test suite against any backup kind. It is used by both TestDecompressAPIBackup
+// and TestDecompressPolicyBackup to avoid duplicating identical test logic.
+//
+// decompress is the bound method under test (e.g. ts.Gw.decompressAPIBackup).
+// enableCompress is a config setup func that enables compression for the kind
+// under test, used when starting a gateway for the round-trip subtest.
+// getCompress returns the matching compress method from a given gateway, also
+// used in the round-trip subtest.
+func runDecompressBackupTests(
+	t *testing.T,
+	decompress func(string) (string, error),
+	enableCompress func(*config.Config),
+	getCompress func(*Gateway) func(string) string,
+) {
+	t.Helper()
 
 	tests := []struct {
 		name        string
@@ -137,9 +151,9 @@ func TestDecompressAPIBackup(t *testing.T) {
 	}{
 		{
 			name:     "Uncompressed data",
-			input:    `[{"api_id":"test","name":"Test API"}]`,
+			input:    `[{"id":"test","name":"Test"}]`,
 			wantErr:  false,
-			expected: `[{"api_id":"test","name":"Test API"}]`,
+			expected: `[{"id":"test","name":"Test"}]`,
 		},
 		{
 			name:     "Empty uncompressed data",
@@ -153,11 +167,17 @@ func TestDecompressAPIBackup(t *testing.T) {
 			wantErr:  false,   // Should be treated as uncompressed JSON
 			expected: "hello",
 		},
+		{
+			name:        "Corrupt compressed data (valid magic bytes, invalid payload)",
+			input:       string([]byte{0x28, 0xB5, 0x2F, 0xFD}) + "this is not valid zstd data",
+			wantErr:     true,
+			expectedErr: "[RPC] --> Failed to decompress",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ts.Gw.decompressAPIBackup(tt.input)
+			result, err := decompress(tt.input)
 
 			if tt.wantErr {
 				if err == nil {
@@ -177,15 +197,13 @@ func TestDecompressAPIBackup(t *testing.T) {
 	}
 
 	t.Run("Compressed data round-trip", func(t *testing.T) {
-		ts := StartTest(func(globalConf *config.Config) {
-			globalConf.Storage.CompressAPIDefinitions = true
-		})
+		ts := StartTest(enableCompress)
 		defer ts.Close()
 
-		original := `[{"api_id":"test","name":"Test API","description":"This is a test"}]`
+		original := `[{"id":"test","name":"Test","description":"This is a test"}]`
+		compress := getCompress(ts.Gw)
 
-		// Compress the data
-		compressed := ts.Gw.compressAPIBackup(original)
+		compressed := compress(original)
 
 		// Verify it has Zstd magic bytes
 		compressedBytes := []byte(compressed)
@@ -200,17 +218,51 @@ func TestDecompressAPIBackup(t *testing.T) {
 			}
 		}
 
-		// Decompress it back
-		decompressed, err := ts.Gw.decompressAPIBackup(compressed)
+		// Decompress it back and verify round-trip fidelity
+		decompressed, err := decompress(compressed)
 		if err != nil {
 			t.Fatalf("Failed to decompress: %v", err)
 		}
 
-		// Verify it matches the original
 		if decompressed != original {
 			t.Errorf("Round-trip failed. Expected %q, got %q", original, decompressed)
 		}
 	})
+
+	t.Run("Compressed data exceeds max decompressed size", func(t *testing.T) {
+		// SetMaxDecompressedSize clamps to a 1MB minimum, so the payload must exceed 1MB.
+		// A string of repeated characters compresses very efficiently, meaning the stored
+		// blob is tiny but decompression is aborted once the output crosses the limit.
+		originalMaxSize := compression.GetMaxDecompressedSize()
+		compression.SetMaxDecompressedSize(1 * 1024 * 1024)
+		defer compression.SetMaxDecompressedSize(originalMaxSize)
+
+		largePayload := strings.Repeat("a", 1*1024*1024+1)
+		compressed, err := compression.CompressZstd([]byte(largePayload))
+		if err != nil {
+			t.Fatalf("Failed to compress test payload: %v", err)
+		}
+
+		_, err = decompress(string(compressed))
+		if err == nil {
+			t.Fatal("Expected error for payload exceeding max decompressed size, got nil")
+		}
+		if !strings.Contains(err.Error(), "Failed to decompress") {
+			t.Errorf("Expected decompression failure error, got: %v", err)
+		}
+	})
+}
+
+func TestDecompressAPIBackup(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	runDecompressBackupTests(
+		t,
+		ts.Gw.decompressAPIBackup,
+		func(c *config.Config) { c.Storage.CompressAPIDefinitions = true },
+		func(gw *Gateway) func(string) string { return gw.compressAPIBackup },
+	)
 }
 
 func TestLoadRPCDefinitionsBackup(t *testing.T) {
@@ -344,6 +396,247 @@ func BenchmarkLoadRPCDefinitionsBackup(b *testing.B) {
 			}
 
 			// Report size metrics
+			b.ReportMetric(float64(len(inputJSON))/1024, "input_KB")
+		})
+	}
+}
+
+// generatePolicy creates a policy JSON of specified size
+func generatePolicy(policyID string, targetSizeKB int) string {
+	base := `{"id":"` + policyID + `","name":"Benchmark Policy","org_id":"test-org","active":true,"description":"`
+	baseSize := len(base) + len(`"}`)
+	paddingSize := (targetSizeKB * 1024) - baseSize
+	if paddingSize < 0 {
+		paddingSize = 0
+	}
+	return base + strings.Repeat("x", paddingSize) + `"}`
+}
+
+func TestSaveRPCPoliciesBackup(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		wantErr     bool
+		expectedErr string
+	}{
+		{
+			name:        "Invalid JSON",
+			input:       `not json at all`,
+			wantErr:     true,
+			expectedErr: "--> RPC Backup save failure: wrong format, skipping.",
+		},
+		{
+			name:    "Valid JSON array",
+			input:   `[{"id":"test","name":"Test Policy","org_id":"test-org"}]`,
+			wantErr: false,
+		},
+		{
+			name:    "Empty array",
+			input:   `[]`,
+			wantErr: false,
+		},
+		{
+			name:    "Valid JSON object",
+			input:   `{"id":"test","name":"Test Policy","org_id":"test-org"}`,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := StartTest(nil)
+			defer ts.Close()
+
+			err := ts.Gw.saveRPCPoliciesBackup(tt.input)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error, got nil")
+				} else if tt.expectedErr != "" && err.Error() != tt.expectedErr {
+					t.Errorf("Expected error %q, got %q", tt.expectedErr, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error, got: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestDecompressPolicyBackup(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	runDecompressBackupTests(
+		t,
+		ts.Gw.decompressPolicyBackup,
+		func(c *config.Config) { c.Storage.CompressPolicies = true },
+		func(gw *Gateway) func(string) string { return gw.compressPolicyBackup },
+	)
+}
+
+func TestLoadRPCPoliciesBackup(t *testing.T) {
+	t.Run("Load from backup - uncompressed", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		policyJSON := `[{"id":"test-policy","name":"Test Policy","org_id":"test-org"}]`
+
+		err := ts.Gw.saveRPCPoliciesBackup(policyJSON)
+		if err != nil {
+			t.Fatalf("Failed to save backup: %v", err)
+		}
+
+		policies, err := ts.Gw.LoadPoliciesFromRPCBackup()
+		if err != nil {
+			t.Fatalf("Failed to load backup: %v", err)
+		}
+
+		if len(policies) != 1 {
+			t.Fatalf("Expected 1 policy, got %d", len(policies))
+		}
+
+		if policies[0].ID != "test-policy" {
+			t.Errorf("Expected ID 'test-policy', got %q", policies[0].ID)
+		}
+		if policies[0].Name != "Test Policy" {
+			t.Errorf("Expected Name 'Test Policy', got %q", policies[0].Name)
+		}
+	})
+
+	t.Run("Load from backup - compressed", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.Storage.CompressPolicies = true
+		})
+		defer ts.Close()
+
+		policyJSON := `[{"id":"compressed-policy","name":"Compressed Policy","org_id":"test-org"}]`
+
+		err := ts.Gw.saveRPCPoliciesBackup(policyJSON)
+		if err != nil {
+			t.Fatalf("Failed to save compressed backup: %v", err)
+		}
+
+		policies, err := ts.Gw.LoadPoliciesFromRPCBackup()
+		if err != nil {
+			t.Fatalf("Failed to load compressed backup: %v", err)
+		}
+
+		if len(policies) != 1 {
+			t.Fatalf("Expected 1 policy, got %d", len(policies))
+		}
+
+		if policies[0].ID != "compressed-policy" {
+			t.Errorf("Expected ID 'compressed-policy', got %q", policies[0].ID)
+		}
+		if policies[0].Name != "Compressed Policy" {
+			t.Errorf("Expected Name 'Compressed Policy', got %q", policies[0].Name)
+		}
+	})
+
+	t.Run("Load from backup - empty backup", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		err := ts.Gw.saveRPCPoliciesBackup(`[]`)
+		if err != nil {
+			t.Fatalf("Failed to save empty backup: %v", err)
+		}
+
+		policies, err := ts.Gw.LoadPoliciesFromRPCBackup()
+		if err != nil {
+			t.Fatalf("Failed to load empty backup: %v", err)
+		}
+
+		if len(policies) != 0 {
+			t.Errorf("Expected 0 policies, got %d", len(policies))
+		}
+	})
+}
+
+// BenchmarkSaveRPCPoliciesBackup benchmarks the save operation with various sizes
+func BenchmarkSaveRPCPoliciesBackup(b *testing.B) {
+	benchmarks := []struct {
+		name               string
+		sizeKB             int
+		compressionEnabled bool
+	}{
+		{"Small_10KB_Uncompressed", 10, false},
+		{"Small_10KB_Compressed", 10, true},
+		{"Medium_100KB_Uncompressed", 100, false},
+		{"Medium_100KB_Compressed", 100, true},
+		{"Large_1MB_Uncompressed", 1024, false},
+		{"Large_1MB_Compressed", 1024, true},
+		{"ExtraLarge_5MB_Uncompressed", 5120, false},
+		{"ExtraLarge_5MB_Compressed", 5120, true},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.Storage.CompressPolicies = bm.compressionEnabled
+			})
+			defer ts.Close()
+
+			policy := generatePolicy("bench-policy", bm.sizeKB)
+			inputJSON := `[` + policy + `]`
+
+			b.ResetTimer()
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				err := ts.Gw.saveRPCPoliciesBackup(inputJSON)
+				if err != nil {
+					b.Fatalf("Failed to save backup: %v", err)
+				}
+			}
+
+			b.ReportMetric(float64(len(inputJSON))/1024, "input_KB")
+		})
+	}
+}
+
+// BenchmarkLoadRPCPoliciesBackup benchmarks the load operation with various sizes
+func BenchmarkLoadRPCPoliciesBackup(b *testing.B) {
+	benchmarks := []struct {
+		name               string
+		sizeKB             int
+		compressionEnabled bool
+	}{
+		{"Small_10KB_Uncompressed", 10, false},
+		{"Small_10KB_Compressed", 10, true},
+		{"Medium_100KB_Uncompressed", 100, false},
+		{"Medium_100KB_Compressed", 100, true},
+		{"Large_1MB_Uncompressed", 1024, false},
+		{"Large_1MB_Compressed", 1024, true},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.Storage.CompressPolicies = bm.compressionEnabled
+			})
+			defer ts.Close()
+
+			policy := generatePolicy("bench-policy", bm.sizeKB)
+			inputJSON := `[` + policy + `]`
+
+			err := ts.Gw.saveRPCPoliciesBackup(inputJSON)
+			if err != nil {
+				b.Fatalf("Failed to save backup: %v", err)
+			}
+
+			b.ResetTimer()
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				_, err := ts.Gw.LoadPoliciesFromRPCBackup()
+				if err != nil {
+					b.Fatalf("Failed to load backup: %v", err)
+				}
+			}
+
 			b.ReportMetric(float64(len(inputJSON))/1024, "input_KB")
 		})
 	}

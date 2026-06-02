@@ -1,0 +1,25 @@
+{
+  "name": "Test RLT - Rate Limited",
+  "api_id": "test-rlt",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "global_rate_limit": {
+    "rate": 1,
+    "per": 60
+  },
+  "proxy": {
+    "listen_path": "/test-rlt/",
+    "target_url": "http://backend-ok:80",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  }
+}

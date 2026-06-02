@@ -745,3 +745,143 @@ func TestGoPlugin_ApplyPolicy(t *testing.T) {
 	assert.True(t, found)
 	assert.Equal(t, float64(114), session.Rate)
 }
+
+func TestGoPlugin_DontWriteBodyInCaseIfPluginRespondsWith4xxOrHigher(t *testing.T) {
+	t.Run("api level plugin", func(t *testing.T) {
+		t.Run("writes body", func(t *testing.T) {
+			ts := gateway.StartTest(nil)
+			t.Cleanup(ts.Close)
+
+			ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+				spec.Proxy.ListenPath = "/test-api/"
+				spec.UseKeylessAccess = true
+				spec.UseStandardAuth = false
+				spec.CustomMiddleware = apidef.MiddlewareSection{
+					Driver: apidef.GoPluginDriver,
+					Pre: []apidef.MiddlewareDefinition{
+						{
+							Name: "RejectWithBody",
+							Path: goPluginFilename(),
+						},
+					},
+				}
+			})
+
+			ts.Run(t, []test.TestCase{
+				{
+					Path: "/test-api/get",
+					Code: http.StatusForbidden,
+					BodyMatchFunc: func(bytes []byte) bool {
+						return assert.Equal(t, "hello", string(bytes))
+					},
+				},
+			}...)
+		})
+
+		t.Run("does not write body if plugin does not write one", func(t *testing.T) {
+			ts := gateway.StartTest(nil)
+			t.Cleanup(ts.Close)
+
+			ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+				spec.Proxy.ListenPath = "/test-api-without/"
+				spec.UseKeylessAccess = true
+				spec.UseStandardAuth = false
+				spec.CustomMiddleware = apidef.MiddlewareSection{
+					Driver: apidef.GoPluginDriver,
+					Pre: []apidef.MiddlewareDefinition{
+						{
+							Name: "RejectWithoutBody",
+							Path: goPluginFilename(),
+						},
+					},
+				}
+			})
+
+			ts.Run(t, []test.TestCase{
+				{
+					Path: "/test-api-without/get",
+					Code: http.StatusForbidden,
+					BodyMatchFunc: func(bytes []byte) bool {
+						return assert.Equal(t, "", string(bytes))
+					},
+				},
+			}...)
+		})
+	})
+
+	t.Run("endpoint level plugin", func(t *testing.T) {
+		t.Run("writes body if plugin writes one", func(t *testing.T) {
+			ts := gateway.StartTest(nil)
+			t.Cleanup(ts.Close)
+
+			ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+				spec.Proxy.ListenPath = "/test-api/"
+				spec.UseKeylessAccess = true
+				spec.UseStandardAuth = false
+
+				// Configure endpoint-level Go plugin
+				v := spec.VersionData.Versions["Default"]
+				v.UseExtendedPaths = true
+				v.ExtendedPaths = apidef.ExtendedPathsSet{
+					GoPlugin: []apidef.GoPluginMeta{
+						{
+							Path:       "/get",
+							Method:     "GET",
+							PluginPath: goPluginFilename(),
+							SymbolName: "RejectWithBody",
+						},
+					},
+				}
+				spec.VersionData.Versions["Default"] = v
+			})
+
+			ts.Run(t, []test.TestCase{
+				{
+					Path: "/test-api/get",
+					Code: http.StatusForbidden,
+					BodyMatchFunc: func(bytes []byte) bool {
+						return assert.Equal(t, "hello", string(bytes))
+					},
+				},
+			}...)
+		})
+
+		t.Run("does not write body if plugin does not write one", func(t *testing.T) {
+			ts := gateway.StartTest(nil)
+			t.Cleanup(ts.Close)
+
+			gateway.BuildOASAPI()
+
+			ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+				spec.Proxy.ListenPath = "/test-api-without/"
+				spec.UseKeylessAccess = true
+				spec.UseStandardAuth = false
+
+				// Configure endpoint-level Go plugin
+				v := spec.VersionData.Versions["Default"]
+				v.UseExtendedPaths = true
+				v.ExtendedPaths = apidef.ExtendedPathsSet{
+					GoPlugin: []apidef.GoPluginMeta{
+						{
+							Path:       "/get",
+							Method:     "GET",
+							PluginPath: goPluginFilename(),
+							SymbolName: "RejectWithoutBody",
+						},
+					},
+				}
+				spec.VersionData.Versions["Default"] = v
+			})
+
+			ts.Run(t, []test.TestCase{
+				{
+					Path: "/test-api-without/get",
+					Code: http.StatusForbidden,
+					BodyMatchFunc: func(bytes []byte) bool {
+						return assert.Equal(t, "", string(bytes))
+					},
+				},
+			}...)
+		})
+	})
+}

@@ -17,6 +17,7 @@ import (
 
 // Mock certificate manager for host checker integration testing
 type mockHostCheckerCertificateManager struct {
+	certs.IdGetter
 	certificates   map[string]*tls.Certificate
 	caCertificates []string
 }
@@ -75,7 +76,6 @@ func (m *mockHostCheckerCertificateManager) CertPool(certIDs []string) *x509.Cer
 }
 
 func (m *mockHostCheckerCertificateManager) FlushCache() {}
-
 
 func TestHostChecker_ProxyIntegration(t *testing.T) {
 	ts := StartTest(nil)

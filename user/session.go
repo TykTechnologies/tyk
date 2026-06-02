@@ -14,6 +14,17 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// PostExpiryAction defines the action to take on a key in Redis after it expires.
+type PostExpiryAction string
+
+const (
+	// PostExpiryActionRetain keeps the key in Redis after expiry. When combined with
+	// PostExpiryGracePeriod, the key is retained for a specified duration after expiry.
+	PostExpiryActionRetain PostExpiryAction = "retain"
+	// PostExpiryActionDelete removes the key from Redis as soon as it expires.
+	PostExpiryActionDelete PostExpiryAction = "delete"
+)
+
 type HashType string
 
 const (
@@ -324,6 +335,8 @@ type SessionState struct {
 	LastUpdated             string                 `json:"last_updated,omitzero" msg:"last_updated"`
 	IdExtractorDeadline     int64                  `json:"id_extractor_deadline,omitzero" msg:"id_extractor_deadline"`
 	SessionLifetime         int64                  `json:"session_lifetime,omitzero" bson:"session_lifetime"`
+	PostExpiryAction        PostExpiryAction       `json:"post_expiry_action,omitzero" msg:"post_expiry_action"`
+	PostExpiryGracePeriod   int64                  `json:"post_expiry_grace_period,omitzero" msg:"post_expiry_grace_period"`
 
 	// Used to store token hash
 	keyHash string
@@ -406,6 +419,44 @@ func (s *SessionState) KeyHashEmpty() bool {
 	return s.keyHash == ""
 }
 
+// hasNewExpiryBehaviour returns true when the new post-expiry fields are explicitly
+// configured, indicating that the new TTL calculation logic should be used instead
+// of the legacy behavior.
+func (s *SessionState) hasNewExpiryBehaviour() bool {
+	return s.PostExpiryAction == PostExpiryActionDelete ||
+		(s.PostExpiryAction == PostExpiryActionRetain && s.PostExpiryGracePeriod != 0)
+}
+
+// calculatePostExpiryLifetime computes the Redis TTL based on PostExpiryAction
+// and PostExpiryGracePeriod fields.
+func (s *SessionState) calculatePostExpiryLifetime() int64 {
+	if s.Expires <= 0 {
+		return 0
+	}
+
+	now := time.Now().Unix()
+
+	if s.PostExpiryAction == PostExpiryActionDelete {
+		ttl := s.Expires - now
+		if ttl <= 0 {
+			return 1 // expire
+		}
+		return ttl
+	}
+
+	// PostExpiryAction == PostExpiryActionRetain with GracePeriod != 0
+	if s.PostExpiryGracePeriod == -1 {
+		return -1 // never delete
+	}
+
+	// GracePeriod > 0
+	ttl := s.Expires - now + s.PostExpiryGracePeriod
+	if ttl <= 0 {
+		return 1 // expire
+	}
+	return ttl
+}
+
 // Lifetime returns the lifetime of a session. Global session lifetime has always precedence. Then, the session lifetime value
 // in the key level takes precedence. However, if key `respectKeyExpiration` is `true`, when the key expiration has longer than
 // the session lifetime, the key expiration is returned. It means even if the session lifetime finishes, it waits for the key expiration
@@ -413,6 +464,10 @@ func (s *SessionState) KeyHashEmpty() bool {
 func (s *SessionState) Lifetime(respectKeyExpiration bool, fallback int64, forceGlobalSessionLifetime bool, globalSessionLifetime int64) int64 {
 	if forceGlobalSessionLifetime {
 		return globalSessionLifetime
+	}
+
+	if s.hasNewExpiryBehaviour() {
+		return s.calculatePostExpiryLifetime()
 	}
 
 	if s.SessionLifetime > 0 {

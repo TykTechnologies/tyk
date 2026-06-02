@@ -23,12 +23,18 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 )
 
 var (
 	ErrCertExpired = errors.New("Certificate has expired")
+	ErrTlsRequired = errpack.New(
+		"Client TLS certificate is required",
+		errpack.WithLogLevel(logrus.InfoLevel),
+		errpack.WithType(errpack.TypeDomain),
+	)
 )
 
 // HexSHA256 calculates the SHA256 hash of the provided certificate bytes
@@ -100,7 +106,7 @@ func ValidateRequestCerts(r *http.Request, certs []*tls.Certificate) error {
 	}
 
 	if len(r.TLS.PeerCertificates) == 0 {
-		return errors.New("Client TLS certificate is required")
+		return ErrTlsRequired
 	}
 
 	// Loop through r.TLS.PeerCertificates to add intermediate CA certificates to the allow list.

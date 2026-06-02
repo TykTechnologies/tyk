@@ -4,6 +4,7 @@ name: "Lint swagger schema"
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - 'swagger.yml'
 
@@ -12,38 +13,55 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  dep-guard:
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@d3fa20888fa2878e877e22bb7702141217290e7c  # main
+    permissions:
+      contents: read
+
   redocly_validator:
+    needs: [dep-guard]
     runs-on: ubuntu-latest
     name: Validate the swagger with redocly cli
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version: 20
       - name: Validate OpenAPI definition with redocly
         run: |
-          npm install @redocly/cli -g
+          npm install --ignore-scripts @redocly/cli@1.33.0 -g
           redocly lint swagger.yml --config=redocly.yml
 
   diff_swagger:
+    needs: [dep-guard]
     name: Diff swagger yaml for comment
     runs-on: ubuntu-latest
 
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
+
       - name: Use GitHub Token
         env:
-          TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          TOKEN: ${{ steps.app-token.outputs.token }}
         run: >
-          git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
 
       - name: Checkout repo
-        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@main
+        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@d3fa20888fa2878e877e22bb7702141217290e7c  # main
         with:
-          token: ${{ secrets.ORG_GH_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Setup Golang
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5
         with:
           go-version: stable
 
@@ -87,7 +105,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Find Comment
-        uses: peter-evans/find-comment@v2
+        uses: peter-evans/find-comment@a54c31d7fa095754bfef525c0c8e5e5674c4b4b1  # v2
         id: fc
         with:
           issue-number: ${{ github.event.pull_request.number }}
@@ -95,7 +113,7 @@ jobs:
           body-includes: Swagger Changes
 
       - name: Create or update comment
-        uses: peter-evans/create-or-update-comment@v3
+        uses: peter-evans/create-or-update-comment@23ff15729ef2fc348714a3bb66d2f655ca9066f2  # v3
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}

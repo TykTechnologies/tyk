@@ -93,7 +93,7 @@ func (m *GraphQLMiddleware) Init() {
 			HttpClient:      httpClient,
 			StreamingClient: httpClient,
 			OpenTelemetry: graphengine.EngineV2OTelConfig{
-				Enabled:        m.Gw.GetConfig().OpenTelemetry.Enabled,
+				Enabled:        m.Gw.GetConfig().OpenTelemetry.TracesEnabled(),
 				TracerProvider: m.Gw.TracerProvider,
 			},
 			Injections: graphengine.EngineV2Injections{
@@ -128,7 +128,7 @@ func (m *GraphQLMiddleware) Init() {
 			Schema:        v2Schema,
 			ApiDefinition: m.Spec.APIDefinition,
 			OpenTelemetry: graphengine.EngineV2OTelConfig{
-				Enabled:        m.Gw.GetConfig().OpenTelemetry.Enabled,
+				Enabled:        m.Gw.GetConfig().OpenTelemetry.TracesEnabled(),
 				TracerProvider: m.Gw.TracerProvider,
 			},
 			HttpClient: &http.Client{

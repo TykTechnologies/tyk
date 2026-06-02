@@ -18,6 +18,7 @@ import (
 
 // Mock certificate manager for testing
 type mockWebhookCertificateManager struct {
+	certs.IdGetter
 	certificates   map[string]*tls.Certificate
 	caCertificates []string
 }
@@ -76,7 +77,6 @@ func (m *mockWebhookCertificateManager) CertPool(certIDs []string) *x509.CertPoo
 }
 
 func (m *mockWebhookCertificateManager) FlushCache() {}
-
 
 func TestWebHookHandler_ProxyIntegration(t *testing.T) {
 	ts := StartTest(nil)

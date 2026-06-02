@@ -23,4 +23,4 @@ tasks:
   deps:
     desc: "Update deps"
     cmds:
-      - go install github.com/TykTechnologies/exp/cmd/schema-gen@main
+      - go install github.com/TykTechnologies/exp/cmd/schema-gen@49245597f0620ef8460735bb0ae6e93be5f8ca51  # main

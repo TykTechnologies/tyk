@@ -40,7 +40,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
@@ -1127,8 +1126,10 @@ func (s *Test) setTestScopeConfig(t *testing.T, apply func(cnf *config.Config)) 
 	newCnf := reflect.Clone(cnf)
 	apply(&newCnf)
 	s.Gw.SetConfig(newCnf)
+	s.Gw.initMembers(newCnf)
 	t.Cleanup(func() {
 		s.Gw.SetConfig(cnf)
+		s.Gw.initMembers(cnf)
 	})
 }
 
@@ -1216,9 +1217,20 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	gw.keyGen = DefaultKeyGenerator{Gw: gw}
 	gw.CoProcessInit()
-	gw.afterConfSetup()
+	if err := gw.afterConfSetup(); err != nil {
+		panic(err)
+	}
 
 	gw.SetConfig(gwConfig)
+
+	// Compile error override patterns for O(1) lookup in tests
+	// (In production, this is done in initialiseSystem() when !isRunningTests())
+	if len(gwConfig.ErrorOverrides) > 0 {
+		compiled := CompileErrorOverrides(gwConfig.ErrorOverrides)
+		if compiled != nil {
+			gw.SetCompiledErrorOverrides(compiled)
+		}
+	}
 
 	cli.Init(confPaths)
 
@@ -1280,17 +1292,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	go s.reloadSimulation(s.ctx, gw)
 
-	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry,
-		gw.GetNodeID(),
-		VERSION,
-		gw.GetConfig().SlaveOptions.UseRPC,
-		gw.GetConfig().SlaveOptions.GroupID,
-		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
-		gw.GetConfig().DBAppConfOptions.Tags)
-
-	gw.MetricInstruments = otel.InitOpenTelemetryMetrics(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry,
-		gw.GetNodeID(),
-		VERSION)
+	gw.InitOpenTelemetryInstruments()
 
 	return gw
 }

@@ -46,9 +46,31 @@ func TestIsGrpcStreaming(t *testing.T) {
 	assert.False(t, IsGrpcStreaming(newRequestWithHeaders(t, -1, map[string]string{headerContentType: "text/plain"})))
 }
 
-func TestIsSseStreamingResponse(t *testing.T) {
-	assert.True(t, IsSseStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "text/event-stream"})))
-	assert.False(t, IsSseStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "application/json"})))
+func TestIsSSEContentType(t *testing.T) {
+	tests := []struct {
+		name string
+		ct   string
+		want bool
+	}{
+		{"exact match", "text/event-stream", true},
+		{"charset with space", "text/event-stream; charset=utf-8", true},
+		{"charset without space", "text/event-stream;charset=utf-8", true},
+		{"application/json", "application/json", false},
+		{"empty string", "", false},
+		{"text/plain", "text/plain", false},
+		{"partial match", "text/event-streamx", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsSSEContentType(tt.ct))
+		})
+	}
+}
+
+func TestIsSSEStreamingResponse(t *testing.T) {
+	assert.True(t, IsSSEStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "text/event-stream"})))
+	assert.True(t, IsSSEStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "text/event-stream; charset=utf-8"})))
+	assert.False(t, IsSSEStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "application/json"})))
 }
 
 func TestIsUpgrade(t *testing.T) {
@@ -76,5 +98,6 @@ func TestIsStreamingRequest(t *testing.T) {
 
 func TestIsStreamingResponse(t *testing.T) {
 	assert.True(t, IsStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "text/event-stream"})))
+	assert.True(t, IsStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "text/event-stream; charset=utf-8"})))
 	assert.False(t, IsStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "application/json"})))
 }

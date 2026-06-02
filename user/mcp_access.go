@@ -2,6 +2,14 @@ package user
 
 import "fmt"
 
+// Primitive type identifiers for MCP access control.
+// Use these constants wherever a primitive type string is required.
+const (
+	PrimitiveTypeTool     = "tool"
+	PrimitiveTypeResource = "resource"
+	PrimitiveTypePrompt   = "prompt"
+)
+
 // AccessControlRules defines allow/block name lists for ACL enforcement.
 // Patterns in Allowed/Blocked are Go regexes anchored ^...$; exact strings work as-is.
 type AccessControlRules struct {
@@ -35,9 +43,9 @@ type MCPPrimitiveLimit struct {
 }
 
 var validMCPPrimitiveTypes = map[string]bool{
-	"tool":     true,
-	"resource": true,
-	"prompt":   true,
+	PrimitiveTypeTool:     true,
+	PrimitiveTypeResource: true,
+	PrimitiveTypePrompt:   true,
 }
 
 // Validate returns an error if Type is not one of the known MCP primitive types.

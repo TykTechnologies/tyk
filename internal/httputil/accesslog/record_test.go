@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
+	tykcxt "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -283,4 +284,101 @@ func TestWithErrorClassification_BuilderChaining(t *testing.T) {
 	result := record.WithErrorClassification(ec)
 
 	assert.Same(t, record, result, "WithErrorClassification should return the same Record for chaining")
+}
+
+// requestWithMCPContext creates a test request with MCP context values set.
+func requestWithMCPContext(method, primitiveType, primitiveName string, errorCode int) *http.Request {
+	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	ctx := req.Context()
+	if method != "" {
+		ctx = context.WithValue(ctx, tykcxt.MCPMethod, method)
+	}
+	if primitiveType != "" {
+		ctx = context.WithValue(ctx, tykcxt.MCPPrimitiveType, primitiveType)
+	}
+	if primitiveName != "" {
+		ctx = context.WithValue(ctx, tykcxt.MCPPrimitiveName, primitiveName)
+	}
+	if errorCode != 0 {
+		ctx = context.WithValue(ctx, tykcxt.JSONRPCErrorCode, errorCode)
+	}
+	return req.WithContext(ctx)
+}
+
+func TestWithAPIType(t *testing.T) {
+	for _, apiType := range []string{"classic", "oas", "graphql", "mcp"} {
+		t.Run(apiType, func(t *testing.T) {
+			rec := accesslog.NewRecord().WithAPIType(apiType)
+			fields := rec.Fields(nil)
+			assert.Equal(t, apiType, fields["api_type"])
+		})
+	}
+}
+
+func TestWithAPIType_BuilderChaining(t *testing.T) {
+	record := accesslog.NewRecord()
+	result := record.WithAPIType("mcp")
+	assert.Same(t, record, result, "WithAPIType should return the same Record for chaining")
+}
+
+func TestWithMCP(t *testing.T) {
+	t.Run("populates all MCP fields", func(t *testing.T) {
+		req := requestWithMCPContext("tools/call", "tool", "get_weather", 0)
+		rec := accesslog.NewRecord().WithMCP(req)
+		fields := rec.Fields(nil)
+
+		assert.Equal(t, "tools/call", fields["mcp_method"])
+		assert.Equal(t, "tool", fields["mcp_primitive_type"])
+		assert.Equal(t, "get_weather", fields["mcp_primitive_name"])
+		assert.NotContains(t, fields, "mcp_error_code")
+	})
+
+	t.Run("includes error code when non-zero", func(t *testing.T) {
+		req := requestWithMCPContext("tools/call", "tool", "bad_tool", -32601)
+		rec := accesslog.NewRecord().WithMCP(req)
+		fields := rec.Fields(nil)
+
+		assert.Equal(t, -32601, fields["mcp_error_code"])
+	})
+
+	t.Run("omits empty fields", func(t *testing.T) {
+		req := requestWithMCPContext("initialize", "", "", 0)
+		rec := accesslog.NewRecord().WithMCP(req)
+		fields := rec.Fields(nil)
+
+		assert.Equal(t, "initialize", fields["mcp_method"])
+		assert.NotContains(t, fields, "mcp_primitive_type")
+		assert.NotContains(t, fields, "mcp_primitive_name")
+		assert.NotContains(t, fields, "mcp_error_code")
+	})
+}
+
+func TestWithMCP_BuilderChaining(t *testing.T) {
+	req := requestWithMCPContext("tools/call", "tool", "get_weather", 0)
+	record := accesslog.NewRecord()
+	result := record.WithMCP(req)
+	assert.Same(t, record, result, "WithMCP should return the same Record for chaining")
+}
+
+func TestRecord_TemplateFiltering(t *testing.T) {
+	t.Run("api_type and mcp_method included when in template", func(t *testing.T) {
+		req := requestWithMCPContext("tools/call", "tool", "get_weather", 0)
+		rec := accesslog.NewRecord().WithAPIType("mcp").WithMCP(req)
+		fields := rec.Fields([]string{"api_type", "mcp_method"})
+
+		assert.Contains(t, fields, "api_type")
+		assert.Contains(t, fields, "mcp_method")
+		assert.NotContains(t, fields, "mcp_primitive_type")
+	})
+
+	t.Run("nil template returns all fields", func(t *testing.T) {
+		req := requestWithMCPContext("tools/call", "tool", "get_weather", 0)
+		rec := accesslog.NewRecord().WithAPIType("mcp").WithMCP(req)
+		fields := rec.Fields(nil)
+
+		assert.Contains(t, fields, "api_type")
+		assert.Contains(t, fields, "mcp_method")
+		assert.Contains(t, fields, "mcp_primitive_type")
+		assert.Contains(t, fields, "mcp_primitive_name")
+	})
 }

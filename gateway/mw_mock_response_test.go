@@ -2,10 +2,14 @@ package gateway
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -140,6 +144,85 @@ func TestMockResponse(t *testing.T) {
 			g.Gw.LoadAPI(api)
 
 			_, _ = g.Run(t, test.TestCase{Path: "/listen-path/get", BodyMatch: "mock: there is no example response for the content type: application/xml"})
+		})
+	})
+
+	t.Run("ProcessRequest", func(t *testing.T) {
+		t.Run("calls hit recorder for oas API", func(t *testing.T) {
+			spec := BuildOASAPI(func(oasDef *oas.OAS) {
+				opId := uuid.New()
+
+				headers := oas.Headers{}
+				headers.Add("Content-Type", "application/json")
+
+				tykExt := oasDef.GetTykExtension()
+				tykExt.Info.ID = "test"
+				tykExt.Info.Name = "test"
+				tykExt.Server.ListenPath.Value = "/test"
+				tykExt.Middleware = &oas.Middleware{}
+				tykExt.Middleware.Operations = oas.Operations{}
+				tykExt.Middleware.Operations[opId] = &oas.Operation{
+					MockResponse: &oas.MockResponse{
+						Enabled: true,
+						Code:    http.StatusCreated,
+						Body:    `{"mocked":true}`,
+						Headers: headers,
+					},
+				}
+
+				desc := "hello world"
+				responses := openapi3.NewResponses()
+				responses.Delete("default")
+				responses.Set("200", &openapi3.ResponseRef{
+					Value: &openapi3.Response{
+						Description: &desc,
+						Content: openapi3.Content{
+							"application/json": &openapi3.MediaType{},
+						},
+					},
+				})
+
+				oasDef.Paths = openapi3.NewPaths()
+				oasDef.Paths.Set("/mock", &openapi3.PathItem{
+					Get: &openapi3.Operation{
+						OperationID: opId,
+						Responses:   responses,
+					},
+				})
+			})[0]
+
+			apiSpec := g.Gw.LoadAPI(spec)[0]
+
+			_, _ = g.Run(t, test.TestCase{
+				Path:   "/test/mock",
+				Method: http.MethodGet,
+				Code:   http.StatusCreated,
+			})
+
+			logger := logrus.New()
+			logger.SetOutput(io.Discard)
+			entry := logrus.NewEntry(logger)
+
+			mockRecorder := &mockHitRecorder{}
+
+			baseMid := NewBaseMiddleware(g.Gw, apiSpec, nil, entry)
+			mockMw := newMockResponseMiddleware(baseMid, withHitRecorder(mockRecorder))
+
+			rw := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, "/test/mock", nil)
+
+			err, _ := mockMw.ProcessRequest(rw, r, nil)
+			assert.NoError(t, err)
+			require.Len(t, mockRecorder.calls, 1, "expected to be called once")
+
+			req := mockRecorder.calls[0].req
+			res := mockRecorder.calls[0].res
+
+			// is needed downstack during writing the log
+			assert.Equal(t, "/mock", req.URL.Path, "req is overwritten to local api endpoint")
+
+			// is needed downstack; body is being read at least twice: during writing log and during proxying to the real response
+			assert.IsType(t, nopCloser{}, res.Body, "response body is wrapped by nopCloser")
 		})
 	})
 }
@@ -663,5 +746,25 @@ func TestMockResponseWithInternalRedirect(t *testing.T) {
 			Method: http.MethodGet,
 			Code:   201,
 		})
+	})
+}
+
+var _ hitRecorder = new(mockHitRecorder)
+
+type (
+	mockHitRecorder struct {
+		calls []mockHitRecorderCall
+	}
+
+	mockHitRecorderCall struct {
+		req *http.Request
+		res *http.Response
+	}
+)
+
+func (h *mockHitRecorder) hit(_ http.ResponseWriter, req *http.Request, res *http.Response, _ time.Time) {
+	h.calls = append(h.calls, mockHitRecorderCall{
+		req: req,
+		res: res,
 	})
 }

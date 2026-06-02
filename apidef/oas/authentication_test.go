@@ -187,7 +187,7 @@ func TestCertificateAuthPrecedence(t *testing.T) {
 										EnableClientCertificate: true,
 									},
 								},
-								CertificateAuth: CertificateAuth{
+								CertificateAuth: &CertificateAuth{
 									Enabled: false,
 								},
 							},
@@ -203,7 +203,9 @@ func TestCertificateAuthPrecedence(t *testing.T) {
 		assert.False(t, apiDef.AuthConfigs[apidef.AuthTokenType].UseCertificate)
 	})
 
-	t.Run("certificate auth field does not exist", func(t *testing.T) {
+	t.Run("certificate auth field does not exist - old contract sets UseCertificate", func(t *testing.T) {
+		// When certificateAuth doesn't exist but token.enableClientCertificate is true,
+		// this is the old contract and should set UseCertificate = true
 		const securityName = "custom"
 		var trueVal = true
 		oas := OAS{
@@ -244,7 +246,7 @@ func TestCertificateAuthPrecedence(t *testing.T) {
 		var apiDef apidef.APIDefinition
 		oas.ExtractTo(&apiDef)
 
-		assert.False(t, apiDef.AuthConfigs[apidef.AuthTokenType].UseCertificate)
+		assert.True(t, apiDef.AuthConfigs[apidef.AuthTokenType].UseCertificate)
 	})
 }
 
@@ -276,6 +278,164 @@ func TestCertificateAuth(t *testing.T) {
 		resultCertificateAuth.Fill(convertedAPI)
 
 		assert.Equal(t, certAuth, resultCertificateAuth)
+	})
+}
+
+func TestCertificateAuthContractPreservation(t *testing.T) {
+	t.Run("old contract preserved - token with enableClientCertificate", func(t *testing.T) {
+		// Old contract: token.enableClientCertificate exists, certificateAuth should be nil
+		trueVal := true
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+					SecuritySchemes: SecuritySchemes{
+						"authToken": &Token{
+							Enabled:                 &trueVal,
+							EnableClientCertificate: true,
+						},
+					},
+				},
+			},
+		})
+
+		api := apidef.APIDefinition{
+			AuthConfigs: map[string]apidef.AuthConfig{
+				apidef.AuthTokenType: {
+					Name:           "authToken",
+					UseCertificate: true,
+				},
+			},
+			UseStandardAuth: true,
+		}
+
+		oas.Fill(api)
+
+		// CertificateAuth should be nil (omitted) when using old contract
+		assert.Nil(t, oas.GetTykExtension().Server.Authentication.CertificateAuth)
+
+		// Token should still have enableClientCertificate
+		token := oas.getTykTokenAuth("authToken")
+		assert.True(t, token.EnableClientCertificate)
+	})
+
+	t.Run("new contract preserved - certificateAuth.enabled", func(t *testing.T) {
+		// New contract: certificateAuth.enabled exists
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+					CertificateAuth: &CertificateAuth{
+						Enabled: true,
+					},
+				},
+			},
+		})
+
+		api := apidef.APIDefinition{
+			AuthConfigs: map[string]apidef.AuthConfig{
+				apidef.AuthTokenType: {
+					UseCertificate: true,
+				},
+			},
+		}
+
+		oas.Fill(api)
+
+		// CertificateAuth should be preserved
+		assert.NotNil(t, oas.GetTykExtension().Server.Authentication.CertificateAuth)
+		assert.True(t, oas.GetTykExtension().Server.Authentication.CertificateAuth.Enabled)
+	})
+
+	t.Run("new API defaults to new contract", func(t *testing.T) {
+		// New API: neither contract exists, should use new contract
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+				},
+			},
+		})
+
+		api := apidef.APIDefinition{
+			AuthConfigs: map[string]apidef.AuthConfig{
+				apidef.AuthTokenType: {
+					Name:           "authToken",
+					UseCertificate: true,
+				},
+			},
+		}
+
+		oas.Fill(api)
+
+		// CertificateAuth should be set (new contract)
+		assert.NotNil(t, oas.GetTykExtension().Server.Authentication.CertificateAuth)
+		assert.True(t, oas.GetTykExtension().Server.Authentication.CertificateAuth.Enabled)
+	})
+
+	t.Run("extract old contract sets UseCertificate", func(t *testing.T) {
+		const schemeName = "authToken"
+		trueVal := true
+		oas := OAS{
+			T: openapi3.T{
+				Components: &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						schemeName: {
+							Value: &openapi3.SecurityScheme{
+								Type: typeAPIKey,
+								Name: "Authorization",
+								In:   header,
+							},
+						},
+					},
+				},
+				Security: openapi3.SecurityRequirements{
+					{schemeName: []string{}},
+				},
+				Extensions: map[string]interface{}{
+					ExtensionTykAPIGateway: &XTykAPIGateway{
+						Server: Server{
+							Authentication: &Authentication{
+								Enabled: true,
+								SecuritySchemes: SecuritySchemes{
+									schemeName: &Token{
+										Enabled:                 &trueVal,
+										EnableClientCertificate: true,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		var api apidef.APIDefinition
+		oas.ExtractTo(&api)
+
+		assert.True(t, api.AuthConfigs[apidef.AuthTokenType].UseCertificate)
+	})
+
+	t.Run("extract new contract sets UseCertificate", func(t *testing.T) {
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+					CertificateAuth: &CertificateAuth{
+						Enabled: true,
+					},
+				},
+			},
+		})
+
+		var api apidef.APIDefinition
+		oas.ExtractTo(&api)
+
+		assert.True(t, api.AuthConfigs[apidef.AuthTokenType].UseCertificate)
 	})
 }
 
@@ -683,6 +843,59 @@ func TestProtectedResourceMetadata_Validate(t *testing.T) {
 		}
 		assert.NoError(t, prm.Validate(false))
 	})
+
+	t.Run("MCP API with no static fields defaults to mirror (passes validation)", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{Enabled: true}
+		assert.NoError(t, prm.Validate(true))
+		assert.True(t, prm.IsMirrorMode(true))
+	})
+
+	t.Run("non-MCP without resource still rejected (mirror is MCP-only)", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{Enabled: true}
+		err := prm.Validate(false)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "resource is required")
+		assert.False(t, prm.IsMirrorMode(false))
+	})
+
+	t.Run("MCP API with static fields keeps static behaviour", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled:              true,
+			Resource:             "https://api.example.com",
+			AuthorizationServers: []string{"https://auth.example.com"},
+		}
+		assert.NoError(t, prm.Validate(true))
+		assert.False(t, prm.IsMirrorMode(true))
+	})
+}
+
+func TestProtectedResourceMetadata_IsMirrorMode(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		prm   *ProtectedResourceMetadata
+		isMCP bool
+		want  bool
+	}{
+		{"nil", nil, true, false},
+		{"disabled", &ProtectedResourceMetadata{Enabled: false}, true, false},
+		{"MCP API with no static fields → mirror", &ProtectedResourceMetadata{Enabled: true}, true, true},
+		{"MCP API with resource set → static", &ProtectedResourceMetadata{Enabled: true, Resource: "https://x"}, true, false},
+		{"MCP API with authorizationServers only → static",
+			&ProtectedResourceMetadata{Enabled: true, AuthorizationServers: []string{"https://auth"}}, true, false},
+		{"non-MCP API never resolves to mirror", &ProtectedResourceMetadata{Enabled: true}, false, false},
+		{"non-MCP with resource set → static", &ProtectedResourceMetadata{Enabled: true, Resource: "https://x"}, false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, tc.prm.IsMirrorMode(tc.isMCP))
+		})
+	}
 }
 
 func TestProtectedResourceMetadata_GetWellKnownPath(t *testing.T) {

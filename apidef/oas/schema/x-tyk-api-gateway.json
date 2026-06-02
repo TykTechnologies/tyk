@@ -13,6 +13,9 @@
     },
     "middleware": {
       "$ref": "#/definitions/X-Tyk-Middleware"
+    },
+    "errorOverrides": {
+      "$ref": "#/definitions/X-Tyk-ErrorOverrides"
     }
   },
   "required": [
@@ -724,11 +727,14 @@
         "value": {
           "type": "integer",
           "minimum": 0
+        },
+        "timeout": {
+          "type": "string",
+          "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
         }
       },
       "required": [
-        "enabled",
-        "value"
+        "enabled"
       ]
     },
     "X-Tyk-ValidateRequest": {
@@ -1243,6 +1249,9 @@
                 },
                 {
                   "$ref": "#/definitions/X-Tyk-ExternalOAuth"
+                },
+                {
+                  "$ref": "#/definitions/X-Tyk-OAuth2"
                 }
               ]
             }
@@ -1324,8 +1333,7 @@
         }
       },
       "required": [
-        "enabled",
-        "resource"
+        "enabled"
       ]
     },
     "X-Tyk-Server": {
@@ -1895,6 +1903,29 @@
       "required": [
         "enabled"
       ]
+    },
+    "X-Tyk-OAuth2": {
+      "type": "object",
+      "description": "OAuth 2.0 security scheme container.",
+      "properties": {
+        "enabled":    { "type": "boolean" },
+        "header":     { "$ref": "#/definitions/X-Tyk-AuthSource" },
+        "cookie":     { "$ref": "#/definitions/X-Tyk-AuthSource" },
+        "query":      { "$ref": "#/definitions/X-Tyk-AuthSource" },
+        "scopeCheck": { "$ref": "#/definitions/X-Tyk-OAuth2-ScopeCheck" }
+      },
+      "required": ["enabled"]
+    },
+    "X-Tyk-OAuth2-ScopeCheck": {
+      "type": "object",
+      "description": "Token-side knobs for OAS-native scope enforcement. Required scopes themselves live in the OAS root security: array.",
+      "properties": {
+        "enabled":        { "type": "boolean" },
+        "claimNames":     { "type": "array", "items": { "type": "string" }, "description": "Ordered list of JWT claim names to read scopes from. The gateway reads each listed claim that is present and merges all scope values into one set. Alternatives drawn from OAS root security: are checked against this merged set. Defaults to [\"scope\", \"scp\"] when unset." },
+        "separator":      { "type": "string" },
+        "scopeSource":    { "type": "string", "enum": ["operation", "global", "union"], "description": "Selects whether enforcement reads per-operation security:, root security:, or both. Defaults to \"union\"." }
+      },
+      "required": ["enabled"]
     },
     "X-Tyk-OAuthProvider": {
       "type": "object",
@@ -2753,10 +2784,77 @@
           "type": "number"
         }
       },
-      "required": [
-        "url",
-        "weight"
-      ]
+      "required": ["url", "weight"]
+    },
+    "X-Tyk-ErrorOverrides": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/X-Tyk-ErrorOverride"
+            }
+          }
+        }
+      },
+      "required": ["enabled"]
+    },
+    "X-Tyk-ErrorOverride": {
+      "type": "object",
+      "properties": {
+        "match": {
+          "$ref": "#/definitions/X-Tyk-ErrorMatcher"
+        },
+        "response": {
+          "$ref": "#/definitions/X-Tyk-ErrorResponse"
+        }
+      },
+      "required": ["response"]
+    },
+    "X-Tyk-ErrorMatcher": {
+      "type": "object",
+      "properties": {
+        "flag": {
+          "type": "string"
+        },
+        "messagePattern": {
+          "type": "string"
+        },
+        "bodyField": {
+          "type": "string"
+        },
+        "bodyValue": {
+          "type": "string"
+        }
+      }
+    },
+    "X-Tyk-ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "statusCode": {
+          "type": "integer"
+        },
+        "body": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "template": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
     }
   }
 }

@@ -22,6 +22,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/cache"
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -81,9 +82,15 @@ type CertificateManager interface {
 	Delete(certID string, orgID string)
 	CertPool(certIDs []string) *x509.CertPool
 	FlushCache()
+	CertificateManagerIdGetter
+}
+
+type CertificateManagerIdGetter interface {
+	GetId(certData []byte) (id string, err error)
 }
 
 type certificateManager struct {
+	IdGetter
 	storage                  storage.Handler
 	logger                   *logrus.Entry
 	cache                    cache.Repository
@@ -143,10 +150,11 @@ func WithBackoffIntervals(maxElapsed, initial, max time.Duration) CertificateMan
 //	    WithBackoffIntervals(60*time.Second, 200*time.Millisecond, 5*time.Second))
 func NewCertificateManager(storageHandler storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
-		logger = logrus.New()
+		logger = tyklog.Get()
 	}
 
 	cm := &certificateManager{
+		IdGetter:                 NewIdGetter(secret),
 		storage:                  storageHandler,
 		logger:                   logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
 		cache:                    cache.New(cacheDefaultTTL, cacheCleanInterval),
@@ -175,7 +183,7 @@ func getOrgFromKeyID(key, certID string) string {
 
 func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
-		logger = logrus.New()
+		logger = tyklog.Get()
 	}
 	log := logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix})
 
@@ -399,6 +407,20 @@ type CertificateMeta struct {
 	NotAfter      time.Time `json:"not_after,omitempty"`
 	DNSNames      []string  `json:"dns_names,omitempty"`
 	IsCA          bool      `json:"is_ca"`
+}
+
+// ToCertificateBasics converts a CertificateMeta to a CertificateBasics struct.
+func (cm *CertificateMeta) ToCertificateBasics() *CertificateBasics {
+	return &CertificateBasics{
+		ID:            cm.ID,
+		IssuerCN:      cm.Issuer.CommonName,
+		SubjectCN:     cm.Subject.CommonName,
+		DNSNames:      cm.DNSNames,
+		HasPrivateKey: cm.HasPrivateKey,
+		NotBefore:     cm.NotBefore,
+		NotAfter:      cm.NotAfter,
+		IsCA:          cm.IsCA,
+	}
 }
 
 func ExtractCertificateMeta(cert *tls.Certificate, certID string) *CertificateMeta {
@@ -745,7 +767,6 @@ func (c *certificateManager) GetRaw(certID string) (string, error) {
 	return c.storage.GetKey("raw-" + certID)
 }
 
-
 func (c *certificateManager) Add(certData []byte, orgID string) (string, error) {
 
 	certID, certChainPEM, err := GetCertIDAndChainPEM(certData, c.secret)
@@ -799,4 +820,19 @@ func (c *certificateManager) FlushCache() {
 
 func (c *certificateManager) flushStorage() {
 	c.storage.DeleteScanMatch("*")
+}
+
+func NewIdGetter(secret string) IdGetter {
+	return IdGetter{
+		secret: secret,
+	}
+}
+
+type IdGetter struct {
+	secret string
+}
+
+func (c *IdGetter) GetId(certData []byte) (id string, err error) {
+	certID, _, err := GetCertIDAndChainPEM(certData, c.secret)
+	return certID, err
 }
