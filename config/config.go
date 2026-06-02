@@ -1325,6 +1325,7 @@ type Config struct {
 	KV struct {
 		Consul ConsulConfig `json:"consul"`
 		Vault  VaultConfig  `json:"vault"`
+		File   FileConfig   `json:"file"`
 	} `json:"kv"`
 
 	// Secrets configures a list of key/value pairs for the gateway.
@@ -1451,6 +1452,18 @@ type ResourceSyncConfig struct {
 type TykError struct {
 	Message string `json:"message"`
 	Code    int    `json:"code"`
+}
+
+// FileConfig configures the file-based KV provider.
+type FileConfig struct {
+	// BasePath is the directory that $secret_file.<key> references are resolved
+	// relative to. When set, <key> must be a relative path that stays within
+	// this directory (absolute paths and ".." traversal are rejected).
+	// When empty, <key> is used as a literal file path with no restrictions.
+	//
+	// For file:// URI references the full path is always used as-is regardless
+	// of this setting.
+	BasePath string `json:"base_path"`
 }
 
 // VaultConfig is used to configure the creation of a client
