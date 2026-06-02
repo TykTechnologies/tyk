@@ -39,7 +39,7 @@ var vaultMatch = regexp.MustCompile(`\$secret_vault.([A-Za-z0-9_\/\-\.]+)`)
 var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
-var fileMatch = regexp.MustCompile(`\$secret_file\.([^\s"]+)`)
+var fileMatch = regexp.MustCompile(`\$secret_file\.([A-Za-z0-9_\/\-\.]+)`)
 
 func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	rawPath := r.URL.String()
