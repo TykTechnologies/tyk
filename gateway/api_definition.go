@@ -566,7 +566,7 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 	}
 
 	if strings.Contains(input, prefixFile) {
-		if err := replaceFileSecrets(&input); err != nil {
+		if err := a.replaceFileSecrets(&input); err != nil {
 			log.WithError(err).Error("Couldn't replace file secrets")
 		}
 	}
@@ -633,7 +633,8 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 	return nil
 }
 
-func replaceFileSecrets(input *string) error {
+func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
+	basePath := a.Gw.GetConfig().KV.File.BasePath
 	matches := fileRegex.FindAllStringSubmatch(*input, -1)
 	seen := map[string]bool{}
 	var firstErr error
@@ -642,7 +643,7 @@ func replaceFileSecrets(input *string) error {
 			continue
 		}
 		seen[m[0]] = true
-		val, err := ResolveFileKV("", m[1])
+		val, err := ResolveFileKV(basePath, m[1])
 		if err != nil {
 			if firstErr == nil {
 				firstErr = err

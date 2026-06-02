@@ -7,32 +7,71 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
-// TestKVStoreFileScheme tests that kvStore() resolves file:// URIs.
+// TestKVStoreFileScheme tests that kvStore() resolves file:// URIs (Context 1).
 func TestKVStoreFileScheme(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
+	t.Run("absolute path without base_path", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
 
-	t.Run("resolves file:// to file contents", func(t *testing.T) {
+		t.Run("resolves absolute file:// to file contents", func(t *testing.T) {
+			dir := t.TempDir()
+			f := filepath.Join(dir, "secret")
+			require.NoError(t, os.WriteFile(f, []byte("super-secret\n"), 0600))
+
+			val, err := ts.Gw.kvStore("file://" + f)
+			require.NoError(t, err)
+			assert.Equal(t, "super-secret", val)
+		})
+
+		t.Run("returns error for missing file", func(t *testing.T) {
+			_, err := ts.Gw.kvStore("file:///nonexistent/file")
+			assert.Error(t, err)
+		})
+
+		t.Run("relative key without base_path returns error", func(t *testing.T) {
+			_, err := ts.Gw.kvStore("file://just-a-name")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "base_path")
+		})
+
+		t.Run("passes through non-file values unchanged", func(t *testing.T) {
+			val, err := ts.Gw.kvStore("plain-string")
+			require.NoError(t, err)
+			assert.Equal(t, "plain-string", val)
+		})
+	})
+
+	t.Run("relative key resolved via base_path", func(t *testing.T) {
 		dir := t.TempDir()
-		f := filepath.Join(dir, "secret")
-		require.NoError(t, os.WriteFile(f, []byte("super-secret\n"), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "node-secret"), []byte("my-node-secret"), 0600))
 
-		val, err := ts.Gw.kvStore("file://" + f)
-		require.NoError(t, err)
-		assert.Equal(t, "super-secret", val)
-	})
+		ts := StartTest(func(conf *config.Config) {
+			conf.KV.File.BasePath = dir
+		})
+		defer ts.Close()
 
-	t.Run("returns error for missing file", func(t *testing.T) {
-		_, err := ts.Gw.kvStore("file:///nonexistent/file")
-		assert.Error(t, err)
-	})
+		t.Run("resolves relative key under base_path", func(t *testing.T) {
+			val, err := ts.Gw.kvStore("file://node-secret")
+			require.NoError(t, err)
+			assert.Equal(t, "my-node-secret", val)
+		})
 
-	t.Run("passes through non-file values unchanged", func(t *testing.T) {
-		val, err := ts.Gw.kvStore("plain-string")
-		require.NoError(t, err)
-		assert.Equal(t, "plain-string", val)
+		t.Run("absolute path still works when base_path is set", func(t *testing.T) {
+			f := filepath.Join(dir, "node-secret")
+			val, err := ts.Gw.kvStore("file://" + f)
+			require.NoError(t, err)
+			assert.Equal(t, "my-node-secret", val)
+		})
+
+		t.Run("dotdot traversal rejected even when base_path is set", func(t *testing.T) {
+			_, err := ts.Gw.kvStore("file://../etc/passwd")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "traversal")
+		})
 	})
 }
 
@@ -83,6 +122,16 @@ func TestResolveFileKV(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	t.Run("relative key without basePath returns descriptive error", func(t *testing.T) {
+		// A short name like "my-cert" makes no sense without a base directory.
+		// Without this guard the call would silently try to open "my-cert" relative
+		// to the process working directory, fail, and return an empty string with no
+		// useful context in the error message.
+		_, err := ResolveFileKV("", "my-cert")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "base_path")
+	})
+
 	t.Run("resolves key relative to basePath", func(t *testing.T) {
 		dir := t.TempDir()
 		f := filepath.Join(dir, "api-key")
@@ -93,11 +142,16 @@ func TestResolveFileKV(t *testing.T) {
 		assert.Equal(t, "the-api-key", val)
 	})
 
-	t.Run("rejects absolute path when basePath is set", func(t *testing.T) {
+	t.Run("absolute path works even when basePath is set", func(t *testing.T) {
+		// basePath is a resolver for relative names, not a jail.
+		// If the caller provides an absolute path it is used as-is.
 		dir := t.TempDir()
-		_, err := ResolveFileKV(dir, "/etc/passwd")
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "absolute")
+		f := filepath.Join(dir, "secret")
+		require.NoError(t, os.WriteFile(f, []byte("abs-value"), 0600))
+
+		val, err := ResolveFileKV("/some/other/base", f)
+		require.NoError(t, err)
+		assert.Equal(t, "abs-value", val)
 	})
 
 	t.Run("rejects dotdot traversal when basePath is set", func(t *testing.T) {

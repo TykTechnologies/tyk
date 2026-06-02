@@ -1537,12 +1537,10 @@ func TestReplaceTykVariablesFileSecret(t *testing.T) {
 			assert.Equal(t, "file-secret-value", result)
 		})
 
-		t.Run("absolute key rejected when base_path is set — resolves to empty string", func(t *testing.T) {
+		t.Run("absolute path works even when base_path is set", func(t *testing.T) {
 			req := httptest.NewRequest("GET", "/", nil)
-			// Providing an absolute path while base_path is configured is a security
-			// violation; ResolveFileKV returns an error and the token becomes "".
 			result := ts.Gw.ReplaceTykVariables(req, "$secret_file."+secretFile, false)
-			assert.Equal(t, "", result)
+			assert.Equal(t, "file-secret-value", result)
 		})
 
 		t.Run("dotdot traversal rejected — resolves to empty string", func(t *testing.T) {

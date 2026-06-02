@@ -21,19 +21,24 @@ import (
 func ResolveFileKV(basePath, key string) (string, error) {
 	path := key
 
-	if basePath != "" {
-		if filepath.IsAbs(key) {
-			return "", fmt.Errorf("file KV: absolute path not allowed when base_path is set: %q", key)
-		}
-
+	if filepath.IsAbs(key) {
+		path = key
+	} else if basePath != "" {
 		joined := filepath.Join(basePath, key)
-		// Ensure the cleaned path stays within basePath.
 		rel, err := filepath.Rel(basePath, joined)
 		if err != nil || strings.HasPrefix(rel, "..") {
 			return "", fmt.Errorf("file KV: path traversal detected in key %q", key)
 		}
-
 		path = joined
+	} else {
+		// Relative key with no base_path: we have no anchor directory.
+		// Silently resolving against the process working directory would almost
+		// certainly be wrong, so fail with a clear message instead.
+		return "", fmt.Errorf(
+			"file KV: key %q is a relative path but kv.file.base_path is not configured; "+
+				"set kv.file.base_path or use an absolute path",
+			key,
+		)
 	}
 
 	// Resolve K8s AtomicWriter symlinks (e.g. ..data -> ..2024_01_01_00_00_00).
