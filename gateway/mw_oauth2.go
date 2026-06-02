@@ -86,52 +86,13 @@ func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request
 	// enabled; reject missing/malformed tokens here so the IdP call doesn't turn
 	// an absent subject_token into a confusing 502 instead of an honest 401.
 	needsBearer := exchangeActive || (scopeCheckActive && len(alternatives) > 0)
-	rawToken := stripBearer(r.Header.Get(header.Authorization))
-	var claims jwt.MapClaims
-	if rawToken == "" {
-		if needsBearer {
-			m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "missing bearer token")
-			return errors.New("Authorization field missing"), http.StatusUnauthorized
-		}
-	} else {
-		c, err := oauth2common.ParseUnverifiedClaims(rawToken)
-		if err != nil {
-			if needsBearer {
-				m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "token is not a parseable JWT")
-				return fmt.Errorf("parsing inbound token claims: %w", err), http.StatusUnauthorized
-			}
-		} else {
-			claims = c
-		}
+	rawToken, claims, err, status := m.parseBearerClaims(w, r, needsBearer)
+	if err != nil {
+		return err, status
 	}
 
 	if scopeCheckActive && len(alternatives) > 0 && !tokenSatisfiesAnyAlternative(claims, cfg.ScopeCheck, alternatives) {
-		// The first declared alternative is cited on the challenge —
-		// listing every alternative would leak intent (a
-		// service-account scope shouldn't be advertised to a
-		// user-token caller).
-		cited := alternatives[0]
-		citedScopes := strings.Join(cited, " ")
-		m.fireScopeCheckFailedEvent(r, claims, alternatives, cited, cfg.ScopeCheck)
-		m.setWWWAuthenticateInsufficientScope(w, r, cited)
-
-		// MCP / JSON-RPC routes get the failure wrapped in a JSON-RPC
-		// 2.0 error envelope by the chain's error handler (which keys
-		// off the routing state). REST routes get the RFC 6750-style
-		// JSON body written inline.
-		if m.Spec.IsMCP() && httpctx.GetJSONRPCRoutingState(r) != nil {
-			return errors.New(oas.OAuth2ErrInsufficientScope), http.StatusForbidden
-		}
-
-		body, _ := json.Marshal(map[string]interface{}{
-			oas.OAuth2FieldError:            oas.OAuth2ErrInsufficientScope,
-			oas.OAuth2FieldErrorDescription: "token does not satisfy required scopes: " + citedScopes,
-			"scope":                         citedScopes,
-		})
-		w.Header().Set(header.ContentType, header.ApplicationJSON)
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write(body)
-		return nil, middleware.StatusRespond
+		return m.handleScopeCheckFailure(w, r, claims, alternatives, cfg)
 	}
 
 	// Hand off to the EE TokenExchangeMiddleware (next in the chain) via
@@ -144,10 +105,61 @@ func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request
 			APIID:                m.Spec.APIID,
 			MatchedOperationID:   m.matchedOperationIDForRequest(r),
 			MatchedPrimitiveName: matchedPrimitiveNameForRequest(r),
+			MatchedPrimitiveType: matchedPrimitiveTypeForRequest(r),
 			InferredScopes:       m.inferredScopesForRequest(r),
 		})
 	}
 	return nil, http.StatusOK
+}
+
+// parseBearerClaims extracts and parses the inbound Bearer token.
+// When needsBearer is true and the token is absent or unparseable, it writes
+// the appropriate WWW-Authenticate challenge and returns a non-nil error.
+func (m *OAuth2Middleware) parseBearerClaims(w http.ResponseWriter, r *http.Request, needsBearer bool) (rawToken string, claims jwt.MapClaims, err error, status int) {
+	rawToken = stripBearer(r.Header.Get(header.Authorization))
+	if rawToken == "" {
+		if needsBearer {
+			m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "missing bearer token")
+			return "", nil, errors.New("Authorization field missing"), http.StatusUnauthorized
+		}
+		return "", nil, nil, 0
+	}
+	c, parseErr := oauth2common.ParseUnverifiedClaims(rawToken)
+	if parseErr != nil {
+		if needsBearer {
+			m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "token is not a parseable JWT")
+			return "", nil, fmt.Errorf("parsing inbound token claims: %w", parseErr), http.StatusUnauthorized
+		}
+		return rawToken, nil, nil, 0
+	}
+	return rawToken, c, nil, 0
+}
+
+// handleScopeCheckFailure writes the RFC 6750 scope rejection and returns the
+// appropriate error. The first declared alternative is cited on the challenge —
+// listing every alternative would leak intent.
+func (m *OAuth2Middleware) handleScopeCheckFailure(w http.ResponseWriter, r *http.Request, claims jwt.MapClaims, alternatives [][]string, cfg *oas.OAuth2) (error, int) {
+	cited := alternatives[0]
+	citedScopes := strings.Join(cited, " ")
+	m.fireScopeCheckFailedEvent(r, claims, alternatives, cited, cfg.ScopeCheck)
+	m.setWWWAuthenticateInsufficientScope(w, r, cited)
+
+	// MCP / JSON-RPC routes get the failure wrapped in a JSON-RPC 2.0 error
+	// envelope by the chain's error handler. REST routes get the RFC 6750-style
+	// JSON body written inline.
+	if m.Spec.IsMCP() && httpctx.GetJSONRPCRoutingState(r) != nil {
+		return errors.New(oas.OAuth2ErrInsufficientScope), http.StatusForbidden
+	}
+
+	body, _ := json.Marshal(map[string]interface{}{
+		oas.OAuth2FieldError:            oas.OAuth2ErrInsufficientScope,
+		oas.OAuth2FieldErrorDescription: "token does not satisfy required scopes: " + citedScopes,
+		"scope":                         citedScopes,
+	})
+	w.Header().Set(header.ContentType, header.ApplicationJSON)
+	w.WriteHeader(http.StatusForbidden)
+	_, _ = w.Write(body)
+	return nil, middleware.StatusRespond
 }
 
 // matchedOperationIDForRequest returns the OAS operationId that the
@@ -160,12 +172,22 @@ func (m *OAuth2Middleware) matchedOperationIDForRequest(r *http.Request) string 
 	return ""
 }
 
-// matchedPrimitiveNameForRequest returns the JSONRPC primitive name
-// (MCP tool / resource / prompt) resolved upstream by the JSONRPC
-// middleware, or "" when this isn't a JSONRPC request.
+// matchedPrimitiveNameForRequest returns the MCP primitive name resolved
+// upstream by the JSONRPC middleware, or "" when this isn't a JSONRPC request.
 func matchedPrimitiveNameForRequest(r *http.Request) string {
 	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
 		return state.PrimitiveName
+	}
+	return ""
+}
+
+// matchedPrimitiveTypeForRequest returns the MCP primitive type ("tool",
+// "resource", "prompt") resolved upstream by the JSONRPC middleware, or ""
+// when this isn't a JSONRPC request. Must be paired with
+// matchedPrimitiveNameForRequest — tool and prompt names share no namespace.
+func matchedPrimitiveTypeForRequest(r *http.Request) string {
+	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
+		return state.PrimitiveType
 	}
 	return ""
 }

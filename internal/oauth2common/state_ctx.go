@@ -29,6 +29,11 @@ type State struct {
 	// MatchedPrimitiveName is the MCP primitive name the request resolved to, if any.
 	MatchedPrimitiveName string
 
+	// MatchedPrimitiveType is the MCP primitive type ("tool", "resource", "prompt").
+	// Required alongside MatchedPrimitiveName to avoid collision when tool and prompt
+	// share the same name.
+	MatchedPrimitiveType string
+
 	// InferredScopes is the flattened union of OR-of-AND scope alternatives for the request.
 	InferredScopes []string
 }
