@@ -1461,8 +1461,8 @@ type FileConfig struct {
 	// this directory (absolute paths and ".." traversal are rejected).
 	// When empty, <key> is used as a literal file path with no restrictions.
 	//
-	// For file:// URI references the full path is always used as-is regardless
-	// of this setting.
+	// For file:// URI references, absolute paths are used as-is.
+	// Relative paths are still resolved relative to this directory.
 	BasePath string `json:"base_path"`
 }
 
