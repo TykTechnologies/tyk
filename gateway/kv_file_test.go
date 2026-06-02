@@ -75,6 +75,55 @@ func TestKVStoreFileScheme(t *testing.T) {
 	})
 }
 
+// TestFileKVHotReload verifies that kvResolvers closures re-read the file on
+// every hot reload and pick up K8s AtomicWriter secret rotations.
+func TestFileKVHotReload(t *testing.T) {
+	dir := t.TempDir()
+	certFile := filepath.Join(dir, "tls.crt")
+	keyFile := filepath.Join(dir, "tls.key")
+	caFile := filepath.Join(dir, "ca.crt")
+	require.NoError(t, os.WriteFile(certFile, []byte("cert-v1"), 0600))
+	require.NoError(t, os.WriteFile(keyFile, []byte("key-v1"), 0600))
+	require.NoError(t, os.WriteFile(caFile, []byte("ca-v1"), 0600))
+
+	gw := NewGateway(config.Config{
+		ExternalServices: config.ExternalServiceConfig{
+			OAuth: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  true,
+					CertFile: "file://" + certFile,
+					KeyFile:  "file://" + keyFile,
+					CAFile:   "file://" + caFile,
+				},
+			},
+		},
+	}, t.Context())
+
+	require.NoError(t, gw.afterConfSetup())
+
+	// Startup: all three fields resolved from files.
+	conf := gw.GetConfig()
+	assert.Equal(t, "cert-v1", conf.ExternalServices.OAuth.MTLS.CertFile)
+	assert.Equal(t, "key-v1", conf.ExternalServices.OAuth.MTLS.KeyFile)
+	assert.Equal(t, "ca-v1", conf.ExternalServices.OAuth.MTLS.CAFile)
+	assert.Len(t, gw.kvResolvers, 3)
+
+	// Simulate cert rotation: overwrite the files.
+	require.NoError(t, os.WriteFile(certFile, []byte("cert-v2"), 0600))
+	require.NoError(t, os.WriteFile(keyFile, []byte("key-v2"), 0600))
+	require.NoError(t, os.WriteFile(caFile, []byte("ca-v2"), 0600))
+
+	// Hot reload: closures must re-read the files and update the live config.
+	for _, resolve := range gw.kvResolvers {
+		require.NoError(t, resolve())
+	}
+
+	conf = gw.GetConfig()
+	assert.Equal(t, "cert-v2", conf.ExternalServices.OAuth.MTLS.CertFile)
+	assert.Equal(t, "key-v2", conf.ExternalServices.OAuth.MTLS.KeyFile)
+	assert.Equal(t, "ca-v2", conf.ExternalServices.OAuth.MTLS.CAFile)
+}
+
 func TestResolveFileKV(t *testing.T) {
 	t.Run("reads plain file contents", func(t *testing.T) {
 		dir := t.TempDir()
