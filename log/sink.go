@@ -66,6 +66,11 @@ func (h *multiSinkHook) Fire(entry *logrus.Entry) error {
 	return errors.Join(res...)
 }
 
+// AcceptorFn
+// Anonymous filter/acceptor.
+// Normally log levels are trace < debug < info < warn < error.
+// But logrus has reverted logic trace > debug > info > warn > error.
+// Ensure you have provided the proper predicate.
 type AcceptorFn func(e *logrus.Entry) bool
 
 func (fn AcceptorFn) Accept(entry *logrus.Entry) bool {
@@ -74,12 +79,12 @@ func (fn AcceptorFn) Accept(entry *logrus.Entry) bool {
 
 func NewAcceptorGte(level logrus.Level) Acceptor {
 	return AcceptorFn(func(e *logrus.Entry) bool {
-		return e.Level >= level
+		return e.Level <= level
 	})
 }
 
 func NewAcceptorLt(level logrus.Level) Acceptor {
 	return AcceptorFn(func(e *logrus.Entry) bool {
-		return e.Level < level
+		return e.Level > level
 	})
 }
