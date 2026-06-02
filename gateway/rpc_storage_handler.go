@@ -73,6 +73,9 @@ var (
 		"GetApiDefinitions": func(dr *model.DefRequest) (string, error) {
 			return "", nil
 		},
+		"GetClientIdPs": func(dr *model.DefRequest) (string, error) {
+			return "", nil
+		},
 		"GetPolicies": func(orgId string) (string, error) {
 			return "", nil
 		},
@@ -80,6 +83,9 @@ var (
 			return nil
 		},
 		"CheckReload": func(clientAddr, orgId string) (bool, error) {
+			return false, nil
+		},
+		"CheckIdPReload": func(clientAddr, orgId string) (bool, error) {
 			return false, nil
 		},
 		"GetKeySpaceUpdate": func(clientAddr, orgId string) ([]string, error) {
@@ -124,6 +130,10 @@ type RPCDataLoader interface {
 	Connect() bool
 	GetApiDefinitions(orgId string, tags []string) string
 	GetPolicies(orgId string) string
+	// GetClientIdPs is the sibling of GetApiDefinitions for the client-IdP
+	// registry. The JSON-array envelope is identical to the dashboard's
+	// /system/clientidps payload — both decoded by unmarshalIdPs.
+	GetClientIdPs(orgId string, tags []string) string
 }
 
 // Connect will establish a connection to the RPC
@@ -772,6 +782,32 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 	return defString.(string)
 }
 
+// GetClientIdPs pulls the client-IdP registry from the RPC server. The payload
+// is already tag-filtered and api_mappings-pruned by MDCB; the segment backstop
+// in IdPRegistry.rebuild is defensive safety.
+func (r *RPCStorageHandler) GetClientIdPs(orgId string, tags []string) string {
+	dr := model.DefRequest{OrgId: orgId, Tags: tags}
+	defString, err := rpc.FuncClientSingleton("GetClientIdPs", dr)
+	if err != nil {
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
+			"GetClientIdPs",
+			err,
+			map[string]string{
+				"orgId": orgId,
+				"tags":  strings.Join(tags, ","),
+			},
+		)
+		// FuncClientSingleton already retries with backoff; on hard failure the
+		// registry refresh logs and leaves the previous index in place.
+		return ""
+	}
+	if defString == nil {
+		return ""
+	}
+	return defString.(string)
+}
+
 // GetPolicies will pull Policies from the RPC server
 func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 	defString, err := rpc.FuncClientSingleton("GetPolicies", orgId)
@@ -835,6 +871,42 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) bool {
 		go func() {
 			r.Gw.MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gw: r.Gw})
 		}()
+	}
+	return true
+}
+
+// CheckForIdPReload is the client-IdP sibling of CheckForReload: a long poll on
+// the dedicated CheckIdPReload RPC. On a reload signal it refreshes ONLY the
+// client-IdP registry (a single GetClientIdPs RPC) — deliberately NOT a full
+// API/policy resync. Errors are logged and the loop continues; the registry
+// keeps its previous snapshot. Returns false only on shutdown to stop the loop.
+func (r *RPCStorageHandler) CheckForIdPReload(orgId string) bool {
+	select {
+	case <-r.Gw.ctx.Done():
+		return false
+	default:
+	}
+
+	reload, err := rpc.FuncClientSingleton("CheckIdPReload", orgId)
+	if err != nil {
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
+			"CheckIdPReload",
+			err,
+			map[string]string{"orgId": orgId},
+		)
+		// Unlike CheckForReload we do not force a re-sync here: an IdP reload
+		// check is auxiliary and must not disturb the main RPC sync state. The
+		// main reload loop owns re-login/recovery.
+		time.Sleep(1 * time.Second)
+		return true
+	}
+
+	if reload == true && r.Gw.idpRegistry != nil {
+		log.Info("[RPC STORE] Received client-IdP reload instruction!")
+		if refreshErr := r.Gw.idpRegistry.doRefresh(); refreshErr != nil {
+			log.WithError(refreshErr).Error("client-IdP registry refresh failed; keeping previous snapshot")
+		}
 	}
 	return true
 }

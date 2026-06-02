@@ -244,6 +244,10 @@ type Gateway struct {
 	// apiJWKCaches cache per api entity
 	apiJWKCaches sync.Map
 
+	// idpRegistry is the in-memory client-IdP registry, a sibling dataset of the
+	// API definitions consulted only as a last fallback in the JWT path.
+	idpRegistry *IdPRegistry
+
 	limitHeaderFactory rate.HeaderSenderFactory
 
 	BundleChecksumVerifier bundleChecksumVerifyFunction
@@ -310,6 +314,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	}
 
 	gw.jwkCache = buildJWKSCache(config)
+	gw.idpRegistry = newIdPRegistry(gw)
 	gw.BundleChecksumVerifier = defaultBundleVerifyFunction
 
 	return gw
@@ -1243,6 +1248,17 @@ func (gw *Gateway) rpcReloadLoop(rpcKey string) {
 	}
 }
 
+// idpReloadLoop long-polls the dedicated CheckIdPReload RPC. It runs parallel to
+// rpcReloadLoop so a client-IdP change refreshes ONLY the registry (one
+// GetClientIdPs RPC) without a full API/policy resync. Exits on shutdown.
+func (gw *Gateway) idpReloadLoop(rpcKey string) {
+	for {
+		if ok := gw.RPCListener.CheckForIdPReload(rpcKey); !ok {
+			return
+		}
+	}
+}
+
 // DoReloadWithError performs a full reload of APIs and policies, returning any
 // sync error that prevented a successful reload. The reloadMu mutex is acquired
 // for the duration of the reload, so each call is safe to make concurrently.
@@ -1295,6 +1311,18 @@ func (gw *Gateway) DoReloadWithError() error {
 	}
 
 	gw.loadGlobalApps()
+
+	// Refresh the client-IdP registry AFTER loadGlobalApps populates apisByID.
+	// The segment-aware backstop indexes only bindings whose api_id is present
+	// in apisByID — sequencing this before loadGlobalApps would drop every
+	// binding and 401 registry-only APIs from boot. Every DoReload (startup,
+	// reloadLoop drain, /tyk/reload, RPC NoticeGroupReload) refreshes the
+	// registry as a side effect, giving operators IdP refresh "for free".
+	if gw.idpRegistry != nil {
+		if err := gw.idpRegistry.doRefresh(); err != nil {
+			mainLog.WithError(err).Warn("IdP registry refresh failed during reload — keeping previous snapshot")
+		}
+	}
 
 	gw.MetricInstruments.RecordReload(gw.ctx, time.Since(start))
 
@@ -2341,6 +2369,7 @@ func (gw *Gateway) start() {
 
 		gw.RPCListener.Connect()
 		go gw.rpcReloadLoop(slaveOptions.RPCKey)
+		go gw.idpReloadLoop(slaveOptions.RPCKey)
 		go gw.RPCListener.StartRPCKeepaliveWatcher()
 		go gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
 	}
