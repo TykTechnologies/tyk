@@ -103,6 +103,18 @@ func TestRedisExchangeCache_GetSetRoundTrip(t *testing.T) {
 	assert.Equal(t, "my-token", token)
 }
 
+func TestRedisExchangeCache_GetReturnsRemainingTTL(t *testing.T) {
+	// Get must surface the entry's remaining lifetime so callers can log/act on
+	// it. This holds only when the value and its TTL live under the same key —
+	// the store must apply no extra prefix/hashing to the raw key.
+	c := newRedisExchangeCache(newFakeStore(), "secret")
+	c.Set("k1", "my-token", 60*time.Second)
+
+	_, ttl, miss := c.Get("k1")
+	require.False(t, miss)
+	assert.Equal(t, 60*time.Second, ttl)
+}
+
 func TestRedisExchangeCache_EncryptedAtRest(t *testing.T) {
 	store := newFakeStore()
 	c := newRedisExchangeCache(store, "secret")

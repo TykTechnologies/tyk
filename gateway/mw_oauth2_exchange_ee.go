@@ -18,9 +18,9 @@ func getOAuth2ExchangeMw(base *BaseMiddleware) TykMiddleware {
 	if _, cfg := base.Spec.GetOAuth2Config(); cfg != nil && cfg.TokenExchange != nil && cfg.TokenExchange.Enabled {
 		for _, p := range cfg.TokenExchange.Providers {
 			if p.Cache != nil && p.Cache.Enabled {
+				// The cache key already carries the oauth2:exchange: namespace; the
+				// store uses raw-key ops, so no KeyPrefix/HashKeys is applied here.
 				store := &storage.RedisCluster{
-					KeyPrefix:         "oauth2-exchange:",
-					HashKeys:          false,
 					ConnectionHandler: base.Gw.StorageConnectionHandler,
 				}
 				store.Connect()

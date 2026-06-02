@@ -307,8 +307,10 @@ const (
 	OAuth2CacheModeDerived = "derived"
 	OAuth2CacheModeStatic  = "static"
 
-	// JWT standard claim key.
+	// JWT standard claim keys.
 	OAuth2ClaimIss = "iss"
+	OAuth2ClaimSub = "sub"
+	OAuth2ClaimExp = "exp"
 
 	// OAuth2 response / WWW-Authenticate field names.
 	OAuth2FieldError            = "error"

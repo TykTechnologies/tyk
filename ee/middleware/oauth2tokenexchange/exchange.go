@@ -64,7 +64,7 @@ func (m *Middleware) runExchange(r *http.Request, st *oauth2common.State) (oauth
 // subjectIDFromState derives a subject identifier from the inbound token state.
 // Uses the "sub" claim when present; falls back to a 12-character hash of the raw token.
 func subjectIDFromState(st *oauth2common.State) string {
-	if sub := oauth2common.StringClaim(st.Claims, "sub"); sub != "" {
+	if sub := oauth2common.StringClaim(st.Claims, oas.OAuth2ClaimSub); sub != "" {
 		return sub
 	}
 	h := sha256.Sum256([]byte(st.RawToken))
@@ -73,7 +73,7 @@ func subjectIDFromState(st *oauth2common.State) string {
 
 // inboundRemaining returns how long the inbound token has left, or 0 if unknown.
 func inboundRemaining(st *oauth2common.State) time.Duration {
-	expVal, ok := st.Claims["exp"]
+	expVal, ok := st.Claims[oas.OAuth2ClaimExp]
 	if !ok {
 		return 0
 	}
