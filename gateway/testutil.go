@@ -47,6 +47,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -1027,8 +1028,9 @@ type Test struct {
 	TestServerRouter *mux.Router
 	MockHandle       *test.DnsMockHandle
 
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx       context.Context
+	cancel    context.CancelFunc
+	cancelLog tyklog.CancelFn
 
 	dynamicHandlers map[string]http.HandlerFunc
 }
@@ -1039,6 +1041,8 @@ type SlaveDataCenter struct {
 }
 
 func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {
+	cancel := tyklog.Reset()
+
 	t := &Test{
 		dynamicHandlers: make(map[string]http.HandlerFunc),
 	}
@@ -1050,6 +1054,7 @@ func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig
 	}
 
 	t.Gw = t.start(genConf)
+	t.cancelLog = cancel
 
 	return t
 }
@@ -1318,6 +1323,7 @@ func (s *Test) ReloadGatewayProxy() {
 
 func (s *Test) Close() {
 	defer s.cancel()
+	defer s.cancelLog()
 
 	for _, p := range s.Gw.DefaultProxyMux.proxies {
 		if p.listener != nil {
