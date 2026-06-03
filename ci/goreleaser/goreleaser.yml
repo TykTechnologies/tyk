@@ -59,12 +59,12 @@ builds:
     binary: tyk
   - id: fips-amd64
     flags:
-      - -tags=goplugin,ee,fips,boringcrypto
+      - -tags=goplugin,ee,fips
       - -trimpath
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
       - CC=gcc
-      - GOEXPERIMENT=boringcrypto
+      - GOFIPS140=v1.0.0
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
@@ -77,12 +77,12 @@ builds:
     binary: tyk
   - id: fips-arm64
     flags:
-      - -tags=goplugin,ee,fips,boringcrypto
+      - -tags=goplugin,ee,fips
       - -trimpath
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
       - CC=aarch64-linux-gnu-gcc
-      - GOEXPERIMENT=boringcrypto
+      - GOFIPS140=v1.0.0
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
@@ -92,6 +92,24 @@ builds:
       - linux
     goarch:
       - arm64
+    binary: tyk
+  - id: fips-s390x
+    flags:
+      - -tags=goplugin,ee,fips
+      - -trimpath
+    env:
+      - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
+      - CC=s390x-linux-gnu-gcc
+      - GOFIPS140=v1.0.0
+    ldflags:
+      - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
+      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
+    goos:
+      - linux
+    goarch:
+      - s390x
     binary: tyk
   - id: std-amd64
     flags:
@@ -208,12 +226,13 @@ nfpms:
     vendor: "Tyk Technologies Ltd"
     homepage: "https://tyk.io"
     maintainer: "Tyk <info@tyk.io>"
-    description: Tyk API Gateway Enterprise Edition written in Go, supporting REST, GraphQL, TCP and gRPC protocols Built with boringssl
+    description: Tyk API Gateway Enterprise Edition written in Go, supporting REST, GraphQL, TCP and gRPC protocols Built with FIPS 140-3 compliant cryptography
     package_name: tyk-gateway-fips
     file_name_template: "{{ .ConventionalFileName }}"
     ids:
       - fips-amd64
       - fips-arm64
+      - fips-s390x
     formats:
       - deb
       - rpm
