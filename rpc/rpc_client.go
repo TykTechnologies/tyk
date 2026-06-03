@@ -24,9 +24,9 @@ import (
 )
 
 var (
-	GlobalRPCCallTimeout               = 30 * time.Second
-	GlobalRPCPingTimeout               = 60 * time.Second
-	Log                  tyklog.Logger = nil
+	GlobalRPCCallTimeout = 30 * time.Second
+	GlobalRPCPingTimeout = 60 * time.Second
+	Log                  = tyklog.Get()
 	Instrument           *health.Stream
 
 	clientSingleton     *gorpc.Client
