@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -14,11 +15,13 @@ import (
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/middleware"
+	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
 const (
-	contentTypeJSON   = "application/json"
-	headerContentType = "Content-Type"
+	contentTypeJSON         = "application/json"
+	headerContentType       = "Content-Type"
+	httpHeaderContentLength = "Content-Length"
 )
 
 // JSONRPCMiddleware handles JSON-RPC 2.0 request detection and routing.
@@ -75,14 +78,16 @@ func (m *JSONRPCMiddleware) validateJSONRPCRequest(r *http.Request) bool {
 }
 
 // readAndParseJSONRPC reads the request body and parses it as JSON-RPC 2.0.
-// Returns the parsed request or writes an error response and returns nil.
+// Returns the parsed request and the raw body, or writes an error response and
+// returns nil. The raw body is returned so callers (e.g. the trace-context
+// read) can resolve a configured body path without re-reading the request.
 // Request body size limits are enforced at the gateway level (proxy_muxer).
-func (m *JSONRPCMiddleware) readAndParseJSONRPC(w http.ResponseWriter, r *http.Request) (*JSONRPCRequest, error) {
+func (m *JSONRPCMiddleware) readAndParseJSONRPC(w http.ResponseWriter, r *http.Request) (*JSONRPCRequest, []byte, error) {
 	// Read the request body (already size-limited by gateway if configured)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		m.writeJSONRPCError(w, r, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
-		return nil, err
+		return nil, nil, err
 	}
 	// Restore body for upstream
 	r.Body = io.NopCloser(bytes.NewReader(body))
@@ -90,16 +95,16 @@ func (m *JSONRPCMiddleware) readAndParseJSONRPC(w http.ResponseWriter, r *http.R
 	var rpcReq JSONRPCRequest
 	if err := json.Unmarshal(body, &rpcReq); err != nil {
 		m.writeJSONRPCError(w, r, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Validate JSON-RPC 2.0 structure
 	if rpcReq.JSONRPC != apidef.JsonRPC20 || rpcReq.Method == "" {
 		m.writeJSONRPCError(w, r, rpcReq.ID, mcp.JSONRPCInvalidRequest, mcp.ErrMsgInvalidRequest, nil)
-		return nil, fmt.Errorf("invalid JSON-RPC request")
+		return nil, nil, fmt.Errorf("invalid JSON-RPC request")
 	}
 
-	return &rpcReq, nil
+	return &rpcReq, body, nil
 }
 
 // setupSequentialRouting initializes sequential VEM routing for JSON-RPC requests.
@@ -171,7 +176,7 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Parse JSON-RPC request
-	rpcReq, err := m.readAndParseJSONRPC(w, r)
+	rpcReq, body, err := m.readAndParseJSONRPC(w, r)
 	if err != nil {
 		// Error response already written by readAndParseJSONRPC
 		return nil, middleware.StatusRespond //nolint:nilerr
@@ -198,8 +203,56 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		ctxSetMCPPrimitiveName(r, state.PrimitiveName)
 	}
 
+	// Bridge the MCP trace context (SEP-414): join the agent's trace from the
+	// configured read sources and stamp the method/tool on the span.
+	m.bridgeMCPTraceContext(r, rpcReq, body)
+
 	// Return StatusOK to allow chain to continue to DummyProxyHandler, which will handle the redirect
 	return nil, http.StatusOK
+}
+
+// bridgeMCPTraceContext reads the W3C trace context from the configured sources
+// and, when the agent set it only in the body (no HTTP traceparent), installs
+// it into the request context so every span/log/audit Tyk emits later joins the
+// agent's trace. It then writes the current trace context into the outbound
+// body's trace-context field so the MCP server — which reads the body, not the
+// header — joins the trace too: the body-channel equivalent of the traceparent
+// header Tyk already injects upstream for ordinary HTTP. It also stamps the MCP
+// method/tool and trace_source on the span. No-op when tracing is disabled.
+func (m *JSONRPCMiddleware) bridgeMCPTraceContext(r *http.Request, rpcReq *JSONRPCRequest, body []byte) {
+	if m.Gw == nil {
+		return
+	}
+	cfg := m.Gw.GetConfig()
+	if !cfg.OpenTelemetry.TracesEnabled() {
+		return
+	}
+
+	sources := cfg.OpenTelemetry.MCPTraceContext.ReadSources
+	if len(sources) == 0 {
+		sources = otel.DefaultMCPReadSources()
+	}
+
+	source := otel.JoinMCPTraceContext(r, sources, body)
+	ctxSetSpanAttributes(r, m.Name(), otel.MCPSpanAttributes(rpcReq.Method, ctxGetMCPPrimitiveType(r), ctxGetMCPPrimitiveName(r), source)...)
+
+	m.writeMCPTraceContext(r, body)
+}
+
+// writeMCPTraceContext rewrites the outbound MCP body so its trace-context field
+// carries Tyk's current W3C trace context (SEP-414): the downstream MCP server
+// then joins the trace and nests under Tyk. It is the body-channel parallel of
+// the traceparent header the OTel roundtripper injects for ordinary upstreams,
+// so it runs automatically whenever tracing is enabled. A no-op — body forwarded
+// unchanged — when there is no active context or the body is non-MCP/malformed.
+func (m *JSONRPCMiddleware) writeMCPTraceContext(r *http.Request, body []byte) {
+	out, changed := mcp.WriteMetaTraceContext(body, otel.CurrentTraceContext(r.Context()))
+	if !changed {
+		return
+	}
+	r.Body = io.NopCloser(bytes.NewReader(out))
+	r.ContentLength = int64(len(out))
+	r.Header.Set(httpHeaderContentLength, strconv.Itoa(len(out)))
 }
 
 // writeJSONRPCError writes a JSON-RPC 2.0 error response.

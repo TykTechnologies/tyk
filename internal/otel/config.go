@@ -76,6 +76,11 @@ type OpenTelemetry struct {
 
 	// Metrics holds the OpenTelemetry metrics configuration.
 	Metrics MetricsConfig `json:"metrics"`
+
+	// MCPTraceContext configures where Tyk reads an MCP request's W3C trace
+	// context from (ordered, first-match-wins). Omitted ⇒ the canonical
+	// [{header}, {body, path: params._meta}] default.
+	MCPTraceContext MCPTraceContextConfig `json:"mcp_trace_context"`
 }
 
 // TracesEnabled reports whether tracing is enabled. It checks the Traces
@@ -146,6 +151,9 @@ func (c *OpenTelemetry) SetDefaults() {
 
 	// 3. Fill remaining gaps with library defaults (export interval, temporality, etc.).
 	c.Metrics.SetDefaults()
+
+	// 4. Materialise the canonical MCP read-source default when omitted.
+	c.MCPTraceContext.SetDefaults()
 }
 
 // LibraryConfig returns the effective trace config for passing to
