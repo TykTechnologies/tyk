@@ -436,16 +436,16 @@ func (s SessionState) Clone() SessionState {
 	return newSession
 }
 
-// lockForWrite acquires the write lock for map field modifications
-func (s *SessionState) lockForWrite() {
+// LockForWrite acquires the write lock for map field modifications
+func (s *SessionState) LockForWrite() {
 	if s.mu == nil {
 		s.mu = &sync.RWMutex{}
 	}
 	s.mu.Lock()
 }
 
-// unlockForWrite releases the write lock
-func (s *SessionState) unlockForWrite() {
+// UnlockForWrite releases the write lock
+func (s *SessionState) UnlockForWrite() {
 	if s.mu != nil {
 		s.mu.Unlock()
 	}
