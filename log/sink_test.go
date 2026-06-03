@@ -53,7 +53,7 @@ func TestNewSink(t *testing.T) {
 	sink := NewSink(writer, formatter, acceptor)
 
 	assert.NotNil(t, sink)
-	assert.Implements(t, (*Sink)(nil), sink)
+	assert.Implements(t, (*Sinker)(nil), sink)
 }
 
 func TestMultiSinkHook_Levels(t *testing.T) {
@@ -69,7 +69,7 @@ func TestMultiSinkHook_Fire_Success(t *testing.T) {
 	sink2 := NewSink(buf2, &mockFormatter{}, NewAcceptorGte(logrus.WarnLevel))
 
 	hook := &multiSinkHook{
-		sinks: []Sink{sink1, sink2},
+		sinks: []Sinker{sink1, sink2},
 	}
 
 	entryInfo := &logrus.Entry{Level: logrus.InfoLevel, Message: "info-msg"}
@@ -86,22 +86,22 @@ func TestMultiSinkHook_Fire_Success(t *testing.T) {
 	assert.Equal(t, "error-msg", buf2.String())
 }
 
-func TestMultiSinkHook_Fire_ErrorJoining(t *testing.T) {
+func TestMultiSinkHook_Fire_WritesAtLeastOne(t *testing.T) {
 	formatErr := errors.New("failed to format")
 	writeErr := errors.New("failed to write")
+	buf := &bytes.Buffer{}
 
-	sinkFormatFail := NewSink(&bytes.Buffer{}, &mockFormatter{err: formatErr}, NewAcceptorLt(logrus.PanicLevel))
-	sinkWriteFail := NewSink(&mockWriter{err: writeErr}, &mockFormatter{}, NewAcceptorLt(logrus.PanicLevel))
-	sinkSuccess := NewSink(&bytes.Buffer{}, &mockFormatter{}, NewAcceptorLt(logrus.PanicLevel))
+	sinkFormatFail := NewSink(&bytes.Buffer{}, &mockFormatter{err: formatErr}, AcceptorAllowAll)
+	sinkWriteFail := NewSink(&mockWriter{err: writeErr}, &mockFormatter{}, AcceptorAllowAll)
+	sinkSuccess := NewSink(buf, &mockFormatter{}, AcceptorAllowAll)
 
 	hook := &multiSinkHook{
-		sinks: []Sink{sinkFormatFail, sinkWriteFail, sinkSuccess},
+		sinks: []Sinker{sinkFormatFail, sinkWriteFail, sinkSuccess},
 	}
 
 	err := hook.Fire(&logrus.Entry{Level: logrus.InfoLevel, Message: "test"})
-
-	assert.ErrorContains(t, err, formatErr.Error())
-	assert.ErrorContains(t, err, writeErr.Error())
+	assert.NoError(t, err)
+	assert.Equal(t, "test", buf.String(), "contains fired message")
 }
 
 func TestAcceptorFn_Accept(t *testing.T) {

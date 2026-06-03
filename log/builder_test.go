@@ -19,7 +19,7 @@ func (m *mockHook) Fire(_ *logrus.Entry) error {
 }
 
 type mockSink struct {
-	Sink
+	Sinker
 }
 
 func TestBuilder(t *testing.T) {
