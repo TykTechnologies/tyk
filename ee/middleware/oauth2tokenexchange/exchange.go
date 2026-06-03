@@ -102,6 +102,7 @@ func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State
 
 	subjectID := subjectIDFromState(st)
 	cacheKey := oauth2common.CacheKeyInput{
+		Issuer:       oauth2common.StringClaim(st.Claims, oas.OAuth2ClaimIss),
 		SubjectID:    subjectID,
 		APIID:        st.APIID,
 		Audience:     target.Audience,

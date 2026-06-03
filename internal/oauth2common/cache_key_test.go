@@ -54,3 +54,11 @@ func TestCacheKey_DifferentAPIIDs(t *testing.T) {
 	k2 := CacheKeyInput{SubjectID: "u1", APIID: "api-y", Audience: "aud", Scopes: []string{"r"}, ProviderName: "p"}
 	assert.NotEqual(t, k1.Build(), k2.Build())
 }
+
+func TestCacheKey_DifferentIssuers(t *testing.T) {
+	// A "sub" is only unique within its issuer. One provider can list several
+	// issuers, so the same sub from two issuers must not share a cache entry.
+	k1 := CacheKeyInput{Issuer: "https://idp-a", SubjectID: "alice", APIID: "api1", Audience: "aud", Scopes: []string{"r"}, ProviderName: "p"}
+	k2 := CacheKeyInput{Issuer: "https://idp-b", SubjectID: "alice", APIID: "api1", Audience: "aud", Scopes: []string{"r"}, ProviderName: "p"}
+	assert.NotEqual(t, k1.Build(), k2.Build())
+}

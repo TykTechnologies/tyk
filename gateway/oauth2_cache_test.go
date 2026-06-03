@@ -132,3 +132,30 @@ func TestRedisExchangeCache_ZeroTTLNotStored(t *testing.T) {
 	_, _, miss := c.Get("k1")
 	assert.True(t, miss)
 }
+
+func TestRedisExchangeCache_SubSecondTTLRoundsUp(t *testing.T) {
+	// A positive sub-second TTL must not floor to 0: Redis treats a 0 expiry as
+	// "no expiry", which would cache a near-expired token forever.
+	store := newFakeStore()
+	c := newRedisExchangeCache(store, "secret")
+	c.Set("k1", "my-token", 400*time.Millisecond)
+
+	exp, err := store.GetExp("k1")
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, exp, int64(1))
+}
+
+// failingSetStore makes SetRawKey fail to exercise the cache-write error path.
+type failingSetStore struct{ *fakeStore }
+
+func (f *failingSetStore) SetRawKey(string, string, int64) error {
+	return errors.New("redis down")
+}
+
+func TestRedisExchangeCache_SetErrorIsNonFatal(t *testing.T) {
+	c := newRedisExchangeCache(&failingSetStore{newFakeStore()}, "secret")
+	// A failed cache write must not panic and must leave no entry behind.
+	c.Set("k1", "my-token", 60*time.Second)
+	_, _, miss := c.Get("k1")
+	assert.True(t, miss)
+}

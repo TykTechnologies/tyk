@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"math"
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
@@ -41,5 +42,10 @@ func (c *redisExchangeCache) Set(key string, token string, ttl time.Duration) {
 	if encrypted == "" {
 		return
 	}
-	_ = c.store.SetRawKey(key, encrypted, int64(ttl.Seconds()))
+	// Round up: a sub-second TTL must not floor to 0, which Redis reads as "no
+	// expiry" and would cache a near-expired token forever.
+	ttlSec := int64(math.Ceil(ttl.Seconds()))
+	if err := c.store.SetRawKey(key, encrypted, ttlSec); err != nil {
+		log.WithError(err).Warning("token exchange cache: failed to store entry")
+	}
 }
