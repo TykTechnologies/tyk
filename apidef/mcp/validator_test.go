@@ -621,6 +621,13 @@ func TestValidateMCPObject_WithTykMCPServerExtension(t *testing.T) {
 				"name": "createOrder",
 				"allow": true,
 				"description": "Create an order",
+				"annotations": {
+					"title": "Create order",
+					"readOnlyHint": false,
+					"destructiveHint": true,
+					"idempotentHint": false,
+					"openWorldHint": true
+				},
 				"parameters": [{
 					"param": "customer_id",
 					"name": "customerId",
@@ -659,6 +666,39 @@ func TestValidateMCPObject_WithTykMCPServerExtension(t *testing.T) {
 	assert.Error(t, err)
 	if err != nil {
 		assert.Contains(t, err.Error(), "x-tyk-mcp-server.primitives.0.allow")
+	}
+
+	invalidAnnotationDoc := []byte(`{
+		"openapi": "3.0.3",
+		"info": {"title": "MCP Proxy", "version": "1.0.0"},
+		"paths": {},
+		"x-tyk-api-gateway": {
+			"info": {
+				"name": "mcp-proxy",
+				"state": {"active": true}
+			},
+			"upstream": {"url": "tyk://rest-1/mcp"},
+			"server": {
+				"listenPath": {"value": "/mcp-proxy"}
+			}
+		},
+		"x-tyk-mcp-server": {
+			"primitives": [{
+				"source": {"operationId": "createOrder"},
+				"name": "createOrder",
+				"annotations": {
+					"title": "Create order",
+					"unknownHint": true
+				}
+			}]
+		}
+	}`)
+
+	err = ValidateMCPObject(invalidAnnotationDoc, "3.0.3")
+	assert.Error(t, err)
+	if err != nil {
+		assert.Contains(t, err.Error(), "annotations")
+		assert.Contains(t, err.Error(), "unknownHint")
 	}
 }
 

@@ -22,6 +22,8 @@ type TykMCPServerPrimitive struct {
 	Name string `bson:"name,omitempty" json:"name,omitempty"`
 	// Description overrides the derived MCP-facing tool description.
 	Description string `bson:"description,omitempty" json:"description,omitempty"`
+	// Annotations overrides MCP tool annotations derived from the source operation.
+	Annotations *DerivedToolAnnotations `bson:"annotations,omitempty" json:"annotations,omitempty"`
 	// Parameters configures MCP-facing argument names and descriptions.
 	Parameters []TykMCPServerParameter `bson:"parameters,omitempty" json:"parameters,omitempty"`
 	// Allow exposes this primitive when any primitive uses explicit allow mode.

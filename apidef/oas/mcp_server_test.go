@@ -30,6 +30,13 @@ func TestTykMCPServerExtension_JSONRoundTrip(t *testing.T) {
 				"name":"create_order",
 				"allow":true,
 				"description":"Place a new order for a customer",
+				"annotations":{
+					"title":"Place order",
+					"readOnlyHint":false,
+					"destructiveHint":false,
+					"idempotentHint":false,
+					"openWorldHint":false
+				},
 				"parameters":[{
 					"param":"customer_id",
 					"name":"customer",
@@ -49,6 +56,12 @@ func TestTykMCPServerExtension_JSONRoundTrip(t *testing.T) {
 	assert.Equal(t, "create_order", ext.Primitives[0].Name)
 	require.NotNil(t, ext.Primitives[0].Allow)
 	assert.True(t, *ext.Primitives[0].Allow)
+	require.NotNil(t, ext.Primitives[0].Annotations)
+	assert.Equal(t, "Place order", ext.Primitives[0].Annotations.Title)
+	require.NotNil(t, ext.Primitives[0].Annotations.ReadOnlyHint)
+	assert.False(t, *ext.Primitives[0].Annotations.ReadOnlyHint)
+	require.NotNil(t, ext.Primitives[0].Annotations.DestructiveHint)
+	assert.False(t, *ext.Primitives[0].Annotations.DestructiveHint)
 	require.Len(t, ext.Primitives[0].Parameters, 1)
 	assert.Equal(t, "customer_id", ext.Primitives[0].Parameters[0].Param)
 	assert.Equal(t, "customer", ext.Primitives[0].Parameters[0].Name)
@@ -61,6 +74,11 @@ func TestTykMCPServerExtension_JSONRoundTrip(t *testing.T) {
 	require.Contains(t, roundTripped, ExtensionTykMCPServer)
 	mcpServer := roundTripped[ExtensionTykMCPServer].(map[string]any)
 	require.Len(t, mcpServer["primitives"], 1)
+	primitive := mcpServer["primitives"].([]any)[0].(map[string]any)
+	annotations := primitive["annotations"].(map[string]any)
+	assert.Equal(t, "Place order", annotations["title"])
+	assert.Equal(t, false, annotations["readOnlyHint"])
+	assert.Equal(t, false, annotations["destructiveHint"])
 }
 
 func TestTykMCPServerExtension_ValidatePlacement(t *testing.T) {
@@ -201,6 +219,49 @@ func TestDeriveMCPToolView_PrimitivesWithoutAllowDoNotRestrictExposure(t *testin
 	assert.Empty(t, warnings)
 	require.Len(t, view.Tools, 2)
 	assert.Equal(t, []string{"create_order", "list_orders"}, view.ToolNames())
+}
+
+func TestDeriveMCPToolView_AppliesAnnotationOverrides(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: "list_orders",
+				Summary:     "List orders",
+			},
+		}),
+	))
+
+	view, warnings, err := DeriveMCPToolView(src, &TykMCPServer{
+		Primitives: []TykMCPServerPrimitive{
+			{
+				Source: TykMCPServerSource{OperationID: "list_orders"},
+				Name:   "orders",
+				Annotations: &DerivedToolAnnotations{
+					Title:           "Fetch orders",
+					ReadOnlyHint:    boolPtr(false),
+					DestructiveHint: boolPtr(false),
+					OpenWorldHint:   boolPtr(true),
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, warnings)
+	require.Len(t, view.Tools, 1)
+
+	annotations := view.Tools[0].Annotations
+	require.NotNil(t, annotations)
+	assert.Equal(t, "Fetch orders", annotations.Title)
+	require.NotNil(t, annotations.ReadOnlyHint)
+	assert.False(t, *annotations.ReadOnlyHint)
+	require.NotNil(t, annotations.DestructiveHint)
+	assert.False(t, *annotations.DestructiveHint)
+	require.NotNil(t, annotations.IdempotentHint)
+	assert.True(t, *annotations.IdempotentHint)
+	require.NotNil(t, annotations.OpenWorldHint)
+	assert.True(t, *annotations.OpenWorldHint)
 }
 
 func TestDeriveMCPToolView_AllowTrueEnablesExplicitAllowMode(t *testing.T) {
@@ -344,6 +405,36 @@ func TestDeriveMCPToolView_DefaultsToAllCanonicalTools(t *testing.T) {
 	assert.Empty(t, warnings)
 	require.Len(t, view.Tools, 2)
 	assert.Equal(t, []string{"create_order", "list_orders"}, view.ToolNames())
+}
+
+func TestCloneDerivedToolCopiesAnnotationsAndOutputSchema(t *testing.T) {
+	t.Parallel()
+
+	original := DerivedTool{
+		Name: "get_order",
+		Annotations: &DerivedToolAnnotations{
+			Title:           "Get order",
+			ReadOnlyHint:    boolPtr(true),
+			DestructiveHint: boolPtr(false),
+		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"id": map[string]any{"type": "string"},
+			},
+		},
+	}
+
+	cloned := cloneDerivedTool(original)
+	cloned.Annotations.Title = "Changed"
+	*cloned.Annotations.ReadOnlyHint = false
+	cloned.OutputSchema["type"] = "changed"
+	cloned.OutputSchema["properties"].(map[string]any)["id"].(map[string]any)["type"] = "integer"
+
+	assert.Equal(t, "Get order", original.Annotations.Title)
+	assert.True(t, *original.Annotations.ReadOnlyHint)
+	assert.Equal(t, "object", original.OutputSchema["type"])
+	assert.Equal(t, "string", original.OutputSchema["properties"].(map[string]any)["id"].(map[string]any)["type"])
 }
 
 func TestDeriveMCPToolView_ValidationFailures(t *testing.T) {

@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -182,6 +183,202 @@ func TestDeriveSourceTools_DerivesFormURLEncodedRequestBody(t *testing.T) {
 	assert.Equal(t, []string{"sku"}, tools[0].InputSchema["required"])
 }
 
+func TestDeriveSourceTools_DerivesDefaultAnnotationsFromMethod(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: "list_orders",
+				Summary:     "List orders",
+			},
+			Put: &openapi3.Operation{
+				OperationID: "replace_order",
+			},
+			Post: &openapi3.Operation{
+				OperationID: "create_order",
+			},
+		}),
+	))
+
+	tools, _, err := DeriveSourceTools(src, nil)
+	require.NoError(t, err)
+	require.Len(t, tools, 3)
+
+	byName := map[string]DerivedTool{}
+	for _, tool := range tools {
+		byName[tool.Name] = tool
+	}
+
+	assertDerivedToolAnnotations(t, byName["list_orders"].Annotations, "List orders", true, false, true, false)
+	assertDerivedToolAnnotations(t, byName["replace_order"].Annotations, "replace_order", false, true, true, true)
+	assertDerivedToolAnnotations(t, byName["create_order"].Annotations, "create_order", false, true, false, true)
+
+	encoded, err := json.Marshal(byName["list_orders"])
+	require.NoError(t, err)
+	assert.Contains(t, string(encoded), `"destructiveHint":false`)
+}
+
+func TestDeriveSourceTools_DerivesOutputSchemaFromJSONResponses(t *testing.T) {
+	t.Parallel()
+
+	responseSchema := openapi3.NewObjectSchema()
+	responseSchema.Description = "Order response"
+	responseSchema.Required = []string{"id"}
+	responseSchema.Properties = openapi3.Schemas{
+		"id": &openapi3.SchemaRef{Value: &openapi3.Schema{
+			Type:   &openapi3.Types{schemaTypeString},
+			Format: "uuid",
+		}},
+		"status": &openapi3.SchemaRef{Value: &openapi3.Schema{
+			Type: &openapi3.Types{schemaTypeString},
+			Enum: []any{"new", "paid"},
+		}},
+		"items": &openapi3.SchemaRef{Value: &openapi3.Schema{
+			Type: &openapi3.Types{schemaTypeArray},
+			Items: &openapi3.SchemaRef{Value: &openapi3.Schema{
+				Type: &openapi3.Types{schemaTypeString},
+			}},
+		}},
+	}
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders/{id}", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: "get_order",
+				Responses: deriveTestResponses(map[string]openapi3.Content{
+					"201": {
+						"application/json": deriveTestMedia(openapi3.NewStringSchema()),
+					},
+					"200": {
+						"application/vnd.tyk+json": deriveTestMedia(openapi3.NewObjectSchema().WithProperty("vendor", openapi3.NewStringSchema())),
+						"application/json":         deriveTestMedia(responseSchema),
+					},
+				}),
+			},
+		}),
+	))
+
+	tools, _, err := DeriveSourceTools(src, nil)
+	require.NoError(t, err)
+	require.Len(t, tools, 1)
+
+	assert.Equal(t, map[string]any{
+		"type":        "object",
+		"description": "Order response",
+		"properties": map[string]any{
+			"id": map[string]any{
+				"type":   "string",
+				"format": "uuid",
+			},
+			"items": map[string]any{
+				"type": "array",
+				"items": map[string]any{
+					"type": "string",
+				},
+			},
+			"status": map[string]any{
+				"type": "string",
+				"enum": []any{"new", "paid"},
+			},
+		},
+		"required": []string{"id"},
+	}, tools[0].OutputSchema)
+}
+
+func TestDeriveSourceTools_OutputSchemaSelectionAndWrapping(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		responses *openapi3.Responses
+		want      map[string]any
+	}{
+		{
+			name: "falls back to lowest JSON 2xx response",
+			responses: deriveTestResponses(map[string]openapi3.Content{
+				"202": {
+					"application/json": deriveTestMedia(openapi3.NewObjectSchema().WithProperty("accepted", openapi3.NewBoolSchema())),
+				},
+				"201": {
+					"application/vnd.tyk+json": deriveTestMedia(openapi3.NewObjectSchema().WithProperty("created", openapi3.NewStringSchema())),
+				},
+			}),
+			want: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"created": map[string]any{"type": "string"},
+				},
+			},
+		},
+		{
+			name: "wraps array response schema under result",
+			responses: deriveTestResponses(map[string]openapi3.Content{
+				"200": {
+					"application/json": deriveTestMedia(openapi3.NewArraySchema().WithItems(openapi3.NewStringSchema())),
+				},
+			}),
+			want: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"result": map[string]any{
+						"type": "array",
+						"items": map[string]any{
+							"type": "string",
+						},
+					},
+				},
+				"required": []string{"result"},
+			},
+		},
+		{
+			name: "omits non JSON response schema",
+			responses: deriveTestResponses(map[string]openapi3.Content{
+				"200": {
+					"text/plain": deriveTestMedia(openapi3.NewStringSchema()),
+				},
+			}),
+		},
+		{
+			name: "omits 204 response",
+			responses: deriveTestResponses(map[string]openapi3.Content{
+				"204": {
+					"application/json": deriveTestMedia(openapi3.NewObjectSchema()),
+				},
+			}),
+		},
+		{
+			name: "omits schema-less JSON response",
+			responses: deriveTestResponses(map[string]openapi3.Content{
+				"200": {
+					"application/json": &openapi3.MediaType{},
+				},
+			}),
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			src := newDeriveTestOAS(openapi3.NewPaths(
+				openapi3.WithPath("/orders", &openapi3.PathItem{
+					Get: &openapi3.Operation{
+						OperationID: "list_orders",
+						Responses:   tc.responses,
+					},
+				}),
+			))
+
+			tools, _, err := DeriveSourceTools(src, nil)
+			require.NoError(t, err)
+			require.Len(t, tools, 1)
+			assert.Equal(t, tc.want, tools[0].OutputSchema)
+		})
+	}
+}
+
 func TestDeriveSourceTools_AllowsMCPCompatibleOperationIDNames(t *testing.T) {
 	t.Parallel()
 
@@ -255,6 +452,41 @@ func toolNames(tools []DerivedTool) []string {
 		names = append(names, tool.Name)
 	}
 	return names
+}
+
+func assertDerivedToolAnnotations(
+	t *testing.T,
+	got *DerivedToolAnnotations,
+	title string,
+	readOnlyHint bool,
+	destructiveHint bool,
+	idempotentHint bool,
+	openWorldHint bool,
+) {
+	t.Helper()
+
+	require.NotNil(t, got)
+	assert.Equal(t, title, got.Title)
+	require.NotNil(t, got.ReadOnlyHint)
+	assert.Equal(t, readOnlyHint, *got.ReadOnlyHint)
+	require.NotNil(t, got.DestructiveHint)
+	assert.Equal(t, destructiveHint, *got.DestructiveHint)
+	require.NotNil(t, got.IdempotentHint)
+	assert.Equal(t, idempotentHint, *got.IdempotentHint)
+	require.NotNil(t, got.OpenWorldHint)
+	assert.Equal(t, openWorldHint, *got.OpenWorldHint)
+}
+
+func deriveTestResponses(contentByStatus map[string]openapi3.Content) *openapi3.Responses {
+	responses := openapi3.NewResponses()
+	for status, content := range contentByStatus {
+		responses.Set(status, &openapi3.ResponseRef{Value: &openapi3.Response{Content: content}})
+	}
+	return responses
+}
+
+func deriveTestMedia(schema *openapi3.Schema) *openapi3.MediaType {
+	return &openapi3.MediaType{Schema: &openapi3.SchemaRef{Value: schema}}
 }
 
 func TestDeriveSourceTools_PrefixesParameterNameCollisions(t *testing.T) {

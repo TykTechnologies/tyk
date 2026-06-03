@@ -29,6 +29,27 @@
           "description": {
             "type": "string"
           },
+          "annotations": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "readOnlyHint": {
+                "type": "boolean"
+              },
+              "destructiveHint": {
+                "type": "boolean"
+              },
+              "idempotentHint": {
+                "type": "boolean"
+              },
+              "openWorldHint": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
           "parameters": {
             "type": "array",
             "items": {

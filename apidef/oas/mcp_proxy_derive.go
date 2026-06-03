@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -65,6 +66,23 @@ type DerivedTool struct {
 	// the tool's accepted arguments. Built from the operation's
 	// parameters + requestBody.
 	InputSchema map[string]any `json:"inputSchema"`
+
+	// Annotations are MCP tool annotations published in tools/list.
+	Annotations *DerivedToolAnnotations `json:"annotations,omitempty"`
+
+	// OutputSchema is the JSON schema published in tools/list to describe
+	// structuredContent returned by successful tools/call responses.
+	OutputSchema map[string]any `json:"outputSchema,omitempty"`
+}
+
+// DerivedToolAnnotations describes MCP tool annotations derived from the
+// source REST operation and optional proxy-side overrides.
+type DerivedToolAnnotations struct {
+	Title           string `bson:"title,omitempty" json:"title,omitempty"`
+	ReadOnlyHint    *bool  `bson:"readOnlyHint,omitempty" json:"readOnlyHint,omitempty"`
+	DestructiveHint *bool  `bson:"destructiveHint,omitempty" json:"destructiveHint,omitempty"`
+	IdempotentHint  *bool  `bson:"idempotentHint,omitempty" json:"idempotentHint,omitempty"`
+	OpenWorldHint   *bool  `bson:"openWorldHint,omitempty" json:"openWorldHint,omitempty"`
 }
 
 const (
@@ -92,6 +110,9 @@ const (
 	schemaKeyProperties  = "properties"
 	schemaKeyRequired    = "required"
 	schemaKeyDescription = "description"
+	schemaKeyFormat      = "format"
+	schemaKeyEnum        = "enum"
+	schemaKeyItems       = "items"
 
 	schemaTypeString  = "string"
 	schemaTypeInteger = "integer"
@@ -278,6 +299,7 @@ func deriveOperationPrimitive(
 	if err != nil {
 		return DerivedPrimitive{}, nil, false, fmt.Errorf("operationId %q: %w", rawName, err)
 	}
+	outputSchema := deriveOutputSchema(mo.op)
 
 	return DerivedPrimitive{
 		Type: MCPPrimitiveTypeTool,
@@ -293,6 +315,8 @@ func deriveOperationPrimitive(
 			ParamSourceNames:       sourceNames,
 			RequestBodyContentType: bodyContentType,
 			InputSchema:            schema,
+			Annotations:            defaultDerivedToolAnnotations(mo.method, mo.op, name),
+			OutputSchema:           outputSchema,
 		},
 	}, nil, true, nil
 }
@@ -388,6 +412,37 @@ func operationDescription(op *openapi3.Operation) string {
 	return op.Description
 }
 
+func defaultDerivedToolAnnotations(method string, op *openapi3.Operation, toolName string) *DerivedToolAnnotations {
+	title := toolName
+	if op != nil && op.Summary != "" {
+		title = op.Summary
+	}
+
+	readOnly, destructive, idempotent, openWorld := defaultAnnotationHints(method)
+	return &DerivedToolAnnotations{
+		Title:           title,
+		ReadOnlyHint:    boolRef(readOnly),
+		DestructiveHint: boolRef(destructive),
+		IdempotentHint:  boolRef(idempotent),
+		OpenWorldHint:   boolRef(openWorld),
+	}
+}
+
+func defaultAnnotationHints(method string) (readOnly, destructive, idempotent, openWorld bool) {
+	switch strings.ToUpper(strings.TrimSpace(method)) {
+	case http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodTrace:
+		return true, false, true, false
+	case http.MethodPut, http.MethodDelete:
+		return false, true, true, true
+	default:
+		return false, true, false, true
+	}
+}
+
+func boolRef(v bool) *bool {
+	return &v
+}
+
 var (
 	toolNameInvalid = regexp.MustCompile(`[^A-Za-z0-9_.-]`)
 	toolNameValid   = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
@@ -450,8 +505,8 @@ func SanitizeToolName(raw string) string {
 
 // deriveParams walks an operation's parameters and requestBody and returns
 // (paramLocations, paramSourceNames, requestBodyContentType, inputSchema). The
-// schema follows the JSON Schema draft-07 dialect that MCP clients expect for
-// tool inputs.
+// emitted schemas intentionally use a small JSON Schema subset that is valid
+// under MCP's default JSON Schema 2020-12 interpretation.
 func deriveParams(item *openapi3.PathItem, op *openapi3.Operation) (map[string]string, map[string]string, string, map[string]any, error) {
 	params := newDerivedParams()
 	params.addParameters(item.Parameters)
@@ -463,6 +518,12 @@ func deriveParams(item *openapi3.PathItem, op *openapi3.Operation) (map[string]s
 
 func schemaType(s *openapi3.Schema) string {
 	if s == nil || s.Type == nil {
+		if s != nil && len(s.Properties) > 0 {
+			return schemaTypeObject
+		}
+		if s != nil && s.Items != nil {
+			return schemaTypeArray
+		}
 		return ""
 	}
 	switch {
@@ -716,7 +777,10 @@ func schemaForSchemaRef(ref *openapi3.SchemaRef, fallbackType string) map[string
 }
 
 func schemaForOpenAPISchema(src *openapi3.Schema, fallbackType string) map[string]any {
-	schema := map[string]any{schemaKeyType: fallbackType}
+	schema := map[string]any{}
+	if fallbackType != "" {
+		schema[schemaKeyType] = fallbackType
+	}
 	if src == nil {
 		return schema
 	}
@@ -726,7 +790,88 @@ func schemaForOpenAPISchema(src *openapi3.Schema, fallbackType string) map[strin
 	if src.Description != "" {
 		schema[schemaKeyDescription] = src.Description
 	}
+	if src.Format != "" {
+		schema[schemaKeyFormat] = src.Format
+	}
+	if len(src.Enum) > 0 {
+		schema[schemaKeyEnum] = append([]any(nil), src.Enum...)
+	}
+	if len(src.Properties) > 0 {
+		props := make(map[string]any, len(src.Properties))
+		for _, name := range sortedSchemaPropertyNames(src.Properties) {
+			props[name] = schemaForSchemaRef(src.Properties[name], "")
+		}
+		schema[schemaKeyProperties] = props
+	}
+	if len(src.Required) > 0 {
+		required := append([]string(nil), src.Required...)
+		sort.Strings(required)
+		schema[schemaKeyRequired] = required
+	}
+	if src.Items != nil {
+		schema[schemaKeyItems] = schemaForSchemaRef(src.Items, "")
+	}
 	return schema
+}
+
+func deriveOutputSchema(op *openapi3.Operation) map[string]any {
+	if op == nil || op.Responses == nil {
+		return nil
+	}
+
+	if schemaRef := responseJSONSchema(op.Responses.Value("200")); schemaRef != nil {
+		return mcpOutputSchemaForSchemaRef(schemaRef)
+	}
+
+	for _, status := range sortedNumeric2xxResponseStatuses(op.Responses) {
+		if status == http.StatusOK || status == http.StatusNoContent {
+			continue
+		}
+		if schemaRef := responseJSONSchema(op.Responses.Value(fmt.Sprintf("%d", status))); schemaRef != nil {
+			return mcpOutputSchemaForSchemaRef(schemaRef)
+		}
+	}
+	return nil
+}
+
+func sortedNumeric2xxResponseStatuses(responses *openapi3.Responses) []int {
+	statuses := []int{}
+	for status := range responses.Map() {
+		code, err := strconv.Atoi(status)
+		if err != nil {
+			continue
+		}
+		if code >= 200 && code < 300 {
+			statuses = append(statuses, code)
+		}
+	}
+	sort.Ints(statuses)
+	return statuses
+}
+
+func responseJSONSchema(responseRef *openapi3.ResponseRef) *openapi3.SchemaRef {
+	if responseRef == nil || responseRef.Value == nil {
+		return nil
+	}
+	media := selectJSONMediaType(responseRef.Value.Content)
+	if media == nil || media.Schema == nil || media.Schema.Value == nil {
+		return nil
+	}
+	return media.Schema
+}
+
+func mcpOutputSchemaForSchemaRef(ref *openapi3.SchemaRef) map[string]any {
+	schema := schemaForSchemaRef(ref, "")
+	if schema[schemaKeyType] == schemaTypeObject {
+		return schema
+	}
+	return map[string]any{
+		schemaKeyType: schemaTypeObject,
+		schemaKeyProperties: map[string]any{
+			"result": schema,
+		},
+		schemaKeyRequired: []string{"result"},
+	}
 }
 
 func sortedRequiredNames(required map[string]struct{}) []string {
@@ -975,6 +1120,7 @@ func deriveConfiguredPathMethodTool(srcOAS *OAS, primitive TykMCPServerPrimitive
 	if err != nil {
 		return DerivedTool{}, fmt.Errorf("source %s %s: %w", method, path, err)
 	}
+	outputSchema := deriveOutputSchema(mo.op)
 	return DerivedTool{
 		SourceKey:              pathMethodSourceKey(method, path),
 		CanonicalName:          name,
@@ -986,6 +1132,8 @@ func deriveConfiguredPathMethodTool(srcOAS *OAS, primitive TykMCPServerPrimitive
 		ParamSourceNames:       sourceNames,
 		RequestBodyContentType: bodyContentType,
 		InputSchema:            schema,
+		Annotations:            defaultDerivedToolAnnotations(method, mo.op, name),
+		OutputSchema:           outputSchema,
 	}, nil
 }
 
@@ -1060,11 +1208,15 @@ func applyMCPToolViewOverride(tool *DerivedTool, override TykMCPServerPrimitive)
 		if err := ValidateMCPToolName(name); err != nil {
 			return fmt.Errorf("%s primitive %q: %w", ExtensionTykMCPServer, sourceKeyForMCPPrimitiveMessage(override), err)
 		}
+		if tool.Annotations != nil && tool.Annotations.Title == tool.Name {
+			tool.Annotations.Title = name
+		}
 		tool.Name = name
 	}
 	if override.Description != "" {
 		tool.Description = override.Description
 	}
+	applyMCPToolAnnotationOverrides(tool, override.Annotations)
 	for _, param := range override.Parameters {
 		paramName := param.Param
 		if param.Name != "" {
@@ -1078,6 +1230,30 @@ func applyMCPToolViewOverride(tool *DerivedTool, override TykMCPServerPrimitive)
 		}
 	}
 	return nil
+}
+
+func applyMCPToolAnnotationOverrides(tool *DerivedTool, override *DerivedToolAnnotations) {
+	if override == nil {
+		return
+	}
+	if tool.Annotations == nil {
+		tool.Annotations = &DerivedToolAnnotations{}
+	}
+	if override.Title != "" {
+		tool.Annotations.Title = override.Title
+	}
+	if override.ReadOnlyHint != nil {
+		tool.Annotations.ReadOnlyHint = boolRef(*override.ReadOnlyHint)
+	}
+	if override.DestructiveHint != nil {
+		tool.Annotations.DestructiveHint = boolRef(*override.DestructiveHint)
+	}
+	if override.IdempotentHint != nil {
+		tool.Annotations.IdempotentHint = boolRef(*override.IdempotentHint)
+	}
+	if override.OpenWorldHint != nil {
+		tool.Annotations.OpenWorldHint = boolRef(*override.OpenWorldHint)
+	}
 }
 
 func sourceKeyForMCPPrimitiveMessage(primitive TykMCPServerPrimitive) string {
@@ -1192,7 +1368,31 @@ func cloneDerivedTool(tool DerivedTool) DerivedTool {
 		tool.ParamSourceNames = sourceNames
 	}
 	tool.InputSchema = cloneMapAny(tool.InputSchema)
+	tool.Annotations = cloneDerivedToolAnnotations(tool.Annotations)
+	tool.OutputSchema = cloneMapAny(tool.OutputSchema)
 	return tool
+}
+
+func cloneDerivedToolAnnotations(src *DerivedToolAnnotations) *DerivedToolAnnotations {
+	if src == nil {
+		return nil
+	}
+	dst := &DerivedToolAnnotations{
+		Title: src.Title,
+	}
+	if src.ReadOnlyHint != nil {
+		dst.ReadOnlyHint = boolRef(*src.ReadOnlyHint)
+	}
+	if src.DestructiveHint != nil {
+		dst.DestructiveHint = boolRef(*src.DestructiveHint)
+	}
+	if src.IdempotentHint != nil {
+		dst.IdempotentHint = boolRef(*src.IdempotentHint)
+	}
+	if src.OpenWorldHint != nil {
+		dst.OpenWorldHint = boolRef(*src.OpenWorldHint)
+	}
+	return dst
 }
 
 func cloneMapAny(src map[string]any) map[string]any {
