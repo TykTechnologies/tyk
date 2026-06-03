@@ -1109,8 +1109,23 @@
         },
         "rateLimit": {
           "$ref": "#/definitions/X-Tyk-RateLimit"
+        },
+        "scopeCheck": {
+          "$ref": "#/definitions/X-Tyk-ScopeCheck"
         }
       },
+      "additionalProperties": false
+    },
+    "X-Tyk-ScopeCheck": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
       "additionalProperties": false
     },
     "X-Tyk-Operations": {
