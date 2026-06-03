@@ -59,6 +59,8 @@ type (
 		RawLogger
 		IsLegacyFormatter() bool
 	}
+
+	CancelFn func()
 )
 
 func newRawLog() *logrus.Logger {
@@ -116,6 +118,12 @@ func Flush() {
 
 		tmpLoggerHook.Proxy(logger)
 	})
+}
+
+// Reset state to default.
+// Added to pass tests.
+func Reset() CancelFn {
+	return once.reset(false)
 }
 
 // Get returns the default configured logger.
@@ -206,10 +214,17 @@ func (s *invokeOnce) Do(fn func(executed bool)) {
 
 // reset's value of invoke once runner
 // create for testing purposes
-func (s *invokeOnce) reset(value bool) {
+func (s *invokeOnce) reset(value bool) func() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	oldValue := s.value
 	s.value = value
+
+	return func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		s.value = oldValue
+	}
 }
 
 var _ logrus.Hook = new(tmpLogsCollector)
