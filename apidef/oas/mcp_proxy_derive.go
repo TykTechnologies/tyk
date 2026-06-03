@@ -78,11 +78,16 @@ type DerivedTool struct {
 // DerivedToolAnnotations describes MCP tool annotations derived from the
 // source REST operation and optional proxy-side overrides.
 type DerivedToolAnnotations struct {
-	Title           string `bson:"title,omitempty" json:"title,omitempty"`
-	ReadOnlyHint    *bool  `bson:"readOnlyHint,omitempty" json:"readOnlyHint,omitempty"`
-	DestructiveHint *bool  `bson:"destructiveHint,omitempty" json:"destructiveHint,omitempty"`
-	IdempotentHint  *bool  `bson:"idempotentHint,omitempty" json:"idempotentHint,omitempty"`
-	OpenWorldHint   *bool  `bson:"openWorldHint,omitempty" json:"openWorldHint,omitempty"`
+	// Title is a human-readable display name for the tool.
+	Title string `bson:"title,omitempty" json:"title,omitempty"`
+	// ReadOnlyHint indicates whether the tool is expected to avoid modifying state.
+	ReadOnlyHint *bool `bson:"readOnlyHint,omitempty" json:"readOnlyHint,omitempty"`
+	// DestructiveHint indicates whether the tool may perform destructive updates.
+	DestructiveHint *bool `bson:"destructiveHint,omitempty" json:"destructiveHint,omitempty"`
+	// IdempotentHint indicates whether repeated calls with the same arguments have the same effect.
+	IdempotentHint *bool `bson:"idempotentHint,omitempty" json:"idempotentHint,omitempty"`
+	// OpenWorldHint indicates whether the tool interacts with external systems.
+	OpenWorldHint *bool `bson:"openWorldHint,omitempty" json:"openWorldHint,omitempty"`
 }
 
 const (
