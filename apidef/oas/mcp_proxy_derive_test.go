@@ -442,6 +442,12 @@ func TestValidateMCPToolName_UsesMCPSpecLengthLimit(t *testing.T) {
 	assert.Contains(t, err.Error(), "128")
 }
 
+func TestSanitizeToolName_CollapsesUnderscoreRuns(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "create_order-v1.ok", SanitizeToolName("__create / order-v1.ok__"))
+}
+
 func TestDeriveSourceTools_RejectsDuplicateToolNames(t *testing.T) {
 	t.Parallel()
 

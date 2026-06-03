@@ -444,8 +444,9 @@ func boolRef(v bool) *bool {
 }
 
 var (
-	toolNameInvalid = regexp.MustCompile(`[^A-Za-z0-9_.-]`)
-	toolNameValid   = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
+	toolNameInvalid             = regexp.MustCompile(`[^A-Za-z0-9_.-]`)
+	toolNameRepeatedUnderscores = regexp.MustCompile(`_+`)
+	toolNameValid               = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 )
 
 // ValidateMCPToolName enforces the gateway REST-as-MCP tool-name contract.
@@ -496,10 +497,7 @@ func SanitizeToolName(raw string) string {
 		return ""
 	}
 	cleaned := toolNameInvalid.ReplaceAllString(raw, "_")
-	// collapse repeated underscores
-	for strings.Contains(cleaned, "__") {
-		cleaned = strings.ReplaceAll(cleaned, "__", "_")
-	}
+	cleaned = toolNameRepeatedUnderscores.ReplaceAllString(cleaned, "_")
 	return strings.Trim(cleaned, "_")
 }
 
