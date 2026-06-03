@@ -1748,11 +1748,11 @@ func TestSessionState_ConcurrentClone(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			for j := 0; j < iterations; j++ {
-				session.lockForWrite()
+				session.LockForWrite()
 				session.AccessRights["api2"] = AccessDefinition{APIID: "api2"}
 				session.MetaData["key2"] = "value2"
 				session.OauthKeys["oauth2"] = "token2"
-				session.unlockForWrite()
+				session.UnlockForWrite()
 			}
 		}(i)
 	}
@@ -1794,11 +1794,11 @@ func TestSessionState_CloneIsolation(t *testing.T) {
 	cloned := original.Clone()
 
 	// Modify the clone
-	cloned.lockForWrite()
+	cloned.LockForWrite()
 	cloned.AccessRights["api2"] = AccessDefinition{APIID: "api2"}
 	cloned.MetaData["key2"] = "value2"
 	cloned.OauthKeys["oauth2"] = "token2"
-	cloned.unlockForWrite()
+	cloned.UnlockForWrite()
 	cloned.ApplyPolicies = append(cloned.ApplyPolicies, "policy2")
 	cloned.Tags = append(cloned.Tags, "tag2")
 
@@ -1833,11 +1833,11 @@ func TestSessionState_ConcurrentMapAccess(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			for j := 0; j < iterations; j++ {
-				session.lockForWrite()
+				session.LockForWrite()
 				session.AccessRights["api"+string(rune(id))] = AccessDefinition{APIID: "api"}
 				session.MetaData["key"+string(rune(id))] = "value"
 				session.OauthKeys["oauth"+string(rune(id))] = "token"
-				session.unlockForWrite()
+				session.UnlockForWrite()
 			}
 		}(i)
 	}
@@ -1873,9 +1873,9 @@ func TestSessionState_NilMutexHandling(t *testing.T) {
 	assert.NotNil(t, cloned.mu)
 
 	// Should be able to use the cloned session safely
-	cloned.lockForWrite()
+	cloned.LockForWrite()
 	cloned.AccessRights["api2"] = AccessDefinition{APIID: "api2"}
-	cloned.unlockForWrite()
+	cloned.UnlockForWrite()
 
 	assert.Len(t, cloned.AccessRights, 2)
 }
@@ -1913,15 +1913,15 @@ func TestSessionState_CloneHasOwnMutex(t *testing.T) {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		original.lockForWrite()
-		defer original.unlockForWrite()
+		original.LockForWrite()
+		defer original.UnlockForWrite()
 		original.AccessRights["api2"] = AccessDefinition{APIID: "api2"}
 	}()
 
 	go func() {
 		defer wg.Done()
-		cloned.lockForWrite()
-		defer cloned.unlockForWrite()
+		cloned.LockForWrite()
+		defer cloned.UnlockForWrite()
 		cloned.AccessRights["api3"] = AccessDefinition{APIID: "api3"}
 	}()
 
