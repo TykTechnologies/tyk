@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/opentelemetry/metric/metrictest"
 
@@ -1219,5 +1221,32 @@ func TestRecordAccessLog_APIType(t *testing.T) {
 
 			hook.Reset()
 		})
+	}
+}
+
+func TestBaseMiddleware_CopyNilLogger_Concurrent(t *testing.T) {
+	spec := &APISpec{}
+	proxy := ReturningHttpHandler(nil)
+	gw := &Gateway{}
+
+	bm := &BaseMiddleware{Spec: spec, Proxy: proxy, Gw: gw}
+
+	const n = 100
+	var wg sync.WaitGroup
+	wg.Add(n)
+	results := make([]*BaseMiddleware, n)
+
+	for i := 0; i < n; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			require.NotPanics(t, func() { results[i] = bm.Copy() })
+		}()
+	}
+	wg.Wait()
+
+	for i, got := range results {
+		require.NotNil(t, got, "goroutine %d", i)
+		assert.Nil(t, got.logger, "Copy of nil logger should leave logger nil (goroutine %d)", i)
 	}
 }

@@ -1,6 +1,8 @@
 package oas
 
 import (
+	"sort"
+
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
@@ -75,6 +77,15 @@ type OAuth2ScopeCheck struct {
 	// `security:`, the OAS root `security:`, or both. Defaults to
 	// "union".
 	ScopeSource string `bson:"scopeSource,omitempty" json:"scopeSource,omitempty"`
+}
+
+// ScopeCheck toggles the operation-level OAuth 2.0 scope check on an
+// operation or MCP primitive. Omitted means enforced; the required
+// scopes themselves live in the OAS `security:` array.
+type ScopeCheck struct {
+	// Enabled enforces the operation's scope check when true. Set it
+	// false to exempt the operation (e.g. scopes enforced upstream).
+	Enabled bool `bson:"enabled" json:"enabled"`
 }
 
 // ScopeSource constants for OAuth2ScopeCheck.ScopeSource.
@@ -289,4 +300,109 @@ func (s *OAS) GetTykOAuth2Config(name string) *OAuth2 {
 // OAS-native OAuth2 scheme.
 func (s *OAS) IsOAuth2Scheme(name string) bool {
 	return s.GetTykOAuth2Config(name) != nil
+}
+
+// collectOAuth2SchemeNames returns the set of configured OAuth2
+// security-scheme names (in the new-style oauth2-block sense).
+func (s *OAS) collectOAuth2SchemeNames() map[string]struct{} {
+	names := map[string]struct{}{}
+	tykAuth := s.getTykAuthentication()
+	if tykAuth == nil || tykAuth.SecuritySchemes == nil {
+		return names
+	}
+	for name, scheme := range tykAuth.SecuritySchemes {
+		if asOAuth2Scheme(scheme) != nil {
+			names[name] = struct{}{}
+		}
+	}
+	return names
+}
+
+// DeriveOAuth2Scopes returns the set of scopes declared across the OAS
+// document's `security:` arrays for every configured oauth2 scheme:
+// the root-level `security:`, each path operation's `security:`, and
+// every MCP primitive's `security:` (tools, resources, prompts).
+// Entries referencing non-oauth2 schemes are ignored. The result is a
+// set; callers needing a stable order use SortedOAuth2Scopes.
+func (s *OAS) DeriveOAuth2Scopes() map[string]struct{} {
+	scopes := map[string]struct{}{}
+	oauth2Names := s.collectOAuth2SchemeNames()
+	if len(oauth2Names) == 0 {
+		return scopes
+	}
+
+	addOAuth2Scopes(scopes, s.Security, oauth2Names)
+	s.addOAuth2ScopesFromPaths(scopes, oauth2Names)
+	s.addOAuth2ScopesFromMCPPrimitives(scopes, oauth2Names)
+
+	return scopes
+}
+
+// addOAuth2Scopes records every non-empty scope that reqs attaches to a
+// recognised oauth2 scheme into scopes.
+func addOAuth2Scopes(scopes map[string]struct{}, reqs openapi3.SecurityRequirements, oauth2Names map[string]struct{}) {
+	for _, req := range reqs {
+		for schemeName, scopeList := range req {
+			if _, ok := oauth2Names[schemeName]; !ok {
+				continue
+			}
+			addNonEmptyScopes(scopes, scopeList)
+		}
+	}
+}
+
+// addNonEmptyScopes records each non-empty entry of list into scopes.
+func addNonEmptyScopes(scopes map[string]struct{}, list []string) {
+	for _, sc := range list {
+		if sc != "" {
+			scopes[sc] = struct{}{}
+		}
+	}
+}
+
+// addOAuth2ScopesFromPaths collects oauth2 scopes from every path
+// operation's `security:` requirement.
+func (s *OAS) addOAuth2ScopesFromPaths(scopes map[string]struct{}, oauth2Names map[string]struct{}) {
+	if s.Paths == nil {
+		return
+	}
+	for _, pathItem := range s.Paths.Map() {
+		if pathItem == nil {
+			continue
+		}
+		for _, op := range pathItem.Operations() {
+			if op != nil && op.Security != nil {
+				addOAuth2Scopes(scopes, *op.Security, oauth2Names)
+			}
+		}
+	}
+}
+
+// addOAuth2ScopesFromMCPPrimitives collects oauth2 scopes from every MCP
+// primitive's `security:` requirement (tools, resources, prompts).
+func (s *OAS) addOAuth2ScopesFromMCPPrimitives(scopes map[string]struct{}, oauth2Names map[string]struct{}) {
+	mw := s.GetTykMiddleware()
+	if mw == nil {
+		return
+	}
+	for _, prims := range []MCPPrimitives{mw.McpTools, mw.McpResources, mw.McpPrompts} {
+		for _, prim := range prims {
+			if prim != nil {
+				addOAuth2Scopes(scopes, prim.Security, oauth2Names)
+			}
+		}
+	}
+}
+
+// SortedOAuth2Scopes returns DeriveOAuth2Scopes as a sorted, stable
+// list. Used to populate read-only "scopes this API advertises"
+// previews and the OAS Components security-scheme scope vocabulary.
+func (s *OAS) SortedOAuth2Scopes() []string {
+	set := s.DeriveOAuth2Scopes()
+	out := make([]string, 0, len(set))
+	for k := range set {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
