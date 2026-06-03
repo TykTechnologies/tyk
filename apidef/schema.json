@@ -1189,6 +1189,24 @@
         }
       }
     },
+    "security_requirement_scopes": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object",
+        "additionalProperties": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "error_overrides_disabled": {
       "type": "boolean"
     },

@@ -1495,7 +1495,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		if p.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
 			hooks = append(hooks, NewLoggingSSEHook(p.logger))
 		}
-		if filterHook := NewMCPListFilterSSEHook(p.TykAPISpec.APIID, ses); filterHook != nil {
+		if filterHook := NewMCPListFilterSSEHook(p.TykAPISpec, ses); filterHook != nil {
 			hooks = append(hooks, filterHook)
 		}
 		res.Body = NewSSETap(res.Body, hooks...)

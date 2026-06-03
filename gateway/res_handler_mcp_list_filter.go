@@ -48,7 +48,25 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 	}
 
 	listCfg := h.listConfig(state.Method)
-	if listCfg == nil {
+	var filter func([]byte) ([]byte, bool)
+	switch {
+	case listCfg != nil:
+		ruleSets := effectiveMCPListRuleSets(h.Spec, ses, listCfg)
+		if len(ruleSets) == 0 {
+			return nil
+		}
+		filter = func(body []byte) ([]byte, bool) {
+			return mcp.FilterJSONRPCBodyWithRuleSets(body, listCfg, ruleSets)
+		}
+	case state.Method == mcp.MethodInitialize:
+		ruleSets := effectiveJSONRPCMethodRuleSets(h.Spec, ses)
+		if len(ruleSets) == 0 {
+			return nil
+		}
+		filter = func(body []byte) ([]byte, bool) {
+			return mcp.FilterInitializeCapabilitiesBody(body, ruleSets)
+		}
+	default:
 		return nil
 	}
 
@@ -59,17 +77,12 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 		return nil
 	}
 
-	rules := h.rulesForAPI(ses, listCfg)
-	if rules.IsEmpty() {
-		return nil
-	}
-
 	body, err := readAndCloseBody(res)
 	if err != nil || len(body) == 0 {
 		return nil //nolint:nilerr // fail-open: pass through on read error
 	}
 
-	newBody, ok := mcp.FilterJSONRPCBody(body, listCfg, rules)
+	newBody, ok := filter(body)
 	if !ok {
 		res.Body = io.NopCloser(bytes.NewReader(body))
 		return nil
@@ -80,21 +93,6 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 	res.Header.Set("Content-Length", strconv.Itoa(len(newBody)))
 
 	return nil
-}
-
-// rulesForAPI extracts the access control rules for the current API from the
-// session, returning empty rules if the session has no applicable restrictions.
-func (h *MCPListFilterResponseHandler) rulesForAPI(ses *user.SessionState, cfg *mcp.ListFilterConfig) user.AccessControlRules {
-	if ses == nil {
-		return user.AccessControlRules{}
-	}
-
-	accessDef, ok := ses.AccessRights[h.Spec.APIID]
-	if !ok || accessDef.MCPAccessRights.IsEmpty() {
-		return user.AccessControlRules{}
-	}
-
-	return cfg.RulesFrom(accessDef.MCPAccessRights)
 }
 
 // listConfig returns the filter configuration for a given JSON-RPC method,
