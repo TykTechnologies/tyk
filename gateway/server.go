@@ -1758,7 +1758,6 @@ func (gw *Gateway) initSystem() error {
 	}
 
 	// suply rpc client globals to join it main loging and instrumentation sub systems
-	rpc.Log = log
 	rpc.Instrument = instrument
 
 	gw.setupGlobals()
