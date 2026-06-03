@@ -8,7 +8,7 @@ import (
 )
 
 type Builder struct {
-	sinks                  []Sink
+	sinks                  []Sinker
 	hooks                  []logrus.Hook
 	level                  *logrus.Level
 	stdLog                 *logrus.Logger
@@ -34,7 +34,7 @@ func (b *Builder) AddHook(hook logrus.Hook) {
 }
 
 // AddSink adds sink.
-func (b *Builder) AddSink(sink Sink) {
+func (b *Builder) AddSink(sink Sinker) {
 	b.sinks = append(b.sinks, sink)
 }
 
