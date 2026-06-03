@@ -33,15 +33,3 @@ func (h *Hook) FilterBy(predicate func(*logrus.Entry) bool) []*logrus.Entry {
 func (h *Hook) CountBy(predicate func(*logrus.Entry) bool) int {
 	return lo.CountBy(h.AllEntries(), predicate)
 }
-
-func removeHook(logger *logrus.Logger, hook logrus.Hook) {
-	clone := make(logrus.LevelHooks, len(logger.Hooks))
-
-	for level, hooks := range logger.Hooks {
-		clone[level] = lo.Filter(hooks, func(item logrus.Hook, _ int) bool {
-			return item != hook
-		})
-	}
-
-	logger.ReplaceHooks(clone)
-}
