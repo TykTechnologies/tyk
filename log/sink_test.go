@@ -31,18 +31,18 @@ func (m *mockWriter) Write(_ []byte) (n int, err error) {
 func TestNewAcceptorGte(t *testing.T) {
 	acceptor := NewAcceptorGte(logrus.InfoLevel)
 
+	assert.False(t, acceptor.Accept(&logrus.Entry{Level: logrus.DebugLevel}))
 	assert.True(t, acceptor.Accept(&logrus.Entry{Level: logrus.InfoLevel}))
-	assert.True(t, acceptor.Accept(&logrus.Entry{Level: logrus.DebugLevel}))
-	assert.False(t, acceptor.Accept(&logrus.Entry{Level: logrus.ErrorLevel}))
+	assert.True(t, acceptor.Accept(&logrus.Entry{Level: logrus.ErrorLevel}))
 }
 
 func TestNewAcceptorLt(t *testing.T) {
 	acceptor := NewAcceptorLt(logrus.InfoLevel)
 
-	assert.True(t, acceptor.Accept(&logrus.Entry{Level: logrus.ErrorLevel}))
-	assert.True(t, acceptor.Accept(&logrus.Entry{Level: logrus.FatalLevel}))
+	assert.True(t, acceptor.Accept(&logrus.Entry{Level: logrus.DebugLevel}))
 	assert.False(t, acceptor.Accept(&logrus.Entry{Level: logrus.InfoLevel}))
-	assert.False(t, acceptor.Accept(&logrus.Entry{Level: logrus.DebugLevel}))
+	assert.False(t, acceptor.Accept(&logrus.Entry{Level: logrus.ErrorLevel}))
+	assert.False(t, acceptor.Accept(&logrus.Entry{Level: logrus.FatalLevel}))
 }
 
 func TestNewSink(t *testing.T) {
@@ -65,8 +65,8 @@ func TestMultiSinkHook_Fire_Success(t *testing.T) {
 	buf1 := &bytes.Buffer{}
 	buf2 := &bytes.Buffer{}
 
-	sink1 := NewSink(buf1, &mockFormatter{}, NewAcceptorGte(logrus.InfoLevel))
-	sink2 := NewSink(buf2, &mockFormatter{}, NewAcceptorLt(logrus.InfoLevel))
+	sink1 := NewSink(buf1, &mockFormatter{}, NewAcceptorLt(logrus.WarnLevel))
+	sink2 := NewSink(buf2, &mockFormatter{}, NewAcceptorGte(logrus.WarnLevel))
 
 	hook := &multiSinkHook{
 		sinks: []Sink{sink1, sink2},
@@ -90,9 +90,9 @@ func TestMultiSinkHook_Fire_ErrorJoining(t *testing.T) {
 	formatErr := errors.New("failed to format")
 	writeErr := errors.New("failed to write")
 
-	sinkFormatFail := NewSink(&bytes.Buffer{}, &mockFormatter{err: formatErr}, NewAcceptorGte(logrus.PanicLevel))
-	sinkWriteFail := NewSink(&mockWriter{err: writeErr}, &mockFormatter{}, NewAcceptorGte(logrus.PanicLevel))
-	sinkSuccess := NewSink(&bytes.Buffer{}, &mockFormatter{}, NewAcceptorGte(logrus.PanicLevel))
+	sinkFormatFail := NewSink(&bytes.Buffer{}, &mockFormatter{err: formatErr}, NewAcceptorLt(logrus.PanicLevel))
+	sinkWriteFail := NewSink(&mockWriter{err: writeErr}, &mockFormatter{}, NewAcceptorLt(logrus.PanicLevel))
+	sinkSuccess := NewSink(&bytes.Buffer{}, &mockFormatter{}, NewAcceptorLt(logrus.PanicLevel))
 
 	hook := &multiSinkHook{
 		sinks: []Sink{sinkFormatFail, sinkWriteFail, sinkSuccess},
@@ -100,9 +100,8 @@ func TestMultiSinkHook_Fire_ErrorJoining(t *testing.T) {
 
 	err := hook.Fire(&logrus.Entry{Level: logrus.InfoLevel, Message: "test"})
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), formatErr.Error())
-	assert.Contains(t, err.Error(), writeErr.Error())
+	assert.ErrorContains(t, err, formatErr.Error())
+	assert.ErrorContains(t, err, writeErr.Error())
 }
 
 func TestAcceptorFn_Accept(t *testing.T) {
