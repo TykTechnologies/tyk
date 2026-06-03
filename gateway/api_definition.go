@@ -648,7 +648,6 @@ func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
 			if firstErr == nil {
 				firstErr = err
 			}
-			log.WithError(err).Errorf("file KV: failed to read secret file %q", m[1])
 			continue
 		}
 		// JSON-escape the value before injecting it into the raw JSON document.
@@ -659,7 +658,6 @@ func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
 			if firstErr == nil {
 				firstErr = err
 			}
-			log.WithError(err).Errorf("file KV: failed to JSON-encode value for %q", m[1])
 			continue
 		}
 		// Strip the surrounding quotes since the replacement sits
