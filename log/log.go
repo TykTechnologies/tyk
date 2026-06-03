@@ -5,9 +5,11 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 )
 
 const (
@@ -104,6 +106,28 @@ func Setup(f func(b *Builder)) {
 		log = &loggerWrapper{logger}
 		tmpLoggerHook.Proxy(logger)
 	})
+}
+
+func GetTestHook(t *testing.T) *logrustest.Hook {
+	t.Helper()
+
+	var hook = &logrustest.Hook{}
+	var target *logrus.Logger
+
+	once.Do(func(executed bool) {
+		if executed {
+			target = log.Logger
+		} else {
+			target = tmpLogger
+		}
+		target.AddHook(hook)
+	})
+
+	t.Cleanup(func() {
+		removeHook(target, hook)
+	})
+
+	return hook
 }
 
 func Flush() {
@@ -252,6 +276,8 @@ func (e *tmpLogsCollector) Proxy(logger *logrus.Logger) {
 	e.mu.Unlock()
 
 	for _, entry := range localEntries {
+		entry.Logger = logger // replace logger to make  copied entries write to proper place
+
 		clonedEntry := logger.WithFields(entry.Data)
 		clonedEntry.Time = entry.Time
 		clonedEntry.Log(entry.Level, entry.Message)
@@ -346,6 +372,21 @@ func (d *loggerWrapper) AsLogrus() *logrus.Logger {
 
 func (d *loggerWrapper) IsLegacyFormatter() bool {
 	return isLegacyFormatter(d.Formatter)
+}
+
+// removeHook
+func removeHook(logger *logrus.Logger, hookToRemove logrus.Hook) {
+	newHooks := make(logrus.LevelHooks)
+
+	for level, hooks := range logger.Hooks {
+		for _, h := range hooks {
+			if h != hookToRemove {
+				newHooks[level] = append(newHooks[level], h)
+			}
+		}
+	}
+
+	logger.ReplaceHooks(newHooks)
 }
 
 func defaultFieldMap() logrus.FieldMap {
