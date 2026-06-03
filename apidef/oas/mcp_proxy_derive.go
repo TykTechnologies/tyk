@@ -130,7 +130,7 @@ const (
 )
 
 const (
-	maxMCPToolNameLength      = 64
+	maxMCPToolNameLength      = 128
 	contentTypeFormURLEncoded = "application/x-www-form-urlencoded"
 )
 

@@ -702,6 +702,54 @@ func TestValidateMCPObject_WithTykMCPServerExtension(t *testing.T) {
 	}
 }
 
+func TestValidateMCPObject_WithTykMCPServerExtensionToolNameLength(t *testing.T) {
+	t.Parallel()
+
+	docWithName := func(toolName string, paramName string) []byte {
+		return []byte(fmt.Sprintf(`{
+			"openapi": "3.0.3",
+			"info": {"title": "MCP Proxy", "version": "1.0.0"},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {
+					"name": "mcp-proxy",
+					"state": {"active": true}
+				},
+				"upstream": {"url": "tyk://rest-1/mcp"},
+				"server": {
+					"listenPath": {"value": "/mcp-proxy"}
+				}
+			},
+			"x-tyk-mcp-server": {
+				"primitives": [{
+					"source": {"operationId": "createOrder"},
+					"name": %q,
+					"parameters": [{
+						"param": "customer_id",
+						"name": %q
+					}]
+				}]
+			}
+		}`, toolName, paramName))
+	}
+
+	validName := strings.Repeat("a", 128)
+	assert.NoError(t, ValidateMCPObject(docWithName(validName, validName), "3.0.3"))
+
+	invalidName := strings.Repeat("a", 129)
+	err := ValidateMCPObject(docWithName(invalidName, validName), "3.0.3")
+	assert.Error(t, err)
+	if err != nil {
+		assert.Contains(t, err.Error(), "x-tyk-mcp-server.primitives.0.name")
+	}
+
+	err = ValidateMCPObject(docWithName(validName, invalidName), "3.0.3")
+	assert.Error(t, err)
+	if err != nil {
+		assert.Contains(t, err.Error(), "x-tyk-mcp-server.primitives.0.parameters.0.name")
+	}
+}
+
 func TestGetMCPSchema_ContainsMCPExtensions(t *testing.T) {
 	t.Parallel()
 

@@ -510,6 +510,30 @@ func TestDeriveMCPToolView_ValidationFailures(t *testing.T) {
 	}
 }
 
+func TestDeriveMCPToolView_AcceptsMaxLengthToolOverrideName(t *testing.T) {
+	t.Parallel()
+
+	name := strings.Repeat("a", maxMCPToolNameLength)
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get: &openapi3.Operation{OperationID: "list_orders"},
+		}),
+	))
+
+	view, _, err := DeriveMCPToolView(src, &TykMCPServer{
+		Primitives: []TykMCPServerPrimitive{
+			{
+				Source: TykMCPServerSource{OperationID: "list_orders"},
+				Name:   name,
+			},
+		},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, view.Tools, 1)
+	assert.Equal(t, name, view.Tools[0].Name)
+}
+
 func TestDeriveMCPToolView_RejectsInvalidParameterOverrideNames(t *testing.T) {
 	t.Parallel()
 

@@ -410,7 +410,7 @@ func TestDeriveSourceTools_RejectsInvalidExposedToolNames(t *testing.T) {
 	}{
 		{name: "space", operationID: "create order", want: "invalid tool name"},
 		{name: "slash", operationID: "create/order", want: "invalid tool name"},
-		{name: "too long", operationID: strings.Repeat("a", 65), want: "64"},
+		{name: "too long", operationID: strings.Repeat("a", maxMCPToolNameLength+1), want: "128"},
 	}
 
 	for _, tc := range cases {
@@ -430,6 +430,16 @@ func TestDeriveSourceTools_RejectsInvalidExposedToolNames(t *testing.T) {
 			assert.Contains(t, err.Error(), tc.want)
 		})
 	}
+}
+
+func TestValidateMCPToolName_UsesMCPSpecLengthLimit(t *testing.T) {
+	t.Parallel()
+
+	assert.NoError(t, ValidateMCPToolName(strings.Repeat("a", maxMCPToolNameLength)))
+
+	err := ValidateMCPToolName(strings.Repeat("a", maxMCPToolNameLength+1))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "128")
 }
 
 func TestDeriveSourceTools_RejectsDuplicateToolNames(t *testing.T) {
