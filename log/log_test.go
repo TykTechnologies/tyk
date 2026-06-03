@@ -121,8 +121,11 @@ func TestJSONFormatterErrorHandling(t *testing.T) {
 	})
 }
 
-func resetState(emOut io.Writer) {
-	once.reset(false)
+func resetState(t *testing.T, emOut io.Writer) {
+	t.Helper()
+
+	cancel := once.reset(false)
+	t.Cleanup(cancel)
 
 	tmpLoggerHook = &tmpLogsCollector{}
 
@@ -138,7 +141,7 @@ func resetState(emOut io.Writer) {
 }
 
 func TestSetup_ExecutionAndProxy(t *testing.T) {
-	resetState(io.Discard)
+	resetState(t, io.Discard)
 
 	log.Info("pre-setup log")
 	assert.Len(t, tmpLoggerHook.entries, 1)
@@ -150,7 +153,7 @@ func TestSetup_ExecutionAndProxy(t *testing.T) {
 }
 
 func TestSetup_PanicsOnMultipleCalls(t *testing.T) {
-	resetState(io.Discard)
+	resetState(t, io.Discard)
 
 	Setup(func(_ *Builder) {})
 
@@ -161,7 +164,7 @@ func TestSetup_PanicsOnMultipleCalls(t *testing.T) {
 
 func TestFlush_WithoutSetup(t *testing.T) {
 	emBuf := &bytes.Buffer{}
-	resetState(emBuf)
+	resetState(t, emBuf)
 
 	log.Info("fatal startup error")
 	assert.Len(t, tmpLoggerHook.entries, 1)
@@ -174,7 +177,7 @@ func TestFlush_WithoutSetup(t *testing.T) {
 
 func TestFlush_AfterSetup(t *testing.T) {
 	emBuf := &bytes.Buffer{}
-	resetState(emBuf)
+	resetState(t, emBuf)
 
 	Setup(func(_ *Builder) {})
 
@@ -186,7 +189,7 @@ func TestFlush_AfterSetup(t *testing.T) {
 }
 
 func TestGetAndGetRaw(t *testing.T) {
-	resetState(io.Discard)
+	resetState(t, io.Discard)
 
 	logger := Get()
 	assert.NotNil(t, logger)
