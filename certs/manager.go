@@ -58,6 +58,13 @@ const (
 	//   - 0 means unlimited (time-based only)
 	//   - Default of 5 provides reasonable retry attempts with exponential backoff
 	DefaultRPCCertFetchMaxRetries = 5
+
+	// embeddedPEMCacheKeyPrefix namespaces the in-process cache entries for
+	// inline PEM input passed to List(). The prefix contains "-" which
+	// disqualifies it from being a (hex-only) SHA256 cert ID, and is long
+	// enough that an operator-supplied org ID cannot accidentally generate a
+	// collision when prepended to a cert ID inside Add().
+	embeddedPEMCacheKeyPrefix = "embedded-pem-"
 )
 
 var (
@@ -250,6 +257,23 @@ func isSHA256(value string) bool {
 	}
 
 	return true
+}
+
+// IsPEMContent reports whether the supplied string is an inline PEM block
+// rather than a SHA256 certificate ID or a filesystem path. The check is
+// intentionally permissive (substring rather than HasPrefix) so that values
+// delivered via secret-store substitution — which often arrive with leading
+// whitespace, BOM bytes, or YAML folding artefacts — are still recognised.
+// pem.Decode performs the strict structural validation downstream, so any
+// false positives here surface as clear parse errors, not silent failures.
+//
+// SHA256 IDs (hex-only) and POSIX file paths in practice never contain the
+// "-----BEGIN " sentinel, so the three cert-source modes remain unambiguous.
+//
+// Exported so that callers outside this package (e.g. certUsageTracker in the
+// gateway) can opt out of treating embedded PEM strings as cert IDs.
+func IsPEMContent(value string) bool {
+	return strings.Contains(value, "-----BEGIN ")
 }
 
 func ParsePEM(data []byte, secret string) ([]*pem.Block, error) {
@@ -580,6 +604,39 @@ func (c *certificateManager) fetchCertificateWithRetry(id string, sharedBackoff 
 	return val, err
 }
 
+// appendEmbeddedPEM resolves a single inline-PEM cert ID, caches it under a
+// content-derived key, and appends it (or nil on parse failure) to out.
+//
+// The cache prefix isolates these entries from SHA256-keyed Redis cert IDs
+// (`embedded-pem-` contains a dash, which never appears in hex). We never
+// persist embedded PEMs into the underlying storage: they are ephemeral
+// content supplied by the API definition, or, in the future, by a
+// secret-store substitution layer.
+func (c *certificateManager) appendEmbeddedPEM(id string, mode CertificateType, out *[]*tls.Certificate) {
+	rawCert := []byte(strings.TrimSpace(id))
+	cacheKey := embeddedPEMCacheKeyPrefix + tykcrypto.HexSHA256(rawCert)
+
+	if cached, found := c.cache.Get(cacheKey); found {
+		if cert, ok := cached.(*tls.Certificate); ok && isCertCanBeListed(cert, mode) {
+			*out = append(*out, cert)
+		}
+		return
+	}
+
+	parsedCert, parseErr := ParsePEMCertificate(rawCert, c.secret)
+	if parseErr != nil {
+		// Never log the PEM body — it may contain a private key.
+		c.logger.WithError(parseErr).Error("Error parsing embedded PEM certificate")
+		*out = append(*out, nil)
+		return
+	}
+
+	c.cache.Set(cacheKey, parsedCert, cache.DefaultExpiration)
+	if isCertCanBeListed(parsedCert, mode) {
+		*out = append(*out, parsedCert)
+	}
+}
+
 func (c *certificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
 	var cert *tls.Certificate
 	var rawCert []byte
@@ -604,6 +661,17 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 	}
 
 	for _, id := range certIDs {
+		// Embedded PEM branch: when the id is a literal PEM block (rather than
+		// a SHA256 cert ID or filesystem path), parse it in-process and cache
+		// under a content-derived key. We deliberately do NOT persist embedded
+		// PEMs into the underlying storage — they are treated as ephemeral
+		// content supplied by the API definition (or, in the future, by a
+		// secret-store substitution layer).
+		if IsPEMContent(id) {
+			c.appendEmbeddedPEM(id, mode, &out)
+			continue
+		}
+
 		if cert, found := c.cache.Get(id); found {
 			if isCertCanBeListed(cert.(*tls.Certificate), mode) {
 				out = append(out, cert.(*tls.Certificate))
@@ -644,7 +712,14 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 	return out
 }
 
-// Returns list of fingerprints
+// Returns list of fingerprints.
+//
+// NOTE: Embedded-PEM input support is intentionally implemented only in
+// List() (and therefore CertPool()). ListPublicKeys deals with fingerprints,
+// which are themselves content rather than references — pinned_public_keys
+// fields can already be substituted from a secret store without code changes.
+// If a future requirement calls for parsing raw PEM public keys here, mirror
+// the isPEMContent() branch from List().
 func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 	var rawKey []byte
 	var err error
