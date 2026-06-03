@@ -1,16 +1,13 @@
 package log
 
 import (
-	"errors"
 	"io"
 
 	"github.com/sirupsen/logrus"
 )
 
-type Sink interface {
-	io.Writer
-	logrus.Formatter
-	Acceptor
+type Sinker interface {
+	Sink(e *logrus.Entry)
 }
 
 type Acceptor interface {
@@ -21,23 +18,37 @@ func NewSink(
 	writer io.Writer,
 	formatter logrus.Formatter,
 	acceptor Acceptor,
-) Sink {
+) *Sink {
 
-	return &anonSink{
-		Writer:    writer,
-		Formatter: formatter,
-		Acceptor:  acceptor,
+	logger := logrus.New()
+	logger.SetLevel(logrus.TraceLevel)
+	logger.SetFormatter(formatter)
+	logger.SetOutput(writer)
+	logger.ExitFunc = func(_ int) {} // skip exi in sub-loggers (sinks)
+
+	return &Sink{
+		logger:   logger,
+		acceptor: acceptor,
 	}
 }
 
-type anonSink struct {
-	io.Writer
-	logrus.Formatter
-	Acceptor
+type Sink struct {
+	logger   *logrus.Logger
+	acceptor Acceptor
+}
+
+func (a *Sink) Sink(entry *logrus.Entry) {
+	if !a.acceptor.Accept(entry) {
+		return
+	}
+
+	clonedEntry := a.logger.WithFields(entry.Data)
+	clonedEntry.Time = entry.Time
+	clonedEntry.Log(entry.Level, entry.Message)
 }
 
 type multiSinkHook struct {
-	sinks []Sink
+	sinks []Sinker
 }
 
 func (h *multiSinkHook) Levels() []logrus.Level {
@@ -45,25 +56,11 @@ func (h *multiSinkHook) Levels() []logrus.Level {
 }
 
 func (h *multiSinkHook) Fire(entry *logrus.Entry) error {
-	var res []error
-
 	for _, s := range h.sinks {
-		if !s.Accept(entry) {
-			continue
-		}
-
-		serialized, err := s.Format(entry)
-		if err != nil {
-			res = append(res, err)
-			continue
-		}
-
-		if _, err = s.Write(serialized); err != nil {
-			res = append(res, err)
-		}
+		s.Sink(entry)
 	}
 
-	return errors.Join(res...)
+	return nil
 }
 
 // AcceptorFn
@@ -88,3 +85,9 @@ func NewAcceptorLt(level logrus.Level) Acceptor {
 		return e.Level > level
 	})
 }
+
+var (
+	AcceptorAllowAll = AcceptorFn(func(_ *logrus.Entry) bool {
+		return true
+	})
+)
