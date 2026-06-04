@@ -1933,3 +1933,52 @@ func TestSessionState_CloneHasOwnMutex(t *testing.T) {
 	assert.Contains(t, cloned.AccessRights, "api3")
 	assert.NotContains(t, cloned.AccessRights, "api2")
 }
+
+func TestSessionState_RaceConcurrentClone(t *testing.T) {
+	session := &SessionState{
+		AccessRights: map[string]AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"v1"}},
+			"api2": {APIID: "api2", Versions: []string{"v1"}},
+			"api3": {APIID: "api3", Versions: []string{"v1"}},
+		},
+		MetaData: map[string]interface{}{
+			"key1": "value1",
+			"key2": "value2",
+		},
+	}
+
+	var wg sync.WaitGroup
+
+	// Writer goroutines - modify the maps (with proper locking)
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < 1000; j++ {
+				// This simulates policy application modifying session
+				session.LockForWrite()
+				session.AccessRights[string(rune('a'+id))] = AccessDefinition{
+					APIID: string(rune('a' + id)),
+				}
+				session.MetaData[string(rune('a'+id))] = id
+				session.UnlockForWrite()
+				time.Sleep(time.Microsecond)
+			}
+		}(i)
+	}
+
+	// Reader goroutines - clone the session (triggers iteration)
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 1000; j++ {
+				// This is what happens in CheckSessionAndIdentityForValidKey
+				_ = session.Clone()
+				time.Sleep(time.Microsecond)
+			}
+		}()
+	}
+
+	wg.Wait()
+}
