@@ -357,6 +357,9 @@ type SessionState struct {
 
 	// mu protects concurrent access to map fields (AccessRights, OauthKeys, MetaData)
 	mu *sync.RWMutex
+
+	// muInit ensures thread-safe lazy initialization of mu
+	muInit sync.Once
 }
 
 func NewSessionState() *SessionState {
@@ -398,18 +401,20 @@ func (s *SessionState) IsModified() bool {
 }
 
 // Clone returns a fresh copy of s with thread-safe map cloning
-func (s SessionState) Clone() SessionState {
-	// Initialize mutex if nil (for sessions created before this change)
-	if s.mu == nil {
-		s.mu = &sync.RWMutex{}
-	}
+func (s *SessionState) Clone() SessionState {
+	// Thread-safe lazy initialization of mutex
+	s.muInit.Do(func() {
+		if s.mu == nil {
+			s.mu = &sync.RWMutex{}
+		}
+	})
 
 	// Acquire read lock to safely read map fields
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	// Simple values are cloned by value
-	newSession := s
+	newSession := *s
 
 	// Deep clone map fields while holding the read lock
 	newSession.AccessRights = maps.Clone(s.AccessRights)
@@ -428,9 +433,12 @@ func (s SessionState) Clone() SessionState {
 
 // LockForWrite acquires the write lock for map field modifications
 func (s *SessionState) LockForWrite() {
-	if s.mu == nil {
-		s.mu = &sync.RWMutex{}
-	}
+	// Thread-safe lazy initialization of mutex
+	s.muInit.Do(func() {
+		if s.mu == nil {
+			s.mu = &sync.RWMutex{}
+		}
+	})
 	s.mu.Lock()
 }
 
