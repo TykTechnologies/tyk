@@ -150,7 +150,7 @@ func TestWriteSyntheticMCPToolsListResponse_FailsClosedWhenRewriteFails(t *testi
 			Name:        "visible",
 			InputSchema: map[string]any{"type": "object"},
 		}},
-	}, true)
+	}, true, nil)
 
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 	assert.NotContains(t, rec.Body.String(), "hidden")

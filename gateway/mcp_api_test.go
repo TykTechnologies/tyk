@@ -843,6 +843,87 @@ func TestHandleAddApiOAS_ValidatesPairedMCPAdapterUpstream(t *testing.T) {
 	assert.Contains(t, msg.Message, "missing-rest")
 }
 
+func TestHandleAddMCP_CopiesSourceRESTGatewayTagsToPairedProxy(t *testing.T) {
+	gw := &Gateway{apisByID: map[string]*APISpec{}}
+	gw.SetConfig(config.Config{
+		AppPath:    "/apps",
+		HostName:   "localhost",
+		ListenPort: 8080,
+	})
+	gw.apisByID["rest-1"] = restSourceSpec("rest-1", "org-1", true)
+	gw.apisByID["rest-1"].TagsDisabled = false
+	gw.apisByID["rest-1"].Tags = []string{"edge-a", "edge-b"}
+
+	body, err := json.Marshal(pairedMCPProxyOAS("proxy-1", "org-1", "rest-1"))
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodPost, "/tyk/mcps", bytes.NewReader(body))
+	fs := afero.NewMemMapFs()
+	require.NoError(t, fs.MkdirAll("/apps", 0755))
+
+	obj, code := gw.handleAddMCP(req, fs)
+
+	require.Equal(t, http.StatusOK, code)
+	resp, ok := obj.(apiModifyKeySuccess)
+	require.True(t, ok)
+	assert.Equal(t, "proxy-1", resp.Key)
+
+	apiDefBody, err := afero.ReadFile(fs, gw.GetConfig().AppPath+"/proxy-1.json")
+	require.NoError(t, err)
+	var apiDef apidef.APIDefinition
+	require.NoError(t, json.Unmarshal(apiDefBody, &apiDef))
+	assert.False(t, apiDef.TagsDisabled)
+	assert.Equal(t, []string{"edge-a", "edge-b"}, apiDef.Tags)
+
+	oasBody, err := afero.ReadFile(fs, gw.GetConfig().AppPath+"/proxy-1-mcp.json")
+	require.NoError(t, err)
+	var proxyOAS oas.OAS
+	require.NoError(t, json.Unmarshal(oasBody, &proxyOAS))
+	require.NotNil(t, proxyOAS.GetTykExtension().Server.GatewayTags)
+	assert.True(t, proxyOAS.GetTykExtension().Server.GatewayTags.Enabled)
+	assert.Equal(t, []string{"edge-a", "edge-b"}, proxyOAS.GetTykExtension().Server.GatewayTags.Tags)
+}
+
+func TestHandleUpdateMCP_CopiesSourceRESTGatewayTagsToPairedProxy(t *testing.T) {
+	gw := &Gateway{apisByID: map[string]*APISpec{}}
+	gw.SetConfig(config.Config{
+		AppPath:    "/apps",
+		HostName:   "localhost",
+		ListenPort: 8080,
+	})
+	gw.apisByID["rest-1"] = restSourceSpec("rest-1", "org-1", true)
+	gw.apisByID["rest-1"].TagsDisabled = false
+	gw.apisByID["rest-1"].Tags = []string{"edge-a", "edge-b"}
+	gw.apisByID["proxy-1"] = pairedMCPProxySpec("proxy-1", "org-1", "rest-1", nil)
+
+	body, err := json.Marshal(pairedMCPProxyOAS("proxy-1", "org-1", "rest-1"))
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodPut, "/tyk/mcps/proxy-1", bytes.NewReader(body))
+	fs := afero.NewMemMapFs()
+	require.NoError(t, fs.MkdirAll("/apps", 0755))
+
+	obj, code := gw.handleUpdateMCP("proxy-1", req, fs)
+
+	require.Equal(t, http.StatusOK, code)
+	resp, ok := obj.(apiModifyKeySuccess)
+	require.True(t, ok)
+	assert.Equal(t, "proxy-1", resp.Key)
+
+	apiDefBody, err := afero.ReadFile(fs, gw.GetConfig().AppPath+"/proxy-1.json")
+	require.NoError(t, err)
+	var apiDef apidef.APIDefinition
+	require.NoError(t, json.Unmarshal(apiDefBody, &apiDef))
+	assert.False(t, apiDef.TagsDisabled)
+	assert.Equal(t, []string{"edge-a", "edge-b"}, apiDef.Tags)
+
+	oasBody, err := afero.ReadFile(fs, gw.GetConfig().AppPath+"/proxy-1-mcp.json")
+	require.NoError(t, err)
+	var proxyOAS oas.OAS
+	require.NoError(t, json.Unmarshal(oasBody, &proxyOAS))
+	require.NotNil(t, proxyOAS.GetTykExtension().Server.GatewayTags)
+	assert.True(t, proxyOAS.GetTykExtension().Server.GatewayTags.Enabled)
+	assert.Equal(t, []string{"edge-a", "edge-b"}, proxyOAS.GetTykExtension().Server.GatewayTags.Tags)
+}
+
 func TestHandleGetMCPListOAS(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

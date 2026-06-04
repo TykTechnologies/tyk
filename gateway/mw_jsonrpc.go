@@ -313,15 +313,25 @@ func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWri
 		return nil, middleware.StatusRespond
 	}
 
-	method := syntheticJSONRPCMethod(r)
+	policyCtx, responded := m.prepareRESTAsMCPPolicy(w, r)
+	if responded {
+		return nil, middleware.StatusRespond
+	}
+
+	method := ""
+	if policyCtx != nil && policyCtx.rpcReq != nil {
+		method = policyCtx.rpcReq.Method
+	} else {
+		method = syntheticJSONRPCMethod(r)
+	}
 	normaliseMCPStreamableAccept(r)
 	installMCPAdapterCallContext(r, m.Gw, m.Spec)
 
-	if method == mcp.MethodToolsList {
+	if method == mcp.MethodToolsList || (policyCtx != nil && policyCtx.listConfig != nil) {
 		rec := newBufferedResponseWriter()
 		m.Spec.MCPAdapter.SDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(rec, r)
 		view, ok := m.syntheticMCPToolViewForCaller(r)
-		m.writeSyntheticMCPToolsListResponse(w, r, rec, view, ok)
+		m.writeSyntheticMCPToolsListResponse(w, r, rec, view, ok, policyCtx)
 		return nil, middleware.StatusRespond
 	}
 
@@ -380,7 +390,7 @@ func (m *JSONRPCMiddleware) syntheticMCPToolViewForCaller(r *http.Request) (oas.
 	return view, ok
 }
 
-func (m *JSONRPCMiddleware) writeSyntheticMCPToolsListResponse(w http.ResponseWriter, r *http.Request, rec *bufferedResponseWriter, view oas.MCPToolView, filter bool) {
+func (m *JSONRPCMiddleware) writeSyntheticMCPToolsListResponse(w http.ResponseWriter, r *http.Request, rec *bufferedResponseWriter, view oas.MCPToolView, filter bool, policyCtx *restAsMCPPolicyContext) {
 	body := rec.body.Bytes()
 	if filter && rec.statusCode < http.StatusBadRequest {
 		rewritten, err := rewriteMCPToolsListResponse(body, view)
@@ -390,6 +400,11 @@ func (m *JSONRPCMiddleware) writeSyntheticMCPToolsListResponse(w http.ResponseWr
 			return
 		}
 		body = rewritten
+	}
+	if rec.statusCode < http.StatusBadRequest {
+		if filtered, ok := filterRESTAsMCPListResponse(body, policyCtx); ok {
+			body = filtered
+		}
 	}
 	rec.writeTo(w, body)
 }
