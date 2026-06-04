@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
 func TestValidationResult_HasErrors(t *testing.T) {
@@ -408,6 +411,64 @@ func TestRuleValidateEnforceTimeout_Validate(t *testing.T) {
 			result: ValidationResult{
 				IsValid: true,
 				Errors:  nil,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, runValidationTest(tc.apiDef, ruleSet, tc.result))
+	}
+}
+
+func TestRuleValidateGlobalEnforceTimeout_Validate(t *testing.T) {
+	ruleSet := ValidationRuleSet{
+		&RuleValidateGlobalEnforceTimeout{},
+	}
+
+	testCases := []struct {
+		name   string
+		apiDef *APIDefinition
+		result ValidationResult
+	}{
+		{
+			name: "zero (not configured) is valid",
+			apiDef: &APIDefinition{
+				GlobalEnforceTimeout: 0,
+			},
+			result: ValidationResult{IsValid: true},
+		},
+		{
+			name: "positive duration is valid",
+			apiDef: &APIDefinition{
+				GlobalEnforceTimeout: tyktime.ReadableDuration(5 * time.Second),
+			},
+			result: ValidationResult{IsValid: true},
+		},
+		{
+			name: "sub-second (1ms) is valid",
+			apiDef: &APIDefinition{
+				GlobalEnforceTimeout: tyktime.ReadableDuration(time.Millisecond),
+			},
+			result: ValidationResult{IsValid: true},
+		},
+		{
+			name: "negative duration is invalid",
+			apiDef: &APIDefinition{
+				GlobalEnforceTimeout: tyktime.ReadableDuration(-1 * time.Second),
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrInvalidGlobalTimeoutValue},
+			},
+		},
+		{
+			name: "negative sub-second is invalid",
+			apiDef: &APIDefinition{
+				GlobalEnforceTimeout: tyktime.ReadableDuration(-500 * time.Millisecond),
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrInvalidGlobalTimeoutValue},
 			},
 		},
 	}

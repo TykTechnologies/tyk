@@ -379,6 +379,78 @@ func Test_setDefaultVersion(t *testing.T) {
 	assert.Equal(t, "3.0", defaultVersion)
 }
 
+func TestUpstreamEnforceTimeoutSchema(t *testing.T) {
+	t.Parallel()
+
+	base := func(enforceTimeout string) []byte {
+		upstream := `"url": "http://upstream"`
+		if enforceTimeout != "" {
+			upstream += `,` + enforceTimeout
+		}
+		return []byte(`{
+			"openapi": "3.0.3",
+			"info": {"title": "t", "version": "1"},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {"name": "t", "state": {"active": true}},
+				"server": {"listenPath": {"value": "/t"}},
+				"upstream": {` + upstream + `}
+			}
+		}`)
+	}
+
+	t.Run("valid: enabled true with duration", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(base(`"enforceTimeout": {"enabled": true, "duration": "5s"}`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("valid: enabled false with duration", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(base(`"enforceTimeout": {"enabled": false, "duration": "500ms"}`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("valid: enabled with sub-second duration", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(base(`"enforceTimeout": {"enabled": true, "duration": "100ms"}`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("valid: enabled with minute duration", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(base(`"enforceTimeout": {"enabled": true, "duration": "2m"}`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("valid: no enforceTimeout field", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(base(""), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("invalid: enforceTimeout missing required enabled field", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(base(`"enforceTimeout": {"duration": "5s"}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "enabled")
+	})
+
+	t.Run("invalid: duration with bad format", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(base(`"enforceTimeout": {"enabled": true, "duration": "5x"}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "duration")
+	})
+
+	t.Run("invalid: duration is a number not a string", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(base(`"enforceTimeout": {"enabled": true, "duration": 5}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "duration")
+	})
+}
+
 func TestGetOASSchema(t *testing.T) {
 	err := loadOASSchema()
 	assert.NoError(t, err)
