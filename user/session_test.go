@@ -1934,7 +1934,7 @@ func TestSessionState_CloneHasOwnMutex(t *testing.T) {
 	assert.NotContains(t, cloned.AccessRights, "api2")
 }
 
-func TestSessionState_RaceConcurrentClone(t *testing.T) {
+func TestSessionState_RaceConcurrentClone(_ *testing.T) {
 	session := &SessionState{
 		AccessRights: map[string]AccessDefinition{
 			"api1": {APIID: "api1", Versions: []string{"v1"}},
