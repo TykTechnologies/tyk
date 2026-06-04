@@ -20,7 +20,7 @@ type apiFilterFunc func(*APISpec) bool
 type apiTypeCheck func(*APISpec) error
 
 func isOASNotMCP(spec *APISpec) bool {
-	return spec != nil && spec.IsOAS && !mcpManaged(spec)
+	return spec != nil && spec.IsOAS && !spec.IsSyntheticMCPAdapter() && !mcpManaged(spec)
 }
 
 func typeCheckFunc(name string, predicate apiFilterFunc) apiTypeCheck {
@@ -40,7 +40,7 @@ func mcpManaged(spec *APISpec) bool {
 	if spec == nil || spec.APIDefinition == nil {
 		return false
 	}
-	return spec.IsMCPManaged()
+	return !spec.IsSyntheticMCPAdapter() && spec.IsMCPManaged()
 }
 
 func (gw *Gateway) setBaseAPIIDHeader(w http.ResponseWriter, oasObj *oas.OAS) {

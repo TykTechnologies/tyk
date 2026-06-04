@@ -33,6 +33,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp/pairing"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 )
@@ -358,6 +359,7 @@ func (gw *Gateway) processSpec(
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &PRMMiddleware{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &MCPLoopAuthBypassMiddleware{BaseMiddleware: baseMid.Copy()})
 
 	// Track auth middlewares for OR wrapper
 	var authMiddlewares []TykMiddleware
@@ -527,6 +529,7 @@ func (gw *Gateway) processSpec(
 
 	gw.mwAppendEnabled(&chainArray, &OAuth2Middleware{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, getOAuth2ExchangeMw(baseMid.Copy()))
+	gw.mwAppendEnabled(&chainArray, &MCPLoopAuthRestoreMiddleware{BaseMiddleware: baseMid.Copy()})
 
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid.Copy(), quotaKey: options.quotaKey})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid.Copy()})
@@ -764,7 +767,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if d.SH.Spec.target.Scheme == "tyk" {
-		handler, _, found := d.Gw.findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
+		handler, _, found := d.Gw.findInternalHTTPHandlerForLoop(d.SH.Spec.target.Host, d.SH.Spec, r)
 
 		if !found {
 			handler := ErrorHandler{d.SH.Base()}
@@ -1213,6 +1216,15 @@ func listenPathLength(listenPath string) int {
 // Create the individual API (app) specs based on live configurations and assign middleware
 func (gw *Gateway) loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
+
+	synthesizedSpecs, mcpPairingSnapshot, err := synthesizeMCPAdapterSpecs(specs, gw.currentSyntheticMCPAdapterSpecs())
+	if err != nil {
+		mainLog.WithError(err).Error("failed to synthesize REST-as-MCP adapters")
+		gw.mcpPairingIndex.Set(pairing.Snapshot{})
+	} else {
+		specs = synthesizedSpecs
+		gw.mcpPairingIndex.Set(mcpPairingSnapshot)
+	}
 
 	// Only build usage map in RPC mode (when tracker exists)
 	if gw.certUsageTracker != nil {

@@ -907,7 +907,7 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 			r.Header.Del(apidef.TykInternalApiHeader)
 		}
 
-		handler, _, found := rt.Gw.findInternalHttpHandlerByNameOrID(r.Host)
+		handler, _, found := rt.Gw.findInternalHTTPHandlerForLoop(r.Host, nil, r)
 		if !found {
 			rt.logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
 			return nil, errors.New("handler could")

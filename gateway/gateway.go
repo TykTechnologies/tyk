@@ -14,7 +14,10 @@ func (gw *Gateway) GetLoadedAPIIDs() []model.LoadedAPIInfo {
 	defer gw.apisMu.RUnlock()
 
 	apis := make([]model.LoadedAPIInfo, 0, len(gw.apisByID))
-	for apiID := range gw.apisByID {
+	for apiID, spec := range gw.apisByID {
+		if spec != nil && spec.IsSyntheticMCPAdapter() {
+			continue
+		}
 		apis = append(apis, model.LoadedAPIInfo{
 			APIID: apiID,
 		})

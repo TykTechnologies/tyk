@@ -24,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
+	restmcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
 
 	_ "github.com/TykTechnologies/tyk/internal/mcp" // registers MCP VEM prefixes
 )
@@ -81,6 +82,16 @@ type APISpec struct {
 	// Key format: "tool:{name}", "resource:{pattern}", "prompt:{name}"
 	// Value: VEM path (e.g., "/mcp-tool:get-weather")
 	MCPPrimitives map[string]string
+
+	// Runtime-only REST-as-MCP synthetic adapter fields. These are never
+	// extracted to/persisted from API definitions or OAS documents.
+	MCPAdapterSynthetic           bool
+	MCPAdapterSourceRESTAPIID     string
+	MCPSDKAdapter                 *restmcpadapter.SDKAdapter
+	MCPAllowedCallerProxyAPIIDs   []string
+	MCPAllowedCallerProxyAPIIDSet map[string]struct{}
+	MCPToolViews                  map[string]oas.MCPToolView
+	MCPAdapterUnionTools          []oas.DerivedTool
 
 	JSONRPCRouter jsonrpc.Router
 
@@ -435,4 +446,10 @@ func (a *APISpec) APIType() string {
 	default:
 		return "classic"
 	}
+}
+
+// IsSyntheticMCPAdapter reports whether this spec is a hidden runtime-only
+// adapter synthesized for a REST-as-MCP proxy/source pairing.
+func (a *APISpec) IsSyntheticMCPAdapter() bool {
+	return a != nil && a.MCPAdapterSynthetic
 }
