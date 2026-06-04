@@ -1202,14 +1202,16 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 
 		timeout := proxyTimeout(p.TykAPISpec)
+		transportTimeout := timeout
 
-		// If an enforced timeout is configured for this API endpoint, use it instead
-		// of the global default timeout, as it should take precedence
+		// If an enforced timeout is configured for this API endpoint, we use context timeout instead of transport timeout
+		// to avoid conflicts between ResponseHeaderTimeout and context timeout across multiple paths.
+		// The enforced timeout is already applied via context.WithTimeout above.
 		if isTimeoutEnforced {
-			timeout = enforcedTimeout
+			transportTimeout = proxyTimeout(p.TykAPISpec)
 		}
 
-		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
+		p.TykAPISpec.HTTPTransport = p.httpTransport(transportTimeout, rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 
 		if oldTransport != nil {
@@ -1469,7 +1471,6 @@ func (p *ReverseProxy) flushInterval(res *http.Response) time.Duration {
 }
 
 func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval time.Duration) {
-
 	if flushInterval != 0 {
 		if wf, ok := dst.(writeFlusher); ok {
 			mlw := &maxLatencyWriter{

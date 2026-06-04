@@ -2417,3 +2417,98 @@ func TestTimeoutPrioritization(t *testing.T) {
 		})
 	})
 }
+
+// TestTransportTimeoutNotLeakedBetweenPaths is a regression test for TT-17386.
+// When two paths on the same API have different enforced timeouts, the HTTP transport
+// is shared (created once and reused). The old code passed the enforced timeout as
+// the transport's ResponseHeaderTimeout, so whichever path created the transport
+// first would poison it for all subsequent paths.
+func TestTransportTimeoutNotLeakedBetweenPaths(t *testing.T) {
+	t.Parallel()
+
+	ts := StartTest(func(c *config.Config) {
+		// Large enough that transport ResponseHeaderTimeout won't fire before the
+		// enforced context deadline on /long (3s).
+		c.ProxyDefaultTimeout = 5
+	})
+	defer ts.Close()
+
+	// Upstream responds after 1.5s — between the short (1s) and long (3s) enforced timeouts.
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(1500 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("Success"))
+	}))
+	defer upstream.Close()
+
+	buildAPI := func() *APISpec {
+		return BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/short",
+						Method:   http.MethodGet,
+						TimeOut:  1,
+					},
+					{
+						Disabled: false,
+						Path:     "/long",
+						Method:   http.MethodGet,
+						TimeOut:  3,
+					},
+				}
+			})
+		})[0]
+	}
+
+	t.Run("short path seeds transport, long path must not inherit short timeout", func(t *testing.T) {
+		ts.Gw.LoadAPI(buildAPI())
+
+		// Hit /short first — seeds the shared HTTPTransport.
+		// Old code: transport ResponseHeaderTimeout=1s.
+		// Fixed code: transport ResponseHeaderTimeout=ProxyDefaultTimeout(5s).
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/short",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+
+		// /long (3s enforced, 1.5s upstream) must succeed.
+		// With old code it fails because it inherits the 1s ResponseHeaderTimeout from /short.
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/long",
+			Code:      http.StatusOK,
+			BodyMatch: "Success",
+		})
+	})
+
+	t.Run("long path seeds transport, short path must still enforce its context timeout", func(t *testing.T) {
+		ts.Gw.LoadAPI(buildAPI())
+
+		// Hit /long first — seeds the transport with ResponseHeaderTimeout=ProxyDefaultTimeout(5s).
+		// /long (3s enforced, 1.5s upstream) succeeds in both old and new code.
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/long",
+			Code:      http.StatusOK,
+			BodyMatch: "Success",
+		})
+
+		// /short (1s enforced, 1.5s upstream) must still time out via its context deadline,
+		// regardless of which ResponseHeaderTimeout the transport carries.
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/short",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+	})
+}
