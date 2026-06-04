@@ -150,41 +150,64 @@ func (gw *Gateway) validateMCPToolViewAliasConflicts(incomingProxyAPIID, orgID, 
 		return nil
 	}
 
-	gw.apisMu.RLock()
-	rest := gw.apisByID[restAPIID]
-	proxies := make([]*APISpec, 0)
-	for _, spec := range gw.apisByID {
-		if spec == nil || spec.APIDefinition == nil || spec.APIID == incomingProxyAPIID || !spec.IsMCPManaged() {
-			continue
-		}
-		_, sourceRESTAPIID, ok := pairedMCPAdapterTarget(spec.Proxy.TargetURL)
-		if !ok || sourceRESTAPIID != restAPIID || spec.OrgID != orgID {
-			continue
-		}
-		proxies = append(proxies, spec)
-	}
-	gw.apisMu.RUnlock()
-
+	rest, proxies := gw.mcpToolViewAliasConflictCandidates(incomingProxyAPIID, orgID, restAPIID)
 	if rest == nil {
 		return nil
 	}
 
 	sort.Slice(proxies, func(i, j int) bool { return proxies[i].APIID < proxies[j].APIID })
 	for _, spec := range proxies {
-		existingView, warnings, err := oas.DeriveMCPToolView(&rest.OAS, spec.OAS.GetTykMCPServerExtension())
-		logMCPDeriveWarnings(spec.APIID, restAPIID, warnings)
-		if err != nil {
-			return fmt.Errorf("build MCP tool view for existing proxy %q: %w", spec.APIID, err)
-		}
-		existingByName := mcpToolViewSourceIDsByName(existingView)
-		for name, incomingSourceID := range incomingByName {
-			existingSourceID, ok := existingByName[name]
-			if ok && existingSourceID != incomingSourceID {
-				return fmt.Errorf("MCP tool alias conflict for %q: incoming proxy maps to source %q, proxy %q maps to source %q", name, incomingSourceID, spec.APIID, existingSourceID)
-			}
+		if err := validateMCPToolViewAliasConflictAgainstProxy(rest, spec, restAPIID, incomingByName); err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+func (gw *Gateway) mcpToolViewAliasConflictCandidates(incomingProxyAPIID, orgID, restAPIID string) (*APISpec, []*APISpec) {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+
+	rest := gw.apisByID[restAPIID]
+	proxies := make([]*APISpec, 0)
+	for _, spec := range gw.apisByID {
+		if !isMCPToolViewAliasConflictCandidate(spec, incomingProxyAPIID, orgID, restAPIID) {
+			continue
+		}
+		proxies = append(proxies, spec)
+	}
+
+	return rest, proxies
+}
+
+func isMCPToolViewAliasConflictCandidate(spec *APISpec, incomingProxyAPIID, orgID, restAPIID string) bool {
+	if spec == nil || spec.APIDefinition == nil || spec.APIID == incomingProxyAPIID || !spec.IsMCPManaged() {
+		return false
+	}
+
+	_, sourceRESTAPIID, ok := pairedMCPAdapterTarget(spec.Proxy.TargetURL)
+	return ok && sourceRESTAPIID == restAPIID && spec.OrgID == orgID
+}
+
+func validateMCPToolViewAliasConflictAgainstProxy(rest, spec *APISpec, restAPIID string, incomingByName map[string]string) error {
+	existingView, warnings, err := oas.DeriveMCPToolView(&rest.OAS, spec.OAS.GetTykMCPServerExtension())
+	logMCPDeriveWarnings(spec.APIID, restAPIID, warnings)
+	if err != nil {
+		return fmt.Errorf("build MCP tool view for existing proxy %q: %w", spec.APIID, err)
+	}
+
+	return mcpToolViewAliasConflict(spec.APIID, incomingByName, mcpToolViewSourceIDsByName(existingView))
+}
+
+func mcpToolViewAliasConflict(proxyAPIID string, incomingByName, existingByName map[string]string) error {
+	for name, incomingSourceID := range incomingByName {
+		existingSourceID, ok := existingByName[name]
+		if !ok || existingSourceID == incomingSourceID {
+			continue
+		}
+		return fmt.Errorf("MCP tool alias conflict for %q: incoming proxy maps to source %q, proxy %q maps to source %q", name, incomingSourceID, proxyAPIID, existingSourceID)
+	}
 	return nil
 }
 

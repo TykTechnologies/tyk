@@ -479,6 +479,7 @@ func assertDerivedToolAnnotations(
 	idempotentHint bool,
 	openWorldHint bool,
 ) {
+
 	t.Helper()
 
 	require.NotNil(t, got)

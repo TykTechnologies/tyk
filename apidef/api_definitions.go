@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"text/template"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/mcpadapter"
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
 	tyktime "github.com/TykTechnologies/tyk/internal/time"
@@ -1486,56 +1486,14 @@ func (a *APIDefinition) IsPairedMCPAdapterProxy() bool {
 		return false
 	}
 
-	host, path, ok := parseMCPAdapterTarget(a.Proxy.TargetURL)
+	host, path, ok := mcpadapter.ParseTarget(a.Proxy.TargetURL)
 	if !ok {
 		return false
 	}
-	if isMCPAdapterFallbackHost(host) {
+	if mcpadapter.IsAPIID(host) {
 		return path == "" || path == "/"
 	}
-	return isMCPAdapterLoopPath(path)
-}
-
-func isMCPAdapterLoopPath(path string) bool {
-	return path == "/mcp" || path == "/mcp/"
-}
-
-func isMCPAdapterFallbackHost(host string) bool {
-	const suffix = "__mcp-server"
-	return strings.HasSuffix(host, suffix) && len(host) > len(suffix)
-}
-
-func parseMCPAdapterTarget(target string) (host, path string, ok bool) {
-	target = strings.TrimSpace(target)
-	const scheme = "tyk://"
-	if !strings.HasPrefix(target, scheme) {
-		return "", "", false
-	}
-
-	rest := strings.TrimPrefix(target, scheme)
-	rest = strings.TrimPrefix(rest, "id:")
-	if rest == "" {
-		return "", "", false
-	}
-
-	hostEnd := len(rest)
-	if i := strings.IndexAny(rest, "/?#"); i != -1 {
-		hostEnd = i
-	}
-	host = rest[:hostEnd]
-	if host == "" {
-		return "", "", false
-	}
-
-	if hostEnd < len(rest) && rest[hostEnd] == '/' {
-		pathEnd := len(rest)
-		if i := strings.IndexAny(rest[hostEnd:], "?#"); i != -1 {
-			pathEnd = hostEnd + i
-		}
-		path = rest[hostEnd:pathEnd]
-	}
-
-	return host, path, true
+	return mcpadapter.IsLoopPath(path)
 }
 
 // IsMCPManaged reports whether this API belongs to the MCP management surface.
