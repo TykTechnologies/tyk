@@ -142,7 +142,33 @@ func TestDeriveSourceTools_PrefersExactJSONRequestBodyMediaType(t *testing.T) {
 		props := tools[0].InputSchema["properties"].(map[string]any)
 		assert.Contains(t, props, "exact")
 		assert.NotContains(t, props, "vendor")
+		assert.Equal(t, "application/json", tools[0].RequestBodyContentType)
 	}
+}
+
+func TestDeriveSourceTools_PreservesSelectedJSONRequestBodyMediaType(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Post: &openapi3.Operation{
+				OperationID: "create_order",
+				RequestBody: &openapi3.RequestBodyRef{Value: &openapi3.RequestBody{
+					Content: openapi3.Content{
+						"application/vnd.api+json": &openapi3.MediaType{
+							Schema: &openapi3.SchemaRef{Value: openapi3.NewObjectSchema().WithProperty("data", openapi3.NewStringSchema())},
+						},
+					},
+				}},
+			},
+		}),
+	))
+
+	tools, _, err := DeriveSourceTools(src, nil)
+	require.NoError(t, err)
+	require.Len(t, tools, 1)
+
+	assert.Equal(t, "application/vnd.api+json", tools[0].RequestBodyContentType)
 }
 
 func TestDeriveSourceTools_DerivesFormURLEncodedRequestBody(t *testing.T) {

@@ -218,6 +218,27 @@ func TestBuildUpstreamRequest_FormURLEncodedBodyFields(t *testing.T) {
 	assert.Equal(t, "5", form.Get("qty"))
 }
 
+func TestBuildUpstreamRequest_PreservesConfiguredJSONBodyContentType(t *testing.T) {
+	t.Parallel()
+	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
+	tool := &oas.DerivedTool{
+		Name:                   "create_order",
+		Method:                 http.MethodPost,
+		PathTemplate:           "/orders",
+		RequestBodyContentType: "application/vnd.api+json",
+		ParamLocations: map[string]string{
+			"data": oas.DerivedParamLocationBodyPrefix + "data",
+		},
+	}
+
+	req, err := BuildUpstreamRequest(parent, tool, "rest-1", map[string]any{
+		"data": "ABC",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "application/vnd.api+json", req.Header.Get("Content-Type"))
+}
+
 func TestBuildUpstreamRequest_MissingPathParam(t *testing.T) {
 	t.Parallel()
 	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)

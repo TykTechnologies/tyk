@@ -334,6 +334,9 @@ func (b *upstreamRequestBuilder) requestBodyContentType() string {
 	if b.isFormURLEncodedBody() {
 		return contentTypeFormURLEncoded
 	}
+	if contentType := strings.TrimSpace(b.tool.RequestBodyContentType); contentType != "" {
+		return contentType
+	}
 	return contentTypeApplicationJSON
 }
 

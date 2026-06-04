@@ -721,8 +721,8 @@ func isBodyParamLocation(location string) bool {
 }
 
 func selectRequestBodyMediaType(content openapi3.Content) (*openapi3.MediaType, string) {
-	if media := selectJSONMediaType(content); media != nil {
-		return media, contentTypeJSON
+	if media, contentType := selectJSONMediaType(content); media != nil {
+		return media, contentType
 	}
 	if media := selectFormURLEncodedMediaType(content); media != nil {
 		return media, contentTypeFormURLEncoded
@@ -730,14 +730,14 @@ func selectRequestBodyMediaType(content openapi3.Content) (*openapi3.MediaType, 
 	return nil, ""
 }
 
-func selectJSONMediaType(content openapi3.Content) *openapi3.MediaType {
+func selectJSONMediaType(content openapi3.Content) (*openapi3.MediaType, string) {
 	if len(content) == 0 {
-		return nil
+		return nil, ""
 	}
 
 	for ct, media := range content {
-		if strings.EqualFold(ct, contentTypeJSON) {
-			return media
+		if strings.EqualFold(strings.TrimSpace(ct), contentTypeJSON) {
+			return media, strings.TrimSpace(ct)
 		}
 	}
 
@@ -750,10 +750,10 @@ func selectJSONMediaType(content openapi3.Content) *openapi3.MediaType {
 	sort.Strings(jsonTypes)
 	for _, ct := range jsonTypes {
 		if media := content[ct]; media != nil {
-			return media
+			return media, strings.TrimSpace(ct)
 		}
 	}
-	return nil
+	return nil, ""
 }
 
 func selectFormURLEncodedMediaType(content openapi3.Content) *openapi3.MediaType {
@@ -866,7 +866,7 @@ func responseJSONSchema(responseRef *openapi3.ResponseRef) *openapi3.SchemaRef {
 	if responseRef == nil || responseRef.Value == nil {
 		return nil
 	}
-	media := selectJSONMediaType(responseRef.Value.Content)
+	media, _ := selectJSONMediaType(responseRef.Value.Content)
 	if media == nil || media.Schema == nil || media.Schema.Value == nil {
 		return nil
 	}
