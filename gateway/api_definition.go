@@ -225,10 +225,14 @@ func (s *APISpec) Unload() {
 func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 	if s.IsOAS {
 		var err error
-		if s.IsMCP() {
+		if s.IsMCPManaged() {
 			// MCP-aware path: empty-mode + no-resource PRM config
 			// resolves to mirror, so users can enable mirror by just
-			// marking the API as MCP without any static fields.
+			// marking the API as MCP without any static fields. Paired
+			// REST-as-MCP proxies also need this path so their
+			// x-tyk-mcp-server extension validates when file-backed
+			// configs are reloaded, even though their runtime JSON-RPC
+			// chain lives on the synthetic adapter.
 			err = s.OAS.ValidateForMCP(context.Background(), oas.GetValidationOptionsFromConfig(oasConfig)...)
 		} else {
 			err = s.OAS.Validate(context.Background(), oas.GetValidationOptionsFromConfig(oasConfig)...)
