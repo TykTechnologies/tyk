@@ -87,11 +87,19 @@ func (m *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	if st == nil || st.OASConfig == nil {
 		return nil, http.StatusOK
 	}
-	if st.OASConfig.TokenExchange == nil || !st.OASConfig.TokenExchange.Enabled {
+	cfg := st.OASConfig
+	if cfg.TokenExchange == nil || !cfg.TokenExchange.Enabled {
 		return nil, http.StatusOK
 	}
 
-	_, err := m.runExchange(r, st)
+	// No exchange fires for this request (no providers, or none targets it):
+	// a no-op with nothing to observe — no span, metric, log, or audit.
+	if len(cfg.TokenExchange.Providers) == 0 || !m.exchangeWouldFire(st, cfg) {
+		oauth2common.MarkExchangeDone(r)
+		return nil, http.StatusOK
+	}
+
+	_, err := m.runExchangeObserved(r, st)
 	if err != nil {
 		switch e := err.(type) {
 		case *oauth2common.NoMatchingProviderError:
