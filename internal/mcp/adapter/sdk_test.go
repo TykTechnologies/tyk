@@ -77,6 +77,21 @@ func TestNewSDKServer_AdvertisesDerivedToolsWithoutListChangedNotifications(t *t
 	assert.Equal(t, "object", schema["type"])
 	assert.Equal(t, map[string]any{"id": map[string]any{"type": "string"}}, schema["properties"])
 	assert.Equal(t, []any{"id"}, schema["required"])
+	annotations := list.Tools[1].Annotations
+	require.NotNil(t, annotations)
+	assert.Equal(t, "Get order", annotations.Title)
+	assert.True(t, annotations.ReadOnlyHint)
+	require.NotNil(t, annotations.DestructiveHint)
+	assert.False(t, *annotations.DestructiveHint)
+	assert.True(t, annotations.IdempotentHint)
+	require.NotNil(t, annotations.OpenWorldHint)
+	assert.False(t, *annotations.OpenWorldHint)
+	assert.Equal(t, map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"id": map[string]any{"type": "string"},
+		},
+	}, list.Tools[1].OutputSchema)
 }
 
 func TestNewSDKServer_CallToolDispatchesDerivedTool(t *testing.T) {
@@ -119,6 +134,48 @@ func TestNewSDKServer_CallToolDispatchesDerivedTool(t *testing.T) {
 	assert.Equal(t, "application/json", result.Meta["upstreamContentType"])
 	require.Len(t, result.Content, 1)
 	assert.Equal(t, `{"ok":true}`, result.Content[0].(*mcpsdk.TextContent).Text)
+	assert.Equal(t, map[string]any{"ok": true}, result.StructuredContent)
+}
+
+func TestNewSDKServer_CallToolWrapsNonObjectStructuredContent(t *testing.T) {
+	t.Parallel()
+
+	tool := oas.DerivedTool{
+		Name:           "list_ids",
+		Method:         http.MethodGet,
+		PathTemplate:   "/ids",
+		ParamLocations: map[string]string{},
+		InputSchema:    map[string]any{"type": "object"},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"result": map[string]any{
+					"type":  "array",
+					"items": map[string]any{"type": "string"},
+				},
+			},
+			"required": []string{"result"},
+		},
+	}
+
+	server, err := NewSDKServer(SDKServerConfig{
+		Name:  "Orders [MCP adapter]",
+		Tools: []oas.DerivedTool{tool},
+		CallTool: func(context.Context, *oas.DerivedTool, map[string]any) (*Recorder, error) {
+			rec := NewRecorder()
+			rec.Header().Set("Content-Type", "application/json")
+			_, err := rec.Write([]byte(`["abc-123"]`))
+			require.NoError(t, err)
+			return rec, nil
+		},
+	})
+	require.NoError(t, err)
+
+	session := connectSDKServer(t, server)
+	result, err := session.CallTool(context.Background(), &mcpsdk.CallToolParams{Name: "list_ids"})
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]any{"result": []any{"abc-123"}}, result.StructuredContent)
 }
 
 func TestSDKToolResult_TruncationNoticeIsVisible(t *testing.T) {
@@ -354,7 +411,31 @@ func TestNewSDKStreamableHTTPHandler_HandlesInitializeAsJSON(t *testing.T) {
 func TestNewSDKStreamableHTTPHandler_UnknownToolArgumentsReturnInvalidParams(t *testing.T) {
 	t.Parallel()
 
+	result := exerciseUnknownToolArgumentCall(t)
+	require.True(t, result.callToolCalled)
+	assertUnknownToolArgumentInvalidParams(t, result.response)
+}
+
+func TestRESTAsMCPToolCall_RejectsUnknownArgumentsBeforeSourceChain(t *testing.T) {
+	t.Parallel()
+
+	result := exerciseUnknownToolArgumentCall(t)
+	require.True(t, result.callToolCalled)
+	assert.False(t, result.sourceChainCalled)
+	assertUnknownToolArgumentInvalidParams(t, result.response)
+}
+
+type unknownToolArgumentCallResult struct {
+	callToolCalled    bool
+	sourceChainCalled bool
+	response          map[string]any
+}
+
+func exerciseUnknownToolArgumentCall(t *testing.T) unknownToolArgumentCallResult {
+	t.Helper()
+
 	called := false
+	sourceCalled := false
 	tool := oas.DerivedTool{
 		Name:           "get_order",
 		Method:         http.MethodGet,
@@ -372,6 +453,7 @@ func TestNewSDKStreamableHTTPHandler_UnknownToolArgumentsReturnInvalidParams(t *
 			if err != nil {
 				return nil, err
 			}
+			sourceCalled = true
 			return NewRecorder(), nil
 		},
 	}, nil)
@@ -389,10 +471,20 @@ func TestNewSDKStreamableHTTPHandler_UnknownToolArgumentsReturnInvalidParams(t *
 
 	handler.ServeHTTP(rec, req)
 
-	require.True(t, called)
 	require.Equal(t, http.StatusOK, rec.Code)
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+
+	return unknownToolArgumentCallResult{
+		callToolCalled:    called,
+		sourceChainCalled: sourceCalled,
+		response:          body,
+	}
+}
+
+func assertUnknownToolArgumentInvalidParams(t *testing.T, body map[string]any) {
+	t.Helper()
+
 	errObj := body["error"].(map[string]any)
 	assert.EqualValues(t, -32602, errObj["code"])
 	assert.Contains(t, errObj["message"], `unknown argument "unknown"`)

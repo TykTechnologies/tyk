@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 
 	sdkjsonrpc "github.com/modelcontextprotocol/go-sdk/jsonrpc"
@@ -207,9 +208,11 @@ func newSDKServer(config SDKServerConfig, listChanged bool) (*mcpsdk.Server, err
 
 func (a *SDKAdapter) addTool(tool oas.DerivedTool) {
 	a.server.AddTool(&mcpsdk.Tool{
-		Name:        tool.Name,
-		Description: tool.Description,
-		InputSchema: toolInputSchema(tool.InputSchema),
+		Name:         tool.Name,
+		Annotations:  sdkToolAnnotations(tool.Annotations),
+		Description:  tool.Description,
+		InputSchema:  toolInputSchema(tool.InputSchema),
+		OutputSchema: toolOutputSchema(tool.OutputSchema),
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error) {
 		args, err := unmarshalToolArgs(req)
 		if err != nil {
@@ -227,7 +230,7 @@ func (a *SDKAdapter) addTool(tool oas.DerivedTool) {
 			return nil, fmt.Errorf("tool %q returned nil recorder", tool.Name)
 		}
 
-		return SDKToolResult(rec), nil
+		return SDKToolResultForTool(&tool, rec), nil
 	})
 }
 
@@ -281,6 +284,16 @@ func SDKToolResult(rec *Recorder) *mcpsdk.CallToolResult {
 	}
 }
 
+// SDKToolResultForTool maps a captured REST response to a tool result and
+// includes structured content when the derived tool publishes an output schema.
+func SDKToolResultForTool(tool *oas.DerivedTool, rec *Recorder) *mcpsdk.CallToolResult {
+	result := SDKToolResult(rec)
+	if structuredContent, ok := toolStructuredContent(tool, rec); ok {
+		result.StructuredContent = structuredContent
+	}
+	return result
+}
+
 func unmarshalToolArgs(req *mcpsdk.CallToolRequest) (map[string]any, error) {
 	args := map[string]any{}
 	if req == nil || req.Params == nil || len(req.Params.Arguments) == 0 {
@@ -297,4 +310,62 @@ func toolInputSchema(schema map[string]any) any {
 		return map[string]any{"type": "object"}
 	}
 	return schema
+}
+
+func toolOutputSchema(schema map[string]any) any {
+	if len(schema) == 0 {
+		return nil
+	}
+	return schema
+}
+
+func sdkToolAnnotations(src *oas.DerivedToolAnnotations) *mcpsdk.ToolAnnotations {
+	if src == nil {
+		return nil
+	}
+
+	dst := &mcpsdk.ToolAnnotations{
+		Title: src.Title,
+	}
+	if src.ReadOnlyHint != nil {
+		dst.ReadOnlyHint = *src.ReadOnlyHint
+	}
+	if src.DestructiveHint != nil {
+		v := *src.DestructiveHint
+		dst.DestructiveHint = &v
+	}
+	if src.IdempotentHint != nil {
+		dst.IdempotentHint = *src.IdempotentHint
+	}
+	if src.OpenWorldHint != nil {
+		v := *src.OpenWorldHint
+		dst.OpenWorldHint = &v
+	}
+	return dst
+}
+
+func toolStructuredContent(tool *oas.DerivedTool, rec *Recorder) (any, bool) {
+	if tool == nil || len(tool.OutputSchema) == 0 || rec == nil || rec.Status() >= http.StatusBadRequest || rec.Truncated() {
+		return nil, false
+	}
+	if !isJSONContentType(rec.ContentType()) {
+		return nil, false
+	}
+
+	var body any
+	if err := json.Unmarshal(rec.Body(), &body); err != nil {
+		return nil, false
+	}
+	if object, ok := body.(map[string]any); ok {
+		return object, true
+	}
+	return map[string]any{"result": body}, true
+}
+
+func isJSONContentType(contentType string) bool {
+	contentType = strings.ToLower(strings.TrimSpace(contentType))
+	if semicolon := strings.Index(contentType, ";"); semicolon != -1 {
+		contentType = strings.TrimSpace(contentType[:semicolon])
+	}
+	return contentType == "application/json" || strings.Contains(contentType, "json")
 }

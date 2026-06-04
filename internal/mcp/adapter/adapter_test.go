@@ -34,6 +34,19 @@ func sampleTools() []oas.DerivedTool {
 				"properties": map[string]any{"id": map[string]any{"type": "string"}},
 				"required":   []string{"id"},
 			},
+			Annotations: &oas.DerivedToolAnnotations{
+				Title:           "Get order",
+				ReadOnlyHint:    boolPtr(true),
+				DestructiveHint: boolPtr(false),
+				IdempotentHint:  boolPtr(true),
+				OpenWorldHint:   boolPtr(false),
+			},
+			OutputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"id": map[string]any{"type": "string"},
+				},
+			},
 		},
 		{
 			Name:         "createOrder",
@@ -46,6 +59,10 @@ func sampleTools() []oas.DerivedTool {
 			},
 		},
 	}
+}
+
+func boolPtr(v bool) *bool {
+	return &v
 }
 
 func sampleTool(t *testing.T, name string) *oas.DerivedTool {
