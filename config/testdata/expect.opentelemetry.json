@@ -85,5 +85,6 @@
         },
         "runtime_metrics": null,
         "api_metrics": null
-    }
+    },
+    "mcp_trace_context": {}
 }

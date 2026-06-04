@@ -125,6 +125,9 @@ func TestGateway_afterConfSetup(t *testing.T) {
 							},
 						},
 					},
+					MCPTraceContext: otel.MCPTraceContextConfig{
+						ReadSources: otel.DefaultMCPReadSources(),
+					},
 				},
 				AnalyticsConfig: config.AnalyticsConfigConfig{
 					PurgeInterval: 10,
