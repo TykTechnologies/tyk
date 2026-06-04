@@ -2,18 +2,22 @@ package gateway
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -630,4 +634,220 @@ func TestIdPRegistry_JWT_ManualSourceWins(t *testing.T) {
 		Headers: map[string]string{"authorization": jwtToken},
 		Code:    http.StatusOK,
 	})
+}
+
+// --- focused unit coverage for the non-RPC helpers ---
+
+func newTestJWTMiddleware(apiID string) *JWTMiddleware {
+	gw := &Gateway{apisByID: map[string]*APISpec{}}
+	gw.SetConfig(config.Config{})
+	gw.idpRegistry = newIdPRegistry(gw)
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: apiID}}
+	return &JWTMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
+}
+
+func TestUnverifiedIssuerHint(t *testing.T) {
+	withIss := &jwt.Token{Claims: jwt.MapClaims{ISS: "https://issuer"}}
+	if got := unverifiedIssuerHint(withIss); got != "https://issuer" {
+		t.Errorf("iss present: want https://issuer, got %q", got)
+	}
+	noIss := &jwt.Token{Claims: jwt.MapClaims{"sub": "x"}}
+	if got := unverifiedIssuerHint(noIss); got != "" {
+		t.Errorf("no iss claim: want empty, got %q", got)
+	}
+	notMap := &jwt.Token{Claims: jwt.RegisteredClaims{}}
+	if got := unverifiedIssuerHint(notMap); got != "" {
+		t.Errorf("non-MapClaims: want empty, got %q", got)
+	}
+}
+
+func TestKeyFromJWKSet(t *testing.T) {
+	if got := keyFromJWKSet(nil, "kid"); got != nil {
+		t.Errorf("nil set must return nil, got %v", got)
+	}
+	if got := keyFromJWKSet(&jose.JSONWebKeySet{}, "kid"); got != nil {
+		t.Errorf("set without kid must return nil, got %v", got)
+	}
+}
+
+func TestCachedJWKSet(t *testing.T) {
+	k := newTestJWTMiddleware("api-a")
+	jwkCache := k.loadOrCreateJWKCache()
+
+	if got := cachedJWKSet(jwkCache, "https://miss"); got != nil {
+		t.Errorf("cache miss must return nil, got %v", got)
+	}
+
+	set := &jose.JSONWebKeySet{}
+	jwkCache.Set("https://hit", set, cache.DefaultExpiration)
+	if got := cachedJWKSet(jwkCache, "https://hit"); got != set {
+		t.Errorf("cache hit must return the set, got %v", got)
+	}
+
+	jwkCache.Set("https://wrong", 1234, cache.DefaultExpiration)
+	if got := cachedJWKSet(jwkCache, "https://wrong"); got != nil {
+		t.Errorf("unexpected cache value type must return nil, got %v", got)
+	}
+}
+
+func TestSecretFromIdPRegistry_EarlyReturns(t *testing.T) {
+	tok := &jwt.Token{Header: map[string]interface{}{KID: "kid-1"}, Claims: jwt.MapClaims{}}
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	// Gw nil.
+	kNoGw := &JWTMiddleware{BaseMiddleware: &BaseMiddleware{Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}}}}
+	if got := kNoGw.secretFromIdPRegistry(r, tok); got != nil {
+		t.Errorf("nil Gw must return nil, got %v", got)
+	}
+
+	// Gw set but registry nil.
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{})
+	kNoReg := &JWTMiddleware{BaseMiddleware: &BaseMiddleware{Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}}, Gw: gw}}
+	if got := kNoReg.secretFromIdPRegistry(r, tok); got != nil {
+		t.Errorf("nil registry must return nil, got %v", got)
+	}
+
+	// Registry present but no bindings for this API.
+	k := newTestJWTMiddleware("api-a")
+	if got := k.secretFromIdPRegistry(r, tok); got != nil {
+		t.Errorf("no bindings must return nil, got %v", got)
+	}
+
+	// Binding exists but the token has no kid.
+	k.Gw.apisMu.Lock()
+	k.Gw.apisByID["api-a"] = &APISpec{}
+	k.Gw.apisMu.Unlock()
+	k.Gw.idpRegistry.rebuild([]IdP{{
+		ID: "idp-1", JWKSURI: "https://i1/jwks",
+		APIMappings: map[string]ScopeMapping{"api-a": {}},
+	}})
+	noKid := &jwt.Token{Header: map[string]interface{}{}, Claims: jwt.MapClaims{}}
+	if got := k.secretFromIdPRegistry(r, noKid); got != nil {
+		t.Errorf("missing kid must return nil, got %v", got)
+	}
+}
+
+func TestKeyForBinding_SkipBranches(t *testing.T) {
+	k := newTestJWTMiddleware("api-a")
+	k.Gw.idpRegistry.rebuild([]IdP{}) // empty registry
+
+	// Unknown IdP id -> nil (no fetch).
+	if got := k.keyForBinding(Binding{IdPID: "missing"}, "", "kid"); got != nil {
+		t.Errorf("unknown IdP must return nil, got %v", got)
+	}
+
+	// Known IdP but issuer hint mismatches -> nil (no fetch).
+	k.Gw.apisMu.Lock()
+	k.Gw.apisByID["api-a"] = &APISpec{}
+	k.Gw.apisMu.Unlock()
+	k.Gw.idpRegistry.rebuild([]IdP{{
+		ID: "idp-1", Issuer: "https://real", JWKSURI: "https://i1/jwks",
+		APIMappings: map[string]ScopeMapping{"api-a": {}},
+	}})
+	if got := k.keyForBinding(Binding{IdPID: "idp-1"}, "https://other", "kid"); got != nil {
+		t.Errorf("issuer mismatch must return nil, got %v", got)
+	}
+}
+
+func TestUnmarshalIdPs_InvalidJSON(t *testing.T) {
+	if _, err := unmarshalIdPs([]byte(`{not json`)); err == nil {
+		t.Error("expected error for malformed envelope")
+	}
+	if _, err := unmarshalIdPs([]byte(`[not json`)); err == nil {
+		t.Error("expected error for malformed array")
+	}
+}
+
+func TestIdPRegistry_FetchFromDashboard_Non200(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	gw := &Gateway{apisByID: map[string]*APISpec{}}
+	conf := config.Config{}
+	conf.UseDBAppConfigs = true
+	conf.DisableDashboardZeroConf = true
+	conf.DBAppConfOptions.ConnectionString = srv.URL
+	gw.SetConfig(conf)
+	gw.SetNodeID("node-1")
+
+	r := newIdPRegistry(gw)
+	if _, err := r.fetchFromDashboard(); err == nil {
+		t.Fatal("expected error on non-200 dashboard response")
+	}
+}
+
+func TestFetchJWKSKey_CacheHit(t *testing.T) {
+	k := newTestJWTMiddleware("api-a")
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	set := &jose.JSONWebKeySet{Keys: []jose.JSONWebKey{
+		{Key: &priv.PublicKey, KeyID: "kid-1", Algorithm: "RS256", Use: "sig"},
+	}}
+	k.loadOrCreateJWKCache().Set("https://jwks", set, cache.DefaultExpiration)
+
+	// Cache hit: returns the key without any network fetch.
+	if got := k.fetchJWKSKey("https://jwks", "kid-1"); got == nil {
+		t.Fatal("cache hit should return the key")
+	}
+}
+
+// fetchFromRPC with the default loader (a real RPCStorageHandler) exercises the
+// newIdPRegistry rpcLoaderFn closure; with the RPC client down it yields nil.
+func TestIdPRegistry_FetchFromRPC_DefaultLoader(t *testing.T) {
+	gw := &Gateway{apisByID: map[string]*APISpec{}}
+	conf := config.Config{}
+	conf.SlaveOptions.UseRPC = true
+	conf.SlaveOptions.RPCKey = "org"
+	gw.SetConfig(conf)
+
+	r := newIdPRegistry(gw) // default rpcLoaderFn
+	idps, err := r.fetchFromRPC()
+	if err != nil {
+		t.Fatalf("fetchFromRPC error: %v", err)
+	}
+	if idps != nil {
+		t.Errorf("RPC down should yield nil IdPs, got %#v", idps)
+	}
+}
+
+// Refresh debounces and then rebuilds via doRefresh on the timer.
+func TestIdPRegistry_Refresh_DebouncedRebuild(t *testing.T) {
+	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": {}}}
+	conf := config.Config{}
+	conf.SlaveOptions.UseRPC = true
+	gw.SetConfig(conf)
+
+	r := newIdPRegistry(gw)
+	r.rpcLoaderFn = func() RPCDataLoader {
+		return &fakeRPCLoader{payload: `[{"client_idp_id":"idp-1",` +
+			`"api_mappings":{"api-a":{"scope_to_policy":{"read":"pol-read"}}}}]`}
+	}
+
+	r.Refresh()
+	r.Refresh() // second call stops + reschedules the debounce timer
+
+	var b []Binding
+	for i := 0; i < 30; i++ {
+		time.Sleep(20 * time.Millisecond)
+		if b = r.BindingsForAPI("api-a"); len(b) > 0 {
+			break
+		}
+	}
+	if len(b) != 1 || b[0].IdPID != "idp-1" {
+		t.Fatalf("Refresh did not rebuild the registry: %#v", b)
+	}
+}
+
+// fetchJWKSKey returns nil when every fetch path fails (factory client, plain
+// client, and the x5c legacy fallback) — covers the error + legacy branches.
+func TestFetchJWKSKey_FetchError(t *testing.T) {
+	k := newTestJWTMiddleware("api-a")
+	if got := k.fetchJWKSKey("http://127.0.0.1:1/jwks", "kid-1"); got != nil {
+		t.Errorf("unreachable JWKS must return nil, got %v", got)
+	}
 }

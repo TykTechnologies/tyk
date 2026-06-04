@@ -68,6 +68,30 @@ func TestDispatcherFuncs_RegistersClientIdPRPCs(t *testing.T) {
 	}
 }
 
+// With the RPC client down, GetClientIdPs logs the error and returns an empty
+// payload (the registry then keeps its previous snapshot).
+func TestRPCStorageHandler_GetClientIdPs_RPCDown(t *testing.T) {
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{})
+	store := RPCStorageHandler{Gw: gw}
+
+	if got := store.GetClientIdPs("org", []string{"tag-a"}); got != "" {
+		t.Fatalf("RPC down should yield empty payload, got %q", got)
+	}
+}
+
+// CheckForIdPReload keeps the loop alive (returns true) when the RPC client is
+// down, logging the error without disturbing the main sync.
+func TestRPCStorageHandler_CheckForIdPReload_RPCDown(t *testing.T) {
+	gw := &Gateway{ctx: context.Background()}
+	gw.SetConfig(config.Config{})
+	store := RPCStorageHandler{Gw: gw}
+
+	if ok := store.CheckForIdPReload("org"); !ok {
+		t.Fatal("CheckForIdPReload should return true to keep the loop running on RPC error")
+	}
+}
+
 // idpReloadLoop is the parallel client-IdP poll loop; it must exit when the
 // gateway context is cancelled (shutdown) rather than spin forever.
 func TestGateway_idpReloadLoop_StopsOnShutdown(t *testing.T) {
