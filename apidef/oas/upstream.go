@@ -1430,16 +1430,28 @@ func (p *PreserveTrailingSlash) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.DisableStripSlash = p.Enabled
 }
 
+// GlobalEnforceTimeout holds the configuration for enforcing a timeout at the API level.
 type GlobalEnforceTimeout struct {
-	Enabled  bool                  `json:"enabled" bson:"enabled"`
-	Duration time.ReadableDuration `json:"duration" bson:"duration"`
+	// Enabled is a boolean flag. If set to `true`, the API-level timeout will be enforced
+	// across all endpoints that do not have an endpoint-level timeout configured.
+	//
+	// Tyk classic API definition: `global_enforce_timeout_disabled` (negated).
+	Enabled bool `json:"enabled" bson:"enabled"`
+
+	// Duration is the configured timeout using a human-readable format (e.g. `5s`, `500ms`, `1m`).
+	// Supported units: ms, s, m.
+	//
+	// Tyk classic API definition: `global_enforce_timeout`.
+	Duration time.ReadableDuration `json:"duration,omitempty" bson:"duration,omitempty"`
 }
 
+// Fill fills *GlobalEnforceTimeout from apidef.APIDefinition.
 func (g *GlobalEnforceTimeout) Fill(api apidef.APIDefinition) {
 	g.Enabled = !api.GlobalEnforceTimeoutDisabled
 	g.Duration = api.GlobalEnforceTimeout
 }
 
+// ExtractTo extracts *GlobalEnforceTimeout to *apidef.APIDefinition.
 func (g *GlobalEnforceTimeout) ExtractTo(api *apidef.APIDefinition) {
 	api.GlobalEnforceTimeoutDisabled = !g.Enabled
 	api.GlobalEnforceTimeout = g.Duration

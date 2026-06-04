@@ -193,7 +193,6 @@ func (r *RuleValidateGlobalEnforceTimeout) Validate(apiDef *APIDefinition, valid
 	if apiDef.GlobalEnforceTimeout < 0 {
 		validationResult.IsValid = false
 		validationResult.AppendError(ErrInvalidGlobalTimeoutValue)
-
 	}
 }
 
