@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -849,5 +850,62 @@ func TestFetchJWKSKey_FetchError(t *testing.T) {
 	k := newTestJWTMiddleware("api-a")
 	if got := k.fetchJWKSKey("http://127.0.0.1:1/jwks", "kid-1"); got != nil {
 		t.Errorf("unreachable JWKS must return nil, got %v", got)
+	}
+}
+
+// The client-IdP registry is backed up to Redis on RPC sync and restored from
+// that backup in emergency mode, mirroring API/policy recovery.
+func TestIdPRegistry_RPCBackup(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const payload = `[{"client_idp_id":"idp-1","issuer":"https://i1",` +
+		`"api_mappings":{"api-a":{"scope_to_policy":{"read":"pol-read"}}}}]`
+
+	t.Run("save then load round-trips", func(t *testing.T) {
+		if err := ts.Gw.saveRPCIdPsBackup(payload); err != nil {
+			t.Fatalf("saveRPCIdPsBackup: %v", err)
+		}
+		idps, err := ts.Gw.LoadIdPsFromRPCBackup()
+		if err != nil {
+			t.Fatalf("LoadIdPsFromRPCBackup: %v", err)
+		}
+		if len(idps) != 1 || idps[0].ID != "idp-1" {
+			t.Fatalf("backup round-trip wrong: %#v", idps)
+		}
+		if idps[0].APIMappings["api-a"].ScopeToPolicy["read"] != "pol-read" {
+			t.Errorf("mappings lost in backup: %#v", idps[0].APIMappings)
+		}
+	})
+
+	t.Run("malformed payload is not stored", func(t *testing.T) {
+		if err := ts.Gw.saveRPCIdPsBackup("{not json"); err == nil {
+			t.Error("expected error for malformed backup payload")
+		}
+	})
+}
+
+// In emergency mode fetchFromRPC restores the registry from the Redis backup
+// instead of calling MDCB.
+func TestIdPRegistry_FetchFromRPC_EmergencyMode(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const payload = `[{"client_idp_id":"idp-1",` +
+		`"api_mappings":{"api-a":{"scope_to_policy":{"read":"pol-read"}}}}]`
+	if err := ts.Gw.saveRPCIdPsBackup(payload); err != nil {
+		t.Fatalf("seed backup: %v", err)
+	}
+
+	rpc.SetEmergencyMode(t, true)
+	defer rpc.SetEmergencyMode(t, false)
+
+	r := newIdPRegistry(ts.Gw)
+	idps, err := r.fetchFromRPC()
+	if err != nil {
+		t.Fatalf("fetchFromRPC (emergency): %v", err)
+	}
+	if len(idps) != 1 || idps[0].ID != "idp-1" {
+		t.Fatalf("emergency mode must load from backup, got %#v", idps)
 	}
 }

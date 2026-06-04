@@ -17,6 +17,7 @@ import (
 const RPCKeyPrefix = "rpc:"
 const BackupApiKeyBase = "node-definition-backup:"
 const BackupPolicyKeyBase = "node-policy-backup:"
+const BackupClientIdPKeyBase = "node-clientidp-backup:"
 
 // backupKind identifies the type of data being compressed or decompressed,
 // used for log and error messages. Defining it as a named type lets the
@@ -26,6 +27,7 @@ type backupKind string
 const (
 	backupKindAPIDefinitions backupKind = "API Definitions"
 	backupKindPolicies       backupKind = "Policies"
+	backupKindClientIdPs     backupKind = "Client IdPs"
 )
 
 func getTagListAsString(tags []string) string {
@@ -150,6 +152,80 @@ func (gw *Gateway) compressPolicyBackup(list string) string {
 
 func (gw *Gateway) decompressPolicyBackup(decrypted string) (string, error) {
 	return gw.decompressBackup(decrypted, backupKindPolicies)
+}
+
+// The client-IdP registry payload is small (one record per org IdP), so it is
+// stored uncompressed; decompressBackup still auto-detects on load.
+func (gw *Gateway) compressClientIdPBackup(list string) string {
+	return gw.compressBackup(list, false, backupKindClientIdPs)
+}
+
+func (gw *Gateway) decompressClientIdPBackup(decrypted string) (string, error) {
+	return gw.decompressBackup(decrypted, backupKindClientIdPs)
+}
+
+// LoadIdPsFromRPCBackup restores the client-IdP registry payload saved on the
+// last successful RPC sync, used when the edge gateway is in emergency mode and
+// MDCB is unreachable — the sibling of LoadDefinitionsFromRPCBackup.
+func (gw *Gateway) LoadIdPsFromRPCBackup() ([]IdP, error) {
+	if gw.StorageConnectionHandler == nil {
+		return nil, errors.New("[RPC] --> RPC Client-IdP Backup recovery failed: no storage connection handler")
+	}
+
+	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
+	checkKey := BackupClientIdPKeyBase + tagList
+
+	store := &storage.RedisCluster{KeyPrefix: RPCKeyPrefix, ConnectionHandler: gw.StorageConnectionHandler}
+	connected := store.Connect()
+
+	log.Info("[RPC] --> Loading client IdPs from backup")
+
+	if !connected {
+		return nil, errors.New("[RPC] --> RPC Client-IdP Backup recovery failed: redis connection failed")
+	}
+
+	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
+	cryptoText, err := store.GetKey(checkKey)
+	if err != nil {
+		return nil, errors.New("[RPC] --> Failed to get node client-idp backup (" + checkKey + "): " + err.Error())
+	}
+
+	decrypted := crypto.Decrypt(secret, cryptoText)
+
+	listAsString, err := gw.decompressClientIdPBackup(decrypted)
+	if err != nil {
+		return nil, err
+	}
+
+	return unmarshalIdPs([]byte(listAsString))
+}
+
+// saveRPCIdPsBackup stores the raw GetClientIdPs payload (a JSON array) to Redis
+// so emergency mode can restore the registry — the sibling of
+// saveRPCDefinitionsBackup.
+func (gw *Gateway) saveRPCIdPsBackup(list string) error {
+	if !json.Valid([]byte(list)) {
+		return errors.New("--> RPC Client-IdP Backup save failure: wrong format, skipping.")
+	}
+	if gw.StorageConnectionHandler == nil {
+		return errors.New("--> RPC Client-IdP Backup save failed: no storage connection handler")
+	}
+
+	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
+
+	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix, ConnectionHandler: gw.StorageConnectionHandler}
+	connected := store.Connect()
+	if !connected {
+		return errors.New("--> RPC Client-IdP Backup save failed: redis connection failed")
+	}
+
+	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
+	cryptoText := crypto.Encrypt(secret, gw.compressClientIdPBackup(list))
+	if err := store.SetKey(BackupClientIdPKeyBase+tagList, cryptoText, -1); err != nil {
+		return errors.New("Failed to store node client-idp backup: " + err.Error())
+	}
+
+	return nil
 }
 
 func (gw *Gateway) LoadPoliciesFromRPCBackup() ([]user.Policy, error) {

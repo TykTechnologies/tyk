@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/rpc"
 )
 
 const idpRefreshDebounce = 100 * time.Millisecond
@@ -242,8 +243,14 @@ func (r *IdPRegistry) fetchFromDashboard() ([]IdP, error) {
 }
 
 // fetchFromRPC pulls the registry over RPC (MDCB/edge). The payload is a bare
-// JSON array; an empty string is a no-op.
+// JSON array; an empty string is a no-op. In emergency mode (MDCB unreachable)
+// it restores the registry from the Redis backup instead — mirroring how APIs
+// and policies recover — and on a successful sync it refreshes that backup.
 func (r *IdPRegistry) fetchFromRPC() ([]IdP, error) {
+	if rpc.IsEmergencyMode() {
+		return r.gw.LoadIdPsFromRPCBackup()
+	}
+
 	conf := r.gw.GetConfig()
 	var tags []string
 	if conf.DBAppConfOptions.NodeIsSegmented {
@@ -252,6 +259,9 @@ func (r *IdPRegistry) fetchFromRPC() ([]IdP, error) {
 	payload := r.rpcLoaderFn().GetClientIdPs(conf.SlaveOptions.RPCKey, tags)
 	if payload == "" {
 		return nil, nil
+	}
+	if err := r.gw.saveRPCIdPsBackup(payload); err != nil {
+		log.WithError(err).Warning("Failed to back up client-IdP registry to Redis")
 	}
 	return unmarshalIdPs([]byte(payload))
 }
