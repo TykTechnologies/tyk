@@ -498,6 +498,10 @@ func (a *APIDefinition) SetDisabledFlags() {
 	a.setEventHandlersDisabledFlags()
 
 	a.ErrorOverridesDisabled = true
+
+	if a.GlobalEnforceTimeout == 0 {
+		a.GlobalEnforceTimeoutDisabled = true
+	}
 }
 
 func (a *APIDefinition) setEventHandlersDisabledFlags() {

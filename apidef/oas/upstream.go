@@ -60,6 +60,10 @@ type Upstream struct {
 	// Proxy contains the configuration for an internal proxy.
 	// Tyk classic API definition: `proxy.proxy_url`
 	Proxy *Proxy `bson:"proxy,omitempty" json:"proxy,omitempty"`
+
+	// EnforceTimeout contains the configuration related to API level timeout duration.
+	// Tyk classic API definition: `global_enforce_timeout`.
+	EnforceTimeout *GlobalEnforceTimeout `bson:"enforce_timeout,omitempty" json:"enforce_timeout,omitempty"`
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
@@ -134,6 +138,15 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	u.Proxy.Fill(api)
 	if ShouldOmit(u.Proxy) {
 		u.Proxy = nil
+	}
+
+	if u.EnforceTimeout == nil {
+		u.EnforceTimeout = &GlobalEnforceTimeout{}
+	}
+
+	u.EnforceTimeout.Fill(api)
+	if ShouldOmit(u.EnforceTimeout) {
+		u.EnforceTimeout = nil
 	}
 
 	u.fillLoadBalancing(api)
@@ -239,6 +252,14 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 		}()
 	}
 	u.Proxy.ExtractTo(api)
+
+	if u.EnforceTimeout == nil {
+		u.EnforceTimeout = &GlobalEnforceTimeout{}
+		defer func() {
+			u.EnforceTimeout = nil
+		}()
+	}
+	u.EnforceTimeout.ExtractTo(api)
 
 	u.preserveHostHeaderExtractTo(api)
 	u.preserveTrailingSlashExtractTo(api)
@@ -1407,4 +1428,19 @@ func (p *PreserveTrailingSlash) Fill(api apidef.APIDefinition) {
 // ExtractTo extracts *PreserveTrailingSlash into *apidef.APIDefinition.
 func (p *PreserveTrailingSlash) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.DisableStripSlash = p.Enabled
+}
+
+type GlobalEnforceTimeout struct {
+	Enabled  bool                  `json:"enabled" bson:"enabled"`
+	Duration time.ReadableDuration `json:"duration" bson:"duration"`
+}
+
+func (g *GlobalEnforceTimeout) Fill(api apidef.APIDefinition) {
+	g.Enabled = !api.GlobalEnforceTimeoutDisabled
+	g.Duration = api.GlobalEnforceTimeout
+}
+
+func (g *GlobalEnforceTimeout) ExtractTo(api *apidef.APIDefinition) {
+	api.GlobalEnforceTimeoutDisabled = !g.Enabled
+	api.GlobalEnforceTimeout = g.Duration
 }

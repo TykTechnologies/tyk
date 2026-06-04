@@ -778,6 +778,9 @@ type APIDefinition struct {
 	GraphQL                              GraphQLConfig          `bson:"graphql" json:"graphql"`
 	AnalyticsPlugin                      AnalyticsPluginConfig  `bson:"analytics_plugin" json:"analytics_plugin,omitempty"`
 
+	GlobalEnforceTimeout         tyktime.ReadableDuration `bson:"global_enforce_timeout,omitempty" json:"global_enforce_timeout,omitempty"`
+	GlobalEnforceTimeoutDisabled bool                     `bson:"global_enforce_timeout_disabled" json:"global_enforce_timeout_disabled"`
+
 	// Gateway segment tags
 	TagsDisabled bool     `bson:"tags_disabled" json:"tags_disabled,omitempty"`
 	Tags         []string `bson:"tags" json:"tags"`
