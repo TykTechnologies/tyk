@@ -63,7 +63,7 @@ type Upstream struct {
 
 	// EnforceTimeout contains the configuration related to API level timeout duration.
 	// Tyk classic API definition: `global_enforce_timeout`.
-	EnforceTimeout *GlobalEnforceTimeout `bson:"enforce_timeout,omitempty" json:"enforce_timeout,omitempty"`
+	EnforceTimeout *GlobalEnforceTimeout `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.

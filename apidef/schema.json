@@ -687,6 +687,12 @@
         }
       }
     },
+    "global_enforce_timeout": {
+      "type": ["string", "integer", "number"]
+    },
+    "global_enforce_timeout_disabled": {
+      "type": "boolean"
+    },
     "request_signing": {
       "type": [
         "object",
