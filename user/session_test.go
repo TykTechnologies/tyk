@@ -1745,7 +1745,7 @@ func TestSessionState_ConcurrentClone(t *testing.T) {
 	// Writer goroutines - modify the session
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
-		go func(id int) {
+		go func(_ int) {
 			defer wg.Done()
 			for j := 0; j < iterations; j++ {
 				session.LockForWrite()
@@ -1760,7 +1760,7 @@ func TestSessionState_ConcurrentClone(t *testing.T) {
 	// Reader goroutines - clone the session
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
-		go func(id int) {
+		go func(_ int) {
 			defer wg.Done()
 			for j := 0; j < iterations; j++ {
 				cloned := session.Clone()
@@ -1818,7 +1818,7 @@ func TestSessionState_CloneIsolation(t *testing.T) {
 }
 
 // TestSessionState_ConcurrentMapAccess tests concurrent read/write access to session maps
-func TestSessionState_ConcurrentMapAccess(t *testing.T) {
+func TestSessionState_ConcurrentMapAccess(_ *testing.T) {
 	session := NewSessionState()
 	session.AccessRights = map[string]AccessDefinition{}
 	session.MetaData = map[string]interface{}{}
@@ -1845,12 +1845,12 @@ func TestSessionState_ConcurrentMapAccess(t *testing.T) {
 	// Multiple readers (via Clone)
 	for i := 0; i < 5; i++ {
 		wg.Add(1)
-		go func() {
+		go func(_ int) {
 			defer wg.Done()
 			for j := 0; j < iterations; j++ {
 				_ = session.Clone()
 			}
-		}()
+		}(i)
 	}
 
 	wg.Wait()
