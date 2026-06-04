@@ -83,6 +83,7 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 	operation.MockResponse = nil                      // This one also fills native part, let's skip it for this test.
 	operation.URLRewrite = nil                        // This one also fills native part, let's skip it for this test.
 	operation.Internal = nil                          // This one also fills native part, let's skip it for this test.
+	operation.ScopeCheck = nil                        // OAS-native; no classic ExtendedPaths equivalent.
 	operation.TransformRequestBody.Path = ""          // if `path` and `body` are present, `body` would take precedence, detailed tests can be found in middleware_test.go
 	operation.TransformResponseBody.Path = ""         // if `path` and `body` are present, `body` would take precedence, detailed tests can be found in middleware_test.go
 	operation.VirtualEndpoint.Path = ""               // if `path` and `body` are present, `body` would take precedence, detailed tests can be found in middleware_test.go

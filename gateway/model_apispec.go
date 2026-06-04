@@ -268,15 +268,12 @@ func (a *APISpec) injectIntoReqContext(req *http.Request) {
 	}
 }
 
-func (a *APISpec) findOperation(r *http.Request) *Operation {
-	middleware := a.OAS.GetTykMiddleware()
-	if middleware == nil {
-		return nil
-	}
-
+// findOASRoute matches the request to an OAS route via the API's OAS
+// router (path templates included). Returns nil when none matches.
+func (a *APISpec) findOASRoute(r *http.Request) (*routers.Route, map[string]string) {
 	if a.oasRouter == nil {
 		log.Warningf("OAS router not initialized properly. Unable to find route for %s %v", r.Method, r.URL)
-		return nil
+		return nil, nil
 	}
 
 	rClone := *r
@@ -286,11 +283,25 @@ func (a *APISpec) findOperation(r *http.Request) *Operation {
 
 	if errors.Is(err, routers.ErrPathNotFound) {
 		log.Tracef("Unable to find route for %s %v at spec %v", r.Method, r.URL, a.Id)
-		return nil
+		return nil, nil
 	}
 
 	if err != nil {
 		log.Errorf("Error finding route: %v", err)
+		return nil, nil
+	}
+
+	return route, pathParams
+}
+
+func (a *APISpec) findOperation(r *http.Request) *Operation {
+	middleware := a.OAS.GetTykMiddleware()
+	if middleware == nil {
+		return nil
+	}
+
+	route, pathParams := a.findOASRoute(r)
+	if route == nil {
 		return nil
 	}
 
