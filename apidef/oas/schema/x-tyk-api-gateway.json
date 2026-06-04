@@ -728,7 +728,7 @@
           "type": "integer",
           "minimum": 0
         },
-        "timeout": {
+        "duration": {
           "type": "string",
           "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
         }
