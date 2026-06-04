@@ -15,6 +15,11 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// sessionMuInit is a package-level mutex used to safely initialize
+// the per-session mutex (mu) in a thread-safe manner for sessions
+// created without calling NewSessionState().
+var sessionMuInit sync.Mutex
+
 // PostExpiryAction defines the action to take on a key in Redis after it expires.
 type PostExpiryAction string
 
@@ -397,12 +402,21 @@ func (s *SessionState) IsModified() bool {
 	return s.modified
 }
 
-// Clone returns a fresh copy of s with thread-safe map cloning
-func (s *SessionState) Clone() SessionState {
-	// Ensure mutex is initialized
+// ensureMu initializes the session mutex in a thread-safe manner.
+// This uses a package-level mutex to avoid races during lazy initialization.
+func (s *SessionState) ensureMu() {
+	// Always acquire the lock to avoid race on reading s.mu
+	sessionMuInit.Lock()
 	if s.mu == nil {
 		s.mu = &sync.RWMutex{}
 	}
+	sessionMuInit.Unlock()
+}
+
+// Clone returns a fresh copy of s with thread-safe map cloning
+func (s *SessionState) Clone() SessionState {
+	// Ensure mutex is initialized in a thread-safe manner
+	s.ensureMu()
 
 	// Acquire read lock to safely read map fields
 	s.mu.RLock()
@@ -428,18 +442,14 @@ func (s *SessionState) Clone() SessionState {
 
 // LockForWrite acquires the write lock for map field modifications
 func (s *SessionState) LockForWrite() {
-	// Ensure mutex is initialized
-	if s.mu == nil {
-		s.mu = &sync.RWMutex{}
-	}
+	// Ensure mutex is initialized in a thread-safe manner
+	s.ensureMu()
 	s.mu.Lock()
 }
 
 // UnlockForWrite releases the write lock
 func (s *SessionState) UnlockForWrite() {
-	if s.mu != nil {
-		s.mu.Unlock()
-	}
+	s.mu.Unlock()
 }
 
 func (s *SessionState) MD5Hash() string {
