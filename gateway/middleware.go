@@ -643,14 +643,19 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		cachedVal, found := t.Gw.SessionCache.Get(cacheKey)
 		if found {
 			t.Logger().Debug("--> Key found in local cache")
-			cachedSession := cachedVal.(user.SessionState)
-			session := (&cachedSession).Clone()
-			if err := t.ApplyPolicies(&session); err != nil {
-				t.Logger().Error(err)
-				return session, false
+			cachedSession, ok := cachedVal.(user.SessionState)
+			if !ok {
+				t.Logger().Error("Failed to cast cached value to SessionState")
+				// Fall through to query keystore
+			} else {
+				session := (&cachedSession).Clone()
+				if err := t.ApplyPolicies(&session); err != nil {
+					t.Logger().Error(err)
+					return session, false
+				}
+				NormalizeMCPEndpoints(&session)
+				return session, true
 			}
-			NormalizeMCPEndpoints(&session)
-			return session, true
 		}
 	}
 
