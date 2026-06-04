@@ -1253,7 +1253,7 @@ func (gw *Gateway) rpcReloadLoop(rpcKey string) {
 // GetClientIdPs RPC) without a full API/policy resync. Exits on shutdown.
 func (gw *Gateway) idpReloadLoop(rpcKey string) {
 	for {
-		if ok := gw.RPCListener.CheckForIdPReload(rpcKey); !ok {
+		if !gw.RPCListener.CheckForIdPReload(rpcKey) {
 			return
 		}
 	}

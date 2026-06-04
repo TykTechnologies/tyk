@@ -388,29 +388,43 @@ func (k *JWTMiddleware) secretFromIdPRegistry(r *http.Request, token *jwt.Token)
 	if !ok || kid == "" {
 		return nil // JWKS lookup needs a kid
 	}
-
-	var iss string
-	if claims, isMap := token.Claims.(jwt.MapClaims); isMap {
-		if issStr, isString := claims[ISS].(string); isString {
-			iss = issStr // hint only, UNVERIFIED — selects which JWKS to try
-		}
-	}
+	iss := unverifiedIssuerHint(token)
 
 	for i := range bindings {
 		b := bindings[i]
-		idp, ok := k.Gw.idpRegistry.IdP(b.IdPID)
-		if !ok {
-			continue
-		}
-		if iss != "" && idp.Issuer != iss {
-			continue // empty iss → walk all candidates
-		}
-		if key := k.fetchJWKSKey(idp.JWKSURI, kid); key != nil {
+		if key := k.keyForBinding(b, iss, kid); key != nil {
 			ctxSetMatchedBinding(r, &b) // request context — never k
 			return key
 		}
 	}
 	return nil
+}
+
+// unverifiedIssuerHint reads the iss claim WITHOUT verification — used only to
+// choose which IdP's JWKS to try; signature verification + validateIssuer run
+// afterwards. Returns "" when there's no usable iss (then all IdPs are tried).
+func unverifiedIssuerHint(token *jwt.Token) string {
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return ""
+	}
+	if iss, ok := claims[ISS].(string); ok {
+		return iss
+	}
+	return ""
+}
+
+// keyForBinding resolves the JWKS key for a single registry binding, or nil to
+// skip it: unknown IdP, iss mismatch (empty iss walks all), or no matching kid.
+func (k *JWTMiddleware) keyForBinding(b Binding, iss, kid string) interface{} {
+	idp, ok := k.Gw.idpRegistry.IdP(b.IdPID)
+	if !ok {
+		return nil
+	}
+	if iss != "" && idp.Issuer != iss {
+		return nil
+	}
+	return k.fetchJWKSKey(idp.JWKSURI, kid)
 }
 
 // fetchJWKSKey resolves a JWKS key by kid, keyed purely on the URL. It is
