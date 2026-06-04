@@ -8,7 +8,6 @@ import (
 	"github.com/sirupsen/logrus"
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/config"
 	tykregexp "github.com/TykTechnologies/tyk/regexp"
@@ -32,7 +31,7 @@ func TestAfterConfSetup_WarnsOnDisableRegexpCacheBound(t *testing.T) {
 	defer log.ReplaceHooks(make(logrus.LevelHooks))
 
 	gw := NewGateway(config.Config{DisableRegexpCacheBound: true}, context.Background())
-	require.NoError(t, gw.afterConfSetup())
+	gw.afterConfSetup()
 
 	var found bool
 	for _, e := range hook.AllEntries() {
@@ -61,7 +60,7 @@ func TestAfterConfSetup_WarnsOnNegativeMaxEntries(t *testing.T) {
 	defer log.ReplaceHooks(make(logrus.LevelHooks))
 
 	gw := NewGateway(config.Config{RegexpCacheMaxEntries: -1}, context.Background())
-	require.NoError(t, gw.afterConfSetup())
+	gw.afterConfSetup()
 
 	var found bool
 	for _, e := range hook.AllEntries() {
