@@ -26,6 +26,12 @@ const (
 	fieldAudience        = "oauth2_audience"
 	fieldScopesRequested = "oauth2_scopes_requested"
 
+	// Delegation (actor-token) fields. Carry only the actor's source and
+	// client/party azp — never the actor subject identity (act.sub) or token.
+	fieldActorSource        = "oauth2_actor_source"
+	fieldActorAzp           = "oauth2_actor_azp"
+	fieldDelegationObserved = "oauth2_delegation_observed"
+
 	truncatedSuffix = "...(truncated)"
 )
 
@@ -56,6 +62,14 @@ type EventPayload struct {
 	// Audience and ScopesRequested are the resolved exchange target.
 	Audience        string
 	ScopesRequested []string
+
+	// ActorSource is the configured actor-token source (client_credentials /
+	// header / static); empty for impersonation. ActorAzp is the actor client's
+	// authorized party. DelegationObserved is true when the exchanged token
+	// carried an RFC 8693 `act` claim (the IdP honoured delegation).
+	ActorSource        string
+	ActorAzp           string
+	DelegationObserved bool
 }
 
 // LogFields returns the structured log line for one exchange: the same bounded
@@ -96,6 +110,13 @@ func (p EventPayload) addOptional(m map[string]interface{}) {
 	}
 	if len(p.ScopesRequested) > 0 {
 		m[fieldScopesRequested] = p.ScopesRequested
+	}
+	if p.ActorSource != "" {
+		m[fieldActorSource] = p.ActorSource
+		m[fieldDelegationObserved] = p.DelegationObserved
+		if p.ActorAzp != "" {
+			m[fieldActorAzp] = p.ActorAzp
+		}
 	}
 	if p.Outcome == oauth2common.OutcomeIdPError {
 		if p.IdpError != "" {
