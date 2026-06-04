@@ -51,6 +51,12 @@ type MetricInstruments struct {
 	exchangeRequests *tykmetric.Counter
 	exchangeDuration *tykmetric.Histogram
 	exchangeCacheHit *tykmetric.Counter
+
+	// Actor-token (client_credentials) acquisition metrics. A distinct IdP
+	// dependency with its own cache, so it gets its own instruments; a
+	// cache-served actor token does not re-increment actorRequests.
+	actorRequests *tykmetric.Counter
+	actorDuration *tykmetric.Histogram
 }
 
 // NewMetricInstruments creates gateway metric instruments from an existing provider.
@@ -129,6 +135,25 @@ func NewMetricInstruments(provider tykmetric.Provider, logger *logrus.Logger) *M
 		logger.Errorf("Creating exchange cache_hit counter: %s", err)
 	}
 
+	actorRequests, err := provider.NewCounter(
+		"tyk.oauth2.actor.requests",
+		"Total client-credentials actor-token acquisitions, by outcome and provider",
+		"1",
+	)
+	if err != nil {
+		logger.Errorf("Creating actor requests counter: %s", err)
+	}
+
+	actorDuration, err := provider.NewHistogram(
+		"tyk.oauth2.actor.duration",
+		"IdP round-trip latency for actor-token acquisition (IdP-touching calls only)",
+		"s",
+		exchangeDurationBuckets,
+	)
+	if err != nil {
+		logger.Errorf("Creating actor duration histogram: %s", err)
+	}
+
 	return &MetricInstruments{
 		provider:         provider,
 		requestCounter:   requestCounter,
@@ -139,6 +164,8 @@ func NewMetricInstruments(provider tykmetric.Provider, logger *logrus.Logger) *M
 		exchangeRequests: exchangeRequests,
 		exchangeDuration: exchangeDuration,
 		exchangeCacheHit: exchangeCacheHit,
+		actorRequests:    actorRequests,
+		actorDuration:    actorDuration,
 	}
 }
 
@@ -160,6 +187,20 @@ func (i *MetricInstruments) RecordExchange(ctx context.Context, outcome, provide
 // provider only). Cache hits are a separate signal, never a requests outcome.
 func (i *MetricInstruments) RecordCacheHit(ctx context.Context, provider string) {
 	i.exchangeCacheHit.Add(ctx, 1, attribute.String(exchangeAttrProvider, provider))
+}
+
+// RecordActorAcquisition records one client-credentials actor-token
+// acquisition: it increments the actor requests counter and records the actor
+// duration histogram, both labelled by outcome + provider. Callers invoke it
+// only for a real IdP acquisition — a cache-served actor token is not recorded,
+// so the counter reads actual IdP load.
+func (i *MetricInstruments) RecordActorAcquisition(ctx context.Context, outcome, provider string, duration time.Duration) {
+	attrs := []attribute.KeyValue{
+		attribute.String(exchangeAttrOutcome, outcome),
+		attribute.String(exchangeAttrProvider, provider),
+	}
+	i.actorRequests.Add(ctx, 1, attrs...)
+	i.actorDuration.Record(ctx, duration.Seconds(), attrs...)
 }
 
 // RecordRequest increments the request counter.

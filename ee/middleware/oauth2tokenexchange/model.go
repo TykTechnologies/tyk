@@ -32,6 +32,12 @@ type BaseMiddleware interface {
 
 	// RecordExchangeCacheHit increments the dedicated cache_hit counter.
 	RecordExchangeCacheHit(ctx context.Context, provider string)
+
+	// RecordActorAcquisition records one client-credentials actor-token
+	// acquisition on the actor instruments (requests counter + duration
+	// histogram), labelled by outcome + provider. Cache-served actor tokens
+	// are not recorded — the counter reads actual IdP load.
+	RecordActorAcquisition(ctx context.Context, outcome, provider string, d time.Duration)
 }
 
 // EffectiveIdPTimeout returns d, falling back to DefaultIdPTimeout when d is zero.

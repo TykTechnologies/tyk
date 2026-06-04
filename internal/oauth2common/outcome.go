@@ -23,6 +23,9 @@ const (
 	// OutcomeNoMatchingProvider: the inbound token's issuer matched no
 	// configured provider.
 	OutcomeNoMatchingProvider OutcomeKind = "no_matching_provider"
+	// OutcomeActorNotAuthorized: the requireMayAct pre-flight rejected the
+	// configured actor before any IdP call (gateway-side policy refusal).
+	OutcomeActorNotAuthorized OutcomeKind = "actor_not_authorized"
 )
 
 // ClassifyExchangeOutcome maps an exchange result to its bounded OutcomeKind.
@@ -41,6 +44,10 @@ func ClassifyExchangeOutcome(err error) OutcomeKind {
 	if errors.As(err, &misconfig) {
 		return OutcomeMisconfig
 	}
+	var actorNotAuthorized *ActorNotAuthorizedError
+	if errors.As(err, &actorNotAuthorized) {
+		return OutcomeActorNotAuthorized
+	}
 	return OutcomeIdPError
 }
 
@@ -48,6 +55,18 @@ func ClassifyExchangeOutcome(err error) OutcomeKind {
 type Outcome struct {
 	// ProviderName is the matched provider; empty when no exchange ran.
 	ProviderName string
+
+	// ActorID identifies the delegating actor used to discriminate the cache
+	// entry: the impersonation sentinel when no actor was attached, the actor
+	// client id for client_credentials, or a HashActorID for header/static.
+	ActorID string
+
+	// ActorSource is the configured actor-token source (client_credentials /
+	// header / static), empty for impersonation. ActorAzp is the actor client's
+	// authorized party. Both feed the delegation observability fields (never
+	// the actor's subject identity).
+	ActorSource string
+	ActorAzp    string
 
 	// Audience is the resolved audience sent to the IdP.
 	Audience string

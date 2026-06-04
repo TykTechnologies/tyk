@@ -2161,6 +2161,9 @@
         "defaultTarget": {
           "$ref": "#/definitions/X-Tyk-OAuth2-DefaultTarget"
         },
+        "actorToken": {
+          "$ref": "#/definitions/X-Tyk-OAuth2-ActorToken"
+        },
         "timeout": {
           "type": "string",
           "description": "Per-call timeout for the RFC 8693 exchange request, Tyk ReadableDuration (e.g. \"100ms\", \"5s\"). Defaults to 15s when zero/unset."
@@ -2190,6 +2193,60 @@
         "safetyMargin": { "type": "string", "description": "Shaved from the computed TTL to avoid serving near-expired tokens. Defaults to 30s." }
       },
       "required": ["enabled"]
+    },
+    "X-Tyk-OAuth2-ActorToken": {
+      "type": "object",
+      "description": "RFC 8693 actor token (delegation). When set, exchange requests carry actor_token; omit to use impersonation.",
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": ["client_credentials", "header", "static"]
+        },
+        "actorTokenType": {
+          "type": "string",
+          "enum": ["urn:ietf:params:oauth:token-type:access_token", "urn:ietf:params:oauth:token-type:jwt"],
+          "description": "RFC 8693 token-type URN advertised for the actor token. Defaults to ...:access_token; set ...:jwt only for an RFC-strict IdP."
+        },
+        "clientCredentials": {
+          "$ref": "#/definitions/X-Tyk-OAuth2-ActorClientCredentials"
+        },
+        "header": {
+          "$ref": "#/definitions/X-Tyk-OAuth2-ActorHeader"
+        },
+        "static": {
+          "$ref": "#/definitions/X-Tyk-OAuth2-ActorStatic"
+        },
+        "requireMayAct": {
+          "type": "boolean",
+          "description": "When true, the gateway verifies the subject token's may_act (RFC 8693 §4.4) authorizes the configured actor before calling the IdP. Defaults false."
+        }
+      },
+      "required": ["source"]
+    },
+    "X-Tyk-OAuth2-ActorClientCredentials": {
+      "type": "object",
+      "properties": {
+        "tokenEndpoint": { "type": "string" },
+        "clientId": { "type": "string" },
+        "clientSecret": { "type": "string" },
+        "scopes": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["tokenEndpoint", "clientId"]
+    },
+    "X-Tyk-OAuth2-ActorHeader": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Request header carrying the actor token. Defaults to X-Actor-Token." },
+        "strip": { "type": "boolean", "description": "Remove the header from the proxied request. Defaults true." },
+        "required": { "type": "boolean", "description": "Reject requests missing the header. Defaults true." }
+      }
+    },
+    "X-Tyk-OAuth2-ActorStatic": {
+      "type": "object",
+      "properties": {
+        "token": { "type": "string", "description": "Pre-configured actor token (env://, secrets://, vault://, consul:// honoured). Testing only." }
+      },
+      "required": ["token"]
     },
     "X-Tyk-OAuth2-ClientAuth": {
       "type": "object",

@@ -69,38 +69,38 @@ func TestBuildExchangeForm(t *testing.T) {
 	target := &oauth2common.Target{Audience: "https://upstream", Scopes: []string{"read", "write"}}
 
 	t.Run("sets RFC 8693 grant + subject token fields", func(t *testing.T) {
-		form := buildExchangeForm(provider, "subject-token", target, oas.OAuth2ClientAuthBasic)
+		form := buildExchangeForm(provider, "subject-token", "", target, oas.OAuth2ClientAuthBasic)
 		assert.Equal(t, oas.OAuth2GrantTypeTokenExchange, form.Get(oas.OAuth2FormGrantType))
 		assert.Equal(t, "subject-token", form.Get(oas.OAuth2FormSubjectToken))
 		assert.Equal(t, oas.OAuth2TokenTypeAccessToken, form.Get(oas.OAuth2FormSubjectTokenType))
 	})
 
 	t.Run("audience populates both audience and resource", func(t *testing.T) {
-		form := buildExchangeForm(provider, "s", target, oas.OAuth2ClientAuthBasic)
+		form := buildExchangeForm(provider, "s", "", target, oas.OAuth2ClientAuthBasic)
 		assert.Equal(t, "https://upstream", form.Get(oas.OAuth2FormAudience))
 		assert.Equal(t, "https://upstream", form.Get(oas.OAuth2FormResource))
 	})
 
 	t.Run("scopes are space-joined and customParams included", func(t *testing.T) {
-		form := buildExchangeForm(provider, "s", target, oas.OAuth2ClientAuthBasic)
+		form := buildExchangeForm(provider, "s", "", target, oas.OAuth2ClientAuthBasic)
 		assert.Equal(t, "read write", form.Get(oas.OAuth2FormScope))
 		assert.Equal(t, "broker", form.Get("requested_issuer"))
 	})
 
 	t.Run("client_secret_post injects credentials into the form", func(t *testing.T) {
-		form := buildExchangeForm(provider, "s", target, oas.OAuth2ClientAuthPost)
+		form := buildExchangeForm(provider, "s", "", target, oas.OAuth2ClientAuthPost)
 		assert.Equal(t, "cid", form.Get(oas.OAuth2FormClientID))
 		assert.Equal(t, "secret", form.Get(oas.OAuth2FormClientSecret))
 	})
 
 	t.Run("basic auth keeps credentials out of the form", func(t *testing.T) {
-		form := buildExchangeForm(provider, "s", target, oas.OAuth2ClientAuthBasic)
+		form := buildExchangeForm(provider, "s", "", target, oas.OAuth2ClientAuthBasic)
 		assert.Empty(t, form.Get(oas.OAuth2FormClientID))
 		assert.Empty(t, form.Get(oas.OAuth2FormClientSecret))
 	})
 
 	t.Run("empty audience and scopes omit those fields", func(t *testing.T) {
-		form := buildExchangeForm(provider, "s", &oauth2common.Target{}, oas.OAuth2ClientAuthBasic)
+		form := buildExchangeForm(provider, "s", "", &oauth2common.Target{}, oas.OAuth2ClientAuthBasic)
 		assert.Empty(t, form.Get(oas.OAuth2FormAudience))
 		assert.Empty(t, form.Get(oas.OAuth2FormScope))
 	})
@@ -231,7 +231,7 @@ func TestExchangeAtIdP(t *testing.T) {
 			ClientAuth:    &oas.OAuth2ClientAuth{Method: oas.OAuth2ClientAuthBasic, ClientID: "cid", ClientSecret: "secret"},
 		}
 
-		tok, ttl, err := mwWithoutTykOps().exchangeAtIdP(context.Background(), provider, "inbound-token", target)
+		tok, ttl, err := mwWithoutTykOps().exchangeAtIdP(context.Background(), provider, "inbound-token", "", target)
 		require.NoError(t, err)
 		assert.Equal(t, "exchanged", tok)
 		assert.Equal(t, 120*time.Second, ttl)
@@ -250,7 +250,7 @@ func TestExchangeAtIdP(t *testing.T) {
 		defer idp.Close()
 
 		provider := &oas.OAuth2TokenExchangeProvider{Name: "p", TokenEndpoint: idp.URL}
-		_, _, err := mwWithoutTykOps().exchangeAtIdP(context.Background(), provider, "inbound", target)
+		_, _, err := mwWithoutTykOps().exchangeAtIdP(context.Background(), provider, "inbound", "", target)
 		require.Error(t, err)
 		var failed *oauth2common.ExchangeFailedError
 		require.ErrorAs(t, err, &failed)
@@ -259,7 +259,7 @@ func TestExchangeAtIdP(t *testing.T) {
 	})
 
 	t.Run("empty tokenEndpoint is rejected before any call", func(t *testing.T) {
-		_, _, err := mwWithoutTykOps().exchangeAtIdP(context.Background(), &oas.OAuth2TokenExchangeProvider{Name: "p"}, "inbound", target)
+		_, _, err := mwWithoutTykOps().exchangeAtIdP(context.Background(), &oas.OAuth2TokenExchangeProvider{Name: "p"}, "inbound", "", target)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "tokenEndpoint is empty")
 	})

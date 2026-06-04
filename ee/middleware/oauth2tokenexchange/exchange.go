@@ -52,8 +52,33 @@ func (m *Middleware) runExchange(r *http.Request, st *oauth2common.State) (oauth
 	out.Audience = target.Audience
 	out.Scopes = target.Scopes
 
+	if provider.ActorToken != nil {
+		out.ActorSource = provider.ActorToken.Source
+	}
+
+	// Optional defence-in-depth: verify the subject token authorizes this actor
+	// (RFC 8693 §4.4) BEFORE acquiring the actor token, so a rejection spends no
+	// IdP round-trip — the expected actor is the configured clientId for the
+	// client_credentials source, and header/static tokens are read without
+	// touching the IdP. No-op unless the operator set actorToken.requireMayAct.
+	if err := m.checkMayAct(st.Claims, provider.ActorToken, m.mayActActorToken(r, provider.ActorToken)); err != nil {
+		return out, err
+	}
+
+	// Acquire the actor token (if configured) before the cache key is built —
+	// the actor identity participates in the key so impersonation and
+	// delegation results for the same subject/target never collide.
+	actorToken, actorID, err := m.acquireActorToken(r, provider)
+	if err != nil {
+		return out, err
+	}
+	out.ActorID = actorID
+	if provider.ActorToken != nil {
+		out.ActorAzp = actorAzp(provider.ActorToken, actorToken)
+	}
+
 	start := time.Now()
-	exchanged, cacheHit, err := m.fetchExchangedToken(r, st, provider, target)
+	exchanged, cacheHit, err := m.fetchExchangedToken(r, st, provider, target, actorToken, actorID)
 	out.CacheHit = cacheHit
 	out.Duration = time.Since(start)
 	if err != nil {
@@ -64,6 +89,9 @@ func (m *Middleware) runExchange(r *http.Request, st *oauth2common.State) (oauth
 		}
 		return out, err
 	}
+	// Strip the actor header on success even on a cache hit, where
+	// acquireActorToken's strip branch wasn't reached.
+	m.maybeStripActorHeader(r, provider)
 	out.ExchangedToken = exchanged
 	r.Header.Set(header.Authorization, oas.OAuth2AuthSchemeBearer+" "+exchanged)
 	return out, nil
@@ -104,9 +132,9 @@ func inboundRemaining(st *oauth2common.State) time.Duration {
 // fetchExchangedToken returns an exchanged token, using the cache when configured
 // and enabled. It also reports whether the token was served from cache. The
 // caller times the call for the duration metric.
-func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State, provider *oas.OAuth2TokenExchangeProvider, target *oauth2common.Target) (string, bool, error) {
+func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State, provider *oas.OAuth2TokenExchangeProvider, target *oauth2common.Target, actorToken, actorID string) (string, bool, error) {
 	if m.Cache == nil || provider.Cache == nil || !provider.Cache.Enabled {
-		token, _, err := m.exchangeAtIdP(r.Context(), provider, st.RawToken, target)
+		token, _, err := m.exchangeAtIdP(r.Context(), provider, st.RawToken, actorToken, target)
 		return token, false, err
 	}
 
@@ -118,6 +146,7 @@ func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State
 		Audience:     target.Audience,
 		Scopes:       target.Scopes,
 		ProviderName: provider.Name,
+		ActorID:      actorID,
 	}.Build()
 
 	log := m.Logger()
@@ -129,7 +158,7 @@ func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State
 			"audience": target.Audience,
 		}).Info("token exchange cache miss")
 
-		tok, expiresIn, fetchErr := m.exchangeAtIdP(r.Context(), provider, st.RawToken, target)
+		tok, expiresIn, fetchErr := m.exchangeAtIdP(r.Context(), provider, st.RawToken, actorToken, target)
 		if fetchErr != nil {
 			return "", 0, fetchErr
 		}
@@ -234,9 +263,34 @@ func (m *Middleware) resolveExchangeTarget(st *oauth2common.State, provider *oas
 	return nil
 }
 
+// actorAzp resolves the actor client's authorized party for observability: the
+// CC client id for source=client_credentials, otherwise the azp claim of the
+// presented actor JWT (decoded unverified), or "" when opaque. Never the actor
+// subject identity.
+func actorAzp(at *oas.OAuth2ActorToken, actorToken string) string {
+	if at.Source == oas.OAuth2ActorSourceClientCredentials && at.ClientCredentials != nil {
+		return at.ClientCredentials.ClientID
+	}
+	if claims, err := oauth2common.ParseUnverifiedClaims(actorToken); err == nil {
+		return oauth2common.StringClaim(claims, oas.OAuth2ClaimAzp)
+	}
+	return ""
+}
+
+// resolveActorTokenType returns the actor_token_type URN to advertise: the
+// per-provider override when set, otherwise access_token (the interoperable
+// default; PingOne/PingAM reject :jwt on the actor token).
+func resolveActorTokenType(at *oas.OAuth2ActorToken) string {
+	if at != nil && at.ActorTokenType != "" {
+		return at.ActorTokenType
+	}
+	return oas.OAuth2TokenTypeAccessToken
+}
+
 // exchangeAtIdP posts the RFC 8693 exchange form to the provider's token endpoint.
 // Returns the exchanged access token and the expires_in value from the response (0 if not provided).
-func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2TokenExchangeProvider, subjectToken string, target *oauth2common.Target) (string, time.Duration, error) {
+// When actorToken is non-empty, actor_token and actor_token_type are added (delegation intent).
+func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2TokenExchangeProvider, subjectToken, actorToken string, target *oauth2common.Target) (string, time.Duration, error) {
 	if provider.TokenEndpoint == "" {
 		return "", 0, errors.New("provider tokenEndpoint is empty")
 	}
@@ -246,7 +300,7 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 		method = provider.ClientAuth.Method
 	}
 
-	form := buildExchangeForm(provider, subjectToken, target, method)
+	form := buildExchangeForm(provider, subjectToken, actorToken, target, method)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.TokenEndpoint, strings.NewReader(form.Encode()))
 	if err != nil {
@@ -277,14 +331,20 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 	return parseExchangeResponse(body)
 }
 
-// buildExchangeForm builds the RFC 8693 token-exchange request form. When the
-// client-auth method is client_secret_post, credentials are injected into the
-// form here (basic-auth credentials are set on the request header instead).
-func buildExchangeForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken string, target *oauth2common.Target, method string) url.Values {
+// buildExchangeForm builds the RFC 8693 token-exchange request form. When
+// actorToken is non-empty, actor_token and actor_token_type are added
+// (delegation intent). When the client-auth method is client_secret_post,
+// credentials are injected into the form here (basic-auth credentials are set
+// on the request header instead).
+func buildExchangeForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken, actorToken string, target *oauth2common.Target, method string) url.Values {
 	form := url.Values{}
 	form.Set(oas.OAuth2FormGrantType, oas.OAuth2GrantTypeTokenExchange)
 	form.Set(oas.OAuth2FormSubjectToken, subjectToken)
 	form.Set(oas.OAuth2FormSubjectTokenType, oas.OAuth2TokenTypeAccessToken)
+	if actorToken != "" {
+		form.Set(oas.OAuth2FormActorToken, actorToken)
+		form.Set(oas.OAuth2FormActorTokenType, resolveActorTokenType(provider.ActorToken))
+	}
 	if target.Audience != "" {
 		form.Set(oas.OAuth2FormAudience, target.Audience)
 		form.Set(oas.OAuth2FormResource, target.Audience)
@@ -380,6 +440,30 @@ func (m *Middleware) writeNoMatchingProviderResponse(w http.ResponseWriter, r *h
 		oas.OAuth2FieldError:            oas.OAuth2ErrNoMatchingProvider,
 		oas.OAuth2FieldErrorDescription: oe.Error(),
 		oas.OAuth2ClaimIss:              oe.Iss,
+	})
+}
+
+// writeActorNotAuthorizedResponse renders a 403 when requireMayAct is set and
+// the subject token's may_act does not authorize the configured actor.
+func (m *Middleware) writeActorNotAuthorizedResponse(w http.ResponseWriter, r *http.Request, e *oauth2common.ActorNotAuthorizedError) {
+	m.writeJSONError(w, r, http.StatusForbidden, [][2]string{
+		{oas.OAuth2FieldError, oas.OAuth2ErrActorNotAuthorized},
+		{oas.OAuth2FieldErrorDescription, e.Error()},
+	}, map[string]string{
+		oas.OAuth2FieldError:            oas.OAuth2ErrActorNotAuthorized,
+		oas.OAuth2FieldErrorDescription: e.Error(),
+	})
+}
+
+// writeMissingActorTokenResponse renders a 401 with an RFC 6750 invalid_token
+// Bearer challenge when a required actor-token header is absent.
+func (m *Middleware) writeMissingActorTokenResponse(w http.ResponseWriter, r *http.Request, e *oauth2common.MissingActorTokenError) {
+	m.writeJSONError(w, r, http.StatusUnauthorized, [][2]string{
+		{oas.OAuth2FieldError, oas.OAuth2ErrInvalidToken},
+		{oas.OAuth2FieldErrorDescription, e.Error()},
+	}, map[string]string{
+		oas.OAuth2FieldError:            oas.OAuth2ErrInvalidToken,
+		oas.OAuth2FieldErrorDescription: e.Error(),
 	})
 }
 

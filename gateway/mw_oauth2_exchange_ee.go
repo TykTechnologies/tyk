@@ -30,6 +30,15 @@ func (t *BaseMiddleware) RecordExchangeCacheHit(ctx context.Context, provider st
 	t.Gw.MetricInstruments.RecordCacheHit(ctx, provider)
 }
 
+// RecordActorAcquisition records one client-credentials actor-token acquisition
+// on the gateway's OTel instruments. Safe to call when metrics are not initialised.
+func (t *BaseMiddleware) RecordActorAcquisition(ctx context.Context, outcome, provider string, d time.Duration) {
+	if t.Gw == nil || t.Gw.MetricInstruments == nil {
+		return
+	}
+	t.Gw.MetricInstruments.RecordActorAcquisition(ctx, outcome, provider, d)
+}
+
 func getOAuth2ExchangeMw(base *BaseMiddleware) TykMiddleware {
 	// OAS is required: the EE middleware reads per-operation exchange
 	// overrides off Spec.OAS; nil OAS would panic on the first request.
