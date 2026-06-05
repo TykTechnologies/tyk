@@ -2601,7 +2601,10 @@ func TestAPILevelTimeout(t *testing.T) {
 	t.Run("API-level timeout triggers when upstream is slow", func(t *testing.T) {
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(500 * time.Millisecond)
-			w.Write([]byte("slow response"))
+			_, err := w.Write([]byte("slow response"))
+			if err != nil {
+				t.Fatal(err)
+			}
 		}))
 		defer upstream.Close()
 
@@ -2624,7 +2627,10 @@ func TestAPILevelTimeout(t *testing.T) {
 
 	t.Run("API-level timeout does not trigger when upstream is fast", func(t *testing.T) {
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Write([]byte("fast response"))
+			_, err := w.Write([]byte("fast response"))
+			if err != nil {
+				t.Fatal(err)
+			}
 		}))
 		defer upstream.Close()
 
@@ -2648,7 +2654,10 @@ func TestAPILevelTimeout(t *testing.T) {
 	t.Run("API-level timeout overrides gateway default", func(t *testing.T) {
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(400 * time.Millisecond)
-			w.Write([]byte("response"))
+			_, err := w.Write([]byte("response"))
+			if err != nil {
+				t.Fatal(err)
+			}
 		}))
 		defer upstream.Close()
 
@@ -2672,7 +2681,10 @@ func TestAPILevelTimeout(t *testing.T) {
 	t.Run("endpoint-level timeout overrides API-level timeout", func(t *testing.T) {
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(300 * time.Millisecond)
-			w.Write([]byte("endpoint response"))
+			_, err := w.Write([]byte("endpoint response"))
+			if err != nil {
+				t.Fatal(err)
+			}
 		}))
 		defer upstream.Close()
 
@@ -2710,7 +2722,10 @@ func TestAPILevelTimeout(t *testing.T) {
 		// Upstream sleeps 400ms on every path.
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(400 * time.Millisecond)
-			w.Write([]byte("response"))
+			_, err := w.Write([]byte("response"))
+			if err != nil {
+				t.Fatal(err)
+			}
 		}))
 		defer upstream.Close()
 
@@ -2756,7 +2771,10 @@ func TestAPILevelTimeout(t *testing.T) {
 	t.Run("disabled API-level timeout falls back to gateway default", func(t *testing.T) {
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(400 * time.Millisecond)
-			w.Write([]byte("gateway default response"))
+			_, err := w.Write([]byte("gateway default response"))
+			if err != nil {
+				t.Fatal(err)
+			}
 		}))
 		defer upstream.Close()
 
