@@ -451,7 +451,6 @@ func (r *RPCStorageHandler) elapsedLog(name string, fn func() error) func() erro
 
 func (r *RPCStorageHandler) SetRawKeyEx(keyName, session string, timeout int64) error {
 	_, _, _ = keyName, session, timeout
-	// SetRawKey
 	return nil
 }
 
