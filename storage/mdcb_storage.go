@@ -85,7 +85,13 @@ func (m MdcbStorage) SetRawKey(string, string, int64) error {
 	panic("implement me")
 }
 
-func (m MdcbStorage) SetRawKeyEx(string, string, int64) error { panic("implement me") }
+func (m MdcbStorage) SetRawKeyEx(key, content string, TTL int64) error {
+	if err := m.local.SetRawKeyEx(key, content, TTL); err != nil {
+		return fmt.Errorf("cannot save key in local: %w", err)
+	}
+
+	return nil
+}
 
 func (m MdcbStorage) SetExp(string, int64) error {
 	panic("implement me")
