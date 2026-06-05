@@ -196,7 +196,7 @@ func (r *IdPRegistry) fetchFromDashboard() ([]IdP, error) {
 	endpoint := r.gw.buildDashboardConnStr("/system/clientidps")
 
 	buildReq := func() (*http.Request, error) {
-		req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+		req, err := http.NewRequestWithContext(r.gw.ctx, http.MethodGet, endpoint, nil)
 		if err != nil {
 			return nil, fmt.Errorf("build client-idps request: %w", err)
 		}

@@ -27,7 +27,6 @@ type backupKind string
 const (
 	backupKindAPIDefinitions backupKind = "API Definitions"
 	backupKindPolicies       backupKind = "Policies"
-	backupKindClientIdPs     backupKind = "Client IdPs"
 )
 
 func getTagListAsString(tags []string) string {
@@ -154,16 +153,6 @@ func (gw *Gateway) decompressPolicyBackup(decrypted string) (string, error) {
 	return gw.decompressBackup(decrypted, backupKindPolicies)
 }
 
-// The client-IdP registry payload is small (one record per org IdP), so it is
-// stored uncompressed; decompressBackup still auto-detects on load.
-func (gw *Gateway) compressClientIdPBackup(list string) string {
-	return gw.compressBackup(list, false, backupKindClientIdPs)
-}
-
-func (gw *Gateway) decompressClientIdPBackup(decrypted string) (string, error) {
-	return gw.decompressBackup(decrypted, backupKindClientIdPs)
-}
-
 // LoadIdPsFromRPCBackup restores the client-IdP registry payload saved on the
 // last successful RPC sync, used when the edge gateway is in emergency mode and
 // MDCB is unreachable — the sibling of LoadDefinitionsFromRPCBackup.
@@ -190,14 +179,9 @@ func (gw *Gateway) LoadIdPsFromRPCBackup() ([]IdP, error) {
 		return nil, errors.New("[RPC] --> Failed to get node client-idp backup (" + checkKey + "): " + err.Error())
 	}
 
+	// The payload is small, so it is stored raw (encrypted only, no compression).
 	decrypted := crypto.Decrypt(secret, cryptoText)
-
-	listAsString, err := gw.decompressClientIdPBackup(decrypted)
-	if err != nil {
-		return nil, err
-	}
-
-	return unmarshalIdPs([]byte(listAsString))
+	return unmarshalIdPs([]byte(decrypted))
 }
 
 // saveRPCIdPsBackup stores the raw GetClientIdPs payload (a JSON array) to Redis
@@ -220,7 +204,7 @@ func (gw *Gateway) saveRPCIdPsBackup(list string) error {
 	}
 
 	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
-	cryptoText := crypto.Encrypt(secret, gw.compressClientIdPBackup(list))
+	cryptoText := crypto.Encrypt(secret, list) // stored raw (small payload, no compression)
 	if err := store.SetKey(BackupClientIdPKeyBase+tagList, cryptoText, -1); err != nil {
 		return errors.New("Failed to store node client-idp backup: " + err.Error())
 	}

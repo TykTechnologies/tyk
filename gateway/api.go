@@ -3299,9 +3299,9 @@ func ctxGetCacheOptions(r *http.Request) *cacheOptions {
 }
 
 // ctxSetMatchedBinding stores the client-IdP registry binding matched for this
-// request. JWTMiddleware is a single shared instance per API (api_loader.go:403)
-// and its ProcessRequest runs concurrently, so per-request state must live on
-// the context, not the middleware struct.
+// request. JWTMiddleware is a single shared instance per API and its
+// ProcessRequest runs concurrently, so per-request state must live on the
+// context, not the middleware struct.
 func ctxSetMatchedBinding(r *http.Request, b *Binding) {
 	setCtxValue(r, ctx.MatchedIdPBinding, b)
 }

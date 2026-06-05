@@ -334,7 +334,7 @@ func TestIdPRegistry_FetchFromDashboard(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	gw := &Gateway{apisByID: map[string]*APISpec{}}
+	gw := &Gateway{apisByID: map[string]*APISpec{}, ctx: context.Background()}
 	conf := config.Config{}
 	conf.UseDBAppConfigs = true
 	conf.DisableDashboardZeroConf = true
@@ -382,7 +382,7 @@ func TestIdPRegistry_FetchFromDashboard_Forbidden(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	gw := &Gateway{apisByID: map[string]*APISpec{}}
+	gw := &Gateway{apisByID: map[string]*APISpec{}, ctx: context.Background()}
 	conf := config.Config{}
 	conf.UseDBAppConfigs = true
 	conf.DisableDashboardZeroConf = true
@@ -766,7 +766,7 @@ func TestIdPRegistry_FetchFromDashboard_Non200(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	gw := &Gateway{apisByID: map[string]*APISpec{}}
+	gw := &Gateway{apisByID: map[string]*APISpec{}, ctx: context.Background()}
 	conf := config.Config{}
 	conf.UseDBAppConfigs = true
 	conf.DisableDashboardZeroConf = true
