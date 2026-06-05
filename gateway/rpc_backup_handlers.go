@@ -189,7 +189,7 @@ func (gw *Gateway) LoadIdPsFromRPCBackup() ([]IdP, error) {
 // saveRPCDefinitionsBackup.
 func (gw *Gateway) saveRPCIdPsBackup(list string) error {
 	if !json.Valid([]byte(list)) {
-		return errors.New("--> RPC Client-IdP Backup save failure: wrong format, skipping.")
+		return errors.New("--> RPC Client-IdP Backup save failure: wrong format, skipping")
 	}
 	if gw.StorageConnectionHandler == nil {
 		return errors.New("--> RPC Client-IdP Backup save failed: no storage connection handler")
@@ -206,7 +206,7 @@ func (gw *Gateway) saveRPCIdPsBackup(list string) error {
 	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
 	cryptoText := crypto.Encrypt(secret, list) // stored raw (small payload, no compression)
 	if err := store.SetKey(BackupClientIdPKeyBase+tagList, cryptoText, -1); err != nil {
-		return errors.New("Failed to store node client-idp backup: " + err.Error())
+		return errors.New("failed to store node client-idp backup: " + err.Error())
 	}
 
 	return nil

@@ -792,7 +792,7 @@ func TestFetchJWKSKey_CacheHit(t *testing.T) {
 	k.loadOrCreateJWKCache().Set("https://jwks", set, cache.DefaultExpiration)
 
 	// Cache hit: returns the key without any network fetch.
-	if got := k.fetchJWKSKey("https://jwks", "kid-1"); got == nil {
+	if k.fetchJWKSKey("https://jwks", "kid-1") == nil {
 		t.Fatal("cache hit should return the key")
 	}
 }

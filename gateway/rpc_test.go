@@ -87,7 +87,7 @@ func TestRPCStorageHandler_CheckForIdPReload_RPCDown(t *testing.T) {
 	gw.SetConfig(config.Config{})
 	store := RPCStorageHandler{Gw: gw}
 
-	if ok := store.CheckForIdPReload("org"); !ok {
+	if !store.CheckForIdPReload("org") {
 		t.Fatal("CheckForIdPReload should return true to keep the loop running on RPC error")
 	}
 }
