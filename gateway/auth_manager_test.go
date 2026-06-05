@@ -503,7 +503,6 @@ func Test_DefaultSessionManager(t *testing.T) {
 type countingStorageHandler struct {
 	deleteRawKeyMutex *sync.Mutex
 	deleteRawKeyCount int
-	storage.SetExHandlerNoImplemented
 }
 
 func newCountingStorageHandler() *countingStorageHandler {
@@ -639,4 +638,12 @@ func (c *countingStorageHandler) AppendToSet(s string, s2 string) {}
 
 func (c *countingStorageHandler) Exists(s string) (bool, error) {
 	return false, nil
+}
+
+func (c *countingStorageHandler) SetKeyEx(string, string, int64) error {
+	return nil
+}
+
+func (c *countingStorageHandler) SetRawKeyEx(string, string, int64) error {
+	return nil
 }

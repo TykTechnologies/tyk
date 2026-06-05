@@ -5,8 +5,6 @@ import (
 	"strings"
 
 	"github.com/mavricknz/ldap"
-
-	"github.com/TykTechnologies/tyk/storage"
 )
 
 // LDAPStorageHandler implements storage.Handler, this is a read-only implementation to access keys from an LDAP service
@@ -18,7 +16,6 @@ type LDAPStorageHandler struct {
 	SessionAttributeName string
 	SearchString         string
 	store                *ldap.LDAPConnection
-	storage.SetExHandlerNoImplemented
 }
 
 func (l *LDAPStorageHandler) LoadConfFromMeta(meta map[string]interface{}) {
@@ -138,6 +135,16 @@ func (l *LDAPStorageHandler) SetKey(cn, session string, timeout int64) error {
 }
 
 func (l *LDAPStorageHandler) SetRawKey(cn, session string, timeout int64) error {
+	l.notifyReadOnly()
+	return nil
+}
+
+func (l *LDAPStorageHandler) SetKeyEx(_key string, _value string, _duration int64) error {
+	l.notifyReadOnly()
+	return nil
+}
+
+func (l *LDAPStorageHandler) SetRawKeyEx(_key string, _value string, _duration int64) error {
 	l.notifyReadOnly()
 	return nil
 }

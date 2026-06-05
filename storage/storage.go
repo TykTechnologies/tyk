@@ -204,13 +204,3 @@ type SetRawKeyExHandler interface {
 	// SetRawKeyEx sets raw key if key already exists.
 	SetRawKeyEx(string, string, int64) error
 }
-
-type SetExHandlerNoImplemented struct{}
-
-func (s3 SetExHandlerNoImplemented) SetKeyEx(_ string, _ string, _ int64) error {
-	return errors.New("SetKeyEx not implemented")
-}
-
-func (s3 SetExHandlerNoImplemented) SetRawKeyEx(_ string, _ string, _ int64) error {
-	return errors.New("SetRawKeyEx not implemented")
-}
