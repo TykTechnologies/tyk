@@ -425,7 +425,7 @@ func (r *RPCStorageHandler) retry(fn func() error) error {
 	for {
 		err := fn()
 
-		if r.IsRetriableError(err) {
+		if r.IsRetriableError(err) && rpc.Login() {
 			continue
 		}
 
