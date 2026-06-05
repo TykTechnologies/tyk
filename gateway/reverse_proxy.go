@@ -651,6 +651,10 @@ func (p *ReverseProxy) GetHardTimeoutEnforcedSettings(spec *APISpec, req *http.R
 		}
 	}
 
+	if !spec.GlobalEnforceTimeoutDisabled && spec.GlobalEnforceTimeout != 0 {
+		return time.Duration(spec.GlobalEnforceTimeout), true
+	}
+
 	return 0, false
 }
 
