@@ -634,8 +634,10 @@ func proxyTimeout(spec *APISpec) float64 {
 	return defaultProxyTimeout
 }
 
-// GetHardTimeoutEnforcedSettings checks APISpec versions for a fine-grained timeout value.
-func (p *ReverseProxy) GetHardTimeoutEnforcedSettings(spec *APISpec, req *http.Request) (time.Duration, bool) {
+// GetEnforcedTimeoutSettings returns the enforced timeout for the current request by checking
+// timeouts in priority order: endpoint-level timeout first, then API-level timeout, returning
+// 0 and false if neither is configured or enabled.
+func (p *ReverseProxy) GetEnforcedTimeoutSettings(spec *APISpec, req *http.Request) (time.Duration, bool) {
 	if !spec.EnforcedTimeoutEnabled {
 		return 0, false
 	}
@@ -1263,7 +1265,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	p.TykAPISpec.Lock()
 
-	enforcedTimeout, isTimeoutEnforced := p.GetHardTimeoutEnforcedSettings(p.TykAPISpec, outreq)
+	enforcedTimeout, isTimeoutEnforced := p.GetEnforcedTimeoutSettings(p.TykAPISpec, outreq)
 
 	// limit request time with context timeout
 	if isTimeoutEnforced {
