@@ -905,8 +905,8 @@ func (r *RPCStorageHandler) CheckForIdPReload(orgId string) bool {
 		return true
 	}
 
-	changedIDs, _ := changed.([]string)
-	if len(changedIDs) > 0 && r.Gw.idpRegistry != nil {
+	changedIDs, ok := changed.([]string)
+	if ok && len(changedIDs) > 0 && r.Gw.idpRegistry != nil {
 		log.Infof("[RPC STORE] %d client-IdP change(s) signalled; refreshing registry", len(changedIDs))
 		if refreshErr := r.Gw.idpRegistry.doRefresh(); refreshErr != nil {
 			log.WithError(refreshErr).Error("client-IdP registry refresh failed; keeping previous snapshot")
