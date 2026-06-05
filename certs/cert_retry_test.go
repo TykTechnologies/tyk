@@ -17,8 +17,14 @@ import (
 
 // baseMockStorage provides default implementations for all storage.Handler methods.
 // Specific mocks can embed this and override only the methods they need.
-type baseMockStorage struct {
-	storage.SetExHandlerNoImplemented
+type baseMockStorage struct{}
+
+func (b *baseMockStorage) SetKeyEx(string, string, int64) error {
+	return errors.New("not implemented")
+}
+
+func (b *baseMockStorage) SetRawKeyEx(string, string, int64) error {
+	return errors.New("not implemented")
 }
 
 func (b *baseMockStorage) GetMultiKey(_ []string) ([]string, error) {

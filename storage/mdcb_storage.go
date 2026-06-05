@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -12,7 +13,6 @@ type MdcbStorage struct {
 	rpc           Handler
 	logger        *logrus.Entry
 	OnRPCCertPull func(key string, val string) error
-	SetExHandlerNoImplemented
 }
 
 const (
@@ -73,9 +73,19 @@ func (m MdcbStorage) SetKey(key string, content string, TTL int64) error {
 	return nil
 }
 
+func (m MdcbStorage) SetKeyEx(key string, content string, TTL int64) error {
+	if err := m.local.SetKeyEx(key, content, TTL); err != nil {
+		return fmt.Errorf("cannot save key in local: %w", err)
+	}
+
+	return nil
+}
+
 func (m MdcbStorage) SetRawKey(string, string, int64) error {
 	panic("implement me")
 }
+
+func (m MdcbStorage) SetRawKeyEx(string, string, int64) error { panic("implement me") }
 
 func (m MdcbStorage) SetExp(string, int64) error {
 	panic("implement me")

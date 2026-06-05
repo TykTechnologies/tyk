@@ -123,7 +123,6 @@ type RPCStorageHandler struct {
 	SuppressRegister bool
 	DoReload         func()
 	Gw               *Gateway `json:"-"`
-	storage.SetExHandlerNoImplemented
 }
 
 //go:generate mockgen -typed -source=$FILE -destination=../internal/policy/store_mock.gen.go -package policy . RPCDataLoader
@@ -400,6 +399,17 @@ func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error
 }
 
 func (r *RPCStorageHandler) SetRawKey(keyName, session string, timeout int64) error {
+	return nil
+}
+
+func (r *RPCStorageHandler) SetKeyEx(keyName, session string, timeout int64) error {
+	// uses set
+	return r.SetKey(keyName, session, timeout)
+}
+
+func (r *RPCStorageHandler) SetRawKeyEx(keyName, session string, timeout int64) error {
+	_, _, _ = keyName, session, timeout
+	// SetRawKey
 	return nil
 }
 
