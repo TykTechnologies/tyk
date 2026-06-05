@@ -1935,6 +1935,7 @@ func (a *APISpec) Init(
 	healthStore storage.Handler,
 	orgStore storage.Handler,
 ) {
+
 	a.AuthManager.Init(authStore)
 	a.Health.Init(healthStore)
 	a.OrgSessionManager.Init(orgStore)
