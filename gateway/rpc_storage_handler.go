@@ -85,8 +85,8 @@ var (
 		"CheckReload": func(clientAddr, orgId string) (bool, error) {
 			return false, nil
 		},
-		"CheckIdPReload": func(clientAddr, orgId string) (bool, error) {
-			return false, nil
+		"CheckIdPReload": func(clientAddr, orgId string) ([]string, error) {
+			return nil, nil
 		},
 		"GetKeySpaceUpdate": func(clientAddr, orgId string) ([]string, error) {
 			return nil, nil
@@ -876,10 +876,13 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) bool {
 }
 
 // CheckForIdPReload is the client-IdP sibling of CheckForReload: a long poll on
-// the dedicated CheckIdPReload RPC. On a reload signal it refreshes ONLY the
-// client-IdP registry (a single GetClientIdPs RPC) — deliberately NOT a full
-// API/policy resync. Errors are logged and the loop continues; the registry
-// keeps its previous snapshot. Returns false only on shutdown to stop the loop.
+// the dedicated CheckIdPReload RPC. MDCB returns the list of client_idp_id values
+// that changed for this node's group (empty when nothing pending); the list is
+// used purely as a "something changed" signal — on a non-empty result we refresh
+// the whole registry once via doRefresh (a single GetClientIdPs RPC), which also
+// handles deletes for free. This is deliberately NOT a full API/policy resync.
+// Errors are logged and the loop continues; the registry keeps its previous
+// snapshot. Returns false only on shutdown to stop the loop.
 func (r *RPCStorageHandler) CheckForIdPReload(orgId string) bool {
 	select {
 	case <-r.Gw.ctx.Done():
@@ -887,7 +890,7 @@ func (r *RPCStorageHandler) CheckForIdPReload(orgId string) bool {
 	default:
 	}
 
-	reload, err := rpc.FuncClientSingleton("CheckIdPReload", orgId)
+	changed, err := rpc.FuncClientSingleton("CheckIdPReload", orgId)
 	if err != nil {
 		rpc.EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
@@ -902,8 +905,9 @@ func (r *RPCStorageHandler) CheckForIdPReload(orgId string) bool {
 		return true
 	}
 
-	if reload == true && r.Gw.idpRegistry != nil {
-		log.Info("[RPC STORE] Received client-IdP reload instruction!")
+	changedIDs, _ := changed.([]string)
+	if len(changedIDs) > 0 && r.Gw.idpRegistry != nil {
+		log.Infof("[RPC STORE] %d client-IdP change(s) signalled; refreshing registry", len(changedIDs))
 		if refreshErr := r.Gw.idpRegistry.doRefresh(); refreshErr != nil {
 			log.WithError(refreshErr).Error("client-IdP registry refresh failed; keeping previous snapshot")
 		}
