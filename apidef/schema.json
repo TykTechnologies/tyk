@@ -688,7 +688,7 @@
       }
     },
     "global_enforce_timeout": {
-      "type": ["string", "integer", "number"]
+      "type": "string"
     },
     "global_enforce_timeout_disabled": {
       "type": "boolean"
