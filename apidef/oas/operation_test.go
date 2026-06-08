@@ -91,6 +91,7 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 	operation.PostPlugins = operation.PostPlugins[:1] // only 1 post plugin is considered at this point, ignore others.
 	operation.PostPlugins[0].Name = ""                // Name is deprecated.
 	operation.EnforceTimeout.Value = 1                // Enforced timeout value is deprecated. We set value of 1 due to new field Timeout that alters deprecated value (rounds up to one second).
+	operation.Exchange = nil                          // OAS-native; not propagated to classic apidef.
 
 	operation.RateLimit.Per = ReadableDuration(time.Minute)
 
