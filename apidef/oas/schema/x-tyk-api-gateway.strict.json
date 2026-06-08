@@ -2080,16 +2080,9 @@
           },
           "description": "Issuer URLs published in the PRM document. At least one entry is required for MCP-proxy APIs."
         },
-        "scopesSupported": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Scopes advertised in PRM `scopes_supported` that aren't referenced by any operation's `security:` array. Merged with the scopeCheck.scopes baseline and the auto-derived set."
-        },
         "autoDeriveScopes": {
           "type": "boolean",
-          "description": "When unset or true (default), the union of all `security:` scopes declared on operations and MCP primitives is added to PRM `scopes_supported`. Set to false to advertise only the manual list."
+          "description": "When unset or true (default), the union of all `security:` scopes declared on operations and MCP primitives is added to PRM `scopes_supported`. Set to false to advertise only the scopes declared in the security scheme's flows.scopes catalog."
         }
       },
       "required": [
