@@ -33,7 +33,7 @@ env:
 jobs:
   dep-guard:
     if: github.event_name == 'pull_request'
-    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@d3fa20888fa2878e877e22bb7702141217290e7c # main
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@production
     permissions:
       contents: read
   goreleaser:
@@ -44,7 +44,7 @@ jobs:
       (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') &&
       github.event.pull_request.draft == false
     name: '${{ matrix.golang_cross }}'
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+    runs-on: ${{ vars.BUILD_RUNNER || vars.DEFAULT_RUNNER }}
     permissions:
       id-token: write # AWS OIDC JWT
       contents: read # actions/checkout
@@ -64,6 +64,13 @@ jobs:
       std_tags: ${{ steps.ci_metadata_std.outputs.tags }}
       commit_author: ${{ steps.set_outputs.outputs.commit_author}}
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
       - name: Checkout of tyk
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -111,14 +118,6 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
-        with:
-          app-id: ${{ secrets.PROBE_APP_ID }}
-          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
-          owner: TykTechnologies
-
       - name: Build
         env:
           NFPM_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
@@ -171,19 +170,33 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
-          platforms: linux/amd64,linux/arm64,linux/s390x
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64,linux/s390x' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          sbom: true
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: ${{ steps.ci_metadata_ee.outputs.tags }}
           labels: ${{ steps.ci_metadata_ee.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
+      - name: Verify compression format for ee CI image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.ci_metadata_ee.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw "$TAG" > manifest.json
+          if grep -q "tar+zstd" manifest.json; then
+            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
+            cat manifest.json | grep mediaType
+            exit 1
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Docker metadata for ee tag push
         id: tag_metadata_ee
+        if: startsWith(github.ref, 'refs/tags')
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: |
@@ -201,21 +214,33 @@ jobs:
             org.opencontainers.image.vendor=tyk.io
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push ee image to prod
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
           platforms: linux/amd64,linux/arm64,linux/s390x
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          sbom: true
           cache-from: type=gha
-          cache-to: type=gha,mode=max
-          push: ${{ startsWith(github.ref, 'refs/tags') }}
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_ee.outputs.tags }}
           labels: ${{ steps.tag_metadata_ee.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
+      - name: Verify compression format for ee prod image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.tag_metadata_ee.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw "$TAG" > manifest.json
+          if grep -q "tar+zstd" manifest.json; then
+            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
+            cat manifest.json | grep mediaType
+            exit 1
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Docker metadata for std CI
         id: ci_metadata_std
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
@@ -237,19 +262,33 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
-          platforms: linux/amd64,linux/arm64,linux/s390x
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64,linux/s390x' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          sbom: true
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: ${{ steps.ci_metadata_std.outputs.tags }}
           labels: ${{ steps.ci_metadata_std.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway
+      - name: Verify compression format for std CI image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.ci_metadata_std.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw "$TAG" > manifest.json
+          if grep -q "tar+zstd" manifest.json; then
+            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
+            cat manifest.json | grep mediaType
+            exit 1
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Docker metadata for std tag push
         id: tag_metadata_std
+        if: startsWith(github.ref, 'refs/tags')
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: |
@@ -267,21 +306,33 @@ jobs:
             org.opencontainers.image.vendor=tyk.io
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push std image to prod
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
           platforms: linux/amd64,linux/arm64,linux/s390x
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          sbom: true
           cache-from: type=gha
-          cache-to: type=gha,mode=max
-          push: ${{ startsWith(github.ref, 'refs/tags') }}
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_std.outputs.tags }}
           labels: ${{ steps.tag_metadata_std.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway
+      - name: Verify compression format for std prod image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.tag_metadata_std.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw "$TAG" > manifest.json
+          if grep -q "tar+zstd" manifest.json; then
+            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
+            cat manifest.json | grep mediaType
+            exit 1
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: save deb
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
@@ -318,6 +369,13 @@ jobs:
       dashboard_branch: ${{ steps.resolve.outputs.dashboard_branch }}
       strategy: ${{ steps.resolve.outputs.strategy }}
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
       - name: Checkout tyk repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -368,14 +426,6 @@ jobs:
         uses: aws-actions/amazon-ecr-login@f2e9fc6c2b355c1890b65e6f6f0e2ac3e6e22f78 # v2
         with:
           mask-password: 'true'
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
-        with:
-          app-id: ${{ secrets.PROBE_APP_ID }}
-          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
-          owner: TykTechnologies
-
       - name: Check if tyk-analytics branch exists
         id: check_branch
         shell: bash
@@ -440,7 +490,7 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HAS_RELEVANT_CHANGES: ${{ steps.check_changes.outputs.has_relevant_changes }}
-          ORG_GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
         run: |
           echo "=================================="
           echo "📊 Dashboard Image Resolution"
@@ -532,7 +582,6 @@ jobs:
           app-id: ${{ secrets.PROBE_APP_ID }}
           private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
           owner: TykTechnologies
-
       - name: Checkout tyk-analytics
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -717,7 +766,7 @@ jobs:
       sink: ${{ steps.params.outputs.sink }}
     steps:
       - name: Set test parameters
-        uses: TykTechnologies/github-actions/.github/actions/tests/test-controller@42304edda365365e0a887cf018d8edc34b960b82 # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/test-controller@production
         id: params
         with:
           variation: ${{ env.VARIATION }}
@@ -754,6 +803,13 @@ jobs:
           - pump: $ECR/tyk-pump:master
             sink: tykio/tyk-mdcb-docker:v2.4
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
       - uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c # v4
         with:
           role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
@@ -763,14 +819,6 @@ jobs:
         uses: aws-actions/amazon-ecr-login@f2e9fc6c2b355c1890b65e6f6f0e2ac3e6e22f78 # v2
         with:
           mask-password: 'true'
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
-        with:
-          app-id: ${{ secrets.PROBE_APP_ID }}
-          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
-          owner: TykTechnologies
-
       - name: Setup tmate session only in debug mode
         uses: mxschmitt/action-tmate@c0afd6f790e3a5564914980036ebf83216678101 # v3
         if: runner.debug == '1'
@@ -780,11 +828,11 @@ jobs:
           # Only ${{ github.actor }} has access
           # See https://github.com/mxschmitt/action-tmate#use-registered-public-ssh-keys
       - name: Fetch environment from tyk-pro
-        uses: TykTechnologies/github-actions/.github/actions/tests/checkout-tyk-pro@42304edda365365e0a887cf018d8edc34b960b82 # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/checkout-tyk-pro@production
         with:
-          org_gh_token: ${{ github.token }}
+          org_gh_token: ${{ steps.app-token.outputs.token }}
       - name: Set up test environment
-        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@42304edda365365e0a887cf018d8edc34b960b82 # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@production
         timeout-minutes: 5
         id: env_up
         with:
@@ -795,18 +843,18 @@ jobs:
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
       - name: Choose test code branch
-        uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@42304edda365365e0a887cf018d8edc34b960b82 # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@production
         with:
           test_folder: api
           org_gh_token: ${{ steps.app-token.outputs.token }}
       - name: Run API tests
-        uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@42304edda365365e0a887cf018d8edc34b960b82 # main
-        timeout-minutes: 30
+        uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@production
+        timeout-minutes: 45
         id: test_execution
         with:
           user_api_secret: ${{ steps.env_up.outputs.USER_API_SECRET }}
       - name: Generate test reports and collect logs
-        uses: TykTechnologies/github-actions/.github/actions/tests/reporting@42304edda365365e0a887cf018d8edc34b960b82 # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/reporting@production
         if: always() && (steps.test_execution.conclusion != 'skipped')
         with:
           report_xml: 'true'
