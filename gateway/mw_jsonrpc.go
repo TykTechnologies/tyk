@@ -26,6 +26,8 @@ const (
 	httpHeaderContentLength = "Content-Length"
 )
 
+const syntheticJSONRPCMethodReadLimit = 1 << 20
+
 // JSONRPCMiddleware handles JSON-RPC 2.0 request detection and routing.
 // When a client sends a JSON-RPC request to a JSON-RPC endpoint, the middleware detects it,
 // extracts the method, routes to the correct VEM, and enables the middleware chain to execute
@@ -334,17 +336,28 @@ func syntheticJSONRPCMethod(r *http.Request) string {
 	if state := httpctx.GetJSONRPCRoutingState(r); state != nil && state.Method != "" {
 		return state.Method
 	}
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, syntheticJSONRPCMethodReadLimit+1))
+	r.Body = prefixedReadCloser{
+		Reader: io.MultiReader(bytes.NewReader(body), r.Body),
+		Closer: r.Body,
+	}
 	if err != nil {
 		return ""
 	}
-	r.Body = io.NopCloser(bytes.NewReader(body))
+	if len(body) > syntheticJSONRPCMethodReadLimit {
+		return ""
+	}
 
 	var req JSONRPCRequest
 	if err := json.Unmarshal(body, &req); err != nil {
 		return ""
 	}
 	return req.Method
+}
+
+type prefixedReadCloser struct {
+	io.Reader
+	io.Closer
 }
 
 func normaliseMCPStreamableAccept(r *http.Request) {
