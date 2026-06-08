@@ -406,28 +406,31 @@ func (r *RPCStorageHandler) SetRawKey(keyName, session string, timeout int64) er
 }
 
 func (r *RPCStorageHandler) SetKeyEx(keyName, session string, timeout int64) error {
-	const fnName = "SetKeyEx"
 	return decorate(
 		func() error {
-			ibd := model.InboundData{
-				KeyName:      r.fixKey(keyName),
-				SessionState: session,
-				Timeout:      timeout,
-			}
-
-			_, err := rpc.FuncClientSingleton(fnName, ibd)
-
-			// Fallback for older MDCB versions that do not support SetKeyEx
-			if err != nil && strings.Contains(err.Error(), "unknown method") {
-				log.Error("SetKeyEx not supported by MDCB, falling back to SetKey")
-				_, err = rpc.FuncClientSingleton("SetKey", ibd)
-			}
-
-			return err
+			return r.internalSetKeyEx(keyName, session, timeout)
 		},
 		retryAlways(r),
-		elapsedLog(fnName, log),
+		elapsedLog("SetKeyEx", log),
 	)()
+}
+
+func (r *RPCStorageHandler) internalSetKeyEx(keyName, session string, timeout int64) error {
+	ibd := model.InboundData{
+		KeyName:      r.fixKey(keyName),
+		SessionState: session,
+		Timeout:      timeout,
+	}
+
+	_, err := rpc.FuncClientSingleton("SetKeyEx", ibd)
+
+	// Fallback for older MDCB versions that do not support SetKeyEx
+	if err != nil && strings.Contains(err.Error(), "unknown method") {
+		log.Error("SetKeyEx not supported by MDCB, falling back to SetKey")
+		_, err = rpc.FuncClientSingleton("SetKey", ibd)
+	}
+
+	return err
 }
 
 func (r *RPCStorageHandler) SetRawKeyEx(keyName, session string, timeout int64) error {
