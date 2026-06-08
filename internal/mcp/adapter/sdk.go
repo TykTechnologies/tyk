@@ -289,6 +289,9 @@ func SDKToolResult(rec *Recorder) *mcpsdk.CallToolResult {
 
 // SDKToolResultForTool maps a captured REST response to a tool result and
 // includes structured content when the derived tool publishes an output schema.
+// Structured content requires unmarshalling the captured JSON response body
+// (bounded by BodyTruncationBytes); tools without an output schema skip that
+// parse and return text content only.
 func SDKToolResultForTool(tool *oas.DerivedTool, rec *Recorder) *mcpsdk.CallToolResult {
 	result := SDKToolResult(rec)
 	if structuredContent, ok := toolStructuredContent(tool, rec); ok {

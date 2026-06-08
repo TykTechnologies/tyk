@@ -78,7 +78,10 @@ type DerivedTool struct {
 	Annotations *DerivedToolAnnotations `json:"annotations,omitempty"`
 
 	// OutputSchema is the JSON schema published in tools/list to describe
-	// structuredContent returned by successful tools/call responses.
+	// structuredContent returned by successful tools/call responses. When set,
+	// the REST-as-MCP adapter unmarshals successful JSON response bodies up to
+	// the adapter body cap to populate structuredContent; omit it for tools
+	// whose large or high-volume responses should stay text-only.
 	OutputSchema map[string]any `json:"outputSchema,omitempty"`
 }
 
