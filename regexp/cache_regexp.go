@@ -10,12 +10,9 @@ type regexpCache struct {
 	noCacheFunc func(string) (*regexp.Regexp, error)
 }
 
-func newRegexpCache(ttl time.Duration, isEnabled bool, fn func(string) (*regexp.Regexp, error)) *regexpCache {
+func newRegexpCache(ttl time.Duration, maxEntries int, isEnabled bool, name string, reporter evictionReporter, fn func(string) (*regexp.Regexp, error)) *regexpCache {
 	return &regexpCache{
-		cache: newCache(
-			ttl,
-			isEnabled,
-		),
+		cache:       newCacheWithSize(ttl, maxEntries, isEnabled, name, reporter),
 		noCacheFunc: fn,
 	}
 }

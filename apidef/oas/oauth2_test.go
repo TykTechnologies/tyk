@@ -311,15 +311,15 @@ func TestOAuth2_FillExtractPreservesSchemeNameVerbatim(t *testing.T) {
 
 func TestOAS_DeriveOAuth2Scopes_NoOAuth2Scheme(t *testing.T) {
 	s := &OAS{}
-	s.T.OpenAPI = "3.0.3"
-	s.T.Info = &openapi3.Info{Title: "test", Version: "1.0"}
-	s.T.Security = openapi3.SecurityRequirements{{"jwtAuth": {"x"}}}
+	s.OpenAPI = "3.0.3"
+	s.Info = &openapi3.Info{Title: "test", Version: "1.0"}
+	s.Security = openapi3.SecurityRequirements{{"jwtAuth": {"x"}}}
 	assert.Empty(t, s.SortedOAuth2Scopes())
 }
 
 func TestOAS_DeriveOAuth2Scopes_RootPerOpAndMCP(t *testing.T) {
 	s := newOAuth2Fixture("corpOAuth")
-	s.T.Security = openapi3.SecurityRequirements{
+	s.Security = openapi3.SecurityRequirements{
 		{"corpOAuth": {"api:access"}},
 		{"jwtAuth": {"ignored"}},
 	}

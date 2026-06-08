@@ -105,14 +105,20 @@ func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request
 		return errors.New(oas.OAuth2ErrInsufficientScope), http.StatusForbidden
 	}
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, err := json.Marshal(map[string]interface{}{
 		"error":             oas.OAuth2ErrInsufficientScope,
 		"error_description": "token does not satisfy required scopes: " + citedScopes,
 		"scope":             citedScopes,
 	})
+	if err != nil {
+		m.Logger().WithError(err).Error("failed to marshal scope-check error body")
+		return errors.New(oas.OAuth2ErrInsufficientScope), http.StatusForbidden
+	}
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(http.StatusForbidden)
-	_, _ = w.Write(body)
+	if _, err := w.Write(body); err != nil {
+		m.Logger().WithError(err).Warning("failed to write scope-check error response")
+	}
 	return nil, middleware.StatusRespond
 }
 
