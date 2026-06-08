@@ -318,15 +318,8 @@ func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWri
 	if method == mcp.MethodToolsList {
 		rec := newBufferedResponseWriter()
 		m.Spec.MCPSDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(rec, r)
-		body := rec.body.Bytes()
-		if view, ok := m.syntheticMCPToolViewForCaller(r); ok && rec.statusCode < http.StatusBadRequest {
-			if rewritten, err := rewriteMCPToolsListResponse(body, view); err == nil {
-				body = rewritten
-			} else {
-				m.Logger().WithError(err).Warn("failed to rewrite REST-as-MCP tools/list response")
-			}
-		}
-		rec.writeTo(w, body)
+		view, ok := m.syntheticMCPToolViewForCaller(r)
+		m.writeSyntheticMCPToolsListResponse(w, r, rec, view, ok)
 		return nil, middleware.StatusRespond
 	}
 
@@ -369,6 +362,20 @@ func (m *JSONRPCMiddleware) syntheticMCPToolViewForCaller(r *http.Request) (oas.
 	}
 	view, ok := m.Spec.MCPToolViews[callerProxyID]
 	return view, ok
+}
+
+func (m *JSONRPCMiddleware) writeSyntheticMCPToolsListResponse(w http.ResponseWriter, r *http.Request, rec *bufferedResponseWriter, view oas.MCPToolView, filter bool) {
+	body := rec.body.Bytes()
+	if filter && rec.statusCode < http.StatusBadRequest {
+		rewritten, err := rewriteMCPToolsListResponse(body, view)
+		if err != nil {
+			m.Logger().WithError(err).Warn("failed to rewrite REST-as-MCP tools/list response")
+			m.writeJSONRPCError(w, r, nil, mcp.JSONRPCInternalError, "Internal error", nil)
+			return
+		}
+		body = rewritten
+	}
+	rec.writeTo(w, body)
 }
 
 func rewriteMCPToolsListResponse(body []byte, view oas.MCPToolView) ([]byte, error) {

@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -131,6 +132,34 @@ func TestRESTAsMCPToolView_RewritesToolsListForCallerProxy(t *testing.T) {
 	tool := tools[0].(map[string]any)
 	assert.Equal(t, "orders", tool["name"])
 	assert.Equal(t, "proxy one list", tool["description"])
+}
+
+func TestWriteSyntheticMCPToolsListResponse_FailsClosedWhenRewriteFails(t *testing.T) {
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{}}
+	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+
+	sdkResponse := newBufferedResponseWriter()
+	sdkResponse.Header().Set("Content-Type", "application/json")
+	sdkResponse.WriteHeader(http.StatusOK)
+	_, err := sdkResponse.Write([]byte(`{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"hidden"}]`))
+	require.NoError(t, err)
+
+	rec := httptest.NewRecorder()
+	mw.writeSyntheticMCPToolsListResponse(rec, req, sdkResponse, oas.MCPToolView{
+		Tools: []oas.DerivedTool{{
+			Name:        "visible",
+			InputSchema: map[string]any{"type": "object"},
+		}},
+	}, true)
+
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	assert.NotContains(t, rec.Body.String(), "hidden")
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.NotContains(t, body, "result")
+	rpcErr := body["error"].(map[string]any)
+	assert.EqualValues(t, mcp.JSONRPCInternalError, rpcErr["code"])
 }
 
 func TestBuildAdapterSpec_ReusedSDKAdapterUsesUpdatedToolViewsForCalls(t *testing.T) {
