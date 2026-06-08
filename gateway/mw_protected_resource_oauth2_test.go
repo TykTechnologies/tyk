@@ -197,6 +197,62 @@ func TestOAuth2PRM_NewWinsOverOld(t *testing.T) {
 	})
 }
 
+// TestOAuth2PRM_ServesWhenOAuth2MasterDisabled pins the migration's
+// safety hatch: PRM publishing is independent of OAuth2 authentication
+// enforcement. The dashboard migration creates the new oauth2 scheme
+// with oauth2.enabled=false (so it doesn't silently turn on auth that
+// wasn't there before) but oauth2.protectedResourceMetadata.enabled=true
+// so the new PRM document is served. If a refactor ever wires
+// GetOAuth2PRMConfig to check oauth2.enabled, every migrated customer
+// stops publishing PRM until they manually flip the master switch.
+func TestOAuth2PRM_ServesWhenOAuth2MasterDisabled(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	doc := newOAuth2PRMOAS("/prm-master-off/", &oas.OAuth2PRM{
+		Enabled:              true,
+		Resource:             "https://api.example.com/",
+		AuthorizationServers: []string{"https://as.example.com/"},
+	}, nil)
+	doc.GetTykExtension().Server.Authentication.SecuritySchemes["corpOAuth"].(*oas.OAuth2).Enabled = false
+	loadOAuth2PRMAPI(ts, "/prm-master-off/", doc)
+
+	ts.Run(t, test.TestCase{
+		Method:    http.MethodGet,
+		Path:      "/prm-master-off/.well-known/oauth-protected-resource",
+		Code:      http.StatusOK,
+		BodyMatch: `"authorization_servers":\["https://as.example.com/"\]`,
+	})
+}
+
+// TestOAuth2PRM_FallsBackToLegacyWhenNewBlockAbsent pins the legacy
+// fallback path that the migration relies on: after the dashboard
+// non-destructively copies the legacy top-level
+// authentication.protectedResourceMetadata block to the new per-scheme
+// oauth2.protectedResourceMetadata location, an operator may later
+// remove the new block (reverting to the old location). The gateway
+// must continue to serve PRM from the legacy block in that state.
+func TestOAuth2PRM_FallsBackToLegacyWhenNewBlockAbsent(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	doc := newOAuth2PRMOAS("/prm-fallback/", nil, nil)
+	//nolint:staticcheck // intentional: pinning the legacy block's runtime fallback.
+	doc.GetTykExtension().Server.Authentication.ProtectedResourceMetadata = &oas.ProtectedResourceMetadata{
+		Enabled:              true,
+		Resource:             "https://api.example.com/legacy",
+		AuthorizationServers: []string{"https://old-as.example.com/"},
+	}
+	loadOAuth2PRMAPI(ts, "/prm-fallback/", doc)
+
+	ts.Run(t, test.TestCase{
+		Method:    http.MethodGet,
+		Path:      "/prm-fallback/.well-known/oauth-protected-resource",
+		Code:      http.StatusOK,
+		BodyMatch: `"authorization_servers":\["https://old-as.example.com/"\]`,
+	})
+}
+
 // TestOAuth2PRM_ResourceMetadataOnChallenge verifies the scope-check
 // middleware appends an RFC 9728 §5.1 resource_metadata= parameter to
 // its Bearer challenges when the API publishes a PRM document, and omits
