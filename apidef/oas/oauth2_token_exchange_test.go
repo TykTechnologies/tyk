@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
 func TestOAuth2_HasContentRecognisesTokenExchange(t *testing.T) {
@@ -321,9 +324,9 @@ func TestOAS_Validate_TokenExchange(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		te        *OAuth2TokenExchange
-		wantErr   string
+		name    string
+		te      *OAuth2TokenExchange
+		wantErr string
 	}{
 		{
 			name:    "valid single provider passes",
@@ -405,5 +408,80 @@ func TestOAS_ValidateForMCP_TokenExchange(t *testing.T) {
 			},
 		})
 		assert.NoError(t, s.ValidateForMCP(context.Background()))
+	})
+}
+
+func TestOAuth2ExchangeCache_RoundTrip(t *testing.T) {
+	provider := OAuth2TokenExchangeProvider{
+		Name: "p1",
+		Cache: &OAuth2ExchangeCache{
+			Enabled:      true,
+			Mode:         OAuth2CacheModeDerived,
+			MaxTimeout:   tyktime.ReadableDuration(5 * time.Minute),
+			SafetyMargin: tyktime.ReadableDuration(30 * time.Second),
+		},
+	}
+	b, err := json.Marshal(provider)
+	require.NoError(t, err)
+	var got OAuth2TokenExchangeProvider
+	require.NoError(t, json.Unmarshal(b, &got))
+	require.NotNil(t, got.Cache)
+	assert.Equal(t, provider.Cache.Enabled, got.Cache.Enabled)
+	assert.Equal(t, provider.Cache.Mode, got.Cache.Mode)
+	assert.Equal(t, provider.Cache.MaxTimeout, got.Cache.MaxTimeout)
+	assert.Equal(t, provider.Cache.SafetyMargin, got.Cache.SafetyMargin)
+}
+
+func TestOAuth2ExchangeCache_NilOmitted(t *testing.T) {
+	provider := OAuth2TokenExchangeProvider{Name: "p1"}
+	b, err := json.Marshal(provider)
+	require.NoError(t, err)
+	assert.NotContains(t, string(b), "cache")
+}
+
+func TestValidateOAuth2Schemes_CacheMode(t *testing.T) {
+	validProvider := func(mode string) OAuth2TokenExchangeProvider {
+		return OAuth2TokenExchangeProvider{
+			Name:          "p",
+			Issuers:       []string{"https://idp"},
+			TokenEndpoint: "https://idp/token",
+			ClientAuth:    &OAuth2ClientAuth{ClientID: "c"},
+			Cache:         &OAuth2ExchangeCache{Enabled: true, Mode: mode},
+		}
+	}
+
+	t.Run("derived mode accepted", func(t *testing.T) {
+		s := newOAuth2WithTokenExchange("x", &OAuth2TokenExchange{
+			Enabled:   true,
+			Providers: []OAuth2TokenExchangeProvider{validProvider(OAuth2CacheModeDerived)},
+		})
+		assert.NoError(t, s.ValidateOAuth2Schemes())
+	})
+
+	t.Run("static mode accepted", func(t *testing.T) {
+		s := newOAuth2WithTokenExchange("x", &OAuth2TokenExchange{
+			Enabled:   true,
+			Providers: []OAuth2TokenExchangeProvider{validProvider(OAuth2CacheModeStatic)},
+		})
+		assert.NoError(t, s.ValidateOAuth2Schemes())
+	})
+
+	t.Run("empty mode accepted (defaults to derived)", func(t *testing.T) {
+		s := newOAuth2WithTokenExchange("x", &OAuth2TokenExchange{
+			Enabled:   true,
+			Providers: []OAuth2TokenExchangeProvider{validProvider("")},
+		})
+		assert.NoError(t, s.ValidateOAuth2Schemes())
+	})
+
+	t.Run("invalid mode rejected", func(t *testing.T) {
+		s := newOAuth2WithTokenExchange("x", &OAuth2TokenExchange{
+			Enabled:   true,
+			Providers: []OAuth2TokenExchangeProvider{validProvider("instant")},
+		})
+		err := s.ValidateOAuth2Schemes()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cache.mode")
+		assert.Contains(t, err.Error(), "invalid")
 	})
 }

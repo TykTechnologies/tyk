@@ -3,13 +3,17 @@
 package oauth2tokenexchange
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"testing"
 
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/internal/oauth2common"
 )
 
 func activePrimitive(audience string) *oas.MCPPrimitive {
@@ -74,4 +78,31 @@ func TestFindActivePrimitive_UnknownType_FallbackSearchesAll(t *testing.T) {
 	}
 	got := findActivePrimitive(mw, "search", "")
 	require.NotNil(t, got, "unknown type falls back to searching all maps")
+}
+
+func TestSubjectIDFromState_UsesSubClaimWhenPresent(t *testing.T) {
+	st := &oauth2common.State{
+		Claims:   jwt.MapClaims{oas.OAuth2ClaimSub: "user-123"},
+		RawToken: "raw-token-value",
+	}
+	assert.Equal(t, "user-123", subjectIDFromState(st))
+}
+
+func TestSubjectIDFromState_FallsBackToFullTokenHashWhenSubMissing(t *testing.T) {
+	st := &oauth2common.State{
+		Claims:   jwt.MapClaims{},
+		RawToken: "raw-token-value",
+	}
+
+	got := subjectIDFromState(st)
+
+	want := fmt.Sprintf("%x", sha256.Sum256([]byte(st.RawToken)))
+	assert.Equal(t, want, got, "fallback must be the full SHA-256 hex of the raw token")
+	assert.Len(t, got, 64, "a truncated hash weakens collision resistance")
+}
+
+func TestSubjectIDFromState_DifferentTokensProduceDifferentIDs(t *testing.T) {
+	a := subjectIDFromState(&oauth2common.State{Claims: jwt.MapClaims{}, RawToken: "token-a"})
+	b := subjectIDFromState(&oauth2common.State{Claims: jwt.MapClaims{}, RawToken: "token-b"})
+	assert.NotEqual(t, a, b)
 }

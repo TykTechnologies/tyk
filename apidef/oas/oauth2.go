@@ -199,6 +199,18 @@ type OAuth2TokenExchangeProvider struct {
 	// Keys in oauth2ReservedExchangeFormKeys are rejected at API-load time.
 	// Values accept env://, secrets://, vault://, consul:// prefixes.
 	CustomParams map[string]string `bson:"customParams,omitempty" json:"customParams,omitempty"`
+
+	// Cache controls Redis-backed caching of exchanged tokens for this provider.
+	Cache *OAuth2ExchangeCache `bson:"cache,omitempty" json:"cache,omitempty"`
+}
+
+// OAuth2ExchangeCache controls caching of exchanged tokens per provider.
+type OAuth2ExchangeCache struct {
+	Enabled      bool                     `bson:"enabled" json:"enabled"`
+	Mode         string                   `bson:"mode,omitempty" json:"mode,omitempty"`
+	MaxTimeout   tyktime.ReadableDuration `bson:"maxTimeout,omitempty" json:"maxTimeout,omitempty"`
+	Timeout      tyktime.ReadableDuration `bson:"timeout,omitempty" json:"timeout,omitempty"`
+	SafetyMargin tyktime.ReadableDuration `bson:"safetyMargin,omitempty" json:"safetyMargin,omitempty"`
 }
 
 // OAuth2ClientAuth describes how Tyk authenticates to the IdP token endpoint.
@@ -290,8 +302,14 @@ const (
 	OAuth2ClientAuthBasic = "client_secret_basic"
 	OAuth2ClientAuthPost  = "client_secret_post"
 
-	// JWT standard claim key.
+	// OAuth2ExchangeCache.Mode values.
+	OAuth2CacheModeDerived = "derived"
+	OAuth2CacheModeStatic  = "static"
+
+	// JWT standard claim keys.
 	OAuth2ClaimIss = "iss"
+	OAuth2ClaimSub = "sub"
+	OAuth2ClaimExp = "exp"
 
 	// OAuth2 response / WWW-Authenticate field names.
 	OAuth2FieldError            = "error"
@@ -378,6 +396,11 @@ func validateOAuth2TokenExchange(schemeName string, te *OAuth2TokenExchange) err
 			if _, reserved := oauth2ReservedExchangeFormKeys[key]; reserved {
 				return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q customParams cannot override reserved RFC 8693 wire key %q", schemeName, p.Name, key)
 			}
+		}
+		if p.Cache != nil && p.Cache.Mode != "" &&
+			p.Cache.Mode != OAuth2CacheModeDerived && p.Cache.Mode != OAuth2CacheModeStatic {
+			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q cache.mode %q is invalid; valid values are %q and %q",
+				schemeName, p.Name, p.Cache.Mode, OAuth2CacheModeDerived, OAuth2CacheModeStatic)
 		}
 	}
 	return nil

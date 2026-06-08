@@ -18,12 +18,17 @@ import (
 )
 
 type Middleware struct {
-	Spec model.MergedAPI
-	Base BaseMiddleware
+	Spec  model.MergedAPI
+	Base  BaseMiddleware
+	Cache *singleFlightCache
 }
 
-func NewMiddleware(base BaseMiddleware, spec model.MergedAPI) *Middleware {
-	return &Middleware{Base: base, Spec: spec}
+func NewMiddleware(base BaseMiddleware, spec model.MergedAPI, cache oauth2common.ExchangeCache) *Middleware {
+	mw := &Middleware{Base: base, Spec: spec}
+	if cache != nil {
+		mw.Cache = newSingleFlightCache(cache)
+	}
+	return mw
 }
 
 func (m *Middleware) Logger() *logrus.Entry {

@@ -4,6 +4,7 @@ package oauth2tokenexchange
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/header"
@@ -49,13 +52,105 @@ func (m *Middleware) runExchange(r *http.Request, st *oauth2common.State) (oauth
 	out.Audience = target.Audience
 	out.Scopes = target.Scopes
 
-	exchanged, err := m.exchangeAtIdP(r.Context(), provider, st.RawToken, target)
+	exchanged, err := m.fetchExchangedToken(r, st, provider, target)
 	if err != nil {
 		return out, err
 	}
 	out.ExchangedToken = exchanged
 	r.Header.Set(header.Authorization, oas.OAuth2AuthSchemeBearer+" "+exchanged)
 	return out, nil
+}
+
+// subjectIDFromState derives a subject identifier from the inbound token state.
+// Uses the "sub" claim when present; falls back to a SHA-256 hash of the raw token.
+func subjectIDFromState(st *oauth2common.State) string {
+	if sub := oauth2common.StringClaim(st.Claims, oas.OAuth2ClaimSub); sub != "" {
+		return sub
+	}
+	h := sha256.Sum256([]byte(st.RawToken))
+	return fmt.Sprintf("%x", h)
+}
+
+// inboundRemaining returns how long the inbound token has left, or 0 if unknown.
+func inboundRemaining(st *oauth2common.State) time.Duration {
+	expVal, ok := st.Claims[oas.OAuth2ClaimExp]
+	if !ok {
+		return 0
+	}
+	var expUnix int64
+	switch v := expVal.(type) {
+	case float64:
+		expUnix = int64(v)
+	case int64:
+		expUnix = v
+	default:
+		return 0
+	}
+	remaining := time.Until(time.Unix(expUnix, 0))
+	if remaining <= 0 {
+		return 0
+	}
+	return remaining
+}
+
+// fetchExchangedToken returns an exchanged token, using the cache when configured and enabled.
+func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State, provider *oas.OAuth2TokenExchangeProvider, target *oauth2common.Target) (string, error) {
+	if m.Cache == nil || provider.Cache == nil || !provider.Cache.Enabled {
+		token, _, err := m.exchangeAtIdP(r.Context(), provider, st.RawToken, target)
+		return token, err
+	}
+
+	subjectID := subjectIDFromState(st)
+	cacheKey := oauth2common.CacheKeyInput{
+		Issuer:       oauth2common.StringClaim(st.Claims, oas.OAuth2ClaimIss),
+		SubjectID:    subjectID,
+		APIID:        st.APIID,
+		Audience:     target.Audience,
+		Scopes:       target.Scopes,
+		ProviderName: provider.Name,
+	}.Build()
+
+	log := m.Logger()
+
+	token, ttlRemaining, hit, err := m.Cache.GetOrFetch(cacheKey, func() (string, time.Duration, error) {
+		log.WithFields(logrus.Fields{
+			"api_id":   st.APIID,
+			"provider": provider.Name,
+			"audience": target.Audience,
+		}).Info("token exchange cache miss")
+
+		tok, expiresIn, fetchErr := m.exchangeAtIdP(r.Context(), provider, st.RawToken, target)
+		if fetchErr != nil {
+			return "", 0, fetchErr
+		}
+		return tok, cacheTTL(provider.Cache, expiresIn, inboundRemaining(st)), nil
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if hit && ttlRemaining > 0 {
+		log.WithFields(logrus.Fields{
+			"api_id":        st.APIID,
+			"provider":      provider.Name,
+			"ttl_remaining": int64(ttlRemaining.Seconds()),
+		}).Debug("token exchange cache hit")
+	}
+
+	return token, nil
+}
+
+// cacheTTL derives the cache entry lifetime for the provider's cache mode,
+// defaulting the safety margin when none is configured.
+func cacheTTL(cache *oas.OAuth2ExchangeCache, expiresIn, inboundRemaining time.Duration) time.Duration {
+	safetyMargin := time.Duration(cache.SafetyMargin)
+	if safetyMargin == 0 {
+		safetyMargin = oauth2common.DefaultSafetyMargin
+	}
+	if cache.Mode == oas.OAuth2CacheModeStatic {
+		return oauth2common.StaticTTL(time.Duration(cache.Timeout), expiresIn, safetyMargin)
+	}
+	return oauth2common.DerivedTTL(expiresIn, inboundRemaining, time.Duration(cache.MaxTimeout), safetyMargin)
 }
 
 // findActivePrimitive returns the primitive with the given name and active exchange
@@ -130,9 +225,10 @@ func (m *Middleware) resolveExchangeTarget(st *oauth2common.State, provider *oas
 }
 
 // exchangeAtIdP posts the RFC 8693 exchange form to the provider's token endpoint.
-func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2TokenExchangeProvider, subjectToken string, target *oauth2common.Target) (string, error) {
+// Returns the exchanged access token and the expires_in value from the response (0 if not provided).
+func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2TokenExchangeProvider, subjectToken string, target *oauth2common.Target) (string, time.Duration, error) {
 	if provider.TokenEndpoint == "" {
-		return "", errors.New("provider tokenEndpoint is empty")
+		return "", 0, errors.New("provider tokenEndpoint is empty")
 	}
 
 	method := ""
@@ -165,7 +261,7 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.TokenEndpoint, strings.NewReader(form.Encode()))
 	if err != nil {
-		return "", fmt.Errorf("building exchange request: %w", err)
+		return "", 0, fmt.Errorf("building exchange request: %w", err)
 	}
 	req.Header.Set(header.ContentType, header.ApplicationFormURLEncoded)
 
@@ -177,20 +273,20 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 			req.SetBasicAuth(provider.ClientAuth.ClientID, provider.ClientAuth.ClientSecret)
 		}
 	default:
-		return "", fmt.Errorf("unsupported clientAuth.method %q", method)
+		return "", 0, fmt.Errorf("unsupported clientAuth.method %q", method)
 	}
 
 	client := oauth2common.NewIdPHTTPClient(EffectiveIdPTimeout(time.Duration(provider.Timeout)))
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("exchange call failed: %w", err)
+		return "", 0, fmt.Errorf("exchange call failed: %w", err)
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, oauth2common.MaxIdPResponseBytes))
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		idpErr, idpDesc := oauth2common.DecodeIdPError(body)
-		return "", &oauth2common.ExchangeFailedError{
+		return "", 0, &oauth2common.ExchangeFailedError{
 			Status:      resp.StatusCode,
 			IdpError:    idpErr,
 			Description: idpDesc,
@@ -199,14 +295,19 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 
 	var parsed struct {
 		AccessToken string `json:"access_token"`
+		ExpiresIn   int64  `json:"expires_in"`
 	}
 	if err := json.Unmarshal(body, &parsed); err != nil {
-		return "", fmt.Errorf("decoding exchange response: %w", err)
+		return "", 0, fmt.Errorf("decoding exchange response: %w", err)
 	}
 	if parsed.AccessToken == "" {
-		return "", errors.New("exchange response missing access_token")
+		return "", 0, errors.New("exchange response missing access_token")
 	}
-	return parsed.AccessToken, nil
+	var expiresIn time.Duration
+	if parsed.ExpiresIn > 0 {
+		expiresIn = time.Duration(parsed.ExpiresIn) * time.Second
+	}
+	return parsed.AccessToken, expiresIn, nil
 }
 
 // writeJSONError writes a JSON error response with the given status and Bearer challenge.
