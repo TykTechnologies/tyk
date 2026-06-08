@@ -88,7 +88,7 @@ func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request
 	// an empty subject_token would surface as a confusing 502 exchange_failed
 	// instead of an honest 401 missing bearer.
 	needsBearer := exchangeActive || (scopeCheckActive && len(alternatives) > 0)
-	rawToken, claims, err, status := m.parseBearerClaims(w, r, needsBearer)
+	rawToken, claims, status, err := m.parseBearerClaims(w, r, needsBearer)
 	if err != nil {
 		return err, status
 	}
@@ -116,30 +116,32 @@ func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request
 // parseBearerClaims extracts and parses the inbound Bearer token.
 // When needsBearer is true and the token is absent or unparseable, it writes
 // the appropriate WWW-Authenticate challenge and returns a non-nil error.
-func (m *OAuth2Middleware) parseBearerClaims(w http.ResponseWriter, r *http.Request, needsBearer bool) (rawToken string, claims jwt.MapClaims, err error, status int) {
+func (m *OAuth2Middleware) parseBearerClaims(w http.ResponseWriter, r *http.Request, needsBearer bool) (rawToken string, claims jwt.MapClaims, status int, err error) {
 	rawToken = stripBearer(r.Header.Get(header.Authorization))
 	if rawToken == "" {
 		if needsBearer {
 			m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "missing bearer token")
 			//nolint:staticcheck // ST1005: "Authorization" is the HTTP header name in this canonical message (MsgAuthFieldMissing)
-			return "", nil, errors.New(MsgAuthFieldMissing), http.StatusUnauthorized
+			return "", nil, http.StatusUnauthorized, errors.New(MsgAuthFieldMissing)
 		}
-		return "", nil, nil, 0
+		return "", nil, 0, nil
 	}
 	c, parseErr := oauth2common.ParseUnverifiedClaims(rawToken)
 	if parseErr != nil {
 		if needsBearer {
 			m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "token is not a parseable JWT")
-			return "", nil, fmt.Errorf("parsing inbound token claims: %w", parseErr), http.StatusUnauthorized
+			return "", nil, http.StatusUnauthorized, fmt.Errorf("parsing inbound token claims: %w", parseErr)
 		}
-		return rawToken, nil, nil, 0
+		return rawToken, nil, 0, nil
 	}
-	return rawToken, c, nil, 0
+	return rawToken, c, 0, nil
 }
 
 // handleScopeCheckFailure writes the RFC 6750 scope rejection and returns the
 // appropriate error. The first declared alternative is cited on the challenge —
 // listing every alternative would leak intent.
+//
+//nolint:staticcheck // ST1008: returns the (error, int) tuple ProcessRequest must produce, returned directly by the caller.
 func (m *OAuth2Middleware) handleScopeCheckFailure(w http.ResponseWriter, r *http.Request, claims jwt.MapClaims, alternatives [][]string, cfg *oas.OAuth2) (error, int) {
 	cited := alternatives[0]
 	citedScopes := strings.Join(cited, " ")

@@ -215,6 +215,62 @@ func TestValidateOAuth2Schemes_EmptyTokenEndpoint(t *testing.T) {
 	assert.Contains(t, err.Error(), `empty tokenEndpoint`)
 }
 
+func TestValidateOAuth2Schemes_TokenEndpointScheme(t *testing.T) {
+	// The gateway gates admin-controlled IdP URLs on an http(s) scheme to
+	// reject non-HTTP SSRF vectors (file://, gopher://, …) — see
+	// gateway/mw_jwt.go fetchJWKSKey. Host-level egress (private-IP)
+	// restrictions are intentionally NOT applied: internal IdPs (e.g. a
+	// private Keycloak) are a legitimate, common deployment.
+	provider := func(endpoint string) OAuth2TokenExchangeProvider {
+		return OAuth2TokenExchangeProvider{
+			Name:          "p",
+			Issuers:       []string{"https://idp"},
+			TokenEndpoint: endpoint,
+			ClientAuth:    &OAuth2ClientAuth{ClientID: "c"},
+		}
+	}
+
+	rejected := []struct {
+		name     string
+		endpoint string
+	}{
+		{"file scheme", "file:///etc/passwd"},
+		{"gopher scheme", "gopher://internal/_"},
+		{"relative url (no scheme)", "idp.internal/token"},
+		{"scheme but no host", "https://"},
+	}
+	for _, tc := range rejected {
+		t.Run("rejected/"+tc.name, func(t *testing.T) {
+			s := newOAuth2WithTokenExchange("corpOAuth", &OAuth2TokenExchange{
+				Enabled:   true,
+				Providers: []OAuth2TokenExchangeProvider{provider(tc.endpoint)},
+			})
+			err := s.ValidateOAuth2Schemes()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "tokenEndpoint")
+		})
+	}
+
+	accepted := []struct {
+		name     string
+		endpoint string
+	}{
+		{"https public", "https://idp.example.com/token"},
+		{"http private host (internal IdP)", "http://keycloak.internal:8443/token"},
+		{"https loopback (allowed — admin trust domain)", "https://127.0.0.1:9443/token"},
+		{"uppercase scheme normalised", "HTTPS://idp.example.com/token"},
+	}
+	for _, tc := range accepted {
+		t.Run("accepted/"+tc.name, func(t *testing.T) {
+			s := newOAuth2WithTokenExchange("corpOAuth", &OAuth2TokenExchange{
+				Enabled:   true,
+				Providers: []OAuth2TokenExchangeProvider{provider(tc.endpoint)},
+			})
+			assert.NoError(t, s.ValidateOAuth2Schemes())
+		})
+	}
+}
+
 func TestValidateOAuth2Schemes_EmptyClientId(t *testing.T) {
 	s := newOAuth2WithTokenExchange("corpOAuth", &OAuth2TokenExchange{
 		Enabled: true,
@@ -294,14 +350,10 @@ func TestOAuth2_RawMapWithTokenExchangePromotesToTypedScheme(t *testing.T) {
 // scheme carrying just the given tokenExchange block.
 func newOAuth2WithTokenExchange(name string, te *OAuth2TokenExchange) *OAS {
 	s := newOAuth2Fixture(name)
-	o := s.GetTykOAuth2Config(name)
-	require := func() *OAuth2 {
-		if o != nil {
-			return o
-		}
-		return &OAuth2{}
+	got := s.GetTykOAuth2Config(name)
+	if got == nil {
+		got = &OAuth2{}
 	}
-	got := require()
 	got.TokenExchange = te
 	// Stuff back into the tyk-extension via the same getter so the
 	// validation walk sees it.

@@ -40,10 +40,14 @@ func (m *Middleware) Name() string {
 }
 
 // Init is required by model.Middleware.
-func (m *Middleware) Init() {}
+func (m *Middleware) Init() {
+	// No-op: this middleware holds no state that needs initialisation.
+}
 
 // Unload is required by model.Middleware.
-func (m *Middleware) Unload() {}
+func (m *Middleware) Unload() {
+	// No-op: this middleware owns no resources that need releasing.
+}
 
 // EnabledForSpec reports whether the EE exchange runtime should run for this spec.
 func (m *Middleware) EnabledForSpec() bool {

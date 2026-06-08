@@ -49,7 +49,10 @@ func SetState(r *http.Request, s *State) {
 
 // GetState returns the request's State or nil when none was set.
 func GetState(r *http.Request) *State {
-	v, _ := r.Context().Value(stateCtxKey{}).(*State)
+	v, ok := r.Context().Value(stateCtxKey{}).(*State)
+	if !ok {
+		return nil
+	}
 	return v
 }
 
@@ -62,6 +65,9 @@ func MarkExchangeDone(r *http.Request) {
 }
 
 func IsExchangeDone(r *http.Request) bool {
-	v, _ := r.Context().Value(exchangeDoneCtxKey{}).(bool)
+	v, ok := r.Context().Value(exchangeDoneCtxKey{}).(bool)
+	if !ok {
+		return false
+	}
 	return v
 }

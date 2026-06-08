@@ -2,6 +2,7 @@ package oas
 
 import (
 	"fmt"
+	"net/url"
 	"sort"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -384,39 +385,86 @@ func validateOAuth2TokenExchange(schemeName string, te *OAuth2TokenExchange) err
 	seenNames := make(map[string]struct{}, len(te.Providers))
 	issuerOwner := make(map[string]string, len(te.Providers))
 	for i := range te.Providers {
-		p := &te.Providers[i]
-		if p.Name == "" {
-			return fmt.Errorf("oauth2 scheme %q: tokenExchange.providers[%d].name is required", schemeName, i)
+		if err := validateOAuth2ExchangeProvider(schemeName, i, &te.Providers[i], seenNames, issuerOwner); err != nil {
+			return err
 		}
-		if _, dup := seenNames[p.Name]; dup {
-			return fmt.Errorf("oauth2 scheme %q: duplicate tokenExchange.provider name %q", schemeName, p.Name)
+	}
+	return nil
+}
+
+// validateOAuth2ExchangeProvider validates a single token-exchange provider and
+// records its name / issuers into the per-scheme dedup maps.
+func validateOAuth2ExchangeProvider(schemeName string, i int, p *OAuth2TokenExchangeProvider, seenNames map[string]struct{}, issuerOwner map[string]string) error {
+	if p.Name == "" {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.providers[%d].name is required", schemeName, i)
+	}
+	if _, dup := seenNames[p.Name]; dup {
+		return fmt.Errorf("oauth2 scheme %q: duplicate tokenExchange.provider name %q", schemeName, p.Name)
+	}
+	seenNames[p.Name] = struct{}{}
+	if err := validateExchangeTokenEndpoint(schemeName, p); err != nil {
+		return err
+	}
+	if p.ClientAuth == nil || p.ClientAuth.ClientID == "" {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q has empty clientAuth.clientId", schemeName, p.Name)
+	}
+	if err := validateExchangeIssuers(schemeName, p, issuerOwner); err != nil {
+		return err
+	}
+	if err := validateExchangeCustomParams(schemeName, p); err != nil {
+		return err
+	}
+	return validateExchangeCacheMode(schemeName, p)
+}
+
+// validateExchangeTokenEndpoint requires a non-empty, absolute http(s)
+// tokenEndpoint. It rejects non-HTTP SSRF vectors (file://, gopher://, …) but
+// deliberately does not apply host-level egress (private-IP) restrictions: the
+// API definition is admin-controlled and internal IdPs legitimately live on
+// private networks — mirrors the gateway's JWKS-fetch SSRF posture.
+func validateExchangeTokenEndpoint(schemeName string, p *OAuth2TokenExchangeProvider) error {
+	if p.TokenEndpoint == "" {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q has empty tokenEndpoint", schemeName, p.Name)
+	}
+	if u, err := url.Parse(p.TokenEndpoint); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q tokenEndpoint must be an absolute http(s) URL", schemeName, p.Name)
+	}
+	return nil
+}
+
+// validateExchangeIssuers rejects an issuer claimed by more than one provider
+// and records each non-empty issuer's owning provider into issuerOwner.
+func validateExchangeIssuers(schemeName string, p *OAuth2TokenExchangeProvider, issuerOwner map[string]string) error {
+	for _, iss := range p.Issuers {
+		if iss == "" {
+			continue
 		}
-		seenNames[p.Name] = struct{}{}
-		if p.TokenEndpoint == "" {
-			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q has empty tokenEndpoint", schemeName, p.Name)
+		if owner, dup := issuerOwner[iss]; dup {
+			return fmt.Errorf("oauth2 scheme %q: duplicate issuer %q configured on tokenExchange.providers %q and %q", schemeName, iss, owner, p.Name)
 		}
-		if p.ClientAuth == nil || p.ClientAuth.ClientID == "" {
-			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q has empty clientAuth.clientId", schemeName, p.Name)
+		issuerOwner[iss] = p.Name
+	}
+	return nil
+}
+
+// validateExchangeCustomParams rejects customParams that would override a
+// reserved RFC 8693 wire key.
+func validateExchangeCustomParams(schemeName string, p *OAuth2TokenExchangeProvider) error {
+	for key := range p.CustomParams {
+		if _, reserved := oauth2ReservedExchangeFormKeys[key]; reserved {
+			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q customParams cannot override reserved RFC 8693 wire key %q", schemeName, p.Name, key)
 		}
-		for _, iss := range p.Issuers {
-			if iss == "" {
-				continue
-			}
-			if owner, dup := issuerOwner[iss]; dup {
-				return fmt.Errorf("oauth2 scheme %q: duplicate issuer %q configured on tokenExchange.providers %q and %q", schemeName, iss, owner, p.Name)
-			}
-			issuerOwner[iss] = p.Name
-		}
-		for key := range p.CustomParams {
-			if _, reserved := oauth2ReservedExchangeFormKeys[key]; reserved {
-				return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q customParams cannot override reserved RFC 8693 wire key %q", schemeName, p.Name, key)
-			}
-		}
-		if p.Cache != nil && p.Cache.Mode != "" &&
-			p.Cache.Mode != OAuth2CacheModeDerived && p.Cache.Mode != OAuth2CacheModeStatic {
-			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q cache.mode %q is invalid; valid values are %q and %q",
-				schemeName, p.Name, p.Cache.Mode, OAuth2CacheModeDerived, OAuth2CacheModeStatic)
-		}
+	}
+	return nil
+}
+
+// validateExchangeCacheMode rejects an unknown cache.mode; empty mode is valid
+// and defaults to derived.
+func validateExchangeCacheMode(schemeName string, p *OAuth2TokenExchangeProvider) error {
+	if p.Cache != nil && p.Cache.Mode != "" &&
+		p.Cache.Mode != OAuth2CacheModeDerived && p.Cache.Mode != OAuth2CacheModeStatic {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q cache.mode %q is invalid; valid values are %q and %q",
+			schemeName, p.Name, p.Cache.Mode, OAuth2CacheModeDerived, OAuth2CacheModeStatic)
 	}
 	return nil
 }

@@ -17,6 +17,7 @@ type noopOAuth2Exchange struct {
 	logOnce sync.Once
 }
 
+//nolint:staticcheck // ST1008: TykMiddleware.ProcessRequest interface requires (error, int) return order.
 func (d *noopOAuth2Exchange) ProcessRequest(_ http.ResponseWriter, _ *http.Request, _ interface{}) (error, int) {
 	return nil, http.StatusOK
 }

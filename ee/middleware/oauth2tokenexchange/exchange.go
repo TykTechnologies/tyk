@@ -236,6 +236,41 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 		method = provider.ClientAuth.Method
 	}
 
+	form := buildExchangeForm(provider, subjectToken, target, method)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.TokenEndpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", 0, fmt.Errorf("building exchange request: %w", err)
+	}
+	req.Header.Set(header.ContentType, header.ApplicationFormURLEncoded)
+	if err := applyClientAuth(req, provider, method); err != nil {
+		return "", 0, err
+	}
+
+	client := oauth2common.NewIdPHTTPClient(EffectiveIdPTimeout(time.Duration(provider.Timeout)))
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", 0, fmt.Errorf("exchange call failed: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, oauth2common.MaxIdPResponseBytes))
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		idpErr, idpDesc := oauth2common.DecodeIdPError(body)
+		return "", 0, &oauth2common.ExchangeFailedError{
+			Status:      resp.StatusCode,
+			IdpError:    idpErr,
+			Description: idpDesc,
+		}
+	}
+
+	return parseExchangeResponse(body)
+}
+
+// buildExchangeForm builds the RFC 8693 token-exchange request form. When the
+// client-auth method is client_secret_post, credentials are injected into the
+// form here (basic-auth credentials are set on the request header instead).
+func buildExchangeForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken string, target *oauth2common.Target, method string) url.Values {
 	form := url.Values{}
 	form.Set(oas.OAuth2FormGrantType, oas.OAuth2GrantTypeTokenExchange)
 	form.Set(oas.OAuth2FormSubjectToken, subjectToken)
@@ -258,41 +293,29 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 			form.Set(oas.OAuth2FormClientSecret, provider.ClientAuth.ClientSecret)
 		}
 	}
+	return form
+}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.TokenEndpoint, strings.NewReader(form.Encode()))
-	if err != nil {
-		return "", 0, fmt.Errorf("building exchange request: %w", err)
-	}
-	req.Header.Set(header.ContentType, header.ApplicationFormURLEncoded)
-
+// applyClientAuth sets the request-level client authentication for the exchange
+// call. client_secret_post credentials are already in the form, so this is a
+// no-op for that method; basic (the default) sets the Authorization header.
+func applyClientAuth(req *http.Request, provider *oas.OAuth2TokenExchangeProvider, method string) error {
 	switch method {
 	case oas.OAuth2ClientAuthPost:
-		// credentials already injected into form above
+		// credentials already injected into form
 	case "", oas.OAuth2ClientAuthBasic:
 		if provider.ClientAuth != nil && provider.ClientAuth.ClientID != "" {
 			req.SetBasicAuth(provider.ClientAuth.ClientID, provider.ClientAuth.ClientSecret)
 		}
 	default:
-		return "", 0, fmt.Errorf("unsupported clientAuth.method %q", method)
+		return fmt.Errorf("unsupported clientAuth.method %q", method)
 	}
+	return nil
+}
 
-	client := oauth2common.NewIdPHTTPClient(EffectiveIdPTimeout(time.Duration(provider.Timeout)))
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", 0, fmt.Errorf("exchange call failed: %w", err)
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, oauth2common.MaxIdPResponseBytes))
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		idpErr, idpDesc := oauth2common.DecodeIdPError(body)
-		return "", 0, &oauth2common.ExchangeFailedError{
-			Status:      resp.StatusCode,
-			IdpError:    idpErr,
-			Description: idpDesc,
-		}
-	}
-
+// parseExchangeResponse decodes a successful IdP exchange response into the
+// exchanged access token and its lifetime (0 when expires_in is absent).
+func parseExchangeResponse(body []byte) (string, time.Duration, error) {
 	var parsed struct {
 		AccessToken string `json:"access_token"`
 		ExpiresIn   int64  `json:"expires_in"`
