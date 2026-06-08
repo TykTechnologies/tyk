@@ -1128,7 +1128,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-Operations": {
       "type": "object",
@@ -2190,13 +2191,32 @@
     "X-Tyk-OAuth2-ExchangeCache": {
       "type": "object",
       "properties": {
-        "enabled": { "type": "boolean" },
-        "mode": { "type": "string", "enum": ["derived", "static"] },
-        "maxTimeout": { "type": "string", "description": "Upper bound on cache TTL for derived mode (e.g. \"5m\")." },
-        "timeout": { "type": "string", "description": "Fixed TTL for static mode (e.g. \"2m\")." },
-        "safetyMargin": { "type": "string", "description": "Shaved from the computed TTL to avoid serving near-expired tokens. Defaults to 30s." }
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "derived",
+            "static"
+          ]
+        },
+        "maxTimeout": {
+          "type": "string",
+          "description": "Upper bound on cache TTL for derived mode (e.g. \"5m\")."
+        },
+        "timeout": {
+          "type": "string",
+          "description": "Fixed TTL for static mode (e.g. \"2m\")."
+        },
+        "safetyMargin": {
+          "type": "string",
+          "description": "Shaved from the computed TTL to avoid serving near-expired tokens. Defaults to 30s."
+        }
       },
-      "required": ["enabled"],
+      "required": [
+        "enabled"
+      ],
       "additionalProperties": false
     },
     "X-Tyk-OAuth2-ClientAuth": {
@@ -3150,7 +3170,7 @@
     },
     "X-Tyk-ReadableDuration": {
       "type": "string",
-      "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?(\\d+ms)?(\\d+\u00b5s)?(\\d+ns)?$",
+      "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?(\\d+ms)?(\\d+µs)?(\\d+ns)?$",
       "additionalProperties": false
     },
     "X-Tyk-LoadBalancingTarget": {

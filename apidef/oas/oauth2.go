@@ -206,10 +206,17 @@ type OAuth2TokenExchangeProvider struct {
 
 // OAuth2ExchangeCache controls caching of exchanged tokens per provider.
 type OAuth2ExchangeCache struct {
-	Enabled      bool                     `bson:"enabled" json:"enabled"`
-	Mode         string                   `bson:"mode,omitempty" json:"mode,omitempty"`
-	MaxTimeout   tyktime.ReadableDuration `bson:"maxTimeout,omitempty" json:"maxTimeout,omitempty"`
-	Timeout      tyktime.ReadableDuration `bson:"timeout,omitempty" json:"timeout,omitempty"`
+	// Enabled turns on Redis-backed caching of exchanged tokens for this provider.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Mode selects how the cache TTL is derived: "derived" (from the exchanged
+	// token's expiry) or "static" (the fixed Timeout). Defaults to derived.
+	Mode string `bson:"mode,omitempty" json:"mode,omitempty"`
+	// MaxTimeout caps the TTL in derived mode (e.g. "5m").
+	MaxTimeout tyktime.ReadableDuration `bson:"maxTimeout,omitempty" json:"maxTimeout,omitempty"`
+	// Timeout is the fixed cache TTL in static mode (e.g. "2m").
+	Timeout tyktime.ReadableDuration `bson:"timeout,omitempty" json:"timeout,omitempty"`
+	// SafetyMargin is shaved from the computed TTL to avoid serving near-expired
+	// tokens. Defaults to 30s.
 	SafetyMargin tyktime.ReadableDuration `bson:"safetyMargin,omitempty" json:"safetyMargin,omitempty"`
 }
 
@@ -222,7 +229,8 @@ type OAuth2ClientAuth struct {
 	//   - "client_secret_post" (RFC 6749 §2.3.1) — credentials in the
 	//     form body.
 	// Empty string defaults to client_secret_basic.
-	Method   string `bson:"method,omitempty" json:"method,omitempty"`
+	Method string `bson:"method,omitempty" json:"method,omitempty"`
+	// ClientID is the OAuth2 client identifier Tyk presents to the IdP token endpoint.
 	ClientID string `bson:"clientId,omitempty" json:"clientId,omitempty"`
 	// ClientSecret accepts env://, secrets://, vault://, consul:// prefixes.
 	ClientSecret string `bson:"clientSecret,omitempty" json:"clientSecret,omitempty"`
@@ -230,8 +238,10 @@ type OAuth2ClientAuth struct {
 
 // OAuth2DefaultTarget is the fallback audience and scopes when no per-op override is set.
 type OAuth2DefaultTarget struct {
-	Audience string   `bson:"audience,omitempty" json:"audience,omitempty"`
-	Scopes   []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
+	// Audience is the default target audience requested for the exchanged token.
+	Audience string `bson:"audience,omitempty" json:"audience,omitempty"`
+	// Scopes is the default set of scopes requested for the exchanged token.
+	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
 }
 
 // OAuth2Exchange is the per-operation audience/scopes override for token exchange.
@@ -241,9 +251,14 @@ type OAuth2DefaultTarget struct {
 //  2. Enabled=true, Scopes empty — inferred from the operation's security: requirement (RFC 8693 §4.5.5).
 //  3. provider.DefaultTarget — used when no per-op block is active (Enabled nil or false).
 type OAuth2Exchange struct {
-	Enabled  *bool    `bson:"enabled,omitempty" json:"enabled,omitempty"`
-	Audience string   `bson:"audience,omitempty" json:"audience,omitempty"`
-	Scopes   []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
+	// Enabled activates this per-operation override; nil or false falls back to
+	// the provider's DefaultTarget.
+	Enabled *bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
+	// Audience is the target audience requested for this operation's exchanged token.
+	Audience string `bson:"audience,omitempty" json:"audience,omitempty"`
+	// Scopes is the explicit scope list for this operation; when empty the scopes
+	// are inferred from the operation's security: requirement (RFC 8693 §4.5.5).
+	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
 }
 
 // IsActive reports whether this per-op exchange block is active (requires explicit Enabled=true).
