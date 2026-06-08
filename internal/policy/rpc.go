@@ -12,6 +12,9 @@ type RPCDataLoaderMock struct {
 	ShouldConnect bool
 	Policies      []user.Policy
 	Apis          []model.MergedAPI
+	// ClientIdPs is the raw client-IdP registry payload (decoded gateway-side);
+	// kept as an opaque value since the IdP type lives in the gateway package.
+	ClientIdPs interface{}
 }
 
 // Connect will return the connection status.
@@ -39,4 +42,16 @@ func (s *RPCDataLoaderMock) GetPolicies(_ string) string {
 		return ""
 	}
 	return string(policyList)
+}
+
+// GetClientIdPs returns the internal ClientIdPs as a json string.
+func (s *RPCDataLoaderMock) GetClientIdPs(_ string, _ []string) string {
+	if s.ClientIdPs == nil {
+		return ""
+	}
+	idpList, err := json.Marshal(s.ClientIdPs)
+	if err != nil {
+		return ""
+	}
+	return string(idpList)
 }

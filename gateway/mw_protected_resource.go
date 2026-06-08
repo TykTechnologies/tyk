@@ -49,6 +49,7 @@ func (m *PRMMiddleware) EnabledForSpec() bool {
 	return m.Spec.GetPRMConfig() != nil
 }
 
+//nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
 func (m *PRMMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// New location wins: when oauth2.protectedResourceMetadata is set it
 	// is the sole authority; the deprecated top-level block is not consulted.
@@ -90,7 +91,7 @@ func (m *PRMMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		ScopesSupported:      prm.ScopesSupported,
 	}
 
-	w.Header().Set(header.ContentType, "application/json")
+	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(doc); err != nil {
 		log.WithError(err).Error("Failed to encode PRM response document")
@@ -103,6 +104,8 @@ func (m *PRMMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 // new-style oauth2.protectedResourceMetadata block. `scopes_supported`
 // comes from OAS.OAuth2PRMScopesSupported; `bearer_methods_supported`
 // is always ["header"].
+//
+//nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
 func (m *PRMMiddleware) serveOAuth2PRM(w http.ResponseWriter, r *http.Request, name string, prm *oas.OAuth2PRM) (error, int) {
 	resource := prm.Resource
 	if resource != "" {
@@ -116,7 +119,7 @@ func (m *PRMMiddleware) serveOAuth2PRM(w http.ResponseWriter, r *http.Request, n
 		BearerMethodsSupported: prmBearerMethodsSupported,
 	}
 
-	w.Header().Set(header.ContentType, "application/json")
+	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(doc); err != nil {
 		log.WithError(err).Error("Failed to encode PRM response document")
@@ -144,7 +147,7 @@ func (m *PRMMiddleware) serveMirroredPRM(w http.ResponseWriter, r *http.Request,
 	// `invalid_target` otherwise.
 	doc.Raw["authorization_servers"] = []any{mcpASProxyBaseURL(r, m.Spec)}
 
-	w.Header().Set(header.ContentType, "application/json")
+	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(doc); err != nil {
 		return fmt.Errorf("encode PRM: %w", err)
@@ -240,6 +243,8 @@ func setPRMWWWAuthenticateHeader(w http.ResponseWriter, r *http.Request, spec *A
 // prmError sets the WWW-Authenticate header with PRM metadata and returns
 // the given error and status code. This is a convenience wrapper to avoid
 // separate setPRMWWWAuthenticateHeader calls at every auth error return site.
+//
+//nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
 func (b *BaseMiddleware) prmError(w http.ResponseWriter, r *http.Request, err error, code int) (error, int) {
 	setPRMWWWAuthenticateHeader(w, r, b.Spec)
 	return err, code
@@ -247,6 +252,8 @@ func (b *BaseMiddleware) prmError(w http.ResponseWriter, r *http.Request, err er
 
 // prmErrorAndStatusCode sets the WWW-Authenticate header with PRM metadata and
 // returns the error and status code for the given error type from TykErrors.
+//
+//nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
 func (b *BaseMiddleware) prmErrorAndStatusCode(w http.ResponseWriter, r *http.Request, errType string) (error, int) {
 	setPRMWWWAuthenticateHeader(w, r, b.Spec)
 	return errorAndStatusCode(errType)

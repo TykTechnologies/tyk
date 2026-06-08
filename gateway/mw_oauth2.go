@@ -62,6 +62,7 @@ func (m *OAuth2Middleware) EnabledForSpec() bool {
 	return false
 }
 
+//nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
 func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
@@ -82,9 +83,10 @@ func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request
 		alternatives = m.requiredScopeAlternativesForRequest(r)
 	}
 
-	// A usable bearer is required when scope-check is enforcing or exchange is
-	// enabled; reject missing/malformed tokens here so the IdP call doesn't turn
-	// an absent subject_token into a confusing 502 instead of an honest 401.
+	// Both gates read the inbound Bearer + parsed claims. Reject missing /
+	// malformed tokens before reaching the downstream EE middleware — passing
+	// an empty subject_token would surface as a confusing 502 exchange_failed
+	// instead of an honest 401 missing bearer.
 	needsBearer := exchangeActive || (scopeCheckActive && len(alternatives) > 0)
 	rawToken, claims, err, status := m.parseBearerClaims(w, r, needsBearer)
 	if err != nil {
@@ -95,8 +97,7 @@ func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request
 		return m.handleScopeCheckFailure(w, r, claims, alternatives, cfg)
 	}
 
-	// Hand off to the EE TokenExchangeMiddleware (next in the chain) via
-	// request-context state; on OSS builds that middleware is a warn-once noop.
+	// Hand off to the EE TokenExchangeMiddleware via request-context state.
 	if exchangeActive {
 		oauth2common.SetState(r, &oauth2common.State{
 			Claims:               claims,
@@ -120,7 +121,8 @@ func (m *OAuth2Middleware) parseBearerClaims(w http.ResponseWriter, r *http.Requ
 	if rawToken == "" {
 		if needsBearer {
 			m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "missing bearer token")
-			return "", nil, errors.New("Authorization field missing"), http.StatusUnauthorized
+			//nolint:staticcheck // ST1005: "Authorization" is the HTTP header name in this canonical message (MsgAuthFieldMissing)
+			return "", nil, errors.New(MsgAuthFieldMissing), http.StatusUnauthorized
 		}
 		return "", nil, nil, 0
 	}
@@ -151,14 +153,20 @@ func (m *OAuth2Middleware) handleScopeCheckFailure(w http.ResponseWriter, r *htt
 		return errors.New(oas.OAuth2ErrInsufficientScope), http.StatusForbidden
 	}
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, err := json.Marshal(map[string]interface{}{
 		oas.OAuth2FieldError:            oas.OAuth2ErrInsufficientScope,
 		oas.OAuth2FieldErrorDescription: "token does not satisfy required scopes: " + citedScopes,
 		"scope":                         citedScopes,
 	})
+	if err != nil {
+		m.Logger().WithError(err).Error("failed to marshal scope-check error body")
+		return errors.New(oas.OAuth2ErrInsufficientScope), http.StatusForbidden
+	}
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(http.StatusForbidden)
-	_, _ = w.Write(body)
+	if _, err := w.Write(body); err != nil {
+		m.Logger().WithError(err).Warning("failed to write scope-check error response")
+	}
 	return nil, middleware.StatusRespond
 }
 
