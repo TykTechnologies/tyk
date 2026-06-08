@@ -15,31 +15,35 @@ import (
 // MCP-spec location. Omitting the block must materialise this default so an
 // operator dumping the resolved config sees exactly what Tyk will read.
 func TestMCPTraceContext_SetDefaults_OmittedBlockGetsCanonicalSources(t *testing.T) {
-	c := OpenTelemetry{}
+	c := OpenTelemetry{Traces: &TracesConfig{}}
 	c.SetDefaults()
 
-	require.Len(t, c.MCPTraceContext.ReadSources, 2)
-	assert.Equal(t, MCPTraceChannelHeader, c.MCPTraceContext.ReadSources[0].Channel)
-	assert.Empty(t, c.MCPTraceContext.ReadSources[0].Path)
-	assert.Equal(t, MCPTraceChannelBody, c.MCPTraceContext.ReadSources[1].Channel)
-	assert.Equal(t, "params._meta", c.MCPTraceContext.ReadSources[1].Path)
+	got := c.Traces.MCPTraceContext.ReadSources
+	require.Len(t, got, 2)
+	assert.Equal(t, MCPTraceChannelHeader, got[0].Channel)
+	assert.Empty(t, got[0].Path)
+	assert.Equal(t, MCPTraceChannelBody, got[1].Channel)
+	assert.Equal(t, "params._meta", got[1].Path)
 }
 
 // An operator-configured list is an explicit override and must survive
 // SetDefaults untouched — the default only fills an omitted block.
 func TestMCPTraceContext_SetDefaults_ExplicitSourcesPreserved(t *testing.T) {
 	c := OpenTelemetry{
-		MCPTraceContext: MCPTraceContextConfig{
-			ReadSources: []MCPTraceSource{
-				{Channel: MCPTraceChannelBody, Path: "meta"},
+		Traces: &TracesConfig{
+			MCPTraceContext: MCPTraceContextConfig{
+				ReadSources: []MCPTraceSource{
+					{Channel: MCPTraceChannelBody, Path: "meta"},
+				},
 			},
 		},
 	}
 	c.SetDefaults()
 
-	require.Len(t, c.MCPTraceContext.ReadSources, 1)
-	assert.Equal(t, MCPTraceChannelBody, c.MCPTraceContext.ReadSources[0].Channel)
-	assert.Equal(t, "meta", c.MCPTraceContext.ReadSources[0].Path)
+	got := c.Traces.MCPTraceContext.ReadSources
+	require.Len(t, got, 1)
+	assert.Equal(t, MCPTraceChannelBody, got[0].Channel)
+	assert.Equal(t, "meta", got[0].Path)
 }
 
 // Span carries the MCP method (always) and tool (only when a primitive
@@ -78,15 +82,31 @@ func TestMCPSpanAttributes(t *testing.T) {
 	})
 }
 
-// The block lives at opentelemetry.mcp_trace_context.read_sources, alongside
-// the existing traces/metrics extensions.
+// The block lives at opentelemetry.traces.mcp.read_sources, nested in the
+// traces sub-object alongside the trace exporter settings.
 func TestMCPTraceContext_JSONShape(t *testing.T) {
-	raw := []byte(`{"mcp_trace_context":{"read_sources":[{"channel":"header"},{"channel":"body","path":"params._meta"}]}}`)
+	raw := []byte(`{"traces":{"mcp":{"read_sources":[{"channel":"header"},{"channel":"body","path":"params._meta"}]}}}`)
 	var c OpenTelemetry
 	require.NoError(t, json.Unmarshal(raw, &c))
 
-	require.Len(t, c.MCPTraceContext.ReadSources, 2)
-	assert.Equal(t, "header", c.MCPTraceContext.ReadSources[0].Channel)
-	assert.Equal(t, "body", c.MCPTraceContext.ReadSources[1].Channel)
-	assert.Equal(t, "params._meta", c.MCPTraceContext.ReadSources[1].Path)
+	require.NotNil(t, c.Traces)
+	got := c.MCPTraceContext().ReadSources
+	require.Len(t, got, 2)
+	assert.Equal(t, "header", got[0].Channel)
+	assert.Equal(t, "body", got[1].Channel)
+	assert.Equal(t, "params._meta", got[1].Path)
+}
+
+// Without the traces sub-object the accessor is empty; callers fall back to the
+// canonical read sources.
+func TestMCPTraceContext_Accessor_EmptyWithoutTraces(t *testing.T) {
+	c := OpenTelemetry{}
+	assert.Empty(t, c.MCPTraceContext().ReadSources)
+}
+
+// The accessor must be callable on a non-addressable value, mirroring the real
+// call site GetConfig().OpenTelemetry.MCPTraceContext() where the config is
+// returned by value — same contract as TracesEnabled().
+func TestMCPTraceContext_Accessor_CallableOnValue(t *testing.T) {
+	assert.Empty(t, OpenTelemetry{}.MCPTraceContext().ReadSources)
 }

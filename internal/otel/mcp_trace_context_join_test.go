@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/otel/propagation"
 
-	"github.com/TykTechnologies/tyk/internal/mcp"
+	otelmcp "github.com/TykTechnologies/tyk/internal/otel/mcp"
 )
 
 // injectCurrent serialises the request context's active trace context back into
@@ -32,7 +32,7 @@ func TestJoinMCPTraceContext(t *testing.T) {
 		r := httptest.NewRequest(http.MethodPost, "/mcp", nil) // no traceparent header
 		source := JoinMCPTraceContext(r, sources, metaBody(traceParentM))
 
-		assert.Equal(t, mcp.TraceSourceMeta, source)
+		assert.Equal(t, otelmcp.TraceSourceMeta, source)
 		assert.Equal(t, traceIDFromM, ExtractTraceID(r.Context()),
 			"after the join every later read of the request context sees the agent trace_id")
 	})
@@ -42,7 +42,7 @@ func TestJoinMCPTraceContext(t *testing.T) {
 		r.Header.Set("traceparent", traceParentH)
 		source := JoinMCPTraceContext(r, sources, metaBody(traceParentM))
 
-		assert.Equal(t, mcp.TraceSourceBoth, source)
+		assert.Equal(t, otelmcp.TraceSourceBoth, source)
 		assert.Empty(t, ExtractTraceID(r.Context()),
 			"join must not install a body context when the header already carried one")
 	})
@@ -51,7 +51,7 @@ func TestJoinMCPTraceContext(t *testing.T) {
 		r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
 		source := JoinMCPTraceContext(r, sources, []byte(`{"method":"tools/call","params":{"name":"x"}}`))
 
-		assert.Equal(t, mcp.TraceSourceNone, source)
+		assert.Equal(t, otelmcp.TraceSourceNone, source)
 		assert.Empty(t, ExtractTraceID(r.Context()))
 	})
 

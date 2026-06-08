@@ -16,6 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	otelmcp "github.com/TykTechnologies/tyk/internal/otel/mcp"
 )
 
 const (
@@ -228,7 +229,7 @@ func (m *JSONRPCMiddleware) bridgeMCPTraceContext(r *http.Request, rpcReq *JSONR
 		return
 	}
 
-	sources := cfg.OpenTelemetry.MCPTraceContext.ReadSources
+	sources := cfg.OpenTelemetry.MCPTraceContext().ReadSources
 	if len(sources) == 0 {
 		sources = otel.DefaultMCPReadSources()
 	}
@@ -246,7 +247,7 @@ func (m *JSONRPCMiddleware) bridgeMCPTraceContext(r *http.Request, rpcReq *JSONR
 // so it runs automatically whenever tracing is enabled. A no-op — body forwarded
 // unchanged — when there is no active context or the body is non-MCP/malformed.
 func (m *JSONRPCMiddleware) writeMCPTraceContext(r *http.Request, body []byte) {
-	out, changed := mcp.WriteMetaTraceContext(body, otel.CurrentTraceContext(r.Context()))
+	out, changed := otelmcp.WriteMetaTraceContext(body, otel.CurrentTraceContext(r.Context()))
 	if !changed {
 		return
 	}
