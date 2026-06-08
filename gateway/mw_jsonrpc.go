@@ -301,7 +301,7 @@ func (m *JSONRPCMiddleware) mapJSONRPCErrorToHTTP(code int) int {
 
 //nolint:staticcheck // ST1008: middleware helper mirrors ProcessRequest's (error, int) convention.
 func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWriter, r *http.Request) (error, int) {
-	if m.Spec == nil || m.Spec.MCPSDKAdapter == nil {
+	if m.Spec == nil || m.Spec.MCPAdapter.SDKAdapter == nil {
 		http.Error(w, "REST-as-MCP adapter is not initialized", http.StatusInternalServerError)
 		return nil, middleware.StatusRespond
 	}
@@ -317,13 +317,13 @@ func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWri
 
 	if method == mcp.MethodToolsList {
 		rec := newBufferedResponseWriter()
-		m.Spec.MCPSDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(rec, r)
+		m.Spec.MCPAdapter.SDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(rec, r)
 		view, ok := m.syntheticMCPToolViewForCaller(r)
 		m.writeSyntheticMCPToolsListResponse(w, r, rec, view, ok)
 		return nil, middleware.StatusRespond
 	}
 
-	m.Spec.MCPSDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(w, r)
+	m.Spec.MCPAdapter.SDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(w, r)
 	return nil, middleware.StatusRespond
 }
 
@@ -360,10 +360,10 @@ func normaliseMCPStreamableAccept(r *http.Request) {
 
 func (m *JSONRPCMiddleware) syntheticMCPToolViewForCaller(r *http.Request) (oas.MCPToolView, bool) {
 	callerProxyID := ctxGetMCPAdapterCallerProxyID(r)
-	if callerProxyID == "" || m.Spec == nil || m.Spec.MCPToolViews == nil {
+	if callerProxyID == "" || m.Spec == nil || m.Spec.MCPAdapter.ToolViews == nil {
 		return oas.MCPToolView{}, false
 	}
-	view, ok := m.Spec.MCPToolViews[callerProxyID]
+	view, ok := m.Spec.MCPAdapter.ToolViews[callerProxyID]
 	return view, ok
 }
 

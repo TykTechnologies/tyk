@@ -120,10 +120,10 @@ func TestBuildAdapterSpec_ReusesSDKAdapterAndUpdatesTools(t *testing.T) {
 	first, err := buildMCPAdapterSpec(rest, []*APISpec{proxy}, nil)
 	require.NoError(t, err)
 	require.True(t, first.IsSyntheticMCPAdapter())
-	require.NotNil(t, first.MCPSDKAdapter)
+	require.NotNil(t, first.MCPAdapter.SDKAdapter)
 	assert.Equal(t, "rest-1__mcp-server", first.APIID)
-	assert.Equal(t, "rest-1", first.MCPAdapterSourceRESTAPIID)
-	assert.Equal(t, []string{"proxy-1"}, first.MCPAllowedCallerProxyAPIIDs)
+	assert.Equal(t, "rest-1", first.MCPAdapter.SourceRESTAPIID)
+	assert.Equal(t, []string{"proxy-1"}, first.MCPAdapter.AllowedCallerProxyAPIIDs)
 
 	rest.OAS.Paths.Set("/orders", &openapi3.PathItem{
 		Get: &openapi3.Operation{OperationID: "list_orders", Summary: "updated list orders"},
@@ -131,8 +131,8 @@ func TestBuildAdapterSpec_ReusesSDKAdapterAndUpdatesTools(t *testing.T) {
 
 	reused, err := buildMCPAdapterSpec(rest, []*APISpec{proxy}, first)
 	require.NoError(t, err)
-	assert.Same(t, first.MCPSDKAdapter, reused.MCPSDKAdapter)
-	tool, ok := reused.MCPToolViews["proxy-1"].ToolByName("list_orders")
+	assert.Same(t, first.MCPAdapter.SDKAdapter, reused.MCPAdapter.SDKAdapter)
+	tool, ok := reused.MCPAdapter.ToolViews["proxy-1"].ToolByName("list_orders")
 	require.True(t, ok)
 	assert.Equal(t, "updated list orders", tool.Description)
 }

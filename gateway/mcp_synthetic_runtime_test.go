@@ -179,7 +179,7 @@ func TestBuildAdapterSpec_ReusedSDKAdapterUsesUpdatedToolViewsForCalls(t *testin
 	})
 	reused, err := buildMCPAdapterSpec(rest, []*APISpec{updatedProxy}, first)
 	require.NoError(t, err)
-	require.Same(t, first.MCPSDKAdapter, reused.MCPSDKAdapter)
+	require.Same(t, first.MCPAdapter.SDKAdapter, reused.MCPAdapter.SDKAdapter)
 
 	gw := &Gateway{
 		apisByID: map[string]*APISpec{
@@ -534,7 +534,7 @@ func mcpAdapterCallContext(t *testing.T, gw *Gateway, adapterSpec *APISpec, call
 func mustAdapterTool(t *testing.T, adapterSpec *APISpec, name string) oas.DerivedTool {
 	t.Helper()
 
-	for _, tool := range adapterSpec.MCPAdapterUnionTools {
+	for _, tool := range adapterSpec.MCPAdapter.UnionTools {
 		if tool.Name == name {
 			return tool
 		}

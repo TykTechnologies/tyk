@@ -164,7 +164,7 @@ func buildMCPAdapterSpec(rest *APISpec, proxies []*APISpec, existing *APISpec) (
 	adapterID := pairing.CanonicalAdapterAPIID(rest.APIID)
 	sdkAdapter := (*restmcpadapter.SDKAdapter)(nil)
 	if existing != nil {
-		sdkAdapter = existing.MCPSDKAdapter
+		sdkAdapter = existing.MCPAdapter.SDKAdapter
 	}
 	if sdkAdapter == nil {
 		sdkAdapter, err = restmcpadapter.NewSDKAdapter(restmcpadapter.SDKServerConfig{
@@ -223,16 +223,17 @@ func buildMCPAdapterSpec(rest *APISpec, proxies []*APISpec, existing *APISpec) (
 	})
 
 	return &APISpec{
-		APIDefinition:                 adapterDef,
-		OAS:                           doc,
-		MCPAdapterSynthetic:           true,
-		MCPAdapterSourceRESTAPIID:     rest.APIID,
-		MCPSDKAdapter:                 sdkAdapter,
-		MCPAllowedCallerProxyAPIIDs:   allowedCallers,
-		MCPAllowedCallerProxyAPIIDSet: stringSet(allowedCallers),
-		MCPToolViews:                  catalogue.toolViews,
-		MCPAdapterUnionTools:          append([]oas.DerivedTool(nil), catalogue.unionTools...),
-		JSONRPCRouter:                 mcp.NewRouter(),
+		APIDefinition: adapterDef,
+		OAS:           doc,
+		MCPAdapter: MCPAdapterRuntime{
+			Synthetic:                true,
+			SourceRESTAPIID:          rest.APIID,
+			SDKAdapter:               sdkAdapter,
+			AllowedCallerProxyAPIIDs: allowedCallers,
+			ToolViews:                catalogue.toolViews,
+			UnionTools:               append([]oas.DerivedTool(nil), catalogue.unionTools...),
+		},
+		JSONRPCRouter: mcp.NewRouter(),
 	}, nil
 }
 
@@ -299,14 +300,6 @@ func callerProxyIDs(proxies []*APISpec) []string {
 	return ids
 }
 
-func stringSet(values []string) map[string]struct{} {
-	out := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		out[value] = struct{}{}
-	}
-	return out
-}
-
 func defaultMCPAdapterCallTool(ctx context.Context, tool *oas.DerivedTool, args map[string]any) (*restmcpadapter.Recorder, error) {
 	gw := mcpAdapterGatewayFromContext(ctx)
 	adapterSpec := mcpAdapterSpecFromContext(ctx)
@@ -339,7 +332,7 @@ func (gw *Gateway) callMCPAdapterTool(parentReq *http.Request, adapterSpec *APIS
 		return nil, fmt.Errorf("caller proxy is not allowed for REST-as-MCP adapter")
 	}
 
-	view, ok := adapterSpec.MCPToolViews[callerProxyID]
+	view, ok := adapterSpec.MCPAdapter.ToolViews[callerProxyID]
 	if !ok {
 		return nil, fmt.Errorf("caller proxy has no REST-as-MCP tool view")
 	}
@@ -349,7 +342,7 @@ func (gw *Gateway) callMCPAdapterTool(parentReq *http.Request, adapterSpec *APIS
 		return nil, fmt.Errorf("tool not found")
 	}
 
-	sourceRESTAPIID := adapterSpec.MCPAdapterSourceRESTAPIID
+	sourceRESTAPIID := adapterSpec.MCPAdapter.SourceRESTAPIID
 	upstreamReq, err := restmcpadapter.BuildUpstreamRequest(parentReq, &callerTool, sourceRESTAPIID, args)
 	if err != nil {
 		return nil, err
@@ -374,7 +367,7 @@ func logMCPToolHiddenFromCaller(adapterSpec *APISpec, callerProxyID, toolName st
 	log.WithFields(logrus.Fields{
 		"tool_name":          toolName,
 		"proxy_api_id":       callerProxyID,
-		"source_rest_api_id": adapterSpec.MCPAdapterSourceRESTAPIID,
+		"source_rest_api_id": adapterSpec.MCPAdapter.SourceRESTAPIID,
 		"adapter_api_id":     adapterSpec.APIID,
 	}).Warn("MCP tool is not exposed for caller proxy")
 }

@@ -83,15 +83,9 @@ type APISpec struct {
 	// Value: VEM path (e.g., "/mcp-tool:get-weather")
 	MCPPrimitives map[string]string
 
-	// Runtime-only REST-as-MCP synthetic adapter fields. These are never
-	// extracted to/persisted from API definitions or OAS documents.
-	MCPAdapterSynthetic           bool
-	MCPAdapterSourceRESTAPIID     string
-	MCPSDKAdapter                 *restmcpadapter.SDKAdapter
-	MCPAllowedCallerProxyAPIIDs   []string
-	MCPAllowedCallerProxyAPIIDSet map[string]struct{}
-	MCPToolViews                  map[string]oas.MCPToolView
-	MCPAdapterUnionTools          []oas.DerivedTool
+	// MCPAdapter holds runtime-only REST-as-MCP synthetic adapter state. It is
+	// never extracted to/persisted from API definitions or OAS documents.
+	MCPAdapter MCPAdapterRuntime
 
 	JSONRPCRouter jsonrpc.Router
 
@@ -120,6 +114,17 @@ type APISpec struct {
 	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
 	// Built from apidef.ErrorOverrides during gateway startup.
 	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
+}
+
+// MCPAdapterRuntime groups runtime-only state for a synthetic REST-as-MCP
+// adapter API.
+type MCPAdapterRuntime struct {
+	Synthetic                bool
+	SourceRESTAPIID          string
+	SDKAdapter               *restmcpadapter.SDKAdapter
+	AllowedCallerProxyAPIIDs []string
+	ToolViews                map[string]oas.MCPToolView
+	UnionTools               []oas.DerivedTool
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
@@ -451,5 +456,5 @@ func (a *APISpec) APIType() string {
 // IsSyntheticMCPAdapter reports whether this spec is a hidden runtime-only
 // adapter synthesized for a REST-as-MCP proxy/source pairing.
 func (a *APISpec) IsSyntheticMCPAdapter() bool {
-	return a != nil && a.MCPAdapterSynthetic
+	return a != nil && a.MCPAdapter.Synthetic
 }
