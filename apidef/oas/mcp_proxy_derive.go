@@ -636,10 +636,10 @@ func (p *derivedParams) addParameter(param *openapi3.Parameter) {
 func parameterSerialization(param *openapi3.Parameter, location, paramSchemaType string) *DerivedParamSerialization {
 	style := strings.TrimSpace(param.Style)
 	if style == "" {
-		style = defaultParameterStyle(location)
+		style = DefaultDerivedParamStyle(location)
 	}
 
-	explode := defaultParameterExplode(style)
+	explode := DefaultDerivedParamExplode(style)
 	if param.Explode != nil {
 		explode = *param.Explode
 	}
@@ -653,7 +653,9 @@ func parameterSerialization(param *openapi3.Parameter, location, paramSchemaType
 	}
 }
 
-func defaultParameterStyle(location string) string {
+// DefaultDerivedParamStyle returns the OpenAPI default serialization style for
+// a derived path, query, or header parameter location.
+func DefaultDerivedParamStyle(location string) string {
 	switch location {
 	case DerivedParamLocationQuery:
 		return "form"
@@ -664,7 +666,9 @@ func defaultParameterStyle(location string) string {
 	}
 }
 
-func defaultParameterExplode(style string) bool {
+// DefaultDerivedParamExplode returns the OpenAPI default explode value for a
+// parameter serialization style.
+func DefaultDerivedParamExplode(style string) bool {
 	return style == "form"
 }
 

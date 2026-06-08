@@ -446,6 +446,17 @@ func TestRecorder_TruncationFlag(t *testing.T) {
 	assert.Equal(t, BodyTruncationBytes, len(rec.Body()))
 }
 
+func TestRecorder_CustomBodyLimit(t *testing.T) {
+	t.Parallel()
+	rec := NewRecorderWithBodyLimit(16)
+
+	_, err := rec.Write([]byte("0123456789abcdefEXTRA"))
+	require.NoError(t, err)
+
+	assert.True(t, rec.Truncated())
+	assert.Equal(t, "0123456789abcdef", string(rec.Body()))
+}
+
 func TestRecorder_StatusAndContentType(t *testing.T) {
 	t.Parallel()
 	rec := NewRecorder()

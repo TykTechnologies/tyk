@@ -35,7 +35,8 @@ const (
 	headerContentType          = "Content-Type"
 	contentTypeApplicationJSON = "application/json"
 	contentTypeFormURLEncoded  = "application/x-www-form-urlencoded"
-	truncationNotice           = "Tyk truncated the upstream response after 1048576 bytes. The content above is incomplete."
+	defaultTruncationNotice    = "Tyk truncated the upstream response after 1048576 bytes. The content above is incomplete."
+	truncationNoticeTemplate   = "Tyk truncated the upstream response after %d bytes. The content above is incomplete."
 )
 
 const (
@@ -319,16 +320,18 @@ func (b *upstreamRequestBuilder) paramSerialization(argName, sourceName, loc str
 				serialization.Location = loc
 			}
 			if serialization.Style == "" {
-				serialization.Style = defaultParameterStyle(loc)
+				serialization.Style = oas.DefaultDerivedParamStyle(loc)
+				serialization.Explode = oas.DefaultDerivedParamExplode(serialization.Style)
 			}
 			return serialization
 		}
 	}
+	style := oas.DefaultDerivedParamStyle(loc)
 	return oas.DerivedParamSerialization{
 		SourceName: sourceName,
 		Location:   loc,
-		Style:      defaultParameterStyle(loc),
-		Explode:    defaultParameterExplode(loc),
+		Style:      style,
+		Explode:    oas.DefaultDerivedParamExplode(style),
 	}
 }
 
@@ -417,21 +420,6 @@ func queryArrayDelimiter(style string) (string, bool) {
 	default:
 		return "", false
 	}
-}
-
-func defaultParameterStyle(loc string) string {
-	switch loc {
-	case oas.DerivedParamLocationQuery:
-		return "form"
-	case oas.DerivedParamLocationPath, oas.DerivedParamLocationHeader:
-		return "simple"
-	default:
-		return ""
-	}
-}
-
-func defaultParameterExplode(loc string) bool {
-	return loc == oas.DerivedParamLocationQuery
 }
 
 func (b *upstreamRequestBuilder) applyBodyFieldArg(argName, loc string, raw any) error {
@@ -556,20 +544,32 @@ func copyHeaders(dst, src http.Header) {
 	}
 }
 
-// Recorder buffers an http.Handler response into memory, capping the
-// body at BodyTruncationBytes. Anything written past the cap is
-// silently discarded and Truncated() returns true.
+// Recorder buffers an http.Handler response into memory, capping the body at
+// its configured limit. Anything written past the cap is silently discarded and
+// Truncated() returns true.
 type Recorder struct {
 	status      int
 	header      http.Header
 	body        bytes.Buffer
+	bodyLimit   int
 	overflow    bool
 	wroteHeader bool
 }
 
-// NewRecorder returns a Recorder ready to capture a single response.
+// NewRecorder returns a Recorder ready to capture a single response with the
+// default body cap.
 func NewRecorder() *Recorder {
-	return &Recorder{status: http.StatusOK, header: http.Header{}}
+	return NewRecorderWithBodyLimit(BodyTruncationBytes)
+}
+
+// NewRecorderWithBodyLimit returns a Recorder ready to capture a single
+// response using bodyLimit as the retained response body cap. Non-positive
+// limits fall back to BodyTruncationBytes.
+func NewRecorderWithBodyLimit(bodyLimit int) *Recorder {
+	if bodyLimit <= 0 {
+		bodyLimit = BodyTruncationBytes
+	}
+	return &Recorder{status: http.StatusOK, header: http.Header{}, bodyLimit: bodyLimit}
 }
 
 // Header satisfies http.ResponseWriter.
@@ -584,10 +584,10 @@ func (r *Recorder) WriteHeader(s int) {
 	r.wroteHeader = true
 }
 
-// Write satisfies http.ResponseWriter; truncates at BodyTruncationBytes.
+// Write satisfies http.ResponseWriter; truncates at the configured body limit.
 func (r *Recorder) Write(b []byte) (int, error) {
 	r.wroteHeader = true
-	remaining := BodyTruncationBytes - r.body.Len()
+	remaining := r.effectiveBodyLimit() - r.body.Len()
 	if remaining <= 0 {
 		r.overflow = true
 		return len(b), nil
@@ -600,10 +600,17 @@ func (r *Recorder) Write(b []byte) (int, error) {
 	return r.body.Write(b)
 }
 
+func (r *Recorder) effectiveBodyLimit() int {
+	if r.bodyLimit > 0 {
+		return r.bodyLimit
+	}
+	return BodyTruncationBytes
+}
+
 // Status returns the HTTP status code the handler chose (defaults to 200).
 func (r *Recorder) Status() int { return r.status }
 
-// Body returns the captured body bytes (up to BodyTruncationBytes).
+// Body returns the captured body bytes, up to the configured body limit.
 func (r *Recorder) Body() []byte { return r.body.Bytes() }
 
 // ContentType returns the recorded Content-Type header (empty if unset).
@@ -640,13 +647,21 @@ func ToolResultText(rec *Recorder) string {
 	if !rec.Truncated() {
 		return string(body)
 	}
+	notice := truncationNotice(rec.effectiveBodyLimit())
 	if len(body) == 0 {
-		return truncationNotice
+		return notice
 	}
 	var builder strings.Builder
-	builder.Grow(len(body) + len(truncationNotice) + 2)
+	builder.Grow(len(body) + len(notice) + 2)
 	builder.Write(body)
 	builder.WriteString("\n\n")
-	builder.WriteString(truncationNotice)
+	builder.WriteString(notice)
 	return builder.String()
+}
+
+func truncationNotice(bodyLimit int) string {
+	if bodyLimit == BodyTruncationBytes {
+		return defaultTruncationNotice
+	}
+	return fmt.Sprintf(truncationNoticeTemplate, bodyLimit)
 }

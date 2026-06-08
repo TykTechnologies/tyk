@@ -40,6 +40,20 @@ func TestAdapterLoopURLForSourceFallsBackWhenSourceHasMCPPath(t *testing.T) {
 	assert.Equal(t, "tyk://rest-1__mcp-server", AdapterLoopURLForSource("rest-1", withMCPPath))
 }
 
+func TestDefaultDerivedParamSerialization(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "form", DefaultDerivedParamStyle(DerivedParamLocationQuery))
+	assert.Equal(t, "simple", DefaultDerivedParamStyle(DerivedParamLocationPath))
+	assert.Equal(t, "simple", DefaultDerivedParamStyle(DerivedParamLocationHeader))
+	assert.Empty(t, DefaultDerivedParamStyle(DerivedParamLocationBody))
+
+	assert.True(t, DefaultDerivedParamExplode("form"))
+	assert.False(t, DefaultDerivedParamExplode("simple"))
+	assert.False(t, DefaultDerivedParamExplode("spaceDelimited"))
+	assert.False(t, DefaultDerivedParamExplode("pipeDelimited"))
+}
+
 func TestDeriveSourcePrimitives_SkipsMissingOperationIDAndEmitsToolPrimitive(t *testing.T) {
 	t.Parallel()
 

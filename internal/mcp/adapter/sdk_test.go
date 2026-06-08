@@ -483,6 +483,58 @@ func TestRESTAsMCPToolCall_RejectsUnknownArgumentsBeforeSourceChain(t *testing.T
 	assertUnknownToolArgumentInvalidParams(t, result.response)
 }
 
+func TestNewSDKStreamableHTTPHandler_InvalidToolArgumentsReturnInvalidParams(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		arguments   string
+		wantMessage string
+	}{
+		{
+			name:        "non object",
+			arguments:   `[]`,
+			wantMessage: "invalid tools/call arguments",
+		},
+		{
+			name:        "oversized",
+			arguments:   `{"body":"` + strings.Repeat("x", MaxToolArgumentsBytes) + `"}`,
+			wantMessage: "tools/call arguments exceed",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			called := false
+			body := exerciseToolCallWithArguments(t, tt.arguments, func(context.Context, *oas.DerivedTool, map[string]any) (*Recorder, error) {
+				called = true
+				return NewRecorder(), nil
+			})
+
+			assert.False(t, called)
+			errObj := body["error"].(map[string]any)
+			assert.EqualValues(t, sdkjsonrpc.CodeInvalidParams, errObj["code"])
+			assert.Contains(t, errObj["message"], tt.wantMessage)
+		})
+	}
+}
+
+func TestUnmarshalToolArgs_RejectsOversizedRawArgumentsBeforeTrimming(t *testing.T) {
+	t.Parallel()
+
+	raw := append(bytes.Repeat([]byte(" "), MaxToolArgumentsBytes+1), []byte("{}")...)
+	_, err := unmarshalToolArgs(&mcpsdk.CallToolRequest{
+		Params: &mcpsdk.CallToolParamsRaw{Arguments: json.RawMessage(raw)},
+	})
+
+	require.Error(t, err)
+	assert.True(t, IsInvalidParams(err))
+	assert.Contains(t, err.Error(), "tools/call arguments exceed")
+}
+
 type unknownToolArgumentCallResult struct {
 	callToolCalled    bool
 	sourceChainCalled bool
@@ -546,4 +598,39 @@ func assertUnknownToolArgumentInvalidParams(t *testing.T, body map[string]any) {
 	errObj := body["error"].(map[string]any)
 	assert.EqualValues(t, sdkjsonrpc.CodeInvalidParams, errObj["code"])
 	assert.Contains(t, errObj["message"], `unknown argument "unknown"`)
+}
+
+func exerciseToolCallWithArguments(t *testing.T, arguments string, callTool ToolCallFunc) map[string]any {
+	t.Helper()
+
+	tool := oas.DerivedTool{
+		Name:           "get_order",
+		Method:         http.MethodGet,
+		PathTemplate:   "/orders",
+		ParamLocations: map[string]string{},
+		InputSchema:    map[string]any{"type": "object"},
+	}
+	handler, err := NewSDKStreamableHTTPHandler(SDKServerConfig{
+		Name:     "Orders [MCP adapter]",
+		Tools:    []oas.DerivedTool{tool},
+		CallTool: callTool,
+	}, nil)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{
+		"jsonrpc":"2.0",
+		"id":1,
+		"method":"tools/call",
+		"params":{"name":"get_order","arguments":`+arguments+`}
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	return body
 }

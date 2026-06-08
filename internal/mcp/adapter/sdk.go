@@ -1,6 +1,7 @@
 package adapter
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,6 +19,10 @@ import (
 )
 
 const internalToolErrorMessage = "internal tool error"
+
+// MaxToolArgumentsBytes is the maximum raw JSON size accepted for a
+// tools/call arguments payload before unmarshalling it into Go values.
+const MaxToolArgumentsBytes = 1 << 20 // 1 MiB
 
 // SDKAdapter owns one long-lived SDK server and its current derived tool set.
 // Updating the tool set mutates the server in place; list-change notifications
@@ -219,7 +224,10 @@ func (a *SDKAdapter) addTool(tool oas.DerivedTool) {
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error) {
 		args, err := unmarshalToolArgs(req)
 		if err != nil {
-			return nil, err
+			if IsInvalidParams(err) {
+				return nil, &sdkjsonrpc.Error{Code: sdkjsonrpc.CodeInvalidParams, Message: err.Error()}
+			}
+			return nil, &sdkjsonrpc.Error{Code: sdkjsonrpc.CodeInternalError, Message: internalToolErrorMessage}
 		}
 
 		rec, err := a.callToolForRequest(ctx, &tool, args)
@@ -305,8 +313,21 @@ func unmarshalToolArgs(req *mcpsdk.CallToolRequest) (map[string]any, error) {
 	if req == nil || req.Params == nil || len(req.Params.Arguments) == 0 {
 		return args, nil
 	}
-	if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
-		return nil, fmt.Errorf("invalid tools/call arguments: %w", err)
+	if len(req.Params.Arguments) > MaxToolArgumentsBytes {
+		return nil, invalidParamsf("tools/call arguments exceed %d bytes", MaxToolArgumentsBytes)
+	}
+	raw := bytes.TrimSpace(req.Params.Arguments)
+	if len(raw) == 0 {
+		return args, nil
+	}
+	if raw[0] != '{' {
+		return nil, invalidParamsf("invalid tools/call arguments: expected JSON object")
+	}
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return nil, invalidParamsf("invalid tools/call arguments: %v", err)
+	}
+	if args == nil {
+		return map[string]any{}, nil
 	}
 	return args, nil
 }
