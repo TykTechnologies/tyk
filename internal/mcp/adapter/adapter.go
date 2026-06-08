@@ -312,11 +312,22 @@ func encodeQuery(params []queryParam) string {
 		return ""
 	}
 
-	encoded := make([]string, 0, len(params))
+	size := len(params) - 1
 	for _, param := range params {
-		encoded = append(encoded, url.QueryEscape(param.name)+"="+url.QueryEscape(param.value))
+		size += len(param.name) + len(param.value) + 1
 	}
-	return strings.Join(encoded, "&")
+
+	var builder strings.Builder
+	builder.Grow(size)
+	for i, param := range params {
+		if i > 0 {
+			builder.WriteByte('&')
+		}
+		builder.WriteString(url.QueryEscape(param.name))
+		builder.WriteByte('=')
+		builder.WriteString(url.QueryEscape(param.value))
+	}
+	return builder.String()
 }
 
 func (b *upstreamRequestBuilder) marshalBody() ([]byte, error) {
@@ -447,12 +458,17 @@ func ToolResultEnvelope(rec *Recorder) map[string]any {
 // the recorder truncated the upstream response, append a visible notice so
 // LLM-facing clients do not receive partial data as if it were complete.
 func ToolResultText(rec *Recorder) string {
-	body := string(rec.Body())
+	body := rec.Body()
 	if !rec.Truncated() {
-		return body
+		return string(body)
 	}
-	if body == "" {
+	if len(body) == 0 {
 		return truncationNotice
 	}
-	return body + "\n\n" + truncationNotice
+	var builder strings.Builder
+	builder.Grow(len(body) + len(truncationNotice) + 2)
+	builder.Write(body)
+	builder.WriteString("\n\n")
+	builder.WriteString(truncationNotice)
+	return builder.String()
 }

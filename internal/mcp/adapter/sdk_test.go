@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	sdkjsonrpc "github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -137,6 +139,34 @@ func TestNewSDKServer_CallToolDispatchesDerivedTool(t *testing.T) {
 	assert.Equal(t, map[string]any{"ok": true}, result.StructuredContent)
 }
 
+func TestNewSDKServer_CallToolSanitizesInternalErrors(t *testing.T) {
+	t.Parallel()
+
+	server, err := NewSDKServer(SDKServerConfig{
+		Name:  "Orders [MCP adapter]",
+		Tools: sampleTools(),
+		CallTool: func(context.Context, *oas.DerivedTool, map[string]any) (*Recorder, error) {
+			return nil, errors.New("dial tcp internal.orders.service.local/10.0.0.7:443: connect: connection refused")
+		},
+	})
+	require.NoError(t, err)
+
+	session := connectSDKServer(t, server)
+	result, err := session.CallTool(context.Background(), &mcpsdk.CallToolParams{
+		Name:      "getOrder",
+		Arguments: map[string]any{"id": "42"},
+	})
+
+	require.Nil(t, result)
+	require.Error(t, err)
+	var rpcErr *sdkjsonrpc.Error
+	require.ErrorAs(t, err, &rpcErr)
+	assert.EqualValues(t, sdkjsonrpc.CodeInternalError, rpcErr.Code)
+	assert.Equal(t, "internal tool error", rpcErr.Message)
+	assert.NotContains(t, err.Error(), "internal.orders.service.local")
+	assert.NotContains(t, err.Error(), "10.0.0.7")
+}
+
 func TestNewSDKServer_CallToolWrapsNonObjectStructuredContent(t *testing.T) {
 	t.Parallel()
 
@@ -176,6 +206,34 @@ func TestNewSDKServer_CallToolWrapsNonObjectStructuredContent(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, map[string]any{"result": []any{"abc-123"}}, result.StructuredContent)
+}
+
+func TestIsJSONContentType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		contentType string
+		want        bool
+	}{
+		{name: "application json", contentType: "application/json", want: true},
+		{name: "application json with charset", contentType: "application/json; charset=utf-8", want: true},
+		{name: "problem json suffix", contentType: "application/problem+json", want: true},
+		{name: "vendor json suffix", contentType: "application/vnd.company.resource+json", want: true},
+		{name: "not json subtype", contentType: "application/not-json", want: false},
+		{name: "text json", contentType: "text/json", want: false},
+		{name: "json word without suffix", contentType: "application/vnd.company.json-problem", want: false},
+		{name: "empty", contentType: "", want: false},
+		{name: "invalid", contentType: "application/json; charset", want: false},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, isJSONContentType(tt.contentType))
+		})
+	}
 }
 
 func TestSDKToolResult_TruncationNoticeIsVisible(t *testing.T) {
@@ -486,6 +544,6 @@ func assertUnknownToolArgumentInvalidParams(t *testing.T, body map[string]any) {
 	t.Helper()
 
 	errObj := body["error"].(map[string]any)
-	assert.EqualValues(t, -32602, errObj["code"])
+	assert.EqualValues(t, sdkjsonrpc.CodeInvalidParams, errObj["code"])
 	assert.Contains(t, errObj["message"], `unknown argument "unknown"`)
 }

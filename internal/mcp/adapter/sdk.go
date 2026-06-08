@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime"
 	"net/http"
 	"reflect"
 	"sort"
@@ -15,6 +16,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
+
+const internalToolErrorMessage = "internal tool error"
 
 // SDKAdapter owns one long-lived SDK server and its current derived tool set.
 // Updating the tool set mutates the server in place; list-change notifications
@@ -224,10 +227,10 @@ func (a *SDKAdapter) addTool(tool oas.DerivedTool) {
 			if IsInvalidParams(err) {
 				return nil, &sdkjsonrpc.Error{Code: sdkjsonrpc.CodeInvalidParams, Message: err.Error()}
 			}
-			return nil, err
+			return nil, &sdkjsonrpc.Error{Code: sdkjsonrpc.CodeInternalError, Message: internalToolErrorMessage}
 		}
 		if rec == nil {
-			return nil, fmt.Errorf("tool %q returned nil recorder", tool.Name)
+			return nil, &sdkjsonrpc.Error{Code: sdkjsonrpc.CodeInternalError, Message: internalToolErrorMessage}
 		}
 
 		return SDKToolResultForTool(&tool, rec), nil
@@ -363,9 +366,10 @@ func toolStructuredContent(tool *oas.DerivedTool, rec *Recorder) (any, bool) {
 }
 
 func isJSONContentType(contentType string) bool {
-	contentType = strings.ToLower(strings.TrimSpace(contentType))
-	if semicolon := strings.Index(contentType, ";"); semicolon != -1 {
-		contentType = strings.TrimSpace(contentType[:semicolon])
+	mediaType, _, err := mime.ParseMediaType(strings.TrimSpace(contentType))
+	if err != nil {
+		return false
 	}
-	return contentType == "application/json" || strings.Contains(contentType, "json")
+	mediaType = strings.ToLower(mediaType)
+	return mediaType == contentTypeApplicationJSON || strings.HasSuffix(mediaType, "+json")
 }
