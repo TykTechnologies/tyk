@@ -208,7 +208,19 @@ type StorageOptionsConf struct {
 	// Defaults to `false`.
 	CompressAPIDefinitions bool `json:"compress_api_definitions"`
 
-	// Maximum decompressed size (in bytes) for API definitions when using compression.
+	// When set to `true`, enables Zstd compression for policies stored in Redis RPC backups.
+	// This feature significantly reduces Redis memory usage in MDCB deployments where policies are cached locally on Data Plane Gateways.
+	// The Gateway can read both compressed and uncompressed formats for backward compatibility.
+	//
+	// You can safely enable this setting on existing deployments.
+	// The Gateway continues to load previously stored uncompressed backups and stores all new backups in compressed form.
+	//
+	// Note: The maximum decompressed size is controlled by `max_decompressed_size`.
+	//
+	// Defaults to `false`.
+	CompressPolicies bool `json:"compress_policies"`
+
+	// Maximum decompressed size (in bytes) for API definitions and Policies when using compression.
 	// This limit prevents memory exhaustion during decompression.
 	// Defaults to 104857600 (100MB).
 	MaxDecompressedSize int64 `json:"max_decompressed_size"`
@@ -599,10 +611,12 @@ type HttpServerOptionsConfig struct {
 	// Start your Gateway HTTP server on specific server name
 	ServerName string `json:"server_name"`
 
-	// Minimum TLS version. Possible values: https://tyk.io/docs/api-management/certificates#supported-tls-versions
+	// Minimum TLS version is inherited from Go library, but can be overridden here.
+	// For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-&-cipher-suites
 	MinVersion uint16 `json:"min_version"`
 
-	// Maximum TLS version.
+	// Maximum TLS version is inherited from Go library, but can be overridden here.
+	// For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-&-cipher-suites
 	MaxVersion uint16 `json:"max_version"`
 
 	// When mTLS enabled, this option allows to skip client CA announcement in the TLS handshake.
@@ -1159,6 +1173,23 @@ type Config struct {
 	// The default is 60 seconds. This must be a positive value. If you set to 0 this uses the default value.
 	RegexpCacheExpire int32 `json:"regexp_cache_expire"`
 
+	// RegexpCacheMaxEntries caps the per-cache LRU size for the regex
+	// compile caches. Defaults to 5000 when unset (0).
+	// To opt into the legacy unbounded cache, set `disable_regexp_cache_bound` to true instead.
+	RegexpCacheMaxEntries int `json:"regexp_cache_max_entries"`
+
+	// DisableRegexpCacheBound opts into the legacy unbounded regex compile
+	// cache (no size eviction). Only safe when the distinct-pattern keyspace
+	// is naturally bounded by API/session shape. The default (`false`) keeps the LRU bound active.
+	DisableRegexpCacheBound bool `json:"disable_regexp_cache_bound"`
+
+	// DisableAutoMaxProcs opts out of `automaxprocs` GOMAXPROCS adjustment.
+	// By default Tyk aligns GOMAXPROCS with the container's cgroup CPU quota
+	// Set to `true` only if you are pinning GOMAXPROCS yourself or
+	// running outside a CPU-quota-aware environment. No-op outside cgroup
+	// CPU-quota environments either way.
+	DisableAutoMaxProcs bool `json:"disable_auto_max_procs"`
+
 	// Tyk can cache some data locally, this can speed up lookup times on a single node and lower the number of connections and operations being done on Redis. It will however introduce a slight delay when updating or modifying keys as the cache must expire.
 	// This does not affect rate limiting.
 	LocalSessionCache LocalSessionCacheConf `json:"local_session_cache"`
@@ -1225,9 +1256,10 @@ type Config struct {
 	// If not set or left empty, it will default to `info`.
 	LogLevel string `json:"log_level"`
 
-	// You can now configure the log format to be either the standard or json format
-	// If not set or left empty, it will default to `standard`.
-	LogFormat string `json:"log_format"`
+	// LogFormat configures the output format of the logs.
+	// Allowed values are `text`, `json`, or `legacy`.
+	// If not set or left empty, it defaults to `text`.
+	LogFormat logger.Format `json:"log_format"`
 
 	// AccessLogs configures the output for access logs.
 	// If not configured, the access log is disabled.
@@ -1394,7 +1426,9 @@ type Config struct {
 	// JWKS holds the configuration for Tyk JWKS functionalities
 	JWKS JWKSConfig `json:"jwks"`
 
-	// AllowUnsafePolicyIds allows unsafe policy identifiers
+	// AllowUnsafePolicyIds allows the use of non-standard characters in policy identifiers (default: false).
+	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
+	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
 	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
 }
 

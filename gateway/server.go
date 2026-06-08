@@ -56,6 +56,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/compression"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -63,7 +64,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
-	logger "github.com/TykTechnologies/tyk/log"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/pkg/validator"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
@@ -79,10 +80,10 @@ import (
 var (
 	globalMu sync.Mutex
 
-	log       = logger.Get()
+	log       = tyklog.Get()
 	mainLog   = log.WithField("prefix", "main")
 	pubSubLog = log.WithField("prefix", "pub-sub")
-	rawLog    = logger.GetRaw()
+	rawLog    = tyklog.GetRaw()
 
 	memProfFile *os.File
 
@@ -172,6 +173,11 @@ type Gateway struct {
 	apisByID        map[string]*APISpec
 	apisHandlesByID *sync.Map
 
+	// prmCache memoises upstream Protected Resource Metadata (RFC 9728) docs
+	// for MCP APIs running in mirror mode. Lazily initialised on first use.
+	prmCacheOnce sync.Once
+	prmCache     *mcp.PRMCache
+
 	policies *model.Policies
 
 	certUsageTracker *certUsageTracker // nil in non-RPC mode
@@ -238,6 +244,10 @@ type Gateway struct {
 	// apiJWKCaches cache per api entity
 	apiJWKCaches sync.Map
 
+	// idpRegistry is the in-memory client-IdP registry, a sibling dataset of the
+	// API definitions consulted only as a last fallback in the JWT path.
+	idpRegistry *IdPRegistry
+
 	limitHeaderFactory rate.HeaderSenderFactory
 
 	BundleChecksumVerifier bundleChecksumVerifyFunction
@@ -252,7 +262,8 @@ type Gateway struct {
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw := &Gateway{
 		DefaultProxyMux: &proxyMux{
-			again: again.New(),
+			again:        again.New(),
+			track404Logs: config.Track404Logs,
 		},
 		ctx: ctx,
 	}
@@ -303,12 +314,22 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	}
 
 	gw.jwkCache = buildJWKSCache(config)
+	gw.idpRegistry = newIdPRegistry(gw)
 	gw.BundleChecksumVerifier = defaultBundleVerifyFunction
 
 	return gw
 }
 
 // cacheCreate will create the caches in *Gateway.
+// PRMCache returns the gateway-wide Protected Resource Metadata cache used
+// by MCP mirror-mode PRM serving. Constructed lazily on first call.
+func (gw *Gateway) PRMCache() *mcp.PRMCache {
+	gw.prmCacheOnce.Do(func() {
+		gw.prmCache = mcp.NewPRMCache(0)
+	})
+	return gw.prmCache
+}
+
 func (gw *Gateway) cacheCreate() {
 	conf := gw.GetConfig()
 
@@ -1227,6 +1248,17 @@ func (gw *Gateway) rpcReloadLoop(rpcKey string) {
 	}
 }
 
+// idpReloadLoop long-polls the dedicated CheckIdPReload RPC. It runs parallel to
+// rpcReloadLoop so a client-IdP change refreshes ONLY the registry (one
+// GetClientIdPs RPC) without a full API/policy resync. Exits on shutdown.
+func (gw *Gateway) idpReloadLoop(rpcKey string) {
+	for {
+		if !gw.RPCListener.CheckForIdPReload(rpcKey) {
+			return
+		}
+	}
+}
+
 // DoReloadWithError performs a full reload of APIs and policies, returning any
 // sync error that prevented a successful reload. The reloadMu mutex is acquired
 // for the duration of the reload, so each call is safe to make concurrently.
@@ -1279,6 +1311,18 @@ func (gw *Gateway) DoReloadWithError() error {
 	}
 
 	gw.loadGlobalApps()
+
+	// Refresh the client-IdP registry AFTER loadGlobalApps populates apisByID.
+	// The segment-aware backstop indexes only bindings whose api_id is present
+	// in apisByID — sequencing this before loadGlobalApps would drop every
+	// binding and 401 registry-only APIs from boot. Every DoReload (startup,
+	// reloadLoop drain, /tyk/reload, RPC NoticeGroupReload) refreshes the
+	// registry as a side effect, giving operators IdP refresh "for free".
+	if gw.idpRegistry != nil {
+		if err := gw.idpRegistry.doRefresh(); err != nil {
+			mainLog.WithError(err).Warn("IdP registry refresh failed during reload — keeping previous snapshot")
+		}
+	}
 
 	gw.MetricInstruments.RecordReload(gw.ctx, time.Since(start))
 
@@ -1584,7 +1628,7 @@ func (gw *Gateway) initSystem() error {
 
 	// Initialize the appropriate log formatter
 	if !gw.isRunningTests() && os.Getenv("TYK_LOGFORMAT") == "" && !*cli.DebugMode {
-		log.Formatter = logger.NewFormatter(gwConfig.LogFormat)
+		tyklog.SetupFormatter(gwConfig.LogFormat)
 		mainLog.Debugf("Set log format to %q", gwConfig.LogFormat)
 	}
 
@@ -1864,7 +1908,26 @@ func (gw *Gateway) afterConfSetup() error {
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	gw.initGenericEventHandlers()
-	regexp.ResetCache(time.Second*time.Duration(conf.RegexpCacheExpire), !conf.DisableRegexpCache)
+	configureAutoMaxProcs(conf.DisableAutoMaxProcs)
+
+	maxEntries := conf.RegexpCacheMaxEntries
+	if maxEntries < 0 {
+		mainLog.Warnf("regex cache: RegexpCacheMaxEntries=%d is invalid; "+
+			"use disable_regexp_cache_bound=true to opt out of size eviction. Treating as default.", maxEntries)
+		maxEntries = 0
+	}
+	if conf.DisableRegexpCacheBound {
+		mainLog.Warnf("regex cache: size eviction disabled. Risk: user-driven pattern cardinality can OOM the gateway.")
+	}
+	cacheOpts := cache.LRUOptions{
+		TTL:        time.Second * time.Duration(conf.RegexpCacheExpire),
+		MaxEntries: maxEntries,
+		Unbounded:  conf.DisableRegexpCacheBound,
+		Enabled:    !conf.DisableRegexpCache,
+		Log:        mainLog.Warnf,
+	}
+	regexp.Configure(cacheOpts)
+	httputil.ConfigurePathRegexpCache(maxEntries, conf.DisableRegexpCacheBound, mainLog.Warnf)
 
 	if conf.HealthCheckEndpointName == "" {
 		conf.HealthCheckEndpointName = "hello"
@@ -2077,7 +2140,7 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 	localStorage := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
 	localStorage.Connect()
 
-	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
+	logger := tyklog.Get().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		return storage.NewMdcbStorage(
@@ -2325,6 +2388,7 @@ func (gw *Gateway) start() {
 
 		gw.RPCListener.Connect()
 		go gw.rpcReloadLoop(slaveOptions.RPCKey)
+		go gw.idpReloadLoop(slaveOptions.RPCKey)
 		go gw.RPCListener.StartRPCKeepaliveWatcher()
 		go gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
 	}
@@ -2428,7 +2492,9 @@ func (gw *Gateway) setupPortsWhitelist() {
 
 func (gw *Gateway) startServer() {
 	// Ensure that Control listener and default http listener running on first start
-	muxer := &proxyMux{}
+	muxer := &proxyMux{
+		track404Logs: gw.GetConfig().Track404Logs,
+	}
 
 	router := mux.NewRouter()
 	gw.loadControlAPIEndpoints(router)

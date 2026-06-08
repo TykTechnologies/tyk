@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -25,6 +26,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
@@ -523,6 +525,8 @@ func (gw *Gateway) processSpec(
 		gw.mwAppendEnabled(&chainArray, &MCPAccessControlMiddleware{baseMid.Copy()})
 	}
 
+	gw.mwAppendEnabled(&chainArray, &OAuth2Middleware{BaseMiddleware: baseMid.Copy()})
+
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid.Copy(), quotaKey: options.quotaKey})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid.Copy()})
 
@@ -938,7 +942,116 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	// Register routes for each prefix
 	gw.generateRoutesForPrefixes(spec, prefixes, gwConfig.HttpServerOptions.EnableStrictRoutes, router, chainObj)
 
+	// Mirror-mode PRM clients (mcp-remote, Claude Desktop) probe the
+	// path-suffix variant of /.well-known/oauth-protected-resource at the
+	// gateway root, not under the API's listen path. Auto-register a
+	// sibling handler so users don't have to wire up a second API.
+	gw.registerMCPPRMSuffixRoutes(spec, router)
+
 	return chainObj, nil
+}
+
+// registerMCPPRMSuffixRoutes wires up the host-root well-known URL
+// (`<root>/.well-known/oauth-protected-resource<listen-path>`) that
+// RFC 9728 §3.1 says clients probe. Only attaches when the API is MCP and
+// has PRM enabled — for all other APIs this is a no-op.
+//
+// mcp-remote strips the trailing slash off the listen path before building
+// the probe URL, so we register both with and without the trailing slash.
+func (gw *Gateway) registerMCPPRMSuffixRoutes(spec *APISpec, router *mux.Router) {
+	if spec == nil || !spec.IsMCP() {
+		return
+	}
+	prm := spec.GetPRMConfig()
+	if prm == nil {
+		return
+	}
+
+	listen := strings.TrimRight(spec.Proxy.ListenPath, "/")
+	if listen == "" {
+		// Listen path is `/` — host-root well-known would collide with
+		// the standard PRM path; nothing extra to register.
+		return
+	}
+	noSlash := "/.well-known/oauth-protected-resource" + listen
+	withSlash := noSlash + "/"
+
+	handler := gw.mcpPRMSuffixHandler(spec)
+	router.HandleFunc(noSlash, handler).Methods(http.MethodGet)
+	router.HandleFunc(withSlash, handler).Methods(http.MethodGet)
+	mainLog.WithField("api_id", spec.APIID).Debugf("registered MCP PRM suffix route at %s", noSlash)
+
+	// Mirror mode also fronts the upstream's OAuth authorization server
+	// so we can rewrite the RFC 8707 `resource` parameter on the wire.
+	// Without this, strict ASes (Notion) reject the client's authorize
+	// request with `invalid_target` because mcp-remote sends the
+	// gateway URL as the resource (per the mirrored PRM doc) but the
+	// upstream AS only knows the upstream URL.
+	if prm.IsMirrorMode(spec.IsMCP()) {
+		gw.registerMCPASProxyRoutes(spec, router)
+	}
+}
+
+// registerMCPASProxyRoutes wires the per-API OAuth Authorization Server
+// proxy endpoints used by mirror-mode PRM. Three routes are registered
+// at gateway root so they're reachable independently of the API's
+// listen path:
+//
+//	GET  /.well-known/oauth-authorization-server/__tyk-as/<api-id>
+//	GET  /__tyk-as/<api-id>/authorize
+//	POST /__tyk-as/<api-id>/token
+//
+// The `.well-known` path-suffix variant is what mcp-remote computes from
+// the AS URL we advertise in the mirrored PRM doc.
+func (gw *Gateway) registerMCPASProxyRoutes(spec *APISpec, router *mux.Router) {
+	asMetadataPath := "/.well-known/oauth-authorization-server" + mcpASProxyPathPrefix + spec.APIID
+	authorizePath := mcpASProxyPathPrefix + spec.APIID + "/authorize"
+	tokenPath := mcpASProxyPathPrefix + spec.APIID + "/token"
+
+	router.HandleFunc(asMetadataPath, gw.serveASProxyMetadata(spec)).Methods(http.MethodGet)
+	router.HandleFunc(authorizePath, gw.authorizeProxyHandler(spec)).Methods(http.MethodGet)
+	router.HandleFunc(tokenPath, gw.tokenProxyHandler(spec)).Methods(http.MethodPost)
+	mainLog.WithField("api_id", spec.APIID).Debugf("registered MCP AS proxy routes under %s%s", mcpASProxyPathPrefix, spec.APIID)
+}
+
+// mcpPRMSuffixHandler returns the http.HandlerFunc that serves the PRM
+// document at the gateway-root well-known URL. It dispatches into the
+// PRMMiddleware logic so static and mirror modes share a code path.
+func (gw *Gateway) mcpPRMSuffixHandler(spec *APISpec) http.HandlerFunc {
+	mw := &PRMMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
+	prm := spec.GetPRMConfig()
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Reuse the mirror serving path directly. For static-mode APIs we
+		// fall back to assembling from the configured fields.
+		if prm == nil {
+			http.NotFound(w, r)
+			return
+		}
+		if prm.IsMirrorMode(spec.IsMCP()) {
+			if err := mw.serveMirroredPRM(w, r, prm); err != nil {
+				log.WithError(err).Warn("PRM mirror failed at suffix route")
+				http.Error(w, "upstream PRM unavailable", http.StatusBadGateway)
+			}
+			return
+		}
+		// Static mode at the suffix route: assemble inline. (We don't go
+		// through PRMMiddleware.ProcessRequest because it gates on
+		// r.URL.Path == prmWellKnownPath which uses the in-listen-path
+		// URL, not the suffix one.)
+		resource := prm.Resource
+		if resource != "" {
+			resource = gw.ReplaceTykVariables(r, resource, false)
+		}
+		doc := prmResponseDocument{
+			Resource:             resource,
+			AuthorizationServers: prm.AuthorizationServers,
+			ScopesSupported:      prm.ScopesSupported,
+		}
+		w.Header().Set(header.ContentType, "application/json")
+		if err := json.NewEncoder(w).Encode(doc); err != nil {
+			log.WithError(err).Warn("PRM suffix-route handler: failed to encode response")
+		}
+	}
 }
 
 func (gw *Gateway) generateRoutesForPrefixes(spec *APISpec, prefixes []string, enabledStrictRoutes bool, router *mux.Router, chainObj *ChainObject) {
@@ -1166,7 +1279,6 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 		track404Logs: gwConf.Track404Logs,
 	}
 	router := mux.NewRouter()
-	router.NotFoundHandler = http.HandlerFunc(muxer.handle404)
 	gw.loadControlAPIEndpoints(router)
 
 	muxer.setRouter(port, "", router, gw.GetConfig())

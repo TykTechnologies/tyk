@@ -229,7 +229,9 @@ type HardTimeoutMeta struct {
 	Disabled bool   `bson:"disabled" json:"disabled"`
 	Path     string `bson:"path" json:"path"`
 	Method   string `bson:"method" json:"method"`
-	TimeOut  int    `bson:"timeout" json:"timeout"`
+	// Deprecated: Use TimeoutDuration instead.
+	TimeOut         int                      `bson:"timeout" json:"timeout"`
+	TimeoutDuration tyktime.ReadableDuration `bson:"timeout_duration,omitempty" json:"timeout_duration,omitempty"`
 }
 
 type TrackEndpointMeta struct {
@@ -790,8 +792,26 @@ type APIDefinition struct {
 	UpstreamAuth UpstreamAuth `bson:"upstream_auth" json:"upstream_auth"`
 
 	// SecurityRequirements stores all OAS security requirements (auto-populated from OpenAPI description import)
-	// When len(SecurityRequirements) > 1, OR logic is automatically applied
-	SecurityRequirements [][]string `json:"security_requirements,omitempty" bson:"security_requirements,omitempty"`
+	// When len(SecurityRequirements) > 1, OR logic is automatically applied.
+	//
+	// Storage tag intentionally omits bson:",omitempty" — a nil here is
+	// the signal that the operator removed all security from the API
+	// and must overwrite any stored value, not be silently dropped from
+	// a $set update.
+	SecurityRequirements [][]string `json:"security_requirements,omitempty" bson:"security_requirements"`
+
+	// SecurityRequirementScopes preserves the per-scheme scope arrays from
+	// OAS root `security:` Security Requirement Objects. Aligned by index
+	// with SecurityRequirements: entry i carries the scope map for the
+	// schemes named in SecurityRequirements[i]. Scopes are honoured only
+	// for schemes whose OAS type is oauth2 or openIdConnect — other
+	// schemes always round-trip with an empty scope array (OAS 3.0
+	// §4.8.30.1).
+	//
+	// Storage tag intentionally omits bson:",omitempty" — see
+	// SecurityRequirements above. A nil after an operator edit must
+	// reach storage as null so the prior value is cleared.
+	SecurityRequirementScopes []map[string][]string `json:"security_requirement_scopes,omitempty" bson:"security_requirement_scopes"`
 
 	// ErrorOverrides contains the configurations for error response customization.
 	ErrorOverrides         ErrorOverridesMap `bson:"error_overrides" json:"error_overrides"`
