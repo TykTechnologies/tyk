@@ -94,24 +94,19 @@ type Authentication struct {
 	// This can be used to combine any declared securitySchemes including Tyk proprietary auth methods.
 	Security [][]string `bson:"security,omitempty" json:"security,omitempty"`
 
-	// Deprecated: Use SecuritySchemes[<name>].OAuth2.ProtectedResourceMetadata instead.
-	// The new per-scheme location is the runtime source of truth; this top-level
-	// field is kept for downgrade safety and will be removed in a future major version.
-	//
 	// ProtectedResourceMetadata configures OAuth 2.0 Protected Resource Metadata (RFC 9728)
 	// for authorization server discovery. This is used by MCP clients to discover which
 	// authorization server to use for accessing the API.
+	//
+	// Deprecated: Use SecuritySchemes[<name>].OAuth2.ProtectedResourceMetadata instead.
+	// The new per-scheme location is the runtime source of truth; this top-level
+	// field is kept for downgrade safety and will be removed in a future major version.
 	ProtectedResourceMetadata *ProtectedResourceMetadata `bson:"protectedResourceMetadata,omitempty" json:"protectedResourceMetadata,omitempty"`
 
 	// CertificateAuth represents certificate-based authentication configuration.
 	CertificateAuth *CertificateAuth `bson:"certificateAuth,omitempty" json:"certificateAuth,omitempty"`
 }
 
-// Deprecated: Use OAuth2PRM (under SecuritySchemes[<name>].OAuth2) instead.
-// This type backs the legacy top-level Authentication.ProtectedResourceMetadata
-// field; the new per-scheme location is the runtime source of truth and the
-// legacy block is kept only for downgrade safety.
-//
 // ProtectedResourceMetadata holds the configuration for OAuth 2.0 Protected Resource Metadata (RFC 9728).
 // It enables MCP clients to discover which authorization server protects this API resource.
 //
@@ -125,6 +120,11 @@ type Authentication struct {
 //     OAuth-protected remote MCP servers.
 //
 // On non-MCP APIs only static is meaningful; mirror is a no-op.
+//
+// Deprecated: Use OAuth2PRM (under SecuritySchemes[<name>].OAuth2) instead.
+// This type backs the legacy top-level Authentication.ProtectedResourceMetadata
+// field; the new per-scheme location is the runtime source of truth and the
+// legacy block is kept only for downgrade safety.
 type ProtectedResourceMetadata struct {
 	// Enabled activates the Protected Resource Metadata endpoint.
 	Enabled bool `bson:"enabled" json:"enabled"` // required

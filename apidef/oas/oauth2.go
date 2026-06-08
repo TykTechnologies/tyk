@@ -56,10 +56,9 @@ type OAuth2PRM struct {
 	// token. At least one entry is required for MCP-proxy APIs.
 	AuthorizationServers []string `bson:"authorizationServers,omitempty" json:"authorizationServers,omitempty"`
 
-	// AutoDeriveScopes, when nil or true (default), unions the served
-	// scopes_supported with scopes from every `security:` array; false
-	// advertises only the `flows.<flow>.scopes` catalog. See
-	// OAuth2PRMScopesSupported.
+	// AutoDeriveScopes unions the served scopes_supported with scopes from
+	// every `security:` array when nil or true (default); false advertises
+	// only the `flows.<flow>.scopes` catalog. See OAuth2PRMScopesSupported.
 	AutoDeriveScopes *bool `bson:"autoDeriveScopes,omitempty" json:"autoDeriveScopes,omitempty"`
 }
 
