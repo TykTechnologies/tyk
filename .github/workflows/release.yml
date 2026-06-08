@@ -33,7 +33,7 @@ env:
 jobs:
   dep-guard:
     if: github.event_name == 'pull_request'
-    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@d3fa20888fa2878e877e22bb7702141217290e7c # main
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@production
     permissions:
       contents: read
   goreleaser:
@@ -174,7 +174,7 @@ jobs:
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: ${{ steps.ci_metadata_ee.outputs.tags }}
@@ -183,6 +183,20 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway-ee
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
+      - name: Verify compression format for ee CI image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.ci_metadata_ee.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw "$TAG" > manifest.json
+          if grep -q "tar+zstd" manifest.json; then
+            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
+            cat manifest.json | grep mediaType
+            exit 1
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Docker metadata for ee tag push
         id: tag_metadata_ee
         if: startsWith(github.ref, 'refs/tags')
@@ -211,13 +225,27 @@ jobs:
           file: ci/Dockerfile.distroless
           provenance: mode=max
           cache-from: type=gha
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_ee.outputs.tags }}
           labels: ${{ steps.tag_metadata_ee.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
+      - name: Verify compression format for ee prod image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.tag_metadata_ee.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw "$TAG" > manifest.json
+          if grep -q "tar+zstd" manifest.json; then
+            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
+            cat manifest.json | grep mediaType
+            exit 1
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Attach base image VEX to ee
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
@@ -235,7 +263,7 @@ jobs:
           fi
       - name: Docker metadata for fips CI
         id: ci_metadata_fips
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && github.event_name != 'pull_request' }}
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: |
@@ -250,14 +278,14 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push fips image to CI
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && github.event_name != 'pull_request' }}
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: ${{ steps.ci_metadata_fips.outputs.tags }}
@@ -266,6 +294,20 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway-fips
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
+      - name: Verify compression format for fips CI image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.ci_metadata_fips.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw "$TAG" > manifest.json
+          if grep -q "tar+zstd" manifest.json; then
+            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
+            cat manifest.json | grep mediaType
+            exit 1
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Docker metadata for fips tag push
         id: tag_metadata_fips
         if: startsWith(github.ref, 'refs/tags')
@@ -293,13 +335,27 @@ jobs:
           file: ci/Dockerfile.distroless
           provenance: mode=max
           cache-from: type=gha
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_fips.outputs.tags }}
           labels: ${{ steps.tag_metadata_fips.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-fips
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
+      - name: Verify compression format for fips prod image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.tag_metadata_fips.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw "$TAG" > manifest.json
+          if grep -q "tar+zstd" manifest.json; then
+            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
+            cat manifest.json | grep mediaType
+            exit 1
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Attach base image VEX to fips
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
@@ -314,7 +370,7 @@ jobs:
           fi
       - name: Docker metadata for std CI
         id: ci_metadata_std
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && github.event_name != 'pull_request' }}
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: |
@@ -329,20 +385,34 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push std image to CI
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && github.event_name != 'pull_request' }}
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64,linux/s390x' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: ${{ steps.ci_metadata_std.outputs.tags }}
           labels: ${{ steps.ci_metadata_std.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway
+      - name: Verify compression format for std CI image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.ci_metadata_std.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw "$TAG" > manifest.json
+          if grep -q "tar+zstd" manifest.json; then
+            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
+            cat manifest.json | grep mediaType
+            exit 1
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Docker metadata for std tag push
         id: tag_metadata_std
         if: startsWith(github.ref, 'refs/tags')
@@ -371,11 +441,25 @@ jobs:
           file: ci/Dockerfile.distroless
           provenance: mode=max
           cache-from: type=gha
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_std.outputs.tags }}
           labels: ${{ steps.tag_metadata_std.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway
+      - name: Verify compression format for std prod image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.tag_metadata_std.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw "$TAG" > manifest.json
+          if grep -q "tar+zstd" manifest.json; then
+            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
+            cat manifest.json | grep mediaType
+            exit 1
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: save deb
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
@@ -809,7 +893,7 @@ jobs:
       sink: ${{ steps.params.outputs.sink }}
     steps:
       - name: Set test parameters
-        uses: TykTechnologies/github-actions/.github/actions/tests/test-controller@42304edda365365e0a887cf018d8edc34b960b82 # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/test-controller@production
         id: params
         with:
           variation: ${{ env.VARIATION }}
@@ -871,11 +955,11 @@ jobs:
           # Only ${{ github.actor }} has access
           # See https://github.com/mxschmitt/action-tmate#use-registered-public-ssh-keys
       - name: Fetch environment from tyk-pro
-        uses: TykTechnologies/github-actions/.github/actions/tests/checkout-tyk-pro@42304edda365365e0a887cf018d8edc34b960b82 # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/checkout-tyk-pro@production
         with:
           org_gh_token: ${{ steps.app-token.outputs.token }}
       - name: Set up test environment
-        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@42304edda365365e0a887cf018d8edc34b960b82 # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@production
         timeout-minutes: 5
         id: env_up
         with:
@@ -886,18 +970,18 @@ jobs:
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
       - name: Choose test code branch
-        uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@42304edda365365e0a887cf018d8edc34b960b82 # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@production
         with:
           test_folder: api
           org_gh_token: ${{ steps.app-token.outputs.token }}
       - name: Run API tests
-        uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@42304edda365365e0a887cf018d8edc34b960b82 # main
-        timeout-minutes: 40
+        uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@production
+        timeout-minutes: 45
         id: test_execution
         with:
           user_api_secret: ${{ steps.env_up.outputs.USER_API_SECRET }}
       - name: Generate test reports and collect logs
-        uses: TykTechnologies/github-actions/.github/actions/tests/reporting@42304edda365365e0a887cf018d8edc34b960b82 # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/reporting@production
         if: always() && (steps.test_execution.conclusion != 'skipped')
         with:
           report_xml: 'true'
