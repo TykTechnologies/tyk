@@ -264,21 +264,11 @@ func (gw *Gateway) pairedMCPProxyIDsReferencingRESTSource(restAPIID string) []st
 		return nil
 	}
 
-	gw.apisMu.RLock()
-	defer gw.apisMu.RUnlock()
-
-	var proxyIDs []string
-	for _, spec := range gw.apisByID {
-		if spec == nil || spec.APIDefinition == nil || spec.APIID == restAPIID || spec.IsSyntheticMCPAdapter() || !spec.IsPairedMCPAdapterProxy() {
-			continue
-		}
-		_, sourceRESTAPIID, ok := pairedMCPAdapterTarget(spec.Proxy.TargetURL)
-		if ok && sourceRESTAPIID == restAPIID {
-			proxyIDs = append(proxyIDs, spec.APIID)
-		}
+	source, ok := gw.mcpPairingIndex.LookupSource(restAPIID)
+	if !ok {
+		return nil
 	}
-	sort.Strings(proxyIDs)
-	return proxyIDs
+	return source.CallerProxyAPIIDs
 }
 
 func apiSpecsByID(specs []*APISpec) map[string]*APISpec {

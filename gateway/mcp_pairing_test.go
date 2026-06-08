@@ -134,6 +134,19 @@ func TestSynthesizeMCPAdapterSpecs_AppendsHiddenInternalAdapters(t *testing.T) {
 	assert.True(t, snapshot.AllowsCaller("rest-1__mcp-server", "proxy-1"))
 }
 
+func TestPairedMCPProxyIDsReferencingRESTSource_UsesPairingIndex(t *testing.T) {
+	snapshot, err := pairing.NewSnapshot([]pairing.Record{
+		{SourceRESTAPIID: "rest-1", SourceOrgID: "org-1", CallerProxyAPIID: "proxy-2", CallerProxyOrgID: "org-1"},
+		{SourceRESTAPIID: "rest-1", SourceOrgID: "org-1", CallerProxyAPIID: "proxy-1", CallerProxyOrgID: "org-1"},
+	})
+	require.NoError(t, err)
+
+	gw := &Gateway{apisByID: map[string]*APISpec{}}
+	gw.mcpPairingIndex.Set(snapshot)
+
+	assert.Equal(t, []string{"proxy-1", "proxy-2"}, gw.pairedMCPProxyIDsReferencingRESTSource("rest-1"))
+}
+
 func pairedMCPProxySpec(proxyID, orgID, restID string, ext *oas.TykMCPServer) *APISpec {
 	doc := pairedMCPProxyOAS(proxyID, orgID, restID)
 	if ext != nil {
