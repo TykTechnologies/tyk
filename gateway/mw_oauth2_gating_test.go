@@ -32,21 +32,30 @@ func fakeIdP(t *testing.T, requireBasic bool) (*httptest.Server, *int32) {
 				return
 			}
 		}
-		_ = r.ParseForm()
+		if err := r.ParseForm(); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		aud := r.PostForm.Get(oas.OAuth2FormAudience)
 		scope := r.PostForm.Get(oas.OAuth2FormScope)
 		payload := map[string]interface{}{"aud": aud, "scope": scope, "iss": "https://exchanged-idp", "sub": "alice"}
-		payloadJSON, _ := json.Marshal(payload)
+		payloadJSON, err := json.Marshal(payload)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		header64 := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
 		payload64 := base64.RawURLEncoding.EncodeToString(payloadJSON)
 		access := header64 + "." + payload64 + ".sig"
 		w.Header().Set(header.ContentType, header.ApplicationJSON)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"access_token":      access,
 			"issued_token_type": oas.OAuth2TokenTypeAccessToken,
 			"token_type":        oas.OAuth2AuthSchemeBearer,
 			"expires_in":        300,
-		})
+		}); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	}))
 	t.Cleanup(srv.Close)
 	return srv, &callCount
@@ -56,7 +65,8 @@ func fakeIdP(t *testing.T, requireBasic bool) (*httptest.Server, *int32) {
 func mintInboundUnverifiedJWT(t *testing.T, iss string) string {
 	t.Helper()
 	payload := map[string]string{"iss": iss, "sub": "alice", "azp": "mcp-client"}
-	pj, _ := json.Marshal(payload)
+	pj, err := json.Marshal(payload)
+	require.NoError(t, err)
 	header64 := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
 	payload64 := base64.RawURLEncoding.EncodeToString(pj)
 	return header64 + "." + payload64 + ".sig"
@@ -71,9 +81,11 @@ type echoUpstream struct {
 func (u *echoUpstream) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	u.authHeader.Store(r.Header.Get(header.Authorization))
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"headers": map[string]string{header.Authorization: r.Header.Get(header.Authorization)},
-	})
+	}); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }
 
 func (u *echoUpstream) ReceivedBearer() string {
@@ -177,7 +189,8 @@ func TestOAuth2Gating_BuildFlavorParity(t *testing.T) {
 	})
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
-	_, _ = io.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
+	require.NoError(t, err)
 
 	upstreamSawBearer := strings.TrimPrefix(upstream.ReceivedBearer(), oas.OAuth2AuthSchemeBearer+" ")
 	upstreamSawBearer = strings.TrimSpace(upstreamSawBearer)

@@ -377,3 +377,28 @@ func TestScopeCheck_RoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, string(empty), "scopeCheck")
 }
+
+func TestValidateOAuth2Schemes_ScopeSource(t *testing.T) {
+	withScopeSource := func(src string) *OAS {
+		s := newOAuth2Fixture("corpOAuth")
+		cfg := s.GetTykOAuth2Config("corpOAuth")
+		if cfg == nil {
+			cfg = &OAuth2{}
+		}
+		cfg.ScopeCheck = &OAuth2ScopeCheck{Enabled: true, ScopeSource: src}
+		s.getTykAuthentication().SecuritySchemes["corpOAuth"] = cfg
+		return s
+	}
+
+	t.Run("rejects unknown scopeSource", func(t *testing.T) {
+		err := withScopeSource("wat").ValidateOAuth2Schemes()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "scopeSource")
+	})
+
+	for _, src := range []string{"", OAuth2ScopeSourceOperation, OAuth2ScopeSourceGlobal, OAuth2ScopeSourceUnion} {
+		t.Run("accepts scopeSource="+src, func(t *testing.T) {
+			assert.NoError(t, withScopeSource(src).ValidateOAuth2Schemes())
+		})
+	}
+}

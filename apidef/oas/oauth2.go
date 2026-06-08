@@ -368,11 +368,31 @@ func (s *OAS) ValidateOAuth2Schemes() error {
 		if cfg == nil || cfg.IsEmpty() {
 			continue
 		}
+		if err := validateOAuth2ScopeCheck(name, cfg.ScopeCheck); err != nil {
+			return err
+		}
 		if err := validateOAuth2TokenExchange(name, cfg.TokenExchange); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// validateOAuth2ScopeCheck rejects an enabled scopeCheck whose scopeSource is
+// outside the supported set. An empty scopeSource is valid and resolves to
+// "union" at enforcement time.
+func validateOAuth2ScopeCheck(schemeName string, sc *OAuth2ScopeCheck) error {
+	if sc == nil || !sc.Enabled || sc.ScopeSource == "" {
+		return nil
+	}
+	switch sc.ScopeSource {
+	case OAuth2ScopeSourceOperation, OAuth2ScopeSourceGlobal, OAuth2ScopeSourceUnion:
+		return nil
+	default:
+		return fmt.Errorf("oauth2 scheme %q: scopeCheck.scopeSource %q is invalid (expected %q, %q or %q)",
+			schemeName, sc.ScopeSource,
+			OAuth2ScopeSourceOperation, OAuth2ScopeSourceGlobal, OAuth2ScopeSourceUnion)
+	}
 }
 
 func validateOAuth2TokenExchange(schemeName string, te *OAuth2TokenExchange) error {
