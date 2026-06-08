@@ -1497,6 +1497,15 @@
     "regexp_cache_expire": {
       "type": "integer"
     },
+    "regexp_cache_max_entries": {
+      "type": "integer"
+    },
+    "disable_regexp_cache_bound": {
+      "type": "boolean"
+    },
+    "disable_auto_max_procs": {
+      "type": "boolean"
+    },
     "proxy_ssl_disable_renegotiation": {
       "type": "boolean"
     },

@@ -65,10 +65,9 @@ type OAuth2PRM struct {
 	// token. At least one entry is required for MCP-proxy APIs.
 	AuthorizationServers []string `bson:"authorizationServers,omitempty" json:"authorizationServers,omitempty"`
 
-	// AutoDeriveScopes, when nil or true (default), unions the served
-	// scopes_supported with scopes from every `security:` array; false
-	// advertises only the `flows.<flow>.scopes` catalog. See
-	// OAuth2PRMScopesSupported.
+	// AutoDeriveScopes unions the served scopes_supported with scopes from
+	// every `security:` array when nil or true (default); false advertises
+	// only the `flows.<flow>.scopes` catalog. See OAuth2PRMScopesSupported.
 	AutoDeriveScopes *bool `bson:"autoDeriveScopes,omitempty" json:"autoDeriveScopes,omitempty"`
 }
 
@@ -582,53 +581,67 @@ func (s *OAS) DeriveOAuth2Scopes() map[string]struct{} {
 		return scopes
 	}
 
-	collect := func(reqs openapi3.SecurityRequirements) {
-		for _, req := range reqs {
-			for schemeName, scopeList := range req {
-				if _, ok := oauth2Names[schemeName]; !ok {
-					continue
-				}
-				for _, sc := range scopeList {
-					if sc == "" {
-						continue
-					}
-					scopes[sc] = struct{}{}
-				}
-			}
-		}
-	}
-
-	collect(s.Security)
-
-	if s.Paths != nil {
-		for _, pathItem := range s.Paths.Map() {
-			if pathItem == nil {
-				continue
-			}
-			for _, op := range pathItem.Operations() {
-				if op == nil || op.Security == nil {
-					continue
-				}
-				collect(*op.Security)
-			}
-		}
-	}
-
-	if mw := s.GetTykMiddleware(); mw != nil {
-		walk := func(prims MCPPrimitives) {
-			for _, prim := range prims {
-				if prim == nil {
-					continue
-				}
-				collect(prim.Security)
-			}
-		}
-		walk(mw.McpTools)
-		walk(mw.McpResources)
-		walk(mw.McpPrompts)
-	}
+	addOAuth2Scopes(scopes, s.Security, oauth2Names)
+	s.addOAuth2ScopesFromPaths(scopes, oauth2Names)
+	s.addOAuth2ScopesFromMCPPrimitives(scopes, oauth2Names)
 
 	return scopes
+}
+
+// addOAuth2Scopes records every non-empty scope that reqs attaches to a
+// recognised oauth2 scheme into scopes.
+func addOAuth2Scopes(scopes map[string]struct{}, reqs openapi3.SecurityRequirements, oauth2Names map[string]struct{}) {
+	for _, req := range reqs {
+		for schemeName, scopeList := range req {
+			if _, ok := oauth2Names[schemeName]; !ok {
+				continue
+			}
+			addNonEmptyScopes(scopes, scopeList)
+		}
+	}
+}
+
+// addNonEmptyScopes records each non-empty entry of list into scopes.
+func addNonEmptyScopes(scopes map[string]struct{}, list []string) {
+	for _, sc := range list {
+		if sc != "" {
+			scopes[sc] = struct{}{}
+		}
+	}
+}
+
+// addOAuth2ScopesFromPaths collects oauth2 scopes from every path
+// operation's `security:` requirement.
+func (s *OAS) addOAuth2ScopesFromPaths(scopes map[string]struct{}, oauth2Names map[string]struct{}) {
+	if s.Paths == nil {
+		return
+	}
+	for _, pathItem := range s.Paths.Map() {
+		if pathItem == nil {
+			continue
+		}
+		for _, op := range pathItem.Operations() {
+			if op != nil && op.Security != nil {
+				addOAuth2Scopes(scopes, *op.Security, oauth2Names)
+			}
+		}
+	}
+}
+
+// addOAuth2ScopesFromMCPPrimitives collects oauth2 scopes from every MCP
+// primitive's `security:` requirement (tools, resources, prompts).
+func (s *OAS) addOAuth2ScopesFromMCPPrimitives(scopes map[string]struct{}, oauth2Names map[string]struct{}) {
+	mw := s.GetTykMiddleware()
+	if mw == nil {
+		return
+	}
+	for _, prims := range []MCPPrimitives{mw.McpTools, mw.McpResources, mw.McpPrompts} {
+		for _, prim := range prims {
+			if prim != nil {
+				addOAuth2Scopes(scopes, prim.Security, oauth2Names)
+			}
+		}
+	}
 }
 
 // SortedOAuth2Scopes returns DeriveOAuth2Scopes as a sorted, stable
