@@ -162,8 +162,14 @@ func InjectTestHook(t *testing.T) *TestHook {
 	return hook
 }
 
+type localTestHook = logrustest.Hook
+
 type TestHook struct {
-	*logrustest.Hook
+	*localTestHook
+}
+
+func NewTestHookWithHook(base *logrustest.Hook) *TestHook {
+	return &TestHook{base}
 }
 
 func (h *TestHook) SomeBy(predicate func(*logrus.Entry) bool) bool {
