@@ -3,9 +3,12 @@ package log
 import (
 	"os"
 	"strings"
+	"testing"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 )
 
 var (
@@ -134,4 +137,45 @@ func IsLegacyFormatter(formatter logrus.Formatter) bool {
 	textFormatter, ok := formatter.(*logrus.TextFormatter)
 
 	return ok && textFormatter.TimestampFormat == LegacyTimestampFormat
+}
+
+// InjectTestHook
+// Inject hook for testing.
+func InjectTestHook(t *testing.T) *TestHook {
+	t.Helper()
+
+	hook := &TestHook{new(logrustest.Hook)}
+	log.AddHook(hook)
+
+	t.Cleanup(func() {
+		clone := make(logrus.LevelHooks, len(log.Hooks))
+
+		for level, hooks := range log.Hooks {
+			clone[level] = lo.Filter(hooks, func(item logrus.Hook, _ int) bool {
+				return item == hook
+			})
+		}
+
+		log.ReplaceHooks(clone)
+	})
+
+	return hook
+}
+
+type TestHook struct {
+	*logrustest.Hook
+}
+
+func (h *TestHook) SomeBy(predicate func(*logrus.Entry) bool) bool {
+	return lo.SomeBy(h.AllEntries(), predicate)
+}
+
+func (h *TestHook) FilterBy(predicate func(*logrus.Entry) bool) []*logrus.Entry {
+	return lo.Filter(h.AllEntries(), func(item *logrus.Entry, _ int) bool {
+		return predicate(item)
+	})
+}
+
+func (h *TestHook) CountBy(predicate func(*logrus.Entry) bool) int {
+	return lo.CountBy(h.AllEntries(), predicate)
 }
