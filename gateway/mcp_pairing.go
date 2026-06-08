@@ -349,7 +349,7 @@ func (gw *Gateway) callMCPAdapterTool(parentReq *http.Request, adapterSpec *APIS
 	}
 	callerTool, ok := view.ToolByName(tool.Name)
 	if !ok {
-		logMCPToolHiddenFromCaller(parentReq, adapterSpec, callerProxyID, tool.Name)
+		logMCPToolHiddenFromCaller(adapterSpec, callerProxyID, tool.Name)
 		return nil, fmt.Errorf("tool not found")
 	}
 
@@ -374,16 +374,11 @@ func (gw *Gateway) callMCPAdapterTool(parentReq *http.Request, adapterSpec *APIS
 	return rec, nil
 }
 
-func logMCPToolHiddenFromCaller(parentReq *http.Request, adapterSpec *APISpec, callerProxyID, toolName string) {
-	sessionKey := ""
-	if ses := ctxGetSession(parentReq); ses != nil {
-		sessionKey = ses.KeyID
-	}
+func logMCPToolHiddenFromCaller(adapterSpec *APISpec, callerProxyID, toolName string) {
 	log.WithFields(logrus.Fields{
 		"tool_name":          toolName,
 		"proxy_api_id":       callerProxyID,
 		"source_rest_api_id": adapterSpec.MCPAdapterSourceRESTAPIID,
 		"adapter_api_id":     adapterSpec.APIID,
-		"session_key":        sessionKey,
 	}).Warn("MCP tool is not exposed for caller proxy")
 }

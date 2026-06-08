@@ -288,7 +288,7 @@ func TestCallMCPAdapterTool_LogsToolHiddenFromCallerProxy(t *testing.T) {
 	assert.Equal(t, "proxy-1", warningEntry.Data["proxy_api_id"])
 	assert.Equal(t, "rest-1", warningEntry.Data["source_rest_api_id"])
 	assert.Equal(t, adapterSpec.APIID, warningEntry.Data["adapter_api_id"])
-	assert.Equal(t, "session-key-1", warningEntry.Data["session_key"])
+	assert.NotContains(t, warningEntry.Data, "session_key")
 }
 
 func TestCallMCPAdapterTool_RunsSourceRESTMiddlewareChain(t *testing.T) {
