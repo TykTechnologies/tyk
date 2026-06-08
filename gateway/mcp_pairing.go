@@ -21,18 +21,26 @@ type mcpAdapterCatalogue struct {
 	toolViews  map[string]oas.MCPToolView
 }
 
+type mcpPairingSynthesisAnalysis struct {
+	snapshot        pairing.Snapshot
+	sourcesByID     map[string]*APISpec
+	proxiesByRESTID map[string][]*APISpec
+}
+
+type pendingMCPProxyPairing struct {
+	spec      *APISpec
+	restAPIID string
+}
+
 func synthesizeMCPAdapterSpecs(specs []*APISpec, existing map[string]*APISpec) ([]*APISpec, pairing.Snapshot, error) {
-	snapshot, err := computeMCPPairing(specs)
+	analysis, err := analyzeMCPPairingsForSynthesis(specs)
 	if err != nil {
 		return specs, pairing.Snapshot{}, err
 	}
 
-	proxiesByRESTID := pairedMCPProxiesByRESTID(specs)
-	sourcesByID := apiSpecsByID(specs)
-
 	out := append([]*APISpec(nil), specs...)
-	for _, restID := range snapshot.ReferencedRESTAPIIDs() {
-		source := sourcesByID[restID]
+	for _, restID := range analysis.snapshot.ReferencedRESTAPIIDs() {
+		source := analysis.sourcesByID[restID]
 		if source == nil {
 			return specs, pairing.Snapshot{}, fmt.Errorf("paired REST API %q is not loaded", restID)
 		}
@@ -43,14 +51,14 @@ func synthesizeMCPAdapterSpecs(specs []*APISpec, existing map[string]*APISpec) (
 			existingAdapter = existing[adapterID]
 		}
 
-		adapterSpec, err := buildMCPAdapterSpec(source, proxiesByRESTID[restID], existingAdapter)
+		adapterSpec, err := buildMCPAdapterSpec(source, analysis.proxiesByRESTID[restID], existingAdapter)
 		if err != nil {
 			return specs, pairing.Snapshot{}, err
 		}
 		out = append(out, adapterSpec)
 	}
 
-	return out, snapshot, nil
+	return out, analysis.snapshot, nil
 }
 
 func (gw *Gateway) currentSyntheticMCPAdapterSpecs() map[string]*APISpec {
@@ -84,43 +92,70 @@ func (gw *Gateway) findInternalHTTPHandlerForLoop(apiNameOrID string, caller *AP
 }
 
 func computeMCPPairing(specs []*APISpec) (pairing.Snapshot, error) {
-	sourcesByID := apiSpecsByID(specs)
-	records := make([]pairing.Record, 0)
+	analysis, err := analyzeMCPPairingsForSynthesis(specs)
+	if err != nil {
+		return pairing.Snapshot{}, err
+	}
+	return analysis.snapshot, nil
+}
+
+func analyzeMCPPairingsForSynthesis(specs []*APISpec) (mcpPairingSynthesisAnalysis, error) {
+	analysis := mcpPairingSynthesisAnalysis{
+		sourcesByID:     make(map[string]*APISpec, len(specs)),
+		proxiesByRESTID: map[string][]*APISpec{},
+	}
+	pairedProxies := make([]pendingMCPProxyPairing, 0)
 
 	for _, spec := range specs {
-		if spec == nil || spec.APIDefinition == nil || spec.IsSyntheticMCPAdapter() || !spec.IsPairedMCPAdapterProxy() {
+		if spec == nil || spec.APIDefinition == nil || spec.IsSyntheticMCPAdapter() {
 			continue
 		}
+		analysis.sourcesByID[spec.APIID] = spec
 
+		if !spec.IsPairedMCPAdapterProxy() {
+			continue
+		}
 		_, restAPIID, ok := pairedMCPAdapterTarget(spec.Proxy.TargetURL)
-		if !ok {
-			continue
+		if ok {
+			pairedProxies = append(pairedProxies, pendingMCPProxyPairing{spec: spec, restAPIID: restAPIID})
+			analysis.proxiesByRESTID[restAPIID] = append(analysis.proxiesByRESTID[restAPIID], spec)
 		}
+	}
 
-		source := sourcesByID[restAPIID]
+	records := make([]pairing.Record, 0, len(pairedProxies))
+	for _, paired := range pairedProxies {
+		source := analysis.sourcesByID[paired.restAPIID]
 		if source == nil || source.APIDefinition == nil {
-			return pairing.Snapshot{}, fmt.Errorf("paired REST API %q is not loaded", restAPIID)
+			return mcpPairingSynthesisAnalysis{}, fmt.Errorf("paired REST API %q is not loaded", paired.restAPIID)
 		}
 		if !source.IsOAS {
-			return pairing.Snapshot{}, fmt.Errorf("paired REST API %q is a Classic API; REST-as-MCP sources must be Tyk OAS APIs", restAPIID)
+			return mcpPairingSynthesisAnalysis{}, fmt.Errorf("paired REST API %q is a Classic API; REST-as-MCP sources must be Tyk OAS APIs", paired.restAPIID)
 		}
 
 		records = append(records, pairing.Record{
-			SourceRESTAPIID:  restAPIID,
+			SourceRESTAPIID:  paired.restAPIID,
 			SourceOrgID:      source.OrgID,
-			CallerProxyAPIID: spec.APIID,
-			CallerProxyOrgID: spec.OrgID,
+			CallerProxyAPIID: paired.spec.APIID,
+			CallerProxyOrgID: paired.spec.OrgID,
 		})
 	}
 
-	return pairing.NewSnapshot(records)
+	for _, proxies := range analysis.proxiesByRESTID {
+		sort.Slice(proxies, func(i, j int) bool { return proxies[i].APIID < proxies[j].APIID })
+	}
+
+	snapshot, err := pairing.NewSnapshot(records)
+	if err != nil {
+		return mcpPairingSynthesisAnalysis{}, err
+	}
+	analysis.snapshot = snapshot
+	return analysis, nil
 }
 
 func buildMCPAdapterSpec(rest *APISpec, proxies []*APISpec, existing *APISpec) (*APISpec, error) {
 	if rest == nil || rest.APIDefinition == nil {
 		return nil, fmt.Errorf("REST-as-MCP source spec is nil")
 	}
-
 	catalogue, err := deriveMCPAdapterCatalogue(rest, proxies)
 	if err != nil {
 		return nil, err
@@ -241,24 +276,6 @@ func deriveMCPAdapterCatalogue(rest *APISpec, proxies []*APISpec) (mcpAdapterCat
 	}, nil
 }
 
-func pairedMCPProxiesByRESTID(specs []*APISpec) map[string][]*APISpec {
-	out := map[string][]*APISpec{}
-	for _, spec := range specs {
-		if spec == nil || spec.APIDefinition == nil || spec.IsSyntheticMCPAdapter() || !spec.IsPairedMCPAdapterProxy() {
-			continue
-		}
-		_, restAPIID, ok := pairedMCPAdapterTarget(spec.Proxy.TargetURL)
-		if !ok {
-			continue
-		}
-		out[restAPIID] = append(out[restAPIID], spec)
-	}
-	for _, proxies := range out {
-		sort.Slice(proxies, func(i, j int) bool { return proxies[i].APIID < proxies[j].APIID })
-	}
-	return out
-}
-
 func (gw *Gateway) pairedMCPProxyIDsReferencingRESTSource(restAPIID string) []string {
 	if gw == nil || restAPIID == "" {
 		return nil
@@ -269,17 +286,6 @@ func (gw *Gateway) pairedMCPProxyIDsReferencingRESTSource(restAPIID string) []st
 		return nil
 	}
 	return source.CallerProxyAPIIDs
-}
-
-func apiSpecsByID(specs []*APISpec) map[string]*APISpec {
-	out := make(map[string]*APISpec, len(specs))
-	for _, spec := range specs {
-		if spec == nil || spec.APIDefinition == nil || spec.IsSyntheticMCPAdapter() {
-			continue
-		}
-		out[spec.APIID] = spec
-	}
-	return out
 }
 
 func callerProxyIDs(proxies []*APISpec) []string {

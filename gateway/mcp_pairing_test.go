@@ -71,6 +71,25 @@ func TestComputeMCPPairing_DuplicateProxyTargetsAllowed(t *testing.T) {
 	assert.Equal(t, []string{"proxy-1", "proxy-2"}, source.CallerProxyAPIIDs)
 }
 
+func TestAnalyzeMCPPairingsForSynthesis_BuildsLookupsAndSnapshot(t *testing.T) {
+	rest := restSourceSpec("rest-1", "org-1", true)
+	unreferenced := restSourceSpec("rest-2", "org-1", true)
+	proxy2 := pairedMCPProxySpec("proxy-2", "org-1", "rest-1", nil)
+	proxy1 := pairedMCPProxySpec("proxy-1", "org-1", "rest-1", nil)
+
+	analysis, err := analyzeMCPPairingsForSynthesis([]*APISpec{rest, unreferenced, proxy2, proxy1})
+	require.NoError(t, err)
+
+	assert.Same(t, rest, analysis.sourcesByID["rest-1"])
+	assert.Same(t, unreferenced, analysis.sourcesByID["rest-2"])
+	assert.Equal(t, []string{"proxy-1", "proxy-2"}, callerProxyIDs(analysis.proxiesByRESTID["rest-1"]))
+	assert.Equal(t, []string{"rest-1"}, analysis.snapshot.ReferencedRESTAPIIDs())
+
+	source, ok := analysis.snapshot.LookupSource("rest-1")
+	require.True(t, ok)
+	assert.Equal(t, []string{"proxy-1", "proxy-2"}, source.CallerProxyAPIIDs)
+}
+
 func TestDeriveMCPAdapterCatalogue_BuildsProxySpecificToolViewsAndUnion(t *testing.T) {
 	rest := restSourceSpec("rest-1", "org-1", true)
 	proxy1 := pairedMCPProxySpec("proxy-1", "org-1", "rest-1", &oas.TykMCPServer{
