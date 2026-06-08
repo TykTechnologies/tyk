@@ -4,11 +4,10 @@ import (
 	"context"
 	"net/http"
 
-	"go.opentelemetry.io/otel/propagation"
-
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	otelmcp "github.com/TykTechnologies/tyk/internal/otel/mcp"
 )
 
 // MCP trace span attribute keys, per the OpenTelemetry GenAI/MCP semantic
@@ -42,7 +41,7 @@ func primitiveNameAttrKey(primitiveType string) string {
 // method (always), the primitive name keyed by its type (tool/resource/prompt,
 // only when one resolved), and where the trace context was found. No identities
 // or token values — only the bounded method/primitive names and the source label.
-func MCPSpanAttributes(method, primitiveType, primitiveName string, source mcp.TraceSource) []SpanAttribute {
+func MCPSpanAttributes(method, primitiveType, primitiveName string, source otelmcp.TraceSource) []SpanAttribute {
 	attrs := []SpanAttribute{
 		tyktrace.NewAttribute(attrMCPMethod, method),
 		tyktrace.NewAttribute(attrMCPTraceSource, string(source)),
@@ -53,12 +52,10 @@ func MCPSpanAttributes(method, primitiveType, primitiveName string, source mcp.T
 	return attrs
 }
 
-// w3cTraceParentHeader / w3cTraceStateHeader are the fixed W3C carrier keys.
-// Only the location an MCP request carries them in is configurable, not the names.
-const (
-	w3cTraceParentHeader = "traceparent"
-	w3cTraceStateHeader  = "tracestate"
-)
+// w3cTraceParentHeader is the fixed W3C header name read to detect an inbound
+// HTTP traceparent. Only the body location an MCP request may carry the trace
+// context in is configurable, not this name.
+const w3cTraceParentHeader = "traceparent"
 
 // Channels an MCP trace-context read source can name.
 const (
@@ -82,8 +79,8 @@ type MCPTraceSource struct {
 }
 
 // MCPTraceContextConfig configures where Tyk reads the MCP trace context from.
-// It lives at opentelemetry.mcp_trace_context, alongside the traces/metrics
-// extensions on the gateway's OpenTelemetry wrapper.
+// It lives at opentelemetry.traces.mcp, nested in the traces sub-object
+// alongside the trace exporter settings.
 type MCPTraceContextConfig struct {
 	// ReadSources is an ordered, first-match-wins list of places to look for
 	// the inbound trace context. When omitted, it defaults to
@@ -97,7 +94,7 @@ type MCPTraceContextConfig struct {
 func DefaultMCPReadSources() []MCPTraceSource {
 	return []MCPTraceSource{
 		{Channel: MCPTraceChannelHeader},
-		{Channel: MCPTraceChannelBody, Path: mcp.DefaultMetaPath},
+		{Channel: MCPTraceChannelBody, Path: otelmcp.DefaultMetaPath},
 	}
 }
 
@@ -114,10 +111,10 @@ func (c *MCPTraceContextConfig) SetDefaults() {
 type MCPTraceResolution struct {
 	// Context is the trace context read from the body (zero when no body source
 	// matched). Carried for the join.
-	Context mcp.TraceContext
+	Context otelmcp.TraceContext
 	// Source records which channel(s) carried a traceparent, for the
 	// trace_source label.
-	Source mcp.TraceSource
+	Source otelmcp.TraceSource
 	// JoinFromBody is true when the caller must install Context into the request
 	// context — i.e. the HTTP header carried nothing and a body source matched.
 	// When the header is present, Tyk's inbound extraction already established
@@ -134,13 +131,13 @@ type MCPTraceResolution struct {
 func ResolveMCPTraceContext(sources []MCPTraceSource, headerTraceParent string, body []byte) MCPTraceResolution {
 	hasHeader := headerTraceParent != ""
 
-	var bodyTC mcp.TraceContext
+	var bodyTC otelmcp.TraceContext
 	bodyFound := false
 	for _, s := range sources {
 		if s.Channel != MCPTraceChannelBody {
 			continue
 		}
-		if tc, ok := mcp.ReadBodyTraceContext(body, s.Path); ok {
+		if tc, ok := otelmcp.ReadBodyTraceContext(body, s.Path); ok {
 			bodyTC, bodyFound = tc, true
 			break
 		}
@@ -148,7 +145,7 @@ func ResolveMCPTraceContext(sources []MCPTraceSource, headerTraceParent string, 
 
 	return MCPTraceResolution{
 		Context:      bodyTC,
-		Source:       mcp.ClassifyTraceSource(headerTraceParent, bodyFound),
+		Source:       otelmcp.ClassifyTraceSource(headerTraceParent, bodyFound),
 		JoinFromBody: bodyFound && !hasHeader,
 	}
 }
@@ -163,7 +160,7 @@ func ResolveMCPTraceContext(sources []MCPTraceSource, headerTraceParent string, 
 // Note: the inbound otelhttp server span is created from the HTTP header before
 // the body is parsed, so it cannot be re-parented here — the join governs every
 // emission from this point onward, which is what the trace_id readers observe.
-func JoinMCPTraceContext(r *http.Request, sources []MCPTraceSource, body []byte) mcp.TraceSource {
+func JoinMCPTraceContext(r *http.Request, sources []MCPTraceSource, body []byte) otelmcp.TraceSource {
 	res := ResolveMCPTraceContext(sources, r.Header.Get(w3cTraceParentHeader), body)
 	if res.JoinFromBody {
 		ctx := extractTraceContext(r.Context(), res.Context)
@@ -173,24 +170,16 @@ func JoinMCPTraceContext(r *http.Request, sources []MCPTraceSource, body []byte)
 }
 
 // extractTraceContext returns ctx with tc installed as the active (remote) span
-// context via the W3C propagator — the same propagator Tyk uses for inbound
-// header extraction, so the joined trace is byte-identical to a header-carried one.
-func extractTraceContext(ctx context.Context, tc mcp.TraceContext) context.Context {
-	carrier := propagation.MapCarrier{w3cTraceParentHeader: tc.TraceParent}
-	if tc.TraceState != "" {
-		carrier[w3cTraceStateHeader] = tc.TraceState
-	}
-	return propagation.TraceContext{}.Extract(ctx, carrier)
+// context via the W3C propagator. SEP-414 fixes the MCP body channel to W3C, so
+// this is always W3C regardless of the operator's configured header propagator.
+func extractTraceContext(ctx context.Context, tc otelmcp.TraceContext) context.Context {
+	return tyktrace.ExtractW3CTraceContext(ctx, tc.TraceParent, tc.TraceState)
 }
 
 // CurrentTraceContext serialises the active span context in ctx to a W3C trace
 // context (traceparent + tracestate), or the zero value when no span is active.
 // Used by the write path to inject Tyk's context into the outbound MCP body.
-func CurrentTraceContext(ctx context.Context) mcp.TraceContext {
-	carrier := propagation.MapCarrier{}
-	propagation.TraceContext{}.Inject(ctx, carrier)
-	return mcp.TraceContext{
-		TraceParent: carrier[w3cTraceParentHeader],
-		TraceState:  carrier[w3cTraceStateHeader],
-	}
+func CurrentTraceContext(ctx context.Context) otelmcp.TraceContext {
+	tp, ts := tyktrace.CurrentW3CTraceContext(ctx)
+	return otelmcp.TraceContext{TraceParent: tp, TraceState: ts}
 }

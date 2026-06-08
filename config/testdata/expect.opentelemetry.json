@@ -55,7 +55,8 @@
             "type": "",
             "rate": 0,
             "parent_based": false
-        }
+        },
+        "mcp": {}
     },
     "metrics": {
         "enabled": true,
@@ -85,6 +86,5 @@
         },
         "runtime_metrics": null,
         "api_metrics": null
-    },
-    "mcp_trace_context": {}
+    }
 }

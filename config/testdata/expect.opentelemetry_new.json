@@ -55,7 +55,8 @@
             "type": "TraceIDRatioBased",
             "rate": 0.5,
             "parent_based": true
-        }
+        },
+        "mcp": {}
     },
     "metrics": {
         "enabled": true,
@@ -85,6 +86,5 @@
         "cardinality_limit": 5000,
         "runtime_metrics": null,
         "api_metrics": null
-    },
-    "mcp_trace_context": {}
+    }
 }

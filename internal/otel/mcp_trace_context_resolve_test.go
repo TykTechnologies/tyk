@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/internal/mcp"
+	otelmcp "github.com/TykTechnologies/tyk/internal/otel/mcp"
 )
 
 const (
@@ -26,13 +26,13 @@ func TestResolveMCPTraceContext(t *testing.T) {
 		res := ResolveMCPTraceContext(sources, "", metaBody(traceParentM))
 		assert.True(t, res.JoinFromBody, "header absent + body present ⇒ Tyk must join")
 		assert.Equal(t, traceParentM, res.Context.TraceParent)
-		assert.Equal(t, mcp.TraceSourceMeta, res.Source)
+		assert.Equal(t, otelmcp.TraceSourceMeta, res.Source)
 	})
 
 	t.Run("header-only: reconcile, never fork", func(t *testing.T) {
 		res := ResolveMCPTraceContext(sources, traceParentH, []byte(`{"method":"tools/call","params":{"name":"x"}}`))
 		assert.False(t, res.JoinFromBody, "header already established the trace")
-		assert.Equal(t, mcp.TraceSourceHeader, res.Source)
+		assert.Equal(t, otelmcp.TraceSourceHeader, res.Source)
 	})
 
 	t.Run("both present: header authoritative, no second trace", func(t *testing.T) {
@@ -40,13 +40,13 @@ func TestResolveMCPTraceContext(t *testing.T) {
 		// and because the inbound extraction already used H we do NOT re-join.
 		res := ResolveMCPTraceContext(sources, traceParentH, metaBody(traceParentM))
 		assert.False(t, res.JoinFromBody, "both channels present ⇒ reconcile to header, don't fork")
-		assert.Equal(t, mcp.TraceSourceBoth, res.Source)
+		assert.Equal(t, otelmcp.TraceSourceBoth, res.Source)
 	})
 
 	t.Run("neither present: nothing to join", func(t *testing.T) {
 		res := ResolveMCPTraceContext(sources, "", []byte(`{"method":"tools/call","params":{"name":"x"}}`))
 		assert.False(t, res.JoinFromBody)
-		assert.Equal(t, mcp.TraceSourceNone, res.Source)
+		assert.Equal(t, otelmcp.TraceSourceNone, res.Source)
 	})
 
 	t.Run("configured body path drives the body read", func(t *testing.T) {

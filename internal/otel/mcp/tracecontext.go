@@ -134,15 +134,23 @@ func WriteMetaTraceContext(body []byte, tc TraceContext) (out []byte, changed bo
 		return body, false
 	}
 
-	meta[TraceParentKey] = jsonString(tc.TraceParent)
+	var err error
+	if meta[TraceParentKey], err = json.Marshal(tc.TraceParent); err != nil {
+		return body, false
+	}
 	if tc.TraceState != "" {
-		meta[TraceStateKey] = jsonString(tc.TraceState)
+		if meta[TraceStateKey], err = json.Marshal(tc.TraceState); err != nil {
+			return body, false
+		}
 	}
 
-	params[MetaKey], _ = json.Marshal(meta) // valid RawMessage values ⇒ cannot fail
-	top["params"], _ = json.Marshal(params)
-	out, err := json.Marshal(top)
-	if err != nil {
+	if params[MetaKey], err = json.Marshal(meta); err != nil {
+		return body, false
+	}
+	if top["params"], err = json.Marshal(params); err != nil {
+		return body, false
+	}
+	if out, err = json.Marshal(top); err != nil {
 		return body, false
 	}
 	return out, true
@@ -174,10 +182,4 @@ func rawString(raw json.RawMessage) string {
 		return ""
 	}
 	return s
-}
-
-// jsonString marshals s into a JSON string RawMessage.
-func jsonString(s string) json.RawMessage {
-	b, _ := json.Marshal(s)
-	return b
 }

@@ -268,6 +268,27 @@
                   "type": "string"
                 }
               }
+            },
+            "mcp": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "read_sources": {
+                  "type": ["array", "null"],
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "channel": {
+                        "type": "string"
+                      },
+                      "path": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         },
@@ -354,27 +375,6 @@
             },
             "api_metrics": {
               "type": ["array", "null"]
-            }
-          }
-        },
-        "mcp_trace_context": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "read_sources": {
-              "type": ["array", "null"],
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "channel": {
-                    "type": "string"
-                  },
-                  "path": {
-                    "type": "string"
-                  }
-                }
-              }
             }
           }
         }

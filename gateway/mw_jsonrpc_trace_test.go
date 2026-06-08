@@ -16,6 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	otelmcp "github.com/TykTechnologies/tyk/internal/otel/mcp"
 )
 
 // agentTraceParent — the W3C traceparent an MCP-native agent sets in params._meta.
@@ -27,8 +28,17 @@ const (
 
 func newMCPTraceMiddleware(t *testing.T, otelEnabled bool) *JSONRPCMiddleware {
 	t.Helper()
-	conf := config.Config{}
-	conf.OpenTelemetry.Enabled = otelEnabled
+	var oc otel.OpenTelemetry
+	oc.Enabled = otelEnabled
+	return newMCPTraceMiddlewareCfg(t, oc)
+}
+
+// newMCPTraceMiddlewareCfg builds the MCP middleware around a caller-supplied
+// OpenTelemetry config, so a test can exercise a non-default read_sources
+// configuration. SetDefaults runs so omitted fields behave as in production.
+func newMCPTraceMiddlewareCfg(t *testing.T, oc otel.OpenTelemetry) *JSONRPCMiddleware {
+	t.Helper()
+	conf := config.Config{OpenTelemetry: oc}
 	conf.OpenTelemetry.SetDefaults()
 	gw := NewGateway(conf, context.Background())
 
@@ -134,7 +144,47 @@ func TestJSONRPCMiddleware_Write_InjectsTykContextIntoMeta(t *testing.T) {
 
 	out, err := io.ReadAll(r.Body)
 	require.NoError(t, err)
-	tc, ok := mcp.ReadMetaTraceContext(out)
+	tc, ok := otelmcp.ReadMetaTraceContext(out)
 	require.True(t, ok, "outbound body must now carry params._meta trace context")
 	assert.Equal(t, tykTraceParent, tc.TraceParent, "the MCP server receives Tyk's trace context")
+}
+
+// otelWithReadSources builds an enabled new-format trace config whose MCP read
+// sources are exactly the given list, at opentelemetry.traces.mcp.read_sources.
+func otelWithReadSources(sources ...otel.MCPTraceSource) otel.OpenTelemetry {
+	var oc otel.OpenTelemetry
+	oc.Traces = &otel.TracesConfig{}
+	oc.Traces.Enabled = true
+	oc.Traces.MCPTraceContext.ReadSources = sources
+	return oc
+}
+
+// A configured read_sources drives the join end-to-end: with the body source
+// pointed at a non-default path (params.trace), an MCP-native agent that carries
+// its traceparent there is joined just like the canonical params._meta location.
+// This exercises the whole config→accessor→resolve→join chain through the
+// opentelemetry.traces.mcp location.
+func TestJSONRPCMiddleware_ConfiguredReadSources_DriveTheJoin(t *testing.T) {
+	m := newMCPTraceMiddlewareCfg(t, otelWithReadSources(
+		otel.MCPTraceSource{Channel: otel.MCPTraceChannelBody, Path: "params.trace"},
+	))
+	body := `{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get-weather","trace":{"traceparent":"` + agentTraceParent + `"}},"id":1}`
+
+	r := mcpToolsCall(t, m, body)
+
+	assert.Equal(t, agentTraceID, otel.ExtractTraceID(r.Context()),
+		"the configured body path params.trace must drive the join")
+}
+
+// The same body is not joined under the default config, proving it is the
+// configured read source — not a hardcoded location — that resolved it: the
+// default params._meta source never looks at params.trace.
+func TestJSONRPCMiddleware_DefaultReadSources_IgnoreCustomPath(t *testing.T) {
+	m := newMCPTraceMiddleware(t, true)
+	body := `{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get-weather","trace":{"traceparent":"` + agentTraceParent + `"}},"id":1}`
+
+	r := mcpToolsCall(t, m, body)
+
+	assert.Empty(t, otel.ExtractTraceID(r.Context()),
+		"a traceparent at params.trace is invisible to the default params._meta source")
 }
