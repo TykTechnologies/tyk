@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/lonelycode/osin"
+	logrus "github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -24,6 +26,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/model"
+	tykLog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -1397,4 +1400,151 @@ func TestLoadApps_PendingCertsDrain_Extended(t *testing.T) {
 		ts.Gw.loadApps([]*APISpec{spec})
 		// no assertion needed beyond mock expectation: GetRaw must not be called
 	})
+}
+
+func Test_RPCStorageHandler(t *testing.T) {
+	t.Run("decorators", func(t *testing.T) {
+		t.Run("elapsedLog", func(t *testing.T) {
+			t.Run("writes logs to provided logger", func(t *testing.T) {
+				const fnName = "testFn"
+
+				logger, rawHook := logrustest.NewNullLogger()
+				logger.Level = logrus.DebugLevel
+				hook := tykLog.NewTestHookWithHook(rawHook)
+
+				fn := decorate(
+					func() error {
+						return nil
+					},
+					elapsedLog(fnName, logger),
+				)
+
+				err := fn()
+				assert.NoError(t, err)
+				assert.Equal(t, 1, hook.CountBy(func(entry *logrus.Entry) bool {
+					return entry.Level == logrus.DebugLevel && strings.Contains(entry.Message, fmt.Sprintf("%q took", fnName))
+				}))
+
+				hook.Reset()
+				mockErr := errors.New("mock error")
+				fn = decorate(
+					func() error {
+						return mockErr
+					},
+					elapsedLog(fnName, logger),
+				)
+				err = fn()
+				assert.ErrorIs(t, err, mockErr)
+				assert.True(t, len(hook.AllEntries()) == 1, "expected contain one error")
+				assert.Equal(t, 1, hook.CountBy(func(entry *logrus.Entry) bool {
+					return entry.Level == logrus.DebugLevel && strings.Contains(entry.Message, fmt.Sprintf("%q failed with error", fnName))
+				}))
+			})
+		})
+
+		t.Run("retryAlways", func(t *testing.T) {
+			t.Run("returns without error on first success", func(t *testing.T) {
+				mockChecker := &mockRpcChecker{
+					isRetriableFn: func(_ error) bool { return false },
+				}
+
+				attempts := 0
+				fn := decorate(
+					func() error {
+						attempts++
+						return nil
+					},
+					retryAlways(mockChecker),
+				)
+
+				err := fn()
+				assert.NoError(t, err)
+				assert.Equal(t, 1, attempts, "expected to run exactly once")
+			})
+
+			t.Run("does not retry and returns error if error is not retriable", func(t *testing.T) {
+				mockErr := errors.New("fatal mock error")
+				mockChecker := &mockRpcChecker{
+					isRetriableFn: func(_ error) bool { return false },
+				}
+
+				attempts := 0
+				fn := decorate(
+					func() error {
+						attempts++
+						return mockErr
+					},
+					retryAlways(mockChecker),
+				)
+
+				err := fn()
+				assert.ErrorIs(t, err, mockErr)
+				assert.Equal(t, 1, attempts, "expected to exit after first failed attempt")
+			})
+
+			t.Run("does not retry and returns error if error is retriable but RpcLogin fails", func(t *testing.T) {
+				mockErr := errors.New("retriable mock error")
+				mockChecker := &mockRpcChecker{
+					isRetriableFn: func(_ error) bool { return true },
+					rpcLoginFn:    func() bool { return false },
+				}
+
+				attempts := 0
+				fn := decorate(
+					func() error {
+						attempts++
+						return mockErr
+					},
+					retryAlways(mockChecker),
+				)
+
+				err := fn()
+				assert.ErrorIs(t, err, mockErr)
+				assert.Equal(t, 1, attempts, "expected to exit after first failed attempt because login failed")
+			})
+
+			t.Run("retries on retriable error and successful RpcLogin, then succeeds", func(t *testing.T) {
+				mockErr := errors.New("temporary mock error")
+				mockChecker := &mockRpcChecker{
+					isRetriableFn: func(err error) bool { return err != nil },
+					rpcLoginFn:    func() bool { return true },
+				}
+
+				attempts := 0
+				fn := decorate(
+					func() error {
+						attempts++
+						if attempts == 1 {
+							return mockErr
+						}
+						return nil
+					},
+					retryAlways(mockChecker),
+				)
+
+				err := fn()
+				assert.NoError(t, err)
+				assert.Equal(t, 2, attempts, "expected exactly 2 attempts before success")
+			})
+		})
+	})
+}
+
+type mockRpcChecker struct {
+	isRetriableFn func(error) bool
+	rpcLoginFn    func() bool
+}
+
+func (m *mockRpcChecker) IsRetriableError(err error) bool {
+	if m.isRetriableFn != nil {
+		return m.isRetriableFn(err)
+	}
+	return false
+}
+
+func (m *mockRpcChecker) RpcLogin() bool {
+	if m.rpcLoginFn != nil {
+		return m.rpcLoginFn()
+	}
+	return false
 }

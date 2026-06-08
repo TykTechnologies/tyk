@@ -7,7 +7,6 @@ import (
 )
 
 func Test_LDAPStorageHandler(t *testing.T) {
-
 	newLDAPStorageHandler := func() *LDAPStorageHandler {
 		return &LDAPStorageHandler{}
 	}

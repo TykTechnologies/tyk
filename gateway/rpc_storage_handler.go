@@ -425,8 +425,8 @@ func (r *RPCStorageHandler) SetKeyEx(keyName, session string, timeout int64) err
 
 			return err
 		},
-		retryAlways(r, rpc.Login),
-		elapsedLog(fnName),
+		retryAlways(r),
+		elapsedLog(fnName, log),
 	)()
 }
 
@@ -779,6 +779,10 @@ func (r RPCStorageHandler) IsRetriableError(err error) bool {
 		}
 	}
 	return false
+}
+
+func (r RPCStorageHandler) RpcLogin() bool {
+	return rpc.Login()
 }
 
 // GetAPIDefinitions will pull API definitions from the RPC server
@@ -1425,8 +1429,7 @@ func decorate[F any](in F, decorators ...func(F) F) F {
 }
 
 func retryAlways(
-	checker interface{ IsRetriableError(error) bool },
-	login func() bool,
+	obj RpcLoginAndRetriableErrorChecker,
 ) func(func() error) func() error {
 
 	return func(next func() error) func() error {
@@ -1434,7 +1437,7 @@ func retryAlways(
 			for {
 				err := next()
 
-				if checker.IsRetriableError(err) && login() {
+				if obj.IsRetriableError(err) && obj.RpcLogin() {
 					continue
 				}
 
@@ -1444,7 +1447,7 @@ func retryAlways(
 	}
 }
 
-func elapsedLog(fnName string) func(func() error) func() error {
+func elapsedLog(fnName string, log *logrus.Logger) func(func() error) func() error {
 	return func(next func() error) func() error {
 		return func() error {
 			start := time.Now()
@@ -1460,4 +1463,17 @@ func elapsedLog(fnName string) func(func() error) func() error {
 			return err
 		}
 	}
+}
+
+type RetriableErrorChecker interface {
+	IsRetriableError(error) bool
+}
+
+type RpcLogin interface {
+	RpcLogin() bool
+}
+
+type RpcLoginAndRetriableErrorChecker interface {
+	RetriableErrorChecker
+	RpcLogin
 }
