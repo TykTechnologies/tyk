@@ -2,6 +2,7 @@
 package gateway
 
 import (
+	"context"
 	"net/http"
 	_ "net/http"
 	"testing"
@@ -54,6 +55,63 @@ func stopRPCMock(server *gorpc.Server) {
 	}
 
 	rpc.Reset()
+}
+
+// The gorpc client can only call RPCs that are registered in dispatcherFuncs;
+// the client-IdP path adds two. (GetClientIdPs was missing originally, which
+// would have failed every edge fetch.)
+func TestDispatcherFuncs_RegistersClientIdPRPCs(t *testing.T) {
+	for _, fn := range []string{"GetClientIdPs", "CheckIdPReload"} {
+		if _, ok := dispatcherFuncs[fn]; !ok {
+			t.Errorf("dispatcherFuncs must register %q so the gorpc client can call it", fn)
+		}
+	}
+}
+
+// With the RPC client down, GetClientIdPs logs the error and returns an empty
+// payload (the registry then keeps its previous snapshot).
+func TestRPCStorageHandler_GetClientIdPs_RPCDown(t *testing.T) {
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{})
+	store := RPCStorageHandler{Gw: gw}
+
+	if got := store.GetClientIdPs("org", []string{"tag-a"}); got != "" {
+		t.Fatalf("RPC down should yield empty payload, got %q", got)
+	}
+}
+
+// CheckForIdPReload keeps the loop alive (returns true) when the RPC client is
+// down, logging the error without disturbing the main sync.
+func TestRPCStorageHandler_CheckForIdPReload_RPCDown(t *testing.T) {
+	gw := &Gateway{ctx: context.Background()}
+	gw.SetConfig(config.Config{})
+	store := RPCStorageHandler{Gw: gw}
+
+	if !store.CheckForIdPReload("org") {
+		t.Fatal("CheckForIdPReload should return true to keep the loop running on RPC error")
+	}
+}
+
+// idpReloadLoop is the parallel client-IdP poll loop; it must exit when the
+// gateway context is cancelled (shutdown) rather than spin forever.
+func TestGateway_idpReloadLoop_StopsOnShutdown(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancelled up front: CheckForIdPReload returns false immediately
+
+	gw := &Gateway{ctx: ctx}
+	gw.RPCListener = RPCStorageHandler{Gw: gw}
+
+	done := make(chan struct{})
+	go func() {
+		gw.idpReloadLoop("org")
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("idpReloadLoop did not exit after context cancellation")
+	}
 }
 
 const apiDefListTest = `[{
