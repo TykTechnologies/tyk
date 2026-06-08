@@ -17,6 +17,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -228,11 +229,21 @@ func (b *upstreamRequestBuilder) applyArg(argName, loc string, raw any) error {
 	sourceName := b.sourceName(argName)
 	switch {
 	case loc == oas.DerivedParamLocationPath:
-		b.applyPathArg(sourceName, raw)
+		if err := b.applyPathArg(argName, sourceName, raw); err != nil {
+			return err
+		}
 	case loc == oas.DerivedParamLocationQuery:
-		b.query = append(b.query, queryParam{name: sourceName, value: fmt.Sprint(raw)})
+		params, err := b.queryParams(argName, sourceName, raw)
+		if err != nil {
+			return err
+		}
+		b.query = append(b.query, params...)
 	case loc == oas.DerivedParamLocationHeader:
-		b.headers.Set(sourceName, fmt.Sprint(raw))
+		value, err := b.headerValue(argName, sourceName, raw)
+		if err != nil {
+			return err
+		}
+		b.headers.Set(sourceName, value)
 	case loc == oas.DerivedParamLocationBody:
 		b.bodyJSON = raw
 		b.hasBody = true
@@ -248,12 +259,179 @@ func (b *upstreamRequestBuilder) sourceName(argName string) string {
 			return sourceName
 		}
 	}
+	if b.tool.ParamSerializations != nil {
+		if sourceName := b.tool.ParamSerializations[argName].SourceName; sourceName != "" {
+			return sourceName
+		}
+	}
 	return argName
 }
 
-func (b *upstreamRequestBuilder) applyPathArg(argName string, raw any) {
-	escaped := url.PathEscape(fmt.Sprint(raw))
-	b.path = strings.ReplaceAll(b.path, "{"+argName+"}", escaped)
+func (b *upstreamRequestBuilder) applyPathArg(argName, sourceName string, raw any) error {
+	serialization := b.paramSerialization(argName, sourceName, oas.DerivedParamLocationPath)
+	value, err := serializedParameterValue(argName, raw, serialization)
+	if err != nil {
+		return err
+	}
+	escaped := url.PathEscape(value)
+	b.path = strings.ReplaceAll(b.path, "{"+sourceName+"}", escaped)
+	return nil
+}
+
+func (b *upstreamRequestBuilder) queryParams(argName, sourceName string, raw any) ([]queryParam, error) {
+	serialization := b.paramSerialization(argName, sourceName, oas.DerivedParamLocationQuery)
+	values, array, err := parameterValues(argName, raw)
+	if err != nil {
+		return nil, err
+	}
+	if !array {
+		return []queryParam{{name: sourceName, value: values[0]}}, nil
+	}
+	if len(values) == 0 {
+		return nil, nil
+	}
+	if serialization.Style == "form" && serialization.Explode {
+		params := make([]queryParam, 0, len(values))
+		for _, value := range values {
+			params = append(params, queryParam{name: sourceName, value: value})
+		}
+		return params, nil
+	}
+	delimiter, ok := queryArrayDelimiter(serialization.Style)
+	if !ok {
+		return nil, invalidParamsf("cannot serialize argument %q with query style %q", argName, serialization.Style)
+	}
+	return []queryParam{{name: sourceName, value: strings.Join(values, delimiter)}}, nil
+}
+
+func (b *upstreamRequestBuilder) headerValue(argName, sourceName string, raw any) (string, error) {
+	serialization := b.paramSerialization(argName, sourceName, oas.DerivedParamLocationHeader)
+	return serializedParameterValue(argName, raw, serialization)
+}
+
+func (b *upstreamRequestBuilder) paramSerialization(argName, sourceName, loc string) oas.DerivedParamSerialization {
+	if b.tool.ParamSerializations != nil {
+		if serialization, ok := b.tool.ParamSerializations[argName]; ok {
+			if serialization.SourceName == "" {
+				serialization.SourceName = sourceName
+			}
+			if serialization.Location == "" {
+				serialization.Location = loc
+			}
+			if serialization.Style == "" {
+				serialization.Style = defaultParameterStyle(loc)
+			}
+			return serialization
+		}
+	}
+	return oas.DerivedParamSerialization{
+		SourceName: sourceName,
+		Location:   loc,
+		Style:      defaultParameterStyle(loc),
+		Explode:    defaultParameterExplode(loc),
+	}
+}
+
+func serializedParameterValue(argName string, raw any, serialization oas.DerivedParamSerialization) (string, error) {
+	values, array, err := parameterValues(argName, raw)
+	if err != nil {
+		return "", err
+	}
+	if !array {
+		return values[0], nil
+	}
+	switch serialization.Location {
+	case oas.DerivedParamLocationPath:
+		if serialization.Style != "simple" {
+			return "", invalidParamsf("cannot serialize argument %q with path style %q", argName, serialization.Style)
+		}
+		return strings.Join(values, ","), nil
+	case oas.DerivedParamLocationHeader:
+		return strings.Join(values, ","), nil
+	default:
+		return "", invalidParamsf("cannot serialize argument %q as %s parameter", argName, serialization.Location)
+	}
+}
+
+func parameterValues(argName string, raw any) ([]string, bool, error) {
+	if values, ok, err := arrayParameterValues(argName, raw); ok || err != nil {
+		return values, ok, err
+	}
+	value, ok := scalarParameterValue(raw)
+	if !ok {
+		return nil, false, invalidParamsf("cannot serialize argument %q of type %T as path/query/header parameter", argName, raw)
+	}
+	return []string{value}, false, nil
+}
+
+func arrayParameterValues(argName string, raw any) ([]string, bool, error) {
+	value := reflect.ValueOf(raw)
+	if !value.IsValid() {
+		return nil, false, nil
+	}
+	switch value.Kind() {
+	case reflect.Slice, reflect.Array:
+	default:
+		return nil, false, nil
+	}
+
+	values := make([]string, 0, value.Len())
+	for i := 0; i < value.Len(); i++ {
+		item := value.Index(i).Interface()
+		text, ok := scalarParameterValue(item)
+		if !ok {
+			return nil, true, invalidParamsf("cannot serialize argument %q array item %d of type %T as path/query/header parameter", argName, i, item)
+		}
+		values = append(values, text)
+	}
+	return values, true, nil
+}
+
+func scalarParameterValue(raw any) (string, bool) {
+	switch v := raw.(type) {
+	case string:
+		return v, true
+	case bool:
+		return fmt.Sprint(v), true
+	case int, int8, int16, int32, int64:
+		return fmt.Sprint(v), true
+	case uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprint(v), true
+	case float32, float64:
+		return fmt.Sprint(v), true
+	case json.Number:
+		return v.String(), true
+	default:
+		return "", false
+	}
+}
+
+func queryArrayDelimiter(style string) (string, bool) {
+	switch style {
+	case "form":
+		return ",", true
+	case "spaceDelimited":
+		return " ", true
+	case "pipeDelimited":
+		return "|", true
+	default:
+		return "", false
+	}
+}
+
+func defaultParameterStyle(loc string) string {
+	switch loc {
+	case oas.DerivedParamLocationQuery:
+		return "form"
+	case oas.DerivedParamLocationPath, oas.DerivedParamLocationHeader:
+		return "simple"
+	default:
+		return ""
+	}
+}
+
+func defaultParameterExplode(loc string) bool {
+	return loc == oas.DerivedParamLocationQuery
 }
 
 func (b *upstreamRequestBuilder) applyBodyFieldArg(argName, loc string, raw any) error {

@@ -139,6 +139,130 @@ func TestBuildUpstreamRequest_QueryParametersUseDerivedOrder(t *testing.T) {
 	assert.Equal(t, "z=3&a=1&m=2", req.URL.RawQuery)
 }
 
+func TestBuildUpstreamRequest_QueryArrayParametersUseSerializationMetadata(t *testing.T) {
+	t.Parallel()
+	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
+	tool := &oas.DerivedTool{
+		Name:         "list_orders",
+		Method:       http.MethodGet,
+		PathTemplate: "/orders",
+		ParamLocations: map[string]string{
+			"tags":       oas.DerivedParamLocationQuery,
+			"ids":        oas.DerivedParamLocationQuery,
+			"pipe_names": oas.DerivedParamLocationQuery,
+		},
+		ParamSourceNames: map[string]string{
+			"tags":       "tag",
+			"ids":        "ids",
+			"pipe_names": "names",
+		},
+		ParamSerializations: map[string]oas.DerivedParamSerialization{
+			"tags":       {SourceName: "tag", Location: oas.DerivedParamLocationQuery, Style: "form", Explode: true, SchemaType: "array"},
+			"ids":        {SourceName: "ids", Location: oas.DerivedParamLocationQuery, Style: "form", Explode: false, SchemaType: "array"},
+			"pipe_names": {SourceName: "names", Location: oas.DerivedParamLocationQuery, Style: "pipeDelimited", Explode: false, SchemaType: "array"},
+		},
+		ParamOrder: []string{"tags", "ids", "pipe_names"},
+	}
+
+	req, err := BuildUpstreamRequest(parent, tool, "rest-1", map[string]any{
+		"tags":       []any{"new", "paid"},
+		"ids":        []any{1, 2},
+		"pipe_names": []any{"alice", "bob"},
+	})
+	require.NoError(t, err)
+
+	query := req.URL.Query()
+	assert.Equal(t, []string{"new", "paid"}, query["tag"])
+	assert.Equal(t, "1,2", query.Get("ids"))
+	assert.Equal(t, "alice|bob", query.Get("names"))
+	assert.Equal(t, "tag=new&tag=paid&ids=1%2C2&names=alice%7Cbob", req.URL.RawQuery)
+}
+
+func TestBuildUpstreamRequest_HeaderArrayParametersUseSerializationMetadata(t *testing.T) {
+	t.Parallel()
+	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
+	tool := &oas.DerivedTool{
+		Name:         "list_orders",
+		Method:       http.MethodGet,
+		PathTemplate: "/orders",
+		ParamLocations: map[string]string{
+			"states": oas.DerivedParamLocationHeader,
+		},
+		ParamSourceNames: map[string]string{
+			"states": "X-States",
+		},
+		ParamSerializations: map[string]oas.DerivedParamSerialization{
+			"states": {SourceName: "X-States", Location: oas.DerivedParamLocationHeader, Style: "simple", Explode: false, SchemaType: "array"},
+		},
+	}
+
+	req, err := BuildUpstreamRequest(parent, tool, "rest-1", map[string]any{
+		"states": []any{"open", "closed"},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "open,closed", req.Header.Get("X-States"))
+}
+
+func TestBuildUpstreamRequest_RejectsNonScalarPathQueryAndHeaderValues(t *testing.T) {
+	t.Parallel()
+	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
+
+	tests := []struct {
+		name string
+		tool *oas.DerivedTool
+		args map[string]any
+	}{
+		{
+			name: "path object",
+			tool: &oas.DerivedTool{
+				Name:         "get_order",
+				Method:       http.MethodGet,
+				PathTemplate: "/orders/{id}",
+				ParamLocations: map[string]string{
+					"id": oas.DerivedParamLocationPath,
+				},
+			},
+			args: map[string]any{"id": map[string]any{"nested": "value"}},
+		},
+		{
+			name: "query object",
+			tool: &oas.DerivedTool{
+				Name:         "list_orders",
+				Method:       http.MethodGet,
+				PathTemplate: "/orders",
+				ParamLocations: map[string]string{
+					"filter": oas.DerivedParamLocationQuery,
+				},
+			},
+			args: map[string]any{"filter": map[string]any{"status": "open"}},
+		},
+		{
+			name: "header object",
+			tool: &oas.DerivedTool{
+				Name:         "list_orders",
+				Method:       http.MethodGet,
+				PathTemplate: "/orders",
+				ParamLocations: map[string]string{
+					"filter": oas.DerivedParamLocationHeader,
+				},
+			},
+			args: map[string]any{"filter": map[string]any{"status": "open"}},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := BuildUpstreamRequest(parent, tt.tool, "rest-1", tt.args)
+			require.Error(t, err)
+			assert.True(t, IsInvalidParams(err))
+			assert.Contains(t, err.Error(), "cannot serialize")
+		})
+	}
+}
+
 func TestBuildUpstreamRequest_BodyFields(t *testing.T) {
 	t.Parallel()
 	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)

@@ -655,6 +655,78 @@ func TestDeriveSourceTools_PrefixesParameterNameCollisions(t *testing.T) {
 	assert.Contains(t, props, "id")
 }
 
+func TestDeriveSourceTools_DerivesParameterSerializationMetadata(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders/{id}", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: "list_orders",
+				Parameters: openapi3.Parameters{
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{
+						Name:     "id",
+						In:       openapi3.ParameterInPath,
+						Required: true,
+						Schema:   &openapi3.SchemaRef{Value: openapi3.NewStringSchema()},
+					}},
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{
+						Name:   "tags",
+						In:     openapi3.ParameterInQuery,
+						Schema: &openapi3.SchemaRef{Value: openapi3.NewArraySchema().WithItems(openapi3.NewStringSchema())},
+					}},
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{
+						Name:    "ids",
+						In:      openapi3.ParameterInQuery,
+						Style:   "form",
+						Explode: boolPtr(false),
+						Schema:  &openapi3.SchemaRef{Value: openapi3.NewArraySchema().WithItems(openapi3.NewIntegerSchema())},
+					}},
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{
+						Name:   "X-Tags",
+						In:     openapi3.ParameterInHeader,
+						Schema: &openapi3.SchemaRef{Value: openapi3.NewArraySchema().WithItems(openapi3.NewStringSchema())},
+					}},
+				},
+			},
+		}),
+	))
+
+	tools, _, err := DeriveSourceTools(src, nil)
+	require.NoError(t, err)
+	require.Len(t, tools, 1)
+
+	assert.Equal(t, map[string]DerivedParamSerialization{
+		"id": {
+			SourceName: "id",
+			Location:   DerivedParamLocationPath,
+			Style:      "simple",
+			Explode:    false,
+			SchemaType: schemaTypeString,
+		},
+		"tags": {
+			SourceName: "tags",
+			Location:   DerivedParamLocationQuery,
+			Style:      "form",
+			Explode:    true,
+			SchemaType: schemaTypeArray,
+		},
+		"ids": {
+			SourceName: "ids",
+			Location:   DerivedParamLocationQuery,
+			Style:      "form",
+			Explode:    false,
+			SchemaType: schemaTypeArray,
+		},
+		"X-Tags": {
+			SourceName: "X-Tags",
+			Location:   DerivedParamLocationHeader,
+			Style:      "simple",
+			Explode:    false,
+			SchemaType: schemaTypeArray,
+		},
+	}, tools[0].ParamSerializations)
+}
+
 func TestDeriveSourceTools_RejectsDuplicateExposedParameterNames(t *testing.T) {
 	t.Parallel()
 

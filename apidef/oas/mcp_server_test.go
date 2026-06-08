@@ -159,6 +159,15 @@ func TestDeriveMCPToolView_AppliesExplicitAllowAliasesAndDescriptionOverrides(t 
 	assert.Equal(t, "Place a new order for a customer", tool.Description)
 	assert.Equal(t, map[string]string{"customer": DerivedParamLocationQuery}, tool.ParamLocations)
 	assert.Equal(t, map[string]string{"customer": "customer_id"}, tool.ParamSourceNames)
+	assert.Equal(t, map[string]DerivedParamSerialization{
+		"customer": {
+			SourceName: "customer_id",
+			Location:   DerivedParamLocationQuery,
+			Style:      "form",
+			Explode:    true,
+			SchemaType: schemaTypeString,
+		},
+	}, tool.ParamSerializations)
 
 	props := tool.InputSchema["properties"].(map[string]any)
 	customer := props["customer"].(map[string]any)
