@@ -44,6 +44,7 @@ const (
 	NoticeDeleteAPICache            NotificationCommand = "DeleteAPICache"
 	NoticeUserKeyReset              NotificationCommand = "UserKeyReset"
 	NoticeInvalidateJWKSCacheForAPI NotificationCommand = "InvalidateJWKSCacheForAPI"
+	NoticeClientIdPChanged          NotificationCommand = "ClientIdPChanged"
 )
 
 // Notification is a type that encodes a message published to a pub sub channel (shared between implementations)
@@ -160,6 +161,12 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 		}
 	case NoticeInvalidateJWKSCacheForAPI:
 		gw.invalidateJWKSCacheByAPIID(notif.Payload)
+	case NoticeClientIdPChanged:
+		// Refresh only the registry — deliberately NOT bundled with NoticeApi*/
+		// NoticePolicyChanged: no router rebuild, no APISpec reload. Debounced,
+		// so a burst of signals coalesces into one rebuild. Direct-Dashboard
+		// mode only; RPC-mode edges refresh on their existing poll/reload tick.
+		gw.refreshIdPRegistry()
 	case NoticeUserKeyReset:
 		gw.handleUserKeyReset(notif.Payload)
 	default:
