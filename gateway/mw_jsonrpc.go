@@ -331,6 +331,9 @@ func syntheticJSONRPCMethod(r *http.Request) string {
 	if r == nil || r.Method != http.MethodPost || r.Body == nil {
 		return ""
 	}
+	if state := httpctx.GetJSONRPCRoutingState(r); state != nil && state.Method != "" {
+		return state.Method
+	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return ""

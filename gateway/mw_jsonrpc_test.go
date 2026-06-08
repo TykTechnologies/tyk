@@ -79,6 +79,14 @@ func TestJSONRPCMiddleware_EnabledForSpec(t *testing.T) {
 	}
 }
 
+func TestSyntheticJSONRPCMethod_UsesRoutingStateBeforeReadingBody(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	r.Body = &errorReadCloser{err: io.ErrUnexpectedEOF}
+	httpctx.SetJSONRPCRoutingState(r, &httpctx.JSONRPCRoutingState{Method: mcp.MethodToolsList})
+
+	assert.Equal(t, mcp.MethodToolsList, syntheticJSONRPCMethod(r))
+}
+
 func TestJSONRPCMiddleware_ProcessRequest_NonPostPassthrough(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
