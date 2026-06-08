@@ -20,7 +20,7 @@ func Test_LDAPStorageHandler(t *testing.T) {
 	t.Run("SetKeyEx", func(t *testing.T) {
 		t.Run("does not return error and logs warning", func(t *testing.T) {
 			handler := newLDAPStorageHandler()
-			hook := logger.InjectTestHook(t)
+			hook := logger.InjectTestHook(t, logger.WithDestLogger(log))
 
 			err := handler.SetKeyEx("", "", 1)
 			assert.NoError(t, err)
@@ -34,7 +34,8 @@ func Test_LDAPStorageHandler(t *testing.T) {
 	t.Run("SetRawKeyEx", func(t *testing.T) {
 		t.Run("does not return error and logs warning", func(t *testing.T) {
 			handler := newLDAPStorageHandler()
-			hook := logger.InjectTestHook(t)
+			hook := logger.InjectTestHook(t, logger.WithDestLogger(log))
+
 			err := handler.SetRawKeyEx("", "", 1)
 			assert.NoError(t, err)
 
