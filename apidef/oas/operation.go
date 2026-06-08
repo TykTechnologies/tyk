@@ -86,6 +86,9 @@ type Operation struct {
 
 	// RateLimit contains endpoint level rate limit configuration.
 	RateLimit *RateLimitEndpoint `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
+
+	// ScopeCheck toggles the operation-level OAuth 2.0 scope check.
+	ScopeCheck *ScopeCheck `bson:"scopeCheck,omitempty" json:"scopeCheck,omitempty"`
 }
 
 // ExtractToExtendedPaths extracts operation-level middleware configuration into a classic
