@@ -9,15 +9,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
+
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
-
 	"github.com/TykTechnologies/tyk/storage"
-
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -407,52 +407,27 @@ func (r *RPCStorageHandler) SetRawKey(keyName, session string, timeout int64) er
 
 func (r *RPCStorageHandler) SetKeyEx(keyName, session string, timeout int64) error {
 	const fnName = "SetKeyEx"
+	return decorate(
+		func() error {
+			ibd := model.InboundData{
+				KeyName:      r.fixKey(keyName),
+				SessionState: session,
+				Timeout:      timeout,
+			}
 
-	return r.retry(r.elapsedLog(fnName, func() error {
-		ibd := model.InboundData{
-			KeyName:      r.fixKey(keyName),
-			SessionState: session,
-			Timeout:      timeout,
-		}
+			_, err := rpc.FuncClientSingleton(fnName, ibd)
 
-		_, err := rpc.FuncClientSingleton(fnName, ibd)
+			// Fallback for older MDCB versions that do not support SetKeyEx
+			if err != nil && strings.Contains(err.Error(), "unknown method") {
+				log.Error("SetKeyEx not supported by MDCB, falling back to SetKey")
+				_, err = rpc.FuncClientSingleton("SetKey", ibd)
+			}
 
-		// Fallback for older MDCB versions that do not support SetKeyEx
-		if err != nil && strings.Contains(err.Error(), "unknown method") {
-			log.Error("SetKeyEx not supported by MDCB, falling back to SetKey")
-			_, err = rpc.FuncClientSingleton("SetKey", ibd)
-		}
-
-		return err
-	}))
-}
-
-func (r *RPCStorageHandler) retry(fn func() error) error {
-	for {
-		err := fn()
-
-		if r.IsRetriableError(err) && rpc.Login() {
-			continue
-		}
-
-		return err
-	}
-}
-
-func (r *RPCStorageHandler) elapsedLog(name string, fn func() error) func() error {
-	return func() error {
-		start := time.Now()
-		err := fn()
-		elapsed := time.Since(start)
-
-		if err != nil {
-			log.Debugf("%q failed with error: %q", name, err)
-		} else {
-			log.Debugf("%q took %s", name, elapsed)
-		}
-
-		return err
-	}
+			return err
+		},
+		retryAlways(r, rpc.Login),
+		elapsedLog(fnName),
+	)()
 }
 
 func (r *RPCStorageHandler) SetRawKeyEx(keyName, session string, timeout int64) error {
@@ -1440,4 +1415,49 @@ func (r *RPCStorageHandler) GetListRange(keyName string, from, to int64) ([]stri
 func (r *RPCStorageHandler) Exists(keyName string) (bool, error) {
 	log.Error("Not implemented")
 	return false, nil
+}
+
+func decorate[F any](in F, decorators ...func(F) F) F {
+	for i := len(decorators) - 1; i >= 0; i-- {
+		in = decorators[i](in)
+	}
+	return in
+}
+
+func retryAlways(
+	checker interface{ IsRetriableError(error) bool },
+	login func() bool,
+) func(func() error) func() error {
+
+	return func(next func() error) func() error {
+		return func() error {
+			for {
+				err := next()
+
+				if checker.IsRetriableError(err) && login() {
+					continue
+				}
+
+				return err
+			}
+		}
+	}
+}
+
+func elapsedLog(fnName string) func(func() error) func() error {
+	return func(next func() error) func() error {
+		return func() error {
+			start := time.Now()
+			err := next()
+			elapsed := time.Since(start)
+
+			if err != nil {
+				log.Debugf("%q failed with error: %q", fnName, err)
+			} else {
+				log.Debugf("%q took %s", fnName, elapsed)
+			}
+
+			return err
+		}
+	}
 }
