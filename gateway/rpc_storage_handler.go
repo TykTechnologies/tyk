@@ -417,6 +417,12 @@ func (r *RPCStorageHandler) SetKeyEx(keyName, session string, timeout int64) err
 
 		_, err := rpc.FuncClientSingleton(fnName, ibd)
 
+		// Fallback for older MDCB versions that do not support SetKeyEx
+		if err != nil && strings.Contains(err.Error(), "unknown method") {
+			log.Error("SetKeyEx not supported by MDCB, falling back to SetKey")
+			_, err = rpc.FuncClientSingleton("SetKey", ibd)
+		}
+
 		return err
 	}))
 }
