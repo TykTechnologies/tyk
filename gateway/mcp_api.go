@@ -345,7 +345,7 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 }
 
 func (gw *Gateway) handleGetMCPListOAS() (interface{}, int) {
-	return gw.handleGetOASList(mcpManaged, false)
+	return gw.handleGetOASList(mcpProxy, false)
 }
 
 func (gw *Gateway) mcpListHandler(w http.ResponseWriter, _ *http.Request) {

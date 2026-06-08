@@ -407,6 +407,9 @@ func rewriteMCPToolsListResponse(body []byte, view oas.MCPToolView) ([]byte, err
 	return json.Marshal(envelope)
 }
 
+// bufferedResponseWriter is intentionally local to synthetic REST-as-MCP
+// tools/list handling. It captures only the response pieces we need to rewrite
+// SDK JSON responses before forwarding them to the caller.
 type bufferedResponseWriter struct {
 	header      http.Header
 	body        bytes.Buffer

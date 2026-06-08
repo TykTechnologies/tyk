@@ -149,7 +149,7 @@ func TestSynthesizeMCPAdapterSpecs_AppendsHiddenInternalAdapters(t *testing.T) {
 	assert.True(t, adapterSpec.IsSyntheticMCPAdapter())
 	assert.True(t, adapterSpec.Internal)
 	assert.Equal(t, "rest-1__mcp-server", adapterSpec.APIID)
-	assert.False(t, mcpManaged(adapterSpec))
+	assert.False(t, mcpProxy(adapterSpec))
 	assert.True(t, snapshot.AllowsCaller("rest-1__mcp-server", "proxy-1"))
 }
 

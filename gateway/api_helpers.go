@@ -20,7 +20,7 @@ type apiFilterFunc func(*APISpec) bool
 type apiTypeCheck func(*APISpec) error
 
 func isOASNotMCP(spec *APISpec) bool {
-	return spec != nil && spec.IsOAS && !spec.IsSyntheticMCPAdapter() && !mcpManaged(spec)
+	return spec != nil && spec.IsOAS && !spec.IsSyntheticMCPAdapter() && !mcpProxy(spec)
 }
 
 func typeCheckFunc(name string, predicate apiFilterFunc) apiTypeCheck {
@@ -33,10 +33,13 @@ func typeCheckFunc(name string, predicate apiFilterFunc) apiTypeCheck {
 }
 
 var (
-	mcpTypeCheck = typeCheckFunc("MCP Proxy", mcpManaged)
+	mcpTypeCheck = typeCheckFunc("MCP Proxy", mcpProxy)
 )
 
-func mcpManaged(spec *APISpec) bool {
+// mcpProxy reports whether spec is a caller-facing MCP-managed API. Synthetic
+// REST-as-MCP adapters are MCP internals and must not be exposed as MCP proxies
+// in admin/public API listings.
+func mcpProxy(spec *APISpec) bool {
 	if spec == nil || spec.APIDefinition == nil {
 		return false
 	}
