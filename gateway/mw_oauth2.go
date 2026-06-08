@@ -56,6 +56,7 @@ func (m *OAuth2Middleware) EnabledForSpec() bool {
 	return cfg.ScopeCheck != nil && cfg.ScopeCheck.Enabled
 }
 
+//nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
 func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
@@ -76,7 +77,8 @@ func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request
 	rawToken := stripBearer(r.Header.Get(header.Authorization))
 	if rawToken == "" {
 		m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "missing bearer token")
-		return errors.New("Authorization field missing"), http.StatusUnauthorized
+		//nolint:staticcheck // ST1005: "Authorization" is the HTTP header name in this canonical message (MsgAuthFieldMissing)
+		return errors.New(MsgAuthFieldMissing), http.StatusUnauthorized
 	}
 
 	claims, err := oauth2common.ParseUnverifiedClaims(rawToken)
