@@ -174,7 +174,7 @@ jobs:
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: ${{ steps.ci_metadata_ee.outputs.tags }}
@@ -183,6 +183,20 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway-ee
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
+      - name: Verify compression format for ee CI image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.ci_metadata_ee.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw -- "$TAG" > manifest.json
+          if grep -q "tar+zstd" manifest.json; then
+            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
+            cat manifest.json | grep mediaType
+            exit 1
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Docker metadata for ee tag push
         id: tag_metadata_ee
         if: startsWith(github.ref, 'refs/tags')
@@ -211,13 +225,27 @@ jobs:
           file: ci/Dockerfile.distroless
           provenance: mode=max
           cache-from: type=gha
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_ee.outputs.tags }}
           labels: ${{ steps.tag_metadata_ee.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
+      - name: Verify compression format for ee prod image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.tag_metadata_ee.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw -- "$TAG" > manifest.json
+          if grep -q "tar+zstd" manifest.json; then
+            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
+            cat manifest.json | grep mediaType
+            exit 1
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Attach base image VEX to ee
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
@@ -257,7 +285,7 @@ jobs:
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: ${{ steps.ci_metadata_fips.outputs.tags }}
@@ -266,6 +294,20 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway-fips
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
+      - name: Verify compression format for fips CI image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.ci_metadata_fips.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw -- "$TAG" > manifest.json
+          if grep -q "tar+zstd" manifest.json; then
+            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
+            cat manifest.json | grep mediaType
+            exit 1
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Docker metadata for fips tag push
         id: tag_metadata_fips
         if: startsWith(github.ref, 'refs/tags')
@@ -293,13 +335,27 @@ jobs:
           file: ci/Dockerfile.distroless
           provenance: mode=max
           cache-from: type=gha
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_fips.outputs.tags }}
           labels: ${{ steps.tag_metadata_fips.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-fips
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
+      - name: Verify compression format for fips prod image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.tag_metadata_fips.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw -- "$TAG" > manifest.json
+          if grep -q "tar+zstd" manifest.json; then
+            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
+            cat manifest.json | grep mediaType
+            exit 1
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Attach base image VEX to fips
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
@@ -336,13 +392,27 @@ jobs:
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64,linux/s390x' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: ${{ steps.ci_metadata_std.outputs.tags }}
           labels: ${{ steps.ci_metadata_std.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway
+      - name: Verify compression format for std CI image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.ci_metadata_std.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw -- "$TAG" > manifest.json
+          if grep -q "tar+zstd" manifest.json; then
+            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
+            cat manifest.json | grep mediaType
+            exit 1
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Docker metadata for std tag push
         id: tag_metadata_std
         if: startsWith(github.ref, 'refs/tags')
@@ -371,11 +441,25 @@ jobs:
           file: ci/Dockerfile.distroless
           provenance: mode=max
           cache-from: type=gha
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_std.outputs.tags }}
           labels: ${{ steps.tag_metadata_std.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway
+      - name: Verify compression format for std prod image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.tag_metadata_std.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw -- "$TAG" > manifest.json
+          if grep -q "tar+zstd" manifest.json; then
+            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
+            cat manifest.json | grep mediaType
+            exit 1
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: save deb
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
