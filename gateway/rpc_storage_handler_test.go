@@ -1555,7 +1555,7 @@ func TestRPCStorageHandler_internalSetKeyEx(t *testing.T) {
 		setKeyCalled := false
 
 		dispatcher := newDispatcher(
-			withFunc("SetKeyEx", func(ibd *model.InboundData) error {
+			withFunc("SetKeyEx", func(_ *model.InboundData) error {
 				setKeyExCalled = true
 				return nil
 			}),
@@ -1603,7 +1603,7 @@ func TestRPCStorageHandler_internalSetKeyEx(t *testing.T) {
 		setKeyCalled := false
 
 		dispatcher := newDispatcher(
-			withFunc("SetKeyEx", func(ibd *model.InboundData) error {
+			withFunc("SetKeyEx", func(_ *model.InboundData) error {
 				setKeyExCalled = true
 				return errors.New("unknown method SetKeyEx")
 			}),
@@ -1651,7 +1651,7 @@ func TestRPCStorageHandler_internalSetKeyEx(t *testing.T) {
 		setKeyCalled := false
 
 		dispatcher := newDispatcher(
-			withFunc("SetKeyEx", func(ibd *model.InboundData) error {
+			withFunc("SetKeyEx", func(_ *model.InboundData) error {
 				setKeyExCalled = true
 				return errors.New("some other error")
 			}),
