@@ -220,7 +220,9 @@
         },
         "claims": {
           "type": "array",
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         },
         "scopeToPolicyMapping": {
           "type": "array",
@@ -1056,6 +1058,9 @@
         "rateLimit": {
           "$ref": "#/definitions/X-Tyk-RateLimit"
         },
+        "exchange": {
+          "$ref": "#/definitions/X-Tyk-OAuth2-Exchange"
+        },
         "scopeCheck": {
           "$ref": "#/definitions/X-Tyk-ScopeCheck"
         }
@@ -1399,6 +1404,8 @@
     },
     "X-Tyk-ProtectedResourceMetadata": {
       "type": "object",
+      "deprecated": true,
+      "description": "Deprecated. Use securitySchemes[<name>].oauth2.protectedResourceMetadata (X-Tyk-OAuth2-PRM) instead. The legacy top-level block is kept for downgrade safety and will be removed in a future major version.",
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1550,10 +1557,14 @@
       },
       "anyOf": [
         {
-          "required": ["url"]
+          "required": [
+            "url"
+          ]
         },
         {
-          "required": ["loadBalancing"]
+          "required": [
+            "loadBalancing"
+          ]
         }
       ]
     },
@@ -1616,13 +1627,24 @@
       "anyOf": [
         {
           "properties": {
-            "location": { "enum": ["header", "url-param"] }
+            "location": {
+              "enum": [
+                "header",
+                "url-param"
+              ]
+            }
           },
-          "required": ["key"]
+          "required": [
+            "key"
+          ]
         },
         {
           "properties": {
-            "location": { "enum": ["url"] }
+            "location": {
+              "enum": [
+                "url"
+              ]
+            }
           }
         }
       ]
@@ -1785,7 +1807,9 @@
         },
         "subjectClaims": {
           "type": "array",
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         },
         "jwksURIs": {
           "type": [
@@ -1803,7 +1827,9 @@
                 "$ref": "#/definitions/X-Tyk-ReadableDuration"
               }
             },
-            "required": ["url"]
+            "required": [
+              "url"
+            ]
           }
         },
         "skipKid": {
@@ -1814,15 +1840,21 @@
         },
         "basePolicyClaims": {
           "type": "array",
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         },
         "allowedIssuers": {
           "type": "array",
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         },
         "allowedAudiences": {
           "type": "array",
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         },
         "jtiValidation": {
           "type": "object",
@@ -1837,7 +1869,9 @@
         },
         "allowedSubjects": {
           "type": "array",
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         },
         "clientBaseField": {
           "type": "string"
@@ -1876,7 +1910,11 @@
           "properties": {
             "type": {
               "type": "string",
-              "enum": ["required", "exact_match", "contains"]
+              "enum": [
+                "required",
+                "exact_match",
+                "contains"
+              ]
             },
             "allowedValues": {
               "type": "array",
@@ -1887,7 +1925,9 @@
               "default": false
             }
           },
-          "required": ["type"]
+          "required": [
+            "type"
+          ]
         }
       },
       "required": [
@@ -1995,24 +2035,210 @@
       "type": "object",
       "description": "OAuth 2.0 security scheme container.",
       "properties": {
-        "enabled":    { "type": "boolean" },
-        "header":     { "$ref": "#/definitions/X-Tyk-AuthSource" },
-        "cookie":     { "$ref": "#/definitions/X-Tyk-AuthSource" },
-        "query":      { "$ref": "#/definitions/X-Tyk-AuthSource" },
-        "scopeCheck": { "$ref": "#/definitions/X-Tyk-OAuth2-ScopeCheck" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "header": {
+          "$ref": "#/definitions/X-Tyk-AuthSource"
+        },
+        "cookie": {
+          "$ref": "#/definitions/X-Tyk-AuthSource"
+        },
+        "query": {
+          "$ref": "#/definitions/X-Tyk-AuthSource"
+        },
+        "scopeCheck": {
+          "$ref": "#/definitions/X-Tyk-OAuth2-ScopeCheck"
+        },
+        "protectedResourceMetadata": {
+          "$ref": "#/definitions/X-Tyk-OAuth2-PRM"
+        },
+        "tokenExchange": {
+          "$ref": "#/definitions/X-Tyk-OAuth2-TokenExchange"
+        }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-OAuth2-PRM": {
+      "type": "object",
+      "description": "OAuth 2.0 Protected Resource Metadata (RFC 9728) published for this API. New home for PRM; the deprecated top-level authentication.protectedResourceMetadata still works but this one wins when both are set.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "wellKnownPath": {
+          "type": "string",
+          "description": "Path under the API listen path where the PRM document is served. Defaults to .well-known/oauth-protected-resource."
+        },
+        "resource": {
+          "type": "string",
+          "description": "Canonical resource identifier this gateway protects. Surfaced as the `resource` field of the PRM document."
+        },
+        "authorizationServers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Issuer URLs published in the PRM document. At least one entry is required for MCP-proxy APIs."
+        },
+        "autoDeriveScopes": {
+          "type": "boolean",
+          "description": "When unset or true (default), the union of all `security:` scopes declared on operations and MCP primitives is added to PRM `scopes_supported`. Set to false to advertise only the scopes declared in the security scheme's flows.scopes catalog."
+        }
+      },
+      "required": [
+        "enabled"
+      ]
     },
     "X-Tyk-OAuth2-ScopeCheck": {
       "type": "object",
       "description": "Token-side knobs for OAS-native scope enforcement. Required scopes themselves live in the OAS root security: array.",
       "properties": {
-        "enabled":        { "type": "boolean" },
-        "claimNames":     { "type": "array", "items": { "type": "string" }, "description": "Ordered list of JWT claim names to read scopes from. The gateway reads each listed claim that is present and merges all scope values into one set. Alternatives drawn from OAS root security: are checked against this merged set. Defaults to [\"scope\", \"scp\"] when unset." },
-        "separator":      { "type": "string" },
-        "scopeSource":    { "type": "string", "enum": ["operation", "global", "union"], "description": "Selects whether enforcement reads per-operation security:, root security:, or both. Defaults to \"union\"." }
+        "enabled": {
+          "type": "boolean"
+        },
+        "claimNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ordered list of JWT claim names to read scopes from. The gateway reads each listed claim that is present and merges all scope values into one set. Alternatives drawn from OAS root security: are checked against this merged set. Defaults to [\"scope\", \"scp\"] when unset."
+        },
+        "separator": {
+          "type": "string"
+        },
+        "scopeSource": {
+          "type": "string",
+          "enum": [
+            "operation",
+            "global",
+            "union"
+          ],
+          "description": "Selects whether enforcement reads per-operation security:, root security:, or both. Defaults to \"union\"."
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-OAuth2-TokenExchange": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "providers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/X-Tyk-OAuth2-Provider"
+          }
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-OAuth2-Provider": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "issuers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tokenEndpoint": {
+          "type": "string"
+        },
+        "clientAuth": {
+          "$ref": "#/definitions/X-Tyk-OAuth2-ClientAuth"
+        },
+        "defaultTarget": {
+          "$ref": "#/definitions/X-Tyk-OAuth2-DefaultTarget"
+        },
+        "timeout": {
+          "type": "string",
+          "description": "Per-call timeout for the RFC 8693 exchange request, Tyk ReadableDuration (e.g. \"100ms\", \"5s\"). Defaults to 15s when zero/unset."
+        },
+        "customParams": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Operator-supplied form parameters appended to every RFC 8693 exchange request. Reserved RFC 8693 / OAuth2 wire keys (grant_type, subject_token, audience, scope, actor_token, client_id, ...) are rejected at API-load time."
+        },
+        "cache": {
+          "$ref": "#/definitions/X-Tyk-OAuth2-ExchangeCache"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "X-Tyk-OAuth2-ExchangeCache": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "mode": { "type": "string", "enum": ["derived", "static"] },
+        "maxTimeout": { "type": "string", "description": "Upper bound on cache TTL for derived mode (e.g. \"5m\")." },
+        "timeout": { "type": "string", "description": "Fixed TTL for static mode (e.g. \"2m\")." },
+        "safetyMargin": { "type": "string", "description": "Shaved from the computed TTL to avoid serving near-expired tokens. Defaults to 30s." }
       },
       "required": ["enabled"]
+    },
+    "X-Tyk-OAuth2-ClientAuth": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": [
+            "client_secret_basic",
+            "client_secret_post"
+          ]
+        },
+        "clientId": {
+          "type": "string"
+        },
+        "clientSecret": {
+          "type": "string"
+        }
+      }
+    },
+    "X-Tyk-OAuth2-DefaultTarget": {
+      "type": "object",
+      "properties": {
+        "audience": {
+          "type": "string"
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "X-Tyk-OAuth2-Exchange": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "audience": {
+          "type": "string"
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     },
     "X-Tyk-OAuthProvider": {
       "type": "object",
@@ -2715,7 +2941,9 @@
         {
           "if": {
             "properties": {
-              "enabled": { "const": true }
+              "enabled": {
+                "const": true
+              }
             }
           },
           "then": {
@@ -2724,7 +2952,9 @@
                 "minItems": 1
               }
             },
-            "required": ["targets"]
+            "required": [
+              "targets"
+            ]
           }
         }
       ]
@@ -2743,11 +2973,21 @@
         },
         "minVersion": {
           "type": "string",
-          "enum": ["1.0", "1.1", "1.2", "1.3"]
+          "enum": [
+            "1.0",
+            "1.1",
+            "1.2",
+            "1.3"
+          ]
         },
         "maxVersion": {
           "type": "string",
-          "enum": ["1.0", "1.1", "1.2", "1.3"]
+          "enum": [
+            "1.0",
+            "1.1",
+            "1.2",
+            "1.3"
+          ]
         },
         "forceCommonNameCheck": {
           "type": "boolean"
@@ -2764,7 +3004,9 @@
           "type": "string"
         }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
     "X-Tyk-PreserveHostHeader": {
       "type": "object",
@@ -2859,7 +3101,7 @@
     },
     "X-Tyk-ReadableDuration": {
       "type": "string",
-      "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?(\\d+ms)?(\\d+µs)?(\\d+ns)?$"
+      "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?(\\d+ms)?(\\d+\u00b5s)?(\\d+ns)?$"
     },
     "X-Tyk-LoadBalancingTarget": {
       "type": "object",
