@@ -650,6 +650,13 @@
                       }
                     }
                   }
+                },
+                "global_enforce_timeout": {
+                  "type": "string",
+                  "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
+                },
+                "global_enforce_timeout_disabled": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -686,12 +693,6 @@
           "type": "number"
         }
       }
-    },
-    "global_enforce_timeout": {
-      "type": "string"
-    },
-    "global_enforce_timeout_disabled": {
-      "type": "boolean"
     },
     "request_signing": {
       "type": [

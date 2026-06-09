@@ -1447,12 +1447,18 @@ type GlobalEnforceTimeout struct {
 
 // Fill fills *GlobalEnforceTimeout from apidef.APIDefinition.
 func (g *GlobalEnforceTimeout) Fill(api apidef.APIDefinition) {
-	g.Enabled = !api.GlobalEnforceTimeoutDisabled
-	g.Duration = api.GlobalEnforceTimeout
+	mainVersion := api.VersionData.Versions[Main]
+	g.Enabled = !mainVersion.GlobalEnforceTimeoutDisabled
+	g.Duration = mainVersion.GlobalEnforceTimeout
 }
 
 // ExtractTo extracts *GlobalEnforceTimeout to *apidef.APIDefinition.
 func (g *GlobalEnforceTimeout) ExtractTo(api *apidef.APIDefinition) {
-	api.GlobalEnforceTimeoutDisabled = !g.Enabled
-	api.GlobalEnforceTimeout = g.Duration
+	if api.VersionData.Versions == nil {
+		api.VersionData.Versions = make(map[string]apidef.VersionInfo)
+	}
+	mainVersion := api.VersionData.Versions[Main]
+	mainVersion.GlobalEnforceTimeoutDisabled = !g.Enabled
+	mainVersion.GlobalEnforceTimeout = g.Duration
+	api.VersionData.Versions[Main] = mainVersion
 }

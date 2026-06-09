@@ -277,9 +277,16 @@ func TestSchema_SecurityRequirementScopes(t *testing.T) {
 func TestSchema_GlobalEnforceTimeout(t *testing.T) {
 	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
 
+	setVersionTimeout := func(spec *APIDefinition, d tyktime.ReadableDuration, disabled bool) {
+		v := spec.VersionData.Versions["Default"]
+		v.GlobalEnforceTimeout = d
+		v.GlobalEnforceTimeoutDisabled = disabled
+		spec.VersionData.Versions["Default"] = v
+	}
+
 	t.Run("valid string duration passes schema", func(t *testing.T) {
 		spec := DummyAPI()
-		spec.GlobalEnforceTimeout = tyktime.ReadableDuration(5 * time.Second)
+		setVersionTimeout(&spec, tyktime.ReadableDuration(5*time.Second), false)
 
 		result, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewGoLoader(spec))
 		require.NoError(t, err)
@@ -288,7 +295,7 @@ func TestSchema_GlobalEnforceTimeout(t *testing.T) {
 
 	t.Run("valid sub-second duration passes schema", func(t *testing.T) {
 		spec := DummyAPI()
-		spec.GlobalEnforceTimeout = tyktime.ReadableDuration(500 * time.Millisecond)
+		setVersionTimeout(&spec, tyktime.ReadableDuration(500*time.Millisecond), false)
 
 		result, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewGoLoader(spec))
 		require.NoError(t, err)
@@ -297,8 +304,7 @@ func TestSchema_GlobalEnforceTimeout(t *testing.T) {
 
 	t.Run("disabled flag passes schema", func(t *testing.T) {
 		spec := DummyAPI()
-		spec.GlobalEnforceTimeout = tyktime.ReadableDuration(5 * time.Second)
-		spec.GlobalEnforceTimeoutDisabled = true
+		setVersionTimeout(&spec, tyktime.ReadableDuration(5*time.Second), true)
 
 		result, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewGoLoader(spec))
 		require.NoError(t, err)

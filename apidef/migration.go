@@ -499,8 +499,11 @@ func (a *APIDefinition) SetDisabledFlags() {
 
 	a.ErrorOverridesDisabled = true
 
-	if a.GlobalEnforceTimeout == 0 {
-		a.GlobalEnforceTimeoutDisabled = true
+	for name, version := range a.VersionData.Versions {
+		if version.GlobalEnforceTimeout == 0 {
+			version.GlobalEnforceTimeoutDisabled = true
+			a.VersionData.Versions[name] = version
+		}
 	}
 }
 

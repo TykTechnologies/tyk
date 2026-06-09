@@ -116,6 +116,16 @@ func TestUpstream(t *testing.T) {
 	})
 
 	t.Run("enforce timeout", func(t *testing.T) {
+		newAPI := func() apidef.APIDefinition {
+			var api apidef.APIDefinition
+			api.VersionData.Versions = map[string]apidef.VersionInfo{Main: {}}
+			api.SetDisabledFlags()
+			return api
+		}
+		mainVersion := func(api apidef.APIDefinition) apidef.VersionInfo {
+			return api.VersionData.Versions[Main]
+		}
+
 		t.Run("enabled with duration round-trips correctly", func(t *testing.T) {
 			upstream := Upstream{
 				EnforceTimeout: &GlobalEnforceTimeout{
@@ -124,12 +134,11 @@ func TestUpstream(t *testing.T) {
 				},
 			}
 
-			var api apidef.APIDefinition
-			api.SetDisabledFlags()
+			api := newAPI()
 			upstream.ExtractTo(&api)
 
-			require.Equal(t, time.ReadableDuration(5*time.Second), api.GlobalEnforceTimeout)
-			assert.False(t, api.GlobalEnforceTimeoutDisabled)
+			require.Equal(t, time.ReadableDuration(5*time.Second), mainVersion(api).GlobalEnforceTimeout)
+			assert.False(t, mainVersion(api).GlobalEnforceTimeoutDisabled)
 
 			var result Upstream
 			result.Fill(api)
@@ -145,12 +154,11 @@ func TestUpstream(t *testing.T) {
 				},
 			}
 
-			var api apidef.APIDefinition
-			api.SetDisabledFlags()
+			api := newAPI()
 			upstream.ExtractTo(&api)
 
-			assert.Equal(t, time.ReadableDuration(10*time.Second), api.GlobalEnforceTimeout)
-			assert.True(t, api.GlobalEnforceTimeoutDisabled)
+			assert.Equal(t, time.ReadableDuration(10*time.Second), mainVersion(api).GlobalEnforceTimeout)
+			assert.True(t, mainVersion(api).GlobalEnforceTimeoutDisabled)
 
 			var result Upstream
 			result.Fill(api)
@@ -161,17 +169,15 @@ func TestUpstream(t *testing.T) {
 		t.Run("nil enforceTimeout produces zero apidef values", func(t *testing.T) {
 			upstream := Upstream{EnforceTimeout: nil}
 
-			var api apidef.APIDefinition
-			api.SetDisabledFlags()
+			api := newAPI()
 			upstream.ExtractTo(&api)
 
-			assert.Equal(t, time.ReadableDuration(0), api.GlobalEnforceTimeout)
-			assert.True(t, api.GlobalEnforceTimeoutDisabled)
+			assert.Equal(t, time.ReadableDuration(0), mainVersion(api).GlobalEnforceTimeout)
+			assert.True(t, mainVersion(api).GlobalEnforceTimeoutDisabled)
 		})
 
 		t.Run("zero apidef values produce nil enforceTimeout", func(t *testing.T) {
-			var api apidef.APIDefinition
-			api.SetDisabledFlags()
+			api := newAPI()
 
 			var result Upstream
 			result.Fill(api)
@@ -187,11 +193,10 @@ func TestUpstream(t *testing.T) {
 				},
 			}
 
-			var api apidef.APIDefinition
-			api.SetDisabledFlags()
+			api := newAPI()
 			upstream.ExtractTo(&api)
 
-			assert.Equal(t, time.ReadableDuration(500*time.Millisecond), api.GlobalEnforceTimeout)
+			assert.Equal(t, time.ReadableDuration(500*time.Millisecond), mainVersion(api).GlobalEnforceTimeout)
 
 			var result Upstream
 			result.Fill(api)

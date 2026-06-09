@@ -190,9 +190,12 @@ var ErrInvalidGlobalTimeoutValue = errors.New("invalid global timeout value")
 type RuleValidateGlobalEnforceTimeout struct{}
 
 func (r *RuleValidateGlobalEnforceTimeout) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
-	if apiDef.GlobalEnforceTimeout < 0 {
-		validationResult.IsValid = false
-		validationResult.AppendError(ErrInvalidGlobalTimeoutValue)
+	for _, vInfo := range apiDef.VersionData.Versions {
+		if vInfo.GlobalEnforceTimeout < 0 {
+			validationResult.IsValid = false
+			validationResult.AppendError(ErrInvalidGlobalTimeoutValue)
+			return
+		}
 	}
 }
 

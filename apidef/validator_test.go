@@ -431,30 +431,34 @@ func TestRuleValidateGlobalEnforceTimeout_Validate(t *testing.T) {
 		result ValidationResult
 	}{
 		{
-			name: "zero (not configured) is valid",
-			apiDef: &APIDefinition{
-				GlobalEnforceTimeout: 0,
-			},
+			name:   "zero (not configured) is valid",
+			apiDef: &APIDefinition{},
 			result: ValidationResult{IsValid: true},
 		},
 		{
 			name: "positive duration is valid",
 			apiDef: &APIDefinition{
-				GlobalEnforceTimeout: tyktime.ReadableDuration(5 * time.Second),
+				VersionData: VersionData{Versions: map[string]VersionInfo{
+					"Default": {GlobalEnforceTimeout: tyktime.ReadableDuration(5 * time.Second)},
+				}},
 			},
 			result: ValidationResult{IsValid: true},
 		},
 		{
 			name: "sub-second (1ms) is valid",
 			apiDef: &APIDefinition{
-				GlobalEnforceTimeout: tyktime.ReadableDuration(time.Millisecond),
+				VersionData: VersionData{Versions: map[string]VersionInfo{
+					"Default": {GlobalEnforceTimeout: tyktime.ReadableDuration(time.Millisecond)},
+				}},
 			},
 			result: ValidationResult{IsValid: true},
 		},
 		{
 			name: "negative duration is invalid",
 			apiDef: &APIDefinition{
-				GlobalEnforceTimeout: tyktime.ReadableDuration(-1 * time.Second),
+				VersionData: VersionData{Versions: map[string]VersionInfo{
+					"Default": {GlobalEnforceTimeout: tyktime.ReadableDuration(-1 * time.Second)},
+				}},
 			},
 			result: ValidationResult{
 				IsValid: false,
@@ -464,7 +468,9 @@ func TestRuleValidateGlobalEnforceTimeout_Validate(t *testing.T) {
 		{
 			name: "negative sub-second is invalid",
 			apiDef: &APIDefinition{
-				GlobalEnforceTimeout: tyktime.ReadableDuration(-500 * time.Millisecond),
+				VersionData: VersionData{Versions: map[string]VersionInfo{
+					"Default": {GlobalEnforceTimeout: tyktime.ReadableDuration(-500 * time.Millisecond)},
+				}},
 			},
 			result: ValidationResult{
 				IsValid: false,

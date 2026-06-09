@@ -653,6 +653,7 @@ func TestSetDisabledFlags(t *testing.T) {
 		VersionData: VersionData{
 			Versions: map[string]VersionInfo{
 				"": {
+					GlobalEnforceTimeoutDisabled: true,
 					ExtendedPaths: ExtendedPathsSet{
 						Virtual: []VirtualMeta{
 							{
@@ -687,9 +688,8 @@ func TestSetDisabledFlags(t *testing.T) {
 				},
 			},
 		},
-		DoNotTrack:                   true,
-		ErrorOverridesDisabled:       true,
-		GlobalEnforceTimeoutDisabled: true,
+		DoNotTrack:             true,
+		ErrorOverridesDisabled: true,
 	}
 	apiDef.SetDisabledFlags()
 	assert.Equal(t, expectedAPIDef, apiDef)
