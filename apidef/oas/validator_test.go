@@ -411,7 +411,7 @@ func TestGetOASSchema(t *testing.T) {
 	t.Run("return error when requested version is not of semver", func(t *testing.T) {
 		reqOASVersion := "a.0.3"
 		_, err = GetOASSchema(reqOASVersion)
-		expectedErr := fmt.Errorf("Malformed version: %s", reqOASVersion)
+		expectedErr := fmt.Errorf("malformed version: %s", reqOASVersion)
 		assert.Equal(t, expectedErr, err)
 	})
 

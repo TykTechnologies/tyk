@@ -196,12 +196,34 @@ type StorageOptionsConf struct {
 	// Options: ["1.0", "1.1", "1.2", "1.3"].
 	// Defaults to "1.2".
 	TLSMinVersion string `json:"tls_min_version"`
-	// Enables Zstd compression of API definitions stored in Redis backups.
-	// When enabled, API definitions are compressed before encryption, reducing Redis storage.
+	// When set to `true`, enables Zstd compression for API definitions stored in Redis RPC backups.
+	// This feature significantly reduces Redis memory usage in MDCB deployments where API definitions are cached locally on Data Plane Gateways.
 	// The Gateway can read both compressed and uncompressed formats for backward compatibility.
-	// Note: Decompression has a 100MB memory limit.
-	// Defaults to false.
+	//
+	// You can safely enable this setting on existing deployments.
+	// The Gateway continues to load previously stored uncompressed backups and stores all new backups in compressed form.
+	//
+	// Note: The maximum decompressed size is controlled by `max_decompressed_size`.
+	//
+	// Defaults to `false`.
 	CompressAPIDefinitions bool `json:"compress_api_definitions"`
+
+	// When set to `true`, enables Zstd compression for policies stored in Redis RPC backups.
+	// This feature significantly reduces Redis memory usage in MDCB deployments where policies are cached locally on Data Plane Gateways.
+	// The Gateway can read both compressed and uncompressed formats for backward compatibility.
+	//
+	// You can safely enable this setting on existing deployments.
+	// The Gateway continues to load previously stored uncompressed backups and stores all new backups in compressed form.
+	//
+	// Note: The maximum decompressed size is controlled by `max_decompressed_size`.
+	//
+	// Defaults to `false`.
+	CompressPolicies bool `json:"compress_policies"`
+
+	// Maximum decompressed size (in bytes) for API definitions and Policies when using compression.
+	// This limit prevents memory exhaustion during decompression.
+	// Defaults to 104857600 (100MB).
+	MaxDecompressedSize int64 `json:"max_decompressed_size"`
 }
 
 type NormalisedURLConfig struct {
@@ -327,6 +349,11 @@ type AccessLogsConfig struct {
 	// - `upstream_latency` will include the upstream latency of the request.
 	// - `upstream_status` will include the upstream response status code for 5XX responses.
 	// - `user_agent` will include the user agent of the request.
+	// - `api_type` will include the API protocol type (classic, oas, graphql, mcp).
+	// - `mcp_method` will include the JSON-RPC method name (MCP APIs only).
+	// - `mcp_primitive_type` will include the MCP primitive type (MCP APIs only).
+	// - `mcp_primitive_name` will include the MCP primitive name (MCP APIs only).
+	// - `mcp_error_code` will include the JSON-RPC error code (MCP APIs only).
 	Template []string `json:"template"`
 }
 
@@ -513,6 +540,7 @@ type HttpServerOptionsConfig struct {
 	//
 	// Note:
 	//   If you set `proxy_default_timeout` to a value greater than 120 seconds, you must also increase [http_server_options.write_timeout](#http-server-options-write-timeout) to a value greater than `proxy_default_timeout`. The `write_timeout` setting defaults to 120 seconds and controls how long Tyk waits to write the response back to the client. If not adjusted, the client connection will be closed before the upstream response is received.
+	//   This timeout does not apply to MCP (Model Context Protocol) SSE streams — the write deadline is cleared for MCP connections to allow long-lived streaming, similar to WebSocket connections.
 	WriteTimeout int `json:"write_timeout"`
 
 	// Set to true to enable SSL connections
@@ -586,10 +614,12 @@ type HttpServerOptionsConfig struct {
 	// Start your Gateway HTTP server on specific server name
 	ServerName string `json:"server_name"`
 
-	// Minimum TLS version. Possible values: https://tyk.io/docs/api-management/certificates#supported-tls-versions
+	// Minimum TLS version is inherited from Go library, but can be overridden here.
+	// For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-&-cipher-suites
 	MinVersion uint16 `json:"min_version"`
 
-	// Maximum TLS version.
+	// Maximum TLS version is inherited from Go library, but can be overridden here.
+	// For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-&-cipher-suites
 	MaxVersion uint16 `json:"max_version"`
 
 	// When mTLS enabled, this option allows to skip client CA announcement in the TLS handshake.
@@ -737,9 +767,9 @@ type SecurityConfig struct {
 	// Specify public keys used for Certificate Pinning on global level.
 	PinnedPublicKeys map[string]string `json:"pinned_public_keys"`
 
-	// AllowUnsafeDynamicMTLSToken controls whether certificate presence is required for
-	// dynamic mTLS authentication. If set to false (default), requests with a token but
-	// no certificate will be rejected for APIs using dynamic mTLS.
+	// AllowUnsafeDynamicMTLSToken is provided for backward compatibility with clients that are authorized using just the
+	// token for APIs secured with legacy Dynamic mTLS. If set to false (default), the client certificate must be presented
+	// and the mTLS handshake will be enforced. This is the recommended setting.
 	AllowUnsafeDynamicMTLSToken bool `json:"allow_unsafe_dynamic_mtls_token"`
 
 	Certificates CertificatesConfig `json:"certificates"`
@@ -749,7 +779,7 @@ type SecurityConfig struct {
 }
 
 type JWKSConfig struct {
-	// Cache hodls configuration for JWKS caching
+	// Cache holds configuration for JWKS caching
 	Cache JWKSCacheConfig `json:"cache"`
 }
 
@@ -878,7 +908,6 @@ type Config struct {
 	AllowRemoteConfig bool `bson:"allow_remote_config" json:"allow_remote_config"`
 
 	// Set to true to enable the /config and /env endpoints for configuration inspection.
-	// These endpoints require X-Tyk-Authorization header with the secret value.
 	// Default: false
 	EnableConfigInspection bool `json:"enable_config_inspection"`
 
@@ -1147,6 +1176,23 @@ type Config struct {
 	// The default is 60 seconds. This must be a positive value. If you set to 0 this uses the default value.
 	RegexpCacheExpire int32 `json:"regexp_cache_expire"`
 
+	// RegexpCacheMaxEntries caps the per-cache LRU size for the regex
+	// compile caches. Defaults to 5000 when unset (0).
+	// To opt into the legacy unbounded cache, set `disable_regexp_cache_bound` to true instead.
+	RegexpCacheMaxEntries int `json:"regexp_cache_max_entries"`
+
+	// DisableRegexpCacheBound opts into the legacy unbounded regex compile
+	// cache (no size eviction). Only safe when the distinct-pattern keyspace
+	// is naturally bounded by API/session shape. The default (`false`) keeps the LRU bound active.
+	DisableRegexpCacheBound bool `json:"disable_regexp_cache_bound"`
+
+	// DisableAutoMaxProcs opts out of `automaxprocs` GOMAXPROCS adjustment.
+	// By default Tyk aligns GOMAXPROCS with the container's cgroup CPU quota
+	// Set to `true` only if you are pinning GOMAXPROCS yourself or
+	// running outside a CPU-quota-aware environment. No-op outside cgroup
+	// CPU-quota environments either way.
+	DisableAutoMaxProcs bool `json:"disable_auto_max_procs"`
+
 	// Tyk can cache some data locally, this can speed up lookup times on a single node and lower the number of connections and operations being done on Redis. It will however introduce a slight delay when updating or modifying keys as the cache must expire.
 	// This does not affect rate limiting.
 	LocalSessionCache LocalSessionCacheConf `json:"local_session_cache"`
@@ -1171,6 +1217,10 @@ type Config struct {
 	BundleInsecureSkipVerify bool `bson:"bundle_insecure_skip_verify" json:"bundle_insecure_skip_verify"`
 
 	// SkipVerifyExistingPluginBundle skips checksum verification for plugin bundles already on disk.
+	//
+	// Tyk always verifies the integrity of plugin bundles when downloading them for the first time to local disk. For security against corruption of the bundles after they have been loaded, it then re-verifies bundle checksum (for signed bundles) when loading each API that uses the plugins.
+	//
+	// In trusted environments, this reverification may be unnecessary and can be skipped using this option, reducing the API load time.
 	SkipVerifyExistingPluginBundle bool `bson:"skip_verify_existing_plugin_bundle" json:"skip_verify_existing_plugin_bundle"`
 
 	// Set to true if you are using JSVM custom middleware or virtual endpoints.
@@ -1209,9 +1259,10 @@ type Config struct {
 	// If not set or left empty, it will default to `info`.
 	LogLevel string `json:"log_level"`
 
-	// You can now configure the log format to be either the standard or json format
-	// If not set or left empty, it will default to `standard`.
-	LogFormat string `json:"log_format"`
+	// LogFormat configures the output format of the logs.
+	// Allowed values are `text`, `json`, or `legacy`.
+	// If not set or left empty, it defaults to `text`.
+	LogFormat logger.Format `json:"log_format"`
 
 	// AccessLogs configures the output for access logs.
 	// If not configured, the access log is disabled.
@@ -1333,6 +1384,25 @@ type Config struct {
 	// ```
 	OverrideMessages map[string]TykError `bson:"override_messages" json:"override_messages"`
 
+	// ErrorOverrides allows you to customize the error responses that the Gateway will return to API clients.
+	// This configuration will be used to override both Gateway-generated errors (e.g. authentication failures, rate limits, validation errors)
+	// and errors returned by the upstream service (4xx/5xx responses from backend APIs).
+	// Rules are organized by HTTP status code and can include additional matching criteria.
+	// These rules will be superseded by any overrides configured in the API definition
+	//
+	// Sample Override Setting
+	// ```
+	// "error_overrides": {
+	//   "500": [{
+	//     "response": {
+	//       "status_code": 503,
+	//       "body": "{\"error\": \"Service temporarily unavailable\"}"
+	//     }
+	//   }]
+	// }
+	// ```
+	ErrorOverrides apidef.ErrorOverridesMap `json:"error_overrides,omitempty"`
+
 	// Cloud flag shows the Gateway runs in Tyk Cloud.
 	Cloud bool `json:"cloud"`
 
@@ -1358,6 +1428,11 @@ type Config struct {
 
 	// JWKS holds the configuration for Tyk JWKS functionalities
 	JWKS JWKSConfig `json:"jwks"`
+
+	// AllowUnsafePolicyIds allows the use of non-standard characters in policy identifiers (default: false).
+	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
+	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
+	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
 }
 
 // LabsConfig include config for streaming

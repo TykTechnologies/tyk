@@ -13,12 +13,12 @@ spec:
         - key: Content-Type
           value: application/json
   specs:
-    - selector: span[tracetest.span.type = "general" name="ResolvePlan"] span[tracetest.span.type="http" name="HTTP POST" http.method="POST"]
+    - selector: span[tracetest.span.type = "general" name="ResolvePlan"] span[tracetest.span.type="http" name="HTTP POST" http.request.method="POST"]
       name: Upstream Request is valid
       assertions:
-        - attr:http.status_code     =     200
-        - attr:http.url   =   "https://countries.trevorblades.com/"
-        - attr:http.method  =  "POST"
+        - attr:http.response.status_code     =     200
+        - attr:url.full   =   "https://countries.trevorblades.com/"
+        - attr:http.request.method  =  "POST"
     - selector: span[tracetest.span.type="general" name="GraphqlEngine"] span[tracetest.span.type="general"]
       name: Make sure there are 3 subspans for graphql engine
       assertions:

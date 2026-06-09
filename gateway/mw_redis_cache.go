@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
-
 	"github.com/TykTechnologies/murmur3"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
@@ -246,8 +246,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		newRes.Header.Del(h)
 	}
 
-	m.Spec.sendRateLimitHeaders(ctxGetSession(r), newRes)
-
+	m.Gw.limitHeaderFactory(newRes.Header).SendQuotas(ctxGetSession(r), m.Spec.APIID)
 	newRes.Header.Set(cachedResponseHeader, "1")
 
 	copyHeader(w.Header(), newRes.Header, m.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
@@ -262,13 +261,16 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	w.WriteHeader(newRes.StatusCode)
 	if newRes.StatusCode != http.StatusNotModified {
-		m.Proxy.CopyResponse(w, newRes.Body, 0)
+		_ = m.Proxy.CopyResponse(w, newRes.Body, 0)
 	}
 
-	// Record analytics
+	// Record analytics and observability signals
 	if !m.Spec.DoNotTrack {
 		ms := DurationToMillisecond(time.Since(t1))
-		m.sh.RecordHit(r, analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}, newRes.StatusCode, newRes, true)
+		latency := analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}
+		m.sh.RecordHit(r, latency, newRes.StatusCode, newRes, true)
+		m.sh.RecordAccessLog(r, newRes, latency)
+		m.sh.Base().RecordMetrics(w, r, newRes.StatusCode, latency, newRes)
 	}
 
 	// Stop any further execution after we wrote cache out

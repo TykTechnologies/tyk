@@ -1,0 +1,21 @@
+{
+  "name": "Test DNS - DNS Failure",
+  "api_id": "test-dns",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-dns/",
+    "target_url": "http://non-existent-hostname-xyz123.invalid",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  }
+}

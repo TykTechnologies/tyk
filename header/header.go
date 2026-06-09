@@ -21,10 +21,12 @@ const (
 )
 
 const (
-	TykHookshot     = "Tyk-Hookshot"
-	ApplicationJSON = "application/json"
-	ApplicationXML  = "application/xml"
-	TextXML         = "text/xml"
+	TykHookshot               = "Tyk-Hookshot"
+	ApplicationJSON           = "application/json"
+	ApplicationXML            = "application/xml"
+	ApplicationSoapXML        = "application/soap+xml"
+	ApplicationFormURLEncoded = "application/x-www-form-urlencoded"
+	TextXML                   = "text/xml"
 )
 
 const (
@@ -57,7 +59,12 @@ const (
 
 // Gateway's custom response headers
 const (
-	XRateLimitLimit     = "X-RateLimit-Limit"
+	// XRateLimitLimit The maximum number of requests that the client is allowed to make in a given time period
+	XRateLimitLimit = "X-RateLimit-Limit"
+
+	// XRateLimitRemaining The number of requests remaining in the current rate limit window.
 	XRateLimitRemaining = "X-RateLimit-Remaining"
-	XRateLimitReset     = "X-RateLimit-Reset"
+
+	// XRateLimitReset The number of seconds until the rate limit resets.
+	XRateLimitReset = "X-RateLimit-Reset"
 )

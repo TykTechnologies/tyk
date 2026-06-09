@@ -11,6 +11,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -29,6 +31,7 @@ import (
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/policy"
+	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -853,6 +856,9 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	tsDash := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/apis" {
 			w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {}}]}`))
+		} else if r.URL.Path == "/system/clientidps" {
+			// The reload also refreshes the client-IdP registry; return an empty feed.
+			mustWriteJSON(t, w, `{"Status": "OK", "Nonce": "1", "Message": []}`)
 		} else {
 			t.Fatal("Unknown dashboard API request", r)
 		}
@@ -1206,6 +1212,9 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 			}
 
 			callNum += 1
+		} else if r.URL.Path == "/system/clientidps" {
+			// The reload also refreshes the client-IdP registry; return an empty feed.
+			mustWriteJSON(t, w, `{"Status": "OK", "Nonce": "1", "Message": []}`)
 		} else {
 			t.Fatal("Unknown dashboard API request", r)
 		}
@@ -1702,7 +1711,7 @@ func TestFromDashboardServiceAutoRecovery(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/register/node") {
 			registrationCount++
 			w.Header().Set("Content-Type", "application/json")
-			response := NodeResponseOK{
+			response := NodeResponse{
 				Status:  "ok",
 				Message: map[string]string{"NodeID": "test-node-id"},
 				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
@@ -1890,7 +1899,7 @@ func TestFromDashboardServiceNoNodeIDFound(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/register/node") {
 			registrationCount++
 			w.Header().Set("Content-Type", "application/json")
-			response := NodeResponseOK{
+			response := NodeResponse{
 				Status:  "ok",
 				Message: map[string]string{"NodeID": "test-node-id"},
 				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
@@ -2076,7 +2085,7 @@ func TestFromDashboardServiceNetworkErrorRecovery(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/register/node") {
 			registrationCount++
 			w.Header().Set("Content-Type", "application/json")
-			response := NodeResponseOK{
+			response := NodeResponse{
 				Status:  "ok",
 				Message: map[string]string{"NodeID": "test-node-id"},
 				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
@@ -2874,5 +2883,172 @@ func TestAddInternalMWtoMCPOperations(t *testing.T) {
 		loader.addInternalMWtoMCPOperations(spec, extendedPaths)
 
 		assert.Empty(t, extendedPaths.Internal)
+	})
+}
+
+func TestURLAllowedAndIgnored_CORSPreflight(t *testing.T) {
+	spec := APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			CORS: apidef.CORSConfig{
+				Enable:             true,
+				OptionsPassthrough: false,
+			},
+		},
+	}
+
+	testPath := "/test"
+	compile, err := regexp.Compile(testPath)
+	assert.NoError(t, err)
+
+	paths := []URLSpec{
+		{
+			spec:   compile,
+			Status: WhiteList,
+			Whitelist: apidef.EndPointMeta{
+				Disabled: false,
+				Path:     testPath,
+				Method:   http.MethodGet,
+			},
+		},
+	}
+
+	headerKey := "Access-Control-Request-Method"
+	req := httptest.NewRequest(http.MethodOptions, testPath, nil)
+	req.Header.Set(headerKey, http.MethodGet)
+
+	t.Run("should return StatusOkAndIgnore for CORS preflight request when CORS is enabled", func(t *testing.T) {
+		spec.CORS.Enable = true
+		spec.CORS.OptionsPassthrough = false
+		status, _ := spec.URLAllowedAndIgnored(req, paths, true)
+		assert.Equal(t, StatusOkAndIgnore, status)
+	})
+
+	t.Run("should return EndPointNotAllowed when CORS passthrough is enabled", func(t *testing.T) {
+		spec.CORS.Enable = true
+		spec.CORS.OptionsPassthrough = true
+		status, _ := spec.URLAllowedAndIgnored(req, paths, true)
+		assert.Equal(t, EndPointNotAllowed, status)
+	})
+
+	t.Run("should return EndPointNotAllowed for CORS preflight request when CORS is disabled - GET on Whitelist", func(t *testing.T) {
+		spec.CORS.Enable = false
+		spec.CORS.OptionsPassthrough = false
+		status, _ := spec.URLAllowedAndIgnored(req, paths, true)
+		assert.Equal(t, EndPointNotAllowed, status)
+	})
+
+	t.Run("should return EndPointNotAllowed for normal OPTIONS request", func(t *testing.T) {
+		req.Header.Del(headerKey)
+		spec.CORS.Enable = true
+		spec.CORS.OptionsPassthrough = false
+		status, _ := spec.URLAllowedAndIgnored(req, paths, true)
+		assert.Equal(t, EndPointNotAllowed, status)
+	})
+}
+
+func TestLoadDefFromFilePath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	loader := APIDefinitionLoader{Gw: ts.Gw}
+
+	t.Run("load classic definition", func(t *testing.T) {
+		apiName := "Test API"
+		apiID := "test-api-1"
+		def := apidef.APIDefinition{
+			Name:  apiName,
+			APIID: apiID,
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/test-api-1",
+			},
+		}
+		data, err := json.Marshal(def)
+		assert.NoError(t, err)
+
+		tmpFile, err := os.CreateTemp("", "api_def_*.json")
+		assert.NoError(t, err)
+		defer os.Remove(tmpFile.Name())
+
+		_, err = tmpFile.Write(data)
+		assert.NoError(t, err)
+		tmpFile.Close()
+
+		spec, err := loader.loadDefFromFilePath(tmpFile.Name())
+		assert.NoError(t, err)
+		assert.NotNil(t, spec)
+		assert.Equal(t, apiName, spec.Name)
+		assert.Equal(t, apiID, spec.APIID)
+	})
+
+	t.Run("load OAS definition", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "oas_test")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tmpDir)
+
+		apiFilePath := filepath.Join(tmpDir, "test-api.json")
+		oasFilePath := filepath.Join(tmpDir, "test-api-oas.json")
+
+		// Test whether schema validator successfully applies schema manipulation to oas doc.
+		expectedPatternAfterLoad := "{\"^[\\\\x{0000}-\\\\x{017f}]*$\"}"
+		schema := openapi3.NewSchema()
+		schema.Pattern = "{\"^[\\\\u0000-\\\\u017f]*$\"}"
+		oasDoc := &oas.OAS{
+			T: openapi3.T{
+				Components: &openapi3.Components{
+					Schemas: openapi3.Schemas{
+						"Schema1": openapi3.NewSchemaRef("", schema),
+					},
+				},
+			},
+		}
+		oasData, err := json.Marshal(oasDoc)
+		assert.NoError(t, err)
+
+		err = os.WriteFile(oasFilePath, oasData, 0644)
+		assert.NoError(t, err)
+
+		apiName := "Test OAS API"
+		apiID := "test-oas-api-1"
+		def := apidef.APIDefinition{
+			Name:  apiName,
+			APIID: apiID,
+			IsOAS: true,
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/test-oas-api-1",
+			},
+		}
+		data, err := json.Marshal(def)
+		assert.NoError(t, err)
+
+		err = os.WriteFile(apiFilePath, data, 0644)
+		assert.NoError(t, err)
+
+		spec, err := loader.loadDefFromFilePath(apiFilePath)
+		assert.NoError(t, err)
+		assert.NotNil(t, spec)
+		assert.Equal(t, apiName, spec.Name)
+		assert.Equal(t, apiID, spec.APIID)
+		assert.NotNil(t, spec.OAS)
+		assert.Equal(t, expectedPatternAfterLoad, spec.OAS.Components.Schemas["Schema1"].Value.Pattern)
+	})
+
+	t.Run("file not found", func(t *testing.T) {
+		spec, err := loader.loadDefFromFilePath("non_existent_file.json")
+		assert.Error(t, err)
+		assert.Nil(t, spec)
+	})
+
+	t.Run("invalid json", func(t *testing.T) {
+		tmpFile, err := os.CreateTemp("", "api_def_*.json")
+		assert.NoError(t, err)
+		defer os.Remove(tmpFile.Name())
+
+		_, err = tmpFile.Write([]byte("{invalid json}"))
+		assert.NoError(t, err)
+		tmpFile.Close()
+
+		spec, err := loader.loadDefFromFilePath(tmpFile.Name())
+		assert.Error(t, err)
+		assert.Nil(t, spec)
 	})
 }

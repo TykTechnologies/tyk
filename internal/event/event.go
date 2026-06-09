@@ -48,6 +48,10 @@ const (
 	CertificateExpiringSoon Event = "CertificateExpiringSoon"
 	// CertificateExpired is the event triggered when a certificate is expired.
 	CertificateExpired Event = "CertificateExpired"
+
+	// OAuth2ScopeCheckFailed fires when an OAS-native scope check
+	// rejects a request (insufficient_scope per RFC 6750 §3.1).
+	OAuth2ScopeCheckFailed Event = "OAuth2ScopeCheckFailed"
 )
 
 // Rate limiter events

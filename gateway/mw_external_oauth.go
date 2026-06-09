@@ -56,7 +56,7 @@ func (k *ExternalOAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 
 	token, _ := k.getAuthToken(k.getAuthType(), r)
 	if token == "" {
-		return errors.New("authorization field missing"), http.StatusBadRequest
+		return k.prmError(w, r, errors.New("authorization field missing"), http.StatusBadRequest)
 	}
 
 	token = stripBearer(token)
@@ -86,14 +86,14 @@ func (k *ExternalOAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 		switch {
 		case errors.Is(err, jwt.ErrSignatureInvalid), errors.Is(err, jwt.ErrTokenMalformed), errors.Is(err, jwt.ErrTokenNotValidYet),
 			errors.Is(err, jwt.ErrTokenUsedBeforeIssued), errors.Is(err, jwt.ErrTokenExpired):
-			return err, http.StatusUnauthorized
+			return k.prmError(w, r, err, http.StatusUnauthorized)
 		}
 
 		return ErrTokenValidationFailed, http.StatusInternalServerError
 	}
 
 	if !valid {
-		return errors.New("access token is not valid"), http.StatusUnauthorized
+		return k.prmError(w, r, errors.New("access token is not valid"), http.StatusUnauthorized)
 	}
 
 	sessionID := k.generateSessionID(identifier)

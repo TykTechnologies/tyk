@@ -1,11 +1,23 @@
 package oas
 
-import "github.com/TykTechnologies/tyk/apidef"
+import (
+	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/TykTechnologies/tyk/apidef"
+)
 
 // MCPPrimitive holds middleware configuration for MCP primitives (tools, resources, prompts).
 // It embeds Operation to reuse all standard middleware (rate limiting, transforms, caching, etc.).
 type MCPPrimitive struct {
 	Operation
+
+	// Security mirrors the OAS `security:` array shape (one item per OR
+	// branch, each a map of scheme name → required scopes). It is the
+	// primitive-level equivalent of an OAS path operation's `security`
+	// field, since MCP primitives have no openapi3.Operation of their own.
+	// Read by the oauth2 scope-check middleware when scopeSource resolves
+	// to "operation" or "union".
+	Security openapi3.SecurityRequirements `bson:"security,omitempty" json:"security,omitempty"`
 }
 
 // extractTransformResponseBodyTo overrides Operation to disable response body transformation.

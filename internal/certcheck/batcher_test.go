@@ -128,13 +128,13 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 				Return(true, nil)
 
 			ctx, cancel := context.WithCancel(context.Background())
-			go batcher.RunInBackground(ctx)
-
+			done := make(chan struct{})
+			go func() {
+				batcher.RunInBackground(ctx)
+				close(done)
+			}()
 			cancel()
-			require.Eventuallyf(t, func() bool {
-				<-ctx.Done()
-				return true
-			}, 5*time.Second, 100*time.Millisecond, "batcher background context was not canceled")
+			<-done
 		})
 
 		t.Run("Should fallback if local cache check fails on initial key check", func(t *testing.T) {
@@ -164,13 +164,13 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 				Return(true, nil)
 
 			ctx, cancel := context.WithCancel(context.Background())
-			go batcher.RunInBackground(ctx)
-
+			done := make(chan struct{})
+			go func() {
+				batcher.RunInBackground(ctx)
+				close(done)
+			}()
 			cancel()
-			require.Eventuallyf(t, func() bool {
-				<-ctx.Done()
-				return true
-			}, 5*time.Second, 100*time.Millisecond, "batcher background context was not canceled")
+			<-done
 		})
 
 		t.Run("Should fallback if local cache check fails on actual value check", func(t *testing.T) {
@@ -203,13 +203,13 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 				Return(true, nil)
 
 			ctx, cancel := context.WithCancel(context.Background())
-			go batcher.RunInBackground(ctx)
-
+			done := make(chan struct{})
+			go func() {
+				batcher.RunInBackground(ctx)
+				close(done)
+			}()
 			cancel()
-			require.Eventuallyf(t, func() bool {
-				<-ctx.Done()
-				return true
-			}, 5*time.Second, 100*time.Millisecond, "batcher background context was not canceled")
+			<-done
 		})
 
 		t.Run("Should skip certificate if fallback fails too", func(t *testing.T) {
@@ -239,13 +239,13 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 				Return(false, errors.New("fallback cache error"))
 
 			ctx, cancel := context.WithCancel(context.Background())
-			go batcher.RunInBackground(ctx)
-
+			done := make(chan struct{})
+			go func() {
+				batcher.RunInBackground(ctx)
+				close(done)
+			}()
 			cancel()
-			require.Eventuallyf(t, func() bool {
-				<-ctx.Done()
-				return true
-			}, 5*time.Second, 100*time.Millisecond, "batcher background context was not canceled")
+			<-done
 		})
 	})
 
@@ -290,13 +290,13 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					Return(nil)
 
 				ctx, cancel := context.WithCancel(context.Background())
-				go batcher.RunInBackground(ctx)
-
+				done := make(chan struct{})
+				go func() {
+					batcher.RunInBackground(ctx)
+					close(done)
+				}()
 				cancel()
-				require.Eventuallyf(t, func() bool {
-					<-ctx.Done()
-					return true
-				}, 5*time.Second, 100*time.Millisecond, "batcher background context was not canceled")
+				<-done
 			})
 
 			t.Run("Should skip event firing but check for its cooldown in fallback cache when initial lookup in local cache fails", func(t *testing.T) {
@@ -338,13 +338,13 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					Return(nil)
 
 				ctx, cancel := context.WithCancel(context.Background())
-				go batcher.RunInBackground(ctx)
-
+				done := make(chan struct{})
+				go func() {
+					batcher.RunInBackground(ctx)
+					close(done)
+				}()
 				cancel()
-				require.Eventuallyf(t, func() bool {
-					<-ctx.Done()
-					return true
-				}, 5*time.Second, 100*time.Millisecond, "batcher background context was not canceled")
+				<-done
 			})
 
 			t.Run("Should skip event firing but check for its cooldown in fallback cache when value retrieval in local cache fails", func(t *testing.T) {
@@ -389,13 +389,13 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					Return(nil)
 
 				ctx, cancel := context.WithCancel(context.Background())
-				go batcher.RunInBackground(ctx)
-
+				done := make(chan struct{})
+				go func() {
+					batcher.RunInBackground(ctx)
+					close(done)
+				}()
 				cancel()
-				require.Eventuallyf(t, func() bool {
-					<-ctx.Done()
-					return true
-				}, 5*time.Second, 100*time.Millisecond, "batcher background context was not canceled")
+				<-done
 			})
 
 			t.Run("Should skip event firing when local cache and fallback cache fail", func(t *testing.T) {
@@ -440,13 +440,13 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					Return(nil)
 
 				ctx, cancel := context.WithCancel(context.Background())
-				go batcher.RunInBackground(ctx)
-
+				done := make(chan struct{})
+				go func() {
+					batcher.RunInBackground(ctx)
+					close(done)
+				}()
 				cancel()
-				require.Eventuallyf(t, func() bool {
-					<-ctx.Done()
-					return true
-				}, 5*time.Second, 100*time.Millisecond, "batcher background context was not canceled")
+				<-done
 			})
 		})
 
@@ -491,13 +491,13 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					Return(nil)
 
 				ctx, cancel := context.WithCancel(context.Background())
-				go batcher.RunInBackground(ctx)
-
+				done := make(chan struct{})
+				go func() {
+					batcher.RunInBackground(ctx)
+					close(done)
+				}()
 				cancel()
-				require.Eventuallyf(t, func() bool {
-					<-ctx.Done()
-					return true
-				}, 5*time.Second, 100*time.Millisecond, "batcher background context was not canceled")
+				<-done
 			})
 
 			t.Run("Should fire event when certificate is expired", func(t *testing.T) {
@@ -559,13 +559,13 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					Return(nil)
 
 				ctx, cancel := context.WithCancel(context.Background())
-				go batcher.RunInBackground(ctx)
-
+				done := make(chan struct{})
+				go func() {
+					batcher.RunInBackground(ctx)
+					close(done)
+				}()
 				cancel()
-				require.Eventuallyf(t, func() bool {
-					<-ctx.Done()
-					return true
-				}, 5*time.Second, 100*time.Millisecond, "batcher background context was not canceled")
+				<-done
 
 				assert.Equal(t, event.CertificateExpired, actualFiredEvent)
 				assert.Equal(t, EventCertificateExpiredMeta{
@@ -640,13 +640,13 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					Return(nil)
 
 				ctx, cancel := context.WithCancel(context.Background())
-				go batcher.RunInBackground(ctx)
-
+				done := make(chan struct{})
+				go func() {
+					batcher.RunInBackground(ctx)
+					close(done)
+				}()
 				cancel()
-				require.Eventuallyf(t, func() bool {
-					<-ctx.Done()
-					return true
-				}, 5*time.Second, 100*time.Millisecond, "batcher background context was not canceled")
+				<-done
 
 				assert.Equal(t, event.CertificateExpiringSoon, actualFiredEvent)
 				assert.Equal(t, EventCertificateExpiringSoonMeta{
@@ -721,13 +721,13 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					Return(errors.New("set fire event cooldown in fallback cache failed"))
 
 				ctx, cancel := context.WithCancel(context.Background())
-				go batcher.RunInBackground(ctx)
-
+				done := make(chan struct{})
+				go func() {
+					batcher.RunInBackground(ctx)
+					close(done)
+				}()
 				cancel()
-				require.Eventuallyf(t, func() bool {
-					<-ctx.Done()
-					return true
-				}, 5*time.Second, 100*time.Millisecond, "batcher background context was not canceled")
+				<-done
 
 				assert.Equal(t, event.CertificateExpiringSoon, actualFiredEvent)
 				assert.Equal(t, EventCertificateExpiringSoonMeta{

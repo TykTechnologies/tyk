@@ -12,7 +12,7 @@ spec:
         value: application/json
   specs:
   - name: Check if the main span executed 3 middleware
-    selector: "span[tracetest.span.type=\"http\" name=\"GET /test-auth/ip\" http.method=\"GET\"]
+    selector: "span[tracetest.span.type=\"http\" name=\"GET /test-auth/ip\" http.request.method=\"GET\"]
       \nspan[tracetest.span.type = \"general\"]"
     assertions:
     - attr:tracetest.selected_spans.count  =  3
@@ -22,10 +22,10 @@ spec:
     assertions:
     - attr:tracetest.selected_spans.count =   0
   - name: Check if the main attributes
-    selector: span[tracetest.span.type="http" name="GET /test-auth/ip" http.method="GET"]
+    selector: span[tracetest.span.type="http" name="GET /test-auth/ip" http.request.method="GET"]
     assertions:
-    - attr:http.method = "GET"
-    - attr:http.status_code = 401
+    - attr:http.request.method = "GET"
+    - attr:http.response.status_code = 401
     - attr:tyk.api.id  =  "1"
     - attr:tyk.api.name  =  "AuthAPI"
     - attr:tyk.api.orgid  =  "default"

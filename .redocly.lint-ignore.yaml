@@ -17,6 +17,10 @@ swagger.yml:
     - >-
       #/paths/~1tyk~1apis~1oas~1import/post/requestBody/content/application~1json/schema
     - '#/paths/~1tyk~1debug/post/requestBody/content/application~1json/schema'
+    - >-
+      #/paths/~1tyk~1mcps/post/requestBody/content/application~1json/schema
+    - >-
+      #/paths/~1tyk~1mcps~1{apiID}/put/requestBody/content/application~1json/schema
 https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json:
   spec:
     - '#/id'

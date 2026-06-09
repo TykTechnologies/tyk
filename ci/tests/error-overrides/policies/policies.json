@@ -1,0 +1,18 @@
+{
+  "test-ead-policy": {
+    "org_id": "default",
+    "name": "Test EAD Policy",
+    "rate": 1000,
+    "per": 60,
+    "quota_max": -1,
+    "quota_renewal_rate": 3600,
+    "active": true,
+    "access_rights": {
+      "test-ead": {
+        "api_id": "test-ead",
+        "api_name": "Test EAD - External Auth Denied",
+        "versions": ["Default"]
+      }
+    }
+  }
+}

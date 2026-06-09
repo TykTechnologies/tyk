@@ -16,13 +16,14 @@ import (
 	"time"
 
 	"github.com/robertkrimen/otto"
-	_ "github.com/robertkrimen/otto/underscore"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/sirupsen/logrus"
+
+	_ "github.com/robertkrimen/otto/underscore"
 )
 
 // RequestObject is marshalled to JSON string and passed into JSON middleware
@@ -230,7 +231,11 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	ms := DurationToMillisecond(time.Since(t1))
 	d.Logger().Debug("JSVM Virtual Endpoint execution took: (ms) ", ms)
 
-	if copiedResponse != nil {
+	// Skip recording intermediate VEM hits for MCP requests — the final
+	// SuccessHandler/ErrorHandler records the hit with proper MCPStats.
+	// Without this guard, each VEM continuation step produces a non-MCP
+	// analytics record that leaks internal routing paths into the endpoints table.
+	if copiedResponse != nil && !d.Spec.IsMCP() {
 		d.sh.RecordHit(r, analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}, copiedResponse.StatusCode, copiedResponse, false)
 	}
 
@@ -331,7 +336,7 @@ func (gw *Gateway) handleForcedResponse(rw http.ResponseWriter, res *http.Respon
 		res.Header.Set("Connection", "close")
 	}
 
-	spec.sendRateLimitHeaders(ses, res)
+	gw.limitHeaderFactory(res.Header).SendQuotas(ses, spec.APIID)
 
 	copyHeader(rw.Header(), res.Header, gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 

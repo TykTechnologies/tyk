@@ -97,14 +97,34 @@ type Authentication struct {
 	// ProtectedResourceMetadata configures OAuth 2.0 Protected Resource Metadata (RFC 9728)
 	// for authorization server discovery. This is used by MCP clients to discover which
 	// authorization server to use for accessing the API.
+	//
+	// Deprecated: Use SecuritySchemes[<name>].OAuth2.ProtectedResourceMetadata instead.
+	// The new per-scheme location is the runtime source of truth; this top-level
+	// field is kept for downgrade safety and will be removed in a future major version.
 	ProtectedResourceMetadata *ProtectedResourceMetadata `bson:"protectedResourceMetadata,omitempty" json:"protectedResourceMetadata,omitempty"`
 
 	// CertificateAuth represents certificate-based authentication configuration.
-	CertificateAuth CertificateAuth `bson:"certificateAuth,omitempty" json:"certificateAuth,omitempty"`
+	CertificateAuth *CertificateAuth `bson:"certificateAuth,omitempty" json:"certificateAuth,omitempty"`
 }
 
 // ProtectedResourceMetadata holds the configuration for OAuth 2.0 Protected Resource Metadata (RFC 9728).
 // It enables MCP clients to discover which authorization server protects this API resource.
+//
+// The serving mode is inferred from the configuration shape, not selected
+// explicitly:
+//   - When `Resource` or `AuthorizationServers` is set, Tyk runs in
+//     **static** mode — the PRM doc is assembled from the fields below.
+//   - When neither is set on an MCP API, Tyk runs in **mirror** mode —
+//     the upstream's PRM doc is fetched, its `resource` field rewritten
+//     to the gateway URL, and served. Used for transparent proxying of
+//     OAuth-protected remote MCP servers.
+//
+// On non-MCP APIs only static is meaningful; mirror is a no-op.
+//
+// Deprecated: Use OAuth2PRM (under SecuritySchemes[<name>].OAuth2) instead.
+// This type backs the legacy top-level Authentication.ProtectedResourceMetadata
+// field; the new per-scheme location is the runtime source of truth and the
+// legacy block is kept only for downgrade safety.
 type ProtectedResourceMetadata struct {
 	// Enabled activates the Protected Resource Metadata endpoint.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
@@ -114,6 +134,8 @@ type ProtectedResourceMetadata struct {
 	WellKnownPath string `bson:"wellKnownPath,omitempty" json:"wellKnownPath,omitempty"`
 
 	// Resource is the resource identifier (the API's resource URL).
+	// Required for static mode. Ignored in mirror mode (rewritten to the
+	// gateway URL at request time).
 	Resource string `bson:"resource,omitempty" json:"resource,omitempty"`
 
 	// AuthorizationServers is the list of authorization server URLs that can issue tokens for this resource.
@@ -123,21 +145,39 @@ type ProtectedResourceMetadata struct {
 	ScopesSupported []string `bson:"scopesSupported,omitempty" json:"scopesSupported,omitempty"`
 }
 
+// IsMirrorMode reports whether the PRM resolves to mirror mode for the
+// given API context. Mirror is the implicit default for MCP APIs whose
+// PRM doesn't configure any static fields (`Resource` or
+// `AuthorizationServers`); everything else is static.
+func (prm *ProtectedResourceMetadata) IsMirrorMode(isMCP bool) bool {
+	if prm == nil || !prm.Enabled {
+		return false
+	}
+	if prm.Resource != "" || len(prm.AuthorizationServers) > 0 {
+		return false
+	}
+	return isMCP
+}
+
 // Validate validates the ProtectedResourceMetadata configuration.
-// When isMCP is true, authorizationServers must have at least one entry.
+// Static mode requires `resource`, and additionally requires
+// `authorizationServers` for MCP APIs. Mirror mode skips the static-field
+// requirements — the upstream's PRM supplies them at request time.
 func (prm *ProtectedResourceMetadata) Validate(isMCP bool) error {
 	if prm == nil || !prm.Enabled {
 		return nil
 	}
-
+	if prm.IsMirrorMode(isMCP) {
+		// Mirror mode: upstream supplies resource/authorizationServers
+		// at request time. Nothing to validate here.
+		return nil
+	}
 	if prm.Resource == "" {
 		return errors.New("protectedResourceMetadata.resource is required when enabled")
 	}
-
 	if isMCP && len(prm.AuthorizationServers) == 0 {
 		return errors.New("protectedResourceMetadata.authorizationServers must have at least one entry for MCP APIs")
 	}
-
 	return nil
 }
 
@@ -199,10 +239,13 @@ func (c *CertificateAuth) ExtractTo(api *apidef.APIDefinition) {
 	if api.AuthConfigs == nil {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
+
+	if c == nil {
+		return
+	}
+
 	authConfig := api.AuthConfigs[apidef.AuthTokenType]
-
 	authConfig.UseCertificate = c.Enabled
-
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
@@ -283,7 +326,13 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.OIDC = nil
 	}
 
+	if a.CertificateAuth == nil {
+		a.CertificateAuth = &CertificateAuth{}
+	}
 	a.CertificateAuth.Fill(api)
+	if ShouldOmit(a.CertificateAuth) {
+		a.CertificateAuth = nil
+	}
 }
 
 // ExtractTo extracts *Authentication into *apidef.APIDefinition.

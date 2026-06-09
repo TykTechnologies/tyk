@@ -39,7 +39,7 @@ type ProxyResponse struct {
 type ReturningHttpHandler interface {
 	ServeHTTP(http.ResponseWriter, *http.Request) ProxyResponse
 	ServeHTTPForCache(http.ResponseWriter, *http.Request) ProxyResponse
-	CopyResponse(io.Writer, io.Reader, time.Duration)
+	CopyResponse(io.Writer, io.Reader, time.Duration) error
 }
 
 // SuccessHandler represents the final ServeHTTP() request for a proxied API request
@@ -167,10 +167,19 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 	rec.GraphQLStats = stats
 }
 
+func recordMCPDetails(rec *analytics.AnalyticsRecord, r *http.Request) {
+	rec.MCPStats = analytics.MCPStats{
+		IsMCP:         true,
+		JSONRPCMethod: ctxGetMCPMethod(r),
+		PrimitiveType: ctxGetMCPPrimitiveType(r),
+		PrimitiveName: ctxGetMCPPrimitiveName(r),
+	}
+}
+
 const traceTagPrefix = "trace-id-"
 
 func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []string {
-	if !s.Gw.GetConfig().OpenTelemetry.Enabled {
+	if !s.Gw.GetConfig().OpenTelemetry.TracesEnabled() {
 		return tags
 	}
 	if id := otel.ExtractTraceID(reqCtx); id != "" {
@@ -315,6 +324,10 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(s.Spec.GraphQL.Schema))
 		}
 
+		if s.Spec.IsMCP() {
+			recordMCPDetails(&record, r)
+		}
+
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
 
 		if s.Spec.GlobalConfig.EnforceOrgDataAge {
@@ -444,6 +457,8 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 		s.RecordAccessLog(r, resp.Response, latency)
+
+		s.Base().RecordMetrics(w, r, resp.Response.StatusCode, latency, resp.Response)
 	}
 	log.Debug("Done proxy")
 
@@ -491,6 +506,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response, false)
 		s.RecordAccessLog(r, inRes.Response, latency)
 
+		s.Base().RecordMetrics(w, r, inRes.Response.StatusCode, latency, inRes.Response)
 	}
 
 	return inRes

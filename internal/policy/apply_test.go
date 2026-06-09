@@ -1335,3 +1335,143 @@ func BenchmarkService_Apply(b *testing.B) {
 		}
 	}
 }
+
+func TestApply_PostExpiryPropagation(t *testing.T) {
+	polID := "post-expiry-pol"
+	pol := user.Policy{
+		ID:                    polID,
+		OrgID:                 "",
+		PostExpiryAction:      user.PostExpiryActionDelete,
+		PostExpiryGracePeriod: 3600,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {
+				APIID:    "api1",
+				Versions: []string{"Default"},
+			},
+		},
+	}
+
+	store := policy.NewStoreMap(map[string]user.Policy{polID: pol})
+	orgID := ""
+	svc := policy.New(&orgID, store, logrus.StandardLogger())
+
+	sess := &user.SessionState{}
+	sess.SetPolicies(polID)
+	err := svc.Apply(sess)
+	assert.NoError(t, err)
+	assert.Equal(t, user.PostExpiryActionDelete, sess.PostExpiryAction)
+	assert.Equal(t, int64(3600), sess.PostExpiryGracePeriod)
+}
+
+func TestApply_PostExpiryPropagation_Scenarios(t *testing.T) {
+	orgID := ""
+
+	t.Run("retain action propagated", func(t *testing.T) {
+		pol := user.Policy{
+			ID:                    "pol-retain",
+			PostExpiryAction:      user.PostExpiryActionRetain,
+			PostExpiryGracePeriod: -1,
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {APIID: "api1"},
+			},
+		}
+		store := policy.NewStoreMap(map[string]user.Policy{"pol-retain": pol})
+		svc := policy.New(&orgID, store, logrus.StandardLogger())
+
+		sess := &user.SessionState{}
+		sess.SetPolicies("pol-retain")
+		assert.NoError(t, svc.Apply(sess))
+		assert.Equal(t, user.PostExpiryActionRetain, sess.PostExpiryAction)
+		assert.Equal(t, int64(-1), sess.PostExpiryGracePeriod)
+	})
+
+	t.Run("empty action does NOT overwrite", func(t *testing.T) {
+		pol := user.Policy{
+			ID:                    "pol-empty-action",
+			PostExpiryAction:      "",
+			PostExpiryGracePeriod: 7200,
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {APIID: "api1"},
+			},
+		}
+		store := policy.NewStoreMap(map[string]user.Policy{"pol-empty-action": pol})
+		svc := policy.New(&orgID, store, logrus.StandardLogger())
+
+		sess := &user.SessionState{
+			PostExpiryAction: user.PostExpiryActionDelete,
+		}
+		sess.SetPolicies("pol-empty-action")
+		assert.NoError(t, svc.Apply(sess))
+		assert.Equal(t, user.PostExpiryActionDelete, sess.PostExpiryAction)
+		assert.Equal(t, int64(7200), sess.PostExpiryGracePeriod)
+	})
+
+	t.Run("zero grace does NOT overwrite", func(t *testing.T) {
+		pol := user.Policy{
+			ID:                    "pol-zero-grace",
+			PostExpiryAction:      user.PostExpiryActionRetain,
+			PostExpiryGracePeriod: 0,
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {APIID: "api1"},
+			},
+		}
+		store := policy.NewStoreMap(map[string]user.Policy{"pol-zero-grace": pol})
+		svc := policy.New(&orgID, store, logrus.StandardLogger())
+
+		sess := &user.SessionState{
+			PostExpiryGracePeriod: 3600,
+		}
+		sess.SetPolicies("pol-zero-grace")
+		assert.NoError(t, svc.Apply(sess))
+		assert.Equal(t, user.PostExpiryActionRetain, sess.PostExpiryAction)
+		assert.Equal(t, int64(3600), sess.PostExpiryGracePeriod)
+	})
+
+	t.Run("two policies, last non-empty wins", func(t *testing.T) {
+		polA := user.Policy{
+			ID:               "polA",
+			PostExpiryAction: user.PostExpiryActionDelete,
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {APIID: "api1"},
+			},
+		}
+		polB := user.Policy{
+			ID:               "polB",
+			PostExpiryAction: user.PostExpiryActionRetain,
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {APIID: "api1"},
+			},
+		}
+		store := policy.NewStoreMap(map[string]user.Policy{"polA": polA, "polB": polB})
+		svc := policy.New(&orgID, store, logrus.StandardLogger())
+
+		sess := &user.SessionState{}
+		sess.SetPolicies("polA", "polB")
+		assert.NoError(t, svc.Apply(sess))
+		assert.Equal(t, user.PostExpiryActionRetain, sess.PostExpiryAction)
+	})
+
+	t.Run("two policies, empty does not overwrite", func(t *testing.T) {
+		polA := user.Policy{
+			ID:               "polA",
+			PostExpiryAction: user.PostExpiryActionDelete,
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {APIID: "api1"},
+			},
+		}
+		polB := user.Policy{
+			ID:               "polB",
+			PostExpiryAction: "", // empty
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {APIID: "api1"},
+			},
+		}
+		store := policy.NewStoreMap(map[string]user.Policy{"polA": polA, "polB": polB})
+		svc := policy.New(&orgID, store, logrus.StandardLogger())
+
+		sess := &user.SessionState{}
+		sess.SetPolicies("polA", "polB")
+		assert.NoError(t, svc.Apply(sess))
+		assert.Equal(t, user.PostExpiryActionDelete, sess.PostExpiryAction)
+	})
+}

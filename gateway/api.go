@@ -54,7 +54,6 @@ import (
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/certs"
@@ -68,6 +67,8 @@ import (
 	"github.com/TykTechnologies/tyk/internal/sanitize"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	lib "github.com/TykTechnologies/tyk/lib/apidef"
+	"github.com/TykTechnologies/tyk/pkg/identifier"
+	"github.com/TykTechnologies/tyk/pkg/schema"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -197,7 +198,15 @@ type VersionMeta struct {
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(code)
-	if err := json.NewEncoder(w).Encode(obj); err != nil {
+
+	var err error
+	if bodyBytes, ok := obj.([]byte); ok {
+		_, err = w.Write(bodyBytes)
+	} else {
+		err = json.NewEncoder(w).Encode(obj)
+	}
+
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	if code != http.StatusOK {
@@ -317,6 +326,13 @@ func (gw *Gateway) checkAndApplyTrialPeriod(
 				newSession.Expires = time.Now().Unix() + policy.KeyExpiresIn
 			}
 		}
+
+		if policy.PostExpiryAction != "" {
+			newSession.PostExpiryAction = policy.PostExpiryAction
+		}
+		if policy.PostExpiryGracePeriod != 0 {
+			newSession.PostExpiryGracePeriod = policy.PostExpiryGracePeriod
+		}
 	}
 }
 
@@ -363,6 +379,10 @@ func (gw *Gateway) ApplyLifetime(sess *user.SessionState, specs ...*APISpec) int
 	for _, spec := range specs {
 		if spec != nil {
 			sessionLifeTime := sess.Lifetime(spec.GetSessionLifetimeRespectsKeyExpiration(), spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime, gw.GetConfig().GlobalSessionLifetime)
+			// -1 means "never delete" (persist forever), which is the maximum possible lifetime
+			if sessionLifeTime == -1 {
+				return -1
+			}
 			// uses the greater lifetime
 			if sessionLifeTime > lifetime {
 				lifetime = sessionLifeTime
@@ -508,6 +528,16 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
+	if err := gw.validateMCPFieldsInAccessRights(newSession.AccessRights); err != nil {
+		log.Error(err)
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
+	if err := gw.validateNonMCPFieldsOnMCPProxy(newSession.AccessRights); err != nil {
+		log.Error(err)
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
 	mw := &BaseMiddleware{Gw: gw}
 	mw.ApplyPolicies(newSession)
 
@@ -563,6 +593,21 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 			}
 		}
 	} else {
+		// POST path (create). Reject a user-supplied custom key ID that would
+		// be unreachable at auth time: CheckSessionAndIdentityForValidKey uses
+		// `len(key) < MinTokenLength` (see middleware.go), so storing a key
+		// shorter than that length would succeed here but every subsequent
+		// auth attempt with the raw ID would silently 403 (AKI). Empty keyName
+		// is fine — generateToken below will produce a safe-length UUID envelope.
+		minLen := gw.GetConfig().MinTokenLength
+		if keyName != "" && minLen > 0 && len(keyName) < minLen {
+			return apiError(fmt.Sprintf(
+				"custom key ID length %d is less than min_token_length (%d); "+
+					"the key would be unreachable at auth time. Use an ID of at least min_token_length characters, "+
+					"or lower min_token_length in the gateway configuration.",
+				len(keyName), minLen,
+			)), http.StatusBadRequest
+		}
 		newSession.DateCreated = time.Now()
 		keyName = gw.generateToken(newSession.OrgID, keyName)
 	}
@@ -1099,6 +1144,11 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
+	if err := gw.validator.Validate(identifier.CustomPolicyId(newPol.ID)); err != nil {
+		log.WithField("id", newPol.ID).WithError(err).Error("Failed to validate policy ID")
+		return apiError(identifier.ErrInvalidCustomPolicyId.Error()), http.StatusBadRequest
+	}
+
 	if polID != "" && newPol.ID != polID && r.Method == http.MethodPut {
 		log.Error("PUT operation on different IDs")
 		return apiError("Request ID does not match that in policy! For Update operations these must match."), http.StatusBadRequest
@@ -1108,6 +1158,16 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		const errMsg = "Unable to create policy without id."
 		log.Error(errMsg)
 		return apiError(errMsg), http.StatusBadRequest
+	}
+
+	if err := gw.validateMCPFieldsInAccessRights(newPol.AccessRights); err != nil {
+		log.Error(err)
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
+	if err := gw.validateNonMCPFieldsOnMCPProxy(newPol.AccessRights); err != nil {
+		log.Error(err)
+		return apiError(err.Error()), http.StatusBadRequest
 	}
 
 	root, err := gw.newPolicyPathRoot()
@@ -1229,11 +1289,21 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 	defer gw.apisMu.RUnlock()
 
 	obj, code := gw.handleGetAPI(apiID, true)
-	if apiOAS, ok := obj.(*oas.OAS); ok && modePublic {
-		apiOAS.RemoveTykExtension()
-	}
-	return obj, code
+	if apiOAS, ok := obj.(*oas.OAS); ok {
+		// We have to operate on oas clone in order to preserve original state after any manipulations on schema.
+		oasClone, _ := apiOAS.Clone() // nolint:errcheck
+		if modePublic {
+			oasClone.RemoveTykExtension()
+		}
 
+		visitor := schema.NewVisitor()
+		visitor.AddSchemaManipulation(schema.RestoreUnicodeEscapesFromRE2Manipulation)
+		visitor.ProcessOAS(oasClone)
+
+		obj = oasClone
+	}
+
+	return obj, code
 }
 
 func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
@@ -1410,7 +1480,12 @@ func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefini
 		suffix = "-mcp"
 	}
 
-	err, errCode = gw.writeToFile(fs, oasObj, apiDef.APIID+suffix)
+	oasDeepCopy, _ := oasObj.Clone() // nolint:errcheck
+	visitor := schema.NewVisitor()
+	visitor.AddSchemaManipulation(schema.RestoreUnicodeEscapesFromRE2Manipulation)
+	visitor.ProcessOAS(oasDeepCopy)
+
+	err, errCode = gw.writeToFile(fs, oasDeepCopy, apiDef.APIID+suffix)
 	if err != nil {
 		return
 	}
@@ -1585,7 +1660,13 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 		gw.setBaseAPIIDHeader(w, oasAPI)
 	}
 
-	doJSONWrite(w, code, obj)
+	jsonBytes, err := json.Marshal(obj)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	doJSONWrite(w, code, jsonBytes)
 }
 
 func (gw *Gateway) apiOASPostHandler(w http.ResponseWriter, r *http.Request) {
@@ -3231,6 +3312,23 @@ func ctxGetCacheOptions(r *http.Request) *cacheOptions {
 	return key
 }
 
+// ctxSetMatchedBinding stores the client-IdP registry binding matched for this
+// request. JWTMiddleware is a single shared instance per API and its
+// ProcessRequest runs concurrently, so per-request state must live on the
+// context, not the middleware struct.
+func ctxSetMatchedBinding(r *http.Request, b *Binding) {
+	setCtxValue(r, ctx.MatchedIdPBinding, b)
+}
+
+// ctxGetMatchedBinding returns the matched binding for this request, or nil.
+func ctxGetMatchedBinding(r *http.Request) *Binding {
+	b, ok := r.Context().Value(ctx.MatchedIdPBinding).(*Binding)
+	if !ok {
+		return nil
+	}
+	return b
+}
+
 func ctxGetSession(r *http.Request) *user.SessionState {
 	return ctx.GetSession(r)
 }
@@ -3577,6 +3675,38 @@ func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 	return
 }
 
+func ctxSetMCPMethod(r *http.Request, method string) {
+	setCtxValue(r, ctx.MCPMethod, method)
+}
+
+func ctxGetMCPMethod(r *http.Request) string {
+	return ctx.GetMCPMethod(r)
+}
+
+func ctxSetMCPPrimitiveType(r *http.Request, primitiveType string) {
+	setCtxValue(r, ctx.MCPPrimitiveType, primitiveType)
+}
+
+func ctxGetMCPPrimitiveType(r *http.Request) string {
+	return ctx.GetMCPPrimitiveType(r)
+}
+
+func ctxSetMCPPrimitiveName(r *http.Request, name string) {
+	setCtxValue(r, ctx.MCPPrimitiveName, name)
+}
+
+func ctxGetMCPPrimitiveName(r *http.Request) string {
+	return ctx.GetMCPPrimitiveName(r)
+}
+
+func ctxSetJSONRPCErrorCode(r *http.Request, code int) {
+	setCtxValue(r, ctx.JSONRPCErrorCode, code)
+}
+
+func ctxGetJSONRPCErrorCode(r *http.Request) int {
+	return ctx.GetJSONRPCErrorCode(r)
+}
+
 var createOauthClientSecret = func() string {
 	secret := uuid.New()
 	return base64.StdEncoding.EncodeToString([]byte(secret))
@@ -3612,6 +3742,15 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	}
 
 	oasObj.T = *t
+
+	visitor := schema.NewVisitor()
+	visitor.AddSchemaManipulation(schema.TransformUnicodeEscapesToRE2Manipulation)
+	visitor.ProcessOAS(&oasObj)
+
+	reqBodyInBytes, err = json.Marshal(&oasObj)
+	if err != nil {
+		return nil, nil, ErrRequestMalformed
+	}
 
 	return reqBodyInBytes, &oasObj, nil
 }

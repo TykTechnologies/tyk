@@ -615,6 +615,41 @@
                       "id": "http://jsonschema.net/version_data/versions/versionInfoProperty/paths/white_list"
                     }
                   }
+                },
+                "extended_paths": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "hard_timeouts": {
+                      "type": [
+                        "array",
+                        "null"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "disabled": {
+                            "type": "boolean"
+                          },
+                          "path": {
+                            "type": "string"
+                          },
+                          "method": {
+                            "type": "string"
+                          },
+                          "timeout": {
+                            "type": "integer"
+                          },
+                          "timeout_duration": {
+                            "type": "string",
+                            "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
+                          }
+                        }
+                      }
+                    }
+                  }
                 }
               },
               "required": [
@@ -1147,6 +1182,61 @@
         "type": "array",
         "items": {
           "type": "string"
+        }
+      }
+    },
+    "security_requirement_scopes": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object",
+        "additionalProperties": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "error_overrides_disabled": {
+      "type": "boolean"
+    },
+    "error_overrides": {
+      "type": ["object", "null"],
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "match": {
+              "type": "object",
+              "properties": {
+                "flag": { "type": "string" },
+                "message_pattern": { "type": "string" },
+                "body_field": { "type": "string" },
+                "body_value": { "type": "string" }
+              }
+            },
+            "response": {
+              "type": "object",
+              "properties": {
+                "status_code": { "type": "integer" },
+                "body": { "type": "string" },
+                "message": { "type": "string" },
+                "template": { "type": "string" },
+                "headers": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                }
+              }
+            }
+          },
+          "required": ["response"]
         }
       }
     }

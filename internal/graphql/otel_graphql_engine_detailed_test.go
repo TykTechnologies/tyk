@@ -52,10 +52,12 @@ var schema *graphql.Schema
 
 func TestMain(m *testing.M) {
 	//use noop tracer exporter
-	tracerProvider = otel.InitOpenTelemetry(context.Background(), logger.GetLogger(), &otel.OpenTelemetry{
-		Enabled:  true,
-		Exporter: "invalid",
-	}, "test", "test", false, "", false, []string{})
+	tracerProvider = otel.InitOpenTelemetry(context.Background(), logger.GetLogger(), &otel.OpenTelemetry{BaseOpenTelemetry: otel.BaseOpenTelemetry{
+		Enabled: true,
+		ExporterConfig: otel.ExporterConfig{
+			Exporter: "invalid",
+		},
+	}}, "test", "test", false, "", false, []string{})
 	var err error
 	schema, err = graphql.NewSchemaFromString(testSchema)
 	if err != nil {

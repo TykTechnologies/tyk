@@ -15,7 +15,6 @@ import (
 	reflect "reflect"
 
 	certs "github.com/TykTechnologies/tyk/certs"
-	config "github.com/TykTechnologies/tyk/config"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -96,6 +95,21 @@ func (mr *MockCertificateManagerMockRecorder) FlushCache() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FlushCache", reflect.TypeOf((*MockCertificateManager)(nil).FlushCache))
 }
 
+// GetId mocks base method.
+func (m *MockCertificateManager) GetId(certData []byte) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetId", certData)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetId indicates an expected call of GetId.
+func (mr *MockCertificateManagerMockRecorder) GetId(certData any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetId", reflect.TypeOf((*MockCertificateManager)(nil).GetId), certData)
+}
+
 // GetRaw mocks base method.
 func (m *MockCertificateManager) GetRaw(certID string) (string, error) {
 	m.ctrl.T.Helper()
@@ -165,16 +179,4 @@ func (m *MockCertificateManager) ListRawPublicKey(keyID string) any {
 func (mr *MockCertificateManagerMockRecorder) ListRawPublicKey(keyID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRawPublicKey", reflect.TypeOf((*MockCertificateManager)(nil).ListRawPublicKey), keyID)
-}
-
-// SetUsageTracker mocks base method.
-func (m *MockCertificateManager) SetUsageTracker(registry certs.UsageTracker, cfg *config.Config) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetUsageTracker", registry, cfg)
-}
-
-// SetUsageTracker indicates an expected call of SetUsageTracker.
-func (mr *MockCertificateManagerMockRecorder) SetUsageTracker(registry, cfg any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUsageTracker", reflect.TypeOf((*MockCertificateManager)(nil).SetUsageTracker), registry, cfg)
 }

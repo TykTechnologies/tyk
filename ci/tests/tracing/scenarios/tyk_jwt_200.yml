@@ -14,10 +14,10 @@ spec:
         value: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0LXVzZXItYWxpYXMiLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MzI1MDM2ODAwMDB9.E8aStwqiSQPAvQN80UboJBEWsSazDU_gEMqHNqeXPbc
   specs:
   - name: Test main span attributes
-    selector: span[tracetest.span.type="http" name="GET /test-jwt/ip" http.method="GET"]
+    selector: span[tracetest.span.type="http" name="GET /test-jwt/ip" http.request.method="GET"]
     assertions:
-    - attr:http.method = "GET"
-    - attr:http.status_code = 200
+    - attr:http.request.method = "GET"
+    - attr:http.response.status_code = 200
     - attr:tyk.api.id = "jwt-test-api"
     - attr:tyk.api.name = "JWTTestAPI"
     - attr:tyk.api.orgid = "default"

@@ -1,0 +1,24 @@
+{
+  "name": "Test QEX - Quota Exceeded",
+  "api_id": "test-qex",
+  "org_id": "default",
+  "use_keyless": false,
+  "active": true,
+  "auth": {
+    "auth_header_name": "Authorization"
+  },
+  "proxy": {
+    "listen_path": "/test-qex/",
+    "target_url": "http://backend-ok:80",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  }
+}

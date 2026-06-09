@@ -13,6 +13,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nsf/jsondiff"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -512,5 +513,220 @@ func TestCertificateExpiryMonitorConfig(t *testing.T) {
 			t.Errorf("Expected EventCooldownSeconds to be %d, got %d",
 				expected.EventCooldownSeconds, c.Security.CertificateExpiryMonitor.EventCooldownSeconds)
 		}
+	})
+}
+
+func TestOpenTelemetryConfig(t *testing.T) {
+	t.Run("JSON parsing", func(t *testing.T) {
+		var c Config
+		err := Load([]string{"testdata/opentelemetry.json"}, &c)
+		require.NoError(t, err)
+
+		otelCfg := c.OpenTelemetry
+		assert.True(t, otelCfg.Enabled)
+		assert.Equal(t, "grpc", otelCfg.Exporter)
+		assert.Equal(t, "collector.example.com:4317", otelCfg.Endpoint)
+		assert.Equal(t, 5, otelCfg.ConnectionTimeout)
+		assert.Equal(t, "my-gateway", otelCfg.ResourceName)
+		assert.Equal(t, "batch", otelCfg.SpanProcessorType)
+		assert.Equal(t, "tracecontext", otelCfg.ContextPropagation)
+
+		// Sampling
+		assert.Equal(t, "TraceIDRatioBased", otelCfg.Sampling.Type)
+		assert.Equal(t, 0.5, otelCfg.Sampling.Rate)
+		assert.True(t, otelCfg.Sampling.ParentBased)
+
+		// Metrics
+		require.NotNil(t, otelCfg.Metrics.Enabled)
+		assert.True(t, *otelCfg.Metrics.Enabled)
+		assert.Equal(t, 30, otelCfg.Metrics.ExportInterval)
+		assert.Equal(t, "cumulative", otelCfg.Metrics.Temporality)
+		assert.Equal(t, 15, otelCfg.Metrics.ShutdownTimeout)
+		assert.Equal(t, 5000, otelCfg.Metrics.CardinalityLimit)
+
+		// Metrics retry
+		require.NotNil(t, otelCfg.Metrics.Retry.Enabled)
+		assert.True(t, *otelCfg.Metrics.Retry.Enabled)
+		assert.Equal(t, 3000, otelCfg.Metrics.Retry.InitialInterval)
+		assert.Equal(t, 15000, otelCfg.Metrics.Retry.MaxInterval)
+		assert.Equal(t, 30000, otelCfg.Metrics.Retry.MaxElapsedTime)
+	})
+
+	t.Run("JSON round-trip preserves inline embedding", func(t *testing.T) {
+		var c Config
+		err := Load([]string{"testdata/opentelemetry.json"}, &c)
+		require.NoError(t, err)
+
+		got, err := json.MarshalIndent(c.OpenTelemetry, "", "    ")
+		require.NoError(t, err)
+
+		expect, err := os.ReadFile("testdata/expect.opentelemetry.json")
+		require.NoError(t, err)
+
+		diff, s := jsondiff.Compare(expect, got, &jsondiff.Options{PrintTypes: true})
+		if diff == jsondiff.NoMatch {
+			t.Errorf("OpenTelemetry JSON mismatch:\n%s", s)
+		}
+	})
+
+	t.Run("env var override", func(t *testing.T) {
+		t.Setenv("TYK_GW_OPENTELEMETRY_ENABLED", "true")
+		t.Setenv("TYK_GW_OPENTELEMETRY_EXPORTER", "grpc")
+		t.Setenv("TYK_GW_OPENTELEMETRY_ENDPOINT", "otel-collector:4317")
+		t.Setenv("TYK_GW_OPENTELEMETRY_CONNECTIONTIMEOUT", "10")
+		t.Setenv("TYK_GW_OPENTELEMETRY_SAMPLING_TYPE", "AlwaysOn")
+		t.Setenv("TYK_GW_OPENTELEMETRY_METRICS_EXPORTINTERVAL", "45")
+		t.Setenv("TYK_GW_OPENTELEMETRY_METRICS_CARDINALITYLIMIT", "500")
+
+		var c Config
+		err := Load([]string{"testdata/opentelemetry_env_override.json"}, &c)
+		require.NoError(t, err)
+
+		// Env vars should override file values
+		assert.True(t, c.OpenTelemetry.Enabled, "enabled should be overridden to true")
+		assert.Equal(t, "grpc", c.OpenTelemetry.Exporter, "exporter should be overridden")
+		assert.Equal(t, "otel-collector:4317", c.OpenTelemetry.Endpoint, "endpoint should be overridden")
+		assert.Equal(t, 10, c.OpenTelemetry.ConnectionTimeout, "connection_timeout should be overridden")
+		assert.Equal(t, "AlwaysOn", c.OpenTelemetry.Sampling.Type, "sampling type should be overridden")
+		assert.Equal(t, 45, c.OpenTelemetry.Metrics.ExportInterval, "metrics export_interval should be overridden")
+		assert.Equal(t, 500, c.OpenTelemetry.Metrics.CardinalityLimit, "cardinality_limit should be overridden")
+	})
+
+	t.Run("env var only (no config file)", func(t *testing.T) {
+		t.Setenv("TYK_GW_OPENTELEMETRY_ENABLED", "true")
+		t.Setenv("TYK_GW_OPENTELEMETRY_EXPORTER", "http")
+		t.Setenv("TYK_GW_OPENTELEMETRY_ENDPOINT", "localhost:4318")
+
+		var c Config
+		err := envconfig.Process("TYK_GW", &c)
+		require.NoError(t, err)
+
+		assert.True(t, c.OpenTelemetry.Enabled)
+		assert.Equal(t, "http", c.OpenTelemetry.Exporter)
+		assert.Equal(t, "localhost:4318", c.OpenTelemetry.Endpoint)
+	})
+
+	t.Run("inline JSON embedding produces flat structure", func(t *testing.T) {
+		// Verify that json:",inline" on the embedded BaseOpenTelemetry
+		// does not produce a nested "BaseOpenTelemetry" key in JSON output.
+		var c Config
+		err := Load([]string{"testdata/opentelemetry.json"}, &c)
+		require.NoError(t, err)
+
+		b, err := json.Marshal(c.OpenTelemetry)
+		require.NoError(t, err)
+
+		var raw map[string]interface{}
+		require.NoError(t, json.Unmarshal(b, &raw))
+
+		// "enabled" should be a top-level key, not nested under "BaseOpenTelemetry"
+		_, hasEnabled := raw["enabled"]
+		assert.True(t, hasEnabled, "expected 'enabled' as top-level JSON key")
+
+		_, hasBase := raw["BaseOpenTelemetry"]
+		assert.False(t, hasBase, "BaseOpenTelemetry should not appear as a JSON key (inline embedding)")
+	})
+
+	t.Run("new format JSON parsing", func(t *testing.T) {
+		var c Config
+		err := Load([]string{"testdata/opentelemetry_new.json"}, &c)
+		require.NoError(t, err)
+
+		otelCfg := c.OpenTelemetry
+
+		// Root-level trace fields should be zero (not used in new format)
+		assert.False(t, otelCfg.Enabled)
+		assert.Empty(t, otelCfg.Exporter)
+
+		// Traces sub-object should be populated
+		require.NotNil(t, otelCfg.Traces, "Traces should be non-nil for new format")
+		assert.True(t, otelCfg.Traces.Enabled)
+		assert.Equal(t, "grpc", otelCfg.Traces.Exporter)
+		assert.Equal(t, "trace-collector.example.com:4317", otelCfg.Traces.Endpoint)
+		assert.Equal(t, 5, otelCfg.Traces.ConnectionTimeout)
+		assert.Equal(t, "my-gateway", otelCfg.Traces.ResourceName)
+		assert.Equal(t, "batch", otelCfg.Traces.SpanProcessorType)
+		assert.Equal(t, "tracecontext", otelCfg.Traces.ContextPropagation)
+		assert.Equal(t, "TraceIDRatioBased", otelCfg.Traces.Sampling.Type)
+		assert.Equal(t, 0.5, otelCfg.Traces.Sampling.Rate)
+		assert.True(t, otelCfg.Traces.Sampling.ParentBased)
+
+		// TracesEnabled() should use Traces sub-object
+		assert.True(t, otelCfg.TracesEnabled())
+
+		// Metrics
+		require.NotNil(t, otelCfg.Metrics.Enabled)
+		assert.True(t, *otelCfg.Metrics.Enabled)
+		assert.Equal(t, "http", otelCfg.Metrics.Exporter)
+		assert.Equal(t, "metrics-collector.example.com:4318", otelCfg.Metrics.Endpoint)
+		assert.Equal(t, 30, otelCfg.Metrics.ExportInterval)
+		assert.Equal(t, 5000, otelCfg.Metrics.CardinalityLimit)
+	})
+
+	t.Run("new format JSON round-trip", func(t *testing.T) {
+		var c Config
+		err := Load([]string{"testdata/opentelemetry_new.json"}, &c)
+		require.NoError(t, err)
+
+		got, err := json.MarshalIndent(c.OpenTelemetry, "", "    ")
+		require.NoError(t, err)
+
+		expect, err := os.ReadFile("testdata/expect.opentelemetry_new.json")
+		require.NoError(t, err)
+
+		diff, s := jsondiff.Compare(expect, got, &jsondiff.Options{PrintTypes: true})
+		if diff == jsondiff.NoMatch {
+			t.Errorf("OpenTelemetry new format JSON mismatch:\n%s", s)
+		}
+	})
+
+	t.Run("new format env var override", func(t *testing.T) {
+		t.Setenv("TYK_GW_OPENTELEMETRY_TRACES_ENABLED", "true")
+		t.Setenv("TYK_GW_OPENTELEMETRY_TRACES_EXPORTER", "grpc")
+		t.Setenv("TYK_GW_OPENTELEMETRY_TRACES_ENDPOINT", "otel-collector:4317")
+		t.Setenv("TYK_GW_OPENTELEMETRY_TRACES_CONNECTIONTIMEOUT", "10")
+		t.Setenv("TYK_GW_OPENTELEMETRY_TRACES_SAMPLING_TYPE", "AlwaysOn")
+		t.Setenv("TYK_GW_OPENTELEMETRY_METRICS_EXPORTINTERVAL", "45")
+		t.Setenv("TYK_GW_OPENTELEMETRY_METRICS_CARDINALITYLIMIT", "500")
+
+		var c Config
+		err := Load([]string{"testdata/opentelemetry_new.json"}, &c)
+		require.NoError(t, err)
+
+		// Traces env vars should override file values
+		require.NotNil(t, c.OpenTelemetry.Traces)
+		assert.True(t, c.OpenTelemetry.Traces.Enabled, "traces enabled should be overridden to true")
+		assert.Equal(t, "grpc", c.OpenTelemetry.Traces.Exporter, "traces exporter should be overridden")
+		assert.Equal(t, "otel-collector:4317", c.OpenTelemetry.Traces.Endpoint, "traces endpoint should be overridden")
+		assert.Equal(t, 10, c.OpenTelemetry.Traces.ConnectionTimeout, "traces connection_timeout should be overridden")
+		assert.Equal(t, "AlwaysOn", c.OpenTelemetry.Traces.Sampling.Type, "traces sampling type should be overridden")
+		assert.Equal(t, 45, c.OpenTelemetry.Metrics.ExportInterval, "metrics export_interval should be overridden")
+		assert.Equal(t, 500, c.OpenTelemetry.Metrics.CardinalityLimit, "cardinality_limit should be overridden")
+	})
+
+	t.Run("new format env var only", func(t *testing.T) {
+		t.Setenv("TYK_GW_OPENTELEMETRY_TRACES_ENABLED", "true")
+		t.Setenv("TYK_GW_OPENTELEMETRY_TRACES_EXPORTER", "http")
+		t.Setenv("TYK_GW_OPENTELEMETRY_TRACES_ENDPOINT", "localhost:4318")
+
+		var c Config
+		err := envconfig.Process("TYK_GW", &c)
+		require.NoError(t, err)
+
+		require.NotNil(t, c.OpenTelemetry.Traces, "Traces should be allocated by envconfig")
+		assert.True(t, c.OpenTelemetry.Traces.Enabled)
+		assert.Equal(t, "http", c.OpenTelemetry.Traces.Exporter)
+		assert.Equal(t, "localhost:4318", c.OpenTelemetry.Traces.Endpoint)
+	})
+
+	t.Run("legacy format TracesEnabled uses root Enabled", func(t *testing.T) {
+		var c Config
+		err := Load([]string{"testdata/opentelemetry.json"}, &c)
+		require.NoError(t, err)
+
+		// envconfig allocates Traces as zero-valued; TracesEnabled
+		// must still return true from root-level Enabled.
+		assert.True(t, c.OpenTelemetry.Enabled)
+		assert.True(t, c.OpenTelemetry.TracesEnabled())
 	})
 }

@@ -14,11 +14,11 @@ spec:
         value: application/json
   specs:
   - name: http attributes
-    selector: span[tracetest.span.type="http" name="GET /tykprotocol-auth/ip" http.method="GET"]
+    selector: span[tracetest.span.type="http" name="GET /tykprotocol-auth/ip" http.request.method="GET"]
     assertions:
-    - attr:http.method = "GET"
-    - attr:http.status_code = 401
-    - attr:http.wrote_bytes != 0
+    - attr:http.request.method = "GET"
+    - attr:http.response.status_code = 401
+    - attr:http.response.body.size != 0
   - name: We should have double VersionCheck spans
     selector: span[tracetest.span.type="general" name="VersionCheck"]
     assertions:

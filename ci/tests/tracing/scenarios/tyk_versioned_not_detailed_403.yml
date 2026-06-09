@@ -11,11 +11,11 @@ spec:
         - key: Content-Type
           value: application/json
   specs:
-    - selector: span[tracetest.span.type="http" name="GET /versioned-not-detailed/ip" http.method="GET"]
+    - selector: span[tracetest.span.type="http" name="GET /versioned-not-detailed/ip" http.request.method="GET"]
       name: Checking attributes + wrong version in attributes
       assertions:
         - attr:tyk.api.version = "v3"
-        - attr:http.status_code = 403
+        - attr:http.response.status_code = 403
         - attr:tyk.api.id = 7
         - attr:tyk.api.name = "VersionedNotDetailedAPI"
         - attr:tyk.api.orgid = "default"

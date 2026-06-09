@@ -1441,46 +1441,64 @@ func TestJSONRPCMiddleware_OperationHeaderInjection(t *testing.T) {
 
 func TestJSONRPCMiddleware_setupSequentialRouting(t *testing.T) {
 	tests := []struct {
-		name               string
-		method             string
-		expectedNextVEM    string
-		expectedVEMChain   []string
-		expectedRedirectTo string
+		name                  string
+		method                string
+		primitiveName         string
+		expectedNextVEM       string
+		expectedVEMChain      []string
+		expectedRedirectTo    string
+		expectedPrimitiveType string
+		expectedPrimitiveName string
 	}{
 		{
-			name:               "tools/call - 2-stage routing",
-			method:             "tools/call",
-			expectedNextVEM:    mcp.ToolPrefix + "weather.getForecast",
-			expectedVEMChain:   []string{jsonrpc.MethodVEMPrefix + "tools/call", mcp.ToolPrefix + "weather.getForecast"},
-			expectedRedirectTo: jsonrpc.MethodVEMPrefix + "tools/call",
+			name:                  "tools/call - 2-stage routing",
+			method:                "tools/call",
+			primitiveName:         "weather.getForecast",
+			expectedNextVEM:       mcp.ToolPrefix + "weather.getForecast",
+			expectedVEMChain:      []string{jsonrpc.MethodVEMPrefix + "tools/call", mcp.ToolPrefix + "weather.getForecast"},
+			expectedRedirectTo:    jsonrpc.MethodVEMPrefix + "tools/call",
+			expectedPrimitiveType: mcp.PrimitiveTypeTool,
+			expectedPrimitiveName: "weather.getForecast",
 		},
 		{
-			name:               "resources/read - 2-stage routing",
-			method:             "resources/read",
-			expectedNextVEM:    mcp.ResourcePrefix + "file:///data/config.json",
-			expectedVEMChain:   []string{jsonrpc.MethodVEMPrefix + "resources/read", mcp.ResourcePrefix + "file:///data/config.json"},
-			expectedRedirectTo: jsonrpc.MethodVEMPrefix + "resources/read",
+			name:                  "resources/read - 2-stage routing",
+			method:                "resources/read",
+			primitiveName:         "file:///data/config.json",
+			expectedNextVEM:       mcp.ResourcePrefix + "file:///data/config.json",
+			expectedVEMChain:      []string{jsonrpc.MethodVEMPrefix + "resources/read", mcp.ResourcePrefix + "file:///data/config.json"},
+			expectedRedirectTo:    jsonrpc.MethodVEMPrefix + "resources/read",
+			expectedPrimitiveType: mcp.PrimitiveTypeResource,
+			expectedPrimitiveName: "file:///data/config.json",
 		},
 		{
-			name:               "prompts/get - 2-stage routing",
-			method:             "prompts/get",
-			expectedNextVEM:    mcp.PromptPrefix + "summarize",
-			expectedVEMChain:   []string{jsonrpc.MethodVEMPrefix + "prompts/get", mcp.PromptPrefix + "summarize"},
-			expectedRedirectTo: jsonrpc.MethodVEMPrefix + "prompts/get",
+			name:                  "prompts/get - 2-stage routing",
+			method:                "prompts/get",
+			primitiveName:         "summarize",
+			expectedNextVEM:       mcp.PromptPrefix + "summarize",
+			expectedVEMChain:      []string{jsonrpc.MethodVEMPrefix + "prompts/get", mcp.PromptPrefix + "summarize"},
+			expectedRedirectTo:    jsonrpc.MethodVEMPrefix + "prompts/get",
+			expectedPrimitiveType: mcp.PrimitiveTypePrompt,
+			expectedPrimitiveName: "summarize",
 		},
 		{
-			name:               "tools/list - 1-stage routing (operation only)",
-			method:             "tools/list",
-			expectedNextVEM:    "",
-			expectedVEMChain:   []string{jsonrpc.MethodVEMPrefix + "tools/list"},
-			expectedRedirectTo: jsonrpc.MethodVEMPrefix + "tools/list",
+			name:                  "tools/list - 1-stage routing (operation only)",
+			method:                "tools/list",
+			primitiveName:         "",
+			expectedNextVEM:       "",
+			expectedVEMChain:      []string{jsonrpc.MethodVEMPrefix + "tools/list"},
+			expectedRedirectTo:    jsonrpc.MethodVEMPrefix + "tools/list",
+			expectedPrimitiveType: "",
+			expectedPrimitiveName: "",
 		},
 		{
-			name:               "ping - 1-stage routing (operation only)",
-			method:             "ping",
-			expectedNextVEM:    "",
-			expectedVEMChain:   []string{jsonrpc.MethodVEMPrefix + "ping"},
-			expectedRedirectTo: jsonrpc.MethodVEMPrefix + "ping",
+			name:                  "ping - 1-stage routing (operation only)",
+			method:                "ping",
+			primitiveName:         "",
+			expectedNextVEM:       "",
+			expectedVEMChain:      []string{jsonrpc.MethodVEMPrefix + "ping"},
+			expectedRedirectTo:    jsonrpc.MethodVEMPrefix + "ping",
+			expectedPrimitiveType: "",
+			expectedPrimitiveName: "",
 		},
 	}
 
@@ -1505,7 +1523,10 @@ func TestJSONRPCMiddleware_setupSequentialRouting(t *testing.T) {
 			}
 
 			// Call setupSequentialRouting
-			mw.setupSequentialRouting(r, rpcReq, tt.expectedVEMChain)
+			mw.setupSequentialRouting(r, rpcReq, jsonrpc.RouteResult{
+				VEMChain:      tt.expectedVEMChain,
+				PrimitiveName: tt.primitiveName,
+			})
 
 			// Check routing state
 			state := httpctx.GetJSONRPCRoutingState(r)
@@ -1514,6 +1535,8 @@ func TestJSONRPCMiddleware_setupSequentialRouting(t *testing.T) {
 			assert.Equal(t, tt.expectedNextVEM, state.NextVEM, "NextVEM should match")
 			assert.Equal(t, tt.expectedVEMChain, state.VEMChain, "VEMChain should match")
 			assert.Equal(t, "/prct", state.OriginalPath, "OriginalPath should match")
+			assert.Equal(t, tt.expectedPrimitiveType, state.PrimitiveType, "PrimitiveType should match")
+			assert.Equal(t, tt.expectedPrimitiveName, state.PrimitiveName, "PrimitiveName should match")
 
 			// Check redirect URL (should always point to operation VEM)
 			redirectURL := ctxGetURLRewriteTarget(r)

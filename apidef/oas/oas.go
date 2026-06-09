@@ -253,14 +253,28 @@ func (s *OAS) Initialize() {
 		case typeAPIKey:
 			s.getTykTokenAuth(name)
 		case typeOAuth2:
-			// For OAuth2, we need to check the Tyk extension data to determine
-			// if it is a standard OAuth or external OAuth provider.
+			// The OAS-side type discriminator `oauth2` is shared by three
+			// Tyk-side schemes: legacy `*OAuth` (Tyk's own OAuth2 server),
+			// `*ExternalOAuth` (introspection / providers), and the new
+			// `*OAuth2` (this scheme). Disambiguate by inspecting the
+			// Tyk-extension shape, in priority order:
+			//   1) If already typed, use it directly.
+			//   2) If the map carries a new oauth2 sub-block (e.g.
+			//      scopeCheck), bind to *OAuth2 — without this branch
+			//      the legacy fallback would convert the new scheme's
+			//      map into a *OAuth and silently drop the sub-block.
+			//   3) Else if it has providers[] like ExternalOAuth, bind there.
+			//   4) Otherwise treat as legacy *OAuth.
 			securityScheme := s.getTykSecurityScheme(name)
 			if securityScheme == nil {
 				continue
 			}
 
-			// Check if the scheme has providers configured (indicates ExternalOAuth)
+			if oauth2 := asOAuth2Scheme(securityScheme); oauth2 != nil {
+				s.getTykSecuritySchemes()[name] = oauth2
+				continue
+			}
+
 			externalOAuth := &ExternalOAuth{}
 			if _, ok := securityScheme.(*ExternalOAuth); ok {
 				s.getTykExternalOAuthAuth(name)
@@ -553,8 +567,9 @@ func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) e
 	securityErr := s.validateSecurity()
 	compliantModeErr := s.validateCompliantModeAuthentication()
 	prmErr := s.validatePRM()
+	oauth2Err := s.ValidateOAuth2Schemes()
 
-	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr)
+	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, oauth2Err)
 }
 
 // Normalize converts the OAS api to a normalized state.
@@ -718,7 +733,8 @@ func (s *OAS) validateCompliantModeAuthentication() error {
 }
 
 // validatePRM validates the Protected Resource Metadata configuration.
-// For non-MCP validation, resource is required when PRM is enabled.
+// For non-MCP validation, resource is required when PRM is enabled (the
+// MCP-aware path is handled by ValidateForMCP).
 func (s *OAS) validatePRM() error {
 	tykAuth := s.getTykAuthentication()
 	if tykAuth == nil {
@@ -726,6 +742,31 @@ func (s *OAS) validatePRM() error {
 	}
 
 	return tykAuth.ProtectedResourceMetadata.Validate(false)
+}
+
+// ValidateForMCP runs the same validation chain as Validate but treats
+// the document as an MCP API for PRM purposes. Use this from MCP-specific
+// admin endpoints (e.g. POST /tyk/mcps) where the empty-mode +
+// no-resource shape resolves to mirror, not static-with-missing-resource.
+func (s *OAS) ValidateForMCP(ctx context.Context, opts ...openapi3.ValidationOption) error {
+	validationOpts := opts
+	if s.T.IsOpenAPI3_1() {
+		validationOpts = make([]openapi3.ValidationOption, len(opts)+1)
+		copy(validationOpts, opts)
+		validationOpts[len(opts)] = openapi3.EnableJSONSchema2020Validation()
+	}
+
+	validationErr := s.T.Validate(ctx, validationOpts...)
+	securityErr := s.validateSecurity()
+	compliantModeErr := s.validateCompliantModeAuthentication()
+	oauth2Err := s.ValidateOAuth2Schemes()
+
+	var prmErr error
+	if tykAuth := s.getTykAuthentication(); tykAuth != nil {
+		prmErr = tykAuth.ProtectedResourceMetadata.Validate(true)
+	}
+
+	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, oauth2Err)
 }
 
 // APIDef holds both OAS and Classic forms of an API definition.

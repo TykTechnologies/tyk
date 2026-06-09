@@ -18,6 +18,7 @@ import (
 
 // Mock certificate manager for integration testing
 type mockIntegrationCertificateManager struct {
+	certs.IdGetter
 	certificates   map[string]*tls.Certificate
 	caCertificates []string
 }
@@ -76,8 +77,6 @@ func (m *mockIntegrationCertificateManager) CertPool(certIDs []string) *x509.Cer
 }
 
 func (m *mockIntegrationCertificateManager) FlushCache() {}
-
-func (m *mockIntegrationCertificateManager) SetUsageTracker(_ certs.UsageTracker, _ *config.Config) {}
 
 func TestExternalServices_ProxyIntegration(t *testing.T) {
 	ts := StartTest(nil)
