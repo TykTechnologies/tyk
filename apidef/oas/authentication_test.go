@@ -2,6 +2,7 @@ package oas
 
 import (
 	"encoding/json"
+	"os"
 	"testing"
 	"time"
 
@@ -967,4 +968,80 @@ func TestProtectedResourceMetadata_JSON(t *testing.T) {
 		assert.NotContains(t, raw, "authorizationServers")
 		assert.NotContains(t, raw, "scopesSupported")
 	})
+}
+
+// TestProtectedResourceMetadata_SchemaMarkedDeprecated pins that every
+// x-tyk-api-gateway schema variant flags the legacy top-level PRM type
+// `X-Tyk-ProtectedResourceMetadata` as deprecated. The new home is the
+// per-scheme `securitySchemes[<name>].oauth2.protectedResourceMetadata`
+// (`X-Tyk-OAuth2-PRM`), and tooling that reads the schema needs the
+// signal to render the deprecation to operators.
+func TestProtectedResourceMetadata_SchemaMarkedDeprecated(t *testing.T) {
+	t.Parallel()
+
+	schemas := []string{
+		"schema/x-tyk-api-gateway.json",
+		"schema/x-tyk-api-gateway.strict.json",
+		"../mcp/schema/x-tyk-api-gateway.json",
+		"../streams/schema/x-tyk-api-gateway.json",
+	}
+	for _, path := range schemas {
+		t.Run(path, func(t *testing.T) {
+			t.Parallel()
+			data, err := os.ReadFile(path)
+			assert.NoError(t, err, "read schema")
+
+			var doc map[string]interface{}
+			assert.NoError(t, json.Unmarshal(data, &doc))
+
+			defs, ok := doc["definitions"].(map[string]interface{})
+			assert.True(t, ok, "schema must have a definitions block")
+			prm, ok := defs["X-Tyk-ProtectedResourceMetadata"].(map[string]interface{})
+			assert.True(t, ok, "schema must define X-Tyk-ProtectedResourceMetadata")
+			assert.Equal(t, true, prm["deprecated"],
+				"X-Tyk-ProtectedResourceMetadata must be marked deprecated; new home is securitySchemes[<name>].oauth2.protectedResourceMetadata")
+		})
+	}
+}
+
+// TestOAS_PRMBothBlocksRoundTrip pins that an OAS document carrying both
+// the deprecated top-level protectedResourceMetadata block and the new
+// per-scheme oauth2.protectedResourceMetadata block round-trips through
+// JSON marshal/unmarshal with both intact and with the OAuth2 master
+// switch staying disabled. This is the persistence shape the dashboard
+// writes after running the PRM auto-migration (non-destructive copy from
+// the legacy location to the new one, both kept in place for downgrade
+// safety).
+func TestOAS_PRMBothBlocksRoundTrip(t *testing.T) {
+	t.Parallel()
+	s := newOAuth2Fixture("oauth2")
+	auth := s.GetTykExtension().Server.Authentication
+	// PRM publishing is independent of the OAuth2 master switch — see
+	// TestOAuth2PRM_ServesWhenOAuth2MasterDisabled in the gateway tests.
+	auth.SecuritySchemes["oauth2"].(*OAuth2).Enabled = false
+	auth.SecuritySchemes["oauth2"].(*OAuth2).ProtectedResourceMetadata = &OAuth2PRM{
+		Enabled:              true,
+		AuthorizationServers: []string{"https://new.example.com"},
+	}
+	//nolint:staticcheck // intentional: the legacy block must round-trip alongside the new one.
+	auth.ProtectedResourceMetadata = &ProtectedResourceMetadata{
+		Enabled:              true,
+		AuthorizationServers: []string{"https://old.example.com"},
+	}
+
+	data, err := json.Marshal(s)
+	assert.NoError(t, err)
+
+	var decoded OAS
+	assert.NoError(t, json.Unmarshal(data, &decoded))
+
+	gotAuth := decoded.GetTykExtension().Server.Authentication
+	assert.NotNil(t, gotAuth.ProtectedResourceMetadata, "legacy block must survive (downgrade safety)")          //nolint:staticcheck
+	assert.Equal(t, []string{"https://old.example.com"}, gotAuth.ProtectedResourceMetadata.AuthorizationServers) //nolint:staticcheck
+	gotOAuth2 := decoded.GetTykOAuth2Config("oauth2")
+	assert.NotNil(t, gotOAuth2)
+	assert.NotNil(t, gotOAuth2.ProtectedResourceMetadata)
+	assert.Equal(t, []string{"https://new.example.com"}, gotOAuth2.ProtectedResourceMetadata.AuthorizationServers)
+	assert.False(t, gotOAuth2.Enabled,
+		"migration must not auto-enable OAuth2 authentication — only the PRM sub-block")
 }
