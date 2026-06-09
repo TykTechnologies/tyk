@@ -505,7 +505,7 @@ type VersionInfo struct {
 	IgnoreEndpointCase            bool                     `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
 	GlobalSizeLimit               int64                    `bson:"global_size_limit" json:"global_size_limit"`
 	GlobalSizeLimitDisabled       bool                     `bson:"global_size_limit_disabled" json:"global_size_limit_disabled"`
-	GlobalEnforceTimeout          tyktime.ReadableDuration `bson:"global_enforce_timeout,omitempty" json:"global_enforce_timeout,omitempty"`
+	GlobalEnforceTimeout          tyktime.ReadableDuration `bson:"global_enforce_timeout" json:"global_enforce_timeout"`
 	GlobalEnforceTimeoutDisabled  bool                     `bson:"global_enforce_timeout_disabled" json:"global_enforce_timeout_disabled"`
 	OverrideTarget                string                   `bson:"override_target" json:"override_target"`
 }
