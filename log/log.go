@@ -3,12 +3,9 @@ package log
 import (
 	"os"
 	"strings"
-	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
 )
 
 var (
@@ -144,68 +141,3 @@ type InjectTestHookOptions struct {
 }
 
 type InjectTestHookOpt func(*InjectTestHookOptions)
-
-func WithDestLogger(dest *logrus.Logger) InjectTestHookOpt {
-	return func(options *InjectTestHookOptions) {
-		options.Logger = dest
-	}
-}
-
-// InjectTestHook
-// Inject hook for testing.
-func InjectTestHook(t *testing.T, opts ...InjectTestHookOpt) *TestHook {
-	t.Helper()
-
-	options := &InjectTestHookOptions{
-		Logger: log,
-	}
-
-	for _, apply := range opts {
-		apply(options)
-	}
-
-	hook := &TestHook{new(logrustest.Hook)}
-	options.Logger.AddHook(hook)
-
-	t.Cleanup(func() {
-		removeHook(options.Logger, hook)
-	})
-
-	return hook
-}
-
-type localTestHook = logrustest.Hook
-
-type TestHook struct {
-	*localTestHook
-}
-
-func NewTestHookWithHook(base *logrustest.Hook) *TestHook {
-	return &TestHook{base}
-}
-
-func (h *TestHook) SomeBy(predicate func(*logrus.Entry) bool) bool {
-	return lo.SomeBy(h.AllEntries(), predicate)
-}
-
-func (h *TestHook) FilterBy(predicate func(*logrus.Entry) bool) []*logrus.Entry {
-	return lo.Filter(h.AllEntries(), func(item *logrus.Entry, _ int) bool {
-		return predicate(item)
-	})
-}
-
-func (h *TestHook) CountBy(predicate func(*logrus.Entry) bool) int {
-	return lo.CountBy(h.AllEntries(), predicate)
-}
-
-func removeHook(logger *logrus.Logger, hook logrus.Hook) {
-	clone := make(logrus.LevelHooks, len(logger.Hooks))
-
-	for level, hooks := range logger.Hooks {
-		clone[level] = lo.Filter(hooks, func(item logrus.Hook, _ int) bool {
-			return item != hook
-		})
-	}
-
-	logger.ReplaceHooks(clone)
-}

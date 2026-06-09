@@ -26,7 +26,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/model"
-	tykLog "github.com/TykTechnologies/tyk/log"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -1410,7 +1410,7 @@ func Test_RPCStorageHandler(t *testing.T) {
 
 				logger, rawHook := logrustest.NewNullLogger()
 				logger.Level = logrus.DebugLevel
-				hook := tykLog.NewTestHookWithHook(rawHook)
+				hook := tyklog.NewHook(rawHook)
 
 				fn := decorate(
 					func() error {

@@ -416,7 +416,7 @@ func Test_MdcbStorage(t *testing.T) {
 		local  *mock.MockHandler
 		rpc    *mock.MockHandler
 		logger *logrus.Logger
-		hook   *logger.TestHook
+		hook   *logger.Hook
 	}
 
 	newTestMdcbStorage := func(t *testing.T) testMdcbStorage {
@@ -438,7 +438,7 @@ func Test_MdcbStorage(t *testing.T) {
 			local:       local,
 			rpc:         rpc,
 			logger:      nullLogger,
-			hook:        logger.NewTestHookWithHook(hook),
+			hook:        logger.NewHook(hook),
 		}
 	}
 
