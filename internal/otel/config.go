@@ -56,6 +56,11 @@ type MetricsConfig struct {
 // this sub-object instead of the root-level inline fields.
 type TracesConfig struct {
 	BaseOpenTelemetry `json:",inline"`
+
+	// MCPTraceContext configures where Tyk reads an MCP request's W3C trace
+	// context from (ordered, first-match-wins). Omitted ⇒ the canonical
+	// [{header}, {body, path: params._meta}] default.
+	MCPTraceContext MCPTraceContextConfig `json:"mcp"`
 }
 
 // OpenTelemetry wraps the library trace config and adds Traces and Metrics sections.
@@ -76,6 +81,20 @@ type OpenTelemetry struct {
 
 	// Metrics holds the OpenTelemetry metrics configuration.
 	Metrics MetricsConfig `json:"metrics"`
+}
+
+// MCPTraceContext returns the MCP trace-context config read from the traces
+// sub-object (opentelemetry.traces.mcp). It is zero-valued when traces uses
+// the root-level format; callers then fall back to DefaultMCPReadSources for
+// the canonical read order.
+//
+// Value receiver so it can be called on non-addressable values (e.g.
+// GetConfig().OpenTelemetry.MCPTraceContext()), matching TracesEnabled.
+func (c OpenTelemetry) MCPTraceContext() MCPTraceContextConfig {
+	if c.Traces != nil {
+		return c.Traces.MCPTraceContext
+	}
+	return MCPTraceContextConfig{}
 }
 
 // TracesEnabled reports whether tracing is enabled. It checks the Traces
@@ -146,6 +165,11 @@ func (c *OpenTelemetry) SetDefaults() {
 
 	// 3. Fill remaining gaps with library defaults (export interval, temporality, etc.).
 	c.Metrics.SetDefaults()
+
+	// 4. Materialise the canonical MCP read-source default when omitted.
+	if c.Traces != nil {
+		c.Traces.MCPTraceContext.SetDefaults()
+	}
 }
 
 // LibraryConfig returns the effective trace config for passing to

@@ -567,8 +567,9 @@ func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) e
 	securityErr := s.validateSecurity()
 	compliantModeErr := s.validateCompliantModeAuthentication()
 	prmErr := s.validatePRM()
+	oauth2Err := s.ValidateOAuth2Schemes()
 
-	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr)
+	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, oauth2Err)
 }
 
 // Normalize converts the OAS api to a normalized state.
@@ -758,13 +759,14 @@ func (s *OAS) ValidateForMCP(ctx context.Context, opts ...openapi3.ValidationOpt
 	validationErr := s.T.Validate(ctx, validationOpts...)
 	securityErr := s.validateSecurity()
 	compliantModeErr := s.validateCompliantModeAuthentication()
+	oauth2Err := s.ValidateOAuth2Schemes()
 
 	var prmErr error
 	if tykAuth := s.getTykAuthentication(); tykAuth != nil {
 		prmErr = tykAuth.ProtectedResourceMetadata.Validate(true)
 	}
 
-	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr)
+	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, oauth2Err)
 }
 
 // APIDef holds both OAS and Classic forms of an API definition.

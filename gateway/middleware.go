@@ -91,6 +91,10 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 				span.SetAttributes(attrs...)
 			}
 
+			if originalPath := ctxGetOriginalRequestPath(r); originalPath != "" {
+				span.SetAttributes(otel.OriginalPathSpanAttribute(originalPath))
+			}
+
 			return err, i
 		}
 	}
@@ -141,6 +145,9 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 						if len(attrs) > 0 {
 							span.SetAttributes(attrs...)
 						}
+						if originalPath := ctxGetOriginalRequestPath(r); originalPath != "" {
+							span.SetAttributes(otel.OriginalPathSpanAttribute(originalPath))
+						}
 						span.End()
 					}()
 				}
@@ -189,7 +196,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			if err != nil {
 				// Prevent double error write
 				writeResponse := true
-				if goPlugin, isGoPlugin := actualMW.(*GoPluginMiddleware); isGoPlugin && goPlugin.handler != nil || errors.Is(err, ErrResponseErrorSent) {
+				if goPlugin, isGoPlugin := actualMW.(*GoPluginMiddleware); isGoPlugin && goPlugin.handler != nil || errors.Is(err, ErrResponseErrorSent) || errors.Is(err, middleware.ErrResponseRendered) {
 					writeResponse = false
 				}
 
@@ -502,6 +509,7 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 	accessLog.WithAPIID(t.Spec.APIID, t.Spec.Name, t.Spec.OrgID)
 	accessLog.WithApiKey(req, hashKeys, gw.obfuscateKey)
 	accessLog.WithRequest(req, latency)
+	accessLog.WithOriginalPath(req)
 	accessLog.WithResponse(resp)
 
 	// Add error classification if present (only on error requests)

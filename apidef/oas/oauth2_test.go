@@ -192,12 +192,11 @@ func TestOAuth2_HasContentRecognisesScopeCheck(t *testing.T) {
 	assert.True(t, o.HasContent())
 }
 
-// TestOAuth2_FillAggregatesFlowScopesFromRootSecurity pins that the
-// scope vocabulary on the materialised OAS scheme is aggregated from
-// every scope referenced for this scheme by the root `security:`
-// array. Operators declare required scopes once (in `security:`) and
-// OAS tooling sees the same vocabulary.
-func TestOAuth2_FillAggregatesFlowScopesFromRootSecurity(t *testing.T) {
+// TestOAuth2_FillDoesNotDeriveFlowScopesFromSecurity pins that fill
+// never writes `security:` scopes into the OAS scheme's flows.scopes
+// catalog. The catalog is operator-authored; the synthesised skeleton
+// for an extension-only scheme starts empty.
+func TestOAuth2_FillDoesNotDeriveFlowScopesFromSecurity(t *testing.T) {
 	s := newOAuth2Fixture("corpOAuth")
 	s.Security = openapi3.SecurityRequirements{
 		{"corpOAuth": []string{"read:billing", "write:billing"}},
@@ -210,20 +209,15 @@ func TestOAuth2_FillAggregatesFlowScopesFromRootSecurity(t *testing.T) {
 	ref := s.Components.SecuritySchemes["corpOAuth"]
 	require.NotNil(t, ref.Value.Flows)
 	require.NotNil(t, ref.Value.Flows.AuthorizationCode)
-	scopes := ref.Value.Flows.AuthorizationCode.Scopes
-	require.NotNil(t, scopes)
-	_, hasRead := scopes["read:billing"]
-	_, hasWrite := scopes["write:billing"]
-	_, hasAdmin := scopes["admin"]
-	assert.True(t, hasRead, "flows.scopes should contain read:billing from the first requirement")
-	assert.True(t, hasWrite, "flows.scopes should contain write:billing from the first requirement")
-	assert.True(t, hasAdmin, "flows.scopes should contain admin from the second requirement")
+	assert.Empty(t, ref.Value.Flows.AuthorizationCode.Scopes,
+		"fill must not derive flows.scopes from security: — the catalog is operator-authored")
 }
 
-// TestOAuth2_FillPreservesExistingScopeDescriptions pins that operator-
-// authored scope descriptions on the OAS scheme survive fill — only
-// the scope-name set is reconciled with `security:`.
-func TestOAuth2_FillPreservesExistingScopeDescriptions(t *testing.T) {
+// TestOAuth2_FillLeavesOperatorAuthoredCatalogUntouched pins that fill
+// never modifies an operator-authored OAS security-scheme component:
+// the flows.scopes catalog survives verbatim and `security:` scopes
+// are not merged in.
+func TestOAuth2_FillLeavesOperatorAuthoredCatalogUntouched(t *testing.T) {
 	s := newOAuth2Fixture("corpOAuth")
 	s.Components = &openapi3.Components{
 		SecuritySchemes: openapi3.SecuritySchemes{
@@ -251,8 +245,8 @@ func TestOAuth2_FillPreservesExistingScopeDescriptions(t *testing.T) {
 	s.fillSecurity(api)
 
 	scopes := s.Components.SecuritySchemes["corpOAuth"].Value.Flows.AuthorizationCode.Scopes
-	assert.Equal(t, "Read billing records", scopes["read:billing"], "existing description should survive fill")
-	assert.Equal(t, "", scopes["admin"], "newly added scope gets an empty description")
+	assert.Equal(t, openapi3.StringMap{"read:billing": "Read billing records"}, scopes,
+		"operator-authored catalog must survive fill verbatim; security: scopes are not merged in")
 }
 
 func TestOAuth2ScopeCheck_RoundTripJSONPreservesAllFields(t *testing.T) {
@@ -382,4 +376,55 @@ func TestScopeCheck_RoundTrip(t *testing.T) {
 	empty, err := json.Marshal(Operation{})
 	require.NoError(t, err)
 	assert.NotContains(t, string(empty), "scopeCheck")
+}
+
+func TestValidateOAuth2Schemes_ScopeSource(t *testing.T) {
+	withScopeSource := func(src string) *OAS {
+		s := newOAuth2Fixture("corpOAuth")
+		cfg := s.GetTykOAuth2Config("corpOAuth")
+		if cfg == nil {
+			cfg = &OAuth2{}
+		}
+		cfg.ScopeCheck = &OAuth2ScopeCheck{Enabled: true, ScopeSource: src}
+		s.getTykAuthentication().SecuritySchemes["corpOAuth"] = cfg
+		return s
+	}
+
+	t.Run("rejects unknown scopeSource", func(t *testing.T) {
+		err := withScopeSource("wat").ValidateOAuth2Schemes()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "scopeSource")
+	})
+
+	for _, src := range []string{"", OAuth2ScopeSourceOperation, OAuth2ScopeSourceGlobal, OAuth2ScopeSourceUnion} {
+		t.Run("accepts scopeSource="+src, func(t *testing.T) {
+			assert.NoError(t, withScopeSource(src).ValidateOAuth2Schemes())
+		})
+	}
+}
+
+func TestOAuth2PRM_IsMirrorMode(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		prm   *OAuth2PRM
+		isMCP bool
+		want  bool
+	}{
+		{"nil", nil, true, false},
+		{"disabled", &OAuth2PRM{Enabled: false}, true, false},
+		{"MCP API with no static fields → mirror", &OAuth2PRM{Enabled: true}, true, true},
+		{"MCP API with resource set → static", &OAuth2PRM{Enabled: true, Resource: "https://x"}, true, false},
+		{"MCP API with authorizationServers only → static",
+			&OAuth2PRM{Enabled: true, AuthorizationServers: []string{"https://auth"}}, true, false},
+		{"non-MCP API never resolves to mirror", &OAuth2PRM{Enabled: true}, false, false},
+		{"non-MCP with resource set → static", &OAuth2PRM{Enabled: true, Resource: "https://x"}, false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, tc.prm.IsMirrorMode(tc.isMCP))
+		})
+	}
 }
