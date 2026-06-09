@@ -1548,3 +1548,156 @@ func (m *mockRpcChecker) RpcLogin() bool {
 	}
 	return false
 }
+
+func TestRPCStorageHandler_internalSetKeyEx(t *testing.T) {
+	t.Run("SetKeyEx succeeds", func(t *testing.T) {
+		setKeyExCalled := false
+		setKeyCalled := false
+
+		dispatcher := newDispatcher(
+			withFunc("SetKeyEx", func(ibd *model.InboundData) error {
+				setKeyExCalled = true
+				return nil
+			}),
+			withFunc("SetKey", func(ibd *model.InboundData) error {
+				if ibd.KeyName == "rpc.listener.test_key" {
+					setKeyCalled = true
+				}
+				return nil
+			}),
+		)
+
+		rpcMock, connectionString := startRPCMock(dispatcher)
+		defer stopRPCMock(rpcMock)
+
+		g := StartTest(func(globalConf *config.Config) {
+			globalConf.SlaveOptions.UseRPC = true
+			globalConf.SlaveOptions.RPCKey = "test_org"
+			globalConf.SlaveOptions.APIKey = "key"
+			globalConf.SlaveOptions.ConnectionString = connectionString
+			globalConf.SlaveOptions.CallTimeout = 1
+		})
+		require.NoError(t, g.Gw.afterConfSetup())
+
+		defer g.Close()
+		time.Sleep(100 * time.Millisecond)
+
+		rpcListener := RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			HashKeys:         false,
+			Gw:               g.Gw,
+		}
+
+		connected := rpcListener.Connect()
+		require.True(t, connected, "Failed to connect to RPC server")
+
+		err := rpcListener.internalSetKeyEx("test_key", "test_session", 100)
+		assert.NoError(t, err)
+		assert.True(t, setKeyExCalled)
+		assert.False(t, setKeyCalled)
+	})
+
+	t.Run("SetKeyEx fails with unknown method, falls back to SetKey", func(t *testing.T) {
+		setKeyExCalled := false
+		setKeyCalled := false
+
+		dispatcher := newDispatcher(
+			withFunc("SetKeyEx", func(ibd *model.InboundData) error {
+				setKeyExCalled = true
+				return errors.New("unknown method SetKeyEx")
+			}),
+			withFunc("SetKey", func(ibd *model.InboundData) error {
+				if ibd.KeyName == "rpc.listener.test_key" {
+					setKeyCalled = true
+				}
+				return nil
+			}),
+		)
+
+		rpcMock, connectionString := startRPCMock(dispatcher)
+		defer stopRPCMock(rpcMock)
+
+		g := StartTest(func(globalConf *config.Config) {
+			globalConf.SlaveOptions.UseRPC = true
+			globalConf.SlaveOptions.RPCKey = "test_org"
+			globalConf.SlaveOptions.APIKey = "key"
+			globalConf.SlaveOptions.ConnectionString = connectionString
+			globalConf.SlaveOptions.CallTimeout = 1
+		})
+		require.NoError(t, g.Gw.afterConfSetup())
+
+		defer g.Close()
+		time.Sleep(100 * time.Millisecond)
+
+		rpcListener := RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			HashKeys:         false,
+			Gw:               g.Gw,
+		}
+
+		connected := rpcListener.Connect()
+		require.True(t, connected, "Failed to connect to RPC server")
+
+		err := rpcListener.internalSetKeyEx("test_key", "test_session", 100)
+		assert.NoError(t, err)
+		assert.True(t, setKeyExCalled)
+		assert.True(t, setKeyCalled)
+	})
+
+	t.Run("SetKeyEx fails with other error", func(t *testing.T) {
+		setKeyExCalled := false
+		setKeyCalled := false
+
+		dispatcher := newDispatcher(
+			withFunc("SetKeyEx", func(ibd *model.InboundData) error {
+				setKeyExCalled = true
+				return errors.New("some other error")
+			}),
+			withFunc("SetKey", func(ibd *model.InboundData) error {
+				if ibd.KeyName == "rpc.listener.test_key" {
+					setKeyCalled = true
+				}
+				return nil
+			}),
+		)
+
+		rpcMock, connectionString := startRPCMock(dispatcher)
+		defer stopRPCMock(rpcMock)
+
+		g := StartTest(func(globalConf *config.Config) {
+			globalConf.SlaveOptions.UseRPC = true
+			globalConf.SlaveOptions.RPCKey = "test_org"
+			globalConf.SlaveOptions.APIKey = "key"
+			globalConf.SlaveOptions.ConnectionString = connectionString
+			globalConf.SlaveOptions.CallTimeout = 1
+		})
+		require.NoError(t, g.Gw.afterConfSetup())
+
+		defer g.Close()
+		time.Sleep(100 * time.Millisecond)
+
+		rpcListener := RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			HashKeys:         false,
+			Gw:               g.Gw,
+		}
+
+		connected := rpcListener.Connect()
+		require.True(t, connected, "Failed to connect to RPC server")
+
+		err := rpcListener.internalSetKeyEx("test_key", "test_session", 100)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "some other error")
+		assert.True(t, setKeyExCalled)
+		assert.False(t, setKeyCalled)
+	})
+}
+
+func TestRPCStorageHandler_SetRawKeyEx(t *testing.T) {
+	rpcListener := RPCStorageHandler{}
+	err := rpcListener.SetRawKeyEx("test_key", "test_session", 100)
+	assert.NoError(t, err)
+}
