@@ -13,6 +13,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"io/ioutil"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -625,6 +626,18 @@ func (c *certificateManager) appendEmbeddedPEM(id string, mode CertificateType, 
 
 	parsedCert, parseErr := ParsePEMCertificate(rawCert, c.secret)
 	if parseErr != nil {
+		// Fallback: the input may be a PEM whose line breaks were collapsed
+		// into spaces by a copy-paste into a single-line field (a common
+		// Dashboard/secret-store mishap). Repair the formatting and retry
+		// once before giving up.
+		if repaired, ok := normalizeCollapsedPEM(rawCert); ok {
+			if cert, retryErr := ParsePEMCertificate(repaired, c.secret); retryErr == nil {
+				c.logger.Warn("Embedded PEM had non-canonical line formatting; normalized successfully. Please supply PEM with real line breaks (\\n).")
+				parsedCert, parseErr = cert, nil
+			}
+		}
+	}
+	if parseErr != nil {
 		// Never log the PEM body — it may contain a private key.
 		c.logger.WithError(parseErr).Error("Error parsing embedded PEM certificate")
 		*out = append(*out, nil)
@@ -635,6 +648,48 @@ func (c *certificateManager) appendEmbeddedPEM(id string, mode CertificateType, 
 	if isCertCanBeListed(parsedCert, mode) {
 		*out = append(*out, parsedCert)
 	}
+}
+
+// pemBlockRe matches a single PEM block whose internal line breaks may have
+// been collapsed into spaces. The body group is non-greedy so multiple blocks
+// (e.g. a certificate followed by its private key) are matched individually.
+var pemBlockRe = regexp.MustCompile(`(?s)-----BEGIN ([A-Z0-9 ]+?)-----(.*?)-----END [A-Z0-9 ]+?-----`)
+
+// normalizeCollapsedPEM rebuilds a canonical PEM document from input whose line
+// breaks were flattened into spaces (or other whitespace). For each block it
+// strips all intra-body whitespace and re-wraps the base64 payload at 64
+// columns with the BEGIN/END markers on their own lines.
+//
+// It returns ok=false when the input contains no recognisable PEM block, so the
+// caller can preserve the original parse error. This runs only as a fallback
+// after a normal parse fails, so well-formed input is never reshaped. Encrypted
+// PEM blocks (which carry `Proc-Type`/`DEK-Info` headers) are not faithfully
+// reproduced by this pass, but those parse correctly on the first attempt and
+// therefore never reach this code; a genuinely malformed block simply fails the
+// retry parse and yields the same nil as before.
+func normalizeCollapsedPEM(data []byte) ([]byte, bool) {
+	matches := pemBlockRe.FindAllSubmatch(data, -1)
+	if len(matches) == 0 {
+		return nil, false
+	}
+
+	var out bytes.Buffer
+	for _, m := range matches {
+		blockType := string(m[1])
+		body := strings.Join(strings.Fields(string(m[2])), "")
+
+		out.WriteString("-----BEGIN " + blockType + "-----\n")
+		for i := 0; i < len(body); i += 64 {
+			end := i + 64
+			if end > len(body) {
+				end = len(body)
+			}
+			out.WriteString(body[i:end])
+			out.WriteByte('\n')
+		}
+		out.WriteString("-----END " + blockType + "-----\n")
+	}
+	return out.Bytes(), true
 }
 
 func (c *certificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {

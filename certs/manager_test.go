@@ -425,3 +425,37 @@ func TestList_EmbeddedPEM_CertPoolWithEmbeddedCA(t *testing.T) {
 	subjects := pool.Subjects()
 	assert.GreaterOrEqual(t, len(subjects), 1, "pool should contain at least the embedded CA")
 }
+
+// collapseToSingleLine simulates a copy-paste of a PEM into a single-line text
+// field: every newline becomes a space.
+func collapseToSingleLine(pem []byte) string {
+	return strings.ReplaceAll(strings.TrimSpace(string(pem)), "\n", " ")
+}
+
+// TestList_EmbeddedPEM_SingleLineCollapsed verifies the gateway tolerates a
+// PEM whose line breaks were collapsed into spaces (e.g. pasted into a
+// single-line Dashboard field). pem.Decode rejects this form, so List() must
+// repair it before parsing.
+func TestList_EmbeddedPEM_SingleLineCollapsed(t *testing.T) {
+	m := newManager()
+	certPem, _ := genCertificateFromCommonName("single-line", false)
+
+	certs := m.List([]string{collapseToSingleLine(certPem)}, CertificatePublic)
+
+	cert := requireSingleCert(t, certs)
+	assert.Equal(t, "single-line", leafSubjectName(cert))
+}
+
+// TestList_EmbeddedPEM_SingleLineCombinedCertKey verifies a combined cert+key
+// PEM (used by upstream_certificates) is also tolerated when collapsed.
+func TestList_EmbeddedPEM_SingleLineCombinedCertKey(t *testing.T) {
+	m := newManager()
+	certPem, keyPem := genCertificateFromCommonName("single-line-priv", false)
+	combined := append(append([]byte{}, certPem...), keyPem...)
+
+	certs := m.List([]string{collapseToSingleLine(combined)}, CertificatePrivate)
+
+	cert := requireSingleCert(t, certs)
+	assert.Equal(t, "single-line-priv", leafSubjectName(cert))
+	assert.False(t, isPrivateKeyEmpty(cert), "private key should survive normalization")
+}
