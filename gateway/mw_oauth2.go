@@ -53,62 +53,112 @@ func (m *OAuth2Middleware) EnabledForSpec() bool {
 	if cfg == nil || !cfg.Enabled {
 		return false
 	}
-	return cfg.ScopeCheck != nil && cfg.ScopeCheck.Enabled
+	if cfg.ScopeCheck != nil && cfg.ScopeCheck.Enabled {
+		return true
+	}
+	if cfg.TokenExchange != nil && cfg.TokenExchange.Enabled {
+		return true
+	}
+	return false
 }
 
+//nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
 func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
 	}
 
 	_, cfg := m.Spec.GetOAuth2Config()
-	if cfg == nil || cfg.ScopeCheck == nil || !cfg.ScopeCheck.Enabled {
+	if cfg == nil {
+		return nil, http.StatusOK
+	}
+	scopeCheckActive := cfg.ScopeCheck != nil && cfg.ScopeCheck.Enabled
+	exchangeActive := cfg.TokenExchange != nil && cfg.TokenExchange.Enabled
+	if !scopeCheckActive && !exchangeActive {
 		return nil, http.StatusOK
 	}
 
-	alternatives := m.requiredScopeAlternativesForRequest(r)
-	if len(alternatives) == 0 {
-		// Nothing to enforce for this request (no per-op `security:`,
-		// no root `security:`, or the resolved requirement is vacuous).
-		return nil, http.StatusOK
+	var alternatives [][]string
+	if scopeCheckActive {
+		alternatives = m.requiredScopeAlternativesForRequest(r)
 	}
 
-	rawToken := stripBearer(r.Header.Get(header.Authorization))
-	if rawToken == "" {
-		m.setWWWAuthenticateInsufficientToken(w, oas.OAuth2ErrInvalidToken, "missing bearer token")
-		return errors.New("authorization field missing"), http.StatusUnauthorized
-	}
-
-	claims, err := oauth2common.ParseUnverifiedClaims(rawToken)
+	// Both gates read the inbound Bearer + parsed claims. Reject missing /
+	// malformed tokens before reaching the downstream EE middleware — passing
+	// an empty subject_token would surface as a confusing 502 exchange_failed
+	// instead of an honest 401 missing bearer.
+	needsBearer := exchangeActive || (scopeCheckActive && len(alternatives) > 0)
+	rawToken, claims, status, err := m.parseBearerClaims(w, r, needsBearer)
 	if err != nil {
-		m.setWWWAuthenticateInsufficientToken(w, oas.OAuth2ErrInvalidToken, "token is not a parseable JWT")
-		return fmt.Errorf("parsing inbound token claims: %w", err), http.StatusUnauthorized
+		return err, status
 	}
 
-	if tokenSatisfiesAnyAlternative(claims, cfg.ScopeCheck, alternatives) {
-		return nil, http.StatusOK
+	if scopeCheckActive && len(alternatives) > 0 && !tokenSatisfiesAnyAlternative(claims, cfg.ScopeCheck, alternatives) {
+		return m.handleScopeCheckFailure(w, r, claims, alternatives, cfg)
 	}
 
-	// The first declared alternative is cited on the challenge — listing
-	// every alternative would leak intent (a service-account scope
-	// shouldn't be advertised to a user-token caller).
+	// Hand off to the EE TokenExchangeMiddleware via request-context state.
+	if exchangeActive {
+		oauth2common.SetState(r, &oauth2common.State{
+			Claims:               claims,
+			RawToken:             rawToken,
+			OASConfig:            cfg,
+			APIID:                m.Spec.APIID,
+			MatchedOperationID:   m.matchedOperationIDForRequest(r),
+			MatchedPrimitiveName: matchedPrimitiveNameForRequest(r),
+			MatchedPrimitiveType: matchedPrimitiveTypeForRequest(r),
+			InferredScopes:       m.inferredScopesForRequest(r),
+		})
+	}
+	return nil, http.StatusOK
+}
+
+// parseBearerClaims extracts and parses the inbound Bearer token.
+// When needsBearer is true and the token is absent or unparseable, it writes
+// the appropriate WWW-Authenticate challenge and returns a non-nil error.
+func (m *OAuth2Middleware) parseBearerClaims(w http.ResponseWriter, r *http.Request, needsBearer bool) (rawToken string, claims jwt.MapClaims, status int, err error) {
+	rawToken = stripBearer(r.Header.Get(header.Authorization))
+	if rawToken == "" {
+		if needsBearer {
+			m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "missing bearer token")
+			//nolint:staticcheck // ST1005: "Authorization" is the HTTP header name in this canonical message (MsgAuthFieldMissing)
+			return "", nil, http.StatusUnauthorized, errors.New(MsgAuthFieldMissing)
+		}
+		return "", nil, 0, nil
+	}
+	c, parseErr := oauth2common.ParseUnverifiedClaims(rawToken)
+	if parseErr != nil {
+		if needsBearer {
+			m.setWWWAuthenticateInsufficientToken(w, r, oas.OAuth2ErrInvalidToken, "token is not a parseable JWT")
+			return "", nil, http.StatusUnauthorized, fmt.Errorf("parsing inbound token claims: %w", parseErr)
+		}
+		return rawToken, nil, 0, nil
+	}
+	return rawToken, c, 0, nil
+}
+
+// handleScopeCheckFailure writes the RFC 6750 scope rejection and returns the
+// appropriate error. The first declared alternative is cited on the challenge —
+// listing every alternative would leak intent.
+//
+//nolint:staticcheck // ST1008: returns the (error, int) tuple ProcessRequest must produce, returned directly by the caller.
+func (m *OAuth2Middleware) handleScopeCheckFailure(w http.ResponseWriter, r *http.Request, claims jwt.MapClaims, alternatives [][]string, cfg *oas.OAuth2) (error, int) {
 	cited := alternatives[0]
 	citedScopes := strings.Join(cited, " ")
 	m.fireScopeCheckFailedEvent(r, claims, alternatives, cited, cfg.ScopeCheck)
-	m.setWWWAuthenticateInsufficientScope(w, cited)
+	m.setWWWAuthenticateInsufficientScope(w, r, cited)
 
-	// MCP / JSON-RPC routes get the failure wrapped in a JSON-RPC 2.0
-	// error envelope by the chain's error handler (which keys off the
-	// routing state). REST routes get the RFC 6750-style JSON body
-	// written inline.
+	// MCP / JSON-RPC routes get the failure wrapped in a JSON-RPC 2.0 error
+	// envelope by the chain's error handler. REST routes get the RFC 6750-style
+	// JSON body written inline.
 	if m.Spec.IsMCP() && httpctx.GetJSONRPCRoutingState(r) != nil {
 		return errors.New(oas.OAuth2ErrInsufficientScope), http.StatusForbidden
 	}
 
 	body, err := json.Marshal(map[string]interface{}{
-		"error":             oas.OAuth2ErrInsufficientScope,
-		"error_description": "token does not satisfy required scopes: " + citedScopes,
-		"scope":             citedScopes,
+		oas.OAuth2FieldError:            oas.OAuth2ErrInsufficientScope,
+		oas.OAuth2FieldErrorDescription: "token does not satisfy required scopes: " + citedScopes,
+		"scope":                         citedScopes,
 	})
 	if err != nil {
 		m.Logger().WithError(err).Error("failed to marshal scope-check error body")
@@ -120,6 +170,74 @@ func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request
 		m.Logger().WithError(err).Warning("failed to write scope-check error response")
 	}
 	return nil, middleware.StatusRespond
+}
+
+// matchedOperationIDForRequest returns the OAS operationId that the
+// gateway's router resolved for this request, or "" when no path/method
+// matched (or this isn't an OAS API).
+func (m *OAuth2Middleware) matchedOperationIDForRequest(r *http.Request) string {
+	if op := m.findOASOperation(r); op != nil {
+		return op.OperationID
+	}
+	return ""
+}
+
+// matchedPrimitiveNameForRequest returns the MCP primitive name resolved
+// upstream by the JSONRPC middleware, or "" when this isn't a JSONRPC request.
+func matchedPrimitiveNameForRequest(r *http.Request) string {
+	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
+		return state.PrimitiveName
+	}
+	return ""
+}
+
+// matchedPrimitiveTypeForRequest returns the MCP primitive type ("tool",
+// "resource", "prompt") resolved upstream by the JSONRPC middleware, or ""
+// when this isn't a JSONRPC request. Must be paired with
+// matchedPrimitiveNameForRequest — tool and prompt names share no namespace.
+func matchedPrimitiveTypeForRequest(r *http.Request) string {
+	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
+		return state.PrimitiveType
+	}
+	return ""
+}
+
+// inferredScopesForRequest returns the union of all scope alternatives
+// for the request — used for outbound exchange.scopes inference per
+// RFC 8693 §4.5.5: multiple alternatives in `security:` (OR-of-AND)
+// all contribute, since the gateway already passes the inbound check
+// on at least one alternative and can't tell at exchange time which
+// alternative the caller satisfied.
+func (m *OAuth2Middleware) inferredScopesForRequest(r *http.Request) []string {
+	return flattenScopeAlternatives(m.requiredScopeAlternativesForRequest(r))
+}
+
+// flattenScopeAlternatives merges every alternative of the OR-of-AND
+// requirement into one deduplicated flat list, preserving first-seen
+// order across alternatives.
+func flattenScopeAlternatives(alts [][]string) []string {
+	if len(alts) == 0 {
+		return nil
+	}
+	var merged []string
+	for _, alt := range alts {
+		merged = append(merged, alt...)
+	}
+	return dedupPreserveOrder(merged)
+}
+
+// dedupPreserveOrder returns s with duplicates removed, preserving
+// first-seen order.
+func dedupPreserveOrder(s []string) []string {
+	seen := make(map[string]struct{}, len(s))
+	out := s[:0:0]
+	for _, v := range s {
+		if _, ok := seen[v]; !ok {
+			seen[v] = struct{}{}
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // requiredScopeAlternativesForRequest resolves the OR-of-AND scope
@@ -520,22 +638,34 @@ func (m *OAuth2Middleware) setWWWAuthenticate(w http.ResponseWriter, params [][2
 }
 
 // setWWWAuthenticateInsufficientScope emits the RFC 6750 §3.1 challenge
-// for a scope-check rejection. The `scope=` parameter advertises the
-// required scope set so RFC 6750 / MCP-aware clients can step up.
-func (m *OAuth2Middleware) setWWWAuthenticateInsufficientScope(w http.ResponseWriter, scopes []string) {
+// for a scope-check rejection: `scope=` advertises the required scopes;
+// `resource_metadata=` is added by appendResourceMetadataParam.
+func (m *OAuth2Middleware) setWWWAuthenticateInsufficientScope(w http.ResponseWriter, r *http.Request, scopes []string) {
 	scopesValue := strings.Join(scopes, " ")
-	m.setWWWAuthenticate(w, [][2]string{
-		{"error", oas.OAuth2ErrInsufficientScope},
-		{"error_description", "missing required scope: " + scopesValue},
+	params := [][2]string{
+		{oas.OAuth2FieldError, oas.OAuth2ErrInsufficientScope},
+		{oas.OAuth2FieldErrorDescription, "missing required scope: " + scopesValue},
 		{"scope", scopesValue},
-	})
+	}
+	m.setWWWAuthenticate(w, m.appendResourceMetadataParam(r, params))
 }
 
-func (m *OAuth2Middleware) setWWWAuthenticateInsufficientToken(w http.ResponseWriter, code, desc string) {
-	m.setWWWAuthenticate(w, [][2]string{
-		{"error", code},
-		{"error_description", desc},
-	})
+func (m *OAuth2Middleware) setWWWAuthenticateInsufficientToken(w http.ResponseWriter, r *http.Request, code, desc string) {
+	params := [][2]string{
+		{oas.OAuth2FieldError, code},
+		{oas.OAuth2FieldErrorDescription, desc},
+	}
+	m.setWWWAuthenticate(w, m.appendResourceMetadataParam(r, params))
+}
+
+// appendResourceMetadataParam adds the RFC 9728 §5.1 `resource_metadata`
+// auth-param to a Bearer challenge when this API publishes a PRM
+// document (see prmMetadataURL); no-op otherwise.
+func (m *OAuth2Middleware) appendResourceMetadataParam(r *http.Request, params [][2]string) [][2]string {
+	if url := prmMetadataURL(r, m.Spec); url != "" {
+		params = append(params, [2]string{oas.OAuth2FieldResourceMetadata, url})
+	}
+	return params
 }
 
 // fireScopeCheckFailedEvent emits the OAuth2ScopeCheckFailed audit
