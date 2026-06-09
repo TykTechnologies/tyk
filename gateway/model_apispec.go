@@ -207,6 +207,18 @@ func (a *APISpec) GetOAuth2Config() (string, *oas.OAuth2) {
 	return "", nil
 }
 
+// GetOAuth2PRMConfig returns the new-style PRM config carried under the
+// oauth2 security scheme and its scheme name, when enabled; ("", nil)
+// otherwise. Wins over the deprecated top-level block (GetPRMConfig)
+// when both exist.
+func (a *APISpec) GetOAuth2PRMConfig() (string, *oas.OAuth2PRM) {
+	name, cfg := a.GetOAuth2Config()
+	if cfg == nil || cfg.ProtectedResourceMetadata == nil || !cfg.ProtectedResourceMetadata.Enabled {
+		return "", nil
+	}
+	return name, cfg.ProtectedResourceMetadata
+}
+
 // FindSpecMatchesStatus checks if a URL spec has a specific status and returns the URLSpec for it.
 func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (*URLSpec, bool) {
 	matchPath, method := a.getMatchPathAndMethod(r, mode)
