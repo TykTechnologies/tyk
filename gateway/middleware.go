@@ -12,26 +12,25 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
-	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
-	"github.com/TykTechnologies/tyk/pkg/errpack"
-
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	"github.com/paulbellamy/ratecounter"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -615,7 +614,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		minLength = 3
 	}
 
-	if len(key) <= minLength {
+	if len(key) < minLength {
 		return user.SessionState{IsInactive: true}, false
 	}
 
