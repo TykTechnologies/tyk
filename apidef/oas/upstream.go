@@ -62,7 +62,7 @@ type Upstream struct {
 	Proxy *Proxy `bson:"proxy,omitempty" json:"proxy,omitempty"`
 
 	// EnforceTimeout contains the configuration related to API level timeout duration.
-	// Tyk classic API definition: `global_enforce_timeout`.
+	// Tyk classic API definition: `version_data.versions.<version_name>.global_enforce_timeout`.
 	EnforceTimeout *GlobalEnforceTimeout `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
 }
 
@@ -1435,13 +1435,13 @@ type GlobalEnforceTimeout struct {
 	// Enabled is a boolean flag. If set to `true`, the API-level timeout will be enforced
 	// across all endpoints that do not have an endpoint-level timeout configured.
 	//
-	// Tyk classic API definition: `global_enforce_timeout_disabled` (negated).
+	// Tyk classic API definition: `version_data.versions.<version_name>.global_enforce_timeout_disabled` (negated).
 	Enabled bool `json:"enabled" bson:"enabled"`
 
 	// Duration is the configured timeout using a human-readable format (e.g. `5s`, `500ms`, `1m`).
 	// Supported units: ms, s, m.
 	//
-	// Tyk classic API definition: `global_enforce_timeout`.
+	// Tyk classic API definition: `version_data.versions.<version_name>.global_enforce_timeout`.
 	Duration time.ReadableDuration `json:"duration,omitempty" bson:"duration,omitempty"`
 }
 
