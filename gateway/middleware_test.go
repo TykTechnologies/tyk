@@ -25,7 +25,6 @@ import (
 	ctxpkg "github.com/TykTechnologies/tyk/ctx"
 	headers2 "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
-	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -756,7 +755,7 @@ func TestRecordAccessLog_OriginalPath(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
 
 			if tc.originalPath != "" {
-				reqCtx := context.WithValue(req.Context(), ctx.OriginalRequestPath, tc.originalPath)
+				reqCtx := context.WithValue(req.Context(), ctxpkg.OriginalRequestPath, tc.originalPath)
 				req = req.WithContext(reqCtx)
 			}
 

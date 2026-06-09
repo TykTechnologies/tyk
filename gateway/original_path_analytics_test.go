@@ -158,7 +158,8 @@ func TestOriginalPathAnalytics_EmptyContextGraceful(t *testing.T) {
 	// SH-3: Empty context produces empty OriginalPath without panic.
 	// This tests defensive behavior - ctxGetOriginalRequestPath returns ""
 	// when the context value was never set, and no panic occurs.
-	req, _ := http.NewRequest("GET", "/test", nil)
+	req, err := http.NewRequest("GET", "/test", nil)
+	require.NoError(t, err)
 	got := ctxGetOriginalRequestPath(req)
 	assert.Equal(t, "", got, "Empty context should return empty string, not panic")
 }
@@ -242,7 +243,7 @@ func TestOriginalPathAnalytics_URLRewritePreservesOriginalPath(t *testing.T) {
 		spec.Proxy.StripListenPath = true
 
 		version := spec.VersionData.Versions["v1"]
-		json.Unmarshal([]byte(`{
+		require.NoError(t, json.Unmarshal([]byte(`{
 			"use_extended_paths": true,
 			"extended_paths": {
 				"url_rewrites": [{
@@ -252,7 +253,7 @@ func TestOriginalPathAnalytics_URLRewritePreservesOriginalPath(t *testing.T) {
 					"rewrite_to": "/new/v2/items/$1"
 				}]
 			}
-		}`), &version)
+		}`), &version))
 		spec.VersionData.Versions["v1"] = version
 	})
 
@@ -285,7 +286,7 @@ func TestOriginalPathAnalytics_CombinedStripAndRewrite(t *testing.T) {
 		spec.Proxy.StripListenPath = true
 
 		version := spec.VersionData.Versions["v1"]
-		json.Unmarshal([]byte(`{
+		require.NoError(t, json.Unmarshal([]byte(`{
 			"use_extended_paths": true,
 			"extended_paths": {
 				"url_rewrites": [{
@@ -295,7 +296,7 @@ func TestOriginalPathAnalytics_CombinedStripAndRewrite(t *testing.T) {
 					"rewrite_to": "/beta/$1"
 				}]
 			}
-		}`), &version)
+		}`), &version))
 		spec.VersionData.Versions["v1"] = version
 	})
 
