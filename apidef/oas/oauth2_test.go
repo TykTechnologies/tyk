@@ -402,3 +402,29 @@ func TestValidateOAuth2Schemes_ScopeSource(t *testing.T) {
 		})
 	}
 }
+
+func TestOAuth2PRM_IsMirrorMode(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		prm   *OAuth2PRM
+		isMCP bool
+		want  bool
+	}{
+		{"nil", nil, true, false},
+		{"disabled", &OAuth2PRM{Enabled: false}, true, false},
+		{"MCP API with no static fields → mirror", &OAuth2PRM{Enabled: true}, true, true},
+		{"MCP API with resource set → static", &OAuth2PRM{Enabled: true, Resource: "https://x"}, true, false},
+		{"MCP API with authorizationServers only → static",
+			&OAuth2PRM{Enabled: true, AuthorizationServers: []string{"https://auth"}}, true, false},
+		{"non-MCP API never resolves to mirror", &OAuth2PRM{Enabled: true}, false, false},
+		{"non-MCP with resource set → static", &OAuth2PRM{Enabled: true, Resource: "https://x"}, false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, tc.prm.IsMirrorMode(tc.isMCP))
+		})
+	}
+}
