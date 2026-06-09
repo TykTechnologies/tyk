@@ -653,8 +653,8 @@ func (p *ReverseProxy) GetEnforcedTimeoutSettings(spec *APISpec, req *http.Reque
 		}
 	}
 
-	if !spec.GlobalEnforceTimeoutDisabled && spec.GlobalEnforceTimeout != 0 {
-		return time.Duration(spec.GlobalEnforceTimeout), true
+	if !vInfo.GlobalEnforceTimeoutDisabled && vInfo.GlobalEnforceTimeout != 0 {
+		return time.Duration(vInfo.GlobalEnforceTimeout), true
 	}
 
 	return 0, false

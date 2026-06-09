@@ -2612,7 +2612,9 @@ func TestAPILevelTimeout(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 			spec.UseKeylessAccess = true
-			spec.GlobalEnforceTimeout = tyktime.ReadableDuration(200 * time.Millisecond)
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.GlobalEnforceTimeout = tyktime.ReadableDuration(200 * time.Millisecond)
+			})
 		})[0]
 
 		ts.Gw.LoadAPI(api)
@@ -2638,7 +2640,9 @@ func TestAPILevelTimeout(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 			spec.UseKeylessAccess = true
-			spec.GlobalEnforceTimeout = tyktime.ReadableDuration(500 * time.Millisecond)
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.GlobalEnforceTimeout = tyktime.ReadableDuration(500 * time.Millisecond)
+			})
 		})[0]
 
 		ts.Gw.LoadAPI(api)
@@ -2665,7 +2669,9 @@ func TestAPILevelTimeout(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 			spec.UseKeylessAccess = true
-			spec.GlobalEnforceTimeout = tyktime.ReadableDuration(200 * time.Millisecond)
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.GlobalEnforceTimeout = tyktime.ReadableDuration(200 * time.Millisecond)
+			})
 		})[0]
 
 		ts.Gw.LoadAPI(api)
@@ -2693,8 +2699,8 @@ func TestAPILevelTimeout(t *testing.T) {
 			spec.Proxy.TargetURL = upstream.URL
 			spec.UseKeylessAccess = true
 			spec.EnforcedTimeoutEnabled = true
-			spec.GlobalEnforceTimeout = tyktime.ReadableDuration(200 * time.Millisecond)
 			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.GlobalEnforceTimeout = tyktime.ReadableDuration(200 * time.Millisecond)
 				version.UseExtendedPaths = true
 				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
 					{
@@ -2734,8 +2740,8 @@ func TestAPILevelTimeout(t *testing.T) {
 			spec.Proxy.TargetURL = upstream.URL
 			spec.UseKeylessAccess = true
 			spec.EnforcedTimeoutEnabled = true
-			spec.GlobalEnforceTimeout = tyktime.ReadableDuration(200 * time.Millisecond)
 			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.GlobalEnforceTimeout = tyktime.ReadableDuration(200 * time.Millisecond)
 				version.UseExtendedPaths = true
 				// Endpoint timeout only on /special — /other gets no endpoint-level config.
 				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
@@ -2782,9 +2788,9 @@ func TestAPILevelTimeout(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 			spec.UseKeylessAccess = true
-			spec.GlobalEnforceTimeout = tyktime.ReadableDuration(200 * time.Millisecond)
-			spec.GlobalEnforceTimeoutDisabled = true
 			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.GlobalEnforceTimeout = tyktime.ReadableDuration(200 * time.Millisecond)
+				version.GlobalEnforceTimeoutDisabled = true
 				version.UseExtendedPaths = true
 				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
 					{
@@ -2794,7 +2800,6 @@ func TestAPILevelTimeout(t *testing.T) {
 						TimeoutDuration: tyktime.ReadableDuration(time.Second),
 					},
 				}
-
 			})
 		})[0]
 

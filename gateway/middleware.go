@@ -313,10 +313,9 @@ func NewBaseMiddleware(gw *Gateway, spec *APISpec, proxy ReturningHttpHandler, l
 		if len(v.ExtendedPaths.HardTimeouts) > 0 {
 			baseMid.Spec.EnforcedTimeoutEnabled = true
 		}
-	}
-
-	if !baseMid.Spec.GlobalEnforceTimeoutDisabled && baseMid.Spec.GlobalEnforceTimeout != 0 {
-		baseMid.Spec.EnforcedTimeoutEnabled = true
+		if !v.GlobalEnforceTimeoutDisabled && v.GlobalEnforceTimeout != 0 {
+			baseMid.Spec.EnforcedTimeoutEnabled = true
+		}
 	}
 
 	return baseMid
