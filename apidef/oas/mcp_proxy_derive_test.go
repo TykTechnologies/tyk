@@ -40,6 +40,20 @@ func TestAdapterLoopURLForSourceFallsBackWhenSourceHasMCPPath(t *testing.T) {
 	assert.Equal(t, "tyk://rest-1__mcp-server", AdapterLoopURLForSource("rest-1", withMCPPath))
 }
 
+func TestDefaultDerivedParamSerialization(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "form", DefaultDerivedParamStyle(DerivedParamLocationQuery))
+	assert.Equal(t, "simple", DefaultDerivedParamStyle(DerivedParamLocationPath))
+	assert.Equal(t, "simple", DefaultDerivedParamStyle(DerivedParamLocationHeader))
+	assert.Empty(t, DefaultDerivedParamStyle(DerivedParamLocationBody))
+
+	assert.True(t, DefaultDerivedParamExplode("form"))
+	assert.False(t, DefaultDerivedParamExplode("simple"))
+	assert.False(t, DefaultDerivedParamExplode("spaceDelimited"))
+	assert.False(t, DefaultDerivedParamExplode("pipeDelimited"))
+}
+
 func TestDeriveSourcePrimitives_SkipsMissingOperationIDAndEmitsToolPrimitive(t *testing.T) {
 	t.Parallel()
 
@@ -142,7 +156,33 @@ func TestDeriveSourceTools_PrefersExactJSONRequestBodyMediaType(t *testing.T) {
 		props := tools[0].InputSchema["properties"].(map[string]any)
 		assert.Contains(t, props, "exact")
 		assert.NotContains(t, props, "vendor")
+		assert.Equal(t, "application/json", tools[0].RequestBodyContentType)
 	}
+}
+
+func TestDeriveSourceTools_PreservesSelectedJSONRequestBodyMediaType(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Post: &openapi3.Operation{
+				OperationID: "create_order",
+				RequestBody: &openapi3.RequestBodyRef{Value: &openapi3.RequestBody{
+					Content: openapi3.Content{
+						"application/vnd.api+json": &openapi3.MediaType{
+							Schema: &openapi3.SchemaRef{Value: openapi3.NewObjectSchema().WithProperty("data", openapi3.NewStringSchema())},
+						},
+					},
+				}},
+			},
+		}),
+	))
+
+	tools, _, err := DeriveSourceTools(src, nil)
+	require.NoError(t, err)
+	require.Len(t, tools, 1)
+
+	assert.Equal(t, "application/vnd.api+json", tools[0].RequestBodyContentType)
 }
 
 func TestDeriveSourceTools_DerivesFormURLEncodedRequestBody(t *testing.T) {
@@ -379,6 +419,83 @@ func TestDeriveSourceTools_OutputSchemaSelectionAndWrapping(t *testing.T) {
 	}
 }
 
+func TestDeriveSourceTools_DerivesWholeBodyRequestSchema(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		schema *openapi3.Schema
+		want   string
+	}{
+		{name: "object", schema: openapi3.NewObjectSchema(), want: schemaTypeObject},
+		{name: "array", schema: openapi3.NewArraySchema(), want: schemaTypeArray},
+		{name: "string", schema: openapi3.NewStringSchema(), want: schemaTypeString},
+		{name: "integer", schema: openapi3.NewIntegerSchema(), want: schemaTypeInteger},
+		{name: "number", schema: openapi3.NewFloat64Schema(), want: schemaTypeNumber},
+		{name: "boolean", schema: openapi3.NewBoolSchema(), want: schemaTypeBoolean},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			src := newDeriveTestOAS(openapi3.NewPaths(
+				openapi3.WithPath("/echo", &openapi3.PathItem{
+					Post: &openapi3.Operation{
+						OperationID: "echo_" + tc.name,
+						RequestBody: &openapi3.RequestBodyRef{Value: &openapi3.RequestBody{
+							Required: true,
+							Content: openapi3.Content{
+								"application/json": &openapi3.MediaType{
+									Schema: &openapi3.SchemaRef{Value: tc.schema},
+								},
+							},
+						}},
+					},
+				}),
+			))
+
+			tools, _, err := DeriveSourceTools(src, nil)
+			require.NoError(t, err)
+			require.Len(t, tools, 1)
+
+			assert.Equal(t, map[string]string{"body": DerivedParamLocationBody}, tools[0].ParamLocations)
+			assert.Equal(t, []string{"body"}, tools[0].ParamOrder)
+			props := tools[0].InputSchema["properties"].(map[string]any)
+			body := props["body"].(map[string]any)
+			assert.Equal(t, tc.want, body["type"])
+			assert.Equal(t, []string{"body"}, tools[0].InputSchema["required"])
+		})
+	}
+}
+
+func TestDeriveSourceTools_PreservesParameterOrderMetadata(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders/{id}", &openapi3.PathItem{
+			Parameters: openapi3.Parameters{
+				&openapi3.ParameterRef{Value: &openapi3.Parameter{Name: "path_id", In: openapi3.ParameterInPath, Required: true, Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()}}},
+				&openapi3.ParameterRef{Value: &openapi3.Parameter{Name: "z_last", In: openapi3.ParameterInQuery, Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()}}},
+			},
+			Get: &openapi3.Operation{
+				OperationID: "list_orders",
+				Parameters: openapi3.Parameters{
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{Name: "a_first", In: openapi3.ParameterInQuery, Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()}}},
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{Name: "middle", In: openapi3.ParameterInQuery, Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()}}},
+				},
+			},
+		}),
+	))
+
+	tools, _, err := DeriveSourceTools(src, nil)
+	require.NoError(t, err)
+	require.Len(t, tools, 1)
+
+	assert.Equal(t, []string{"path_id", "z_last", "a_first", "middle"}, tools[0].ParamOrder)
+}
+
 func TestDeriveSourceTools_AllowsMCPCompatibleOperationIDNames(t *testing.T) {
 	t.Parallel()
 
@@ -550,6 +667,78 @@ func TestDeriveSourceTools_PrefixesParameterNameCollisions(t *testing.T) {
 	assert.Contains(t, props, "query_id")
 	assert.Contains(t, props, "header_id")
 	assert.Contains(t, props, "id")
+}
+
+func TestDeriveSourceTools_DerivesParameterSerializationMetadata(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders/{id}", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: "list_orders",
+				Parameters: openapi3.Parameters{
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{
+						Name:     "id",
+						In:       openapi3.ParameterInPath,
+						Required: true,
+						Schema:   &openapi3.SchemaRef{Value: openapi3.NewStringSchema()},
+					}},
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{
+						Name:   "tags",
+						In:     openapi3.ParameterInQuery,
+						Schema: &openapi3.SchemaRef{Value: openapi3.NewArraySchema().WithItems(openapi3.NewStringSchema())},
+					}},
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{
+						Name:    "ids",
+						In:      openapi3.ParameterInQuery,
+						Style:   "form",
+						Explode: boolPtr(false),
+						Schema:  &openapi3.SchemaRef{Value: openapi3.NewArraySchema().WithItems(openapi3.NewIntegerSchema())},
+					}},
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{
+						Name:   "X-Tags",
+						In:     openapi3.ParameterInHeader,
+						Schema: &openapi3.SchemaRef{Value: openapi3.NewArraySchema().WithItems(openapi3.NewStringSchema())},
+					}},
+				},
+			},
+		}),
+	))
+
+	tools, _, err := DeriveSourceTools(src, nil)
+	require.NoError(t, err)
+	require.Len(t, tools, 1)
+
+	assert.Equal(t, map[string]DerivedParamSerialization{
+		"id": {
+			SourceName: "id",
+			Location:   DerivedParamLocationPath,
+			Style:      "simple",
+			Explode:    false,
+			SchemaType: schemaTypeString,
+		},
+		"tags": {
+			SourceName: "tags",
+			Location:   DerivedParamLocationQuery,
+			Style:      "form",
+			Explode:    true,
+			SchemaType: schemaTypeArray,
+		},
+		"ids": {
+			SourceName: "ids",
+			Location:   DerivedParamLocationQuery,
+			Style:      "form",
+			Explode:    false,
+			SchemaType: schemaTypeArray,
+		},
+		"X-Tags": {
+			SourceName: "X-Tags",
+			Location:   DerivedParamLocationHeader,
+			Style:      "simple",
+			Explode:    false,
+			SchemaType: schemaTypeArray,
+		},
+	}, tools[0].ParamSerializations)
 }
 
 func TestDeriveSourceTools_RejectsDuplicateExposedParameterNames(t *testing.T) {

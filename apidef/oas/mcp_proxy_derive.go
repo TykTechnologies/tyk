@@ -60,6 +60,16 @@ type DerivedTool struct {
 	// original REST parameter or body field name.
 	ParamSourceNames map[string]string `json:"-"`
 
+	// ParamSerializations maps each MCP-facing path/query/header argument to
+	// the source OpenAPI serialization method the adapter uses when rebuilding
+	// the upstream REST request.
+	ParamSerializations map[string]DerivedParamSerialization `json:"-"`
+
+	// ParamOrder lists MCP-facing argument names in source derivation order.
+	// The adapter uses it when emitting ordered request components such as
+	// query strings.
+	ParamOrder []string `json:"-"`
+
 	// RequestBodyContentType is the selected source request body media type.
 	// Empty means JSON/default.
 	RequestBodyContentType string `json:"-"`
@@ -73,8 +83,32 @@ type DerivedTool struct {
 	Annotations *DerivedToolAnnotations `json:"annotations,omitempty"`
 
 	// OutputSchema is the JSON schema published in tools/list to describe
-	// structuredContent returned by successful tools/call responses.
+	// structuredContent returned by successful tools/call responses. When set,
+	// the REST-as-MCP adapter unmarshals successful JSON response bodies up to
+	// the adapter body cap to populate structuredContent; omit it for tools
+	// whose large or high-volume responses should stay text-only.
 	OutputSchema map[string]any `json:"outputSchema,omitempty"`
+}
+
+// DerivedParamSerialization describes how a path, query, or header parameter
+// should be encoded when translating MCP tool arguments to a REST request.
+type DerivedParamSerialization struct {
+	// SourceName is the original REST parameter name used in the upstream
+	// request.
+	SourceName string
+
+	// Location is the REST parameter location, such as path, query, or header.
+	Location string
+
+	// Style is the OpenAPI serialization style for the parameter.
+	Style string
+
+	// Explode indicates whether arrays and objects should generate separate
+	// parameter values.
+	Explode bool
+
+	// SchemaType is the derived JSON schema type for the parameter value.
+	SchemaType string
 }
 
 // DerivedToolAnnotations describes MCP tool annotations derived from the
@@ -302,7 +336,7 @@ func deriveOperationPrimitive(
 	}
 
 	seen[name] = true
-	locs, sourceNames, bodyContentType, schema, err := deriveParams(item, mo.op)
+	locs, sourceNames, serializations, order, bodyContentType, schema, err := deriveParams(item, mo.op)
 	if err != nil {
 		return DerivedPrimitive{}, nil, false, fmt.Errorf("operationId %q: %w", rawName, err)
 	}
@@ -320,6 +354,8 @@ func deriveOperationPrimitive(
 			PathTemplate:           mo.path,
 			ParamLocations:         locs,
 			ParamSourceNames:       sourceNames,
+			ParamSerializations:    serializations,
+			ParamOrder:             order,
 			RequestBodyContentType: bodyContentType,
 			InputSchema:            schema,
 			Annotations:            defaultDerivedToolAnnotations(mo.method, mo.op, name),
@@ -509,16 +545,16 @@ func SanitizeToolName(raw string) string {
 }
 
 // deriveParams walks an operation's parameters and requestBody and returns
-// (paramLocations, paramSourceNames, requestBodyContentType, inputSchema). The
-// emitted schemas intentionally use a small JSON Schema subset that is valid
-// under MCP's default JSON Schema 2020-12 interpretation.
-func deriveParams(item *openapi3.PathItem, op *openapi3.Operation) (map[string]string, map[string]string, string, map[string]any, error) {
+// adapter metadata plus the MCP input schema. The emitted schemas intentionally
+// use a small JSON Schema subset that is valid under MCP's default JSON Schema
+// 2020-12 interpretation.
+func deriveParams(item *openapi3.PathItem, op *openapi3.Operation) (map[string]string, map[string]string, map[string]DerivedParamSerialization, []string, string, map[string]any, error) {
 	params := newDerivedParams()
 	params.addParameters(item.Parameters)
 	params.addParameters(op.Parameters)
 	params.addRequestBody(op.RequestBody)
-	locations, sourceNames, schema, err := params.build()
-	return locations, sourceNames, params.requestBodyContentType, schema, err
+	locations, sourceNames, serializations, order, schema, err := params.build()
+	return locations, sourceNames, serializations, order, params.requestBodyContentType, schema, err
 }
 
 func schemaType(s *openapi3.Schema) string {
@@ -549,10 +585,11 @@ func schemaType(s *openapi3.Schema) string {
 }
 
 type derivedParam struct {
-	sourceName string
-	location   string
-	schema     map[string]any
-	required   bool
+	sourceName    string
+	location      string
+	schema        map[string]any
+	serialization *DerivedParamSerialization
+	required      bool
 }
 
 type derivedParams struct {
@@ -582,12 +619,64 @@ func (p *derivedParams) addParameter(param *openapi3.Parameter) {
 		return
 	}
 
+	schema := schemaForParameter(param)
 	p.addOrReplace(derivedParam{
 		sourceName: param.Name,
 		location:   location,
-		schema:     schemaForParameter(param),
-		required:   param.Required,
+		schema:     schema,
+		serialization: parameterSerialization(
+			param,
+			location,
+			schemaTypeForDerivedSchema(schema, schemaTypeString),
+		),
+		required: param.Required,
 	})
+}
+
+func parameterSerialization(param *openapi3.Parameter, location, paramSchemaType string) *DerivedParamSerialization {
+	style := strings.TrimSpace(param.Style)
+	if style == "" {
+		style = DefaultDerivedParamStyle(location)
+	}
+
+	explode := DefaultDerivedParamExplode(style)
+	if param.Explode != nil {
+		explode = *param.Explode
+	}
+
+	return &DerivedParamSerialization{
+		SourceName: param.Name,
+		Location:   location,
+		Style:      style,
+		Explode:    explode,
+		SchemaType: paramSchemaType,
+	}
+}
+
+// DefaultDerivedParamStyle returns the OpenAPI default serialization style for
+// a derived path, query, or header parameter location.
+func DefaultDerivedParamStyle(location string) string {
+	switch location {
+	case DerivedParamLocationQuery:
+		return "form"
+	case DerivedParamLocationPath, DerivedParamLocationHeader:
+		return "simple"
+	default:
+		return ""
+	}
+}
+
+// DefaultDerivedParamExplode returns the OpenAPI default explode value for a
+// parameter serialization style.
+func DefaultDerivedParamExplode(style string) bool {
+	return style == "form"
+}
+
+func schemaTypeForDerivedSchema(schema map[string]any, fallback string) string {
+	if typ, ok := schema[schemaKeyType].(string); ok && typ != "" {
+		return typ
+	}
+	return fallback
 }
 
 func parameterLocation(in string) string {
@@ -667,7 +756,7 @@ func (p *derivedParams) addOrReplace(param derivedParam) {
 	p.params = append(p.params, param)
 }
 
-func (p *derivedParams) build() (map[string]string, map[string]string, map[string]any, error) {
+func (p *derivedParams) build() (map[string]string, map[string]string, map[string]DerivedParamSerialization, []string, map[string]any, error) {
 	nameCounts := make(map[string]int, len(p.params))
 	for _, param := range p.params {
 		nameCounts[param.sourceName]++
@@ -675,16 +764,22 @@ func (p *derivedParams) build() (map[string]string, map[string]string, map[strin
 
 	locations := make(map[string]string, len(p.params))
 	sourceNames := make(map[string]string, len(p.params))
+	serializations := make(map[string]DerivedParamSerialization, len(p.params))
 	props := make(map[string]any, len(p.params))
+	order := make([]string, 0, len(p.params))
 	required := map[string]struct{}{}
 
 	for _, param := range p.params {
 		name := exposedParamName(param, nameCounts[param.sourceName] > 1)
 		if _, duplicate := locations[name]; duplicate {
-			return nil, nil, nil, fmt.Errorf("duplicate exposed parameter name %q", name)
+			return nil, nil, nil, nil, nil, fmt.Errorf("duplicate exposed parameter name %q", name)
 		}
 		locations[name] = param.location
 		sourceNames[name] = param.sourceName
+		if param.serialization != nil {
+			serializations[name] = *param.serialization
+		}
+		order = append(order, name)
 		props[name] = param.schema
 		if param.required {
 			required[name] = struct{}{}
@@ -698,7 +793,7 @@ func (p *derivedParams) build() (map[string]string, map[string]string, map[strin
 	if len(required) > 0 {
 		schema[schemaKeyRequired] = sortedRequiredNames(required)
 	}
-	return locations, sourceNames, schema, nil
+	return locations, sourceNames, serializations, order, schema, nil
 }
 
 func exposedParamName(param derivedParam, collides bool) string {
@@ -713,8 +808,8 @@ func isBodyParamLocation(location string) bool {
 }
 
 func selectRequestBodyMediaType(content openapi3.Content) (*openapi3.MediaType, string) {
-	if media := selectJSONMediaType(content); media != nil {
-		return media, contentTypeJSON
+	if media, contentType := selectJSONMediaType(content); media != nil {
+		return media, contentType
 	}
 	if media := selectFormURLEncodedMediaType(content); media != nil {
 		return media, contentTypeFormURLEncoded
@@ -722,14 +817,14 @@ func selectRequestBodyMediaType(content openapi3.Content) (*openapi3.MediaType, 
 	return nil, ""
 }
 
-func selectJSONMediaType(content openapi3.Content) *openapi3.MediaType {
+func selectJSONMediaType(content openapi3.Content) (*openapi3.MediaType, string) {
 	if len(content) == 0 {
-		return nil
+		return nil, ""
 	}
 
 	for ct, media := range content {
-		if strings.EqualFold(ct, contentTypeJSON) {
-			return media
+		if strings.EqualFold(strings.TrimSpace(ct), contentTypeJSON) {
+			return media, strings.TrimSpace(ct)
 		}
 	}
 
@@ -742,10 +837,10 @@ func selectJSONMediaType(content openapi3.Content) *openapi3.MediaType {
 	sort.Strings(jsonTypes)
 	for _, ct := range jsonTypes {
 		if media := content[ct]; media != nil {
-			return media
+			return media, strings.TrimSpace(ct)
 		}
 	}
-	return nil
+	return nil, ""
 }
 
 func selectFormURLEncodedMediaType(content openapi3.Content) *openapi3.MediaType {
@@ -858,7 +953,7 @@ func responseJSONSchema(responseRef *openapi3.ResponseRef) *openapi3.SchemaRef {
 	if responseRef == nil || responseRef.Value == nil {
 		return nil
 	}
-	media := selectJSONMediaType(responseRef.Value.Content)
+	media, _ := selectJSONMediaType(responseRef.Value.Content)
 	if media == nil || media.Schema == nil || media.Schema.Value == nil {
 		return nil
 	}
@@ -1121,7 +1216,7 @@ func deriveConfiguredPathMethodTool(srcOAS *OAS, primitive TykMCPServerPrimitive
 		return DerivedTool{}, fmt.Errorf("%s primitive source %s %s: %w", ExtensionTykMCPServer, method, path, err)
 	}
 
-	locs, sourceNames, bodyContentType, schema, err := deriveParams(item, mo.op)
+	locs, sourceNames, serializations, order, bodyContentType, schema, err := deriveParams(item, mo.op)
 	if err != nil {
 		return DerivedTool{}, fmt.Errorf("source %s %s: %w", method, path, err)
 	}
@@ -1135,6 +1230,8 @@ func deriveConfiguredPathMethodTool(srcOAS *OAS, primitive TykMCPServerPrimitive
 		PathTemplate:           path,
 		ParamLocations:         locs,
 		ParamSourceNames:       sourceNames,
+		ParamSerializations:    serializations,
+		ParamOrder:             order,
 		RequestBodyContentType: bodyContentType,
 		InputSchema:            schema,
 		Annotations:            defaultDerivedToolAnnotations(method, mo.op, name),
@@ -1299,8 +1396,25 @@ func renameMCPToolParameter(tool *DerivedTool, oldName, newName string) error {
 	delete(tool.ParamSourceNames, oldName)
 	tool.ParamSourceNames[newName] = sourceName
 
+	if tool.ParamSerializations != nil {
+		serialization, ok := tool.ParamSerializations[oldName]
+		if ok {
+			delete(tool.ParamSerializations, oldName)
+			tool.ParamSerializations[newName] = serialization
+		}
+	}
+
+	renameMCPToolParameterOrder(tool, oldName, newName)
 	renameMCPToolInputSchemaParameter(tool, oldName, newName)
 	return nil
+}
+
+func renameMCPToolParameterOrder(tool *DerivedTool, oldName, newName string) {
+	for i, name := range tool.ParamOrder {
+		if name == oldName {
+			tool.ParamOrder[i] = newName
+		}
+	}
 }
 
 func renameMCPToolInputSchemaParameter(tool *DerivedTool, oldName, newName string) {
@@ -1371,6 +1485,16 @@ func cloneDerivedTool(tool DerivedTool) DerivedTool {
 			sourceNames[k] = v
 		}
 		tool.ParamSourceNames = sourceNames
+	}
+	if tool.ParamSerializations != nil {
+		serializations := make(map[string]DerivedParamSerialization, len(tool.ParamSerializations))
+		for k, v := range tool.ParamSerializations {
+			serializations[k] = v
+		}
+		tool.ParamSerializations = serializations
+	}
+	if tool.ParamOrder != nil {
+		tool.ParamOrder = append([]string(nil), tool.ParamOrder...)
 	}
 	tool.InputSchema = cloneMapAny(tool.InputSchema)
 	tool.Annotations = cloneDerivedToolAnnotations(tool.Annotations)

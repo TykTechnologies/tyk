@@ -159,6 +159,15 @@ func TestDeriveMCPToolView_AppliesExplicitAllowAliasesAndDescriptionOverrides(t 
 	assert.Equal(t, "Place a new order for a customer", tool.Description)
 	assert.Equal(t, map[string]string{"customer": DerivedParamLocationQuery}, tool.ParamLocations)
 	assert.Equal(t, map[string]string{"customer": "customer_id"}, tool.ParamSourceNames)
+	assert.Equal(t, map[string]DerivedParamSerialization{
+		"customer": {
+			SourceName: "customer_id",
+			Location:   DerivedParamLocationQuery,
+			Style:      "form",
+			Explode:    true,
+			SchemaType: schemaTypeString,
+		},
+	}, tool.ParamSerializations)
 
 	props := tool.InputSchema["properties"].(map[string]any)
 	customer := props["customer"].(map[string]any)
@@ -262,6 +271,47 @@ func TestDeriveMCPToolView_AppliesAnnotationOverrides(t *testing.T) {
 	assert.True(t, *annotations.IdempotentHint)
 	require.NotNil(t, annotations.OpenWorldHint)
 	assert.True(t, *annotations.OpenWorldHint)
+}
+
+func TestDeriveMCPToolView_ParameterRenamePreservesOrderAndSourceName(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: "list_orders",
+				Parameters: openapi3.Parameters{
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{Name: "customer_id", In: openapi3.ParameterInQuery, Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()}}},
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{Name: "status", In: openapi3.ParameterInQuery, Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()}}},
+				},
+			},
+		}),
+	))
+
+	view, warnings, err := DeriveMCPToolView(src, &TykMCPServer{
+		Primitives: []TykMCPServerPrimitive{
+			{
+				Source: TykMCPServerSource{OperationID: "list_orders"},
+				Parameters: []TykMCPServerParameter{
+					{Param: "customer_id", Name: "customer"},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, warnings)
+	require.Len(t, view.Tools, 1)
+
+	tool := view.Tools[0]
+	assert.Equal(t, []string{"customer", "status"}, tool.ParamOrder)
+	assert.Equal(t, map[string]string{
+		"customer": "customer_id",
+		"status":   "status",
+	}, tool.ParamSourceNames)
+	assert.Equal(t, map[string]string{
+		"customer": DerivedParamLocationQuery,
+		"status":   DerivedParamLocationQuery,
+	}, tool.ParamLocations)
 }
 
 func TestDeriveMCPToolView_AllowTrueEnablesExplicitAllowMode(t *testing.T) {
