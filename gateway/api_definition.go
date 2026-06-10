@@ -727,6 +727,36 @@ func (a APIDefinitionLoader) GetMCPFilepath(path string) string {
 	return strings.TrimSuffix(path, ".json") + "-mcp.json"
 }
 
+func (a APIDefinitionLoader) isOASCompanionFile(path string) bool {
+	var apiDefPath string
+	switch {
+	case strings.HasSuffix(path, "-oas.json"):
+		apiDefPath = strings.TrimSuffix(path, "-oas.json") + ".json"
+	case strings.HasSuffix(path, "-mcp.json"):
+		apiDefPath = strings.TrimSuffix(path, "-mcp.json") + ".json"
+	default:
+		return false
+	}
+
+	if _, err := os.Stat(apiDefPath); err != nil {
+		return false
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+
+	var marker struct {
+		OpenAPI string `json:"openapi"`
+		Swagger string `json:"swagger"`
+	}
+	if err := json.Unmarshal(data, &marker); err != nil {
+		return false
+	}
+	return marker.OpenAPI != "" || marker.Swagger != ""
+}
+
 // FromDir will load APIDefinitions from a directory on the filesystem. Definitions need
 // to be the JSON representation of APIDefinition object
 func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
@@ -735,7 +765,7 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
 	for _, path := range paths {
 		// Skip companion files (loaded separately)
-		if strings.HasSuffix(path, "-oas.json") || strings.HasSuffix(path, "-mcp.json") {
+		if a.isOASCompanionFile(path) {
 			continue
 		}
 

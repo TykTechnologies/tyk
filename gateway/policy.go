@@ -93,7 +93,7 @@ func (gw *Gateway) validateMCPFieldsInAccessRights(accessRights map[string]user.
 		if spec == nil {
 			continue
 		}
-		if !spec.IsMCP() {
+		if !mcpProxy(spec) {
 			return fmt.Errorf("MCP fields can only be configured on MCP Proxies, API %q is not an MCP Proxy", apiID)
 		}
 		for _, p := range ar.MCPPrimitives {
@@ -127,7 +127,7 @@ func (gw *Gateway) validateNonMCPFieldsOnMCPProxy(accessRights map[string]user.A
 		if spec == nil {
 			continue
 		}
-		if spec.IsMCP() {
+		if mcpProxy(spec) {
 			return fmt.Errorf("HTTP/REST and GraphQL fields cannot be configured on MCP Proxies, API %q is an MCP Proxy", apiID)
 		}
 	}

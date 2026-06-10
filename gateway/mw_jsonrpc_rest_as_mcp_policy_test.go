@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
@@ -191,6 +192,39 @@ func TestRESTAsMCPPolicy_AliasUsesCallerFacingName(t *testing.T) {
 	assert.Equal(t, middleware.StatusRespond, status)
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 	assert.Contains(t, rec.Body.String(), "tool 'orders' is not available")
+}
+
+func TestRESTAsMCPPolicy_RejectsOversizedJSONRPCBeforeSDK(t *testing.T) {
+	gw, adapterSpec, _ := syntheticAdapterGatewayForCallTest(t)
+	called := false
+	var err error
+	adapterSpec.MCPAdapter.SDKAdapter, err = mcpadapter.NewSDKAdapter(mcpadapter.SDKServerConfig{
+		Name:  adapterSpec.Name,
+		Tools: adapterSpec.MCPAdapter.UnionTools,
+		CallTool: func(context.Context, *oas.DerivedTool, map[string]any) (*mcpadapter.Recorder, error) {
+			called = true
+			return mcpadapter.NewRecorder(), nil
+		},
+	})
+	require.NoError(t, err)
+
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec, Gw: gw}}
+	sessionID := initializeSyntheticAdapterSession(t, mw, "proxy-1")
+	body := `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"orders","arguments":{"payload":"` +
+		strings.Repeat("x", syntheticJSONRPCMethodReadLimit) +
+		`"}}}`
+	req := restAsMCPPolicyRequest(t, sessionID, body)
+	ctxSetMCPAdapterCallerProxyID(req, "proxy-1")
+	setSessionForTest(req, restAsMCPSession("proxy-1", user.AccessDefinition{APIID: "proxy-1"}))
+	rec := httptest.NewRecorder()
+
+	err, status := mw.ProcessRequest(rec, req, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, middleware.StatusRespond, status)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Contains(t, rec.Body.String(), mcp.ErrMsgParseError)
+	assert.False(t, called)
 }
 
 func restAsMCPPolicyGatewayWithTwoTools(t *testing.T) (*Gateway, *APISpec) {

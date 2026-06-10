@@ -34,7 +34,11 @@ type restAsMCPPolicyContext struct {
 // prepareRESTAsMCPPolicy parses the JSON-RPC request handled by a synthetic
 // REST-as-MCP adapter and applies caller-proxy policy before SDK execution.
 func (m *JSONRPCMiddleware) prepareRESTAsMCPPolicy(w http.ResponseWriter, r *http.Request) (*restAsMCPPolicyContext, bool) {
-	rpcReq, ok := parseSyntheticAdapterJSONRPC(r)
+	rpcReq, ok, err := parseSyntheticAdapterJSONRPC(r)
+	if err != nil {
+		m.writeJSONRPCError(w, r, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
+		return nil, true
+	}
 	if !ok {
 		return nil, false
 	}
@@ -59,27 +63,32 @@ func (m *JSONRPCMiddleware) prepareRESTAsMCPPolicy(w http.ResponseWriter, r *htt
 	return policyCtx, false
 }
 
-func parseSyntheticAdapterJSONRPC(r *http.Request) (*JSONRPCRequest, bool) {
+func parseSyntheticAdapterJSONRPC(r *http.Request) (*JSONRPCRequest, bool, error) {
 	if r == nil || r.Method != http.MethodPost || r.Body == nil {
-		return nil, false
+		return nil, false, nil
 	}
 	if !strings.HasPrefix(r.Header.Get(headerContentType), contentTypeJSON) {
-		return nil, false
+		return nil, false, nil
 	}
 
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		r.Body = io.NopCloser(bytes.NewReader(nil))
-		return nil, false
+	body, err := io.ReadAll(io.LimitReader(r.Body, syntheticJSONRPCMethodReadLimit+1))
+	r.Body = prefixedReadCloser{
+		Reader: io.MultiReader(bytes.NewReader(body), r.Body),
+		Closer: r.Body,
 	}
-	r.Body = io.NopCloser(bytes.NewReader(body))
+	if err != nil {
+		return nil, false, err
+	}
+	if len(body) > syntheticJSONRPCMethodReadLimit {
+		return nil, false, fmt.Errorf("synthetic JSON-RPC request exceeds %d bytes", syntheticJSONRPCMethodReadLimit)
+	}
 
 	var rpcReq JSONRPCRequest
 	if err := json.Unmarshal(body, &rpcReq); err != nil || rpcReq.Method == "" {
-		return nil, false
+		return nil, false, nil
 	}
 
-	return &rpcReq, true
+	return &rpcReq, true, nil
 }
 
 func (m *JSONRPCMiddleware) routeSyntheticAdapterJSONRPC(rpcReq *JSONRPCRequest) (jsonrpc.RouteResult, error) {

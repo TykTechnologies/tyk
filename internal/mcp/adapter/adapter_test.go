@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -92,6 +93,50 @@ func TestBuildUpstreamRequest_PathQueryHeader(t *testing.T) {
 	assert.Equal(t, "true", req.URL.Query().Get("verbose"))
 	assert.Equal(t, "rest-1", req.URL.Host)
 	assert.Equal(t, "http", req.URL.Scheme)
+}
+
+func TestBuildUpstreamRequest_DetachesFromParentCancellation(t *testing.T) {
+	t.Parallel()
+	type contextKey string
+
+	parentCtx, cancel := context.WithCancel(context.WithValue(context.Background(), contextKey("caller"), "proxy-1"))
+	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil).WithContext(parentCtx)
+	cancel()
+	tool := sampleTool(t, "getOrder")
+
+	req, err := BuildUpstreamRequest(parent, tool, "rest-1", map[string]any{"id": 42})
+
+	require.NoError(t, err)
+	assert.Equal(t, "proxy-1", req.Context().Value(contextKey("caller")))
+	select {
+	case <-req.Context().Done():
+		t.Fatal("upstream request context should not inherit parent cancellation")
+	default:
+	}
+}
+
+func TestBuildUpstreamRequest_IntegerValuedFloatArgumentUsesDecimalNotation(t *testing.T) {
+	t.Parallel()
+	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
+	tool := &oas.DerivedTool{
+		Name:         "large_response",
+		Method:       http.MethodGet,
+		PathTemplate: "/large/{size}",
+		ParamLocations: map[string]string{
+			"size": oas.DerivedParamLocationPath,
+		},
+		ParamSourceNames: map[string]string{
+			"size": "size",
+		},
+		ParamOrder: []string{"size"},
+	}
+
+	req, err := BuildUpstreamRequest(parent, tool, "rest-1", map[string]any{
+		"size": float64(2097152),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "/large/2097152", req.URL.Path)
 }
 
 func TestBuildUpstreamRequest_RejectsUnknownArgs(t *testing.T) {
