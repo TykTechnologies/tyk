@@ -104,6 +104,7 @@ func NewFormatter(format Format) logrus.Formatter {
 
 func newFormatterText() logrus.Formatter {
 	return &logrus.TextFormatter{
+		FieldMap:        defaultFieldMap(),
 		TimestampFormat: time.RFC3339,
 		FullTimestamp:   true,
 		DisableColors:   true,
@@ -112,18 +113,21 @@ func newFormatterText() logrus.Formatter {
 
 func newFormatterJson() logrus.Formatter {
 	return &JSONFormatter{
+		FieldMap:        NewFieldMap(defaultFieldMap()),
 		TimestampFormat: time.RFC3339,
 	}
 }
 
 func newFormatterLogrusJson() logrus.Formatter {
 	return &logrus.JSONFormatter{
+		FieldMap:        defaultFieldMap(),
 		TimestampFormat: time.RFC3339,
 	}
 }
 
 func newFormatterLegacy() logrus.Formatter {
 	return &logrus.TextFormatter{
+		FieldMap:        logrus.FieldMap{},
 		TimestampFormat: LegacyTimestampFormat,
 		FullTimestamp:   true,
 		DisableColors:   true,
@@ -136,8 +140,8 @@ func IsLegacyFormatter(formatter logrus.Formatter) bool {
 	return ok && textFormatter.TimestampFormat == LegacyTimestampFormat
 }
 
-type InjectTestHookOptions struct {
-	Logger *logrus.Logger
+func defaultFieldMap() logrus.FieldMap {
+	return logrus.FieldMap{
+		logrus.FieldKeyMsg: "message",
+	}
 }
-
-type InjectTestHookOpt func(*InjectTestHookOptions)
