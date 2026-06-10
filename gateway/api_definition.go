@@ -770,8 +770,20 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 	nestDef := model.MergedAPI{APIDefinition: &def}
 	if def.IsOAS {
 		loader := openapi3.NewLoader()
-		// use openapi3.ReadFromFile as ReadFromURIFunc since the default implementation cache spec based on file path.
-		loader.ReadFromURIFunc = openapi3.ReadFromFile
+		// Apply replaceSecrets to OAS bytes before parsing so secret prefixes
+		// (vault://, env://, etc.) in the x-tyk-api-gateway extension are resolved.
+		// Scoped to local-file reads only — resolving remote $ref content would be
+		// an injection vector for operator-untrusted bytes.
+		loader.ReadFromURIFunc = func(l *openapi3.Loader, uri *url.URL) ([]byte, error) {
+			b, err := openapi3.ReadFromFile(l, uri)
+			if err != nil {
+				return nil, err
+			}
+			if uri == nil || uri.Scheme == "" || uri.Scheme == "file" {
+				return a.replaceSecrets(b), nil
+			}
+			return b, nil
+		}
 
 		var oasFilepath string
 		if def.IsMCPManaged() {

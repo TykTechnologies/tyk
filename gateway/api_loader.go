@@ -526,6 +526,7 @@ func (gw *Gateway) processSpec(
 	}
 
 	gw.mwAppendEnabled(&chainArray, &OAuth2Middleware{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, getOAuth2ExchangeMw(baseMid.Copy()))
 
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid.Copy(), quotaKey: options.quotaKey})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid.Copy()})
@@ -1028,7 +1029,7 @@ func (gw *Gateway) mcpPRMSuffixHandler(spec *APISpec) http.HandlerFunc {
 			return
 		}
 		if prm.IsMirrorMode(spec.IsMCPManaged()) {
-			if err := mw.serveMirroredPRM(w, r, prm); err != nil {
+			if err := mw.serveMirroredPRM(w, r); err != nil {
 				log.WithError(err).Warn("PRM mirror failed at suffix route")
 				http.Error(w, "upstream PRM unavailable", http.StatusBadGateway)
 			}
