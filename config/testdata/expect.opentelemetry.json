@@ -55,7 +55,8 @@
             "type": "",
             "rate": 0,
             "parent_based": false
-        }
+        },
+        "mcp": {}
     },
     "metrics": {
         "enabled": true,

@@ -1026,15 +1026,10 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	// API. The manual API-def map is merged with any matched registry binding
 	// (manual wins on collision, binding fills gaps). With no binding this
 	// returns the manual map unchanged — byte-identical for manual APIs.
-	scopeMap := scopeToPolicyMapForRequest(k.Spec.GetScopeToPolicyMapping(), ctxGetMatchedBinding(r))
+	binding := ctxGetMatchedBinding(r)
+	scopeMap := scopeToPolicyMapForRequest(k.Spec.GetScopeToPolicyMapping(), binding)
 	if len(scopeMap) != 0 {
-		scopeClaimName := k.Spec.GetScopeClaimName()
-		if k.Spec.IsOAS {
-			scopeClaimName = k.getScopeClaimNameOAS(claims)
-		}
-		if scopeClaimName == "" {
-			scopeClaimName = "scope"
-		}
+		scopeClaimName := k.scopeClaimNameForRequest(claims, binding)
 
 		if scope := getScopeFromClaim(claims, scopeClaimName); len(scope) > 0 {
 			// Start with base policy if it exists
@@ -1167,6 +1162,25 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	ctxSetJWTContextVars(k.Spec, r, token)
 
 	return nil, http.StatusOK
+}
+
+// scopeClaimNameForRequest resolves the JWT claim that holds the OAuth scopes.
+// Manual API-def config wins (Classic GetScopeClaimName or OAS); an empty value
+// falls back to the matched registry binding's IdP scope_claim_name (e.g. "scp"
+// for Entra/Azure AD), then to the conventional "scope" claim. The fallback only
+// fires when the API def sets nothing, so manual config stays byte-identical.
+func (k *JWTMiddleware) scopeClaimNameForRequest(claims jwt.MapClaims, binding *Binding) string {
+	name := k.Spec.GetScopeClaimName()
+	if k.Spec.IsOAS {
+		name = k.getScopeClaimNameOAS(claims)
+	}
+	if name == "" && binding != nil {
+		name = binding.ScopeClaimName
+	}
+	if name == "" {
+		name = "scope"
+	}
+	return name
 }
 
 func (k *JWTMiddleware) getScopeClaimNameOAS(claims jwt.MapClaims) string {
