@@ -111,6 +111,8 @@ func (m *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 			m.writeActorNotAuthorizedResponse(w, r, e)
 		case *oauth2common.MissingActorTokenError:
 			m.writeMissingActorTokenResponse(w, r, e)
+		case *oauth2common.StepUpRequiredError:
+			m.writeStepUpRequiredResponse(w, r, e)
 		case *oauth2common.MisconfigError:
 			m.writeMisconfigResponse(w, r, e)
 		default:

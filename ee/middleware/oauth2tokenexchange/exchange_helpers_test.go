@@ -144,6 +144,14 @@ func TestApplyClientAuth(t *testing.T) {
 		assert.False(t, ok)
 	})
 
+	t.Run("private_key_jwt sets no Authorization header (assertion is in the form)", func(t *testing.T) {
+		req := newReq()
+		provider := &oas.OAuth2TokenExchangeProvider{ClientAuth: &oas.OAuth2ClientAuth{Method: oas.OAuth2ClientAuthPrivateKeyJWT, ClientID: "cid", CertID: "c1"}}
+		require.NoError(t, applyClientAuth(req, provider, oas.OAuth2ClientAuthPrivateKeyJWT))
+		_, _, ok := req.BasicAuth()
+		assert.False(t, ok, "private_key_jwt must not set basic auth")
+	})
+
 	t.Run("unsupported method is rejected", func(t *testing.T) {
 		req := newReq()
 		provider := &oas.OAuth2TokenExchangeProvider{ClientAuth: &oas.OAuth2ClientAuth{ClientID: "cid"}}

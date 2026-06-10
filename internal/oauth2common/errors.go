@@ -44,6 +44,23 @@ func (e *MissingActorTokenError) Error() string {
 	return fmt.Sprintf("missing actor token header %s", e.Header)
 }
 
+// StepUpRequiredError is raised when an Entra On-Behalf-Of exchange returns a
+// Conditional Access claims challenge (error=interaction_required) instead of a
+// token. It is an expected control-flow event, not a failure: the gateway
+// re-emits it to the caller as an HTTP 401 with a WWW-Authenticate
+// insufficient_claims challenge, and it is never cached. Claims is the raw
+// challenge from the IdP (a JSON string); AuthorizationURI is the authorize
+// endpoint the caller completes the step-up against, when known.
+type StepUpRequiredError struct {
+	Claims           string
+	AuthorizationURI string
+	IdpError         string
+}
+
+func (e *StepUpRequiredError) Error() string {
+	return "step_up_required: Entra returned a claims challenge (interaction_required)"
+}
+
 // ExchangeFailedError represents a non-2xx IdP token-endpoint response.
 type ExchangeFailedError struct {
 	Status      int
@@ -56,6 +73,17 @@ func (e *ExchangeFailedError) Error() string {
 		return fmt.Sprintf("exchange_failed: idp_error=%s: %s", e.IdpError, e.Description)
 	}
 	return fmt.Sprintf("exchange_failed: idp_error=%s (status %d)", e.IdpError, e.Status)
+}
+
+// DecodeEntraClaimsChallenge extracts the `claims` challenge and optional
+// authorization_uri from an Entra interaction_required error body.
+func DecodeEntraClaimsChallenge(body []byte) (claims, authorizationURI string) {
+	var p struct {
+		Claims           string `json:"claims"`
+		AuthorizationURI string `json:"authorization_uri"`
+	}
+	_ = json.Unmarshal(body, &p)
+	return p.Claims, p.AuthorizationURI
 }
 
 // MaxIdPErrorBodyBytes caps the raw snippet captured from a non-JSON IdP error body.

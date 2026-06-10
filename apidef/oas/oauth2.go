@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"sort"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -191,6 +192,13 @@ type OAuth2TokenExchangeProvider struct {
 	// Name is an operator-chosen identifier used in audit logs. Unique within Providers.
 	Name string `bson:"name" json:"name"`
 
+	// Flow selects the delegation flow this provider speaks. Empty or
+	// "token-exchange" (default) uses the RFC 8693 token-exchange grant;
+	// "on-behalf-of" uses the On-Behalf-Of flow (jwt-bearer grant, single token,
+	// target named by scope) implemented by some identity providers. The default
+	// keeps existing providers unchanged.
+	Flow string `bson:"flow,omitempty" json:"flow,omitempty"`
+
 	// Issuers is the set of inbound token `iss` values routed to this provider.
 	// Must not overlap with issuers on other providers — dispatch would be non-deterministic.
 	Issuers []string `bson:"issuers,omitempty" json:"issuers,omitempty"`
@@ -225,6 +233,40 @@ type OAuth2TokenExchangeProvider struct {
 
 	// Cache controls Redis-backed caching of exchanged tokens for this provider.
 	Cache *OAuth2ExchangeCache `bson:"cache,omitempty" json:"cache,omitempty"`
+}
+
+// IsOnBehalfOf reports whether this provider uses the On-Behalf-Of flow.
+// Empty flow defaults to RFC 8693 token-exchange.
+func (p *OAuth2TokenExchangeProvider) IsOnBehalfOf() bool {
+	return p != nil && p.Flow == OAuth2FlowOnBehalfOf
+}
+
+// EntraScopeList translates an RFC 8693-style target (audience + scopes) into
+// the Entra On-Behalf-Of `scope` list. Each discrete scope is prefixed with the
+// audience resource; a scope that already carries a resource (contains "/") is
+// taken verbatim — the explicit-scope escape hatch; an audience with no scopes
+// becomes "<audience>/.default" (all statically-consented permissions).
+func EntraScopeList(audience string, scopes []string) []string {
+	out := make([]string, 0, len(scopes))
+	for _, s := range scopes {
+		switch {
+		case strings.Contains(s, "/"):
+			out = append(out, s)
+		case audience != "":
+			out = append(out, audience+"/"+s)
+		default:
+			out = append(out, s)
+		}
+	}
+	if len(out) == 0 && audience != "" {
+		out = append(out, audience+"/.default")
+	}
+	return out
+}
+
+// EntraScopeString space-joins EntraScopeList into the Entra `scope` value.
+func EntraScopeString(audience string, scopes []string) string {
+	return strings.Join(EntraScopeList(audience, scopes), " ")
 }
 
 // OAuth2ActorToken describes how Tyk obtains the actor token sent on the
@@ -309,12 +351,19 @@ type OAuth2ClientAuth struct {
 	//     HTTP Authorization header.
 	//   - "client_secret_post" (RFC 6749 §2.3.1) — credentials in the
 	//     form body.
+	//   - "private_key_jwt" (OIDC Core §9) — a signed client-assertion JWT
+	//     authenticated by a certificate referenced via CertID; no shared
+	//     secret. Required for Microsoft Entra certificate login.
 	// Empty string defaults to client_secret_basic.
 	Method string `bson:"method,omitempty" json:"method,omitempty"`
 	// ClientID is the OAuth2 client identifier Tyk presents to the IdP token endpoint.
 	ClientID string `bson:"clientId,omitempty" json:"clientId,omitempty"`
 	// ClientSecret accepts env://, secrets://, vault://, consul:// prefixes.
 	ClientSecret string `bson:"clientSecret,omitempty" json:"clientSecret,omitempty"`
+	// CertID references a certificate (with private key) in the gateway
+	// certificate store used to sign the private_key_jwt client assertion.
+	// Required when Method is private_key_jwt; ignored otherwise.
+	CertID string `bson:"certId,omitempty" json:"certId,omitempty"`
 }
 
 // OAuth2DefaultTarget is the fallback audience and scopes when no per-op override is set.
@@ -373,6 +422,12 @@ const (
 	OAuth2ErrMisconfigured      = "misconfigured"
 	OAuth2ErrActorNotAuthorized = "actor_not_authorized"
 
+	// Entra On-Behalf-Of step-up (Conditional Access claims challenge).
+	OAuth2ErrInteractionRequired = "interaction_required" // Entra back-channel error
+	OAuth2ErrInsufficientClaims  = "insufficient_claims"  // re-emitted front-channel challenge
+	OAuth2FieldClaims            = "claims"
+	OAuth2FieldAuthorizationURI  = "authorization_uri"
+
 	OAuth2AuthSchemeBearer = "Bearer" // RFC 6750 §2.1
 
 	// RFC 8693 form keys.
@@ -396,9 +451,24 @@ const (
 	OAuth2TokenTypeAccessToken       = "urn:ietf:params:oauth:token-type:access_token"
 	OAuth2TokenTypeJWT               = "urn:ietf:params:oauth:token-type:jwt"
 
+	// OAuth2TokenExchangeProvider.Flow values.
+	OAuth2FlowTokenExchange = "token-exchange"
+	OAuth2FlowOnBehalfOf    = "on-behalf-of"
+
+	// Entra On-Behalf-Of wire constants (RFC 7523 jwt-bearer grant + the
+	// Microsoft-specific requested_token_use flag).
+	OAuth2FormAssertion         = "assertion"
+	OAuth2FormRequestedTokenUse = "requested_token_use"
+	OAuth2GrantTypeJWTBearer    = "urn:ietf:params:oauth:grant-type:jwt-bearer"
+	OAuth2RequestedTokenUseOBO  = "on_behalf_of"
+
 	// OAuth2ClientAuth.Method values.
-	OAuth2ClientAuthBasic = "client_secret_basic"
-	OAuth2ClientAuthPost  = "client_secret_post"
+	OAuth2ClientAuthBasic         = "client_secret_basic"
+	OAuth2ClientAuthPost          = "client_secret_post"
+	OAuth2ClientAuthPrivateKeyJWT = "private_key_jwt"
+
+	// client_assertion_type value for the private_key_jwt method (RFC 7523 §2.2).
+	OAuth2ClientAssertionTypeJWTBearer = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 
 	// OAuth2ExchangeCache.Mode values.
 	OAuth2CacheModeDerived = "derived"
@@ -447,6 +517,8 @@ var oauth2ReservedExchangeFormKeys = map[string]struct{}{
 	OAuth2FormClientSecret:        {},
 	OAuth2FormClientAssertion:     {},
 	OAuth2FormClientAssertionType: {},
+	OAuth2FormAssertion:           {},
+	OAuth2FormRequestedTokenUse:   {},
 }
 
 // ValidateOAuth2Schemes enforces token-exchange invariants across all configured
@@ -516,11 +588,17 @@ func validateOAuth2ExchangeProvider(schemeName string, i int, p *OAuth2TokenExch
 		return fmt.Errorf("oauth2 scheme %q: duplicate tokenExchange.provider name %q", schemeName, p.Name)
 	}
 	seenNames[p.Name] = struct{}{}
+	if err := validateExchangeFlow(schemeName, p); err != nil {
+		return err
+	}
 	if err := validateExchangeTokenEndpoint(schemeName, p); err != nil {
 		return err
 	}
 	if p.ClientAuth == nil || p.ClientAuth.ClientID == "" {
 		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q has empty clientAuth.clientId", schemeName, p.Name)
+	}
+	if err := validateExchangeClientAuth(schemeName, p); err != nil {
+		return err
 	}
 	if err := validateExchangeIssuers(schemeName, p, issuerOwner); err != nil {
 		return err
@@ -531,7 +609,72 @@ func validateOAuth2ExchangeProvider(schemeName string, i int, p *OAuth2TokenExch
 	if err := validateExchangeCacheMode(schemeName, p); err != nil {
 		return err
 	}
+	if p.IsOnBehalfOf() {
+		return validateOnBehalfOfProvider(schemeName, p)
+	}
 	return validateOAuth2ActorToken(schemeName, p.Name, p.ActorToken)
+}
+
+// validateOnBehalfOfProvider enforces the On-Behalf-Of invariants: no actor
+// token (single-token delegation) and a resolvable, single-resource target.
+func validateOnBehalfOfProvider(schemeName string, p *OAuth2TokenExchangeProvider) error {
+	if p.ActorToken != nil {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q actorToken is not valid when flow is %q; the On-Behalf-Of flow is single-token delegation",
+			schemeName, p.Name, OAuth2FlowOnBehalfOf)
+	}
+	return validateOnBehalfOfTarget(schemeName, p.Name, p.DefaultTarget)
+}
+
+// validateOnBehalfOfTarget enforces the Entra scope rules on the provider's default
+// target: a target must name a scope/resource, every scope must be
+// resource-qualified, all scopes must share one resource, and ".default" must not
+// mix with discrete scopes (Entra AADSTS70011). A nil target is allowed — a
+// per-operation / per-primitive override may supply it.
+func validateOnBehalfOfTarget(schemeName, providerName string, dt *OAuth2DefaultTarget) error {
+	if dt == nil {
+		return nil
+	}
+	scopes := EntraScopeList(dt.Audience, dt.Scopes)
+	if len(scopes) == 0 {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q flow %q requires a defaultTarget audience or scope",
+			schemeName, providerName, OAuth2FlowOnBehalfOf)
+	}
+	resources := make(map[string]struct{}, len(scopes))
+	var hasDefault, hasDiscrete bool
+	for _, s := range scopes {
+		idx := strings.LastIndex(s, "/")
+		if idx <= 0 {
+			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q flow %q scope %q must be resource-qualified (set defaultTarget.audience, or use a fully-qualified scope like api://x/Scope or <resource>/.default)",
+				schemeName, providerName, OAuth2FlowOnBehalfOf, s)
+		}
+		resources[s[:idx]] = struct{}{}
+		if s[idx+1:] == ".default" {
+			hasDefault = true
+		} else {
+			hasDiscrete = true
+		}
+	}
+	if hasDefault && hasDiscrete {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q flow %q cannot combine .default with discrete scopes in one target",
+			schemeName, providerName, OAuth2FlowOnBehalfOf)
+	}
+	if len(resources) > 1 {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q flow %q target spans multiple resources; one On-Behalf-Of exchange targets a single resource",
+			schemeName, providerName, OAuth2FlowOnBehalfOf)
+	}
+	return nil
+}
+
+// validateExchangeFlow rejects an unknown provider flow. Empty is valid and
+// resolves to token-exchange.
+func validateExchangeFlow(schemeName string, p *OAuth2TokenExchangeProvider) error {
+	switch p.Flow {
+	case "", OAuth2FlowTokenExchange, OAuth2FlowOnBehalfOf:
+		return nil
+	default:
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q flow %q is invalid; valid values are %q and %q",
+			schemeName, p.Name, p.Flow, OAuth2FlowTokenExchange, OAuth2FlowOnBehalfOf)
+	}
 }
 
 // validateExchangeTokenEndpoint requires a non-empty, absolute http(s)
@@ -547,6 +690,26 @@ func validateExchangeTokenEndpoint(schemeName string, p *OAuth2TokenExchangeProv
 		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q tokenEndpoint must be an absolute http(s) URL", schemeName, p.Name)
 	}
 	return nil
+}
+
+// validateExchangeClientAuth validates the client-authentication method.
+// Secret methods (basic/post, and the empty default) are accepted as-is;
+// private_key_jwt additionally requires a certId to sign the client assertion;
+// any other method is rejected at config load rather than at the first call.
+func validateExchangeClientAuth(schemeName string, p *OAuth2TokenExchangeProvider) error {
+	switch p.ClientAuth.Method {
+	case "", OAuth2ClientAuthBasic, OAuth2ClientAuthPost:
+		return nil
+	case OAuth2ClientAuthPrivateKeyJWT:
+		if p.ClientAuth.CertID == "" {
+			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q clientAuth.method %q requires a certId to sign the client assertion",
+				schemeName, p.Name, OAuth2ClientAuthPrivateKeyJWT)
+		}
+		return nil
+	default:
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q clientAuth.method %q is invalid; valid values are %q, %q and %q",
+			schemeName, p.Name, p.ClientAuth.Method, OAuth2ClientAuthBasic, OAuth2ClientAuthPost, OAuth2ClientAuthPrivateKeyJWT)
+	}
 }
 
 // validateExchangeIssuers rejects an issuer claimed by more than one provider

@@ -5,6 +5,7 @@ package oauth2tokenexchange
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -302,6 +303,12 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 
 	form := buildExchangeForm(provider, subjectToken, actorToken, target, method)
 
+	if method == oas.OAuth2ClientAuthPrivateKeyJWT {
+		if err := m.addClientAssertion(form, provider); err != nil {
+			return "", 0, err
+		}
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.TokenEndpoint, strings.NewReader(form.Encode()))
 	if err != nil {
 		return "", 0, fmt.Errorf("building exchange request: %w", err)
@@ -321,6 +328,17 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		idpErr, idpDesc := oauth2common.DecodeIdPError(body)
+		// Entra Conditional Access returns interaction_required with a claims
+		// challenge instead of a token. Branch before the generic failure path so
+		// it is re-emitted to the caller as a step-up, never collapsed to idp_error.
+		if provider.IsOnBehalfOf() && idpErr == oas.OAuth2ErrInteractionRequired {
+			claims, authURI := oauth2common.DecodeEntraClaimsChallenge(body)
+			return "", 0, &oauth2common.StepUpRequiredError{
+				Claims:           claims,
+				AuthorizationURI: authURI,
+				IdpError:         idpErr,
+			}
+		}
 		return "", 0, &oauth2common.ExchangeFailedError{
 			Status:      resp.StatusCode,
 			IdpError:    idpErr,
@@ -331,12 +349,17 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 	return parseExchangeResponse(body)
 }
 
-// buildExchangeForm builds the RFC 8693 token-exchange request form. When
-// actorToken is non-empty, actor_token and actor_token_type are added
-// (delegation intent). When the client-auth method is client_secret_post,
-// credentials are injected into the form here (basic-auth credentials are set
-// on the request header instead).
+// buildExchangeForm builds the token-exchange request form for the provider's
+// flow. RFC 8693 (the default) sends subject_token + optional actor_token;
+// On-Behalf-Of sends the inbound token as `assertion` with the jwt-bearer
+// grant. When the client-auth method is client_secret_post, credentials are
+// injected into the form here (basic-auth credentials are set on the request
+// header instead).
 func buildExchangeForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken, actorToken string, target *oauth2common.Target, method string) url.Values {
+	if provider.IsOnBehalfOf() {
+		return buildOnBehalfOfForm(provider, subjectToken, target, method)
+	}
+
 	form := url.Values{}
 	form.Set(oas.OAuth2FormGrantType, oas.OAuth2GrantTypeTokenExchange)
 	form.Set(oas.OAuth2FormSubjectToken, subjectToken)
@@ -352,18 +375,47 @@ func buildExchangeForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken, 
 	if len(target.Scopes) > 0 {
 		form.Set(oas.OAuth2FormScope, strings.Join(target.Scopes, " "))
 	}
+	addCustomParams(form, provider)
+	addPostClientCredentials(form, provider, method)
+	return form
+}
+
+// buildOnBehalfOfForm builds the Microsoft Entra On-Behalf-Of request: the
+// jwt-bearer grant, the inbound user token as `assertion`, the mandatory
+// requested_token_use flag, and the target folded into the Entra `scope`. There
+// is no actor token — the acting party is the gateway's own client login.
+func buildOnBehalfOfForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken string, target *oauth2common.Target, method string) url.Values {
+	form := url.Values{}
+	form.Set(oas.OAuth2FormGrantType, oas.OAuth2GrantTypeJWTBearer)
+	form.Set(oas.OAuth2FormAssertion, subjectToken)
+	form.Set(oas.OAuth2FormRequestedTokenUse, oas.OAuth2RequestedTokenUseOBO)
+	if scope := oas.EntraScopeString(target.Audience, target.Scopes); scope != "" {
+		form.Set(oas.OAuth2FormScope, scope)
+	}
+	addCustomParams(form, provider)
+	addPostClientCredentials(form, provider, method)
+	return form
+}
+
+// addCustomParams appends the provider's operator-supplied form parameters.
+func addCustomParams(form url.Values, provider *oas.OAuth2TokenExchangeProvider) {
 	for k, v := range provider.CustomParams {
 		form.Set(k, v)
 	}
-	if method == oas.OAuth2ClientAuthPost && provider.ClientAuth != nil {
-		if provider.ClientAuth.ClientID != "" {
-			form.Set(oas.OAuth2FormClientID, provider.ClientAuth.ClientID)
-		}
-		if provider.ClientAuth.ClientSecret != "" {
-			form.Set(oas.OAuth2FormClientSecret, provider.ClientAuth.ClientSecret)
-		}
+}
+
+// addPostClientCredentials injects client_id/client_secret into the form for the
+// client_secret_post method; a no-op for basic (set on the request header).
+func addPostClientCredentials(form url.Values, provider *oas.OAuth2TokenExchangeProvider, method string) {
+	if method != oas.OAuth2ClientAuthPost || provider.ClientAuth == nil {
+		return
 	}
-	return form
+	if provider.ClientAuth.ClientID != "" {
+		form.Set(oas.OAuth2FormClientID, provider.ClientAuth.ClientID)
+	}
+	if provider.ClientAuth.ClientSecret != "" {
+		form.Set(oas.OAuth2FormClientSecret, provider.ClientAuth.ClientSecret)
+	}
 }
 
 // applyClientAuth sets the request-level client authentication for the exchange
@@ -371,8 +423,9 @@ func buildExchangeForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken, 
 // no-op for that method; basic (the default) sets the Authorization header.
 func applyClientAuth(req *http.Request, provider *oas.OAuth2TokenExchangeProvider, method string) error {
 	switch method {
-	case oas.OAuth2ClientAuthPost:
-		// credentials already injected into form
+	case oas.OAuth2ClientAuthPost, oas.OAuth2ClientAuthPrivateKeyJWT:
+		// credentials already injected into the form (client_secret_post or the
+		// signed private_key_jwt client_assertion).
 	case "", oas.OAuth2ClientAuthBasic:
 		if provider.ClientAuth != nil && provider.ClientAuth.ClientID != "" {
 			req.SetBasicAuth(provider.ClientAuth.ClientID, provider.ClientAuth.ClientSecret)
@@ -465,6 +518,25 @@ func (m *Middleware) writeMissingActorTokenResponse(w http.ResponseWriter, r *ht
 		oas.OAuth2FieldError:            oas.OAuth2ErrInvalidToken,
 		oas.OAuth2FieldErrorDescription: e.Error(),
 	})
+}
+
+// writeStepUpRequiredResponse renders a 401 with a Bearer insufficient_claims
+// challenge when Entra returns a Conditional Access claims challenge. The claims
+// are base64-encoded with padding (Microsoft's convention) on the
+// WWW-Authenticate header; the upstream is never called and nothing is cached.
+func (m *Middleware) writeStepUpRequiredResponse(w http.ResponseWriter, r *http.Request, e *oauth2common.StepUpRequiredError) {
+	params := [][2]string{{oas.OAuth2FieldError, oas.OAuth2ErrInsufficientClaims}}
+	body := map[string]string{oas.OAuth2FieldError: oas.OAuth2ErrInsufficientClaims}
+	if e.Claims != "" {
+		encoded := base64.StdEncoding.EncodeToString([]byte(e.Claims))
+		params = append(params, [2]string{oas.OAuth2FieldClaims, encoded})
+		body[oas.OAuth2FieldClaims] = encoded
+	}
+	if e.AuthorizationURI != "" {
+		params = append(params, [2]string{oas.OAuth2FieldAuthorizationURI, e.AuthorizationURI})
+		body[oas.OAuth2FieldAuthorizationURI] = e.AuthorizationURI
+	}
+	m.writeJSONError(w, r, http.StatusUnauthorized, params, body)
 }
 
 // writeMisconfigResponse renders a 500 for an incomplete exchange configuration.
