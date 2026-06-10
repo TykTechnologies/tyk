@@ -162,6 +162,7 @@ func buildMCPAdapterSpec(rest *APISpec, proxies []*APISpec, existing *APISpec) (
 	}
 
 	adapterID := pairing.CanonicalAdapterAPIID(rest.APIID)
+	gw := gatewayForSyntheticAdapter(rest, existing)
 	sdkAdapter := (*restmcpadapter.SDKAdapter)(nil)
 	if existing != nil {
 		sdkAdapter = existing.MCPAdapter.SDKAdapter
@@ -225,6 +226,16 @@ func buildMCPAdapterSpec(rest *APISpec, proxies []*APISpec, existing *APISpec) (
 	return &APISpec{
 		APIDefinition: adapterDef,
 		OAS:           doc,
+		Health: &DefaultHealthChecker{
+			Gw:    gw,
+			APIID: adapterID,
+		},
+		AuthManager: &DefaultSessionManager{Gw: gw},
+		OrgSessionManager: &DefaultSessionManager{
+			orgID: rest.OrgID,
+			Gw:    gw,
+		},
+		GlobalConfig: rest.GlobalConfig,
 		MCPAdapter: MCPAdapterRuntime{
 			Synthetic:                true,
 			SourceRESTAPIID:          rest.APIID,
@@ -235,6 +246,24 @@ func buildMCPAdapterSpec(rest *APISpec, proxies []*APISpec, existing *APISpec) (
 		},
 		JSONRPCRouter: mcp.NewRouter(),
 	}, nil
+}
+
+func gatewayForSyntheticAdapter(specs ...*APISpec) *Gateway {
+	for _, spec := range specs {
+		if spec == nil {
+			continue
+		}
+		if manager, ok := spec.AuthManager.(*DefaultSessionManager); ok && manager.Gw != nil {
+			return manager.Gw
+		}
+		if manager, ok := spec.OrgSessionManager.(*DefaultSessionManager); ok && manager.Gw != nil {
+			return manager.Gw
+		}
+		if health, ok := spec.Health.(*DefaultHealthChecker); ok && health.Gw != nil {
+			return health.Gw
+		}
+	}
+	return nil
 }
 
 func deriveMCPAdapterCatalogue(rest *APISpec, proxies []*APISpec) (mcpAdapterCatalogue, error) {
