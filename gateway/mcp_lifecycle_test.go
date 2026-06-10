@@ -25,6 +25,9 @@ func TestHandleDeleteAPI_RefusesRESTSourceWithPairedMCPProxy(t *testing.T) {
 	gw.apisByID[rest.APIID] = rest
 	gw.apisByID[proxy1.APIID] = proxy1
 	gw.apisByID[proxy2.APIID] = proxy2
+	snapshot, err := computeMCPPairing([]*APISpec{rest, proxy1, proxy2})
+	require.NoError(t, err)
+	gw.mcpPairingIndex.Set(snapshot)
 
 	obj, code := gw.handleDeleteAPI("rest-delete")
 	require.Equal(t, http.StatusConflict, code)
