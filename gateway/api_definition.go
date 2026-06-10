@@ -545,7 +545,7 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 					log.WithError(err).Errorf("Couldn't JSON-escape env secret for key: %s", m[1])
 					continue
 				}
-				input = strings.Replace(input, m[0], escaped, -1)
+				input = strings.ReplaceAll(input, m[0], escaped)
 			}
 		}
 	}
@@ -557,7 +557,7 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 				log.WithError(err).Errorf("Couldn't JSON-escape config secret for key: %s", k)
 				continue
 			}
-			input = strings.Replace(input, prefixSecrets+k, escaped, -1)
+			input = strings.ReplaceAll(input, prefixSecrets+k, escaped)
 		}
 	}
 
@@ -592,7 +592,7 @@ func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
 		if err != nil {
 			return err
 		}
-		*input = strings.Replace(*input, prefixConsul+key, escaped, -1)
+		*input = strings.ReplaceAll(*input, prefixConsul+key, escaped)
 	}
 
 	return nil
@@ -637,7 +637,7 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 		if err != nil {
 			return err
 		}
-		*input = strings.Replace(*input, prefixVault+k, escaped, -1)
+		*input = strings.ReplaceAll(*input, prefixVault+k, escaped)
 	}
 
 	return nil

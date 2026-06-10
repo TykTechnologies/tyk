@@ -428,8 +428,8 @@ func TestList_EmbeddedPEM_CertPoolWithEmbeddedCA(t *testing.T) {
 
 // collapseToSingleLine simulates a copy-paste of a PEM into a single-line text
 // field: every newline becomes a space.
-func collapseToSingleLine(pem []byte) string {
-	return strings.ReplaceAll(strings.TrimSpace(string(pem)), "\n", " ")
+func collapseToSingleLine(v []byte) string {
+	return strings.ReplaceAll(strings.TrimSpace(string(v)), "\n", " ")
 }
 
 // TestList_EmbeddedPEM_SingleLineCollapsed verifies the gateway tolerates a
