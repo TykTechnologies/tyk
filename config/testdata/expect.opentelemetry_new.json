@@ -55,7 +55,8 @@
             "type": "TraceIDRatioBased",
             "rate": 0.5,
             "parent_based": true
-        }
+        },
+        "mcp": {}
     },
     "metrics": {
         "enabled": true,

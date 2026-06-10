@@ -1029,7 +1029,7 @@ func (gw *Gateway) mcpPRMSuffixHandler(spec *APISpec) http.HandlerFunc {
 			return
 		}
 		if prm.IsMirrorMode(spec.IsMCP()) {
-			if err := mw.serveMirroredPRM(w, r, prm); err != nil {
+			if err := mw.serveMirroredPRM(w, r); err != nil {
 				log.WithError(err).Warn("PRM mirror failed at suffix route")
 				http.Error(w, "upstream PRM unavailable", http.StatusBadGateway)
 			}

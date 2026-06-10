@@ -20,12 +20,16 @@ const idpRefreshDebounce = 100 * time.Millisecond
 // (GET /system/clientidps) and the MDCB/edge RPC feed (GetClientIdPs); the JSON
 // tags mirror the dashboard's model.ClientIdP.
 type IdP struct {
-	ID          string                  `json:"client_idp_id"`
-	OrgID       string                  `json:"org_id"`
-	Name        string                  `json:"name"`
-	Issuer      string                  `json:"issuer"`
-	JWKSURI     string                  `json:"jwks_uri"`
-	APIMappings map[string]ScopeMapping `json:"api_mappings"`
+	ID      string `json:"client_idp_id"`
+	OrgID   string `json:"org_id"`
+	Name    string `json:"name"`
+	Issuer  string `json:"issuer"`
+	JWKSURI string `json:"jwks_uri"`
+	// ScopeClaimName is the JWT claim that holds the OAuth scopes (e.g. "scope",
+	// "scp" for Entra/Azure AD, "roles"); empty means the gateway falls back to
+	// the conventional "scope" claim. Mirrors the dashboard's model.ClientIdP.
+	ScopeClaimName string                  `json:"scope_claim_name"`
+	APIMappings    map[string]ScopeMapping `json:"api_mappings"`
 }
 
 // ScopeMapping is the value type of IdP.APIMappings; the map key is the api_id.
@@ -46,6 +50,9 @@ type idpFeedEnvelope struct {
 type Binding struct {
 	ScopeToPolicy map[string]string
 	IdPID         string
+	// ScopeClaimName is denormalised from the bound IdP at rebuild time so the
+	// JWT hot path resolves the scope claim without a second registry lookup.
+	ScopeClaimName string
 }
 
 // IdPRegistry is an in-memory, request-time join of APIs to their client IdPs.
@@ -115,8 +122,9 @@ func (r *IdPRegistry) rebuild(idps []IdP) {
 				continue
 			}
 			bindingsByAPI[apiID] = append(bindingsByAPI[apiID], Binding{
-				IdPID:         idp.ID,
-				ScopeToPolicy: sm.ScopeToPolicy,
+				IdPID:          idp.ID,
+				ScopeToPolicy:  sm.ScopeToPolicy,
+				ScopeClaimName: idp.ScopeClaimName,
 			})
 			indexed = true
 		}
