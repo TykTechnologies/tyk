@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/mock"
 
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -439,6 +441,65 @@ func TestDeleteRawKeysWithAllowanceScope(t *testing.T) {
 	})
 }
 
+func Test_DefaultSessionManager(t *testing.T) {
+	ts := StartTest(func(_ *config.Config) {})
+	defer ts.Close()
+
+	newDefaultSessionManager := func(t *testing.T) (*DefaultSessionManager, *mock.MockHandler) {
+		t.Helper()
+
+		ctrl := gomock.NewController(t)
+		store := mock.NewMockHandler(ctrl)
+
+		return &DefaultSessionManager{
+			store: store,
+			Gw:    ts.Gw,
+		}, store
+	}
+
+	t.Run("UpdateSession", func(t *testing.T) {
+		// https://tyktech.atlassian.net/browse/TT-16259
+		// restored session has to be saved by using SET <key> <value> XX redis cmd
+		// the new one session has to be saved by SET <key> <value> redis cmd (without XX)
+
+		t.Run("invokes SetRawKey hashed=true restored=false", func(t *testing.T) {
+			session := &user.SessionState{}
+			sessionManager, store := newDefaultSessionManager(t)
+			store.EXPECT().GetKeyPrefix().Return("prefix")
+			store.EXPECT().SetRawKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			err := sessionManager.UpdateSession("key", session, 0, true)
+			assert.NoError(t, err)
+		})
+
+		t.Run("invokes SetKey hashed=false restored=false", func(t *testing.T) {
+			session := &user.SessionState{}
+			sessionManager, store := newDefaultSessionManager(t)
+			store.EXPECT().SetKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			err := sessionManager.UpdateSession("key", session, 0, false)
+			assert.NoError(t, err)
+		})
+
+		t.Run("invokes SetRawKeyEx hashed=true restored=true", func(t *testing.T) {
+			session := &user.SessionState{}
+			session.MarkAsRestored()
+			sessionManager, store := newDefaultSessionManager(t)
+			store.EXPECT().GetKeyPrefix().Return("prefix")
+			store.EXPECT().SetRawKeyEx(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			err := sessionManager.UpdateSession("key", session, 0, true)
+			assert.NoError(t, err)
+		})
+
+		t.Run("invokes SetKeyEx hashed=false restored=true", func(t *testing.T) {
+			session := &user.SessionState{}
+			session.MarkAsRestored()
+			sessionManager, store := newDefaultSessionManager(t)
+			store.EXPECT().SetKeyEx(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			err := sessionManager.UpdateSession("key", session, 0, false)
+			assert.NoError(t, err)
+		})
+	})
+}
+
 type countingStorageHandler struct {
 	deleteRawKeyMutex *sync.Mutex
 	deleteRawKeyCount int
@@ -577,4 +638,12 @@ func (c *countingStorageHandler) AppendToSet(s string, s2 string) {}
 
 func (c *countingStorageHandler) Exists(s string) (bool, error) {
 	return false, nil
+}
+
+func (c *countingStorageHandler) SetKeyEx(string, string, int64) error {
+	return nil
+}
+
+func (c *countingStorageHandler) SetRawKeyEx(string, string, int64) error {
+	return nil
 }

@@ -197,6 +197,9 @@ type Gateway struct {
 	// OnConnect this is a callback which is called whenever we transition redis Disconnected to connected
 	OnConnect func()
 
+	// shuttingDown tracks whether the gateway has received a termination signal and is initiating its graceful shutdown sequence.
+	shuttingDown atomic.Bool
+
 	// SessionID is the unique session id which is used while connecting to dashboard to prevent multiple node allocation.
 	SessionID string
 
@@ -243,6 +246,10 @@ type Gateway struct {
 
 	// apiJWKCaches cache per api entity
 	apiJWKCaches sync.Map
+
+	// idpRegistry is the in-memory client-IdP registry, a sibling dataset of the
+	// API definitions consulted only as a last fallback in the JWT path.
+	idpRegistry *IdPRegistry
 
 	limitHeaderFactory rate.HeaderSenderFactory
 
@@ -310,6 +317,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	}
 
 	gw.jwkCache = buildJWKSCache(config)
+	gw.idpRegistry = newIdPRegistry(gw)
 	gw.BundleChecksumVerifier = defaultBundleVerifyFunction
 
 	return gw
@@ -1243,6 +1251,17 @@ func (gw *Gateway) rpcReloadLoop(rpcKey string) {
 	}
 }
 
+// idpReloadLoop long-polls the dedicated CheckIdPReload RPC. It runs parallel to
+// rpcReloadLoop so a client-IdP change refreshes ONLY the registry (one
+// GetClientIdPs RPC) without a full API/policy resync. Exits on shutdown.
+func (gw *Gateway) idpReloadLoop(rpcKey string) {
+	for {
+		if !gw.RPCListener.CheckForIdPReload(rpcKey) {
+			return
+		}
+	}
+}
+
 // DoReloadWithError performs a full reload of APIs and policies, returning any
 // sync error that prevented a successful reload. The reloadMu mutex is acquired
 // for the duration of the reload, so each call is safe to make concurrently.
@@ -1295,6 +1314,18 @@ func (gw *Gateway) DoReloadWithError() error {
 	}
 
 	gw.loadGlobalApps()
+
+	// Refresh the client-IdP registry AFTER loadGlobalApps populates apisByID.
+	// The segment-aware backstop indexes only bindings whose api_id is present
+	// in apisByID — sequencing this before loadGlobalApps would drop every
+	// binding and 401 registry-only APIs from boot. Every DoReload (startup,
+	// reloadLoop drain, /tyk/reload, RPC NoticeGroupReload) refreshes the
+	// registry as a side effect, giving operators IdP refresh "for free".
+	if gw.idpRegistry != nil {
+		if err := gw.idpRegistry.doRefresh(); err != nil {
+			mainLog.WithError(err).Warn("IdP registry refresh failed during reload — keeping previous snapshot")
+		}
+	}
 
 	gw.MetricInstruments.RecordReload(gw.ctx, time.Since(start))
 
@@ -1880,7 +1911,26 @@ func (gw *Gateway) afterConfSetup() error {
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	gw.initGenericEventHandlers()
-	regexp.ResetCache(time.Second*time.Duration(conf.RegexpCacheExpire), !conf.DisableRegexpCache)
+	configureAutoMaxProcs(conf.DisableAutoMaxProcs)
+
+	maxEntries := conf.RegexpCacheMaxEntries
+	if maxEntries < 0 {
+		mainLog.Warnf("regex cache: RegexpCacheMaxEntries=%d is invalid; "+
+			"use disable_regexp_cache_bound=true to opt out of size eviction. Treating as default.", maxEntries)
+		maxEntries = 0
+	}
+	if conf.DisableRegexpCacheBound {
+		mainLog.Warnf("regex cache: size eviction disabled. Risk: user-driven pattern cardinality can OOM the gateway.")
+	}
+	cacheOpts := cache.LRUOptions{
+		TTL:        time.Second * time.Duration(conf.RegexpCacheExpire),
+		MaxEntries: maxEntries,
+		Unbounded:  conf.DisableRegexpCacheBound,
+		Enabled:    !conf.DisableRegexpCache,
+		Log:        mainLog.Warnf,
+	}
+	regexp.Configure(cacheOpts)
+	httputil.ConfigurePathRegexpCache(maxEntries, conf.DisableRegexpCacheBound, mainLog.Warnf)
 
 	if conf.HealthCheckEndpointName == "" {
 		conf.HealthCheckEndpointName = "hello"
@@ -2170,6 +2220,16 @@ func Start() {
 	go func() {
 		sig := <-sigChan
 		mainLog.Infof("Shutdown signal received: %v. Initiating graceful shutdown...", sig)
+
+		gw.shuttingDown.Store(true)
+		if gwConfig.GracefulShutdownDelaySeconds > 0 {
+			mainLog.Infof("Delaying graceful shutdown for %d seconds", gwConfig.GracefulShutdownDelaySeconds)
+
+			select {
+			case <-time.After(time.Duration(gwConfig.GracefulShutdownDelaySeconds) * time.Second):
+			}
+		}
+
 		cancel()
 
 		// we need to set default cfg value here as the ctx is created before the afterconf is executed
@@ -2341,6 +2401,7 @@ func (gw *Gateway) start() {
 
 		gw.RPCListener.Connect()
 		go gw.rpcReloadLoop(slaveOptions.RPCKey)
+		go gw.idpReloadLoop(slaveOptions.RPCKey)
 		go gw.RPCListener.StartRPCKeepaliveWatcher()
 		go gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
 	}
