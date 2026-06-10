@@ -135,3 +135,9 @@ func IsLegacyFormatter(formatter logrus.Formatter) bool {
 
 	return ok && textFormatter.TimestampFormat == LegacyTimestampFormat
 }
+
+type InjectTestHookOptions struct {
+	Logger *logrus.Logger
+}
+
+type InjectTestHookOpt func(*InjectTestHookOptions)
