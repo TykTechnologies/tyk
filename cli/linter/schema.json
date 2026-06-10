@@ -268,6 +268,27 @@
                   "type": "string"
                 }
               }
+            },
+            "mcp": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "read_sources": {
+                  "type": ["array", "null"],
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "channel": {
+                        "type": "string"
+                      },
+                      "path": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         },
@@ -1496,6 +1517,15 @@
     },
     "regexp_cache_expire": {
       "type": "integer"
+    },
+    "regexp_cache_max_entries": {
+      "type": "integer"
+    },
+    "disable_regexp_cache_bound": {
+      "type": "boolean"
+    },
+    "disable_auto_max_procs": {
+      "type": "boolean"
     },
     "proxy_ssl_disable_renegotiation": {
       "type": "boolean"

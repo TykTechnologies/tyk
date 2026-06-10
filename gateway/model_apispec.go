@@ -207,6 +207,18 @@ func (a *APISpec) GetOAuth2Config() (string, *oas.OAuth2) {
 	return "", nil
 }
 
+// GetOAuth2PRMConfig returns the new-style PRM config carried under the
+// oauth2 security scheme and its scheme name, when enabled; ("", nil)
+// otherwise. Wins over the deprecated top-level block (GetPRMConfig)
+// when both exist.
+func (a *APISpec) GetOAuth2PRMConfig() (string, *oas.OAuth2PRM) {
+	name, cfg := a.GetOAuth2Config()
+	if cfg == nil || cfg.ProtectedResourceMetadata == nil || !cfg.ProtectedResourceMetadata.Enabled {
+		return "", nil
+	}
+	return name, cfg.ProtectedResourceMetadata
+}
+
 // FindSpecMatchesStatus checks if a URL spec has a specific status and returns the URLSpec for it.
 func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (*URLSpec, bool) {
 	matchPath, method := a.getMatchPathAndMethod(r, mode)
@@ -268,15 +280,12 @@ func (a *APISpec) injectIntoReqContext(req *http.Request) {
 	}
 }
 
-func (a *APISpec) findOperation(r *http.Request) *Operation {
-	middleware := a.OAS.GetTykMiddleware()
-	if middleware == nil {
-		return nil
-	}
-
+// findOASRoute matches the request to an OAS route via the API's OAS
+// router (path templates included). Returns nil when none matches.
+func (a *APISpec) findOASRoute(r *http.Request) (*routers.Route, map[string]string) {
 	if a.oasRouter == nil {
 		log.Warningf("OAS router not initialized properly. Unable to find route for %s %v", r.Method, r.URL)
-		return nil
+		return nil, nil
 	}
 
 	rClone := *r
@@ -286,11 +295,25 @@ func (a *APISpec) findOperation(r *http.Request) *Operation {
 
 	if errors.Is(err, routers.ErrPathNotFound) {
 		log.Tracef("Unable to find route for %s %v at spec %v", r.Method, r.URL, a.Id)
-		return nil
+		return nil, nil
 	}
 
 	if err != nil {
 		log.Errorf("Error finding route: %v", err)
+		return nil, nil
+	}
+
+	return route, pathParams
+}
+
+func (a *APISpec) findOperation(r *http.Request) *Operation {
+	middleware := a.OAS.GetTykMiddleware()
+	if middleware == nil {
+		return nil
+	}
+
+	route, pathParams := a.findOASRoute(r)
+	if route == nil {
 		return nil
 	}
 

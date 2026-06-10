@@ -107,7 +107,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 
 		for _, operation := range settings.Middleware.Operations {
 			operation.EnforceTimeout.Value = 2
-			operation.EnforceTimeout.Timeout = ReadableDuration(2 * time.Second)
+			operation.EnforceTimeout.Duration = ReadableDuration(2 * time.Second)
 		}
 
 		settings.Upstream.Authentication = &UpstreamAuth{
