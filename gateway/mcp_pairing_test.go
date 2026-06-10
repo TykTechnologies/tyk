@@ -151,7 +151,7 @@ func TestBuildAdapterSpec_InitializesManagerFields(t *testing.T) {
 	store.EXPECT().Connect().Return(true).Times(2)
 
 	require.NotPanics(t, func() {
-		adapterSpec.Init(store, store, store, store)
+		adapterSpec.Init(store, store, store)
 	})
 }
 
