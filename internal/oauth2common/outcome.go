@@ -26,6 +26,10 @@ const (
 	// OutcomeActorNotAuthorized: the requireMayAct pre-flight rejected the
 	// configured actor before any IdP call (gateway-side policy refusal).
 	OutcomeActorNotAuthorized OutcomeKind = "actor_not_authorized"
+	// OutcomeMissingActorToken: a required header-source actor token was absent
+	// from the inbound request — a client-side failure that never reached the
+	// IdP, so it must not be counted as an idp_error.
+	OutcomeMissingActorToken OutcomeKind = "missing_actor_token"
 )
 
 // ClassifyExchangeOutcome maps an exchange result to its bounded OutcomeKind.
@@ -47,6 +51,10 @@ func ClassifyExchangeOutcome(err error) OutcomeKind {
 	var actorNotAuthorized *ActorNotAuthorizedError
 	if errors.As(err, &actorNotAuthorized) {
 		return OutcomeActorNotAuthorized
+	}
+	var missingActor *MissingActorTokenError
+	if errors.As(err, &missingActor) {
+		return OutcomeMissingActorToken
 	}
 	return OutcomeIdPError
 }
