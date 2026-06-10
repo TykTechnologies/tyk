@@ -7,12 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
+	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage/mock"
-
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 )
 
 type testSetup struct {
@@ -406,4 +407,92 @@ func TestCacheCertificate(t *testing.T) {
 
 		})
 	}
+}
+
+func Test_MdcbStorage(t *testing.T) {
+	type testMdcbStorage struct {
+		*MdcbStorage
+		ctrl   *gomock.Controller
+		local  *mock.MockHandler
+		rpc    *mock.MockHandler
+		logger *logrus.Logger
+		hook   *logger.Hook
+	}
+
+	newTestMdcbStorage := func(t *testing.T) testMdcbStorage {
+		t.Helper()
+		nullLogger, hook := logrustest.NewNullLogger()
+
+		ctrl := gomock.NewController(t)
+		local := mock.NewMockHandler(ctrl)
+		rpc := mock.NewMockHandler(ctrl)
+		dummyCb := func(_ string, _ string) error {
+			return nil
+		}
+
+		storage := NewMdcbStorage(local, rpc, logrus.NewEntry(nullLogger), dummyCb)
+
+		return testMdcbStorage{
+			MdcbStorage: storage,
+			ctrl:        ctrl,
+			local:       local,
+			rpc:         rpc,
+			logger:      nullLogger,
+			hook:        logger.NewHook(hook),
+		}
+	}
+
+	t.Run("SetKeyEx", func(t *testing.T) {
+		t.Run("returns nil if underlying local storage returns nil", func(t *testing.T) {
+			storage := newTestMdcbStorage(t)
+
+			storage.local.
+				EXPECT().
+				SetKeyEx("key", "value", int64(123)).
+				Return(nil)
+
+			err := storage.SetKeyEx("key", "value", 123)
+			assert.NoError(t, err)
+		})
+
+		t.Run("returns wrapped error if underlying local storage returns one", func(t *testing.T) {
+			storage := newTestMdcbStorage(t)
+			mockErr := errors.New("mock err")
+
+			storage.local.
+				EXPECT().
+				SetKeyEx("key", "value", int64(123)).
+				Return(mockErr)
+
+			err := storage.SetKeyEx("key", "value", 123)
+			assert.ErrorIs(t, err, mockErr)
+		})
+	})
+
+	t.Run("SetRawKeyEx", func(t *testing.T) {
+		t.Run("returns nil if underlying local storage returns nil", func(t *testing.T) {
+			storage := newTestMdcbStorage(t)
+
+			storage.local.
+				EXPECT().
+				SetRawKeyEx("key", "value", int64(123)).
+				Return(nil)
+
+			err := storage.SetRawKeyEx("key", "value", 123)
+			assert.NoError(t, err)
+		})
+
+		t.Run("returns wrapped error if underlying local storage returns one", func(t *testing.T) {
+			storage := newTestMdcbStorage(t)
+			mockErr := errors.New("mock err")
+
+			storage.local.
+				EXPECT().
+				SetRawKeyEx("key", "value", int64(123)).
+				Return(mockErr)
+
+			err := storage.SetRawKeyEx("key", "value", 123)
+			assert.ErrorIs(t, err, mockErr)
+		})
+	})
 }

@@ -247,6 +247,29 @@ func TestIdPRegistry_RebuildSegmentBackstop(t *testing.T) {
 	}
 }
 
+// rebuild denormalises the IdP's scope_claim_name into each binding so the JWT
+// hot path can resolve it without a second registry lookup.
+func TestIdPRegistry_RebuildCarriesScopeClaimName(t *testing.T) {
+	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": {}}}
+	r := newIdPRegistry(gw)
+
+	r.rebuild([]IdP{{
+		ID:             "idp-1",
+		ScopeClaimName: "scp",
+		APIMappings: map[string]ScopeMapping{
+			"api-a": {ScopeToPolicy: map[string]string{"read": "pol-read"}},
+		},
+	}})
+
+	b := r.BindingsForAPI("api-a")
+	if len(b) != 1 {
+		t.Fatalf("want 1 binding, got %d", len(b))
+	}
+	if b[0].ScopeClaimName != "scp" {
+		t.Errorf("binding ScopeClaimName: want scp, got %q", b[0].ScopeClaimName)
+	}
+}
+
 // rebuild is build-then-swap: a previous snapshot must be fully replaced.
 func TestIdPRegistry_RebuildReplacesSnapshot(t *testing.T) {
 	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": {}}}
@@ -637,6 +660,113 @@ func TestIdPRegistry_JWT_ManualSourceWins(t *testing.T) {
 	})
 }
 
+// A registry IdP can declare a non-default scope_claim_name (e.g. "scp" for
+// Entra/Azure AD). When the API def sets no scope claim name, the gateway must
+// fall back to the bound IdP's claim, find the scopes, and map the policy (200).
+// Without the fallback the gateway reads "scope", finds nothing, and 403s.
+func TestIdPRegistry_JWT_ResolvesScopeClaimNameFromRegistry(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const apiID = "idp-reg-scp-api"
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "idp-reg-scp-policy"
+		p.AccessRights = map[string]user.AccessDefinition{apiID: {APIName: apiID}}
+		p.Partitions = user.PolicyPartitions{Acl: true}
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiID
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = "" // registry-only: no manual JWKS source
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTScopeClaimName = "" // no manual scope claim name -> must use registry's
+		spec.Proxy.ListenPath = "/idp-reg-scp/"
+		spec.OrgID = "default"
+	})
+
+	// rebuild AFTER load so apisByID contains apiID (segment backstop).
+	ts.Gw.idpRegistry.rebuild([]IdP{{
+		ID:             "idp-scp",
+		Issuer:         "my-issuer",
+		JWKSURI:        testHttpJWK,
+		ScopeClaimName: "scp", // Entra/Azure AD style claim
+		APIMappings: map[string]ScopeMapping{
+			apiID: {ScopeToPolicy: map[string]string{"read": pID}},
+		},
+	}})
+
+	jwtToken := CreateJWKToken(func(tok *jwt.Token) {
+		tok.Header["kid"] = "12345"
+		tok.Claims.(jwt.MapClaims)["user_id"] = "user"
+		tok.Claims.(jwt.MapClaims)["iss"] = "my-issuer"
+		tok.Claims.(jwt.MapClaims)["scp"] = "read" // scopes under "scp", NOT "scope"
+		tok.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(72 * time.Hour).Unix()
+	})
+
+	_, _ = ts.Run(t, test.TestCase{
+		Path:    "/idp-reg-scp/",
+		Headers: map[string]string{"authorization": jwtToken},
+		Code:    http.StatusOK,
+	})
+}
+
+// Counterpart to the test above: same setup but the bound IdP declares no
+// scope_claim_name, so the gateway falls through to the conventional "scope"
+// claim, finds nothing under "scp", and rejects (403). This pins down that the
+// registry fallback — not some other path — is what flips the result to 200.
+func TestIdPRegistry_JWT_NoScopeClaimNameRejects(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const apiID = "idp-reg-noscp-api"
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "idp-reg-noscp-policy"
+		p.AccessRights = map[string]user.AccessDefinition{apiID: {APIName: apiID}}
+		p.Partitions = user.PolicyPartitions{Acl: true}
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiID
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = ""
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTScopeClaimName = ""
+		spec.Proxy.ListenPath = "/idp-reg-noscp/"
+		spec.OrgID = "default"
+	})
+
+	ts.Gw.idpRegistry.rebuild([]IdP{{
+		ID:      "idp-noscp",
+		Issuer:  "my-issuer",
+		JWKSURI: testHttpJWK,
+		// ScopeClaimName intentionally empty -> gateway defaults to "scope".
+		APIMappings: map[string]ScopeMapping{
+			apiID: {ScopeToPolicy: map[string]string{"read": pID}},
+		},
+	}})
+
+	jwtToken := CreateJWKToken(func(tok *jwt.Token) {
+		tok.Header["kid"] = "12345"
+		tok.Claims.(jwt.MapClaims)["user_id"] = "user"
+		tok.Claims.(jwt.MapClaims)["iss"] = "my-issuer"
+		tok.Claims.(jwt.MapClaims)["scp"] = "read" // scopes under "scp" -> not seen under "scope"
+		tok.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(72 * time.Hour).Unix()
+	})
+
+	_, _ = ts.Run(t, test.TestCase{
+		Path:    "/idp-reg-noscp/",
+		Headers: map[string]string{"authorization": jwtToken},
+		Code:    http.StatusForbidden,
+	})
+}
+
 // --- focused unit coverage for the non-RPC helpers ---
 
 func newTestJWTMiddleware(apiID string) *JWTMiddleware {
@@ -645,6 +775,34 @@ func newTestJWTMiddleware(apiID string) *JWTMiddleware {
 	gw.idpRegistry = newIdPRegistry(gw)
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: apiID}}
 	return &JWTMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
+}
+
+// scopeClaimNameForRequest resolves the scope claim with manual config winning,
+// then the registry binding, then the conventional "scope" default.
+func TestScopeClaimNameForRequest(t *testing.T) {
+	k := newTestJWTMiddleware("api-a")
+
+	// No manual config, no binding -> default "scope".
+	if got := k.scopeClaimNameForRequest(jwt.MapClaims{}, nil); got != "scope" {
+		t.Errorf("default: want scope, got %q", got)
+	}
+
+	// Binding fills the gap when the API def sets nothing.
+	b := &Binding{ScopeClaimName: "scp"}
+	if got := k.scopeClaimNameForRequest(jwt.MapClaims{}, b); got != "scp" {
+		t.Errorf("binding fallback: want scp, got %q", got)
+	}
+
+	// An empty binding claim still falls through to the default.
+	if got := k.scopeClaimNameForRequest(jwt.MapClaims{}, &Binding{}); got != "scope" {
+		t.Errorf("empty binding: want scope, got %q", got)
+	}
+
+	// Manual API-def config wins over the binding.
+	k.Spec.JWTScopeClaimName = "roles"
+	if got := k.scopeClaimNameForRequest(jwt.MapClaims{}, b); got != "roles" {
+		t.Errorf("manual wins: want roles, got %q", got)
+	}
 }
 
 func TestUnverifiedIssuerHint(t *testing.T) {
