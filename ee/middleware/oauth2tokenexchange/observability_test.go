@@ -105,6 +105,23 @@ func TestEventPayload_LogFields_CapsIdPErrorDescription(t *testing.T) {
 	assert.LessOrEqual(t, len(desc), oauth2common.MaxIdPErrorBodyBytes+len("...(truncated)"))
 }
 
+// TestEventPayload_CapsIdPErrorCode pins that an oversized IdP error *code* is
+// length-capped on both the log line and the audit meta. The OAuth2 error code
+// is short by spec, but the IdP is untrusted and may return an arbitrary value.
+func TestEventPayload_CapsIdPErrorCode(t *testing.T) {
+	t.Parallel()
+
+	p := okPayload()
+	p.Outcome = oauth2common.OutcomeIdPError
+	p.IdpError = strings.Repeat("x", oauth2common.MaxIdPErrorBodyBytes+500)
+
+	logErr, _ := p.LogFields()["oauth2_idp_error"].(string)
+	assert.LessOrEqual(t, len(logErr), oauth2common.MaxIdPErrorBodyBytes+len("...(truncated)"))
+
+	auditErr, _ := p.AuditMeta()["oauth2_idp_error"].(string)
+	assert.LessOrEqual(t, len(auditErr), oauth2common.MaxIdPErrorBodyBytes+len("...(truncated)"))
+}
+
 // TestEventPayload_AuditMeta_Succeeded pins TC7: a successful exchange's audit
 // meta carries the oauth2_-namespaced safe fields and no identity/token.
 func TestEventPayload_AuditMeta_Succeeded(t *testing.T) {

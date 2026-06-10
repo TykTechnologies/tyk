@@ -99,10 +99,10 @@ func (p EventPayload) addOptional(m map[string]interface{}) {
 	}
 	if p.Outcome == oauth2common.OutcomeIdPError {
 		if p.IdpError != "" {
-			m[fieldIdpError] = p.IdpError
+			m[fieldIdpError] = capIdPErrorField(p.IdpError)
 		}
 		if p.IdpErrorDesc != "" {
-			m[fieldIdpErrorDesc] = capIdPErrorDesc(p.IdpErrorDesc)
+			m[fieldIdpErrorDesc] = capIdPErrorField(p.IdpErrorDesc)
 		}
 	}
 }
@@ -123,9 +123,9 @@ func (p EventPayload) AuditDecision() (event.Event, bool) {
 	}
 }
 
-// capIdPErrorDesc bounds an IdP error description so an oversized (or hostile)
-// IdP body cannot bloat a log line or audit event.
-func capIdPErrorDesc(s string) string {
+// capIdPErrorField bounds an IdP-supplied error code or description so an
+// oversized (or hostile) IdP body cannot bloat a log line or audit event.
+func capIdPErrorField(s string) string {
 	if len(s) <= oauth2common.MaxIdPErrorBodyBytes {
 		return s
 	}
