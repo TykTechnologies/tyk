@@ -9,15 +9,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
+
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
-
 	"github.com/TykTechnologies/tyk/storage"
-
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -32,6 +32,9 @@ var (
 			return "", nil
 		},
 		"SetKey": func(ibd *model.InboundData) error {
+			return nil
+		},
+		"SetKeyEx": func(ibd *model.InboundData) error {
 			return nil
 		},
 		"GetExp": func(keyName string) (int64, error) {
@@ -402,6 +405,39 @@ func (r *RPCStorageHandler) SetRawKey(keyName, session string, timeout int64) er
 	return nil
 }
 
+func (r *RPCStorageHandler) SetKeyEx(keyName, session string, timeout int64) error {
+	return decorate(
+		func() error {
+			return r.internalSetKeyEx(keyName, session, timeout)
+		},
+		retryAlways(r),
+		elapsedLog("SetKeyEx", log),
+	)()
+}
+
+func (r *RPCStorageHandler) internalSetKeyEx(keyName, session string, timeout int64) error {
+	ibd := model.InboundData{
+		KeyName:      r.fixKey(keyName),
+		SessionState: session,
+		Timeout:      timeout,
+	}
+
+	_, err := rpc.FuncClientSingleton("SetKeyEx", ibd)
+
+	// Fallback for older MDCB versions that do not support SetKeyEx
+	if err != nil && strings.Contains(err.Error(), "unknown method") {
+		log.Error("SetKeyEx not supported by MDCB, falling back to SetKey")
+		_, err = rpc.FuncClientSingleton("SetKey", ibd)
+	}
+
+	return err
+}
+
+func (r *RPCStorageHandler) SetRawKeyEx(keyName, session string, timeout int64) error {
+	_, _, _ = keyName, session, timeout
+	return nil
+}
+
 // Decrement will decrement a key in redis
 func (r *RPCStorageHandler) Decrement(keyName string) {
 	log.Warning("Decrement called")
@@ -746,6 +782,10 @@ func (r RPCStorageHandler) IsRetriableError(err error) bool {
 		}
 	}
 	return false
+}
+
+func (r RPCStorageHandler) RpcLogin() bool {
+	return rpc.Login()
 }
 
 // GetAPIDefinitions will pull API definitions from the RPC server
@@ -1382,4 +1422,61 @@ func (r *RPCStorageHandler) GetListRange(keyName string, from, to int64) ([]stri
 func (r *RPCStorageHandler) Exists(keyName string) (bool, error) {
 	log.Error("Not implemented")
 	return false, nil
+}
+
+func decorate[F any](in F, decorators ...func(F) F) F {
+	for i := len(decorators) - 1; i >= 0; i-- {
+		in = decorators[i](in)
+	}
+	return in
+}
+
+func retryAlways(
+	obj RpcLoginAndRetriableErrorChecker,
+) func(func() error) func() error {
+
+	return func(next func() error) func() error {
+		return func() error {
+			for {
+				err := next()
+
+				if obj.IsRetriableError(err) && obj.RpcLogin() {
+					continue
+				}
+
+				return err
+			}
+		}
+	}
+}
+
+func elapsedLog(fnName string, log *logrus.Logger) func(func() error) func() error {
+	return func(next func() error) func() error {
+		return func() error {
+			start := time.Now()
+			err := next()
+			elapsed := time.Since(start)
+
+			if err != nil {
+				log.Debugf("%q failed with error: %q", fnName, err)
+			} else {
+				log.Debugf("%q took %s", fnName, elapsed)
+			}
+
+			return err
+		}
+	}
+}
+
+type RetriableErrorChecker interface {
+	IsRetriableError(error) bool
+}
+
+type RpcLogin interface {
+	RpcLogin() bool
+}
+
+type RpcLoginAndRetriableErrorChecker interface {
+	RetriableErrorChecker
+	RpcLogin
 }

@@ -245,6 +245,16 @@ func TestGateway_readinessHandler(t *testing.T) {
 			expectedStatus:       http.StatusServiceUnavailable,
 			expectedErrorMessage: "A successful API reload did not happen",
 		},
+		{
+			name:   "gateway is shutting down - should return StatusServiceUnavailable",
+			method: http.MethodGet,
+			setupGateway: func(gw *Gateway) {
+				gw.shuttingDown.Store(true)
+			},
+			setupHealthCheck:     func(_ *Gateway) {},
+			expectedStatus:       http.StatusServiceUnavailable,
+			expectedErrorMessage: "Gateway is shutting down",
+		},
 	}
 
 	for _, tt := range tests {

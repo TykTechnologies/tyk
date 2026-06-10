@@ -490,6 +490,9 @@
     "streaming": {
       "$ref": "#/definitions/Streaming"
     },
+    "graceful_shutdown_delay_seconds": {
+      "type": "integer"
+    },
     "allow_insecure_configs": {
       "type": "boolean"
     },
