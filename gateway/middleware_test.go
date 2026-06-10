@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/opentelemetry/metric/metrictest"
 
@@ -710,6 +712,82 @@ func TestRecordAccessLog_TraceID(t *testing.T) {
 	}
 }
 
+func TestRecordAccessLog_OriginalPath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	tests := []struct {
+		name               string
+		originalPath       string
+		expectOriginalPath bool
+	}{
+		{
+			name:               "AL-1: original_path present when context value is non-empty",
+			originalPath:       "/api/v1/users",
+			expectOriginalPath: true,
+		},
+		{
+			name:               "AL-2: original_path omitted when context value is empty",
+			originalPath:       "",
+			expectOriginalPath: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, hook := logrustest.NewNullLogger()
+
+			gwConfig := ts.Gw.GetConfig()
+			gwConfig.AccessLogs.Enabled = true
+			ts.Gw.SetConfig(gwConfig)
+
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{},
+				GlobalConfig:  gwConfig,
+			}
+
+			baseMw := &BaseMiddleware{
+				Spec:   spec,
+				Gw:     ts.Gw,
+				logger: logger.WithField("prefix", "test"),
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
+
+			if tc.originalPath != "" {
+				reqCtx := context.WithValue(req.Context(), ctxpkg.OriginalRequestPath, tc.originalPath)
+				req = req.WithContext(reqCtx)
+			}
+
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+			}
+
+			latency := analytics.Latency{
+				Total:    100,
+				Upstream: 80,
+				Gateway:  20,
+			}
+
+			baseMw.RecordAccessLog(req, resp, latency)
+
+			assert.NotEmpty(t, hook.Entries, "Expected a log entry")
+			lastEntry := hook.LastEntry()
+
+			_, hasOriginalPath := lastEntry.Data["original_path"]
+			assert.Equal(t, tc.expectOriginalPath, hasOriginalPath,
+				"original_path field presence mismatch")
+
+			if tc.expectOriginalPath {
+				assert.Equal(t, tc.originalPath, lastEntry.Data["original_path"],
+					"original_path value should match context value")
+			}
+
+			hook.Reset()
+		})
+	}
+}
+
 func TestGateway_isDisabledForMCP(t *testing.T) {
 	gw := &Gateway{}
 
@@ -1219,5 +1297,32 @@ func TestRecordAccessLog_APIType(t *testing.T) {
 
 			hook.Reset()
 		})
+	}
+}
+
+func TestBaseMiddleware_CopyNilLogger_Concurrent(t *testing.T) {
+	spec := &APISpec{}
+	proxy := ReturningHttpHandler(nil)
+	gw := &Gateway{}
+
+	bm := &BaseMiddleware{Spec: spec, Proxy: proxy, Gw: gw}
+
+	const n = 100
+	var wg sync.WaitGroup
+	wg.Add(n)
+	results := make([]*BaseMiddleware, n)
+
+	for i := 0; i < n; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			require.NotPanics(t, func() { results[i] = bm.Copy() })
+		}()
+	}
+	wg.Wait()
+
+	for i, got := range results {
+		require.NotNil(t, got, "goroutine %d", i)
+		assert.Nil(t, got.logger, "Copy of nil logger should leave logger nil (goroutine %d)", i)
 	}
 }
