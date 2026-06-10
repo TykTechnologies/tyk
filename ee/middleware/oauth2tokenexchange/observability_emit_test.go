@@ -4,6 +4,7 @@ package oauth2tokenexchange
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/oauth2common"
@@ -110,6 +112,24 @@ func erroringIdP() *httptest.Server {
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"error":             "invalid_grant",
 			"error_description": "subject token expired",
+		})
+	}))
+}
+
+// stepUpClaims is the raw claims challenge an On-Behalf-Of IdP returns under a
+// Conditional Access policy.
+const stepUpClaims = `{"access_token":{"acrs":{"essential":true,"value":"c1"}}}`
+
+// stepUpIdP returns a stub that answers an On-Behalf-Of exchange with an
+// interaction_required claims challenge instead of a token.
+func stepUpIdP() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"error":             oas.OAuth2ErrInteractionRequired,
+			"error_description": "AADSTS50076 multi-factor authentication required",
+			"claims":            stepUpClaims,
+			"authorization_uri": "https://login.microsoftonline.com/tid/oauth2/v2.0/authorize",
 		})
 	}))
 }
@@ -261,6 +281,48 @@ func TestProcessRequest_IdPErrorEmitsFailed(t *testing.T) {
 	require.NotNil(t, exch)
 	gotOutcome, _ := spanAttr(exch, spanAttrOutcome)
 	assert.Equal(t, "idp_error", gotOutcome)
+}
+
+// TestProcessRequest_StepUpRequired pins the On-Behalf-Of claims-challenge path
+// end to end: an interaction_required IdP response is rendered to the caller as a
+// terminal 401 insufficient_claims challenge (carrying the base64 claims), is
+// classified as step_up_required — not idp_error — and, with caching enabled, is
+// never written to the exchanged-token cache.
+func TestProcessRequest_StepUpRequired(t *testing.T) {
+	sr := installRecorder(t)
+	idp := stepUpIdP()
+	t.Cleanup(idp.Close)
+
+	base := newFakeBase()
+	fc := &fakeCache{items: map[string]string{}}
+	m := newMiddleware(base, fc)
+
+	p := provider("corpIdP", idp.URL, true)
+	p.Flow = oas.OAuth2FlowOnBehalfOf
+
+	rec := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "http://gw/api/tools", nil)
+	oauth2common.SetState(r, exchangeState(p))
+
+	err, _ := m.ProcessRequest(rec, r, nil)
+
+	// Rendered as a terminal 401 challenge, not proxied upstream.
+	require.Error(t, err)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	challenge := rec.Header().Get(header.WWWAuthenticate)
+	assert.Contains(t, challenge, `error="insufficient_claims"`)
+	assert.Contains(t, challenge, `claims="`+base64.StdEncoding.EncodeToString([]byte(stepUpClaims))+`"`)
+
+	// Classified as a control-flow event, not a failure.
+	require.Len(t, base.metrics, 1)
+	assert.Equal(t, "step_up_required", base.metrics[0].outcome)
+	exch := findSpan(sr.Ended(), exchangeSpanName)
+	require.NotNil(t, exch)
+	gotOutcome, _ := spanAttr(exch, spanAttrOutcome)
+	assert.Equal(t, "step_up_required", gotOutcome)
+
+	// The challenge is never cached.
+	assert.Empty(t, fc.items, "a claims challenge must never be written to the token cache")
 }
 
 // TestProcessRequest_NoMatchingProvider pins TC4: a token from an unconfigured

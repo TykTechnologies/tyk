@@ -22,6 +22,7 @@ func TestClassifyExchangeOutcome(t *testing.T) {
 		{"idp rejection", &ExchangeFailedError{Status: 400, IdpError: "invalid_grant"}, OutcomeIdPError},
 		{"actor not authorized", &ActorNotAuthorizedError{Reason: "may_act mismatch"}, OutcomeActorNotAuthorized},
 		{"missing actor token", &MissingActorTokenError{Header: "X-Actor"}, OutcomeMissingActorToken},
+		{"step up required", &StepUpRequiredError{Claims: "{}"}, OutcomeStepUpRequired},
 		{"generic error treated as idp_error", errors.New("dial tcp: connection refused"), OutcomeIdPError},
 	}
 	for _, tt := range tests {
@@ -53,4 +54,5 @@ func TestOutcomeKind_WireValues(t *testing.T) {
 	assert.Equal(t, OutcomeKind("no_matching_provider"), OutcomeNoMatchingProvider)
 	assert.Equal(t, OutcomeKind("actor_not_authorized"), OutcomeActorNotAuthorized)
 	assert.Equal(t, OutcomeKind("missing_actor_token"), OutcomeMissingActorToken)
+	assert.Equal(t, OutcomeKind("step_up_required"), OutcomeStepUpRequired)
 }

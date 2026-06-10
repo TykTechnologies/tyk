@@ -30,6 +30,10 @@ const (
 	// from the inbound request — a client-side failure that never reached the
 	// IdP, so it must not be counted as an idp_error.
 	OutcomeMissingActorToken OutcomeKind = "missing_actor_token"
+	// OutcomeStepUpRequired: an Entra On-Behalf-Of exchange returned a
+	// Conditional Access claims challenge. An expected control-flow event re-emitted
+	// to the caller as a 401 insufficient_claims challenge — not an idp_error.
+	OutcomeStepUpRequired OutcomeKind = "step_up_required"
 )
 
 // ClassifyExchangeOutcome maps an exchange result to its bounded OutcomeKind.
@@ -55,6 +59,10 @@ func ClassifyExchangeOutcome(err error) OutcomeKind {
 	var missingActor *MissingActorTokenError
 	if errors.As(err, &missingActor) {
 		return OutcomeMissingActorToken
+	}
+	var stepUp *StepUpRequiredError
+	if errors.As(err, &stepUp) {
+		return OutcomeStepUpRequired
 	}
 	return OutcomeIdPError
 }
