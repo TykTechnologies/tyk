@@ -1,8 +1,11 @@
 package log
 
 import (
+	"bytes"
 	"errors"
 	"io"
+	stdlog "log"
+	"os"
 	"testing"
 	"time"
 
@@ -197,4 +200,36 @@ func TestJSONFormatterErrorHandling(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotContains(t, string(output), "logrus_error")
 	})
+}
+
+func Test_SetupFormatter_RedirectsStandardLog(t *testing.T) {
+	_ = os.DevNull
+
+	// Save original standard log settings
+	origStdOutput := stdlog.Writer()
+	origStdFlags := stdlog.Flags()
+
+	// Save original logrus settings
+	origLogOutput := log.Out
+
+	t.Cleanup(func() {
+		stdlog.SetOutput(origStdOutput)
+		stdlog.SetFlags(origStdFlags)
+		log.SetOutput(origLogOutput)
+	})
+
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+
+	SetupFormatter(FormatText)
+
+	// Verify standard log flags are set to 0
+	assert.Equal(t, 0, stdlog.Flags())
+
+	// Write to standard log
+	stdlog.Println("hello from standard log")
+
+	// Verify the output was redirected to logrus
+	output := buf.String()
+	assert.Contains(t, output, "hello from standard log")
 }

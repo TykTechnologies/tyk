@@ -1,6 +1,7 @@
 package log
 
 import (
+	stdlog "log"
 	"os"
 	"strings"
 	"time"
@@ -70,6 +71,23 @@ func setupGlobals() {
 	rawLog.Formatter = new(RawFormatter)
 }
 
+// logrusWriter is a custom io.Writer that redirects standard library log output
+// directly to Tyk's logrus logger.
+type logrusWriter struct {
+	logger *logrus.Logger
+}
+
+func (w *logrusWriter) Write(p []byte) (n int, err error) {
+	msg := string(p)
+	// Standard log package appends a trailing newline, which we trim
+	// to avoid double newlines or empty lines in structured log outputs.
+	if len(msg) > 0 && msg[len(msg)-1] == '\n' {
+		msg = msg[:len(msg)-1]
+	}
+	w.logger.Print(msg)
+	return len(p), nil
+}
+
 func SetupFormatter(format Format) {
 	log.Formatter = NewFormatter(format)
 
@@ -77,6 +95,11 @@ func SetupFormatter(format Format) {
 	if format != FormatLegacy {
 		logrus.StandardLogger().Formatter = log.Formatter
 	}
+
+	// Redirect standard log output to Tyk's logrus logger
+	stdlog.SetOutput(&logrusWriter{logger: log})
+	// Disable standard log flags (date, time, etc.) to prevent double-timestamping
+	stdlog.SetFlags(0)
 }
 
 // Get returns the default configured logger.
