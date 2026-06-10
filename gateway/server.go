@@ -1716,7 +1716,26 @@ func (gw *Gateway) afterConfSetup() {
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	gw.initGenericEventHandlers()
-	regexp.ResetCache(time.Second*time.Duration(conf.RegexpCacheExpire), !conf.DisableRegexpCache)
+	configureAutoMaxProcs(conf.DisableAutoMaxProcs)
+
+	maxEntries := conf.RegexpCacheMaxEntries
+	if maxEntries < 0 {
+		mainLog.Warnf("regex cache: RegexpCacheMaxEntries=%d is invalid; "+
+			"use disable_regexp_cache_bound=true to opt out of size eviction. Treating as default.", maxEntries)
+		maxEntries = 0
+	}
+	if conf.DisableRegexpCacheBound {
+		mainLog.Warnf("regex cache: size eviction disabled. Risk: user-driven pattern cardinality can OOM the gateway.")
+	}
+	cacheOpts := cache.LRUOptions{
+		TTL:        time.Second * time.Duration(conf.RegexpCacheExpire),
+		MaxEntries: maxEntries,
+		Unbounded:  conf.DisableRegexpCacheBound,
+		Enabled:    !conf.DisableRegexpCache,
+		Log:        mainLog.Warnf,
+	}
+	regexp.Configure(cacheOpts)
+	httputil.ConfigurePathRegexpCache(maxEntries, conf.DisableRegexpCacheBound, mainLog.Warnf)
 
 	if conf.HealthCheckEndpointName == "" {
 		conf.HealthCheckEndpointName = "hello"

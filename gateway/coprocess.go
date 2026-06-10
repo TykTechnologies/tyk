@@ -538,11 +538,13 @@ func (h CustomMiddlewareResponseHook) Base() *BaseTykResponseHandler {
 func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) error {
 	mwDefinition := mwDef.(apidef.MiddlewareDefinition)
 
+	baseMid := &BaseMiddleware{
+		Spec: spec,
+		Gw:   h.Gw,
+	}
+	baseMid.SetName("CoProcessMiddleware")
 	h.mw = &CoProcessMiddleware{
-		BaseMiddleware: &BaseMiddleware{
-			Spec: spec,
-			Gw:   h.Gw,
-		},
+		BaseMiddleware:   baseMid,
 		HookName:         mwDefinition.Name,
 		HookType:         coprocess.HookType_Response,
 		RawBodyOnly:      mwDefinition.RawBodyOnly,
