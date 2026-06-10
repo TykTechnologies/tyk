@@ -379,23 +379,47 @@ func TestRecordCacheHit_SeparateCounter(t *testing.T) {
 	metrictest.AssertDataPointCount(t, ch, 1)
 }
 
+// TestRecordActorAcquisition_RequestsAndDuration pins that a CC actor-token
+// acquisition increments the requests counter and records the duration
+// histogram, both labelled by the bounded outcome + provider only.
+func TestRecordActorAcquisition_RequestsAndDuration(t *testing.T) {
+	inst, tp := activeProvider(t)
+	ctx := context.Background()
+
+	inst.RecordActorAcquisition(ctx, "ok", "corpIdP", 40*time.Millisecond)
+
+	reqs := tp.FindMetric(t, "tyk.oauth2.actor.requests")
+	metrictest.AssertSumWithAttrs(t, reqs, int64(1),
+		attribute.String("outcome", "ok"), attribute.String("provider", "corpIdP"))
+	metrictest.AssertDataPointCount(t, reqs, 1)
+	metrictest.AssertHistogramCount(t, tp.FindMetric(t, "tyk.oauth2.actor.duration"), uint64(1))
+}
+
+func TestRecordActorAcquisition_Noop(t *testing.T) {
+	inst := noopProvider(t)
+	require.NotPanics(t, func() {
+		inst.RecordActorAcquisition(context.Background(), "idp_error", "corpIdP", 0)
+	})
+}
+
 func TestExchangeMetricNames_Registered(t *testing.T) {
 	inst, tp := activeProvider(t)
 	ctx := context.Background()
 
 	inst.RecordExchange(ctx, "ok", "corpIdP", time.Millisecond)
 	inst.RecordCacheHit(ctx, "corpIdP")
+	inst.RecordActorAcquisition(ctx, "ok", "corpIdP", time.Millisecond)
 
 	names := tp.MetricNames()
 	for _, name := range []string{
 		"tyk.oauth2.exchange.requests",
 		"tyk.oauth2.exchange.duration",
 		"tyk.oauth2.exchange.cache_hit",
+		"tyk.oauth2.actor.requests",
+		"tyk.oauth2.actor.duration",
 	} {
 		assert.Contains(t, names, name)
 	}
-	// Actor metrics belong to a separate story — they must not appear here.
-	assert.NotContains(t, names, "tyk.oauth2.actor.requests")
 }
 
 func TestAllMetricNames_Registered(t *testing.T) {

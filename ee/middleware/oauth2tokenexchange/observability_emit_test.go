@@ -40,10 +40,11 @@ type recordedEvent struct {
 }
 
 type fakeBase struct {
-	logger    *logrus.Entry
-	metrics   []recordedMetric
-	cacheHits []string
-	events    []recordedEvent
+	logger       *logrus.Entry
+	metrics      []recordedMetric
+	actorMetrics []recordedMetric
+	cacheHits    []string
+	events       []recordedEvent
 }
 
 func newFakeBase() *fakeBase {
@@ -65,6 +66,10 @@ func (f *fakeBase) RecordExchangeMetric(_ context.Context, outcome, provider str
 
 func (f *fakeBase) RecordExchangeCacheHit(_ context.Context, provider string) {
 	f.cacheHits = append(f.cacheHits, provider)
+}
+
+func (f *fakeBase) RecordActorAcquisition(_ context.Context, outcome, provider string, d time.Duration) {
+	f.actorMetrics = append(f.actorMetrics, recordedMetric{outcome: outcome, provider: provider, duration: d})
 }
 
 // --- helpers ---
@@ -313,4 +318,39 @@ func TestProcessRequest_CacheHitOmitsIdPSpan(t *testing.T) {
 	lastEvent := base.events[len(base.events)-1]
 	assert.Equal(t, apidef.TykEvent(event.OAuth2ExchangeSucceeded), lastEvent.name)
 	assert.Equal(t, true, lastEvent.meta["oauth2_exchange_cache_hit"])
+}
+
+// TestProcessRequest_ActorDelegation_MetricAndFields pins the actor-flow
+// observability: a client_credentials acquisition records the actor metric
+// once (ok), and the exchange's log/audit meta carries the delegation fields
+// (source + actor azp + delegation_observed) — never the actor's subject.
+func TestProcessRequest_ActorDelegation_MetricAndFields(t *testing.T) {
+	sr := installRecorder(t)
+	idp := okIdP(t, 0, "downstream-app")
+	t.Cleanup(idp.Close)
+
+	actorIdP := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"access_token": "actor-tok", "expires_in": 3600})
+	}))
+	t.Cleanup(actorIdP.Close)
+
+	base := newFakeBase()
+	m := newMiddleware(base, nil)
+	p := provider("corpIdP", idp.URL, false)
+	p.ActorToken = &oas.OAuth2ActorToken{
+		Source:            oas.OAuth2ActorSourceClientCredentials,
+		ClientCredentials: &oas.OAuth2ActorClientCredentials{TokenEndpoint: actorIdP.URL, ClientID: "tyk-gateway-actor"},
+	}
+	processInTrace(t, m, exchangeState(p), sr)
+
+	require.Len(t, base.actorMetrics, 1, "the CC actor acquisition must record one actor metric")
+	assert.Equal(t, "ok", base.actorMetrics[0].outcome)
+	assert.Equal(t, "corpIdP", base.actorMetrics[0].provider)
+
+	require.Len(t, base.events, 1)
+	meta := base.events[0].meta
+	assert.Equal(t, "client_credentials", meta["oauth2_actor_source"])
+	assert.Equal(t, "tyk-gateway-actor", meta["oauth2_actor_azp"])
+	assert.Equal(t, false, meta["oauth2_delegation_observed"], "the okIdP token carries no act claim")
+	assert.NotContains(t, meta, "oauth2_act_sub")
 }

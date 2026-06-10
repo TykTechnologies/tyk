@@ -65,18 +65,21 @@ func (m *Middleware) emitObservability(ctx context.Context, st *oauth2common.Sta
 	}
 
 	payload := EventPayload{
-		TraceID:         tykotel.ExtractTraceID(ctx),
-		APIID:           st.APIID,
-		Provider:        out.ProviderName,
-		Outcome:         outcome,
-		CacheHit:        out.CacheHit,
-		DurationMS:      out.Duration.Milliseconds(),
-		IdpError:        out.IdpErrorCode,
-		IdpErrorDesc:    out.IdpErrorDesc,
-		SubjectAzp:      oauth2common.StringClaim(st.Claims, oas.OAuth2ClaimAzp),
-		ExchangedAzp:    exchangedAzp(out.ExchangedToken),
-		Audience:        out.Audience,
-		ScopesRequested: out.Scopes,
+		TraceID:            tykotel.ExtractTraceID(ctx),
+		APIID:              st.APIID,
+		Provider:           out.ProviderName,
+		Outcome:            outcome,
+		CacheHit:           out.CacheHit,
+		DurationMS:         out.Duration.Milliseconds(),
+		IdpError:           out.IdpErrorCode,
+		IdpErrorDesc:       out.IdpErrorDesc,
+		SubjectAzp:         oauth2common.StringClaim(st.Claims, oas.OAuth2ClaimAzp),
+		ExchangedAzp:       exchangedAzp(out.ExchangedToken),
+		Audience:           out.Audience,
+		ScopesRequested:    out.Scopes,
+		ActorSource:        out.ActorSource,
+		ActorAzp:           out.ActorAzp,
+		DelegationObserved: delegationObserved(out.ExchangedToken),
 	}
 
 	m.Logger().WithFields(payload.LogFields()).Info("oauth2 token exchange")
@@ -93,6 +96,24 @@ func cacheStatus(hit bool) string {
 	}
 	return cacheStatusMiss
 }
+
+// delegationObserved reports whether the exchanged token carries an RFC 8693
+// `act` claim — i.e. the IdP honoured delegation and recorded the actor in the
+// chain. Best-effort; false when the token is absent or unparseable.
+func delegationObserved(token string) bool {
+	if token == "" {
+		return false
+	}
+	claims, err := oauth2common.ParseUnverifiedClaims(token)
+	if err != nil {
+		return false
+	}
+	_, ok := claims[actClaim]
+	return ok
+}
+
+// actClaim is the RFC 8693 §4.1 delegation claim key on an exchanged token.
+const actClaim = "act"
 
 // exchangedAzp best-effort reads the authorized party of the exchanged token,
 // for the non-PII oauth2_exchanged_azp field. Returns "" when absent or
