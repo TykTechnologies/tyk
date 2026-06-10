@@ -12,26 +12,25 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
-	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
-	"github.com/TykTechnologies/tyk/pkg/errpack"
-
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	"github.com/paulbellamy/ratecounter"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -92,6 +91,10 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 				span.SetAttributes(attrs...)
 			}
 
+			if originalPath := ctxGetOriginalRequestPath(r); originalPath != "" {
+				span.SetAttributes(otel.OriginalPathSpanAttribute(originalPath))
+			}
+
 			return err, i
 		}
 	}
@@ -142,6 +145,9 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 						if len(attrs) > 0 {
 							span.SetAttributes(attrs...)
 						}
+						if originalPath := ctxGetOriginalRequestPath(r); originalPath != "" {
+							span.SetAttributes(otel.OriginalPathSpanAttribute(originalPath))
+						}
 						span.End()
 					}()
 				}
@@ -190,7 +196,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			if err != nil {
 				// Prevent double error write
 				writeResponse := true
-				if goPlugin, isGoPlugin := actualMW.(*GoPluginMiddleware); isGoPlugin && goPlugin.handler != nil || errors.Is(err, ErrResponseErrorSent) {
+				if goPlugin, isGoPlugin := actualMW.(*GoPluginMiddleware); isGoPlugin && goPlugin.handler != nil || errors.Is(err, ErrResponseErrorSent) || errors.Is(err, middleware.ErrResponseRendered) {
 					writeResponse = false
 				}
 
@@ -318,15 +324,19 @@ func NewBaseMiddleware(gw *Gateway, spec *APISpec, proxy ReturningHttpHandler, l
 	return baseMid
 }
 
-// Copy provides a new BaseMiddleware with it's own logger scope (copy).
-// The Spec, Proxy and Gw values are not copied.
+// Copy returns a BaseMiddleware with its own logger scope. Spec, Proxy and
+// Gw are shared. loggerMu guards t.logger against concurrent mutation by
+// SetName / Logger / SetRequestLogger.
 func (t *BaseMiddleware) Copy() *BaseMiddleware {
-	return &BaseMiddleware{
-		logger: t.logger.Dup(),
-		Spec:   t.Spec,
-		Proxy:  t.Proxy,
-		Gw:     t.Gw,
+	t.loggerMu.Lock()
+	logger := t.logger
+	t.loggerMu.Unlock()
+
+	var dupedLogger *logrus.Entry
+	if logger != nil {
+		dupedLogger = logger.Dup()
 	}
+	return &BaseMiddleware{logger: dupedLogger, Spec: t.Spec, Proxy: t.Proxy, Gw: t.Gw}
 }
 
 // Base serves to provide the full BaseMiddleware API. It's part of the TykMiddleware interface.
@@ -499,6 +509,7 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 	accessLog.WithAPIID(t.Spec.APIID, t.Spec.Name, t.Spec.OrgID)
 	accessLog.WithApiKey(req, hashKeys, gw.obfuscateKey)
 	accessLog.WithRequest(req, latency)
+	accessLog.WithOriginalPath(req)
 	accessLog.WithResponse(resp)
 
 	// Add error classification if present (only on error requests)
@@ -615,7 +626,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		minLength = 3
 	}
 
-	if len(key) <= minLength {
+	if len(key) < minLength {
 		return user.SessionState{IsInactive: true}, false
 	}
 
@@ -706,6 +717,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 
 	// session not found
 	session.KeyID = key
+
 	return session, false
 }
 

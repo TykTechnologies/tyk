@@ -21,6 +21,7 @@ import (
 	"github.com/lonelycode/osin"
 	"github.com/ohler55/ojg/jp"
 	"github.com/tidwall/gjson"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -358,9 +359,175 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 	session, rawKeyExists := k.CheckSessionAndIdentityForValidKey(tykId, r)
 	tykId = session.KeyID
 	if !rawKeyExists {
+		// Last fallback: the client-IdP registry. Branches 1 (OAS JWTJwksURIs)
+		// and 2 (JWTSource) return earlier when manual config is set, so manual
+		// APIs never reach this path — manual config always wins.
+		if key := k.secretFromIdPRegistry(r, token); key != nil {
+			return key, nil
+		}
 		return nil, errors.New("token invalid, key not found")
 	}
 	return []byte(session.JWTData.Secret), nil
+}
+
+// secretFromIdPRegistry resolves the signing key from the client-IdP registry.
+// It probes the per-API reverse index, picks a candidate IdP by the (unverified)
+// iss hint, and fetches the matching JWKS key by kid. On a match it records the
+// binding on the request context (never on the shared middleware struct) so the
+// scope-resolution branch can apply the binding's overrides.
+func (k *JWTMiddleware) secretFromIdPRegistry(r *http.Request, token *jwt.Token) interface{} {
+	if k.Gw == nil || k.Gw.idpRegistry == nil {
+		return nil
+	}
+	bindings := k.Gw.idpRegistry.BindingsForAPI(k.Spec.APIID)
+	if len(bindings) == 0 {
+		return nil
+	}
+
+	kid, ok := token.Header[KID].(string)
+	if !ok || kid == "" {
+		return nil // JWKS lookup needs a kid
+	}
+	iss := unverifiedIssuerHint(token)
+
+	for i := range bindings {
+		b := bindings[i]
+		if key := k.keyForBinding(b, iss, kid); key != nil {
+			ctxSetMatchedBinding(r, &b) // request context — never k
+			return key
+		}
+	}
+	return nil
+}
+
+// unverifiedIssuerHint reads the iss claim WITHOUT verification — used only to
+// choose which IdP's JWKS to try; signature verification + validateIssuer run
+// afterwards. Returns "" when there's no usable iss (then all IdPs are tried).
+func unverifiedIssuerHint(token *jwt.Token) string {
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return ""
+	}
+	if iss, ok := claims[ISS].(string); ok {
+		return iss
+	}
+	return ""
+}
+
+// keyForBinding resolves the JWKS key for a single registry binding, or nil to
+// skip it: unknown IdP, iss mismatch (empty iss walks all), or no matching kid.
+func (k *JWTMiddleware) keyForBinding(b Binding, iss, kid string) interface{} {
+	idp, ok := k.Gw.idpRegistry.IdP(b.IdPID)
+	if !ok {
+		return nil
+	}
+	if iss != "" && idp.Issuer != iss {
+		return nil
+	}
+	return k.fetchJWKSKey(idp.JWKSURI, kid)
+}
+
+// fetchJWKSKey resolves a JWKS key by kid, keyed purely on the URL. It is
+// deliberately not getSecretFromURL: that function's cache-hit path is gated on
+// decode(Spec.JWTSource) == url, which is always false for a registry URL
+// (Spec.JWTSource == ""), so it would refetch the JWKS on every request.
+//
+// Security: url is the IdP's jwks_uri from the admin-controlled client-IdP
+// registry (Dashboard/MDCB) — the same trust domain and HTTP client
+// (ExternalHTTPClientFactory) as the existing JWTSource/JWTJwksURIs fetches, so
+// it inherits their SSRF posture rather than introducing a new one. We require
+// an http(s) scheme here to reject non-HTTP vectors (file://, gopher://, ...);
+// host-level egress restrictions are intentionally NOT applied because DCR IdPs
+// (e.g. an internal Keycloak) legitimately live on private networks.
+func (k *JWTMiddleware) fetchJWKSKey(url, kid string) interface{} {
+	if url == "" || kid == "" {
+		return nil
+	}
+	if !httpScheme.MatchString(url) {
+		k.Logger().Warnf("Ignoring non-HTTP client-IdP JWKS URI")
+		return nil
+	}
+	jwkCache := k.loadOrCreateJWKCache() // per-API cache; URL-keyed inside
+
+	if key := keyFromJWKSet(cachedJWKSet(jwkCache, url), kid); key != nil {
+		return key
+	}
+
+	// Coalesce concurrent fetches for the same (API, URL) so a burst of requests
+	// on a cold/expired cache triggers a single network fetch instead of a
+	// thundering herd against the IdP's JWKS endpoint. Keyed by APIID so each
+	// API's per-API cache stays coherent.
+	res, err, _ := jwksFetchGroup.Do(k.Spec.APIID+"|"+url, func() (interface{}, error) {
+		set, fetchErr := k.fetchAndCacheJWKS(url, jwkCache)
+		return set, fetchErr
+	})
+
+	if err != nil {
+		// x5c PEM fallback (mirrors getSecretFromMultipleJWKURIs); rare error path.
+		if key, legacyErr := k.legacyGetSecretFromURL(url, kid, k.Spec.JWTSigningMethod); legacyErr == nil {
+			return key
+		}
+		k.Gw.logJWKError(k.Logger(), url, err)
+		return nil
+	}
+
+	set, ok := res.(*jose.JSONWebKeySet)
+	if !ok {
+		return nil
+	}
+	return keyFromJWKSet(set, kid)
+}
+
+// jwksFetchGroup coalesces concurrent client-IdP JWKS fetches per (API, URL).
+var jwksFetchGroup singleflight.Group
+
+// keyFromJWKSet returns the public key for kid from set, or nil if set is nil or
+// the kid is absent (e.g. JWKS cached before a key rotation).
+func keyFromJWKSet(set *jose.JSONWebKeySet, kid string) interface{} {
+	if set == nil {
+		return nil
+	}
+	if keys := set.Key(kid); len(keys) > 0 {
+		return keys[0].Key
+	}
+	return nil
+}
+
+// cachedJWKSet returns the cached JWKS for url, or nil on a miss / unexpected
+// cache value type.
+func cachedJWKSet(jwkCache cache.Repository, url string) *jose.JSONWebKeySet {
+	if raw, ok := jwkCache.Get(url); ok {
+		if set, isSet := raw.(*jose.JSONWebKeySet); isSet {
+			return set
+		}
+	}
+	return nil
+}
+
+// fetchAndCacheJWKS fetches the JWKS at url (factory client, then plain-client
+// fallback) and caches it. Runs inside the single-flight, so it re-checks the
+// cache first in case a prior in-flight fetch already populated it.
+func (k *JWTMiddleware) fetchAndCacheJWKS(url string, jwkCache cache.Repository) (*jose.JSONWebKeySet, error) {
+	if set := cachedJWKSet(jwkCache, url); set != nil {
+		return set, nil
+	}
+
+	var (
+		jwkSet *jose.JSONWebKeySet
+		err    error
+	)
+	client, clientErr := NewExternalHTTPClientFactory(k.Gw).CreateJWKClient()
+	if clientErr == nil {
+		jwkSet, err = getJWKWithClient(url, client)
+	}
+	if clientErr != nil || err != nil {
+		jwkSet, err = GetJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+	}
+	if err != nil {
+		return nil, err
+	}
+	jwkCache.Set(url, jwkSet, cache.DefaultExpiration)
+	return jwkSet, nil
 }
 
 var GetJWK = getJWK
@@ -855,15 +1022,14 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 	}
 
-	// apply policies from scope if scope-to-policy mapping is specified for this API
-	if len(k.Spec.GetScopeToPolicyMapping()) != 0 {
-		scopeClaimName := k.Spec.GetScopeClaimName()
-		if k.Spec.IsOAS {
-			scopeClaimName = k.getScopeClaimNameOAS(claims)
-		}
-		if scopeClaimName == "" {
-			scopeClaimName = "scope"
-		}
+	// apply policies from scope if scope-to-policy mapping is specified for this
+	// API. The manual API-def map is merged with any matched registry binding
+	// (manual wins on collision, binding fills gaps). With no binding this
+	// returns the manual map unchanged — byte-identical for manual APIs.
+	binding := ctxGetMatchedBinding(r)
+	scopeMap := scopeToPolicyMapForRequest(k.Spec.GetScopeToPolicyMapping(), binding)
+	if len(scopeMap) != 0 {
+		scopeClaimName := k.scopeClaimNameForRequest(claims, binding)
 
 		if scope := getScopeFromClaim(claims, scopeClaimName); len(scope) > 0 {
 			// Start with base policy if it exists
@@ -878,7 +1044,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 
 			// add all policies matched from scope-policy mapping
-			mappedPolIDs := mapScopeToPolicies(k.Spec.GetScopeToPolicyMapping(), scope)
+			mappedPolIDs := mapScopeToPolicies(scopeMap, scope)
 			if len(mappedPolIDs) > 0 {
 				k.Logger().Debugf("Identified policy(s) to apply to this token from scope claim: %s", scopeClaimName)
 			} else {
@@ -920,7 +1086,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			k.reportLoginFailure(baseFieldData, r)
 			k.Logger().Error("No policies could be determined from token (no base policy, no valid scopes)")
 			return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
-		} else if exists && len(k.Spec.GetScopeToPolicyMapping()) == 0 {
+		} else if exists && len(scopeMap) == 0 {
 			k.reportLoginFailure(baseFieldData, r)
 			k.Logger().Error("Existing session requires policy in token when no defaults configured")
 			return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
@@ -998,10 +1164,37 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	return nil, http.StatusOK
 }
 
+// scopeClaimNameForRequest resolves the JWT claim that holds the OAuth scopes.
+// Manual API-def config wins (Classic GetScopeClaimName or OAS); an empty value
+// falls back to the matched registry binding's IdP scope_claim_name (e.g. "scp"
+// for Entra/Azure AD), then to the conventional "scope" claim. The fallback only
+// fires when the API def sets nothing, so manual config stays byte-identical.
+func (k *JWTMiddleware) scopeClaimNameForRequest(claims jwt.MapClaims, binding *Binding) string {
+	name := k.Spec.GetScopeClaimName()
+	if k.Spec.IsOAS {
+		name = k.getScopeClaimNameOAS(claims)
+	}
+	if name == "" && binding != nil {
+		name = binding.ScopeClaimName
+	}
+	if name == "" {
+		name = "scope"
+	}
+	return name
+}
+
 func (k *JWTMiddleware) getScopeClaimNameOAS(claims jwt.MapClaims) string {
-	claimNames := k.Spec.OAS.GetJWTConfiguration().Scopes.Claims
-	if len(claimNames) == 0 && k.Spec.OAS.GetJWTConfiguration().Scopes.ClaimName != "" {
-		claimNames = []string{k.Spec.OAS.GetJWTConfiguration().Scopes.ClaimName}
+	// A registry-resolved OAS API has no JWT configuration in its OAS def, so
+	// GetJWTConfiguration() (and its Scopes) can be nil — the scope claim name
+	// then falls back to the default ("scope") in the caller.
+	jwtConfig := k.Spec.OAS.GetJWTConfiguration()
+	if jwtConfig == nil || jwtConfig.Scopes == nil {
+		return ""
+	}
+
+	claimNames := jwtConfig.Scopes.Claims
+	if len(claimNames) == 0 && jwtConfig.Scopes.ClaimName != "" {
+		claimNames = []string{jwtConfig.Scopes.ClaimName}
 	}
 	for _, claimName := range claimNames {
 		for k := range claims {
@@ -1111,8 +1304,13 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		// Are we mapping to a central JWT Secret?
 		hasJWTSource := k.Spec.JWTSource != ""
 		hasJwksURIs := len(k.Spec.JWTJwksURIs) > 0
+		// Registry-resolved tokens are conceptually centralised (external IdP);
+		// without this third condition a registry-only API would fall to
+		// processOneToOneTokenMap and the binding's scope→policy overrides would
+		// never apply.
+		hasRegistryBinding := ctxGetMatchedBinding(r) != nil
 
-		if hasJWTSource || hasJwksURIs {
+		if hasJWTSource || hasJwksURIs || hasRegistryBinding {
 			return k.processCentralisedJWT(r, token)
 		}
 
