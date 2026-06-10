@@ -4,8 +4,10 @@ package oauth2tokenexchange
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -47,6 +49,9 @@ type fakeBase struct {
 	actorMetrics []recordedMetric
 	cacheHits    []string
 	events       []recordedEvent
+	// cert is returned by GetClientCertificate; certErr overrides it when set.
+	cert    *tls.Certificate
+	certErr error
 }
 
 func newFakeBase() *fakeBase {
@@ -72,6 +77,16 @@ func (f *fakeBase) RecordExchangeCacheHit(_ context.Context, provider string) {
 
 func (f *fakeBase) RecordActorAcquisition(_ context.Context, outcome, provider string, d time.Duration) {
 	f.actorMetrics = append(f.actorMetrics, recordedMetric{outcome: outcome, provider: provider, duration: d})
+}
+
+func (f *fakeBase) GetClientCertificate(certID string) (*tls.Certificate, error) {
+	if f.certErr != nil {
+		return nil, f.certErr
+	}
+	if f.cert == nil {
+		return nil, fmt.Errorf("certificate %q not found", certID)
+	}
+	return f.cert, nil
 }
 
 // --- helpers ---

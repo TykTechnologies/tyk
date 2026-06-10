@@ -303,6 +303,12 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 
 	form := buildExchangeForm(provider, subjectToken, actorToken, target, method)
 
+	if method == oas.OAuth2ClientAuthPrivateKeyJWT {
+		if err := m.addClientAssertion(form, provider); err != nil {
+			return "", 0, err
+		}
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.TokenEndpoint, strings.NewReader(form.Encode()))
 	if err != nil {
 		return "", 0, fmt.Errorf("building exchange request: %w", err)
@@ -417,8 +423,9 @@ func addPostClientCredentials(form url.Values, provider *oas.OAuth2TokenExchange
 // no-op for that method; basic (the default) sets the Authorization header.
 func applyClientAuth(req *http.Request, provider *oas.OAuth2TokenExchangeProvider, method string) error {
 	switch method {
-	case oas.OAuth2ClientAuthPost:
-		// credentials already injected into form
+	case oas.OAuth2ClientAuthPost, oas.OAuth2ClientAuthPrivateKeyJWT:
+		// credentials already injected into the form (client_secret_post or the
+		// signed private_key_jwt client_assertion).
 	case "", oas.OAuth2ClientAuthBasic:
 		if provider.ClientAuth != nil && provider.ClientAuth.ClientID != "" {
 			req.SetBasicAuth(provider.ClientAuth.ClientID, provider.ClientAuth.ClientSecret)

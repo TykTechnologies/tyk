@@ -4,6 +4,7 @@ package oauth2tokenexchange
 
 import (
 	"context"
+	"crypto/tls"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -38,6 +39,11 @@ type BaseMiddleware interface {
 	// histogram), labelled by outcome + provider. Cache-served actor tokens
 	// are not recorded — the counter reads actual IdP load.
 	RecordActorAcquisition(ctx context.Context, outcome, provider string, d time.Duration)
+
+	// GetClientCertificate returns the certificate (with private key) stored
+	// under certID, used to sign a private_key_jwt client assertion. Errors
+	// when the store is unavailable or the certificate is not found.
+	GetClientCertificate(certID string) (*tls.Certificate, error)
 }
 
 // EffectiveIdPTimeout returns d, falling back to DefaultIdPTimeout when d is zero.

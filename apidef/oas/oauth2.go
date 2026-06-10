@@ -351,12 +351,19 @@ type OAuth2ClientAuth struct {
 	//     HTTP Authorization header.
 	//   - "client_secret_post" (RFC 6749 §2.3.1) — credentials in the
 	//     form body.
+	//   - "private_key_jwt" (OIDC Core §9) — a signed client-assertion JWT
+	//     authenticated by a certificate referenced via CertID; no shared
+	//     secret. Required for Microsoft Entra certificate login.
 	// Empty string defaults to client_secret_basic.
 	Method string `bson:"method,omitempty" json:"method,omitempty"`
 	// ClientID is the OAuth2 client identifier Tyk presents to the IdP token endpoint.
 	ClientID string `bson:"clientId,omitempty" json:"clientId,omitempty"`
 	// ClientSecret accepts env://, secrets://, vault://, consul:// prefixes.
 	ClientSecret string `bson:"clientSecret,omitempty" json:"clientSecret,omitempty"`
+	// CertID references a certificate (with private key) in the gateway
+	// certificate store used to sign the private_key_jwt client assertion.
+	// Required when Method is private_key_jwt; ignored otherwise.
+	CertID string `bson:"certId,omitempty" json:"certId,omitempty"`
 }
 
 // OAuth2DefaultTarget is the fallback audience and scopes when no per-op override is set.
@@ -456,8 +463,12 @@ const (
 	OAuth2RequestedTokenUseOBO  = "on_behalf_of"
 
 	// OAuth2ClientAuth.Method values.
-	OAuth2ClientAuthBasic = "client_secret_basic"
-	OAuth2ClientAuthPost  = "client_secret_post"
+	OAuth2ClientAuthBasic         = "client_secret_basic"
+	OAuth2ClientAuthPost          = "client_secret_post"
+	OAuth2ClientAuthPrivateKeyJWT = "private_key_jwt"
+
+	// client_assertion_type value for the private_key_jwt method (RFC 7523 §2.2).
+	OAuth2ClientAssertionTypeJWTBearer = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 
 	// OAuth2ExchangeCache.Mode values.
 	OAuth2CacheModeDerived = "derived"
@@ -586,6 +597,9 @@ func validateOAuth2ExchangeProvider(schemeName string, i int, p *OAuth2TokenExch
 	if p.ClientAuth == nil || p.ClientAuth.ClientID == "" {
 		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q has empty clientAuth.clientId", schemeName, p.Name)
 	}
+	if err := validateExchangeClientAuth(schemeName, p); err != nil {
+		return err
+	}
 	if err := validateExchangeIssuers(schemeName, p, issuerOwner); err != nil {
 		return err
 	}
@@ -676,6 +690,26 @@ func validateExchangeTokenEndpoint(schemeName string, p *OAuth2TokenExchangeProv
 		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q tokenEndpoint must be an absolute http(s) URL", schemeName, p.Name)
 	}
 	return nil
+}
+
+// validateExchangeClientAuth validates the client-authentication method.
+// Secret methods (basic/post, and the empty default) are accepted as-is;
+// private_key_jwt additionally requires a certId to sign the client assertion;
+// any other method is rejected at config load rather than at the first call.
+func validateExchangeClientAuth(schemeName string, p *OAuth2TokenExchangeProvider) error {
+	switch p.ClientAuth.Method {
+	case "", OAuth2ClientAuthBasic, OAuth2ClientAuthPost:
+		return nil
+	case OAuth2ClientAuthPrivateKeyJWT:
+		if p.ClientAuth.CertID == "" {
+			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q clientAuth.method %q requires a certId to sign the client assertion",
+				schemeName, p.Name, OAuth2ClientAuthPrivateKeyJWT)
+		}
+		return nil
+	default:
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q clientAuth.method %q is invalid; valid values are %q, %q and %q",
+			schemeName, p.Name, p.ClientAuth.Method, OAuth2ClientAuthBasic, OAuth2ClientAuthPost, OAuth2ClientAuthPrivateKeyJWT)
+	}
 }
 
 // validateExchangeIssuers rejects an issuer claimed by more than one provider
