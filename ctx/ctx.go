@@ -67,6 +67,8 @@ const (
 	JSONRPCRoutingState
 	// MCPRouting indicates the request came via MCP JSON-RPC routing
 	MCPRouting
+	// OriginalRequestPath stores the original request path before any middleware modifications
+	OriginalRequestPath
 	// MCPMethod stores the JSON-RPC method name for MCP metrics dimensions.
 	MCPMethod
 	// MCPPrimitiveType stores the MCP primitive type (tool/resource/prompt) for metrics dimensions.

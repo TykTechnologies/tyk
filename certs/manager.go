@@ -91,7 +91,7 @@ type CertificateManagerIdGetter interface {
 
 type certificateManager struct {
 	IdGetter
-	storage                  storage.Handler
+	storage                  StorageHandler
 	logger                   *logrus.Entry
 	cache                    cache.Repository
 	secret                   string
@@ -135,6 +135,18 @@ func WithBackoffIntervals(maxElapsed, initial, max time.Duration) CertificateMan
 	}
 }
 
+type StorageHandler interface {
+	storage.GetKeyHandler
+	storage.SetKeyHandler
+	storage.GetKeysHandler
+	storage.RemoveFromListHandler
+	storage.AppendToSetHandler
+	storage.ExistsHandler
+	storage.GetListRangeHandler
+	storage.DeleteKeyHandler
+	storage.DeleteScanMatchHandler
+}
+
 // NewCertificateManager creates a certificate manager with optional retry configuration.
 // Maintains backward compatibility: calling without options uses defaults.
 //
@@ -148,7 +160,7 @@ func WithBackoffIntervals(maxElapsed, initial, max time.Duration) CertificateMan
 //	    WithRetryEnabled(true),
 //	    WithMaxRetries(10),
 //	    WithBackoffIntervals(60*time.Second, 200*time.Millisecond, 5*time.Second))
-func NewCertificateManager(storageHandler storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
+func NewCertificateManager(storageHandler StorageHandler, secret string, logger *logrus.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
 		logger = tyklog.Get()
 	}

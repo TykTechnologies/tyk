@@ -323,7 +323,9 @@ type AccessLogsConfig struct {
 	//
 	// Template Options:
 	//
+	// - `api_id` will include the API ID.
 	// - `api_key` will include the obfuscated or hashed key.
+	// - `api_name` will include the API name.
 	// - `circuit_breaker_state` will include the circuit breaker state when applicable.
 	// - `client_ip` will include the IP of the request.
 	// - `error_source` will include the source of an error (e.g., ReverseProxy).
@@ -333,6 +335,7 @@ type AccessLogsConfig struct {
 	// - `latency_total` will include the total latency of the request.
 	// - `method` will include the request method.
 	// - `org_id` will include the organization ID.
+	// - `original_path` will include the original request path before URL rewrites.
 	// - `path` will include the path of the request.
 	// - `protocol` will include the protocol of the request.
 	// - `remote_addr` will include the remote address of the request.
@@ -1117,6 +1120,10 @@ type Config struct {
 	// GracefulShutdownTimeoutDuration sets how many seconds the gateway should wait for an existing connection
 	//to finish before shutting down the server. Defaults to 30 seconds.
 	GracefulShutdownTimeoutDuration int `json:"graceful_shutdown_timeout_duration"`
+
+	// GracefulShutdownDelaySeconds sets how many seconds the gateway will wait before proceeding with a graceful shutdown.
+	// During delay and shutdown the readiness endpoint will respond with 503 StatusServiceUnavailable.
+	GracefulShutdownDelaySeconds int `json:"graceful_shutdown_delay_seconds"`
 
 	// Change the expiry time of a refresh token. By default 14 days (in seconds).
 	OauthRefreshExpire int64 `json:"oauth_refresh_token_expire"`
