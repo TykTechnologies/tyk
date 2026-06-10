@@ -1543,6 +1543,12 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 		return resp, code
 	}
 
+	if !spec.IsMCPManaged() {
+		if pairedProxyIDs := gw.pairedMCPProxyIDsReferencingRESTSource(apiID); len(pairedProxyIDs) > 0 {
+			return apiError("API is referenced by paired MCP proxies: " + strings.Join(pairedProxyIDs, ", ")), http.StatusConflict
+		}
+	}
+
 	fs := afero.NewOsFs()
 
 	if spec.IsOAS {

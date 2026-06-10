@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	"github.com/TykTechnologies/tyk/internal/mcp"
@@ -24,6 +25,8 @@ const (
 	headerContentType       = "Content-Type"
 	httpHeaderContentLength = "Content-Length"
 )
+
+const syntheticJSONRPCMethodReadLimit = 1 << 20
 
 // JSONRPCMiddleware handles JSON-RPC 2.0 request detection and routing.
 // When a client sends a JSON-RPC request to a JSON-RPC endpoint, the middleware detects it,
@@ -171,6 +174,10 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, http.StatusOK
 	}
 
+	if m.Spec.IsSyntheticMCPAdapter() {
+		return m.processSyntheticMCPAdapterRequest(w, r)
+	}
+
 	// Validate request type
 	if !m.validateJSONRPCRequest(r) {
 		return nil, http.StatusOK
@@ -291,5 +298,165 @@ func (m *JSONRPCMiddleware) mapJSONRPCErrorToHTTP(code int) int {
 		return http.StatusForbidden
 	default:
 		return http.StatusInternalServerError
+	}
+}
+
+//nolint:staticcheck // ST1008: middleware helper mirrors ProcessRequest's (error, int) convention.
+func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWriter, r *http.Request) (error, int) {
+	if m.Spec == nil || m.Spec.MCPAdapter.SDKAdapter == nil {
+		http.Error(w, "REST-as-MCP adapter is not initialized", http.StatusInternalServerError)
+		return nil, middleware.StatusRespond
+	}
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return nil, middleware.StatusRespond
+	}
+
+	method := syntheticJSONRPCMethod(r)
+	normaliseMCPStreamableAccept(r)
+	installMCPAdapterCallContext(r, m.Gw, m.Spec)
+
+	if method == mcp.MethodToolsList {
+		rec := newBufferedResponseWriter()
+		m.Spec.MCPAdapter.SDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(rec, r)
+		view, ok := m.syntheticMCPToolViewForCaller(r)
+		m.writeSyntheticMCPToolsListResponse(w, r, rec, view, ok)
+		return nil, middleware.StatusRespond
+	}
+
+	m.Spec.MCPAdapter.SDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(w, r)
+	return nil, middleware.StatusRespond
+}
+
+func syntheticJSONRPCMethod(r *http.Request) string {
+	if r == nil || r.Method != http.MethodPost || r.Body == nil {
+		return ""
+	}
+	if state := httpctx.GetJSONRPCRoutingState(r); state != nil && state.Method != "" {
+		return state.Method
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, syntheticJSONRPCMethodReadLimit+1))
+	r.Body = prefixedReadCloser{
+		Reader: io.MultiReader(bytes.NewReader(body), r.Body),
+		Closer: r.Body,
+	}
+	if err != nil {
+		return ""
+	}
+	if len(body) > syntheticJSONRPCMethodReadLimit {
+		return ""
+	}
+
+	var req JSONRPCRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		return ""
+	}
+	return req.Method
+}
+
+type prefixedReadCloser struct {
+	io.Reader
+	io.Closer
+}
+
+func normaliseMCPStreamableAccept(r *http.Request) {
+	if r == nil {
+		return
+	}
+	accept := r.Header.Get("Accept")
+	if strings.Contains(accept, "application/json") && strings.Contains(accept, "text/event-stream") {
+		return
+	}
+	r.Header.Set("Accept", "application/json, text/event-stream")
+}
+
+func (m *JSONRPCMiddleware) syntheticMCPToolViewForCaller(r *http.Request) (oas.MCPToolView, bool) {
+	callerProxyID := ctxGetMCPAdapterCallerProxyID(r)
+	if callerProxyID == "" || m.Spec == nil || m.Spec.MCPAdapter.ToolViews == nil {
+		return oas.MCPToolView{}, false
+	}
+	view, ok := m.Spec.MCPAdapter.ToolViews[callerProxyID]
+	return view, ok
+}
+
+func (m *JSONRPCMiddleware) writeSyntheticMCPToolsListResponse(w http.ResponseWriter, r *http.Request, rec *bufferedResponseWriter, view oas.MCPToolView, filter bool) {
+	body := rec.body.Bytes()
+	if filter && rec.statusCode < http.StatusBadRequest {
+		rewritten, err := rewriteMCPToolsListResponse(body, view)
+		if err != nil {
+			m.Logger().WithError(err).Warn("failed to rewrite REST-as-MCP tools/list response")
+			m.writeJSONRPCError(w, r, nil, mcp.JSONRPCInternalError, "Internal error", nil)
+			return
+		}
+		body = rewritten
+	}
+	rec.writeTo(w, body)
+}
+
+func rewriteMCPToolsListResponse(body []byte, view oas.MCPToolView) ([]byte, error) {
+	var envelope map[string]any
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, err
+	}
+	result, ok := envelope["result"].(map[string]any)
+	if !ok {
+		return body, nil
+	}
+	result["tools"] = view.Tools
+	return json.Marshal(envelope)
+}
+
+// bufferedResponseWriter is intentionally local to synthetic REST-as-MCP
+// tools/list handling. It captures only the response pieces we need to rewrite
+// SDK JSON responses before forwarding them to the caller.
+type bufferedResponseWriter struct {
+	header      http.Header
+	body        bytes.Buffer
+	statusCode  int
+	wroteHeader bool
+}
+
+func newBufferedResponseWriter() *bufferedResponseWriter {
+	return &bufferedResponseWriter{
+		header:     http.Header{},
+		statusCode: http.StatusOK,
+	}
+}
+
+func (w *bufferedResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *bufferedResponseWriter) WriteHeader(statusCode int) {
+	if w.wroteHeader {
+		return
+	}
+	w.statusCode = statusCode
+	w.wroteHeader = true
+}
+
+func (w *bufferedResponseWriter) Write(data []byte) (int, error) {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.body.Write(data)
+}
+
+func (w *bufferedResponseWriter) Flush() {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func (w *bufferedResponseWriter) writeTo(dst http.ResponseWriter, body []byte) {
+	for key, values := range w.header {
+		for _, value := range values {
+			dst.Header().Add(key, value)
+		}
+	}
+	dst.WriteHeader(w.statusCode)
+	if _, err := dst.Write(body); err != nil {
+		log.WithError(err).Debug("failed to write REST-as-MCP response")
 	}
 }

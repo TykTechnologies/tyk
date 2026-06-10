@@ -24,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
+	restmcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
 
 	_ "github.com/TykTechnologies/tyk/internal/mcp" // registers MCP VEM prefixes
 )
@@ -82,6 +83,10 @@ type APISpec struct {
 	// Value: VEM path (e.g., "/mcp-tool:get-weather")
 	MCPPrimitives map[string]string
 
+	// MCPAdapter holds runtime-only REST-as-MCP synthetic adapter state. It is
+	// never extracted to/persisted from API definitions or OAS documents.
+	MCPAdapter MCPAdapterRuntime
+
 	JSONRPCRouter jsonrpc.Router
 
 	// OperationsAllowListEnabled is true if any JSON-RPC operation (method-level) has
@@ -109,6 +114,17 @@ type APISpec struct {
 	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
 	// Built from apidef.ErrorOverrides during gateway startup.
 	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
+}
+
+// MCPAdapterRuntime groups runtime-only state for a synthetic REST-as-MCP
+// adapter API.
+type MCPAdapterRuntime struct {
+	Synthetic                bool
+	SourceRESTAPIID          string
+	SDKAdapter               *restmcpadapter.SDKAdapter
+	AllowedCallerProxyAPIIDs []string
+	ToolViews                map[string]oas.MCPToolView
+	UnionTools               []oas.DerivedTool
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
@@ -435,4 +451,10 @@ func (a *APISpec) APIType() string {
 	default:
 		return "classic"
 	}
+}
+
+// IsSyntheticMCPAdapter reports whether this spec is a hidden runtime-only
+// adapter synthesized for a REST-as-MCP proxy/source pairing.
+func (a *APISpec) IsSyntheticMCPAdapter() bool {
+	return a != nil && a.MCPAdapter.Synthetic
 }
