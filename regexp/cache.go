@@ -2,88 +2,121 @@ package regexp
 
 import (
 	"regexp"
+	"sync/atomic"
 	"time"
 
-	gocache "github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/hashicorp/golang-lru/v2/expirable"
+
+	internalcache "github.com/TykTechnologies/tyk/internal/cache"
 )
 
 const (
-	defaultCacheItemTTL         = 60 * time.Second
-	defaultCacheCleanupInterval = 5 * time.Minute
-
-	maxKeySize   = 1024
-	maxValueSize = 2048
+	maxKeySize             = 1024
+	maxValueSize           = 2048
+	defaultCacheMaxEntries = internalcache.DefaultLRUMaxEntries
 )
 
+// cache wraps an expirable.LRU.
 type cache struct {
-	*gocache.Cache
+	lru         *expirable.LRU[string, any]
+	isEnabled   atomic.Bool
+	onSizeEvict func()
+}
 
-	isEnabled bool
-	ttl       time.Duration
+// evictionReporter records the number of entries evicted from a named cache.
+// Implementations must be safe for concurrent use.
+type evictionReporter interface {
+	Record(bucket string)
 }
 
 func newCache(ttl time.Duration, isEnabled bool) *cache {
-	return &cache{
-		Cache:     gocache.NewCache(ttl, defaultCacheCleanupInterval),
-		isEnabled: isEnabled,
-		ttl:       ttl,
+	return newCacheWithSize(ttl, defaultCacheMaxEntries, isEnabled, "", nil)
+}
+
+func newCacheWithSize(ttl time.Duration, maxEntries int, isEnabled bool, name string, reporter evictionReporter) *cache {
+	if maxEntries < 0 {
+		maxEntries = 0
 	}
+
+	var onSizeEvict func()
+	if reporter != nil {
+		onSizeEvict = func() { reporter.Record(name) }
+	}
+
+	c := &cache{
+		lru:         expirable.NewLRU[string, any](maxEntries, nil, ttl),
+		onSizeEvict: onSizeEvict,
+	}
+
+	c.isEnabled.Store(isEnabled)
+
+	return c
 }
 
 func (c *cache) enabled() bool {
-	return c.isEnabled && c.Cache != nil
+	return c.isEnabled.Load()
 }
 
-func (c *cache) add(key string, value interface{}) {
-	c.Set(key, value, c.ttl)
+func (c *cache) add(key string, value any) {
+	if c.lru.Add(key, value) && c.onSizeEvict != nil {
+		c.onSizeEvict()
+	}
 }
 
+// getRegexp returns the cached *regexp.Regexp shared across all callers.
+// Callers must not mutate it (e.g. via Longest()); read-only methods are
+// safe for concurrent use since Go 1.12.
 func (c *cache) getRegexp(key string) (*regexp.Regexp, bool) {
-	if val, found := c.Get(key); found {
-		return val.(*regexp.Regexp).Copy(), true
+	if v, ok := c.lru.Get(key); ok {
+		if r, ok := v.(*regexp.Regexp); ok {
+			return r, true
+		}
 	}
 
 	return nil, false
 }
 
 func (c *cache) getString(key string) (string, bool) {
-	if val, found := c.Get(key); found {
-		return val.(string), true
+	if v, ok := c.lru.Get(key); ok {
+		if s, ok := v.(string); ok {
+			return s, true
+		}
 	}
 
 	return "", false
 }
 
 func (c *cache) getStrSlice(key string) ([]string, bool) {
-	if val, found := c.Get(key); found {
-		return val.([]string), true
+	if v, ok := c.lru.Get(key); ok {
+		if s, ok := v.([]string); ok {
+			return s, true
+		}
 	}
 
 	return []string{}, false
 }
 
 func (c *cache) getStrSliceOfSlices(key string) ([][]string, bool) {
-	if val, found := c.Get(key); found {
-		return val.([][]string), true
+	if v, ok := c.lru.Get(key); ok {
+		if s, ok := v.([][]string); ok {
+			return s, true
+		}
 	}
 
 	return [][]string{}, false
 }
 
 func (c *cache) getBool(key string) (bool, bool) {
-	if val, found := c.Get(key); found {
-		return val.(bool), true
+	if v, ok := c.lru.Get(key); ok {
+		if b, ok := v.(bool); ok {
+			return b, true
+		}
 	}
 
 	return false, false
 }
 
-func (c *cache) reset(ttl time.Duration, isEnabled bool) {
-	if c.Cache == nil {
-		return
-	}
-
-	c.isEnabled = isEnabled
-	c.ttl = ttl
-	c.Flush()
+func (c *cache) reset(isEnabled bool) {
+	c.isEnabled.Store(isEnabled)
+	c.lru.Purge()
 }
