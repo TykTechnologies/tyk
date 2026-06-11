@@ -473,20 +473,6 @@ func (mr *MockHandlerMockRecorder) SetKey(arg0, arg1, arg2 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetKey", reflect.TypeOf((*MockHandler)(nil).SetKey), arg0, arg1, arg2)
 }
 
-// SetKeyEx mocks base method.
-func (m *MockHandler) SetKeyEx(arg0, arg1 string, arg2 int64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetKeyEx", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetKeyEx indicates an expected call of SetKeyEx.
-func (mr *MockHandlerMockRecorder) SetKeyEx(arg0, arg1, arg2 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetKeyEx", reflect.TypeOf((*MockHandler)(nil).SetKeyEx), arg0, arg1, arg2)
-}
-
 // SetRawKey mocks base method.
 func (m *MockHandler) SetRawKey(arg0, arg1 string, arg2 int64) error {
 	m.ctrl.T.Helper()
@@ -499,20 +485,6 @@ func (m *MockHandler) SetRawKey(arg0, arg1 string, arg2 int64) error {
 func (mr *MockHandlerMockRecorder) SetRawKey(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetRawKey", reflect.TypeOf((*MockHandler)(nil).SetRawKey), arg0, arg1, arg2)
-}
-
-// SetRawKeyEx mocks base method.
-func (m *MockHandler) SetRawKeyEx(arg0, arg1 string, arg2 int64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetRawKeyEx", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetRawKeyEx indicates an expected call of SetRawKeyEx.
-func (mr *MockHandlerMockRecorder) SetRawKeyEx(arg0, arg1, arg2 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetRawKeyEx", reflect.TypeOf((*MockHandler)(nil).SetRawKeyEx), arg0, arg1, arg2)
 }
 
 // SetRollingWindow mocks base method.

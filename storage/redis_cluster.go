@@ -33,10 +33,6 @@ var (
 	ErrStorageConn = fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
 )
 
-var (
-	_ Handler = (*RedisCluster)(nil)
-)
-
 // RedisCluster is a storage manager that uses the redis database.
 type RedisCluster struct {
 	KeyPrefix   string
@@ -55,23 +51,6 @@ type RedisCluster struct {
 	listStorage      model.List
 	setStorage       model.Set
 	sortedSetStorage model.SortedSet
-}
-
-// SetKeyEx will update a key value in the store if value already exist.
-func (r *RedisCluster) SetKeyEx(keyName, session string, timeout int64) error {
-	return r.SetRawKeyEx(r.fixKey(keyName), session, timeout)
-}
-
-// SetRawKeyEx will update a raw key value in the store if value already exist.
-func (r *RedisCluster) SetRawKeyEx(keyName, session string, timeout int64) error {
-	storage, err := r.kv()
-
-	if err != nil {
-		return err
-	}
-
-	_, err = storage.SetIfExist(context.Background(), keyName, session, time.Duration(timeout)*time.Second)
-	return err
 }
 
 func (r *RedisCluster) getConnectionHandler() *ConnectionHandler {
