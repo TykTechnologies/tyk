@@ -1517,6 +1517,177 @@ func BenchmarkSessionState_RoundTrip(b *testing.B) {
 	}
 }
 
+// BenchmarkSessionClone_Sequential measures single-threaded clone performance
+// This shows the base overhead of mutex locking without contention
+func BenchmarkSessionClone_Sequential(b *testing.B) {
+	session := &SessionState{
+		AccessRights: map[string]AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"v1"}},
+			"api2": {APIID: "api2", Versions: []string{"v1"}},
+			"api3": {APIID: "api3", Versions: []string{"v1"}},
+		},
+		MetaData: map[string]interface{}{
+			"key1": "value1",
+			"key2": "value2",
+			"key3": "value3",
+		},
+		OauthKeys: map[string]string{
+			"oauth1": "token1",
+			"oauth2": "token2",
+		},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = session.Clone()
+	}
+}
+
+// BenchmarkSessionClone_Concurrent measures concurrent clone performance
+// This shows the overhead under high contention (similar to production load)
+func BenchmarkSessionClone_Concurrent(b *testing.B) {
+	session := &SessionState{
+		AccessRights: map[string]AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"v1"}},
+			"api2": {APIID: "api2", Versions: []string{"v1"}},
+			"api3": {APIID: "api3", Versions: []string{"v1"}},
+		},
+		MetaData: map[string]interface{}{
+			"key1": "value1",
+			"key2": "value2",
+			"key3": "value3",
+		},
+		OauthKeys: map[string]string{
+			"oauth1": "token1",
+			"oauth2": "token2",
+		},
+	}
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_ = session.Clone()
+		}
+	})
+}
+
+// BenchmarkSessionClone_WithWrites measures clone performance under concurrent writes
+// This simulates the real-world scenario: cloning during policy application
+func BenchmarkSessionClone_WithWrites(b *testing.B) {
+	session := &SessionState{
+		AccessRights: map[string]AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"v1"}},
+		},
+		MetaData: map[string]interface{}{
+			"key1": "value1",
+		},
+		OauthKeys: map[string]string{
+			"oauth1": "token1",
+		},
+	}
+
+	// Start background writers to simulate policy application
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	// Writer 1: Modify AccessRights
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				session.mu.Lock()
+				session.AccessRights["api2"] = AccessDefinition{APIID: "api2"}
+				session.mu.Unlock()
+			}
+		}
+	}()
+
+	// Writer 2: Modify MetaData
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				session.mu.Lock()
+				session.MetaData["key2"] = "value2"
+				session.mu.Unlock()
+			}
+		}
+	}()
+
+	// Writer 3: Modify OauthKeys
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				session.mu.Lock()
+				session.OauthKeys["oauth2"] = "token2"
+				session.mu.Unlock()
+			}
+		}
+	}()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = session.Clone()
+	}
+	b.StopTimer()
+
+	close(stop)
+	wg.Wait()
+}
+
+// BenchmarkSessionClone_SmallSession measures overhead for small sessions
+func BenchmarkSessionClone_SmallSession(b *testing.B) {
+	session := &SessionState{
+		AccessRights: map[string]AccessDefinition{
+			"api1": {APIID: "api1"},
+		},
+		MetaData: map[string]interface{}{
+			"key1": "value1",
+		},
+	}
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_ = session.Clone()
+		}
+	})
+}
+
+// BenchmarkSessionClone_LargeSession measures overhead for large sessions
+func BenchmarkSessionClone_LargeSession(b *testing.B) {
+	session := &SessionState{
+		AccessRights: make(map[string]AccessDefinition),
+		MetaData:     make(map[string]interface{}),
+		OauthKeys:    make(map[string]string),
+	}
+
+	// Create a large session (100 APIs, 100 metadata keys, 100 oauth keys)
+	for i := 0; i < 100; i++ {
+		session.AccessRights[string(rune('a'+i))] = AccessDefinition{APIID: string(rune('a' + i))}
+		session.MetaData[string(rune('a'+i))] = "value"
+		session.OauthKeys[string(rune('a'+i))] = "token"
+	}
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_ = session.Clone()
+		}
+	})
+}
+
 func TestAccessDefinition_MCPFields_OmittedFromJSONWhenEmpty(t *testing.T) {
 	ad := AccessDefinition{}
 
