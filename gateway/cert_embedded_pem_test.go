@@ -3,6 +3,7 @@ package gateway
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -317,4 +318,40 @@ func TestEmbeddedPEM_BackwardCompatibility(t *testing.T) {
 			assert.NotEmpty(t, out[0].Certificate, "expected cert chain to be populated")
 		})
 	}
+}
+
+// TestEmbeddedPEM_PinnedPublicKey verifies that spec.PinnedPublicKeys accepts
+// an inline PEM public key (rather than a SHA256 fingerprint or a file path).
+// This exercises the embedded-PEM branch in
+// certs.(*certificateManager).ListPublicKeys: the pinned value is the upstream
+// server's public key in PEM form, which the gateway decodes in memory and
+// hashes to obtain the pin to compare against the live handshake.
+func TestEmbeddedPEM_PinnedPublicKey(t *testing.T) {
+	_, _, _, serverCert := crypto.GenServerCertificate()
+
+	// Derive the upstream public key as inline PEM — exactly what a secret
+	// store would substitute into the pinned_public_keys field.
+	x509Cert, err := x509.ParseCertificate(serverCert.Certificate[0])
+	require.NoError(t, err)
+	pubDer, err := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
+	require.NoError(t, err)
+	inlinePubPEM := string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer}))
+
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.ProxySSLInsecureSkipVerify = false
+	})
+	defer ts.Close()
+
+	upstream, _, finish := newUpstreamSSL(t, ts.Gw, serverCert, handlerEmpty)
+	defer finish()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.PinnedPublicKeys = map[string]string{"127.0.0.1": inlinePubPEM}
+		spec.Proxy.TargetURL = upstream.URL
+	})
+
+	ts.Run(t, test.TestCase{Code: http.StatusOK})
+
+	ts.Gw.CertificateManager.FlushCache()
 }

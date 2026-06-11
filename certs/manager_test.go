@@ -227,6 +227,54 @@ func TestStorageIndex(t *testing.T) {
 	}
 }
 
+func TestListPublicKeys_EmbeddedPEM(t *testing.T) {
+	m := newManager()
+
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	assert.NoError(t, err)
+	privDer, err := x509.MarshalPKIXPublicKey(&priv.PublicKey)
+	assert.NoError(t, err)
+	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: privDer})
+	expectedFingerprint := tykcrypto.HexSHA256(privDer)
+
+	t.Run("ListPublicKeys decodes inline PEM", func(t *testing.T) {
+		out := m.ListPublicKeys([]string{string(pubPem)})
+
+		assert.Len(t, out, 1)
+		assert.Equal(t, expectedFingerprint, out[0])
+	})
+
+	t.Run("ListPublicKeys leading/trailing whitespace tolerated", func(t *testing.T) {
+		out := m.ListPublicKeys([]string{"\n  " + string(pubPem) + "  \n"})
+
+		assert.Len(t, out, 1)
+		assert.Equal(t, expectedFingerprint, out[0])
+	})
+
+	t.Run("ListPublicKeys tolerates single-line collapsed PEM", func(t *testing.T) {
+		// A paste into a single-line field flattens line breaks into spaces,
+		// exactly as the embedded-cert path in List() already tolerates.
+		collapsed := strings.ReplaceAll(strings.TrimSpace(string(pubPem)), "\n", " ")
+		out := m.ListPublicKeys([]string{collapsed})
+
+		assert.Len(t, out, 1)
+		assert.Equal(t, expectedFingerprint, out[0])
+	})
+
+	t.Run("ListRawPublicKey parses inline PEM", func(t *testing.T) {
+		out := m.ListRawPublicKey(string(pubPem))
+
+		assert.NotNil(t, out)
+	})
+
+	t.Run("malformed inline PEM fails gracefully", func(t *testing.T) {
+		out := m.ListPublicKeys([]string{"-----BEGIN PUBLIC KEY-----\nbogus\n-----END PUBLIC KEY-----"})
+
+		assert.Len(t, out, 1)
+		assert.Equal(t, "", out[0])
+	})
+}
+
 func TestToCertificateBasics(t *testing.T) {
 	now := time.Now()
 
