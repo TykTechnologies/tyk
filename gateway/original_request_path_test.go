@@ -6,14 +6,17 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	tyklog "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestOriginalRequestPath(t *testing.T) {
@@ -88,4 +91,56 @@ func TestOriginalRequestPath_MainHTTPSpanAttribute(t *testing.T) {
 	assert.Contains(t, string(payload), "GET /api/v1/users")
 	assert.True(t, bytes.Contains(payload, []byte("tyk.original_path")))
 	assert.True(t, bytes.Contains(payload, []byte("/api/v1/users")))
+}
+
+func TestOriginalRequestPath_OnlyOnMainSpan_DetailedTracing(t *testing.T) {
+	var mu sync.Mutex
+	var payloads []byte
+	otelCollectorMock := httpCollectorMock(t, func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		mu.Lock()
+		payloads = append(payloads, body...)
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}, ":0")
+	otelCollectorMock.Start()
+	defer otelCollectorMock.Close()
+
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.OpenTelemetry.Enabled = true
+		globalConf.OpenTelemetry.Exporter = "http"
+		globalConf.OpenTelemetry.Endpoint = otelCollectorMock.URL
+		globalConf.OpenTelemetry.SpanProcessorType = "simple"
+	})
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test"
+		spec.Proxy.ListenPath = "/my-api/"
+		spec.UseKeylessAccess = true
+		spec.DetailedTracing = true
+	})
+
+	_, _ = ts.Run(t, test.TestCase{Path: "/my-api/", Code: http.StatusOK})
+
+	// With the simple span processor, child (middleware) spans export synchronously
+	// before the main HTTP span ends, so once the main span arrives all spans arrived.
+	deadline := time.Now().Add(5 * time.Second)
+	var exported []byte
+	for {
+		mu.Lock()
+		exported = append([]byte(nil), payloads...)
+		mu.Unlock()
+		if bytes.Contains(exported, []byte("GET /my-api/")) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("timed out waiting for main HTTP span export")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	count := bytes.Count(exported, []byte("tyk.original_path"))
+	assert.Equal(t, 1, count, "tyk.original_path must be set only on the main HTTP span, found %d occurrences", count)
 }
