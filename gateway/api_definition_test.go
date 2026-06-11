@@ -857,6 +857,9 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	tsDash := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/apis" {
 			w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {}}]}`))
+		} else if r.URL.Path == "/system/clientidps" {
+			// The reload also refreshes the client-IdP registry; return an empty feed.
+			mustWriteJSON(t, w, `{"Status": "OK", "Nonce": "1", "Message": []}`)
 		} else {
 			t.Fatal("Unknown dashboard API request", r)
 		}
@@ -1210,6 +1213,9 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 			}
 
 			callNum += 1
+		} else if r.URL.Path == "/system/clientidps" {
+			// The reload also refreshes the client-IdP registry; return an empty feed.
+			mustWriteJSON(t, w, `{"Status": "OK", "Nonce": "1", "Message": []}`)
 		} else {
 			t.Fatal("Unknown dashboard API request", r)
 		}

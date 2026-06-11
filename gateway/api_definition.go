@@ -18,38 +18,30 @@ import (
 	texttemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/ee/middleware/streams"
-	"github.com/TykTechnologies/tyk/storage/kv"
-
-	"github.com/TykTechnologies/tyk/internal/httpctx"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/mcp"
-	"github.com/TykTechnologies/tyk/internal/oasutil"
-
-	"github.com/getkin/kin-openapi/routers/gorillamux"
-
-	"github.com/getkin/kin-openapi/openapi3"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
-	"github.com/cenk/backoff"
-
 	"github.com/Masterminds/sprig/v3"
-
+	"github.com/cenk/backoff"
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/routers/gorillamux"
 	"github.com/sirupsen/logrus"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 
-	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	"github.com/TykTechnologies/tyk/pkg/schema"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/kv"
 )
 
 // const used by cache middleware
@@ -648,7 +640,6 @@ func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
 			if firstErr == nil {
 				firstErr = err
 			}
-			log.WithError(err).Errorf("file KV: failed to read secret file %q", m[1])
 			continue
 		}
 		// JSON-escape the value before injecting it into the raw JSON document.
@@ -659,7 +650,6 @@ func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
 			if firstErr == nil {
 				firstErr = err
 			}
-			log.WithError(err).Errorf("file KV: failed to JSON-encode value for %q", m[1])
 			continue
 		}
 		// Strip the surrounding quotes since the replacement sits
@@ -815,8 +805,20 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 	nestDef := model.MergedAPI{APIDefinition: &def}
 	if def.IsOAS {
 		loader := openapi3.NewLoader()
-		// use openapi3.ReadFromFile as ReadFromURIFunc since the default implementation cache spec based on file path.
-		loader.ReadFromURIFunc = openapi3.ReadFromFile
+		// Apply replaceSecrets to OAS bytes before parsing so secret prefixes
+		// (vault://, env://, etc.) in the x-tyk-api-gateway extension are resolved.
+		// Scoped to local-file reads only — resolving remote $ref content would be
+		// an injection vector for operator-untrusted bytes.
+		loader.ReadFromURIFunc = func(l *openapi3.Loader, uri *url.URL) ([]byte, error) {
+			b, err := openapi3.ReadFromFile(l, uri)
+			if err != nil {
+				return nil, err
+			}
+			if uri == nil || uri.Scheme == "" || uri.Scheme == "file" {
+				return a.replaceSecrets(b), nil
+			}
+			return b, nil
+		}
 
 		var oasFilepath string
 		if def.IsMCP() {
@@ -1971,7 +1973,12 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	return combinedPath, whiteListEnabled
 }
 
-func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Handler) {
+func (a *APISpec) Init(
+	authStore storage.Handler,
+	healthStore storage.Handler,
+	orgStore storage.Handler,
+) {
+
 	a.AuthManager.Init(authStore)
 	a.Health.Init(healthStore)
 	a.OrgSessionManager.Init(orgStore)

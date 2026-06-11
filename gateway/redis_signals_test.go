@@ -98,6 +98,13 @@ func TestHandleUserKeyReset(t *testing.T) {
 			kvPath:   "consul://api-keys/key",
 			expected: newKey,
 		},
+		{
+			name:     "File key reset",
+			payload:  fmt.Sprintf("%s.%s:test", oldKey, newKey),
+			kvType:   "file",
+			kvPath:   "file://api-keys/key",
+			expected: newKey,
+		},
 	}
 
 	for _, tc := range testCases {

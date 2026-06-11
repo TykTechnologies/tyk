@@ -1524,7 +1524,6 @@ func TestReplaceTykVariablesFileSecret(t *testing.T) {
 		})
 	})
 
-	// base_path configured — keys are relative filenames resolved under the base directory.
 	t.Run("with base_path configured", func(t *testing.T) {
 		ts := StartTest(func(conf *config.Config) {
 			conf.KV.File.BasePath = dir

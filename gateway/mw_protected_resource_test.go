@@ -829,6 +829,97 @@ func TestPRMMirrorMode_SuffixRoute(t *testing.T) {
 	})
 }
 
+// TestOAuth2PRM_MirrorMode is the regression guard for the PRM auto-migration
+// (TT-17176). A mirror-shape MCP API (enabled, no resource/authorizationServers)
+// migrated into the new-style oauth2.protectedResourceMetadata block must keep
+// mirroring the upstream's PRM document. The new block wins over the deprecated
+// top-level block, so the new serving path must itself mirror — otherwise the
+// migrated API serves an empty static document instead of the upstream's.
+func TestOAuth2PRM_MirrorMode(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/.well-known/oauth-protected-resource/v1/mcp/authv2" {
+			w.Header().Set("Content-Type", "application/json")
+			//nolint:errcheck // test fixture; HTTP response Write failure not actionable here
+			_, _ = io.WriteString(w, `{
+				"resource": "https://upstream.example/v1/mcp/authv2",
+				"authorization_servers": ["https://auth.upstream.example/tenant"],
+				"bearer_methods_supported": ["header"],
+				"resource_documentation": "https://upstream.example/docs"
+			}`)
+			return
+		}
+		w.Header().Set("WWW-Authenticate", `Bearer realm="OAuth"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	t.Cleanup(upstream.Close)
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const listenPath = "/jira-new/"
+
+	oasDoc := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info:    &openapi3.Info{Title: "MCP Mirror New", Version: "1.0"},
+			Paths:   openapi3.NewPaths(),
+		},
+	}
+	oasDoc.SetTykExtension(&oas.XTykAPIGateway{
+		Info:     oas.Info{Name: "mcp-mirror-new-test", State: oas.State{Active: true}},
+		Upstream: oas.Upstream{URL: upstream.URL + "/v1/mcp/authv2"},
+		Server: oas.Server{
+			ListenPath: oas.ListenPath{Value: listenPath, Strip: true},
+			Authentication: &oas.Authentication{
+				Enabled: true,
+				SecuritySchemes: oas.SecuritySchemes{
+					"corpOAuth": &oas.OAuth2{
+						Enabled: true,
+						// Mirror shape: enabled, no Resource / AuthorizationServers.
+						ProtectedResourceMetadata: &oas.OAuth2PRM{Enabled: true},
+					},
+				},
+			},
+		},
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.MarkAsMCP()
+		spec.Proxy.ListenPath = listenPath
+		spec.Proxy.TargetURL = upstream.URL + "/v1/mcp/authv2"
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+	})
+
+	ts.Gw.PRMCache().Invalidate(upstream.URL + "/.well-known/oauth-protected-resource/v1/mcp/authv2")
+
+	resp, _ := ts.Run(t, test.TestCase{
+		Method: http.MethodGet,
+		Path:   "/jira-new/.well-known/oauth-protected-resource",
+		Code:   http.StatusOK,
+	})
+
+	var doc map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&doc))
+
+	// Mirror mode rewrites `resource` to the gateway URL the client hit;
+	// an empty static doc would leave it "".
+	got, _ := doc["resource"].(string)
+	assert.True(t, strings.HasSuffix(got, listenPath),
+		"resource %q should be the rewritten gateway URL ending %q (mirror mode), not an empty static value", got, listenPath)
+
+	// Mirror mode redirects authorization_servers at Tyk's per-API AS proxy.
+	authServers, _ := doc["authorization_servers"].([]any)
+	require.Len(t, authServers, 1,
+		"expected mirrored authorization_servers; got %v (empty static doc?)", doc["authorization_servers"])
+	asURL, _ := authServers[0].(string)
+	assert.Contains(t, asURL, "/__tyk-as/", "authorization_servers should point at the Tyk AS proxy")
+
+	// Pass-through fields from the upstream doc prove we mirrored, not assembled.
+	assert.Equal(t, "https://upstream.example/docs", doc["resource_documentation"])
+}
+
 // TestPRMMirrorMode_OAuthProxy exercises the full mirror-mode OAuth flow:
 // PRM points clients at Tyk's AS proxy, the AS metadata endpoint serves
 // rewritten `authorization_endpoint`/`token_endpoint`, the authorize

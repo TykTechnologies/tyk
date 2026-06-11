@@ -7,8 +7,14 @@ import (
 	"strings"
 )
 
-// ResolveFileKV reads the contents of a file at the given key path and returns it as a string.
-// When basePath is empty the key is used directly as a file path, with no restrictions.
+// ResolveFileKV reads the file at key and returns its contents trimmed of trailing newlines.
+//
+// Absolute keys are used as-is; basePath is ignored for them.
+// Callers that enforce a security boundary (e.g. runtime middleware where
+// API-designer-level input is untrusted) must reject absolute keys before
+// calling this function when basePath is configured.
+//
+// Relative keys require basePath to be set; they are joined and confined to it.
 func ResolveFileKV(basePath, key string) (string, error) {
 	var path string
 
@@ -40,8 +46,10 @@ func ResolveFileKV(basePath, key string) (string, error) {
 	// outside (symlink escape).
 	if basePath != "" && !filepath.IsAbs(key) {
 		canonicalBase, err := filepath.EvalSymlinks(basePath)
+		// EvalSymlinks failure here requires a race (basePath symlink broken between
+		// resolving the file path above and this call). Not worth a flaky test.
 		if err != nil {
-			canonicalBase = basePath
+			return "", fmt.Errorf("file KV: cannot resolve base_path %q: %w", basePath, err)
 		}
 		rel, err := filepath.Rel(canonicalBase, resolved)
 		if err != nil || !filepath.IsLocal(rel) {
