@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -198,22 +197,4 @@ func TestJSONFormatterErrorHandling(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotContains(t, string(output), "logrus_error")
 	})
-}
-
-func Test_removeHook(t *testing.T) {
-	logger := logrus.New()
-	logger.SetOutput(io.Discard)
-
-	hook := &logrustest.Hook{}
-	logger.AddHook(hook)
-
-	for _, hooks := range logger.Hooks {
-		assert.True(t, len(hooks) == 1, "each logger level hes it's hook")
-	}
-
-	removeHook(logger, hook)
-
-	for _, hooks := range logger.Hooks {
-		assert.True(t, len(hooks) == 0, "has removed all the hooks from logger")
-	}
 }

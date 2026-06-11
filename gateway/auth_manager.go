@@ -122,13 +122,8 @@ func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 }
 
 // UpdateSession updates the session state in the storage engine
-func (b *DefaultSessionManager) UpdateSession(
-	keyName string,
-	session *user.SessionState,
-	resetTTLTo int64,
-	hashed bool,
-) error {
-
+func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState,
+	resetTTLTo int64, hashed bool) error {
 	defer b.clearCacheForKey(keyName, hashed)
 
 	v, err := json.Marshal(session)
@@ -137,20 +132,12 @@ func (b *DefaultSessionManager) UpdateSession(
 		return err
 	}
 
-	if !session.IsRestored() {
-		if hashed {
-			keyName = b.store.GetKeyPrefix() + keyName
-			err = b.store.SetRawKey(keyName, string(v), resetTTLTo)
-		} else {
-			err = b.store.SetKey(keyName, string(v), resetTTLTo)
-		}
+	// sync update
+	if hashed {
+		keyName = b.store.GetKeyPrefix() + keyName
+		err = b.store.SetRawKey(keyName, string(v), resetTTLTo)
 	} else {
-		if hashed {
-			keyName = b.store.GetKeyPrefix() + keyName
-			err = b.store.SetRawKeyEx(keyName, string(v), resetTTLTo)
-		} else {
-			err = b.store.SetKeyEx(keyName, string(v), resetTTLTo)
-		}
+		err = b.store.SetKey(keyName, string(v), resetTTLTo)
 	}
 
 	return err
@@ -225,7 +212,6 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 		return user.SessionState{}, false
 	}
 	session.KeyID = keyId
-	session.MarkAsRestored()
 	return session.Clone(), true
 }
 
