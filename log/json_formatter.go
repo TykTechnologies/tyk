@@ -10,7 +10,7 @@ import (
 // JSONFormatter formats logs into parsable json.
 type JSONFormatter struct {
 	// TimestampFormat sets the format used for marshaling timestamps.
-	// The format to use is the same than for time.Format or time.Parse from the standard
+	// The format to use is the same then for time.Format or time.Parse from the standard
 	// library.
 	// The standard Library already provides a set of predefined format.
 	TimestampFormat string
@@ -20,6 +20,9 @@ type JSONFormatter struct {
 
 	// DataKey allows users to put all the log entry parameters into a nested dictionary at a given key.
 	DataKey string
+
+	// FieldMap allows to define field mapping.
+	FieldMap FieldMap
 }
 
 // Format renders a single log entry
@@ -44,17 +47,17 @@ func (f *JSONFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 
 	if v, ok := entry.Data[logrus.ErrorKey]; ok {
 		if e, ok := v.(error); ok {
-			data[logrus.FieldKeyLogrusError] = e.Error()
+			data[f.FieldMap.Resolve(logrus.FieldKeyLogrusError)] = e.Error()
 		} else {
-			data[logrus.FieldKeyLogrusError] = v
+			data[f.FieldMap.Resolve(logrus.FieldKeyLogrusError)] = v
 		}
 	}
 
 	if !f.DisableTimestamp {
-		data[logrus.FieldKeyTime] = entry.Time.Format(f.TimestampFormat)
+		data[f.FieldMap.Resolve(logrus.FieldKeyTime)] = entry.Time.Format(f.TimestampFormat)
 	}
-	data[logrus.FieldKeyMsg] = entry.Message
-	data[logrus.FieldKeyLevel] = entry.Level.String()
+	data[f.FieldMap.Resolve(logrus.FieldKeyMsg)] = entry.Message
+	data[f.FieldMap.Resolve(logrus.FieldKeyLevel)] = entry.Level.String()
 
 	var w bytes.Buffer
 	enc := json.NewEncoder(&w)

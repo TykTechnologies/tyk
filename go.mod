@@ -25,11 +25,11 @@ require (
 	github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481
 	github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6
 	github.com/TykTechnologies/goverify v0.0.0-20260203113354-7a104729566e
-	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20251104074758-abfe5c458f3b
+	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20260610093432-c7048b604e16
 	github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
-	github.com/TykTechnologies/storage v1.3.1
+	github.com/TykTechnologies/storage v1.3.2
 	github.com/TykTechnologies/tyk-pump v1.15.0-rc1.0.20260609132845-8a614d6efd02
 	github.com/akutz/memconn v0.1.0
 	github.com/bshuster-repo/logrus-logstash-hook v1.1.0
