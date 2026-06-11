@@ -236,6 +236,52 @@ func TestEmbeddedPEM_ControlAPIClientCAs(t *testing.T) {
 	})
 }
 
+// TestEmbeddedPEM_SingleLineClientCertificate mirrors the real-world case a
+// user hits when pasting a certificate into a single-line Dashboard field:
+// the PEM line breaks are collapsed into spaces. The gateway must tolerate
+// this and still complete the mTLS handshake. Exercises the normalization
+// fallback in certs.appendEmbeddedPEM end-to-end.
+func TestEmbeddedPEM_SingleLineClientCertificate(t *testing.T) {
+	serverCertPem, _, combinedServerPEM, _ := crypto.GenServerCertificate()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.EnableCustomDomains = true
+		globalConf.HttpServerOptions.UseSSL = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{string(combinedServerPEM)}
+		globalConf.HttpServerOptions.SkipClientCAAnnouncement = true
+		globalConf.ProxySSLMaxVersion = tls.VersionTLS12
+		globalConf.HttpServerOptions.MaxVersion = tls.VersionTLS12
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	clientCertPem, _, _, clientCert := crypto.GenCertificate(&x509.Certificate{}, false)
+
+	// Collapse the client cert's line breaks into spaces, exactly as a
+	// copy-paste into a single-line text field would.
+	singleLineClientPEM := strings.ReplaceAll(strings.TrimSpace(string(clientCertPem)), "\n", " ")
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Domain = "localhost"
+		spec.Proxy.ListenPath = "/"
+		spec.UseMutualTLSAuth = true
+		spec.ClientCertificates = []string{singleLineClientPEM}
+	})
+
+	tlsConfig := GetTLSConfig(&clientCert, serverCertPem)
+	tlsConfig.GetClientCertificate = func(_ *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+		return &clientCert, nil
+	}
+	httpClient := &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
+
+	_, _ = ts.Run(t, test.TestCase{
+		Code: http.StatusOK, Client: httpClient, Domain: "localhost",
+	})
+
+	ts.Gw.CertificateManager.FlushCache()
+	tlsConfigCache.Flush()
+}
+
 // TestEmbeddedPEM_BackwardCompatibility is a focused regression check: a
 // single subtest table that runs the same hot path (List() resolving a
 // server cert) via all three sources — embedded PEM, SHA256 cert ID, file
