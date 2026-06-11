@@ -231,10 +231,10 @@ func (gw *Gateway) processSpec(
 	}
 
 	// Initialise the auth and session managers (use Redis for now)
-	authStore, orgStore, sessionStore := gw.configureAuthAndOrgStores(gs, spec)
+	authStore, orgStore, _ := gw.configureAuthAndOrgStores(gs, spec)
 
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
-	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
+	spec.Init(authStore, gs.healthStore, orgStore)
 
 	if !spec.ErrorOverridesDisabled && len(spec.ErrorOverrides) > 0 {
 		if compiled := CompileErrorOverrides(spec.ErrorOverrides); compiled != nil {
@@ -1029,7 +1029,7 @@ func (gw *Gateway) mcpPRMSuffixHandler(spec *APISpec) http.HandlerFunc {
 			return
 		}
 		if prm.IsMirrorMode(spec.IsMCP()) {
-			if err := mw.serveMirroredPRM(w, r, prm); err != nil {
+			if err := mw.serveMirroredPRM(w, r); err != nil {
 				log.WithError(err).Warn("PRM mirror failed at suffix route")
 				http.Error(w, "upstream PRM unavailable", http.StatusBadGateway)
 			}
@@ -1088,14 +1088,8 @@ func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxy
 		gw.enforceOrgDataAgeIfQuotasEnabled(spec)
 	}
 
-	sessionStore := gs.redisStore
-	switch spec.SessionProvider.StorageEngine {
-	case RPCStorageEngine:
-		sessionStore = gs.rpcAuthStore
-	}
-
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
-	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
+	spec.Init(authStore, gs.healthStore, orgStore)
 
 	muxer.addTCPService(spec, nil, gw)
 }

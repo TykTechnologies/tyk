@@ -90,6 +90,22 @@ func (prm *OAuth2PRM) IsAutoDeriveScopes() bool {
 	return *prm.AutoDeriveScopes
 }
 
+// IsMirrorMode reports whether this PRM resolves to mirror mode for the
+// given API context. Mirror is the implicit default for MCP APIs whose
+// PRM configures no static fields (Resource or AuthorizationServers);
+// everything else is static. Mirrors ProtectedResourceMetadata.IsMirrorMode
+// so the new per-scheme block behaves identically to the deprecated
+// top-level block it supersedes.
+func (prm *OAuth2PRM) IsMirrorMode(isMCP bool) bool {
+	if prm == nil || !prm.Enabled {
+		return false
+	}
+	if prm.Resource != "" || len(prm.AuthorizationServers) > 0 {
+		return false
+	}
+	return isMCP
+}
+
 // OAuth2ScopeCheck holds OAS-native scope enforcement configuration.
 //
 // The required scopes themselves live in the OAS root `security:`

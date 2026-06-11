@@ -72,7 +72,7 @@ func (m *PRMMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 	// Mirror mode: fetch from upstream, rewrite resource, serve.
 	if prm.IsMirrorMode(m.Spec.IsMCP()) {
-		if err := m.serveMirroredPRM(w, r, prm); err != nil {
+		if err := m.serveMirroredPRM(w, r); err != nil {
 			log.WithError(err).Warn("PRM mirror failed; passing through to upstream")
 			return nil, http.StatusOK
 		}
@@ -107,6 +107,18 @@ func (m *PRMMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 //
 //nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
 func (m *PRMMiddleware) serveOAuth2PRM(w http.ResponseWriter, r *http.Request, name string, prm *oas.OAuth2PRM) (error, int) {
+	// Mirror mode (MCP, no static fields): serve the upstream's PRM doc,
+	// same as the deprecated top-level block. The new block wins over the
+	// old one, so the mirror path must live here too — otherwise a migrated
+	// mirror-shape MCP API serves an empty static document.
+	if prm.IsMirrorMode(m.Spec.IsMCP()) {
+		if err := m.serveMirroredPRM(w, r); err != nil {
+			log.WithError(err).Warn("PRM mirror failed; passing through to upstream")
+			return nil, http.StatusOK
+		}
+		return nil, middleware.StatusRespond
+	}
+
 	resource := prm.Resource
 	if resource != "" {
 		resource = m.Gw.ReplaceTykVariables(r, resource, false)
@@ -132,7 +144,7 @@ func (m *PRMMiddleware) serveOAuth2PRM(w http.ResponseWriter, r *http.Request, n
 // at Tyk's per-API AS-proxy URL so RFC 8707 `resource`-parameter rewriting
 // can intercept the OAuth flow, and writes the result to w. The fetched
 // document is cached per upstream URL with TTL.
-func (m *PRMMiddleware) serveMirroredPRM(w http.ResponseWriter, r *http.Request, _ *oas.ProtectedResourceMetadata) error {
+func (m *PRMMiddleware) serveMirroredPRM(w http.ResponseWriter, r *http.Request) error {
 	doc, err := m.Gw.upstreamPRMDoc(r.Context(), m.Spec)
 	if err != nil {
 		return err
