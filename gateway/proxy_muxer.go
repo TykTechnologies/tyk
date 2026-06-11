@@ -21,6 +21,7 @@ import (
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/tcp"
 
@@ -68,6 +69,9 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctxSetRequestStartTime(r, time.Now())
 	// Capture original request path before any middleware modifications
 	ctxSetOriginalRequestPath(r, r.URL.Path)
+	if span := otel.SpanFromContext(r.Context()); span != nil {
+		span.SetAttributes(otel.OriginalPathSpanAttribute(r.URL.Path))
+	}
 
 	if r.Body != nil {
 		if !h.handleRequestLimits(w, r) {
