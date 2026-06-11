@@ -769,23 +769,50 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 
 // Returns list of fingerprints.
 //
-// NOTE: Embedded-PEM input support is intentionally implemented only in
-// List() (and therefore CertPool()). ListPublicKeys deals with fingerprints,
-// which are themselves content rather than references — pinned_public_keys
-// fields can already be substituted from a secret store without code changes.
-// If a future requirement calls for parsing raw PEM public keys here, mirror
-// the isPEMContent() branch from List().
+// publicKeyCacheKey derives the in-process cache key for a pinned-key
+// reference. Inline PEM is hashed (mirroring embeddedPEMCacheKeyPrefix used by
+// List()) so the key stays bounded and matches on the trimmed content; SHA256
+// IDs and file paths are short and used verbatim.
+func publicKeyCacheKey(id string) string {
+	if IsPEMContent(id) {
+		return embeddedPEMCacheKeyPrefix + "pub-" + tykcrypto.HexSHA256([]byte(strings.TrimSpace(id)))
+	}
+	return "pub-" + id
+}
+
+// decodePublicKeyBlock decodes the first PEM block from rawKey. If the input
+// has been whitespace-collapsed (e.g. pasted into a single-line field), it is
+// normalised and retried once, matching the tolerance of appendEmbeddedPEM.
+func decodePublicKeyBlock(rawKey []byte) *pem.Block {
+	if block, _ := pem.Decode(rawKey); block != nil {
+		return block
+	}
+	if repaired, ok := normalizeCollapsedPEM(rawKey); ok {
+		if block, _ := pem.Decode(repaired); block != nil {
+			return block
+		}
+	}
+	return nil
+}
+
+// ListPublicKeys resolves pinned-public-key references to their fingerprints.
+// A reference is one of: a SHA256 ID (Redis-backed), an inline PEM public key
+// (embedded content, e.g. substituted from a secret store), or a filesystem
+// path. Inline PEM is detected by content sniffing and decoded in memory,
+// mirroring the embedded-PEM branch in List().
 func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 	var rawKey []byte
 	var err error
 
 	for _, id := range keyIDs {
-		if fingerprint, found := c.cache.Get("pub-" + id); found {
+		cacheKey := publicKeyCacheKey(id)
+		if fingerprint, found := c.cache.Get(cacheKey); found {
 			out = append(out, fingerprint.(string))
 			continue
 		}
 
-		if isSHA256(id) {
+		switch {
+		case isSHA256(id):
 			var val string
 			val, err := c.storage.GetKey("raw-" + id)
 			if err != nil {
@@ -794,7 +821,9 @@ func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 				continue
 			}
 			rawKey = []byte(val)
-		} else {
+		case IsPEMContent(id):
+			rawKey = []byte(strings.TrimSpace(id))
+		default:
 			rawKey, err = ioutil.ReadFile(id)
 			if err != nil {
 				c.logger.Error("Error while reading public key from file:", id, err)
@@ -803,7 +832,7 @@ func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 			}
 		}
 
-		block, _ := pem.Decode(rawKey)
+		block := decodePublicKeyBlock(rawKey)
 		if block == nil {
 			c.logger.Error("Can't parse public key:", id)
 			out = append(out, "")
@@ -811,7 +840,7 @@ func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 		}
 
 		fingerprint := tykcrypto.HexSHA256(block.Bytes)
-		c.cache.Set("pub-"+id, fingerprint, cache.DefaultExpiration)
+		c.cache.Set(cacheKey, fingerprint, cache.DefaultExpiration)
 		out = append(out, fingerprint)
 	}
 
@@ -823,7 +852,8 @@ func (c *certificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 	var rawKey []byte
 	var err error
 
-	if isSHA256(keyID) {
+	switch {
+	case isSHA256(keyID):
 		var val string
 		val, err := c.storage.GetKey("raw-" + keyID)
 		if err != nil {
@@ -831,7 +861,9 @@ func (c *certificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 			return nil
 		}
 		rawKey = []byte(val)
-	} else {
+	case IsPEMContent(keyID):
+		rawKey = []byte(strings.TrimSpace(keyID))
+	default:
 		rawKey, err = ioutil.ReadFile(keyID)
 		if err != nil {
 			c.logger.Error("Error while reading public key from file:", keyID, err)
@@ -839,7 +871,7 @@ func (c *certificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 		}
 	}
 
-	block, _ := pem.Decode(rawKey)
+	block := decodePublicKeyBlock(rawKey)
 	if block == nil {
 		c.logger.Error("Can't parse public key:", keyID)
 		return nil
