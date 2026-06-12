@@ -653,6 +653,7 @@ func TestSetDisabledFlags(t *testing.T) {
 		VersionData: VersionData{
 			Versions: map[string]VersionInfo{
 				"": {
+					GlobalEnforceTimeoutDisabled: true,
 					ExtendedPaths: ExtendedPathsSet{
 						Virtual: []VirtualMeta{
 							{

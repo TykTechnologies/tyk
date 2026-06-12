@@ -60,6 +60,10 @@ type Upstream struct {
 	// Proxy contains the configuration for an internal proxy.
 	// Tyk classic API definition: `proxy.proxy_url`
 	Proxy *Proxy `bson:"proxy,omitempty" json:"proxy,omitempty"`
+
+	// EnforceTimeout contains the configuration related to API level timeout duration.
+	// Tyk classic API definition: `version_data.versions.<version_name>.global_enforce_timeout`.
+	EnforceTimeout *GlobalEnforceTimeout `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
@@ -134,6 +138,15 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	u.Proxy.Fill(api)
 	if ShouldOmit(u.Proxy) {
 		u.Proxy = nil
+	}
+
+	if u.EnforceTimeout == nil {
+		u.EnforceTimeout = &GlobalEnforceTimeout{}
+	}
+
+	u.EnforceTimeout.Fill(api)
+	if ShouldOmit(u.EnforceTimeout) {
+		u.EnforceTimeout = nil
 	}
 
 	u.fillLoadBalancing(api)
@@ -239,6 +252,14 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 		}()
 	}
 	u.Proxy.ExtractTo(api)
+
+	if u.EnforceTimeout == nil {
+		u.EnforceTimeout = &GlobalEnforceTimeout{}
+		defer func() {
+			u.EnforceTimeout = nil
+		}()
+	}
+	u.EnforceTimeout.ExtractTo(api)
 
 	u.preserveHostHeaderExtractTo(api)
 	u.preserveTrailingSlashExtractTo(api)
@@ -1407,4 +1428,37 @@ func (p *PreserveTrailingSlash) Fill(api apidef.APIDefinition) {
 // ExtractTo extracts *PreserveTrailingSlash into *apidef.APIDefinition.
 func (p *PreserveTrailingSlash) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.DisableStripSlash = p.Enabled
+}
+
+// GlobalEnforceTimeout holds the configuration for enforcing a timeout at the API level.
+type GlobalEnforceTimeout struct {
+	// Enabled is a boolean flag. If set to `true`, the API-level timeout will be enforced
+	// across all endpoints that do not have an endpoint-level timeout configured.
+	//
+	// Tyk classic API definition: `version_data.versions.<version_name>.global_enforce_timeout_disabled` (negated).
+	Enabled bool `json:"enabled" bson:"enabled"`
+
+	// Duration is the configured timeout using a human-readable format (e.g. `5s`, `500ms`, `1m`).
+	// Supported units: ms, s, m.
+	//
+	// Tyk classic API definition: `version_data.versions.<version_name>.global_enforce_timeout`.
+	Duration time.ReadableDuration `json:"duration,omitempty" bson:"duration,omitempty"`
+}
+
+// Fill fills *GlobalEnforceTimeout from apidef.APIDefinition.
+func (g *GlobalEnforceTimeout) Fill(api apidef.APIDefinition) {
+	mainVersion := api.VersionData.Versions[Main]
+	g.Enabled = !mainVersion.GlobalEnforceTimeoutDisabled
+	g.Duration = mainVersion.GlobalEnforceTimeout
+}
+
+// ExtractTo extracts *GlobalEnforceTimeout to *apidef.APIDefinition.
+func (g *GlobalEnforceTimeout) ExtractTo(api *apidef.APIDefinition) {
+	if api.VersionData.Versions == nil {
+		api.VersionData.Versions = make(map[string]apidef.VersionInfo)
+	}
+	mainVersion := api.VersionData.Versions[Main]
+	mainVersion.GlobalEnforceTimeoutDisabled = !g.Enabled
+	mainVersion.GlobalEnforceTimeout = g.Duration
+	api.VersionData.Versions[Main] = mainVersion
 }

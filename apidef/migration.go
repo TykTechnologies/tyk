@@ -498,6 +498,13 @@ func (a *APIDefinition) SetDisabledFlags() {
 	a.setEventHandlersDisabledFlags()
 
 	a.ErrorOverridesDisabled = true
+
+	for name, version := range a.VersionData.Versions {
+		if version.GlobalEnforceTimeout == 0 {
+			version.GlobalEnforceTimeoutDisabled = true
+			a.VersionData.Versions[name] = version
+		}
+	}
 }
 
 func (a *APIDefinition) setEventHandlersDisabledFlags() {

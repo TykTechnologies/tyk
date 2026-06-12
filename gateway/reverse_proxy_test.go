@@ -2588,6 +2588,232 @@ func TestTimeoutPrioritization(t *testing.T) {
 	})
 }
 
+func TestAPILevelTimeout(t *testing.T) {
+	t.Parallel()
+
+	ts := StartTest(func(c *config.Config) {
+		c.ProxyDefaultTimeout = 10
+	})
+	defer ts.Close()
+
+	upstreamTimeout := "Upstream service reached hard timeout"
+
+	t.Run("API-level timeout triggers when upstream is slow", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(500 * time.Millisecond)
+			_, err := w.Write([]byte("slow response"))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.GlobalEnforceTimeout = tyktime.ReadableDuration(200 * time.Millisecond)
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/anything",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: upstreamTimeout,
+		})
+	})
+
+	t.Run("API-level timeout does not trigger when upstream is fast", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, err := w.Write([]byte("fast response"))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.GlobalEnforceTimeout = tyktime.ReadableDuration(500 * time.Millisecond)
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/anything",
+			Code:      http.StatusOK,
+			BodyMatch: "fast response",
+		})
+	})
+
+	t.Run("API-level timeout overrides gateway default", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(400 * time.Millisecond)
+			_, err := w.Write([]byte("response"))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.GlobalEnforceTimeout = tyktime.ReadableDuration(200 * time.Millisecond)
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/anything",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: upstreamTimeout,
+		})
+	})
+
+	t.Run("endpoint-level timeout overrides API-level timeout", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(300 * time.Millisecond)
+			_, err := w.Write([]byte("endpoint response"))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.GlobalEnforceTimeout = tyktime.ReadableDuration(200 * time.Millisecond)
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled:        false,
+						Path:            "/endpoint",
+						Method:          http.MethodGet,
+						TimeoutDuration: tyktime.ReadableDuration(time.Second),
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		// The endpoint timeout (1s) wins over the API timeout (200ms): request succeeds.
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/endpoint",
+			Code:      http.StatusOK,
+			BodyMatch: "endpoint response",
+		})
+	})
+
+	t.Run("API-level timeout applies to all endpoints without endpoint override", func(t *testing.T) {
+		// Upstream sleeps 400ms on every path.
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(400 * time.Millisecond)
+			_, err := w.Write([]byte("response"))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.GlobalEnforceTimeout = tyktime.ReadableDuration(200 * time.Millisecond)
+				version.UseExtendedPaths = true
+				// Endpoint timeout only on /special — /other gets no endpoint-level config.
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled:        false,
+						Path:            "/special",
+						Method:          http.MethodGet,
+						TimeoutDuration: tyktime.ReadableDuration(time.Second),
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		// /special has a 1s endpoint timeout — request succeeds despite 400ms delay.
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/special",
+			Code:      http.StatusOK,
+			BodyMatch: "response",
+		})
+
+		// /other has no endpoint timeout — falls back to API-level 200ms, request times out.
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/other",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: upstreamTimeout,
+		})
+	})
+
+	t.Run("disabled API-level timeout falls back to gateway default", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(400 * time.Millisecond)
+			_, err := w.Write([]byte("gateway default response"))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.GlobalEnforceTimeout = tyktime.ReadableDuration(200 * time.Millisecond)
+				version.GlobalEnforceTimeoutDisabled = true
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled:        false,
+						Path:            "/special",
+						Method:          http.MethodGet,
+						TimeoutDuration: tyktime.ReadableDuration(time.Second),
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/anything",
+			Code:      http.StatusOK,
+			BodyMatch: "gateway default response",
+		})
+	})
+}
+
 func getResponseForGivenURL(r *http.Request, sResp string, msResp string) string {
 	if strings.HasPrefix(r.URL.Path, "/timeout/seconds") {
 		time.Sleep(2 * time.Second)
