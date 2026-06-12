@@ -1622,6 +1622,14 @@
               "type": "integer"
             }
           }
+        },
+        "file": {
+          "type": ["object", "null"],
+          "properties": {
+            "base_path": {
+              "type": "string"
+            }
+          }
         }
       }
     },
