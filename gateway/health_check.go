@@ -161,6 +161,10 @@ func (gw *Gateway) gatherHealthChecks() {
 				Time:          time.Now().Format(time.RFC3339),
 			}
 
+			// rpc.Login takes no context but is internally bounded (30s call
+			// timeout, max 3 retries) and singleflighted, so a slow RPC server
+			// parks this goroutine for minutes at most while the bounded
+			// barrier below keeps the health-check round moving.
 			if !rpc.Login() {
 				checkItem.Output = "Could not connect to RPC"
 				checkItem.Status = Fail

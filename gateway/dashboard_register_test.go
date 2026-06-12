@@ -472,6 +472,10 @@ func TestPing_HangingDashboard_BoundedByTimeout(t *testing.T) {
 	case err := <-done:
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "dashboard is down? Heartbeat is failing")
+		// The bound is constrained on both sides: comfortably above the
+		// expected 1s probe timeout (half of CheckDuration) to absorb CI
+		// scheduling slack, and strictly below 2s — the pre-fix behaviour —
+		// so the assertion keeps distinguishing fixed from unfixed code.
 		assert.Less(t, time.Since(start), 1700*time.Millisecond,
 			"the probe must time out at half the check interval so its error is reported before the round's barrier expires")
 	case <-time.After(7 * time.Second):
