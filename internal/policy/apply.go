@@ -79,8 +79,13 @@ type applyStatus struct {
 // Apply will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t *Service) Apply(session *user.SessionState) error {
+	// Lock for the entire policy application to ensure atomicity
+	session.LockForWrite()
+	defer session.UnlockForWrite()
+
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
+
 	if session.MetaData == nil {
 		session.MetaData = make(map[string]interface{})
 	}

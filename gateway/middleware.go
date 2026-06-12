@@ -643,13 +643,19 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		cachedVal, found := t.Gw.SessionCache.Get(cacheKey)
 		if found {
 			t.Logger().Debug("--> Key found in local cache")
-			session := cachedVal.(user.SessionState).Clone()
-			if err := t.ApplyPolicies(&session); err != nil {
-				t.Logger().Error(err)
-				return session, false
+			cachedSession, ok := cachedVal.(user.SessionState)
+			if !ok {
+				t.Logger().Error("Failed to cast cached value to SessionState")
+				// Fall through to query keystore
+			} else {
+				session := (&cachedSession).Clone()
+				if err := t.ApplyPolicies(&session); err != nil {
+					t.Logger().Error(err)
+					return session, false
+				}
+				NormalizeMCPEndpoints(&session)
+				return session, true
 			}
-			NormalizeMCPEndpoints(&session)
-			return session, true
 		}
 	}
 
@@ -663,11 +669,6 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		}
 		session := session.Clone()
 		session.SetKeyHash(keyHash)
-		// If exists, assume it has been authorized and pass on
-		// cache it
-		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			t.Gw.SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
-		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(&session); err != nil {
@@ -675,6 +676,13 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 			return session, false
 		}
 		NormalizeMCPEndpoints(&session)
+
+		// Cache the session after policy application, asynchronously with a fresh clone
+		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
+			clonedSession := session.Clone()
+			go t.Gw.SessionCache.Set(cacheKey, clonedSession, cache.DefaultExpiration)
+		}
+
 		t.Logger().Debug("Got key")
 		return session, true
 	}
@@ -696,11 +704,6 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		t.Logger().Info("Recreating session for key: ", t.Gw.obfuscateKey(key))
 
-		// cache it
-		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go t.Gw.SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
-		}
-
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(&session); err != nil {
 			t.Logger().Error(err)
@@ -711,6 +714,12 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
 
 		session.Touch()
+
+		// Cache the session after policy application, asynchronously with a fresh clone
+		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
+			clonedSession := session.Clone()
+			go t.Gw.SessionCache.Set(cacheKey, clonedSession, cache.DefaultExpiration)
+		}
 
 		return session, found
 	}

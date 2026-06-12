@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -353,10 +354,15 @@ type SessionState struct {
 	// The flag holds information if session was restored or not.
 	// Use MarkAsRestored() to mark session as restored, and IsRestored() to get it.
 	isRestored bool
+
+	// mu protects concurrent access to map fields (AccessRights, OauthKeys, MetaData)
+	mu sync.RWMutex
 }
 
 func NewSessionState() *SessionState {
-	return &SessionState{}
+	return &SessionState{
+		// mu is zero-initialized and ready to use
+	}
 }
 
 // APILimit returns an user.APILimit from the session data.
@@ -401,17 +407,36 @@ func (s *SessionState) IsModified() bool {
 	return s.modified
 }
 
-// Clone  returns a fresh copy of s
-func (s SessionState) Clone() SessionState {
-	// Simple vales are cloned by value
-	newSession := s
+// Clone returns a fresh copy of s with thread-safe map cloning
+func (s *SessionState) Clone() SessionState {
+	// Acquire read lock to safely read map fields
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Simple values are cloned by value
+	newSession := *s
+
+	// Deep clone map fields while holding the read lock
 	newSession.AccessRights = maps.Clone(s.AccessRights)
 	newSession.OauthKeys = maps.Clone(s.OauthKeys)
-	newSession.ApplyPolicies = slices.Clone(s.ApplyPolicies)
 	newSession.MetaData = maps.Clone(s.MetaData)
+
+	// Clone slice fields
+	newSession.ApplyPolicies = slices.Clone(s.ApplyPolicies)
 	newSession.Tags = slices.Clone(s.Tags)
 
+	// mu is copied by value, each clone has its own mutex
 	return newSession
+}
+
+// LockForWrite acquires the write lock for map field modifications
+func (s *SessionState) LockForWrite() {
+	s.mu.Lock()
+}
+
+// UnlockForWrite releases the write lock
+func (s *SessionState) UnlockForWrite() {
+	s.mu.Unlock()
 }
 
 func (s *SessionState) MD5Hash() string {
