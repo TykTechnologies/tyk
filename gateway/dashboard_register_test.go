@@ -365,7 +365,7 @@ func TestPing_NilGatewayContext_DoesNotPanic(t *testing.T) {
 // TestPing_DashboardUnreachable_Fails pins the transport-error behaviour of
 // the liveness probe: no response from the dashboard reports it as down.
 func TestPing_DashboardUnreachable_Fails(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 	srv.Close() // connection refused from now on
 
 	h, closeFn := newTestDashboardHandler(t, srv.URL)
@@ -436,8 +436,10 @@ func TestPing_RedisDownDashboardUp_DoesNotBlockOrReRegister(t *testing.T) {
 // never answers must be reported as failing before the round's barrier
 // expires, not block the health-check loop.
 func TestPing_HangingDashboard_BoundedByTimeout(t *testing.T) {
+	const checkDuration = 2 * time.Second
+
 	release := make(chan struct{})
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		<-release
 	}))
 	defer srv.Close()
@@ -449,7 +451,7 @@ func TestPing_HangingDashboard_BoundedByTimeout(t *testing.T) {
 		c.UseDBAppConfigs = false
 		c.NodeSecret = "test-secret"
 		c.DisableDashboardZeroConf = true
-		c.LivenessCheck.CheckDuration = 2 * time.Second
+		c.LivenessCheck.CheckDuration = checkDuration
 	})
 	defer g.Close()
 	g.Gw.resetDashboardClient()
@@ -472,11 +474,14 @@ func TestPing_HangingDashboard_BoundedByTimeout(t *testing.T) {
 	case err := <-done:
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "dashboard is down? Heartbeat is failing")
-		// The bound is constrained on both sides: comfortably above the
-		// expected 1s probe timeout (half of CheckDuration) to absorb CI
-		// scheduling slack, and strictly below 2s — the pre-fix behaviour —
-		// so the assertion keeps distinguishing fixed from unfixed code.
-		assert.Less(t, time.Since(start), 1700*time.Millisecond,
+		// Mirror Ping's derivation, plus scheduling slack for slow CI. The
+		// sum must stay strictly below checkDuration — the pre-fix
+		// behaviour — so the assertion keeps distinguishing fixed from
+		// unfixed code.
+		probeTimeout := checkDuration / 2
+		schedulingSlack := 700 * time.Millisecond
+		require.Less(t, probeTimeout+schedulingSlack, checkDuration)
+		assert.Less(t, time.Since(start), probeTimeout+schedulingSlack,
 			"the probe must time out at half the check interval so its error is reported before the round's barrier expires")
 	case <-time.After(7 * time.Second):
 		t.Fatal("Ping() not bounded: still blocked after 7s on an unresponsive dashboard")
