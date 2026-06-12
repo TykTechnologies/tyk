@@ -278,6 +278,43 @@ func TestNewRequestWithContext_InvalidURL_Panics(t *testing.T) {
 	})
 }
 
+// TestPing_HeartbeatOK_UpdatesNonce pins the healthy-path behaviour of the
+// liveness probe: a 200 heartbeat response succeeds and stores the nonce
+// returned by the dashboard.
+func TestPing_HeartbeatOK_UpdatesNonce(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		writeJSON(t, w, NodeResponse{Status: "OK", Nonce: "nonce-hb-1"})
+	}))
+	defer srv.Close()
+
+	h, closeFn := newTestDashboardHandler(t, srv.URL)
+	defer closeFn()
+	h.HeartBeatEndpoint = srv.URL + "/register/ping"
+
+	require.NoError(t, h.Ping())
+
+	h.Gw.ServiceNonceMutex.RLock()
+	gotNonce := h.Gw.ServiceNonce
+	h.Gw.ServiceNonceMutex.RUnlock()
+	assert.Equal(t, "nonce-hb-1", gotNonce)
+}
+
+// TestPing_DashboardUnreachable_Fails pins the transport-error behaviour of
+// the liveness probe: no response from the dashboard reports it as down.
+func TestPing_DashboardUnreachable_Fails(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	srv.Close() // connection refused from now on
+
+	h, closeFn := newTestDashboardHandler(t, srv.URL)
+	defer closeFn()
+	h.HeartBeatEndpoint = srv.URL + "/register/ping"
+
+	err := h.Ping()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "dashboard is down? Heartbeat is failing")
+}
+
 func Test_DashboardLifecycle(t *testing.T) {
 	var handler HTTPDashboardHandler
 
