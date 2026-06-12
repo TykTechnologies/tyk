@@ -346,6 +346,7 @@ type JSVM struct {
 }
 
 const defaultJSVMTimeout = 5
+const defaultJSVMHTTPRequestTimeout = 5
 
 // Init creates the JSVM with the core library and sets up a default
 // timeout.
@@ -577,8 +578,15 @@ func (j *JSVM) LoadTykJSApi() {
 
 		tr.Proxy = proxyFromAPI(j.Spec)
 
+		var jsvmHTTPRequestTimeout int
+		if jsvmHTTPRequestTimeout = j.Gw.GetConfig().JSVMHTTPRequestTimeout; jsvmHTTPRequestTimeout <= 0 {
+			j.Log.Debug("Default JSVM HTTP Request timeout: ", jsvmHTTPRequestTimeout)
+		} else {
+			j.Log.Debug("Custom JSVM HTTP Request timeout: ", jsvmHTTPRequestTimeout)
+		}
+
 		// using new Client each time should be ok, since we closing connection every time
-		client := &http.Client{Transport: tr}
+		client := &http.Client{Transport: tr, Timeout: time.Duration(jsvmHTTPRequestTimeout) * time.Second}
 		resp, err := client.Do(r)
 		if err != nil {
 			j.Log.WithError(err).Error("Request failed")
