@@ -360,9 +360,7 @@ type SessionState struct {
 }
 
 func NewSessionState() *SessionState {
-	return &SessionState{
-		// mu is zero-initialized and ready to use
-	}
+	return &SessionState{}
 }
 
 // APILimit returns an user.APILimit from the session data.
