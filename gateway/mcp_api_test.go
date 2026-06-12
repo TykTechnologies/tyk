@@ -3,17 +3,24 @@ package gateway
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestExtractMCPObjFromReq(t *testing.T) {
@@ -502,6 +509,338 @@ func TestValidateMCP_EdgeCases(t *testing.T) {
 		assert.True(t, nextCalled, "next handler should be called for DELETE")
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
+}
+
+func pairedMCPProxyOAS(proxyID, orgID, restID string) *oas.OAS {
+	doc := &oas.OAS{T: openapi3.T{
+		OpenAPI: "3.0.3",
+		Info:    &openapi3.Info{Title: proxyID, Version: "1.0.0"},
+		Paths:   openapi3.NewPaths(),
+	}}
+	doc.SetTykExtension(&oas.XTykAPIGateway{
+		Info: oas.Info{
+			ID:    proxyID,
+			OrgID: orgID,
+			Name:  proxyID,
+			State: oas.State{Active: true},
+		},
+		Server: oas.Server{
+			ListenPath: oas.ListenPath{Value: "/" + proxyID + "/"},
+		},
+		Upstream: oas.Upstream{URL: oas.AdapterLoopURL(restID)},
+	})
+	return doc
+}
+
+func restSourceSpec(apiID, orgID string, isOAS bool) *APISpec {
+	doc := oas.OAS{T: openapi3.T{
+		OpenAPI: "3.0.3",
+		Info:    &openapi3.Info{Title: apiID, Version: "1.0.0"},
+		Paths: openapi3.NewPaths(
+			openapi3.WithPath("/orders", &openapi3.PathItem{
+				Get:  &openapi3.Operation{OperationID: "list_orders", Summary: "list orders"},
+				Post: &openapi3.Operation{OperationID: "create_order", Summary: "create order"},
+			}),
+		),
+	}}
+	return &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: apiID,
+			OrgID: orgID,
+			IsOAS: isOAS,
+		},
+		OAS: doc,
+	}
+}
+
+func TestPairedMCPAdapterTarget(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		target        string
+		wantAdapterID string
+		wantRestAPIID string
+		wantOK        bool
+	}{
+		{
+			name:          "accepts canonical mcp path",
+			target:        "tyk://rest-1/mcp",
+			wantAdapterID: "rest-1",
+			wantRestAPIID: "rest-1",
+			wantOK:        true,
+		},
+		{
+			name:          "accepts id-prefixed host",
+			target:        "tyk://id:rest-1/mcp/",
+			wantAdapterID: "rest-1",
+			wantRestAPIID: "rest-1",
+			wantOK:        true,
+		},
+		{
+			name:          "accepts fallback suffix target",
+			target:        "tyk://rest-1__mcp-server",
+			wantAdapterID: "rest-1__mcp-server",
+			wantRestAPIID: "rest-1",
+			wantOK:        true,
+		},
+		{
+			name:   "rejects non mcp path",
+			target: "tyk://rest-1/not-mcp",
+		},
+		{
+			name:   "rejects non tyk scheme",
+			target: "https://rest-1/mcp",
+		},
+		{
+			name:   "rejects empty source api id",
+			target: "tyk:///mcp",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			adapterID, restAPIID, ok := pairedMCPAdapterTarget(tt.target)
+
+			assert.Equal(t, tt.wantAdapterID, adapterID)
+			assert.Equal(t, tt.wantRestAPIID, restAPIID)
+			assert.Equal(t, tt.wantOK, ok)
+		})
+	}
+}
+
+func TestValidatePairedMCPAdapterUpstream(t *testing.T) {
+	t.Parallel()
+
+	t.Run("allows OAS source in same org", func(t *testing.T) {
+		t.Parallel()
+
+		gw := &Gateway{apisByID: map[string]*APISpec{
+			"rest-1": restSourceSpec("rest-1", "org-1", true),
+		}}
+
+		msg, code := gw.validatePairedMCPAdapterUpstream(httptest.NewRequest(http.MethodPost, "/tyk/mcps", nil), pairedMCPProxyOAS("proxy-1", "org-1", "rest-1"))
+
+		assert.Empty(t, msg)
+		assert.Zero(t, code)
+	})
+
+	t.Run("rejects missing source", func(t *testing.T) {
+		t.Parallel()
+
+		gw := &Gateway{apisByID: map[string]*APISpec{}}
+
+		msg, code := gw.validatePairedMCPAdapterUpstream(httptest.NewRequest(http.MethodPost, "/tyk/mcps", nil), pairedMCPProxyOAS("proxy-1", "org-1", "missing-rest"))
+
+		assert.Equal(t, http.StatusBadRequest, code)
+		assert.Contains(t, msg, "missing-rest")
+	})
+
+	t.Run("rejects Classic source", func(t *testing.T) {
+		t.Parallel()
+
+		gw := &Gateway{apisByID: map[string]*APISpec{
+			"rest-1": restSourceSpec("rest-1", "org-1", false),
+		}}
+
+		msg, code := gw.validatePairedMCPAdapterUpstream(httptest.NewRequest(http.MethodPost, "/tyk/mcps", nil), pairedMCPProxyOAS("proxy-1", "org-1", "rest-1"))
+
+		assert.Equal(t, http.StatusBadRequest, code)
+		assert.Contains(t, msg, "Classic")
+	})
+
+	t.Run("rejects cross org source", func(t *testing.T) {
+		t.Parallel()
+
+		gw := &Gateway{apisByID: map[string]*APISpec{
+			"rest-1": restSourceSpec("rest-1", "org-1", true),
+		}}
+
+		msg, code := gw.validatePairedMCPAdapterUpstream(httptest.NewRequest(http.MethodPost, "/tyk/mcps", nil), pairedMCPProxyOAS("proxy-1", "org-2", "rest-1"))
+
+		assert.Equal(t, http.StatusForbidden, code)
+		assert.Contains(t, msg, "different OrgID")
+	})
+
+	t.Run("allows multiple same org proxies for same source", func(t *testing.T) {
+		t.Parallel()
+
+		existingProxy := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				APIID: "proxy-1",
+				OrgID: "org-1",
+				IsOAS: true,
+				Proxy: apidef.ProxyConfig{TargetURL: oas.AdapterLoopURL("rest-1")},
+			},
+			OAS: *pairedMCPProxyOAS("proxy-1", "org-1", "rest-1"),
+		}
+		gw := &Gateway{apisByID: map[string]*APISpec{
+			"rest-1":  restSourceSpec("rest-1", "org-1", true),
+			"proxy-1": existingProxy,
+		}}
+
+		msg, code := gw.validatePairedMCPAdapterUpstream(httptest.NewRequest(http.MethodPost, "/tyk/mcps", nil), pairedMCPProxyOAS("proxy-2", "org-1", "rest-1"))
+
+		assert.Empty(t, msg)
+		assert.Zero(t, code)
+	})
+
+	t.Run("rejects invalid catalogue config", func(t *testing.T) {
+		t.Parallel()
+
+		proxy := pairedMCPProxyOAS("proxy-1", "org-1", "rest-1")
+		proxy.SetTykMCPServerExtension(&oas.TykMCPServer{
+			Primitives: []oas.TykMCPServerPrimitive{
+				{
+					Source:     oas.TykMCPServerSource{OperationID: "list_orders"},
+					Parameters: []oas.TykMCPServerParameter{{Param: "missing_param", Name: "missing"}},
+				},
+			},
+		})
+		gw := &Gateway{apisByID: map[string]*APISpec{
+			"rest-1": restSourceSpec("rest-1", "org-1", true),
+		}}
+
+		msg, code := gw.validatePairedMCPAdapterUpstream(httptest.NewRequest(http.MethodPost, "/tyk/mcps", nil), proxy)
+
+		assert.Equal(t, http.StatusBadRequest, code)
+		assert.Contains(t, msg, "missing_param")
+	})
+
+	t.Run("rejects alias conflicts across same org proxies", func(t *testing.T) {
+		t.Parallel()
+
+		existingOAS := pairedMCPProxyOAS("proxy-1", "org-1", "rest-1")
+		existingOAS.SetTykMCPServerExtension(&oas.TykMCPServer{
+			Primitives: []oas.TykMCPServerPrimitive{
+				{Source: oas.TykMCPServerSource{OperationID: "list_orders"}, Name: "orders", Allow: boolPtr(true)},
+			},
+		})
+		incomingOAS := pairedMCPProxyOAS("proxy-2", "org-1", "rest-1")
+		incomingOAS.SetTykMCPServerExtension(&oas.TykMCPServer{
+			Primitives: []oas.TykMCPServerPrimitive{
+				{Source: oas.TykMCPServerSource{OperationID: "create_order"}, Name: "orders", Allow: boolPtr(true)},
+			},
+		})
+
+		gw := &Gateway{apisByID: map[string]*APISpec{
+			"rest-1": restSourceSpec("rest-1", "org-1", true),
+			"proxy-1": {
+				APIDefinition: &apidef.APIDefinition{
+					APIID: "proxy-1",
+					OrgID: "org-1",
+					IsOAS: true,
+					Proxy: apidef.ProxyConfig{TargetURL: oas.AdapterLoopURL("rest-1")},
+				},
+				OAS: *existingOAS,
+			},
+		}}
+
+		msg, code := gw.validatePairedMCPAdapterUpstream(httptest.NewRequest(http.MethodPost, "/tyk/mcps", nil), incomingOAS)
+
+		assert.Equal(t, http.StatusBadRequest, code)
+		assert.Contains(t, msg, "alias conflict")
+	})
+}
+
+func TestValidatePairedMCPAdapterUpstream_LogsDeriveWarnings(t *testing.T) {
+	logger, hook := logrustest.NewNullLogger()
+	logger.SetLevel(logrus.WarnLevel)
+	originalLog := log
+	log = logger
+	t.Cleanup(func() {
+		log = originalLog
+	})
+
+	rest := restSourceSpec("rest-1", "org-1", true)
+	rest.OAS.Paths = openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get: &openapi3.Operation{OperationID: "list_orders", Summary: "list orders"},
+		}),
+		openapi3.WithPath("/skipped", &openapi3.PathItem{
+			Get: &openapi3.Operation{Summary: "missing operation id"},
+		}),
+	)
+	gw := &Gateway{apisByID: map[string]*APISpec{
+		"rest-1": rest,
+	}}
+
+	msg, code := gw.validatePairedMCPAdapterUpstream(httptest.NewRequest(http.MethodPost, "/tyk/mcps", nil), pairedMCPProxyOAS("proxy-1", "org-1", "rest-1"))
+
+	require.Empty(t, msg)
+	require.Zero(t, code)
+
+	var warningEntry *logrus.Entry
+	for _, entry := range hook.AllEntries() {
+		if entry.Level == logrus.WarnLevel && entry.Message == "REST-as-MCP derivation warning" {
+			warningEntry = entry
+			break
+		}
+	}
+	require.NotNil(t, warningEntry)
+	assert.Equal(t, "proxy-1", warningEntry.Data["api_id"])
+	assert.Equal(t, "rest-1", warningEntry.Data["rest_api_id"])
+	assert.Equal(t, "GET /skipped", warningEntry.Data["operation"])
+	assert.Equal(t, "GET", warningEntry.Data["method"])
+	assert.Equal(t, "/skipped", warningEntry.Data["path"])
+	assert.Equal(t, "missing operationId", warningEntry.Data["reason"])
+}
+
+func TestHandleGetMCPListOAS_IncludesPairedProxy(t *testing.T) {
+	t.Parallel()
+
+	pairedProxy := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "proxy-1",
+			OrgID: "org-1",
+			Name:  "proxy-1",
+			IsOAS: true,
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/proxy-1/",
+				TargetURL:  oas.AdapterLoopURL("rest-1"),
+			},
+		},
+	}
+	require.False(t, pairedProxy.IsMCP())
+	require.True(t, pairedProxy.IsMCPManaged())
+
+	gw := &Gateway{apisByID: map[string]*APISpec{
+		"proxy-1": pairedProxy,
+		"rest-1":  restSourceSpec("rest-1", "org-1", true),
+	}}
+
+	obj, code := gw.handleGetMCPListOAS()
+
+	require.Equal(t, http.StatusOK, code)
+	apisList, ok := obj.([]oas.OAS)
+	require.True(t, ok)
+	require.Len(t, apisList, 1)
+	tykExt := apisList[0].GetTykExtension()
+	require.NotNil(t, tykExt)
+	assert.Equal(t, "proxy-1", tykExt.Info.ID)
+}
+
+func TestHandleAddApiOAS_ValidatesPairedMCPAdapterUpstream(t *testing.T) {
+	gw := &Gateway{apisByID: map[string]*APISpec{}}
+	gw.SetConfig(config.Config{
+		AppPath:    "/",
+		HostName:   "localhost",
+		ListenPort: 8080,
+	})
+
+	body, err := json.Marshal(pairedMCPProxyOAS("proxy-1", "org-1", "missing-rest"))
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodPost, "/tyk/apis/oas", bytes.NewReader(body))
+
+	resp, code := gw.handleAddApi(req, afero.NewMemMapFs(), true)
+
+	require.Equal(t, http.StatusBadRequest, code)
+	msg, ok := resp.(apiStatusMessage)
+	require.True(t, ok)
+	assert.Contains(t, msg.Message, "missing-rest")
 }
 
 func TestHandleGetMCPListOAS(t *testing.T) {

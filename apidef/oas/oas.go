@@ -24,6 +24,9 @@ const (
 	// ExtensionTykStreaming is the OAS schema key for the Tyk Streams extension.
 	ExtensionTykStreaming = "x-tyk-streaming"
 
+	// ExtensionTykMCPServer is the OAS schema key for REST-as-MCP proxy tool-view configuration.
+	ExtensionTykMCPServer = "x-tyk-mcp-server"
+
 	// Main holds the default version value (empty).
 	Main = ""
 
@@ -224,6 +227,7 @@ func (s *OAS) Initialize() {
 	// These functions convert raw JSON to typed structs and cache them.
 	s.GetTykExtension()
 	s.GetTykStreamingExtension()
+	s.GetTykMCPServerExtension()
 
 	if s.Components == nil || s.Components.SecuritySchemes == nil {
 		return
@@ -567,9 +571,10 @@ func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) e
 	securityErr := s.validateSecurity()
 	compliantModeErr := s.validateCompliantModeAuthentication()
 	prmErr := s.validatePRM()
+	mcpServerErr := s.validateMCPServerExtensionPlacement(false)
 	oauth2Err := s.ValidateOAuth2Schemes()
 
-	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, oauth2Err)
+	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, mcpServerErr, oauth2Err)
 }
 
 // Normalize converts the OAS api to a normalized state.
@@ -765,8 +770,9 @@ func (s *OAS) ValidateForMCP(ctx context.Context, opts ...openapi3.ValidationOpt
 	if tykAuth := s.getTykAuthentication(); tykAuth != nil {
 		prmErr = tykAuth.ProtectedResourceMetadata.Validate(true)
 	}
+	mcpServerErr := s.validateMCPServerExtensionPlacement(true)
 
-	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, oauth2Err)
+	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, mcpServerErr, oauth2Err)
 }
 
 // APIDef holds both OAS and Classic forms of an API definition.

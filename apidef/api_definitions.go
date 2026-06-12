@@ -16,6 +16,7 @@ import (
 	"github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/mcpadapter"
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
 	tyktime "github.com/TykTechnologies/tyk/internal/time"
@@ -1476,6 +1477,31 @@ func (a *APIDefinition) IsMCP() bool {
 // MarkAsMCP configures the API definition as a Model Context Protocol (MCP) API.
 func (a *APIDefinition) MarkAsMCP() {
 	a.SetProtocol(JsonRPC20, AppProtocolMCP)
+}
+
+// IsPairedMCPAdapterProxy returns true if this API is a REST-as-MCP proxy
+// whose upstream loops into a REST-as-MCP adapter target for a REST API.
+func (a *APIDefinition) IsPairedMCPAdapterProxy() bool {
+	if a == nil {
+		return false
+	}
+
+	host, path, ok := mcpadapter.ParseTarget(a.Proxy.TargetURL)
+	if !ok {
+		return false
+	}
+	if mcpadapter.IsAPIID(host) {
+		return path == "" || path == "/"
+	}
+	return mcpadapter.IsLoopPath(path)
+}
+
+// IsMCPManaged reports whether this API belongs to the MCP management surface.
+func (a *APIDefinition) IsMCPManaged() bool {
+	if a == nil {
+		return false
+	}
+	return a.IsMCP() || a.IsPairedMCPAdapterProxy()
 }
 
 // IsChildAPI returns true if this API is a child API in a versioning hierarchy.
