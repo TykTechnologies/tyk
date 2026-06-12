@@ -2027,9 +2027,10 @@ func TestSessionState_ConcurrentMapAccess(_ *testing.T) {
 	wg.Wait()
 }
 
-// TestSessionState_NilMutexHandling tests that sessions with nil mutex are handled correctly
-func TestSessionState_NilMutexHandling(t *testing.T) {
-	// Create a session without using NewSessionState (simulating old sessions)
+// TestSessionState_StructLiteralInitialization tests that sessions initialized
+// as struct literals (without NewSessionState) work correctly with the embedded mutex.
+func TestSessionState_StructLiteralInitialization(t *testing.T) {
+	// Create a session without using NewSessionState (simulating struct literal initialization)
 	session := SessionState{
 		AccessRights: map[string]AccessDefinition{
 			"api1": {APIID: "api1"},
@@ -2039,9 +2040,8 @@ func TestSessionState_NilMutexHandling(t *testing.T) {
 		},
 	}
 
-	// Clone should initialize the mutex if nil
+	// The embedded mutex has a valid zero value and should work correctly
 	cloned := session.Clone()
-	assert.NotNil(t, cloned.mu)
 
 	// Should be able to use the cloned session safely
 	cloned.LockForWrite()
@@ -2075,10 +2075,8 @@ func TestSessionState_CloneHasOwnMutex(t *testing.T) {
 
 	cloned := original.Clone()
 
-	// The cloned session should have its own mutex
-	assert.NotNil(t, cloned.mu)
-
 	// Both should be independently lockable without deadlock
+	// (each has its own mutex copied by value)
 	var wg sync.WaitGroup
 
 	wg.Add(2)

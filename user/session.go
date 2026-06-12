@@ -415,7 +415,7 @@ func (s *SessionState) Clone() SessionState {
 	newSession.ApplyPolicies = slices.Clone(s.ApplyPolicies)
 	newSession.Tags = slices.Clone(s.Tags)
 
-	// mu is copied by value, which is fine - each clone has its own mutex
+	// mu is copied by value, each clone has its own mutex
 	return newSession
 }
 

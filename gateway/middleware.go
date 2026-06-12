@@ -680,9 +680,10 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		}
 		NormalizeMCPEndpoints(&session)
 
-		// Cache the session after policy application to ensure the cached value is fully detached
+		// Cache the session after policy application, asynchronously with a fresh clone
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			t.Gw.SessionCache.Set(cacheKey, session.Clone(), cache.DefaultExpiration)
+			clonedSession := session.Clone()
+			go t.Gw.SessionCache.Set(cacheKey, clonedSession, cache.DefaultExpiration)
 		}
 
 		t.Logger().Debug("Got key")
@@ -717,9 +718,10 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 
 		session.Touch()
 
-		// Cache the session after policy application, synchronously with a fresh clone
+		// Cache the session after policy application, asynchronously with a fresh clone
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			t.Gw.SessionCache.Set(cacheKey, session.Clone(), cache.DefaultExpiration)
+			clonedSession := session.Clone()
+			go t.Gw.SessionCache.Set(cacheKey, clonedSession, cache.DefaultExpiration)
 		}
 
 		return session, found
