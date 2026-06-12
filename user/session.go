@@ -8,17 +8,14 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
-
-// sessionMuInit is a package-level mutex used to safely initialize
-// the per-session mutex (mu) in a thread-safe manner for sessions
-// created without calling NewSessionState().
-var sessionMuInit sync.Mutex
 
 // PostExpiryAction defines the action to take on a key in Redis after it expires.
 type PostExpiryAction string
@@ -402,25 +399,36 @@ func (s *SessionState) IsModified() bool {
 	return s.modified
 }
 
-// ensureMu initializes the session mutex in a thread-safe manner.
-// This uses a package-level mutex to avoid races during lazy initialization.
+// ensureMu initializes the session mutex using lock-free atomic operations.
+// This eliminates the global lock bottleneck from the previous implementation.
 func (s *SessionState) ensureMu() {
-	// Always acquire the lock to avoid race on reading s.mu
-	sessionMuInit.Lock()
-	if s.mu == nil {
-		s.mu = &sync.RWMutex{}
+	// Fast path: mutex already initialized
+	if atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&s.mu))) != nil {
+		return
 	}
-	sessionMuInit.Unlock()
+
+	// Slow path: initialize mutex using compare-and-swap
+	newMu := &sync.RWMutex{}
+	atomic.CompareAndSwapPointer(
+		(*unsafe.Pointer)(unsafe.Pointer(&s.mu)),
+		nil,
+		unsafe.Pointer(newMu),
+	)
+	// Note: If another goroutine won the race, newMu will be garbage collected
 }
 
 // Clone returns a fresh copy of s with thread-safe map cloning
+// This version eliminates unnecessary mutex allocations
 func (s *SessionState) Clone() SessionState {
-	// Ensure mutex is initialized in a thread-safe manner
+	// Ensure mutex is initialized using lock-free atomic operations
 	s.ensureMu()
 
+	// Atomic load of mutex pointer to avoid race with ensureMu()
+	mu := (*sync.RWMutex)(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&s.mu))))
+
 	// Acquire read lock to safely read map fields
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	mu.RLock()
+	defer mu.RUnlock()
 
 	// Simple values are cloned by value
 	newSession := *s
@@ -434,22 +442,27 @@ func (s *SessionState) Clone() SessionState {
 	newSession.ApplyPolicies = slices.Clone(s.ApplyPolicies)
 	newSession.Tags = slices.Clone(s.Tags)
 
-	// Give the clone its own mutex
-	newSession.mu = &sync.RWMutex{}
+	// Don't allocate mutex - let ensureMu() do it lazily if needed
+	newSession.mu = nil
 
 	return newSession
 }
 
 // LockForWrite acquires the write lock for map field modifications
 func (s *SessionState) LockForWrite() {
-	// Ensure mutex is initialized in a thread-safe manner
+	// Ensure mutex is initialized using lock-free atomic operations
 	s.ensureMu()
-	s.mu.Lock()
+
+	// Atomic load of mutex pointer to avoid race with ensureMu()
+	mu := (*sync.RWMutex)(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&s.mu))))
+	mu.Lock()
 }
 
 // UnlockForWrite releases the write lock
 func (s *SessionState) UnlockForWrite() {
-	s.mu.Unlock()
+	// Atomic load of mutex pointer
+	mu := (*sync.RWMutex)(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&s.mu))))
+	mu.Unlock()
 }
 
 func (s *SessionState) MD5Hash() string {

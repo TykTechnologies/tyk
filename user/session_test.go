@@ -1599,9 +1599,9 @@ func BenchmarkSessionClone_WithWrites(b *testing.B) {
 			case <-stop:
 				return
 			default:
-				session.mu.Lock()
+				session.LockForWrite()
 				session.AccessRights["api2"] = AccessDefinition{APIID: "api2"}
-				session.mu.Unlock()
+				session.UnlockForWrite()
 			}
 		}
 	}()
@@ -1614,9 +1614,9 @@ func BenchmarkSessionClone_WithWrites(b *testing.B) {
 			case <-stop:
 				return
 			default:
-				session.mu.Lock()
+				session.LockForWrite()
 				session.MetaData["key2"] = "value2"
-				session.mu.Unlock()
+				session.UnlockForWrite()
 			}
 		}
 	}()
@@ -1629,9 +1629,9 @@ func BenchmarkSessionClone_WithWrites(b *testing.B) {
 			case <-stop:
 				return
 			default:
-				session.mu.Lock()
+				session.LockForWrite()
 				session.OauthKeys["oauth2"] = "token2"
-				session.mu.Unlock()
+				session.UnlockForWrite()
 			}
 		}
 	}()
