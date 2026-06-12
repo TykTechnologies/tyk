@@ -411,7 +411,7 @@ func (r *RPCStorageHandler) SetKeyEx(keyName, session string, timeout int64) err
 			return r.internalSetKeyEx(keyName, session, timeout)
 		},
 		retryAlways(r),
-		elapsedLog("SetKeyEx", log),
+		elapsedLog("SetKeyEx", log.AsLogrus()),
 	)()
 }
 

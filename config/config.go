@@ -1261,7 +1261,7 @@ type Config struct {
 
 	// You can now set a logging level (log_level). The following levels can be set: debug, info, warn, error.
 	// If not set or left empty, it will default to `info`.
-	LogLevel string `json:"log_level"`
+	LogLevel logger.Level `json:"log_level"`
 
 	// LogFormat configures the output format of the logs.
 	// Allowed values are `text`, `json`, or `legacy`.

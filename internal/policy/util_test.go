@@ -7,11 +7,12 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/internal/policy"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestMergeAllowedURLs(t *testing.T) {
-	svc := policy.New(nil, nil, logrus.New())
+	svc := policy.New(nil, nil, tyklog.Wrap(logrus.New()))
 
 	session := &user.SessionState{}
 	policies := []user.Policy{

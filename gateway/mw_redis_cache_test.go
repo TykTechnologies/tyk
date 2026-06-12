@@ -447,6 +447,8 @@ func Test_addBodyHash(t *testing.T) {
 // the same observability signals as regular (non-cached) requests:
 // analytics (RecordHit), access logs (RecordAccessLog), and OTel metrics (RecordMetrics).
 func TestRedisCacheMiddleware_Observability(t *testing.T) {
+	log := logrus.New()
+
 	// Install a test hook on the global logger to capture access log entries.
 	hook := &logrustest.Hook{}
 	log.AddHook(hook)

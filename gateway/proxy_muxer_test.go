@@ -363,7 +363,7 @@ func TestHandle404(t *testing.T) {
 
 	logger := logrus.New()
 	oLogger := log
-	log = logger
+	log = tykLog.Wrap(logger)
 	t.Cleanup(func() {
 		log = oLogger
 	})
