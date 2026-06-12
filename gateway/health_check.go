@@ -43,13 +43,17 @@ func (gw *Gateway) getHealthCheckInfo() map[string]HealthCheckItem {
 	return ret
 }
 
+// defaultHealthCheckInterval applies when liveness_check.check_duration is
+// not configured.
+const defaultHealthCheckInterval = 10 * time.Second
+
 // healthCheckInterval is how often the health of all components is gathered,
 // and the longest a single gather round is allowed to take.
 func (gw *Gateway) healthCheckInterval() time.Duration {
 	if n := gw.GetConfig().LivenessCheck.CheckDuration; n > 0 {
 		return n
 	}
-	return 10 * time.Second
+	return defaultHealthCheckInterval
 }
 
 func (gw *Gateway) initHealthCheck(ctx context.Context) {
@@ -187,9 +191,12 @@ func (gw *Gateway) gatherHealthChecks() {
 		close(barrier)
 	}()
 
+	timer := time.NewTimer(gw.healthCheckInterval())
+	defer timer.Stop()
+
 	select {
 	case <-barrier:
-	case <-time.After(gw.healthCheckInterval()):
+	case <-timer.C:
 		mainLog.WithField("liveness-check", true).Warning("Health check timed out waiting for components")
 	}
 

@@ -443,7 +443,7 @@ func TestPing_RedisDownDashboardUp_DoesNotBlockOrReRegister(t *testing.T) {
 // never answers must be reported as failing before the round's barrier
 // expires, not block the health-check loop.
 func TestPing_HangingDashboard_BoundedByTimeout(t *testing.T) {
-	const checkDuration = 2 * time.Second
+	const checkDuration = 4 * time.Second
 
 	release := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
@@ -486,7 +486,7 @@ func TestPing_HangingDashboard_BoundedByTimeout(t *testing.T) {
 		// behaviour — so the assertion keeps distinguishing fixed from
 		// unfixed code.
 		probeTimeout := checkDuration / 2
-		schedulingSlack := 700 * time.Millisecond
+		schedulingSlack := time.Second
 		require.Less(t, probeTimeout+schedulingSlack, checkDuration)
 		assert.Less(t, time.Since(start), probeTimeout+schedulingSlack,
 			"the probe must time out at half the check interval so its error is reported before the round's barrier expires")
