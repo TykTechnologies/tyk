@@ -60,6 +60,13 @@ func writeJSON(t *testing.T, w http.ResponseWriter, v interface{}) {
 	}
 }
 
+func writeBody(t *testing.T, w http.ResponseWriter, body string) {
+	t.Helper()
+	if _, err := w.Write([]byte(body)); err != nil {
+		t.Errorf("failed to write response body: %v", err)
+	}
+}
+
 func okResponse(nodeID, nonce string) NodeResponse {
 	return NodeResponse{
 		Status:  "OK",
@@ -394,12 +401,12 @@ func TestPing_RedisDownDashboardUp_DoesNotBlockOrReRegister(t *testing.T) {
 		case "/register/ping":
 			// Dashboard with Redis down: GetNodeFromSessionWithFallback fails.
 			w.WriteHeader(http.StatusForbidden)
-			_, _ = w.Write([]byte(`{"Status":"Error","Message":"Authorization failed (Session not found)"}`))
+			writeBody(t, w, `{"Status":"Error","Message":"Authorization failed (Session not found)"}`)
 		case "/register/node":
 			atomic.AddInt32(&registerAttempts, 1)
 			// Dashboard with Redis down: NodeIDConn.Lock fails.
 			w.WriteHeader(http.StatusConflict)
-			_, _ = w.Write([]byte(`{"Status":"Error","Message":"Another registration operation in progress"}`))
+			writeBody(t, w, `{"Status":"Error","Message":"Another registration operation in progress"}`)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
