@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,62 @@ import (
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 )
+
+// blockingPingDashService is a DashboardServiceSender whose Ping blocks until
+// unblock is closed — a stand-in for any probe that hangs.
+type blockingPingDashService struct {
+	unblock chan struct{}
+}
+
+func (s *blockingPingDashService) Init() error                          { return nil }
+func (s *blockingPingDashService) Register(_ context.Context) error     { return nil }
+func (s *blockingPingDashService) DeRegister() error                    { return nil }
+func (s *blockingPingDashService) StartBeating(_ context.Context) error { return nil }
+func (s *blockingPingDashService) StopBeating()                         {}
+func (s *blockingPingDashService) NotifyDashboardOfEvent(interface{}) error {
+	return nil
+}
+func (s *blockingPingDashService) Ping() error {
+	<-s.unblock
+	return nil
+}
+
+// TestGatherHealthChecks_HungProbeDoesNotWedgeTheLoop verifies that no single
+// hung dependency probe can block the health-check barrier (TT-17486): the
+// round must complete within the check interval, commit the healthy
+// components, and report the hung one as failed.
+func TestGatherHealthChecks_HungProbeDoesNotWedgeTheLoop(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	unblock := make(chan struct{})
+	defer close(unblock)
+	ts.Gw.DashService = &blockingPingDashService{unblock: unblock}
+
+	cfg := ts.Gw.GetConfig()
+	cfg.UseDBAppConfigs = true
+	cfg.LivenessCheck.CheckDuration = time.Second
+	ts.Gw.SetConfig(cfg)
+
+	done := make(chan struct{})
+	go func() {
+		ts.Gw.gatherHealthChecks()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("gatherHealthChecks wedged by a hung dashboard probe — /hello and /ready would serve a stale status forever")
+	}
+
+	checks := ts.Gw.getHealthCheckInfo()
+	require.Contains(t, checks, "redis")
+	assert.Equal(t, Pass, checks["redis"].Status)
+	require.Contains(t, checks, "dashboard")
+	assert.Equal(t, HealthCheckStatus(Fail), checks["dashboard"].Status)
+	assert.Equal(t, "health check timed out", checks["dashboard"].Output)
+}
 
 func TestGateway_readinessHandler(t *testing.T) {
 	tests := []struct {

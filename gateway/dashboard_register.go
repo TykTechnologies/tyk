@@ -277,10 +277,9 @@ func (h *HTTPDashboardHandler) attemptRegistration(ctx context.Context) (registe
 // session store is unavailable), and recovery from that state is owned by
 // the heartbeat loop, not by the probe.
 func (h *HTTPDashboardHandler) Ping() error {
-	timeout := 5 * time.Second
-	if n := h.Gw.GetConfig().LivenessCheck.CheckDuration; n > 0 && n < timeout {
-		timeout = n
-	}
+	// Half the check interval, so the probe always reports its own error
+	// before the round's barrier in gatherHealthChecks expires.
+	timeout := h.Gw.healthCheckInterval() / 2
 
 	baseCtx := h.Gw.ctx
 	if baseCtx == nil {

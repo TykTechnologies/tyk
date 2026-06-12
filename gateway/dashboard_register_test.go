@@ -377,6 +377,108 @@ func TestPing_DashboardUnreachable_Fails(t *testing.T) {
 	assert.Contains(t, err.Error(), "dashboard is down? Heartbeat is failing")
 }
 
+// TestPing_RedisDownDashboardUp_DoesNotBlockOrReRegister is the TT-17486
+// regression test: with Redis down but the Dashboard up, the Dashboard
+// answers the heartbeat with 403 (it cannot read the session->node mapping)
+// and registration with 409 + Status "Error" (its Redis-backed lock/session
+// calls fail). The liveness probe must not block on, nor trigger,
+// re-registration in that state — Register() retries such a 409 every 5s
+// until its context is cancelled, so a probe that reaches it wedges the
+// health-check loop and /hello and /ready serve a stale "pass" cache.
+func TestPing_RedisDownDashboardUp_DoesNotBlockOrReRegister(t *testing.T) {
+	var registerAttempts int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/register/ping":
+			// Dashboard with Redis down: GetNodeFromSessionWithFallback fails.
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"Status":"Error","Message":"Authorization failed (Session not found)"}`))
+		case "/register/node":
+			atomic.AddInt32(&registerAttempts, 1)
+			// Dashboard with Redis down: NodeIDConn.Lock fails.
+			w.WriteHeader(http.StatusConflict)
+			_, _ = w.Write([]byte(`{"Status":"Error","Message":"Another registration operation in progress"}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	h, closeFn := newTestDashboardHandler(t, srv.URL)
+	defer closeFn()
+	h.HeartBeatEndpoint = srv.URL + "/register/ping"
+
+	done := make(chan error, 1)
+	go func() {
+		// Exactly what the dashboard goroutine in gatherHealthChecks does.
+		done <- h.Gw.DashService.Ping()
+	}()
+
+	select {
+	case err := <-done:
+		// v5.8.13 parity: the dashboard responded (403), so it is reachable
+		// and the probe reports it healthy without re-registering.
+		require.NoError(t, err)
+		assert.Zero(t, atomic.LoadInt32(&registerAttempts),
+			"the liveness probe must never trigger node re-registration")
+	case <-time.After(10 * time.Second):
+		t.Fatalf("Ping() blocked (register attempts: %d) — the dashboard health "+
+			"goroutine never finishes, gatherHealthChecks' wg.Wait() never returns, "+
+			"and /hello and /ready serve the stale last-known-good status forever",
+			atomic.LoadInt32(&registerAttempts))
+	}
+}
+
+// TestPing_HangingDashboard_BoundedByTimeout verifies the probe is bounded by
+// half the health-check interval: a dashboard that accepts the connection but
+// never answers must be reported as failing before the round's barrier
+// expires, not block the health-check loop.
+func TestPing_HangingDashboard_BoundedByTimeout(t *testing.T) {
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		<-release
+	}))
+	defer srv.Close()
+	defer close(release)
+
+	// Production-default dashboard client (30s timeout) so the probe's own
+	// bound is what gets exercised, not the test helper's short client.
+	g := StartTest(func(c *config.Config) {
+		c.UseDBAppConfigs = false
+		c.NodeSecret = "test-secret"
+		c.DisableDashboardZeroConf = true
+		c.LivenessCheck.CheckDuration = 2 * time.Second
+	})
+	defer g.Close()
+	g.Gw.resetDashboardClient()
+	t.Cleanup(g.Gw.resetDashboardClient)
+
+	h := &HTTPDashboardHandler{
+		Gw:                g.Gw,
+		Secret:            "test-secret",
+		HeartBeatEndpoint: srv.URL + "/register/ping",
+	}
+	g.Gw.DashService = h
+
+	done := make(chan error, 1)
+	start := time.Now()
+	go func() {
+		done <- h.Gw.DashService.Ping()
+	}()
+
+	select {
+	case err := <-done:
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dashboard is down? Heartbeat is failing")
+		assert.Less(t, time.Since(start), 1700*time.Millisecond,
+			"the probe must time out at half the check interval so its error is reported before the round's barrier expires")
+	case <-time.After(7 * time.Second):
+		t.Fatal("Ping() not bounded: still blocked after 7s on an unresponsive dashboard")
+	}
+}
+
 func Test_DashboardLifecycle(t *testing.T) {
 	var handler HTTPDashboardHandler
 
