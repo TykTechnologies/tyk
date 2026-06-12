@@ -43,16 +43,20 @@ func (gw *Gateway) getHealthCheckInfo() map[string]HealthCheckItem {
 	return ret
 }
 
+// healthCheckInterval is how often the health of all components is gathered,
+// and the longest a single gather round is allowed to take.
+func (gw *Gateway) healthCheckInterval() time.Duration {
+	if n := gw.GetConfig().LivenessCheck.CheckDuration; n > 0 {
+		return n
+	}
+	return 10 * time.Second
+}
+
 func (gw *Gateway) initHealthCheck(ctx context.Context) {
 	gw.setCurrentHealthCheckInfo(make(map[string]HealthCheckItem, 3))
 
 	go func(ctx context.Context) {
-		var n = gw.GetConfig().LivenessCheck.CheckDuration
-		if n == 0 {
-			n = 10 * time.Second
-		}
-
-		ticker := time.NewTicker(n)
+		ticker := time.NewTicker(gw.healthCheckInterval())
 
 		for {
 			select {
@@ -78,6 +82,10 @@ type SafeHealthCheck struct {
 
 func (gw *Gateway) gatherHealthChecks() {
 	allInfos := SafeHealthCheck{info: make(map[string]HealthCheckItem, 3)}
+
+	// expected tracks the components probed this round, so the ones whose
+	// probe does not finish in time can be reported as failed.
+	expected := map[string]string{"redis": Datastore}
 
 	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-", ConnectionHandler: gw.StorageConnectionHandler}
 	redisStore.Connect()
@@ -109,6 +117,7 @@ func (gw *Gateway) gatherHealthChecks() {
 	}()
 
 	if gw.GetConfig().UseDBAppConfigs {
+		expected["dashboard"] = System
 		wg.Add(1)
 
 		go func() {
@@ -140,7 +149,7 @@ func (gw *Gateway) gatherHealthChecks() {
 	}
 
 	if gw.GetConfig().Policies.PolicySource == "rpc" {
-
+		expected["rpc"] = System
 		wg.Add(1)
 
 		go func() {
@@ -165,11 +174,42 @@ func (gw *Gateway) gatherHealthChecks() {
 		}()
 	}
 
-	wg.Wait()
+	// A single hung probe must not wedge the health-check loop (TT-17486):
+	// wait for the barrier only up to the check interval, then commit
+	// whatever completed and mark the missing components as failed.
+	barrier := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(barrier)
+	}()
 
+	select {
+	case <-barrier:
+	case <-time.After(gw.healthCheckInterval()):
+		mainLog.WithField("liveness-check", true).Warning("Health check timed out waiting for components")
+	}
+
+	// Copy under the mutex: a probe that finishes late may still write to
+	// allInfos.info, which must not race with readers of the stored map.
 	allInfos.mux.Lock()
-	gw.setCurrentHealthCheckInfo(allInfos.info)
+	info := make(map[string]HealthCheckItem, len(expected))
+	for component, item := range allInfos.info {
+		info[component] = item
+	}
 	allInfos.mux.Unlock()
+
+	for component, componentType := range expected {
+		if _, ok := info[component]; !ok {
+			info[component] = HealthCheckItem{
+				Status:        Fail,
+				Output:        "health check timed out",
+				ComponentType: componentType,
+				Time:          time.Now().Format(time.RFC3339),
+			}
+		}
+	}
+
+	gw.setCurrentHealthCheckInfo(info)
 }
 
 func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {

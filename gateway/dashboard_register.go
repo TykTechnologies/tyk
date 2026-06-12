@@ -271,11 +271,27 @@ func (h *HTTPDashboardHandler) attemptRegistration(ctx context.Context) (registe
 	return true, nil
 }
 
+// Ping is the dashboard liveness probe behind /hello and /ready. It must
+// never block on, nor trigger, node re-registration (TT-17486): a 403 means
+// the dashboard is reachable but does not recognise this node (e.g. its
+// session store is unavailable), and recovery from that state is owned by
+// the heartbeat loop, not by the probe.
 func (h *HTTPDashboardHandler) Ping() error {
-	return h.sendHeartBeat(
-		h.newRequest(http.MethodGet, h.HeartBeatEndpoint),
-		h.Gw.initialiseClient(),
-		context.Background())
+	timeout := 5 * time.Second
+	if n := h.Gw.GetConfig().LivenessCheck.CheckDuration; n > 0 && n < timeout {
+		timeout = n
+	}
+
+	ctx, cancel := context.WithTimeout(h.Gw.ctx, timeout)
+	defer cancel()
+
+	err := h.doHeartBeat(
+		h.newRequestWithContext(ctx, http.MethodGet, h.HeartBeatEndpoint),
+		h.Gw.initialiseClient())
+	if errors.Is(err, errHeartBeatForbidden) {
+		return nil
+	}
+	return err
 }
 
 func (h *HTTPDashboardHandler) isHeartBeatStopped() bool {
@@ -335,7 +351,20 @@ func (h *HTTPDashboardHandler) addHeaderToRequest(req *http.Request) {
 	req.Header.Set(header.XTykSessionID, h.Gw.SessionID)
 }
 
+// errHeartBeatForbidden is returned by doHeartBeat when the dashboard
+// answers the heartbeat with 403: it is reachable but does not recognise
+// this node.
+var errHeartBeatForbidden = errors.New("heartbeat rejected: node not recognised by the dashboard")
+
 func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Client, ctx context.Context) error {
+	err := h.doHeartBeat(req, client)
+	if errors.Is(err, errHeartBeatForbidden) {
+		return h.Gw.DashService.Register(ctx)
+	}
+	return err
+}
+
+func (h *HTTPDashboardHandler) doHeartBeat(req *http.Request, client *http.Client) error {
 	req.Header.Set(header.XTykNodeID, h.Gw.GetNodeID())
 	h.Gw.ServiceNonceMutex.RLock()
 	req.Header.Set(header.XTykNonce, h.Gw.ServiceNonce)
@@ -349,7 +378,7 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
-		return h.Gw.DashService.Register(ctx)
+		return errHeartBeatForbidden
 	}
 
 	if resp.StatusCode != http.StatusOK {
