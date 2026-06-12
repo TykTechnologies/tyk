@@ -532,14 +532,24 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 			uniqueWords[m[0]] = true
 			val := os.Getenv(m[1])
 			if val != "" {
-				input = strings.Replace(input, m[0], val, -1)
+				escaped, err := jsonEscapeString(val)
+				if err != nil {
+					log.WithError(err).Errorf("Couldn't JSON-escape env secret for key: %s", m[1])
+					continue
+				}
+				input = strings.ReplaceAll(input, m[0], escaped)
 			}
 		}
 	}
 
 	if strings.Contains(input, prefixSecrets) {
 		for k, v := range a.Gw.GetConfig().Secrets {
-			input = strings.Replace(input, prefixSecrets+k, v, -1)
+			escaped, err := jsonEscapeString(v)
+			if err != nil {
+				log.WithError(err).Errorf("Couldn't JSON-escape config secret for key: %s", k)
+				continue
+			}
+			input = strings.ReplaceAll(input, prefixSecrets+k, escaped)
 		}
 	}
 
@@ -570,7 +580,11 @@ func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
 
 	for i := 1; i < len(pairs); i++ {
 		key := strings.TrimPrefix(pairs[i].Key, prefixKeys+"/")
-		*input = strings.Replace(*input, prefixConsul+key, string(pairs[i].Value), -1)
+		escaped, err := jsonEscapeString(string(pairs[i].Value))
+		if err != nil {
+			return err
+		}
+		*input = strings.ReplaceAll(*input, prefixConsul+key, escaped)
 	}
 
 	return nil
@@ -611,7 +625,11 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 	}
 
 	for k, v := range pairsMap {
-		*input = strings.Replace(*input, prefixVault+k, fmt.Sprintf("%v", v), -1)
+		escaped, err := jsonEscapeString(fmt.Sprintf("%v", v))
+		if err != nil {
+			return err
+		}
+		*input = strings.ReplaceAll(*input, prefixVault+k, escaped)
 	}
 
 	return nil
