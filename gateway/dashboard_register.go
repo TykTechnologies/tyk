@@ -282,7 +282,12 @@ func (h *HTTPDashboardHandler) Ping() error {
 		timeout = n
 	}
 
-	ctx, cancel := context.WithTimeout(h.Gw.ctx, timeout)
+	baseCtx := h.Gw.ctx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	ctx, cancel := context.WithTimeout(baseCtx, timeout)
 	defer cancel()
 
 	err := h.doHeartBeat(

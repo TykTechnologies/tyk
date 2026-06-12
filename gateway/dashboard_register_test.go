@@ -278,6 +278,45 @@ func TestNewRequestWithContext_InvalidURL_Panics(t *testing.T) {
 	})
 }
 
+// TestSendHeartBeat_Forbidden_ReRegisters pins the recovery path the health
+// probe relies on: the heartbeat loop (not the probe) owns re-registration,
+// so a 403 heartbeat response must trigger Register and refresh the node
+// identity.
+func TestSendHeartBeat_Forbidden_ReRegisters(t *testing.T) {
+	var registerCalls int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/register/ping":
+			w.WriteHeader(http.StatusForbidden)
+		case "/register/node":
+			atomic.AddInt32(&registerCalls, 1)
+			writeJSON(t, w, okResponse("node-recovered", "nonce-recovered"))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	h, closeFn := newTestDashboardHandler(t, srv.URL)
+	defer closeFn()
+	h.HeartBeatEndpoint = srv.URL + "/register/ping"
+
+	err := h.sendHeartBeat(
+		h.newRequest(http.MethodGet, h.HeartBeatEndpoint),
+		h.Gw.initialiseClient(),
+		context.Background())
+	require.NoError(t, err)
+
+	assert.Equal(t, int32(1), atomic.LoadInt32(&registerCalls))
+	assert.Equal(t, "node-recovered", h.Gw.GetNodeID())
+
+	h.Gw.ServiceNonceMutex.RLock()
+	gotNonce := h.Gw.ServiceNonce
+	h.Gw.ServiceNonceMutex.RUnlock()
+	assert.Equal(t, "nonce-recovered", gotNonce)
+}
+
 // TestPing_HeartbeatOK_UpdatesNonce pins the healthy-path behaviour of the
 // liveness probe: a 200 heartbeat response succeeds and stores the nonce
 // returned by the dashboard.
@@ -298,6 +337,29 @@ func TestPing_HeartbeatOK_UpdatesNonce(t *testing.T) {
 	gotNonce := h.Gw.ServiceNonce
 	h.Gw.ServiceNonceMutex.RUnlock()
 	assert.Equal(t, "nonce-hb-1", gotNonce)
+}
+
+// TestPing_NilGatewayContext_DoesNotPanic guards embedders that construct a
+// Gateway without a context: the probe falls back to context.Background()
+// instead of panicking in context.WithTimeout.
+func TestPing_NilGatewayContext_DoesNotPanic(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		writeJSON(t, w, NodeResponse{Status: "OK", Nonce: "nonce-1"})
+	}))
+	defer srv.Close()
+
+	h, closeFn := newTestDashboardHandler(t, srv.URL)
+	defer closeFn()
+	h.HeartBeatEndpoint = srv.URL + "/register/ping"
+
+	oldCtx := h.Gw.ctx
+	h.Gw.ctx = nil
+	defer func() { h.Gw.ctx = oldCtx }()
+
+	assert.NotPanics(t, func() {
+		assert.NoError(t, h.Ping())
+	})
 }
 
 // TestPing_DashboardUnreachable_Fails pins the transport-error behaviour of
