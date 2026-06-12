@@ -174,7 +174,7 @@ jobs:
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: ${{ steps.ci_metadata_ee.outputs.tags }}
@@ -183,6 +183,49 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway-ee
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
+      - name: Verify compression format for ee CI image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.ci_metadata_ee.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw -- "$TAG" > manifest.json
+
+          # Extract child digests (excluding attestation manifests) if it's a multi-arch manifest list / index
+          DIGESTS=$(jq -r '.manifests[] | select((.platform.architecture // "") != "unknown" and (.annotations["vnd.docker.reference.type"] // "") != "attestation-manifest") | .digest' manifest.json 2>/dev/null || true)
+
+          verify_manifest() {
+            local file=$1
+            # Check if any layer does NOT end in gzip/tar+gzip/tar.gzip
+            local invalid_layers
+            invalid_layers=$(jq -r '.layers[].mediaType' "$file" | grep -v 'tar+gzip' | grep -v 'tar.gzip' || true)
+            if [ -n "$invalid_layers" ]; then
+              echo "::error::Found layers that are not gzip-compressed:"
+              echo "$invalid_layers"
+              exit 1
+            fi
+            # Also verify we found at least one layer
+            local layer_count
+            layer_count=$(jq '.layers | length' "$file" 2>/dev/null || echo 0)
+            if [ "$layer_count" -eq 0 ]; then
+              echo "::error::No layers found in manifest!"
+              exit 1
+            fi
+          }
+
+          if [ -n "$DIGESTS" ]; then
+            echo "Multi-arch image list detected. Checking each platform manifest..."
+            for digest in $DIGESTS; do
+              echo "Inspecting child platform manifest: $digest"
+              docker buildx imagetools inspect --raw -- "$TAG@$digest" > child_manifest.json
+              verify_manifest child_manifest.json
+            done
+          else
+            echo "Single-arch manifest detected. Checking manifest..."
+            verify_manifest manifest.json
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Docker metadata for ee tag push
         id: tag_metadata_ee
         if: startsWith(github.ref, 'refs/tags')
@@ -211,13 +254,56 @@ jobs:
           file: ci/Dockerfile.distroless
           provenance: mode=max
           cache-from: type=gha
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_ee.outputs.tags }}
           labels: ${{ steps.tag_metadata_ee.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
+      - name: Verify compression format for ee prod image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.tag_metadata_ee.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw -- "$TAG" > manifest.json
+
+          # Extract child digests (excluding attestation manifests) if it's a multi-arch manifest list / index
+          DIGESTS=$(jq -r '.manifests[] | select((.platform.architecture // "") != "unknown" and (.annotations["vnd.docker.reference.type"] // "") != "attestation-manifest") | .digest' manifest.json 2>/dev/null || true)
+
+          verify_manifest() {
+            local file=$1
+            # Check if any layer does NOT end in gzip/tar+gzip/tar.gzip
+            local invalid_layers
+            invalid_layers=$(jq -r '.layers[].mediaType' "$file" | grep -v 'tar+gzip' | grep -v 'tar.gzip' || true)
+            if [ -n "$invalid_layers" ]; then
+              echo "::error::Found layers that are not gzip-compressed:"
+              echo "$invalid_layers"
+              exit 1
+            fi
+            # Also verify we found at least one layer
+            local layer_count
+            layer_count=$(jq '.layers | length' "$file" 2>/dev/null || echo 0)
+            if [ "$layer_count" -eq 0 ]; then
+              echo "::error::No layers found in manifest!"
+              exit 1
+            fi
+          }
+
+          if [ -n "$DIGESTS" ]; then
+            echo "Multi-arch image list detected. Checking each platform manifest..."
+            for digest in $DIGESTS; do
+              echo "Inspecting child platform manifest: $digest"
+              docker buildx imagetools inspect --raw -- "$TAG@$digest" > child_manifest.json
+              verify_manifest child_manifest.json
+            done
+          else
+            echo "Single-arch manifest detected. Checking manifest..."
+            verify_manifest manifest.json
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Attach base image VEX to ee
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
@@ -257,7 +343,7 @@ jobs:
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: ${{ steps.ci_metadata_fips.outputs.tags }}
@@ -266,6 +352,49 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway-fips
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
+      - name: Verify compression format for fips CI image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.ci_metadata_fips.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw -- "$TAG" > manifest.json
+
+          # Extract child digests (excluding attestation manifests) if it's a multi-arch manifest list / index
+          DIGESTS=$(jq -r '.manifests[] | select((.platform.architecture // "") != "unknown" and (.annotations["vnd.docker.reference.type"] // "") != "attestation-manifest") | .digest' manifest.json 2>/dev/null || true)
+
+          verify_manifest() {
+            local file=$1
+            # Check if any layer does NOT end in gzip/tar+gzip/tar.gzip
+            local invalid_layers
+            invalid_layers=$(jq -r '.layers[].mediaType' "$file" | grep -v 'tar+gzip' | grep -v 'tar.gzip' || true)
+            if [ -n "$invalid_layers" ]; then
+              echo "::error::Found layers that are not gzip-compressed:"
+              echo "$invalid_layers"
+              exit 1
+            fi
+            # Also verify we found at least one layer
+            local layer_count
+            layer_count=$(jq '.layers | length' "$file" 2>/dev/null || echo 0)
+            if [ "$layer_count" -eq 0 ]; then
+              echo "::error::No layers found in manifest!"
+              exit 1
+            fi
+          }
+
+          if [ -n "$DIGESTS" ]; then
+            echo "Multi-arch image list detected. Checking each platform manifest..."
+            for digest in $DIGESTS; do
+              echo "Inspecting child platform manifest: $digest"
+              docker buildx imagetools inspect --raw -- "$TAG@$digest" > child_manifest.json
+              verify_manifest child_manifest.json
+            done
+          else
+            echo "Single-arch manifest detected. Checking manifest..."
+            verify_manifest manifest.json
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Docker metadata for fips tag push
         id: tag_metadata_fips
         if: startsWith(github.ref, 'refs/tags')
@@ -293,13 +422,56 @@ jobs:
           file: ci/Dockerfile.distroless
           provenance: mode=max
           cache-from: type=gha
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_fips.outputs.tags }}
           labels: ${{ steps.tag_metadata_fips.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-fips
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
+      - name: Verify compression format for fips prod image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.tag_metadata_fips.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw -- "$TAG" > manifest.json
+
+          # Extract child digests (excluding attestation manifests) if it's a multi-arch manifest list / index
+          DIGESTS=$(jq -r '.manifests[] | select((.platform.architecture // "") != "unknown" and (.annotations["vnd.docker.reference.type"] // "") != "attestation-manifest") | .digest' manifest.json 2>/dev/null || true)
+
+          verify_manifest() {
+            local file=$1
+            # Check if any layer does NOT end in gzip/tar+gzip/tar.gzip
+            local invalid_layers
+            invalid_layers=$(jq -r '.layers[].mediaType' "$file" | grep -v 'tar+gzip' | grep -v 'tar.gzip' || true)
+            if [ -n "$invalid_layers" ]; then
+              echo "::error::Found layers that are not gzip-compressed:"
+              echo "$invalid_layers"
+              exit 1
+            fi
+            # Also verify we found at least one layer
+            local layer_count
+            layer_count=$(jq '.layers | length' "$file" 2>/dev/null || echo 0)
+            if [ "$layer_count" -eq 0 ]; then
+              echo "::error::No layers found in manifest!"
+              exit 1
+            fi
+          }
+
+          if [ -n "$DIGESTS" ]; then
+            echo "Multi-arch image list detected. Checking each platform manifest..."
+            for digest in $DIGESTS; do
+              echo "Inspecting child platform manifest: $digest"
+              docker buildx imagetools inspect --raw -- "$TAG@$digest" > child_manifest.json
+              verify_manifest child_manifest.json
+            done
+          else
+            echo "Single-arch manifest detected. Checking manifest..."
+            verify_manifest manifest.json
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Attach base image VEX to fips
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
@@ -336,13 +508,56 @@ jobs:
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64,linux/s390x' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: ${{ steps.ci_metadata_std.outputs.tags }}
           labels: ${{ steps.ci_metadata_std.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway
+      - name: Verify compression format for std CI image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.ci_metadata_std.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw -- "$TAG" > manifest.json
+
+          # Extract child digests (excluding attestation manifests) if it's a multi-arch manifest list / index
+          DIGESTS=$(jq -r '.manifests[] | select((.platform.architecture // "") != "unknown" and (.annotations["vnd.docker.reference.type"] // "") != "attestation-manifest") | .digest' manifest.json 2>/dev/null || true)
+
+          verify_manifest() {
+            local file=$1
+            # Check if any layer does NOT end in gzip/tar+gzip/tar.gzip
+            local invalid_layers
+            invalid_layers=$(jq -r '.layers[].mediaType' "$file" | grep -v 'tar+gzip' | grep -v 'tar.gzip' || true)
+            if [ -n "$invalid_layers" ]; then
+              echo "::error::Found layers that are not gzip-compressed:"
+              echo "$invalid_layers"
+              exit 1
+            fi
+            # Also verify we found at least one layer
+            local layer_count
+            layer_count=$(jq '.layers | length' "$file" 2>/dev/null || echo 0)
+            if [ "$layer_count" -eq 0 ]; then
+              echo "::error::No layers found in manifest!"
+              exit 1
+            fi
+          }
+
+          if [ -n "$DIGESTS" ]; then
+            echo "Multi-arch image list detected. Checking each platform manifest..."
+            for digest in $DIGESTS; do
+              echo "Inspecting child platform manifest: $digest"
+              docker buildx imagetools inspect --raw -- "$TAG@$digest" > child_manifest.json
+              verify_manifest child_manifest.json
+            done
+          else
+            echo "Single-arch manifest detected. Checking manifest..."
+            verify_manifest manifest.json
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: Docker metadata for std tag push
         id: tag_metadata_std
         if: startsWith(github.ref, 'refs/tags')
@@ -371,11 +586,54 @@ jobs:
           file: ci/Dockerfile.distroless
           provenance: mode=max
           cache-from: type=gha
-          push: true
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_std.outputs.tags }}
           labels: ${{ steps.tag_metadata_std.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway
+      - name: Verify compression format for std prod image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.tag_metadata_std.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw -- "$TAG" > manifest.json
+
+          # Extract child digests (excluding attestation manifests) if it's a multi-arch manifest list / index
+          DIGESTS=$(jq -r '.manifests[] | select((.platform.architecture // "") != "unknown" and (.annotations["vnd.docker.reference.type"] // "") != "attestation-manifest") | .digest' manifest.json 2>/dev/null || true)
+
+          verify_manifest() {
+            local file=$1
+            # Check if any layer does NOT end in gzip/tar+gzip/tar.gzip
+            local invalid_layers
+            invalid_layers=$(jq -r '.layers[].mediaType' "$file" | grep -v 'tar+gzip' | grep -v 'tar.gzip' || true)
+            if [ -n "$invalid_layers" ]; then
+              echo "::error::Found layers that are not gzip-compressed:"
+              echo "$invalid_layers"
+              exit 1
+            fi
+            # Also verify we found at least one layer
+            local layer_count
+            layer_count=$(jq '.layers | length' "$file" 2>/dev/null || echo 0)
+            if [ "$layer_count" -eq 0 ]; then
+              echo "::error::No layers found in manifest!"
+              exit 1
+            fi
+          }
+
+          if [ -n "$DIGESTS" ]; then
+            echo "Multi-arch image list detected. Checking each platform manifest..."
+            for digest in $DIGESTS; do
+              echo "Inspecting child platform manifest: $digest"
+              docker buildx imagetools inspect --raw -- "$TAG@$digest" > child_manifest.json
+              verify_manifest child_manifest.json
+            done
+          else
+            echo "Single-arch manifest detected. Checking manifest..."
+            verify_manifest manifest.json
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
       - name: save deb
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
@@ -944,18 +1202,9 @@ jobs:
       deb: ${{ steps.params.outputs.deb }}
       rpm: ${{ steps.params.outputs.rpm }}
     steps:
-      - name: set params
+      - name: Set distro matrix
+        uses: TykTechnologies/github-actions/.github/actions/tests/distro-matrix@production
         id: params
-        shell: bash
-        env:
-          # startsWith covers pull_request_target too
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
-        run: |
-          set -eo pipefail
-          curl -s --retry 5 --retry-delay 10 --fail-with-body "http://tui.internal.dev.tyk.technology/v2/$VARIATION/tyk/$BASE_REF/${{ github.event_name}}/api/Distros.gho" | tee -a "$GITHUB_OUTPUT"
-          if ! [[ $VARIATION =~ prod ]];then
-            echo "::warning file=.github/workflows/release.yml,line=24,col=1,endColumn=8::Using test variation"
-          fi
   upgrade-deb:
     services:
       httpbin.org:
