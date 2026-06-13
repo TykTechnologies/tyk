@@ -6,6 +6,7 @@
 //	mockgen -typed -source= -destination=../internal/policy/store_mock.gen.go -package policy . RPCDataLoader
 //
 
+// SYS-REQ-008: generated mock for RPCDataLoader used in policy tests
 // Package policy is a generated GoMock package.
 package policy
 

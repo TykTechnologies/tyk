@@ -1,0 +1,52 @@
+id: SYS-REQ-070
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !apply_requested | !clear_requested | result_deterministic
+description: All policy engine operations (Apply, ClearSession, ApplyRateLimits, ApplyEndpointLevelLimits) shall produce deterministic results. Given the same inputs and policy state, repeated calls shall produce identical session state, error values, and side effects. Non-determinism from map iteration order, timing, or goroutine scheduling must not affect operational outcomes.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Non-deterministic behavior in policy application makes testing impossible and can cause intermittent failures in production. ClearSession must always produce the same cleared state regardless of previous session history. Error handling must consistently identify the same errors given the same inputs. Performance boundaries must be consistently met.
+tags:
+    - determinism
+    - reproducibility
+    - testing
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-002
+        - STK-REQ-005
+        - STK-REQ-006
+        - STK-REQ-007
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-05-19T17:10:22.416189Z"
+    reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:c7e3810b6c543e46361709b17a2e2218001ee66391e0a42de8b80cc801c887bc
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T12:00:00Z"
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-05-08T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-05-08T00:00:00Z"
+obligation_class: determinism
+lifecycle:
+    change_history:
+        - date: "2026-05-08T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class determinism covering STK-REQ-002, STK-REQ-005, STK-REQ-006, STK-REQ-007
+          changed_by: ai:claude

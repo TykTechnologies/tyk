@@ -1,3 +1,4 @@
+// SYS-REQ-008: RPC data loader mock for policy integration tests
 package policy
 
 import (
@@ -29,7 +30,7 @@ func (s *RPCDataLoaderMock) GetApiDefinitions(_ string, tags []string) string {
 	}
 
 	apiList, err := json.Marshal(s.Apis)
-	if err != nil {
+	if err != nil { //mcdc:ignore json.Marshal cannot fail for []model.MergedAPI (no channels, funcs, or complex numbers)
 		return ""
 	}
 	return string(apiList)
@@ -38,7 +39,7 @@ func (s *RPCDataLoaderMock) GetApiDefinitions(_ string, tags []string) string {
 // GetPolicies returns the internal Policies as a json string.
 func (s *RPCDataLoaderMock) GetPolicies(_ string) string {
 	policyList, err := json.Marshal(s.Policies)
-	if err != nil {
+	if err != nil { //mcdc:ignore json.Marshal cannot fail for []user.Policy (no channels, funcs, or complex numbers)
 		return ""
 	}
 	return string(policyList)

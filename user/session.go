@@ -62,6 +62,19 @@ type RateLimit struct {
 }
 
 // APILimit stores quota and rate limit on ACL level (per API)
+//
+// reqproof:model
+// field Rate float64
+// field Per float64
+// field Smoothing bool
+// field ThrottleInterval float64
+// field ThrottleRetryLimit int
+// field MaxQueryDepth int
+// field QuotaMax int64
+// field QuotaRenews int64
+// field QuotaRemaining int64
+// field QuotaRenewalRate int64
+// field SetBy string
 type APILimit struct {
 	RateLimit
 	ThrottleInterval   float64 `json:"throttle_interval,omitzero" msg:"throttle_interval"`
@@ -112,6 +125,13 @@ func (r RateLimit) Duration() time.Duration {
 // NOTE: when adding new fields it is required to map them from DBAccessDefinition
 // in the gateway/policy.go:19
 // TODO: is it possible to share fields?
+//
+// reqproof:model
+// field Limit APILimit
+// field AllowanceScope string
+// field Endpoints Endpoints
+// field JSONRPCMethods JSONRPCMethodLimit
+// field MCPPrimitives MCPPrimitiveLimit
 type AccessDefinition struct {
 	APIName              string                  `json:"api_name,omitzero" msg:"api_name"`
 	APIID                string                  `json:"api_id,omitzero" msg:"api_id"`
@@ -189,6 +209,47 @@ func (r RateLimit) IsZero() bool {
 	return r.Rate == 0 && r.Per == 0 && r.Smoothing == nil
 }
 
+// IsAllZero reports whether every numeric field of the APILimit is the
+// zero value. Equivalent to IsEmpty() restricted to the integer/float
+// fields the lemma can reason about; it asserts the natural
+// "all zero ⇒ empty" direction.
+//
+// reqproof:requires a.Rate == 0.0
+// reqproof:requires a.Per == 0.0
+// reqproof:requires a.QuotaMax == 0
+// reqproof:requires a.QuotaRenews == 0
+// reqproof:requires a.QuotaRemaining == 0
+// reqproof:requires a.QuotaRenewalRate == 0
+// reqproof:lemma apilimit_isempty_when_all_fields_zero func(a APILimit) bool {
+//   return a.Rate == 0.0 && a.Per == 0.0 && a.QuotaMax == 0 && a.QuotaRenews == 0 && a.QuotaRemaining == 0 && a.QuotaRenewalRate == 0
+// }
+func (a APILimit) IsAllZero() bool {
+	return a.Rate == 0.0 && a.Per == 0.0 && a.QuotaMax == 0 && a.QuotaRenews == 0 && a.QuotaRemaining == 0 && a.QuotaRenewalRate == 0
+}
+
+// HasQuotaConfigured reports whether the APILimit defines a positive
+// quota — i.e. it is *not* empty in the quota dimension.
+//
+// reqproof:requires a.QuotaMax > 0
+// reqproof:lemma apilimit_nonempty_when_quota_set func(a APILimit) bool {
+//   return a.QuotaMax > 0
+// }
+func (a APILimit) HasQuotaConfigured() bool {
+	return a.QuotaMax > 0
+}
+
+// HasThrottleWindow reports whether the APILimit defines a non-trivial
+// throttle window: ThrottleInterval > 0 AND ThrottleRetryLimit > 0.
+//
+// reqproof:requires a.ThrottleInterval > 0.0
+// reqproof:requires a.ThrottleRetryLimit > 0
+// reqproof:lemma apilimit_throttle_window_positive_when_both_set func(a APILimit) bool {
+//   return a.ThrottleInterval > 0.0 && a.ThrottleRetryLimit > 0
+// }
+func (a APILimit) HasThrottleWindow() bool {
+	return a.ThrottleInterval > 0.0 && a.ThrottleRetryLimit > 0
+}
+
 // IsZero returns true if FieldLimits is empty (for omitzero support).
 func (f FieldLimits) IsZero() bool {
 	return f.MaxQueryDepth == 0
@@ -233,6 +294,8 @@ func (m Monitor) IsZero() bool {
 }
 
 // Endpoints is a collection of Endpoint.
+//
+// reqproof:abstract sort=Opaque
 type Endpoints []Endpoint
 
 // Len is used to implement sort interface.
@@ -294,6 +357,16 @@ type EndpointMethod struct {
 // There's a data structure that's based on this and it's used for Protocol Buffer support, make sure to update "coprocess/proto/coprocess_session_state.proto" and generate the bindings using: cd coprocess/proto && ./update_bindings.sh
 //
 // swagger:model
+// reqproof:model
+// field Rate float64
+// field Per float64
+// field QuotaMax int64
+// field QuotaRenews int64
+// field QuotaRemaining int64
+// field QuotaRenewalRate int64
+// field ThrottleRetryLimit int
+// field Expires int64
+// field IsInactive bool
 type SessionState struct {
 	LastCheck                     int64                       `json:"last_check,omitzero" msg:"last_check"`
 	Allowance                     float64                     `json:"allowance,omitzero" msg:"allowance"`
@@ -569,6 +642,33 @@ func (s *SessionState) GetQuotaLimitByAPIID(apiID string) (int64, int64, int64, 
 // IsBasicAuth returns whether the key is basic auth or not.
 func (s *SessionState) IsBasicAuth() bool {
 	return s.BasicAuthData.Password != ""
+}
+
+// IsActiveAt reports whether the session is conceptually "active" at the
+// given Unix timestamp `now`: not flagged inactive AND its Expires lies
+// strictly in the future.
+//
+// reqproof:requires s.IsInactive == false
+// reqproof:requires s.Expires > now
+// reqproof:lemma session_active_when_future_expiry func(s SessionState, now int64) bool {
+//   return s.Expires > now && s.IsInactive == false
+// }
+func (s SessionState) IsActiveAt(now int64) bool {
+	return s.Expires > now && !s.IsInactive
+}
+
+// HasConsumedQuota reports whether the session has spent at least one
+// unit of its quota budget — QuotaRemaining < QuotaMax with a positive
+// QuotaMax. Encodes the standard accounting invariant the rate-limiter
+// relies on.
+//
+// reqproof:requires s.QuotaMax > 0
+// reqproof:requires s.QuotaRemaining < s.QuotaMax
+// reqproof:lemma session_quota_consumed_when_remaining_below_max func(s SessionState) bool {
+//   return s.QuotaRemaining < s.QuotaMax && s.QuotaMax > 0
+// }
+func (s SessionState) HasConsumedQuota() bool {
+	return s.QuotaRemaining < s.QuotaMax && s.QuotaMax > 0
 }
 
 // EndpointRateLimitInfo holds the information to process endpoint rate limits.

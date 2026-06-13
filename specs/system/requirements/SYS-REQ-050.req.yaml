@@ -1,0 +1,61 @@
+id: SYS-REQ-050
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !apply_requested | policies_provided | multiple_policies | result_returned
+description: When Apply processes an empty policy list (no policies referenced and no custom policies), the session's existing access rights with per-API limits must be preserved with their allowance scopes set. Apply must not report an error for this case -- it is a valid no-op merge.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: ""
+tags: []
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-001
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-05-19T17:10:22.253953Z"
+    reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:9eb732c7b14fd84d525cc17b451650d0a0d89f86ed494190eb47594e1955aa34
+verification:
+    assurance_level: B
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: false
+    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
+    gaps_reviewed_by: leonidbugaev
+    impact_reviews:
+        - requirement: SYS-REQ-050
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:9eb732c7b14fd84d525cc17b451650d0a0d89f86ed494190eb47594e1955aa34
+          approval_fingerprint: sha256:4ca8b2a95dd5e49d674e01586f8c1850a82ab44e813416e3082574ac12185710
+          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
+          reviewed_at: "2026-05-19T17:01:30Z"
+history:
+    created_by: human:cli
+    created_at: "2026-04-19T15:28:51Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:35:44Z"
+obligation_class: error_handling
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:35:44Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli
+audit_ignore:
+    - lint-formalization-quality

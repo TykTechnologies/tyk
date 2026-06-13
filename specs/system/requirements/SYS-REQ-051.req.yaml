@@ -1,0 +1,59 @@
+id: SYS-REQ-051
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: constraint
+fretish: the policy shall always satisfy !rate_limit_apply_requested | !policy_rate_higher | rate_limit_applied
+description: 'The greaterThanInt64 comparison function must correctly handle the -1 sentinel value as unlimited (always greatest). This ensures that when a policy specifies -1 for quota or rate, it always wins the merge regardless of the other value. SECURITY: A failure here could cause quota bypass if -1 is treated as less than a finite value.'
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: ""
+tags: []
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-003
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-05-19T17:10:22.256913Z"
+    reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:816fa7dfec2a629ed6996d85433363843848b97592e3f032a0c23faa313f6bb7
+verification:
+    assurance_level: B
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: false
+    impact_reviews:
+        - requirement: SYS-REQ-051
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:816fa7dfec2a629ed6996d85433363843848b97592e3f032a0c23faa313f6bb7
+          approval_fingerprint: sha256:504d49263a0b96f723abd5e304ae1bdd24bfe76000098029828aabeb54a561b4
+          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
+          reviewed_at: "2026-05-19T17:01:30Z"
+history:
+    created_by: human:cli
+    created_at: "2026-04-19T15:29:11Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:35:44Z"
+obligation_class: rate_limit_boundary
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:35:44Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli
+audit_ignore:
+    - lint-formalization-quality

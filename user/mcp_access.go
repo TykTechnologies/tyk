@@ -28,12 +28,16 @@ func (a AccessControlRules) IsZero() bool {
 }
 
 // JSONRPCMethodLimit defines a per-JSON-RPC-method rate limit entry.
+//
+// reqproof:abstract sort=Opaque
 type JSONRPCMethodLimit struct {
 	Name  string    `json:"name" msg:"name"`
 	Limit RateLimit `json:"limit,omitzero" msg:"limit"`
 }
 
 // MCPPrimitiveLimit defines a per-MCP-primitive rate limit entry.
+//
+// reqproof:abstract sort=Opaque
 type MCPPrimitiveLimit struct {
 	// Type is one of: "tool", "resource", "prompt".
 	Type string `json:"type" msg:"type"`
