@@ -47,6 +47,7 @@ type APISpec struct {
 	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
 	Health                   HealthChecker
 	JSVM                     JSVM
+	GojaJSVM                 GojaJSVM
 	ResponseChain            []TykResponseHandler
 	RoundRobin               RoundRobin
 	URLRewriteEnabled        bool
@@ -109,6 +110,21 @@ type APISpec struct {
 	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
 	// Built from apidef.ErrorOverrides during gateway startup.
 	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
+}
+
+// GetJSRunner returns the active JSRunner for this API spec based on the
+// configured middleware driver. Returns nil if no JS VM is initialized.
+func (a *APISpec) GetJSRunner() JSRunner {
+	if a.CustomMiddleware.Driver == apidef.JavaScriptDriver {
+		if a.GojaJSVM.Ready() {
+			return &a.GojaJSVM
+		}
+		return nil
+	}
+	if a.JSVM.Ready() {
+		return &a.JSVM
+	}
+	return nil
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
