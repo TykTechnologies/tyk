@@ -32,3 +32,7 @@ spec:
     - attr:tyk.api.tags  not-contains "test"
     - attr:tyk.api.path  =  "/test-auth/"
     - attr:tyk.original_path  =  "/test-auth/ip"
+  - selector: span[tracetest.span.type="general"]
+    name: Middleware spans should not contain tyk.original_path
+    assertions:
+    - attr:tyk.original_path = ""
