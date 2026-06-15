@@ -82,18 +82,23 @@ func (t *Service) Apply(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
 
-	// Lock for the entire policy application to ensure atomicity
-	// This must happen before any session reads to prevent race conditions
-	session.LockForWrite()
-	defer session.UnlockForWrite()
-
-	// Get policy storage (now safe under lock)
+	// Get policy storage before locking (I/O operation)
 	storage := t.storage
 	var policyIDs []model.PolicyID
 	if customPolicies, err := session.GetCustomPolicies(); err == nil {
 		storage = NewStore(customPolicies)
 		policyIDs = storage.PolicyIDs()
 	} else {
+		// We'll get policyIDs after locking since it reads session
+		policyIDs = nil
+	}
+
+	// Lock for the entire policy application to ensure atomicity
+	session.LockForWrite()
+	defer session.UnlockForWrite()
+
+	// Get policy IDs if we didn't get them from custom policies
+	if policyIDs == nil {
 		policyIDs = t.policyIds(session)
 	}
 

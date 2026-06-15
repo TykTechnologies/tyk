@@ -652,10 +652,6 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 				// Fall through to query keystore
 			} else {
 				session := (&cachedSession).Clone()
-				if err := t.ApplyPolicies(&session); err != nil {
-					t.Logger().Error(err)
-					return session, false
-				}
 				NormalizeMCPEndpoints(&session)
 				return session, true
 			}
