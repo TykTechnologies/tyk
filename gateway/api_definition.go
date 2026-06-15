@@ -508,12 +508,14 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 }
 
 var envRegex = regexp.MustCompile(`env://([^"]+)`)
+var fileRegex = regexp.MustCompile(`file://([^"]+)`)
 
 const (
 	prefixEnv       = "env://"
 	prefixSecrets   = "secrets://"
 	prefixConsul    = "consul://"
 	prefixVault     = "vault://"
+	prefixFile      = "file://"
 	prefixKeys      = "tyk-apis"
 	vaultSecretPath = "secret/data/"
 )
@@ -562,6 +564,12 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 	if strings.Contains(input, prefixVault) {
 		if err := a.replaceVaultSecrets(&input); err != nil {
 			log.WithError(err).Error("Couldn't replace vault secrets")
+		}
+	}
+
+	if strings.Contains(input, prefixFile) {
+		if err := a.replaceFileSecrets(&input); err != nil {
+			log.WithError(err).Error("Couldn't replace file secrets")
 		}
 	}
 
@@ -633,6 +641,41 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 	}
 
 	return nil
+}
+
+func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
+	basePath := a.Gw.GetConfig().KV.File.BasePath
+	matches := fileRegex.FindAllStringSubmatch(*input, -1)
+	seen := map[string]bool{}
+	var firstErr error
+	for _, m := range matches {
+		if seen[m[0]] {
+			continue
+		}
+		seen[m[0]] = true
+		val, err := ResolveFileKV(basePath, m[1])
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		// JSON-escape the value before injecting it into the raw JSON document.
+		// Without this, multi-line content (e.g. PEM certificates) produces
+		// literal newlines inside a JSON string, which is invalid JSON.
+		jsonBytes, err := json.Marshal(val)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		// Strip the surrounding quotes since the replacement sits
+		// inside an existing JSON string already.
+		escaped := string(jsonBytes[1 : len(jsonBytes)-1])
+		*input = strings.ReplaceAll(*input, m[0], escaped)
+	}
+	return firstErr
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.

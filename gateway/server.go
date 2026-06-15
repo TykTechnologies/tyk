@@ -2085,6 +2085,12 @@ func (gw *Gateway) kvStore(value string) (string, error) {
 		return gw.vaultKVStore.Get(key)
 	}
 
+	if strings.HasPrefix(value, "file://") {
+		path := strings.TrimPrefix(value, "file://")
+		log.Debugf("Retrieving %s from kv file", path)
+		return ResolveFileKV(gw.GetConfig().KV.File.BasePath, path)
+	}
+
 	return value, nil
 }
 
