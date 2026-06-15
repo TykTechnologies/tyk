@@ -82,12 +82,29 @@ func (t *Service) Apply(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
 
-	// Acquire write lock for map field modifications
+	// Get policy storage before locking (I/O operation)
+	storage := t.storage
+	var policyIDs []model.PolicyID
+	if customPolicies, err := session.GetCustomPolicies(); err == nil {
+		storage = NewStore(customPolicies)
+		policyIDs = storage.PolicyIDs()
+	} else {
+		// We'll get policyIDs after locking since it reads session
+		policyIDs = nil
+	}
+
+	// Lock for the entire policy application to ensure atomicity
 	session.LockForWrite()
+	defer session.UnlockForWrite()
+
+	// Get policy IDs if we didn't get them from custom policies
+	if policyIDs == nil {
+		policyIDs = t.policyIds(session)
+	}
+
 	if session.MetaData == nil {
 		session.MetaData = make(map[string]interface{})
 	}
-	session.UnlockForWrite()
 
 	if err := t.ClearSession(session); err != nil {
 		t.logger.WithError(err).Warn("error clearing session")
@@ -98,18 +115,6 @@ func (t *Service) Apply(session *user.SessionState) error {
 		didRateLimit:  make(map[string]bool),
 		didAcl:        make(map[string]bool),
 		didComplexity: make(map[string]bool),
-	}
-
-	var (
-		policyIDs []model.PolicyID
-	)
-
-	storage := t.storage
-	if customPolicies, err := session.GetCustomPolicies(); err == nil {
-		storage = NewStore(customPolicies)
-		policyIDs = storage.PolicyIDs()
-	} else {
-		policyIDs = t.policyIds(session)
 	}
 
 	// Only the status of policies applied to a key should determine the validity of the key.
@@ -162,11 +167,9 @@ func (t *Service) Apply(session *user.SessionState) error {
 			tags[tag] = true
 		}
 
-		session.LockForWrite()
 		for k, v := range policy.MetaData {
 			session.MetaData[k] = v
 		}
-		session.UnlockForWrite()
 
 		if policy.LastUpdated > session.LastUpdated {
 			session.LastUpdated = policy.LastUpdated
@@ -193,7 +196,6 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	if len(policyIDs) == 0 {
-		session.LockForWrite()
 		for apiID, accessRight := range session.AccessRights {
 			// check if the api in the session has per api limit
 			if !accessRight.Limit.IsEmpty() {
@@ -201,7 +203,6 @@ func (t *Service) Apply(session *user.SessionState) error {
 				session.AccessRights[apiID] = accessRight
 			}
 		}
-		session.UnlockForWrite()
 	}
 
 	distinctACL := make(map[string]bool)
@@ -255,9 +256,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 	// Override session ACL if at least one policy define it
 	if len(applyState.didAcl) > 0 {
-		session.LockForWrite()
 		session.AccessRights = rights
-		session.UnlockForWrite()
 	}
 
 	if len(rights) == 0 && policyIDs != nil {
