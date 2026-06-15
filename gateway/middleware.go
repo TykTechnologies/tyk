@@ -669,7 +669,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		// If exists, assume it has been authorized and pass on
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			t.Gw.SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			t.Gw.SessionCache.Set(cacheKey, session.Clone(), cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
@@ -701,7 +701,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go t.Gw.SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			go t.Gw.SessionCache.Set(cacheKey, session.Clone(), cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values

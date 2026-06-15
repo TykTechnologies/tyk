@@ -159,6 +159,49 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 	assert.Equal(t, "t7", getToken(oidc.getAuthType(), oidc.getAuthToken))
 }
 
+func TestCheckSessionAndIdentityForValidKey_CachesSessionWithoutSharingAccessRights(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HashKeys = false
+		globalConf.LocalSessionCache.DisableCacheSessionState = false
+	})
+	defer ts.Close()
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = uuid.New()
+		spec.UseKeylessAccess = false
+		spec.Auth.AuthHeaderName = "authorization"
+	})[0]
+
+	key := "cache-isolation-" + uuid.New()
+	session := CreateStandardSession()
+	session.AccessRights = map[string]user.AccessDefinition{
+		api.APIID: {
+			APIID:    api.APIID,
+			Versions: []string{"Default"},
+			Limit: user.APILimit{
+				RateLimit: user.RateLimit{
+					Rate: 100,
+					Per:  60,
+				},
+			},
+		},
+	}
+	require.NoError(t, ts.Gw.GlobalSessionManager.UpdateSession(key, session, 60, false))
+	defer ts.Gw.GlobalSessionManager.RemoveSession(session.OrgID, key, false)
+	defer ts.Gw.SessionCache.Delete(key)
+
+	baseMid := NewBaseMiddleware(ts.Gw, api, nil, nil)
+	got, ok := baseMid.CheckSessionAndIdentityForValidKey(key, httptest.NewRequest(http.MethodGet, "/", nil))
+	require.True(t, ok)
+	require.Equal(t, api.APIID, got.AccessRights[api.APIID].AllowanceScope)
+
+	cachedVal, found := ts.Gw.SessionCache.Get(key)
+	require.True(t, found)
+
+	cached := cachedVal.(user.SessionState)
+	require.Empty(t, cached.AccessRights[api.APIID].AllowanceScope)
+}
+
 func TestBaseMiddleware_getAuthToken(t *testing.T) {
 	t.Run("should get token from cookie", func(t *testing.T) {
 		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
