@@ -1646,6 +1646,54 @@ func BenchmarkSessionClone_WithWrites(b *testing.B) {
 	wg.Wait()
 }
 
+// TestSessionState_GetCustomPoliciesRace tests that GetCustomPolicies
+// is safe to call concurrently with MetaData modifications
+func TestSessionState_GetCustomPoliciesRace(t *testing.T) {
+	session := NewSessionState()
+	session.MetaData = map[string]interface{}{
+		"policies": []interface{}{
+			map[string]interface{}{
+				"id":   "pol1",
+				"name": "Policy 1",
+			},
+		},
+	}
+
+	var wg sync.WaitGroup
+	iterations := 1000
+
+	// Reader goroutines - call GetCustomPolicies
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				_, _ = session.GetCustomPolicies()
+			}
+		}()
+	}
+
+	// Writer goroutines - modify MetaData
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				session.LockForWrite()
+				session.MetaData["policies"] = []interface{}{
+					map[string]interface{}{
+						"id":   fmt.Sprintf("pol%d", id),
+						"name": fmt.Sprintf("Policy %d", id),
+					},
+				}
+				session.UnlockForWrite()
+			}
+		}(i)
+	}
+
+	wg.Wait()
+}
+
 // BenchmarkSessionClone_SmallSession measures overhead for small sessions
 func BenchmarkSessionClone_SmallSession(b *testing.B) {
 	session := &SessionState{

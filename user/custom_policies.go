@@ -23,7 +23,11 @@ func (s *SessionState) CustomPolicies() (map[string]Policy, error) {
 }
 
 // GetCustomPolicies is like CustomPolicies but returns the list, preserving order.
+// This method is thread-safe and acquires a read lock to safely access MetaData.
 func (s *SessionState) GetCustomPolicies() ([]Policy, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	var (
 		customPolicies []Policy
 	)
