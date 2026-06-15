@@ -56,6 +56,7 @@ var DefaultValidationRuleSet = ValidationRuleSet{
 	&RuleUniqueDataSourceNames{},
 	&RuleAtLeastEnableOneAuthSource{},
 	&RuleValidateIPList{},
+	&RuleValidateGlobalEnforceTimeout{},
 	&RuleValidateEnforceTimeout{},
 	&RuleUpstreamAuth{},
 	&RuleLoadBalancingTargets{},
@@ -182,6 +183,20 @@ func (r *RuleValidateIPList) validateIPAddr(ips []string) []error {
 	}
 
 	return errs
+}
+
+var ErrInvalidGlobalTimeoutValue = errors.New("invalid global timeout value")
+
+type RuleValidateGlobalEnforceTimeout struct{}
+
+func (r *RuleValidateGlobalEnforceTimeout) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
+	for _, vInfo := range apiDef.VersionData.Versions {
+		if vInfo.GlobalEnforceTimeout < 0 {
+			validationResult.IsValid = false
+			validationResult.AppendError(ErrInvalidGlobalTimeoutValue)
+			return
+		}
+	}
 }
 
 var ErrInvalidTimeoutValue = errors.New("invalid timeout value")

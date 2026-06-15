@@ -45,7 +45,7 @@ func (ts *Test) createSpecTestFrom(tb testing.TB, def *apidef.APIDefinition) *AP
 	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	orgStore.Connect()
 
-	spec.Init(redisStore, healthStore, orgStore)
+	spec.Init(redisStore, redisStore, healthStore, orgStore)
 	return spec
 }
 
