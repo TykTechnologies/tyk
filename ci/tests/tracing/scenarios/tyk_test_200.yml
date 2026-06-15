@@ -44,3 +44,4 @@ spec:
     name: Middleware spans should not contain tyk.original_path
     assertions:
     - attr:tyk.original_path not-contains "/"
+# trigger ci
