@@ -22,6 +22,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
@@ -1666,6 +1667,88 @@ func TestReplaceSecrets(t *testing.T) {
 	assert.Equal(t, "Şenharputlu", api2.AuthConfigs[apidef.AuthTokenType].AuthHeaderName)
 	assert.Equal(t, "Ghiur", api1.JWTSigningMethod)
 	assert.Equal(t, "Ghiur", api2.AuthConfigs[apidef.OAuthType].AuthHeaderName)
+}
+
+func TestReplaceSecretsFileScheme(t *testing.T) {
+	t.Run("absolute path without base_path", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		t.Run("replaces file:// reference with file contents", func(t *testing.T) {
+			dir := t.TempDir()
+			f := filepath.Join(dir, "jwt-secret")
+			require.NoError(t, os.WriteFile(f, []byte("my-jwt-signing-key\n"), 0600))
+
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.APIID = "file-kv-1"
+				spec.JWTSource = "file://" + f
+			})
+
+			api := ts.Gw.getApiSpec("file-kv-1")
+			require.NotNil(t, api)
+			assert.Equal(t, "my-jwt-signing-key", api.JWTSource)
+		})
+
+		t.Run("multiple file:// references in one definition are all replaced", func(t *testing.T) {
+			dir := t.TempDir()
+			f1 := filepath.Join(dir, "source")
+			f2 := filepath.Join(dir, "method")
+			require.NoError(t, os.WriteFile(f1, []byte("source-value"), 0600))
+			require.NoError(t, os.WriteFile(f2, []byte("method-value"), 0600))
+
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.APIID = "file-kv-2"
+				spec.JWTSource = "file://" + f1
+				spec.JWTSigningMethod = "file://" + f2
+			})
+
+			api := ts.Gw.getApiSpec("file-kv-2")
+			require.NotNil(t, api)
+			assert.Equal(t, "source-value", api.JWTSource)
+			assert.Equal(t, "method-value", api.JWTSigningMethod)
+		})
+	})
+
+	t.Run("relative key resolved via base_path", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "jwt-secret"), []byte("key-from-mount"), 0600))
+
+		ts := StartTest(func(conf *config.Config) {
+			conf.KV.File.BasePath = dir
+		})
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "file-kv-3"
+			spec.JWTSource = "file://jwt-secret"
+		})
+
+		api := ts.Gw.getApiSpec("file-kv-3")
+		require.NotNil(t, api)
+		assert.Equal(t, "key-from-mount", api.JWTSource)
+	})
+
+	t.Run("multi-line PEM content is valid JSON after substitution", func(t *testing.T) {
+		dir := t.TempDir()
+		pem := "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJ\n-----END CERTIFICATE-----"
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "tls.crt"), []byte(pem+"\n"), 0600))
+
+		ts := StartTest(func(conf *config.Config) {
+			conf.KV.File.BasePath = dir
+		})
+		defer ts.Close()
+
+		// If the replacement is not JSON-escaped, the literal newlines in the PEM
+		// produce invalid JSON and BuildAndLoadAPI silently loads nothing.
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "file-kv-pem"
+			spec.JWTSource = "file://tls.crt"
+		})
+
+		api := ts.Gw.getApiSpec("file-kv-pem")
+		require.NotNil(t, api)
+		assert.Equal(t, pem, api.JWTSource)
+	})
 }
 
 func TestInternalEndpointMW_TT_11126(t *testing.T) {

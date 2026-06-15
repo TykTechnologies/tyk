@@ -6,11 +6,15 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -1455,6 +1459,95 @@ func TestReplaceTykVariables(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestReplaceTykVariablesFileSecret(t *testing.T) {
+	dir := t.TempDir()
+	secretFile := filepath.Join(dir, "api-key")
+	require.NoError(t, os.WriteFile(secretFile, []byte("file-secret-value\n"), 0600))
+
+	pemFile := filepath.Join(dir, "cert.pem")
+	require.NoError(t, os.WriteFile(pemFile, []byte("-----BEGIN CERT-----\nABC\n-----END CERT-----\n"), 0600))
+
+	// No base_path configured — keys are used as literal file paths.
+	t.Run("no base_path", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		t.Setenv("TYK_SECRET_TEST_FILE_KV_VAR", "env-test-val")
+
+		tests := []struct {
+			name     string
+			input    string
+			expected string
+		}{
+			{
+				name:     "resolves $secret_file. with absolute path",
+				input:    "$secret_file." + secretFile,
+				expected: "file-secret-value",
+			},
+			{
+				name:     "trailing newline stripped",
+				input:    "Bearer $secret_file." + secretFile,
+				expected: "Bearer file-secret-value",
+			},
+			{
+				name:     "PEM cert content preserved except trailing newline",
+				input:    "$secret_file." + pemFile,
+				expected: "-----BEGIN CERT-----\nABC\n-----END CERT-----",
+			},
+			{
+				name:     "non-existent file resolves to empty string",
+				input:    "$secret_file./nonexistent/path/file",
+				expected: "",
+			},
+			{
+				name:     "mixed with other secret providers",
+				input:    "env=$secret_env.TEST_FILE_KV_VAR file=$secret_file." + secretFile,
+				expected: "env=env-test-val file=file-secret-value",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				req := httptest.NewRequest("GET", "/", nil)
+				result := ts.Gw.ReplaceTykVariables(req, tt.input, false)
+				assert.Equal(t, tt.expected, result)
+			})
+		}
+
+		t.Run("not URL-encoded when escape=true", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			result := ts.Gw.ReplaceTykVariables(req, "$secret_file."+secretFile, true)
+			assert.Equal(t, "file-secret-value", result)
+			assert.NotContains(t, result, "%")
+		})
+	})
+
+	t.Run("with base_path configured", func(t *testing.T) {
+		ts := StartTest(func(conf *config.Config) {
+			conf.KV.File.BasePath = dir
+		})
+		defer ts.Close()
+
+		t.Run("resolves relative key under base_path", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			result := ts.Gw.ReplaceTykVariables(req, "$secret_file.api-key", false)
+			assert.Equal(t, "file-secret-value", result)
+		})
+
+		t.Run("absolute path rejected when base_path is set", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			result := ts.Gw.ReplaceTykVariables(req, "$secret_file."+secretFile, false)
+			assert.Equal(t, "", result)
+		})
+
+		t.Run("dotdot traversal rejected — resolves to empty string", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			result := ts.Gw.ReplaceTykVariables(req, "$secret_file../etc/passwd", false)
+			assert.Equal(t, "", result)
+		})
+	})
 }
 
 func TestURLRewriteMiddleware_CheckHostRewrite(t *testing.T) {
