@@ -34,3 +34,7 @@ spec:
     - attr:http.response.status_code = 500
     - attr:url.full = "http://httpbin:80/status/500"
     - attr:tracetest.span.parent_id != ""
+  - name: Check for RateCheckMiddleware
+    selector: span[tracetest.span.type="general" name="RateCheckMW"]
+    assertions:
+    - attr:tyk.original_path = "/test/status/500"

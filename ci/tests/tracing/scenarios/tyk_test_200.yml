@@ -35,7 +35,9 @@ spec:
     name: Check for RateCheckMiddleware
     assertions:
     - attr:name  =  "RateCheckMW"
+    - attr:tyk.original_path = "/test/ip"
   - selector: span[tracetest.span.type="general" name="VersionCheck"]
     name: VersionCheck MW attributes
     assertions:
     - attr:tyk.api.version = "Non Versioned"
+    - attr:tyk.original_path = "/test/ip"

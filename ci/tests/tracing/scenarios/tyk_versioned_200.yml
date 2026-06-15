@@ -18,6 +18,7 @@ spec:
     name: Checking version attribute
     assertions:
     - attr:tyk.api.version = "v1"
+    - attr:tyk.original_path = "/versioned/ip"
   - selector: span[tracetest.span.type="http" name="GET /versioned/ip" http.request.method="GET"]
     name: Checking API attributes
     assertions:

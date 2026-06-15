@@ -21,6 +21,7 @@ spec:
     name: Checking if the version is "Non versioned"
     assertions:
     - attr:tyk.api.version = "Non Versioned"
+    - attr:tyk.original_path = "/versioned/ip"
   - selector: span[tracetest.span.type="http" name="GET /versioned/ip" http.request.method="GET"]
     name: Checking the HTTP status code
     assertions:
