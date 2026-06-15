@@ -2708,6 +2708,65 @@ func TestReplaceVaultSecrets(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "some-api-key: my-secret-value", input)
 	})
+
+	t.Run("multiline value produces valid JSON", func(t *testing.T) {
+		ts := StartTest(nil, TestConfig{
+			Delay: 10 * time.Millisecond,
+		})
+		defer ts.Close()
+
+		multiline := "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIU\n-----END CERTIFICATE-----\n"
+		ts.Gw.vaultKVStore = &mockVaultSecretReader{
+			secret: &vaultapi.Secret{
+				Data: map[string]interface{}{
+					"data": map[string]interface{}{
+						"certo": multiline,
+					},
+				},
+			},
+		}
+
+		l := APIDefinitionLoader{Gw: ts.Gw}
+		input := `{"allowlist":["vault://certo"]}`
+		err := l.replaceVaultSecrets(&input)
+
+		assert.NoError(t, err)
+		var result map[string]interface{}
+		assert.NoError(t, json.Unmarshal([]byte(input), &result), "substituted JSON must be valid")
+	})
+}
+
+func TestReplaceEnvSecretsMultilineJSON(t *testing.T) {
+	multiline := "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIU\n-----END CERTIFICATE-----\n"
+	t.Setenv("CERT_VALUE", multiline)
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	l := APIDefinitionLoader{Gw: ts.Gw}
+	input := `{"allowlist":["env://CERT_VALUE"]}`
+	out := l.replaceSecrets([]byte(input))
+
+	var result map[string]interface{}
+	assert.NoError(t, json.Unmarshal(out, &result), "substituted JSON must be valid after env:// replacement")
+}
+
+func TestReplaceInlineSecretsMultilineJSON(t *testing.T) {
+	multiline := "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIU\n-----END CERTIFICATE-----\n"
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	conf := ts.Gw.GetConfig()
+	conf.Secrets = map[string]string{"certo": multiline}
+	ts.Gw.SetConfig(conf)
+
+	l := APIDefinitionLoader{Gw: ts.Gw}
+	input := `{"allowlist":["secrets://certo"]}`
+	out := l.replaceSecrets([]byte(input))
+
+	var result map[string]interface{}
+	assert.NoError(t, json.Unmarshal(out, &result), "substituted JSON must be valid after secrets:// replacement")
 }
 
 func TestPopulateMCPPrimitivesMap(t *testing.T) {
