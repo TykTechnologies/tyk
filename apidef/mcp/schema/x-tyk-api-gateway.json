@@ -725,10 +725,20 @@
           "minimum": 0
         }
       },
-      "required": [
-        "enabled",
-        "value"
-      ]
+      "required": ["enabled", "value"]
+    },
+    "X-Tyk-GlobalEnforceTimeout": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "duration": {
+          "type": "string",
+          "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
+        }
+      },
+      "required": ["enabled"]
     },
     "X-Tyk-ValidateRequest": {
       "type": "object",
@@ -1553,6 +1563,9 @@
         },
         "proxy": {
           "$ref": "#/definitions/X-Tyk-Proxy"
+        },
+        "enforceTimeout": {
+          "$ref": "#/definitions/X-Tyk-GlobalEnforceTimeout"
         }
       },
       "anyOf": [
