@@ -60,11 +60,21 @@ func TestKVStoreFileScheme(t *testing.T) {
 			assert.Equal(t, "my-node-secret", val)
 		})
 
-		t.Run("absolute path still works when base_path is set", func(t *testing.T) {
+		t.Run("absolute path rejected when base_path is set", func(t *testing.T) {
 			f := filepath.Join(dir, "node-secret")
-			val, err := ts.Gw.kvStore("file://" + f)
-			require.NoError(t, err)
-			assert.Equal(t, "my-node-secret", val)
+			_, err := ts.Gw.kvStore("file://" + f)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "absolute path")
+		})
+
+		t.Run("absolute path to file outside base_path is rejected", func(t *testing.T) {
+			outside := t.TempDir()
+			secret := filepath.Join(outside, "passwd")
+			require.NoError(t, os.WriteFile(secret, []byte("root:x:0:0"), 0600))
+
+			_, err := ts.Gw.kvStore("file://" + secret)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "absolute path")
 		})
 
 		t.Run("dotdot traversal rejected even when base_path is set", func(t *testing.T) {
@@ -188,14 +198,24 @@ func TestResolveFileKV(t *testing.T) {
 		assert.Equal(t, "the-api-key", val)
 	})
 
-	t.Run("absolute path works even when basePath is set", func(t *testing.T) {
+	t.Run("rejects absolute path when basePath is set", func(t *testing.T) {
 		dir := t.TempDir()
 		f := filepath.Join(dir, "secret")
 		require.NoError(t, os.WriteFile(f, []byte("abs-value"), 0600))
 
-		val, err := ResolveFileKV("/some/other/base", f)
-		require.NoError(t, err)
-		assert.Equal(t, "abs-value", val)
+		_, err := ResolveFileKV("/some/other/base", f)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "absolute path")
+	})
+
+	t.Run("rejects absolute path even when it points inside basePath", func(t *testing.T) {
+		dir := t.TempDir()
+		f := filepath.Join(dir, "secret")
+		require.NoError(t, os.WriteFile(f, []byte("abs-value"), 0600))
+
+		_, err := ResolveFileKV(dir, f)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "absolute path")
 	})
 
 	t.Run("rejects dotdot traversal when basePath is set", func(t *testing.T) {

@@ -9,31 +9,38 @@ import (
 
 // ResolveFileKV reads the file at key and returns its contents trimmed of trailing newlines.
 //
-// Absolute keys are used as-is; basePath is ignored for them.
-// Callers that enforce a security boundary (e.g. runtime middleware where
-// API-designer-level input is untrusted) must reject absolute keys before
-// calling this function when basePath is configured.
+// basePath, when set, is a security boundary: only relative keys are accepted
+// and they are joined to basePath and confined within it. Absolute keys are
+// rejected so that untrusted input cannot escape the boundary to read arbitrary files.
 //
-// Relative keys require basePath to be set; they are joined and confined to it.
+// When basePath is empty no boundary is configured, so only absolute keys are
+// accepted; a relative key has no base to resolve against and is rejected.
 func ResolveFileKV(basePath, key string) (string, error) {
 	var path string
 
-	switch {
-	case filepath.IsAbs(key):
+	if basePath == "" {
+		if !filepath.IsAbs(key) {
+			return "", fmt.Errorf(
+				"file KV: key %q is a relative path but kv.file.base_path is not configured; "+
+					"set kv.file.base_path or use an absolute path",
+				key,
+			)
+		}
 		path = key
-	case basePath != "":
+	} else {
+		if filepath.IsAbs(key) {
+			return "", fmt.Errorf(
+				"file KV: absolute path %q rejected because kv.file.base_path is configured; "+
+					"use a path relative to base_path",
+				key,
+			)
+		}
 		joined := filepath.Join(basePath, key)
 		rel, err := filepath.Rel(basePath, joined)
 		if err != nil || !filepath.IsLocal(rel) {
 			return "", fmt.Errorf("file KV: path traversal detected in key %q", key)
 		}
 		path = joined
-	default:
-		return "", fmt.Errorf(
-			"file KV: key %q is a relative path but kv.file.base_path is not configured; "+
-				"set kv.file.base_path or use an absolute path",
-			key,
-		)
 	}
 
 	// Resolve K8s AtomicWriter symlinks (e.g. ..data -> ..2024_01_01_00_00_00).
@@ -44,7 +51,7 @@ func ResolveFileKV(basePath, key string) (string, error) {
 
 	// Re-verify after symlink resolution: a symlink inside basePath can point
 	// outside (symlink escape).
-	if basePath != "" && !filepath.IsAbs(key) {
+	if basePath != "" {
 		canonicalBase, err := filepath.EvalSymlinks(basePath)
 		// EvalSymlinks failure here requires a race (basePath symlink broken between
 		// resolving the file path above and this call). Not worth a flaky test.
