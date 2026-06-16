@@ -43,12 +43,8 @@ func (gw *Gateway) getHealthCheckInfo() map[string]HealthCheckItem {
 	return ret
 }
 
-// defaultHealthCheckInterval applies when liveness_check.check_duration is
-// not configured.
 const defaultHealthCheckInterval = 10 * time.Second
 
-// healthCheckInterval is how often the health of all components is gathered,
-// and the longest a single gather round is allowed to take.
 func (gw *Gateway) healthCheckInterval() time.Duration {
 	if n := gw.GetConfig().LivenessCheck.CheckDuration; n > 0 {
 		return n
@@ -87,8 +83,6 @@ type SafeHealthCheck struct {
 func (gw *Gateway) gatherHealthChecks() {
 	allInfos := SafeHealthCheck{info: make(map[string]HealthCheckItem, 3)}
 
-	// expected tracks the components probed this round, so the ones whose
-	// probe does not finish in time can be reported as failed.
 	expected := map[string]string{"redis": Datastore}
 
 	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-", ConnectionHandler: gw.StorageConnectionHandler}
@@ -165,10 +159,6 @@ func (gw *Gateway) gatherHealthChecks() {
 				Time:          time.Now().Format(time.RFC3339),
 			}
 
-			// rpc.Login takes no context but is internally bounded (30s call
-			// timeout, max 3 retries) and singleflighted, so a slow RPC server
-			// parks this goroutine for minutes at most while the bounded
-			// barrier below keeps the health-check round moving.
 			if !rpc.Login() {
 				checkItem.Output = "Could not connect to RPC"
 				checkItem.Status = Fail
@@ -182,9 +172,7 @@ func (gw *Gateway) gatherHealthChecks() {
 		}()
 	}
 
-	// A single hung probe must not wedge the health-check loop (TT-17486):
-	// wait for the barrier only up to the check interval, then commit
-	// whatever completed and mark the missing components as failed.
+	// Wait up to one check interval; mark any probe that didn't finish as failed.
 	barrier := make(chan struct{})
 	go func() {
 		wg.Wait()
@@ -200,8 +188,6 @@ func (gw *Gateway) gatherHealthChecks() {
 		mainLog.WithField("liveness-check", true).Warning("Health check timed out waiting for components")
 	}
 
-	// Copy under the mutex: a probe that finishes late may still write to
-	// allInfos.info, which must not race with readers of the stored map.
 	allInfos.mux.Lock()
 	info := make(map[string]HealthCheckItem, len(expected))
 	for component, item := range allInfos.info {

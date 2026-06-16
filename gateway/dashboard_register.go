@@ -276,13 +276,6 @@ func (h *HTTPDashboardHandler) attemptRegistration(ctx context.Context) (registe
 // the dashboard is reachable but does not recognise this node (e.g. its
 // session store is unavailable), and recovery from that state is owned by
 // the heartbeat loop, not by the probe.
-//
-// No probe-level timeout is set here: gatherHealthChecks already bounds the
-// entire round with a healthCheckInterval() timer and marks any probe that
-// does not finish in time as Fail. Adding a shorter deadline inside Ping()
-// would cause a slow-but-reachable Dashboard (e.g. Redis down, so its
-// session lookup is slow) to be mis-reported as down before it can return
-// the 403 that should count as pass.
 func (h *HTTPDashboardHandler) Ping() error {
 	ctx := h.Gw.ctx
 	if ctx == nil {
@@ -355,9 +348,7 @@ func (h *HTTPDashboardHandler) addHeaderToRequest(req *http.Request) {
 	req.Header.Set(header.XTykSessionID, h.Gw.SessionID)
 }
 
-// errHeartBeatForbidden is returned by doHeartBeat when the dashboard
-// answers the heartbeat with 403: it is reachable but does not recognise
-// this node.
+// errHeartBeatForbidden signals a 403 heartbeat response: dashboard reachable but node not recognised.
 var errHeartBeatForbidden = errors.New("heartbeat rejected: node not recognised by the dashboard")
 
 func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Client, ctx context.Context) error {

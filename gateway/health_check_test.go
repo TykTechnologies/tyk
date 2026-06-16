@@ -17,8 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
-// blockingPingDashService is a DashboardServiceSender whose Ping blocks until
-// unblock is closed — a stand-in for any probe that hangs.
+// blockingPingDashService is a DashboardServiceSender whose Ping blocks until unblock is closed.
 type blockingPingDashService struct {
 	unblock chan struct{}
 }
@@ -36,10 +35,8 @@ func (s *blockingPingDashService) Ping() error {
 	return nil
 }
 
-// TestGatherHealthChecks_HungProbeDoesNotWedgeTheLoop verifies that no single
-// hung dependency probe can block the health-check barrier (TT-17486): the
-// round must complete within the check interval, commit the healthy
-// components, and report the hung one as failed.
+// TestGatherHealthChecks_HungProbeDoesNotWedgeTheLoop verifies a hung probe does not block
+// the health-check round: the hung component is reported as failed and the rest are committed.
 func TestGatherHealthChecks_HungProbeDoesNotWedgeTheLoop(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

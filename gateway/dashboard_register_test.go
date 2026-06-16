@@ -285,10 +285,7 @@ func TestNewRequestWithContext_InvalidURL_Panics(t *testing.T) {
 	})
 }
 
-// TestSendHeartBeat_Forbidden_ReRegisters pins the recovery path the health
-// probe relies on: the heartbeat loop (not the probe) owns re-registration,
-// so a 403 heartbeat response must trigger Register and refresh the node
-// identity.
+// TestSendHeartBeat_Forbidden_ReRegisters verifies a 403 heartbeat triggers re-registration.
 func TestSendHeartBeat_Forbidden_ReRegisters(t *testing.T) {
 	var registerCalls int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -324,9 +321,7 @@ func TestSendHeartBeat_Forbidden_ReRegisters(t *testing.T) {
 	assert.Equal(t, "nonce-recovered", gotNonce)
 }
 
-// TestPing_HeartbeatOK_UpdatesNonce pins the healthy-path behaviour of the
-// liveness probe: a 200 heartbeat response succeeds and stores the nonce
-// returned by the dashboard.
+// TestPing_HeartbeatOK_UpdatesNonce verifies a 200 heartbeat response stores the returned nonce.
 func TestPing_HeartbeatOK_UpdatesNonce(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -346,9 +341,7 @@ func TestPing_HeartbeatOK_UpdatesNonce(t *testing.T) {
 	assert.Equal(t, "nonce-hb-1", gotNonce)
 }
 
-// TestPing_NilGatewayContext_DoesNotPanic guards embedders that construct a
-// Gateway without a context: the probe falls back to context.Background()
-// instead of panicking in context.WithTimeout.
+// TestPing_NilGatewayContext_DoesNotPanic guards against a nil gateway context.
 func TestPing_NilGatewayContext_DoesNotPanic(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -369,8 +362,7 @@ func TestPing_NilGatewayContext_DoesNotPanic(t *testing.T) {
 	})
 }
 
-// TestPing_DashboardUnreachable_Fails pins the transport-error behaviour of
-// the liveness probe: no response from the dashboard reports it as down.
+// TestPing_DashboardUnreachable_Fails verifies a transport error reports the dashboard as down.
 func TestPing_DashboardUnreachable_Fails(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 	srv.Close() // connection refused from now on
@@ -384,14 +376,9 @@ func TestPing_DashboardUnreachable_Fails(t *testing.T) {
 	assert.Contains(t, err.Error(), "dashboard is down? Heartbeat is failing")
 }
 
-// TestPing_RedisDownDashboardUp_DoesNotBlockOrReRegister is the TT-17486
-// regression test: with Redis down but the Dashboard up, the Dashboard
-// answers the heartbeat with 403 (it cannot read the session->node mapping)
-// and registration with 409 + Status "Error" (its Redis-backed lock/session
-// calls fail). The liveness probe must not block on, nor trigger,
-// re-registration in that state — Register() retries such a 409 every 5s
-// until its context is cancelled, so a probe that reaches it wedges the
-// health-check loop and /hello and /ready serve a stale "pass" cache.
+// TestPing_RedisDownDashboardUp_DoesNotBlockOrReRegister is the TT-17486 regression test.
+// With Redis down the Dashboard returns 403 on heartbeat and 409 on registration.
+// Ping must return immediately without triggering re-registration.
 func TestPing_RedisDownDashboardUp_DoesNotBlockOrReRegister(t *testing.T) {
 	var registerAttempts int32
 
@@ -419,39 +406,24 @@ func TestPing_RedisDownDashboardUp_DoesNotBlockOrReRegister(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		// Exactly what the dashboard goroutine in gatherHealthChecks does.
 		done <- h.Gw.DashService.Ping()
 	}()
 
 	select {
 	case err := <-done:
-		// v5.8.13 parity: the dashboard responded (403), so it is reachable
-		// and the probe reports it healthy without re-registering.
 		require.NoError(t, err)
-		assert.Zero(t, atomic.LoadInt32(&registerAttempts),
-			"the liveness probe must never trigger node re-registration")
+		assert.Zero(t, atomic.LoadInt32(&registerAttempts), "liveness probe must not trigger re-registration")
 	case <-time.After(10 * time.Second):
-		t.Fatalf("Ping() blocked (register attempts: %d) — the dashboard health "+
-			"goroutine never finishes, gatherHealthChecks' wg.Wait() never returns, "+
-			"and /hello and /ready serve the stale last-known-good status forever",
-			atomic.LoadInt32(&registerAttempts))
+		t.Fatalf("Ping() blocked after %d register attempts", atomic.LoadInt32(&registerAttempts))
 	}
 }
 
-// TestPing_SlowDashboard_RedisDown_ReportsPass pins the behaviour when Redis
-// is down but the Dashboard is still up: the Dashboard is slow to respond
-// (its own Redis lookups add latency) and ultimately returns 403. The probe
-// must treat that 403 as reachable (pass) regardless of how long the
-// Dashboard took to answer — a transport error and a slow-but-real response
-// must not be conflated. The gatherHealthChecks barrier (healthCheckInterval)
-// is the correct wedge guard for a permanently hung probe; Ping() must not
-// impose its own shorter deadline that fires before the 403 arrives.
+// TestPing_SlowDashboard_RedisDown_ReportsPass verifies that a slow but reachable
+// Dashboard (Redis down, so its session lookup is delayed) returning 403 is
+// reported as pass, not as dashboard down.
 func TestPing_SlowDashboard_RedisDown_ReportsPass(t *testing.T) {
 	const checkDuration = 4 * time.Second
-	// The Dashboard sleeps longer than checkDuration/2 before answering 403,
-	// simulating its internal Redis lookup delay. On the unfixed branch this
-	// caused the probe context (checkDuration/2) to fire first, making Ping()
-	// return an error as if the Dashboard were unreachable.
+	// Delay exceeds checkDuration/2 to simulate the Dashboard's internal Redis lookup latency.
 	const dashDelay = checkDuration/2 + 500*time.Millisecond
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -486,8 +458,6 @@ func TestPing_SlowDashboard_RedisDown_ReportsPass(t *testing.T) {
 
 	select {
 	case err := <-done:
-		// Dashboard responded (eventually with 403): it is reachable, so the
-		// probe must report pass regardless of the delay.
 		assert.NoError(t, err, "slow 403 from dashboard must be treated as reachable (pass), not as dashboard down")
 	case <-time.After(checkDuration * 2):
 		t.Fatal("Ping() blocked: did not return within the expected window")
