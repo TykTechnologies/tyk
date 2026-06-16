@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
 func TestAPIDefinition_JsonRpcVersion(t *testing.T) {
@@ -248,6 +250,66 @@ func TestSchema(t *testing.T) {
 			t.Error(err)
 		}
 	}
+}
+
+func TestSchema_SecurityRequirementScopes(t *testing.T) {
+	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
+
+	spec := DummyAPI()
+	spec.SecurityRequirementScopes = []map[string][]string{
+		{"jwt1": {}, "oauth2_scheme": {"read:pets", "write:pets"}},
+		{"oauth2_scheme": {"admin"}},
+	}
+
+	goLoader := gojsonschema.NewGoLoader(spec)
+	result, err := gojsonschema.Validate(schemaLoader, goLoader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !result.Valid() {
+		for _, e := range result.Errors() {
+			t.Error(e)
+		}
+	}
+}
+
+func TestSchema_GlobalEnforceTimeout(t *testing.T) {
+	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
+
+	setVersionTimeout := func(spec *APIDefinition, d tyktime.ReadableDuration, disabled bool) {
+		v := spec.VersionData.Versions["Default"]
+		v.GlobalEnforceTimeout = d
+		v.GlobalEnforceTimeoutDisabled = disabled
+		spec.VersionData.Versions["Default"] = v
+	}
+
+	t.Run("valid string duration passes schema", func(t *testing.T) {
+		spec := DummyAPI()
+		setVersionTimeout(&spec, tyktime.ReadableDuration(5*time.Second), false)
+
+		result, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewGoLoader(spec))
+		require.NoError(t, err)
+		assert.True(t, result.Valid(), result.Errors())
+	})
+
+	t.Run("valid sub-second duration passes schema", func(t *testing.T) {
+		spec := DummyAPI()
+		setVersionTimeout(&spec, tyktime.ReadableDuration(500*time.Millisecond), false)
+
+		result, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewGoLoader(spec))
+		require.NoError(t, err)
+		assert.True(t, result.Valid(), result.Errors())
+	})
+
+	t.Run("disabled flag passes schema", func(t *testing.T) {
+		spec := DummyAPI()
+		setVersionTimeout(&spec, tyktime.ReadableDuration(5*time.Second), true)
+
+		result, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewGoLoader(spec))
+		require.NoError(t, err)
+		assert.True(t, result.Valid(), result.Errors())
+	})
 }
 
 func TestStringRegexMap(t *testing.T) {

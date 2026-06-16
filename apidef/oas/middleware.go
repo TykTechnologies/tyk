@@ -1318,13 +1318,13 @@ type EnforceTimeout struct {
 	// Value is the configured timeout in seconds.
 	//
 	// Tyk classic API definition: `version_data.versions.extended_paths.hard_timeouts[].timeout`.
-	// Deprecated: Use Timeout instead.
+	// Deprecated: Use Duration instead.
 	Value int `bson:"value" json:"value"`
 
-	// Timeout is the configured timeout.
+	// Duration is the configured timeout duration. Supports sub-second values (e.g. "500ms", "5s").
 	//
 	// Tyk classic API definition: `version_data.versions.extended_paths.hard_timeouts[].timeout_duration`.
-	Timeout tyktime.ReadableDuration `bson:"timeout,omitempty" json:"timeout,omitempty"`
+	Duration tyktime.ReadableDuration `bson:"duration,omitempty" json:"duration,omitempty"`
 }
 
 // Fill fills *EnforceTimeout from apidef.HardTimeoutMeta.
@@ -1332,7 +1332,7 @@ func (et *EnforceTimeout) Fill(meta apidef.HardTimeoutMeta) {
 	et.Enabled = !meta.Disabled
 
 	if meta.TimeoutDuration != 0 {
-		et.Timeout = meta.TimeoutDuration
+		et.Duration = meta.TimeoutDuration
 		et.Value = int(meta.TimeoutDuration.SecondsCeil())
 	} else {
 		et.Value = meta.TimeOut
@@ -1343,9 +1343,9 @@ func (et *EnforceTimeout) Fill(meta apidef.HardTimeoutMeta) {
 func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 	meta.Disabled = !et.Enabled
 
-	if et.Timeout != 0 {
-		meta.TimeoutDuration = et.Timeout
-		meta.TimeOut = int(et.Timeout.SecondsCeil())
+	if et.Duration != 0 {
+		meta.TimeoutDuration = et.Duration
+		meta.TimeOut = int(et.Duration.SecondsCeil())
 	} else {
 		meta.TimeOut = et.Value
 	}

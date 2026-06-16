@@ -612,6 +612,9 @@ func (gw *Gateway) processSpec(
 		gw.mwAppendEnabled(&chainArray, &MCPAccessControlMiddleware{baseMid.Copy()})
 	}
 
+	gw.mwAppendEnabled(&chainArray, &OAuth2Middleware{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, getOAuth2ExchangeMw(baseMid.Copy()))
+
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid.Copy(), quotaKey: options.quotaKey})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid.Copy()})
 
@@ -698,7 +701,7 @@ func (gw *Gateway) processSpec(
 	} else if gw.GetConfig().OpenTelemetry.TracesEnabled() { // check if opentelemetry is enabled
 		spanAttrs := []otel.SpanAttribute{}
 		spanAttrs = append(spanAttrs, otel.ApidefSpanAttributes(spec.APIDefinition)...)
-		chainDef.ThisHandler = otel.HTTPHandler(spec.Name, chain, gw.TracerProvider, spanAttrs...)
+		chainDef.ThisHandler = otel.HTTPHandler(spec.Name, withOriginalPathSpanAttribute(chain), gw.TracerProvider, spanAttrs...)
 	} else {
 		chainDef.ThisHandler = chain
 	}
@@ -1113,7 +1116,7 @@ func (gw *Gateway) mcpPRMSuffixHandler(spec *APISpec) http.HandlerFunc {
 			return
 		}
 		if prm.IsMirrorMode(spec.IsMCP()) {
-			if err := mw.serveMirroredPRM(w, r, prm); err != nil {
+			if err := mw.serveMirroredPRM(w, r); err != nil {
 				log.WithError(err).Warn("PRM mirror failed at suffix route")
 				http.Error(w, "upstream PRM unavailable", http.StatusBadGateway)
 			}

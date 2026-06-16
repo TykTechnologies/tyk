@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/time"
@@ -112,6 +113,96 @@ func TestUpstream(t *testing.T) {
 		resultUpstream.Fill(convertedAPI)
 
 		assert.Equal(t, emptyUpstream, resultUpstream)
+	})
+
+	t.Run("enforce timeout", func(t *testing.T) {
+		newAPI := func() apidef.APIDefinition {
+			var api apidef.APIDefinition
+			api.VersionData.Versions = map[string]apidef.VersionInfo{Main: {}}
+			api.SetDisabledFlags()
+			return api
+		}
+		mainVersion := func(api apidef.APIDefinition) apidef.VersionInfo {
+			return api.VersionData.Versions[Main]
+		}
+
+		t.Run("enabled with duration round-trips correctly", func(t *testing.T) {
+			upstream := Upstream{
+				EnforceTimeout: &GlobalEnforceTimeout{
+					Enabled:  true,
+					Duration: ReadableDuration(5 * time.Second),
+				},
+			}
+
+			api := newAPI()
+			upstream.ExtractTo(&api)
+
+			require.Equal(t, time.ReadableDuration(5*time.Second), mainVersion(api).GlobalEnforceTimeout)
+			assert.False(t, mainVersion(api).GlobalEnforceTimeoutDisabled)
+
+			var result Upstream
+			result.Fill(api)
+
+			assert.Equal(t, upstream, result)
+		})
+
+		t.Run("disabled with duration round-trips correctly", func(t *testing.T) {
+			upstream := Upstream{
+				EnforceTimeout: &GlobalEnforceTimeout{
+					Enabled:  false,
+					Duration: ReadableDuration(10 * time.Second),
+				},
+			}
+
+			api := newAPI()
+			upstream.ExtractTo(&api)
+
+			assert.Equal(t, time.ReadableDuration(10*time.Second), mainVersion(api).GlobalEnforceTimeout)
+			assert.True(t, mainVersion(api).GlobalEnforceTimeoutDisabled)
+
+			var result Upstream
+			result.Fill(api)
+
+			assert.Equal(t, upstream, result)
+		})
+
+		t.Run("nil enforceTimeout produces zero apidef values", func(t *testing.T) {
+			upstream := Upstream{EnforceTimeout: nil}
+
+			api := newAPI()
+			upstream.ExtractTo(&api)
+
+			assert.Equal(t, time.ReadableDuration(0), mainVersion(api).GlobalEnforceTimeout)
+			assert.True(t, mainVersion(api).GlobalEnforceTimeoutDisabled)
+		})
+
+		t.Run("zero apidef values produce nil enforceTimeout", func(t *testing.T) {
+			api := newAPI()
+
+			var result Upstream
+			result.Fill(api)
+
+			assert.Nil(t, result.EnforceTimeout)
+		})
+
+		t.Run("sub-second duration round-trips correctly", func(t *testing.T) {
+			upstream := Upstream{
+				EnforceTimeout: &GlobalEnforceTimeout{
+					Enabled:  true,
+					Duration: ReadableDuration(500 * time.Millisecond),
+				},
+			}
+
+			api := newAPI()
+			upstream.ExtractTo(&api)
+
+			assert.Equal(t, time.ReadableDuration(500*time.Millisecond), mainVersion(api).GlobalEnforceTimeout)
+
+			var result Upstream
+			result.Fill(api)
+
+			assert.Equal(t, upstream, result)
+		})
 	})
 
 	t.Run("rate limit", func(t *testing.T) {

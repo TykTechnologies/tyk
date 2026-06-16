@@ -9,6 +9,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -285,6 +287,43 @@ func TestGateway_afterConfSetup(t *testing.T) {
 							CertFile: "/consul/path/to/cert.pem",
 							KeyFile:  "/consul/path/to/key.pem",
 							CAFile:   "/consul/path/to/ca.pem",
+						},
+					},
+				},
+				AnalyticsConfig: config.AnalyticsConfigConfig{
+					PurgeInterval: 10,
+				},
+				HealthCheckEndpointName:    "hello",
+				ReadinessCheckEndpointName: "ready",
+			},
+		},
+		{
+			name:          "oauth mtls kv store - file backend",
+			initialConfig: config.Config{},
+			setup: func(t *testing.T, gw *Gateway) {
+				t.Helper()
+				dir := t.TempDir()
+				certFile := filepath.Join(dir, "cert.pem")
+				keyFile := filepath.Join(dir, "key.pem")
+				caFile := filepath.Join(dir, "ca.pem")
+				require.NoError(t, os.WriteFile(certFile, []byte("/file/path/to/cert.pem"), 0o600))
+				require.NoError(t, os.WriteFile(keyFile, []byte("/file/path/to/key.pem"), 0o600))
+				require.NoError(t, os.WriteFile(caFile, []byte("/file/path/to/ca.pem"), 0o600))
+				conf := gw.GetConfig()
+				conf.ExternalServices.OAuth.MTLS.Enabled = true
+				conf.ExternalServices.OAuth.MTLS.CertFile = "file://" + certFile
+				conf.ExternalServices.OAuth.MTLS.KeyFile = "file://" + keyFile
+				conf.ExternalServices.OAuth.MTLS.CAFile = "file://" + caFile
+				gw.SetConfig(conf)
+			},
+			expectedConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "/file/path/to/cert.pem",
+							KeyFile:  "/file/path/to/key.pem",
+							CAFile:   "/file/path/to/ca.pem",
 						},
 					},
 				},

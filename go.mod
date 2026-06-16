@@ -25,12 +25,12 @@ require (
 	github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481
 	github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6
 	github.com/TykTechnologies/goverify v0.0.0-20260203113354-7a104729566e
-	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20251104074758-abfe5c458f3b
+	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20260610093432-c7048b604e16
 	github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
 	github.com/TykTechnologies/storage v1.3.1
-	github.com/TykTechnologies/tyk-pump v1.14.1-rc1.0.20260424072310-bad4cd383b57
+	github.com/TykTechnologies/tyk-pump v1.15.0-rc1.0.20260609132845-8a614d6efd02
 	github.com/akutz/memconn v0.1.0
 	github.com/bshuster-repo/logrus-logstash-hook v1.1.0
 	github.com/buger/jsonparser v1.1.2
@@ -74,6 +74,7 @@ require (
 	github.com/valyala/fasthttp v1.58.0 // test
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/xeipuuv/gojsonschema v1.2.0
+	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/crypto v0.49.0
 	golang.org/x/net v0.52.0
 	golang.org/x/sync v0.20.0
@@ -96,7 +97,7 @@ require (
 	github.com/IBM/sarama v1.46.3
 	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20250926102005-c54e73aae17d
-	github.com/TykTechnologies/opentelemetry v0.0.26-0.20260521112223-3b0d024e6090
+	github.com/TykTechnologies/opentelemetry v0.0.26-0.20260608075444-bc5cc136cf52
 	github.com/TykTechnologies/structviewer v1.2.0
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/dop251/goja v0.0.0-20241024094426-79f3a7efcdbd

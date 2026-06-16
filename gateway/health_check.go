@@ -236,6 +236,11 @@ func (gw *Gateway) readinessHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if gw.shuttingDown.Load() {
+		doJSONWrite(w, http.StatusServiceUnavailable, apiError("Gateway is shutting down"))
+		return
+	}
+
 	// Reuse existing health check data
 	checks := gw.getHealthCheckInfo()
 

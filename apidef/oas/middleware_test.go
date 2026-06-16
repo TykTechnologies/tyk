@@ -463,15 +463,15 @@ func TestExtendedPaths(t *testing.T) {
 		// Timeout is coupled with the deprecated 'Value' due to backward and forward compatibility.
 		// Value is automatically rounded up to the nearest second when Timeout is set up during fill and extract process.
 		for _, path := range paths {
-			path.Get.EnforceTimeout.Timeout = 0
-			path.Options.EnforceTimeout.Timeout = 0
-			path.Delete.EnforceTimeout.Timeout = 0
-			path.Connect.EnforceTimeout.Timeout = 0
-			path.Head.EnforceTimeout.Timeout = 0
-			path.Patch.EnforceTimeout.Timeout = 0
-			path.Post.EnforceTimeout.Timeout = 0
-			path.Put.EnforceTimeout.Timeout = 0
-			path.Trace.EnforceTimeout.Timeout = 0
+			path.Get.EnforceTimeout.Duration = 0
+			path.Options.EnforceTimeout.Duration = 0
+			path.Delete.EnforceTimeout.Duration = 0
+			path.Connect.EnforceTimeout.Duration = 0
+			path.Head.EnforceTimeout.Duration = 0
+			path.Patch.EnforceTimeout.Duration = 0
+			path.Post.EnforceTimeout.Duration = 0
+			path.Put.EnforceTimeout.Duration = 0
+			path.Trace.EnforceTimeout.Duration = 0
 		}
 
 		var convertedEP apidef.ExtendedPathsSet

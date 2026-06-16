@@ -312,6 +312,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	vInfo.GlobalResponseHeadersDisabled = false
 	vInfo.UseExtendedPaths = false
 	vInfo.GlobalSizeLimitDisabled = false
+	vInfo.GlobalEnforceTimeoutDisabled = false
 
 	vInfo.ExtendedPaths.Clear()
 
@@ -399,7 +400,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.AnalyticsPlugin.Enabled",
 		"APIDefinition.AnalyticsPlugin.PluginPath",
 		"APIDefinition.AnalyticsPlugin.FuncName",
-		"APIDefinition.SecurityRequirements[0]",
 	}
 
 	assert.Equal(t, expectedFields, noOASSupportFields)

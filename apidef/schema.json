@@ -650,6 +650,13 @@
                       }
                     }
                   }
+                },
+                "global_enforce_timeout": {
+                  "type": "string",
+                  "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
+                },
+                "global_enforce_timeout_disabled": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -1182,6 +1189,24 @@
         "type": "array",
         "items": {
           "type": "string"
+        }
+      }
+    },
+    "security_requirement_scopes": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object",
+        "additionalProperties": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

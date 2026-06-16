@@ -495,18 +495,20 @@ type VersionInfo struct {
 		WhiteList []string `bson:"white_list" json:"white_list"`
 		BlackList []string `bson:"black_list" json:"black_list"`
 	} `bson:"paths" json:"paths"`
-	UseExtendedPaths              bool              `bson:"use_extended_paths" json:"use_extended_paths"`
-	ExtendedPaths                 ExtendedPathsSet  `bson:"extended_paths" json:"extended_paths"`
-	GlobalHeaders                 map[string]string `bson:"global_headers" json:"global_headers"`
-	GlobalHeadersRemove           []string          `bson:"global_headers_remove" json:"global_headers_remove"`
-	GlobalHeadersDisabled         bool              `bson:"global_headers_disabled" json:"global_headers_disabled"`
-	GlobalResponseHeaders         map[string]string `bson:"global_response_headers" json:"global_response_headers"`
-	GlobalResponseHeadersRemove   []string          `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
-	GlobalResponseHeadersDisabled bool              `bson:"global_response_headers_disabled" json:"global_response_headers_disabled"`
-	IgnoreEndpointCase            bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
-	GlobalSizeLimit               int64             `bson:"global_size_limit" json:"global_size_limit"`
-	GlobalSizeLimitDisabled       bool              `bson:"global_size_limit_disabled" json:"global_size_limit_disabled"`
-	OverrideTarget                string            `bson:"override_target" json:"override_target"`
+	UseExtendedPaths              bool                     `bson:"use_extended_paths" json:"use_extended_paths"`
+	ExtendedPaths                 ExtendedPathsSet         `bson:"extended_paths" json:"extended_paths"`
+	GlobalHeaders                 map[string]string        `bson:"global_headers" json:"global_headers"`
+	GlobalHeadersRemove           []string                 `bson:"global_headers_remove" json:"global_headers_remove"`
+	GlobalHeadersDisabled         bool                     `bson:"global_headers_disabled" json:"global_headers_disabled"`
+	GlobalResponseHeaders         map[string]string        `bson:"global_response_headers" json:"global_response_headers"`
+	GlobalResponseHeadersRemove   []string                 `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
+	GlobalResponseHeadersDisabled bool                     `bson:"global_response_headers_disabled" json:"global_response_headers_disabled"`
+	IgnoreEndpointCase            bool                     `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
+	GlobalSizeLimit               int64                    `bson:"global_size_limit" json:"global_size_limit"`
+	GlobalSizeLimitDisabled       bool                     `bson:"global_size_limit_disabled" json:"global_size_limit_disabled"`
+	GlobalEnforceTimeout          tyktime.ReadableDuration `bson:"global_enforce_timeout" json:"global_enforce_timeout"`
+	GlobalEnforceTimeoutDisabled  bool                     `bson:"global_enforce_timeout_disabled" json:"global_enforce_timeout_disabled"`
+	OverrideTarget                string                   `bson:"override_target" json:"override_target"`
 }
 
 func (v *VersionInfo) GlobalHeadersEnabled() bool {
@@ -808,8 +810,26 @@ type APIDefinition struct {
 	UpstreamAuth UpstreamAuth `bson:"upstream_auth" json:"upstream_auth"`
 
 	// SecurityRequirements stores all OAS security requirements (auto-populated from OpenAPI description import)
-	// When len(SecurityRequirements) > 1, OR logic is automatically applied
-	SecurityRequirements [][]string `json:"security_requirements,omitempty" bson:"security_requirements,omitempty"`
+	// When len(SecurityRequirements) > 1, OR logic is automatically applied.
+	//
+	// Storage tag intentionally omits bson:",omitempty" — a nil here is
+	// the signal that the operator removed all security from the API
+	// and must overwrite any stored value, not be silently dropped from
+	// a $set update.
+	SecurityRequirements [][]string `json:"security_requirements,omitempty" bson:"security_requirements"`
+
+	// SecurityRequirementScopes preserves the per-scheme scope arrays from
+	// OAS root `security:` Security Requirement Objects. Aligned by index
+	// with SecurityRequirements: entry i carries the scope map for the
+	// schemes named in SecurityRequirements[i]. Scopes are honoured only
+	// for schemes whose OAS type is oauth2 or openIdConnect — other
+	// schemes always round-trip with an empty scope array (OAS 3.0
+	// §4.8.30.1).
+	//
+	// Storage tag intentionally omits bson:",omitempty" — see
+	// SecurityRequirements above. A nil after an operator edit must
+	// reach storage as null so the prior value is cleared.
+	SecurityRequirementScopes []map[string][]string `json:"security_requirement_scopes,omitempty" bson:"security_requirement_scopes"`
 
 	// ErrorOverrides contains the configurations for error response customization.
 	ErrorOverrides         ErrorOverridesMap `bson:"error_overrides" json:"error_overrides"`
