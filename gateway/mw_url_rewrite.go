@@ -342,6 +342,7 @@ func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]in
 
 			val, err := ResolveFileKV(gw.GetConfig().KV.File.BasePath, key)
 			if err != nil {
+				log.WithError(err).Debug("file KV: $secret_file resolution failed")
 				in = emptyStringFn(key, in, v)
 				continue
 			}
