@@ -438,22 +438,30 @@ func TestPing_RedisDownDashboardUp_DoesNotBlockOrReRegister(t *testing.T) {
 	}
 }
 
-// TestPing_HangingDashboard_BoundedByTimeout verifies the probe is bounded by
-// half the health-check interval: a dashboard that accepts the connection but
-// never answers must be reported as failing before the round's barrier
-// expires, not block the health-check loop.
-func TestPing_HangingDashboard_BoundedByTimeout(t *testing.T) {
+// TestPing_SlowDashboard_RedisDown_ReportsPass pins the behaviour when Redis
+// is down but the Dashboard is still up: the Dashboard is slow to respond
+// (its own Redis lookups add latency) and ultimately returns 403. The probe
+// must treat that 403 as reachable (pass) regardless of how long the
+// Dashboard took to answer — a transport error and a slow-but-real response
+// must not be conflated. The gatherHealthChecks barrier (healthCheckInterval)
+// is the correct wedge guard for a permanently hung probe; Ping() must not
+// impose its own shorter deadline that fires before the 403 arrives.
+func TestPing_SlowDashboard_RedisDown_ReportsPass(t *testing.T) {
 	const checkDuration = 4 * time.Second
+	// The Dashboard sleeps longer than checkDuration/2 before answering 403,
+	// simulating its internal Redis lookup delay. On the unfixed branch this
+	// caused the probe context (checkDuration/2) to fire first, making Ping()
+	// return an error as if the Dashboard were unreachable.
+	const dashDelay = checkDuration/2 + 500*time.Millisecond
 
-	release := make(chan struct{})
-	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		<-release
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(dashDelay)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		writeBody(t, w, `{"Status":"Error","Message":"Authorization failed (Session not found)"}`)
 	}))
 	defer srv.Close()
-	defer close(release)
 
-	// Production-default dashboard client (30s timeout) so the probe's own
-	// bound is what gets exercised, not the test helper's short client.
 	g := StartTest(func(c *config.Config) {
 		c.UseDBAppConfigs = false
 		c.NodeSecret = "test-secret"
@@ -472,26 +480,17 @@ func TestPing_HangingDashboard_BoundedByTimeout(t *testing.T) {
 	g.Gw.DashService = h
 
 	done := make(chan error, 1)
-	start := time.Now()
 	go func() {
-		done <- h.Gw.DashService.Ping()
+		done <- h.Ping()
 	}()
 
 	select {
 	case err := <-done:
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "dashboard is down? Heartbeat is failing")
-		// Mirror Ping's derivation, plus scheduling slack for slow CI. The
-		// sum must stay strictly below checkDuration — the pre-fix
-		// behaviour — so the assertion keeps distinguishing fixed from
-		// unfixed code.
-		probeTimeout := checkDuration / 2
-		schedulingSlack := time.Second
-		require.Less(t, probeTimeout+schedulingSlack, checkDuration)
-		assert.Less(t, time.Since(start), probeTimeout+schedulingSlack,
-			"the probe must time out at half the check interval so its error is reported before the round's barrier expires")
-	case <-time.After(7 * time.Second):
-		t.Fatal("Ping() not bounded: still blocked after 7s on an unresponsive dashboard")
+		// Dashboard responded (eventually with 403): it is reachable, so the
+		// probe must report pass regardless of the delay.
+		assert.NoError(t, err, "slow 403 from dashboard must be treated as reachable (pass), not as dashboard down")
+	case <-time.After(checkDuration * 2):
+		t.Fatal("Ping() blocked: did not return within the expected window")
 	}
 }
 

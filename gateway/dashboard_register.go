@@ -276,18 +276,18 @@ func (h *HTTPDashboardHandler) attemptRegistration(ctx context.Context) (registe
 // the dashboard is reachable but does not recognise this node (e.g. its
 // session store is unavailable), and recovery from that state is owned by
 // the heartbeat loop, not by the probe.
+//
+// No probe-level timeout is set here: gatherHealthChecks already bounds the
+// entire round with a healthCheckInterval() timer and marks any probe that
+// does not finish in time as Fail. Adding a shorter deadline inside Ping()
+// would cause a slow-but-reachable Dashboard (e.g. Redis down, so its
+// session lookup is slow) to be mis-reported as down before it can return
+// the 403 that should count as pass.
 func (h *HTTPDashboardHandler) Ping() error {
-	// Half the check interval, so the probe always reports its own error
-	// before the round's barrier in gatherHealthChecks expires.
-	timeout := h.Gw.healthCheckInterval() / 2
-
-	baseCtx := h.Gw.ctx
-	if baseCtx == nil {
-		baseCtx = context.Background()
+	ctx := h.Gw.ctx
+	if ctx == nil {
+		ctx = context.Background()
 	}
-
-	ctx, cancel := context.WithTimeout(baseCtx, timeout)
-	defer cancel()
 
 	err := h.doHeartBeat(
 		h.newRequestWithContext(ctx, http.MethodGet, h.HeartBeatEndpoint),
