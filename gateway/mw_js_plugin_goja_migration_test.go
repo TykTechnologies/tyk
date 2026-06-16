@@ -143,9 +143,9 @@ es6Mid.NewProcessRequest(function(request, session) {
 // bridge marshals the outbound request and decodes {Code,Body,Headers} back into
 // JS. Existing coverage only exercises the bridge via GojaJSVM.Run directly.
 func TestGoja_TykMakeHttpRequest_EndToEnd(t *testing.T) {
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("pong"))
+		w.Write([]byte("pong"))
 	}))
 	defer upstream.Close()
 
