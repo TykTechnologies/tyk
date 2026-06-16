@@ -1728,6 +1728,30 @@ func TestReplaceSecretsFileScheme(t *testing.T) {
 		assert.Equal(t, "key-from-mount", api.JWTSource)
 	})
 
+	t.Run("absolute path in API definition is rejected when base_path is set", func(t *testing.T) {
+		baseDir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(baseDir, "jwt-secret"), []byte("allowed-value"), 0600))
+
+		outsideDir := t.TempDir()
+		secret := filepath.Join(outsideDir, "passwd")
+		require.NoError(t, os.WriteFile(secret, []byte("root:x:0:0:secret"), 0600))
+
+		ts := StartTest(func(conf *config.Config) {
+			conf.KV.File.BasePath = baseDir
+		})
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "file-kv-abs-reject"
+			spec.JWTSource = "file://" + secret
+		})
+
+		api := ts.Gw.getApiSpec("file-kv-abs-reject")
+		require.NotNil(t, api)
+		assert.NotContains(t, api.JWTSource, "root:x:0:0", "absolute-path file contents must not be injected")
+		assert.Equal(t, "file://"+secret, api.JWTSource, "raw file:// reference should be left unresolved")
+	})
+
 	t.Run("multi-line PEM content is valid JSON after substitution", func(t *testing.T) {
 		dir := t.TempDir()
 		pem := "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJ\n-----END CERTIFICATE-----"
