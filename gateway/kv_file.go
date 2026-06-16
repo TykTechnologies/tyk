@@ -16,31 +16,9 @@ import (
 // When basePath is empty no boundary is configured, so only absolute keys are
 // accepted; a relative key has no base to resolve against and is rejected.
 func ResolveFileKV(basePath, key string) (string, error) {
-	var path string
-
-	if basePath == "" {
-		if !filepath.IsAbs(key) {
-			return "", fmt.Errorf(
-				"file KV: key %q is a relative path but kv.file.base_path is not configured; "+
-					"set kv.file.base_path or use an absolute path",
-				key,
-			)
-		}
-		path = key
-	} else {
-		if filepath.IsAbs(key) {
-			return "", fmt.Errorf(
-				"file KV: absolute path %q rejected because kv.file.base_path is configured; "+
-					"use a path relative to base_path",
-				key,
-			)
-		}
-		joined := filepath.Join(basePath, key)
-		rel, err := filepath.Rel(basePath, joined)
-		if err != nil || !filepath.IsLocal(rel) {
-			return "", fmt.Errorf("file KV: path traversal detected in key %q", key)
-		}
-		path = joined
+	path, err := resolveKeyPath(basePath, key)
+	if err != nil {
+		return "", err
 	}
 
 	// Resolve K8s AtomicWriter symlinks (e.g. ..data -> ..2024_01_01_00_00_00).
@@ -58,9 +36,13 @@ func ResolveFileKV(basePath, key string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("file KV: cannot resolve base_path %q: %w", basePath, err)
 		}
-		rel, err := filepath.Rel(canonicalBase, resolved)
-		if err != nil || !filepath.IsLocal(rel) {
-			return "", fmt.Errorf("file KV: symlink escape detected for key %q: resolved to %q which is outside base_path", key, resolved)
+
+		if !confined(canonicalBase, resolved) {
+			return "", fmt.Errorf(
+				"file KV: symlink escape detected for key %q: resolved to %q which is outside base_path",
+				key,
+				resolved,
+			)
 		}
 	}
 
@@ -70,4 +52,43 @@ func ResolveFileKV(basePath, key string) (string, error) {
 	}
 
 	return strings.TrimRight(string(data), "\r\n"), nil
+}
+
+// resolveKeyPath applies the base_path boundary policy and returns the
+// candidate file path.
+func resolveKeyPath(basePath, key string) (string, error) {
+	if basePath == "" {
+		if !filepath.IsAbs(key) {
+			return "", fmt.Errorf(
+				"file KV: key %q is a relative path but kv.file.base_path is not configured; "+
+					"set kv.file.base_path or use an absolute path",
+				key,
+			)
+		}
+
+		return key, nil
+	}
+
+	if filepath.IsAbs(key) {
+		return "", fmt.Errorf(
+			"file KV: absolute path %q rejected because kv.file.base_path is configured; "+
+				"use a path relative to base_path",
+			key,
+		)
+	}
+
+	joined := filepath.Join(basePath, key)
+	if !confined(basePath, joined) {
+
+		return "", fmt.Errorf("file KV: path traversal detected in key %q", key)
+	}
+
+	return joined, nil
+}
+
+// confined reports whether target resolves to a location within base,
+// using lexical analysis only.
+func confined(base, target string) bool {
+	rel, err := filepath.Rel(base, target)
+	return err == nil && filepath.IsLocal(rel)
 }
