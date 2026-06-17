@@ -12,6 +12,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 
+	"github.com/TykTechnologies/storage/kv"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -1347,9 +1348,11 @@ type Config struct {
 	// This section enables the use of the KV capabilities to substitute configuration values.
 	// See more details https://tyk.io/docs/tyk-self-managed/#store-configuration-with-key-value-store
 	KV struct {
-		Consul ConsulConfig `json:"consul"`
-		Vault  VaultConfig  `json:"vault"`
-		File   FileConfig   `json:"file"`
+		Consul ConsulConfig              `json:"consul"`
+		Vault  VaultConfig               `json:"vault"`
+		File   FileConfig                `json:"file"`
+		Stores map[string]kv.StoreConfig `json:"stores" ignored:"true"`
+		Cache  kv.CacheConfig            `json:"cache"`
 	} `json:"kv"`
 
 	// Secrets configures a list of key/value pairs for the gateway.
