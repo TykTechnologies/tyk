@@ -1381,6 +1381,10 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 	} else {
 		newDef.IsOAS = false
 
+		// Round the sub-second hard timeout durations up into the deprecated
+		// whole-second field so older Gateways still enforce a timeout.
+		newDef.FillHardTimeoutDeprecatedFields()
+
 		err, errCode := gw.writeToFile(fs, newDef, newDef.APIID)
 		if err != nil {
 			return apiError(err.Error()), errCode
@@ -1459,6 +1463,10 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 
 	} else if !oasEndpoint {
 		newDef.IsOAS = false
+
+		// Round the sub-second hard timeout durations up into the deprecated
+		// whole-second field so older Gateways still enforce a timeout.
+		newDef.FillHardTimeoutDeprecatedFields()
 
 		err, errCode := gw.writeToFile(fs, newDef, newDef.APIID)
 		if err != nil {

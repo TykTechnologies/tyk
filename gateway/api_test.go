@@ -32,6 +32,7 @@ import (
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 	internalmodel "github.com/TykTechnologies/tyk/internal/model"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/pkg/identifier"
 	"github.com/TykTechnologies/tyk/storage"
@@ -2334,6 +2335,41 @@ func TestHandleAddApi(t *testing.T) {
 
 		assert.Equal(t, "Request malformed", errorResponse.Message)
 		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("rounds up classic hard timeout duration into legacy field on save", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = "ht-roundup"
+		v := apiDef.VersionData.Versions["Default"]
+		v.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+			{
+				Path:            "/get",
+				Method:          http.MethodGet,
+				TimeOut:         5,
+				TimeoutDuration: tyktime.ReadableDuration(1200 * time.Millisecond),
+			},
+		}
+		apiDef.VersionData.Versions["Default"] = v
+
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		_, statusCode := ts.Gw.handleAddApi(req, testFs, false)
+		require.Equal(t, http.StatusOK, statusCode)
+
+		defFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, "ht-roundup.json")
+		stored, err := afero.ReadFile(testFs, defFilePath)
+		require.NoError(t, err)
+
+		var storedDef apidef.APIDefinition
+		require.NoError(t, json.Unmarshal(stored, &storedDef))
+
+		got := storedDef.VersionData.Versions["Default"].ExtendedPaths.HardTimeouts[0]
+		assert.Equal(t, 2, got.TimeOut, "duration 1.2s should round up to 2s in the legacy timeout field")
+		assert.Equal(t, tyktime.ReadableDuration(1200*time.Millisecond), got.TimeoutDuration)
 	})
 
 	t.Run("should return error when semantic validation fails", func(t *testing.T) {

@@ -413,6 +413,62 @@ func TestRuleValidateEnforceTimeout_Validate(t *testing.T) {
 				Errors:  nil,
 			},
 		},
+		{
+			name: "sub-second duration is valid",
+			apiDef: getAPIDef([]HardTimeoutMeta{
+				{
+					Path:            "/get",
+					Method:          http.MethodGet,
+					TimeoutDuration: tyktime.ReadableDuration(1500 * time.Millisecond),
+				},
+			}),
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
+		{
+			name: "1ms duration is valid (boundary)",
+			apiDef: getAPIDef([]HardTimeoutMeta{
+				{
+					Path:            "/get",
+					Method:          http.MethodGet,
+					TimeoutDuration: tyktime.ReadableDuration(time.Millisecond),
+				},
+			}),
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
+		{
+			name: "negative duration is invalid",
+			apiDef: getAPIDef([]HardTimeoutMeta{
+				{
+					Path:            "/get",
+					Method:          http.MethodGet,
+					TimeoutDuration: tyktime.ReadableDuration(-3 * time.Second),
+				},
+			}),
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrInvalidTimeoutValue},
+			},
+		},
+		{
+			name: "zero duration with enabled entry is valid (no timeout)",
+			apiDef: getAPIDef([]HardTimeoutMeta{
+				{
+					Disabled: false,
+					Path:     "/get",
+					Method:   http.MethodGet,
+				},
+			}),
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
 	}
 
 	for _, tc := range testCases {

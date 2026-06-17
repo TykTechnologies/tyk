@@ -231,7 +231,24 @@ type HardTimeoutMeta struct {
 	Method   string `bson:"method" json:"method"`
 	// Deprecated: Use TimeoutDuration instead.
 	TimeOut         int                      `bson:"timeout" json:"timeout"`
-	TimeoutDuration tyktime.ReadableDuration `bson:"timeout_duration,omitempty" json:"timeout_duration,omitempty"`
+	TimeoutDuration tyktime.ReadableDuration `bson:"duration,omitempty" json:"duration,omitempty"`
+}
+
+// FillHardTimeoutDeprecatedFields synchronises the deprecated whole-second timeout
+// (TimeOut) from the sub-second TimeoutDuration for every hard timeout, rounding up
+// to the nearest second. When a duration is set it takes precedence and overwrites
+// the deprecated value, mirroring the OAS EnforceTimeout.ExtractTo behaviour, so
+// that older Gateways (which only read the deprecated field) still enforce a timeout.
+// It is a no-op for entries without a duration.
+func (a *APIDefinition) FillHardTimeoutDeprecatedFields() {
+	for _, version := range a.VersionData.Versions {
+		for i := range version.ExtendedPaths.HardTimeouts {
+			meta := &version.ExtendedPaths.HardTimeouts[i]
+			if meta.TimeoutDuration != 0 {
+				meta.TimeOut = int(meta.TimeoutDuration.SecondsCeil())
+			}
+		}
+	}
 }
 
 type TrackEndpointMeta struct {
