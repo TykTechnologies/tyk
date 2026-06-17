@@ -3389,6 +3389,17 @@ func ctxGetOriginalRequestPath(r *http.Request) string {
 	return ""
 }
 
+func withOriginalPathSpanAttribute(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if originalPath := ctxGetOriginalRequestPath(r); originalPath != "" {
+			span := otel.SpanFromContext(r.Context())
+			span.SetAttributes(otel.OriginalPathSpanAttribute(originalPath))
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
 	if v := r.Context().Value(ctx.VersionData); v != nil {
 		return v.(*apidef.VersionInfo)
