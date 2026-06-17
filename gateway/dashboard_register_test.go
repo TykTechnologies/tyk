@@ -60,6 +60,13 @@ func writeJSON(t *testing.T, w http.ResponseWriter, v interface{}) {
 	}
 }
 
+func writeBody(t *testing.T, w http.ResponseWriter, body string) {
+	t.Helper()
+	if _, err := w.Write([]byte(body)); err != nil {
+		t.Errorf("failed to write response body: %v", err)
+	}
+}
+
 func okResponse(nodeID, nonce string) NodeResponse {
 	return NodeResponse{
 		Status:  "OK",
@@ -276,6 +283,185 @@ func TestNewRequestWithContext_InvalidURL_Panics(t *testing.T) {
 	assert.Panics(t, func() {
 		h.newRequestWithContext(context.Background(), "INVALID METHOD", "://bad-url")
 	})
+}
+
+// TestSendHeartBeat_Forbidden_ReRegisters verifies a 403 heartbeat triggers re-registration.
+func TestSendHeartBeat_Forbidden_ReRegisters(t *testing.T) {
+	var registerCalls int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/register/ping":
+			w.WriteHeader(http.StatusForbidden)
+		case "/register/node":
+			atomic.AddInt32(&registerCalls, 1)
+			writeJSON(t, w, okResponse("node-recovered", "nonce-recovered"))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	h, closeFn := newTestDashboardHandler(t, srv.URL)
+	defer closeFn()
+	h.HeartBeatEndpoint = srv.URL + "/register/ping"
+
+	err := h.sendHeartBeat(
+		h.newRequest(http.MethodGet, h.HeartBeatEndpoint),
+		h.Gw.initialiseClient(),
+		context.Background())
+	require.NoError(t, err)
+
+	assert.Equal(t, int32(1), atomic.LoadInt32(&registerCalls))
+	assert.Equal(t, "node-recovered", h.Gw.GetNodeID())
+
+	h.Gw.ServiceNonceMutex.RLock()
+	gotNonce := h.Gw.ServiceNonce
+	h.Gw.ServiceNonceMutex.RUnlock()
+	assert.Equal(t, "nonce-recovered", gotNonce)
+}
+
+// TestPing_HeartbeatOK_UpdatesNonce verifies a 200 heartbeat response stores the returned nonce.
+func TestPing_HeartbeatOK_UpdatesNonce(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		writeJSON(t, w, NodeResponse{Status: "OK", Nonce: "nonce-hb-1"})
+	}))
+	defer srv.Close()
+
+	h, closeFn := newTestDashboardHandler(t, srv.URL)
+	defer closeFn()
+	h.HeartBeatEndpoint = srv.URL + "/register/ping"
+
+	require.NoError(t, h.Ping())
+
+	h.Gw.ServiceNonceMutex.RLock()
+	gotNonce := h.Gw.ServiceNonce
+	h.Gw.ServiceNonceMutex.RUnlock()
+	assert.Equal(t, "nonce-hb-1", gotNonce)
+}
+
+// TestPing_NilGatewayContext_DoesNotPanic guards against a nil gateway context.
+func TestPing_NilGatewayContext_DoesNotPanic(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		writeJSON(t, w, NodeResponse{Status: "OK", Nonce: "nonce-1"})
+	}))
+	defer srv.Close()
+
+	h, closeFn := newTestDashboardHandler(t, srv.URL)
+	defer closeFn()
+	h.HeartBeatEndpoint = srv.URL + "/register/ping"
+
+	oldCtx := h.Gw.ctx
+	h.Gw.ctx = nil
+	defer func() { h.Gw.ctx = oldCtx }()
+
+	assert.NotPanics(t, func() {
+		assert.NoError(t, h.Ping())
+	})
+}
+
+// TestPing_DashboardUnreachable_Fails verifies a transport error reports the dashboard as down.
+func TestPing_DashboardUnreachable_Fails(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+	srv.Close() // connection refused from now on
+
+	h, closeFn := newTestDashboardHandler(t, srv.URL)
+	defer closeFn()
+	h.HeartBeatEndpoint = srv.URL + "/register/ping"
+
+	err := h.Ping()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "dashboard is down? Heartbeat is failing")
+}
+
+// TestPing_RedisDownDashboardUp_DoesNotBlockOrReRegister is the TT-17486 regression test.
+// With Redis down the Dashboard returns 403 on heartbeat and 409 on registration.
+// Ping must return immediately without triggering re-registration.
+func TestPing_RedisDownDashboardUp_DoesNotBlockOrReRegister(t *testing.T) {
+	var registerAttempts int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/register/ping":
+			// Dashboard with Redis down: GetNodeFromSessionWithFallback fails.
+			w.WriteHeader(http.StatusForbidden)
+			writeBody(t, w, `{"Status":"Error","Message":"Authorization failed (Session not found)"}`)
+		case "/register/node":
+			atomic.AddInt32(&registerAttempts, 1)
+			// Dashboard with Redis down: NodeIDConn.Lock fails.
+			w.WriteHeader(http.StatusConflict)
+			writeBody(t, w, `{"Status":"Error","Message":"Another registration operation in progress"}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	h, closeFn := newTestDashboardHandler(t, srv.URL)
+	defer closeFn()
+	h.HeartBeatEndpoint = srv.URL + "/register/ping"
+
+	done := make(chan error, 1)
+	go func() {
+		done <- h.Gw.DashService.Ping()
+	}()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+		assert.Zero(t, atomic.LoadInt32(&registerAttempts), "liveness probe must not trigger re-registration")
+	case <-time.After(10 * time.Second):
+		t.Fatalf("Ping() blocked after %d register attempts", atomic.LoadInt32(&registerAttempts))
+	}
+}
+
+// TestPing_SlowDashboard_RedisDown_ReportsPass verifies that a slow but reachable
+// Dashboard (Redis down, so its session lookup is delayed) returning 403 is
+// reported as pass, not as dashboard down.
+func TestPing_SlowDashboard_RedisDown_ReportsPass(t *testing.T) {
+	const checkDuration = 4 * time.Second
+	// Delay exceeds checkDuration/2 to simulate the Dashboard's internal Redis lookup latency.
+	const dashDelay = checkDuration/2 + 500*time.Millisecond
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(dashDelay)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		writeBody(t, w, `{"Status":"Error","Message":"Authorization failed (Session not found)"}`)
+	}))
+	defer srv.Close()
+
+	g := StartTest(func(c *config.Config) {
+		c.UseDBAppConfigs = false
+		c.NodeSecret = "test-secret"
+		c.DisableDashboardZeroConf = true
+		c.LivenessCheck.CheckDuration = checkDuration
+	})
+	defer g.Close()
+	g.Gw.resetDashboardClient()
+	t.Cleanup(g.Gw.resetDashboardClient)
+
+	h := &HTTPDashboardHandler{
+		Gw:                g.Gw,
+		Secret:            "test-secret",
+		HeartBeatEndpoint: srv.URL + "/register/ping",
+	}
+	g.Gw.DashService = h
+
+	done := make(chan error, 1)
+	go func() {
+		done <- h.Ping()
+	}()
+
+	select {
+	case err := <-done:
+		assert.NoError(t, err, "slow 403 from dashboard must be treated as reachable (pass), not as dashboard down")
+	case <-time.After(checkDuration * 2):
+		t.Fatal("Ping() blocked: did not return within the expected window")
+	}
 }
 
 func Test_DashboardLifecycle(t *testing.T) {
