@@ -28,6 +28,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -200,6 +201,60 @@ func TestCheckSessionAndIdentityForValidKey_CachesSessionWithoutSharingAccessRig
 
 	cached := cachedVal.(user.SessionState)
 	require.Empty(t, cached.AccessRights[api.APIID].AllowanceScope)
+}
+
+func TestCheckSessionAndIdentityForValidKey_AuthStorePath_CachesClonedSession(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HashKeys = false
+		globalConf.LocalSessionCache.DisableCacheSessionState = false
+	})
+	defer ts.Close()
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = uuid.New()
+		spec.UseKeylessAccess = false
+		spec.UseOauth2 = true
+		spec.Auth.AuthHeaderName = "authorization"
+	})[0]
+
+	key := "auth-store-" + uuid.New()
+	session := CreateStandardSession()
+	session.AccessRights = map[string]user.AccessDefinition{
+		api.APIID: {
+			APIID:    api.APIID,
+			Versions: []string{"Default"},
+			Limit: user.APILimit{
+				RateLimit: user.RateLimit{
+					Rate: 100,
+					Per:  60,
+				},
+			},
+		},
+	}
+
+	require.NoError(t, api.AuthManager.UpdateSession(key, session, 60, false))
+	defer api.AuthManager.RemoveSession(session.OrgID, key, false)
+
+	baseMid := NewBaseMiddleware(ts.Gw, api, nil, nil)
+	got, ok := baseMid.CheckSessionAndIdentityForValidKey(key, httptest.NewRequest(http.MethodGet, "/", nil))
+	require.True(t, ok, "session should be found in auth store")
+
+	require.Equal(t, api.APIID, got.AccessRights[api.APIID].AllowanceScope)
+
+	time.Sleep(100 * time.Millisecond)
+
+	cacheKey := key
+	if ts.Gw.GetConfig().HashKeys {
+		cacheKey = storage.HashStr(key, storage.HashMurmur64)
+	}
+
+	cachedVal, found := ts.Gw.SessionCache.Get(cacheKey)
+	require.True(t, found, "session should be cached after auth store lookup")
+
+	cached := cachedVal.(user.SessionState)
+	require.Empty(t, cached.AccessRights[api.APIID].AllowanceScope, "cached session should not have AllowanceScope set by policy application")
+
+	ts.Gw.SessionCache.Delete(cacheKey)
 }
 
 func TestBaseMiddleware_getAuthToken(t *testing.T) {
