@@ -242,12 +242,11 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	chainObj.ThisHandler.ServeHTTP(wr, tr)
 
 	var response string
-	// if dump, err := httputil.DumpResponse(wr.Result(), true); err == nil {
-	// 	response = string(dump)
-	// } else {
-	// 	response = err.Error()
-	// }
-	response = "BUG"
+	if dump, err := httputil.DumpResponse(wr.Result(), true); err == nil {
+		response = string(dump)
+	} else {
+		response = err.Error()
+	}
 
 	var request string
 	if dump, err := httputil.DumpRequest(tr, true); err == nil {
