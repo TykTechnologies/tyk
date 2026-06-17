@@ -593,7 +593,7 @@ func (s *OAS) validateSecurity() error {
 	}
 
 	if s.Components == nil || s.Components.SecuritySchemes == nil || len(s.Components.SecuritySchemes) == 0 {
-		return errors.New("No components or security schemes present in OAS")
+		return errors.New("No components or security schemes present in OAS - SOME CHANGE ...")
 	}
 
 	for _, requirement := range s.Security {
