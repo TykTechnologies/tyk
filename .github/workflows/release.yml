@@ -118,6 +118,40 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+      - name: Validate Go version
+        run: |
+          GO_VERSION_STR=$(docker run --rm tykio/golang-cross:${{ matrix.golang_cross }} go version 2>&1 || true)
+          if [[ ! "$GO_VERSION_STR" =~ go[0-9]+ ]]; then
+            echo "::warning::Could not determine Go version from container: $GO_VERSION_STR"
+            exit 1
+          fi
+          GO_VERSION=$(echo "$GO_VERSION_STR" | awk '{print $3}' | sed 's/^go//')
+          echo "Go version in container: $GO_VERSION"
+          MINOR_VERSION=$(echo "$GO_VERSION" | cut -d. -f1,2)
+          echo "Minor version: $MINOR_VERSION"
+
+          # Fetch latest patches
+          LATEST_PATCH_STR=$(curl -s 'https://go.dev/dl/?mode=json&include=all' || true)
+          if [ -z "$LATEST_PATCH_STR" ]; then
+            echo "::warning::Could not fetch Go releases from API. Skipping validation."
+            exit 0
+          fi
+          LATEST_PATCH=$(echo "$LATEST_PATCH_STR" | jq -r --arg minor "go${MINOR_VERSION}" '.[] | select(.stable == true and (.version | startswith($minor + ".") or . == $minor)) | .version' | head -n 1 | sed 's/^go//')
+
+          if [ -n "$LATEST_PATCH" ]; then
+            echo "Latest patch version for Go $MINOR_VERSION is $LATEST_PATCH"
+            if [ "$GO_VERSION" != "$LATEST_PATCH" ]; then
+              echo "::error::Go version validation failed!"
+              echo "Used version: $GO_VERSION (in tykio/golang-cross:${{ matrix.golang_cross }})"
+              echo "Latest patch: $LATEST_PATCH"
+              echo "Please update the buildenv Go version to the latest patch version."
+              exit 1
+            else
+              echo "Go version is up to date: $GO_VERSION"
+            fi
+          else
+            echo "::warning::Could not determine latest patch version for Go $MINOR_VERSION from API. Skipping validation."
+          fi
       - name: Build
         env:
           NFPM_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
