@@ -73,6 +73,10 @@ func resolveKeyPath(basePath, key string) (string, error) {
 		)
 	}
 
+	if key == "" {
+		return "", fmt.Errorf("file KV: file:// reference has an empty key; specify a path relative to base_path")
+	}
+
 	if filepath.IsAbs(key) {
 		return "", fmt.Errorf(
 			"file KV: absolute path %q rejected because kv.file.base_path is configured; "+
