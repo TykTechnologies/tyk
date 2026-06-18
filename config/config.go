@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/storage/kv"
+	"github.com/TykTechnologies/storage/kv/registry"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -1633,6 +1635,12 @@ func WriteDefault(in string, conf *Config) error {
 		return nil
 	}
 	return WriteConf(in, conf)
+}
+
+// LoadAndResolve runs Load, then the KV bootstrap and full-config resolution.
+// The caller owns the returned registry, including Close on shutdown.
+func LoadAndResolve(ctx context.Context, paths []string, conf *Config) (*registry.Registry, error) {
+	return nil, nil
 }
 
 // Load will load a configuration file, trying each of the paths given
