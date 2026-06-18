@@ -79,8 +79,7 @@ func resolveKeyPath(basePath, key string) (string, error) {
 
 	if filepath.IsAbs(key) {
 		return "", fmt.Errorf(
-			"file KV: absolute path %q rejected because kv.file.base_path is configured; "+
-				"use a path relative to base_path",
+			"file KV: absolute path %q rejected; file:// references must be relative to kv.file.base_path",
 			key,
 		)
 	}
