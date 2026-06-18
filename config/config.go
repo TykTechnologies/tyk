@@ -1751,10 +1751,12 @@ func buildKVConfig(cfg *Config) map[string]kv.StoreConfig {
 		Config: envCfg,
 	}
 
-	fileCfg, _ := json.Marshal(cfg.KV.File)
-	stores["file"] = kv.StoreConfig{
-		Type:   kv.File,
-		Config: fileCfg,
+	if cfg.KV.File.BasePath != "" {
+		fileCfg, _ := json.Marshal(cfg.KV.File)
+		stores["file"] = kv.StoreConfig{
+			Type:   kv.File,
+			Config: fileCfg,
+		}
 	}
 
 	// Names "secrets" so legacy secrets:// references route here; values are literal.

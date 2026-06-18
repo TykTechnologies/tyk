@@ -20,7 +20,7 @@ func decodeConfig(t *testing.T, raw json.RawMessage) map[string]any {
 	return m
 }
 
-func TestBuildKVConfig_AlwaysEmitted(t *testing.T) {
+func TestBuildKVConfig_EmptyConfig(t *testing.T) {
 	t.Parallel()
 
 	stores := buildKVConfig(&Config{})
@@ -37,24 +37,19 @@ func TestBuildKVConfig_AlwaysEmitted(t *testing.T) {
 		require.Equal(t, true, cfg["uppercase"], "legacy behavior uppercases the key")
 	})
 
-	t.Run("file store is always emitted, even with empty base_path", func(t *testing.T) {
+	t.Run("file store is NOT emitted without base_path", func(t *testing.T) {
 		t.Parallel()
 
-		file, ok := stores["file"]
-		require.True(t, ok, "file store must always be emitted")
-		require.Equal(t, kv.File, file.Type)
-
-		cfg := decodeConfig(t, file.Config)
-		require.Equal(t, "", cfg["base_path"])
+		require.NotContains(t, stores, "file")
 	})
 
-	t.Run("no conditional stores on an empty config", func(t *testing.T) {
+	t.Run("only the env store is emitted on an empty config", func(t *testing.T) {
 		t.Parallel()
 
 		require.NotContains(t, stores, "secrets")
 		require.NotContains(t, stores, "vault")
 		require.NotContains(t, stores, "consul")
-		require.Len(t, stores, 2, "empty config emits exactly env and file")
+		require.Len(t, stores, 1, "empty config emits exactly the env store")
 	})
 }
 
@@ -66,7 +61,11 @@ func TestBuildKVConfig_FileBasePath(t *testing.T) {
 
 	stores := buildKVConfig(conf)
 
-	cfg := decodeConfig(t, stores["file"].Config)
+	file, ok := stores["file"]
+	require.True(t, ok, "file store must be emitted when base_path is set")
+	require.Equal(t, kv.File, file.Type)
+
+	cfg := decodeConfig(t, file.Config)
 	require.Equal(t, "/etc/tyk/secrets", cfg["base_path"])
 }
 
@@ -213,7 +212,8 @@ func TestBuildKVConfig_FullConfig(t *testing.T) {
 
 	stores := buildKVConfig(conf)
 
-	require.ElementsMatch(t,
+	require.ElementsMatch(
+		t,
 		[]string{"env", "file", "secrets", "vault", "consul"},
 		keysOf(stores),
 	)
