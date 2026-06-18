@@ -106,6 +106,7 @@ jobs:
     # See: https://github.com/actions/runner-images?tab=readme-ov-file#available-images
     # Avoid using ubuntu-latest as it would upgrade python unattended.
     runs-on: ubuntu-22.04
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
