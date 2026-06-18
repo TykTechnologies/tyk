@@ -1,0 +1,34 @@
+---
+version: "3"
+
+vars:
+  coverage: cache.cov
+
+tasks:
+  default:
+    desc: "Run everything"
+    cmds:
+      - task: fmt
+      - task: test
+
+  fmt:
+    desc: "Run formatters"
+    cmds:
+      - goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
+      - go fmt ./...
+
+  test:
+    desc: "Build/run tests"
+    cmds:
+      - go test -bench=. -benchtime=10s -race -cpu 1,2,4 -cover -coverprofile {{.coverage}} -coverpkg=$(go list .) -v .
+
+  cover:
+    desc: "Show source coverage"
+    aliases: [coverage, cov]
+    cmds:
+      - go tool cover -func={{.coverage}}
+
+  uncover:
+    desc: "Show uncovered source"
+    cmds:
+      - uncover {{.coverage}}
