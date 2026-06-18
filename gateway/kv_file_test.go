@@ -13,26 +13,21 @@ import (
 
 // TestKVStoreFileScheme tests that kvStore() resolves file:// URIs (Context 1).
 func TestKVStoreFileScheme(t *testing.T) {
-	t.Run("absolute path without base_path", func(t *testing.T) {
+	t.Run("no base_path configured", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		t.Run("resolves absolute file:// to file contents", func(t *testing.T) {
+		t.Run("absolute file:// rejected without base_path", func(t *testing.T) {
 			dir := t.TempDir()
 			f := filepath.Join(dir, "secret")
 			require.NoError(t, os.WriteFile(f, []byte("super-secret\n"), 0600))
 
-			val, err := ts.Gw.kvStore("file://" + f)
-			require.NoError(t, err)
-			assert.Equal(t, "super-secret", val)
+			_, err := ts.Gw.kvStore("file://" + f)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "base_path")
 		})
 
-		t.Run("returns error for missing file", func(t *testing.T) {
-			_, err := ts.Gw.kvStore("file:///nonexistent/file")
-			assert.Error(t, err)
-		})
-
-		t.Run("relative key without base_path returns error", func(t *testing.T) {
+		t.Run("relative file:// rejected without base_path", func(t *testing.T) {
 			_, err := ts.Gw.kvStore("file://just-a-name")
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "base_path")
@@ -96,18 +91,22 @@ func TestFileKVHotReload(t *testing.T) {
 	require.NoError(t, os.WriteFile(keyFile, []byte("key-v1"), 0600))
 	require.NoError(t, os.WriteFile(caFile, []byte("ca-v1"), 0600))
 
-	gw := NewGateway(config.Config{
+	// file:// references require base_path; keys are relative to it.
+	cfg := config.Config{
 		ExternalServices: config.ExternalServiceConfig{
 			OAuth: config.ServiceConfig{
 				MTLS: config.MTLSConfig{
 					Enabled:  true,
-					CertFile: "file://" + certFile,
-					KeyFile:  "file://" + keyFile,
-					CAFile:   "file://" + caFile,
+					CertFile: "file://tls.crt",
+					KeyFile:  "file://tls.key",
+					CAFile:   "file://ca.crt",
 				},
 			},
 		},
-	}, t.Context())
+	}
+	cfg.KV.File.BasePath = dir
+
+	gw := NewGateway(cfg, t.Context())
 
 	require.NoError(t, gw.afterConfSetup())
 
@@ -137,53 +136,55 @@ func TestFileKVHotReload(t *testing.T) {
 func TestResolveFileKV(t *testing.T) {
 	t.Run("reads plain file contents", func(t *testing.T) {
 		dir := t.TempDir()
-		f := filepath.Join(dir, "secret.txt")
-		require.NoError(t, os.WriteFile(f, []byte("my-secret-value"), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "secret.txt"), []byte("my-secret-value"), 0600))
 
-		val, err := ResolveFileKV("", f)
+		val, err := ResolveFileKV(dir, "secret.txt")
 		require.NoError(t, err)
 		assert.Equal(t, "my-secret-value", val)
 	})
 
 	t.Run("strips trailing newline by default", func(t *testing.T) {
 		dir := t.TempDir()
-		f := filepath.Join(dir, "secret.txt")
-		require.NoError(t, os.WriteFile(f, []byte("my-secret-value\n"), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "secret.txt"), []byte("my-secret-value\n"), 0600))
 
-		val, err := ResolveFileKV("", f)
+		val, err := ResolveFileKV(dir, "secret.txt")
 		require.NoError(t, err)
 		assert.Equal(t, "my-secret-value", val)
 	})
 
 	t.Run("strips trailing newline CRLF", func(t *testing.T) {
 		dir := t.TempDir()
-		f := filepath.Join(dir, "secret.txt")
-		require.NoError(t, os.WriteFile(f, []byte("my-secret-value\r\n"), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "secret.txt"), []byte("my-secret-value\r\n"), 0600))
 
-		val, err := ResolveFileKV("", f)
+		val, err := ResolveFileKV(dir, "secret.txt")
 		require.NoError(t, err)
 		assert.Equal(t, "my-secret-value", val)
 	})
 
 	t.Run("preserves multi-line content except trailing newline", func(t *testing.T) {
 		dir := t.TempDir()
-		f := filepath.Join(dir, "cert.pem")
 		pem := "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJ\n-----END CERTIFICATE-----\n"
-		require.NoError(t, os.WriteFile(f, []byte(pem), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "cert.pem"), []byte(pem), 0600))
 
-		val, err := ResolveFileKV("", f)
+		val, err := ResolveFileKV(dir, "cert.pem")
 		require.NoError(t, err)
 		assert.Equal(t, "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJ\n-----END CERTIFICATE-----", val)
 	})
 
-	t.Run("returns error for non-existent file", func(t *testing.T) {
-		_, err := ResolveFileKV("", "/nonexistent/path/secret.txt")
+	t.Run("returns error for non-existent file under basePath", func(t *testing.T) {
+		dir := t.TempDir()
+		_, err := ResolveFileKV(dir, "nonexistent.txt")
 		assert.Error(t, err)
 	})
 
 	t.Run("relative key without basePath returns descriptive error", func(t *testing.T) {
-		// A short name like "my-cert" makes no sense without a base directory.
 		_, err := ResolveFileKV("", "my-cert")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "base_path")
+	})
+
+	t.Run("absolute key without basePath returns descriptive error", func(t *testing.T) {
+		_, err := ResolveFileKV("", "/etc/passwd")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "base_path")
 	})
@@ -245,14 +246,14 @@ func TestResolveFileKV(t *testing.T) {
 		assert.Contains(t, err.Error(), "symlink escape")
 	})
 
-	t.Run("allows absolute path when basePath is empty", func(t *testing.T) {
+	t.Run("rejects absolute path when basePath is empty", func(t *testing.T) {
 		dir := t.TempDir()
 		f := filepath.Join(dir, "secret")
 		require.NoError(t, os.WriteFile(f, []byte("value"), 0600))
 
-		val, err := ResolveFileKV("", f)
-		require.NoError(t, err)
-		assert.Equal(t, "value", val)
+		_, err := ResolveFileKV("", f)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "base_path")
 	})
 
 	t.Run("follows k8s AtomicWriter symlinks", func(t *testing.T) {

@@ -9,12 +9,12 @@ import (
 
 // ResolveFileKV reads the file at key and returns its contents trimmed of trailing newlines.
 //
-// basePath, when set, is a security boundary: only relative keys are accepted
-// and they are joined to basePath and confined within it. Absolute keys are
-// rejected so that untrusted input cannot escape the boundary to read arbitrary files.
+// basePath is a mandatory security boundary: file:// references resolve only when
+// it is configured. Keys must be relative; they are joined to basePath and confined
+// within it, so untrusted input cannot escape the boundary to read arbitrary files.
+// Absolute keys are rejected.
 //
-// When basePath is empty no boundary is configured, so only absolute keys are
-// accepted; a relative key has no base to resolve against and is rejected.
+// When basePath is empty no boundary is configured, so every key is rejected.
 func ResolveFileKV(basePath, key string) (string, error) {
 	path, err := resolveKeyPath(basePath, key)
 	if err != nil {
@@ -58,15 +58,11 @@ func ResolveFileKV(basePath, key string) (string, error) {
 // candidate file path.
 func resolveKeyPath(basePath, key string) (string, error) {
 	if basePath == "" {
-		if !filepath.IsAbs(key) {
-			return "", fmt.Errorf(
-				"file KV: key %q is a relative path but kv.file.base_path is not configured; "+
-					"set kv.file.base_path or use an absolute path",
-				key,
-			)
-		}
-
-		return key, nil
+		return "", fmt.Errorf(
+			"file KV: cannot resolve key %q because kv.file.base_path is not configured; "+
+				"set kv.file.base_path to enable file:// references",
+			key,
+		)
 	}
 
 	if filepath.IsAbs(key) {

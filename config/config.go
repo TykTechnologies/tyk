@@ -1480,13 +1480,11 @@ type TykError struct {
 
 // FileConfig configures the file-based KV provider.
 type FileConfig struct {
-	// BasePath is the directory that $secret_file.<key> references are resolved
-	// relative to. When set, <key> must be a relative path that stays within
-	// this directory (absolute paths and ".." traversal are rejected).
-	// When empty, <key> is used as a literal file path with no restrictions.
-	//
-	// For file:// URI references, absolute paths are used as-is.
-	// Relative paths are still resolved relative to this directory.
+	// BasePath is the directory that file:// and $secret_file.<key> references are
+	// resolved relative to. It is a mandatory security boundary: when set, <key>
+	// must be a relative path that stays within this directory (absolute paths and
+	// ".." traversal are rejected). When empty, file:// references are disabled and
+	// every key is rejected.
 	BasePath string `json:"base_path"`
 }
 

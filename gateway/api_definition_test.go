@@ -1670,11 +1670,11 @@ func TestReplaceSecrets(t *testing.T) {
 }
 
 func TestReplaceSecretsFileScheme(t *testing.T) {
-	t.Run("absolute path without base_path", func(t *testing.T) {
+	t.Run("file:// references rejected without base_path", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		t.Run("replaces file:// reference with file contents", func(t *testing.T) {
+		t.Run("absolute file:// reference left unresolved", func(t *testing.T) {
 			dir := t.TempDir()
 			f := filepath.Join(dir, "jwt-secret")
 			require.NoError(t, os.WriteFile(f, []byte("my-jwt-signing-key\n"), 0600))
@@ -1686,26 +1686,19 @@ func TestReplaceSecretsFileScheme(t *testing.T) {
 
 			api := ts.Gw.getApiSpec("file-kv-1")
 			require.NotNil(t, api)
-			assert.Equal(t, "my-jwt-signing-key", api.JWTSource)
+			assert.NotContains(t, api.JWTSource, "my-jwt-signing-key", "file contents must not be injected without base_path")
+			assert.Equal(t, "file://"+f, api.JWTSource, "raw file:// reference should be left unresolved")
 		})
 
-		t.Run("multiple file:// references in one definition are all replaced", func(t *testing.T) {
-			dir := t.TempDir()
-			f1 := filepath.Join(dir, "source")
-			f2 := filepath.Join(dir, "method")
-			require.NoError(t, os.WriteFile(f1, []byte("source-value"), 0600))
-			require.NoError(t, os.WriteFile(f2, []byte("method-value"), 0600))
-
+		t.Run("relative file:// reference left unresolved", func(t *testing.T) {
 			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.APIID = "file-kv-2"
-				spec.JWTSource = "file://" + f1
-				spec.JWTSigningMethod = "file://" + f2
+				spec.JWTSource = "file://jwt-secret"
 			})
 
 			api := ts.Gw.getApiSpec("file-kv-2")
 			require.NotNil(t, api)
-			assert.Equal(t, "source-value", api.JWTSource)
-			assert.Equal(t, "method-value", api.JWTSigningMethod)
+			assert.Equal(t, "file://jwt-secret", api.JWTSource, "raw file:// reference should be left unresolved")
 		})
 	})
 
