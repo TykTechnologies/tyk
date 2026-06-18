@@ -79,7 +79,6 @@ func resolveKeyPath(basePath, key string) (string, error) {
 
 	joined := filepath.Join(basePath, key)
 	if !confined(basePath, joined) {
-
 		return "", fmt.Errorf("file KV: path traversal detected in key %q", key)
 	}
 
