@@ -29,21 +29,19 @@ func ResolveFileKV(basePath, key string) (string, error) {
 
 	// Re-verify after symlink resolution: a symlink inside basePath can point
 	// outside (symlink escape).
-	if basePath != "" {
-		canonicalBase, err := filepath.EvalSymlinks(basePath)
-		// EvalSymlinks failure here requires a race (basePath symlink broken between
-		// resolving the file path above and this call). Not worth a flaky test.
-		if err != nil {
-			return "", fmt.Errorf("file KV: cannot resolve base_path %q: %w", basePath, err)
-		}
+	canonicalBase, err := filepath.EvalSymlinks(basePath)
+	// EvalSymlinks failure here requires a race (basePath symlink broken between
+	// resolving the file path above and this call). Not worth a flaky test.
+	if err != nil {
+		return "", fmt.Errorf("file KV: cannot resolve base_path %q: %w", basePath, err)
+	}
 
-		if !confined(canonicalBase, resolved) {
-			return "", fmt.Errorf(
-				"file KV: symlink escape detected for key %q: resolved to %q which is outside base_path",
-				key,
-				resolved,
-			)
-		}
+	if !confined(canonicalBase, resolved) {
+		return "", fmt.Errorf(
+			"file KV: symlink escape detected for key %q: resolved to %q which is outside base_path",
+			key,
+			resolved,
+		)
 	}
 
 	data, err := os.ReadFile(resolved)
