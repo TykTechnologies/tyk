@@ -189,6 +189,12 @@ func TestResolveFileKV(t *testing.T) {
 		assert.Contains(t, err.Error(), "base_path")
 	})
 
+	t.Run("rejects relative basePath", func(t *testing.T) {
+		_, err := ResolveFileKV("relative/base", "secret.txt")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be an absolute path")
+	})
+
 	t.Run("resolves key relative to basePath", func(t *testing.T) {
 		dir := t.TempDir()
 		f := filepath.Join(dir, "api-key")

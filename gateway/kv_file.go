@@ -63,6 +63,16 @@ func resolveKeyPath(basePath, key string) (string, error) {
 		)
 	}
 
+	// A relative base_path resolves against the process working directory, which
+	// is non-deterministic across deployments and defeats the purpose of a fixed
+	// boundary.
+	if !filepath.IsAbs(basePath) {
+		return "", fmt.Errorf(
+			"file KV: kv.file.base_path %q must be an absolute path",
+			basePath,
+		)
+	}
+
 	if filepath.IsAbs(key) {
 		return "", fmt.Errorf(
 			"file KV: absolute path %q rejected because kv.file.base_path is configured; "+
