@@ -3,6 +3,7 @@ package middleware
 import "github.com/TykTechnologies/tyk/apidef"
 
 // Enabled returns whether middlewares are enabled or not.
+// SW-REQ-031
 func Enabled(defs ...apidef.MiddlewareDefinition) bool {
 	for _, def := range defs {
 		if !def.Disabled && def.Name != "" {

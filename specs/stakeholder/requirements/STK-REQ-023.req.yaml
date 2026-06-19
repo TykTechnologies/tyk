@@ -1,0 +1,60 @@
+id: STK-REQ-023
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: Gateway middleware setup helpers shall determine whether configured middleware definitions enable middleware execution and expose the sentinel status used to stop further middleware processing.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: middleware
+rationale: The middleware helper package is internal gateway infrastructure. This requirement owns only local middleware-definition enablement and sentinel status behavior; it does not claim middleware execution order, plugin loading, request authorization, response generation, analytics, or gateway endpoint outcomes.
+tags:
+    - middleware
+    - in-process
+    - configuration
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: agent:codex
+        role: requirements_author
+        reviewed_at: "2026-06-19T22:40:00Z"
+        comment: Agent approval only. Middleware stakeholder requirement is scoped to internal/middleware enablement and StatusRespond sentinel helper behavior; focused internal/middleware tests passed. This is not a human approval and does not claim middleware execution order, plugin loading, request authorization, response generation, analytics, or gateway endpoint outcomes.
+        ai_generated: true
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T22:35:12Z"
+obligation_checklist:
+    - nominal
+    - boundary
+stakeholder:
+    persona: Gateway middleware configurator
+    story: As gateway setup code, I need middleware helper decisions to identify enabled middleware definitions predictably and expose the stop-processing sentinel used by middleware chains.
+    acceptance_criteria:
+        - id: STK-REQ-023-AC-01
+          text: Given middleware definitions with non-empty names and disabled flags, when enablement is evaluated, then enabled definitions are detected and disabled or unnamed definitions do not enable middleware.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-111
+        - id: STK-REQ-023-AC-02
+          text: Given middleware chain code needs to stop further processing, when it uses the middleware status sentinel, then the sentinel value remains available for that stop-processing outcome.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-111
+lifecycle:
+    change_history:
+        - date: "2026-06-19T22:35:12Z"
+          from: draft
+          to: review
+          reason: Ready for requirements-owner review after focused internal/middleware tests passed; no human approval recorded by agent.
+          changed_by: agent:codex

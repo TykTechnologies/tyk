@@ -1,0 +1,59 @@
+id: SYS-REQ-111
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the middleware shall always satisfy !middleware_helper_requested | middleware_helper_determined
+description: Middleware helper handling shall determine true when any provided middleware definition is not disabled and has a non-empty name, determine false for disabled, unnamed, or absent middleware definitions, and expose the stop-processing response status sentinel.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-023
+component: middleware
+rationale: This system requirement owns deterministic in-process middleware helper behavior. It does not claim middleware execution order, plugin loading, request authorization, response generation, analytics, or gateway endpoint outcomes.
+tags:
+    - middleware
+    - in-process
+    - configuration
+variables:
+    - middleware_helper_requested
+    - middleware_helper_determined
+traces:
+    satisfies:
+        - STK-REQ-023
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: agent:codex
+        role: requirements_author
+        reviewed_at: "2026-06-19T22:40:00Z"
+        comment: Agent approval only. Middleware system requirement is scoped to deterministic internal/middleware enablement and StatusRespond sentinel helper behavior; focused internal/middleware tests passed. This is not a human approval and does not claim middleware execution order, plugin loading, request authorization, response generation, analytics, or gateway endpoint outcomes.
+        ai_generated: true
+    gaps_reviewed_at: "2026-06-19T22:35:17.538812Z"
+    gaps_reviewed_by: agent:codex
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-111|middleware_helper_determined
+          reviewer: agent:codex
+          reason: 'Agent review: SYS-REQ-111''s middleware_helper_determined variable is decomposed by SW-REQ-031 for enabled, disabled, unnamed, empty, and StatusRespond sentinel helper behavior. This review is limited to internal/middleware helper behavior and does not claim middleware execution order, plugin loading, request authorization, response generation, analytics, or gateway endpoint outcomes.'
+          reviewed_at: "2026-06-19T22:35:17.538812Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T22:35:12Z"
+obligation_checklist:
+    - nominal
+    - boundary
+lifecycle:
+    change_history:
+        - date: "2026-06-19T22:35:12Z"
+          from: draft
+          to: review
+          reason: Ready for requirements-owner review after focused internal/middleware tests passed; no human approval recorded by agent.
+          changed_by: agent:codex

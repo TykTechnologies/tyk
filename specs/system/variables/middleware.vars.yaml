@@ -1,0 +1,14 @@
+component: middleware
+no_interface:
+    declared: true
+    reason: The middleware package is an in-process helper for middleware-definition enablement and local sentinel status constants; this proof slice does not define a cross-component runtime interface boundary.
+variables:
+    - name: middleware_helper_requested
+      type: bool
+      direction: input
+      description: Gateway setup code requests in-process middleware enablement or stop-processing sentinel helper behavior.
+
+    - name: middleware_helper_determined
+      type: bool
+      direction: output
+      description: The middleware helper returns a deterministic enablement decision or exposes the stop-processing sentinel for the requested helper behavior.
