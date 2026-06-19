@@ -165,6 +165,8 @@ project:
             - internal/rate/headers_test.go
             - internal/rate/rate.go
             - internal/rate/rate_test.go
+            - internal/rate/smoothing.go
+            - internal/rate/smoothing_test.go
             - docs/**
         completeness:
             production_include:

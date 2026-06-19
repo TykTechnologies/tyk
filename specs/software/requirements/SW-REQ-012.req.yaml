@@ -1,0 +1,53 @@
+id: SW-REQ-012
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal rate package shall validate smoothing configuration, create initial allowance state, skip updates before the allowance delay expires, lock and re-read allowance state before updates, increase or decrease allowance within configured bounds, emit smoothing direction events for changed allowances, and return explicit errors for store, lock, or write failures while preserving the previous allowance when applicable.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-103
+component: rate_model
+rationale: This software requirement owns the concrete internal/rate smoothing orchestration and arithmetic behavior. It uses mock allowance storage evidence and does not claim live Redis availability, distributed lock correctness beyond error propagation, external limiter algorithm behavior, or gateway request admission.
+tags:
+    - rate-limit
+    - rate-limit-state
+    - smoothing
+    - allowance-storage
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-103
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T20:32:16Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19. Requirement is scoped to internal/rate smoothing orchestration and arithmetic only; focused smoothing tests passed. This approval does not waive MC/DC, live Redis behavior, distributed lock correctness, external limiter correctness, or gateway admission evidence.
+        fingerprint: sha256:e6c6b41a8d106dc63bcb28ae33b2cb8611bed3979b193fce4fc278d738eac31b
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T20:27:18Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T20:32:16Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-19T20:27:33Z"
+          from: draft
+          to: review
+          reason: ""
+          changed_by: agent:codex

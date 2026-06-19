@@ -5,14 +5,20 @@ import (
 	"sync"
 )
 
-type Locker sync.Mutex
+type Locker struct {
+	mu  sync.Mutex
+	Err error
+}
 
 func (m *Locker) Lock(ctx context.Context) error {
-	(*sync.Mutex)(m).Lock()
+	if m.Err != nil {
+		return m.Err
+	}
+	m.mu.Lock()
 	return nil
 }
 
 func (m *Locker) Unlock(ctx context.Context) error {
-	(*sync.Mutex)(m).Unlock()
+	m.mu.Unlock()
 	return nil
 }

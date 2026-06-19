@@ -14,6 +14,7 @@ type Smoothing struct {
 	allowanceStore AllowanceRepository
 }
 
+// SW-REQ-012
 // NewSmoothing will return a new instance of *Smoothing.
 func NewSmoothing(redis redis.UniversalClient) *Smoothing {
 	return &Smoothing{
@@ -21,11 +22,13 @@ func NewSmoothing(redis redis.UniversalClient) *Smoothing {
 	}
 }
 
+// SW-REQ-012
 // String returns the String output from the allowance store.
 func (d *Smoothing) String() string {
 	return d.allowanceStore.String()
 }
 
+// SW-REQ-012
 // Do processes the rate limit smoothing based on the provided session settings and current rate.
 //
 // Internally it will get the current allowance, and if the update is allowed will
@@ -132,6 +135,7 @@ func (d *Smoothing) Do(r *http.Request, session *apidef.RateLimitSmoothing, key 
 	return allowance, nil
 }
 
+// SW-REQ-012
 func increaseRateAllowance(session *apidef.RateLimitSmoothing, allowedRate int64, currentRate int64, maxAllowedRate int64) (int64, bool) {
 	step := float64(allowedRate) - session.Trigger*float64(session.Step)
 	newAllowedRate := allowedRate + session.Step
@@ -145,6 +149,7 @@ func increaseRateAllowance(session *apidef.RateLimitSmoothing, allowedRate int64
 	return allowedRate, false
 }
 
+// SW-REQ-012
 func decreaseRateAllowance(session *apidef.RateLimitSmoothing, allowedRate int64, currentRate int64, minAllowedRate int64) (int64, bool) {
 	newAllowedRate := allowedRate - session.Step
 	step := float64(newAllowedRate) - session.Trigger*float64(session.Step)

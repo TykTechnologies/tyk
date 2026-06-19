@@ -5,10 +5,12 @@
 <!-- documents SW-REQ-009 -->
 <!-- documents SW-REQ-010 -->
 <!-- documents SW-REQ-011 -->
+<!-- documents SW-REQ-012 -->
 
-This document records the first rate-limit support-state proof slice. The slice
-is deliberately limited to `internal/rate/model` allowance state behavior and
-the dependency-free allowance store behavior in `internal/rate`.
+This document records the current rate-limit support-state proof slice. The
+slice is deliberately limited to the listed `internal/rate/model` allowance
+state behavior, dependency-free `internal/rate` support helpers, header senders,
+and smoothing orchestration.
 
 `SYS-REQ-103` covers gateway rate-limit allowance state operations at the
 system layer.
@@ -40,7 +42,14 @@ rate-limit sender quota path, Unix reset formatting, and negative remaining
 clamping. It does not claim the full gateway middleware lifecycle, quota-blocked
 response behavior, or upstream header interaction beyond the local sender.
 
-The rest of the root `internal/rate` package, smoothing orchestration,
-sliding-log integration, and `internal/rate/limiter` algorithms are intentionally
-not included in this slice. They need separate requirements and evidence before
-scope expansion.
+`SW-REQ-012` owns the concrete `internal/rate` smoothing orchestration and
+arithmetic behavior. Its evidence covers configuration rejection, initial
+allowance creation, hold-off skips, lock errors, set errors, increase and
+decrease transitions with emitted direction events, no-change paths, and the
+increase/decrease boundary arithmetic. It uses mock allowance storage evidence
+and does not claim live Redis availability, distributed lock correctness beyond
+error propagation, external limiter algorithm correctness, or gateway admission.
+
+The rest of the root `internal/rate` package, sliding-log integration, and
+`internal/rate/limiter` algorithms are intentionally not included in this slice.
+They need separate requirements and evidence before scope expansion.
