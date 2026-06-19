@@ -18,6 +18,7 @@ type Root struct {
 // SYS-REQ-099
 func NewRoot(path string) (*Root, error) {
 	absPath, err := filepath.Abs(path)
+	//mcdc:ignore:defensive filepath.Abs failures depend on process working-directory failure, which is not reliably driveable through this API on darwin/linux test hosts.
 	if err != nil {
 		return nil, fmt.Errorf("failed to get absolute path for '%s': %w", path, err)
 	}
