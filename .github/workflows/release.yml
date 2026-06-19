@@ -61,6 +61,7 @@ jobs:
             debvers: 'ubuntu/xenial ubuntu/bionic ubuntu/focal ubuntu/jammy ubuntu/noble debian/jessie debian/buster debian/bullseye debian/bookworm debian/trixie'
     outputs:
       ee_tags: ${{ steps.ci_metadata_ee.outputs.tags }}
+      fips_tags: ${{ steps.ci_metadata_fips.outputs.tags }}
       std_tags: ${{ steps.ci_metadata_std.outputs.tags }}
       commit_author: ${{ steps.set_outputs.outputs.commit_author}}
     steps:
@@ -333,6 +334,171 @@ jobs:
             verify_manifest manifest.json
           fi
           echo "Success: All layers are uniformly compressed using gzip."
+      - name: Docker metadata for fips CI
+        id: ci_metadata_fips
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: |
+            ${{ steps.ecr.outputs.registry }}/tyk-fips
+          flavor: |
+            latest=false
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,format=long
+            type=semver,pattern={{major}},prefix=v
+            type=semver,pattern={{major}}.{{minor}},prefix=v
+            type=semver,pattern={{version}},prefix=v
+      - name: push fips image to CI
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: "dist"
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+          file: ci/Dockerfile.distroless
+          provenance: mode=max
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ steps.ci_metadata_fips.outputs.tags }}
+          labels: ${{ steps.ci_metadata_fips.outputs.labels }}
+          build-args: |
+            BUILD_PACKAGE_NAME=tyk-gateway-fips
+            BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
+      - name: Verify compression format for fips CI image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.ci_metadata_fips.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw -- "$TAG" > manifest.json
+
+          # Extract child digests (excluding attestation manifests) if it's a multi-arch manifest list / index
+          DIGESTS=$(jq -r '.manifests[] | select((.platform.architecture // "") != "unknown" and (.annotations["vnd.docker.reference.type"] // "") != "attestation-manifest") | .digest' manifest.json 2>/dev/null || true)
+
+          verify_manifest() {
+            local file=$1
+            # Check if any layer does NOT end in gzip/tar+gzip/tar.gzip
+            local invalid_layers
+            invalid_layers=$(jq -r '.layers[].mediaType' "$file" | grep -v 'tar+gzip' | grep -v 'tar.gzip' || true)
+            if [ -n "$invalid_layers" ]; then
+              echo "::error::Found layers that are not gzip-compressed:"
+              echo "$invalid_layers"
+              exit 1
+            fi
+            # Also verify we found at least one layer
+            local layer_count
+            layer_count=$(jq '.layers | length' "$file" 2>/dev/null || echo 0)
+            if [ "$layer_count" -eq 0 ]; then
+              echo "::error::No layers found in manifest!"
+              exit 1
+            fi
+          }
+
+          if [ -n "$DIGESTS" ]; then
+            echo "Multi-arch image list detected. Checking each platform manifest..."
+            for digest in $DIGESTS; do
+              echo "Inspecting child platform manifest: $digest"
+              docker buildx imagetools inspect --raw -- "$TAG@$digest" > child_manifest.json
+              verify_manifest child_manifest.json
+            done
+          else
+            echo "Single-arch manifest detected. Checking manifest..."
+            verify_manifest manifest.json
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
+      - name: Docker metadata for fips tag push
+        id: tag_metadata_fips
+        if: startsWith(github.ref, 'refs/tags')
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: |
+            tykio/tyk-gateway-fips
+          flavor: |
+            latest=false
+            prefix=v
+          tags: |
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}}
+          labels: |
+            org.opencontainers.image.title=Tyk Gateway Enterprise Edition FIPS
+            org.opencontainers.image.description=Tyk API Gateway Enterprise Edition written in Go, supporting REST, GraphQL, TCP and gRPC protocols Built with FIPS 140-3 compliant cryptography
+            org.opencontainers.image.vendor=tyk.io
+            org.opencontainers.image.version=${{ github.ref_name }}
+      - name: push fips image to prod
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: "dist"
+          platforms: linux/amd64,linux/arm64
+          file: ci/Dockerfile.distroless
+          provenance: mode=max
+          cache-from: type=gha
+          outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
+          tags: ${{ steps.tag_metadata_fips.outputs.tags }}
+          labels: ${{ steps.tag_metadata_fips.outputs.labels }}
+          build-args: |
+            BUILD_PACKAGE_NAME=tyk-gateway-fips
+            BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
+      - name: Verify compression format for fips prod image
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          # Resolve the first tag for verification
+          TAG=$(echo "${{ steps.tag_metadata_fips.outputs.tags }}" | tr ',' '\n' | head -n1)
+          echo "Inspecting layer compression for tag: $TAG"
+
+          docker buildx imagetools inspect --raw -- "$TAG" > manifest.json
+
+          # Extract child digests (excluding attestation manifests) if it's a multi-arch manifest list / index
+          DIGESTS=$(jq -r '.manifests[] | select((.platform.architecture // "") != "unknown" and (.annotations["vnd.docker.reference.type"] // "") != "attestation-manifest") | .digest' manifest.json 2>/dev/null || true)
+
+          verify_manifest() {
+            local file=$1
+            # Check if any layer does NOT end in gzip/tar+gzip/tar.gzip
+            local invalid_layers
+            invalid_layers=$(jq -r '.layers[].mediaType' "$file" | grep -v 'tar+gzip' | grep -v 'tar.gzip' || true)
+            if [ -n "$invalid_layers" ]; then
+              echo "::error::Found layers that are not gzip-compressed:"
+              echo "$invalid_layers"
+              exit 1
+            fi
+            # Also verify we found at least one layer
+            local layer_count
+            layer_count=$(jq '.layers | length' "$file" 2>/dev/null || echo 0)
+            if [ "$layer_count" -eq 0 ]; then
+              echo "::error::No layers found in manifest!"
+              exit 1
+            fi
+          }
+
+          if [ -n "$DIGESTS" ]; then
+            echo "Multi-arch image list detected. Checking each platform manifest..."
+            for digest in $DIGESTS; do
+              echo "Inspecting child platform manifest: $digest"
+              docker buildx imagetools inspect --raw -- "$TAG@$digest" > child_manifest.json
+              verify_manifest child_manifest.json
+            done
+          else
+            echo "Single-arch manifest detected. Checking manifest..."
+            verify_manifest manifest.json
+          fi
+          echo "Success: All layers are uniformly compressed using gzip."
+      - name: Attach base image VEX to fips
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          # Install Docker Scout CLI
+          curl -fsSL https://raw.githubusercontent.com/docker/scout-cli/v1.20.4/install.sh -o /tmp/scout-install.sh && sh /tmp/scout-install.sh 2>/dev/null
+          # Extract VEX from the DHI base image
+          docker scout vex get --org tykio -o /tmp/fips-vex.json tykio/dhi-busybox:1.37-fips || true
+          if [ -f /tmp/fips-vex.json ]; then
+            cosign attest --yes --type openvex \
+              --predicate /tmp/fips-vex.json \
+              tykio/tyk-gateway-fips:${{ github.ref_name }} || true
+          fi
       - name: Docker metadata for std CI
         id: ci_metadata_std
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
