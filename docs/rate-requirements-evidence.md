@@ -11,6 +11,7 @@
 <!-- documents SW-REQ-015 -->
 <!-- documents SW-REQ-016 -->
 <!-- documents SW-REQ-017 -->
+<!-- documents SW-REQ-018 -->
 
 This document records the current rate-limit support-state proof slice. The
 slice is deliberately limited to the listed `internal/rate/model` allowance
@@ -92,5 +93,10 @@ delegation after successful script execution, and fail-closed behavior on script
 errors. It does not claim distributed Redis topology correctness, external
 limiter algorithm correctness, gateway admission, or product cooldown policy.
 
-The rest of `internal/rate/limiter` algorithms are intentionally not included in
-this slice. They need separate requirements and evidence before scope expansion.
+`SW-REQ-018` owns the concrete `internal/rate/limiter` adapter wiring behavior.
+Its evidence covers adapter construction defaults, no-op local locking,
+Redis-backed locking, local and Redis-backed first-call delegation for
+fixed-window, sliding-window, token-bucket, and leaky-bucket adapters, and
+fixed-window exhaustion error propagation. It does not claim correctness of the
+external limiter algorithms, distributed lock robustness, Redis server
+availability outside provisioned tests, or gateway admission.

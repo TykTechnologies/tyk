@@ -7,6 +7,7 @@ import (
 	"github.com/TykTechnologies/exp/pkg/limiters"
 )
 
+// SW-REQ-018
 func (l *Limiter) LeakyBucket(ctx context.Context, key string, rate float64, per float64) (time.Duration, error) {
 	var (
 		storage limiters.LeakyBucketStateBackend

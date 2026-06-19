@@ -1,0 +1,64 @@
+id: SW-REQ-018
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal rate limiter adapter package shall construct limiter adapters with default clock, logger, and lock state, choose local storage and no-op locking when no Redis client is configured, choose Redis-backed storage and Redis locks when a Redis client is configured, and delegate fixed-window, sliding-window, token-bucket, and leaky-bucket calls to the external limiter package while returning the resulting wait duration or exhaustion error.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-103
+component: rate_model
+rationale: This software requirement owns the concrete internal/rate/limiter adapter wiring behavior. It covers constructor defaults, local-versus-Redis backend selection, distributed-lock selection, and result/error propagation from external limiter calls only and does not claim correctness of the external limiter algorithms, distributed lock robustness, Redis server availability outside provisioned tests, or gateway request admission.
+tags:
+    - rate-limit
+    - rate-limit-state
+    - limiter-adapter
+    - redis-storage
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-103
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T21:05:14Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19. Requirement is scoped to internal/rate/limiter adapter wiring only; local and Redis-backed adapter tests passed with a temporary Redis 7 container, including constructor defaults, lock selection, first-call delegation for all adapters, and fixed-window exhaustion propagation. This approval does not waive MC/DC, external limiter algorithm correctness, distributed lock robustness, Redis availability outside provisioned tests, or gateway admission evidence.
+        fingerprint: sha256:edac4d47b79d4c9179cdad93fb9a93c80ce3364a180dc8d885ca84d86146a5cd
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-018
+          artifact: internal/rate/limiter/limiter_fixed_window.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19. internal/rate/limiter/limiter_fixed_window.go now matches newly authored SW-REQ-018 and docs/rate-requirements-evidence.md; the code comment was corrected to match observed adapter behavior, and local plus Redis-backed limiter adapter tests passed, so no further authored requirement or design text change is needed.
+          base: origin/master
+          requirement_fingerprint: sha256:bd6f770cbd4957bd9c8ab4caa29b2b9018ae9a4f9a25713c52dfd55baac37c01
+          approval_fingerprint: sha256:edac4d47b79d4c9179cdad93fb9a93c80ce3364a180dc8d885ca84d86146a5cd
+          artifact_fingerprint: sha256:6331da840b70d80509b4b2e8d21b1131d6a4fd783cb4a6545037b8cc54bb2023
+          reviewed_at: "2026-06-19T21:05:50Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T21:03:08Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T21:05:14Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-19T21:03:08Z"
+          from: draft
+          to: review
+          reason: ""
+          changed_by: agent:codex

@@ -11,6 +11,7 @@ import (
 
 var ErrLimitExhausted = limiters.ErrLimitExhausted
 
+// SW-REQ-018
 type Limiter struct {
 	redis redis.UniversalClient
 
@@ -19,8 +20,10 @@ type Limiter struct {
 	clock  limiters.Clock
 }
 
+// SW-REQ-018
 type Func func(ctx context.Context, key string, rate float64, per float64) (ttl time.Duration, err error)
 
+// SW-REQ-018
 // NewLimiter creates a new limiter object. It holds the redis client and the
 // default non-distributed locks, logger, and a clock for supporting tests.
 func NewLimiter(redis redis.UniversalClient) *Limiter {
@@ -32,6 +35,7 @@ func NewLimiter(redis redis.UniversalClient) *Limiter {
 	}
 }
 
+// SW-REQ-018
 // Locker will ensure a distributed lock with redis, using redsync for a key.
 // If redis is not in use, fallback is done to use the default locker.
 func (l *Limiter) Locker(name string) limiters.DistLocker {
