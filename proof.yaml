@@ -161,8 +161,11 @@ project:
             - internal/rate/model/**
             - internal/rate/allowance_store.go
             - internal/rate/allowance_store_test.go
+            - internal/rate/checker.go
             - internal/rate/headers.go
             - internal/rate/headers_test.go
+            - internal/rate/limiter.go
+            - internal/rate/model.go
             - internal/rate/rate.go
             - internal/rate/rate_test.go
             - internal/rate/smoothing.go

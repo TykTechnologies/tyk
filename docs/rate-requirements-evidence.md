@@ -6,11 +6,14 @@
 <!-- documents SW-REQ-010 -->
 <!-- documents SW-REQ-011 -->
 <!-- documents SW-REQ-012 -->
+<!-- documents SW-REQ-013 -->
+<!-- documents SW-REQ-014 -->
+<!-- documents SW-REQ-015 -->
 
 This document records the current rate-limit support-state proof slice. The
 slice is deliberately limited to the listed `internal/rate/model` allowance
 state behavior, dependency-free `internal/rate` support helpers, header senders,
-and smoothing orchestration.
+facade helpers, and smoothing orchestration.
 
 `SYS-REQ-103` covers gateway rate-limit allowance state operations at the
 system layer.
@@ -49,6 +52,25 @@ decrease transitions with emitted direction events, no-change paths, and the
 increase/decrease boundary arithmetic. It uses mock allowance storage evidence
 and does not claim live Redis availability, distributed lock correctness beyond
 error propagation, external limiter algorithm correctness, or gateway admission.
+
+`SW-REQ-013` owns the concrete `internal/rate` checker helper behavior. Its
+evidence covers empty stats, strict greater-than blocking semantics, and
+anonymous checker delegation including error propagation. It does not claim
+limiter selection, Redis command behavior, limiter algorithm correctness,
+distributed locking, or gateway admission.
+
+`SW-REQ-014` owns the concrete `internal/rate` root-package allowance alias and
+constructor facade. Its evidence covers alias compatibility and constructor
+forwarding to the underlying allowance model. It does not claim allowance model
+behavior beyond the underlying `SW-REQ-006` evidence, Redis storage behavior, or
+gateway admission.
+
+`SW-REQ-015` owns the concrete `internal/rate` limiter facade and key
+construction behavior. Its evidence covers release-build limiter selection for
+fixed-window mode, nil limiter behavior when no supported limiter is enabled,
+and limiter key construction from cached session hashes or supplied keys. It
+does not claim Redis command behavior, limiter algorithm correctness,
+distributed locking, or gateway admission.
 
 The rest of the root `internal/rate` package, sliding-log integration, and
 `internal/rate/limiter` algorithms are intentionally not included in this slice.

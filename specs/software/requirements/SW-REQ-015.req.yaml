@@ -1,0 +1,52 @@
+id: SW-REQ-015
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal rate package shall select the fixed-window limiter only when enabled by gateway configuration, return no limiter when no supported release-build limiter is enabled, and construct limiter storage keys from either the cached session key hash or the supplied key according to the custom-key flag.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-103
+component: rate_model
+rationale: This software requirement owns the concrete internal/rate limiter facade and key-construction behavior used by gateway rate-limit wiring. It covers local selection and key construction only and does not claim Redis command behavior, limiter algorithm correctness, distributed locking, or gateway request admission.
+tags:
+    - rate-limit
+    - rate-limit-state
+    - limiter-key
+    - limiter-selection
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-103
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T20:40:47Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19. Requirement is scoped to internal/rate limiter facade selection and limiter key construction only; focused limiter selection and key tests passed. This approval does not waive MC/DC, Redis command behavior, limiter algorithm correctness, distributed locking, or gateway admission evidence.
+        fingerprint: sha256:444fb532247409c7ac22186af402be0e441e077d843c5d64001c969b08d8bc45
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T20:39:16Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T20:40:47Z"
+obligation_checklist:
+    - nominal
+    - boundary
+lifecycle:
+    change_history:
+        - date: "2026-06-19T20:39:26Z"
+          from: draft
+          to: review
+          reason: ""
+          changed_by: agent:codex

@@ -1,0 +1,57 @@
+id: SW-REQ-013
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal rate package shall provide empty stats and anonymous checker helpers with deterministic strict-greater-than blocking semantics while preserving delegated checker errors.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-103
+component: rate_model
+rationale: This software requirement owns the concrete internal/rate checker helper behavior used by gateway rate-limit wiring. It covers local stats construction, block-decision semantics, and anonymous checker delegation only and does not claim limiter selection, Redis command behavior, limiter algorithm correctness, distributed locking, or gateway request admission.
+tags:
+    - rate-limit
+    - rate-limit-state
+    - checker
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-103
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T20:40:47Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19 after splitting the broader facade requirement. Requirement is scoped to internal/rate checker helper behavior only; focused stats and anonymous-checker tests passed. This approval does not waive MC/DC, limiter selection, Redis command behavior, limiter algorithm correctness, distributed locking, or gateway admission evidence.
+        fingerprint: sha256:d4d7bb8b5ec670f1169863a9a4c129e4914a589fa74c8dd4a9faf1ab71ece236
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T20:37:13Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T20:40:47Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-19T20:37:35Z"
+          from: draft
+          to: review
+          reason: ""
+          changed_by: agent:codex
+        - date: "2026-06-19T20:40:47Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-19T20:38:41Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19. Requirement is scoped to internal/rate facade and checker helper behavior only; focused alias, stats, checker, limiter selection, and limiter-key tests passed. This approval does not waive MC/DC, Redis command behavior, limiter algorithm correctness, distributed locking, or gateway admission evidence.")'
+          changed_by: human:buger

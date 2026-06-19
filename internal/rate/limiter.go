@@ -7,6 +7,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+// SW-REQ-015
 // Limiter returns the appropriate rate limiter as configured by gateway.
 func Limiter(gwConfig *config.Config, rClient redis.UniversalClient) limiter.Func {
 	name, ok := limiterKind(gwConfig)
@@ -30,6 +31,7 @@ func Limiter(gwConfig *config.Config, rClient redis.UniversalClient) limiter.Fun
 	return nil
 }
 
+// SW-REQ-015
 // limiterKind returns the kind of rate limiter enabled by config.
 // This function is used for release builds.
 func limiterKind(c *config.Config) (string, bool) {
@@ -39,6 +41,7 @@ func limiterKind(c *config.Config) (string, bool) {
 	return "", false
 }
 
+// SW-REQ-015
 // LimiterKey returns a redis key name based on passed parameters.
 // The key should be post-fixed if multiple keys are required (sentinel).
 func LimiterKey(currentSession *user.SessionState, rateScope string, key string, useCustomKey bool) string {
