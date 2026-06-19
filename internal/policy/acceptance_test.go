@@ -49,6 +49,7 @@ func TestAcceptance_ApplySinglePolicyMergesAllFields(t *testing.T) {
 	assert.Contains(t, session.AccessRights, "api1")
 }
 
+// Verifies: STK-REQ-001 [example]
 func TestAcceptance_ApplyPerAPIPolicyAppliesIndependentLimits(t *testing.T) {
 	orgID := "org1"
 	pol := acceptancePolicy(orgID, "per-api")
@@ -89,6 +90,7 @@ func TestAcceptance_ApplyPerAPIPolicyAppliesIndependentLimits(t *testing.T) {
 	assert.Equal(t, 2, api2.MaxQueryDepth)
 }
 
+// Verifies: STK-REQ-001 [example]
 func TestAcceptance_ApplyPartitionedPolicyAppliesOnlyEnabledFields(t *testing.T) {
 	orgID := "org1"
 	pol := acceptancePolicy(orgID, "quota-acl")
@@ -124,6 +126,7 @@ func TestAcceptance_ApplyPartitionedPolicyAppliesOnlyEnabledFields(t *testing.T)
 	assert.Contains(t, session.AccessRights, "api2")
 }
 
+// Verifies: STK-REQ-001, STK-REQ-003 [example]
 func TestAcceptance_ApplyMultiplePoliciesHighestRateWins(t *testing.T) {
 	orgID := "org1"
 	low := acceptancePolicy(orgID, "low")
@@ -201,6 +204,7 @@ func TestAcceptance_EndpointLevelLimitsMergeHighestAndNewPaths(t *testing.T) {
 	assert.Equal(t, float64(5), limits["POST:/orders"].Rate)
 }
 
+// Verifies: STK-REQ-005 [negative]
 func TestAcceptance_ApplyPolicyNotFoundReportsErrorAndPreservesFields(t *testing.T) {
 	orgID := "org1"
 	svc := newTestService(orgID, nil)
@@ -226,6 +230,7 @@ func TestAcceptance_ApplyPolicyNotFoundReportsErrorAndPreservesFields(t *testing
 	assert.Equal(t, "metadata", session.MetaData["existing"])
 }
 
+// Verifies: STK-REQ-001 [negative]
 func TestAcceptance_ApplyOrgMismatchReportsError(t *testing.T) {
 	orgID := "org1"
 	wrongOrg := acceptancePolicy("other", "wrong-org")
