@@ -23,6 +23,15 @@ var ipHeaderTests = []struct {
 	{remoteAddr: "10.0.1.4:8080", key: "X-Real-IP", value: "bob", expected: "10.0.1.4", comment: "invalid X-Real-IP"},
 }
 
+// Verifies: STK-REQ-017, SYS-REQ-105, SW-REQ-023
+// STK-REQ-017:nominal:nominal
+// STK-REQ-017:boundary:boundary
+// SYS-REQ-105:nominal:nominal
+// SYS-REQ-105:boundary:boundary
+// SW-REQ-023:nominal:nominal
+// SW-REQ-023:boundary:boundary
+// SW-REQ-023:error_handling:negative
+// MCDC SYS-REQ-105: client_ip_resolution_requested=T, client_ip_result_determined=T => TRUE
 func TestRealIP(t *testing.T) {
 	// Initialize the Global function with a mock config that has XFFDepth set to 0 (first IP in chain)
 	mockConfig := config.Config{}
@@ -191,6 +200,11 @@ func BenchmarkRealIP_Context(b *testing.B) {
 	}
 }
 
+// Verifies: STK-REQ-017, SYS-REQ-105, SW-REQ-023
+// SYS-REQ-105:boundary:boundary
+// STK-REQ-017:error_handling:negative
+// SW-REQ-023:boundary:boundary
+// SW-REQ-023:error_handling:negative
 func TestXFFDepth(t *testing.T) {
 	// Define test cases for XFFDepth
 	testCases := []struct {

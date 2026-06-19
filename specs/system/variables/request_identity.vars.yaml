@@ -1,0 +1,14 @@
+component: request_identity
+no_interface:
+    declared: true
+    reason: Gateway request identity resolution in this proof slice is exercised through the in-process request.RealIP helper; no cross-component runtime interface contract is modeled yet.
+variables:
+    - name: client_ip_resolution_requested
+      type: bool
+      direction: input
+      description: Gateway request handling requests a client IP candidate from request context, forwarding headers, or connection remote address.
+
+    - name: client_ip_result_determined
+      type: bool
+      direction: output
+      description: Client IP resolution returns the selected context/header/remote-address value, fallback remote address, or explicit empty result for invalid configured forwarded-header depth.

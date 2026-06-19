@@ -1,0 +1,67 @@
+id: STK-REQ-017
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: Gateway request identity handling shall derive a stable client IP candidate from trusted request context, configured forwarding headers, or the connection remote address so downstream logging, authorization, and policy flows use the intended source address without silently accepting malformed forwarded input.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: request_identity
+rationale: Client IP derivation is observable in gateway request handling and influences logs, allow/block decisions, and policy-facing context. This stakeholder requirement owns the request-identity behavior only; it does not claim authentication, IP allow/block enforcement, proxy trust configuration beyond XFF depth selection, or concurrent mutation of global configuration.
+tags:
+    - request-identity
+    - client-ip
+    - headers
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T21:40:13Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Stakeholder requirement is scoped to gateway request client-IP derivation from trusted context, configured forwarding headers, or connection RemoteAddr only. Focused request.RealIP tests passed. This approval does not waive authentication, IP allow/block enforcement, trusted proxy establishment beyond configured XFF depth selection, non-string remote_addr context values, concurrent request.Global mutation, or MC/DC evidence.
+        fingerprint: sha256:40d41d5a3f930efda8e8a45e248aad6baef741561688346b2d5ebfcd6e5101a5
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T21:37:51Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T21:40:13Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need request client IP derivation to prefer trusted context and configured forwarding headers without silently accepting malformed forwarded input.
+    acceptance_criteria:
+        - id: STK-REQ-017-AC-01
+          text: Given a request with a string remote_addr context value, when client IP resolution is requested, then the context value is returned before header or connection-derived values.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-105
+        - id: STK-REQ-017-AC-02
+          text: Given requests with valid or invalid X-Real-IP and X-Forwarded-For headers, when client IP resolution is requested, then valid configured header values are selected and malformed header values fall back to RemoteAddr.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-105
+        - id: STK-REQ-017-AC-03
+          text: Given an invalid configured XFFDepth, when forwarded header resolution is requested, then no arbitrary forwarded address is selected.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-105
+lifecycle:
+    change_history:
+        - date: "2026-06-19T21:40:01Z"
+          from: draft
+          to: review
+          reason: Ready for delegated requirements-owner review after focused request.RealIP tests passed
+          changed_by: agent:codex

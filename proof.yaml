@@ -22,13 +22,13 @@ project:
             path: /Users/leonidbugaev/tools/kind2/kind2
             timeout: 30
     commands:
-        build: go build ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier
-        test: mkdir -p .proof/test-results .proof/coverage && go test ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
+        build: go build ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request
+        test: mkdir -p .proof/test-results .proof/coverage && go test ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
         tests:
             test:
-                command: mkdir -p .proof/test-results .proof/coverage && go test ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
+                command: mkdir -p .proof/test-results .proof/coverage && go test ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
                 language: go
-        lint: go vet ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier
+        lint: go vet ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request
     obligation_classes:
         - nominal
         - error_handling
@@ -155,6 +155,8 @@ project:
             - apidef/support_helpers_test.go
             - pkg/identifier/custom.go
             - pkg/identifier/custom_test.go
+            - request/real_ip.go
+            - request/real_ip_test.go
             - internal/policy/**
             - internal/model/**
             - internal/event/**

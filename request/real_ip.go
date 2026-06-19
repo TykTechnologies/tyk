@@ -12,6 +12,7 @@ import (
 var Global func() config.Config
 
 // RealIP takes a request object, and returns the real Client IP address.
+// SW-REQ-023
 func RealIP(r *http.Request) string {
 
 	if contextIp := r.Context().Value("remote_addr"); contextIp != nil {
