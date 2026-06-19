@@ -9,6 +9,7 @@
 <!-- documents SW-REQ-013 -->
 <!-- documents SW-REQ-014 -->
 <!-- documents SW-REQ-015 -->
+<!-- documents SW-REQ-016 -->
 
 This document records the current rate-limit support-state proof slice. The
 slice is deliberately limited to the listed `internal/rate/model` allowance
@@ -71,6 +72,15 @@ fixed-window mode, nil limiter behavior when no supported limiter is enabled,
 and limiter key construction from cached session hashes or supplied keys. It
 does not claim Redis command behavior, limiter algorithm correctness,
 distributed locking, or gateway admission.
+
+`SW-REQ-016` owns the concrete `internal/rate` storage client construction and
+TLS configuration mapping behavior. Its evidence covers local Redis option
+propagation, simple/cluster/sentinel selection precedence, default pool and
+timeout behavior, external-services mTLS precedence over legacy storage TLS
+settings, certificate loading success and failure paths, and TLS version
+parsing. It does not claim Redis server availability, successful network
+dialing, Redis command behavior, limiter algorithm correctness, or gateway
+admission.
 
 The rest of the root `internal/rate` package, sliding-log integration, and
 `internal/rate/limiter` algorithms are intentionally not included in this slice.

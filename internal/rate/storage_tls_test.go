@@ -18,6 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Verifies: SW-REQ-016
+// SW-REQ-016:nominal:nominal
+// SW-REQ-016:boundary:boundary
+// SW-REQ-016:error_handling:negative
 func TestCreateTLSConfig(t *testing.T) {
 	t.Run("No SSL configured", func(t *testing.T) {
 		cfg := &config.StorageOptionsConf{
@@ -183,6 +187,10 @@ func TestCreateTLSConfig(t *testing.T) {
 	})
 }
 
+// Verifies: SW-REQ-016
+// SW-REQ-016:nominal:nominal
+// SW-REQ-016:boundary:boundary
+// SW-REQ-016:error_handling:negative
 func TestGetTLSVersion(t *testing.T) {
 	tests := []struct {
 		input    string

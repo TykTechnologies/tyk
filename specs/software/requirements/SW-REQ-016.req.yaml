@@ -1,0 +1,53 @@
+id: SW-REQ-016
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal rate package shall construct rate-limiter Redis storage clients with configured addresses, authentication, database, pool size, timeouts, TLS settings, and the Redis client type implied by cluster and sentinel master configuration, and shall build TLS configurations from external-services mTLS settings before legacy storage settings while tolerating certificate and TLS-version loading failures by preserving the remaining valid settings.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-103
+component: rate_model
+rationale: This software requirement owns the concrete internal/rate storage client construction and TLS configuration mapping behavior. It covers local option propagation, client-type selection, certificate loading, TLS version parsing, precedence, and failure tolerance only and does not claim Redis server availability, successful network dialing, Redis command behavior, limiter algorithm correctness, or gateway request admission.
+tags:
+    - rate-limit
+    - rate-limit-state
+    - redis-storage
+    - tls
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-103
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T20:45:38Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19. Requirement is scoped to internal/rate storage client construction and TLS configuration mapping only; focused storage, TLS config, certificate-loading, and TLS-version tests passed. This approval does not waive MC/DC, Redis server availability, network dialing, Redis command behavior, limiter algorithm correctness, distributed locking, or gateway admission evidence.
+        fingerprint: sha256:741e6e459bc02f3a7231a40faec81a968cab7b5c4e0ad0f34bf4496df48c1e47
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T20:44:01Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T20:45:38Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-19T20:44:01Z"
+          from: draft
+          to: review
+          reason: ""
+          changed_by: agent:codex

@@ -2,34 +2,117 @@ package rate
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/redis"
 )
 
+// Verifies: SW-REQ-016
+// SW-REQ-016:nominal:nominal
+// SW-REQ-016:boundary:boundary
 func TestNewStorage(t *testing.T) {
-	conf, err := config.NewDefaultWithEnv()
-	assert.NoError(t, err)
+	baseConfig := func() config.StorageOptionsConf {
+		return config.StorageOptionsConf{
+			Addrs:                 []string{"redis-1:6379", "redis-2:6379"},
+			Username:              "rate-user",
+			Password:              "rate-pass",
+			Database:              3,
+			MaxActive:             100,
+			Timeout:               4,
+			UseSSL:                true,
+			SSLInsecureSkipVerify: true,
+			SentinelPassword:      "sentinel-pass",
+		}
+	}
 
-	// Coverage
-	conf.Storage.MaxActive = 100
-	conf.Storage.Timeout = 4
-	conf.Storage.UseSSL = true
+	t.Run("creates simple client with configured options", func(t *testing.T) {
+		cfg := baseConfig()
 
-	client := NewStorage(&conf.Storage, nil)
-	assert.NotNil(t, client)
+		client := NewStorage(&cfg, nil)
+		t.Cleanup(func() { _ = client.Close() })
 
-	conf.Storage.EnableCluster = true
-	client = NewStorage(&conf.Storage, nil)
-	assert.NotNil(t, client)
+		simple, ok := client.(*redis.Client)
+		require.True(t, ok)
 
-	conf.Storage.EnableCluster = false
-	conf.Storage.MasterName = "redis"
-	client = NewStorage(&conf.Storage, nil)
-	assert.NotNil(t, client)
+		opts := simple.Options()
+		assert.Equal(t, "redis-1:6379", opts.Addr)
+		assert.Equal(t, "rate-user", opts.Username)
+		assert.Equal(t, "rate-pass", opts.Password)
+		assert.Equal(t, 3, opts.DB)
+		assert.Equal(t, 100, opts.PoolSize)
+		assert.Equal(t, 4*time.Second, opts.DialTimeout)
+		assert.Equal(t, 4*time.Second, opts.ReadTimeout)
+		assert.Equal(t, 4*time.Second, opts.WriteTimeout)
+		require.NotNil(t, opts.TLSConfig)
+		assert.True(t, opts.TLSConfig.InsecureSkipVerify)
+	})
+
+	t.Run("creates cluster client when cluster is enabled", func(t *testing.T) {
+		cfg := baseConfig()
+		cfg.EnableCluster = true
+
+		client := NewStorage(&cfg, nil)
+		t.Cleanup(func() { _ = client.Close() })
+
+		cluster, ok := client.(*redis.ClusterClient)
+		require.True(t, ok)
+
+		opts := cluster.Options()
+		assert.Equal(t, []string{"redis-1:6379", "redis-2:6379"}, opts.Addrs)
+		assert.Equal(t, "rate-user", opts.Username)
+		assert.Equal(t, "rate-pass", opts.Password)
+		assert.Equal(t, 100, opts.PoolSize)
+		assert.Equal(t, 4*time.Second, opts.DialTimeout)
+		assert.Equal(t, 4*time.Second, opts.ReadTimeout)
+		assert.Equal(t, 4*time.Second, opts.WriteTimeout)
+		require.NotNil(t, opts.TLSConfig)
+		assert.True(t, opts.TLSConfig.InsecureSkipVerify)
+	})
+
+	t.Run("sentinel master selection takes precedence over cluster", func(t *testing.T) {
+		cfg := baseConfig()
+		cfg.EnableCluster = true
+		cfg.MasterName = "redis-master"
+
+		client := NewStorage(&cfg, nil)
+		t.Cleanup(func() { _ = client.Close() })
+
+		_, isCluster := client.(*redis.ClusterClient)
+		assert.False(t, isCluster)
+
+		sentinel, ok := client.(*redis.Client)
+		require.True(t, ok)
+		assert.Equal(t, "rate-user", sentinel.Options().Username)
+	})
+
+	t.Run("uses default pool and timeout when unset", func(t *testing.T) {
+		cfg := config.StorageOptionsConf{
+			Host: "redis",
+			Port: 6379,
+		}
+
+		client := NewStorage(&cfg, nil)
+		t.Cleanup(func() { _ = client.Close() })
+
+		simple, ok := client.(*redis.Client)
+		require.True(t, ok)
+
+		opts := simple.Options()
+		assert.Equal(t, "redis:6379", opts.Addr)
+		assert.Equal(t, 500, opts.PoolSize)
+		assert.Equal(t, 5*time.Second, opts.DialTimeout)
+		assert.Nil(t, opts.TLSConfig)
+	})
 }
 
+// Verifies: SW-REQ-016
+// SW-REQ-016:nominal:nominal
+// SW-REQ-016:boundary:boundary
+// SW-REQ-016:error_handling:negative
 func TestCreateTLSConfig_ExternalServicesIntegration(t *testing.T) {
 	// Test that external services storage configuration overrides legacy config
 
@@ -77,6 +160,10 @@ func TestCreateTLSConfig_ExternalServicesIntegration(t *testing.T) {
 	assert.False(t, tlsConfigDisabled.InsecureSkipVerify, "Should use legacy config when external services mTLS disabled")
 }
 
+// Verifies: SW-REQ-016
+// SW-REQ-016:nominal:nominal
+// SW-REQ-016:boundary:boundary
+// SW-REQ-016:error_handling:negative
 func TestCreateTLSConfig_TLSVersions(t *testing.T) {
 	// Test TLS version configuration with external services
 

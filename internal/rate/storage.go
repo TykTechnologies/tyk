@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// SW-REQ-016
 // NewStorage provides a redis v9 client for rate limiter use.
 func NewStorage(cfg *config.StorageOptionsConf, externalServicesConfig *config.ExternalServiceConfig) redis.UniversalClient {
 	logrus.Debugf("[ExternalServices] Creating Redis client for rate limiter")
@@ -59,6 +60,7 @@ func NewStorage(cfg *config.StorageOptionsConf, externalServicesConfig *config.E
 	return redis.NewClient(opts.Simple())
 }
 
+// SW-REQ-016
 // createTLSConfig creates a TLS configuration with proper mTLS support
 // It prioritizes external services storage configuration over legacy storage config
 func createTLSConfig(cfg *config.StorageOptionsConf, externalServicesConfig *config.ExternalServiceConfig) *tls.Config {
@@ -167,6 +169,7 @@ func createTLSConfig(cfg *config.StorageOptionsConf, externalServicesConfig *con
 	return tlsConfig
 }
 
+// SW-REQ-016
 // getTLSVersion converts a string TLS version to the corresponding tls constant
 func getTLSVersion(version string) (uint16, bool) {
 	switch version {

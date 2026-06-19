@@ -170,6 +170,9 @@ project:
             - internal/rate/rate_test.go
             - internal/rate/smoothing.go
             - internal/rate/smoothing_test.go
+            - internal/rate/storage.go
+            - internal/rate/storage_test.go
+            - internal/rate/storage_tls_test.go
             - docs/**
         completeness:
             production_include:
