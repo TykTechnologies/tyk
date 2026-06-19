@@ -29,6 +29,17 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
+    impact_reviews:
+        - requirement: STK-REQ-004
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: agent:codex
+          reason: 'Reviewed internal/policy/apply.go diff against origin/master: nil session/store/API-limit guards, quota-unlimited renewal handling, deterministic single-API root variable selection, rights-map prefill/merge cleanup, and proof annotations are implementation/evidence changes under the existing policy requirements; no requirement or linked design text change is required, and existing non-atomic KnownIssues remain unresolved.'
+          base: origin/master
+          requirement_fingerprint: sha256:890faecaf8cb433a4c57861c5afd5bc9894cc610f2e4bd503de591c7f8832b31
+          approval_fingerprint: sha256:3d32f9e7a3cdf23d4d9c677ded8ca3cc3c4ba6cac0e9f10daa6622b7a7bf9acf
+          artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+          reviewed_at: "2026-06-19T17:43:36Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"

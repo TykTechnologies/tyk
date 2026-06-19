@@ -29,6 +29,17 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
+    impact_reviews:
+        - requirement: SYS-REQ-035
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: agent:codex
+          reason: 'Reviewed internal/policy/apply.go diff against origin/master: nil session/store/API-limit guards, quota-unlimited renewal handling, deterministic single-API root variable selection, rights-map prefill/merge cleanup, and proof annotations are implementation/evidence changes under the existing policy requirements; no requirement or linked design text change is required, and existing non-atomic KnownIssues remain unresolved.'
+          base: origin/master
+          requirement_fingerprint: sha256:394b415b84fb3c49a80f6fdaf65c6cc6c5fe12f79e6acacf2f96a53cbe025912
+          approval_fingerprint: sha256:6e86a8c270730d4dee6d3e86b0a6685ebcbd1cac777f4d6602ce12b52f9dfdf5
+          artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+          reviewed_at: "2026-06-19T17:43:36Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:29:56Z"
