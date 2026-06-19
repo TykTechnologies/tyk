@@ -6,6 +6,7 @@ import (
 	"github.com/TykTechnologies/tyk/pkg/identifier"
 )
 
+// SW-REQ-034
 func customPolicyIdValidator(fl govalidator.FieldLevel) bool {
 	return identifier.CustomPolicyId(fl.Field().String()).Validate() == nil
 }

@@ -10,9 +10,17 @@ import (
 	tykvalidator "github.com/TykTechnologies/tyk/pkg/validator"
 )
 
+// Verifies: SW-REQ-034
+// SW-REQ-034:nominal:nominal
+// SW-REQ-034:boundary:boundary
+// SW-REQ-034:error_handling:negative
+// SW-REQ-034:malformed_input:negative
 func Test_customPolicyIdValidator(t *testing.T) {
 	type parentStruct struct {
 		Id string `validate:"custom_policy_id"`
+	}
+	type requiredStruct struct {
+		Name string `validate:"required"`
 	}
 
 	t.Run("WithAllowUnsafePolicyIds=true", func(t *testing.T) {
@@ -46,6 +54,20 @@ func Test_customPolicyIdValidator(t *testing.T) {
 				Id: "żuk",
 			})
 			assert.Error(t, err)
+			var errp errpack.Error
+			assert.ErrorAs(t, err, &errp)
+			assert.True(t, errp.TypeOf(errpack.TypeDomain))
+		})
+
+		t.Run("ignores non-struct values without custom validators", func(t *testing.T) {
+			err := validator.Validate("plain-policy-id")
+			assert.NoError(t, err)
+		})
+
+		t.Run("formats generic validation failures as domain errors", func(t *testing.T) {
+			err := validator.Validate(&requiredStruct{})
+			assert.Error(t, err)
+			assert.ErrorContains(t, err, "field Name: failed validation on required")
 			var errp errpack.Error
 			assert.ErrorAs(t, err, &errp)
 			assert.True(t, errp.TypeOf(errpack.TypeDomain))

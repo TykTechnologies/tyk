@@ -10,24 +10,31 @@ import (
 	"github.com/TykTechnologies/tyk/pkg/identifier"
 )
 
+// SW-REQ-034
 const customIdValidatorTag = "custom_policy_id"
 
+// SW-REQ-034
 type Validator interface {
 	Validate(v any) error
 }
 
+// SW-REQ-034
 type Option func(*validatorCfg)
 
+// SW-REQ-034
 type ValidateFn func(val reflect.Value) error
 
+// SW-REQ-034
 type validatorCfg struct {
 	allowUnsafePolicyIds bool
 }
 
+// SW-REQ-034
 type customValidator interface {
 	Validate() error
 }
 
+// SW-REQ-034
 func New(opts ...Option) Validator {
 	validator := &validatorImpl{
 		inner:    govalidator.New(),
@@ -50,11 +57,13 @@ func New(opts ...Option) Validator {
 	return validator
 }
 
+// SW-REQ-034
 type validatorImpl struct {
 	inner    *govalidator.Validate
 	registry map[reflect.Type]ValidateFn
 }
 
+// SW-REQ-034
 func (v *validatorImpl) Validate(obj any) error {
 	val := reflect.ValueOf(obj)
 	if val.Kind() == reflect.Ptr {
@@ -85,6 +94,7 @@ func (v *validatorImpl) Validate(obj any) error {
 	return nil
 }
 
+// SW-REQ-034
 func (v *validatorImpl) formatError(ve govalidator.ValidationErrors) error {
 	fe := ve[0]
 	switch fe.Tag() {
@@ -95,12 +105,14 @@ func (v *validatorImpl) formatError(ve govalidator.ValidationErrors) error {
 	}
 }
 
+// SW-REQ-034
 func (v *validatorImpl) mustRegisterValidator(tag string, fn govalidator.Func, callValidationEvenIfNull ...bool) {
 	if err := v.inner.RegisterValidation(tag, fn, callValidationEvenIfNull...); err != nil {
 		panic(err)
 	}
 }
 
+// SW-REQ-034
 func (v *validatorImpl) autoregister(val customValidator) {
 	v.registry[reflect.TypeOf(val)] = func(val reflect.Value) error {
 		if v, ok := val.Interface().(customValidator); !ok {
@@ -111,12 +123,14 @@ func (v *validatorImpl) autoregister(val customValidator) {
 	}
 }
 
+// SW-REQ-034
 func WithAllowUnsafePolicyIds(disabled bool) Option {
 	return func(cfg *validatorCfg) {
 		cfg.allowUnsafePolicyIds = disabled
 	}
 }
 
+// SW-REQ-034
 func skipValidator(_ govalidator.FieldLevel) bool {
 	return true
 }
