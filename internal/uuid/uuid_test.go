@@ -37,10 +37,6 @@ func TestUUIDHex(t *testing.T) {
 // SW-REQ-001:malformed_input:nominal
 // SW-REQ-001:malformed_input:negative
 // SW-REQ-001:boundary:nominal
-// MCDC SYS-REQ-083: uuid_operation_requested=F, uuid_operation_result_returned=F => TRUE
-// MCDC SYS-REQ-083: uuid_operation_requested=T, uuid_operation_result_returned=F => FALSE
-// MCDC SW-REQ-001: uuid_operation_requested=F, uuid_operation_result_returned=F => TRUE
-// MCDC SW-REQ-001: uuid_operation_requested=T, uuid_operation_result_returned=F => FALSE
 func TestUUIDValid(t *testing.T) {
 	id := uuid.New()
 

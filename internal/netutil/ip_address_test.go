@@ -31,13 +31,11 @@ func (f fakeAddr) String() string  { return string(f) }
 // SW-REQ-005:error_handling:nominal
 // SW-REQ-005:error_handling:negative
 // SW-REQ-005:determinism:nominal
-// MCDC SYS-REQ-095: usable_node_address_discovery_requested=F, usable_node_addresses_reported=F => TRUE
 // MCDC SYS-REQ-095: usable_node_address_discovery_requested=T, usable_node_addresses_reported=T => TRUE
 // MCDC SYS-REQ-096: unusable_node_address_record_present=F, unusable_node_address_record_excluded=F => TRUE
 // MCDC SYS-REQ-096: unusable_node_address_record_present=T, unusable_node_address_record_excluded=T => TRUE
 // MCDC SYS-REQ-097: node_interface_enumeration_failed=F, node_interface_error_returned=F => TRUE
 // MCDC SYS-REQ-097: node_interface_enumeration_failed=T, node_interface_error_returned=T => TRUE
-// MCDC SW-REQ-005: netutil_address_lookup_requested=F, netutil_address_lookup_result_returned=F => TRUE
 // MCDC SW-REQ-005: netutil_address_lookup_requested=T, netutil_address_lookup_result_returned=T => TRUE
 func Test_GetIpAddress(t *testing.T) {
 	defer func() { netInterfaceAddrs = net.InterfaceAddrs }()

@@ -34,7 +34,6 @@ func setupTestDir(t *testing.T) string {
 // SYS-REQ-099:malformed_input:negative
 // SYS-REQ-099:error_handling:nominal
 // SYS-REQ-099:error_handling:negative
-// MCDC SYS-REQ-098: root_creation_requested=F, root_directory_scoped=F => TRUE
 // MCDC SYS-REQ-098: root_creation_requested=T, root_directory_scoped=T => TRUE
 // MCDC SYS-REQ-099: invalid_root_path_presented=F, invalid_root_path_rejected=F => TRUE
 // MCDC SYS-REQ-099: invalid_root_path_presented=T, invalid_root_path_rejected=T => TRUE
@@ -76,7 +75,6 @@ func TestNewRoot(t *testing.T) {
 // SYS-REQ-101:malformed_input:nominal
 // SYS-REQ-101:malformed_input:negative
 // SYS-REQ-101:boundary:nominal
-// MCDC SYS-REQ-100: scoped_path_resolution_requested=F, scoped_path_returned=F => TRUE
 // MCDC SYS-REQ-100: scoped_path_resolution_requested=T, scoped_path_returned=T => TRUE
 // MCDC SYS-REQ-101: lexical_escape_path_presented=F, lexical_escape_rejected=F => TRUE
 // MCDC SYS-REQ-101: lexical_escape_path_presented=T, lexical_escape_rejected=T => TRUE
@@ -115,7 +113,6 @@ func TestEnsure(t *testing.T) {
 // SYS-REQ-102:nominal:nominal
 // SYS-REQ-102:boundary:nominal
 // SYS-REQ-102:error_handling:nominal
-// MCDC SYS-REQ-102: scoped_file_operation_requested=F, scoped_file_operation_confined=F => TRUE
 // MCDC SYS-REQ-102: scoped_file_operation_requested=T, scoped_file_operation_confined=T => TRUE
 func TestWriteFile(t *testing.T) {
 	tempDir := setupTestDir(t)
