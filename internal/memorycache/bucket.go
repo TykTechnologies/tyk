@@ -19,6 +19,7 @@ type Bucket struct {
 	mutex     sync.Mutex
 }
 
+// SW-REQ-031
 func NewBucket(capacity uint, rate time.Duration) *Bucket {
 	return &Bucket{
 		capacity:  capacity,
@@ -29,6 +30,7 @@ func NewBucket(capacity uint, rate time.Duration) *Bucket {
 }
 
 // Add to the bucket.
+// SW-REQ-031
 func (b *Bucket) Add(amount uint) (model.BucketState, error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -41,6 +43,7 @@ func (b *Bucket) Add(amount uint) (model.BucketState, error) {
 }
 
 // State returns bucket state.
+// SW-REQ-031
 func (b *Bucket) State() model.BucketState {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -49,6 +52,7 @@ func (b *Bucket) State() model.BucketState {
 	return model.BucketState{Capacity: b.capacity, Remaining: b.remaining, Reset: b.reset}
 }
 
+// SW-REQ-031
 func (b *Bucket) resetIfNeeded() {
 	if time.Now().After(b.reset) {
 		b.reset = time.Now().Add(b.rate)

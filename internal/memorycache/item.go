@@ -12,6 +12,7 @@ type Item struct {
 	expires *time.Time
 }
 
+// SW-REQ-031
 func (item *Item) touch(duration time.Duration) {
 	item.Lock()
 	expiration := time.Now().Add(duration)
@@ -19,6 +20,7 @@ func (item *Item) touch(duration time.Duration) {
 	item.Unlock()
 }
 
+// SW-REQ-031
 func (item *Item) expired() bool {
 	var value bool
 	item.RLock()

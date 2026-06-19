@@ -13,6 +13,7 @@ type BucketStorage struct {
 }
 
 // New initializes the in-memory bucket store.
+// SW-REQ-031
 func New(ctx context.Context) *BucketStorage {
 	return &BucketStorage{
 		buckets: NewCache(ctx, 10*time.Minute),
@@ -20,6 +21,7 @@ func New(ctx context.Context) *BucketStorage {
 }
 
 // Create a bucket.
+// SW-REQ-031
 func (s *BucketStorage) Create(name string, capacity uint, rate time.Duration) (model.Bucket, error) {
 	b, ok := s.buckets.Get(name)
 	if ok {

@@ -15,6 +15,7 @@ type Cache struct {
 
 // NewCache is a helper to create instance of the Cache struct.
 // The ctx is used to cancel the TTL map cleanup goroutine.
+// SW-REQ-031
 func NewCache(ctx context.Context, duration time.Duration) *Cache {
 	cache := &Cache{
 		ttl:   duration,
@@ -25,6 +26,7 @@ func NewCache(ctx context.Context, duration time.Duration) *Cache {
 }
 
 // Set is a thread-safe way to add new items to the map
+// SW-REQ-031
 func (cache *Cache) Set(key string, data *Bucket) {
 	cache.mutex.Lock()
 	item := &Item{data: data}
@@ -35,6 +37,7 @@ func (cache *Cache) Set(key string, data *Bucket) {
 
 // Get is a thread-safe way to lookup items
 // Every lookup, also touches the item, hence extending it's life
+// SW-REQ-031
 func (cache *Cache) Get(key string) (data *Bucket, found bool) {
 	cache.mutex.Lock()
 	item, exists := cache.items[key]
@@ -52,6 +55,7 @@ func (cache *Cache) Get(key string) (data *Bucket, found bool) {
 
 // Count returns the number of items in the cache
 // (helpful for tracking memory leaks)
+// SW-REQ-031
 func (cache *Cache) Count() int {
 	cache.mutex.RLock()
 	count := len(cache.items)
@@ -59,6 +63,7 @@ func (cache *Cache) Count() int {
 	return count
 }
 
+// SW-REQ-031
 func (cache *Cache) cleanup() {
 	cache.mutex.Lock()
 	for key, item := range cache.items {
@@ -69,12 +74,14 @@ func (cache *Cache) cleanup() {
 	cache.mutex.Unlock()
 }
 
+// SW-REQ-031
 func (cache *Cache) clear() {
 	cache.mutex.Lock()
 	cache.items = map[string]*Item{}
 	cache.mutex.Unlock()
 }
 
+// SW-REQ-031
 func (cache *Cache) startCleanupTimer(ctx context.Context) {
 	interval := cache.ttl
 	if interval < time.Second {

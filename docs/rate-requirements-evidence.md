@@ -12,11 +12,13 @@
 <!-- documents SW-REQ-016 -->
 <!-- documents SW-REQ-017 -->
 <!-- documents SW-REQ-018 -->
+<!-- documents SW-REQ-031 -->
 
 This document records the current rate-limit support-state proof slice. The
 slice is deliberately limited to the listed `internal/rate/model` allowance
 state behavior, dependency-free `internal/rate` support helpers, header senders,
-facade helpers, and smoothing orchestration.
+facade helpers, smoothing orchestration, and local `internal/memorycache`
+leaky-bucket storage.
 
 `SYS-REQ-103` covers gateway rate-limit allowance state operations at the
 system layer.
@@ -100,3 +102,12 @@ fixed-window, sliding-window, token-bucket, and leaky-bucket adapters, and
 fixed-window exhaustion error propagation. It does not claim correctness of the
 external limiter algorithms, distributed lock robustness, Redis server
 availability outside provisioned tests, or gateway admission.
+
+`SW-REQ-031` owns the concrete `internal/memorycache` local leaky-bucket storage
+used by gateway rate-limit allowance checks. Its evidence covers bucket
+capacity decrement, full-bucket rejection, state reporting, interval reset,
+named bucket reuse through storage creation, synchronized TTL cache set/get and
+count behavior, and cleanup-context cancellation clearing cached buckets. It
+does not claim gateway admission decisions, distributed limiter correctness,
+Redis behavior, cross-process synchronization, caller key selection, response
+headers, or external limiter algorithms.

@@ -22,13 +22,13 @@ project:
             path: /Users/leonidbugaev/tools/kind2/kind2
             timeout: 30
     commands:
-        build: go build ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx ./internal/cache ./internal/maps
-        test: mkdir -p .proof/test-results .proof/coverage && go test ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx ./internal/cache ./internal/maps -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
+        build: go build ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./internal/memorycache ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx ./internal/cache ./internal/maps
+        test: mkdir -p .proof/test-results .proof/coverage && go test ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./internal/memorycache ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx ./internal/cache ./internal/maps -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
         tests:
             test:
-                command: mkdir -p .proof/test-results .proof/coverage && go test ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx ./internal/cache ./internal/maps -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
+                command: mkdir -p .proof/test-results .proof/coverage && go test ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./internal/memorycache ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx ./internal/cache ./internal/maps -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
                 language: go
-        lint: go vet ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx ./internal/cache ./internal/maps
+        lint: go vet ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./internal/memorycache ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx ./internal/cache ./internal/maps
     obligation_classes:
         - nominal
         - error_handling
@@ -203,6 +203,12 @@ project:
             - internal/netutil/**
             - internal/osutil/**
             - internal/rate/model/**
+            - internal/memorycache/bucket.go
+            - internal/memorycache/bucket_test.go
+            - internal/memorycache/cache.go
+            - internal/memorycache/cache_test.go
+            - internal/memorycache/item.go
+            - internal/memorycache/storage.go
             - internal/rate/limiter/**
             - internal/rate/allowance_store.go
             - internal/rate/allowance_store_test.go

@@ -11,6 +11,13 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 )
 
+// Verifies: SYS-REQ-103, SW-REQ-031
+// SYS-REQ-103:nominal:nominal
+// SYS-REQ-103:boundary:boundary
+// SYS-REQ-103:error_handling:negative
+// SW-REQ-031:nominal:nominal
+// SW-REQ-031:boundary:boundary
+// SW-REQ-031:error_handling:negative
 func TestBucket(t *testing.T) {
 	t.Run("Add", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
