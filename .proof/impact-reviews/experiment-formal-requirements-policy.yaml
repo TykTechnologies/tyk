@@ -1,0 +1,733 @@
+schema_version: 1
+branch: experiment-formal-requirements-policy
+generated_at: "2026-06-19T12:15:07Z"
+reviews:
+    - requirement: STK-REQ-001
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:c047c407da7dd577411c57f62c7d9380d105c33ec042a54e1d4374d93b4f8590
+      approval_fingerprint: sha256:23071baf4eeb9959df9e4254d278a7731a74c82a5f3f838d7106f11e50fe5de1
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: STK-REQ-002
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:46fe1a71febd56a2cf6a47d3b261886b4832645adb79be1a56129b2243f2e2cc
+      approval_fingerprint: sha256:9106997346062b9c765406137492c2492631bed5f9f25f881dd7cf106e73c5f2
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: STK-REQ-003
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:6cab2673baf528f841761e7d835ff4c7c86d97c6f320d2e708f63e1596ac8f07
+      approval_fingerprint: sha256:a186daee7253389c030e08887cbe5492444875e343ceec74ce7ef67db9a0e9e6
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: STK-REQ-004
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:890faecaf8cb433a4c57861c5afd5bc9894cc610f2e4bd503de591c7f8832b31
+      approval_fingerprint: sha256:3d32f9e7a3cdf23d4d9c677ded8ca3cc3c4ba6cac0e9f10daa6622b7a7bf9acf
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: STK-REQ-005
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:9898a196dc70687ca71eea8a96cc6f26da34adf6209dde915605347cac1091e3
+      approval_fingerprint: sha256:303fb9a0b2e1e65181b46a10cd8307a4b852da7b3343695e022686804bc91040
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: STK-REQ-006
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:f9248c403e1e4f235a531d1bdfc0c09285fd54dfdedd075f992700d9ea5503bc
+      approval_fingerprint: sha256:c7db53feabf89b737e5e359915956002591a01af2572c2d1eb9568819e5e4348
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: STK-REQ-007
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:24b7a1135aa1cbd93113f6ad7b7a995e6d8af17a3fba694477306b3f6132a144
+      approval_fingerprint: sha256:9a3f20b699c12d36a6e06a77e8c047c30b486497329ddcf77677540609fa9ff1
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SW-REQ-002
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:d022df1cc428940f08200fac471c6ce68f0abad40f3d8e0a6b05831bc2b6fe6b
+      approval_fingerprint: sha256:40a451ce868abe1d6731473d7ac2a02f576cba8dbaa730925cbe0bba8696e486
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-008
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: buger
+      reason: Removed obsolete proof-only same-package reqproof assume comments from internal/policy/apply.go after no-cache solver verification; executable code, requirement intent, and documented product behavior are unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:cfaf4bd293b95ea3be43ac9f210fad3698a51296e636f27cbe53a48d3183914e
+      approval_fingerprint: sha256:26ec5252de27f351a0cb66c6542c155c95a79754e8c01727ad1ac7c6f5675dbd
+      artifact_fingerprint: sha256:074dbf7efdafef20b7222cf7bfb6558a9ed5312f87b22150bc7984857639b2f7
+      reviewed_at: "2026-06-19T07:30:17Z"
+    - requirement: SYS-REQ-008
+      artifact: internal/policy/rpc.go
+      decision: no-authored-change
+      reviewer: leonidbugaev
+      reason: 'Policy deep-dive: system requirements consistent with implementation'
+      base: origin/master
+      requirement_fingerprint: sha256:0518a1b0fc78146fb48bd209865d02947ce5c7229c7bbb4d93e2f8c2e66a3014
+      approval_fingerprint: sha256:7f805274a0d61c89f9ecc9d5548deaddb48e24513275505f1983c3ded31032d6
+      artifact_fingerprint: sha256:0e40b705cf492ffa91ab4835d6a5b94cbf3d7e27f230b77a28a5b451b564d32b
+      reviewed_at: "2026-05-19T17:01:30Z"
+    - requirement: SYS-REQ-008
+      artifact: internal/policy/store.go
+      decision: no-authored-change
+      reviewer: leonidbugaev
+      reason: 'Policy deep-dive: system requirements consistent with implementation'
+      base: origin/master
+      requirement_fingerprint: sha256:0518a1b0fc78146fb48bd209865d02947ce5c7229c7bbb4d93e2f8c2e66a3014
+      approval_fingerprint: sha256:7f805274a0d61c89f9ecc9d5548deaddb48e24513275505f1983c3ded31032d6
+      artifact_fingerprint: sha256:0b871001e1125f3881afd6636a98e162038ff80ce43c764e0288c1b418f818d7
+      reviewed_at: "2026-05-19T17:01:30Z"
+    - requirement: SYS-REQ-008
+      artifact: internal/policy/store_map.go
+      decision: no-authored-change
+      reviewer: leonidbugaev
+      reason: 'Policy deep-dive: system requirements consistent with implementation'
+      base: origin/master
+      requirement_fingerprint: sha256:0518a1b0fc78146fb48bd209865d02947ce5c7229c7bbb4d93e2f8c2e66a3014
+      approval_fingerprint: sha256:7f805274a0d61c89f9ecc9d5548deaddb48e24513275505f1983c3ded31032d6
+      artifact_fingerprint: sha256:7a7b1601bc4fd3d7ecac375ab6e5044dc9a444cc21e67f9b9f2a195a8cecb967
+      reviewed_at: "2026-05-19T17:01:30Z"
+    - requirement: SYS-REQ-008
+      artifact: internal/policy/store_mock.gen.go
+      decision: no-authored-change
+      reviewer: leonidbugaev
+      reason: 'Policy deep-dive: system requirements consistent with implementation'
+      base: origin/master
+      requirement_fingerprint: sha256:0518a1b0fc78146fb48bd209865d02947ce5c7229c7bbb4d93e2f8c2e66a3014
+      approval_fingerprint: sha256:7f805274a0d61c89f9ecc9d5548deaddb48e24513275505f1983c3ded31032d6
+      artifact_fingerprint: sha256:40369f57926e217e9147ef3143864b6835f8d80b51beed9d873730f1c494e88f
+      reviewed_at: "2026-05-19T17:01:30Z"
+    - requirement: SYS-REQ-010
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:dfa273bcc6b238c4e527de76dbf85d6889ae694fef52b55a4ba2b8ab8ad4a675
+      approval_fingerprint: sha256:2db9a38055c79dd7f094a339ae7ced8764d4824b2cfc3f4a2f44565148c621a6
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-011
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:b951fbde04c88e2f23071356ec8ead7fc4f6069536a5542b86f36dd5a20eee86
+      approval_fingerprint: sha256:a58d95a7d52f109ea394dcc2d59de336a2e362e09866fca3631322211ed722b4
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-012
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:6981bd891e20ca96586362e21d2f6bd4ae8eb574f284003671c8e5a5a2415e2d
+      approval_fingerprint: sha256:7d71753f5e61281ea842872a861b7dbffee86932bd572710ed4bd6092638775d
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-013
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:b8e104648ca9ab60783a72f17f39de643889c8f60fde0107dc40512d5ae428e7
+      approval_fingerprint: sha256:ea4a9a03fac664a1f7f4144b84b74ad0f3c015c1b3b062338ec60e59822b3266
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-013
+      artifact: internal/policy/util.go
+      decision: no-authored-change
+      reviewer: leonidbugaev
+      reason: 'Policy deep-dive: system requirements consistent with implementation'
+      base: origin/master
+      requirement_fingerprint: sha256:fb2c3cd6f601c6e931618db26c9d6da7ae4ddf5d4ae64c59bb484bee2841585d
+      approval_fingerprint: sha256:6b1ff16012a043c7331724b52b298de9361ef74534ad06b51ad0b4fe47f1cabb
+      artifact_fingerprint: sha256:e7c53482815efd8e708c449e82dfe958b6f957acb864490402c7aca5fbf9a9fc
+      reviewed_at: "2026-05-19T17:01:30Z"
+    - requirement: SYS-REQ-014
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:deab066c7663134aa0076ab6df34d3e7b3f4be6595a31bcfa7bf8967ebdaf5ab
+      approval_fingerprint: sha256:c6f06a910442973e6d931c9e8b450d2dce0b3468cf3130b5b01d1596a644da7b
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-015
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:4ac7fa2cd018c8b53f6c25586ed429aa405caa68eee33ff19e2b3ba9f176358b
+      approval_fingerprint: sha256:015f2eb3de2ba0297c6e9a78686497debb4fd30ebdc0287d8d4fa4405741b66b
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-016
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:b863e444e171e3a1c9247d2c6deb2d87b80ddb2dbd9f4065f47df2040111002f
+      approval_fingerprint: sha256:5fa09d2797bc86dfeb142a78c60a4a0c74139b491044baf237d14853e7b0ff4c
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-017
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:95d14fcc20442727ca8cbeb04ec9fcae515b1b5ebc07e5778dc9f184eb1b84ee
+      approval_fingerprint: sha256:6ff40007838e6cdd1bb5b68290c7fda9a97800b7ce1deb8699adfd34be6c7dc6
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-018
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:a2ac9044b55f0ade501637982a917af20642ac1f2c8afe9ed7538421fc61209c
+      approval_fingerprint: sha256:25a9e2e9de42bc965d9e179a6ff732480fdc8d2563ae3b260c44b66d22873aa6
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-019
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:1d1b933905b04410fe6753b61476bb481320e43b655c93df2be7d5ec6c954725
+      approval_fingerprint: sha256:5c95e9e5a47d0912a494e0435a816829f110f96d301edaa1a3b8e6395a5bd5bc
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-020
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:f02ae5205aa3fe41b668a5315bd8411d27e6daad60a6e8a5912c48ce4f75c3aa
+      approval_fingerprint: sha256:f635ef814a121e6bfeca096ba0c14335a2d246f3844ccb296b8da8a9f1653e84
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-021
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:82bc64763f5351b17db3f34d937b10920b5740e9eef5e910e74acde1ccc391ff
+      approval_fingerprint: sha256:4748b1707bc7799429b9b45013d257762ba563d792c98af98d213d396ccd91f6
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-021
+      artifact: internal/policy/util.go
+      decision: no-authored-change
+      reviewer: leonidbugaev
+      reason: 'Policy deep-dive: system requirements consistent with implementation'
+      base: origin/master
+      requirement_fingerprint: sha256:b12f1cdeab0adc985bb3405118d2f02199664875a98232bb8c4568e70a22da62
+      approval_fingerprint: sha256:eb057d97f7ab86b1bf0f3e8d359a4daf69669ab7e267029d6a9610d00e2a1802
+      artifact_fingerprint: sha256:e7c53482815efd8e708c449e82dfe958b6f957acb864490402c7aca5fbf9a9fc
+      reviewed_at: "2026-05-19T17:01:30Z"
+    - requirement: SYS-REQ-022
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:704c4b981d59fa69f185efdec019c0c1f9740df78d8ed342bd2b3707070278dc
+      approval_fingerprint: sha256:382b1314e3c2d93c31ad4955c874df08996e99f80a026f36b6cb588dadfede0e
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-023
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:29206d85b613ea002272d8f31a4bc93200bb4caf40e7b375876b34cd1d224735
+      approval_fingerprint: sha256:37070049511df945602d785c4cee052a7f37f5a2f878ecc4f9bfdaf15a00fd45
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-024
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:163b4ca0cb468c40c3cb97393e47a8be768cbe3382820f0a12707578203c25a1
+      approval_fingerprint: sha256:2f0d624a3b9ba8c8cd33fbdec1a393f6e129e4a1fe7ad16cf148dafb4f96d62c
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-025
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:bbffb88a957cce43f75ae51ff1894fd451e530d5f500e2736b8e10aa5244b0c9
+      approval_fingerprint: sha256:31adf280c5c398267e3ec0afa54de13b76a081cba04200c7ccc9b00967c20141
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-026
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:ad93cb0f5d44f8aff9aac64ee5b427814e157e10fa9bff721c51a4130fd2805a
+      approval_fingerprint: sha256:8187b1f4a0771d81f4738adb947fc6439fdcd1f515653a9eafddc7498df19b50
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-027
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:53eb671e0cf37bcea4dcaea78bb8e4ba775388bdd30217d56e1b2c334b06c098
+      approval_fingerprint: sha256:d4c6b102bd45a8f8b958367f01582ae37b5f0729dd0f3d6f69a5a0cc67f4c044
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-028
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:9ac983ca73e25dfe6e97a393d270cb1c4ccbd213e50c7df40c00eefb7bef5f8a
+      approval_fingerprint: sha256:d060375d9307d5b552e9130ac9de9800677f31a404e9d3807d4603b3dca3402e
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-029
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:8e4c2ad459b5e201e836c17346b272e25fe1595d659f59663701170653c3d1dc
+      approval_fingerprint: sha256:7d59686004f2ac1a2234451fe34c8898d8982b6045fa17a617e534d4c7256f10
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-030
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:38c4a04fb7b71c285ca4242c3279c65ce9397902e7fad8225a380418443383f9
+      approval_fingerprint: sha256:303829ce3191aedc8bda330962d966c7ed39d66153a2076631d7e717255d6e85
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-031
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:89a43f7c3fb3ced42f0fdc79d8d3ee79d753490d9007b11c235c64825c116aad
+      approval_fingerprint: sha256:da75fc196ad32cafa813a37e60a4b5e83a44c1945bc3260d6d0b46982bed5e64
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-032
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:e4f61dd13714663fabf1804ffdcccd3e9cc7488a51da14cdfe854b2515a52d01
+      approval_fingerprint: sha256:cc41e2128a006c63b98198ca5d5116bb1b90b2ef57334b4d93f0f53a96e1fb41
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-033
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:e2c5c01480d3b1531a40e8cf991c4c9d973637011e5692eba6914164e253b1d2
+      approval_fingerprint: sha256:c56dfc45811b3b86bcc5f04bd7577a680135a3ce3908599b2adc9f9d250782b3
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-035
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      reviewer: agent:codex
+      reason: Reviewed apply.go trace-maintenance and proof-annotation cleanup; SYS-REQ-035 empty-rate exclusivity contract and linked evidence remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:394b415b84fb3c49a80f6fdaf65c6cc6c5fe12f79e6acacf2f96a53cbe025912
+      approval_fingerprint: sha256:6e86a8c270730d4dee6d3e86b0a6685ebcbd1cac777f4d6602ce12b52f9dfdf5
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T12:15:07Z"
+    - requirement: SYS-REQ-040
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:b686592f82faf1093228e69f4bf476fae333436cab2e8a491ccec0ef58ad5870
+      approval_fingerprint: sha256:27a53d5bd5955ea5b4bb049945dddfba804c8acdef26b26b973bc3961af1c6de
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-041
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:423cf0317319fec7da4094a9d9a385e3402c25870b108afdd450f5e58ac5a159
+      approval_fingerprint: sha256:095ba6b66fe7c04fd192f041a06726bbfc56b2773fa0d481067ebf16cced0333
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-041
+      artifact: internal/policy/util.go
+      decision: no-authored-change
+      reviewer: leonidbugaev
+      reason: 'Policy deep-dive: system requirements consistent with implementation'
+      base: origin/master
+      requirement_fingerprint: sha256:77e0687e68e2a8708a846fffb6b29fb117833698e08bce246373f369dd8862e8
+      approval_fingerprint: sha256:f91a7719147051c6bfbd0434395ee80916ac4511dfd861f0d5dc88a5ac4ef4a4
+      artifact_fingerprint: sha256:e7c53482815efd8e708c449e82dfe958b6f957acb864490402c7aca5fbf9a9fc
+      reviewed_at: "2026-05-19T17:01:30Z"
+    - requirement: SYS-REQ-042
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:9e8c9e8bff89661a4a37a0b03a6e417dab0f9df8d52100d9855aa6aaf7f50d13
+      approval_fingerprint: sha256:15f00008d86fc775cf988755da0b6b96a566f6b8cbfbd544b097d022fd22b563
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-043
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:4b3c98e411a0acd232fb3fbdda30f8157a28053976e6e0492d8c8c080674cdf4
+      approval_fingerprint: sha256:052af936cbb257432408913db729dce6f6ad16fba1d58cc7c7916839f307086c
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-044
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:fb5c3742092b10797c3091dca5e1e25164f9875b4ccc700b789475e432d7ede3
+      approval_fingerprint: sha256:e79811fef1d5801080f495f282e240c4ae8352d02040b1d51d27b404c0d3cbe7
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-049
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:2727913eaa721e44d7f2aafa627e0c592ac625723157bb0e30c9b73feb892378
+      approval_fingerprint: sha256:ede5280da4da6832b0a523c58fd3d0c70aaa8faf99d81b006ff4a0356461cbd4
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-050
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:a6b41b20b385bb03d35f69ac825177799fa78bf5524d232ca1c6dcd992668276
+      approval_fingerprint: sha256:094145a69734af01771048c34d1bbda8f1a91e4fd89e3d0cb78614976b4caf75
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-051
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:f7a429b630d3ddd5d5f440728a12777294f63634527d397a40207cd08d29f539
+      approval_fingerprint: sha256:2a350707a8dab18590ff6783715d9c1156ba6cdb15ba45f541383d13f1bc412e
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-052
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:3783fb46b69d990dfc10d59c364280a251fa07eea5ce5ee4e26e892665b10e6b
+      approval_fingerprint: sha256:dd44c2ce0c859867df552e19494e0e3e6d61762c44199185549831622c27eff4
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-053
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:a0ea84f2d92ad5995b0a3b13dedb91bdf8d1d6160270c1866c22551e3ca20c2c
+      approval_fingerprint: sha256:5d2ffbfe11eeb52cf10666665a5e26b981f21f54d0849cdfaf0adec0581ebd4c
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-054
+      artifact: internal/policy/apply.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      base: origin/master
+      requirement_fingerprint: sha256:fb53cfcdfc33bf120f4a6f7ebfd463266994fb4ce22aaafff361fcaca42badb1
+      approval_fingerprint: sha256:b9924c8b0100614604bda2046eac086697bc4cc5ea1e82a087ee51441d0839e0
+      artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
+      reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SYS-REQ-085
+      artifact: internal/compression/zstd.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed internal/compression/zstd.go change for valid round-trip and invalid-frame behavior: introduced an unexported decoder-constructor seam that defaults to the same zstd.NewReader call and does not change compression output, decompression output, frame detection, or invalid-frame rejection. Requirement and documented design intent remain correct; change only enables direct evidence for defensive MC/DC paths.'
+      base: origin/master
+      requirement_fingerprint: sha256:d0edf6c8eadc824d790c65e400de8bf9dbb0fd46d7084f13bb432bee9fcc26fb
+      approval_fingerprint: sha256:b095051e01b0ec61c6a3b7d6af2695e20ca6cb5839f93fa4403fbda3c3c8361f
+      artifact_fingerprint: sha256:5b74c7e2094bd05753208f6b1e1c279ab87d2ca3f5d4a5831dc3efefc286ce05
+      reviewed_at: "2026-06-18T21:34:07Z"
+    - requirement: SYS-REQ-086
+      artifact: internal/compression/zstd.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed internal/compression/zstd.go change for valid round-trip and invalid-frame behavior: introduced an unexported decoder-constructor seam that defaults to the same zstd.NewReader call and does not change compression output, decompression output, frame detection, or invalid-frame rejection. Requirement and documented design intent remain correct; change only enables direct evidence for defensive MC/DC paths.'
+      base: origin/master
+      requirement_fingerprint: sha256:85ec50854946c16693c58d86069eedf14ab1ab8eba9fbe01be964928cf717968
+      approval_fingerprint: sha256:757da2401a88317cee8de044cbfa2a76e7e99af1192b20c5b92e5039ad56cc10
+      artifact_fingerprint: sha256:5b74c7e2094bd05753208f6b1e1c279ab87d2ca3f5d4a5831dc3efefc286ce05
+      reviewed_at: "2026-06-18T21:34:07Z"
+    - requirement: SYS-REQ-087
+      artifact: internal/compression/zstd.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed internal/compression/zstd.go change: introduced an unexported decoder-constructor seam that defaults to the same zstd.NewReader call and preserves existing compression/decompression behavior, size-limit behavior, and defensive error behavior. Requirement and documented design intent remain correct; change only enables direct evidence for defensive MC/DC paths.'
+      base: origin/master
+      requirement_fingerprint: sha256:cf19c0c7f2c6f89e0e2a3a8b71c59cb2b61df49ef44ca9b341c55c284ca7e338
+      approval_fingerprint: sha256:a995391f0b9c119a8684c8c8eca7ea5790f856ddb0f7736c8fc3d66462be58d9
+      artifact_fingerprint: sha256:5b74c7e2094bd05753208f6b1e1c279ab87d2ca3f5d4a5831dc3efefc286ce05
+      reviewed_at: "2026-06-18T21:33:46Z"
+    - requirement: SYS-REQ-088
+      artifact: internal/compression/zstd.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed internal/compression/zstd.go change: introduced an unexported decoder-constructor seam that defaults to the same zstd.NewReader call and preserves existing compression/decompression behavior, size-limit behavior, and defensive error behavior. Requirement and documented design intent remain correct; change only enables direct evidence for defensive MC/DC paths.'
+      base: origin/master
+      requirement_fingerprint: sha256:4ee5fde43eac211f119600d63c14f0b9f9d68b4700d016af09fb90168323728d
+      approval_fingerprint: sha256:1d41d46e3c4d1c67c44e9094fd419f26fdc48eaf30704219e2c2c633878fe0cd
+      artifact_fingerprint: sha256:5b74c7e2094bd05753208f6b1e1c279ab87d2ca3f5d4a5831dc3efefc286ce05
+      reviewed_at: "2026-06-18T21:33:46Z"
+    - requirement: SYS-REQ-089
+      artifact: internal/compression/zstd.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed internal/compression/zstd.go change: introduced an unexported decoder-constructor seam that defaults to the same zstd.NewReader call and preserves existing compression/decompression behavior, size-limit behavior, and defensive error behavior. Requirement and documented design intent remain correct; change only enables direct evidence for defensive MC/DC paths.'
+      base: origin/master
+      requirement_fingerprint: sha256:57c716358e6f371694e52101c413c9ccbd00734135c89a89a64a6c68353ef618
+      approval_fingerprint: sha256:f6514f2ee768510e4eed6b092402e2ec77d41605d8664f4efa90772999b6e8e4
+      artifact_fingerprint: sha256:5b74c7e2094bd05753208f6b1e1c279ab87d2ca3f5d4a5831dc3efefc286ce05
+      reviewed_at: "2026-06-18T21:33:46Z"
+    - requirement: SYS-REQ-090
+      artifact: internal/compression/zstd.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed internal/compression/zstd.go change: introduced an unexported decoder-constructor seam that defaults to the same zstd.NewReader call and preserves existing compression/decompression behavior, size-limit behavior, and defensive error behavior. Requirement and documented design intent remain correct; change only enables direct evidence for defensive MC/DC paths.'
+      base: origin/master
+      requirement_fingerprint: sha256:a5073c6c585b1bc29bf7c3ad67bd4649fdabcb0922f9db41d1eb5ec4e06f4ab4
+      approval_fingerprint: sha256:b7aed1a8ab2b9b4bce5637fc3f804e9e7663354908d4b538b78ffefd5a67e21b
+      artifact_fingerprint: sha256:5b74c7e2094bd05753208f6b1e1c279ab87d2ca3f5d4a5831dc3efefc286ce05
+      reviewed_at: "2026-06-18T21:33:46Z"
+    - requirement: SYS-REQ-091
+      artifact: internal/sanitize/path.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed internal/sanitize/path.go changes for SYS-REQ-091 through SYS-REQ-094: added unexported seams that default to the same filepath.IsAbs, filepath.VolumeName, and filepath.Rel functions for direct defensive-path evidence; rewrote the bounded URL decode loop to the same three decode attempts; removed only the second decoded-empty check because empty component input is rejected before decoding and successful URL unescape of a non-empty string cannot produce a zero-length string. Requirement intent and product behavior are unchanged except that the newly documented KnownIssue reproducers expose pre-existing sanitizer defects.'
+      base: origin/master
+      requirement_fingerprint: sha256:8d1bb25559e3b4014ca42de0eb346cef4f6bb65a95e916f643f930bace643915
+      approval_fingerprint: sha256:7e6f6617f0c21aeed7194ea177bfa7014fbdeabb3ecc395b4ce34fc4791e6d81
+      artifact_fingerprint: sha256:d46784507cc214aa8932513b2cf2a3d13d42617a6f0bd6a72deb35c915924358
+      reviewed_at: "2026-06-18T21:53:37Z"
+    - requirement: SYS-REQ-092
+      artifact: internal/sanitize/path.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed internal/sanitize/path.go changes for SYS-REQ-091 through SYS-REQ-094: added unexported seams that default to the same filepath.IsAbs, filepath.VolumeName, and filepath.Rel functions for direct defensive-path evidence; rewrote the bounded URL decode loop to the same three decode attempts; removed only the second decoded-empty check because empty component input is rejected before decoding and successful URL unescape of a non-empty string cannot produce a zero-length string. Requirement intent and product behavior are unchanged except that the newly documented KnownIssue reproducers expose pre-existing sanitizer defects.'
+      base: origin/master
+      requirement_fingerprint: sha256:0c822b09e3ef27df2ff7d18ee91cb6777dcd9b05ea9b56570d0c5ed90b44adea
+      approval_fingerprint: sha256:c7b3217c3b0bb4db19e36e62a9c2970dd44d676fdf24a4317bdd30f645e1819a
+      artifact_fingerprint: sha256:d46784507cc214aa8932513b2cf2a3d13d42617a6f0bd6a72deb35c915924358
+      reviewed_at: "2026-06-18T21:53:37Z"
+    - requirement: SYS-REQ-093
+      artifact: internal/sanitize/path.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed internal/sanitize/path.go changes for SYS-REQ-091 through SYS-REQ-094: added unexported seams that default to the same filepath.IsAbs, filepath.VolumeName, and filepath.Rel functions for direct defensive-path evidence; rewrote the bounded URL decode loop to the same three decode attempts; removed only the second decoded-empty check because empty component input is rejected before decoding and successful URL unescape of a non-empty string cannot produce a zero-length string. Requirement intent and product behavior are unchanged except that the newly documented KnownIssue reproducers expose pre-existing sanitizer defects.'
+      base: origin/master
+      requirement_fingerprint: sha256:5ec1ce6a793853ae1003b5e7e0f1e2bb386e47d684ab8d7c8640e2366a8cfe0f
+      approval_fingerprint: sha256:f65c1f5bdf694341c125d5dc66ed1daa0a4865e2a4a893a0ad6ccf0be0dfd8c5
+      artifact_fingerprint: sha256:d46784507cc214aa8932513b2cf2a3d13d42617a6f0bd6a72deb35c915924358
+      reviewed_at: "2026-06-18T21:53:37Z"
+    - requirement: SYS-REQ-094
+      artifact: internal/sanitize/path.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed internal/sanitize/path.go changes for SYS-REQ-091 through SYS-REQ-094: added unexported seams that default to the same filepath.IsAbs, filepath.VolumeName, and filepath.Rel functions for direct defensive-path evidence; rewrote the bounded URL decode loop to the same three decode attempts; removed only the second decoded-empty check because empty component input is rejected before decoding and successful URL unescape of a non-empty string cannot produce a zero-length string. Requirement intent and product behavior are unchanged except that the newly documented KnownIssue reproducers expose pre-existing sanitizer defects.'
+      base: origin/master
+      requirement_fingerprint: sha256:c119c332e35bb7b31164a1d04e304505aa0d3c3eeed9825212d4574cc3ff245b
+      approval_fingerprint: sha256:94391f6f11ac6995257721e34bf6be384ff6930f0ed07eaa133be1b062716e6b
+      artifact_fingerprint: sha256:d46784507cc214aa8932513b2cf2a3d13d42617a6f0bd6a72deb35c915924358
+      reviewed_at: "2026-06-18T21:53:37Z"
+    - requirement: SYS-REQ-098
+      artifact: internal/osutil/osutil.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed internal/osutil/osutil.go changes for SYS-REQ-098, SYS-REQ-099, and SYS-REQ-102: introduced unexported seams that default to the same filepath.Abs, os.Stat, os.WriteFile, and os.Remove functions, plus requirement trace comments. Runtime behavior remains unchanged; the symlink escape behavior is pre-existing and is tracked separately as KI-OSUTIL-SYMLINK-ESCAPE with a reproducer.'
+      base: origin/master
+      requirement_fingerprint: sha256:e8684285a85b7ec0bdd9e6e1b3916c28d05cc1b16045d740d713b30080643346
+      approval_fingerprint: sha256:4fc87f1a3598a37a4440721d936d5ec06aaa9b560ec3d65068ceb0dcdf78d754
+      artifact_fingerprint: sha256:723e27cf714204b562a50cf3da39e6e7edb82b384895b4e273887edd04b6f135
+      reviewed_at: "2026-06-19T06:21:38Z"
+    - requirement: SYS-REQ-099
+      artifact: internal/osutil/osutil.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed internal/osutil/osutil.go changes for SYS-REQ-098, SYS-REQ-099, and SYS-REQ-102: introduced unexported seams that default to the same filepath.Abs, os.Stat, os.WriteFile, and os.Remove functions, plus requirement trace comments. Runtime behavior remains unchanged; the symlink escape behavior is pre-existing and is tracked separately as KI-OSUTIL-SYMLINK-ESCAPE with a reproducer.'
+      base: origin/master
+      requirement_fingerprint: sha256:9fd6d3e1c5233e458a9b135d62cc73343f93696a765c6780f2c420e75fc3b0ab
+      approval_fingerprint: sha256:1837dd5feb775f73ff54515f1ccc2e194723c9d5d88e472d19881b1cf40915b2
+      artifact_fingerprint: sha256:723e27cf714204b562a50cf3da39e6e7edb82b384895b4e273887edd04b6f135
+      reviewed_at: "2026-06-19T06:21:38Z"
+    - requirement: SYS-REQ-100
+      artifact: internal/osutil/osutil.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed internal/osutil/osutil.go changes for SYS-REQ-100 and SYS-REQ-101: requirement trace comments were added and shared defaulted test seams were introduced for neighboring filesystem helpers. The Ensure path-resolution logic itself is unchanged; lexical in-root resolution and lexical escape rejection behavior remain as specified and tested.'
+      base: origin/master
+      requirement_fingerprint: sha256:9821e33f89ca1c821e07dcc2e3e074e454b8c81f2c7c574d5c0ee5e24173a1d3
+      approval_fingerprint: sha256:f6dd9ff5259afcf6ed584e8963824a5a035f4b260843c9033b07fe9e54ed2405
+      artifact_fingerprint: sha256:723e27cf714204b562a50cf3da39e6e7edb82b384895b4e273887edd04b6f135
+      reviewed_at: "2026-06-19T06:22:36Z"
+    - requirement: SYS-REQ-101
+      artifact: internal/osutil/osutil.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed internal/osutil/osutil.go changes for SYS-REQ-100 and SYS-REQ-101: requirement trace comments were added and shared defaulted test seams were introduced for neighboring filesystem helpers. The Ensure path-resolution logic itself is unchanged; lexical in-root resolution and lexical escape rejection behavior remain as specified and tested.'
+      base: origin/master
+      requirement_fingerprint: sha256:4cee9ca829a33c3a9ef760c9ee4fab1ffee59dfe479be5b31f09adf3b48fbb02
+      approval_fingerprint: sha256:4395375840db1727b16b5cb675123dcef3ce239e4dd71495b9d0f0bcae7b1707
+      artifact_fingerprint: sha256:723e27cf714204b562a50cf3da39e6e7edb82b384895b4e273887edd04b6f135
+      reviewed_at: "2026-06-19T06:22:36Z"
+    - requirement: SYS-REQ-102
+      artifact: internal/osutil/osutil.go
+      decision: no-authored-change
+      change_type: refactor
+      reviewer: agent:codex
+      reason: 'Reviewed internal/osutil/osutil.go changes for SYS-REQ-098, SYS-REQ-099, and SYS-REQ-102: introduced unexported seams that default to the same filepath.Abs, os.Stat, os.WriteFile, and os.Remove functions, plus requirement trace comments. Runtime behavior remains unchanged; the symlink escape behavior is pre-existing and is tracked separately as KI-OSUTIL-SYMLINK-ESCAPE with a reproducer.'
+      base: origin/master
+      requirement_fingerprint: sha256:873dc0eba43fb2c692ee382bc2443f348f8f20a93be34066cdfbd37df3b39a96
+      approval_fingerprint: sha256:a4f18d68d3220aab8f0f28e1aed2ccf6818bef57fb2acd51cfa8e7d5b66b707b
+      artifact_fingerprint: sha256:723e27cf714204b562a50cf3da39e6e7edb82b384895b4e273887edd04b6f135
+      reviewed_at: "2026-06-19T06:21:38Z"

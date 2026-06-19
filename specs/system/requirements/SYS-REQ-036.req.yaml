@@ -18,12 +18,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-001
-    verified_by_extra:
-        - FLIP:policy/tc-081
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-04-27T06:25:20.839779Z"
-    reviewed_by: human:leonidbugaev
+    reviewed_at: "2026-06-18T19:38:45.015502Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:bf4efb8946f26e10514ef048084ab288bb47a00c85575cf373289661c5dbae77
 verification:
     assurance_level: B
     formalization_status: valid
@@ -31,13 +28,18 @@ verification:
         status: approved
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
-        ai_generated: false
+        ai_generated: true
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:29:56Z"
-    last_modified_by: human:cli
-    last_modified_at: "2026-04-19T15:13:34Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-18T19:07:43Z"
 obligation_class: nominal
+assumption:
+    status: invalid
+    external_owner: team:policy-boundary-owners
+    review_date: "2026-06-19"
+    rationale: 'Invalid as formalized: policies_provided is policy_count == 1, while multiple_policies is policy_count >= 2.'
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:34Z"
@@ -45,5 +47,3 @@ lifecycle:
           to: review
           reason: Migration to assurance model complete
           changed_by: human:cli
-audit_ignore:
-    - lint-formalization-quality

@@ -4,7 +4,7 @@ status: review
 priority: shall
 category: functional
 req_type: assumption
-fretish: the policy shall always satisfy !(clear_requested & rate_limit_apply_requested)
+fretish: the caller shall always satisfy !(clear_requested & rate_limit_apply_requested)
 description: ClearSession and ApplyRateLimits are never called simultaneously.
 formalization_strategy: fretish
 informal_verification:
@@ -18,10 +18,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-006
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-04-27T06:25:20.779213Z"
-    reviewed_by: human:leonidbugaev
+    reviewed_at: "2026-06-18T19:38:44.262618Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:b63d3d7fda2ac67ac78eb601a8c8b199a8ebd58aff223f108a0f0235ca52b4b3
 verification:
     assurance_level: B
     formalization_status: valid
@@ -29,13 +28,20 @@ verification:
         status: approved
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
-        ai_generated: false
+        ai_generated: true
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:05Z"
-    last_modified_by: human:cli
-    last_modified_at: "2026-04-19T15:13:34Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-18T19:07:33Z"
 obligation_class: nominal
+assumption:
+    status: known_issue
+    external_owner: team:policy-boundary-owners
+    review_date: "2026-06-19"
+    linked_known_issue:
+        - KI-POLICY-SHARED-SESSION-RACE
+    rationale: Concurrent shared-session policy operations are tracked by KI-POLICY-SHARED-SESSION-RACE; Apply reaches ApplyRateLimits internally while ClearSession mutates the same session fields.
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:34Z"
