@@ -107,14 +107,27 @@ of untraced functions and `orphan_code_clean` reports thousands of code
 functions without requirement annotations under `--verification-scope '**'`.
 Those are real onboarding gaps, not warnings to suppress.
 
-As of commit `d26158efb`, the full strict audit is not green either:
-`proof audit --format markdown --max-findings 0` reports 0 errors and 2
-warnings. The blocking warnings are `verification_scope_complete` and
-`suspect_clean`. The enabled-slice implementation stage is clean, validation is
-clean, and targeted documentation, acceptance, MC/DC, and KnownIssue checks are
-clean. The remaining `suspect_clean` warning requires trace review of 35 stale
-links; it should be handled as a human trace review packet, not by spoofing a
-human reviewer.
+As of the strict audit run after `8ad801bfc`, the full strict audit is not
+green either: `proof audit --format markdown --max-findings 0 --set
+project.audit.invocation_log.enabled=false` reports 0 errors and 4 warnings.
+The blocking warnings are `verification_scope_complete`,
+`authored_delta_expected`, `suspect_clean`, and
+`acceptance_criteria_witnessed`. Validation is clean (`proof validate` reports
+125 requirements and 16 variable files with 0 warnings/errors), annotation
+validity is clean, KnownIssue quality is clean, and the current policy evidence
+manifests validate strictly. The remaining `suspect_clean` warning reports 67
+stale links and should be handled as a human trace review packet, not by
+spoofing a human reviewer. The `authored_delta_expected` warning is also a
+human/code-owner review gate unless trace ownership is narrowed by real
+requirement restructuring.
+
+The `acceptance_criteria_witnessed` warning is intentionally visible debt:
+three `STK-REQ-005` atomicity criteria are deferred to concrete KnownIssues
+because the current product behavior mutates session state on some Apply error
+paths. Those criteria must stay warning-visible until the product is fixed and
+real acceptance tests prove the all-or-nothing behavior. Do not clear that
+warning by re-adding acceptance annotations that only prove "an error happened";
+the criteria also require "no fields are merged."
 
 The local worktree also currently has `internal/build` deleted while runtime
 packages such as `goplugin`, `cli`, `cli/version`, and `gateway/version.go`
@@ -172,6 +185,37 @@ treatment before they enter production completeness: `internal/rate/mock`,
 `internal/graphengine/gomock_reflect_3503306920`, generated mock files, and
 packages imported only from tests such as `internal/oasbuilder` and
 `internal/debug2`.
+
+The current production-pattern inventory is 495 non-test Go files. Only 24 are
+inside `verification_scope.include`; 471 remain outside scope. Major excluded
+runtime domains are:
+
+| Excluded domain | Approx. production-pattern files | Treatment |
+| --- | ---: | --- |
+| Gateway runtime | 147 | Slice by gateway behavior; never onboard as one monolithic component. |
+| API definition, OAS, adapters, importers | 58 | Product-facing API lifecycle SYS with SW decomposition for package helpers. |
+| Internal helper packages | 48 | Mostly SW under consuming SYS stories. |
+| Plugins, coprocess, enterprise middleware | 38 | Product-facing extensibility, with generated/protobuf artifacts classified separately. |
+| Observability, tracing, OTel | 26 | SYS for operator-visible fields/output; SW for provider adapters. |
+| Storage, cache, Redis, DNS | 24 | SYS/SW depending on durability and runtime visibility; INT only with boundary evidence. |
+| RPC, JSON-RPC, MCP | 19 | SYS for protocol/control-plane behavior; INT only for tested caller/callee contracts. |
+| Rate and quota | 17 | Next product wave; split gateway-visible rate/quota behavior from SW helpers. |
+| Certificates, crypto, signing | 16 | Security-sensitive SYS/SW with stricter obligation modeling. |
+| User, session, auth support | 11 | SYS when externally visible through request/session behavior; otherwise SW/model evidence. |
+| Config | 8 | SYS for operator-visible startup/config precedence; SW for decoders/helpers. |
+
+Paths that look like production Go to the completeness checker but should be
+classified before normal onboarding include generated protobufs and mocks
+(`coprocess/*.pb.go`, `coprocess/*_grpc.pb.go`,
+`internal/policy/store_mock.gen.go`, `storage/mock/storage.go`,
+`certs/mock/mock.go`, `internal/certcheck/*_mock.go`,
+`internal/graphql/execution_engine_mock.go`,
+`internal/graphengine/gomock_reflect_3503306920/prog.go`,
+`internal/rate/mock/*`, `dnscache/mock_storage.go`) and test/tooling fixtures
+(`test/**`, `tests/**`, `testdata/doc.go`,
+`ci/tests/plugin-compiler/testdata/**`, `ci/smoke-tests/plugin-aliasing/**`,
+`tests/streams/scripts/**`). These classifications are not waivers; they are
+scope hygiene so production completeness measures the right surface.
 
 ## Repo Inventory Snapshot
 
