@@ -23,6 +23,7 @@ import (
 // SYS-REQ-092:encoding_safety:nominal
 // MCDC SYS-REQ-091: archive_path_validation_requested=T, archive_path_within_target=T => TRUE
 // MCDC SYS-REQ-091: archive_path_validation_requested=T, archive_path_within_target=F => FALSE
+// MCDC SYS-REQ-092: unsafe_archive_path_presented=F, unsafe_archive_path_rejected=F => TRUE
 // MCDC SYS-REQ-092: unsafe_archive_path_presented=T, unsafe_archive_path_rejected=T => TRUE
 func TestZipFilePath(t *testing.T) {
 	targetDir := "/tmp/bundles/test-bundle"

@@ -41,16 +41,17 @@ Unknown must not become green.
 ## Observed behavior in Tyk
 
 After removing known-false no-call witness comments, removing refused
-trigger-false ignores, and closing the four invariant-only rows that already
-had positive witnesses, Tyk reports:
+trigger-false ignores, closing the four invariant-only rows that already had
+positive witnesses, and adding the missing safe-archive-path executable witness,
+Tyk reports:
 
 ```sh
 proof mcdc spec queue --limit 120
 ```
 
 ```text
-39/364 witness rows uncovered across 91 requirement(s)
-23 partial-row-coverage items
+38/364 witness rows uncovered across 91 requirement(s)
+22 partial-row-coverage items
 ```
 
 Representative current rows:

@@ -46,7 +46,7 @@ the honest disposition required to close it.
 | `spec_lint_status_vs_review` | `SW-REQ-007` and `SW-REQ-008` are `status=review` while `verification.review.status=in_review` by `agent:codex` | human review required | Advancing these to approved requires a real human review signature. Downgrading them to draft would be an authored lifecycle change, not a proof fix. The warning should stay visible until a human reviews or chooses a lifecycle action. |
 | `authored_delta_expected` | `internal/policy/apply.go` lacks current no-authored-change review for 43 linked requirements | real impact review required | The branch diff against `origin/master` contains executable behavior changes in `apply.go` (nil-store/session guards, quota sentinel handling, deterministic root update behavior, and related policy behavior). It is not a comment-only proof annotation change, so a blanket agent no-authored-change review would be dishonest. |
 | `suspect_clean` | 35 suspect links | human trace review required | `proof trace review --suspect` records a human signature and correctly rejects `agent:codex`. These links should remain visible until a human reviews the stale trace ownership. |
-| `mcdc_coverage` | 39/364 uncovered rows across 23 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
+| `mcdc_coverage` | 38/364 uncovered rows across 22 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 ## MC/DC Evidence Policy For This Phase
 
@@ -68,7 +68,7 @@ The trigger-false/no-action witness gap is tracked upstream:
 
 ## Current MC/DC Backlog Classification
 
-The current 39 uncovered MC/DC rows are intentionally left visible. They fall
+The current 38 uncovered MC/DC rows are intentionally left visible. They fall
 into two closure groups:
 
 1. Trigger-false/no-action rows: leave red until there is real no-action
@@ -105,13 +105,15 @@ new product KnownIssue.
 | `SW-REQ-008` | `store_requested=F,lookup_returned=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
 | `SYS-REQ-080` | `api_list_requested=F,api_list_result_returned=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
 | `SYS-REQ-091` | `validation_requested=F,path_within_target=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
-| `SYS-REQ-092` | `unsafe_path_presented=F,unsafe_path_rejected=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
 | `SYS-REQ-093` | `validation_requested=F,component_accepted=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
 | `SYS-REQ-102` | `operation_requested=F,operation_confined=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
 The earlier invariant-only candidates `SYS-REQ-096`, `SYS-REQ-097`,
 `SYS-REQ-099`, and `SYS-REQ-101` were closed with narrow defensive
 `//mcdc:ignore` rows after `proof mcdc show` confirmed their positive rows were
 already witnessed. No refused, stale, or dangling MC/DC exemptions remain.
+`SYS-REQ-092` was closed with real executable evidence: safe archive paths are
+presented and accepted, proving `unsafe_archive_path_presented=F` and
+`unsafe_archive_path_rejected=F`.
 
 Sub-agent cross-check on 2026-06-19 reached the same row-level classification
 for the original backlog and found no remaining missing row that looked like a
