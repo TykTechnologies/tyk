@@ -902,7 +902,7 @@ func TestMCDC_SYS_REQ_041_Row2_NoRateLimitApply(t *testing.T) {
 
 // Verifies: SYS-REQ-041
 // MCDC SYS-REQ-041: api_limit_empty=T, policy_rate_empty=F, policy_rate_equal=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
-//mcdc:ignore:defensive SYS-REQ-041: api_limit_empty=T, policy_rate_empty=F, policy_rate_equal=F, rate_limit_applied=F, rate_limit_apply_requested=T => FALSE -- violation row is the negation of the required empty-API-limit application path; this test asserts the policy rate is applied instead [reviewed: agent:codex]
+//mcdc:ignore SYS-REQ-041: api_limit_empty=T, policy_rate_empty=F, policy_rate_equal=F, rate_limit_applied=F, rate_limit_apply_requested=T => FALSE -- violation row is the negation of the required empty-API-limit application path; this test asserts the policy rate is applied instead [category: defensive] [reviewed: agent:codex]
 func TestMCDC_SYS_REQ_041_Row3_Baseline(t *testing.T) {
 	// Row 3 (FALSE): api limit empty, policy rate not empty and not equal.
 	// When api limit is empty and policy is non-empty, rate IS applied,
