@@ -15,7 +15,6 @@ import (
 // SW-REQ-007:malformed_input:nominal
 // SW-REQ-007:malformed_input:negative
 // SW-REQ-007:determinism:nominal
-// MCDC SW-REQ-007: policy_identifier_available=T, policy_identifier_valid=F, policy_identity_requested=F => TRUE
 // MCDC SW-REQ-007: policy_identifier_available=T, policy_identifier_valid=F, policy_identity_requested=T => FALSE
 // MCDC SW-REQ-007: policy_identity_requested=T, policy_identifier_available=T, policy_identifier_valid=T => TRUE
 // MCDC SW-REQ-007: policy_identity_requested=T, policy_identifier_available=F, policy_identifier_valid=F => TRUE
@@ -84,7 +83,6 @@ func Test_EnsurePolicyId(t *testing.T) {
 // SW-REQ-008:error_handling:negative
 // SW-REQ-008:idempotency:nominal
 // SYS-REQ-079:nominal:nominal
-// MCDC SW-REQ-008: policy_lookup_returned=F, policy_store_requested=F => TRUE
 // MCDC SW-REQ-008: policy_lookup_returned=F, policy_store_requested=T => FALSE
 // MCDC SW-REQ-008: policy_lookup_returned=T, policy_store_requested=T => TRUE
 // MCDC SYS-REQ-079: collision_reported=F, policy_collision_detected=T => FALSE

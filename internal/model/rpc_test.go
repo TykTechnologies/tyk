@@ -12,7 +12,6 @@ import (
 )
 
 // Verifies: SYS-REQ-081
-// MCDC SYS-REQ-081: model_adapter_requested=F, model_adapter_result_returned=F => TRUE
 func TestLoadedAPIInfo_TypeAlias(t *testing.T) {
 	info := LoadedAPIInfo{APIID: "test-api"}
 	require.Equal(t, "test-api", info.APIID)

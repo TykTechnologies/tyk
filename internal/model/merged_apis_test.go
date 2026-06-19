@@ -15,7 +15,6 @@ import (
 // SYS-REQ-080:nominal:nominal
 // SYS-REQ-080:boundary:nominal
 // SYS-REQ-080:determinism:nominal
-// MCDC SYS-REQ-080: api_list_requested=F, api_list_result_returned=F => TRUE
 // MCDC SYS-REQ-080: api_list_requested=T, api_list_result_returned=F => FALSE
 // MCDC SYS-REQ-080: api_list_requested=T, api_list_result_returned=T => TRUE
 func TestMergedAPIList_Filter(t *testing.T) {

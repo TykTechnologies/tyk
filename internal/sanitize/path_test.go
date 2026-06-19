@@ -260,7 +260,6 @@ func TestKnownIssue_ValidatePathComponentAcceptsMalformedPercentEscape(t *testin
 }
 
 // Verifies: SYS-REQ-093, SYS-REQ-094
-// MCDC SYS-REQ-093: path_component_validation_requested=F, path_component_accepted=F => TRUE
 // MCDC SYS-REQ-094: unsafe_path_component_presented=F, unsafe_path_component_rejected=F => TRUE
 func TestValidatePathComponent_DecodingLimit(t *testing.T) {
 	component := "api-definition"
