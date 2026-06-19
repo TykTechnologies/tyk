@@ -1,0 +1,68 @@
+id: STK-REQ-018
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: JSON-RPC clients shall receive stable JSON-RPC 2.0 error envelopes when gateway request handling rejects or fails a JSON-RPC request, so clients can distinguish protocol, authentication, authorization, rate-limit, upstream, and internal failures without relying only on HTTP status text.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: jsonrpc_errors
+rationale: JSON-RPC error envelopes are client-visible protocol behavior. This requirement owns stable HTTP-to-JSON-RPC error mapping and response envelope construction only; it does not claim JSON-RPC method routing, request parsing, middleware authorization decisions, analytics persistence, or gateway transport behavior outside the error mapper/writer helpers.
+tags:
+    - json-rpc
+    - protocol-errors
+    - client-errors
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T21:52:32Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. JSON-RPC error requirements are scoped to internal/jsonrpc/errors HTTP-status mapping and JSON-RPC 2.0 error envelope writing only; focused mapper/writer tests passed, including fallback behavior for response marshal failure. This approval does not claim JSON-RPC method routing, request parsing, middleware authorization decisions, analytics persistence, or network write success beyond net/http response handoff.
+        fingerprint: sha256:537fcbb5a887550f63aac521ba674ef4ea2ff731fb81e73caff23483905afce7
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T21:52:32Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+stakeholder:
+    persona: JSON-RPC API client
+    story: As a JSON-RPC API client, I need gateway rejections and failures to be returned as JSON-RPC 2.0 error envelopes with stable codes and request identifiers.
+    acceptance_criteria:
+        - id: STK-REQ-018-AC-01
+          text: Given an HTTP authentication, authorization, rate-limit, upstream, internal, bad-request, not-found, or method-not-allowed failure status, when the gateway creates a JSON-RPC error, then the JSON-RPC code is selected from the documented standard or server-defined range for that failure class.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-106
+        - id: STK-REQ-018-AC-02
+          text: Given a successful HTTP status, when only an error-code mapping is requested, then no JSON-RPC error code is returned.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-106
+        - id: STK-REQ-018-AC-03
+          text: Given a JSON-RPC error response write request, when the response is encoded, then the body contains jsonrpc version 2.0, the mapped error code and message, the original HTTP status in error data, and the original request identifier when it is JSON-encodable.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-106
+lifecycle:
+    change_history:
+        - date: "2026-06-19T21:52:24Z"
+          from: draft
+          to: review
+          reason: Ready for delegated requirements-owner review after focused internal/jsonrpc/errors tests passed
+          changed_by: agent:codex

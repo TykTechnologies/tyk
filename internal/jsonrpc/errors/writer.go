@@ -10,9 +10,11 @@ import (
 
 var logger = log.Get()
 
+// SW-REQ-024
 const defaultInternalErrorResponse = `{"jsonrpc":"2.0","error":{"code":-32603,"message":"Internal error"},"id":null}`
 
 // JSONRPCError represents a JSON-RPC 2.0 error object as defined in the specification.
+// SW-REQ-024
 type JSONRPCError struct {
 	Code    int         `json:"code"`
 	Message string      `json:"message"`
@@ -20,6 +22,7 @@ type JSONRPCError struct {
 }
 
 // JSONRPCErrorResponse represents a complete JSON-RPC 2.0 error response.
+// SW-REQ-024
 type JSONRPCErrorResponse struct {
 	JSONRPC string       `json:"jsonrpc"`
 	Error   JSONRPCError `json:"error"`
@@ -30,6 +33,7 @@ type JSONRPCErrorResponse struct {
 // The HTTP status code is mapped to an appropriate JSON-RPC error code,
 // and the original HTTP code is included in the data field for debugging.
 // Returns the JSON response body for analytics recording.
+// SW-REQ-024
 func WriteJSONRPCError(w http.ResponseWriter, requestID interface{}, httpCode int, message string) []byte {
 	rpcCode := MapHTTPStatusToJSONRPCCode(httpCode)
 
@@ -38,6 +42,7 @@ func WriteJSONRPCError(w http.ResponseWriter, requestID interface{}, httpCode in
 	return writeJSONResponse(w, httpCode, response)
 }
 
+// SW-REQ-024
 func buildErrorResponse(requestID interface{}, rpcCode int, message string, httpCode int) JSONRPCErrorResponse {
 	return JSONRPCErrorResponse{
 		JSONRPC: apidef.JsonRPC20,
@@ -52,6 +57,7 @@ func buildErrorResponse(requestID interface{}, rpcCode int, message string, http
 	}
 }
 
+// SW-REQ-024
 func writeJSONResponse(w http.ResponseWriter, httpCode int, response JSONRPCErrorResponse) []byte {
 	body, err := json.Marshal(response)
 	if err != nil {

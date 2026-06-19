@@ -9,6 +9,7 @@ import (
 // Custom JSON-RPC error codes in the server-defined range (-32000 to -32099).
 // These codes are used to map HTTP error statuses to JSON-RPC error responses
 // while preserving semantic meaning.
+// SW-REQ-024
 const (
 	// CodeServerError is a generic server error (-32000).
 	CodeServerError = -32000
@@ -30,6 +31,7 @@ const (
 // Uses standard JSON-RPC codes (-32700 to -32603) where appropriate, and
 // custom server codes (-32000 to -32099) for HTTP-specific errors like
 // auth failures, rate limits, and upstream issues.
+// SW-REQ-024
 func MapHTTPStatusToJSONRPCCode(httpStatus int) int {
 	// Success statuses don't need JSON-RPC error codes
 	if httpStatus < 400 {

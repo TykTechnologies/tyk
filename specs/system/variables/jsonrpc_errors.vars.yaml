@@ -1,0 +1,14 @@
+component: jsonrpc_errors
+no_interface:
+    declared: true
+    reason: JSON-RPC error handling in this proof slice is exercised through in-process mapper and writer helpers; no cross-component runtime interface contract is modeled yet.
+variables:
+    - name: jsonrpc_error_response_requested
+      type: bool
+      direction: input
+      description: Gateway JSON-RPC handling requests an error-code mapping or JSON-RPC 2.0 error response body for an HTTP failure status.
+
+    - name: jsonrpc_error_response_determined
+      type: bool
+      direction: output
+      description: JSON-RPC error handling determines the mapped error code or encoded JSON-RPC 2.0 error response body, including deterministic fallback behavior for unknown statuses and marshal failures.

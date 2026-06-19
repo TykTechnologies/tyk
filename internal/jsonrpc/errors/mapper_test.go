@@ -9,6 +9,16 @@ import (
 	"github.com/TykTechnologies/tyk/internal/mcp"
 )
 
+// Verifies: STK-REQ-018, SYS-REQ-106, SW-REQ-024
+// STK-REQ-018:nominal:nominal
+// STK-REQ-018:boundary:boundary
+// SYS-REQ-106:nominal:nominal
+// SYS-REQ-106:boundary:boundary
+// SYS-REQ-106:error_handling:negative
+// SW-REQ-024:nominal:nominal
+// SW-REQ-024:boundary:boundary
+// SW-REQ-024:error_handling:negative
+// MCDC SYS-REQ-106: jsonrpc_error_response_requested=T, jsonrpc_error_response_determined=T => TRUE
 func TestMapHTTPStatusToJSONRPCCode(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -85,6 +95,10 @@ func TestMapHTTPStatusToJSONRPCCode(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-018, SYS-REQ-106, SW-REQ-024
+// STK-REQ-018:nominal:nominal
+// SYS-REQ-106:nominal:nominal
+// SW-REQ-024:nominal:nominal
 func TestMapHTTPStatusToJSONRPCCode_AllDefinedCodes(t *testing.T) {
 	// Ensure all common HTTP status codes have defined mappings
 	commonStatuses := []int{

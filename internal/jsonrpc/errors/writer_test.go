@@ -13,6 +13,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/mcp"
 )
 
+// Verifies: STK-REQ-018, SYS-REQ-106, SW-REQ-024
+// STK-REQ-018:nominal:nominal
+// SYS-REQ-106:nominal:nominal
+// SW-REQ-024:nominal:nominal
 func TestWriteJSONRPCError(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -89,6 +93,10 @@ func TestWriteJSONRPCError(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-018, SYS-REQ-106, SW-REQ-024
+// STK-REQ-018:encoding_safety:nominal
+// SYS-REQ-106:encoding_safety:nominal
+// SW-REQ-024:encoding_safety:nominal
 func TestWriteJSONRPCError_ValidJSONOutput(t *testing.T) {
 	w := httptest.NewRecorder()
 	requestID := "test-123"
@@ -113,6 +121,10 @@ func TestWriteJSONRPCError_ValidJSONOutput(t *testing.T) {
 	assert.Equal(t, message, errorObj["message"])
 }
 
+// Verifies: STK-REQ-018, SYS-REQ-106, SW-REQ-024
+// STK-REQ-018:encoding_safety:nominal
+// SYS-REQ-106:encoding_safety:nominal
+// SW-REQ-024:encoding_safety:nominal
 func TestWriteJSONRPCError_MessageEscaping(t *testing.T) {
 	w := httptest.NewRecorder()
 	message := `Message with "quotes" and <html>`
@@ -127,6 +139,10 @@ func TestWriteJSONRPCError_MessageEscaping(t *testing.T) {
 	assert.Equal(t, message, response.Error.Message)
 }
 
+// Verifies: STK-REQ-018, SYS-REQ-106, SW-REQ-024
+// STK-REQ-018:boundary:boundary
+// SYS-REQ-106:boundary:boundary
+// SW-REQ-024:boundary:boundary
 func TestWriteJSONRPCError_DifferentIDTypes(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -153,6 +169,10 @@ func TestWriteJSONRPCError_DifferentIDTypes(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-018, SYS-REQ-106, SW-REQ-024
+// STK-REQ-018:nominal:nominal
+// SYS-REQ-106:nominal:nominal
+// SW-REQ-024:nominal:nominal
 func TestWriteJSONRPCError_ReturnsResponseBody(t *testing.T) {
 	w := httptest.NewRecorder()
 	requestID := "test-123"
@@ -171,4 +191,19 @@ func TestWriteJSONRPCError_ReturnsResponseBody(t *testing.T) {
 	assert.Equal(t, apidef.JsonRPC20, response.JSONRPC)
 	assert.Equal(t, message, response.Error.Message)
 	assert.Equal(t, requestID, response.ID)
+}
+
+// Verifies: STK-REQ-018, SYS-REQ-106, SW-REQ-024
+// STK-REQ-018:error_handling:negative
+// SYS-REQ-106:error_handling:negative
+// SW-REQ-024:error_handling:negative
+func TestWriteJSONRPCError_MarshalFallback(t *testing.T) {
+	w := httptest.NewRecorder()
+
+	body := WriteJSONRPCError(w, make(chan int), http.StatusInternalServerError, "cannot encode id")
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+	assert.Equal(t, []byte(defaultInternalErrorResponse), body)
+	assert.Equal(t, string(body), w.Body.String())
 }

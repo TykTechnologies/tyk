@@ -1,0 +1,62 @@
+id: SYS-REQ-106
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the jsonrpc_errors shall always satisfy !jsonrpc_error_response_requested | jsonrpc_error_response_determined
+description: JSON-RPC error handling shall map HTTP success statuses to no error code, map known HTTP error statuses to stable JSON-RPC standard or server-defined error codes, map unknown 4xx and 5xx statuses to deterministic fallback error codes, and write JSON-RPC 2.0 error responses with the mapped code, message, original HTTP status, request identifier when encodable, application/json content type, and requested HTTP status.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-018
+component: jsonrpc_errors
+rationale: This system requirement owns the client-visible JSON-RPC error mapping and envelope body produced by the error helper package. It does not claim gateway middleware routing, JSON-RPC request parsing, authorization decisions that choose the HTTP status, analytics recording, or network write success after the response is handed to net/http.
+tags:
+    - json-rpc
+    - protocol-errors
+    - error-mapping
+variables:
+    - jsonrpc_error_response_requested
+    - jsonrpc_error_response_determined
+traces:
+    satisfies:
+        - STK-REQ-018
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T21:52:32Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. JSON-RPC error requirements are scoped to internal/jsonrpc/errors HTTP-status mapping and JSON-RPC 2.0 error envelope writing only; focused mapper/writer tests passed, including fallback behavior for response marshal failure. This approval does not claim JSON-RPC method routing, request parsing, middleware authorization decisions, analytics persistence, or network write success beyond net/http response handoff.
+        fingerprint: sha256:507de413d3fcffb08ce7de9807f0008f3047dd9478a97f3772b017f6cd2eb187
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-19T21:52:45.207083Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-106|jsonrpc_error_response_determined
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-106's jsonrpc_error_response_determined variable is decomposed by SW-REQ-024 for HTTP status to JSON-RPC code mapping, JSON-RPC 2.0 envelope construction, response status/content-type/body return, request ID preservation when encodable, unknown-status fallbacks, and marshal-failure fallback. The review is limited to internal/jsonrpc/errors helper behavior and does not claim JSON-RPC routing, request parsing, middleware authorization, analytics persistence, or network write success.
+          reviewed_at: "2026-06-19T21:52:45.207083Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T21:52:32Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+lifecycle:
+    change_history:
+        - date: "2026-06-19T21:52:24Z"
+          from: draft
+          to: review
+          reason: Ready for delegated requirements-owner review after focused internal/jsonrpc/errors tests passed
+          changed_by: agent:codex
