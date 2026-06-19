@@ -66,6 +66,61 @@ The trigger-false/no-action witness gap is tracked upstream:
 - `probelabs/reqproof#257` -- Require explicit no-action evidence on
   trigger-false MC/DC row witnesses.
 
+## Current MC/DC Backlog Classification
+
+The current 43 uncovered MC/DC rows are intentionally left visible. They fall
+into three closure groups:
+
+1. Trigger-false/no-action rows: leave red until there is real no-action
+   evidence, requirement refinement, or the ReqProof mechanism from
+   `probelabs/reqproof#257`.
+2. Paired invariant-violation rows: leave red while the paired trigger-false
+   row is unresolved, because the requirement's positive row set is incomplete.
+3. Invariant-only rows with positive rows already witnessed: possible future
+   `//mcdc:ignore` candidates, but not automatically ignored in this phase to
+   avoid expanding ignores as the default closure mechanism.
+
+Some trigger-true violation rows may later get real executable witnesses, and
+some trigger-false rows may become caller-level no-action tests. This table does
+not mark them green in advance. It records the current honest state: no backlog
+row has enough evidence to close today, and no backlog row currently requires a
+new product KnownIssue.
+
+| Requirement | Missing row shape | Classification | Current disposition |
+| --- | --- | --- | --- |
+| `SW-REQ-001` | `requested=F,result=F => TRUE`; `requested=T,result=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SW-REQ-003` | `requested=F,result=F => TRUE`; `requested=T,result=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SW-REQ-004` | `requested=F,result=F => TRUE`; `requested=T,result=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SW-REQ-005` | `requested=F,result=F => TRUE`; `requested=T,result=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SW-REQ-006` | `requested=F,result=F => TRUE`; `requested=T,result=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SYS-REQ-081` | `requested=F,result=F => TRUE`; `requested=T,result=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SYS-REQ-082` | `requested=F,result=F => TRUE`; `requested=T,result=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SYS-REQ-083` | `requested=F,result=F => TRUE`; `requested=T,result=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SYS-REQ-084` | `requested=F,result=F => TRUE`; `requested=T,result=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SYS-REQ-085` | `requested=F,preserved=F => TRUE`; `requested=T,preserved=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SYS-REQ-088` | `requested=F,preserved=F => TRUE`; `requested=T,preserved=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SYS-REQ-089` | `requested=F,enforced=F => TRUE`; `requested=T,enforced=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SYS-REQ-095` | `requested=F,reported=F => TRUE`; `requested=T,reported=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SYS-REQ-098` | `requested=F,scoped=F => TRUE`; `requested=T,scoped=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SYS-REQ-100` | `requested=F,returned=F => TRUE`; `requested=T,returned=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SYS-REQ-103` | `requested=F,result=F => TRUE`; `requested=T,result=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SW-REQ-007` | `identity_requested=F,identifier_available=T,identifier_valid=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
+| `SW-REQ-008` | `store_requested=F,lookup_returned=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
+| `SYS-REQ-080` | `api_list_requested=F,api_list_result_returned=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
+| `SYS-REQ-091` | `validation_requested=F,path_within_target=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
+| `SYS-REQ-092` | `unsafe_path_presented=F,unsafe_path_rejected=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
+| `SYS-REQ-093` | `validation_requested=F,component_accepted=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
+| `SYS-REQ-102` | `operation_requested=F,operation_confined=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
+| `SYS-REQ-096` | `record_present=T,record_excluded=F => FALSE` | invariant-only violation row; positive rows witnessed | Possible future defensive ignore or model refinement, but intentionally not added in this phase. |
+| `SYS-REQ-097` | `enumeration_failed=T,error_returned=F => FALSE` | invariant-only violation row; positive rows witnessed | Possible future defensive ignore or model refinement, but intentionally not added in this phase. |
+| `SYS-REQ-099` | `invalid_root_presented=T,invalid_root_rejected=F => FALSE` | invariant-only violation row; positive rows witnessed | Possible future defensive ignore or model refinement, but intentionally not added in this phase. |
+| `SYS-REQ-101` | `lexical_escape_presented=T,lexical_escape_rejected=F => FALSE` | invariant-only violation row; positive rows witnessed | Possible future defensive ignore or model refinement, but intentionally not added in this phase. |
+
+Sub-agent cross-check on 2026-06-19 reached the same row-level conclusion:
+classification only, no new ignores proposed, and no remaining missing row
+looked like a new product KnownIssue. Existing KnownIssue-covered rows were
+already witnessed rather than part of this backlog.
+
 ## Current Known Issues To Keep Visible
 
 The current audit reports nine active KnownIssues. They are intentionally
