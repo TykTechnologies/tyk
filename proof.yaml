@@ -161,6 +161,8 @@ project:
             - internal/rate/model/**
             - internal/rate/allowance_store.go
             - internal/rate/allowance_store_test.go
+            - internal/rate/rate.go
+            - internal/rate/rate_test.go
             - docs/**
         completeness:
             production_include:

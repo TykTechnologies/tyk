@@ -24,6 +24,7 @@ const (
 	LimiterKeyPrefix = "rate-limit-"
 )
 
+// SW-REQ-010
 // Prefix is a utility function to generate rate limiter redis key names.
 func Prefix(params ...string) string {
 	var res strings.Builder

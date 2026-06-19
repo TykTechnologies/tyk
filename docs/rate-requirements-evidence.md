@@ -3,6 +3,7 @@
 <!-- documents SYS-REQ-103 -->
 <!-- documents SW-REQ-006 -->
 <!-- documents SW-REQ-009 -->
+<!-- documents SW-REQ-010 -->
 
 This document records the first rate-limit support-state proof slice. The slice
 is deliberately limited to `internal/rate/model` allowance state behavior and
@@ -24,6 +25,11 @@ sets expiry from the allowance delay, and preserves the written allowance in the
 local cache. Its evidence uses redismock and local cache assertions; it does not
 claim live Redis availability, distributed lock correctness, sliding-log
 correctness, external limiter algorithm behavior, or gateway request admission.
+
+`SW-REQ-010` owns the concrete `internal/rate.Prefix` key-fragment normalization
+helper used by allowance storage and lock-key construction. Its evidence covers
+ordinary joins, empty fragments, dash-wrapped fragments, and separator-only
+inputs. It does not claim every gateway rate-limit key scope or endpoint suffix.
 
 The rest of the root `internal/rate` package, smoothing orchestration,
 sliding-log integration, and `internal/rate/limiter` algorithms are intentionally
