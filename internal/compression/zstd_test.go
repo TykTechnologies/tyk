@@ -138,7 +138,8 @@ func TestDecompressZstd(t *testing.T) {
 // SYS-REQ-086:error_handling:nominal
 // SYS-REQ-086:error_handling:negative
 // MCDC SYS-REQ-086: zstd_invalid_frame_presented=T, zstd_invalid_frame_rejected=T => TRUE
-//mcdc:ignore:defensive SYS-REQ-086: zstd_invalid_frame_presented=T, zstd_invalid_frame_rejected=F => FALSE -- violation row is the negation of the invalid-frame rejection guarantee; this test asserts malformed frames return errors [reviewed: agent:codex]
+//
+//mcdc:ignore SYS-REQ-086: zstd_invalid_frame_presented=T, zstd_invalid_frame_rejected=F => FALSE -- violation row is the negation of the invalid-frame rejection guarantee; this test asserts malformed frames return errors [category: defensive] [reviewed: agent:codex]
 func TestDecompressZstd_InvalidData(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -339,8 +340,7 @@ func TestIsZstdCompressed(t *testing.T) {
 // SYS-REQ-088:boundary:nominal
 // MCDC SYS-REQ-087: zstd_oversize_decompression_requested=T, zstd_oversize_decompression_blocked=T => TRUE
 // MCDC SYS-REQ-087: zstd_oversize_decompression_requested=F, zstd_oversize_decompression_blocked=F => TRUE
-//mcdc:ignore:defensive SYS-REQ-087: zstd_oversize_decompression_blocked=F, zstd_oversize_decompression_requested=T => FALSE -- violation row is the negation of the oversize-decompression guard; this test asserts oversized payloads fail and within-limit payloads succeed [reviewed: agent:codex]
-//mcdc:ignore:defensive SYS-REQ-088: zstd_allowed_decompression_requested=T, zstd_payload_bytes_preserved=F => FALSE -- violation row is the negation of the within-limit payload-preservation guarantee; this test asserts successful decompression preserves bytes [reviewed: agent:codex]
+//mcdc:ignore SYS-REQ-087: zstd_oversize_decompression_blocked=F, zstd_oversize_decompression_requested=T => FALSE -- violation row is the negation of the oversize-decompression guard; this test asserts oversized payloads fail and within-limit payloads succeed [category: defensive] [reviewed: agent:codex]
 func TestDecompressZstd_MaxSizeLimit(t *testing.T) {
 	// 2MB uncompressed data (exceeds the 1MB minimum limit)
 	bigData := bytes.Repeat([]byte("a"), 2*1024*1024)
@@ -375,7 +375,6 @@ func TestDecompressZstd_MaxSizeLimit(t *testing.T) {
 // SYS-REQ-089:boundary:nominal
 // SYS-REQ-089:determinism:nominal
 // MCDC SYS-REQ-089: zstd_limit_update_requested=T, zstd_minimum_limit_enforced=T => TRUE
-//mcdc:ignore:defensive SYS-REQ-089: zstd_limit_update_requested=T, zstd_minimum_limit_enforced=F => FALSE -- violation row is the negation of the minimum-limit clamp; this test asserts below-minimum updates clamp to minDecompressedSize [reviewed: agent:codex]
 func TestSetMaxDecompressedSize_ClampsBelowMinimum(t *testing.T) {
 	orig := maxDecompressedSize
 	defer SetMaxDecompressedSize(orig)
@@ -421,7 +420,8 @@ func TestIsZstdCompressed_WithActualCompressedData(t *testing.T) {
 // SYS-REQ-090:error_handling:negative
 // SYS-REQ-090:panic_free_input_handling:nominal
 // MCDC SYS-REQ-090: zstd_codec_failure_present=T, zstd_codec_failure_reported=T => TRUE
-//mcdc:ignore:defensive SYS-REQ-090: zstd_codec_failure_present=T, zstd_codec_failure_reported=F => FALSE -- violation row is the negation of the codec-failure reporting guarantee; this test asserts nil and wrong-type codec pool failures return errors [reviewed: agent:codex]
+//
+//mcdc:ignore SYS-REQ-090: zstd_codec_failure_present=T, zstd_codec_failure_reported=F => FALSE -- violation row is the negation of the codec-failure reporting guarantee; this test asserts nil and wrong-type codec pool failures return errors [category: defensive] [reviewed: agent:codex]
 func TestZstdCodecPoolFailuresReturnErrors(t *testing.T) {
 	origMax := maxDecompressedSize
 	defer resetZstdCodecStateForTest(origMax)
