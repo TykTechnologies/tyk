@@ -12,6 +12,7 @@ package policy_test
 
 import (
 	"encoding/json"
+	"math"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -20,6 +21,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/user"
@@ -986,10 +988,31 @@ func TestMCDCClosure_RPCDataLoaderMock(t *testing.T) {
 		assert.Equal(t, "null", result)
 	})
 
+	t.Run("GetPolicies returns empty string on marshal error", func(t *testing.T) {
+		mock := &policy.RPCDataLoaderMock{
+			Policies: []user.Policy{{ID: "bad-rate", Rate: math.Inf(1)}},
+		}
+		result := mock.GetPolicies("org1")
+		assert.Empty(t, result)
+	})
+
 	t.Run("GetApiDefinitions returns JSON", func(t *testing.T) {
 		mock := &policy.RPCDataLoaderMock{}
 		result := mock.GetApiDefinitions("org1", []string{"tag1"})
 		assert.NotEmpty(t, result)
+	})
+
+	t.Run("GetApiDefinitions returns empty string on marshal error", func(t *testing.T) {
+		mock := &policy.RPCDataLoaderMock{
+			Apis: []model.MergedAPI{{
+				APIDefinition: &apidef.APIDefinition{
+					APIID:                "bad-api",
+					HmacAllowedClockSkew: math.Inf(1),
+				},
+			}},
+		}
+		result := mock.GetApiDefinitions("org1", nil)
+		assert.Empty(t, result)
 	})
 }
 
