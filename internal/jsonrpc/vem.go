@@ -3,6 +3,7 @@ package jsonrpc
 
 // VEM path prefixes for JSON-RPC routing.
 // These are protocol-agnostic and work for any JSON-RPC 2.0 implementation.
+// SW-REQ-025
 const (
 	// MethodVEMPrefix is the prefix for operation-level VEMs based on JSON-RPC method names.
 	// Format: /json-rpc-method:{method}

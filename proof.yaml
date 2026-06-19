@@ -161,6 +161,8 @@ project:
             - internal/jsonrpc/errors/mapper_test.go
             - internal/jsonrpc/errors/writer.go
             - internal/jsonrpc/errors/writer_test.go
+            - internal/jsonrpc/router.go
+            - internal/jsonrpc/vem.go
             - internal/mcp/jsonrpc.go
             - internal/mcp/list_filter.go
             - internal/mcp/list_filter_test.go
