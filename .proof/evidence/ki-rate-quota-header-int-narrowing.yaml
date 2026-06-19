@@ -1,17 +1,18 @@
 schema_version: proof.evidence_profile.v1
 results:
     - profile: known_issue_reproducer
-      requirement: SYS-REQ-067
-      command: rg -n 'strconv\.Itoa\(int\(quota(Max|Remaining|Renews)\)\)' internal/rate/headers.go
+      requirement: SW-REQ-011
+      command: "! rg -n 'strconv\\.Itoa\\(int\\(quota(Max|Remaining|Renews)\\)\\)' internal/rate/headers.go && go test ./internal/rate -run 'Test_quotaSender/SendQuotas/preserves_int64_quota_values_without_native_int_narrowing' -count=1"
       status: pass
-      observed_result: known_issue_reproduced
-      executed_at: "2026-06-19T12:43:29Z"
+      observed_result: known_issue_not_reproduced
+      executed_at: "2026-06-19T20:22:14Z"
       input_set:
-        - KI-RATE-QUOTA-HEADER-INT-NARROWING static reproducer
+        - KI-RATE-QUOTA-HEADER-INT-NARROWING regression guard
       freshness_hashes:
-        .proof/known-issues/KI-RATE-QUOTA-HEADER-INT-NARROWING.yaml: sha256:330eba1d4ff25ebcf7f070b0706075b46faf4d94dccd256e471773f01e9bc090
-        internal/rate/headers.go: sha256:c53f7f412e3ab84ac36a5a4676cd40ec8715bd38d22dd66d286a8b5b9cfde509
-        proof.yaml: sha256:895daff29b9390d8058fda4de375d4ae1f6468fde2e953f32526d40ddca5817f
-        specs/system/requirements/SYS-REQ-067.req.yaml: sha256:c99281c9db602639fef785956e155b1c0759292a0bc7556b8c57d8d301867e26
+        .proof/known-issues/KI-RATE-QUOTA-HEADER-INT-NARROWING.yaml: sha256:63121ed81b415dad356df2169fd1e5c42f1423b941384330172ed44da3e95a3d
+        internal/rate/headers.go: sha256:f7b2b3a37d0ecc6eb6f7b23af1cdd9b8ed6f2fe37dbda5e5b36c98c046b89a76
+        internal/rate/headers_test.go: sha256:9677dda128a7872024520ded6e32dd54dcefbf840252c1addb692eeed0df9fea
+        proof.yaml: sha256:85708e2b571054038dd0e39be64c7c5fcbf7eae8d73fb9f31e5dcd5571b27d17
+        specs/software/requirements/SW-REQ-011.req.yaml: sha256:f1c6260b13f43170416fff7f3bf167b52ad798040768c121492ad44a37185d36
       known_issues:
         - KI-RATE-QUOTA-HEADER-INT-NARROWING

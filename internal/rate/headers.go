@@ -40,6 +40,7 @@ type (
 	}
 )
 
+// SW-REQ-011
 func NewSenderFactory(typ config.RateLimitSource) HeaderSenderFactory {
 	return func(hdr http.Header) HeaderSender {
 		switch typ {
@@ -53,7 +54,10 @@ func NewSenderFactory(typ config.RateLimitSource) HeaderSenderFactory {
 	}
 }
 
+// SW-REQ-011
 func (q *quotaSender) SendRateLimits(_ Stats) {}
+
+// SW-REQ-011
 func (q *quotaSender) SendQuotas(session *user.SessionState, apiId string) {
 	quotaMax, quotaRemaining, quotaRenews := int64(0), int64(0), int64(0)
 
@@ -61,17 +65,20 @@ func (q *quotaSender) SendQuotas(session *user.SessionState, apiId string) {
 		quotaMax, quotaRemaining, _, quotaRenews = session.GetQuotaLimitByAPIID(apiId)
 	}
 
-	q.hdr.Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-	q.hdr.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-	q.hdr.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
+	q.hdr.Set(header.XRateLimitLimit, strconv.FormatInt(quotaMax, 10))
+	q.hdr.Set(header.XRateLimitRemaining, strconv.FormatInt(quotaRemaining, 10))
+	q.hdr.Set(header.XRateLimitReset, strconv.FormatInt(quotaRenews, 10))
 }
 
+// SW-REQ-011
 // SendQuotas clears any rate limit headers that may have been injected by the upstream.
 func (r *rateLimitSender) SendQuotas(_ *user.SessionState, _ string) {
 	r.hdr.Del(header.XRateLimitLimit)
 	r.hdr.Del(header.XRateLimitRemaining)
 	r.hdr.Del(header.XRateLimitReset)
 }
+
+// SW-REQ-011
 func (r *rateLimitSender) SendRateLimits(limits Stats) {
 	r.hdr.Set(header.XRateLimitLimit, strconv.Itoa(limits.Limit))
 

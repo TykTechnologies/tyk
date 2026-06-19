@@ -4,6 +4,7 @@
 <!-- documents SW-REQ-006 -->
 <!-- documents SW-REQ-009 -->
 <!-- documents SW-REQ-010 -->
+<!-- documents SW-REQ-011 -->
 
 This document records the first rate-limit support-state proof slice. The slice
 is deliberately limited to `internal/rate/model` allowance state behavior and
@@ -30,6 +31,14 @@ correctness, external limiter algorithm behavior, or gateway request admission.
 helper used by allowance storage and lock-key construction. Its evidence covers
 ordinary joins, empty fragments, dash-wrapped fragments, and separator-only
 inputs. It does not claim every gateway rate-limit key scope or endpoint suffix.
+
+`SW-REQ-011` owns the concrete `internal/rate` header-sender support behavior
+for quota and rate-limit state metadata. Its evidence covers sender selection,
+quota no-op behavior on rate-limit calls, zero quota headers for nil sessions,
+int64-preserving quota header serialization, quota header clearing on the
+rate-limit sender quota path, Unix reset formatting, and negative remaining
+clamping. It does not claim the full gateway middleware lifecycle, quota-blocked
+response behavior, or upstream header interaction beyond the local sender.
 
 The rest of the root `internal/rate` package, smoothing orchestration,
 sliding-log integration, and `internal/rate/limiter` algorithms are intentionally

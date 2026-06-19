@@ -1,0 +1,64 @@
+id: SW-REQ-011
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal rate package shall select the configured quota or rate-limit response-header sender, serialize quota header values from int64 session state without native-int narrowing, clear quota headers on the rate-limit sender quota path, clamp negative remaining rate-limit values to zero, and encode rate-limit reset values as Unix timestamps.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-103
+component: rate_model
+rationale: This software requirement owns the concrete internal/rate header-sender support behavior for rate-limit and quota state metadata. It fixes KI-RATE-QUOTA-HEADER-INT-NARROWING but does not claim full gateway middleware response timing, quota-blocked behavior, or upstream interaction.
+tags:
+    - rate-limit
+    - rate-limit-state
+    - response-headers
+    - quota-headers
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-103
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T20:20:18Z"
+        comment: Approved by human:buger via explicit chat delegation to agent:codex on 2026-06-19. Semantic review passed for the narrow rate header-sender software requirement; focused header tests passed and KI-RATE-QUOTA-HEADER-INT-NARROWING static reproducer no longer matches. This approval does not waive global requirement-level MC/DC gaps or claim full gateway middleware response behavior.
+        fingerprint: sha256:f37bc69443c225116e4245df85a9eca7636d3bcfc96d7bcb96ef5ff595b2c185
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-011
+          artifact: internal/rate/headers.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19. internal/rate/headers.go now matches the newly authored SW-REQ-011 header-sender requirement and docs/rate-requirements-evidence.md; the change fixes KI-RATE-QUOTA-HEADER-INT-NARROWING by formatting quota int64 values with strconv.FormatInt and is covered by focused header tests, so no further authored requirement or design text change is needed.
+          base: origin/master
+          requirement_fingerprint: sha256:3a2d5b4678a9c911e25eb19c25661b000abfb21b4949b9dba5b1f07cb75e685c
+          approval_fingerprint: sha256:f37bc69443c225116e4245df85a9eca7636d3bcfc96d7bcb96ef5ff595b2c185
+          artifact_fingerprint: sha256:f7b2b3a37d0ecc6eb6f7b23af1cdd9b8ed6f2fe37dbda5e5b36c98c046b89a76
+          reviewed_at: "2026-06-19T20:24:24Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T20:18:55Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T20:20:18Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-19T20:19:04Z"
+          from: draft
+          to: review
+          reason: ""
+          changed_by: agent:codex
