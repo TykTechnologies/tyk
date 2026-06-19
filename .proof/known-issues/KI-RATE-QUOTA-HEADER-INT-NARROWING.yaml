@@ -1,0 +1,25 @@
+id: KI-RATE-QUOTA-HEADER-INT-NARROWING
+title: Quota rate-limit headers narrow int64 values through int
+description: quotaSender.SendQuotas formats quota max, remaining, and reset values by converting int64 session quota fields to native int before strconv.Itoa. On 32-bit builds, large quota values can overflow before serialization, so response headers can misreport the configured quota state.
+severity: medium
+risk: quota_header_serialization
+cve_surface: none
+affected_api: internal/rate.quotaSender.SendQuotas
+attacker_input: 'non-attacker trigger: session or API quota fields larger than native int on a 32-bit build'
+reproducer_command: rg -n 'strconv\.Itoa\(int\(quota(Max|Remaining|Renews)\)\)' internal/rate/headers.go
+introduced_in: 9792d0774e
+mitigation: Do not rely on large quota header values on 32-bit builds until SendQuotas formats int64 values directly.
+remediation: Change quotaSender.SendQuotas to format quotaMax, quotaRemaining, and quotaRenews with strconv.FormatInt, then add a regression test or static check for MaxInt64 quota header serialization.
+customer_impact: On platforms where native int is narrower than int64, large configured quota values can be emitted in X-RateLimit headers as overflowed values rather than the stored quota state.
+owner: human:buger
+review_date: "2026-07-19"
+release_disposition: ship_with_known_issue
+status: open
+history:
+    - at: "2026-06-19T11:43:43Z"
+      by: agent:codex
+      action: created
+    - at: "2026-06-19T11:44:57Z"
+      by: agent:codex
+      action: edit
+      detail: introduced-in=9792d0774e
