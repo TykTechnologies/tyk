@@ -1,0 +1,5 @@
+component: policy_identifier
+no_interface:
+    declared: true
+    reason: The policy identifier package is an in-process validation helper for custom policy ID strings; this SW slice does not define a standalone cross-component runtime interface boundary.
+variables: []

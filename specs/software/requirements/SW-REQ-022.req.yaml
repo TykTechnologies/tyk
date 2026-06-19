@@ -1,0 +1,69 @@
+id: SW-REQ-022
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The pkg/identifier package shall preserve custom policy identifier string values, accept empty identifiers as unset, accept only ASCII letters, digits, dot, underscore, hyphen, and tilde for non-empty custom policy identifiers, and return the domain invalid-policy-ID error for any other character.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-010
+component: policy_identifier
+rationale: Custom policy identifiers are policy lookup inputs. This software requirement owns only the pkg/identifier.CustomPolicyId helper behavior that supports policy lookup and configuration validation; it does not claim gateway policy loading, policy Apply behavior, storage lookup semantics, policy merge outcomes, or a standalone runtime interface boundary.
+tags:
+    - policy
+    - identifier
+    - custom-policy-id
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-010
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T21:35:54Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after moving the helper to the policy_identifier software component and adding a no-interface attestation. Requirement is scoped to pkg/identifier.CustomPolicyId string preservation, empty-as-unset behavior, allowed character validation, and invalid-policy-ID error only; focused package tests, configured race test command, build, and vet passed. This approval does not waive gateway policy loading, API validation response, policy Apply, storage lookup, policy merge, runtime interface, or MC/DC evidence.
+        fingerprint: sha256:6856baffc918ec2124bebb7f98908aae0ca1fef81c779e562daf60e5d014dcb1
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-022
+          artifact: pkg/identifier/custom.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. pkg/identifier/custom.go received requirement trace annotations only; executable CustomPolicyId behavior is unchanged and is covered by pkg/identifier/custom_test.go plus docs/custom-policy-identifier-requirements-evidence.md, so no further authored requirement or design text change is needed.
+          base: origin/master
+          requirement_fingerprint: sha256:1451b0a673a152c8ac5bd17c9d5211c89e508c7663da8c700e276c487f99247b
+          approval_fingerprint: sha256:e0da3c1795aaeb7d2970325eccd386ae442aba992cfa378f8d4ae9357f8c44b7
+          artifact_fingerprint: sha256:a47df7de44e3ac9a4d393d14e1a1bc686fbf273f49d7dd8e7c27cb1f5c06ebe0
+          reviewed_at: "2026-06-19T21:32:07Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T21:29:35Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T21:35:54Z"
+obligation_checklist:
+    - boundary
+    - error_handling
+    - malformed_input
+    - nominal
+lifecycle:
+    change_history:
+        - date: "2026-06-19T21:31:44Z"
+          from: draft
+          to: review
+          reason: Ready for delegated requirements-owner review after focused pkg/identifier tests passed
+          changed_by: agent:codex
+        - date: "2026-06-19T21:35:54Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-19T21:31:53Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Requirement is scoped to pkg/identifier.CustomPolicyId string preservation, empty-as-unset behavior, allowed character validation, and invalid-policy-ID error only; focused package tests, configured race test command, build, and vet passed. This approval does not waive gateway policy loading, API validation response, policy Apply, storage lookup, policy merge, or MC/DC evidence.")'
+          changed_by: human:buger

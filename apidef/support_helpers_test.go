@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Verifies: SW-REQ-019
+// Verifies: SYS-REQ-104, SW-REQ-019
 // SW-REQ-019:nominal:nominal
 // SW-REQ-019:boundary:boundary
 // MCDC SYS-REQ-104: api_definition_support_requested=T, api_definition_support_shape_preserved=T => TRUE
