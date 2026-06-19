@@ -33,6 +33,17 @@ verification:
         reviewer: human:buger
         reviewed_at: "2026-06-19T00:00:00Z"
         ai_generated: false
+    impact_reviews:
+        - requirement: SYS-REQ-100
+          artifact: internal/osutil/osutil.go
+          decision: no-authored-change
+          reviewer: agent:codex
+          reason: Reviewed comment-only MC/DC classification changes in internal/osutil/osutil.go; executable behavior and documented requirement intent are unchanged
+          base: origin/master
+          requirement_fingerprint: sha256:9821e33f89ca1c821e07dcc2e3e074e454b8c81f2c7c574d5c0ee5e24173a1d3
+          approval_fingerprint: sha256:f6dd9ff5259afcf6ed584e8963824a5a035f4b260843c9033b07fe9e54ed2405
+          artifact_fingerprint: sha256:cc044bf87d947904725c36e1adbfe7b84448d5702004b5db737d45344efdfc9e
+          reviewed_at: "2026-06-19T16:20:26Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-19T00:00:00Z"
