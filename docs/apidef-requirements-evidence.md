@@ -4,6 +4,7 @@
 <!-- documents SW-REQ-019 -->
 <!-- documents SW-REQ-020 -->
 <!-- documents SW-REQ-021 -->
+<!-- documents SW-REQ-033 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small `apidef` helper models and does not claim
@@ -33,3 +34,10 @@ compilation, preserving an already compiled matcher, no-op empty-pattern
 compilation, and explicit invalid-regex errors. It does not claim gateway error
 response selection, template execution, response-body matching, or API request
 behavior.
+
+`SW-REQ-033` owns the embedded Classic API definition schema document exposed as
+`apidef.Schema`. Its evidence covers non-empty embedded content, JSON
+parseability, and stable top-level schema metadata. It does not claim full API
+definition validation behavior, schema completeness, API import, OAS conversion,
+route generation, gateway request admission, or the full API definition
+lifecycle.

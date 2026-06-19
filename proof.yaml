@@ -156,6 +156,8 @@ project:
             - apidef/rate_limit_smoothing_test.go
             - apidef/rpc.go
             - apidef/rpc_test.go
+            - apidef/schema.go
+            - apidef/schema_test.go
             - apidef/support_helpers_test.go
             - header/header.go
             - pkg/identifier/custom.go
