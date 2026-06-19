@@ -35,3 +35,13 @@ variables:
       type: bool
       direction: output
       description: The model adapter preserves the requested data shape or completes the no-op adapter call without modifying the request.
+
+    - name: api_definition_support_requested
+      type: bool
+      direction: input
+      description: A caller requests API-definition support model behavior such as health-check wire shapes, host-list access, or error-override helper state.
+
+    - name: api_definition_support_shape_preserved
+      type: bool
+      direction: output
+      description: The API-definition support helper preserves the requested wire shape, host-list result, or error-override helper state.

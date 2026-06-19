@@ -1,0 +1,62 @@
+id: SYS-REQ-104
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the model shall always satisfy !api_definition_support_requested | api_definition_support_shape_preserved
+description: Gateway API definition support model helpers shall preserve typed health-check wire values, deterministic host-list access behavior, and error-override matcher/template state so API definition, RPC, and configuration flows can exchange these helper shapes without silent data-shape drift.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: model
+rationale: This system-level requirement owns small API-definition support helper behavior only. It does not claim API import, OAS conversion, route generation, gateway request admission, or full API definition lifecycle behavior, which require separate black-box or adapter evidence.
+tags: []
+variables:
+    - api_definition_support_requested
+    - api_definition_support_shape_preserved
+traces:
+    satisfies:
+        - STK-REQ-008
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T21:17:16Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after linking to the existing API-inventory stakeholder parent and adding FRETish formalization. Requirement is scoped to small API-definition support model helpers only; focused SW child tests passed. This approval does not waive MC/DC, API import, OAS conversion, route generation, gateway request admission, or full API definition lifecycle evidence.
+        fingerprint: sha256:6df5468d0c32f5b7c151cbc6a22d42f8d584de9a35a10f47e7433758dbb46cdf
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-19T21:23:55.262047Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-104|api_definition_support_shape_preserved
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-104's api_definition_support_shape_preserved variable is decomposed across SW-REQ-019 health-check wire constants/JSON shapes, SW-REQ-020 HostList constructor/access/error behavior, and SW-REQ-021 error-override template and matcher state. The review is limited to these apidef support helpers and does not claim API import, OAS conversion, route generation, gateway request admission, or full API definition lifecycle coverage.
+          reviewed_at: "2026-06-19T21:23:55.262047Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T21:10:22Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T21:17:16Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-19T21:10:22Z"
+          from: draft
+          to: review
+          reason: ""
+          changed_by: agent:codex
+        - date: "2026-06-19T21:17:16Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-19T21:13:36Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Requirement is scoped to small API-definition support model helpers only; focused SW child tests passed. This approval does not waive MC/DC, API import, OAS conversion, route generation, gateway request admission, or full API definition lifecycle evidence.")'
+          changed_by: human:buger

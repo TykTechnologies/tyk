@@ -149,6 +149,10 @@ project:
     waivers: []
     verification_scope:
         include:
+            - apidef/error_overrides.go
+            - apidef/health_check.go
+            - apidef/host_list.go
+            - apidef/support_helpers_test.go
             - internal/policy/**
             - internal/model/**
             - internal/event/**

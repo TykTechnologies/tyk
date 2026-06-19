@@ -65,6 +65,7 @@ stakeholder:
           verification_method: test
           derived_reqs:
             - SYS-REQ-081
+            - SYS-REQ-104
 lifecycle:
     change_history:
         - date: "2026-06-18T00:00:00Z"

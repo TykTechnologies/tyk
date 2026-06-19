@@ -11,6 +11,7 @@ import (
 type ErrorOverridesMap map[string][]ErrorOverride
 
 // ErrorOverride combines an optional matcher with its response.
+// SW-REQ-021
 type ErrorOverride struct {
 	// Match contains optional additional matching criteria.
 	Match *ErrorMatcher `bson:"match,omitempty" json:"match,omitempty"`
@@ -26,6 +27,7 @@ type ErrorOverride struct {
 }
 
 // SetCompiledTemplates stores the pre-compiled templates for inline Body.
+// SW-REQ-021
 func (e *ErrorOverride) SetCompiledTemplates(textTmpl, htmlTmpl any) {
 	e.compiledBodyTmpl = textTmpl
 	e.compiledBodyTmplHTML = htmlTmpl
@@ -33,6 +35,7 @@ func (e *ErrorOverride) SetCompiledTemplates(textTmpl, htmlTmpl any) {
 
 // GetCompiledTemplate returns the pre-compiled template for the given content type.
 // Returns nil if no inline Body template was compiled (e.g., using file template).
+// SW-REQ-021
 func (e *ErrorOverride) GetCompiledTemplate(isXML bool) any {
 	if isXML {
 		return e.compiledBodyTmpl
@@ -42,11 +45,13 @@ func (e *ErrorOverride) GetCompiledTemplate(isXML bool) any {
 }
 
 // HasCompiledTemplate returns true if this override has a pre-compiled inline Body template.
+// SW-REQ-021
 func (e *ErrorOverride) HasCompiledTemplate() bool {
 	return e.compiledBodyTmpl != nil
 }
 
 // ErrorMatcher defines additional matching criteria for error overrides.
+// SW-REQ-021
 type ErrorMatcher struct {
 	// Flag matches against the error classification flag from the request context.
 	Flag errors.ResponseFlag `bson:"flag,omitempty" json:"flag,omitempty"`
@@ -66,6 +71,7 @@ type ErrorMatcher struct {
 
 // Compile compiles the MessagePattern regex if present.
 // Should be called after unmarshaling from JSON or YAML.
+// SW-REQ-021
 func (m *ErrorMatcher) Compile() error {
 	if m.MessagePattern != "" && m.CompiledPattern == nil {
 		re, err := regexp.Compile(m.MessagePattern)
@@ -80,6 +86,7 @@ func (m *ErrorMatcher) Compile() error {
 }
 
 // ErrorResponse defines the override response for error overrides.
+// SW-REQ-021
 type ErrorResponse struct {
 	// StatusCode is the HTTP status code to return.
 	StatusCode int `bson:"status_code" json:"status_code"`

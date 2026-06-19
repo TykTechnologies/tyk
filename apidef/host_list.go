@@ -10,18 +10,21 @@ type HostList struct {
 	hosts  []string
 }
 
+// SW-REQ-020
 func NewHostList() *HostList {
 	hl := HostList{}
 	hl.hosts = make([]string, 0)
 	return &hl
 }
 
+// SW-REQ-020
 func NewHostListFromList(newList []string) *HostList {
 	hl := NewHostList()
 	hl.Set(newList)
 	return hl
 }
 
+// SW-REQ-020
 func (h *HostList) Set(newList []string) {
 	h.hMutex.Lock()
 	defer h.hMutex.Unlock()
@@ -29,10 +32,12 @@ func (h *HostList) Set(newList []string) {
 	h.hosts = newList
 }
 
+// SW-REQ-020
 func (h *HostList) All() []string {
 	return h.hosts
 }
 
+// SW-REQ-020
 func (h *HostList) GetIndex(i int) (string, error) {
 	if i < 0 {
 		return "", errors.New("index must be positive int")
@@ -47,6 +52,7 @@ func (h *HostList) GetIndex(i int) (string, error) {
 	return h.hosts[i], nil
 }
 
+// SW-REQ-020
 func (h *HostList) Len() int {
 	h.hMutex.RLock()
 	defer h.hMutex.RUnlock()
