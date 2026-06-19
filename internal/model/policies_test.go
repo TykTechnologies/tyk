@@ -10,15 +10,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Verifies: SYS-REQ-077
-// SYS-REQ-077:nominal:nominal
-// SYS-REQ-077:malformed_input:nominal
-// SYS-REQ-077:malformed_input:negative
-// SYS-REQ-077:determinism:nominal
-// MCDC SYS-REQ-077: policy_identifier_available=T, policy_identifier_valid=F, policy_identity_requested=F => TRUE
-// MCDC SYS-REQ-077: policy_identifier_available=T, policy_identifier_valid=F, policy_identity_requested=T => FALSE
-// MCDC SYS-REQ-077: policy_identity_requested=T, policy_identifier_available=T, policy_identifier_valid=T => TRUE
-// MCDC SYS-REQ-077: policy_identity_requested=T, policy_identifier_available=F, policy_identifier_valid=F => TRUE
+// Verifies: SW-REQ-007
+// SW-REQ-007:nominal:nominal
+// SW-REQ-007:malformed_input:nominal
+// SW-REQ-007:malformed_input:negative
+// SW-REQ-007:determinism:nominal
+// MCDC SW-REQ-007: policy_identifier_available=T, policy_identifier_valid=F, policy_identity_requested=F => TRUE
+// MCDC SW-REQ-007: policy_identifier_available=T, policy_identifier_valid=F, policy_identity_requested=T => FALSE
+// MCDC SW-REQ-007: policy_identity_requested=T, policy_identifier_available=T, policy_identifier_valid=T => TRUE
+// MCDC SW-REQ-007: policy_identity_requested=T, policy_identifier_available=F, policy_identifier_valid=F => TRUE
 func Test_EnsurePolicyId(t *testing.T) {
 	objectId := persistentmodel.NewObjectID()
 
@@ -78,15 +78,15 @@ func Test_EnsurePolicyId(t *testing.T) {
 	})
 }
 
-// Verifies: SYS-REQ-078, SYS-REQ-079
-// SYS-REQ-078:nominal:nominal
-// SYS-REQ-078:error_handling:nominal
-// SYS-REQ-078:error_handling:negative
-// SYS-REQ-078:idempotency:nominal
+// Verifies: SW-REQ-008, SYS-REQ-079
+// SW-REQ-008:nominal:nominal
+// SW-REQ-008:error_handling:nominal
+// SW-REQ-008:error_handling:negative
+// SW-REQ-008:idempotency:nominal
 // SYS-REQ-079:nominal:nominal
-// MCDC SYS-REQ-078: policy_lookup_returned=F, policy_store_requested=F => TRUE
-// MCDC SYS-REQ-078: policy_lookup_returned=F, policy_store_requested=T => FALSE
-// MCDC SYS-REQ-078: policy_lookup_returned=T, policy_store_requested=T => TRUE
+// MCDC SW-REQ-008: policy_lookup_returned=F, policy_store_requested=F => TRUE
+// MCDC SW-REQ-008: policy_lookup_returned=F, policy_store_requested=T => FALSE
+// MCDC SW-REQ-008: policy_lookup_returned=T, policy_store_requested=T => TRUE
 // MCDC SYS-REQ-079: collision_reported=F, policy_collision_detected=T => FALSE
 // MCDC SYS-REQ-079: collision_reported=T, policy_collision_detected=T => TRUE
 // MCDC SYS-REQ-079: collision_reported=F, policy_collision_detected=F => TRUE
@@ -371,8 +371,8 @@ func Test_Policies(t *testing.T) {
 }
 
 // Reproduces: KI-MODEL-DELETE-LEGACY-LOOKUP
-// Verifies: SYS-REQ-078
-// MCDC SYS-REQ-078: policy_lookup_returned=F, policy_store_requested=T => FALSE [known-issue] [ki: KI-MODEL-DELETE-LEGACY-LOOKUP]
+// Verifies: SW-REQ-008
+// MCDC SW-REQ-008: policy_lookup_returned=F, policy_store_requested=T => FALSE [known-issue] [ki: KI-MODEL-DELETE-LEGACY-LOOKUP]
 func TestKnownIssue_DeleteByIdDropsLegacyLookupForRemainingScopedPolicy(t *testing.T) {
 	pols := model.NewPolicies()
 	pols.Reload([]user.Policy{

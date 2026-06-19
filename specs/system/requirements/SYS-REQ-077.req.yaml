@@ -1,6 +1,6 @@
 id: SYS-REQ-077
 version: 1
-status: review
+status: rejected
 priority: shall
 category: functional
 req_type: guarantee
@@ -38,16 +38,21 @@ history:
     created_by: agent:codex
     created_at: "2026-06-18T00:00:00Z"
     last_modified_by: agent:codex
-    last_modified_at: "2026-06-18T00:00:00Z"
-obligation_class: malformed_input
-obligation_checklist:
-    - nominal
-    - malformed_input
-    - determinism
+    last_modified_at: "2026-06-19T14:25:56Z"
 lifecycle:
     change_history:
         - date: "2026-06-18T00:00:00Z"
           from: draft
           to: review
           reason: Added model package proof scope.
+          changed_by: agent:codex
+        - date: "2026-06-19T14:25:56Z"
+          from: review
+          to: rejected
+          reason: '[REQPROOF-LAYERING-REPAIR] Policy identity normalization is private model component behavior; superseded by SW-REQ-007 under SYS-REQ-010.'
+          changed_by: agent:codex
+        - date: "2026-06-19T14:31:00Z"
+          from: rejected
+          to: rejected
+          reason: '[REQPROOF-LAYERING-REPAIR] Removed active obligation checklist from rejected helper-level SYS tombstone; SW-REQ-007 now owns the software evidence.'
           changed_by: agent:codex

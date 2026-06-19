@@ -1,0 +1,32 @@
+component: model
+no_interface:
+    declared: true
+    reason: 'The model package is a pure in-process data model helper consumed inside Go packages; it does not define a cross-component runtime interface boundary.'
+independence:
+    declared: true
+    reason: 'Model software requirements govern separate helper contracts: policy identity normalization decides whether a usable identifier exists, while policy-store operations decide whether store operations return data or explicit miss results. The store implementation may call the identity helper, but the formalized outputs are not competing modes.'
+variables:
+    - name: policy_identity_requested
+      type: bool
+      direction: input
+      description: A caller requests policy identifier normalization or rendering.
+
+    - name: policy_identifier_valid
+      type: bool
+      direction: input
+      description: The policy has either a non-empty custom ID or a valid persistent MID.
+
+    - name: policy_identifier_available
+      type: bool
+      direction: output
+      description: The model returns or preserves a usable policy identifier.
+
+    - name: policy_store_requested
+      type: bool
+      direction: input
+      description: A caller requests policy-store creation, loading, lookup, enumeration, deletion, or callback registration.
+
+    - name: policy_lookup_returned
+      type: bool
+      direction: output
+      description: The policy store operation returns either the requested policy data or an explicit not-found/false result.

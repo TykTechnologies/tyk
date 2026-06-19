@@ -36,12 +36,6 @@ history:
     created_at: "2026-06-18T00:00:00Z"
     last_modified_by: agent:codex
     last_modified_at: "2026-06-19T13:57:18Z"
-obligation_checklist:
-    - nominal
-    - malformed_input
-    - determinism
-    - error_handling
-    - boundary
 stakeholder:
     persona: Gateway maintainer
     story: As a gateway maintainer, I need policy and API inventory data to preserve identity, lookup, filtering, and adapter semantics so gateway and policy flows rely on deterministic model data.
@@ -87,4 +81,9 @@ lifecycle:
           from: review
           to: rejected
           reason: '[REQPROOF-LAYERING-REPAIR] Helper-domain acceptance criteria belong below stakeholder level; no direct integrated acceptance witness exists'
+          changed_by: agent:codex
+        - date: "2026-06-19T14:31:00Z"
+          from: rejected
+          to: rejected
+          reason: '[REQPROOF-LAYERING-REPAIR] Removed active obligation checklist from rejected helper-domain stakeholder tombstone; active obligations are being rehomed under product SYS and SW requirements.'
           changed_by: agent:codex

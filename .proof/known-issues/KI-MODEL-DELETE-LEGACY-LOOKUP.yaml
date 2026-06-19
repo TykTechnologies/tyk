@@ -2,7 +2,7 @@ id: KI-MODEL-DELETE-LEGACY-LOOKUP
 title: Deleting scoped policy drops remaining legacy lookup alias
 description: Deleting one scoped policy with a custom ID removes the non-scoped legacy lookup entry for that custom ID even when another scoped policy with the same ID remains loaded.
 affected_requirements:
-    - SYS-REQ-078
+    - SW-REQ-008
 evidence_manifests:
     - .proof/evidence/ki-model-delete-legacy-lookup.yaml
 severity: medium
@@ -27,3 +27,7 @@ history:
       by: agent:codex
       action: edit
       detail: add-evidence-manifest
+    - at: "2026-06-19T14:32:00Z"
+      by: agent:codex
+      action: edit
+      detail: reanchor affected requirement from rejected SYS-REQ-078 to SW-REQ-008

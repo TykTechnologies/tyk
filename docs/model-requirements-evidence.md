@@ -1,16 +1,16 @@
 # Model Requirements Evidence
 
-<!-- documents SYS-REQ-077 -->
-<!-- documents SYS-REQ-078 -->
+<!-- documents SW-REQ-007 -->
+<!-- documents SW-REQ-008 -->
 <!-- documents SYS-REQ-079 -->
 <!-- documents SYS-REQ-080 -->
 <!-- documents SYS-REQ-081 -->
 
 This document records the first expansion of the proof scope beyond `internal/policy` into `internal/model`.
 
-`SYS-REQ-077` covers policy identity normalization and invalid identifier rejection.
+`SW-REQ-007` covers policy identity normalization and invalid identifier rejection.
 
-`SYS-REQ-078` covers policy-store load, lookup, enumeration, deletion, and explicit miss behavior.
+`SW-REQ-008` covers policy-store load, lookup, enumeration, deletion, and explicit miss behavior.
 
 `SYS-REQ-079` covers observable policy collision reporting and non-reporting for same database ID replacements.
 

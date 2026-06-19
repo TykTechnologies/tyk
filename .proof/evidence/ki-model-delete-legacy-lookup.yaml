@@ -1,7 +1,7 @@
 schema_version: proof.evidence_profile.v1
 results:
     - profile: known_issue_reproducer
-      requirement: SYS-REQ-078
+      requirement: SW-REQ-008
       command: go test ./internal/model -run TestKnownIssue_DeleteByIdDropsLegacyLookupForRemainingScopedPolicy -count=1
       status: pass
       observed_result: known_issue_reproduced

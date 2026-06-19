@@ -55,7 +55,7 @@ type (
 	}
 )
 
-// SYS-REQ-078
+// SW-REQ-008
 func (p *Policies) init() {
 	p.once.Do(func() {
 		p.initDefaultCallbacks()
@@ -63,13 +63,13 @@ func (p *Policies) init() {
 	})
 }
 
-// SYS-REQ-078
+// SW-REQ-008
 func (p *Policies) initDefaultCallbacks() {
 	p.onBrokenPolicy = brokenPolicyNoop
 	p.onInternalCollision = internalCollisionCb
 }
 
-// SYS-REQ-078
+// SW-REQ-008
 func NewPolicies(opts ...PolicySetOpt) *Policies {
 	var set Policies
 	set.init()
@@ -81,7 +81,7 @@ func NewPolicies(opts ...PolicySetOpt) *Policies {
 	return &set
 }
 
-// SYS-REQ-078
+// SW-REQ-008
 func WithCombined(opts ...PolicySetOpt) PolicySetOpt {
 	return func(s *Policies) {
 		for _, apply := range opts {
@@ -92,7 +92,7 @@ func WithCombined(opts ...PolicySetOpt) PolicySetOpt {
 
 // WithLoadFail sets callback for invalid policies.
 // Callback will be called when found invalid policy to load.
-// SYS-REQ-078
+// SW-REQ-008
 func WithLoadFail(cb BrokenPolicyCb) PolicySetOpt {
 	return func(s *Policies) {
 		s.onBrokenPolicy = cb
@@ -106,7 +106,7 @@ func WithInternalCollision(cb InternalCollisionCb) PolicySetOpt {
 	}
 }
 
-// SYS-REQ-078
+// SW-REQ-008
 func (p *Policies) PolicyCount() int {
 	p.init()
 	p.mu.RLock()
@@ -114,7 +114,7 @@ func (p *Policies) PolicyCount() int {
 	return len(p.policiesScoped)
 }
 
-// SYS-REQ-078
+// SW-REQ-008
 func (p *Policies) AsSlice() []user.Policy {
 	p.init()
 	p.mu.RLock()
@@ -122,7 +122,7 @@ func (p *Policies) AsSlice() []user.Policy {
 	return maps.Values(p.policiesScoped)
 }
 
-// SYS-REQ-078
+// SW-REQ-008
 func (p *Policies) PolicyIDs() []PolicyID {
 	p.init()
 	p.mu.RLock()
@@ -133,7 +133,7 @@ func (p *Policies) PolicyIDs() []PolicyID {
 	})
 }
 
-// SYS-REQ-078
+// SW-REQ-008
 func (p *Policies) PolicyByID(id PolicyID) (user.Policy, bool) {
 	p.init()
 	p.mu.RLock()
@@ -146,7 +146,7 @@ func (p *Policies) PolicyByID(id PolicyID) (user.Policy, bool) {
 	return user.Policy{}, false
 }
 
-// SYS-REQ-078
+// SW-REQ-008
 func (p *Policies) PolicyByIdExtended(id PolicyID) (user.Policy, error) {
 	p.init()
 	p.mu.RLock()
@@ -155,7 +155,7 @@ func (p *Policies) PolicyByIdExtended(id PolicyID) (user.Policy, error) {
 	return p.policyByIdExtended(id)
 }
 
-// SYS-REQ-078
+// SW-REQ-008
 func (p *Policies) DeleteById(id PolicyID) bool {
 	p.init()
 	pol, err := p.PolicyByIdExtended(id)
@@ -170,7 +170,7 @@ func (p *Policies) DeleteById(id PolicyID) bool {
 	return true
 }
 
-// SYS-REQ-078
+// SW-REQ-008
 // SYS-REQ-079
 func (p *Policies) Add(policies ...user.Policy) {
 	p.init()
@@ -186,7 +186,7 @@ func (p *Policies) Add(policies ...user.Policy) {
 	collision.Emit(p.onInternalCollision)
 }
 
-// SYS-REQ-078
+// SW-REQ-008
 // SYS-REQ-079
 func (p *Policies) Reload(policies ...user.Policy) {
 	p.init()
@@ -205,7 +205,7 @@ func (p *Policies) Reload(policies ...user.Policy) {
 	p.policySet = set
 }
 
-// SYS-REQ-078
+// SW-REQ-008
 func (p *Policies) policyByIdExtended(id PolicyID) (user.Policy, error) {
 	switch id := id.(type) {
 	case ScopedCustomPolicyId:
@@ -228,7 +228,7 @@ func (p *Policies) policyByIdExtended(id PolicyID) (user.Policy, error) {
 	}
 }
 
-// SYS-REQ-078
+// SW-REQ-008
 func brokenPolicyNoop(_ *user.Policy) {}
 
 // SYS-REQ-079
@@ -236,7 +236,7 @@ func internalCollisionCb(_ string, _ []persistentmodel.ObjectID) {}
 
 // EnsurePolicyId ensures ID field exists
 // should be removed after migrate
-// SYS-REQ-077
+// SW-REQ-007
 func EnsurePolicyId(policy *user.Policy) bool {
 	if policy == nil {
 		return false
@@ -254,7 +254,7 @@ func EnsurePolicyId(policy *user.Policy) bool {
 	return true
 }
 
-// SYS-REQ-078
+// SW-REQ-008
 func newPolicySet(
 	capacity int,
 	callbacksSet callbacks,
@@ -266,8 +266,8 @@ func newPolicySet(
 	}
 }
 
-// SYS-REQ-077
-// SYS-REQ-078
+// SW-REQ-007
+// SW-REQ-008
 // SYS-REQ-079
 func (p *policySet) loadOne(
 	pol *user.Policy,
@@ -289,7 +289,7 @@ func (p *policySet) loadOne(
 	p.policies[ck] = *pol
 }
 
-// SYS-REQ-078
+// SW-REQ-008
 func (p *policySet) unloadOne(pol *user.Policy) {
 	delete(p.policiesScoped, scopedCustomKey{id: pol.ID, org: pol.OrgID})
 	delete(p.policies, customKey(pol.ID))
