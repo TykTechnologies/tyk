@@ -684,12 +684,13 @@
         "value": {
           "type": "integer",
           "minimum": 0
+        },
+        "duration": {
+          "type": "string",
+          "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
         }
       },
-      "required": [
-        "enabled",
-        "value"
-      ]
+      "required": ["enabled"]
     },
     "X-Tyk-ValidateRequest": {
       "type": "object",

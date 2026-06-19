@@ -91,10 +91,6 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 				span.SetAttributes(attrs...)
 			}
 
-			if originalPath := ctxGetOriginalRequestPath(r); originalPath != "" {
-				span.SetAttributes(otel.OriginalPathSpanAttribute(originalPath))
-			}
-
 			return err, i
 		}
 	}
@@ -144,9 +140,6 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 						attrs := ctxGetSpanAttributes(r, mw.Name())
 						if len(attrs) > 0 {
 							span.SetAttributes(attrs...)
-						}
-						if originalPath := ctxGetOriginalRequestPath(r); originalPath != "" {
-							span.SetAttributes(otel.OriginalPathSpanAttribute(originalPath))
 						}
 						span.End()
 					}()
@@ -317,6 +310,9 @@ func NewBaseMiddleware(gw *Gateway, spec *APISpec, proxy ReturningHttpHandler, l
 			baseMid.Spec.CircuitBreakerEnabled = true
 		}
 		if len(v.ExtendedPaths.HardTimeouts) > 0 {
+			baseMid.Spec.EnforcedTimeoutEnabled = true
+		}
+		if !v.GlobalEnforceTimeoutDisabled && v.GlobalEnforceTimeout != 0 {
 			baseMid.Spec.EnforcedTimeoutEnabled = true
 		}
 	}
@@ -666,7 +662,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		// If exists, assume it has been authorized and pass on
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			t.Gw.SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			t.Gw.SessionCache.Set(cacheKey, session.Clone(), cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
@@ -698,7 +694,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go t.Gw.SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			go t.Gw.SessionCache.Set(cacheKey, session.Clone(), cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
