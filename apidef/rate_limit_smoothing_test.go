@@ -6,6 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Verifies: SW-REQ-032
+// SW-REQ-032:nominal:nominal
+// SW-REQ-032:error_handling:negative
 func TestRateLimitSmoothing_Valid(t *testing.T) {
 	t.Run("Valid case", func(t *testing.T) {
 		r := &RateLimitSmoothing{
@@ -30,6 +33,10 @@ func TestRateLimitSmoothing_Valid(t *testing.T) {
 	})
 }
 
+// Verifies: SW-REQ-032
+// SW-REQ-032:nominal:nominal
+// SW-REQ-032:boundary:boundary
+// SW-REQ-032:error_handling:negative
 func TestRateLimitSmoothing_Err(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -108,4 +115,23 @@ func TestRateLimitSmoothing_Err(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Verifies: SW-REQ-032
+// SW-REQ-032:boundary:boundary
+func TestRateLimitSmoothing_IsZero(t *testing.T) {
+	t.Run("nil smoothing is zero", func(t *testing.T) {
+		var r *RateLimitSmoothing
+		assert.True(t, r.IsZero())
+	})
+
+	t.Run("disabled smoothing is zero", func(t *testing.T) {
+		r := &RateLimitSmoothing{Enabled: false}
+		assert.True(t, r.IsZero())
+	})
+
+	t.Run("enabled smoothing is not zero", func(t *testing.T) {
+		r := &RateLimitSmoothing{Enabled: true}
+		assert.False(t, r.IsZero())
+	})
 }

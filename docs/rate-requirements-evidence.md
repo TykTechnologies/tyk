@@ -13,12 +13,13 @@
 <!-- documents SW-REQ-017 -->
 <!-- documents SW-REQ-018 -->
 <!-- documents SW-REQ-031 -->
+<!-- documents SW-REQ-032 -->
 
 This document records the current rate-limit support-state proof slice. The
 slice is deliberately limited to the listed `internal/rate/model` allowance
 state behavior, dependency-free `internal/rate` support helpers, header senders,
-facade helpers, smoothing orchestration, and local `internal/memorycache`
-leaky-bucket storage.
+facade helpers, smoothing orchestration, local `internal/memorycache`
+leaky-bucket storage, and the `apidef` smoothing configuration helper.
 
 `SYS-REQ-103` covers gateway rate-limit allowance state operations at the
 system layer.
@@ -112,3 +113,11 @@ count behavior, and cleanup-context cancellation clearing cached buckets. It
 does not claim gateway admission decisions, distributed limiter correctness,
 Redis behavior, cross-process synchronization, caller key selection, response
 headers, or external limiter algorithms.
+
+`SW-REQ-032` owns the concrete `apidef.RateLimitSmoothing` configuration helper
+used by gateway rate-limit smoothing. Its evidence covers valid enabled
+configuration, nil/disabled/invalid configuration errors, `Valid` delegating to
+the error check, and nil or disabled smoothing reporting as zero for JSON
+omission. It does not claim allowance-store correctness, smoothing arithmetic,
+distributed locking, Redis behavior, event emission, gateway admission decisions,
+or response header behavior.

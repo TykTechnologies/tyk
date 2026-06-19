@@ -152,6 +152,8 @@ project:
             - apidef/error_overrides.go
             - apidef/health_check.go
             - apidef/host_list.go
+            - apidef/rate_limit_smoothing.go
+            - apidef/rate_limit_smoothing_test.go
             - apidef/support_helpers_test.go
             - header/header.go
             - pkg/identifier/custom.go

@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// SW-REQ-032
 // RateLimitSmoothing holds the rate smoothing configuration.
 //
 // Rate Limit Smoothing is a mechanism to dynamically adjust the request rate
@@ -85,6 +86,7 @@ type RateLimitSmoothing struct {
 	Delay int64 `json:"delay" bson:"delay"`
 }
 
+// SW-REQ-032
 // Valid will return true if the rate limit smoothing should be applied.
 func (r *RateLimitSmoothing) Valid() bool {
 	if err := r.Err(); err != nil {
@@ -93,6 +95,7 @@ func (r *RateLimitSmoothing) Valid() bool {
 	return true
 }
 
+// SW-REQ-032
 // Err checks the rate limit smoothing configuration for validity and returns an error if it is not valid.
 // It checks for a nil value, the enabled flag and valid values for each setting.
 func (r *RateLimitSmoothing) Err() error {
@@ -116,6 +119,7 @@ func (r *RateLimitSmoothing) Err() error {
 	return nil
 }
 
+// SW-REQ-032
 // IsZero returns true if rate limit smoothing is not enabled (for omitzero support).
 // This allows the struct to be omitted from JSON when Enabled is false.
 func (r *RateLimitSmoothing) IsZero() bool {
