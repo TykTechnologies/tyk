@@ -5,12 +5,12 @@ results:
       command: go test ./internal/policy -run 'TestNegative_OverflowSafety_MaxInt64Quota/QuotaMax_=_-1_\(unlimited\)_with_MaxInt64_renewal' -count=1
       status: pass
       observed_result: known_issue_not_reproduced
-      executed_at: "2026-06-19T11:54:38Z"
+      executed_at: "2026-06-19T13:22:57Z"
       input_set:
         - KI-POLICY-UNLIMITED-QUOTA-RENEWAL regression guard
       freshness_hashes:
         .proof/known-issues/KI-POLICY-UNLIMITED-QUOTA-RENEWAL.yaml: sha256:58b985d587b5156cd897223c714210558a92ec3f738c2199ff2f28cb7293a1a0
-        internal/policy/negative_obligation_test.go: sha256:3b4cb062334dc4338d535f362dd28dac5d43e2de779030f35a28b294dd43d34e
+        internal/policy/negative_obligation_test.go: sha256:e6e19a4146e1bb1f4a8bff2d2e6f9dbf590f195ce59093c2e4e0211cbb4215d3
         proof.yaml: sha256:895daff29b9390d8058fda4de375d4ae1f6468fde2e953f32526d40ddca5817f
       known_issues:
         - KI-POLICY-UNLIMITED-QUOTA-RENEWAL

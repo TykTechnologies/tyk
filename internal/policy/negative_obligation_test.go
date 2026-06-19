@@ -33,6 +33,7 @@ import (
 // TestNegative_MalformedInput_NilAPILimitPointer tries to break
 // ApplyRateLimits by passing a nil *user.APILimit.  The function
 // dereferences apiLimits without a nil guard.
+// Reproduces: KI-POLICY-NIL-API-LIMIT
 // Verifies: SYS-REQ-021, SYS-REQ-073, SYS-REQ-075
 // SYS-REQ-021:nil_safety:negative
 func TestNegative_MalformedInput_NilAPILimitPointer(t *testing.T) {
@@ -189,6 +190,7 @@ func TestNegative_MalformedInput_NegativeQuota(t *testing.T) {
 //
 // Note: the function will likely panic (nil dereference on session fields),
 // but we assert that it does so in a recoverable way.
+// Reproduces: KI-POLICY-NIL-SESSION-APPLY
 // Verifies: SYS-REQ-073, SYS-REQ-075
 // SYS-REQ-010:nil_safety:negative
 func TestNegative_NilSafety_NilSessionOnApply(t *testing.T) {
@@ -336,6 +338,7 @@ func TestNegative_NilSafety_NilAccessRights(t *testing.T) {
 // TestNegative_OverflowSafety_MaxInt64Quota exercises the quota comparison
 // path with MaxInt64 and MinInt64 values — the exact boundary where
 // greaterThanInt64 is called.
+// Reproduces: KI-POLICY-UNLIMITED-QUOTA-RENEWAL
 // Verifies: SYS-REQ-024, SYS-REQ-052, SYS-REQ-067
 // SYS-REQ-015:overflow_safety:negative
 func TestNegative_OverflowSafety_MaxInt64Quota(t *testing.T) {
@@ -736,10 +739,10 @@ func TestNegative_Concurrent_ApplyOnSameSession(t *testing.T) {
 	orgID := "org1"
 
 	pol1 := user.Policy{
-		ID:    "pol1",
-		OrgID: orgID,
-		Rate:  100,
-		Per:   60,
+		ID:               "pol1",
+		OrgID:            orgID,
+		Rate:             100,
+		Per:              60,
 		QuotaMax:         5000,
 		QuotaRenewalRate: 3600,
 		AccessRights: map[string]user.AccessDefinition{
@@ -747,10 +750,10 @@ func TestNegative_Concurrent_ApplyOnSameSession(t *testing.T) {
 		},
 	}
 	pol2 := user.Policy{
-		ID:    "pol2",
-		OrgID: orgID,
-		Rate:  200,
-		Per:   30,
+		ID:               "pol2",
+		OrgID:            orgID,
+		Rate:             200,
+		Per:              30,
 		QuotaMax:         10000,
 		QuotaRenewalRate: 7200,
 		AccessRights: map[string]user.AccessDefinition{
@@ -789,10 +792,10 @@ func TestNegative_Concurrent_DifferentSessionsSameService(t *testing.T) {
 	orgID := "org1"
 
 	pol := user.Policy{
-		ID:    "pol1",
-		OrgID: orgID,
-		Rate:  100,
-		Per:   60,
+		ID:               "pol1",
+		OrgID:            orgID,
+		Rate:             100,
+		Per:              60,
 		QuotaMax:         5000,
 		QuotaRenewalRate: 3600,
 		AccessRights: map[string]user.AccessDefinition{
@@ -810,8 +813,8 @@ func TestNegative_Concurrent_DifferentSessionsSameService(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			session := &user.SessionState{
-				MetaData:   map[string]interface{}{},
-				QuotaMax:   int64(id * 100),
+				MetaData:    map[string]interface{}{},
+				QuotaMax:    int64(id * 100),
 				QuotaRenews: int64(id * 50),
 			}
 			session.SetPolicies("pol1")
@@ -831,10 +834,10 @@ func TestNegative_Concurrent_ClearSessionAndApply(t *testing.T) {
 	orgID := "org1"
 
 	pol := user.Policy{
-		ID:    "pol1",
-		OrgID: orgID,
-		Rate:  100,
-		Per:   60,
+		ID:               "pol1",
+		OrgID:            orgID,
+		Rate:             100,
+		Per:              60,
 		QuotaMax:         5000,
 		QuotaRenewalRate: 3600,
 		AccessRights: map[string]user.AccessDefinition{
@@ -896,10 +899,10 @@ func TestNegative_Atomicity_OrgMismatch(t *testing.T) {
 	svc := newTestService(orgID, []user.Policy{polWrongOrg})
 
 	session := &user.SessionState{
-		Rate:       50,
-		Per:        30,
-		QuotaMax:   1000,
-		MetaData:   map[string]interface{}{},
+		Rate:     50,
+		Per:      30,
+		QuotaMax: 1000,
+		MetaData: map[string]interface{}{},
 	}
 	session.SetPolicies("pol-wrong")
 
@@ -914,6 +917,79 @@ func TestNegative_Atomicity_OrgMismatch(t *testing.T) {
 	assert.Equal(t, initialRate, session.Rate, "Rate unchanged on error")
 	assert.Equal(t, initialPer, session.Per, "Per unchanged on error")
 	assert.Equal(t, initialQuotaMax, session.QuotaMax, "QuotaMax unchanged on error")
+}
+
+// TestKnownIssue_ApplyOrgMismatchClearsSessionBeforeError is the active
+// reproducer for the cross-org Apply atomicity gap documented by the old audit.
+// Reproduces: KI-POLICY-APPLY-NONATOMIC-ORG-MISMATCH
+// Verifies: SYS-REQ-069
+// MCDC SYS-REQ-069: apply_requested=T, error_reported=T, session_modified=T => FALSE [known-issue] [ki: KI-POLICY-APPLY-NONATOMIC-ORG-MISMATCH]
+func TestKnownIssue_ApplyOrgMismatchClearsSessionBeforeError(t *testing.T) {
+	orgID := "org1"
+
+	polWrongOrg := user.Policy{
+		ID:    "pol-wrong",
+		OrgID: "org-different",
+		Rate:  200,
+		Per:   60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api2": {Versions: []string{"v1"}},
+		},
+	}
+
+	svc := newTestService(orgID, []user.Policy{polWrongOrg})
+	session := &user.SessionState{
+		Rate:     50,
+		Per:      30,
+		QuotaMax: 1000,
+		MetaData: map[string]interface{}{},
+	}
+	session.SetPolicies("pol-wrong")
+
+	err := svc.Apply(session)
+	assert.Error(t, err, "cross-org policy must still report an error")
+	assert.Zero(t, session.Rate, "ClearSession clears Rate before Apply reports the org error")
+	assert.Zero(t, session.Per, "ClearSession clears Per before Apply reports the org error")
+	assert.Zero(t, session.QuotaMax, "ClearSession clears QuotaMax before Apply reports the org error")
+}
+
+// TestKnownIssue_ApplyMalformedPartitionClearsSessionBeforeError is the active
+// reproducer for malformed PerAPI+partition policies mutating session state
+// before Apply reports the configuration error.
+// Reproduces: KI-POLICY-APPLY-NONATOMIC-MALFORMED-PARTITION
+// Verifies: SYS-REQ-069
+// MCDC SYS-REQ-069: apply_requested=T, error_reported=T, session_modified=T => FALSE [known-issue] [ki: KI-POLICY-APPLY-NONATOMIC-MALFORMED-PARTITION]
+func TestKnownIssue_ApplyMalformedPartitionClearsSessionBeforeError(t *testing.T) {
+	orgID := "org1"
+
+	malformed := user.Policy{
+		ID:    "pol-malformed",
+		OrgID: orgID,
+		Rate:  200,
+		Per:   60,
+		Partitions: user.PolicyPartitions{
+			PerAPI:    true,
+			RateLimit: true,
+		},
+		AccessRights: map[string]user.AccessDefinition{
+			"api2": {Versions: []string{"v1"}},
+		},
+	}
+
+	svc := newTestService(orgID, []user.Policy{malformed})
+	session := &user.SessionState{
+		Rate:     50,
+		Per:      30,
+		QuotaMax: 1000,
+		MetaData: map[string]interface{}{},
+	}
+	session.SetPolicies("pol-malformed")
+
+	err := svc.Apply(session)
+	assert.Error(t, err, "malformed policy must still report an error")
+	assert.Zero(t, session.Rate, "ClearSession clears Rate before Apply reports the malformed-policy error")
+	assert.Zero(t, session.Per, "ClearSession clears Per before Apply reports the malformed-policy error")
+	assert.Equal(t, int64(1000), session.QuotaMax, "RateLimit partition only clears rate fields before the error")
 }
 
 // TestNegative_Atomicity_PolicyNotFound verifies that when a policy is
@@ -956,18 +1032,20 @@ func TestNegative_Atomicity_PolicyNotFound(t *testing.T) {
 // TestNegative_Atomicity_SecondPolicyFailure exercises the case where
 // Apply processes policy 1 successfully, then fails on policy 2. Since
 // Apply does not take a snapshot and rollback, this documents the gap.
+// Reproduces: KI-POLICY-APPLY-PARTIAL-MULTIPOLICY-ERROR
 // Verifies: SYS-REQ-029, SYS-REQ-069
 // SYS-REQ-025:atomicity:negative
 // SYS-REQ-025:error_handling:negative
 // SYS-REQ-029:error_handling:negative
+// MCDC SYS-REQ-069: apply_requested=T, error_reported=T, session_modified=T => FALSE [known-issue] [ki: KI-POLICY-APPLY-PARTIAL-MULTIPOLICY-ERROR]
 func TestNegative_Atomicity_SecondPolicyFailure(t *testing.T) {
 	orgID := "org1"
 
 	polGood := user.Policy{
-		ID:    "pol-good",
-		OrgID: orgID,
-		Rate:  100,
-		Per:   60,
+		ID:               "pol-good",
+		OrgID:            orgID,
+		Rate:             100,
+		Per:              60,
 		QuotaMax:         5000,
 		QuotaRenewalRate: 3600,
 		AccessRights: map[string]user.AccessDefinition{
@@ -990,8 +1068,8 @@ func TestNegative_Atomicity_SecondPolicyFailure(t *testing.T) {
 	// Apply processes polGood first (may fail due to org mismatches),
 	// but the key scenario is testing partial application.
 	session := &user.SessionState{
-		Rate:    10,
-		Per:     10,
+		Rate:     10,
+		Per:      10,
 		QuotaMax: 100,
 		MetaData: map[string]interface{}{},
 	}
@@ -999,8 +1077,7 @@ func TestNegative_Atomicity_SecondPolicyFailure(t *testing.T) {
 	session.SetPolicies("pol-good", "pol-bad")
 
 	err := svc.Apply(session)
-	t.Logf("Apply with good+bad policies returned: %v", err)
-	t.Logf("Session Rate after: %f", session.Rate)
-	t.Logf("Session QuotaMax after: %d", session.QuotaMax)
+	assert.Error(t, err, "wrong-org second policy must report an error")
+	assert.Equal(t, float64(100), session.Rate, "first policy remains partially applied after later error")
+	assert.Equal(t, int64(5000), session.QuotaMax, "first policy quota remains partially applied after later error")
 }
-

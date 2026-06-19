@@ -1,0 +1,19 @@
+schema_version: proof.evidence_profile.v1
+results:
+    - profile: known_issue_reproducer
+      requirement: SYS-REQ-069
+      command: go test ./internal/policy -run TestKnownIssue_ApplyMalformedPartitionClearsSessionBeforeError -count=1
+      status: pass
+      observed_result: known_issue_reproduced
+      executed_at: "2026-06-19T13:22:57Z"
+      input_set:
+        - KI-POLICY-APPLY-NONATOMIC-MALFORMED-PARTITION reproducer
+      freshness_hashes:
+        .proof/known-issues/KI-POLICY-APPLY-NONATOMIC-MALFORMED-PARTITION.yaml: sha256:e7301935351bd7d7b9eb5965a97085e11370735a0020a1d7142cae70da71d76e
+        internal/policy/negative_obligation_test.go: sha256:e6e19a4146e1bb1f4a8bff2d2e6f9dbf590f195ce59093c2e4e0211cbb4215d3
+        proof.yaml: sha256:895daff29b9390d8058fda4de375d4ae1f6468fde2e953f32526d40ddca5817f
+        specs/system/requirements/SYS-REQ-012.req.yaml: sha256:c77c34a6c154b62dc7619c1866741eeec78f8e4722094049deb9cfae5a6c7638
+        specs/system/requirements/SYS-REQ-054.req.yaml: sha256:391393ae1db863afff088b5e04793204883337318c9d577c10200f0ef895951a
+        specs/system/requirements/SYS-REQ-069.req.yaml: sha256:5895d7fb099ea67d78943b6b6f04889c7e336cddd42eb9cddbc0f2c961a229ca
+      known_issues:
+        - KI-POLICY-APPLY-NONATOMIC-MALFORMED-PARTITION

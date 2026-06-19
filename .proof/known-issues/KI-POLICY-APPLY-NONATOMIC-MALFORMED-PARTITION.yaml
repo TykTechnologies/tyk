@@ -1,0 +1,37 @@
+id: KI-POLICY-APPLY-NONATOMIC-MALFORMED-PARTITION
+title: Malformed partitioned policy clears session before error
+description: Service.Apply calls ClearSession before validating that a policy does not combine PerAPI mode with partition flags. When a malformed PerAPI+partition policy is referenced, Apply returns an error but rate-limit fields may already have been cleared from the session.
+affected_requirements:
+    - SYS-REQ-012
+    - SYS-REQ-054
+    - SYS-REQ-069
+evidence_manifests:
+    - .proof/evidence/ki-policy-apply-nonatomic-malformed-partition.yaml
+severity: high
+risk: policy_application_atomicity
+cve_surface: possible
+affected_api: internal/policy.Service.Apply
+attacker_input: session referencing a policy whose configuration combines PerAPI mode with partition flags
+sanitizer: go-test:policy-apply-atomicity
+reproducer_command: go test ./internal/policy -run TestKnownIssue_ApplyMalformedPartitionClearsSessionBeforeError -count=1
+introduced_in: 2dfcc3bf32
+minimization_status: candidate
+mitigation: Treat Apply errors as potentially mutating the supplied session; callers that need rollback semantics must snapshot the session before calling Apply until Apply validates policies before clearing or rolls back on error.
+remediation: Validate malformed PerAPI+partition policy configuration before ClearSession, or snapshot and restore session fields on any Apply error, then convert the reproducer into an expected rollback regression test.
+customer_impact: A malformed policy application can leave an API key session with rate-limit fields cleared even though no policy was successfully applied.
+owner: human:buger
+review_date: "2026-07-19"
+release_disposition: ship_with_known_issue
+status: open
+history:
+    - at: "2026-06-19T13:17:14Z"
+      by: agent:codex
+      action: created
+    - at: "2026-06-19T13:17:57Z"
+      by: agent:codex
+      action: edit
+      detail: add-evidence-manifest
+    - at: "2026-06-19T13:22:27Z"
+      by: agent:codex
+      action: edit
+      detail: introduced-in=2dfcc3bf32

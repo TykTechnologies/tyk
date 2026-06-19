@@ -19,13 +19,9 @@ tags:
     - atomicity
 variables: []
 traces:
-    implemented_by_extra:
-        - internal/policy/apply.go
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-05-19T17:10:21.379701Z"
-    reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:f6f52e1634a387d81bd6d676493facc3bfaa54224701288365a5f647be06abf1
+    reviewed_at: "2026-06-18T19:38:44.120675Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:9898a196dc70687ca71eea8a96cc6f26da34adf6209dde915605347cac1091e3
 verification:
     assurance_level: A
     formalization_status: ""
@@ -34,17 +30,6 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
-    impact_reviews:
-        - requirement: STK-REQ-005
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:f6f52e1634a387d81bd6d676493facc3bfaa54224701288365a5f647be06abf1
-          approval_fingerprint: sha256:bfae1d18fe1cfc1497dfff5d1c51788d568bde3b4c626360badf0776b45d98b7
-          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
-          reviewed_at: "2026-05-19T17:01:30Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"
@@ -66,32 +51,55 @@ stakeholder:
         - id: STK-REQ-005-AC-01
           text: Given a successful policy application, then no error is reported and all fields are merged
           testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-028
+            - SYS-REQ-029
+            - SYS-REQ-052
+            - SYS-REQ-070
+            - SYS-REQ-073
         - id: STK-REQ-005-AC-02
           text: Given a policy not found error, then an error is reported and no fields are merged
           testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-010
             - SYS-REQ-040
         - id: STK-REQ-005-AC-03
           text: Given an organization mismatch error, then an error is reported and no fields are merged
           testable: true
+          verification_method: test
+          witness_deferred:
+            reason: Organization mismatch currently reports an error after ClearSession has already cleared session fields; tracked as KI-POLICY-APPLY-NONATOMIC-ORG-MISMATCH until Apply validates before mutating or rolls back on error.
+            tracking: KI-POLICY-APPLY-NONATOMIC-ORG-MISMATCH
           derived_reqs:
             - SYS-REQ-011
             - SYS-REQ-024
             - SYS-REQ-025
             - SYS-REQ-026
+            - SYS-REQ-038
         - id: STK-REQ-005-AC-04
           text: Given a malformed policy (PerAPI+partition conflict), then an error is reported and no fields are merged
           testable: true
+          verification_method: test
+          witness_deferred:
+            reason: Malformed PerAPI+partition policies currently report an error after ClearSession has already cleared rate fields; tracked as KI-POLICY-APPLY-NONATOMIC-MALFORMED-PARTITION until Apply validates before mutating or rolls back on error.
+            tracking: KI-POLICY-APPLY-NONATOMIC-MALFORMED-PARTITION
           derived_reqs:
+            - SYS-REQ-002
             - SYS-REQ-012
+            - SYS-REQ-054
+            - SYS-REQ-075
         - id: STK-REQ-005-AC-05
           text: At no point can both error_reported and access_rights_merged be true simultaneously
           testable: true
+          verification_method: test
+          witness_deferred:
+            reason: Multi-policy error handling can leave fields from an earlier policy merged after a later policy error; tracked as KI-POLICY-APPLY-PARTIAL-MULTIPOLICY-ERROR until Apply commits only after all policies validate successfully.
+            tracking: KI-POLICY-APPLY-PARTIAL-MULTIPOLICY-ERROR
           derived_reqs:
             - SYS-REQ-028
+            - SYS-REQ-069
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

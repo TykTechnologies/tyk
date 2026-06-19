@@ -214,30 +214,44 @@ func TestAcceptance_EndpointLevelLimitsMergeHighestAndNewPaths(t *testing.T) {
 	assert.Equal(t, float64(5), limits["POST:/orders"].Rate)
 }
 
-// STK-REQ-001:STK-REQ-001-AC-05:acceptance
 // STK-REQ-005:STK-REQ-005-AC-02:acceptance
-// STK-REQ-005:STK-REQ-005-AC-03:acceptance
-// STK-REQ-005:STK-REQ-005-AC-04:acceptance
-// STK-REQ-005:STK-REQ-005-AC-05:acceptance
-func TestAcceptance_ApplyErrorsReportAndDoNotMergeFields(t *testing.T) {
+func TestAcceptance_ApplyPolicyNotFoundReportsErrorAndPreservesFields(t *testing.T) {
+	orgID := "org1"
+	svc := newTestService(orgID, nil)
+
+	session := &user.SessionState{
+		AccessRights: map[string]user.AccessDefinition{"api-existing": {Versions: []string{"v1"}}},
+		Rate:         77,
+		Per:          33,
+		QuotaMax:     1234,
+		Tags:         []string{"existing"},
+		MetaData:     map[string]interface{}{"existing": "metadata"},
+	}
+	session.SetPolicies("missing")
+
+	err := svc.Apply(session)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "policy not found")
+	assert.Contains(t, session.AccessRights, "api-existing")
+	assert.Equal(t, float64(77), session.Rate)
+	assert.Equal(t, float64(33), session.Per)
+	assert.Equal(t, int64(1234), session.QuotaMax)
+	assert.ElementsMatch(t, []string{"existing"}, session.Tags)
+	assert.Equal(t, "metadata", session.MetaData["existing"])
+}
+
+// STK-REQ-001:STK-REQ-001-AC-05:acceptance
+func TestAcceptance_ApplyOrgMismatchReportsError(t *testing.T) {
 	orgID := "org1"
 	wrongOrg := acceptancePolicy("other", "wrong-org")
-	malformed := acceptancePolicy(orgID, "malformed")
-	malformed.Partitions = user.PolicyPartitions{PerAPI: true, RateLimit: true}
+	svc := newTestService(orgID, []user.Policy{wrongOrg})
 
-	svc := newTestService(orgID, []user.Policy{wrongOrg, malformed})
+	session := &user.SessionState{MetaData: map[string]interface{}{}}
+	session.SetPolicies("wrong-org")
 
-	for _, policyID := range []string{"missing", "wrong-org", "malformed"} {
-		session := &user.SessionState{MetaData: map[string]interface{}{}}
-		session.SetPolicies(policyID)
-
-		err := svc.Apply(session)
-		require.Error(t, err, policyID)
-		assert.Empty(t, session.AccessRights)
-		assert.Equal(t, float64(0), session.Rate)
-		assert.Equal(t, int64(0), session.QuotaMax)
-		assert.Empty(t, session.Tags)
-	}
+	err := svc.Apply(session)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "different organisation")
 }
 
 // Verifies: STK-REQ-006 [malformed]
