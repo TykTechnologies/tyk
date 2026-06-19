@@ -48,6 +48,9 @@ project:
             evidence: [race]
         - atomicity
         - panic_free_input_handling
+    evidence_types:
+        nominal:
+            description: Test asserts expected behavior for a well-formed or explicitly modeled scenario.
     checks:
         coverage_threshold:
             threshold: 90

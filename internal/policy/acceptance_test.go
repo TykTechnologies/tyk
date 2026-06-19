@@ -31,8 +31,6 @@ func acceptancePolicy(orgID, id string) user.Policy {
 }
 
 // Verifies: STK-REQ-001, STK-REQ-005 [example]
-// STK-REQ-001:STK-REQ-001-AC-01:acceptance
-// STK-REQ-005:STK-REQ-005-AC-01:acceptance
 func TestAcceptance_ApplySinglePolicyMergesAllFields(t *testing.T) {
 	orgID := "org1"
 	svc := newTestService(orgID, []user.Policy{acceptancePolicy(orgID, "gold")})
@@ -51,7 +49,6 @@ func TestAcceptance_ApplySinglePolicyMergesAllFields(t *testing.T) {
 	assert.Contains(t, session.AccessRights, "api1")
 }
 
-// STK-REQ-001:STK-REQ-001-AC-02:acceptance
 func TestAcceptance_ApplyPerAPIPolicyAppliesIndependentLimits(t *testing.T) {
 	orgID := "org1"
 	pol := acceptancePolicy(orgID, "per-api")
@@ -92,7 +89,6 @@ func TestAcceptance_ApplyPerAPIPolicyAppliesIndependentLimits(t *testing.T) {
 	assert.Equal(t, 2, api2.MaxQueryDepth)
 }
 
-// STK-REQ-001:STK-REQ-001-AC-03:acceptance
 func TestAcceptance_ApplyPartitionedPolicyAppliesOnlyEnabledFields(t *testing.T) {
 	orgID := "org1"
 	pol := acceptancePolicy(orgID, "quota-acl")
@@ -128,8 +124,6 @@ func TestAcceptance_ApplyPartitionedPolicyAppliesOnlyEnabledFields(t *testing.T)
 	assert.Contains(t, session.AccessRights, "api2")
 }
 
-// STK-REQ-001:STK-REQ-001-AC-04:acceptance
-// STK-REQ-003:STK-REQ-003-AC-04:acceptance
 func TestAcceptance_ApplyMultiplePoliciesHighestRateWins(t *testing.T) {
 	orgID := "org1"
 	low := acceptancePolicy(orgID, "low")
@@ -149,9 +143,6 @@ func TestAcceptance_ApplyMultiplePoliciesHighestRateWins(t *testing.T) {
 }
 
 // Verifies: STK-REQ-003 [boundary]
-// STK-REQ-003:STK-REQ-003-AC-01:acceptance
-// STK-REQ-003:STK-REQ-003-AC-02:acceptance
-// STK-REQ-003:STK-REQ-003-AC-03:acceptance
 func TestAcceptance_ApplyRateLimitsHonorsHigherEmptyAndEqualRates(t *testing.T) {
 	svc := &policy.Service{}
 
@@ -172,8 +163,6 @@ func TestAcceptance_ApplyRateLimitsHonorsHigherEmptyAndEqualRates(t *testing.T) 
 }
 
 // Verifies: STK-REQ-002 [example]
-// STK-REQ-002:STK-REQ-002-AC-01:acceptance
-// STK-REQ-002:STK-REQ-002-AC-02:acceptance
 func TestAcceptance_ClearSessionResetsValuesAndReportsMissingPolicy(t *testing.T) {
 	orgID := "org1"
 	svc := newTestService(orgID, []user.Policy{acceptancePolicy(orgID, "gold")})
@@ -193,8 +182,6 @@ func TestAcceptance_ClearSessionResetsValuesAndReportsMissingPolicy(t *testing.T
 }
 
 // Verifies: STK-REQ-004 [example]
-// STK-REQ-004:STK-REQ-004-AC-01:acceptance
-// STK-REQ-004:STK-REQ-004-AC-02:acceptance
 func TestAcceptance_EndpointLevelLimitsMergeHighestAndNewPaths(t *testing.T) {
 	svc := &policy.Service{}
 	current := user.Endpoints{
@@ -214,7 +201,6 @@ func TestAcceptance_EndpointLevelLimitsMergeHighestAndNewPaths(t *testing.T) {
 	assert.Equal(t, float64(5), limits["POST:/orders"].Rate)
 }
 
-// STK-REQ-005:STK-REQ-005-AC-02:acceptance
 func TestAcceptance_ApplyPolicyNotFoundReportsErrorAndPreservesFields(t *testing.T) {
 	orgID := "org1"
 	svc := newTestService(orgID, nil)
@@ -240,7 +226,6 @@ func TestAcceptance_ApplyPolicyNotFoundReportsErrorAndPreservesFields(t *testing
 	assert.Equal(t, "metadata", session.MetaData["existing"])
 }
 
-// STK-REQ-001:STK-REQ-001-AC-05:acceptance
 func TestAcceptance_ApplyOrgMismatchReportsError(t *testing.T) {
 	orgID := "org1"
 	wrongOrg := acceptancePolicy("other", "wrong-org")
@@ -255,9 +240,6 @@ func TestAcceptance_ApplyOrgMismatchReportsError(t *testing.T) {
 }
 
 // Verifies: STK-REQ-006 [malformed]
-// STK-REQ-006:STK-REQ-006-AC-01:acceptance
-// STK-REQ-006:STK-REQ-006-AC-02:acceptance
-// STK-REQ-006:STK-REQ-006-AC-03:acceptance
 func TestAcceptance_IdleNilStoreAndActiveIdleTransitions(t *testing.T) {
 	orgID := "org1"
 	idle := &user.SessionState{
@@ -297,8 +279,6 @@ func TestAcceptance_IdleNilStoreAndActiveIdleTransitions(t *testing.T) {
 }
 
 // Verifies: STK-REQ-007 [boundary]
-// STK-REQ-007:STK-REQ-007-AC-01:acceptance
-// STK-REQ-007:STK-REQ-007-AC-02:acceptance
 func TestAcceptance_ApplyCompletesWithinPolicyCountBounds(t *testing.T) {
 	for _, count := range []int{10, 50} {
 		t.Run("policy_count", func(t *testing.T) {
