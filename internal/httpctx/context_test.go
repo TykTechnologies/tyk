@@ -10,20 +10,11 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 )
 
-// Verifies: SYS-REQ-108
-// MCDC SYS-REQ-108: httpctx_context_metadata_determined=F, httpctx_context_metadata_requested=F => TRUE
-func TestMCDC_SYS_REQ_108_NoContextMetadataRequest(t *testing.T) {
-	req := httptest.NewRequest("GET", "/", nil)
-	_ = req
-}
-
 // Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-028
 // STK-REQ-020:nominal:nominal
 // SYS-REQ-108:nominal:nominal
 // SW-REQ-028:nominal:nominal
 // MCDC SYS-REQ-108: httpctx_context_metadata_requested=T, httpctx_context_metadata_determined=T => TRUE
-//
-//mcdc:ignore SYS-REQ-108: httpctx_context_metadata_determined=F, httpctx_context_metadata_requested=T => FALSE -- violation row is the negation of the request-context metadata determination guarantee; focused tests assert stored, missing, mismatched, routing, and flag requests return deterministic results [category: defensive] [reviewed: human:buger]
 func TestValue_SetAndGet(t *testing.T) {
 	// Define a key and instantiate a new Value with type map[string]any
 	key := "testKey"

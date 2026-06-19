@@ -1,11 +1,13 @@
 # Phase: Scoped ReqProof Stabilization -- Current Warning Disposition
 
-Date: 2026-06-19
+Date: 2026-06-20
 
 ## Goal
 
-Bring the currently scoped Tyk ReqProof slice into a truthful strict-audit posture
-without claiming full-repo completion. The audit policy remains strict:
+Track the current truthful baseline on the path to full Tyk ReqProof onboarding
+with zero audit warnings. The current state is not accepted as complete; it is
+the honest backlog after removing known false evidence. The audit policy remains
+strict:
 
 - `project.audit.fail_level: warn`
 - `project.workflow.fail_level: warn`
@@ -16,9 +18,9 @@ without claiming full-repo completion. The audit policy remains strict:
 - no fake `// MCDC` witnesses
 - no no-op trigger-false witnesses
 
-This phase is not the full package-onboarding wave. Most production Go files are
-still intentionally visible as out of scope until they have real product
-requirements, traces, and evidence.
+Most production Go files are still visible as out of scope until they have real
+product requirements, traces, and evidence. The path to zero warnings is full
+onboarding, not narrowing the audit or hiding the warning.
 
 ## Current Audit Snapshot
 
@@ -42,8 +44,8 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 24/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
-| `mcdc_coverage` | 38/364 uncovered rows across 22 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
+| `verification_scope_complete` | 61/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `mcdc_coverage` | 52/385 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
 
@@ -76,7 +78,7 @@ The trigger-false/no-action witness gap is tracked upstream:
 
 ## Current MC/DC Backlog Classification
 
-The current 38 uncovered MC/DC rows are intentionally left visible. They fall
+The current 52 uncovered MC/DC rows are intentionally left visible. They fall
 into two closure groups:
 
 1. Trigger-false/no-action rows: leave red until there is real no-action
@@ -109,6 +111,9 @@ new product KnownIssue.
 | `SYS-REQ-098` | `requested=F,scoped=F => TRUE`; `requested=T,scoped=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
 | `SYS-REQ-100` | `requested=F,returned=F => TRUE`; `requested=T,returned=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
 | `SYS-REQ-103` | `requested=F,result=F => TRUE`; `requested=T,result=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SYS-REQ-108` | `requested=F,determined=F => TRUE`; `requested=T,determined=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SYS-REQ-109` | `requested=F,determined=F => TRUE`; `requested=T,determined=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
+| `SYS-REQ-110` | `requested=F,determined=F => TRUE`; `requested=T,determined=F => FALSE` | trigger-false plus paired invariant violation | Leave red until no-action evidence or model refinement exists. |
 | `SW-REQ-007` | `identity_requested=F,identifier_available=T,identifier_valid=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
 | `SW-REQ-008` | `store_requested=F,lookup_returned=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
 | `SYS-REQ-080` | `api_list_requested=F,api_list_result_returned=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
@@ -130,7 +135,7 @@ rather than part of this backlog.
 
 ## Current Known Issues To Keep Visible
 
-The current audit reports nine active KnownIssues. They are intentionally
+The current audit reports eight active KnownIssues. They are intentionally
 visible product or platform debts, not assumptions:
 
 - `KI-MODEL-DELETE-LEGACY-LOOKUP`
@@ -139,7 +144,6 @@ visible product or platform debts, not assumptions:
 - `KI-POLICY-APPLY-NONATOMIC-ORG-MISMATCH`
 - `KI-POLICY-APPLY-PARTIAL-MULTIPOLICY-ERROR`
 - `KI-POLICY-SHARED-SESSION-RACE`
-- `KI-RATE-QUOTA-HEADER-INT-NARROWING`
 - `KI-SANITIZE-MALFORMED-PERCENT`
 - `KI-SANITIZE-WINDOWS-VOLUME-PATH`
 

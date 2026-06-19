@@ -40,18 +40,18 @@ Unknown must not become green.
 
 ## Observed behavior in Tyk
 
-After removing known-false no-call witness comments, removing refused
-trigger-false ignores, closing the four invariant-only rows that already had
-positive witnesses, and adding the missing safe-archive-path executable witness,
-Tyk reports:
+After removing known-false no-call witness comments, removing the paired
+refused trigger-false ignores that depended on those comments, closing the four
+invariant-only rows that already had positive witnesses, and adding the missing
+safe-archive-path executable witness, Tyk reports:
 
 ```sh
 proof mcdc spec queue --limit 120
 ```
 
 ```text
-38/364 witness rows uncovered across 91 requirement(s)
-22 partial-row-coverage items
+52/385 witness rows uncovered across 98 requirement(s)
+29 partial-row-coverage items
 ```
 
 Representative current rows:
@@ -72,6 +72,18 @@ SYS-REQ-095:
 SYS-REQ-098:
   root_creation_requested=F, root_directory_scoped=F => TRUE
   root_creation_requested=T, root_directory_scoped=F => FALSE
+
+SYS-REQ-108:
+  httpctx_context_metadata_determined=F, httpctx_context_metadata_requested=F => TRUE
+  httpctx_context_metadata_determined=F, httpctx_context_metadata_requested=T => FALSE
+
+SYS-REQ-109:
+  cache_operation_determined=F, cache_operation_requested=F => TRUE
+  cache_operation_determined=F, cache_operation_requested=T => FALSE
+
+SYS-REQ-110:
+  maps_operation_determined=F, maps_operation_requested=F => TRUE
+  maps_operation_determined=F, maps_operation_requested=T => FALSE
 ```
 
 Example requirements and evidence:

@@ -9,13 +9,6 @@ type flattenTestStruct struct {
 	Count int
 }
 
-// Verifies: SYS-REQ-110
-// MCDC SYS-REQ-110: maps_operation_determined=F, maps_operation_requested=F => TRUE
-func TestMCDC_SYS_REQ_110_NoMapsOperation(t *testing.T) {
-	var flat FlatMap
-	_ = flat
-}
-
 // Verifies: STK-REQ-022, SYS-REQ-110, SW-REQ-030
 // STK-REQ-022:nominal:nominal
 // STK-REQ-022:boundary:boundary
@@ -24,8 +17,6 @@ func TestMCDC_SYS_REQ_110_NoMapsOperation(t *testing.T) {
 // SW-REQ-030:nominal:nominal
 // SW-REQ-030:boundary:boundary
 // MCDC SYS-REQ-110: maps_operation_requested=T, maps_operation_determined=T => TRUE
-//
-//mcdc:ignore SYS-REQ-110: maps_operation_determined=F, maps_operation_requested=T => FALSE -- violation row is the negation of the in-process map operation determination guarantee; focused tests assert supported flattening, unsupported-value errors, invalid-key panics, and synchronized string-map operations are deterministic [category: defensive] [reviewed: human:buger]
 func TestFlatten(t *testing.T) {
 	got, err := Flatten(map[string]interface{}{
 		"bool_true":  true,
