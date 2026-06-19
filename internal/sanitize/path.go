@@ -11,6 +11,8 @@ import (
 var ErrInvalidFilePath = errors.New("invalid file path in archive")
 
 // ZipFilePath validates that a file path from a zip archive is safe and within the expected directory.
+// SYS-REQ-091
+// SYS-REQ-092
 func ZipFilePath(filePath string, targetDir string) error {
 	cleanPath := filepath.Clean(filePath)
 
@@ -31,6 +33,8 @@ func ZipFilePath(filePath string, targetDir string) error {
 	return nil
 }
 
+// SYS-REQ-093
+// SYS-REQ-094
 func ValidatePathComponent(component string) error {
 	if component == "" || component == "." || component == ".." {
 		return fmt.Errorf("%w: invalid path component %q", ErrInvalidFilePath, component)

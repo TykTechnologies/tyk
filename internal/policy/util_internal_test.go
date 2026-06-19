@@ -8,7 +8,6 @@ import (
 )
 
 // Verifies: SYS-REQ-021 [boundary]
-// MCDC SYS-REQ-021: apply_requested=T, result_returned=T => TRUE
 func TestGreaterThanInt_BothPositive(t *testing.T) {
 	// Covers: second == -1 evaluating to false (both args positive)
 	if !greaterThanInt(10, 5) {
@@ -20,7 +19,6 @@ func TestGreaterThanInt_BothPositive(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-021 [boundary]
-// MCDC SYS-REQ-021: apply_requested=T, result_returned=T => TRUE
 func TestGreaterThanInt64_BothPositive(t *testing.T) {
 	// Covers: second == -1 evaluating to false (both args positive)
 	if !greaterThanInt64(100, 50) {
@@ -32,7 +30,6 @@ func TestGreaterThanInt64_BothPositive(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-021 [boundary]
-// MCDC SYS-REQ-021: apply_requested=T, result_returned=T => TRUE
 func TestGreaterThanInt_Sentinel(t *testing.T) {
 	// first == -1 => always true
 	if !greaterThanInt(-1, 5) {
@@ -45,7 +42,6 @@ func TestGreaterThanInt_Sentinel(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-008 [boundary]
-// MCDC SYS-REQ-008: apply_requested=T, policy_found=F => TRUE
 func TestPolicyByID_NonACLType(t *testing.T) {
 	// Covers: store.go:57 ok=false branch (non-aclPolId type)
 	store := NewStore(nil)

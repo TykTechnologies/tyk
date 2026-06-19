@@ -37,7 +37,7 @@ type Service struct {
 const QuotaUnlimited = -1
 const QuotaUnlimitedInt64 int64 = -1
 
-// SYS-REQ-008, SYS-REQ-042
+// SW-REQ-002, SYS-REQ-042
 // reqproof:requires orgID != nil
 // reqproof:ensures return != nil
 func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Service {
@@ -51,7 +51,6 @@ func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Se
 // SYS-REQ-019, SYS-REQ-020, SYS-REQ-049
 // ClearSession clears the quota, rate limit and complexity values so that partitioned policies can apply their values.
 // Otherwise, if the session has already a higher value, an applied policy will not win, and its values will be ignored.
-//
 func (t *Service) ClearSession(session *user.SessionState) error {
 	if t.storage == nil {
 		return ErrNilPolicyStore
@@ -96,12 +95,11 @@ type applyStatus struct {
 	didPartition  bool
 }
 
-// SYS-REQ-008, SYS-REQ-010, SYS-REQ-011, SYS-REQ-012, SYS-REQ-013, SYS-REQ-014, SYS-REQ-015, SYS-REQ-016, SYS-REQ-017, SYS-REQ-018
+// SW-REQ-002, SYS-REQ-010, SYS-REQ-011, SYS-REQ-012, SYS-REQ-013, SYS-REQ-014, SYS-REQ-015, SYS-REQ-016, SYS-REQ-017, SYS-REQ-018
 // SYS-REQ-024, SYS-REQ-025, SYS-REQ-026, SYS-REQ-027, SYS-REQ-028, SYS-REQ-029, SYS-REQ-030, SYS-REQ-031, SYS-REQ-032, SYS-REQ-033
 // SYS-REQ-040, SYS-REQ-042, SYS-REQ-043, SYS-REQ-044, SYS-REQ-050, SYS-REQ-052, SYS-REQ-053, SYS-REQ-054
 // Apply will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
-//
 func (t *Service) Apply(session *user.SessionState) error {
 	if session == nil {
 		return errors.New("nil session")
@@ -293,7 +291,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 	return nil
 }
 
-// SYS-REQ-008
+// SW-REQ-002
 // Logger implements a typical logger signature with service context.
 func (t *Service) Logger() *logrus.Entry {
 	return logrus.NewEntry(t.logger)
@@ -399,7 +397,7 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 	return nil
 }
 
-// SYS-REQ-008, SYS-REQ-033
+// SW-REQ-002, SYS-REQ-033
 func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
 	ids := session.PolicyIDs()
 
@@ -680,17 +678,6 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 	}
 }
 
-// Phase UU.31: these same-package methods cannot be lowered because their
-// bodies call opaque-type methods (.Map(), .Endpoints(), .Duration()) and use
-// operations (len, range over opaque returns) the translator does not support.
-// The assumes use the real model types (now declared as reqproof:abstract
-// sort=Opaque in the user package) rather than the old bool projections.
-//
-// reqproof:assume policy.Service.ApplyEndpointLevelLimits func(t *Service, policyEndpoints user.Endpoints, currEndpoints user.Endpoints) user.Endpoints { return policyEndpoints }
-// reqproof:assume policy.Service.ApplyJSONRPCMethodLimits func(t *Service, policyMethods user.JSONRPCMethodLimit, currMethods user.JSONRPCMethodLimit) user.JSONRPCMethodLimit { return policyMethods }
-// reqproof:assume policy.Service.ApplyMCPPrimitiveLimits func(t *Service, policyPrimitives user.MCPPrimitiveLimit, currPrimitives user.MCPPrimitiveLimit) user.MCPPrimitiveLimit { return policyPrimitives }
-// reqproof:assume user.APILimit.Duration func(m user.APILimit) float64 { return m.Per / m.Rate }
-//
 // ---
 // Lemma 1: QuotaMax never goes negative
 // reqproof:requires policyAD.Limit.QuotaMax >= 0
@@ -718,15 +705,6 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 // reqproof:requires currAD.Limit.QuotaMax <= policyAD.Limit.QuotaMax
 // reqproof:lemma apply_api_limits_quota_max_identity proves t.applyAPILevelLimits(policyAD, currAD).Limit.QuotaMax == policyAD.Limit.QuotaMax
 //
-// Lemma 6: Duration branch — when policy has longer Per/Rate ratio (longer
-// interval = more restrictive), currAD's shorter-duration values are used.
-// Requires different Per values so the lemma only proves when the branch
-// actually copies currAD.Per (otherwise policyAD.Per=2.0 would persist).
-// reqproof:requires policyAD.Limit.Rate == 50.0
-// reqproof:requires policyAD.Limit.Per == 2.0
-// reqproof:requires currAD.Limit.Rate == 100.0
-// reqproof:requires currAD.Limit.Per == 1.0
-// reqproof:lemma apply_api_limits_duration_branch_sets_per proves t.applyAPILevelLimits(policyAD, currAD).Limit.Per == 1.0
 // SYS-REQ-016, SYS-REQ-017, SYS-REQ-018
 func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
 	var updated bool
@@ -765,7 +743,6 @@ func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD use
 // SYS-REQ-023
 // ApplyEndpointLevelLimits combines policyEndpoints and currEndpoints and returns the combined value.
 // The returned endpoints would have the highest request rate from policyEndpoints and currEndpoints.
-//
 func (t *Service) ApplyEndpointLevelLimits(policyEndpoints user.Endpoints, currEndpoints user.Endpoints) user.Endpoints {
 	currEPMap := currEndpoints.Map()
 	if len(currEPMap) == 0 {
@@ -887,7 +864,6 @@ func (t *Service) ApplyMCPPrimitiveLimits(policy, current []user.MCPPrimitiveLim
 	}
 	return out
 }
-
 
 // Phase UU.26: exercise nested field write lowering in the real Tyk
 // codebase. The body writes through two levels of struct selectors

@@ -1,0 +1,81 @@
+component: compression
+no_interface:
+    declared: true
+    reason: 'The compression package is an in-process helper for Zstd encoding, decoding, frame detection, and size-limit configuration; it does not define a cross-component runtime interface boundary.'
+variables:
+    - name: zstd_roundtrip_requested
+      type: bool
+      direction: input
+      description: A caller requests Zstd compression followed by decompression of a valid byte payload.
+
+    - name: zstd_payload_bytes_preserved
+      type: bool
+      direction: output
+      description: Decompression returns exactly the original byte payload for valid compressed data.
+
+    - name: zstd_invalid_frame_presented
+      type: bool
+      direction: input
+      description: A caller presents invalid, corrupted, too-short, or malformed Zstd input for detection or decompression.
+
+    - name: zstd_invalid_frame_rejected
+      type: bool
+      direction: output
+      description: Detection rejects non-magic prefixes and decompression returns an error for invalid compressed frames.
+
+    - name: zstd_oversize_decompression_requested
+      type: bool
+      direction: input
+      description: A caller requests decompression of a payload whose decoded size exceeds the active decompressed-size limit.
+      data_constraint:
+        domain: integer
+        variable: zstd_decompressed_size
+        condition: "zstd_decompressed_size > zstd_active_limit"
+        parameters:
+          - name: zstd_decompressed_size
+            type: int64
+            constraint: ">= 0"
+          - name: zstd_active_limit
+            type: int64
+            constraint: ">= 1048576"
+
+    - name: zstd_oversize_decompression_blocked
+      type: bool
+      direction: output
+      description: Decompression returns an error instead of producing oversized decoded payload bytes.
+
+    - name: zstd_allowed_decompression_requested
+      type: bool
+      direction: input
+      description: A caller requests decompression of a payload whose decoded size is within the active decompressed-size limit.
+      data_constraint:
+        domain: integer
+        variable: zstd_decompressed_size
+        condition: "zstd_decompressed_size <= zstd_active_limit"
+        parameters:
+          - name: zstd_decompressed_size
+            type: int64
+            constraint: ">= 0"
+          - name: zstd_active_limit
+            type: int64
+            constraint: ">= 1048576"
+
+    - name: zstd_limit_update_requested
+      type: bool
+      direction: input
+      description: A caller updates the configured maximum decompressed size.
+
+    - name: zstd_minimum_limit_enforced
+      type: bool
+      direction: output
+      description: The active maximum decompressed size is never left below the package minimum limit.
+
+    - name: zstd_codec_failure_present
+      type: bool
+      direction: input
+      description: The internal Zstd encoder or decoder pool provides no codec object, a codec object with the wrong type, or cannot construct a decoder.
+
+    - name: zstd_codec_failure_reported
+      type: bool
+      direction: output
+      description: Compression or decompression returns an explicit error for the internal codec failure without panicking or treating payload bytes as valid.

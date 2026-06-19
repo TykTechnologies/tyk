@@ -18,13 +18,9 @@ tags:
     - sla
 variables: []
 traces:
-    implemented_by_extra:
-        - internal/policy/apply.go
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-05-19T17:10:21.386924Z"
-    reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:6aec76320ee98c52d7f777a4c441711d75a1c974a5b8bcbe5ceccbfd7a8c5936
+    reviewed_at: "2026-06-18T19:38:44.176646Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:24b7a1135aa1cbd93113f6ad7b7a995e6d8af17a3fba694477306b3f6132a144
 verification:
     assurance_level: A
     formalization_status: ""
@@ -33,17 +29,6 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
-    impact_reviews:
-        - requirement: STK-REQ-007
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:6aec76320ee98c52d7f777a4c441711d75a1c974a5b8bcbe5ceccbfd7a8c5936
-          approval_fingerprint: sha256:4b444c9ec10c3effa036920ee016989689a5a17ddf065ab82b58725322957bd9
-          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
-          reviewed_at: "2026-05-19T17:01:30Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"
@@ -62,13 +47,21 @@ stakeholder:
         - id: STK-REQ-007-AC-01
           text: Given a session with 1-10 policies, when Apply is called, then it completes within 100ms
           testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-044
+            - SYS-REQ-066
+            - SYS-REQ-067
+            - SYS-REQ-070
+            - SYS-REQ-076
         - id: STK-REQ-007-AC-02
           text: Given a session with 50 policies, when Apply is called, then it completes within 100ms
           testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-044
+            - SYS-REQ-067
+            - SYS-REQ-076
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

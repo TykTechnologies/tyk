@@ -1,0 +1,14 @@
+component: identifiers
+no_interface:
+    declared: true
+    reason: 'Gateway identifier generation and validation is an in-process product behavior in this proof slice; no cross-component runtime interface contract is modeled here.'
+variables:
+    - name: uuid_operation_requested
+      type: bool
+      direction: input
+      description: A caller requests gateway UUID generation, dash-free UUID generation, UUID validation, or internal UUID generation error signaling.
+
+    - name: uuid_operation_result_returned
+      type: bool
+      direction: output
+      description: Gateway identifier behavior returns the expected identifier, validation result, or explicit panic signal for an internal generation error.

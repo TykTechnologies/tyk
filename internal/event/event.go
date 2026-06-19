@@ -71,6 +71,7 @@ var eventMap = map[Event]string{
 
 // String will return the description for the event if any.
 // If no description exists, it will return the event value.
+// SW-REQ-004
 func String(e Event) string {
 	v, ok := eventMap[e]
 	if ok {
@@ -111,6 +112,7 @@ const eventContextKey contextKey = "events"
 
 // Add adds an event to the request context.
 // Add adds an event to the context value in the request.
+// SW-REQ-004
 func Add(r *http.Request, event Event) {
 	ctx := r.Context()
 
@@ -122,12 +124,14 @@ func Add(r *http.Request, event Event) {
 
 // Set updates the context with the provided events and returns the new context.
 // Set will update the context with a new value and return the new context.
+// SW-REQ-004
 func Set(ctx context.Context, events []Event) context.Context {
 	return context.WithValue(ctx, eventContextKey, events)
 }
 
 // Get retrieves the events from the context.
 // Get will get the events from context. It will return nil if no events in context.
+// SW-REQ-004
 func Get(ctx context.Context) []Event {
 	if v, ok := ctx.Value(eventContextKey).([]Event); ok {
 		return v
@@ -137,6 +141,7 @@ func Get(ctx context.Context) []Event {
 
 // EncodeRequestToEvent will write the request out in wire protocol and
 // encode it to base64 and store it in an Event object
+// SW-REQ-004
 func EncodeRequestToEvent(r *http.Request) string {
 	var asBytes bytes.Buffer
 	err := r.Write(&asBytes)

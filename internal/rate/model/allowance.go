@@ -8,6 +8,7 @@ import (
 )
 
 // Allowance is a redis data model type. It's encoded into a redis Hash type.
+// SW-REQ-006
 type Allowance struct {
 	// Delay is the minimum time between rate limit changes (in seconds).
 	Delay int64 `redis:"delay"`
@@ -20,6 +21,7 @@ type Allowance struct {
 }
 
 // NewAllowance creates a new allowance with the update delay (in seconds).
+// SW-REQ-006
 func NewAllowance(delay int64) *Allowance {
 	return &Allowance{
 		Delay: delay,
@@ -27,6 +29,7 @@ func NewAllowance(delay int64) *Allowance {
 }
 
 // NewAllowanceFromMap will scan the `in` parameter and convert it to *Allowance.
+// SW-REQ-006
 func NewAllowanceFromMap(in map[string]string) *Allowance {
 	result := &Allowance{}
 
@@ -40,12 +43,14 @@ func NewAllowanceFromMap(in map[string]string) *Allowance {
 }
 
 // Valid returns false if validation with Err() fails.
+// SW-REQ-006
 func (a *Allowance) Valid() bool {
 	err := a.Err()
 	return err == nil
 }
 
 // Err returns a validation error for *Allowance.
+// SW-REQ-006
 func (a *Allowance) Err() error {
 	if a.Delay <= 0 {
 		return errors.New("allowance: invalid delay")
@@ -54,6 +59,7 @@ func (a *Allowance) Err() error {
 }
 
 // Map will return an allowance as a map.
+// SW-REQ-006
 func (a *Allowance) Map() map[string]any {
 	return map[string]any{
 		"delay":        fmt.Sprint(a.Delay),
@@ -63,6 +69,7 @@ func (a *Allowance) Map() map[string]any {
 }
 
 // Reset will clear the allowance.
+// SW-REQ-006
 func (a *Allowance) Reset() {
 	if a == nil {
 		return
@@ -72,28 +79,33 @@ func (a *Allowance) Reset() {
 }
 
 // GetDelay returns the delay for rate limit smoothing as a time.Duration.
+// SW-REQ-006
 func (a *Allowance) GetDelay() time.Duration {
 	return time.Second * time.Duration(a.Delay)
 }
 
 // Get returns the current allowance.
+// SW-REQ-006
 func (a *Allowance) Get() int64 {
 	return a.Current
 }
 
 // Set updates the current allowance to the specified value and
 // sets the next update time based on the configured delay.
+// SW-REQ-006
 func (a *Allowance) Set(allowance int64) {
 	a.Current = allowance
 	a.Touch()
 }
 
 // Touch updates the next allowance time to the configured delay.
+// SW-REQ-006
 func (a *Allowance) Touch() {
 	a.NextUpdateAt = time.Now().Add(a.GetDelay())
 }
 
 // Expired checks if the allowance can be updated based on the configured delay.
+// SW-REQ-006
 func (a *Allowance) Expired() bool {
 	return time.Since(a.NextUpdateAt) > 0
 }

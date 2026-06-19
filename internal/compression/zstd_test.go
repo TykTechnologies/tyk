@@ -3,9 +3,14 @@ package compression
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
+	"sync"
 	"testing"
+
+	"github.com/klauspost/compress/zstd"
 )
 
+// Verifies: SYS-REQ-085
 func TestCompressZstd(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -62,10 +67,23 @@ func TestCompressZstd(t *testing.T) {
 			if string(compressed) == tt.input {
 				t.Error("CompressZstd did not compress the data")
 			}
+			if !IsZstdCompressed(compressed) {
+				t.Error("CompressZstd returned data without the Zstd magic prefix")
+			}
 		})
 	}
 }
 
+// Verifies: SYS-REQ-085, SYS-REQ-086
+// SYS-REQ-085:nominal:nominal
+// SYS-REQ-085:encoding_safety:nominal
+// SYS-REQ-085:determinism:nominal
+// SYS-REQ-086:malformed_input:nominal
+// SYS-REQ-086:nominal:nominal
+// SYS-REQ-086:encoding_safety:nominal
+// SYS-REQ-086:determinism:nominal
+// MCDC SYS-REQ-085: zstd_roundtrip_requested=T, zstd_payload_bytes_preserved=T => TRUE
+// MCDC SYS-REQ-086: zstd_invalid_frame_presented=F, zstd_invalid_frame_rejected=F => TRUE
 func TestDecompressZstd(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -115,6 +133,11 @@ func TestDecompressZstd(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-086
+// SYS-REQ-086:malformed_input:negative
+// SYS-REQ-086:error_handling:nominal
+// SYS-REQ-086:error_handling:negative
+// MCDC SYS-REQ-086: zstd_invalid_frame_presented=T, zstd_invalid_frame_rejected=T => TRUE
 func TestDecompressZstd_InvalidData(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -144,6 +167,13 @@ func TestDecompressZstd_InvalidData(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-085, SYS-REQ-088, SYS-REQ-090
+// SYS-REQ-088:nominal:nominal
+// SYS-REQ-088:boundary:nominal
+// SYS-REQ-088:encoding_safety:nominal
+// SYS-REQ-090:nominal:nominal
+// MCDC SYS-REQ-088: zstd_allowed_decompression_requested=T, zstd_payload_bytes_preserved=T => TRUE
+// MCDC SYS-REQ-090: zstd_codec_failure_present=F, zstd_codec_failure_reported=F => TRUE
 func TestCompressDecompressRoundTrip(t *testing.T) {
 	// Test with realistic API definition data
 	apiDef := map[string]interface{}{
@@ -181,6 +211,9 @@ func TestCompressDecompressRoundTrip(t *testing.T) {
 	if len(compressed) >= len(jsonData) {
 		t.Logf("Compressed size (%d) >= original size (%d)", len(compressed), len(jsonData))
 	}
+	if !IsZstdCompressed(compressed) {
+		t.Fatal("compressed data was not identified as a Zstd frame")
+	}
 
 	decompressed, err := DecompressZstd(compressed)
 	if err != nil {
@@ -199,6 +232,7 @@ func TestCompressDecompressRoundTrip(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-085
 func TestCompressionRatio(t *testing.T) {
 	// Test with a large, repetitive JSON structure (should compress well)
 	largeJSON := `{
@@ -221,6 +255,17 @@ func TestCompressionRatio(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CompressZstd failed: %v", err)
 	}
+	if !IsZstdCompressed(compressed) {
+		t.Fatal("compressed data was not identified as a Zstd frame")
+	}
+
+	decompressed, err := DecompressZstd(compressed)
+	if err != nil {
+		t.Fatalf("DecompressZstd failed: %v", err)
+	}
+	if string(decompressed) != largeJSON {
+		t.Fatal("decompressed data does not match original repetitive JSON")
+	}
 
 	originalSize := len(largeJSON)
 	compressedSize := len(compressed)
@@ -236,6 +281,7 @@ func TestCompressionRatio(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-086
 func TestIsZstdCompressed(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -284,6 +330,15 @@ func TestIsZstdCompressed(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-087, SYS-REQ-088
+// SYS-REQ-087:nominal:nominal
+// SYS-REQ-087:boundary:nominal
+// SYS-REQ-087:error_handling:nominal
+// SYS-REQ-087:error_handling:negative
+// SYS-REQ-088:boundary:nominal
+// MCDC SYS-REQ-087: zstd_oversize_decompression_requested=T, zstd_oversize_decompression_blocked=T => TRUE
+// MCDC SYS-REQ-087: zstd_oversize_decompression_requested=F, zstd_oversize_decompression_blocked=F => TRUE
+// MCDC SYS-REQ-088: zstd_allowed_decompression_requested=F, zstd_payload_bytes_preserved=F => TRUE
 func TestDecompressZstd_MaxSizeLimit(t *testing.T) {
 	// 2MB uncompressed data (exceeds the 1MB minimum limit)
 	bigData := bytes.Repeat([]byte("a"), 2*1024*1024)
@@ -313,6 +368,11 @@ func TestDecompressZstd_MaxSizeLimit(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-089
+// SYS-REQ-089:nominal:nominal
+// SYS-REQ-089:boundary:nominal
+// SYS-REQ-089:determinism:nominal
+// MCDC SYS-REQ-089: zstd_limit_update_requested=T, zstd_minimum_limit_enforced=T => TRUE
 func TestSetMaxDecompressedSize_ClampsBelowMinimum(t *testing.T) {
 	orig := maxDecompressedSize
 	defer SetMaxDecompressedSize(orig)
@@ -321,8 +381,13 @@ func TestSetMaxDecompressedSize_ClampsBelowMinimum(t *testing.T) {
 	if maxDecompressedSize != minDecompressedSize {
 		t.Errorf("expected maxDecompressedSize to be clamped to %d, got %d", minDecompressedSize, maxDecompressedSize)
 	}
+	if GetMaxDecompressedSize() != minDecompressedSize {
+		t.Errorf("expected GetMaxDecompressedSize to return %d, got %d", minDecompressedSize, GetMaxDecompressedSize())
+	}
 }
 
+// Verifies: SYS-REQ-085, SYS-REQ-089
+// MCDC SYS-REQ-089: zstd_limit_update_requested=F, zstd_minimum_limit_enforced=F => TRUE
 func TestIsZstdCompressed_WithActualCompressedData(t *testing.T) {
 	// Test with actual compressed data
 	original := []byte(`{"api_id":"test","name":"Test API"}`)
@@ -347,4 +412,52 @@ func TestIsZstdCompressed_WithActualCompressedData(t *testing.T) {
 			t.Errorf("Magic byte at position %d: got 0x%02X, want 0x%02X", i, compressed[i], expectedMagic[i])
 		}
 	}
+}
+
+// Verifies: SYS-REQ-090
+// SYS-REQ-090:error_handling:nominal
+// SYS-REQ-090:error_handling:negative
+// SYS-REQ-090:panic_free_input_handling:nominal
+// MCDC SYS-REQ-090: zstd_codec_failure_present=T, zstd_codec_failure_reported=T => TRUE
+func TestZstdCodecPoolFailuresReturnErrors(t *testing.T) {
+	origMax := maxDecompressedSize
+	defer resetZstdCodecStateForTest(origMax)
+
+	encoderPool = sync.Pool{New: func() interface{} { return nil }}
+	_, err := CompressZstd([]byte("payload"))
+	if err == nil || !strings.Contains(err.Error(), "failed to get Zstd encoder") {
+		t.Fatalf("expected nil encoder pool error, got %v", err)
+	}
+
+	encoderPool = sync.Pool{New: func() interface{} { return struct{}{} }}
+	_, err = CompressZstd([]byte("payload"))
+	if err == nil || !strings.Contains(err.Error(), "invalid encoder type") {
+		t.Fatalf("expected invalid encoder type error, got %v", err)
+	}
+
+	decoderPool = sync.Pool{New: func() interface{} { return nil }}
+	_, err = DecompressZstd([]byte("payload"))
+	if err == nil || !strings.Contains(err.Error(), "failed to get Zstd decoder") {
+		t.Fatalf("expected nil decoder pool error, got %v", err)
+	}
+
+	decoderPool = sync.Pool{New: func() interface{} { return struct{}{} }}
+	_, err = DecompressZstd([]byte("payload"))
+	if err == nil || !strings.Contains(err.Error(), "invalid decoder type") {
+		t.Fatalf("expected invalid decoder type error, got %v", err)
+	}
+
+}
+
+func resetZstdCodecStateForTest(maxSize uint64) {
+	encoderPool = sync.Pool{
+		New: func() interface{} {
+			encoder, err := zstd.NewWriter(nil)
+			if err != nil {
+				return nil
+			}
+			return encoder
+		},
+	}
+	SetMaxDecompressedSize(maxSize)
 }

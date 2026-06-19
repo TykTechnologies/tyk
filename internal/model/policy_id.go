@@ -21,6 +21,8 @@ type (
 
 // markerPolicyId marker
 //
+// SYS-REQ-077
+//
 //nolint:unused
 func (i BasePolicyId) markerPolicyId() {}
 
@@ -30,6 +32,7 @@ var (
 )
 
 // NewScopedCustomPolicyId creates custom policy identifier
+// SYS-REQ-077
 func NewScopedCustomPolicyId(orgId, customId string) ScopedCustomPolicyId {
 	return ScopedCustomPolicyId{
 		orgId: orgId,
@@ -37,18 +40,28 @@ func NewScopedCustomPolicyId(orgId, customId string) ScopedCustomPolicyId {
 	}
 }
 
+// SYS-REQ-077
 func (c ScopedCustomPolicyId) OrgId() string {
 	return c.orgId
 }
+
+// SYS-REQ-077
 func (c ScopedCustomPolicyId) Id() string {
 	return c.id
 }
+
+// SYS-REQ-077
 func (c ScopedCustomPolicyId) String() string {
 	return c.id
 }
+
+// SYS-REQ-077
 func (c ScopedCustomPolicyId) markerPolicyId() {}
 
+// SYS-REQ-077
 func (c NonScopedLastInsertedPolicyId) String() string {
 	return string(c)
 }
+
+// SYS-REQ-077
 func (c NonScopedLastInsertedPolicyId) markerPolicyId() {}

@@ -18,14 +18,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-002
-    verified_by_extra:
-        - FLIP:policy/tc-030
-        - FLIP:policy/tc-031
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-05-19T17:10:22.188128Z"
-    reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:5d4418f55b6ccfd516765c5462f6fd153b2eb2c7b7cc89613c7de0715e1f90c1
+    reviewed_at: "2026-06-18T19:38:44.776659Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:f02ae5205aa3fe41b668a5315bd8411d27e6daad60a6e8a5912c48ce4f75c3aa
 verification:
     assurance_level: A
     formalization_status: valid
@@ -34,19 +29,99 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
-    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
-    gaps_reviewed_by: leonidbugaev
-    impact_reviews:
-        - requirement: SYS-REQ-020
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:5d4418f55b6ccfd516765c5462f6fd153b2eb2c7b7cc89613c7de0715e1f90c1
-          approval_fingerprint: sha256:285ce57ce07df5d19c443bced4ed07b9bebe087694cbcb5b0c3a7e33c23ffd31
-          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
-          reviewed_at: "2026-05-19T17:01:30Z"
+    gaps_reviewed_at: "2026-06-18T19:38:25.148877Z"
+    gaps_reviewed_by: buger
+    gap_reviews:
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-010|SYS-REQ-020
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-011|SYS-REQ-020
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-012|SYS-REQ-020
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-016|SYS-REQ-020
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-017|SYS-REQ-020
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-018|SYS-REQ-020
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-019|SYS-REQ-020
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-020|SYS-REQ-024
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-020|SYS-REQ-025
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-020|SYS-REQ-026
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-020|SYS-REQ-027
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-020|SYS-REQ-040
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-020|SYS-REQ-042
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-020|SYS-REQ-049
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-020|SYS-REQ-054
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-020|SYS-REQ-069
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-020|SYS-REQ-072
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-020|SYS-REQ-074
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:53Z"

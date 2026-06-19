@@ -18,13 +18,9 @@ tags:
     - rate-limiting
 variables: []
 traces:
-    implemented_by_extra:
-        - internal/policy/apply.go
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-05-19T17:10:21.376635Z"
-    reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:66c6ca1434bbaa03ed8035933c8db71bb02f07ab316fc672cf72b64416222cd7
+    reviewed_at: "2026-06-18T19:38:44.106756Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:890faecaf8cb433a4c57861c5afd5bc9894cc610f2e4bd503de591c7f8832b31
 verification:
     assurance_level: A
     formalization_status: ""
@@ -33,17 +29,6 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
-    impact_reviews:
-        - requirement: STK-REQ-004
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:66c6ca1434bbaa03ed8035933c8db71bb02f07ab316fc672cf72b64416222cd7
-          approval_fingerprint: sha256:7bf43faab9b4e17955b85ceef290a9c2df35178244d7b75af8763537c8153e87
-          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
-          reviewed_at: "2026-05-19T17:01:30Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"
@@ -66,12 +51,22 @@ stakeholder:
         - id: STK-REQ-004-AC-01
           text: Given policies with endpoint limits for the same path+method, when they are merged, then the highest rate for each endpoint is used
           testable: true
+          verification_method: test
           derived_reqs:
+            - SYS-REQ-022
             - SYS-REQ-023
+            - SYS-REQ-061
+            - SYS-REQ-062
+            - SYS-REQ-063
+            - SYS-REQ-067
+            - SYS-REQ-073
+            - SYS-REQ-074
         - id: STK-REQ-004-AC-02
           text: Given a policy with endpoint limits for new paths, when it is merged, then the new endpoint limits are added
           testable: true
+          verification_method: test
           derived_reqs:
+            - SYS-REQ-017
             - SYS-REQ-023
 lifecycle:
     change_history:

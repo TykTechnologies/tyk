@@ -1,0 +1,14 @@
+component: observability
+no_interface:
+    declared: true
+    reason: 'Gateway observability metadata in this proof slice is exercised through in-process event metadata behavior; no cross-component runtime interface contract is modeled yet.'
+variables:
+    - name: event_metadata_exchange_requested
+      type: bool
+      direction: input
+      description: A gateway event handler, analytics path, or audit flow requests event-name rendering, context event propagation, or HTTP request snapshot metadata.
+
+    - name: event_metadata_result_preserved
+      type: bool
+      direction: output
+      description: The gateway-visible event metadata result preserves the expected event name, ordered event slice, encoded request snapshot, or explicit empty snapshot for an encoding failure.

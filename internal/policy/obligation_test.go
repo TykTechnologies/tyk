@@ -67,10 +67,10 @@ func TestObligation_SYS_REQ_055_Determinism(t *testing.T) {
 	// The ACL partition is required so api1 stays in the rights map
 	// after the cleanup loop (which deletes entries without didAcl).
 	polA := user.Policy{
-		ID:    "polA",
-		OrgID: orgID,
-		Rate:  100,
-		Per:   60,
+		ID:               "polA",
+		OrgID:            orgID,
+		Rate:             100,
+		Per:              60,
 		QuotaMax:         5000,
 		QuotaRenewalRate: 3600,
 		MaxQueryDepth:    10,
@@ -173,18 +173,18 @@ func TestObligation_SYS_REQ_055_Row_NoApply(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // SYS-REQ-056: Idempotency -- Apply twice produces identical state
-// FRETish: !apply_requested | (apply_result_first = apply_result_second)
+// FRETish: !apply_requested | apply_results_equal
 // ---------------------------------------------------------------------------
 
 // Verifies: SYS-REQ-056
-// MCDC SYS-REQ-056: apply_requested=T, apply_result_first=T, apply_result_second=T => TRUE
+// MCDC SYS-REQ-056: apply_requested=T, apply_results_equal=T => TRUE
 func TestObligation_SYS_REQ_056_Idempotency(t *testing.T) {
 	orgID := "org1"
 	pol := user.Policy{
-		ID:    "pol1",
-		OrgID: orgID,
-		Rate:  50,
-		Per:   30,
+		ID:               "pol1",
+		OrgID:            orgID,
+		Rate:             50,
+		Per:              30,
 		QuotaMax:         1000,
 		QuotaRenewalRate: 3600,
 		Tags:             []string{"tag1", "tag2"},
@@ -228,7 +228,7 @@ func TestObligation_SYS_REQ_056_Idempotency(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-056
-// MCDC SYS-REQ-056: apply_requested=F, apply_result_first=T, apply_result_second=T => TRUE
+// MCDC SYS-REQ-056: apply_requested=F, apply_results_equal=F => TRUE
 func TestObligation_SYS_REQ_056_Row_NoApply(t *testing.T) {
 	// Antecedent false: requirement vacuously satisfied.
 	orgID := "org1"
@@ -246,10 +246,10 @@ func TestObligation_SYS_REQ_056_Row_NoApply(t *testing.T) {
 func TestObligation_SYS_REQ_057_Commutativity(t *testing.T) {
 	orgID := "org1"
 	polA := user.Policy{
-		ID:    "polA",
-		OrgID: orgID,
-		Rate:  100,
-		Per:   60,
+		ID:               "polA",
+		OrgID:            orgID,
+		Rate:             100,
+		Per:              60,
 		QuotaMax:         2000,
 		QuotaRenewalRate: 3600,
 		Tags:             []string{"tagA"},
@@ -259,10 +259,10 @@ func TestObligation_SYS_REQ_057_Commutativity(t *testing.T) {
 		},
 	}
 	polB := user.Policy{
-		ID:    "polB",
-		OrgID: orgID,
-		Rate:  200,
-		Per:   60,
+		ID:               "polB",
+		OrgID:            orgID,
+		Rate:             200,
+		Per:              60,
 		QuotaMax:         5000,
 		QuotaRenewalRate: 7200,
 		Tags:             []string{"tagB"},
@@ -375,11 +375,11 @@ func TestObligation_SYS_REQ_058_Row_SinglePolicy(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // SYS-REQ-059: Rate limit commutativity
-// FRETish: !rate_limit_apply_requested | !multiple_policies | (rate_merge_AB = rate_merge_BA)
+// FRETish: !rate_limit_apply_requested | !multiple_policies | rate_merge_results_equal
 // ---------------------------------------------------------------------------
 
 // Verifies: SYS-REQ-059
-// MCDC SYS-REQ-059: multiple_policies=T, rate_limit_apply_requested=T, rate_merge_AB=T, rate_merge_BA=T => TRUE
+// MCDC SYS-REQ-059: multiple_policies=T, rate_limit_apply_requested=T, rate_merge_results_equal=T => TRUE
 func TestObligation_SYS_REQ_059_RateLimitCommutativity(t *testing.T) {
 	orgID := "org1"
 	polA := user.Policy{
@@ -414,7 +414,7 @@ func TestObligation_SYS_REQ_059_RateLimitCommutativity(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-059
-// MCDC SYS-REQ-059: multiple_policies=F, rate_limit_apply_requested=T, rate_merge_AB=T, rate_merge_BA=T => TRUE
+// MCDC SYS-REQ-059: multiple_policies=F, rate_limit_apply_requested=T, rate_merge_results_equal=F => TRUE
 func TestObligation_SYS_REQ_059_Row_SinglePolicy(t *testing.T) {
 	// Antecedent false: single policy, requirement vacuously satisfied.
 	orgID := "org1"
@@ -437,7 +437,7 @@ func TestObligation_SYS_REQ_059_Row_SinglePolicy(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // Verifies: SYS-REQ-060
-// MCDC SYS-REQ-060: new_rate=T, old_rate=T, policy_added=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-060: new_rate_GE_old_rate=T, policy_added=T, rate_limit_apply_requested=T => TRUE
 func TestObligation_SYS_REQ_060_RateLimitMonotonicity(t *testing.T) {
 	orgID := "org1"
 	polBase := user.Policy{
@@ -475,7 +475,7 @@ func TestObligation_SYS_REQ_060_RateLimitMonotonicity(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-060
-// MCDC SYS-REQ-060: new_rate=T, old_rate=T, policy_added=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-060: new_rate_GE_old_rate=T, policy_added=T, rate_limit_apply_requested=T => TRUE
 func TestObligation_SYS_REQ_060_MonotonicityHigherPolicy(t *testing.T) {
 	// Adding a higher-rate policy should increase the effective rate.
 	orgID := "org1"
@@ -511,7 +511,7 @@ func TestObligation_SYS_REQ_060_MonotonicityHigherPolicy(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-060
-// MCDC SYS-REQ-060: new_rate=T, old_rate=T, policy_added=F, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-060: new_rate_GE_old_rate=F, policy_added=F, rate_limit_apply_requested=T => TRUE
 func TestObligation_SYS_REQ_060_Row_NoPolicyAdded(t *testing.T) {
 	// Antecedent false: policy_added is false, requirement vacuously satisfied.
 	orgID := "org1"
@@ -584,11 +584,11 @@ func TestObligation_SYS_REQ_061_Row_SinglePolicy(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // SYS-REQ-062: Endpoint limit commutativity
-// FRETish: !endpoint_limit_apply_requested | !multiple_policies | (endpoint_merge_AB = endpoint_merge_BA)
+// FRETish: !endpoint_limit_apply_requested | !multiple_policies | endpoint_merge_results_equal
 // ---------------------------------------------------------------------------
 
 // Verifies: SYS-REQ-062
-// MCDC SYS-REQ-062: endpoint_limit_apply_requested=T, endpoint_merge_AB=T, endpoint_merge_BA=T, multiple_policies=T => TRUE
+// MCDC SYS-REQ-062: endpoint_limit_apply_requested=T, endpoint_merge_results_equal=T, multiple_policies=T => TRUE
 func TestObligation_SYS_REQ_062_EndpointCommutativity(t *testing.T) {
 	svc := &policy.Service{}
 
@@ -633,7 +633,7 @@ func TestObligation_SYS_REQ_062_EndpointCommutativity(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-062
-// MCDC SYS-REQ-062: endpoint_limit_apply_requested=T, endpoint_merge_AB=T, endpoint_merge_BA=T, multiple_policies=F => TRUE
+// MCDC SYS-REQ-062: endpoint_limit_apply_requested=T, endpoint_merge_results_equal=F, multiple_policies=F => TRUE
 func TestObligation_SYS_REQ_062_Row_SinglePolicy(t *testing.T) {
 	svc := &policy.Service{}
 	ep := user.Endpoints{
@@ -651,7 +651,7 @@ func TestObligation_SYS_REQ_062_Row_SinglePolicy(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // Verifies: SYS-REQ-063
-// MCDC SYS-REQ-063: endpoint_limit_apply_requested=T, new_endpoint_rate=T, old_endpoint_rate=T, policy_added=T => TRUE
+// MCDC SYS-REQ-063: endpoint_limit_apply_requested=T, new_endpoint_rate_GE_old_endpoint_rate=T, policy_added=T => TRUE
 func TestObligation_SYS_REQ_063_EndpointMonotonicity(t *testing.T) {
 	svc := &policy.Service{}
 
@@ -683,7 +683,7 @@ func TestObligation_SYS_REQ_063_EndpointMonotonicity(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-063
-// MCDC SYS-REQ-063: endpoint_limit_apply_requested=T, new_endpoint_rate=T, old_endpoint_rate=T, policy_added=T => TRUE
+// MCDC SYS-REQ-063: endpoint_limit_apply_requested=T, new_endpoint_rate_GE_old_endpoint_rate=T, policy_added=T => TRUE
 func TestObligation_SYS_REQ_063_MonotonicityNewEndpoint(t *testing.T) {
 	// Adding a policy with a new endpoint should add it (not decrease anything).
 	svc := &policy.Service{}
@@ -705,7 +705,7 @@ func TestObligation_SYS_REQ_063_MonotonicityNewEndpoint(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-063
-// MCDC SYS-REQ-063: endpoint_limit_apply_requested=T, new_endpoint_rate=T, old_endpoint_rate=T, policy_added=F => TRUE
+// MCDC SYS-REQ-063: endpoint_limit_apply_requested=T, new_endpoint_rate_GE_old_endpoint_rate=F, policy_added=F => TRUE
 func TestObligation_SYS_REQ_063_Row_NoPolicyAdded(t *testing.T) {
 	svc := &policy.Service{}
 	ep := user.Endpoints{
@@ -790,7 +790,7 @@ func TestObligation_SYS_REQ_064_Row_NoClearRequested(t *testing.T) {
 
 // Verifies: SYS-REQ-065
 // SYS-REQ-065:nil_safety:negative
-// MCDC SYS-REQ-065: any_operation_requested=T, error_reported=T, nil_store=T => TRUE
+// MCDC SYS-REQ-065: any_operation_requested=T, nil_store=T, nil_store_rejected=T => TRUE
 func TestObligation_SYS_REQ_065_NilStoreAllEntryPoints(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel)
@@ -819,7 +819,7 @@ func TestObligation_SYS_REQ_065_NilStoreAllEntryPoints(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-065
-// MCDC SYS-REQ-065: any_operation_requested=T, error_reported=F, nil_store=F => TRUE
+// MCDC SYS-REQ-065: any_operation_requested=T, nil_store=F, nil_store_rejected=F => TRUE
 func TestObligation_SYS_REQ_065_Row_StoreAvailable(t *testing.T) {
 	// nil_store is false (store available), requirement vacuously satisfied.
 	orgID := "org1"
@@ -837,7 +837,7 @@ func TestObligation_SYS_REQ_065_Row_StoreAvailable(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-065
-// MCDC SYS-REQ-065: any_operation_requested=F, error_reported=F, nil_store=T => TRUE
+// MCDC SYS-REQ-065: any_operation_requested=F, nil_store=T, nil_store_rejected=F => TRUE
 func TestObligation_SYS_REQ_065_Row_NoOperation(t *testing.T) {
 	// Antecedent false: no operation requested.
 	logger := logrus.New()
@@ -856,22 +856,22 @@ func TestObligation_SYS_REQ_065_Row_NoOperation(t *testing.T) {
 // MCDC SYS-REQ-066: encoding_roundtrip_safe=T, rpc_data_load_requested=T => TRUE
 func TestObligation_SYS_REQ_066_EncodingSafety(t *testing.T) {
 	original := user.Policy{
-		ID:               "pol-rt-test",
-		Name:             "Round-Trip Test Policy",
-		OrgID:            "org-unicode-\u00e9\u00e8\u00ea",
-		Rate:             999.5,
-		Per:              60.0,
-		QuotaMax:         1000000,
-		QuotaRenewalRate: 86400,
-		ThrottleInterval: 1.5,
+		ID:                 "pol-rt-test",
+		Name:               "Round-Trip Test Policy",
+		OrgID:              "org-unicode-\u00e9\u00e8\u00ea",
+		Rate:               999.5,
+		Per:                60.0,
+		QuotaMax:           1000000,
+		QuotaRenewalRate:   86400,
+		ThrottleInterval:   1.5,
 		ThrottleRetryLimit: 3,
-		MaxQueryDepth:    10,
-		HMACEnabled:      true,
-		Active:           true,
-		IsInactive:       false,
-		Tags:             []string{"tag1", "tag2", "tag-with-unicode-\u00fc"},
-		KeyExpiresIn:     3600,
-		LastUpdated:      "2026-04-21T00:00:00Z",
+		MaxQueryDepth:      10,
+		HMACEnabled:        true,
+		Active:             true,
+		IsInactive:         false,
+		Tags:               []string{"tag1", "tag2", "tag-with-unicode-\u00fc"},
+		KeyExpiresIn:       3600,
+		LastUpdated:        "2026-04-21T00:00:00Z",
 		MetaData: map[string]interface{}{
 			"string_key":  "value",
 			"numeric_key": float64(42),
@@ -895,11 +895,11 @@ func TestObligation_SYS_REQ_066_EncodingSafety(t *testing.T) {
 			},
 		},
 		Partitions: user.PolicyPartitions{
-			Quota:     true,
-			RateLimit: false,
+			Quota:      true,
+			RateLimit:  false,
 			Complexity: false,
-			Acl:       false,
-			PerAPI:    false,
+			Acl:        false,
+			PerAPI:     false,
 		},
 	}
 
@@ -978,10 +978,10 @@ func TestObligation_SYS_REQ_066_RPCDataLoader(t *testing.T) {
 	// End-to-end: use RPCDataLoaderMock to simulate the RPC round-trip path.
 	original := []user.Policy{
 		{
-			ID:    "pol1",
-			OrgID: "org1",
-			Rate:  100,
-			Per:   60,
+			ID:               "pol1",
+			OrgID:            "org1",
+			Rate:             100,
+			Per:              60,
 			QuotaMax:         5000,
 			QuotaRenewalRate: 3600,
 			Tags:             []string{"tag1"},
@@ -1056,10 +1056,10 @@ func TestObligation_SYS_REQ_066_Row_NoRPCLoad(t *testing.T) {
 
 // Verifies: SYS-REQ-067
 // SYS-REQ-067:overflow_safety:negative
-// MCDC SYS-REQ-067: overflow_safe=T, apply_requested=T => TRUE
+// MCDC SYS-REQ-067: apply_requested=T, bounds_checked=F, overflow_safe=T => TRUE
 // Verifies: SYS-REQ-068
 // SYS-REQ-068:concurrent:race
-// MCDC SYS-REQ-068: concurrent_safe=T, apply_requested=T => TRUE
+// MCDC SYS-REQ-068: apply_requested=T, concurrent_safe=T, data_race_free=F => TRUE
 func TestObligation_SYS_REQ_068_ConcurrentSafety(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -1114,7 +1114,7 @@ func TestObligation_SYS_REQ_068_ConcurrentSafety(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-068
-// MCDC SYS-REQ-068: concurrent_safe=F, apply_requested=F => TRUE
+// MCDC SYS-REQ-068: apply_requested=F, concurrent_safe=F, data_race_free=F => TRUE
 func TestObligation_SYS_REQ_068_Row_NoConcurrentApply(t *testing.T) {
 	orgID := "org1"
 	svc := obligationTestService(orgID, nil)
@@ -1178,7 +1178,7 @@ func TestObligation_SYS_REQ_069_Row_SuccessModifies(t *testing.T) {
 
 // Verifies: SYS-REQ-070
 // SYS-REQ-070:determinism:negative
-// MCDC SYS-REQ-070: result_deterministic=T, apply_requested=T => TRUE
+// MCDC SYS-REQ-070: apply_requested=T, clear_requested=T, result_deterministic=T => TRUE
 func TestObligation_SYS_REQ_070_Determinism_ErrorConsistency(t *testing.T) {
 	orgID := "org1"
 	logger := logrus.New()
@@ -1196,7 +1196,7 @@ func TestObligation_SYS_REQ_070_Determinism_ErrorConsistency(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-070
-// MCDC SYS-REQ-070: result_deterministic=T, clear_requested=T => TRUE
+// MCDC SYS-REQ-070: apply_requested=T, clear_requested=T, result_deterministic=T => TRUE
 func TestObligation_SYS_REQ_070_Determinism_ClearConsistency(t *testing.T) {
 	orgID := "org1"
 	pol := user.Policy{
@@ -1230,12 +1230,12 @@ func TestObligation_SYS_REQ_070_Determinism_ClearConsistency(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // SYS-REQ-071: Idempotency -- ClearSession twice identical
-// FRETish: !clear_requested | (clear_result_first = clear_result_second)
+// FRETish: !clear_requested | clear_results_equal
 // ---------------------------------------------------------------------------
 
 // Verifies: SYS-REQ-071
 // SYS-REQ-071:idempotency:negative
-// MCDC SYS-REQ-071: clear_requested=T, clear_result_first=T, clear_result_second=T => TRUE
+// MCDC SYS-REQ-071: clear_requested=T, clear_results_equal=T => TRUE
 func TestObligation_SYS_REQ_071_ClearSessionIdempotency(t *testing.T) {
 	orgID := "org1"
 	pol := user.Policy{
@@ -1284,10 +1284,10 @@ func TestObligation_SYS_REQ_072_ClearSessionMalformedInput(t *testing.T) {
 
 	t.Run("nonexistent policy ID", func(t *testing.T) {
 		session := &user.SessionState{
-			Rate:      50,
-			Per:       60,
-			QuotaMax:  1000,
-			MetaData:  map[string]interface{}{},
+			Rate:     50,
+			Per:      60,
+			QuotaMax: 1000,
+			MetaData: map[string]interface{}{},
 		}
 		session.SetPolicies("nonexistent")
 
@@ -1315,7 +1315,7 @@ func TestObligation_SYS_REQ_072_ClearSessionMalformedInput(t *testing.T) {
 
 // Verifies: SYS-REQ-073
 // SYS-REQ-073:nil_safety:negative
-// MCDC SYS-REQ-073: nil_safe_execution=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-073: apply_requested=T, endpoint_limit_apply_requested=T, nil_safe_execution=T, rate_limit_apply_requested=T => TRUE
 func TestObligation_SYS_REQ_073_NilSafetyRateEndpoint(t *testing.T) {
 	svc := &policy.Service{}
 
@@ -1341,12 +1341,12 @@ func TestObligation_SYS_REQ_073_NilSafetyRateEndpoint(t *testing.T) {
 		svc := obligationTestService(orgID, []user.Policy{pol})
 
 		session := &user.SessionState{
-			Rate:          0,
-			Per:           0,
-			QuotaMax:      0,
+			Rate:           0,
+			Per:            0,
+			QuotaMax:       0,
 			QuotaRemaining: 0,
-			AccessRights:  nil,
-			MetaData:      nil,
+			AccessRights:   nil,
+			MetaData:       nil,
 		}
 		session.SetPolicies("pol1")
 		_ = svc.Apply(session)
@@ -1410,7 +1410,7 @@ func TestObligation_SYS_REQ_074_EndpointErrorHandling(t *testing.T) {
 
 // Verifies: SYS-REQ-075
 // SYS-REQ-075:panic_free_input_handling:negative
-// MCDC SYS-REQ-075: panic_free=T, apply_requested=T => TRUE
+// MCDC SYS-REQ-075: apply_requested=T, clear_requested=T, panic_free=T, store_available=T => TRUE
 func TestObligation_SYS_REQ_075_PanicFreeInputHandling(t *testing.T) {
 	orgID := "org1"
 
@@ -1454,8 +1454,8 @@ func TestObligation_SYS_REQ_076_PerformanceBoundary(t *testing.T) {
 
 	t.Run("empty policy list", func(t *testing.T) {
 		session := &user.SessionState{
-			Rate:    100,
-			Per:     60,
+			Rate:     100,
+			Per:      60,
 			MetaData: map[string]interface{}{},
 		}
 		_ = svc.Apply(session)
@@ -1463,10 +1463,10 @@ func TestObligation_SYS_REQ_076_PerformanceBoundary(t *testing.T) {
 
 	t.Run("single policy boundary", func(t *testing.T) {
 		session := &user.SessionState{
-			Rate:      0,
-			Per:       0,
-			QuotaMax:  0,
-			MetaData:  map[string]interface{}{},
+			Rate:     0,
+			Per:      0,
+			QuotaMax: 0,
+			MetaData: map[string]interface{}{},
 		}
 		session.SetPolicies("pol1")
 		err := svc.Apply(session)

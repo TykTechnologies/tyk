@@ -19,14 +19,9 @@ traces:
     satisfies:
         - STK-REQ-003
         - STK-REQ-004
-    verified_by_extra:
-        - FLIP:policy/tc-036
-        - FLIP:policy/tc-037
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-05-19T17:10:22.194405Z"
-    reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:9d15ea99683f80c38d806b18bb4725cea02d1134853aea697701ed999c7b3411
+    reviewed_at: "2026-06-18T19:38:44.802641Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:704c4b981d59fa69f185efdec019c0c1f9740df78d8ed342bd2b3707070278dc
 verification:
     assurance_level: A
     formalization_status: valid
@@ -34,25 +29,40 @@ verification:
         status: approved
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
-        ai_generated: false
-    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
-    gaps_reviewed_by: leonidbugaev
-    impact_reviews:
-        - requirement: SYS-REQ-022
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:9d15ea99683f80c38d806b18bb4725cea02d1134853aea697701ed999c7b3411
-          approval_fingerprint: sha256:e4d35f1a84bf6a0f02fa33e0b34e28ecdc35127c12781bb13449c8c097ce1ec3
-          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
-          reviewed_at: "2026-05-19T17:01:30Z"
+        ai_generated: true
+    gaps_reviewed_at: "2026-06-18T19:38:25.148877Z"
+    gaps_reviewed_by: buger
+    gap_reviews:
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-015|SYS-REQ-022
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-021|SYS-REQ-022
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-022|SYS-REQ-025
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-022|SYS-REQ-027
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-022|SYS-REQ-041
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:53Z"
-    last_modified_by: human:cli
-    last_modified_at: "2026-04-19T15:13:34Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-18T19:07:42Z"
 obligation_class: rate_limit_boundary
 obligation_checklist:
     - rate_limit_boundary
@@ -65,5 +75,3 @@ lifecycle:
           to: review
           reason: Migration to assurance model complete
           changed_by: human:cli
-audit_ignore:
-    - lint-formalization-quality

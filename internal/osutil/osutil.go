@@ -14,6 +14,8 @@ type Root struct {
 
 // NewRoot creates a Root scoped to the given directory path.
 // This is the flexible and recommended way to create a scoped file system.
+// SYS-REQ-098
+// SYS-REQ-099
 func NewRoot(path string) (*Root, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
@@ -37,6 +39,8 @@ func NewRoot(path string) (*Root, error) {
 
 // Ensure that relative path is inside root directory.
 // Methods detects escapes out of root directory.
+// SYS-REQ-100
+// SYS-REQ-101
 func (r *Root) Ensure(relative string) (string, error) {
 	fullPath := filepath.Join(r.rootPath, relative)
 
@@ -53,6 +57,7 @@ func (r *Root) Ensure(relative string) (string, error) {
 }
 
 // WriteFile writes data into file which locates inside of root directory.
+// SYS-REQ-102
 func (r *Root) WriteFile(filePath string, data []byte, perm fs.FileMode) error {
 	fullPath, err := r.Ensure(filePath)
 
@@ -64,6 +69,7 @@ func (r *Root) WriteFile(filePath string, data []byte, perm fs.FileMode) error {
 }
 
 // Remove file which is inside root path.
+// SYS-REQ-102
 func (r *Root) Remove(filePath string) error {
 	fullPath, err := r.Ensure(filePath)
 
@@ -75,6 +81,7 @@ func (r *Root) Remove(filePath string) error {
 }
 
 // Stat invokes os.Stat in safe scope
+// SYS-REQ-102
 func (r *Root) Stat(filePath string) (os.FileInfo, error) {
 	fullPath, err := r.Ensure(filePath)
 

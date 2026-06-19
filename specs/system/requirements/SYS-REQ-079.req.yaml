@@ -1,0 +1,50 @@
+id: SYS-REQ-079
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the model shall always satisfy !policy_collision_detected | collision_reported
+description: When loading a scoped policy observes the same custom ID and organization with different persistent database IDs, the configured internal-collision callback must receive the custom ID and the unordered set of all observed database IDs. Same database ID replacements must not emit a collision.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: model
+rationale: Collision reporting makes ambiguous policy identity states observable to the caller while avoiding false positives for idempotent reloads of the same database object.
+tags:
+    - model
+    - collision
+variables:
+    - policy_collision_detected
+    - collision_reported
+traces:
+    satisfies:
+        - STK-REQ-008
+    reviewed_at: "2026-06-19T08:08:39.948833Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:5088602f40fb98964488c346958ad9dc24c7f44d6a904d24c0b6d133f85ed0bb
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-18T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-18T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-18T00:00:00Z"
+obligation_class: nominal
+obligation_checklist:
+    - nominal
+lifecycle:
+    change_history:
+        - date: "2026-06-18T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added model package proof scope.
+          changed_by: agent:codex

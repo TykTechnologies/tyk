@@ -1,0 +1,52 @@
+id: SYS-REQ-078
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the model shall always satisfy !policy_store_requested | policy_lookup_returned
+description: Policy-store operations must initialize safely, load valid policies, reject invalid policies through the configured callback, enumerate stored policy IDs as an unordered set, return scoped or legacy lookup results explicitly, delete requested policies, and return explicit not-found or false results when a policy is absent.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: model
+rationale: The policy engine depends on the model store to return explicit policy data, unordered policy-ID sets, or explicit miss results; silent misses or ambiguous lookup behavior would corrupt policy application.
+tags:
+    - model
+    - policy-store
+variables:
+    - policy_store_requested
+    - policy_lookup_returned
+traces:
+    satisfies:
+        - STK-REQ-008
+    reviewed_at: "2026-06-19T08:08:39.936893Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:bf7dc87490bac40a6c22a657b21c02e68cc8be17fc76a2f1ac34e8b116b754db
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-18T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-18T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-18T00:00:00Z"
+obligation_class: error_handling
+obligation_checklist:
+    - nominal
+    - error_handling
+    - idempotency
+lifecycle:
+    change_history:
+        - date: "2026-06-18T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added model package proof scope.
+          changed_by: agent:codex

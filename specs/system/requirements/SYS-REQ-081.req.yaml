@@ -1,0 +1,53 @@
+id: SYS-REQ-081
+version: 1
+status: review
+priority: shall
+category: interface
+req_type: guarantee
+fretish: the model shall always satisfy !model_adapter_requested | model_adapter_result_returned
+description: Model adapter shims must preserve RPC alias field shapes, construct event metadata with the supplied message and encoded request, and allow the mock upstream-auth provider to complete Fill without modifying the request or panicking.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: model
+rationale: These shims exist to avoid import cycles and provide stable adapter boundaries. They must preserve data shape so callers can rely on the internal model facade.
+tags:
+    - model
+    - adapter
+    - interface
+variables:
+    - model_adapter_requested
+    - model_adapter_result_returned
+traces:
+    satisfies:
+        - STK-REQ-008
+    reviewed_at: "2026-06-19T08:08:39.983729Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:780e9f2474c67283cda3c641f53ffcd4f9e605bbc16873bb1f965be212f11f50
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-18T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-18T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-18T00:00:00Z"
+obligation_class: nominal
+obligation_checklist:
+    - nominal
+    - panic_free_input_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-18T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added model package proof scope.
+          changed_by: agent:codex

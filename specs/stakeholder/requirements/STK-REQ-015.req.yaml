@@ -1,0 +1,89 @@
+id: STK-REQ-015
+version: 1
+status: rejected
+priority: shall
+category: security
+req_type: guarantee
+fretish: ""
+description: Gateway policy-file filesystem operations shall establish a configured directory root, resolve relative paths inside that root, reject lexical escape attempts, and apply write, remove, and stat operations only after scoped path validation.
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy_file_access
+rationale: Policy file access must be constrained to configured directories and must surface invalid roots, traversal attempts, and filesystem operation errors.
+tags:
+    - policy-file-access
+    - filesystem
+    - scoped-root
+variables: []
+traces:
+    reviewed_at: "2026-06-19T08:08:39.77083Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:df0461028758aecf6949e31282fe571f30cd666181fd13425b3c1dc81ba07c85
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T13:57:19Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - malformed_input
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need policy-file filesystem operations to be rooted in the configured policy directory so invalid roots and traversal attempts cannot redirect reads or writes outside the intended scope.
+    acceptance_criteria:
+        - id: STK-REQ-015-AC-01
+          text: Given an existing directory, a missing path, and a file path, when scoped root creation is requested, then only the existing directory creates a root and invalid roots are rejected.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-098
+            - SYS-REQ-099
+        - id: STK-REQ-015-AC-02
+          text: Given a relative path that lexically resolves inside the root, when scoped path resolution is requested, then the returned full path remains under the root.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-100
+        - id: STK-REQ-015-AC-03
+          text: Given traversal or sibling-prefix relative paths, when scoped path resolution is requested, then the escape attempt is rejected.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-101
+        - id: STK-REQ-015-AC-04
+          text: Given write, remove, and stat operations on scoped relative paths, when the operation is requested, then it is applied only after scoped path validation and filesystem errors are returned to the caller.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-102
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added osutil package proof scope.
+          changed_by: agent:codex
+        - date: "2026-06-19T00:00:00Z"
+          from: review
+          to: review
+          reason: Reframed stakeholder wording from package-level helper ownership to gateway-level policy-file access behavior per spec-layering guidance.
+          changed_by: agent:codex
+        - date: "2026-06-19T13:57:19Z"
+          from: review
+          to: rejected
+          reason: '[REQPROOF-LAYERING-REPAIR] Helper-domain acceptance criteria belong below stakeholder level; no direct integrated acceptance witness exists'
+          changed_by: agent:codex

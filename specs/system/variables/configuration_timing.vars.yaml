@@ -1,0 +1,14 @@
+component: configuration_timing
+no_interface:
+    declared: true
+    reason: Gateway configuration timing behavior is modeled as externally visible duration exchange semantics in this proof slice; the concrete helper implementation is decomposed into specs/software.
+variables:
+    - name: duration_exchange_requested
+      type: bool
+      direction: input
+      description: Gateway configuration or runtime code serializes, parses, or converts a readable duration value at a timing boundary.
+
+    - name: duration_exchange_result_preserved
+      type: bool
+      direction: output
+      description: The timing boundary preserves the intended duration value, returns the expected conversion, falls back to zero for invalid shorthand duration strings, or reports malformed JSON explicitly.

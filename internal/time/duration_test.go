@@ -8,6 +8,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Verifies: SYS-REQ-084, SW-REQ-003 [boundary]
+// SYS-REQ-084:nominal:nominal
+// SYS-REQ-084:boundary:nominal
+// SYS-REQ-084:encoding_safety:nominal
+// SYS-REQ-084:determinism:nominal
+// SW-REQ-003:nominal:nominal
+// SW-REQ-003:boundary:nominal
+// SW-REQ-003:encoding_safety:nominal
+// SW-REQ-003:determinism:nominal
+// MCDC SYS-REQ-084: duration_exchange_requested=T, duration_exchange_result_preserved=T => TRUE
+// MCDC SW-REQ-003: duration_operation_requested=T, duration_operation_result_returned=T => TRUE
 func TestReadableDuration_MarshalJSON(t *testing.T) {
 	t.Parallel()
 
@@ -66,6 +77,7 @@ func TestReadableDuration_MarshalJSON(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-084, SW-REQ-003
 func TestReadableDuration_Seconds(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		inputJSON := []byte(`"30m50ms"`)
@@ -82,8 +94,21 @@ func TestReadableDuration_Seconds(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, float64(1802), duration.Seconds())
 	})
+
+	t.Run("subsecond conversions", func(t *testing.T) {
+		duration := ReadableDuration(2*time.Second + 3*time.Millisecond + 4*time.Microsecond + 5*time.Nanosecond)
+
+		assert.Equal(t, int64(2003), duration.Milliseconds())
+		assert.Equal(t, int64(2003004), duration.Microseconds())
+		assert.Equal(t, int64(2003004005), duration.Nanoseconds())
+	})
 }
 
+// Verifies: SYS-REQ-084, SW-REQ-003 [malformed]
+// SYS-REQ-084:malformed_input:nominal
+// SYS-REQ-084:malformed_input:negative
+// SW-REQ-003:malformed_input:nominal
+// SW-REQ-003:malformed_input:negative
 func TestReadableDuration_UnmarshalJSON(t *testing.T) {
 	t.Parallel()
 
@@ -120,5 +145,11 @@ func TestReadableDuration_UnmarshalJSON(t *testing.T) {
 		err := json.Unmarshal(invalidJSON, &invalidDuration)
 		assert.NoError(t, err)
 		assert.Equal(t, ReadableDuration(0), invalidDuration)
+	})
+
+	t.Run("malformed JSON returns error", func(t *testing.T) {
+		var duration ReadableDuration
+		err := duration.UnmarshalJSON([]byte(`not-json`))
+		assert.EqualError(t, err, "error while parsing duration")
 	})
 }

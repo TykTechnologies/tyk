@@ -1,0 +1,53 @@
+id: SYS-REQ-101
+version: 1
+status: review
+priority: shall
+category: security
+req_type: guarantee
+fretish: the osutil shall always satisfy !lexical_escape_path_presented | lexical_escape_rejected
+description: Scoped path resolution must reject traversal and sibling-prefix relative paths that lexically resolve outside the configured root.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: osutil
+rationale: Lexical traversal and similarly named sibling directories must not bypass the scoped root boundary.
+tags:
+    - osutil
+    - filesystem
+    - traversal
+variables:
+    - lexical_escape_path_presented
+    - lexical_escape_rejected
+traces:
+    satisfies:
+        - STK-REQ-015
+    reviewed_at: "2026-06-19T08:09:25.503366Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:4cee9ca829a33c3a9ef760c9ee4fab1ffee59dfe479be5b31f09adf3b48fbb02
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T00:00:00Z"
+obligation_class: malformed_input
+obligation_checklist:
+    - nominal
+    - malformed_input
+    - boundary
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added osutil package proof scope.
+          changed_by: agent:codex

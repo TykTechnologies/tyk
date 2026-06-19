@@ -1,0 +1,14 @@
+component: policy_service
+no_interface:
+    declared: true
+    reason: The policy service requirement models in-process software behavior inside internal/policy; no standalone cross-component runtime interface is introduced by this SW decomposition.
+variables:
+    - name: service_apply_invoked
+      type: bool
+      direction: input
+      description: A caller invokes internal/policy.Service.Apply.
+
+    - name: service_apply_success_returned
+      type: bool
+      direction: output
+      description: The policy service returns nil from Apply after completing the policy application path.

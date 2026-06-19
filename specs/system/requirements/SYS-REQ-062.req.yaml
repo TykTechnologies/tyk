@@ -4,7 +4,7 @@ status: review
 priority: shall
 category: functional
 req_type: guarantee
-fretish: the policy shall always satisfy !endpoint_limit_apply_requested | !multiple_policies | (endpoint_merge_AB = endpoint_merge_BA)
+fretish: the policy shall always satisfy !endpoint_limit_apply_requested | !multiple_policies | endpoint_merge_results_equal
 description: Endpoint-level rate limit merge shall be commutative -- merging endpoint limits from policies [A, B] shall produce the same per-endpoint rates as merging from [B, A]. For each path+method key, the highest-rate-wins comparison is order-independent.
 formalization_strategy: fretish
 informal_verification:
@@ -20,13 +20,12 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-004
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-04-27T06:25:20.888166Z"
-    reviewed_by: human:leonidbugaev
+    reviewed_at: "2026-06-18T19:38:45.351643Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:95440c9bfa51fcb6ebfd9d0b2d7b5f3da668d4f6ea31d6ecde876873d7d6bcce
 verification:
     assurance_level: A
-    formalization_status: ""
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:leonidbugaev
@@ -35,8 +34,8 @@ verification:
 history:
     created_by: ai:claude
     created_at: "2026-04-21T00:00:00Z"
-    last_modified_by: ai:claude
-    last_modified_at: "2026-04-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-18T19:07:43Z"
 obligation_class: commutativity
 lifecycle:
     change_history:
@@ -45,5 +44,3 @@ lifecycle:
           to: review
           reason: New obligation class commutativity added for endpoint limit merge order independence
           changed_by: ai:claude
-audit_ignore:
-    - lint-formalization-quality

@@ -21,13 +21,12 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-004
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-04-27T06:25:20.886179Z"
-    reviewed_by: human:leonidbugaev
+    reviewed_at: "2026-06-18T19:38:45.340671Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:b45ddfb634e46592b2525efb1c0d6798a6437a618cd6d30e29a60f7d743bb384
 verification:
     assurance_level: A
-    formalization_status: ""
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:leonidbugaev
@@ -36,8 +35,8 @@ verification:
 history:
     created_by: ai:claude
     created_at: "2026-04-21T00:00:00Z"
-    last_modified_by: ai:claude
-    last_modified_at: "2026-04-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-18T19:07:43Z"
 obligation_class: determinism
 lifecycle:
     change_history:
@@ -46,5 +45,3 @@ lifecycle:
           to: review
           reason: New obligation class determinism added for endpoint limit merge determinism
           changed_by: ai:claude
-audit_ignore:
-    - lint-formalization-quality

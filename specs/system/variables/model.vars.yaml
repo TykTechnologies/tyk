@@ -1,0 +1,62 @@
+component: model
+no_interface:
+    declared: true
+    reason: 'The model package is a pure in-process data model facade consumed inside Go packages; it does not define a cross-component runtime interface boundary.'
+independence:
+    declared: true
+    reason: 'Model requirements govern disjoint in-process concerns: policy identity normalization, policy-store lookup/deletion, collision reporting, merged API list filtering, and adapter shim shape preservation.'
+variables:
+    - name: policy_identity_requested
+      type: bool
+      direction: input
+      description: A caller requests policy identifier normalization or rendering.
+
+    - name: policy_identifier_valid
+      type: bool
+      direction: input
+      description: The policy has either a non-empty custom ID or a valid persistent MID.
+
+    - name: policy_identifier_available
+      type: bool
+      direction: output
+      description: The model returns or preserves a usable policy identifier.
+
+    - name: policy_store_requested
+      type: bool
+      direction: input
+      description: A caller requests policy-store creation, loading, lookup, enumeration, deletion, or callback registration.
+
+    - name: policy_lookup_returned
+      type: bool
+      direction: output
+      description: The policy store operation returns either the requested policy data or an explicit not-found/false result.
+
+    - name: policy_collision_detected
+      type: bool
+      direction: input
+      description: Loading a scoped policy observes a custom-ID/database-ID collision.
+
+    - name: collision_reported
+      type: bool
+      direction: output
+      description: The configured internal-collision callback receives the colliding custom ID and database IDs.
+
+    - name: api_list_requested
+      type: bool
+      direction: input
+      description: A caller requests merged API list construction, classic API loading, log fields, or tag filtering.
+
+    - name: api_list_result_returned
+      type: bool
+      direction: output
+      description: The merged API list operation returns the constructed list, log field map, or filtered list.
+
+    - name: model_adapter_requested
+      type: bool
+      direction: input
+      description: A caller requests model adapter behavior such as RPC type aliases, event metadata, or mock upstream auth filling.
+
+    - name: model_adapter_result_returned
+      type: bool
+      direction: output
+      description: The model adapter preserves the requested data shape or completes the no-op adapter call without modifying the request.

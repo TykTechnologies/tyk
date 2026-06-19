@@ -19,17 +19,9 @@ traces:
     satisfies:
         - STK-REQ-005
         - STK-REQ-006
-    verified_by_extra:
-        - FLIP:policy/tc-059
-        - FLIP:policy/tc-060
-        - FLIP:policy/tc-061
-        - FLIP:policy/tc-062
-        - FLIP:policy/tc-063
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-05-19T17:10:22.216612Z"
-    reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:d4f2516b40cb9f8ac0365d00a96819a8bb811e878959a4371d74b1061895886d
+    reviewed_at: "2026-06-18T19:38:44.922471Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:8e4c2ad459b5e201e836c17346b272e25fe1595d659f59663701170653c3d1dc
 verification:
     assurance_level: B
     formalization_status: valid
@@ -38,17 +30,6 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
-    impact_reviews:
-        - requirement: SYS-REQ-029
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:d4f2516b40cb9f8ac0365d00a96819a8bb811e878959a4371d74b1061895886d
-          approval_fingerprint: sha256:1e7ce74aeb3ac92a3e067f0b15fb4a7141a5297740f360e49982c3b56c581ae3
-          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
-          reviewed_at: "2026-05-19T17:01:30Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:29:12Z"

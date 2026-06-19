@@ -1,0 +1,57 @@
+component: osutil
+no_interface:
+    declared: true
+    reason: 'The osutil package is an in-process scoped filesystem helper; it does not define a cross-component runtime interface boundary.'
+independence:
+    declared: true
+    reason: 'Root creation, lexical path resolution, lexical escape rejection, and scoped filesystem operation behavior are separate contracts over different inputs or operation phases. They do not make competing claims over a shared output mode.'
+variables:
+    - name: root_creation_requested
+      type: bool
+      direction: input
+      description: A caller requests creation of a scoped Root from an existing directory path.
+
+    - name: root_directory_scoped
+      type: bool
+      direction: output
+      description: A Root is returned with an absolute directory path as its scope.
+
+    - name: invalid_root_path_presented
+      type: bool
+      direction: input
+      description: A caller presents a root path that cannot be absolutized, cannot be statted, or is not a directory.
+
+    - name: invalid_root_path_rejected
+      type: bool
+      direction: output
+      description: Scoped root creation returns an error and no Root for an invalid root path.
+
+    - name: scoped_path_resolution_requested
+      type: bool
+      direction: input
+      description: A caller requests resolution of a relative path that should remain inside the root.
+
+    - name: scoped_path_returned
+      type: bool
+      direction: output
+      description: Ensure returns a full path that lexically equals the root or remains under the root plus separator.
+
+    - name: lexical_escape_path_presented
+      type: bool
+      direction: input
+      description: A caller presents a traversal or sibling-prefix path that lexically resolves outside the root.
+
+    - name: lexical_escape_rejected
+      type: bool
+      direction: output
+      description: Ensure returns an error and no path for a lexical root escape attempt.
+
+    - name: scoped_file_operation_requested
+      type: bool
+      direction: input
+      description: A caller requests WriteFile, Remove, or Stat through a scoped Root.
+
+    - name: scoped_file_operation_confined
+      type: bool
+      direction: output
+      description: The scoped file operation is applied only after path validation and does not modify or report paths outside the root.

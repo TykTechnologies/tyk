@@ -220,9 +220,10 @@ func (r RateLimit) IsZero() bool {
 // reqproof:requires a.QuotaRenews == 0
 // reqproof:requires a.QuotaRemaining == 0
 // reqproof:requires a.QuotaRenewalRate == 0
-// reqproof:lemma apilimit_isempty_when_all_fields_zero func(a APILimit) bool {
-//   return a.Rate == 0.0 && a.Per == 0.0 && a.QuotaMax == 0 && a.QuotaRenews == 0 && a.QuotaRemaining == 0 && a.QuotaRenewalRate == 0
-// }
+//
+//	reqproof:lemma apilimit_isempty_when_all_fields_zero func(a APILimit) bool {
+//	  return a.Rate == 0.0 && a.Per == 0.0 && a.QuotaMax == 0 && a.QuotaRenews == 0 && a.QuotaRemaining == 0 && a.QuotaRenewalRate == 0
+//	}
 func (a APILimit) IsAllZero() bool {
 	return a.Rate == 0.0 && a.Per == 0.0 && a.QuotaMax == 0 && a.QuotaRenews == 0 && a.QuotaRemaining == 0 && a.QuotaRenewalRate == 0
 }
@@ -231,9 +232,10 @@ func (a APILimit) IsAllZero() bool {
 // quota — i.e. it is *not* empty in the quota dimension.
 //
 // reqproof:requires a.QuotaMax > 0
-// reqproof:lemma apilimit_nonempty_when_quota_set func(a APILimit) bool {
-//   return a.QuotaMax > 0
-// }
+//
+//	reqproof:lemma apilimit_nonempty_when_quota_set func(a APILimit) bool {
+//	  return a.QuotaMax > 0
+//	}
 func (a APILimit) HasQuotaConfigured() bool {
 	return a.QuotaMax > 0
 }
@@ -243,9 +245,10 @@ func (a APILimit) HasQuotaConfigured() bool {
 //
 // reqproof:requires a.ThrottleInterval > 0.0
 // reqproof:requires a.ThrottleRetryLimit > 0
-// reqproof:lemma apilimit_throttle_window_positive_when_both_set func(a APILimit) bool {
-//   return a.ThrottleInterval > 0.0 && a.ThrottleRetryLimit > 0
-// }
+//
+//	reqproof:lemma apilimit_throttle_window_positive_when_both_set func(a APILimit) bool {
+//	  return a.ThrottleInterval > 0.0 && a.ThrottleRetryLimit > 0
+//	}
 func (a APILimit) HasThrottleWindow() bool {
 	return a.ThrottleInterval > 0.0 && a.ThrottleRetryLimit > 0
 }
@@ -635,9 +638,10 @@ func (s *SessionState) IsBasicAuth() bool {
 //
 // reqproof:requires s.IsInactive == false
 // reqproof:requires s.Expires > now
-// reqproof:lemma session_active_when_future_expiry func(s SessionState, now int64) bool {
-//   return s.Expires > now && s.IsInactive == false
-// }
+//
+//	reqproof:lemma session_active_when_future_expiry func(s SessionState, now int64) bool {
+//	  return s.Expires > now && s.IsInactive == false
+//	}
 func (s SessionState) IsActiveAt(now int64) bool {
 	return s.Expires > now && !s.IsInactive
 }
@@ -649,9 +653,10 @@ func (s SessionState) IsActiveAt(now int64) bool {
 //
 // reqproof:requires s.QuotaMax > 0
 // reqproof:requires s.QuotaRemaining < s.QuotaMax
-// reqproof:lemma session_quota_consumed_when_remaining_below_max func(s SessionState) bool {
-//   return s.QuotaRemaining < s.QuotaMax && s.QuotaMax > 0
-// }
+//
+//	reqproof:lemma session_quota_consumed_when_remaining_below_max func(s SessionState) bool {
+//	  return s.QuotaRemaining < s.QuotaMax && s.QuotaMax > 0
+//	}
 func (s SessionState) HasConsumedQuota() bool {
 	return s.QuotaRemaining < s.QuotaMax && s.QuotaMax > 0
 }

@@ -1,0 +1,58 @@
+id: SYS-REQ-083
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the uuid shall always satisfy !uuid_operation_requested | uuid_operation_result_returned
+description: Gateway identifier behavior must return non-empty dashed version-4 UUID strings, return non-empty dash-free UUID hex strings where dash-free identifiers are required, accept valid UUID strings, reject malformed UUID strings, and fail loudly instead of returning an ambiguous identifier when identifier generation reports an internal error.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: identifiers
+rationale: Gateway records, API definitions, OAuth clients, host checks, imports, and generated runtime objects rely on parseable identifiers. Identifier generation failures must not be hidden, and validation must reject malformed input so storage and lookup behavior remains reliable.
+tags:
+    - identifiers
+    - identity
+    - validation
+variables:
+    - uuid_operation_requested
+    - uuid_operation_result_returned
+traces:
+    satisfies:
+        - STK-REQ-010
+    reviewed_at: "2026-06-19T08:11:20.28101Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:ea56c17a7d5da9e80a5efe6e8fe704c886e49fd1130345c80c01f1a57040a6b4
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-18T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-18T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T00:00:00Z"
+obligation_class: malformed_input
+obligation_checklist:
+    - nominal
+    - malformed_input
+    - boundary
+lifecycle:
+    change_history:
+        - date: "2026-06-18T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added UUID package proof scope.
+          changed_by: agent:codex
+        - date: "2026-06-19T00:00:00Z"
+          from: review
+          to: review
+          reason: Reframed as gateway-level identifier behavior and added SW-REQ-001 as the implementation-owned uuid package decomposition.
+          changed_by: agent:codex

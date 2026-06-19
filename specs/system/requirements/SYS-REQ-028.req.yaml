@@ -18,11 +18,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-005
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-05-19T17:10:22.213792Z"
-    reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:5d3d339ee34c0f8963a85244dcc50fe1c874abdba82587804c7fe9cfde67e583
+    reviewed_at: "2026-06-18T19:38:44.91053Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:9ac983ca73e25dfe6e97a393d270cb1c4ccbd213e50c7df40c00eefb7bef5f8a
 verification:
     assurance_level: A
     formalization_status: valid
@@ -31,17 +29,6 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
-    impact_reviews:
-        - requirement: SYS-REQ-028
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:5d3d339ee34c0f8963a85244dcc50fe1c874abdba82587804c7fe9cfde67e583
-          approval_fingerprint: sha256:190227b99f89bd63769049e51780c30267cfda2765d4bfdd0f222dfe01b7f85e
-          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
-          reviewed_at: "2026-05-19T17:01:30Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:29:12Z"

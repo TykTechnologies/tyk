@@ -1,0 +1,53 @@
+id: SYS-REQ-093
+version: 1
+status: review
+priority: shall
+category: security
+req_type: guarantee
+fretish: the sanitize shall always satisfy !path_component_validation_requested | path_component_accepted
+description: Path-component validation must accept non-empty single components that remain single components after bounded URL decoding.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: sanitize
+rationale: Safe identifier-like path components must remain valid after normal bounded decoding checks.
+tags:
+    - sanitize
+    - path-component
+variables:
+    - path_component_validation_requested
+    - path_component_accepted
+traces:
+    satisfies:
+        - STK-REQ-013
+    reviewed_at: "2026-06-19T08:09:25.337297Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:5ec1ce6a793853ae1003b5e7e0f1e2bb386e47d684ab8d7c8640e2366a8cfe0f
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T00:00:00Z"
+obligation_class: encoding_safety
+obligation_checklist:
+    - nominal
+    - boundary
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added sanitize package proof scope.
+          changed_by: agent:codex

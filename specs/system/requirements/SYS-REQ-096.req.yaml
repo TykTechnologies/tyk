@@ -1,0 +1,53 @@
+id: SYS-REQ-096
+version: 1
+status: review
+priority: shall
+category: reliability
+req_type: guarantee
+fretish: the node_network_identity shall always satisfy !unusable_node_address_record_present | unusable_node_address_record_excluded
+description: Gateway node address discovery shall exclude loopback, non-IPNet, malformed, and non-convertible interface address records without returning those unusable records as node addresses.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: node_network_identity
+rationale: Loopback and malformed interface records must not be reported as usable gateway node addresses. The concrete internal/netutil helper implementation is decomposed into SW-REQ-005.
+tags:
+    - node-network-identity
+    - network-address
+    - malformed-input
+variables:
+    - unusable_node_address_record_present
+    - unusable_node_address_record_excluded
+traces:
+    satisfies:
+        - STK-REQ-014
+    reviewed_at: "2026-06-19T10:14:59.729363Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:001d66f2ebd25468c8914c052c70c43128fbbbe8779e281476b2987d8433f56a
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T10:14:11Z"
+        ai_generated: true
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T10:14:11Z"
+obligation_class: malformed_input
+obligation_checklist:
+    - nominal
+    - boundary
+    - malformed_input
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added netutil package proof scope.
+          changed_by: agent:codex

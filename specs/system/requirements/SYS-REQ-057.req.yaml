@@ -21,13 +21,12 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-001
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-04-27T06:25:20.879554Z"
-    reviewed_by: human:leonidbugaev
+    reviewed_at: "2026-06-18T19:38:45.290648Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:35a0c146e8aa4280410cceadbe24b349b6dec214e8460ec07f40fca1f2e3b0d6
 verification:
     assurance_level: A
-    formalization_status: ""
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:leonidbugaev
@@ -36,8 +35,8 @@ verification:
 history:
     created_by: ai:claude
     created_at: "2026-04-21T00:00:00Z"
-    last_modified_by: ai:claude
-    last_modified_at: "2026-04-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-18T19:07:43Z"
 obligation_class: commutativity
 lifecycle:
     change_history:
@@ -46,5 +45,3 @@ lifecycle:
           to: review
           reason: New obligation class commutativity added for policy merge order independence
           changed_by: ai:claude
-audit_ignore:
-    - lint-formalization-quality

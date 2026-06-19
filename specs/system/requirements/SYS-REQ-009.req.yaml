@@ -16,13 +16,9 @@ rationale: Numbering gap — ID was never assigned
 tags: []
 variables: []
 traces:
-    satisfies:
-        - STK-REQ-001
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-05-19T17:10:21.995283Z"
-    reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:8558ce7b1ec0799ab4fe254a1d8e5421a5e70fcafc62071d7344e3160e71e794
+    reviewed_at: "2026-06-18T19:38:44.522722Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:4a972d469644b112fae249e6ad9d3115f03378be21be9ddf77862918e659e9e0
 verification:
     assurance_level: A
     formalization_status: ""

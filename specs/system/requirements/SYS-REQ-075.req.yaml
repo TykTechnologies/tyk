@@ -23,14 +23,12 @@ traces:
     satisfies:
         - STK-REQ-005
         - STK-REQ-006
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-05-19T17:10:22.431633Z"
-    reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:a48f4e65ab4cce8b747268a6962dac10f485316a9349c90e93d525bf5272fb61
+    reviewed_at: "2026-06-18T19:38:45.56876Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:6066c451295d216684ac5e8ac5b813c0a9dbc1defad8c8109afac8e23c6ee3f7
 verification:
     assurance_level: A
-    formalization_status: ""
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:leonidbugaev

@@ -1,0 +1,52 @@
+id: SYS-REQ-097
+version: 1
+status: review
+priority: shall
+category: reliability
+req_type: guarantee
+fretish: the node_network_identity shall always satisfy !node_interface_enumeration_failed | node_interface_error_returned
+description: Gateway node address discovery shall return the interface enumeration error when the underlying interface address enumeration operation fails, without reporting discovered node addresses for that failed enumeration.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: node_network_identity
+rationale: Operators and callers must distinguish interface enumeration failure from a successful discovery that found no usable non-loopback node addresses. The concrete internal/netutil helper implementation is decomposed into SW-REQ-005.
+tags:
+    - node-network-identity
+    - network-address
+    - error-handling
+variables:
+    - node_interface_enumeration_failed
+    - node_interface_error_returned
+traces:
+    satisfies:
+        - STK-REQ-014
+    reviewed_at: "2026-06-19T10:14:59.741575Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:dff786b8bd91393497b9bbf3f5185b26e45b672a17a255a46acde3a3596b127c
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T10:14:17Z"
+        ai_generated: true
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T10:14:17Z"
+obligation_class: error_handling
+obligation_checklist:
+    - nominal
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added netutil package proof scope.
+          changed_by: agent:codex

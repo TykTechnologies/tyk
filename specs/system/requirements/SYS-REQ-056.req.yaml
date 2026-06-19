@@ -4,7 +4,7 @@ status: review
 priority: shall
 category: functional
 req_type: guarantee
-fretish: the policy shall always satisfy !apply_requested | (apply_result_first = apply_result_second)
+fretish: the policy shall always satisfy !apply_requested | apply_results_equal
 description: Calling Apply twice on the same session with the same policies shall produce the same session state. Apply is idempotent -- repeated application does not accumulate or alter fields beyond the first application. Tags, metadata, and access rights shall not be duplicated or modified by a second Apply call.
 formalization_strategy: fretish
 informal_verification:
@@ -20,13 +20,12 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-001
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-04-27T06:25:20.877898Z"
-    reviewed_by: human:leonidbugaev
+    reviewed_at: "2026-06-18T19:38:45.278563Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:4e67f27a595aac59b434478c0c810f3758f45213d0bbcd5fd6a470b00d3d0c1d
 verification:
     assurance_level: A
-    formalization_status: ""
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:leonidbugaev

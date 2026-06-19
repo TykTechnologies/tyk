@@ -23,12 +23,19 @@ in `internal/policy/apply.go`.
 - **`internal/policy/apply.go`**: Added import-level abstract annotations (matching
   the type-level directives in the user package).
 
-### 2. Endpoint Assumes (updated, not eliminated)
+### 2. Endpoint Assumes (updated, then eliminated for same-package calls)
 
-**Decision**: The 3 endpoint assumes were updated to use the real model types
-(`user.Endpoints`, `user.JSONRPCMethodLimit`, `user.MCPPrimitiveLimit`) instead
-of the old bool projections. They were NOT fully eliminated because the method
-bodies cannot be lowered by the translator.
+**Original decision**: The 3 endpoint assumes were updated to use the real
+model types (`user.Endpoints`, `user.JSONRPCMethodLimit`,
+`user.MCPPrimitiveLimit`) instead of the old bool projections.
+
+**2026-06-19 follow-up**: The same-package endpoint assumes were removed after
+`assume_contract_consistency` flagged them as unbacked callee contracts. A
+fresh no-cache `proof verify --no-cache --format json --fail-level error`
+reverified all 10 components and passed realization, consistency, vacuity, and
+gap analysis without those assumes. This proved the current lemmas do not need
+the same-package endpoint-call abstractions, so retaining them would add
+unnecessary and over-strong contracts.
 
 **Root cause**: The method bodies contain opaque-type operations the translator
 does not support:
@@ -40,8 +47,9 @@ does not support:
 
 Even with all types properly declared as opaque in the model, the translator's
 `collectPackageMethodBundles` cannot translate these bodies, so the methods
-never register as callables. The assumes bridge this gap with the correct
-type signatures.
+may not register as callables for direct callee proofs. The current
+`applyAPILevelLimits` lemmas no longer need same-package assumes for those
+calls.
 
 ### 3. emptyRateLimit Lemmas Deleted
 
@@ -60,16 +68,16 @@ production function `emptyRateLimit` is preserved (it is called from
 
 ## Remaining Gap
 
-The 3 endpoint methods still require `// reqproof:assume` directives because
-their bodies contain operations on opaque types that the translator cannot
-lower. This is a translator limitation, not a model gap. The model is now
-correctly set up:
+The endpoint methods still contain operations on opaque types that the
+translator cannot lower directly. This is a translator limitation, not a model
+gap. The model is now correctly set up:
 
 - `user.Endpoints` — opaque abstract type (was already declared)
 - `user.JSONRPCMethodLimit` — opaque abstract type (NEW)
 - `user.MCPPrimitiveLimit` — opaque abstract type (NEW)
 - `AccessDefinition` model fields now reference the real opaque types (not bool)
 
-If the translator ever gains the ability to lower opaque-type method calls,
-`len()` on opaque returns, or `range` over opaque-typed maps, the 3 assumes
-can be removed.
+If future lemmas need direct facts about the endpoint merge return values, add
+truthful callee lemmas or improve translator support for opaque-type method
+calls, `len()` on opaque returns, and `range` over opaque-typed maps. Do not
+reintroduce unbacked same-package assumes as a substitute for those proofs.

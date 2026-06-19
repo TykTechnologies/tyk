@@ -1,0 +1,47 @@
+component: sanitize
+no_interface:
+    declared: true
+    reason: 'The sanitize package is an in-process helper for archive path and path-component validation; it does not define a cross-component runtime interface boundary.'
+independence:
+    declared: true
+    reason: 'Archive-entry containment and path-component validation are separate helper contracts over different caller inputs and outputs. They do not share mutable state or make competing guarantees over the same system mode.'
+variables:
+    - name: archive_path_validation_requested
+      type: bool
+      direction: input
+      description: A caller requests validation of a zip/archive entry path against a target directory.
+
+    - name: archive_path_within_target
+      type: bool
+      direction: output
+      description: The archive path is accepted because it resolves inside the target directory.
+
+    - name: unsafe_archive_path_presented
+      type: bool
+      direction: input
+      description: A caller presents an absolute, volume-qualified, traversal, or unresolvable archive path.
+
+    - name: unsafe_archive_path_rejected
+      type: bool
+      direction: output
+      description: The archive path validator returns an error for an unsafe archive path.
+
+    - name: path_component_validation_requested
+      type: bool
+      direction: input
+      description: A caller requests validation of a single path component.
+
+    - name: path_component_accepted
+      type: bool
+      direction: output
+      description: The path component is accepted because it remains non-empty and separator-free after bounded URL decoding.
+
+    - name: unsafe_path_component_presented
+      type: bool
+      direction: input
+      description: A caller presents an empty, dot, dot-dot, separator-containing, encoded traversal, encoded separator, or malformed encoded component.
+
+    - name: unsafe_path_component_rejected
+      type: bool
+      direction: output
+      description: The path-component validator returns ErrInvalidFilePath for an unsafe component.

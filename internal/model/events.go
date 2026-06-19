@@ -14,6 +14,7 @@ type EventMetaDefault struct {
 }
 
 // NewEventMetaDefault creates an instance of model.EventMetaDefault.
+// SYS-REQ-081
 func NewEventMetaDefault(r *http.Request, message string) EventMetaDefault {
 	return EventMetaDefault{
 		Message:            message,

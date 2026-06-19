@@ -1,0 +1,55 @@
+id: SYS-REQ-094
+version: 1
+status: review
+priority: shall
+category: security
+req_type: guarantee
+fretish: the sanitize shall always satisfy !unsafe_path_component_presented | unsafe_path_component_rejected
+description: Path-component validation must reject empty, dot, dot-dot, separator-containing, encoded traversal, encoded separator, and malformed encoded components with ErrInvalidFilePath.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: sanitize
+rationale: Path components must not carry traversal semantics or malformed encoding that could bypass path-component validation.
+tags:
+    - sanitize
+    - path-component
+    - traversal
+variables:
+    - unsafe_path_component_presented
+    - unsafe_path_component_rejected
+traces:
+    satisfies:
+        - STK-REQ-013
+    reviewed_at: "2026-06-19T08:09:25.349237Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:c119c332e35bb7b31164a1d04e304505aa0d3c3eeed9825212d4574cc3ff245b
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T00:00:00Z"
+obligation_class: malformed_input
+obligation_checklist:
+    - nominal
+    - malformed_input
+    - error_handling
+    - boundary
+    - encoding_safety
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added sanitize package proof scope.
+          changed_by: agent:codex

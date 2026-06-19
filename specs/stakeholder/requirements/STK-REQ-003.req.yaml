@@ -18,13 +18,9 @@ tags:
     - traffic-control
 variables: []
 traces:
-    implemented_by_extra:
-        - internal/policy/apply.go
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-05-19T17:10:21.373089Z"
-    reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:184277cd9d7748e4a83dfbe764b5de02f2574bee24b6931f63ca5bf5c8b14fa9
+    reviewed_at: "2026-06-18T19:38:44.090202Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:6cab2673baf528f841761e7d835ff4c7c86d97c6f320d2e708f63e1596ac8f07
 verification:
     assurance_level: A
     formalization_status: ""
@@ -33,17 +29,6 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
-    impact_reviews:
-        - requirement: STK-REQ-003
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:184277cd9d7748e4a83dfbe764b5de02f2574bee24b6931f63ca5bf5c8b14fa9
-          approval_fingerprint: sha256:eb4db3d224e55fa46b72b522f2c5bb6ebdabd55261db5afe635e57b5edf3d0df
-          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
-          reviewed_at: "2026-05-19T17:01:30Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"
@@ -66,23 +51,39 @@ stakeholder:
         - id: STK-REQ-003-AC-01
           text: Given a policy with a higher rate than the current session, when rate limits are applied, then the policy rate replaces the session rate
           testable: true
+          verification_method: test
           derived_reqs:
+            - SYS-REQ-015
             - SYS-REQ-021
+            - SYS-REQ-035
+            - SYS-REQ-039
+            - SYS-REQ-051
+            - SYS-REQ-067
+            - SYS-REQ-073
         - id: STK-REQ-003-AC-02
           text: Given a policy with an empty rate (Rate=0 or Per=0), when rate limits are applied, then the empty rate is never applied
           testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-022
+            - SYS-REQ-040
         - id: STK-REQ-003-AC-03
           text: Given a policy with an equal rate to the current session, when rate limits are applied, then the existing rate is preserved
           testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-041
+            - SYS-REQ-046
         - id: STK-REQ-003-AC-04
           text: Given multiple policies with different rates, when they are merged, then the highest rate wins
           testable: true
+          verification_method: test
           derived_reqs:
+            - SYS-REQ-016
             - SYS-REQ-021
+            - SYS-REQ-058
+            - SYS-REQ-059
+            - SYS-REQ-060
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

@@ -1,0 +1,53 @@
+id: SYS-REQ-099
+version: 1
+status: review
+priority: shall
+category: security
+req_type: guarantee
+fretish: the osutil shall always satisfy !invalid_root_path_presented | invalid_root_path_rejected
+description: Scoped root creation must reject paths that cannot be absolutized, cannot be statted, or resolve to a non-directory.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: osutil
+rationale: Invalid roots must fail closed so later scoped operations are not anchored to an undefined or non-directory location.
+tags:
+    - osutil
+    - filesystem
+    - malformed-input
+variables:
+    - invalid_root_path_presented
+    - invalid_root_path_rejected
+traces:
+    satisfies:
+        - STK-REQ-015
+    reviewed_at: "2026-06-19T08:09:25.468405Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:9fd6d3e1c5233e458a9b135d62cc73343f93696a765c6780f2c420e75fc3b0ab
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T00:00:00Z"
+obligation_class: malformed_input
+obligation_checklist:
+    - nominal
+    - malformed_input
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added osutil package proof scope.
+          changed_by: agent:codex

@@ -1,0 +1,55 @@
+id: SYS-REQ-092
+version: 1
+status: review
+priority: shall
+category: security
+req_type: guarantee
+fretish: the sanitize shall always satisfy !unsafe_archive_path_presented | unsafe_archive_path_rejected
+description: Archive path validation must reject absolute paths, volume-qualified paths, traversal paths that escape the target directory, and paths whose target-relative path cannot be resolved.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: sanitize
+rationale: Archive entries must fail closed when they could escape the extraction root or cannot be safely resolved.
+tags:
+    - sanitize
+    - archive-path
+    - traversal
+variables:
+    - unsafe_archive_path_presented
+    - unsafe_archive_path_rejected
+traces:
+    satisfies:
+        - STK-REQ-013
+    reviewed_at: "2026-06-19T08:09:25.325362Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:0c822b09e3ef27df2ff7d18ee91cb6777dcd9b05ea9b56570d0c5ed90b44adea
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T00:00:00Z"
+obligation_class: malformed_input
+obligation_checklist:
+    - nominal
+    - malformed_input
+    - error_handling
+    - boundary
+    - encoding_safety
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added sanitize package proof scope.
+          changed_by: agent:codex

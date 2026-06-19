@@ -1,0 +1,14 @@
+component: uuid
+no_interface:
+    declared: true
+    reason: 'The UUID package is an in-process software helper for generated identifier strings and validation; it does not define a cross-component runtime interface boundary.'
+variables:
+    - name: uuid_operation_requested
+      type: bool
+      direction: input
+      description: A caller requests UUID generation, dash-free UUID generation, UUID validation, or internal UUID generation error signaling.
+
+    - name: uuid_operation_result_returned
+      type: bool
+      direction: output
+      description: The UUID package returns the expected identifier, validation result, or explicit panic signal for an internal generation error.

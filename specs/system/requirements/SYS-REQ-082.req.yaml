@@ -1,0 +1,63 @@
+id: SYS-REQ-082
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the observability shall always satisfy !event_metadata_exchange_requested | event_metadata_result_preserved
+description: Gateway observability metadata shall preserve stable event display names, accumulated request-context event slices, and serializable HTTP request snapshots so event handlers, analytics, and audit flows receive the intended event metadata, including explicit empty snapshots when request encoding fails.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: observability
+rationale: Gateway event handlers and metadata builders rely on stable event strings, accumulated request-context events, and encoded request snapshots. The concrete internal/event helper implementation is decomposed into SW-REQ-004.
+tags:
+    - observability
+    - event-metadata
+    - context
+    - request-encoding
+variables:
+    - event_metadata_exchange_requested
+    - event_metadata_result_preserved
+traces:
+    satisfies:
+        - STK-REQ-009
+    reviewed_at: "2026-06-19T08:42:19.922774Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:85563b866ab77588bfc8c7b78d7855b4c8d9e806ef0df8e0d3d8ef5d999b7ca1
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-18T00:00:00Z"
+        ai_generated: true
+    gaps_reviewed_at: "2026-06-19T08:44:15.901889Z"
+    gaps_reviewed_by: buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-082|event_metadata_result_preserved
+          reviewer: buger
+          reason: Reviewed SYS-REQ-082 decomposition after moving internal/event helper behavior into SW-REQ-004; the parent owns gateway observability metadata preservation and the child owns the concrete event helper implementation evidence.
+          reviewed_at: "2026-06-19T08:44:15.901889Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-18T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T08:19:20Z"
+obligation_class: encoding_safety
+obligation_checklist:
+    - nominal
+    - boundary
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-18T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added event package proof scope.
+          changed_by: agent:codex

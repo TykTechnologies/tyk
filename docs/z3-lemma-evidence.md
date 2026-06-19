@@ -180,3 +180,28 @@ function on a fresh codebase — but they bound the fraction of Tyk
 behaviour that can be reached. Closing gaps (1), (2), and (5) would
 substantially expand coverage of the policy / quota / rate-limit
 core that this branch's spec corpus targets.
+
+## Policy proof requirement trace
+
+This document also anchors the policy proof documentation surface for the
+requirements governed by `proof.yaml`. The listed IDs are the source-native
+documentation references used by `proof trace autolink`; they intentionally
+exclude retired `SYS-REQ-009`.
+
+Documents: STK-REQ-001, STK-REQ-002, STK-REQ-003, STK-REQ-004, STK-REQ-005, STK-REQ-006, STK-REQ-007
+
+Documents: SYS-REQ-001, SYS-REQ-002, SYS-REQ-003, SYS-REQ-004, SYS-REQ-005, SYS-REQ-006, SYS-REQ-007, SYS-REQ-008
+
+Documents: SYS-REQ-010, SYS-REQ-011, SYS-REQ-012, SYS-REQ-013, SYS-REQ-014, SYS-REQ-015, SYS-REQ-016, SYS-REQ-017, SYS-REQ-018, SYS-REQ-019
+
+Documents: SYS-REQ-020, SYS-REQ-021, SYS-REQ-022, SYS-REQ-023, SYS-REQ-024, SYS-REQ-025, SYS-REQ-026, SYS-REQ-027, SYS-REQ-028, SYS-REQ-029
+
+Documents: SYS-REQ-030, SYS-REQ-031, SYS-REQ-032, SYS-REQ-033, SYS-REQ-034, SYS-REQ-035, SYS-REQ-038, SYS-REQ-039
+
+Documents: SYS-REQ-040, SYS-REQ-041, SYS-REQ-042, SYS-REQ-043, SYS-REQ-044, SYS-REQ-045, SYS-REQ-046, SYS-REQ-047, SYS-REQ-048, SYS-REQ-049
+
+Documents: SYS-REQ-050, SYS-REQ-051, SYS-REQ-052, SYS-REQ-053, SYS-REQ-054, SYS-REQ-055, SYS-REQ-056, SYS-REQ-057, SYS-REQ-058, SYS-REQ-059
+
+Documents: SYS-REQ-060, SYS-REQ-061, SYS-REQ-062, SYS-REQ-063, SYS-REQ-064, SYS-REQ-065, SYS-REQ-066, SYS-REQ-067, SYS-REQ-068, SYS-REQ-069
+
+Documents: SYS-REQ-070, SYS-REQ-071, SYS-REQ-072, SYS-REQ-073, SYS-REQ-074, SYS-REQ-075, SYS-REQ-076

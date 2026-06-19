@@ -8,6 +8,7 @@ var (
 
 // GetIpAddress returns the list of non-loopback IP address (IPv4 and IPv6) found.
 // Returns error if it fails to get the list of addresses, empty if there's no valid IP addresses.
+// SW-REQ-005
 func GetIpAddress() ([]string, error) {
 	var (
 		ips        []string

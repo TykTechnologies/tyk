@@ -1,0 +1,61 @@
+id: SYS-REQ-095
+version: 1
+status: review
+priority: shall
+category: reliability
+req_type: guarantee
+fretish: the node_network_identity shall always satisfy !usable_node_address_discovery_requested | usable_node_addresses_reported
+description: Gateway node address discovery shall report IPv4 and IPv6 non-loopback interface addresses in enumeration order when usable non-loopback interface addresses are available.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: node_network_identity
+rationale: Gateway startup, diagnostics, and node reporting need externally usable interface addresses rather than loopback-only data when discovery finds usable node addresses. The concrete internal/netutil helper implementation is decomposed into SW-REQ-005.
+tags:
+    - node-network-identity
+    - network-address
+    - interface-discovery
+variables:
+    - usable_node_address_discovery_requested
+    - usable_node_addresses_reported
+traces:
+    satisfies:
+        - STK-REQ-014
+    reviewed_at: "2026-06-19T10:14:59.715639Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:c7f806f17547b187c1c42e736e3bd2714fab356b622782bafa465eba184bc285
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T10:14:04Z"
+        ai_generated: true
+    gaps_reviewed_at: "2026-06-19T10:17:21.337208Z"
+    gaps_reviewed_by: buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-095|usable_node_addresses_reported
+          reviewer: buger
+          reason: Reviewed SYS-REQ-095 decomposition after moving internal/netutil helper behavior into SW-REQ-005; the parent owns gateway node address reporting when usable non-loopback addresses are available, and the child owns the concrete GetIpAddress implementation evidence.
+          reviewed_at: "2026-06-19T10:17:21.337208Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T10:14:04Z"
+obligation_class: boundary
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added netutil package proof scope.
+          changed_by: agent:codex

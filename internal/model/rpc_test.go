@@ -25,12 +25,10 @@ func TestLoadedPolicyInfo_TypeAlias(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-081
-// STK-REQ-008:STK-REQ-008-AC-04:acceptance
 // SYS-REQ-081:nominal:nominal
 // SYS-REQ-081:determinism:nominal
 // SYS-REQ-081:panic_free_input_handling:nominal
 // MCDC SYS-REQ-081: model_adapter_requested=T, model_adapter_result_returned=T => TRUE
-//mcdc:ignore SYS-REQ-081: model_adapter_requested=T, model_adapter_result_returned=F => FALSE -- violation row is the exact negation of preserving requested adapter data shape or completing the no-op adapter call; this test witnesses the positive alias, metadata, and upstream-auth adapter paths [reviewed: agent:codex] [category: defensive]
 func TestModelAdapters_RPCAliasesEventMetadataAndUpstreamAuth(t *testing.T) {
 	groupLogin := GroupLoginRequest{UserKey: "user", GroupID: "group", ForceSync: true, Node: []byte("node")}
 	require.Equal(t, apidef.GroupLoginRequest(groupLogin), apidef.GroupLoginRequest{UserKey: "user", GroupID: "group", ForceSync: true, Node: []byte("node")})

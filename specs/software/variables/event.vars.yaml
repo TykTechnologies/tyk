@@ -1,0 +1,14 @@
+component: event
+no_interface:
+    declared: true
+    reason: 'The event package is an in-process helper for event names, request contexts, and request snapshots; it does not define a cross-component runtime interface boundary.'
+variables:
+    - name: event_operation_requested
+      type: bool
+      direction: input
+      description: A caller requests event string rendering, event context storage/retrieval, request event append, or HTTP request encoding.
+
+    - name: event_operation_result_returned
+      type: bool
+      direction: output
+      description: The event helper returns the expected string, event slice, encoded request string, or explicit empty result for an encoding failure.

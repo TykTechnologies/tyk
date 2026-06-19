@@ -19,13 +19,9 @@ tags:
     - store-availability
 variables: []
 traces:
-    implemented_by_extra:
-        - internal/policy/apply.go
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-05-19T17:10:21.383584Z"
-    reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:fcb1a101473c1c22c7ab4c8b548e1dc131895286794dca5f366599041bf62062
+    reviewed_at: "2026-06-18T19:38:44.134861Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:f9248c403e1e4f235a531d1bdfc0c09285fd54dfdedd075f992700d9ea5503bc
 verification:
     assurance_level: A
     formalization_status: ""
@@ -34,17 +30,6 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
-    impact_reviews:
-        - requirement: STK-REQ-006
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:fcb1a101473c1c22c7ab4c8b548e1dc131895286794dca5f366599041bf62062
-          approval_fingerprint: sha256:6ef6cab1d41209b880acf31174816fb1402e85f8776941c2339007e4b5980dcc
-          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
-          reviewed_at: "2026-05-19T17:01:30Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"
@@ -63,19 +48,31 @@ stakeholder:
         - id: STK-REQ-006-AC-01
           text: Given no operation is requested, then all output variables remain false
           testable: true
+          verification_method: test
           derived_reqs:
+            - SYS-REQ-004
+            - SYS-REQ-005
+            - SYS-REQ-006
+            - SYS-REQ-007
             - SYS-REQ-027
         - id: STK-REQ-006-AC-02
           text: Given the policy store is nil or unavailable, when any operation is attempted, then an error is reported immediately
           testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-042
+            - SYS-REQ-047
+            - SYS-REQ-049
+            - SYS-REQ-065
+            - SYS-REQ-075
         - id: STK-REQ-006-AC-03
           text: Given a transition from idle to active and back, then state correctness is preserved
           testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-027
             - SYS-REQ-029
+            - SYS-REQ-070
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

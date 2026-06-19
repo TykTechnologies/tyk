@@ -27,7 +27,7 @@ func (s *RPCDataLoaderMock) GetApiDefinitions(_ string, tags []string) string {
 	}
 
 	apiList, err := json.Marshal(s.Apis)
-	if err != nil { //mcdc:ignore json.Marshal cannot fail for []model.MergedAPI (no channels, funcs, or complex numbers)
+	if err != nil {
 		return ""
 	}
 	return string(apiList)
@@ -36,7 +36,7 @@ func (s *RPCDataLoaderMock) GetApiDefinitions(_ string, tags []string) string {
 // GetPolicies returns the internal Policies as a json string.
 func (s *RPCDataLoaderMock) GetPolicies(_ string) string {
 	policyList, err := json.Marshal(s.Policies)
-	if err != nil { //mcdc:ignore json.Marshal cannot fail for []user.Policy (no channels, funcs, or complex numbers)
+	if err != nil {
 		return ""
 	}
 	return string(policyList)

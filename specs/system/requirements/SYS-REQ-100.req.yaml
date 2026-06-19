@@ -1,0 +1,52 @@
+id: SYS-REQ-100
+version: 1
+status: review
+priority: shall
+category: security
+req_type: guarantee
+fretish: the osutil shall always satisfy !scoped_path_resolution_requested | scoped_path_returned
+description: Scoped path resolution must return a full path for relative paths that lexically resolve to the root itself or a child below the root.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: osutil
+rationale: Valid in-root relative paths must remain usable for scoped filesystem operations.
+tags:
+    - osutil
+    - filesystem
+variables:
+    - scoped_path_resolution_requested
+    - scoped_path_returned
+traces:
+    satisfies:
+        - STK-REQ-015
+    reviewed_at: "2026-06-19T08:09:25.491273Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:9821e33f89ca1c821e07dcc2e3e074e454b8c81f2c7c574d5c0ee5e24173a1d3
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T00:00:00Z"
+obligation_class: boundary
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added osutil package proof scope.
+          changed_by: agent:codex

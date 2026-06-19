@@ -14,6 +14,7 @@ type MergedAPI struct {
 }
 
 // Logger returns API detail fields for logging.
+// SYS-REQ-080
 func (m *MergedAPI) LogFields() logrus.Fields {
 	return logrus.Fields{
 		"api_id": m.APIID,
@@ -29,6 +30,7 @@ type MergedAPIList struct {
 	Nonce   string
 }
 
+// SYS-REQ-080
 func NewMergedAPIList(apis ...MergedAPI) *MergedAPIList {
 	return &MergedAPIList{
 		Message: apis,
@@ -36,6 +38,7 @@ func NewMergedAPIList(apis ...MergedAPI) *MergedAPIList {
 }
 
 // Set sets the available classic API definitions to the MergedAPIList.
+// SYS-REQ-080
 func (f *MergedAPIList) SetClassic(defs []*apidef.APIDefinition) {
 	for _, def := range defs {
 		f.Message = append(f.Message, MergedAPI{APIDefinition: def})
@@ -43,6 +46,7 @@ func (f *MergedAPIList) SetClassic(defs []*apidef.APIDefinition) {
 }
 
 // Filter, if enabled=true, will filter the internal api definitions by their tags.
+// SYS-REQ-080
 func (f *MergedAPIList) Filter(enabled bool, tags ...string) []MergedAPI {
 	if !enabled {
 		return f.Message

@@ -1,0 +1,55 @@
+id: SYS-REQ-103
+version: 1
+status: review
+priority: shall
+category: reliability
+req_type: guarantee
+fretish: the rate_limit_allowance shall always satisfy !rate_limit_allowance_operation_requested | rate_limit_allowance_state_result_returned
+description: Gateway rate-limit allowance state operations shall return the expected allowance state result for stored-field decoding, stored-field export, invalid timing validation, safe reset, value access, value update, next-update computation, and expiry checks.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: rate_limit_allowance
+rationale: Gateway request enforcement and rate-limit smoothing rely on allowance state that can be decoded, exported for storage, validated, reset, read, updated, and checked for expiry without accepting invalid timing configuration or corrupting stored values.
+tags:
+    - rate-limit
+    - rate-limit-state
+    - state
+variables:
+    - rate_limit_allowance_operation_requested
+    - rate_limit_allowance_state_result_returned
+traces:
+    satisfies:
+        - STK-REQ-016
+    reviewed_at: "2026-06-19T11:02:52.280026Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:a9575e63c91ffe330a40023d5d1fb57528c4d2081c405494034d7fbbdcc37044
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: true
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T00:00:00Z"
+obligation_class: boundary
+obligation_checklist:
+    - nominal
+    - malformed_input
+    - boundary
+    - error_handling
+    - nil_safety
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added gateway rate-limit allowance state system requirement.
+          changed_by: agent:codex

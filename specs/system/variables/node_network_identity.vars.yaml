@@ -1,0 +1,37 @@
+component: node_network_identity
+no_interface:
+    declared: true
+    reason: 'Gateway node network identity discovery in this proof slice is exercised through in-process local interface enumeration behavior; no cross-component runtime interface contract is modeled yet.'
+independence:
+    declared: true
+    reason: 'Node address discovery guarantees cover separate gateway-visible outcomes: successful usable-address reporting, unusable-record exclusion, and interface enumeration error propagation.'
+variables:
+    - name: usable_node_address_discovery_requested
+      type: bool
+      direction: input
+      description: Gateway node address discovery is requested in a state where one or more usable non-loopback interface addresses are available.
+
+    - name: usable_node_addresses_reported
+      type: bool
+      direction: output
+      description: Gateway node address discovery reports the usable IPv4 or IPv6 non-loopback interface addresses in enumeration order.
+
+    - name: unusable_node_address_record_present
+      type: bool
+      direction: input
+      description: Interface enumeration includes loopback, non-IPNet, malformed, or non-convertible address records.
+
+    - name: unusable_node_address_record_excluded
+      type: bool
+      direction: output
+      description: Gateway node address discovery excludes unusable interface address records from the reported node address list.
+
+    - name: node_interface_enumeration_failed
+      type: bool
+      direction: input
+      description: The underlying local interface address enumeration operation returns an error.
+
+    - name: node_interface_error_returned
+      type: bool
+      direction: output
+      description: Gateway node address discovery returns the underlying interface enumeration error without reporting discovered addresses for the failed enumeration.

@@ -1,0 +1,54 @@
+id: SW-REQ-001
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the uuid shall always satisfy !uuid_operation_requested | uuid_operation_result_returned
+description: The internal uuid package shall return non-empty dashed version-4 UUID strings, return non-empty dash-free UUID hex strings that still parse as UUIDs, accept valid UUID strings, reject malformed UUID strings, and panic with the supplied context message when the internal generation error guard receives an error.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-083
+component: uuid
+rationale: This software requirement owns the concrete identifier helper behavior that implements SYS-REQ-083 for gateway-generated UUID values and validation.
+tags:
+    - uuid
+    - identity
+    - validation
+variables:
+    - uuid_operation_requested
+    - uuid_operation_result_returned
+traces:
+    satisfies:
+        - SYS-REQ-083
+    reviewed_at: "2026-06-19T08:08:39.803801Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:4d07a41c32737576356ff44143b67f18b27fe178d509e08d329ddf96be6d4001
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T00:00:00Z"
+obligation_class: malformed_input
+obligation_checklist:
+    - nominal
+    - malformed_input
+    - boundary
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added software-layer decomposition for the uuid package under gateway identifier behavior.
+          changed_by: agent:codex

@@ -7,12 +7,14 @@ import (
 )
 
 // New returns a V4 UUID.
+// SW-REQ-001
 func New() string {
 	id, err := uuid.NewV4()
 	checkErrAndPanic(err, "Error generating UUID")
 	return id.String()
 }
 
+// SW-REQ-001
 func checkErrAndPanic(err error, message string) {
 	if err != nil {
 		// This is unfortunate, but UUID generation is used for DB
@@ -24,11 +26,13 @@ func checkErrAndPanic(err error, message string) {
 }
 
 // NewHex returns a V4 UUID without dashes.
+// SW-REQ-001
 func NewHex() string {
 	return strings.ReplaceAll(New(), "-", "")
 }
 
 // Valid returns true if id is parsed as UUID without error.
+// SW-REQ-001
 func Valid(id string) bool {
 	_, err := uuid.FromString(id)
 	return err == nil

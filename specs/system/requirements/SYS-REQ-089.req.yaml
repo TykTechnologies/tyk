@@ -1,0 +1,53 @@
+id: SYS-REQ-089
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the compression shall always satisfy !zstd_limit_update_requested | zstd_minimum_limit_enforced
+description: When the decompressed-size limit is updated below the minimum allowed limit, the compression helper must clamp the active limit to the minimum before rebuilding the decoder pool.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: compression
+rationale: Limit updates must not accidentally disable the decompression safety floor by accepting a value below the package minimum.
+tags:
+    - compression
+    - zstd
+    - boundary
+variables:
+    - zstd_limit_update_requested
+    - zstd_minimum_limit_enforced
+traces:
+    satisfies:
+        - STK-REQ-012
+    reviewed_at: "2026-06-19T08:09:25.258308Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:57c716358e6f371694e52101c413c9ccbd00734135c89a89a64a6c68353ef618
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T00:00:00Z"
+obligation_class: boundary
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added compression package proof scope.
+          changed_by: agent:codex

@@ -1,0 +1,53 @@
+id: SYS-REQ-102
+version: 1
+status: review
+priority: shall
+category: security
+req_type: guarantee
+fretish: the osutil shall always satisfy !scoped_file_operation_requested | scoped_file_operation_confined
+description: Scoped write, remove, and stat operations must perform scoped path validation before invoking the underlying filesystem operation and must not modify or report paths outside the scoped root.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: osutil
+rationale: File operations built on a scoped root must not become an escape path for policy file writes, deletes, or metadata reads.
+tags:
+    - osutil
+    - filesystem
+    - traversal
+variables:
+    - scoped_file_operation_requested
+    - scoped_file_operation_confined
+traces:
+    satisfies:
+        - STK-REQ-015
+    reviewed_at: "2026-06-19T08:09:25.516354Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:873dc0eba43fb2c692ee382bc2443f348f8f20a93be34066cdfbd37df3b39a96
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T00:00:00Z"
+obligation_class: error_handling
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added osutil package proof scope.
+          changed_by: agent:codex

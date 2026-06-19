@@ -1,0 +1,52 @@
+id: SYS-REQ-098
+version: 1
+status: review
+priority: shall
+category: security
+req_type: guarantee
+fretish: the osutil shall always satisfy !root_creation_requested | root_directory_scoped
+description: Scoped root creation must return a Root for an existing directory path after resolving that path to an absolute directory.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: osutil
+rationale: Filesystem operations need a stable absolute root before path-scoped access can be enforced.
+tags:
+    - osutil
+    - filesystem
+variables:
+    - root_creation_requested
+    - root_directory_scoped
+traces:
+    satisfies:
+        - STK-REQ-015
+    reviewed_at: "2026-06-19T08:09:25.426271Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:e8684285a85b7ec0bdd9e6e1b3916c28d05cc1b16045d740d713b30080643346
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T00:00:00Z"
+obligation_class: boundary
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added osutil package proof scope.
+          changed_by: agent:codex

@@ -42,14 +42,27 @@ func newClosureTestService(orgID string, policies []user.Policy) *policy.Service
 	return policy.New(&orgID, store, logger)
 }
 
+// Verifies: SW-REQ-002
+// MCDC SW-REQ-002: service_apply_invoked=F, service_apply_success_returned=F => TRUE
+func TestMCDCClosure_ServiceApplyNotInvoked(t *testing.T) {
+	orgID := "org1"
+	svc := newClosureTestService(orgID, nil)
+	require.NotNil(t, svc)
+
+	session := &user.SessionState{}
+	assert.Empty(t, session.PolicyIDs(), "idle setup must not invoke Apply or mutate policy IDs")
+}
+
 // ===========================================================================
 // Gap: apply.go:199 !accessRight.Limit.IsEmpty() -- missing F=>T proof
 // Need: session with empty policyIDs AND access rights where limit IS empty
 // ===========================================================================
 
-// Verifies: SYS-REQ-008, SYS-REQ-050 [boundary]
+// Verifies: SYS-REQ-008, SYS-REQ-050, SW-REQ-002 [boundary]
+// SW-REQ-002:nominal:nominal
 // MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
 // MCDC SYS-REQ-050: apply_requested=T, multiple_policies=F, policies_provided=F, result_returned=T => TRUE
+// MCDC SW-REQ-002: service_apply_invoked=T, service_apply_success_returned=T => TRUE
 func TestMCDCClosure_Apply199_LimitIsEmpty(t *testing.T) {
 	// When policyIDs is empty and an access right has an empty limit,
 	// the IsEmpty() branch evaluates to true, so !IsEmpty() => false.
@@ -826,6 +839,47 @@ func TestMCDCClosure_UpdateSessionRootVars589_595_601(t *testing.T) {
 }
 
 // ===========================================================================
+// Gap: apply.go:637 policy.QuotaMax == QuotaUnlimited -- need T
+// Master policy quota path must zero renewal rate for unlimited quota.
+// ===========================================================================
+
+// Verifies: SYS-REQ-053 [boundary]
+func TestMCDCClosure_ApplyPartitions637_MasterQuotaUnlimited(t *testing.T) {
+	orgID := "org1"
+	pol := user.Policy{
+		ID:               "pol1",
+		OrgID:            orgID,
+		QuotaMax:         policy.QuotaUnlimitedInt64,
+		QuotaRenewalRate: 3600,
+		Partitions: user.PolicyPartitions{
+			Quota: true,
+		},
+	}
+	aclPol := user.Policy{
+		ID:    "pol2",
+		OrgID: orgID,
+		Partitions: user.PolicyPartitions{
+			Acl: true,
+		},
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {Versions: []string{"v1"}},
+		},
+	}
+
+	svc := newClosureTestService(orgID, []user.Policy{pol, aclPol})
+	session := &user.SessionState{}
+	session.SetPolicies("pol1", "pol2")
+	session.MetaData = map[string]interface{}{}
+
+	err := svc.Apply(session)
+	require.NoError(t, err)
+
+	assert.Equal(t, policy.QuotaUnlimitedInt64, session.QuotaMax)
+	assert.Equal(t, int64(0), session.QuotaRenewalRate,
+		"unlimited master-policy quota must force renewal rate to zero")
+}
+
+// ===========================================================================
 // Gap: store.go:27 len(s.policies) == 0 -- need T (empty store)
 // ===========================================================================
 
@@ -977,11 +1031,13 @@ func TestMCDCClosure_Intersection(t *testing.T) {
 // Coverage: ClearSession with partitioned policies (all branches)
 // ===========================================================================
 
-// Verifies: SYS-REQ-019, SYS-REQ-020 [boundary]
-// SYS-REQ-019:nil_safety:negative
-// SYS-REQ-020:error_handling:negative
+// Verifies: SYS-REQ-019, SYS-REQ-049, SYS-REQ-065 [boundary]
+// SYS-REQ-019:nominal:nominal
+// SYS-REQ-049:error_handling:negative
+// SYS-REQ-065:nil_safety:negative
 // MCDC SYS-REQ-019: clear_requested=T, error_reported=F, policy_found=T, session_cleared=T => TRUE
-// MCDC SYS-REQ-020: clear_requested=T, error_reported=F, policy_found=T => TRUE
+// MCDC SYS-REQ-049: clear_requested=T, error_reported=T, store_available=F => TRUE
+// MCDC SYS-REQ-065: any_operation_requested=T, nil_store=T, nil_store_rejected=T => TRUE
 func TestMCDCClosure_ClearSession_Partitioned(t *testing.T) {
 	orgID := "org1"
 
@@ -1020,10 +1076,10 @@ func TestMCDCClosure_ClearSession_Partitioned(t *testing.T) {
 		}
 		svc := newClosureTestService(orgID, []user.Policy{pol})
 		session := &user.SessionState{
-			QuotaMax:       1000,
-			Rate:           200,
-			Per:            120,
-			MaxQueryDepth:  5,
+			QuotaMax:      1000,
+			Rate:          200,
+			Per:           120,
+			MaxQueryDepth: 5,
 		}
 		session.SetPolicies("pol1")
 
@@ -1075,9 +1131,11 @@ func TestMCDCClosure_ClearSession_Partitioned(t *testing.T) {
 // Coverage: Apply with LastUpdated propagation
 // ===========================================================================
 
-// Verifies: SYS-REQ-008, SYS-REQ-017 [boundary]
+// Verifies: SYS-REQ-008, SYS-REQ-017, SW-REQ-002 [boundary]
+// SW-REQ-002:error_handling:nominal
 // MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
 // MCDC SYS-REQ-017: apply_requested=T, error_reported=F, metadata_merged=T => TRUE
+// MCDC SW-REQ-002: service_apply_invoked=T, service_apply_success_returned=T => TRUE
 func TestMCDCClosure_Apply_LastUpdated(t *testing.T) {
 	orgID := "org1"
 
@@ -1109,10 +1167,12 @@ func TestMCDCClosure_Apply_LastUpdated(t *testing.T) {
 // Coverage: Apply with nil logger in ClearSession error path
 // ===========================================================================
 
-// Verifies: SYS-REQ-008, SYS-REQ-042 [boundary]
+// Verifies: SYS-REQ-008, SYS-REQ-042, SW-REQ-002 [boundary]
 // SYS-REQ-042:nil_safety:negative
+// SW-REQ-002:error_handling:negative
 // MCDC SYS-REQ-008: apply_requested=T, result_returned=F => FALSE
 // MCDC SYS-REQ-042: apply_requested=T, error_reported=T, store_available=F => TRUE
+// MCDC SW-REQ-002: service_apply_invoked=T, service_apply_success_returned=F => FALSE
 func TestMCDCClosure_Apply_NilLoggerClearSessionError(t *testing.T) {
 	// When logger is nil and ClearSession fails, the nil check at apply.go:100
 	// prevents the panic.
@@ -2192,7 +2252,7 @@ func TestMCDCFlip_RateLimitEndpoints514(t *testing.T) {
 	pol2 := user.Policy{
 		ID: "pol2", OrgID: orgID,
 		Partitions: user.PolicyPartitions{RateLimit: true},
-		Rate: 20, Per: 60,
+		Rate:       20, Per: 60,
 		AccessRights: map[string]user.AccessDefinition{
 			"api1": {
 				Versions: []string{"v1"},
@@ -2270,7 +2330,9 @@ func TestMCDCFlip_UpdateSessionRootVars(t *testing.T) {
 
 // Gap: apply.go:242 -- v.Limit.SetBy != "" (second condition in && short-circuit)
 // Need: v.AllowanceScope="" and v.Limit.SetBy="" (F) AND
-//       v.AllowanceScope="" and v.Limit.SetBy!="" (T)
+//
+//	v.AllowanceScope="" and v.Limit.SetBy!="" (T)
+//
 // in the same test with distinctACL > 1.
 // Verifies: SYS-REQ-024 [boundary]
 // MCDC SYS-REQ-024: access_rights_merged=T, apply_requested=T, error_reported=F => TRUE

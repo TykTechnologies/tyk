@@ -1,0 +1,14 @@
+component: rate_model
+no_interface:
+    declared: true
+    reason: 'The rate model package is an in-process state helper for rate-limit allowance data; this slice does not define a cross-component runtime interface boundary.'
+variables:
+    - name: rate_limit_allowance_operation_requested
+      type: bool
+      direction: input
+      description: A caller invokes an internal rate model Allowance construction, decoding, validation, reset, access, update, timing, or expiry helper.
+
+    - name: rate_limit_allowance_state_result_returned
+      type: bool
+      direction: output
+      description: The rate model Allowance helper returns the expected allowance value, validation result, cleared state, updated state, timing, or expiry result.

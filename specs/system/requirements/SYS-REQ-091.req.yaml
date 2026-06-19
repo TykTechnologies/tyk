@@ -1,0 +1,53 @@
+id: SYS-REQ-091
+version: 1
+status: review
+priority: shall
+category: security
+req_type: guarantee
+fretish: the sanitize shall always satisfy !archive_path_validation_requested | archive_path_within_target
+description: Archive path validation must accept relative file paths that cleanly resolve within the target directory.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: sanitize
+rationale: Valid archive entries must remain usable when they resolve inside the intended extraction root.
+tags:
+    - sanitize
+    - archive-path
+variables:
+    - archive_path_validation_requested
+    - archive_path_within_target
+traces:
+    satisfies:
+        - STK-REQ-013
+    reviewed_at: "2026-06-19T08:09:25.282337Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:8d1bb25559e3b4014ca42de0eb346cef4f6bb65a95e916f643f930bace643915
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T00:00:00Z"
+obligation_class: boundary
+obligation_checklist:
+    - nominal
+    - boundary
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added sanitize package proof scope.
+          changed_by: agent:codex

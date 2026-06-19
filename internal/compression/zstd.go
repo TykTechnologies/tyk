@@ -49,6 +49,8 @@ var (
 
 // CompressZstd compresses data using Zstd compression
 // Returns the compressed data and an error if compression fails
+// SYS-REQ-085
+// SYS-REQ-090
 func CompressZstd(data []byte) ([]byte, error) {
 	encoderInterface := encoderPool.Get()
 	if encoderInterface == nil {
@@ -77,6 +79,11 @@ func CompressZstd(data []byte) ([]byte, error) {
 }
 
 // DecompressZstd decompresses Zstd-compressed data
+// SYS-REQ-085
+// SYS-REQ-086
+// SYS-REQ-087
+// SYS-REQ-088
+// SYS-REQ-090
 func DecompressZstd(data []byte) ([]byte, error) {
 	decoderInterface := decoderPool.Get()
 	if decoderInterface == nil {
@@ -99,6 +106,7 @@ func DecompressZstd(data []byte) ([]byte, error) {
 }
 
 // GetMaxDecompressedSize returns the current maximum allowed decompressed size.
+// SYS-REQ-089
 func GetMaxDecompressedSize() uint64 {
 	return maxDecompressedSize
 }
@@ -106,6 +114,10 @@ func GetMaxDecompressedSize() uint64 {
 // SetMaxDecompressedSize updates the maximum allowed decompressed size
 // and reinitializes the decoder pool with the new limit.
 // Values below 1MB are clamped to 1MB with a warning.
+// SYS-REQ-087
+// SYS-REQ-088
+// SYS-REQ-089
+// SYS-REQ-090
 func SetMaxDecompressedSize(size uint64) {
 	if size < minDecompressedSize {
 		log.Warnf("MaxDecompressedSize %d is below minimum %d, using minimum", size, minDecompressedSize)
@@ -125,6 +137,8 @@ func SetMaxDecompressedSize(size uint64) {
 }
 
 // IsZstdCompressed checks if the data starts with Zstd magic bytes
+// SYS-REQ-085
+// SYS-REQ-086
 func IsZstdCompressed(data []byte) bool {
 	return len(data) >= 4 && bytes.Equal(data[:4], zstdMagicBytes)
 }

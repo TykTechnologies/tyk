@@ -1,0 +1,89 @@
+id: STK-REQ-013
+version: 1
+status: rejected
+priority: shall
+category: security
+req_type: guarantee
+fretish: ""
+description: Gateway path and identifier input handling shall validate archive file paths and path components so bundle, API, policy, MCP, and identifier inputs remain contained, single-component, and resistant to traversal or encoded separator attacks.
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: input_containment
+rationale: Path and component validation protects bundle extraction, API definition management, MCP file operations, and identifier-based paths from directory traversal, absolute paths, encoded separators, and malformed encoded input.
+tags:
+    - input-containment
+    - path
+    - traversal
+variables: []
+traces:
+    reviewed_at: "2026-06-19T08:08:39.705707Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:b341a7765c643479f3197d7d2bd81345ee11f2171f22d68e99cdceb7b50af7d8
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T13:57:18Z"
+obligation_checklist:
+    - nominal
+    - malformed_input
+    - boundary
+    - encoding_safety
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need archive paths and path components to be validated before use so untrusted bundle, API, MCP, policy, or identifier input cannot escape expected filesystem or component boundaries.
+    acceptance_criteria:
+        - id: STK-REQ-013-AC-01
+          text: Given relative archive paths that resolve inside the target directory, when archive path validation is requested, then validation succeeds.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-091
+        - id: STK-REQ-013-AC-02
+          text: Given absolute, volume-qualified, traversal, or unresolvable archive paths, when archive path validation is requested, then validation returns an error and traversal attempts use ErrInvalidFilePath.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-092
+        - id: STK-REQ-013-AC-03
+          text: Given a non-empty single path component without separators after bounded URL decoding, when path-component validation is requested, then validation succeeds.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-093
+        - id: STK-REQ-013-AC-04
+          text: Given empty, dot, dot-dot, separator-containing, encoded traversal, encoded separator, or malformed encoded path components, when path-component validation is requested, then validation returns ErrInvalidFilePath.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-094
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added sanitize package proof scope.
+          changed_by: agent:codex
+        - date: "2026-06-19T00:00:00Z"
+          from: review
+          to: review
+          reason: Reframed stakeholder wording from package-level helper ownership to gateway-level input containment behavior per spec-layering guidance.
+          changed_by: agent:codex
+        - date: "2026-06-19T13:57:18Z"
+          from: review
+          to: rejected
+          reason: '[REQPROOF-LAYERING-REPAIR] Helper-domain acceptance criteria belong below stakeholder level; no direct integrated acceptance witness exists'
+          changed_by: agent:codex

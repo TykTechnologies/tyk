@@ -1,0 +1,14 @@
+component: netutil
+no_interface:
+    declared: true
+    reason: 'The netutil package is an in-process helper for local interface address discovery; it does not define a cross-component runtime interface boundary.'
+variables:
+    - name: netutil_address_lookup_requested
+      type: bool
+      direction: input
+      description: A caller invokes the internal netutil address lookup helper.
+
+    - name: netutil_address_lookup_result_returned
+      type: bool
+      direction: output
+      description: The netutil helper returns the expected address slice, an empty successful slice, or the underlying interface enumeration error according to the lookup input conditions.

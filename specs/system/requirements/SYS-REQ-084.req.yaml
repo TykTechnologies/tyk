@@ -1,0 +1,64 @@
+id: SYS-REQ-084
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the configuration_timing shall always satisfy !duration_exchange_requested | duration_exchange_result_preserved
+description: Gateway configuration and runtime timing behavior shall preserve readable duration values when duration settings are serialized, parsed, or converted, including normalized shorthand output, explicit malformed-JSON errors, zero fallback for invalid duration strings, and unit conversions matching the underlying duration.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: configuration_timing
+rationale: Gateway timeout, window, delay, and interval values must preserve intended timing semantics at configuration and runtime boundaries. The concrete internal/time helper implementation is decomposed into SW-REQ-003.
+tags:
+    - configuration
+    - timing
+    - duration
+    - json
+variables:
+    - duration_exchange_requested
+    - duration_exchange_result_preserved
+traces:
+    satisfies:
+        - STK-REQ-011
+    reviewed_at: "2026-06-19T08:09:25.130381Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:3d6e4b9f5c3022fdc3aa084d681e60834904b9c35fa8d4301cfe870cb09c7e44
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: true
+    gaps_reviewed_at: "2026-06-19T08:07:36.485908Z"
+    gaps_reviewed_by: buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-084|duration_exchange_result_preserved
+          reviewer: buger
+          reason: Reviewed SYS-REQ-084 decomposition after moving internal/time helper behavior into SW-REQ-003; the parent owns gateway configuration timing preservation and the child owns the concrete ReadableDuration implementation evidence.
+          reviewed_at: "2026-06-19T08:07:36.485908Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T08:04:39Z"
+obligation_class: encoding_safety
+obligation_checklist:
+    - nominal
+    - malformed_input
+    - boundary
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added time package proof scope.
+          changed_by: agent:codex

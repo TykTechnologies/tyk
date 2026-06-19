@@ -21,13 +21,12 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-003
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-04-27T06:25:20.881113Z"
-    reviewed_by: human:leonidbugaev
+    reviewed_at: "2026-06-18T19:38:45.304489Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:ab3a01c583feff30cee35b238c9bdb3da8d7e1c16c534632af8bcb640d1a18a1
 verification:
     assurance_level: A
-    formalization_status: ""
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:leonidbugaev
@@ -36,8 +35,8 @@ verification:
 history:
     created_by: ai:claude
     created_at: "2026-04-21T00:00:00Z"
-    last_modified_by: ai:claude
-    last_modified_at: "2026-04-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-18T19:07:43Z"
 obligation_class: determinism
 lifecycle:
     change_history:
@@ -46,5 +45,3 @@ lifecycle:
           to: review
           reason: New obligation class determinism added for rate limit merge determinism
           changed_by: ai:claude
-audit_ignore:
-    - lint-formalization-quality

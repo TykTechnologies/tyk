@@ -1,0 +1,14 @@
+component: rate_limit_allowance
+no_interface:
+    declared: true
+    reason: 'This proof slice models gateway-visible allowance state semantics exercised through in-process rate model behavior; no cross-component runtime interface contract is introduced.'
+variables:
+    - name: rate_limit_allowance_operation_requested
+      type: bool
+      direction: input
+      description: Gateway rate-limit allowance state decoding, validation, reset, access, update, timing, or expiry behavior is requested.
+
+    - name: rate_limit_allowance_state_result_returned
+      type: bool
+      direction: output
+      description: The allowance state operation returns the expected decoded values, validation result, cleared state, accessed value, updated state, next-update timing, or expiry result.

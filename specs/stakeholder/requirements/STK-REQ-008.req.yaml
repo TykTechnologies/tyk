@@ -1,0 +1,90 @@
+id: STK-REQ-008
+version: 1
+status: rejected
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: Gateway policy and API inventory data shall preserve stable identities, explicit lookup results, deterministic filtering, and adapter data shapes so gateway, policy, RPC, and reporting flows consume the intended model data without ambiguity or silent shape changes.
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy_inventory
+rationale: Policy and API inventory data is shared across authorization, RPC, MDCB reporting, event metadata, and API filtering flows. Incorrect identity normalization, lookup behavior, API filtering, or adapter shims can cause higher-level gateway behavior to consume the wrong model data.
+tags:
+    - policy-inventory
+    - api-inventory
+    - policy-store
+    - adapter-shim
+variables: []
+traces:
+    reviewed_at: "2026-06-19T08:08:39.467004Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:b2b790804ed9bcd3aaa0f5594de8bbf58333d4b08147f937fcf52d158ba402a3
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-18T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-18T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T13:57:18Z"
+obligation_checklist:
+    - nominal
+    - malformed_input
+    - determinism
+    - error_handling
+    - boundary
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need policy and API inventory data to preserve identity, lookup, filtering, and adapter semantics so gateway and policy flows rely on deterministic model data.
+    acceptance_criteria:
+        - id: STK-REQ-008-AC-01
+          text: Given valid and invalid policy identifiers, when gateway or policy flows normalize identifiers, then valid identifiers are preserved or derived and invalid identifiers are rejected.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-077
+        - id: STK-REQ-008-AC-02
+          text: Given policy-store load, lookup, delete, enumeration, and collision-callback operations, when gateway or policy flows request policy inventory data, then lookups and misses return explicit results and enumeration or collision lists represent the expected unordered set of policies or database IDs.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-078
+            - SYS-REQ-079
+        - id: STK-REQ-008-AC-03
+          text: Given merged API inventory construction and tag filtering, when gateway reporting or filtering is requested, then disabled filtering returns all APIs and enabled filtering returns only non-disabled APIs with matching tags.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-080
+        - id: STK-REQ-008-AC-04
+          text: Given adapter data used by RPC aliases, event metadata, and upstream-auth flows, when those adapters are used, then they preserve the expected data shape or complete without modifying the request.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-081
+lifecycle:
+    change_history:
+        - date: "2026-06-18T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added model package proof scope.
+          changed_by: agent:codex
+        - date: "2026-06-19T00:00:00Z"
+          from: review
+          to: review
+          reason: Reframed stakeholder wording from package-level helper ownership to gateway-level policy and API inventory behavior per spec-layering guidance.
+          changed_by: agent:codex
+        - date: "2026-06-19T13:57:18Z"
+          from: review
+          to: rejected
+          reason: '[REQPROOF-LAYERING-REPAIR] Helper-domain acceptance criteria belong below stakeholder level; no direct integrated acceptance witness exists'
+          changed_by: agent:codex

@@ -1,0 +1,82 @@
+id: STK-REQ-014
+version: 1
+status: rejected
+priority: shall
+category: reliability
+req_type: guarantee
+fretish: ""
+description: Gateway node address discovery shall report usable non-loopback interface IP addresses while excluding loopback, non-IP, and malformed interface addresses and surfacing interface enumeration failures to operators or callers.
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: node_network_identity
+rationale: Gateway startup, diagnostics, and node reporting depend on address discovery that reports usable node addresses without mistaking loopback or malformed interface data for externally reachable addresses.
+tags:
+    - node-network-identity
+    - network-address
+    - interface-discovery
+variables: []
+traces:
+    reviewed_at: "2026-06-19T08:08:39.737843Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:badfc599de2a701986bb62536bcbd00b7eea104c9e772decab3071f33c6a5940
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T13:57:18Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - malformed_input
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need local address discovery to return only usable non-loopback addresses and to fail visibly when interface enumeration fails so network-facing diagnostics and startup behavior are trustworthy.
+    acceptance_criteria:
+        - id: STK-REQ-014-AC-01
+          text: Given interface enumeration returns IPv4 and IPv6 non-loopback addresses, when address discovery is requested, then those addresses are returned in enumeration order.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-095
+        - id: STK-REQ-014-AC-02
+          text: Given loopback, non-IPNet, malformed, or non-convertible interface addresses, when address discovery is requested, then those unusable addresses are excluded and no error is returned solely because they were present.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-096
+        - id: STK-REQ-014-AC-03
+          text: Given interface enumeration fails, when address discovery is requested, then the enumeration error is returned and no discovered addresses are reported.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-097
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added netutil package proof scope.
+          changed_by: agent:codex
+        - date: "2026-06-19T00:00:00Z"
+          from: review
+          to: review
+          reason: Reframed stakeholder wording from package-level helper ownership to gateway-level node network identity behavior per spec-layering guidance.
+          changed_by: agent:codex
+        - date: "2026-06-19T13:57:18Z"
+          from: review
+          to: rejected
+          reason: '[REQPROOF-LAYERING-REPAIR] Helper-domain acceptance criteria belong below stakeholder level; no direct integrated acceptance witness exists'
+          changed_by: agent:codex

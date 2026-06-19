@@ -1,0 +1,61 @@
+id: SYS-REQ-088
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the compression shall always satisfy !zstd_allowed_decompression_requested | zstd_payload_bytes_preserved
+description: Zstd decompression must succeed and preserve bytes when the decoded payload is within the active decompressed-size limit.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: compression
+rationale: The size guard must reject oversized data without preventing valid payloads that fit within the configured limit.
+tags:
+    - compression
+    - zstd
+    - boundary
+variables:
+    - zstd_allowed_decompression_requested
+    - zstd_payload_bytes_preserved
+traces:
+    satisfies:
+        - STK-REQ-012
+    reviewed_at: "2026-06-19T08:09:25.24626Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:4ee5fde43eac211f119600d63c14f0b9f9d68b4700d016af09fb90168323728d
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-18T21:30:01.323858Z"
+    gaps_reviewed_by: agent:codex
+    gap_reviews:
+        - check: ambiguity
+          issue_key: ambiguity|compression|SYS-REQ-085|SYS-REQ-088
+          reviewer: agent:codex
+          reason: 'Reviewed SYS-REQ-085 and SYS-REQ-088 overlap: both intentionally constrain zstd_payload_bytes_preserved from different input modes. SYS-REQ-085 covers valid round-trip compression/decompression; SYS-REQ-088 covers within-limit decompression success. Shared output is intentional consistency vocabulary, not conflicting behavior.'
+          reviewed_at: "2026-06-18T21:30:01.323858Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-18T21:30:00Z"
+obligation_class: boundary
+obligation_checklist:
+    - nominal
+    - boundary
+    - encoding_safety
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added compression package proof scope.
+          changed_by: agent:codex

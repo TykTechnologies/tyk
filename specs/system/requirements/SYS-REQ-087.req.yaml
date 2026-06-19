@@ -1,0 +1,53 @@
+id: SYS-REQ-087
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the compression shall always satisfy !zstd_oversize_decompression_requested | zstd_oversize_decompression_blocked
+description: Zstd decompression must return an error when the decoded payload would exceed the active decompressed-size limit.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: compression
+rationale: Decompression must bound memory exposure from compressed payloads whose decoded size is larger than the configured resource limit.
+tags:
+    - compression
+    - zstd
+    - boundary
+variables:
+    - zstd_oversize_decompression_requested
+    - zstd_oversize_decompression_blocked
+traces:
+    satisfies:
+        - STK-REQ-012
+    reviewed_at: "2026-06-19T08:09:25.235246Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:cf19c0c7f2c6f89e0e2a3a8b71c59cb2b61df49ef44ca9b341c55c284ca7e338
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T00:00:00Z"
+obligation_class: boundary
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added compression package proof scope.
+          changed_by: agent:codex

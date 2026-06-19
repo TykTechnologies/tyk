@@ -1,0 +1,82 @@
+id: STK-REQ-009
+version: 1
+status: rejected
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: Gateway event metadata shall preserve stable event names, request-context event propagation, and HTTP request encoding so event handlers, analytics, and audit flows can attach and serialize event metadata without losing events or silently changing event names.
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: observability
+rationale: Gateway event handlers and metadata builders rely on stable event strings, accumulated request-context events, and encoded request snapshots. Drift in these values can break event routing or remove audit context.
+tags:
+    - observability
+    - event-metadata
+    - context
+    - request-encoding
+variables: []
+traces:
+    reviewed_at: "2026-06-19T08:08:39.541839Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:c45c3db007b13e8cb10ac03fe5b997e16ddee091cf684b8a943f2461d227882e
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-18T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-18T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T13:57:18Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - encoding_safety
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need gateway event metadata to preserve event names, context values, and encoded request snapshots so event handlers receive the intended audit signal.
+    acceptance_criteria:
+        - id: STK-REQ-009-AC-01
+          text: Given a known or unknown event value, when its display string is requested, then known mapped events return their readable description and unknown events return their raw value.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-082
+        - id: STK-REQ-009-AC-02
+          text: Given an HTTP request context, when events are set or added, then retrieving events returns exactly the accumulated ordered event slice and an untouched context returns no events.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-082
+        - id: STK-REQ-009-AC-03
+          text: Given an HTTP request, when request encoding is requested, then a writable request returns base64 wire-format data and an unwritable request returns an empty encoding result.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-082
+lifecycle:
+    change_history:
+        - date: "2026-06-18T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added event package proof scope.
+          changed_by: agent:codex
+        - date: "2026-06-19T00:00:00Z"
+          from: review
+          to: review
+          reason: Reframed stakeholder wording from package-level helper ownership to gateway-level event metadata behavior per spec-layering guidance.
+          changed_by: agent:codex
+        - date: "2026-06-19T13:57:18Z"
+          from: review
+          to: rejected
+          reason: '[REQPROOF-LAYERING-REPAIR] Helper-domain acceptance criteria belong below stakeholder level; no direct integrated acceptance witness exists'
+          changed_by: agent:codex

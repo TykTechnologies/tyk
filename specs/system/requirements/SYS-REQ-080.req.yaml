@@ -1,0 +1,53 @@
+id: SYS-REQ-080
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the model shall always satisfy !api_list_requested | api_list_result_returned
+description: Merged API list helpers must preserve constructed classic and OAS API entries, expose stable logging fields, append classic definitions, return all APIs when filtering is disabled, return nil for enabled filtering with no tags, skip tag-disabled APIs, and return only APIs whose tags match the requested filter.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: model
+rationale: Gateway API synchronization depends on predictable merged API list construction and tag filtering. Returning disabled or non-matching APIs would route the wrong API definitions downstream.
+tags:
+    - model
+    - api-list
+    - filtering
+variables:
+    - api_list_requested
+    - api_list_result_returned
+traces:
+    satisfies:
+        - STK-REQ-008
+    reviewed_at: "2026-06-19T08:08:39.960821Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:5db39fa3b6c07a86064d473d1afd0e5dab7f4deb2f2ac52533db56c50f6bd297
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-18T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-18T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-18T00:00:00Z"
+obligation_class: boundary
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-18T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added model package proof scope.
+          changed_by: agent:codex

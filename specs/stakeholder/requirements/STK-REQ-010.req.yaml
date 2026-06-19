@@ -1,0 +1,81 @@
+id: STK-REQ-010
+version: 1
+status: rejected
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: Gateway identifier generation and validation shall produce parseable UUID values, dash-free UUID hex values where required, and reliable rejection of malformed UUID strings so records, APIs, OAuth clients, and runtime objects use consistent identifiers.
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: identifiers
+rationale: UUID values are used across API definitions, OAuth flows, host checks, imports, and generated records. Invalid formatting or false validation would make identifier storage and lookup unreliable.
+tags:
+    - identifiers
+    - uuid
+    - identity
+    - validation
+variables: []
+traces:
+    reviewed_at: "2026-06-19T08:08:39.587035Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:ff38d1f5c53465fd721bac27a2ce056fbdc5e7e616d08ef638b5e3a0c964a40f
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-18T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-18T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T13:57:18Z"
+obligation_checklist:
+    - nominal
+    - malformed_input
+    - boundary
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need generated identifiers to be parseable and malformed identifiers to be rejected so IDs remain reliable across storage and request flows.
+    acceptance_criteria:
+        - id: STK-REQ-010-AC-01
+          text: Given a UUID generation request, when dashed or dash-free output is requested, then the returned string is non-empty, parseable as a UUID, and matches the requested dash format.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-083
+        - id: STK-REQ-010-AC-02
+          text: Given valid and malformed UUID strings, when validation is requested, then valid UUID strings are accepted and malformed strings are rejected.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-083
+        - id: STK-REQ-010-AC-03
+          text: Given an internal UUID generation error, when the panic guard receives that error, then it fails loudly with the supplied context message instead of returning an ambiguous identifier.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-083
+lifecycle:
+    change_history:
+        - date: "2026-06-18T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added UUID package proof scope.
+          changed_by: agent:codex
+        - date: "2026-06-19T00:00:00Z"
+          from: review
+          to: review
+          reason: Reframed stakeholder wording from package-level helper ownership to gateway-level identifier behavior per spec-layering guidance.
+          changed_by: agent:codex
+        - date: "2026-06-19T13:57:18Z"
+          from: review
+          to: rejected
+          reason: '[REQPROOF-LAYERING-REPAIR] Helper-domain acceptance criteria belong below stakeholder level; no direct integrated acceptance witness exists'
+          changed_by: agent:codex

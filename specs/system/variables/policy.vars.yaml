@@ -32,6 +32,7 @@ variables:
       type: bool
       direction: input
       proof_auxiliary: true  # complement of policies_provided for Z3 data completeness
+      proof_auxiliary_reason: Complements policies_provided so policy_count partitions are complete; not a standalone behavioral obligation.
       description: No policy IDs exist in the session (policy_count == 0)
       data_constraint:
         domain: integer
@@ -115,6 +116,7 @@ variables:
       type: bool
       direction: input
       proof_auxiliary: true  # complement of policy_rate_empty for Z3 data completeness
+      proof_auxiliary_reason: Complements policy_rate_empty so rate-limit input partitions are exhaustive; not a separate requirement claim.
       description: Policy rate limit values are non-zero (Rate > 0 and Per > 0)
       data_constraint:
         domain: integer
@@ -148,6 +150,7 @@ variables:
       type: bool
       direction: input
       proof_auxiliary: true  # complement of api_limit_empty for Z3 data completeness
+      proof_auxiliary_reason: Complements api_limit_empty for API-limit partition completeness; excluded from standalone orphan proof emission.
       description: Current API-level rate limit has non-zero values (Rate > 0 and Per > 0)
       data_constraint:
         domain: integer
@@ -199,6 +202,7 @@ variables:
       type: bool
       direction: input
       proof_auxiliary: true  # complement of is_per_api/partitions_enabled for Z3 data completeness
+      proof_auxiliary_reason: Completes the policy_mode partition with the no-PerAPI/no-partitions case; not an independent requirement.
       description: Policy uses standard mode (no PerAPI, no partitions) - master policy case
       data_constraint:
         domain: boolean
@@ -246,6 +250,7 @@ variables:
       type: bool
       direction: input
       proof_auxiliary: true  # complement of policies_all_missing for Z3 data completeness
+      proof_auxiliary_reason: Complements policies_all_missing for found_count partition coverage; not asserted as a standalone obligation.
       description: At least one referenced policy was found when multiple exist
       data_constraint:
         domain: integer
@@ -263,6 +268,7 @@ variables:
       type: bool
       direction: input
       proof_auxiliary: true  # complement domain variable for policies_all_missing threshold
+      proof_auxiliary_reason: Covers the policy_count threshold below the all-missing domain; used only to make partitions exhaustive.
       description: Fewer than 2 policies referenced so all_missing check is not applicable
       data_constraint:
         domain: integer
@@ -296,6 +302,7 @@ variables:
       type: bool
       direction: input
       proof_auxiliary: true  # complement of policy_rate_higher for Z3 data completeness
+      proof_auxiliary_reason: Complements rate comparison branches for MC/DC and completeness checks; not a standalone behavioral proof.
       description: Policy has lower request rate than current API limit (longer duration)
       data_constraint:
         domain: integer
@@ -381,7 +388,6 @@ variables:
         merge: highest
         compare_by: duration
         fields: [Rate, Per]
-        note: "Compares by duration (Per/Rate); shorter duration = higher rate wins"
       data_constraint:
         domain: integer
         variable: result_rate
@@ -438,7 +444,6 @@ variables:
       properties:
         merge: combine
         key: metadata_key
-        note: "last-write-wins per key when policies overlap"
 
     - name: error_reported
       type: bool
@@ -462,7 +467,6 @@ variables:
             type: RateLimit
             merge: highest
             compare_by: duration
-            note: "Shorter duration wins; on equal duration, higher Rate wins"
 
     - name: complexity_applied
       type: bool
@@ -503,6 +507,18 @@ variables:
       type: bool
       direction: output
       description: Apply() completed within the performance bound (100ms for up to 50 policies)
+      data_constraint:
+        domain: integer
+        variable: apply_latency
+        condition: "policy_count <= 50 && elapsed_ms <= 100"
+        assignment: "(=> (<= policy_count 50) (<= elapsed_ms 100))"
+        parameters:
+          - name: policy_count
+            type: int
+            constraint: ">= 0 && policy_count <= 50"
+          - name: elapsed_ms
+            type: int
+            constraint: ">= 0"
 
     # ==========================================
     # OBLIGATION CLASS VARIABLES
@@ -515,6 +531,35 @@ variables:
       type: bool
       direction: input
       description: Among multiple AccessRights entries, exactly one API has policies applied to it
+      data_constraint:
+        domain: integer
+        variable: api_policy_count
+        condition: "access_rights_count >= 2 && api_policy_count == 1"
+        parameters:
+          - name: access_rights_count
+            type: int
+            constraint: ">= 0"
+          - name: api_policy_count
+            type: int
+            constraint: ">= 0 && api_policy_count <= access_rights_count"
+
+    - name: not_single_api_has_policies
+      type: bool
+      direction: input
+      proof_auxiliary: true
+      proof_auxiliary_reason: Complements single_api_has_policies so the API policy-count partition is exhaustive for Z3 completeness.
+      description: Either fewer than two access-right entries exist or the number of APIs with policies is not exactly one
+      data_constraint:
+        domain: integer
+        variable: api_policy_count
+        condition: "access_rights_count < 2 || api_policy_count != 1"
+        parameters:
+          - name: access_rights_count
+            type: int
+            constraint: ">= 0"
+          - name: api_policy_count
+            type: int
+            constraint: ">= 0 && api_policy_count <= access_rights_count"
 
     - name: session_fields_from_specific_api
       type: bool
@@ -522,15 +567,10 @@ variables:
       description: Session-level fields (rate, quota, ACL) were set from the specific API that has policies, not from arbitrary map iteration
 
     # --- Idempotency (SYS-REQ-056) ---
-    - name: apply_result_first
+    - name: apply_results_equal
       type: bool
       direction: output
-      description: The session state snapshot after the first Apply() call
-
-    - name: apply_result_second
-      type: bool
-      direction: output
-      description: The session state snapshot after the second Apply() call on the same session
+      description: The session state snapshot after the first Apply() call equals the snapshot after the second Apply() call on the same session
 
     # --- Commutativity (SYS-REQ-057) ---
     - name: merge_order_independent
@@ -545,15 +585,10 @@ variables:
       description: Rate limit merge result is the same regardless of policy iteration order
 
     # --- Rate limit commutativity (SYS-REQ-059) ---
-    - name: rate_merge_AB
+    - name: rate_merge_results_equal
       type: bool
       direction: output
-      description: Rate limit merge result when applying policies in order [A, B]
-
-    - name: rate_merge_BA
-      type: bool
-      direction: output
-      description: Rate limit merge result when applying policies in order [B, A]
+      description: Rate limit merge result for policies [A, B] equals the result for policies [B, A]
 
     # --- Rate limit monotonicity (SYS-REQ-060) ---
     - name: policy_added
@@ -578,15 +613,10 @@ variables:
       description: Endpoint-level rate limit merge result is the same regardless of policy iteration order
 
     # --- Endpoint limit commutativity (SYS-REQ-062) ---
-    - name: endpoint_merge_AB
+    - name: endpoint_merge_results_equal
       type: bool
       direction: output
-      description: Endpoint limit merge result when applying policies in order [A, B]
-
-    - name: endpoint_merge_BA
-      type: bool
-      direction: output
-      description: Endpoint limit merge result when applying policies in order [B, A]
+      description: Endpoint limit merge result for policies [A, B] equals the result for policies [B, A]
 
     # --- Endpoint limit monotonicity (SYS-REQ-063) ---
     - name: new_endpoint_rate
@@ -677,15 +707,10 @@ variables:
       description: All policy engine operations produce deterministic results given identical inputs
 
     # --- ClearSession idempotency (SYS-REQ-071) ---
-    - name: clear_result_first
+    - name: clear_results_equal
       type: bool
       direction: output
-      description: The session state after the first ClearSession call
-
-    - name: clear_result_second
-      type: bool
-      direction: output
-      description: The session state after the second ClearSession call on the same session
+      description: The session state after the first ClearSession call equals the state after the second ClearSession call
 
     # --- Nil safety for rate/endpoint/error operations (SYS-REQ-073) ---
     - name: nil_safe_execution
@@ -704,3 +729,9 @@ variables:
       type: bool
       direction: output
       description: Apply() respects performance boundary conditions including empty and maximum policy lists
+
+domain:
+    mutex:
+        - name: apply_error_vs_access_merge
+          members: [error_reported, access_rights_merged]
+          reason: Apply outcome cannot both report an error and merge access rights successfully.

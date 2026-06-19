@@ -18,13 +18,9 @@ tags:
     - policy-lifecycle
 variables: []
 traces:
-    implemented_by_extra:
-        - internal/policy/apply.go
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-05-19T17:10:21.369934Z"
-    reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:1091b37d7e8d5a0ffabb31c13da0a3089ca31c236f75d8a00aeb2607a7aff72d
+    reviewed_at: "2026-06-18T19:38:44.072537Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:46fe1a71febd56a2cf6a47d3b261886b4832645adb79be1a56129b2243f2e2cc
 verification:
     assurance_level: A
     formalization_status: ""
@@ -33,17 +29,6 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
-    impact_reviews:
-        - requirement: STK-REQ-002
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:1091b37d7e8d5a0ffabb31c13da0a3089ca31c236f75d8a00aeb2607a7aff72d
-          approval_fingerprint: sha256:cfba12e8b8081c62e58dbdbec55b92e5cb8ecfabd4dd71eebd9e3afb877ea818
-          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
-          reviewed_at: "2026-05-19T17:01:30Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"
@@ -63,13 +48,19 @@ stakeholder:
         - id: STK-REQ-002-AC-01
           text: Given a session with existing quota, rate, and complexity values, when ClearSession is called with a valid policy, then all values are reset to zero
           testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-019
+            - SYS-REQ-064
+            - SYS-REQ-070
+            - SYS-REQ-071
         - id: STK-REQ-002-AC-02
           text: Given a session referencing a missing policy, when ClearSession is called, then an error is returned
           testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-020
+            - SYS-REQ-072
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

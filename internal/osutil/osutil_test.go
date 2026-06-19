@@ -25,6 +25,19 @@ func setupTestDir(t *testing.T) string {
 	return tempDir
 }
 
+// Verifies: SYS-REQ-098, SYS-REQ-099
+// SYS-REQ-098:nominal:nominal
+// SYS-REQ-098:boundary:nominal
+// SYS-REQ-098:determinism:nominal
+// SYS-REQ-099:nominal:nominal
+// SYS-REQ-099:malformed_input:nominal
+// SYS-REQ-099:malformed_input:negative
+// SYS-REQ-099:error_handling:nominal
+// SYS-REQ-099:error_handling:negative
+// MCDC SYS-REQ-098: root_creation_requested=F, root_directory_scoped=F => TRUE
+// MCDC SYS-REQ-098: root_creation_requested=T, root_directory_scoped=T => TRUE
+// MCDC SYS-REQ-099: invalid_root_path_presented=F, invalid_root_path_rejected=F => TRUE
+// MCDC SYS-REQ-099: invalid_root_path_presented=T, invalid_root_path_rejected=T => TRUE
 func TestNewRoot(t *testing.T) {
 	t.Run("ValidDirectory", func(t *testing.T) {
 		tempDir := setupTestDir(t)
@@ -55,6 +68,18 @@ func TestNewRoot(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-100, SYS-REQ-101
+// SYS-REQ-100:nominal:nominal
+// SYS-REQ-100:boundary:nominal
+// SYS-REQ-100:determinism:nominal
+// SYS-REQ-101:nominal:nominal
+// SYS-REQ-101:malformed_input:nominal
+// SYS-REQ-101:malformed_input:negative
+// SYS-REQ-101:boundary:nominal
+// MCDC SYS-REQ-100: scoped_path_resolution_requested=F, scoped_path_returned=F => TRUE
+// MCDC SYS-REQ-100: scoped_path_resolution_requested=T, scoped_path_returned=T => TRUE
+// MCDC SYS-REQ-101: lexical_escape_path_presented=F, lexical_escape_rejected=F => TRUE
+// MCDC SYS-REQ-101: lexical_escape_path_presented=T, lexical_escape_rejected=T => TRUE
 func TestEnsure(t *testing.T) {
 	tempDir := setupTestDir(t)
 	root, err := osutil.NewRoot(tempDir)
@@ -86,24 +111,40 @@ func TestEnsure(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-102
+// SYS-REQ-102:nominal:nominal
+// SYS-REQ-102:boundary:nominal
+// SYS-REQ-102:error_handling:nominal
+// MCDC SYS-REQ-102: scoped_file_operation_requested=F, scoped_file_operation_confined=F => TRUE
+// MCDC SYS-REQ-102: scoped_file_operation_requested=T, scoped_file_operation_confined=T => TRUE
 func TestWriteFile(t *testing.T) {
 	tempDir := setupTestDir(t)
 	root, err := osutil.NewRoot(tempDir)
 	assert.NoError(t, err)
 
-	fileName := "test.txt"
-	content := []byte("hello world")
-	perm := os.FileMode(0644)
+	t.Run("SuccessfulWrite", func(t *testing.T) {
+		fileName := "test.txt"
+		content := []byte("hello world")
+		perm := os.FileMode(0644)
 
-	err = root.WriteFile(fileName, content, perm)
-	assert.NoError(t, err, "WriteFile should not return an error")
+		err = root.WriteFile(fileName, content, perm)
+		assert.NoError(t, err, "WriteFile should not return an error")
 
-	fullPath := filepath.Join(tempDir, fileName)
-	readContent, err := os.ReadFile(fullPath)
-	assert.NoError(t, err)
-	assert.Equal(t, content, readContent)
+		fullPath := filepath.Join(tempDir, fileName)
+		readContent, err := os.ReadFile(fullPath)
+		assert.NoError(t, err)
+		assert.Equal(t, content, readContent)
+	})
+
+	t.Run("PathTraversalAttack", func(t *testing.T) {
+		err := root.WriteFile("../../../etc/passwd", []byte("blocked"), 0644)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "attempts to escape root directory")
+	})
 }
 
+// Verifies: SYS-REQ-102
+// SYS-REQ-102:error_handling:negative
 func TestRemove(t *testing.T) {
 	tempDir := setupTestDir(t)
 	root, err := osutil.NewRoot(tempDir)
@@ -128,6 +169,8 @@ func TestRemove(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-102
+// SYS-REQ-102:error_handling:negative
 func TestStat(t *testing.T) {
 	tempDir := setupTestDir(t)
 	root, err := osutil.NewRoot(tempDir)
@@ -160,4 +203,31 @@ func TestStat(t *testing.T) {
 		assert.True(t, os.IsNotExist(err))
 		assert.Nil(t, info)
 	})
+}
+
+// Reproduces: KI-OSUTIL-SYMLINK-ESCAPE
+// Verifies: SYS-REQ-102
+// MCDC SYS-REQ-102: scoped_file_operation_requested=T, scoped_file_operation_confined=F => FALSE
+func TestKnownIssue_WriteFileFollowsSymlinkOutsideRoot(t *testing.T) {
+	tempDir := setupTestDir(t)
+	outsideDir := setupTestDir(t)
+	outsideFile := filepath.Join(outsideDir, "outside.txt")
+	err := os.WriteFile(outsideFile, []byte("original"), 0644)
+	assert.NoError(t, err)
+
+	linkPath := filepath.Join(tempDir, "link.txt")
+	err = os.Symlink(outsideFile, linkPath)
+	if err != nil {
+		t.Skipf("symlink creation unavailable: %v", err)
+	}
+
+	root, err := osutil.NewRoot(tempDir)
+	assert.NoError(t, err)
+
+	err = root.WriteFile("link.txt", []byte("changed"), 0644)
+	assert.NoError(t, err)
+
+	outsideContent, err := os.ReadFile(outsideFile)
+	assert.NoError(t, err)
+	assert.Equal(t, []byte("changed"), outsideContent)
 }

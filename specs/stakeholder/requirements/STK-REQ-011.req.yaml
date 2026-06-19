@@ -1,0 +1,83 @@
+id: STK-REQ-011
+version: 1
+status: rejected
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: Gateway configuration and runtime timing values shall serialize, parse, and convert readable durations consistently so timeout, window, delay, and interval values are exchanged without ambiguous units or silent malformed JSON acceptance.
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: configuration_timing
+rationale: Duration values appear in API definitions, OAS conversion, JWT behavior, configuration, and runtime windows. Incorrect formatting, parsing, or unit conversion can alter timeouts, windows, or delays.
+tags:
+    - configuration
+    - timing
+    - duration
+    - json
+variables: []
+traces:
+    reviewed_at: "2026-06-19T08:08:39.636707Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:dfebc242aad52a1d6b6be50ff43f23a380a47e1d36512b2cedeec26f4ca053f6
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T13:57:18Z"
+obligation_checklist:
+    - nominal
+    - malformed_input
+    - boundary
+    - encoding_safety
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need readable durations to serialize, parse, and convert consistently so configuration and runtime code preserve intended timing.
+    acceptance_criteria:
+        - id: STK-REQ-011-AC-01
+          text: Given zero, positive, negative, and mixed-unit readable durations, when JSON serialization is requested, then the output is a quoted shorthand string with normalized unit order and zero encoded as "0s".
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-084
+        - id: STK-REQ-011-AC-02
+          text: Given valid, empty, invalid-duration, and malformed JSON duration input, when JSON parsing is requested, then valid values parse to the intended duration, empty or invalid-duration strings become zero, and malformed JSON returns an error.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-084
+        - id: STK-REQ-011-AC-03
+          text: Given a readable duration, when seconds, milliseconds, microseconds, or nanoseconds are requested, then the returned value matches the corresponding time.Duration conversion, with seconds rounded down.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-084
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added time package proof scope.
+          changed_by: agent:codex
+        - date: "2026-06-19T00:00:00Z"
+          from: review
+          to: review
+          reason: Reframed stakeholder wording from package-level helper ownership to gateway-level configuration timing behavior per spec-layering guidance.
+          changed_by: agent:codex
+        - date: "2026-06-19T13:57:18Z"
+          from: review
+          to: rejected
+          reason: '[REQPROOF-LAYERING-REPAIR] Helper-domain acceptance criteria belong below stakeholder level; no direct integrated acceptance witness exists'
+          changed_by: agent:codex

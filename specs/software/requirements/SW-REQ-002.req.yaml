@@ -1,0 +1,56 @@
+id: SW-REQ-002
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy_service shall always satisfy !service_apply_invoked | service_apply_success_returned
+description: The internal policy Service Apply method shall return nil after a successful policy application and shall return a non-nil error when the application request is rejected, including nil sessions or unavailable policy storage.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-008
+component: policy_service
+rationale: This software requirement owns the concrete internal/policy.Service result-return behavior that implements the gateway policy application completion contract in SYS-REQ-008.
+tags:
+    - policy
+    - policy-service
+    - apply
+    - error-handling
+variables:
+    - service_apply_invoked
+    - service_apply_success_returned
+traces:
+    satisfies:
+        - SYS-REQ-008
+    reviewed_at: "2026-06-19T08:08:39.82693Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:d022df1cc428940f08200fac471c6ce68f0abad40f3d8e0a6b05831bc2b6fe6b
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T07:38:35Z"
+        comment: Reviewed policy Service software decomposition under SYS-REQ-008; requirement scope and evidence annotations match Apply result-return behavior.
+        fingerprint: sha256:e09dffa96bd391e57c7ee7dad4e4a78c42039d30705195c52bf52507125156bf
+        ai_generated: true
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T07:35:07Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T07:46:54Z"
+obligation_checklist:
+    - error_handling
+    - nominal
+lifecycle:
+    change_history:
+        - date: "2026-06-19T07:37:18Z"
+          from: draft
+          to: review
+          reason: Software decomposition for policy Apply result-return behavior under SYS-REQ-008
+          changed_by: agent:codex

@@ -8,6 +8,37 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type fakeAddr string
+
+func (f fakeAddr) Network() string { return string(f) }
+func (f fakeAddr) String() string  { return string(f) }
+
+// Verifies: SYS-REQ-095, SYS-REQ-096, SYS-REQ-097, SW-REQ-005
+// SYS-REQ-095:nominal:nominal
+// SYS-REQ-095:boundary:nominal
+// SYS-REQ-095:determinism:nominal
+// SYS-REQ-096:nominal:nominal
+// SYS-REQ-096:boundary:nominal
+// SYS-REQ-096:malformed_input:nominal
+// SYS-REQ-096:malformed_input:negative
+// SYS-REQ-097:nominal:nominal
+// SYS-REQ-097:error_handling:nominal
+// SYS-REQ-097:error_handling:negative
+// SW-REQ-005:nominal:nominal
+// SW-REQ-005:boundary:nominal
+// SW-REQ-005:malformed_input:nominal
+// SW-REQ-005:malformed_input:negative
+// SW-REQ-005:error_handling:nominal
+// SW-REQ-005:error_handling:negative
+// SW-REQ-005:determinism:nominal
+// MCDC SYS-REQ-095: usable_node_address_discovery_requested=F, usable_node_addresses_reported=F => TRUE
+// MCDC SYS-REQ-095: usable_node_address_discovery_requested=T, usable_node_addresses_reported=T => TRUE
+// MCDC SYS-REQ-096: unusable_node_address_record_present=F, unusable_node_address_record_excluded=F => TRUE
+// MCDC SYS-REQ-096: unusable_node_address_record_present=T, unusable_node_address_record_excluded=T => TRUE
+// MCDC SYS-REQ-097: node_interface_enumeration_failed=F, node_interface_error_returned=F => TRUE
+// MCDC SYS-REQ-097: node_interface_enumeration_failed=T, node_interface_error_returned=T => TRUE
+// MCDC SW-REQ-005: netutil_address_lookup_requested=F, netutil_address_lookup_result_returned=F => TRUE
+// MCDC SW-REQ-005: netutil_address_lookup_requested=T, netutil_address_lookup_result_returned=T => TRUE
 func Test_GetIpAddress(t *testing.T) {
 	defer func() { netInterfaceAddrs = net.InterfaceAddrs }()
 
@@ -66,6 +97,18 @@ func Test_GetIpAddress(t *testing.T) {
 				}, nil
 			},
 			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "non-ipnet-and-malformed-addresses",
+			netInterfaceAddrs: func() ([]net.Addr, error) {
+				return []net.Addr{
+					fakeAddr("not-ipnet"),
+					&net.IPNet{IP: net.IP{1, 2, 3}, Mask: net.CIDRMask(24, 32)},
+					&net.IPNet{IP: net.ParseIP("10.0.0.5"), Mask: net.IPv4Mask(255, 255, 255, 0)},
+				}, nil
+			},
+			want:    []string{"10.0.0.5"},
 			wantErr: false,
 		},
 	}

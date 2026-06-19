@@ -4,7 +4,7 @@ status: review
 priority: shall
 category: functional
 req_type: guarantee
-fretish: the policy shall always satisfy !clear_requested | (clear_result_first = clear_result_second)
+fretish: the policy shall always satisfy !clear_requested | clear_results_equal
 description: ClearSession must be idempotent. Calling ClearSession twice on the same session with the same policy shall produce the same final session state as calling it once. After the first clear resets quota, rate, and complexity to zero, a second clear must leave those values at zero without error.
 formalization_strategy: fretish
 informal_verification:
@@ -21,14 +21,12 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-002
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-05-19T17:10:22.419234Z"
-    reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:084f5805bb1ca35e9aa40e01364ae2d0e24b6722040f1ec0d2dfff7c4799af3b
+    reviewed_at: "2026-06-18T19:38:45.516606Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:63c522fe394806dbe0463c8ea9ab0040729e4defd594adc19e89a761d81b37b7
 verification:
     assurance_level: A
-    formalization_status: ""
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:leonidbugaev

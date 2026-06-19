@@ -10,7 +10,7 @@ description: |-
 
     ARCHITECTURE: The Service struct holds a policy store and logger. Apply() iterates over policy IDs, looks up each policy, validates org ownership, and dispatches to either applyPerAPI() or applyPartitions() based on the PerAPI flag. ClearSession() resets session values before application. ApplyRateLimits() implements the highest-rate-wins merge. ApplyEndpointLevelLimits() merges per-endpoint rate limits. MergeAllowedURLs() merges per-URL ACLs. The Store and StoreMap provide policy lookup.
 
-    DESIGN DECISIONS: (1) Highest value wins for rate limits and quotas, ensuring the most permissive policy governs. (2) Per-API mode and partition mode are mutually exclusive. (3) Missing policies are skipped when multiple policies exist but cause errors for single-policy sessions. (4) Org ID mismatch is a hard error (security boundary). (5) Session clearing happens before application to prevent stale values from surviving.
+    DESIGN DECISIONS: (1) Highest value wins for rate limits and quotas, ensuring the most permissive policy governs. (2) Per-API mode and partition mode are handled by dedicated mode requirements. (3) Missing policies are skipped when multiple policies exist but cause errors for single-policy sessions. (4) Org ID mismatch is a hard error (security boundary). (5) Session clearing happens before application to prevent stale values from surviving.
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -23,13 +23,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-001
-    verified_by_extra:
-        - FLIP:policy/tc-078
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-05-19T17:10:22.22938Z"
-    reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:4e90269fa03e213954e3f3458b96c41fbde047d8b9995054de6c07432791d3e7
+    reviewed_at: "2026-06-18T19:38:44.98051Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:e2c5c01480d3b1531a40e8cf991c4c9d973637011e5692eba6914164e253b1d2
 verification:
     assurance_level: A
     formalization_status: valid
@@ -38,17 +34,6 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
-    impact_reviews:
-        - requirement: SYS-REQ-033
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:4e90269fa03e213954e3f3458b96c41fbde047d8b9995054de6c07432791d3e7
-          approval_fingerprint: sha256:1a42049fa6da4d15e470f78967e2d7633a28fc54bd286952a3446b26be0bd79e
-          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
-          reviewed_at: "2026-05-19T17:01:30Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:29:33Z"
@@ -58,11 +43,6 @@ obligation_class: nominal
 obligation_checklist:
     - nominal
     - error_handling
-obligation_suppressions:
-    - id: error_handling
-      reason: Component overview requirement (constraint type) documents architecture, not testable error behavior.
-      suppressed_by: leonidbugaev
-      suppressed_at: "2026-05-19T17:09:01Z"
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:34Z"

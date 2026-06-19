@@ -19,13 +19,9 @@ tags:
     - security-critical
 variables: []
 traces:
-    implemented_by_extra:
-        - internal/policy/apply.go
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-05-19T17:10:20.904223Z"
-    reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:fec439a596fa66c50158f41ed0bdf0ed3a2bcf0ec62c36f113634d3885dd14a2
+    reviewed_at: "2026-06-18T19:38:43.858125Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:c047c407da7dd577411c57f62c7d9380d105c33ec042a54e1d4374d93b4f8590
 verification:
     assurance_level: A
     formalization_status: ""
@@ -34,17 +30,6 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
-    impact_reviews:
-        - requirement: STK-REQ-001
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:fec439a596fa66c50158f41ed0bdf0ed3a2bcf0ec62c36f113634d3885dd14a2
-          approval_fingerprint: sha256:9cdf6fc9e16adb4b65e748377c1b9d41cc2ea2a099c72f8a6c3e3262f47917c3
-          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
-          reviewed_at: "2026-05-19T17:01:30Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"
@@ -70,7 +55,10 @@ stakeholder:
         - id: STK-REQ-001-AC-01
           text: Given a valid single-policy session, when Apply is called, then all policy fields are merged into the session
           testable: true
+          verification_method: test
           derived_reqs:
+            - SYS-REQ-001
+            - SYS-REQ-003
             - SYS-REQ-008
             - SYS-REQ-013
             - SYS-REQ-014
@@ -79,9 +67,17 @@ stakeholder:
             - SYS-REQ-017
             - SYS-REQ-018
             - SYS-REQ-033
+            - SYS-REQ-050
+            - SYS-REQ-052
+            - SYS-REQ-053
+            - SYS-REQ-055
+            - SYS-REQ-056
+            - SYS-REQ-067
+            - SYS-REQ-068
         - id: STK-REQ-001-AC-02
           text: Given a per-API policy, when Apply is called, then per-API limits are applied independently
           testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-013
             - SYS-REQ-014
@@ -89,6 +85,7 @@ stakeholder:
         - id: STK-REQ-001-AC-03
           text: Given a partitioned policy, when Apply is called, then only the partitioned fields are applied
           testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-030
             - SYS-REQ-031
@@ -96,15 +93,25 @@ stakeholder:
         - id: STK-REQ-001-AC-04
           text: Given multiple policies, when Apply is called, then the highest-rate-wins rule resolves conflicts
           testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-016
             - SYS-REQ-017
             - SYS-REQ-043
+            - SYS-REQ-045
+            - SYS-REQ-048
+            - SYS-REQ-057
+            - SYS-REQ-069
         - id: STK-REQ-001-AC-05
           text: Given a policy with an org mismatch, when Apply is called, then an error is returned
           testable: true
+          verification_method: test
           derived_reqs:
+            - SYS-REQ-010
             - SYS-REQ-011
+            - SYS-REQ-012
+            - SYS-REQ-034
+            - SYS-REQ-040
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

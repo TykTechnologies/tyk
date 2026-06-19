@@ -21,13 +21,12 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-004
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-04-27T06:25:20.891298Z"
-    reviewed_by: human:leonidbugaev
+    reviewed_at: "2026-06-18T19:38:45.363679Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:7bc0167780f9e5bd5796a8fa2af498e35fbdd6fd5082a766c2143709fbc897c8
 verification:
     assurance_level: A
-    formalization_status: ""
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:leonidbugaev

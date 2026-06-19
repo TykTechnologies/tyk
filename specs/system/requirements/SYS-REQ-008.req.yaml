@@ -18,13 +18,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-001
-    verified_by_extra:
-        - FLIP:policy/tc-004
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-05-19T17:10:21.390155Z"
-    reviewed_by: human:leonidbugaev
-    reviewed_fingerprint: sha256:0518a1b0fc78146fb48bd209865d02947ce5c7229c7bbb4d93e2f8c2e66a3014
+    reviewed_at: "2026-06-18T19:38:44.27968Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:cfaf4bd293b95ea3be43ac9f210fad3698a51296e636f27cbe53a48d3183914e
 verification:
     assurance_level: A
     formalization_status: valid
@@ -33,59 +29,24 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
-    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
-    gaps_reviewed_by: leonidbugaev
-    impact_reviews:
-        - requirement: SYS-REQ-008
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:0518a1b0fc78146fb48bd209865d02947ce5c7229c7bbb4d93e2f8c2e66a3014
-          approval_fingerprint: sha256:7f805274a0d61c89f9ecc9d5548deaddb48e24513275505f1983c3ded31032d6
-          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
-          reviewed_at: "2026-05-19T17:01:30Z"
-        - requirement: SYS-REQ-008
-          artifact: internal/policy/rpc.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:0518a1b0fc78146fb48bd209865d02947ce5c7229c7bbb4d93e2f8c2e66a3014
-          approval_fingerprint: sha256:7f805274a0d61c89f9ecc9d5548deaddb48e24513275505f1983c3ded31032d6
-          artifact_fingerprint: sha256:0e40b705cf492ffa91ab4835d6a5b94cbf3d7e27f230b77a28a5b451b564d32b
-          reviewed_at: "2026-05-19T17:01:30Z"
-        - requirement: SYS-REQ-008
-          artifact: internal/policy/store.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:0518a1b0fc78146fb48bd209865d02947ce5c7229c7bbb4d93e2f8c2e66a3014
-          approval_fingerprint: sha256:7f805274a0d61c89f9ecc9d5548deaddb48e24513275505f1983c3ded31032d6
-          artifact_fingerprint: sha256:0b871001e1125f3881afd6636a98e162038ff80ce43c764e0288c1b418f818d7
-          reviewed_at: "2026-05-19T17:01:30Z"
-        - requirement: SYS-REQ-008
-          artifact: internal/policy/store_map.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:0518a1b0fc78146fb48bd209865d02947ce5c7229c7bbb4d93e2f8c2e66a3014
-          approval_fingerprint: sha256:7f805274a0d61c89f9ecc9d5548deaddb48e24513275505f1983c3ded31032d6
-          artifact_fingerprint: sha256:7a7b1601bc4fd3d7ecac375ab6e5044dc9a444cc21e67f9b9f2a195a8cecb967
-          reviewed_at: "2026-05-19T17:01:30Z"
-        - requirement: SYS-REQ-008
-          artifact: internal/policy/store_mock.gen.go
-          decision: no-authored-change
-          reviewer: leonidbugaev
-          reason: 'Policy deep-dive: system requirements consistent with implementation'
-          base: origin/master
-          requirement_fingerprint: sha256:0518a1b0fc78146fb48bd209865d02947ce5c7229c7bbb4d93e2f8c2e66a3014
-          approval_fingerprint: sha256:7f805274a0d61c89f9ecc9d5548deaddb48e24513275505f1983c3ded31032d6
-          artifact_fingerprint: sha256:40369f57926e217e9147ef3143864b6835f8d80b51beed9d873730f1c494e88f
-          reviewed_at: "2026-05-19T17:01:30Z"
+    gaps_reviewed_at: "2026-06-18T19:38:25.148877Z"
+    gaps_reviewed_by: buger
+    gap_reviews:
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-008|SYS-REQ-027
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-008|SYS-REQ-050
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
+        - check: ambiguity
+          issue_key: ambiguity|policy|SYS-REQ-008|SYS-REQ-054
+          reviewer: buger
+          reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
+          reviewed_at: "2026-06-18T19:38:25.148877Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:13Z"

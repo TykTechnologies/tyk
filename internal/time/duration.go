@@ -50,11 +50,13 @@ const (
 type ReadableDuration time.Duration
 
 // MarshalJSON converts ReadableDuration into human-readable shorthand notation for time.Duration into json format.
+// SW-REQ-003
 func (d ReadableDuration) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`"%s"`, d.format())), nil
 }
 
 // UnmarshalJSON converts human-readable shorthand notation for time.Duration into ReadableDuration from json format.
+// SW-REQ-003
 func (d *ReadableDuration) UnmarshalJSON(data []byte) error {
 	in, err := strconv.Unquote(string(data))
 	if err != nil {
@@ -73,27 +75,32 @@ func (d *ReadableDuration) UnmarshalJSON(data []byte) error {
 }
 
 // Seconds returns ReadableDuration rounded down to the seconds.
+// SW-REQ-003
 func (d ReadableDuration) Seconds() float64 {
 	durationInSeconds := math.Floor(Duration(d).Seconds())
 	return durationInSeconds
 }
 
 // Millisecond returns ReadableDuration in milliseconds.
+// SW-REQ-003
 func (d ReadableDuration) Milliseconds() int64 {
 	return Duration(d).Milliseconds()
 }
 
 // Nanoseconds returns ReadableDuration in nanoseconds.
+// SW-REQ-003
 func (d ReadableDuration) Nanoseconds() int64 {
 	return Duration(d).Nanoseconds()
 }
 
 // Microseconds returns ReadableDuration in microseconds.
+// SW-REQ-003
 func (d ReadableDuration) Microseconds() int64 {
 	return Duration(d).Microseconds()
 }
 
 // formats time duration dur to validation pattern ^(\d+h)?(\d+m)?(\d+s)?(\d+ms)?(\d+µs)?(\d+ns)%
+// SW-REQ-003
 func (d ReadableDuration) format() string {
 	if d == 0 {
 		return "0s"

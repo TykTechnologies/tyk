@@ -1,0 +1,92 @@
+id: STK-REQ-012
+version: 1
+status: rejected
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: Gateway compressed payload handling shall preserve bytes across valid Zstd round trips, identify Zstd frame prefixes, reject invalid compressed input, and enforce configured decompressed-size limits.
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: compressed_payloads
+rationale: Gateway backup, RPC, server, and runtime flows may exchange compressed API definition or runtime data. Compressed payload handling must preserve data integrity while rejecting malformed frames and bounding decompression resource usage.
+tags:
+    - compressed-payloads
+    - zstd
+    - encoding
+variables: []
+traces:
+    reviewed_at: "2026-06-19T08:08:39.67385Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:d3135f3a66f8c98aee3b202cb7b5efbc6ec9439ddf54c0eec649a715dd8b5522
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:buger
+        reviewed_at: "2026-06-19T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-19T13:57:18Z"
+obligation_checklist:
+    - nominal
+    - malformed_input
+    - boundary
+    - encoding_safety
+    - determinism
+    - error_handling
+    - panic_free_input_handling
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need compressed payload handling to preserve payloads and reject malformed or oversized compressed data so gateway components can exchange compressed data safely.
+    acceptance_criteria:
+        - id: STK-REQ-012-AC-01
+          text: Given a valid byte payload, when Zstd compression and decompression are performed, then the compressed payload is identified as a Zstd frame and decompression returns exactly the original bytes.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-085
+        - id: STK-REQ-012-AC-02
+          text: Given invalid, corrupted, too-short, or malformed Zstd input, when frame detection or decompression is requested, then detection reports only true Zstd magic-byte prefixes and decompression returns an error for invalid compressed frames.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-086
+        - id: STK-REQ-012-AC-03
+          text: Given a decompressed-size limit, when compressed data is decompressed, then data over the active limit is rejected, data within the active limit succeeds, and configured limits below the minimum are clamped to the minimum.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-087
+            - SYS-REQ-088
+            - SYS-REQ-089
+        - id: STK-REQ-012-AC-04
+          text: Given an unavailable or invalid internal Zstd codec object, when compression or decompression is requested, then the helper returns an explicit error without panicking or treating the payload as valid.
+          testable: true
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-090
+lifecycle:
+    change_history:
+        - date: "2026-06-19T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added compression package proof scope.
+          changed_by: agent:codex
+        - date: "2026-06-19T00:00:00Z"
+          from: review
+          to: review
+          reason: Reframed stakeholder wording from package-level helper ownership to gateway-level compressed payload behavior per spec-layering guidance.
+          changed_by: agent:codex
+        - date: "2026-06-19T13:57:18Z"
+          from: review
+          to: rejected
+          reason: '[REQPROOF-LAYERING-REPAIR] Helper-domain acceptance criteria belong below stakeholder level; no direct integrated acceptance witness exists'
+          changed_by: agent:codex
