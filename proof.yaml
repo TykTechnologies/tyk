@@ -22,13 +22,13 @@ project:
             path: /Users/leonidbugaev/tools/kind2/kind2
             timeout: 30
     commands:
-        build: go build ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol
-        test: mkdir -p .proof/test-results .proof/coverage && go test ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
+        build: go build ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx
+        test: mkdir -p .proof/test-results .proof/coverage && go test ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
         tests:
             test:
-                command: mkdir -p .proof/test-results .proof/coverage && go test ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
+                command: mkdir -p .proof/test-results .proof/coverage && go test ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
                 language: go
-        lint: go vet ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol
+        lint: go vet ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx
     obligation_classes:
         - nominal
         - error_handling
@@ -170,6 +170,14 @@ project:
             - internal/mcp/router_test.go
             - internal/agentprotocol/vem.go
             - internal/agentprotocol/vem_test.go
+            - internal/httpctx/context.go
+            - internal/httpctx/context_test.go
+            - internal/httpctx/jsonrpc.go
+            - internal/httpctx/jsonrpc_test.go
+            - internal/httpctx/jsonrpc_routing.go
+            - internal/httpctx/jsonrpc_routing_test.go
+            - internal/httpctx/looping.go
+            - internal/httpctx/looping_test.go
             - internal/policy/**
             - internal/model/**
             - internal/event/**

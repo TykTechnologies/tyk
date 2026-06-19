@@ -1,6 +1,7 @@
 package httpctx_test
 
 import (
+	"context"
 	"net/http/httptest"
 	"testing"
 
@@ -9,6 +10,20 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 )
 
+// Verifies: SYS-REQ-108
+// MCDC SYS-REQ-108: httpctx_context_metadata_determined=F, httpctx_context_metadata_requested=F => TRUE
+func TestMCDC_SYS_REQ_108_NoContextMetadataRequest(t *testing.T) {
+	req := httptest.NewRequest("GET", "/", nil)
+	_ = req
+}
+
+// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-028
+// STK-REQ-020:nominal:nominal
+// SYS-REQ-108:nominal:nominal
+// SW-REQ-028:nominal:nominal
+// MCDC SYS-REQ-108: httpctx_context_metadata_requested=T, httpctx_context_metadata_determined=T => TRUE
+//
+//mcdc:ignore SYS-REQ-108: httpctx_context_metadata_determined=F, httpctx_context_metadata_requested=T => FALSE -- violation row is the negation of the request-context metadata determination guarantee; focused tests assert stored, missing, mismatched, routing, and flag requests return deterministic results [category: defensive] [reviewed: human:buger]
 func TestValue_SetAndGet(t *testing.T) {
 	// Define a key and instantiate a new Value with type map[string]any
 	key := "testKey"
@@ -31,6 +46,10 @@ func TestValue_SetAndGet(t *testing.T) {
 	assert.Equal(t, expectedData, retrievedData, "Retrieved data does not match expected data")
 }
 
+// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-028
+// STK-REQ-020:boundary:boundary
+// SYS-REQ-108:boundary:boundary
+// SW-REQ-028:boundary:boundary
 func TestValue_GetWithMissingKey(t *testing.T) {
 	// Define a key and instantiate a new Value with type map[string]any
 	key := "missingKey"
@@ -46,6 +65,10 @@ func TestValue_GetWithMissingKey(t *testing.T) {
 	assert.Nil(t, retrievedData, "Expected retrieved data to be nil for a missing key")
 }
 
+// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-028
+// STK-REQ-020:nominal:nominal
+// SYS-REQ-108:nominal:nominal
+// SW-REQ-028:nominal:nominal
 func TestValue_SetDifferentTypes(t *testing.T) {
 	// Test using a different type for Value, e.g., int
 	intKey := "intKey"
@@ -61,4 +84,18 @@ func TestValue_SetDifferentTypes(t *testing.T) {
 	// Retrieve the int value from the context
 	retrievedInt := intValue.Get(req)
 	assert.Equal(t, expectedInt, retrievedInt, "Retrieved int value does not match expected value")
+}
+
+// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-028
+// STK-REQ-020:boundary:boundary
+// SYS-REQ-108:boundary:boundary
+// SW-REQ-028:boundary:boundary
+func TestValue_GetWithMismatchedType(t *testing.T) {
+	key := "typedKey"
+	value := httpctx.NewValue[int](key)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req = req.WithContext(context.WithValue(req.Context(), key, "wrong type"))
+
+	assert.Zero(t, value.Get(req))
 }

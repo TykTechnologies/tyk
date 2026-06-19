@@ -9,6 +9,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 )
 
+// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-028
+// STK-REQ-020:nominal:nominal
+// SYS-REQ-108:nominal:nominal
+// SW-REQ-028:nominal:nominal
 func TestSetSelfLooping(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	assert.False(t, httpctx.IsSelfLooping(req))

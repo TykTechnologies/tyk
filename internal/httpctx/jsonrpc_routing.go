@@ -36,23 +36,27 @@ type JSONRPCRoutingState struct {
 var routingStateValue = NewValue[*JSONRPCRoutingState](ctx.JSONRPCRoutingState)
 
 // SetJSONRPCRoutingState stores routing state in request context.
+// SW-REQ-028
 func SetJSONRPCRoutingState(r *http.Request, state *JSONRPCRoutingState) {
 	routingStateValue.Set(r, state)
 }
 
 // GetJSONRPCRoutingState retrieves routing state from request context.
 // Returns nil if no routing state exists.
+// SW-REQ-028
 func GetJSONRPCRoutingState(r *http.Request) *JSONRPCRoutingState {
 	return routingStateValue.Get(r)
 }
 
 // IsRoutingComplete returns true when there's no next VEM to route to.
+// SW-REQ-028
 func IsRoutingComplete(r *http.Request) bool {
 	state := GetJSONRPCRoutingState(r)
 	return state == nil || state.NextVEM == ""
 }
 
 // RecordVEMVisit adds the current VEM to the visited list for telemetry.
+// SW-REQ-028
 func RecordVEMVisit(state *JSONRPCRoutingState, vemPath string) {
 	if state == nil {
 		return

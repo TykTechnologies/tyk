@@ -1,0 +1,67 @@
+id: SYS-REQ-108
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the httpctx shall always satisfy !httpctx_context_metadata_requested | httpctx_context_metadata_determined
+description: Request context helper handling shall store and retrieve typed values by key, return zero values for missing or type-mismatched values, preserve JSON-RPC request data and routing state in request contexts, classify routing as complete when no next VEM remains, record VEM visits on non-nil routing state, and preserve self-looping and JSON-RPC routing flags.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-020
+component: httpctx
+rationale: This system requirement owns deterministic in-request metadata handling for context helpers. It does not claim which gateway middleware writes the values, how callers sequence routing, session authorization behavior, analytics persistence, network transport behavior, or final HTTP status generation.
+tags:
+    - request-context
+    - json-rpc
+    - routing-state
+    - self-looping
+variables:
+    - httpctx_context_metadata_requested
+    - httpctx_context_metadata_determined
+traces:
+    satisfies:
+        - STK-REQ-020
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T22:14:04Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. HTTP context system formalization is scoped to internal/httpctx request-context metadata operations: typed storage/retrieval, zero-value handling, JSON-RPC request/routing state, routing completion, VEM visit recording, JSON-RPC routing flags, and self-looping flags. Focused internal/httpctx tests passed, including the positive formal witness. This approval does not claim caller ordering, middleware authorization decisions, JSON-RPC body parsing, API definition synthesis, analytics persistence, network transport behavior, or final HTTP status generation.'
+        fingerprint: sha256:0e0a912366988f9f425cc8b7ac79f1a28526bb90d1c85586b9c329d2ea4a7a63
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-19T22:15:59.491088Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-108|httpctx_context_metadata_determined
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-108's httpctx_context_metadata_determined variable is decomposed by SW-REQ-028 for typed request-context value storage/retrieval, zero-value handling for absent or mismatched entries, JSON-RPC request metadata, JSON-RPC routing state and completion checks, VEM visit recording, JSON-RPC routing flags, and self-looping flags. This review is limited to internal/httpctx helper behavior and does not claim caller ordering, middleware authorization decisions, JSON-RPC body parsing, API definition synthesis, analytics persistence, network transport behavior, or final HTTP status generation.
+          reviewed_at: "2026-06-19T22:15:59.491088Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T22:14:04Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - nil_safety
+lifecycle:
+    change_history:
+        - date: "2026-06-19T22:12:20Z"
+          from: draft
+          to: review
+          reason: Ready for delegated requirements-owner review after focused internal/httpctx tests passed
+          changed_by: agent:codex
+        - date: "2026-06-19T22:14:04Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-19T22:12:20Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. HTTP context requirements are scoped to internal/httpctx typed request-context storage and retrieval, JSON-RPC request metadata, JSON-RPC routing state and completion checks, VEM visit recording, JSON-RPC routing flags, and self-looping flags only; focused internal/httpctx tests passed. This approval does not claim caller ordering, middleware authorization decisions, JSON-RPC body parsing, API definition synthesis, analytics persistence, network transport behavior, or final HTTP status generation.")'
+          changed_by: human:buger

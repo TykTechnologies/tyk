@@ -1,0 +1,14 @@
+component: httpctx
+no_interface:
+    declared: true
+    reason: The httpctx package is an in-process helper for request context metadata storage and retrieval; this proof slice does not define a cross-component runtime interface boundary.
+variables:
+    - name: httpctx_context_metadata_requested
+      type: bool
+      direction: input
+      description: Gateway helper code requests in-process request-context metadata storage, retrieval, routing-state inspection, VEM visit recording, JSON-RPC routing flag handling, or self-looping flag handling.
+
+    - name: httpctx_context_metadata_determined
+      type: bool
+      direction: output
+      description: The request-context helper returns the requested stored value, zero value, routing-completion decision, updated VEM visit list, JSON-RPC routing flag, or self-looping flag deterministically for the request.

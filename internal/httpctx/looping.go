@@ -9,11 +9,13 @@ import (
 var selfLoopingValue = NewValue[bool](ctx.SelfLooping)
 
 // SetSelfLooping updates the request context with a boolean value indicating whether the request is in a self-looping state.
+// SW-REQ-028
 func SetSelfLooping(r *http.Request, value bool) {
 	selfLoopingValue.Set(r, value)
 }
 
 // IsSelfLooping returns true if the request is flagged as self-looping, indicating it originates and targets the same service.
+// SW-REQ-028
 func IsSelfLooping(r *http.Request) bool {
 	return selfLoopingValue.Get(r)
 }

@@ -12,6 +12,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/mcp"
 )
 
+// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-028
+// STK-REQ-020:nominal:nominal
+// SYS-REQ-108:nominal:nominal
+// SW-REQ-028:nominal:nominal
 func TestJSONRPCRoutingState_SetAndGet(t *testing.T) {
 	r := httptest.NewRequest("POST", "/test", nil)
 
@@ -38,6 +42,10 @@ func TestJSONRPCRoutingState_SetAndGet(t *testing.T) {
 	assert.Equal(t, "/api", retrieved.OriginalPath)
 }
 
+// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-028
+// STK-REQ-020:boundary:boundary
+// SYS-REQ-108:boundary:boundary
+// SW-REQ-028:boundary:boundary
 func TestIsRoutingComplete(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -76,6 +84,10 @@ func TestIsRoutingComplete(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-028
+// STK-REQ-020:nominal:nominal
+// SYS-REQ-108:nominal:nominal
+// SW-REQ-028:nominal:nominal
 func TestRoutingStatePreservation(t *testing.T) {
 	r := httptest.NewRequest("POST", "/test", nil)
 
@@ -99,6 +111,13 @@ func TestRoutingStatePreservation(t *testing.T) {
 	assert.Equal(t, []string{"/op"}, final.VisitedVEMs)
 }
 
+// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-028
+// STK-REQ-020:nominal:nominal
+// STK-REQ-020:nil_safety:negative
+// SYS-REQ-108:nominal:nominal
+// SYS-REQ-108:nil_safety:negative
+// SW-REQ-028:nominal:nominal
+// SW-REQ-028:nil_safety:negative
 func TestRecordVEMVisit(t *testing.T) {
 	state := &JSONRPCRoutingState{
 		VisitedVEMs: []string{},

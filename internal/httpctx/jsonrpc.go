@@ -27,12 +27,14 @@ type JSONRPCRequestData struct {
 var jsonrpcRequestValue = NewValue[*JSONRPCRequestData](ctx.JSONRPCRequest)
 
 // SetJSONRPCRequest stores parsed JSON-RPC request data in the request context.
+// SW-REQ-028
 func SetJSONRPCRequest(r *http.Request, data *JSONRPCRequestData) {
 	jsonrpcRequestValue.Set(r, data)
 }
 
 // GetJSONRPCRequest retrieves parsed JSON-RPC request data from the request context.
 // Returns nil if no JSON-RPC data has been stored.
+// SW-REQ-028
 func GetJSONRPCRequest(r *http.Request) *JSONRPCRequestData {
 	return jsonrpcRequestValue.Get(r)
 }
@@ -42,12 +44,14 @@ var jsonrpcRoutingValue = NewValue[bool](ctx.JsonRPCRouting)
 // SetJsonRPCRouting sets the JSON-RPC routing flag in the request context.
 // This is used by JSON-RPC routers (MCP, A2A, etc.) to indicate that a request
 // is being routed internally to a protocol-specific endpoint.
+// SW-REQ-028
 func SetJsonRPCRouting(r *http.Request, enabled bool) {
 	jsonrpcRoutingValue.Set(r, enabled)
 }
 
 // IsJsonRPCRouting returns true if the request came via JSON-RPC routing.
 // This is checked by the access control logic to allow internal endpoint access.
+// SW-REQ-028
 func IsJsonRPCRouting(r *http.Request) bool {
 	return jsonrpcRoutingValue.Get(r)
 }
