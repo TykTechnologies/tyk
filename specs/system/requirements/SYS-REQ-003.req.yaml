@@ -4,7 +4,7 @@ status: review
 priority: shall
 category: functional
 req_type: assumption
-fretish: the policy shall always satisfy !is_per_api | !partitions_enabled
+fretish: the environment shall always satisfy !is_per_api | !partitions_enabled
 description: PerAPI mode and partition mode are mutually exclusive operational modes. A policy uses either per-API limits or partitioned limits, never both.
 formalization_strategy: fretish
 informal_verification:
@@ -23,12 +23,9 @@ references:
 traces:
     satisfies:
         - STK-REQ-001
-    verified_by_extra:
-        - FLIP:policy/tc-003
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-04-27T06:25:20.771744Z"
-    reviewed_by: human:leonidbugaev
+    reviewed_at: "2026-06-18T19:38:44.215608Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:a41c62310cfa5acff52e01ac025134a5b1a83485f7c114d39a2b03a3abf8c48d
 verification:
     assurance_level: B
     formalization_status: valid
@@ -36,13 +33,20 @@ verification:
         status: approved
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
-        ai_generated: false
+        ai_generated: true
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:05Z"
-    last_modified_by: human:cli
-    last_modified_at: "2026-04-19T15:13:33Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-18T19:07:42Z"
 obligation_class: nominal
+assumption:
+    status: discharged
+    external_owner: team:policy-boundary-owners
+    review_date: "2026-06-19"
+    discharged_by:
+        - specs/system/variables/policy.vars.yaml
+    rationale: PerAPI and partition mode exclusivity is modeled as a policy domain fact in policy.vars.yaml; malformed mixed-mode input is handled by SYS-REQ-012.
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"
@@ -50,5 +54,3 @@ lifecycle:
           to: review
           reason: Migration to assurance model complete
           changed_by: human:cli
-audit_ignore:
-    - lint-formalization-quality

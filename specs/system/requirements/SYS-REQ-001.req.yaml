@@ -26,12 +26,9 @@ references:
 traces:
     satisfies:
         - STK-REQ-001
-    verified_by_extra:
-        - FLIP:policy/tc-001
-    documented_by_extra:
-        - README.md
-    reviewed_at: "2026-04-27T06:25:20.767744Z"
-    reviewed_by: human:leonidbugaev
+    reviewed_at: "2026-06-18T19:38:44.18989Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:b81012420532153aea5229cd17d11c0a1cf98425de859333cd93a5084df406b1
 verification:
     assurance_level: B
     formalization_status: valid
@@ -39,13 +36,20 @@ verification:
         status: approved
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
-        ai_generated: false
+        ai_generated: true
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:27:55Z"
-    last_modified_by: human:cli
-    last_modified_at: "2026-04-19T15:13:33Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-18T19:07:42Z"
 obligation_class: nominal
+assumption:
+    status: discharged
+    external_owner: team:policy-boundary-owners
+    review_date: "2026-06-19"
+    discharged_by:
+        - SYS-REQ-050
+    rationale: Empty policy input is handled as a verified no-op by SYS-REQ-050; this is component behavior, not an external boundary condition.
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"
@@ -53,5 +57,3 @@ lifecycle:
           to: review
           reason: Migration to assurance model complete
           changed_by: human:cli
-audit_ignore:
-    - lint-formalization-quality
