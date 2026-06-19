@@ -2075,11 +2075,9 @@ func TestAssumption_ClearThenApply_Sequential(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// Verifies: SYS-REQ-034, SYS-REQ-037 [example]
+// Verifies: SYS-REQ-034 [example]
 // MCDC SYS-REQ-034: policy_found=T, policy_inactive=T => TRUE
-// MCDC SYS-REQ-037: has_access_rights=T, is_per_api=T, policy_found=T => TRUE
 // Assumption: A policy can only be marked inactive if it exists in the store.
-// Assumption: A per-API policy that is found must have access rights.
 func TestAssumption_PolicyExistsAndHasRights(t *testing.T) {
 	orgID := "org1"
 	pol := user.Policy{
@@ -2119,34 +2117,6 @@ func TestAssumption_ZeroRateNeverHigher(t *testing.T) {
 	// Zero rate means the policy rate is not applied (empty = skip)
 	assert.Equal(t, float64(10), session.Rate,
 		"zero policy rate should not override existing rate")
-}
-
-// Verifies: SYS-REQ-036 [example]
-// MCDC SYS-REQ-036: multiple_policies=T, policies_provided=T => TRUE
-// Assumption: Having multiple policies implies at least one policy is provided.
-func TestAssumption_MultiplePoliciesImpliesProvided(t *testing.T) {
-	orgID := "org1"
-	pol1 := user.Policy{
-		ID: "pol1", OrgID: orgID, Rate: 10, Per: 60,
-		AccessRights: map[string]user.AccessDefinition{
-			"api1": {Versions: []string{"v1"}},
-		},
-	}
-	pol2 := user.Policy{
-		ID: "pol2", OrgID: orgID, Rate: 20, Per: 60,
-		AccessRights: map[string]user.AccessDefinition{
-			"api1": {Versions: []string{"v1"}},
-		},
-	}
-	svc := newTestService(orgID, []user.Policy{pol1, pol2})
-
-	session := &user.SessionState{}
-	session.SetPolicies("pol1", "pol2")
-	session.MetaData = map[string]interface{}{}
-
-	err := svc.Apply(session)
-	require.NoError(t, err,
-		"multiple valid policies should succeed")
 }
 
 // Verifies: SYS-REQ-039 [example]

@@ -1,6 +1,6 @@
 id: SYS-REQ-036
 version: 1
-status: review
+status: retired
 priority: shall
 category: functional
 req_type: assumption
@@ -16,8 +16,6 @@ rationale: Having multiple policies implies at least one policy is provided.
 tags: []
 variables: []
 traces:
-    satisfies:
-        - STK-REQ-001
     reviewed_at: "2026-06-18T19:38:45.015502Z"
     reviewed_by: human:buger
     reviewed_fingerprint: sha256:bf4efb8946f26e10514ef048084ab288bb47a00c85575cf373289661c5dbae77
@@ -42,6 +40,11 @@ assumption:
     rationale: 'Invalid as formalized: policies_provided is policy_count == 1, while multiple_policies is policy_count >= 2.'
 lifecycle:
     change_history:
+        - date: "2026-06-19T12:50:00Z"
+          from: review
+          to: retired
+          reason: Retired invalid assumption; multiple_policies maps to policy_count >= 2 while policies_provided maps to policy_count == 1, so the requirement contradicts the current domain model.
+          changed_by: agent:codex
         - date: "2026-04-19T15:13:34Z"
           from: draft
           to: review

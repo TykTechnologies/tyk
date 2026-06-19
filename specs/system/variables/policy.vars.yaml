@@ -95,33 +95,6 @@ variables:
           - partition_acl
           - partition_complexity
 
-    - name: has_access_rights
-      type: bool
-      direction: input
-      description: Policy has non-empty AccessRights map
-      data_constraint:
-        domain: integer
-        variable: access_rights_count
-        condition: "access_rights_count >= 1"
-        parameters:
-          - name: access_rights_count
-            type: int
-            constraint: ">= 0"
-
-    - name: no_access_rights
-      type: bool
-      direction: input
-      proof_auxiliary: true  # complement of has_access_rights for Z3 data completeness
-      description: Policy has empty AccessRights map (master policy case)
-      data_constraint:
-        domain: integer
-        variable: access_rights_count
-        condition: "access_rights_count == 0"
-        parameters:
-          - name: access_rights_count
-            type: int
-            constraint: ">= 0"
-
     - name: policy_rate_empty
       type: bool
       direction: input

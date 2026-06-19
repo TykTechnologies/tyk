@@ -1,6 +1,6 @@
 id: SYS-REQ-037
 version: 1
-status: review
+status: retired
 priority: shall
 category: functional
 req_type: assumption
@@ -16,8 +16,6 @@ rationale: A per-API policy that is found must have access rights. Per-API mode 
 tags: []
 variables: []
 traces:
-    satisfies:
-        - STK-REQ-001
     reviewed_at: "2026-06-18T19:38:45.030481Z"
     reviewed_by: human:buger
     reviewed_fingerprint: sha256:486b46934ad50bde87462c00edb1c2cb7630d15cf487e776ecf0a4c9b1868895
@@ -42,6 +40,11 @@ assumption:
     rationale: 'Invalid as an external assumption: per-API policies with empty AccessRights are possible inputs and Apply handles them as an error path; replace with a guarantee only with direct error-path evidence in the policy rewrite wave.'
 lifecycle:
     change_history:
+        - date: "2026-06-19T12:50:00Z"
+          from: review
+          to: retired
+          reason: Retired invalid external assumption; empty AccessRights per-API policies are possible inputs and need a component error-path requirement with direct evidence in a future policy rewrite wave.
+          changed_by: agent:codex
         - date: "2026-04-19T15:13:34Z"
           from: draft
           to: review
