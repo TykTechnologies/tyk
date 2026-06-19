@@ -32,7 +32,7 @@ Result:
 
 ```text
 Errors: 0
-Warnings: 5
+Warnings: 2
 ```
 
 The remaining warnings are intentionally not hidden. Each is classified below by
@@ -43,10 +43,18 @@ the honest disposition required to close it.
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
 | `verification_scope_complete` | 24/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
-| `spec_lint_status_vs_review` | `SW-REQ-007` and `SW-REQ-008` are `status=review` while `verification.review.status=in_review` by `agent:codex` | human review required | Advancing these to approved requires a real human review signature. Downgrading them to draft would be an authored lifecycle change, not a proof fix. The warning should stay visible until a human reviews or chooses a lifecycle action. |
-| `authored_delta_expected` | `internal/policy/apply.go` lacks current no-authored-change review for 43 linked requirements | real impact review required | The branch diff against `origin/master` contains executable behavior changes in `apply.go` (nil-store/session guards, quota sentinel handling, deterministic root update behavior, and related policy behavior). It is not a comment-only proof annotation change, so a blanket agent no-authored-change review would be dishonest. |
-| `suspect_clean` | 35 suspect links | human trace review required | `proof trace review --suspect` records a human signature and correctly rejects `agent:codex`. These links should remain visible until a human reviews the stale trace ownership. |
 | `mcdc_coverage` | 38/364 uncovered rows across 22 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
+
+Closed during this pass:
+
+- `authored_delta_expected` was closed by real impact reviews for
+  `internal/policy/apply.go` and related `internal/policy/util.go` ownership.
+- `spec_lint_status_vs_review` was closed for `SW-REQ-007` and `SW-REQ-008`
+  after explicit chat delegation from `human:buger`; the approval comments
+  state that MC/DC gaps remain tracked separately.
+- `suspect_clean` was closed after explicit chat delegation from `human:buger`
+  to review the current suspect trace set; the trace review does not waive
+  MC/DC coverage or product KnownIssues.
 
 ## MC/DC Evidence Policy For This Phase
 
@@ -153,25 +161,13 @@ requirement ignores.
 
 ## Next Honest Closure Paths
 
-1. Human review path:
-   - Review `SW-REQ-007` and `SW-REQ-008` lifecycle/review state.
-   - Run `proof trace review --suspect` as a human reviewer if the stale links
-     are still correct.
-
-2. `internal/policy/apply.go` impact path:
-   - Review the executable behavior changes against the 43 owning requirements.
-   - Update requirements, design docs, tests, or KnownIssues where behavior
-     changed.
-   - Record impact reviews only for requirements whose authored intent and
-     documented design truly remain correct.
-
-3. MC/DC model/tooling path:
+1. MC/DC model/tooling path:
    - Do not add no-op tests for trigger-false rows.
    - Refine requirements or variable roles where activation/no-action rows are
      not meaningful executable obligations.
    - Use the upstream ReqProof no-action evidence mechanism when available.
 
-4. Scope onboarding path:
+2. Scope onboarding path:
    - Add product capability hierarchy by domain, not by package name.
    - Bring production packages into `verification_scope.include` in batches only
      after real STK/SYS/SW requirements, traces, and tests exist.

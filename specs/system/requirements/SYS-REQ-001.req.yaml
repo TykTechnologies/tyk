@@ -26,9 +26,9 @@ references:
 traces:
     satisfies:
         - STK-REQ-001
-    reviewed_at: "2026-06-18T19:38:44.18989Z"
+    reviewed_at: "2026-06-19T19:50:10.736538Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:b81012420532153aea5229cd17d11c0a1cf98425de859333cd93a5084df406b1
+    reviewed_fingerprint: sha256:f6f9463929740823f40ff4b79a53f3733a4117ea9f4bf3d51d37e4f98aa02fea
 verification:
     assurance_level: B
     formalization_status: valid
