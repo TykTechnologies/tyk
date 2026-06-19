@@ -460,9 +460,9 @@ Wave 1 likely bug or disposition surfaces to investigate before green claims:
 - 2026-06-19: Logged `KI-RATE-QUOTA-HEADER-INT-NARROWING` with a current
   static reproducer evidence manifest instead of fixing production code or
   promoting an unverified rate-header requirement slice. The active defect is
-  visible, while the full rate/quota header requirement hierarchy remains
-  deferred to the rate/quota onboarding wave where gateway acceptance and MC/DC
-  evidence can be added honestly.
+  visible. The full rate/quota header requirement hierarchy is assigned to the
+  rate/quota onboarding wave, where gateway acceptance and MC/DC evidence are
+  required before the package enters strict scope.
 
 ## Current Covered Components And Destination Layer
 
