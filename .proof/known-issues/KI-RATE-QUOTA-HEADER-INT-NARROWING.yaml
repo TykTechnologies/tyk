@@ -1,6 +1,8 @@
 id: KI-RATE-QUOTA-HEADER-INT-NARROWING
 title: Quota rate-limit headers narrow int64 values through int
 description: quotaSender.SendQuotas formats quota max, remaining, and reset values by converting int64 session quota fields to native int before strconv.Itoa. On 32-bit builds, large quota values can overflow before serialization, so response headers can misreport the configured quota state.
+evidence_manifests:
+    - .proof/evidence/ki-rate-quota-header-int-narrowing.yaml
 severity: medium
 risk: quota_header_serialization
 cve_surface: none
@@ -23,3 +25,7 @@ history:
       by: agent:codex
       action: edit
       detail: introduced-in=9792d0774e
+    - at: "2026-06-19T12:45:00Z"
+      by: agent:codex
+      action: edit
+      detail: keep-source-level-known-issue-evidence-until-rate-header-requirement-wave

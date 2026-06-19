@@ -1,0 +1,17 @@
+schema_version: proof.evidence_profile.v1
+results:
+    - profile: known_issue_reproducer
+      requirement: SYS-REQ-067
+      command: rg -n 'strconv\.Itoa\(int\(quota(Max|Remaining|Renews)\)\)' internal/rate/headers.go
+      status: pass
+      observed_result: known_issue_reproduced
+      executed_at: "2026-06-19T12:43:29Z"
+      input_set:
+        - KI-RATE-QUOTA-HEADER-INT-NARROWING static reproducer
+      freshness_hashes:
+        .proof/known-issues/KI-RATE-QUOTA-HEADER-INT-NARROWING.yaml: sha256:330eba1d4ff25ebcf7f070b0706075b46faf4d94dccd256e471773f01e9bc090
+        internal/rate/headers.go: sha256:c53f7f412e3ab84ac36a5a4676cd40ec8715bd38d22dd66d286a8b5b9cfde509
+        proof.yaml: sha256:895daff29b9390d8058fda4de375d4ae1f6468fde2e953f32526d40ddca5817f
+        specs/system/requirements/SYS-REQ-067.req.yaml: sha256:c99281c9db602639fef785956e155b1c0759292a0bc7556b8c57d8d301867e26
+      known_issues:
+        - KI-RATE-QUOTA-HEADER-INT-NARROWING
