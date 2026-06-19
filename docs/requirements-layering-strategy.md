@@ -107,6 +107,15 @@ of untraced functions and `orphan_code_clean` reports thousands of code
 functions without requirement annotations under `--verification-scope '**'`.
 Those are real onboarding gaps, not warnings to suppress.
 
+As of commit `d26158efb`, the full strict audit is not green either:
+`proof audit --format markdown --max-findings 0` reports 0 errors and 2
+warnings. The blocking warnings are `verification_scope_complete` and
+`suspect_clean`. The enabled-slice implementation stage is clean, validation is
+clean, and targeted documentation, acceptance, MC/DC, and KnownIssue checks are
+clean. The remaining `suspect_clean` warning requires trace review of 35 stale
+links; it should be handled as a human trace review packet, not by spoofing a
+human reviewer.
+
 The local worktree also currently has `internal/build` deleted while runtime
 packages such as `goplugin`, `cli`, `cli/version`, and `gateway/version.go`
 import `github.com/TykTechnologies/tyk/internal/build`. Until that build
@@ -448,6 +457,12 @@ Wave 1 likely bug or disposition surfaces to investigate before green claims:
   `internal/netutil.GetIpAddress` helper behavior and source annotations.
   Loopback-only discovery is modeled as an allowed empty-success case, not as
   a false witness for available-address reporting.
+- 2026-06-19: Logged `KI-RATE-QUOTA-HEADER-INT-NARROWING` with a current
+  static reproducer evidence manifest instead of fixing production code or
+  promoting an unverified rate-header requirement slice. The active defect is
+  visible, while the full rate/quota header requirement hierarchy remains
+  deferred to the rate/quota onboarding wave where gateway acceptance and MC/DC
+  evidence can be added honestly.
 
 ## Current Covered Components And Destination Layer
 
