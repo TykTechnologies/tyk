@@ -16,4 +16,4 @@ This document records the first expansion of the proof scope beyond `internal/po
 
 `SYS-REQ-080` covers merged API list construction, stable logging fields, classic API appends, and tag filtering.
 
-`SYS-REQ-081` covers RPC alias shapes, event metadata construction, and the mock upstream-auth provider adapter.
+`SYS-REQ-081` covers RPC alias shapes, event metadata construction, and the mock upstream-auth provider adapter. The RPC shape evidence includes the underlying `apidef/rpc.go` JSON field names used by the `internal/model/rpc.go` aliases.

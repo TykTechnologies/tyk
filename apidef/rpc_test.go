@@ -7,6 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Verifies: SYS-REQ-081
+// SYS-REQ-081:nominal:nominal
+// SYS-REQ-081:determinism:nominal
 func TestLoadedAPIInfo_JSONSerialization(t *testing.T) {
 	info := LoadedAPIInfo{APIID: "api-123"}
 
@@ -20,6 +23,9 @@ func TestLoadedAPIInfo_JSONSerialization(t *testing.T) {
 	assert.Equal(t, "api-123", decoded.APIID)
 }
 
+// Verifies: SYS-REQ-081
+// SYS-REQ-081:nominal:nominal
+// SYS-REQ-081:determinism:nominal
 func TestLoadedPolicyInfo_JSONSerialization(t *testing.T) {
 	info := LoadedPolicyInfo{PolicyID: "pol-456"}
 
@@ -33,6 +39,9 @@ func TestLoadedPolicyInfo_JSONSerialization(t *testing.T) {
 	assert.Equal(t, "pol-456", decoded.PolicyID)
 }
 
+// Verifies: SYS-REQ-081
+// SYS-REQ-081:nominal:nominal
+// SYS-REQ-081:determinism:nominal
 func TestGWStats_WithLoadedResources_JSONSerialization(t *testing.T) {
 	stats := GWStats{
 		APIsCount:     2,
@@ -58,6 +67,8 @@ func TestGWStats_WithLoadedResources_JSONSerialization(t *testing.T) {
 	assert.JSONEq(t, expected, string(data))
 }
 
+// Verifies: SYS-REQ-081
+// SYS-REQ-081:determinism:nominal
 func TestGWStats_EmptyLoadedResources_OmitsFields(t *testing.T) {
 	stats := GWStats{
 		APIsCount:     0,

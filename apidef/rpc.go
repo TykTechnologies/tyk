@@ -1,5 +1,6 @@
 package apidef
 
+// SYS-REQ-081
 type InboundData struct {
 	KeyName      string
 	Value        string
@@ -9,12 +10,14 @@ type InboundData struct {
 	Expire       int64
 }
 
+// SYS-REQ-081
 type DefRequest struct {
 	OrgId   string
 	Tags    []string
 	LoadOAS bool
 }
 
+// SYS-REQ-081
 type GroupLoginRequest struct {
 	UserKey   string
 	GroupID   string
@@ -24,12 +27,14 @@ type GroupLoginRequest struct {
 
 // HostDetails contains information about a host machine,
 // including its hostname, process ID (PID), and IP address.
+// SYS-REQ-081
 type HostDetails struct {
 	Hostname string
 	PID      int
 	Address  string
 }
 
+// SYS-REQ-081
 type NodeData struct {
 	NodeID          string                     `json:"node_id"`
 	APIKey          string                     `json:"api_key"`
@@ -44,15 +49,18 @@ type NodeData struct {
 }
 
 // LoadedAPIInfo represents a loaded API with its metadata.
+// SYS-REQ-081
 type LoadedAPIInfo struct {
 	APIID string `json:"api_id"`
 }
 
 // LoadedPolicyInfo represents a loaded policy with its metadata.
+// SYS-REQ-081
 type LoadedPolicyInfo struct {
 	PolicyID string `json:"policy_id"`
 }
 
+// SYS-REQ-081
 type GWStats struct {
 	APIsCount      int                `json:"apis_count"`
 	PoliciesCount  int                `json:"policies_count"`
@@ -60,11 +68,13 @@ type GWStats struct {
 	LoadedPolicies []LoadedPolicyInfo `json:"loaded_policies,omitempty"`
 }
 
+// SYS-REQ-081
 type GroupKeySpaceRequest struct {
 	OrgID   string
 	GroupID string
 }
 
+// SYS-REQ-081
 type KeysValuesPair struct {
 	Keys   []string
 	Values []string
