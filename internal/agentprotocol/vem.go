@@ -13,6 +13,7 @@ var (
 
 // RegisterVEMPrefix registers a VEM path prefix for a protocol.
 // This should be called during package initialization.
+// SW-REQ-027
 func RegisterVEMPrefix(prefix string) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -21,6 +22,7 @@ func RegisterVEMPrefix(prefix string) {
 
 // IsProtocolVEMPath returns true if the path is a protocol-specific VEM path.
 // These paths are internal-only and should return 404 when accessed directly.
+// SW-REQ-027
 func IsProtocolVEMPath(path string) bool {
 	mu.RLock()
 	defer mu.RUnlock()
