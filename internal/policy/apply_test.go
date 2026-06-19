@@ -21,11 +21,9 @@ import (
 //go:embed testdata/*.json
 var testDataFS embed.FS
 
-// Verifies: STK-REQ-003, SYS-REQ-021, SYS-REQ-022, SYS-REQ-041 [boundary]
-// MCDC STK-REQ-003: N/A
+// Verifies: SYS-REQ-021, SYS-REQ-022, SYS-REQ-041 [boundary]
 // MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 // MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
-// MCDC SYS-REQ-041: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 	t.Run("policy limits unset", func(t *testing.T) {
 		svc := &policy.Service{}
@@ -206,8 +204,7 @@ func TestApplyACL_FromCustomPolicies(t *testing.T) {
 	})
 }
 
-// Verifies: STK-REQ-004, SYS-REQ-023 [example]
-// MCDC STK-REQ-004: N/A
+// Verifies: SYS-REQ-023 [example]
 // MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApplyEndpointLevelLimits(t *testing.T) {
 	f, err := testDataFS.ReadFile("testdata/apply_endpoint_rl.json")
@@ -1295,14 +1292,12 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 	return service, tests
 }
 
-// Verifies: STK-REQ-001, STK-REQ-005, STK-REQ-007, SYS-REQ-008, SYS-REQ-010, SYS-REQ-011, SYS-REQ-012, SYS-REQ-013, SYS-REQ-014, SYS-REQ-015, SYS-REQ-025, SYS-REQ-026, SYS-REQ-027, SYS-REQ-030, SYS-REQ-032 [example]
+// Verifies: SYS-REQ-008, SYS-REQ-010, SYS-REQ-011, SYS-REQ-012, SYS-REQ-013, SYS-REQ-014, SYS-REQ-015, SYS-REQ-025, SYS-REQ-026, SYS-REQ-027, SYS-REQ-030, SYS-REQ-032, SW-REQ-002 [example]
 // SYS-REQ-010:error_handling:negative
 // SYS-REQ-011:error_handling:negative
 // SYS-REQ-012:malformed_input:negative
-// MCDC STK-REQ-001: N/A
-// MCDC STK-REQ-005: N/A
-// MCDC STK-REQ-007: N/A
 // MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
+// MCDC SW-REQ-002: service_apply_invoked=T, service_apply_success_returned=T => TRUE
 // MCDC SYS-REQ-010: apply_requested=T, error_reported=F, multiple_policies=F, policy_found=T => TRUE
 // MCDC SYS-REQ-011: apply_requested=T, error_reported=F, org_matches=T => TRUE
 // MCDC SYS-REQ-012: apply_requested=T, error_reported=F, per_api_and_partition_set=F => TRUE
@@ -1356,9 +1351,6 @@ func TestService_Apply(t *testing.T) {
 	}
 }
 
-// Verifies: STK-REQ-007, SYS-REQ-008 [example]
-// MCDC STK-REQ-007: N/A
-// MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
 func BenchmarkService_Apply(b *testing.B) {
 	b.ReportAllocs()
 

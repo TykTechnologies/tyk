@@ -31,8 +31,7 @@ func newTestService(orgID string, policies []user.Policy) *policy.Service {
 	return policy.New(&orgID, store, logger)
 }
 
-// Verifies: STK-REQ-001, SYS-REQ-017 [example]
-// MCDC STK-REQ-001: N/A
+// Verifies: SYS-REQ-017 [example]
 // MCDC SYS-REQ-017: apply_requested=T, error_reported=F, metadata_merged=T => TRUE
 func TestSpec_MetadataMerged(t *testing.T) {
 	orgID := "org1"
@@ -63,8 +62,7 @@ func TestSpec_MetadataMerged(t *testing.T) {
 	assert.Equal(t, "data", session.MetaData["existing"])
 }
 
-// Verifies: STK-REQ-002, SYS-REQ-019, SYS-REQ-020 [example]
-// MCDC STK-REQ-002: N/A
+// Verifies: SYS-REQ-019, SYS-REQ-020 [example]
 // MCDC SYS-REQ-019: clear_requested=T, error_reported=F, policy_found=T, session_cleared=T => TRUE
 // MCDC SYS-REQ-020: clear_requested=T, error_reported=F, policy_found=T => TRUE
 func TestSpec_ClearSession(t *testing.T) {
@@ -106,8 +104,7 @@ func TestSpec_ClearSession(t *testing.T) {
 	})
 }
 
-// Verifies: STK-REQ-005, SYS-REQ-024, SYS-REQ-028 [boundary]
-// MCDC STK-REQ-005: N/A
+// Verifies: SYS-REQ-024, SYS-REQ-028 [boundary]
 // MCDC SYS-REQ-024: access_rights_merged=T, apply_requested=T, error_reported=F => TRUE
 // MCDC SYS-REQ-028: access_rights_merged=T, error_reported=F => TRUE
 // SYS-REQ-028:atomicity:negative
@@ -549,8 +546,7 @@ func TestProperty_Tags_Commutativity(t *testing.T) {
 
 // --- Rate Limits: highest wins via duration comparison ---
 
-// Verifies: STK-REQ-003, SYS-REQ-021 [property]
-// MCDC STK-REQ-003: N/A
+// Verifies: SYS-REQ-021 [property]
 // MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func TestProperty_RateLimit_HighestWins_ByDuration(t *testing.T) {
 	svc := &policy.Service{}
@@ -876,8 +872,7 @@ func TestProperty_Metadata_CombineByKey(t *testing.T) {
 
 // --- Endpoints: combine by path+method, highest rate per endpoint ---
 
-// Verifies: STK-REQ-004, SYS-REQ-023 [property]
-// MCDC STK-REQ-004: N/A
+// Verifies: SYS-REQ-023 [property]
 // MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestProperty_Endpoints_CombineHighest(t *testing.T) {
 	svc := &policy.Service{}
@@ -1041,8 +1036,7 @@ func TestProperty_MergeAllowedURLs_Union(t *testing.T) {
 
 // --- ClearSession: partition-aware clearing ---
 
-// Verifies: STK-REQ-002, SYS-REQ-019 [property]
-// MCDC STK-REQ-002: N/A
+// Verifies: SYS-REQ-019 [property]
 // MCDC SYS-REQ-019: clear_requested=T, error_reported=F, policy_found=T, session_cleared=T => TRUE
 func TestProperty_ClearSession_PartitionBehavior(t *testing.T) {
 	orgID := "org1"
@@ -1350,7 +1344,7 @@ func TestSpec_Issue2_AllPoliciesMissing(t *testing.T) {
 
 // Verifies: SYS-REQ-041 [boundary]
 // SYS-REQ-041:boundary:negative
-// MCDC SYS-REQ-041: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=T, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-041: api_limit_empty=T, policy_rate_empty=F, policy_rate_equal=T, rate_limit_applied=F, rate_limit_apply_requested=T => TRUE
 func TestSpec_Issue3_EqualRateLimits(t *testing.T) {
 	t.Run("equal duration does NOT overwrite", func(t *testing.T) {
 		svc := &policy.Service{}
@@ -1391,7 +1385,7 @@ func TestSpec_Issue3_EqualRateLimits(t *testing.T) {
 	})
 }
 
-// Verifies: STK-REQ-006, SYS-REQ-042 [malformed]
+// Verifies: SYS-REQ-042 [malformed]
 // MCDC SYS-REQ-042: apply_requested=T, error_reported=T, store_available=F => TRUE
 func TestSpec_Issue4_NilStore(t *testing.T) {
 	t.Run("nil store panics or errors on Apply", func(t *testing.T) {
@@ -1492,8 +1486,7 @@ func TestSpec_Issue6_MetadataIterationOrder(t *testing.T) {
 	}
 }
 
-// Verifies: STK-REQ-007, SYS-REQ-044 [boundary]
-// MCDC STK-REQ-007: N/A
+// Verifies: SYS-REQ-044 [boundary]
 // MCDC SYS-REQ-044: apply_requested=T, apply_time_bounded=T => TRUE
 // SYS-REQ-044:boundary:negative
 // SYS-REQ-044:overflow_safety:negative
@@ -1876,7 +1869,7 @@ func TestSpec_SomePoliciesMissing_NoError(t *testing.T) {
 		"partial missing in multi-policy mode should not error")
 }
 
-// Verifies: STK-REQ-006, SYS-REQ-042 [boundary]
+// Verifies: SYS-REQ-042 [boundary]
 // MCDC SYS-REQ-042: apply_requested=T, error_reported=F, store_available=T => TRUE
 func TestSpec_ValidStore_NoError(t *testing.T) {
 	orgID := "org1"

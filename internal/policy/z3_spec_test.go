@@ -244,8 +244,7 @@ var z3PropertyMappings = map[string]z3PropertyMapping{
 	},
 }
 
-// Verifies: STK-REQ-001, SYS-REQ-021, SYS-REQ-022, SYS-REQ-033, SYS-REQ-016, SYS-REQ-017 [boundary]
-// MCDC STK-REQ-001: N/A
+// Verifies: SYS-REQ-021, SYS-REQ-022, SYS-REQ-033, SYS-REQ-016, SYS-REQ-017 [boundary]
 // MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 // MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 // MCDC SYS-REQ-033: apply_requested=T, result_returned=T => TRUE
@@ -458,8 +457,7 @@ func TestZ3_FormalEvidence_AllProperties(t *testing.T) {
 	t.Logf("Z3 formal evidence: %d fixtures across %d properties", len(allFixtures), len(properties))
 }
 
-// Verifies: STK-REQ-001, SYS-REQ-021 [formal]
-// MCDC STK-REQ-001: N/A
+// Verifies: SYS-REQ-021 [formal]
 // MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func TestZ3_FormalEvidence_RateLimitProperty(t *testing.T) {
 	fixtures := loadZ3Fixtures(t, "rate_limit_applied")
