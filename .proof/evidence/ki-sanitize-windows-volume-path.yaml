@@ -1,0 +1,16 @@
+schema_version: proof.evidence_profile.v1
+results:
+    - profile: known_issue_reproducer
+      requirement: SYS-REQ-092
+      command: go test ./internal/sanitize -run TestKnownIssue_ZipFilePathAcceptsWindowsVolumePathOnUnix -count=1
+      status: pass
+      observed_result: known_issue_reproduced
+      executed_at: "2026-06-19T11:54:06Z"
+      input_set:
+        - KI-SANITIZE-WINDOWS-VOLUME-PATH reproducer
+      freshness_hashes:
+        .proof/known-issues/KI-SANITIZE-WINDOWS-VOLUME-PATH.yaml: sha256:da7592964976d59cd68903f7555a757043e27d5baa16a4ad7f0762ab906db510
+        internal/sanitize/path_test.go: sha256:598aec0325ffdf371cbd529d79c702cecc9dc480f48f259dc12e38baa9c7dff6
+        proof.yaml: sha256:895daff29b9390d8058fda4de375d4ae1f6468fde2e953f32526d40ddca5817f
+      known_issues:
+        - KI-SANITIZE-WINDOWS-VOLUME-PATH

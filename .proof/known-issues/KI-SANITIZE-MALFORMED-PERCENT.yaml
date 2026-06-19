@@ -1,0 +1,29 @@
+id: KI-SANITIZE-MALFORMED-PERCENT
+title: Malformed percent escape accepted as safe path component
+description: ValidatePathComponent stops URL decoding when url.QueryUnescape reports a malformed escape, then continues validation on the original component. A component such as safe%2 is accepted instead of returning ErrInvalidFilePath, contrary to the sanitizer requirement for malformed encoded components.
+affected_requirements:
+    - SYS-REQ-094
+evidence_manifests:
+    - .proof/evidence/ki-sanitize-malformed-percent.yaml
+severity: medium
+risk: path_traversal_sanitization
+cve_surface: possible
+affected_api: internal/sanitize.ValidatePathComponent
+attacker_input: path component containing malformed percent-escape syntax, for example safe%2
+reproducer_command: go test ./internal/sanitize -run TestKnownIssue_ValidatePathComponentAcceptsMalformedPercentEscape -count=1
+introduced_in: 6ca23835e0
+mitigation: Do not treat ValidatePathComponent as rejecting malformed percent escapes until the decoder error path is changed; callers that need strict URL-encoded input rejection should reject malformed escapes before calling this helper.
+remediation: Return ErrInvalidFilePath when bounded URL decoding encounters malformed percent-escape syntax, then convert the reproducer into an expected rejection regression test.
+customer_impact: Malformed percent-escaped path components can pass validation even though the sanitizer contract requires malformed encoded components to fail closed.
+owner: human:buger
+review_date: "2026-07-18"
+release_disposition: ship_with_known_issue
+status: open
+history:
+    - at: "2026-06-18T21:41:42Z"
+      by: agent:codex
+      action: created
+    - at: "2026-06-18T21:42:00Z"
+      by: agent:codex
+      action: edit
+      detail: add-evidence-manifest

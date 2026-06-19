@@ -1,0 +1,27 @@
+id: KI-POLICY-NIL-SESSION-APPLY
+title: Apply dereferenced nil session input
+description: Service.Apply previously accessed fields on a nil *user.SessionState before validating the input. A malformed caller path could panic the policy engine instead of returning an explicit error.
+affected_requirements:
+    - SYS-REQ-073
+    - SYS-REQ-075
+evidence_manifests:
+    - .proof/evidence/ki-policy-nil-session-apply.yaml
+severity: medium
+risk: panic_free_input_handling
+cve_surface: none
+affected_api: internal/policy.Service.Apply
+attacker_input: 'non-attacker trigger: caller passes nil *user.SessionState to Apply'
+reproducer_command: go test ./internal/policy -run TestNegative_NilSafety_NilSessionOnApply -count=1
+introduced_in: 2dfcc3bf32
+mitigation: No runtime mitigation is required on this branch; Apply now returns an error for nil session input and the regression test verifies no panic.
+remediation: Fixed by adding an entry nil-session guard before Apply accesses session fields; keep the regression test bound to this KnownIssue.
+customer_impact: Historically, malformed policy application input could panic the gateway process instead of failing closed.
+owner: human:buger
+review_date: "2026-07-19"
+release_disposition: ship
+status: fixed
+history:
+    - at: "2026-06-19T06:32:00Z"
+      by: agent:codex
+      action: created
+      detail: reconstructed from policy bug-hunt decision log and current regression test

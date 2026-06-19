@@ -1,0 +1,16 @@
+schema_version: proof.evidence_profile.v1
+results:
+    - profile: known_issue_reproducer
+      requirement: SYS-REQ-069
+      command: go test ./internal/policy -run TestNegative_Atomicity_SecondPolicyFailure -count=1
+      status: pass
+      observed_result: known_issue_reproduced
+      executed_at: "2026-06-19T11:53:36Z"
+      input_set:
+        - KI-POLICY-APPLY-PARTIAL-MULTIPOLICY-ERROR reproducer
+      freshness_hashes:
+        .proof/known-issues/KI-POLICY-APPLY-PARTIAL-MULTIPOLICY-ERROR.yaml: sha256:4804a6d81f2647c1797e427c8da77d75069696f7a5e8c33fa773e7d157dbd525
+        internal/policy/negative_obligation_test.go: sha256:3b4cb062334dc4338d535f362dd28dac5d43e2de779030f35a28b294dd43d34e
+        proof.yaml: sha256:895daff29b9390d8058fda4de375d4ae1f6468fde2e953f32526d40ddca5817f
+      known_issues:
+        - KI-POLICY-APPLY-PARTIAL-MULTIPOLICY-ERROR

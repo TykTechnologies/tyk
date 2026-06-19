@@ -1,0 +1,29 @@
+id: KI-POLICY-UNLIMITED-QUOTA-RENEWAL
+title: Unlimited quota copied nonzero renewal rate
+description: Partitioned and master policy application previously copied QuotaRenewalRate even when QuotaMax was the unlimited sentinel (-1). That violated the policy invariant that unlimited quota must force renewal rate to zero.
+affected_requirements:
+    - SYS-REQ-015
+    - SYS-REQ-024
+    - SYS-REQ-052
+    - SYS-REQ-067
+evidence_manifests:
+    - .proof/evidence/ki-policy-unlimited-quota-renewal.yaml
+severity: medium
+risk: quota_invariant_violation
+cve_surface: none
+affected_api: internal/policy.Service.Apply partition quota paths
+attacker_input: 'non-attacker trigger: policy configuration with QuotaMax=-1 and nonzero QuotaRenewalRate'
+reproducer_command: go test ./internal/policy -run 'TestNegative_OverflowSafety_MaxInt64Quota/QuotaMax_=_-1_\(unlimited\)_with_MaxInt64_renewal' -count=1
+introduced_in: 290355b7f8
+mitigation: No runtime mitigation is required on this branch; regression evidence verifies QuotaMax=-1 forces QuotaRenewalRate=0.
+remediation: Fixed by zeroing renewal rate whenever the QuotaUnlimited sentinel is applied in partition and master policy paths; keep the regression test bound to this KnownIssue.
+customer_impact: Historically, unlimited quota policies could leave inconsistent renewal state on the session after policy application.
+owner: human:buger
+review_date: "2026-07-19"
+release_disposition: ship
+status: fixed
+history:
+    - at: "2026-06-19T06:32:00Z"
+      by: agent:codex
+      action: created
+      detail: reconstructed from policy bug-hunt decision log and current regression test

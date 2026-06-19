@@ -1,0 +1,35 @@
+id: KI-OSUTIL-SYMLINK-ESCAPE
+title: Scoped root write follows symlink outside root
+description: Root.WriteFile validates only the lexical path returned by Ensure before calling os.WriteFile. If an in-root path is a symlink to a file outside the root, os.WriteFile follows the symlink and modifies the outside file, contrary to the scoped filesystem contract for confined file operations.
+affected_requirements:
+    - SYS-REQ-102
+evidence_manifests:
+    - .proof/evidence/ki-osutil-symlink-escape.yaml
+severity: high
+risk: scoped_filesystem_escape
+cve_surface: possible
+affected_api: internal/osutil.Root.WriteFile
+attacker_input: relative path inside the scoped root that names a symlink pointing outside the root
+sanitizer: go-test:scoped-filesystem-symlink
+reproducer_command: go test ./internal/osutil -run TestKnownIssue_WriteFileFollowsSymlinkOutsideRoot -count=1
+introduced_in: 39e1e5660b
+minimization_status: minimized
+mitigation: Do not rely on Root.WriteFile to prevent symlink-following escapes until scoped operations use no-follow/openat-style containment or canonical path checks.
+remediation: Change scoped file operations to reject or safely handle symlinks that resolve outside the root, then convert the reproducer into an expected rejection regression test.
+customer_impact: A policy-file write routed through Root.WriteFile can modify a file outside the configured scoped root if the in-root path is a symlink to that outside file.
+owner: human:buger
+review_date: "2026-07-18"
+release_disposition: ship_with_known_issue
+status: open
+history:
+    - at: "2026-06-19T06:18:03Z"
+      by: agent:codex
+      action: created
+    - at: "2026-06-19T06:18:20Z"
+      by: agent:codex
+      action: edit
+      detail: add-evidence-manifest
+    - at: "2026-06-19T11:53:00Z"
+      by: agent:codex
+      action: edit
+      detail: set-sanitizer,set-minimization-status=minimized

@@ -1,0 +1,16 @@
+schema_version: proof.evidence_profile.v1
+results:
+    - profile: known_issue_reproducer
+      requirement: SYS-REQ-075
+      command: go test ./internal/policy -run TestNegative_NilSafety_NilSessionOnApply -count=1
+      status: pass
+      observed_result: known_issue_not_reproduced
+      executed_at: "2026-06-19T11:54:38Z"
+      input_set:
+        - KI-POLICY-NIL-SESSION-APPLY regression guard
+      freshness_hashes:
+        .proof/known-issues/KI-POLICY-NIL-SESSION-APPLY.yaml: sha256:b905189b16b0384861dc1d4261c66f52835c06cd31fb317051b7b4177536c1a1
+        internal/policy/negative_obligation_test.go: sha256:3b4cb062334dc4338d535f362dd28dac5d43e2de779030f35a28b294dd43d34e
+        proof.yaml: sha256:895daff29b9390d8058fda4de375d4ae1f6468fde2e953f32526d40ddca5817f
+      known_issues:
+        - KI-POLICY-NIL-SESSION-APPLY

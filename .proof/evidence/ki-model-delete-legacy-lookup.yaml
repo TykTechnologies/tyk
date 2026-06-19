@@ -1,0 +1,16 @@
+schema_version: proof.evidence_profile.v1
+results:
+    - profile: known_issue_reproducer
+      requirement: SYS-REQ-078
+      command: go test ./internal/model -run TestKnownIssue_DeleteByIdDropsLegacyLookupForRemainingScopedPolicy -count=1
+      status: pass
+      observed_result: known_issue_reproduced
+      executed_at: "2026-06-19T11:53:33Z"
+      input_set:
+        - KI-MODEL-DELETE-LEGACY-LOOKUP reproducer
+      freshness_hashes:
+        .proof/known-issues/KI-MODEL-DELETE-LEGACY-LOOKUP.yaml: sha256:c0b823d0ab5cb3d156e04965113a56bf82d97fe93baa21a19361f107066bf8b1
+        internal/model/policies_test.go: sha256:116ad56d34738061300b74e0fd98797aa29c45db6fe2b28041f0e3309450f2a0
+        proof.yaml: sha256:895daff29b9390d8058fda4de375d4ae1f6468fde2e953f32526d40ddca5817f
+      known_issues:
+        - KI-MODEL-DELETE-LEGACY-LOOKUP

@@ -1,0 +1,28 @@
+id: KI-POLICY-NIL-API-LIMIT
+title: ApplyRateLimits dereferenced nil API limit input
+description: ApplyRateLimits previously dereferenced the caller-provided *user.APILimit before checking for nil. A malformed or partially constructed caller path could panic the policy engine instead of returning or preserving state safely.
+affected_requirements:
+    - SYS-REQ-021
+    - SYS-REQ-073
+    - SYS-REQ-075
+evidence_manifests:
+    - .proof/evidence/ki-policy-nil-api-limit.yaml
+severity: medium
+risk: panic_free_input_handling
+cve_surface: none
+affected_api: internal/policy.Service.ApplyRateLimits
+attacker_input: 'non-attacker trigger: caller passes nil *user.APILimit to ApplyRateLimits'
+reproducer_command: go test ./internal/policy -run TestNegative_MalformedInput_NilAPILimitPointer -count=1
+introduced_in: 2dfcc3bf32
+mitigation: No runtime mitigation is required on this branch; the nil API limit regression test now verifies the guard remains in place.
+remediation: Fixed by adding an entry nil guard before ApplyRateLimits dereferences apiLimits; keep the regression test bound to this KnownIssue.
+customer_impact: Historically, malformed rate-limit input could panic policy application and interrupt gateway request handling.
+owner: human:buger
+review_date: "2026-07-19"
+release_disposition: ship
+status: fixed
+history:
+    - at: "2026-06-19T06:32:00Z"
+      by: agent:codex
+      action: created
+      detail: reconstructed from policy bug-hunt decision log and current regression test

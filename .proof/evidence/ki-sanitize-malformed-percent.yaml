@@ -1,0 +1,16 @@
+schema_version: proof.evidence_profile.v1
+results:
+    - profile: known_issue_reproducer
+      requirement: SYS-REQ-094
+      command: go test ./internal/sanitize -run TestKnownIssue_ValidatePathComponentAcceptsMalformedPercentEscape -count=1
+      status: pass
+      observed_result: known_issue_reproduced
+      executed_at: "2026-06-19T11:54:06Z"
+      input_set:
+        - KI-SANITIZE-MALFORMED-PERCENT reproducer
+      freshness_hashes:
+        .proof/known-issues/KI-SANITIZE-MALFORMED-PERCENT.yaml: sha256:c4ae51231bdd3771f86917b80c2635172cea9bb821c827eba4f3def415112d49
+        internal/sanitize/path_test.go: sha256:598aec0325ffdf371cbd529d79c702cecc9dc480f48f259dc12e38baa9c7dff6
+        proof.yaml: sha256:895daff29b9390d8058fda4de375d4ae1f6468fde2e953f32526d40ddca5817f
+      known_issues:
+        - KI-SANITIZE-MALFORMED-PERCENT

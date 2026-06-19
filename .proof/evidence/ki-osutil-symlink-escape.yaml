@@ -1,0 +1,16 @@
+schema_version: proof.evidence_profile.v1
+results:
+    - profile: known_issue_reproducer
+      requirement: SYS-REQ-102
+      command: go test ./internal/osutil -run TestKnownIssue_WriteFileFollowsSymlinkOutsideRoot -count=1
+      status: pass
+      observed_result: known_issue_reproduced
+      executed_at: "2026-06-19T11:53:34Z"
+      input_set:
+        - KI-OSUTIL-SYMLINK-ESCAPE reproducer
+      freshness_hashes:
+        .proof/known-issues/KI-OSUTIL-SYMLINK-ESCAPE.yaml: sha256:69f681428f89ad81d2a722e1f2c7e9dd95621117c0445cca7924c63d4c4c54dd
+        internal/osutil/osutil_test.go: sha256:84f6f581c0a4fab302fb1eac0baa7983ab998a43229bbd7f24a4e14f57c52f04
+        proof.yaml: sha256:895daff29b9390d8058fda4de375d4ae1f6468fde2e953f32526d40ddca5817f
+      known_issues:
+        - KI-OSUTIL-SYMLINK-ESCAPE

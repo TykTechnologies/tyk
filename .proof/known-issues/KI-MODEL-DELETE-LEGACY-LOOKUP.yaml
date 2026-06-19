@@ -1,0 +1,29 @@
+id: KI-MODEL-DELETE-LEGACY-LOOKUP
+title: Deleting scoped policy drops remaining legacy lookup alias
+description: Deleting one scoped policy with a custom ID removes the non-scoped legacy lookup entry for that custom ID even when another scoped policy with the same ID remains loaded.
+affected_requirements:
+    - SYS-REQ-078
+evidence_manifests:
+    - .proof/evidence/ki-model-delete-legacy-lookup.yaml
+severity: medium
+risk: policy_lookup_correctness
+cve_surface: none
+affected_api: internal/model.Policies.DeleteById and PolicyByIdExtended(NonScopedLastInsertedPolicyId)
+attacker_input: 'non-attacker trigger: policy deletion in a multi-organization store with shared custom policy IDs'
+reproducer_command: go test ./internal/model -run TestKnownIssue_DeleteByIdDropsLegacyLookupForRemainingScopedPolicy -count=1
+introduced_in: e62488eb42d10c037ca81a2443239a3b52055808
+mitigation: Use scoped policy identifiers for deletion and lookup paths until the legacy alias is rebuilt or repointed after scoped deletion.
+remediation: Update DeleteById/unloadOne to preserve or repoint the legacy non-scoped alias when another scoped policy with the same custom ID remains; then flip the reproducer into an expected-behavior regression test.
+customer_impact: A legacy non-scoped policy lookup can report policy not found after deleting one organization-scoped policy, although another policy with the same custom ID remains loaded.
+owner: human:buger
+review_date: "2026-07-18"
+release_disposition: ship_with_known_issue
+status: open
+history:
+    - at: "2026-06-18T20:45:55Z"
+      by: agent:codex
+      action: created
+    - at: "2026-06-18T20:47:42Z"
+      by: agent:codex
+      action: edit
+      detail: add-evidence-manifest

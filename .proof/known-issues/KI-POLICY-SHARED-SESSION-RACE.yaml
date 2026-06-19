@@ -1,0 +1,27 @@
+id: KI-POLICY-SHARED-SESSION-RACE
+title: Concurrent policy operations race on a shared session
+description: Apply and ClearSession mutate the supplied *user.SessionState without synchronization. Concurrent Apply calls, or concurrent ClearSession and Apply calls, on the same session pointer trigger Go race-detector findings. The currently verified concurrency requirement covers concurrent Apply on different sessions, so this KnownIssue records the unsupported shared-session case explicitly.
+affected_requirements:
+    - SYS-REQ-068
+    - SYS-REQ-075
+evidence_manifests:
+    - .proof/evidence/ki-policy-shared-session-race.yaml
+severity: medium
+risk: shared_session_data_race
+cve_surface: none
+affected_api: internal/policy.Service.Apply and internal/policy.Service.ClearSession
+attacker_input: 'non-attacker trigger: caller concurrently reuses the same *user.SessionState across policy operations'
+reproducer_command: go test -race -tags proof_race_reproducer ./internal/policy -run 'TestKnownIssue_SharedSession(ConcurrentApplyRace|ClearAndApplyRace)' -count=1
+introduced_in: 2dfcc3bf32
+mitigation: Do not call Apply or ClearSession concurrently with the same session pointer. Use one session instance per request path or serialize policy operations on shared session state.
+remediation: Either document shared-session concurrent use as unsupported in the public contract and keep caller assumptions explicit, or add synchronization/copy-on-write semantics around session mutation.
+customer_impact: If a caller shares one session object across concurrent policy operations, the session can be observed or written concurrently, producing data races and potentially inconsistent fields.
+owner: human:buger
+review_date: "2026-07-19"
+release_disposition: ship_with_known_issue
+status: open
+history:
+    - at: "2026-06-19T06:32:00Z"
+      by: agent:codex
+      action: created
+      detail: reconstructed from policy bug-hunt and phase-zero audit logs with dedicated race-detector reproducer

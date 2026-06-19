@@ -1,0 +1,16 @@
+schema_version: proof.evidence_profile.v1
+results:
+    - profile: known_issue_reproducer
+      requirement: SYS-REQ-068
+      command: go test -race -tags proof_race_reproducer ./internal/policy -run 'TestKnownIssue_SharedSession(ConcurrentApplyRace|ClearAndApplyRace)' -count=1
+      status: fail
+      observed_result: known_issue_reproduced
+      executed_at: "2026-06-19T11:54:38Z"
+      input_set:
+        - KI-POLICY-SHARED-SESSION-RACE race-detector reproducer
+      freshness_hashes:
+        .proof/known-issues/KI-POLICY-SHARED-SESSION-RACE.yaml: sha256:39ca14ab172cbc96d74041ecff0296f137cc6ceb126fd17d140ee70543ddf848
+        internal/policy/known_issue_race_test.go: sha256:2e1c468d5a4580c88ab29eeafcfecc76aba82c3e6855ec0340fcc8ecf43d2207
+        proof.yaml: sha256:895daff29b9390d8058fda4de375d4ae1f6468fde2e953f32526d40ddca5817f
+      known_issues:
+        - KI-POLICY-SHARED-SESSION-RACE

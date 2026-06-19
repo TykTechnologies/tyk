@@ -1,0 +1,34 @@
+id: KI-POLICY-APPLY-PARTIAL-MULTIPOLICY-ERROR
+title: Apply leaves first policy merged after later policy error
+description: In a multi-policy session, Service.Apply can merge fields from an earlier valid policy and then return an error for a later invalid policy. The session keeps the earlier policy's rate and quota fields after the error, violating all-or-nothing policy application.
+affected_requirements:
+    - SYS-REQ-025
+    - SYS-REQ-029
+    - SYS-REQ-069
+evidence_manifests:
+    - .proof/evidence/ki-policy-apply-partial-multipolicy-error.yaml
+severity: high
+risk: policy_application_atomicity
+cve_surface: possible
+affected_api: internal/policy.Service.Apply
+attacker_input: session referencing multiple policies where an earlier policy is valid and a later policy reports an error
+sanitizer: go-test:policy-apply-atomicity
+reproducer_command: go test ./internal/policy -run TestNegative_Atomicity_SecondPolicyFailure -count=1
+introduced_in: 2dfcc3bf32
+minimization_status: candidate
+mitigation: Treat Apply errors as potentially mutating the supplied session; callers that need all-or-nothing semantics must snapshot before Apply until Apply validates the full policy set before merging or rolls back on error.
+remediation: Stage policy validation and merge output into temporary state, committing to the session only after all referenced policies succeed; then convert the reproducer into an expected no-mutation regression test.
+customer_impact: A failed multi-policy apply can leave a session with access-control fields from only part of the intended policy set.
+owner: human:buger
+review_date: "2026-07-19"
+release_disposition: ship_with_known_issue
+status: open
+history:
+    - at: "2026-06-19T06:32:00Z"
+      by: agent:codex
+      action: created
+      detail: reconstructed from policy bug-hunt and full-audit decision logs, then strengthened into active evidence
+    - at: "2026-06-19T11:53:01Z"
+      by: agent:codex
+      action: edit
+      detail: set-sanitizer,set-minimization-status=candidate

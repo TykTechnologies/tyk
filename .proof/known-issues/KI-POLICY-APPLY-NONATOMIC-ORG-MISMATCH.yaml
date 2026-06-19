@@ -1,0 +1,33 @@
+id: KI-POLICY-APPLY-NONATOMIC-ORG-MISMATCH
+title: Apply clears session before reporting wrong-organization policy error
+description: Service.Apply calls ClearSession before validating that the referenced policy belongs to the configured organization. When the policy is from another organization, Apply returns an error but the session has already had rate and quota fields cleared.
+affected_requirements:
+    - SYS-REQ-011
+    - SYS-REQ-069
+evidence_manifests:
+    - .proof/evidence/ki-policy-apply-nonatomic-org-mismatch.yaml
+severity: high
+risk: policy_application_atomicity
+cve_surface: possible
+affected_api: internal/policy.Service.Apply
+attacker_input: session referencing a policy id whose resolved policy belongs to a different organization
+sanitizer: go-test:policy-apply-atomicity
+reproducer_command: go test ./internal/policy -run TestKnownIssue_ApplyOrgMismatchClearsSessionBeforeError -count=1
+introduced_in: 2dfcc3bf32
+minimization_status: candidate
+mitigation: Treat Apply errors as potentially mutating the supplied session; callers that need rollback semantics must snapshot the session before calling Apply until Apply validates policies before clearing or rolls back on error.
+remediation: Validate all referenced policies before ClearSession, or snapshot and restore session fields on any Apply error, then convert the reproducer into an expected rollback regression test.
+customer_impact: A failed cross-organization policy application can leave an API key session partially cleared even though no policy was successfully applied.
+owner: human:buger
+review_date: "2026-07-19"
+release_disposition: ship_with_known_issue
+status: open
+history:
+    - at: "2026-06-19T06:32:00Z"
+      by: agent:codex
+      action: created
+      detail: reconstructed from policy bug-hunt decision log and active reproducer
+    - at: "2026-06-19T11:53:01Z"
+      by: agent:codex
+      action: edit
+      detail: set-sanitizer,set-minimization-status=candidate

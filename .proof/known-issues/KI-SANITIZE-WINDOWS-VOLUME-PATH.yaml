@@ -1,0 +1,29 @@
+id: KI-SANITIZE-WINDOWS-VOLUME-PATH
+title: Windows volume archive path accepted on Unix
+description: ZipFilePath relies on host filepath semantics. On Unix-like builds, a ZIP entry named C:\Windows\System32 is not considered absolute or volume-qualified by filepath.VolumeName, so the archive path is accepted instead of returning ErrInvalidFilePath. ZIP entry names are platform-neutral input, so volume-qualified archive paths should fail closed consistently.
+affected_requirements:
+    - SYS-REQ-092
+evidence_manifests:
+    - .proof/evidence/ki-sanitize-windows-volume-path.yaml
+severity: medium
+risk: path_traversal_sanitization
+cve_surface: possible
+affected_api: internal/sanitize.ZipFilePath
+attacker_input: ZIP archive entry name containing a Windows volume path, for example C:\Windows\System32
+reproducer_command: go test ./internal/sanitize -run TestKnownIssue_ZipFilePathAcceptsWindowsVolumePathOnUnix -count=1
+introduced_in: 5cb1b68324
+mitigation: Do not treat ZipFilePath as platform-neutral volume-path rejection on Unix-like builds until the validator explicitly detects Windows drive/volume syntax independent of host OS.
+remediation: Reject Windows volume-qualified archive entry names with platform-neutral checks before joining with the extraction target, then convert the reproducer into an expected rejection regression test.
+customer_impact: A ZIP bundle containing a Windows volume-style entry can pass archive path validation on Unix-like builds even though the sanitizer contract requires volume-qualified archive paths to be rejected.
+owner: human:buger
+review_date: "2026-07-18"
+release_disposition: ship_with_known_issue
+status: open
+history:
+    - at: "2026-06-18T21:50:35Z"
+      by: agent:codex
+      action: created
+    - at: "2026-06-18T21:51:00Z"
+      by: agent:codex
+      action: edit
+      detail: add-evidence-manifest
