@@ -16,6 +16,9 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
+// Verifies: SW-REQ-017
+// SW-REQ-017:nominal:nominal
+// SW-REQ-017:boundary:boundary
 // TestSlidingLog_Do is an integration test that tests counter behaviour.
 func TestSlidingLog_Do(t *testing.T) {
 	t.Parallel()
@@ -52,6 +55,8 @@ func (*dummyClientProvider) Client() (redis.UniversalClient, error) {
 	return nil, io.EOF
 }
 
+// Verifies: SW-REQ-017
+// SW-REQ-017:error_handling:negative
 // TestSlidingLog_Errors covers some error branches.
 func TestSlidingLog_Errors(t *testing.T) {
 	var err error
@@ -63,6 +68,9 @@ func TestSlidingLog_Errors(t *testing.T) {
 	assert.Error(t, io.EOF, err)
 }
 
+// Verifies: SW-REQ-017
+// SW-REQ-017:nominal:nominal
+// SW-REQ-017:boundary:boundary
 // TestSlidingLog_GetCount is an integration test that tests counter behaviour.
 func TestSlidingLog_GetCount(t *testing.T) {
 	t.Parallel()
@@ -84,6 +92,9 @@ func TestSlidingLog_GetCount(t *testing.T) {
 	}
 }
 
+// Verifies: SW-REQ-017
+// SW-REQ-017:nominal:nominal
+// SW-REQ-017:boundary:boundary
 // TestSlidingLog_Get is an integration test that tests log behaviour.
 func TestSlidingLog_Get(t *testing.T) {
 	t.Parallel()
@@ -105,6 +116,8 @@ func TestSlidingLog_Get(t *testing.T) {
 	}
 }
 
+// Verifies: SW-REQ-017
+// SW-REQ-017:error_handling:negative
 // TestSlidingLog_pipelinerError is testing that pipeline errors are returned as expected.
 func TestSlidingLog_pipelinerError(t *testing.T) {
 	t.Parallel()
@@ -143,6 +156,38 @@ func TestSlidingLog_pipelinerError(t *testing.T) {
 
 	_, err = rl.SetCount(ctx, time.Now(), "test", 5)
 	assert.Error(t, err, io.EOF)
+}
+
+// Verifies: SW-REQ-017
+// SW-REQ-017:boundary:boundary
+func TestSlidingLog_SameTimestampRecordsDistinctPipelineHits(t *testing.T) {
+	ctx := context.Background()
+	db := connectRedis(t)
+	now := time.Now()
+
+	for _, tx := range []bool{true, false} {
+		t.Run("count", func(t *testing.T) {
+			key := uuid.New()
+			rl := rate.NewSlidingLogRedis(db, tx, nil)
+
+			for i := int64(0); i < 3; i++ {
+				count, err := rl.SetCount(ctx, now, key, 10)
+				require.NoError(t, err)
+				assert.Equal(t, i, count)
+			}
+		})
+
+		t.Run("members", func(t *testing.T) {
+			key := uuid.New()
+			rl := rate.NewSlidingLogRedis(db, tx, nil)
+
+			for i := 0; i < 3; i++ {
+				members, err := rl.Set(ctx, now, key, 10)
+				require.NoError(t, err)
+				assert.Len(t, members, i)
+			}
+		})
+	}
 }
 
 const testRequestCount int = 1000
@@ -270,6 +315,9 @@ func BenchmarkSlidingLog_Count(b *testing.B) {
 	})
 }
 
+// Verifies: SW-REQ-017
+// SW-REQ-017:nominal:nominal
+// SW-REQ-017:boundary:boundary
 func Test_GetCountScript(t *testing.T) {
 	db := connectRedis(t)
 	now := time.Now()
@@ -318,6 +366,28 @@ func Test_GetCountScript(t *testing.T) {
 	ttl, err := db.TTL(t.Context(), "key").Result()
 	require.NoError(t, err)
 	require.InDelta(t, float64(10), ttl.Seconds(), .1)
+}
+
+// Verifies: SW-REQ-017
+// SW-REQ-017:boundary:boundary
+func Test_GetCountScriptRecordsSameTimestampHits(t *testing.T) {
+	db := connectRedis(t)
+	now := time.Now()
+	key := uuid.New()
+
+	slr := rate.NewSlidingLogRedis(db, true, nil)
+	for i := 0; i < 3; i++ {
+		res, err := slr.SetCountScript(t.Context(), now, key, 3, 10)
+		expectedRemaining := 2 - i
+		if expectedRemaining < 0 {
+			expectedRemaining = 0
+		}
+
+		require.NoError(t, err)
+		require.Equal(t, i, res.Count)
+		require.Equal(t, 3, res.Limit)
+		require.Equal(t, expectedRemaining, res.Remaining)
+	}
 }
 
 func connectRedis(tb testing.TB) redis.UniversalClient {

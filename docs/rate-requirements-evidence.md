@@ -10,6 +10,7 @@
 <!-- documents SW-REQ-014 -->
 <!-- documents SW-REQ-015 -->
 <!-- documents SW-REQ-016 -->
+<!-- documents SW-REQ-017 -->
 
 This document records the current rate-limit support-state proof slice. The
 slice is deliberately limited to the listed `internal/rate/model` allowance
@@ -82,6 +83,14 @@ parsing. It does not claim Redis server availability, successful network
 dialing, Redis command behavior, limiter algorithm correctness, or gateway
 admission.
 
-The rest of the root `internal/rate` package, sliding-log integration, and
-`internal/rate/limiter` algorithms are intentionally not included in this slice.
-They need separate requirements and evidence before scope expansion.
+`SW-REQ-017` owns the concrete `internal/rate` sliding-log storage
+orchestration and Redis sorted-set/script mapping behavior. Its evidence covers
+constructor validation, pipeline and transaction dispatch, pipeline error
+propagation, Redis sorted-set trim/count/member flows, unique members for
+same-timestamp hits, script-derived count/remaining/reset stats, smoothing
+delegation after successful script execution, and fail-closed behavior on script
+errors. It does not claim distributed Redis topology correctness, external
+limiter algorithm correctness, gateway admission, or product cooldown policy.
+
+The rest of `internal/rate/limiter` algorithms are intentionally not included in
+this slice. They need separate requirements and evidence before scope expansion.

@@ -168,6 +168,8 @@ project:
             - internal/rate/model.go
             - internal/rate/rate.go
             - internal/rate/rate_test.go
+            - internal/rate/sliding_log.go
+            - internal/rate/sliding_log_test.go
             - internal/rate/smoothing.go
             - internal/rate/smoothing_test.go
             - internal/rate/storage.go

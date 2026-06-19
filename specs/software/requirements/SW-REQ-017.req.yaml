@@ -1,0 +1,64 @@
+id: SW-REQ-017
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal rate package shall construct sliding-log Redis storage objects, choose pipeline or transaction execution according to configuration, trim expired sorted-set entries, record each observed request as a unique sorted-set member scored by request time, report current window counts or members before the new record where applicable, execute the Redis script path to return count, remaining, limit, and non-negative reset duration, delegate block decisions to smoothing after successful script execution, and fail closed with empty stats when script execution fails.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-103
+component: rate_model
+rationale: This software requirement owns the concrete internal/rate sliding-log storage orchestration and Redis sorted-set/script mapping behavior. It covers constructor validation, pipeline dispatch, local Redis command sequencing, same-timestamp member uniqueness, script result interpretation, smoothing delegation, and storage-error propagation only and does not claim distributed Redis topology correctness, external limiter algorithm correctness, gateway request admission, or product cooldown policy.
+tags:
+    - rate-limit
+    - rate-limit-state
+    - sliding-log
+    - redis-storage
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-103
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T20:57:21Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19. Requirement is scoped to internal/rate sliding-log storage orchestration and Redis sorted-set/script mapping only; Redis-backed sliding-log tests passed with a temporary Redis 7 container, including same-timestamp member uniqueness regressions and static removal of native-int UnixNano formatting. This approval does not waive MC/DC, distributed Redis topology correctness, external limiter algorithm correctness, gateway admission, or product cooldown policy evidence.
+        fingerprint: sha256:3ee482610e21a12d7ab8540b6cd94fc9d0f61e7a0709e556dce3343c53ec8164
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-017
+          artifact: internal/rate/sliding_log.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19 after adding the mustScript trace. internal/rate/sliding_log.go remains within newly authored SW-REQ-017 and docs/rate-requirements-evidence.md; the implementation change preserves timestamp scoring, uses unique sorted-set members to avoid same-timestamp undercounting, removes native-int UnixNano formatting, and Redis-backed sliding-log tests passed, so no further authored requirement or design text change is needed.'
+          base: origin/master
+          requirement_fingerprint: sha256:cd865ebbfaff01ca30c6adf18827f1e198d9878f3231cbb23c223335ac3cb363
+          approval_fingerprint: sha256:3ee482610e21a12d7ab8540b6cd94fc9d0f61e7a0709e556dce3343c53ec8164
+          artifact_fingerprint: sha256:c5f4ed9213e9c845a5b7c0af5bcdd7b95d8450cbda721ab4a7c64fe481594843
+          reviewed_at: "2026-06-19T21:00:03Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T20:51:52Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T20:57:21Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-19T20:51:53Z"
+          from: draft
+          to: review
+          reason: ""
+          changed_by: agent:codex
