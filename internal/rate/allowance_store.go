@@ -30,6 +30,7 @@ type AllowanceStore struct {
 	}
 }
 
+// SW-REQ-009
 // NewAllowanceStore will return a new instance of *AllowanceStore.
 func NewAllowanceStore(redis redis.UniversalClient) *AllowanceStore {
 	return &AllowanceStore{
@@ -38,6 +39,7 @@ func NewAllowanceStore(redis redis.UniversalClient) *AllowanceStore {
 	}
 }
 
+// SW-REQ-009
 // String will return the stats for the AllowanceStore.
 func (s *AllowanceStore) String() string {
 	var (
@@ -51,6 +53,7 @@ func (s *AllowanceStore) String() string {
 	return fmt.Sprintf("locker=%d set=%d setErrors=%d get=%d getCached=%d getErrors=%d", locker, set, setErrors, get, getCached, getErrors)
 }
 
+// SW-REQ-009
 func (s *AllowanceStore) get(key string) *Allowance {
 	s.cacheMu.Lock()
 	defer s.cacheMu.Unlock()
@@ -64,6 +67,7 @@ func (s *AllowanceStore) get(key string) *Allowance {
 	return nil
 }
 
+// SW-REQ-009
 func (s *AllowanceStore) set(key string, allowance *Allowance) {
 	// We have control over the type, marshalling must not fail.
 	b, _ := json.Marshal(allowance)
@@ -74,6 +78,7 @@ func (s *AllowanceStore) set(key string, allowance *Allowance) {
 	s.cache[key] = b
 }
 
+// SW-REQ-009
 // Locker returns a distributed locker, similar to a mutex.
 func (s *AllowanceStore) Locker(key string) limiters.DistLocker {
 	atomic.AddInt64(&s.stats.locker, 1)
@@ -81,6 +86,7 @@ func (s *AllowanceStore) Locker(key string) limiters.DistLocker {
 	return limiters.NewLockRedis(redis.NewPool(s.redis), Prefix(key, "lock"))
 }
 
+// SW-REQ-009
 // Get retrieves and decodes an Allowance value from storage.
 func (s *AllowanceStore) Get(ctx context.Context, key string) (*Allowance, error) {
 	atomic.AddInt64(&s.stats.get, 1)
@@ -104,6 +110,7 @@ func (s *AllowanceStore) Get(ctx context.Context, key string) (*Allowance, error
 	return result, nil
 }
 
+// SW-REQ-009
 // Set will write the passed Allowance value to storage.
 func (s *AllowanceStore) Set(ctx context.Context, key string, allowance *Allowance) error {
 	allowanceKey := Prefix(key, "allowance")

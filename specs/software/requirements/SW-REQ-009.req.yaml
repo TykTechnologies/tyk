@@ -1,0 +1,55 @@
+id: SW-REQ-009
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal rate package shall provide allowance storage support that constructs a store around the configured Redis client, builds a distributed lock key for allowance updates, retrieves stored allowance fields, caches decoded allowance state, writes allowance fields to storage, sets allowance expiry from the configured delay, and preserves the written allowance in the local cache.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: rate_model
+rationale: This software requirement owns the concrete internal/rate AllowanceStore behavior that supports the gateway rate-limit allowance state operations described by SYS-REQ-103 without claiming Redis availability, distributed rate-limit correctness, or gateway admission behavior.
+tags:
+    - rate-limit
+    - rate-limit-state
+    - allowance-storage
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-103
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T20:12:17Z"
+        comment: Approved by human:buger via explicit chat delegation to agent:codex on 2026-06-19 after adding the nominal and boundary obligation checklist required by the existing evidence annotations. Semantic scope remains the narrow allowance-store software requirement; focused allowance-store tests passed. This approval does not waive global requirement-level MC/DC gaps or claim live Redis/distributed limiter behavior.
+        fingerprint: sha256:8125d8af31a16235298860430ebf8a049478f53b05c387700fa6bba375fd728a
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-19T20:06:33Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T20:12:17Z"
+obligation_checklist:
+    - nominal
+    - boundary
+lifecycle:
+    change_history:
+        - date: "2026-06-19T20:08:08Z"
+          from: draft
+          to: review
+          reason: ""
+          changed_by: agent:codex
+        - date: "2026-06-19T20:12:17Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-19T20:10:41Z comment="Approved by human:buger via explicit chat delegation to agent:codex on 2026-06-19. Semantic review passed for the narrow allowance-store software requirement; source, test, and documentation traces point to internal/rate/allowance_store.go, internal/rate/allowance_store_test.go, and docs/rate-requirements-evidence.md. Focused allowance-store tests passed. This approval does not waive global requirement-level MC/DC gaps or claim live Redis/distributed limiter behavior.")'
+          changed_by: human:buger

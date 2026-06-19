@@ -159,6 +159,8 @@ project:
             - internal/netutil/**
             - internal/osutil/**
             - internal/rate/model/**
+            - internal/rate/allowance_store.go
+            - internal/rate/allowance_store_test.go
             - docs/**
         completeness:
             production_include:
