@@ -1,0 +1,78 @@
+id: STK-REQ-007
+version: 1
+status: review
+priority: shall
+category: non-functional
+req_type: guarantee
+fretish: ""
+description: The policy engine shall complete Apply() within 100ms for sessions referencing up to 50 policies. Policy application is in the hot path of every API request; excessive latency degrades gateway throughput.
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: The policy engine runs on every API request. Gateway SLAs require sub-100ms policy resolution. Performance regression in policy application directly impacts API response times and customer-facing SLAs.
+tags:
+    - performance
+    - sla
+variables: []
+traces:
+    implemented_by_extra:
+        - internal/policy/apply.go
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-05-19T17:10:21.386924Z"
+    reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:6aec76320ee98c52d7f777a4c441711d75a1c974a5b8bcbe5ceccbfd7a8c5936
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: true
+    impact_reviews:
+        - requirement: STK-REQ-007
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:6aec76320ee98c52d7f777a4c441711d75a1c974a5b8bcbe5ceccbfd7a8c5936
+          approval_fingerprint: sha256:4b444c9ec10c3effa036920ee016989689a5a17ddf065ab82b58725322957bd9
+          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
+          reviewed_at: "2026-05-19T17:01:30Z"
+history:
+    created_by: ai:claude
+    created_at: "2026-04-14T10:00:00Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:33Z"
+obligation_checklist:
+    - nominal
+    - encoding_safety
+    - boundary
+    - determinism
+    - overflow_safety
+stakeholder:
+    persona: Platform reliability engineer
+    story: As a platform reliability engineer, I need the policy engine to complete Apply() within 100ms for up to 50 policies so that API gateway latency SLAs are maintained.
+    acceptance_criteria:
+        - id: STK-REQ-007-AC-01
+          text: Given a session with 1-10 policies, when Apply is called, then it completes within 100ms
+          testable: true
+          derived_reqs:
+            - SYS-REQ-044
+        - id: STK-REQ-007-AC-02
+          text: Given a session with 50 policies, when Apply is called, then it completes within 100ms
+          testable: true
+          derived_reqs:
+            - SYS-REQ-044
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:33Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

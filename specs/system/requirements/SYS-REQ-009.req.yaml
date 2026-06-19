@@ -1,0 +1,40 @@
+id: SYS-REQ-009
+version: 1
+status: retired
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: 'Retired: numbering gap placeholder'
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Numbering gap — ID was never assigned
+tags: []
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-001
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-05-19T17:10:21.995283Z"
+    reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:8558ce7b1ec0799ab4fe254a1d8e5421a5e70fcafc62071d7344e3160e71e794
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: human:cli
+    created_at: "2026-04-21T00:00:00Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-21T00:00:00Z"
+lifecycle:
+    retired_at: "2026-04-21T00:00:00Z"

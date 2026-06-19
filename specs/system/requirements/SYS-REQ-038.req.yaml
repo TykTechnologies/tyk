@@ -1,0 +1,48 @@
+id: SYS-REQ-038
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: assumption
+fretish: the policy shall always satisfy org_matches | !policy_found | apply_requested
+description: Org mismatch can only occur when a policy is found during an apply operation. Outside of apply, org matching is irrelevant.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Org mismatch can only occur when a policy is found during an apply operation. Outside of apply, org matching is irrelevant.
+tags: []
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-005
+    verified_by_extra:
+        - FLIP:policy/tc-084
+        - FLIP:policy/tc-085
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-04-27T06:25:20.844181Z"
+    reviewed_by: human:leonidbugaev
+verification:
+    assurance_level: B
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: false
+history:
+    created_by: human:cli
+    created_at: "2026-03-28T13:30:07Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:34Z"
+obligation_class: nominal
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:34Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

@@ -1,0 +1,59 @@
+id: SYS-REQ-053
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !apply_requested | !policy_inactive | session_inactive_set
+description: 'When multiple policies are applied, session.IsInactive is the logical OR of all policies'' IsInactive flags. If ANY policy marks itself inactive, the session becomes inactive. This is the conservative security choice: one inactive policy deactivates the entire session to prevent an active policy from overriding an administrative deactivation.'
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: ""
+tags: []
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-001
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-05-19T17:10:22.263408Z"
+    reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:264cbbb87ddcc50a643b1fad85d18657604edf6827024862efe353104bb34b99
+verification:
+    assurance_level: B
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: false
+    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
+    gaps_reviewed_by: leonidbugaev
+    impact_reviews:
+        - requirement: SYS-REQ-053
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:264cbbb87ddcc50a643b1fad85d18657604edf6827024862efe353104bb34b99
+          approval_fingerprint: sha256:f3f6ee8c62841e71e8f220a0b2169a297169642bebb529cdd3f39be2a210a6bf
+          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
+          reviewed_at: "2026-05-19T17:01:30Z"
+history:
+    created_by: human:cli
+    created_at: "2026-04-19T15:29:46Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:35:44Z"
+obligation_class: nominal
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:35:44Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

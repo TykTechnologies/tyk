@@ -1,0 +1,79 @@
+id: STK-REQ-002
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The policy engine shall correctly clear session state when requested, resetting quota, rate limit, and complexity values so that subsequent policy application starts from a clean baseline. Session clearing must handle missing policies gracefully.
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Session clearing is required before re-applying policies to prevent stale values from accumulating. Without proper clearing, policy updates would merge with leftover state, producing incorrect access decisions. This is especially critical after policy changes by administrators.
+tags:
+    - session-management
+    - policy-lifecycle
+variables: []
+traces:
+    implemented_by_extra:
+        - internal/policy/apply.go
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-05-19T17:10:21.369934Z"
+    reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:1091b37d7e8d5a0ffabb31c13da0a3089ca31c236f75d8a00aeb2607a7aff72d
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: true
+    impact_reviews:
+        - requirement: STK-REQ-002
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:1091b37d7e8d5a0ffabb31c13da0a3089ca31c236f75d8a00aeb2607a7aff72d
+          approval_fingerprint: sha256:cfba12e8b8081c62e58dbdbec55b92e5cb8ecfabd4dd71eebd9e3afb877ea818
+          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
+          reviewed_at: "2026-05-19T17:01:30Z"
+history:
+    created_by: ai:claude
+    created_at: "2026-04-14T10:00:00Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:33Z"
+obligation_checklist:
+    - nominal
+    - error_handling
+    - nil_safety
+    - determinism
+    - idempotency
+    - malformed_input
+stakeholder:
+    persona: API platform administrator
+    story: As an API platform administrator, I need the policy engine to correctly clear session state so that policy changes take effect immediately without stale data.
+    acceptance_criteria:
+        - id: STK-REQ-002-AC-01
+          text: Given a session with existing quota, rate, and complexity values, when ClearSession is called with a valid policy, then all values are reset to zero
+          testable: true
+          derived_reqs:
+            - SYS-REQ-019
+        - id: STK-REQ-002-AC-02
+          text: Given a session referencing a missing policy, when ClearSession is called, then an error is returned
+          testable: true
+          derived_reqs:
+            - SYS-REQ-020
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:33Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli
