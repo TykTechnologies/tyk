@@ -54,6 +54,42 @@ func TestAPIDefinition_JsonRpcVersion(t *testing.T) {
 	})
 }
 
+// TestHardTimeoutMeta_DurationWireTag locks in the TT-17515 rename of the
+// granular enforced-timeout field from `timeout_duration` to `duration`.
+// The Go field name (TimeoutDuration) is unchanged; only the JSON/BSON tags moved.
+func TestHardTimeoutMeta_DurationWireTag(t *testing.T) {
+	t.Run("marshals to duration, not timeout_duration", func(t *testing.T) {
+		meta := HardTimeoutMeta{
+			Path:            "/get",
+			Method:          http.MethodGet,
+			TimeOut:         2,
+			TimeoutDuration: tyktime.ReadableDuration(1500 * time.Millisecond),
+		}
+
+		data, err := json.Marshal(meta)
+		assert.NoError(t, err)
+
+		assert.Contains(t, string(data), `"duration"`)
+		assert.NotContains(t, string(data), "timeout_duration")
+	})
+
+	t.Run("unmarshals the duration key", func(t *testing.T) {
+		var meta HardTimeoutMeta
+		err := json.Unmarshal([]byte(`{"path":"/get","method":"GET","timeout":2,"duration":"500ms"}`), &meta)
+		require.NoError(t, err)
+
+		assert.Equal(t, 2, meta.TimeOut)
+		assert.Equal(t, tyktime.ReadableDuration(500*time.Millisecond), meta.TimeoutDuration)
+	})
+
+	t.Run("empty duration omitted", func(t *testing.T) {
+		data, err := json.Marshal(HardTimeoutMeta{Path: "/get", Method: http.MethodGet, TimeOut: 3})
+		assert.NoError(t, err)
+
+		assert.NotContains(t, string(data), "duration")
+	})
+}
+
 func TestAPIDefinition_ApplicationProtocol(t *testing.T) {
 	t.Run("application protocol field marshaling", func(t *testing.T) {
 		api := APIDefinition{
