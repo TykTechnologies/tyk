@@ -13,6 +13,7 @@ type Janitor struct {
 }
 
 // NewJanitor returns a new Janitor that performs cleanup at the specified interval.
+// SW-REQ-029
 func NewJanitor(interval time.Duration, cleanup func()) *Janitor {
 	janitor := &Janitor{
 		Interval: interval,
@@ -25,6 +26,7 @@ func NewJanitor(interval time.Duration, cleanup func()) *Janitor {
 }
 
 // Run starts the janitor which calls the provided cleanup function at every interval.
+// SW-REQ-029
 func (j *Janitor) Run(cleanup func()) {
 	ticker := time.NewTicker(j.Interval)
 	defer ticker.Stop()
@@ -41,6 +43,7 @@ func (j *Janitor) Run(cleanup func()) {
 
 // Close stops the janitor from performing further cleanup operations.
 // It is safe to call Close multiple times.
+// SW-REQ-029
 func (j *Janitor) Close() {
 	j.once.Do(func() {
 		close(j.stop)

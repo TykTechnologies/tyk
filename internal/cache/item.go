@@ -10,6 +10,7 @@ type Item struct {
 }
 
 // Returns true if the item has expired.
+// SW-REQ-029
 func (item Item) Expired() bool {
 	if item.Expiration <= 0 {
 		return false

@@ -19,6 +19,7 @@ type Cache struct {
 }
 
 // NewCache creates a new *Cache for storing items with a TTL.
+// SW-REQ-029
 func NewCache(expiration, cleanupInterval time.Duration) *Cache {
 	if expiration == 0 {
 		expiration = -1
@@ -38,6 +39,7 @@ func NewCache(expiration, cleanupInterval time.Duration) *Cache {
 }
 
 // Close implements an io.Closer; Invoke it to cancel the cleanup goroutine.
+// SW-REQ-029
 func (c *Cache) Close() {
 	if c.janitor != nil {
 		c.janitor.Close()
@@ -48,6 +50,7 @@ func (c *Cache) Close() {
 
 // Add an item to the cache, replacing any existing item. If the duration is 0,
 // the cache's expiration time is used. If it is -1, the item never expires.
+// SW-REQ-029
 func (c *Cache) Set(k string, x any, d time.Duration) {
 	var e int64
 	if d == 0 {
@@ -66,6 +69,7 @@ func (c *Cache) Set(k string, x any, d time.Duration) {
 
 // Get an item from the cache. Returns the item or nil, and a bool indicating
 // whether the key was found.
+// SW-REQ-029
 func (c *Cache) Get(k string) (any, bool) {
 	c.mu.RLock()
 
@@ -87,6 +91,7 @@ func (c *Cache) Get(k string) (any, bool) {
 }
 
 // Items copies all unexpired items in the cache into a new map and returns it.
+// SW-REQ-029
 func (c *Cache) Items() map[string]Item {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -105,6 +110,7 @@ func (c *Cache) Items() map[string]Item {
 }
 
 // Delete an item from the cache. Does nothing if the key is not in the cache.
+// SW-REQ-029
 func (c *Cache) Delete(k string) {
 	c.mu.Lock()
 	delete(c.items, k)
@@ -112,6 +118,7 @@ func (c *Cache) Delete(k string) {
 }
 
 // Cleanup will delete all expired items from the cache map.
+// SW-REQ-029
 func (c *Cache) Cleanup() {
 	now := time.Now().UnixNano()
 
@@ -126,6 +133,7 @@ func (c *Cache) Cleanup() {
 
 // Count returns the number of items in cache, including expired items.
 // Expired items get cleaned up by the janitor periodically.
+// SW-REQ-029
 func (c *Cache) Count() int {
 	c.mu.RLock()
 	n := len(c.items)
@@ -135,6 +143,7 @@ func (c *Cache) Count() int {
 }
 
 // Flush deletes all items from the cache.
+// SW-REQ-029
 func (c *Cache) Flush() {
 	c.mu.Lock()
 	c.items = map[string]Item{}

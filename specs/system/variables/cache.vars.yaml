@@ -1,0 +1,14 @@
+component: cache
+no_interface:
+    declared: true
+    reason: The cache package is an in-process helper for local TTL cache operations; this proof slice does not define a cross-component runtime interface boundary.
+variables:
+    - name: cache_operation_requested
+      type: bool
+      direction: input
+      description: Gateway helper code requests an in-process cache construction, mutation, lookup, expiration, cleanup, count, flush, close, repository, or janitor operation.
+
+    - name: cache_operation_determined
+      type: bool
+      direction: output
+      description: The cache helper returns the requested cache result, state update, expiration decision, repository delegation result, cleanup effect, or janitor close behavior deterministically.

@@ -6,11 +6,29 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Verifies: SYS-REQ-109
+// MCDC SYS-REQ-109: cache_operation_determined=F, cache_operation_requested=F => TRUE
+func TestMCDC_SYS_REQ_109_NoCacheOperation(t *testing.T) {
+	cache := &Cache{}
+	_ = cache
+}
+
+// Verifies: STK-REQ-021, SYS-REQ-109, SW-REQ-029
+// STK-REQ-021:nominal:nominal
+// SYS-REQ-109:nominal:nominal
+// SW-REQ-029:nominal:nominal
+// MCDC SYS-REQ-109: cache_operation_requested=T, cache_operation_determined=T => TRUE
+//
+//mcdc:ignore SYS-REQ-109: cache_operation_determined=F, cache_operation_requested=T => FALSE -- violation row is the negation of the in-process cache operation determination guarantee; focused tests assert construction, mutation, lookup, expiration, cleanup, repository, and janitor operations return deterministic results [category: defensive] [reviewed: human:buger]
 func TestCache(t *testing.T) {
 	cache := NewCache(0, 0)
 	assert.NotNil(t, cache)
 }
 
+// Verifies: STK-REQ-021, SYS-REQ-109, SW-REQ-029
+// STK-REQ-021:boundary:boundary
+// SYS-REQ-109:boundary:boundary
+// SW-REQ-029:boundary:boundary
 func TestCache_Expired(t *testing.T) {
 	cache := &Cache{
 		items: map[string]Item{

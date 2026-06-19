@@ -20,6 +20,7 @@ var (
 )
 
 // New creates a new cache instance.
+// SW-REQ-029
 func New(defaultExpiration, cleanupInterval int64) *MemRepository {
 	var (
 		defaultExpirationDuration = time.Duration(defaultExpiration) * time.Second
@@ -45,12 +46,14 @@ type MemRepository struct {
 }
 
 // Get retrieves a cache item by key.
+// SW-REQ-029
 func (r *MemRepository) Get(key string) (interface{}, bool) {
 	return r.cache.Get(key)
 }
 
 // Set writes a cache item with a timeout in seconds. If timeout is zero,
 // the default expiration for the MemRepository instance will be used.
+// SW-REQ-029
 func (r *MemRepository) Set(key string, value interface{}, timeout int64) {
 	if timeout <= 0 {
 		timeout = r.defaultExpiration
@@ -59,32 +62,38 @@ func (r *MemRepository) Set(key string, value interface{}, timeout int64) {
 }
 
 // Delete cache item by key.
+// SW-REQ-029
 func (r *MemRepository) Delete(key string) {
 	r.cache.Delete(key)
 }
 
 // Count returns number of items in the cache.
+// SW-REQ-029
 func (r *MemRepository) Count() int {
 	return r.cache.Count()
 }
 
 // Flush flushes all the items from the cache.
+// SW-REQ-029
 func (r *MemRepository) Flush() {
 	r.cache.Flush()
 }
 
 // Close will stop background cleanup and clear the cache for garbage collection.
 // Close also flushes the data in the cache.
+// SW-REQ-029
 func (r *MemRepository) Close() {
 	r.cache.Close()
 }
 
 // DefaultExpiration returns default expiration in seconds
+// SW-REQ-029
 func (r *MemRepository) DefaultExpiration() int64 {
 	return r.defaultExpiration
 }
 
 // CleanupInterval returns cleanup interval in seconds
+// SW-REQ-029
 func (r *MemRepository) CleanupInterval() int64 {
 	return r.cleanupInterval
 }

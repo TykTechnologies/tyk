@@ -10,6 +10,10 @@ import (
 )
 
 // TestJanitor verifies that the Janitor executes the cleanup function periodically and stops when closed.
+// Verifies: STK-REQ-021, SYS-REQ-109, SW-REQ-029
+// STK-REQ-021:nominal:nominal
+// SYS-REQ-109:nominal:nominal
+// SW-REQ-029:nominal:nominal
 func TestJanitor(t *testing.T) {
 	var count int32
 
@@ -33,6 +37,13 @@ func TestJanitor(t *testing.T) {
 	assert.NotEqual(t, int32(0), finalCount, "Expected cleanup() called")
 }
 
+// Verifies: STK-REQ-021, SYS-REQ-109, SW-REQ-029
+// STK-REQ-021:idempotency:nominal
+// STK-REQ-021:concurrent:race
+// SYS-REQ-109:idempotency:nominal
+// SYS-REQ-109:concurrent:race
+// SW-REQ-029:idempotency:nominal
+// SW-REQ-029:concurrent:race
 func TestJanitor_MultipleClose(t *testing.T) {
 	cleanup := func() {}
 

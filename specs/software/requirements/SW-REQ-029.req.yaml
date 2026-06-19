@@ -1,0 +1,95 @@
+id: SW-REQ-029
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal/cache package shall implement an in-memory TTL cache and repository facade that store and retrieve live values, omit expired values from retrieval and item snapshots, delete expired values during cleanup, count stored entries, delete and flush entries, close janitor-backed caches, apply default repository timeouts when requested, report item expiration from expiration timestamps, and allow janitor close to be called repeatedly or concurrently without panic or deadlock.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-109
+component: cache
+rationale: This software requirement owns only the in-process implementation in internal/cache. It does not claim distributed cache behavior, persistence, external storage semantics, caller cache-key policy, cross-process consistency, or gateway endpoint outcomes.
+tags:
+    - cache
+    - ttl
+    - cleanup
+    - in-process
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-109
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T22:22:41Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Cache requirements are scoped to internal/cache in-process TTL cache and repository behavior: construction, set/get, missing lookup, expiration checks, item snapshots, delete, cleanup, count, flush, close, default timeout handling, janitor cleanup, and repeated or concurrent janitor close. Focused internal/cache tests passed, including race. This approval does not claim distributed cache behavior, persistence, Redis or other external storage semantics, caller cache-key policy, cross-process consistency, or gateway endpoint outcomes.'
+        fingerprint: sha256:ac54b455819767d2d80454025afde9681a20b52c19b29377f02be5e6eed723f3
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-029
+          artifact: internal/cache/cache.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/cache production files received requirement trace annotations only; executable cache behavior is unchanged and is covered by internal/cache tests plus docs/cache-requirements-evidence.md, so no further authored requirement or design text change is needed.
+          base: origin/master
+          requirement_fingerprint: sha256:86b2619ed007905d8569cd357714b74369dfafb0a5e07c243b37c7e084c2b7f7
+          approval_fingerprint: sha256:ac54b455819767d2d80454025afde9681a20b52c19b29377f02be5e6eed723f3
+          artifact_fingerprint: sha256:6083da56f8cd69543e58777c74f2f418b2dd42009b4145f9daef3e9b228d209a
+          reviewed_at: "2026-06-19T22:22:56Z"
+        - requirement: SW-REQ-029
+          artifact: internal/cache/item.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/cache production files received requirement trace annotations only; executable cache behavior is unchanged and is covered by internal/cache tests plus docs/cache-requirements-evidence.md, so no further authored requirement or design text change is needed.
+          base: origin/master
+          requirement_fingerprint: sha256:86b2619ed007905d8569cd357714b74369dfafb0a5e07c243b37c7e084c2b7f7
+          approval_fingerprint: sha256:ac54b455819767d2d80454025afde9681a20b52c19b29377f02be5e6eed723f3
+          artifact_fingerprint: sha256:0a9c00e244c654c95be8a0d49f7aa502542d0d573acc8852ecb0fa157649033d
+          reviewed_at: "2026-06-19T22:22:56Z"
+        - requirement: SW-REQ-029
+          artifact: internal/cache/janitor.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/cache production files received requirement trace annotations only; executable cache behavior is unchanged and is covered by internal/cache tests plus docs/cache-requirements-evidence.md, so no further authored requirement or design text change is needed.
+          base: origin/master
+          requirement_fingerprint: sha256:86b2619ed007905d8569cd357714b74369dfafb0a5e07c243b37c7e084c2b7f7
+          approval_fingerprint: sha256:ac54b455819767d2d80454025afde9681a20b52c19b29377f02be5e6eed723f3
+          artifact_fingerprint: sha256:81aa80a261066dcce0faad13f11d2ea0f29fa7af9df3a2bd4ab977550520cbd3
+          reviewed_at: "2026-06-19T22:22:56Z"
+        - requirement: SW-REQ-029
+          artifact: internal/cache/repository.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/cache production files received requirement trace annotations only; executable cache behavior is unchanged and is covered by internal/cache tests plus docs/cache-requirements-evidence.md, so no further authored requirement or design text change is needed.
+          base: origin/master
+          requirement_fingerprint: sha256:86b2619ed007905d8569cd357714b74369dfafb0a5e07c243b37c7e084c2b7f7
+          approval_fingerprint: sha256:ac54b455819767d2d80454025afde9681a20b52c19b29377f02be5e6eed723f3
+          artifact_fingerprint: sha256:9d9da5e1ffa74f9db5a36b549ec1685c42599444921742c60d3fc12075ae6291
+          reviewed_at: "2026-06-19T22:22:56Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T22:22:41Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - idempotency
+    - concurrent
+lifecycle:
+    change_history:
+        - date: "2026-06-19T22:22:41Z"
+          from: draft
+          to: review
+          reason: Ready for delegated requirements-owner review after focused internal/cache tests passed
+          changed_by: agent:codex

@@ -1,0 +1,69 @@
+id: STK-REQ-021
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: Gateway in-process cache users shall receive deterministic cache helper behavior for storing, retrieving, expiring, deleting, flushing, counting, closing, and periodically cleaning cached values.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: cache
+rationale: The in-process cache is internal gateway infrastructure. This requirement owns helper-level cache behavior only; it does not claim distributed cache behavior, persistence, Redis or other external storage semantics, caller cache-key policy, cross-process consistency, or gateway endpoint outcomes.
+tags:
+    - cache
+    - ttl
+    - cleanup
+    - in-process
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T22:22:41Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Cache requirements are scoped to internal/cache in-process TTL cache and repository behavior: construction, set/get, missing lookup, expiration checks, item snapshots, delete, cleanup, count, flush, close, default timeout handling, janitor cleanup, and repeated or concurrent janitor close. Focused internal/cache tests passed, including race. This approval does not claim distributed cache behavior, persistence, Redis or other external storage semantics, caller cache-key policy, cross-process consistency, or gateway endpoint outcomes.'
+        fingerprint: sha256:eea9a4cf105afc1dda5186f7ac85663c9776150ad149d8de36ebd5d85376b4a5
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T22:22:41Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - idempotency
+    - concurrent
+stakeholder:
+    persona: Gateway cache caller
+    story: As gateway helper code, I need in-process cache operations to store values, respect expiration, and clean up safely so repeated request handling can rely on deterministic local state.
+    acceptance_criteria:
+        - id: STK-REQ-021-AC-01
+          text: Given a cache item stored with a non-expired TTL, when the item is retrieved, counted, listed, deleted, flushed, or closed, then the helper returns deterministic in-memory state changes.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-109
+        - id: STK-REQ-021-AC-02
+          text: Given expired, default-expiration, negative-expiration, or missing cache entries, when cache helpers inspect them, then expired entries are not returned as live items and missing entries return a negative lookup result.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-109
+        - id: STK-REQ-021-AC-03
+          text: Given a janitor with a cleanup interval, when it runs and is closed sequentially or concurrently, then cleanup is invoked before close and repeated close calls do not panic or deadlock.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-109
+lifecycle:
+    change_history:
+        - date: "2026-06-19T22:22:41Z"
+          from: draft
+          to: review
+          reason: Ready for delegated requirements-owner review after focused internal/cache tests passed
+          changed_by: agent:codex

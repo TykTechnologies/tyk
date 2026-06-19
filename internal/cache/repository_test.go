@@ -8,6 +8,13 @@ import (
 	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
+// Verifies: STK-REQ-021, SYS-REQ-109, SW-REQ-029
+// STK-REQ-021:nominal:nominal
+// STK-REQ-021:boundary:boundary
+// SYS-REQ-109:nominal:nominal
+// SYS-REQ-109:boundary:boundary
+// SW-REQ-029:nominal:nominal
+// SW-REQ-029:boundary:boundary
 func TestRepository(t *testing.T) {
 	store := cache.New(1, 1)
 
