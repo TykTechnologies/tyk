@@ -339,7 +339,6 @@ func TestIsZstdCompressed(t *testing.T) {
 // SYS-REQ-088:boundary:nominal
 // MCDC SYS-REQ-087: zstd_oversize_decompression_requested=T, zstd_oversize_decompression_blocked=T => TRUE
 // MCDC SYS-REQ-087: zstd_oversize_decompression_requested=F, zstd_oversize_decompression_blocked=F => TRUE
-// MCDC SYS-REQ-088: zstd_allowed_decompression_requested=F, zstd_payload_bytes_preserved=F => TRUE
 //mcdc:ignore:defensive SYS-REQ-087: zstd_oversize_decompression_blocked=F, zstd_oversize_decompression_requested=T => FALSE -- violation row is the negation of the oversize-decompression guard; this test asserts oversized payloads fail and within-limit payloads succeed [reviewed: agent:codex]
 //mcdc:ignore:defensive SYS-REQ-088: zstd_allowed_decompression_requested=T, zstd_payload_bytes_preserved=F => FALSE -- violation row is the negation of the within-limit payload-preservation guarantee; this test asserts successful decompression preserves bytes [reviewed: agent:codex]
 func TestDecompressZstd_MaxSizeLimit(t *testing.T) {
@@ -390,8 +389,7 @@ func TestSetMaxDecompressedSize_ClampsBelowMinimum(t *testing.T) {
 	}
 }
 
-// Verifies: SYS-REQ-085, SYS-REQ-089
-// MCDC SYS-REQ-089: zstd_limit_update_requested=F, zstd_minimum_limit_enforced=F => TRUE
+// Verifies: SYS-REQ-085
 func TestIsZstdCompressed_WithActualCompressedData(t *testing.T) {
 	// Test with actual compressed data
 	original := []byte(`{"api_id":"test","name":"Test API"}`)
