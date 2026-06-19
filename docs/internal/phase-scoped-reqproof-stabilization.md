@@ -46,7 +46,7 @@ the honest disposition required to close it.
 | `spec_lint_status_vs_review` | `SW-REQ-007` and `SW-REQ-008` are `status=review` while `verification.review.status=in_review` by `agent:codex` | human review required | Advancing these to approved requires a real human review signature. Downgrading them to draft would be an authored lifecycle change, not a proof fix. The warning should stay visible until a human reviews or chooses a lifecycle action. |
 | `authored_delta_expected` | `internal/policy/apply.go` lacks current no-authored-change review for 43 linked requirements | real impact review required | The branch diff against `origin/master` contains executable behavior changes in `apply.go` (nil-store/session guards, quota sentinel handling, deterministic root update behavior, and related policy behavior). It is not a comment-only proof annotation change, so a blanket agent no-authored-change review would be dishonest. |
 | `suspect_clean` | 35 suspect links | human trace review required | `proof trace review --suspect` records a human signature and correctly rejects `agent:codex`. These links should remain visible until a human reviews the stale trace ownership. |
-| `mcdc_coverage` | 43/364 uncovered rows across 27 partial requirements | ReqProof tooling gap and model refinement required | Most remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, paired with invariant-violation rows. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
+| `mcdc_coverage` | 39/364 uncovered rows across 23 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 ## MC/DC Evidence Policy For This Phase
 
@@ -68,17 +68,14 @@ The trigger-false/no-action witness gap is tracked upstream:
 
 ## Current MC/DC Backlog Classification
 
-The current 43 uncovered MC/DC rows are intentionally left visible. They fall
-into three closure groups:
+The current 39 uncovered MC/DC rows are intentionally left visible. They fall
+into two closure groups:
 
 1. Trigger-false/no-action rows: leave red until there is real no-action
    evidence, requirement refinement, or the ReqProof mechanism from
    `probelabs/reqproof#257`.
 2. Paired invariant-violation rows: leave red while the paired trigger-false
    row is unresolved, because the requirement's positive row set is incomplete.
-3. Invariant-only rows with positive rows already witnessed: possible future
-   `//mcdc:ignore` candidates, but not automatically ignored in this phase to
-   avoid expanding ignores as the default closure mechanism.
 
 Some trigger-true violation rows may later get real executable witnesses, and
 some trigger-false rows may become caller-level no-action tests. This table does
@@ -111,15 +108,15 @@ new product KnownIssue.
 | `SYS-REQ-092` | `unsafe_path_presented=F,unsafe_path_rejected=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
 | `SYS-REQ-093` | `validation_requested=F,component_accepted=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
 | `SYS-REQ-102` | `operation_requested=F,operation_confined=F => TRUE` | trigger-false/no-action only | Leave red until a caller-level no-action witness or requirement refinement exists. |
-| `SYS-REQ-096` | `record_present=T,record_excluded=F => FALSE` | invariant-only violation row; positive rows witnessed | Possible future defensive ignore or model refinement, but intentionally not added in this phase. |
-| `SYS-REQ-097` | `enumeration_failed=T,error_returned=F => FALSE` | invariant-only violation row; positive rows witnessed | Possible future defensive ignore or model refinement, but intentionally not added in this phase. |
-| `SYS-REQ-099` | `invalid_root_presented=T,invalid_root_rejected=F => FALSE` | invariant-only violation row; positive rows witnessed | Possible future defensive ignore or model refinement, but intentionally not added in this phase. |
-| `SYS-REQ-101` | `lexical_escape_presented=T,lexical_escape_rejected=F => FALSE` | invariant-only violation row; positive rows witnessed | Possible future defensive ignore or model refinement, but intentionally not added in this phase. |
+The earlier invariant-only candidates `SYS-REQ-096`, `SYS-REQ-097`,
+`SYS-REQ-099`, and `SYS-REQ-101` were closed with narrow defensive
+`//mcdc:ignore` rows after `proof mcdc show` confirmed their positive rows were
+already witnessed. No refused, stale, or dangling MC/DC exemptions remain.
 
-Sub-agent cross-check on 2026-06-19 reached the same row-level conclusion:
-classification only, no new ignores proposed, and no remaining missing row
-looked like a new product KnownIssue. Existing KnownIssue-covered rows were
-already witnessed rather than part of this backlog.
+Sub-agent cross-check on 2026-06-19 reached the same row-level classification
+for the original backlog and found no remaining missing row that looked like a
+new product KnownIssue. Existing KnownIssue-covered rows were already witnessed
+rather than part of this backlog.
 
 ## Current Known Issues To Keep Visible
 

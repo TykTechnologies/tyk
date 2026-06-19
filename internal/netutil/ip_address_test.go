@@ -34,8 +34,10 @@ func (f fakeAddr) String() string  { return string(f) }
 // MCDC SYS-REQ-095: usable_node_address_discovery_requested=T, usable_node_addresses_reported=T => TRUE
 // MCDC SYS-REQ-096: unusable_node_address_record_present=F, unusable_node_address_record_excluded=F => TRUE
 // MCDC SYS-REQ-096: unusable_node_address_record_present=T, unusable_node_address_record_excluded=T => TRUE
+//mcdc:ignore SYS-REQ-096: unusable_node_address_record_excluded=F, unusable_node_address_record_present=T => FALSE -- violation row is the negation of the unusable-record exclusion guarantee; this test asserts unusable loopback records are excluded [category: defensive] [reviewed: agent:codex]
 // MCDC SYS-REQ-097: node_interface_enumeration_failed=F, node_interface_error_returned=F => TRUE
 // MCDC SYS-REQ-097: node_interface_enumeration_failed=T, node_interface_error_returned=T => TRUE
+//mcdc:ignore SYS-REQ-097: node_interface_enumeration_failed=T, node_interface_error_returned=F => FALSE -- violation row is the negation of the interface-enumeration error propagation guarantee; this test asserts enumeration failures return errors [category: defensive] [reviewed: agent:codex]
 // MCDC SW-REQ-005: netutil_address_lookup_requested=T, netutil_address_lookup_result_returned=T => TRUE
 func Test_GetIpAddress(t *testing.T) {
 	defer func() { netInterfaceAddrs = net.InterfaceAddrs }()

@@ -40,16 +40,17 @@ Unknown must not become green.
 
 ## Observed behavior in Tyk
 
-After removing known-false no-call witness comments and removing refused
-trigger-false ignores, Tyk reports:
+After removing known-false no-call witness comments, removing refused
+trigger-false ignores, and closing the four invariant-only rows that already
+had positive witnesses, Tyk reports:
 
 ```sh
 proof mcdc spec queue --limit 120
 ```
 
 ```text
-43/364 witness rows uncovered across 91 requirement(s)
-27 partial-row-coverage items
+39/364 witness rows uncovered across 91 requirement(s)
+23 partial-row-coverage items
 ```
 
 Representative current rows:
@@ -105,7 +106,9 @@ Example requirements and evidence:
   ```
 
 These current gaps are good: they show the audit is no longer accepting comments
-that do not prove the row.
+that do not prove the row. The remaining backlog is still dominated by
+trigger-false/no-action rows and paired invariant rows whose positive set is
+incomplete until the trigger-false row has an honest disposition.
 
 ## False-pass risk examples
 
