@@ -153,6 +153,7 @@ project:
             - apidef/health_check.go
             - apidef/host_list.go
             - apidef/support_helpers_test.go
+            - header/header.go
             - pkg/identifier/custom.go
             - pkg/identifier/custom_test.go
             - request/real_ip.go

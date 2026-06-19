@@ -28,9 +28,13 @@ const (
 	TextXML            = "text/xml"
 )
 
+// SW-REQ-023
 const (
-	XRealIP               = "X-Real-IP"
-	XForwardFor           = "X-Forwarded-For"
+	XRealIP     = "X-Real-IP"
+	XForwardFor = "X-Forwarded-For"
+)
+
+const (
 	XAuthResult           = "X-Auth-Result"
 	XSessionAlias         = "X-Session-Alias"
 	XInitialURI           = "X-Initial-URI"
@@ -57,6 +61,7 @@ const (
 )
 
 // Gateway's custom response headers
+// SW-REQ-011
 const (
 	// XRateLimitLimit The maximum number of requests that the client is allowed to make in a given time period
 	XRateLimitLimit = "X-RateLimit-Limit"

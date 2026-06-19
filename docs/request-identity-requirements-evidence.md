@@ -13,7 +13,8 @@ trusted proxy establishment beyond configured XFF depth selection, non-string
 `SYS-REQ-105` owns the request-visible behavior: string context value
 precedence, valid `X-Real-IP`, configured-depth `X-Forwarded-For`, `RemoteAddr`
 fallback for malformed headers, and empty result for invalid configured depth.
-`SW-REQ-023` owns the concrete `request.RealIP` helper implementation.
+`SW-REQ-023` owns the concrete `request.RealIP` helper implementation plus the
+shared `header` package names it uses for `X-Real-IP` and `X-Forwarded-For`.
 
 The evidence in `request/real_ip_test.go` covers context precedence, valid and
 invalid `X-Real-IP`, valid and invalid `X-Forwarded-For`, depth 0 through 4,
