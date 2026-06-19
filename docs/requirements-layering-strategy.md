@@ -81,6 +81,7 @@ not stories on their own.
 Strict audit policy is now intentionally warning-gated:
 
 ```yaml
+# abridged; proof.yaml is authoritative
 audit:
   fail_level: warn
   scope: full
@@ -89,17 +90,40 @@ workflow:
 verification_scope:
   completeness:
     production_include:
-      - "**/*.go"
+      - "*.go"
+      - "apidef/**/*.go"
+      - "gateway/**/*.go"
+      - "internal/**/*.go"
+      - "... product root globs for certs, config, rpc, storage, trace, user, etc."
+      - "... explicitly classified non-product roots such as ci/**, test/**, tests/**, middleware/**, bin/**"
+    production_exclude:
+      - "**/*_test.go"
+      - ".conductor/**"
+      - ".proof/**"
+      - "vendor/**"
+      - "test/**"
+      - "tests/**"
+      - "testdata/**"
+      - "ci/**"
+      - "**/*.pb.go"
+      - "**/mock/**"
+      - "**/mocks/**"
+      - "**/*_mock.go"
+      - "**/mock_*.go"
+      - "internal/graphengine/gomock_*/**"
 ```
 
 The current state is not repo-wide green. With production Go completeness
 enabled, `proof workflow check --stage spec --format json` reports one warning:
-`verification_scope_complete` covers 24 of 495 declared production Go files.
-`proof scope --format json` reports 51 in-scope source files, 27 in-scope test
-files, 482 in-scope functions, 332 in-scope test functions, 912 out-of-scope
-source files, and 9664 out-of-scope functions. The two counts are different
-because the workflow completeness check counts declared production Go files,
-while `proof scope` reports the full enabled source/test scan.
+`verification_scope_complete` covers 24 of 447 declared production Go files.
+The denominator excludes test fixtures, generated protobufs, generated gomock
+programs, and dedicated mock packages; it still intentionally includes all
+ordinary product Go that has not been onboarded. `proof scope` reports 50
+in-scope source files, 26 in-scope test files, 477 in-scope functions, 327
+in-scope test functions, 912 out-of-scope source files, and 9664 out-of-scope
+functions. The two counts are different because the workflow completeness check
+counts declared production Go files, while `proof scope` reports the full
+enabled source/test scan.
 
 A one-off repo-wide implementation check also shows why scope expansion must be
 deliberate rather than a single manifest flip: `lint_clean` reports thousands
@@ -107,19 +131,26 @@ of untraced functions and `orphan_code_clean` reports thousands of code
 functions without requirement annotations under `--verification-scope '**'`.
 Those are real onboarding gaps, not warnings to suppress.
 
-As of the strict audit run after `8ad801bfc`, the full strict audit is not
+As of the strict audit run after `a3648a99b`, the full strict audit is not
 green either: `proof audit --format markdown --max-findings 0 --set
-project.audit.invocation_log.enabled=false` reports 0 errors and 4 warnings.
+project.audit.invocation_log.enabled=false` reports 0 errors and 5 warnings.
 The blocking warnings are `verification_scope_complete`,
-`authored_delta_expected`, `suspect_clean`, and
+`authored_delta_expected`, `suspect_clean`, `mcdc_coverage`, and
 `acceptance_criteria_witnessed`. Validation is clean (`proof validate` reports
 125 requirements and 16 variable files with 0 warnings/errors), annotation
 validity is clean, KnownIssue quality is clean, and the current policy evidence
-manifests validate strictly. The remaining `suspect_clean` warning reports 67
+manifests validate strictly. The remaining `suspect_clean` warning reports 58
 stale links and should be handled as a human trace review packet, not by
 spoofing a human reviewer. The `authored_delta_expected` warning is also a
 human/code-owner review gate unless trace ownership is narrowed by real
 requirement restructuring.
+
+The current `mcdc_coverage` warning is mostly caused by helper-domain SYS/SW
+requirements whose formulas demand artificial "no operation requested" rows and
+guarantee-violation rows. Do not clear those by adding no-op witnesses or
+`mcdc:ignore` comments. The preferred repair is to move helper-owned behavior
+to SW requirements under real product SYS parents, split over-broad helper
+requirements, and keep product defects as KnownIssues.
 
 The `acceptance_criteria_witnessed` warning is intentionally visible debt:
 three `STK-REQ-005` atomicity criteria are deferred to concrete KnownIssues
@@ -128,6 +159,12 @@ paths. Those criteria must stay warning-visible until the product is fixed and
 real acceptance tests prove the all-or-nothing behavior. Do not clear that
 warning by re-adding acceptance annotations that only prove "an error happened";
 the criteria also require "no fields are merged."
+
+Repo-wide scope also has an external worktree blocker: `internal/build` is
+currently deleted in the worktree, while `goplugin/plugin_name_builder.go`
+imports it. The deleted files are not part of ReqProof audit work and must be
+restored or otherwise resolved before a credible repo-wide `go list ./...` or
+full production verification wave can run.
 
 The local worktree also currently has `internal/build` deleted while runtime
 packages such as `goplugin`, `cli`, `cli/version`, and `gateway/version.go`
