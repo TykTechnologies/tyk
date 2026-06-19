@@ -8,6 +8,7 @@ import (
 )
 
 // ListFilterConfig holds the configuration for filtering a specific list method.
+// SW-REQ-026
 type ListFilterConfig struct {
 	ArrayKey  string                                                    // JSON key of the array in result (e.g. "tools")
 	NameField string                                                    // JSON field to match against rules (e.g. "name", "uri")
@@ -17,6 +18,7 @@ type ListFilterConfig struct {
 // ListFilterConfigs maps array keys to their filter configurations.
 // Both method-based lookup and result-key-based lookup (InferListConfigFromResult)
 // reference these shared definitions.
+// SW-REQ-026
 var ListFilterConfigs = map[string]*ListFilterConfig{
 	"tools": {
 		ArrayKey:  "tools",
@@ -41,6 +43,7 @@ var ListFilterConfigs = map[string]*ListFilterConfig{
 }
 
 // JSONRPCResponse represents a JSON-RPC 2.0 response envelope.
+// SW-REQ-026
 type JSONRPCResponse struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      any             `json:"id"`
@@ -50,6 +53,7 @@ type JSONRPCResponse struct {
 
 // ExtractStringField extracts a string field from a JSON object.
 // Returns empty string if the field doesn't exist or isn't a string.
+// SW-REQ-026
 func ExtractStringField(raw json.RawMessage, field string) string {
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &obj); err != nil {
@@ -72,6 +76,7 @@ func ExtractStringField(raw json.RawMessage, field string) string {
 // FilterItems applies access control rules to a slice of JSON items, returning
 // only items that are permitted. Items whose name field cannot be extracted are
 // included (fail-open for malformed data).
+// SW-REQ-026
 func FilterItems(items []json.RawMessage, nameField string, rules user.AccessControlRules) []json.RawMessage {
 	filtered := make([]json.RawMessage, 0, len(items))
 	for _, item := range items {
@@ -92,6 +97,7 @@ func FilterItems(items []json.RawMessage, nameField string, rules user.AccessCon
 
 // ReencodeEnvelope marshals the filtered items back into the JSON-RPC response
 // envelope, performing the three-step re-marshal: items -> result -> envelope.
+// SW-REQ-026
 func ReencodeEnvelope(envelope *JSONRPCResponse, result map[string]json.RawMessage, arrayKey string, filtered []json.RawMessage) ([]byte, error) {
 	filteredBytes, err := json.Marshal(filtered)
 	if err != nil {
@@ -114,6 +120,7 @@ func ReencodeEnvelope(envelope *JSONRPCResponse, result map[string]json.RawMessa
 // according to the given config and rules, and returns the re-encoded body.
 // Returns (nil, false) when any parsing or marshalling step fails, signalling
 // that the caller should pass through the original body unmodified.
+// SW-REQ-026
 func FilterJSONRPCBody(body []byte, cfg *ListFilterConfig, rules user.AccessControlRules) ([]byte, bool) {
 	var envelope JSONRPCResponse
 	if err := json.Unmarshal(body, &envelope); err != nil {
@@ -135,6 +142,7 @@ func FilterJSONRPCBody(body []byte, cfg *ListFilterConfig, rules user.AccessCont
 // FilterParsedJSONRPC filters items in an already-parsed JSON-RPC result and
 // re-encodes the envelope. Returns (nil, false) when the array key is missing,
 // items cannot be parsed, or re-encoding fails.
+// SW-REQ-026
 func FilterParsedJSONRPC(envelope *JSONRPCResponse, result map[string]json.RawMessage, cfg *ListFilterConfig, rules user.AccessControlRules) ([]byte, bool) {
 	itemsRaw, exists := result[cfg.ArrayKey]
 	if !exists {
@@ -158,6 +166,7 @@ func FilterParsedJSONRPC(envelope *JSONRPCResponse, result map[string]json.RawMe
 
 // InferListConfigFromResult determines the list type by inspecting which
 // well-known array key is present in the JSON-RPC result object.
+// SW-REQ-026
 func InferListConfigFromResult(result map[string]json.RawMessage) *ListFilterConfig {
 	// Check resourceTemplates before resources — "resources" would also match
 	// if we checked it first, since both use the Resources access rights,
@@ -178,6 +187,8 @@ func InferListConfigFromResult(result map[string]json.RawMessage) *ListFilterCon
 //  1. Blocked is checked first — if matched, the request is denied.
 //  2. If Allowed is non-empty and the name does not match any entry, the request is denied.
 //  3. If both lists are empty, access is permitted.
+//
+// SW-REQ-026
 func CheckAccessControlRules(rules user.AccessControlRules, name string) bool {
 	for _, pattern := range rules.Blocked {
 		if matchPattern(pattern, name) {
@@ -201,6 +212,7 @@ func CheckAccessControlRules(rules user.AccessControlRules, name string) bool {
 // matchPattern tests name against a regex pattern anchored with ^...$, enforcing full-match semantics.
 // Uses the tyk/regexp package which caches compiled patterns.
 // Falls back to exact-string comparison if the pattern is not valid regex.
+// SW-REQ-026
 func matchPattern(pattern, name string) bool {
 	re, err := regexp.Compile("^(?:" + pattern + ")$")
 	if err != nil {

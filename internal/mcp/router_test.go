@@ -10,6 +10,11 @@ import (
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 )
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-025
+// STK-REQ-019:nominal:nominal
+// SYS-REQ-107:nominal:nominal
+// SW-REQ-025:nominal:nominal
+// MCDC SYS-REQ-107: mcp_protocol_decision_requested=T, mcp_protocol_decision_determined=T => TRUE
 func TestRouter_ToolsCall_Found(t *testing.T) {
 	router := NewRouter()
 	primitives := map[string]string{
@@ -32,6 +37,9 @@ func TestRouter_ToolsCall_Found(t *testing.T) {
 	}, result.VEMChain)
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-025
+// SYS-REQ-107:boundary:boundary
+// SW-REQ-025:boundary:boundary
 func TestRouter_ToolsCall_NotFound(t *testing.T) {
 	router := NewRouter()
 	primitives := map[string]string{}
@@ -52,6 +60,9 @@ func TestRouter_ToolsCall_NotFound(t *testing.T) {
 	}, result.VEMChain)
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-025
+// SYS-REQ-107:boundary:boundary
+// SW-REQ-025:boundary:boundary
 func TestRouter_ToolsCall_NotFound_AllowListEnabled(t *testing.T) {
 	router := NewRouter()
 	primitives := map[string]string{}
@@ -72,6 +83,10 @@ func TestRouter_ToolsCall_NotFound_AllowListEnabled(t *testing.T) {
 	}, result.VEMChain)
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-025
+// STK-REQ-019:error_handling:negative
+// SYS-REQ-107:error_handling:negative
+// SW-REQ-025:error_handling:negative
 func TestRouter_ToolsCall_MissingParams(t *testing.T) {
 	router := NewRouter()
 	primitives := map[string]string{}
@@ -82,6 +97,10 @@ func TestRouter_ToolsCall_MissingParams(t *testing.T) {
 	assert.Contains(t, err.Error(), "params")
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-025
+// STK-REQ-019:error_handling:negative
+// SYS-REQ-107:error_handling:negative
+// SW-REQ-025:error_handling:negative
 func TestRouter_ToolsCall_MissingName(t *testing.T) {
 	router := NewRouter()
 	primitives := map[string]string{}
@@ -97,6 +116,10 @@ func TestRouter_ToolsCall_MissingName(t *testing.T) {
 	assert.Contains(t, err.Error(), "name")
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-025
+// STK-REQ-019:error_handling:negative
+// SYS-REQ-107:error_handling:negative
+// SW-REQ-025:error_handling:negative
 func TestRouter_ToolsCall_EmptyName(t *testing.T) {
 	router := NewRouter()
 	primitives := map[string]string{}
@@ -112,6 +135,10 @@ func TestRouter_ToolsCall_EmptyName(t *testing.T) {
 	require.Error(t, err)
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-025
+// STK-REQ-019:nominal:nominal
+// SYS-REQ-107:nominal:nominal
+// SW-REQ-025:nominal:nominal
 func TestRouter_ResourcesRead_Found(t *testing.T) {
 	router := NewRouter()
 	primitives := map[string]string{
@@ -133,6 +160,10 @@ func TestRouter_ResourcesRead_Found(t *testing.T) {
 	}, result.VEMChain)
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-025
+// STK-REQ-019:boundary:boundary
+// SYS-REQ-107:boundary:boundary
+// SW-REQ-025:boundary:boundary
 func TestRouter_ResourcesRead_WildcardMatch(t *testing.T) {
 	router := NewRouter()
 	primitives := map[string]string{
@@ -154,6 +185,10 @@ func TestRouter_ResourcesRead_WildcardMatch(t *testing.T) {
 	}, result.VEMChain)
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-025
+// STK-REQ-019:boundary:boundary
+// SYS-REQ-107:boundary:boundary
+// SW-REQ-025:boundary:boundary
 func TestRouter_ResourcesRead_ExactMatchBeatsWildcard(t *testing.T) {
 	router := NewRouter()
 	primitives := map[string]string{
@@ -172,6 +207,10 @@ func TestRouter_ResourcesRead_ExactMatchBeatsWildcard(t *testing.T) {
 	assert.Equal(t, ResourcePrefix+"exact", result.VEMChain[1])
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-025
+// STK-REQ-019:boundary:boundary
+// SYS-REQ-107:boundary:boundary
+// SW-REQ-025:boundary:boundary
 func TestRouter_ResourcesRead_LongerPrefixWins(t *testing.T) {
 	router := NewRouter()
 	primitives := map[string]string{
@@ -190,6 +229,10 @@ func TestRouter_ResourcesRead_LongerPrefixWins(t *testing.T) {
 	assert.Equal(t, ResourcePrefix+"long", result.VEMChain[1])
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-025
+// STK-REQ-019:error_handling:negative
+// SYS-REQ-107:error_handling:negative
+// SW-REQ-025:error_handling:negative
 func TestRouter_ResourcesRead_MissingURI(t *testing.T) {
 	router := NewRouter()
 	primitives := map[string]string{}
@@ -203,6 +246,10 @@ func TestRouter_ResourcesRead_MissingURI(t *testing.T) {
 	assert.Contains(t, err.Error(), "uri")
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-025
+// STK-REQ-019:nominal:nominal
+// SYS-REQ-107:nominal:nominal
+// SW-REQ-025:nominal:nominal
 func TestRouter_PromptsGet_Found(t *testing.T) {
 	router := NewRouter()
 	primitives := map[string]string{
@@ -225,6 +272,10 @@ func TestRouter_PromptsGet_Found(t *testing.T) {
 	}, result.VEMChain)
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-025
+// STK-REQ-019:nominal:nominal
+// SYS-REQ-107:nominal:nominal
+// SW-REQ-025:nominal:nominal
 func TestRouter_Operation_Found(t *testing.T) {
 	router := NewRouter()
 	primitives := map[string]string{
@@ -238,6 +289,9 @@ func TestRouter_Operation_Found(t *testing.T) {
 	assert.Equal(t, []string{jsonrpc.MethodVEMPrefix + "tools-list"}, result.VEMChain)
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-025
+// SYS-REQ-107:boundary:boundary
+// SW-REQ-025:boundary:boundary
 func TestRouter_Operation_NotFound(t *testing.T) {
 	router := NewRouter()
 	primitives := map[string]string{}
@@ -249,6 +303,9 @@ func TestRouter_Operation_NotFound(t *testing.T) {
 	assert.Equal(t, []string{jsonrpc.MethodVEMPrefix + "initialize"}, result.VEMChain)
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-025
+// SYS-REQ-107:boundary:boundary
+// SW-REQ-025:boundary:boundary
 func TestRouter_Operation_AllowListEnabled(t *testing.T) {
 	router := NewRouter()
 	primitives := map[string]string{}

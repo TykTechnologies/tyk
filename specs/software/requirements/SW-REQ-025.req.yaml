@@ -1,0 +1,72 @@
+id: SW-REQ-025
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal/mcp routing helpers shall expose non-empty MCP primitive VEM prefixes, classify tool/resource/prompt primitive VEM paths, register MCP and JSON-RPC VEM prefixes with the agent protocol registry, route tools/call, resources/read, prompts/get, and generic operations to deterministic VEM chains, select exact resource mappings before wildcard mappings, prefer the longest resource wildcard prefix, and return parameter errors for missing, malformed, or empty primitive identifiers.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-107
+component: mcp_protocol
+rationale: This software requirement owns only MCP prefix classification, VEM prefix registration, and method-to-VEM route construction in internal/mcp. It does not claim gateway middleware execution, request body parsing before these helpers are called, session-right selection, or HTTP redirect behavior.
+tags:
+    - mcp
+    - vem-routing
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-107
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T22:00:04Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP protocol requirements are scoped to internal/mcp helper behavior for primitive VEM prefix classification and registration, MCP method-to-VEM route construction, parameter validation, access-rule matching, JSON-RPC list filtering, pass-through handling, and envelope re-encoding only; focused internal/mcp tests passed. This approval does not claim gateway middleware sequencing, API definition synthesis, session-right retrieval, analytics, network transport behavior, or final HTTP status generation.
+        fingerprint: sha256:1d7677ccc08586180966126f1be4e3ac878ea8b141fc73a45616734b46f700c7
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-025
+          artifact: internal/mcp/mcp.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP routing production files received requirement trace annotations only; executable prefix, registration, and route-construction behavior is unchanged and is covered by internal/mcp tests plus docs/mcp-protocol-requirements-evidence.md, so no further authored requirement or design text change is needed.
+          base: origin/master
+          requirement_fingerprint: sha256:584a3d407c972a0b8b81c6cb60fb150fca18e1e0a9f583d4eb474b1f51f6bf3b
+          approval_fingerprint: sha256:1d7677ccc08586180966126f1be4e3ac878ea8b141fc73a45616734b46f700c7
+          artifact_fingerprint: sha256:f5a62987b88aae035a76fa5cabc54c4d42d2ac16c899b4e40a854a7c22b60053
+          reviewed_at: "2026-06-19T22:00:20Z"
+        - requirement: SW-REQ-025
+          artifact: internal/mcp/router.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP routing production files received requirement trace annotations only; executable prefix, registration, and route-construction behavior is unchanged and is covered by internal/mcp tests plus docs/mcp-protocol-requirements-evidence.md, so no further authored requirement or design text change is needed.
+          base: origin/master
+          requirement_fingerprint: sha256:584a3d407c972a0b8b81c6cb60fb150fca18e1e0a9f583d4eb474b1f51f6bf3b
+          approval_fingerprint: sha256:1d7677ccc08586180966126f1be4e3ac878ea8b141fc73a45616734b46f700c7
+          artifact_fingerprint: sha256:3133ebfd71c537cb6579dfb99ac22fd53cf2e7da916800ec8779c91eb3d048f3
+          reviewed_at: "2026-06-19T22:00:20Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T22:00:04Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-19T22:00:04Z"
+          from: draft
+          to: review
+          reason: Ready for delegated requirements-owner review after focused internal/mcp tests passed
+          changed_by: agent:codex

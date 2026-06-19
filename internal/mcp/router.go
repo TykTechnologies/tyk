@@ -11,10 +11,12 @@ import (
 type Router struct {
 }
 
+// SW-REQ-025
 func NewRouter() jsonrpc.Router {
 	return &Router{}
 }
 
+// SW-REQ-025
 func (r *Router) RouteMethod(method string, params json.RawMessage, primitives map[string]string) (jsonrpc.RouteResult, error) {
 	switch method {
 	case MethodToolsCall:
@@ -28,6 +30,7 @@ func (r *Router) RouteMethod(method string, params json.RawMessage, primitives m
 	}
 }
 
+// SW-REQ-025
 func (r *Router) routeToolsCall(params json.RawMessage, primitives map[string]string) (jsonrpc.RouteResult, error) {
 	name, err := extractStringParam(params, ParamKeyName)
 	if err != nil {
@@ -50,6 +53,7 @@ func (r *Router) routeToolsCall(params json.RawMessage, primitives map[string]st
 	}, nil
 }
 
+// SW-REQ-025
 func (r *Router) routeResourcesRead(params json.RawMessage, primitives map[string]string) (jsonrpc.RouteResult, error) {
 	uri, err := extractStringParam(params, ParamKeyURI)
 	if err != nil {
@@ -72,6 +76,7 @@ func (r *Router) routeResourcesRead(params json.RawMessage, primitives map[strin
 	}, nil
 }
 
+// SW-REQ-025
 func (r *Router) routePromptsGet(params json.RawMessage, primitives map[string]string) (jsonrpc.RouteResult, error) {
 	name, err := extractStringParam(params, ParamKeyName)
 	if err != nil {
@@ -94,6 +99,7 @@ func (r *Router) routePromptsGet(params json.RawMessage, primitives map[string]s
 	}, nil
 }
 
+// SW-REQ-025
 func (r *Router) routeOperation(method string, primitives map[string]string) (jsonrpc.RouteResult, error) {
 	operationVEM, found := primitives[PrimitiveKeyOperation+method]
 	if !found {
@@ -106,6 +112,7 @@ func (r *Router) routeOperation(method string, primitives map[string]string) (js
 	}, nil
 }
 
+// SW-REQ-025
 func extractStringParam(params json.RawMessage, key string) (string, error) {
 	if len(params) == 0 {
 		return "", errors.New(ErrMsgMissingParams)
@@ -136,6 +143,7 @@ func extractStringParam(params json.RawMessage, key string) (string, error) {
 	return strVal, nil
 }
 
+// SW-REQ-025
 func matchResourceURI(uri string, primitives map[string]string) (string, bool) {
 	if vem, ok := primitives[PrimitiveKeyResource+uri]; ok {
 		return vem, true

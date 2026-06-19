@@ -1,0 +1,65 @@
+id: SW-REQ-026
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal/mcp list-filtering helpers shall extract string item identifiers, evaluate blocked rules before allowed rules using anchored full-match regular expressions with exact-match fallback for invalid patterns, preserve malformed or unidentifiable items, remove denied list items from JSON-RPC result arrays, re-encode successful JSON-RPC envelopes, infer list configuration from well-known result array keys, and report pass-through for unsupported or malformed response bodies.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-107
+component: mcp_protocol
+rationale: This software requirement owns only in-process MCP JSON-RPC list filtering and rule matching. It does not claim gateway response middleware selection, user session lookup, persistence of access rights, analytics, or transport-level response handling.
+tags:
+    - mcp
+    - list-filtering
+    - access-control
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-107
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T22:00:04Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP protocol requirements are scoped to internal/mcp helper behavior for primitive VEM prefix classification and registration, MCP method-to-VEM route construction, parameter validation, access-rule matching, JSON-RPC list filtering, pass-through handling, and envelope re-encoding only; focused internal/mcp tests passed. This approval does not claim gateway middleware sequencing, API definition synthesis, session-right retrieval, analytics, network transport behavior, or final HTTP status generation.
+        fingerprint: sha256:715917eef30c708c80266b3a456a0180038f4f18fb7fc5ccfe63db0bb782839e
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-026
+          artifact: internal/mcp/list_filter.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP list-filter production file received requirement trace annotations only; executable list filtering and access-rule behavior is unchanged and is covered by internal/mcp tests plus docs/mcp-protocol-requirements-evidence.md, so no further authored requirement or design text change is needed.
+          base: origin/master
+          requirement_fingerprint: sha256:37a1dc0e1ff1cbacebf764c9e552666718b57662db5c9bbb5707197fa837c577
+          approval_fingerprint: sha256:715917eef30c708c80266b3a456a0180038f4f18fb7fc5ccfe63db0bb782839e
+          artifact_fingerprint: sha256:a47da6b6de2bbfa2ddebcbd0f4e913660b0b34c520372c85a83e7e694452fc05
+          reviewed_at: "2026-06-19T22:00:20Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T22:00:04Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - access_denied
+    - malformed_input
+    - encoding_safety
+lifecycle:
+    change_history:
+        - date: "2026-06-19T22:00:04Z"
+          from: draft
+          to: review
+          reason: Ready for delegated requirements-owner review after focused internal/mcp tests passed
+          changed_by: agent:codex

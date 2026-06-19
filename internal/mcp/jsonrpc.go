@@ -1,6 +1,7 @@
 package mcp
 
 // JSON-RPC 2.0 Error Codes as defined in the JSON-RPC 2.0 specification.
+// SW-REQ-025
 const (
 	// JSONRPCParseError indicates invalid JSON was received by the server.
 	JSONRPCParseError = -32700
@@ -16,6 +17,7 @@ const (
 )
 
 // MCP JSON-RPC method names as defined in the Model Context Protocol specification.
+// SW-REQ-025
 const (
 	// Tool methods
 	MethodToolsCall = "tools/call"
@@ -32,6 +34,7 @@ const (
 )
 
 // JSON-RPC parameter keys used across MCP methods
+// SW-REQ-025
 const (
 	ParamKeyName = "name" // Used by tools/call and prompts/get
 	ParamKeyURI  = "uri"  // Used by resources/* methods
@@ -39,6 +42,7 @@ const (
 
 // Primitive type identifiers — mirrors user.PrimitiveType* for gateway-internal use.
 // Gateway code always uses these constants; dashboard code uses user.PrimitiveType*.
+// SW-REQ-025
 const (
 	PrimitiveTypeTool     = "tool"
 	PrimitiveTypeResource = "resource"
@@ -46,6 +50,7 @@ const (
 )
 
 // Primitive type key prefixes for primitives map lookups
+// SW-REQ-025
 const (
 	PrimitiveKeyTool      = "tool:"
 	PrimitiveKeyResource  = "resource:"
@@ -54,6 +59,7 @@ const (
 )
 
 // Error messages for JSON-RPC responses
+// SW-REQ-025
 const (
 	ErrMsgParseError     = "parse error"
 	ErrMsgInvalidRequest = "invalid request"
@@ -61,6 +67,7 @@ const (
 )
 
 // Detailed error messages for invalid params scenarios
+// SW-REQ-025
 const (
 	ErrMsgMissingParams     = "missing required params object"
 	ErrMsgMissingParamName  = "missing required parameter: name"

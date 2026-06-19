@@ -10,6 +10,11 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-026
+// STK-REQ-019:malformed_input:negative
+// SYS-REQ-107:malformed_input:negative
+// SW-REQ-026:malformed_input:negative
+// SW-REQ-026:nominal:nominal
 func TestExtractStringField(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -57,6 +62,13 @@ func TestExtractStringField(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-026
+// STK-REQ-019:access_denied:negative
+// STK-REQ-019:boundary:boundary
+// SYS-REQ-107:access_denied:negative
+// SYS-REQ-107:boundary:boundary
+// SW-REQ-026:access_denied:negative
+// SW-REQ-026:boundary:boundary
 func TestCheckAccessControlRules(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -126,6 +138,10 @@ func TestCheckAccessControlRules(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-026
+// STK-REQ-019:boundary:boundary
+// SYS-REQ-107:boundary:boundary
+// SW-REQ-026:boundary:boundary
 func TestMatchPattern(t *testing.T) {
 	tests := []struct {
 		pattern string
@@ -182,6 +198,13 @@ func TestMatchPattern(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-026
+// STK-REQ-019:access_denied:negative
+// STK-REQ-019:malformed_input:negative
+// SYS-REQ-107:access_denied:negative
+// SYS-REQ-107:malformed_input:negative
+// SW-REQ-026:access_denied:negative
+// SW-REQ-026:malformed_input:negative
 func TestFilterItems(t *testing.T) {
 	t.Run("empty items array returns empty", func(t *testing.T) {
 		rules := user.AccessControlRules{Allowed: []string{"anything"}}
@@ -234,6 +257,13 @@ func TestFilterItems(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-026
+// STK-REQ-019:encoding_safety:nominal
+// STK-REQ-019:malformed_input:negative
+// SYS-REQ-107:encoding_safety:nominal
+// SYS-REQ-107:malformed_input:negative
+// SW-REQ-026:encoding_safety:nominal
+// SW-REQ-026:malformed_input:negative
 func TestFilterJSONRPCBody(t *testing.T) {
 	t.Run("batch JSON-RPC array passes through (returns false)", func(t *testing.T) {
 		// JSON-RPC batch = top-level array. Not supported for filtering.
@@ -283,6 +313,10 @@ func TestFilterJSONRPCBody(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-026
+// STK-REQ-019:boundary:boundary
+// SYS-REQ-107:boundary:boundary
+// SW-REQ-026:boundary:boundary
 func TestInferListConfigFromResult(t *testing.T) {
 	tests := []struct {
 		name     string

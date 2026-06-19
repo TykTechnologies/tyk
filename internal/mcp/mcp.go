@@ -11,6 +11,7 @@ import (
 
 // VEM path prefixes for different MCP primitive types.
 // MCP defines three core primitives: Tools, Resources, and Prompts.
+// SW-REQ-025
 const (
 	ToolPrefix     = "/mcp-tool:"
 	ResourcePrefix = "/mcp-resource:"
@@ -18,11 +19,13 @@ const (
 )
 
 // WildcardPattern is the mux-style pattern for matching any remaining path segments.
+// SW-REQ-025
 const WildcardPattern = "{rest:.*}"
 
 // Catch-all patterns for MCP primitive VEMs in allowlist mode.
 // Uses mux-style pattern matching: /prefix{rest:.*}
 // These patterns match any path starting with the primitive prefix.
+// SW-REQ-025
 const (
 	// ToolCatchAllPattern matches all tool VEM paths.
 	// Format: /mcp-tool:{rest:.*}
@@ -41,6 +44,7 @@ var registerOnce sync.Once
 
 // RegisterVEMPrefixes registers MCP and JSON-RPC VEM prefixes with the agent protocol registry.
 // This is called automatically when needed via sync.Once.
+// SW-REQ-025
 func RegisterVEMPrefixes() {
 	registerOnce.Do(func() {
 		// Register MCP-specific primitive VEM prefixes
@@ -54,6 +58,7 @@ func RegisterVEMPrefixes() {
 
 // IsPrimitiveVEMPath returns true if the path is an MCP primitive VEM path.
 // These paths are internal-only and should return 404 when accessed directly.
+// SW-REQ-025
 func IsPrimitiveVEMPath(path string) bool {
 	return strings.HasPrefix(path, ToolPrefix) ||
 		strings.HasPrefix(path, ResourcePrefix) ||

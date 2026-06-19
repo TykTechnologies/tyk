@@ -1,0 +1,14 @@
+component: mcp_protocol
+no_interface:
+    declared: true
+    reason: MCP protocol behavior in this proof slice is exercised through in-process routing and list-filtering helpers; no cross-component runtime interface contract is modeled yet.
+variables:
+    - name: mcp_protocol_decision_requested
+      type: bool
+      direction: input
+      description: Gateway MCP handling requests an in-process helper decision for VEM route construction, primitive VEM classification, VEM prefix registration, or JSON-RPC list-response filtering.
+
+    - name: mcp_protocol_decision_determined
+      type: bool
+      direction: output
+      description: MCP helper handling returns a deterministic route, classification, prefix-registration effect, filtered response body, pass-through decision, or parameter error for the requested helper operation.

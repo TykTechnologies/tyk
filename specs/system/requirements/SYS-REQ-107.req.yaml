@@ -1,0 +1,65 @@
+id: SYS-REQ-107
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the mcp_protocol shall always satisfy !mcp_protocol_decision_requested | mcp_protocol_decision_determined
+description: MCP protocol helper handling shall determine stable VEM route chains for tool calls, resource reads, prompt gets, and generic operations; reject malformed primitive parameters; classify MCP primitive VEM paths; register MCP and JSON-RPC VEM prefixes; and filter JSON-RPC list-response bodies according to allowed and blocked MCP access-control rules while passing through malformed or unsupported response shapes unmodified.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-019
+component: mcp_protocol
+rationale: This system requirement owns deterministic MCP helper decisions used by gateway JSON-RPC/MCP flows. It does not claim gateway middleware sequencing, API definition synthesis, session-right retrieval, analytics recording, network write behavior, or final client transport behavior outside these helpers.
+tags:
+    - mcp
+    - json-rpc
+    - vem-routing
+    - list-filtering
+variables:
+    - mcp_protocol_decision_requested
+    - mcp_protocol_decision_determined
+traces:
+    satisfies:
+        - STK-REQ-019
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T22:00:04Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP protocol requirements are scoped to internal/mcp helper behavior for primitive VEM prefix classification and registration, MCP method-to-VEM route construction, parameter validation, access-rule matching, JSON-RPC list filtering, pass-through handling, and envelope re-encoding only; focused internal/mcp tests passed. This approval does not claim gateway middleware sequencing, API definition synthesis, session-right retrieval, analytics, network transport behavior, or final HTTP status generation.
+        fingerprint: sha256:b65b1262ccf2abb20794ed5654cb0878f71817976ba1e7e73fe5a8cf90ac7a53
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-19T22:01:23.337841Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-107|mcp_protocol_decision_determined
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-107's mcp_protocol_decision_determined variable is decomposed by SW-REQ-025 for MCP primitive VEM prefixes, prefix registration, route-chain construction, resource matching, and parameter-error behavior, and by SW-REQ-026 for MCP list access-rule matching, malformed item pass-through, JSON-RPC body filtering, re-encoding, and unsupported-body pass-through. The review is limited to internal/mcp helper behavior and does not claim gateway middleware sequencing, API definition synthesis, session-right retrieval, analytics, network transport behavior, or final HTTP status generation.
+          reviewed_at: "2026-06-19T22:01:23.337841Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T22:00:04Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - access_denied
+    - malformed_input
+    - encoding_safety
+lifecycle:
+    change_history:
+        - date: "2026-06-19T22:00:04Z"
+          from: draft
+          to: review
+          reason: Ready for delegated requirements-owner review after focused internal/mcp tests passed
+          changed_by: agent:codex
