@@ -1,0 +1,69 @@
+id: STK-REQ-022
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: Gateway helper code shall receive deterministic in-process map helper behavior for flattening nested data into dotted string keys and for concurrent string-keyed map storage and lookup.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: maps
+rationale: The maps package is internal helper infrastructure. This requirement owns only local flattening and string-map helper behavior; it does not claim API definition schema conversion, caller validation policy, persistence, cross-process sharing, or gateway endpoint outcomes.
+tags:
+    - maps
+    - flatten
+    - concurrency
+    - in-process
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T22:29:26Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Maps requirements are scoped to internal/maps in-process helper behavior: flattening supported nested values to dotted string keys, unsupported-value errors, non-string map-key panics, synchronized string-map set/get, missing-key results, and race-free concurrent access. Focused internal/maps tests passed, including race. This approval does not claim API definition schema conversion, caller validation policy before flattening, persistence, cross-process sharing, or gateway endpoint outcomes.'
+        fingerprint: sha256:bada025e105daf7cf9744083fda1ff1015d584da5ae0fb45ecc78ccf11a002e2
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T22:29:26Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - malformed_input
+    - concurrent
+stakeholder:
+    persona: Gateway map helper caller
+    story: As gateway helper code, I need nested map data and concurrent string-keyed state to be handled predictably inside the process.
+    acceptance_criteria:
+        - id: STK-REQ-022-AC-01
+          text: Given nested string-keyed map, slice, array, struct, scalar, boolean, numeric, string, or nil values, when flattening is requested, then the helper returns dotted keys with deterministic string values.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-110
+        - id: STK-REQ-022-AC-02
+          text: Given unsupported flattened value types or maps with non-string keys, when flattening reaches those values, then the helper reports the unsupported value or panics on the invalid key shape.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-110
+        - id: STK-REQ-022-AC-03
+          text: Given concurrent string-map readers and writers, when they set and get values, then access remains race-free and lookups report whether keys exist.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-110
+lifecycle:
+    change_history:
+        - date: "2026-06-19T22:29:26Z"
+          from: draft
+          to: review
+          reason: Ready for delegated requirements-owner review after focused internal/maps tests passed
+          changed_by: agent:codex

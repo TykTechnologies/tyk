@@ -10,6 +10,7 @@ type StringMap struct {
 }
 
 // NewStringMap returns a new *StringMap.
+// SW-REQ-030
 func NewStringMap() *StringMap {
 	return &StringMap{
 		data: make(map[string]string),
@@ -17,6 +18,7 @@ func NewStringMap() *StringMap {
 }
 
 // Set will set a value to a key in the map.
+// SW-REQ-030
 func (s *StringMap) Set(key, value string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -25,6 +27,7 @@ func (s *StringMap) Set(key, value string) {
 }
 
 // Get returns the value, and if it existed in the map.
+// SW-REQ-030
 func (s *StringMap) Get(key string) (string, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

@@ -1,0 +1,75 @@
+id: SW-REQ-030
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal/maps package shall flatten supported nested values into dotted string-key maps, return an error for unsupported flattened value types, panic for non-string map keys during flattening, and provide a mutex-protected string map that stores values, returns stored values with an existence flag, reports missing keys, and remains race-free during concurrent set and get operations.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-110
+component: maps
+rationale: This software requirement owns only the implementation in internal/maps. It does not claim API definition schema conversion, caller validation policy before flattening, persistence, cross-process sharing, or gateway endpoint outcomes.
+tags:
+    - maps
+    - flatten
+    - concurrency
+    - in-process
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-110
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T22:29:26Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Maps requirements are scoped to internal/maps in-process helper behavior: flattening supported nested values to dotted string keys, unsupported-value errors, non-string map-key panics, synchronized string-map set/get, missing-key results, and race-free concurrent access. Focused internal/maps tests passed, including race. This approval does not claim API definition schema conversion, caller validation policy before flattening, persistence, cross-process sharing, or gateway endpoint outcomes.'
+        fingerprint: sha256:0acb805adfa67e738fb7c30e17ef771e36de28f6c7ed15b9ad8074da85b90b33
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-030
+          artifact: internal/maps/flatten.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/maps production files received requirement trace annotations only; executable map helper behavior is unchanged and is covered by internal/maps tests plus docs/maps-requirements-evidence.md, so no further authored requirement or design text change is needed.
+          base: origin/master
+          requirement_fingerprint: sha256:7be5110b79c1fac7a10574c3ec24e4a3266a675c1b3cab434327c2b7e86c0a11
+          approval_fingerprint: sha256:0acb805adfa67e738fb7c30e17ef771e36de28f6c7ed15b9ad8074da85b90b33
+          artifact_fingerprint: sha256:39c9aaad343f18a2638f793dd8d2598ee6867107f53032dddf10586281ec3b84
+          reviewed_at: "2026-06-19T22:29:30Z"
+        - requirement: SW-REQ-030
+          artifact: internal/maps/strings.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/maps production files received requirement trace annotations only; executable map helper behavior is unchanged and is covered by internal/maps tests plus docs/maps-requirements-evidence.md, so no further authored requirement or design text change is needed.
+          base: origin/master
+          requirement_fingerprint: sha256:7be5110b79c1fac7a10574c3ec24e4a3266a675c1b3cab434327c2b7e86c0a11
+          approval_fingerprint: sha256:0acb805adfa67e738fb7c30e17ef771e36de28f6c7ed15b9ad8074da85b90b33
+          artifact_fingerprint: sha256:5537236680d62e95065f90de971ffac093b4a9e993d07e62c52881fa71f33565
+          reviewed_at: "2026-06-19T22:29:30Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T22:29:26Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - malformed_input
+    - concurrent
+lifecycle:
+    change_history:
+        - date: "2026-06-19T22:29:26Z"
+          from: draft
+          to: review
+          reason: Ready for delegated requirements-owner review after focused internal/maps tests passed
+          changed_by: agent:codex

@@ -1,0 +1,14 @@
+component: maps
+no_interface:
+    declared: true
+    reason: The maps package is an in-process helper for local map flattening and synchronized string-map operations; this proof slice does not define a cross-component runtime interface boundary.
+variables:
+    - name: maps_operation_requested
+      type: bool
+      direction: input
+      description: Gateway helper code requests an in-process map flattening operation or synchronized string-map set/get operation.
+
+    - name: maps_operation_determined
+      type: bool
+      direction: output
+      description: The maps helper returns the requested flattened output, unsupported-value error, invalid-key panic, stored string-map value, missing-key result, or race-free synchronized access behavior.

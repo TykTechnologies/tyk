@@ -22,13 +22,13 @@ project:
             path: /Users/leonidbugaev/tools/kind2/kind2
             timeout: 30
     commands:
-        build: go build ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx ./internal/cache
-        test: mkdir -p .proof/test-results .proof/coverage && go test ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx ./internal/cache -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
+        build: go build ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx ./internal/cache ./internal/maps
+        test: mkdir -p .proof/test-results .proof/coverage && go test ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx ./internal/cache ./internal/maps -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
         tests:
             test:
-                command: mkdir -p .proof/test-results .proof/coverage && go test ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx ./internal/cache -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
+                command: mkdir -p .proof/test-results .proof/coverage && go test ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx ./internal/cache ./internal/maps -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
                 language: go
-        lint: go vet ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx ./internal/cache
+        lint: go vet ./apidef ./internal/policy/... ./internal/model ./internal/event ./internal/uuid ./internal/time ./internal/compression ./internal/sanitize ./internal/netutil ./internal/osutil ./internal/rate/model ./pkg/identifier ./request ./internal/jsonrpc/errors ./internal/mcp ./internal/agentprotocol ./internal/httpctx ./internal/cache ./internal/maps
     obligation_classes:
         - nominal
         - error_handling
@@ -187,6 +187,10 @@ project:
             - internal/cache/janitor_test.go
             - internal/cache/repository.go
             - internal/cache/repository_test.go
+            - internal/maps/flatten.go
+            - internal/maps/flatten_test.go
+            - internal/maps/strings.go
+            - internal/maps/strings_test.go
             - internal/policy/**
             - internal/model/**
             - internal/event/**

@@ -9,6 +9,7 @@ import (
 type FlatMap map[string]string
 
 // Flatten transforms deep map to flat map.
+// SW-REQ-030
 func Flatten(data map[string]interface{}) (flatmap FlatMap, err error) {
 	flatmap = make(FlatMap)
 	for k, raw := range data {
@@ -20,6 +21,7 @@ func Flatten(data map[string]interface{}) (flatmap FlatMap, err error) {
 	return
 }
 
+// SW-REQ-030
 func flatten(result FlatMap, prefix string, v reflect.Value) (err error) {
 	if v.Kind() == reflect.Interface {
 		v = v.Elem()
@@ -60,6 +62,7 @@ func flatten(result FlatMap, prefix string, v reflect.Value) (err error) {
 	return nil
 }
 
+// SW-REQ-030
 func flattenMap(result FlatMap, prefix string, v reflect.Value) (err error) {
 	for _, k := range v.MapKeys() {
 		if k.Kind() == reflect.Interface {
@@ -76,6 +79,7 @@ func flattenMap(result FlatMap, prefix string, v reflect.Value) (err error) {
 	return nil
 }
 
+// SW-REQ-030
 func flattenSliceArray(result FlatMap, prefix string, v reflect.Value) (err error) {
 	prefix = prefix + "."
 	for i := 0; i < v.Len(); i++ {
@@ -87,6 +91,7 @@ func flattenSliceArray(result FlatMap, prefix string, v reflect.Value) (err erro
 	return nil
 }
 
+// SW-REQ-030
 func flattenStruct(result FlatMap, prefix string, v reflect.Value) (err error) {
 	prefix = prefix + "."
 	ty := v.Type()

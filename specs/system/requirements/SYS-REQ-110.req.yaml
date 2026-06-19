@@ -1,0 +1,63 @@
+id: SYS-REQ-110
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the maps shall always satisfy !maps_operation_requested | maps_operation_determined
+description: Map helper handling shall determine flattened dotted-key string output for supported nested values, report unsupported flattened value types, panic for non-string map keys during flattening, and provide synchronized string-map set and get operations that report missing keys.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-022
+component: maps
+rationale: This system requirement owns deterministic in-process map helper behavior. It does not claim API definition schema conversion, caller validation policy before flattening, persistence, cross-process sharing, or gateway endpoint outcomes.
+tags:
+    - maps
+    - flatten
+    - concurrency
+    - in-process
+variables:
+    - maps_operation_requested
+    - maps_operation_determined
+traces:
+    satisfies:
+        - STK-REQ-022
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-19T22:29:26Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Maps requirements are scoped to internal/maps in-process helper behavior: flattening supported nested values to dotted string keys, unsupported-value errors, non-string map-key panics, synchronized string-map set/get, missing-key results, and race-free concurrent access. Focused internal/maps tests passed, including race. This approval does not claim API definition schema conversion, caller validation policy before flattening, persistence, cross-process sharing, or gateway endpoint outcomes.'
+        fingerprint: sha256:9b452db7dbe735f2536158779e6c8b7dabb301c473b515ff606e23c10a765839
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-19T22:29:31.295133Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-110|maps_operation_determined
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-110's maps_operation_determined variable is decomposed by SW-REQ-030 for supported nested value flattening, unsupported-value errors, non-string map-key panics, synchronized string-map set/get, missing-key results, and race-free concurrent access. This review is limited to internal/maps helper behavior and does not claim API definition schema conversion, caller validation policy, persistence, cross-process sharing, or gateway endpoint outcomes.
+          reviewed_at: "2026-06-19T22:29:31.295133Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-19T22:29:26Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - malformed_input
+    - concurrent
+lifecycle:
+    change_history:
+        - date: "2026-06-19T22:29:26Z"
+          from: draft
+          to: review
+          reason: Ready for delegated requirements-owner review after focused internal/maps tests passed
+          changed_by: agent:codex
