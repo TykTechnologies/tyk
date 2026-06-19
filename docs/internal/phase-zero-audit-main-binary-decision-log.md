@@ -5,6 +5,11 @@ Branch: experiment/formal-requirements-policy
 Audit binary: /tmp/reqproof-main
 Command: `proof audit --scope full`
 
+> Historical phase log only. This is not the current audit posture. The current
+> scoped strict-audit state is tracked in
+> `docs/internal/phase-scoped-reqproof-stabilization.md`, where the active
+> goal keeps remaining warnings visible instead of suppressing them.
+
 ## Summary
 
 Initial audit: 0 errors, 7 warnings

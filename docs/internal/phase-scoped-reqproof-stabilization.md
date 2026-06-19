@@ -136,6 +136,18 @@ visible product or platform debts, not assumptions:
 - `KI-SANITIZE-MALFORMED-PERCENT`
 - `KI-SANITIZE-WINDOWS-VOLUME-PATH`
 
+This phase does not fix or close KnownIssues. Existing fixed-status
+KnownIssues, if present in `.proof/known-issues`, are historical records from
+earlier repair work. The active scoped stabilization posture is only that
+currently open product debts stay visible and are not converted into
+assumptions, waivers, or MC/DC ignores.
+
+KnownIssue evidence freshness refresh is also outside this phase. As of this
+snapshot, `proof known-issue check` reports stale freshness metadata for
+historical evidence manifests after nearby proof/test files changed. That is a
+separate evidence-refresh/review activity, not a reason to mark product issues
+fixed or to hide them from the current strict audit.
+
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or
 requirement ignores.

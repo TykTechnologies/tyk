@@ -1,5 +1,11 @@
 # Phase: Z3 Encoder Issue and Remaining Warnings -- Decision Log
 
+> Historical phase log only. This is not the current audit posture. The current
+> scoped strict-audit state is tracked in
+> `docs/internal/phase-scoped-reqproof-stabilization.md`, where the active
+> goal keeps full-scope onboarding, human review, authored-delta, suspect trace,
+> and MC/DC tooling/model warnings visible.
+
 ## Summary
 
 Fixed all 4 pre-existing warnings on the Tyk project at `experiment/formal-requirements-policy`:

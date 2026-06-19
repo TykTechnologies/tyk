@@ -3,6 +3,11 @@
 Date: 2026-05-08
 Phase: Obligation Class Expansion and Checklist Enrichment
 
+> Historical phase log only. This is not the current audit posture. The current
+> scoped strict-audit state is tracked in
+> `docs/internal/phase-scoped-reqproof-stabilization.md`; old baseline-scope
+> zero-warning results should not be read as current full-project completion.
+
 ## Summary
 
 Enriched the Tyk policy engine's obligation system across proof.yaml, all 7 STK-REQs,
