@@ -233,6 +233,12 @@ func TestValidatePathComponent(t *testing.T) {
 			wantErr:     true,
 			errContains: ErrInvalidFilePath,
 		},
+		{
+			name:        "triple encoded separator",
+			component:   "safe%25252Ffile",
+			wantErr:     true,
+			errContains: ErrInvalidFilePath,
+		},
 	}
 
 	for _, tt := range tests {

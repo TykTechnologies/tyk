@@ -91,6 +91,21 @@ func TestEnsure(t *testing.T) {
 		assert.Equal(t, expectedPath, fullPath)
 	})
 
+	t.Run("RootPath", func(t *testing.T) {
+		fullPath, err := root.Ensure(".")
+		assert.NoError(t, err)
+		assert.Equal(t, tempDir, fullPath)
+	})
+
+	t.Run("FilesystemRootKeepsSeparator", func(t *testing.T) {
+		root, err := osutil.NewRoot(string(os.PathSeparator))
+		assert.NoError(t, err)
+
+		fullPath, err := root.Ensure("tmp")
+		assert.NoError(t, err)
+		assert.Equal(t, filepath.Join(string(os.PathSeparator), "tmp"), fullPath)
+	})
+
 	t.Run("PathTraversalAttack", func(t *testing.T) {
 		relPath := "../../../etc/passwd"
 		fullPath, err := root.Ensure(relPath)
