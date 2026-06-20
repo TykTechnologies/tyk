@@ -1,0 +1,60 @@
+id: SYS-REQ-119
+version: 1
+status: approved
+priority: shall
+category: configuration
+req_type: guarantee
+fretish: the private_configuration shall always satisfy !private_configuration_operation_requested | private_configuration_result_determined
+description: Private configuration support shall determine local OAuth token purge interval results by returning a one-hour default when the private interval is absent and returning the configured duration in seconds when present, without claiming OAuth token storage, purge execution, scheduler behavior, customer JSON exposure, or final gateway runtime behavior.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-031
+component: private_configuration
+rationale: This system requirement owns local config/private.go helper behavior. Runtime purge scheduling and token storage are covered elsewhere or remain outside this proof slice.
+tags:
+    - configuration
+    - private
+    - oauth
+variables:
+    - private_configuration_operation_requested
+    - private_configuration_result_determined
+traces:
+    satisfies:
+        - STK-REQ-031
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T10:08:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Private configuration scope is limited to local config/private.go behavior: OAuth token purge interval selection returns the configured duration in seconds when present and a one-hour default when absent. The focused table-driven config test passed, including race through the config package gate. This approval does not claim OAuth token storage, purge execution, scheduler behavior, customer JSON exposure, or final gateway runtime behavior.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T10:15:00.118455Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-119|private_configuration_result_determined
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final requirement approval. SYS-REQ-119''s private_configuration_result_determined variable is decomposed by SW-REQ-106 for local config/private.go behavior: OAuth token purge interval selection returns a one-hour default when the private interval is absent and the configured second-based duration when present. This review is limited to local private configuration helper support and does not claim OAuth token storage, purge execution, scheduler behavior, customer JSON exposure, or final gateway runtime behavior.'
+          reviewed_at: "2026-06-20T10:15:00.118455Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T10:08:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T10:08:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+lifecycle:
+    change_history:
+        - date: "2026-06-20T10:08:00Z"
+          from: draft
+          to: review
+          reason: Added private configuration system requirement for config/private.go onboarding.
+          changed_by: agent:codex

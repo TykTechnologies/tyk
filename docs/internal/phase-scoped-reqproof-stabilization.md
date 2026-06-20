@@ -44,8 +44,8 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 154/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
-| `mcdc_coverage` | 52/409 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
+| `verification_scope_complete` | 155/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `mcdc_coverage` | 52/412 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
 
@@ -399,6 +399,15 @@ fixed or to hide them from the current strict audit.
   connectivity, distributed storage behavior, gateway request admission, or
   final client-visible runtime behavior. It moves the visible production
   coverage baseline from 152/447 to 154/447.
+- `SW-REQ-106` onboarded `config/private.go` with a new private
+  configuration stakeholder/system/software chain and a focused table-driven
+  config test for local OAuth token purge interval behavior: one-hour default
+  duration when the private interval is absent and configured second-based
+  durations when present. This increment is scoped to local private
+  configuration helper support and does not claim OAuth token storage, purge
+  execution, scheduler behavior, customer JSON exposure, or final gateway
+  runtime behavior. It moves the visible production coverage baseline from
+  154/447 to 155/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

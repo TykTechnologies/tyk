@@ -171,6 +171,8 @@ project:
             - config/development_off_test.go
             - config/external_service.go
             - config/external_service_test.go
+            - config/private.go
+            - config/private_test.go
             - apidef/importer/blueprint.go
             - apidef/importer/blueprint_reqproof_test.go
             - apidef/importer/importer.go

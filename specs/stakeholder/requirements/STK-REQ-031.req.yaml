@@ -1,0 +1,61 @@
+id: STK-REQ-031
+version: 1
+status: approved
+priority: shall
+category: configuration
+req_type: guarantee
+fretish: ""
+description: Private configuration support shall determine the local OAuth token purge interval by using the configured private interval when present and a deterministic one-hour default when absent, without exposing private fields to customer JSON or claiming OAuth token storage, purge execution, scheduler behavior, or final gateway runtime behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: private_configuration
+rationale: Private configuration contains local non-customer-facing helper behavior. This stakeholder requirement owns OAuth token purge interval selection in config/private.go; purge scheduling and token storage are outside this proof slice.
+tags:
+    - configuration
+    - private
+    - oauth
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T10:08:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Private configuration scope is limited to local config/private.go behavior: OAuth token purge interval selection returns the configured duration in seconds when present and a one-hour default when absent. The focused table-driven config test passed, including race through the config package gate. This approval does not claim OAuth token storage, purge execution, scheduler behavior, customer JSON exposure, or final gateway runtime behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T10:08:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T10:08:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need private OAuth token purge timing configuration to resolve predictably before purge scheduling code consumes it.
+    acceptance_criteria:
+        - id: STK-REQ-031-AC-01
+          text: Given no private OAuth token purge interval, when local configuration asks for the purge interval, then a one-hour default duration is returned.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-119
+        - id: STK-REQ-031-AC-02
+          text: Given a private OAuth token purge interval in seconds, when local configuration asks for the purge interval, then that configured duration is returned in seconds.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-119
+lifecycle:
+    change_history:
+        - date: "2026-06-20T10:08:00Z"
+          from: draft
+          to: review
+          reason: Added private configuration stakeholder requirement for config/private.go onboarding.
+          changed_by: agent:codex

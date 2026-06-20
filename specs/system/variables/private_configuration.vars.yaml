@@ -1,0 +1,14 @@
+component: private_configuration
+no_interface:
+    declared: true
+    reason: The config/private.go file is exercised as a local private configuration helper; OAuth token storage, purge execution, scheduler behavior, customer JSON exposure, gateway request admission, and request handling are outside this local component boundary.
+variables:
+    - name: private_configuration_operation_requested
+      type: bool
+      direction: input
+      description: Gateway code or tests request local private OAuth token purge interval selection.
+
+    - name: private_configuration_result_determined
+      type: bool
+      direction: output
+      description: Private configuration support returns the configured OAuth token purge interval duration in seconds or the deterministic one-hour default duration.

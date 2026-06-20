@@ -18,6 +18,7 @@ type Private struct {
 }
 
 // GetOAuthTokensPurgeInterval returns purge interval for lapsed OAuth tokens.
+// SW-REQ-106
 func (p Private) GetOAuthTokensPurgeInterval() time.Duration {
 	if p.OAuthTokensPurgeInterval != 0 {
 		return time.Second * time.Duration(p.OAuthTokensPurgeInterval)
