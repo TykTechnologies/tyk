@@ -23,6 +23,9 @@ variables:
 traces:
     satisfies:
         - STK-REQ-034
+    reviewed_at: "2026-06-20T13:34:09.643488Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:7fa89a4c5f853eeba88c533a2f36cd6a1fb3fe9b359d96864f0593907197af6c
 verification:
     assurance_level: A
     formalization_status: valid

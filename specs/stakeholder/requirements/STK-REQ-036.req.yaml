@@ -17,7 +17,10 @@ tags:
     - coprocess
     - dispatcher
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:34:00.638211Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:7286201408b9fc7c1bdcecc6267398cb103b4a2079651279ca9a176ebdd68300
 verification:
     assurance_level: A
     formalization_status: none

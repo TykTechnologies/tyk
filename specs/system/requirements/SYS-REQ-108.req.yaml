@@ -25,6 +25,9 @@ variables:
 traces:
     satisfies:
         - STK-REQ-020
+    reviewed_at: "2026-06-20T13:34:09.345027Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:2c6cbb444aea77f5f0de0b74fb64163fac74a2a39b781c8dc7557738f04dc7fd
 verification:
     assurance_level: A
     formalization_status: valid

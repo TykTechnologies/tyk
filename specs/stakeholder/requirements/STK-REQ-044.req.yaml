@@ -18,7 +18,10 @@ tags:
     - goroutine
     - observability
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:34:01.10728Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:b3d2b01b314f6cf6d67571dec0d40ce15d074c9cfa1b5d4bd794a9f5305dcbfb
 verification:
     assurance_level: A
     formalization_status: none

@@ -18,9 +18,9 @@ tags:
     - rate-limiting
 variables: []
 traces:
-    reviewed_at: "2026-06-18T19:38:44.106756Z"
+    reviewed_at: "2026-06-20T13:33:58.900973Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:890faecaf8cb433a4c57861c5afd5bc9894cc610f2e4bd503de591c7f8832b31
+    reviewed_fingerprint: sha256:ecf8534441acfbe8e6574ad96df53538872c3d5ef8b5218310eb358c072b77df
 verification:
     assurance_level: A
     formalization_status: ""

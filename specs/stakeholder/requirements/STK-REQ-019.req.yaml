@@ -20,7 +20,10 @@ tags:
     - list-filtering
     - schema-validation
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:33:59.12895Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:87228dde8550023221189ed4e7ea28c33ab88a5b69d955d329d0665140fd09a4
 verification:
     assurance_level: A
     formalization_status: none

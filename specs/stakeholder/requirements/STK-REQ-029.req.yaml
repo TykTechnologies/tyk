@@ -19,7 +19,10 @@ tags:
     - mtls
     - proxy
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:34:00.222418Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:d0732c337d26abbd328f0302d56107fc12eb6c3ec9a386129c289dde3f0209ba
 verification:
     assurance_level: A
     formalization_status: none

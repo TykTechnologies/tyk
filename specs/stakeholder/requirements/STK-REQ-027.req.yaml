@@ -18,7 +18,10 @@ tags:
     - lint
     - configuration
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:34:00.110434Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:fc08396423e699d177d27aa225e1c8e939a5e45e3d97ab9beda5c7e6a38faf2f
 verification:
     assurance_level: A
     formalization_status: none

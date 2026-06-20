@@ -18,9 +18,9 @@ tags:
     - policy-lifecycle
 variables: []
 traces:
-    reviewed_at: "2026-06-18T19:38:44.072537Z"
+    reviewed_at: "2026-06-20T13:33:58.867963Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:46fe1a71febd56a2cf6a47d3b261886b4832645adb79be1a56129b2243f2e2cc
+    reviewed_fingerprint: sha256:36f6a42cabf800134080acda5d0bb36e67929257f72f5baa1cca665a01ad2ce6
 verification:
     assurance_level: A
     formalization_status: ""

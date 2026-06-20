@@ -17,7 +17,10 @@ tags:
     - helper
     - option-builder
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:34:00.581277Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:5a492d6c2d067ad3466db038c19edfca7ab440bed9a418b79d71c7b759395258
 verification:
     assurance_level: A
     formalization_status: none

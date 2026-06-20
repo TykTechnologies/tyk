@@ -18,7 +18,10 @@ tags:
     - usage
     - interface-contract
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:34:01.053293Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:221c83f867cf375575743cf3e8f5689b1ec5b17d24507059a74da8d77adae2da
 verification:
     assurance_level: A
     formalization_status: none

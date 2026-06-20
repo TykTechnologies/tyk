@@ -19,9 +19,9 @@ tags:
     - security-critical
 variables: []
 traces:
-    reviewed_at: "2026-06-19T19:51:51Z"
+    reviewed_at: "2026-06-20T13:33:58.681432Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:0dcdf3a6225f509af9d2b7895f5769eec1b598ae65c30c876b9ec406b9c9f157
+    reviewed_fingerprint: sha256:de13e8599a696f0dab5d3141d391a60380c38f13b68c3736b70df110a396cc0e
 verification:
     assurance_level: A
     formalization_status: ""

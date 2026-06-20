@@ -18,7 +18,10 @@ tags:
     - upstream-auth
     - basic-auth
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:34:00.874251Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:962a8da2354c4476b6ebe9e25fab56b5a9953a9821bd96bbe6b51a38aaa5d40f
 verification:
     assurance_level: A
     formalization_status: none

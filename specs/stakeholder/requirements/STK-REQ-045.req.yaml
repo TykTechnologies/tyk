@@ -18,7 +18,10 @@ tags:
     - reliability
     - shutdown
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:34:01.159222Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:0c5bd3703083d77f1f1410bbc68cde03562f552c0d63336f1a327dbb6acb9f45
 verification:
     assurance_level: A
     formalization_status: none

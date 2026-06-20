@@ -18,7 +18,10 @@ tags:
     - redis
     - maintainability
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:34:01.212211Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:e0081d7ed2598fa6fefa4b80f3591d98dc5516622a6655197b148bc6812be0a4
 verification:
     assurance_level: A
     formalization_status: none

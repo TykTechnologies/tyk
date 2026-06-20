@@ -24,6 +24,9 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-107
+    reviewed_at: "2026-06-20T13:34:04.31566Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:63eab5ad3ef7cbe3f47963bd269666e56dc7edc67f47fc9b2a18619b003e6d15
 verification:
     assurance_level: A
     formalization_status: none

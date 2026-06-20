@@ -19,7 +19,10 @@ tags:
     - diagnostics
     - analytics
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:33:59.939346Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:a7d569bb2883b363ef6bf1ab49fdcebd689ae4e0dec522ef1e682483b6dd3c6a
 verification:
     assurance_level: A
     formalization_status: none

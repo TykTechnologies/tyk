@@ -18,7 +18,10 @@ tags:
     - import
     - api-definition
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:34:00.052449Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:f76e0bc56ee82f7cf5a0327654a215334a4a147c6be6f007b1e3bc93adb42f5d
 verification:
     assurance_level: A
     formalization_status: none

@@ -18,7 +18,10 @@ tags:
     - protocol-errors
     - client-errors
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:33:59.025017Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:49aaf0fca94dba3e2c9840ca8e7a8d681e3d6179a67112d855d9cb01e5d2b177
 verification:
     assurance_level: A
     formalization_status: none

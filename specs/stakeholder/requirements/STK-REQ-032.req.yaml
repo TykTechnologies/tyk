@@ -17,7 +17,10 @@ tags:
     - configuration
     - rate-limit
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:34:00.416302Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:7eadd0d4657aeb882b3e45b78fb0f5f004ddbe6feea5dd7bbb1c49778a25708a
 verification:
     assurance_level: A
     formalization_status: none

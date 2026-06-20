@@ -18,7 +18,10 @@ tags:
     - private
     - oauth
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:34:00.359269Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:3b1c83e1ce783fb8e15fd778d15a3aff7ff3e0d7fcb0717bf70bb3cc2724bf5c
 verification:
     assurance_level: A
     formalization_status: none

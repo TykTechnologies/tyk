@@ -17,7 +17,10 @@ tags:
     - configuration
     - opentracing
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:34:00.470351Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:3d6b12b71c10517c422da02b99751421fbabdc59206c62a0d1cdb48428040337
 verification:
     assurance_level: A
     formalization_status: none

@@ -18,9 +18,9 @@ tags:
     - sla
 variables: []
 traces:
-    reviewed_at: "2026-06-18T19:38:44.176646Z"
+    reviewed_at: "2026-06-20T13:33:58.937896Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:24b7a1135aa1cbd93113f6ad7b7a995e6d8af17a3fba694477306b3f6132a144
+    reviewed_fingerprint: sha256:d4c77a532e96175ec960f7d944a36de94aa839769b04c2fdf55ec528b8b5f99d
 verification:
     assurance_level: A
     formalization_status: ""

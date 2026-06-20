@@ -19,7 +19,10 @@ tags:
     - routing-state
     - self-looping
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:33:59.401969Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:1eeaef72f678a848f69b829482458aae1e5a9e6e9a75d61393c7ba5a59c3e523
 verification:
     assurance_level: A
     formalization_status: none

@@ -19,9 +19,9 @@ tags:
     - atomicity
 variables: []
 traces:
-    reviewed_at: "2026-06-18T19:38:44.120675Z"
+    reviewed_at: "2026-06-20T13:33:58.912906Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:9898a196dc70687ca71eea8a96cc6f26da34adf6209dde915605347cac1091e3
+    reviewed_fingerprint: sha256:9a626a44c180fdb42db2ea8e3f64ef3c9790e94a580033e925fa6eb1bec6de0f
 verification:
     assurance_level: A
     formalization_status: ""

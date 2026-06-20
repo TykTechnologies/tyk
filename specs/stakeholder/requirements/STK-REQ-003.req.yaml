@@ -18,9 +18,9 @@ tags:
     - traffic-control
 variables: []
 traces:
-    reviewed_at: "2026-06-18T19:38:44.090202Z"
+    reviewed_at: "2026-06-20T13:33:58.887963Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:6cab2673baf528f841761e7d835ff4c7c86d97c6f320d2e708f63e1596ac8f07
+    reviewed_fingerprint: sha256:b8ff483db4a0a3fd84ed803ede6f7e374994a03a7a5db01503a3077a50f1d306
 verification:
     assurance_level: A
     formalization_status: ""

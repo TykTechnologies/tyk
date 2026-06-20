@@ -19,7 +19,10 @@ tags:
     - build-tags
     - rate-limiter
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:34:00.280517Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:ad8511f42a15cb97c95e7d69510ec6c281098f92a1ae7232afd6e13c9eb9f9bd
 verification:
     assurance_level: A
     formalization_status: none

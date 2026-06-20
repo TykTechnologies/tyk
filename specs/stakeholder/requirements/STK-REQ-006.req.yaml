@@ -19,9 +19,9 @@ tags:
     - store-availability
 variables: []
 traces:
-    reviewed_at: "2026-06-18T19:38:44.134861Z"
+    reviewed_at: "2026-06-20T13:33:58.925921Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:f9248c403e1e4f235a531d1bdfc0c09285fd54dfdedd075f992700d9ea5503bc
+    reviewed_fingerprint: sha256:fa32a7f2a107644353ce1653d2383114ff9a8b13a4b6752d380cc6cf4207901b
 verification:
     assurance_level: A
     formalization_status: ""

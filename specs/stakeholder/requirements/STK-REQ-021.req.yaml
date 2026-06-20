@@ -20,7 +20,10 @@ tags:
     - in-process
     - dns
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-20T13:33:59.58171Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:7aeaa2e660d2072bbfdc00bde558c756cd1d023aadac9c6209eb44a0137e827f
 verification:
     assurance_level: A
     formalization_status: none
