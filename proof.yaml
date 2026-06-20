@@ -149,6 +149,8 @@ project:
     waivers: []
     verification_scope:
         include:
+            - apidef/adapter/asyncapi.go
+            - apidef/adapter/asyncapi_test.go
             - apidef/adapter/import_adapter.go
             - apidef/adapter/graphql_config_adapter.go
             - apidef/adapter/graphql_config_adapter_test.go

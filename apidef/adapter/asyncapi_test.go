@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	kafkadatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
+	"github.com/TykTechnologies/graphql-translator/asyncapi"
 	"github.com/buger/jsonparser"
 	"github.com/stretchr/testify/require"
 
@@ -346,6 +348,76 @@ const expectedGraphqlConfig = `{
     }
 }`
 
+const asyncAPIWithSelectedKafkaServer = `asyncapi: '2.4.0'
+info:
+  title: Selected Kafka API
+  version: '1.0.0'
+servers:
+  primary:
+    url: primary.kafka.local:9092
+    protocol: kafka
+  secondary:
+    url: secondary.kafka.local:9093
+    protocol: kafka-secure
+    bindings:
+      kafka:
+        clientId: client-{tenantId}
+        groupId: group-{tenantId}
+channels:
+  tenant.{tenantId}.event.{eventId}:
+    servers:
+      - secondary
+    subscribe:
+      operationId: tenantEvent
+      message:
+        payload:
+          type: object
+          properties:
+            id:
+              type: string`
+
+const unsupportedKafkaProtocolAsyncAPI = `asyncapi: '2.4.0'
+info:
+  title: Unsupported Kafka API
+  version: '1.0.0'
+servers:
+  unsupported:
+    url: broker.kafka.local:9092
+    protocol: http
+channels:
+  events:
+    subscribe:
+      operationId: unsupportedEvent
+      message:
+        payload:
+          type: object
+          properties:
+            id:
+              type: string`
+
+const missingKafkaURLAsyncAPI = `asyncapi: '2.4.0'
+info:
+  title: Missing Kafka URL API
+  version: '1.0.0'
+servers:
+  missing:
+    protocol: kafka
+channels:
+  events:
+    subscribe:
+      operationId: missingURLEvent
+      message:
+        payload:
+          type: object
+          properties:
+            id:
+              type: string`
+
+// Verifies: SYS-REQ-104, SW-REQ-070
+// SW-REQ-070:nominal:nominal
+// SW-REQ-070:boundary:nominal
+// SW-REQ-070:error_handling:negative
+// SW-REQ-070:determinism:nominal
 func TestGraphQLConfigAdapter_AsyncAPI(t *testing.T) {
 	importer := NewAsyncAPIAdapter("my-org-id", []byte(streetlightsKafkaAsyncAPI))
 
@@ -368,4 +440,75 @@ func TestGraphQLConfigAdapter_AsyncAPI(t *testing.T) {
 	err = json.Indent(dst, actualGraphqlConfig, "", "    ")
 	require.NoError(t, err)
 	require.Equal(t, expectedGraphqlConfig, dst.String())
+}
+
+// Verifies: SYS-REQ-104, SW-REQ-070
+// SW-REQ-070:nominal:nominal
+// SW-REQ-070:boundary:nominal
+// SW-REQ-070:determinism:nominal
+func TestAsyncAPIAdapterKafkaServerSelectionAndArgumentTemplates(t *testing.T) {
+	require.Equal(t, "tenant.{{.arguments.tenantId}}.event.{{.arguments.eventId}}", processArgumentSection("tenant.{tenantId}.event.{eventId}"))
+	require.Equal(t, "plain-topic", processArgumentSection("plain-topic"))
+
+	importer := NewAsyncAPIAdapter("my-org-id", []byte(asyncAPIWithSelectedKafkaServer))
+
+	actualApiDefinition, err := importer.Import()
+	require.NoError(t, err)
+
+	require.Equal(t, "Selected Kafka API", actualApiDefinition.Name)
+	require.Len(t, actualApiDefinition.GraphQL.Engine.FieldConfigs, 1)
+	require.Equal(t, apidef.GraphQLFieldConfig{
+		TypeName:  "Subscription",
+		FieldName: "tenantEvent",
+		Path:      []string{"tenantEvent"},
+	}, actualApiDefinition.GraphQL.Engine.FieldConfigs[0])
+	require.Len(t, actualApiDefinition.GraphQL.Engine.DataSources, 1)
+
+	dataSource := actualApiDefinition.GraphQL.Engine.DataSources[0]
+	require.Equal(t, apidef.GraphQLEngineDataSourceKind(apidef.GraphQLEngineDataSourceKindKafka), dataSource.Kind)
+	require.Equal(t, "consumer-group:tenantEvent", dataSource.Name)
+	require.Equal(t, []apidef.GraphQLTypeFields{
+		{Type: "Subscription", Fields: []string{"tenantEvent"}},
+	}, dataSource.RootFields)
+
+	var config map[string]any
+	require.NoError(t, json.Unmarshal(dataSource.Config, &config))
+	require.Equal(t, []any{"secondary.kafka.local:9093"}, config["broker_addresses"])
+	require.Equal(t, []any{"tenant.{{.arguments.tenantId}}.event.{{.arguments.eventId}}"}, config["topics"])
+	require.Equal(t, "group-{{.arguments.tenantId}}", config["group_id"])
+	require.Equal(t, "client-{{.arguments.tenantId}}", config["client_id"])
+	require.Contains(t, actualApiDefinition.GraphQL.Schema, "tenantEvent")
+
+	repeatedImporter := NewAsyncAPIAdapter("my-org-id", []byte(asyncAPIWithSelectedKafkaServer))
+	repeatedApiDefinition, err := repeatedImporter.Import()
+	require.NoError(t, err)
+	require.Equal(t, actualApiDefinition.GraphQL.Engine.FieldConfigs, repeatedApiDefinition.GraphQL.Engine.FieldConfigs)
+	require.Equal(t, actualApiDefinition.GraphQL.Engine.DataSources, repeatedApiDefinition.GraphQL.Engine.DataSources)
+}
+
+// Verifies: SYS-REQ-104, SW-REQ-070
+// SW-REQ-070:error_handling:negative
+func TestAsyncAPIAdapterRejectsMalformedAndUnsupportedKafkaInput(t *testing.T) {
+	_, err := NewAsyncAPIAdapter("my-org-id", []byte("asyncapi: [")).Import()
+	require.Error(t, err)
+
+	_, err = NewAsyncAPIAdapter("my-org-id", []byte(unsupportedKafkaProtocolAsyncAPI)).Import()
+	require.ErrorContains(t, err, "invalid server protocol: http")
+
+	_, err = NewAsyncAPIAdapter("my-org-id", []byte(missingKafkaURLAsyncAPI)).Import()
+	require.ErrorContains(t, err, "url is required")
+
+	_, err = prepareKafkaDataSourceConfig(&asyncapi.AsyncAPI{
+		Servers: map[string]*asyncapi.Server{
+			"missing": {Protocol: "kafka"},
+		},
+	})
+	require.ErrorContains(t, err, "server.URL cannot be empty")
+
+	_, err = encodeKafkaDataSourceConfig(kafklessSubscriptionOptions(), "topic")
+	require.Error(t, err)
+}
+
+func kafklessSubscriptionOptions() kafkadatasource.GraphQLSubscriptionOptions {
+	return kafkadatasource.GraphQLSubscriptionOptions{}
 }

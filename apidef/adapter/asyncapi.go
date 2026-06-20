@@ -21,6 +21,7 @@ const (
 	KafkaClientIdKey = "clientId"
 )
 
+// SW-REQ-070
 func removeCurlyBraces(argument string) string {
 	return strings.Map(
 		func(r rune) rune {
@@ -32,6 +33,8 @@ func removeCurlyBraces(argument string) string {
 		argument,
 	)
 }
+
+// SW-REQ-070
 func processArgumentSection(input string) string {
 	sampleRegexp := regexp.MustCompile("{(.*?)}")
 	matches := sampleRegexp.FindAll([]byte(input), -1)
@@ -43,6 +46,7 @@ func processArgumentSection(input string) string {
 	return input
 }
 
+// SW-REQ-070
 func prepareKafkaDataSourceConfig(parsed *asyncapi.AsyncAPI) (map[string]kafkadatasource.GraphQLSubscriptionOptions, error) {
 	serverConfig := make(map[string]kafkadatasource.GraphQLSubscriptionOptions)
 	for name, server := range parsed.Servers {
@@ -84,6 +88,7 @@ func prepareKafkaDataSourceConfig(parsed *asyncapi.AsyncAPI) (map[string]kafkada
 	return serverConfig, nil
 }
 
+// SW-REQ-070
 func encodeKafkaDataSourceConfig(cfg kafkadatasource.GraphQLSubscriptionOptions, topic string) ([]byte, error) {
 	localConfig := cfg
 	localConfig.Topics = append(localConfig.Topics, topic)
@@ -95,6 +100,7 @@ func encodeKafkaDataSourceConfig(cfg kafkadatasource.GraphQLSubscriptionOptions,
 	return json.Marshal(localConfig)
 }
 
+// SW-REQ-070
 func (a *asyncAPI) prepareGraphQLEngineConfig() error {
 	serverConfig, err := prepareKafkaDataSourceConfig(a.document)
 	if err != nil {
@@ -153,6 +159,7 @@ func (a *asyncAPI) prepareGraphQLEngineConfig() error {
 	return nil
 }
 
+// SW-REQ-070
 func (a *asyncAPI) Import() (*apidef.APIDefinition, error) {
 	document, err := asyncapi.ParseAsyncAPIDocument(a.input)
 	if err != nil {
@@ -187,6 +194,7 @@ func (a *asyncAPI) Import() (*apidef.APIDefinition, error) {
 	return a.apiDefinition, nil
 }
 
+// SW-REQ-070
 type asyncAPI struct {
 	orgId         string
 	input         []byte
@@ -195,6 +203,7 @@ type asyncAPI struct {
 	document      *asyncapi.AsyncAPI
 }
 
+// SW-REQ-070
 func NewAsyncAPIAdapter(orgId string, input []byte) ImportAdapter {
 	return &asyncAPI{
 		orgId:  orgId,

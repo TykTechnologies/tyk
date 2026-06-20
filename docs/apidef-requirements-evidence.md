@@ -25,6 +25,7 @@
 <!-- documents SW-REQ-065 -->
 <!-- documents SW-REQ-068 -->
 <!-- documents SW-REQ-069 -->
+<!-- documents SW-REQ-070 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -42,8 +43,9 @@ OAS server-regeneration helper shapes,
 internal reflection support helper behavior,
 custom middleware definition enablement classification, OAS extension header
 name/value helper shapes, OAS extension error-override helper shapes, adapter
-interface and GraphQL utility helper behavior, and GraphQL config adapter
-selection behavior without silent data-shape drift.
+interface and GraphQL utility helper behavior, GraphQL config adapter
+selection behavior, and AsyncAPI adapter support-shape generation without
+silent data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -310,3 +312,19 @@ adapter packages, GraphQL schema parsing, GraphQL execution, AsyncAPI or
 OpenAPI import correctness, gateway API loading, route generation, request
 matching, gateway request admission, middleware execution, upstream
 availability, persistence, analytics, or final client-visible runtime behavior.
+
+`SW-REQ-070` owns the concrete `apidef/adapter` AsyncAPI adapter used by
+API-definition adapter flows. Its evidence covers well-formed AsyncAPI import
+into a new active GraphQL execution-engine API definition, Kafka broker and
+binding conversion into GraphQL Kafka data-source configuration, AsyncAPI
+argument template conversion, channel-specific server selection and default
+server fallback, deterministic field/data-source sorting,
+schema printing into the API definition, malformed input errors, unsupported
+server protocol errors, missing server URL errors, and invalid Kafka
+data-source configuration errors. This evidence does not claim complete
+AsyncAPI specification coverage, correctness of the upstream AsyncAPI parser or
+GraphQL translator, downstream GraphQL engine adapter correctness, GraphQL
+execution, Kafka connectivity or consumption behavior, gateway API loading,
+route generation, request matching, gateway request admission, middleware
+execution, upstream availability, persistence, analytics, or final
+client-visible runtime behavior.
