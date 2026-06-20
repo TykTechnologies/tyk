@@ -1,0 +1,60 @@
+id: SYS-REQ-121
+version: 1
+status: approved
+priority: shall
+category: configuration
+req_type: guarantee
+fretish: the opentracing_configuration shall always satisfy !opentracing_configuration_operation_requested | opentracing_configuration_result_determined
+description: OpenTracing configuration support shall determine local tracing option decode and environment override results for JSON/YAML-compatible Zipkin and Jaeger option maps, including matching tracer override application, unrelated tracer no-op behavior, and explicit local errors for invalid environment values or malformed compatible decode destinations, without claiming tracer initialization, trace export delivery, collector connectivity, runtime sampling correctness, panic recovery for unsupported non-serializable in-memory Go values, or final gateway runtime behavior.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-033
+component: opentracing_configuration
+rationale: This system requirement owns local config/opentracing_custom_env_loader.go helper behavior. Runtime tracing setup and exporter behavior remain outside this proof slice.
+tags:
+    - configuration
+    - opentracing
+variables:
+    - opentracing_configuration_operation_requested
+    - opentracing_configuration_result_determined
+traces:
+    satisfies:
+        - STK-REQ-033
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T10:27:46Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. OpenTracing configuration scope is limited to local config/opentracing_custom_env_loader.go behavior: JSON/YAML-compatible option decoding, Zipkin and Jaeger environment overrides, unrelated tracer no-op behavior, and explicit local errors for invalid environment values or malformed compatible decode destinations. The focused config tests passed. This approval does not claim tracer initialization, trace export delivery, collector connectivity, runtime sampling correctness, panic recovery for unsupported non-serializable in-memory Go values, or final gateway runtime behavior.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T10:31:27.264943Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-121|opentracing_configuration_result_determined
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final requirement approval. SYS-REQ-121''s opentracing_configuration_result_determined variable is decomposed by SW-REQ-108 for local config/opentracing_custom_env_loader.go behavior: JSON/YAML-compatible option decoding, Zipkin and Jaeger environment overrides, unrelated tracer no-op behavior, and explicit local errors for invalid environment values or malformed compatible decode destinations. This review is limited to local OpenTracing configuration helper support and does not claim tracer initialization, trace export delivery, collector connectivity, runtime sampling correctness, panic recovery for unsupported non-serializable in-memory Go values, or final gateway runtime behavior.'
+          reviewed_at: "2026-06-20T10:31:27.264943Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T10:27:46Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T10:27:46Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-20T10:27:46Z"
+          from: draft
+          to: review
+          reason: Added OpenTracing configuration system requirement for config/opentracing_custom_env_loader.go onboarding.
+          changed_by: agent:codex

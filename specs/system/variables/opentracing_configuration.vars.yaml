@@ -1,0 +1,14 @@
+component: opentracing_configuration
+no_interface:
+    declared: true
+    reason: The config/opentracing_custom_env_loader.go file is exercised as a local OpenTracing configuration helper; tracer initialization, trace export delivery, collector connectivity, runtime sampling correctness, gateway request admission, and final request handling are outside this local component boundary.
+variables:
+    - name: opentracing_configuration_operation_requested
+      type: bool
+      direction: input
+      description: Gateway code or tests request local OpenTracing option decoding or environment override application.
+
+    - name: opentracing_configuration_result_determined
+      type: bool
+      direction: output
+      description: OpenTracing configuration support skips unrelated tracer names, returns decoded compatible option maps, applies matching environment overrides, or returns explicit local errors for invalid compatible inputs.

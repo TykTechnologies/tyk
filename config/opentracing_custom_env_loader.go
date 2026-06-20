@@ -49,6 +49,7 @@ type Sampler struct {
 
 // DecodeJSON marshals src to json and tries to unmarshal the result into
 // dest.
+// SW-REQ-108
 func DecodeJSON(dest, src interface{}) error {
 	b, err := json.Marshal(src)
 	if err != nil {
@@ -57,6 +58,7 @@ func DecodeJSON(dest, src interface{}) error {
 	return json.Unmarshal(b, dest)
 }
 
+// SW-REQ-108
 func DecodeYAML(dest, src interface{}) error {
 	b, err := yaml.Marshal(src)
 	if err != nil {
@@ -76,6 +78,7 @@ func DecodeYAML(dest, src interface{}) error {
 // TYK_GW_TRACER_OPTIONS_SAMPLER_RATE
 // TYK_GW_TRACER_OPTIONS_SAMPLER_SALT
 // TYK_GW_TRACER_OPTIONS_SAMPLER_MOD
+// SW-REQ-108
 func loadZipkin(prefix string, c *Config) error {
 	if c.Tracer.Name != "zipkin" {
 		return nil
@@ -127,6 +130,7 @@ func loadZipkin(prefix string, c *Config) error {
 // TYK_GW_TRACER_OPTIONS_THROTTLER_HOSTPORT
 // TYK_GW_TRACER_OPTIONS_THROTTLER_REFRESHINTERVAL
 // TYK_GW_TRACER_OPTIONS_THROTTLER_SYNCHRONOUSINITIALIZATION
+// SW-REQ-108
 func loadJaeger(prefix string, c *Config) error {
 	if c.Tracer.Name != "jaeger" {
 		return nil
