@@ -34,6 +34,8 @@ The evidence scope includes:
   update-client mutable field responses that preserve immutable ID/secret
   values, rotate-client secret replacement, token-list statuses, delete-client
   statuses, lapsed-token purge statuses, and refresh-token invalidation statuses
+- local health-check, user-rate projection, cache invalidation, OAuth storage
+  selection, and single-token revoke status outcomes
 - static mTLS certificate-binding helper validation for empty bindings,
   existing certificate IDs, organization-prefixed certificate IDs, wrong-org
   IDs, path traversal-shaped IDs, and missing certificates

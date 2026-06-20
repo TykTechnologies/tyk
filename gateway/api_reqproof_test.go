@@ -1892,6 +1892,174 @@ func TestGatewayOAuthClientManagementHelpers(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:error_handling:negative
+// STK-REQ-051:error_handling:nominal
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:error_handling:negative
+// SYS-REQ-139:error_handling:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:error_handling:negative
+// SW-REQ-126:error_handling:nominal
+// SW-REQ-126:determinism:nominal
+func TestGatewayControlAPIStatusHelpers(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := ts.LoadTestOAuthSpec()
+
+	rec := httptest.NewRecorder()
+	ts.Gw.healthCheckhandler(rec, httptest.NewRequest(http.MethodGet, "/tyk/health?api_id=999999", nil))
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.JSONEq(t, `{"status":"error","message":"Health checks are not enabled for this node"}`, rec.Body.String())
+
+	globalConf := ts.Gw.GetConfig()
+	globalConf.HealthCheck.EnableHealthChecks = true
+	ts.Gw.SetConfig(globalConf)
+
+	for _, tc := range []struct {
+		name   string
+		target string
+		want   int
+		body   string
+	}{
+		{
+			name:   "health missing api id",
+			target: "/tyk/health",
+			want:   http.StatusBadRequest,
+			body:   `{"status":"error","message":"missing api_id parameter"}`,
+		},
+		{
+			name:   "health missing api",
+			target: "/tyk/health?api_id=missing-api",
+			want:   http.StatusNotFound,
+			body:   `{"status":"error","message":"API ID not found"}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+
+			ts.Gw.healthCheckhandler(rec, httptest.NewRequest(http.MethodGet, tc.target, nil))
+
+			require.Equal(t, tc.want, rec.Code)
+			assert.JSONEq(t, tc.body, rec.Body.String())
+		})
+	}
+
+	for _, tc := range []struct {
+		name string
+		want int
+		body string
+	}{
+		{
+			name: "missing session",
+			want: http.StatusBadRequest,
+			body: `{"status":"error","message":"Health checks are not enabled for this node"}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/tyk/rates", nil)
+			rec := httptest.NewRecorder()
+
+			userRatesCheck(rec, req)
+
+			require.Equal(t, tc.want, rec.Code)
+			assert.JSONEq(t, tc.body, rec.Body.String())
+		})
+	}
+
+	ratesReq := httptest.NewRequest(http.MethodGet, "/tyk/rates", nil)
+	ctxSetSession(ratesReq, &user.SessionState{
+		QuotaRenews:    11,
+		QuotaRemaining: 12,
+		QuotaMax:       13,
+		Rate:           14,
+		Per:            15,
+	}, false, false)
+	rec = httptest.NewRecorder()
+	userRatesCheck(rec, ratesReq)
+	require.Equal(t, http.StatusOK, rec.Code)
+	var rates PublicSession
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &rates))
+	assert.Equal(t, int64(11), rates.Quota.QuotaRenews)
+	assert.Equal(t, int64(12), rates.Quota.QuotaRemaining)
+	assert.Equal(t, int64(13), rates.Quota.QuotaMax)
+	assert.Equal(t, 14.0, rates.RateLimit.Rate)
+	assert.Equal(t, 15.0, rates.RateLimit.Per)
+
+	rec = httptest.NewRecorder()
+	ts.Gw.invalidateCacheHandler(rec, mux.SetURLVars(httptest.NewRequest(http.MethodDelete, "/tyk/cache/999999", nil), map[string]string{"apiID": spec.APIID}))
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.JSONEq(t, `{"status":"ok","message":"cache invalidated"}`, rec.Body.String())
+
+	storage, code, err := ts.Gw.GetStorageForApi(spec.APIID)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, code)
+	require.NotNil(t, storage)
+
+	storage, code, err = ts.Gw.GetStorageForApi("missing-api")
+	require.Error(t, err)
+	require.Equal(t, http.StatusNotFound, code)
+	require.Nil(t, storage)
+
+	createPayload, err := json.Marshal(NewClientRequest{
+		ClientID:          "status-client",
+		ClientRedirectURI: "http://client.example/callback",
+		APIID:             spec.APIID,
+		ClientSecret:      "status-secret",
+	})
+	require.NoError(t, err)
+	rec = httptest.NewRecorder()
+	ts.Gw.createOauthClient(rec, httptest.NewRequest(http.MethodPost, "/tyk/oauth/clients/create", bytes.NewReader(createPayload)))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	for _, tc := range []struct {
+		name string
+		form string
+		want int
+		body string
+	}{
+		{
+			name: "revoke missing token",
+			form: "client_id=status-client&org_id=default",
+			want: http.StatusBadRequest,
+			body: `{"status":"error","message":"token is required"}`,
+		},
+		{
+			name: "revoke missing client",
+			form: "token=access-a&org_id=default",
+			want: http.StatusBadRequest,
+			body: `{"status":"error","message":"client_id is required"}`,
+		},
+		{
+			name: "revoke unknown client",
+			form: "token=access-a&client_id=missing-client&org_id=default",
+			want: http.StatusBadRequest,
+			body: `{"status":"error","message":"oauth client doesn't exist"}`,
+		},
+		{
+			name: "revoke accepted",
+			form: "token=access-a&token_type_hint=access_token&client_id=status-client&org_id=default",
+			want: http.StatusOK,
+			body: `{"status":"ok","message":"token revoked successfully"}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/tyk/oauth/revoke", strings.NewReader(tc.form))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rec := httptest.NewRecorder()
+
+			ts.Gw.RevokeTokenHandler(rec, req)
+
+			require.Equal(t, tc.want, rec.Code)
+			assert.JSONEq(t, tc.body, rec.Body.String())
+		})
+	}
+}
+
 // Verifies: STK-REQ-054, SYS-REQ-142, SW-REQ-129
 // STK-REQ-054:STK-REQ-054-AC-01:acceptance
 // SYS-REQ-142:nominal:nominal

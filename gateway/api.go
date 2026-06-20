@@ -3115,6 +3115,7 @@ func (gw *Gateway) getApisForOauthClientId(oauthClientId string, orgId string) [
 	return apis
 }
 
+// SW-REQ-126
 func (gw *Gateway) healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 	if !gw.GetConfig().HealthCheck.EnableHealthChecks {
 		doJSONWrite(w, http.StatusBadRequest, apiError("Health checks are not enabled for this node"))
@@ -3134,6 +3135,7 @@ func (gw *Gateway) healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, health)
 }
 
+// SW-REQ-126
 func userRatesCheck(w http.ResponseWriter, r *http.Request) {
 	session := ctxGetSession(r)
 	if session == nil {
@@ -3151,6 +3153,7 @@ func userRatesCheck(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, returnSession)
 }
 
+// SW-REQ-126
 func (gw *Gateway) invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 
@@ -3179,6 +3182,7 @@ func (gw *Gateway) invalidateCacheHandler(w http.ResponseWriter, r *http.Request
 	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
 }
 
+// SW-REQ-126
 func (gw *Gateway) RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 
@@ -3217,6 +3221,7 @@ func (gw *Gateway) RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, apiOk("token revoked successfully"))
 }
 
+// SW-REQ-126
 func (gw *Gateway) GetStorageForApi(apiID string) (ExtendedOsinStorageInterface, int, error) {
 	apiSpec := gw.getApiSpec(apiID)
 	if apiSpec == nil {

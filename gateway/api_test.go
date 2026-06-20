@@ -277,6 +277,15 @@ func serializePolicy(t *testing.T, pol user.Policy) string {
 	return string(data)
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:error_handling:negative
+// STK-REQ-051:error_handling:nominal
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:error_handling:negative
+// SYS-REQ-139:error_handling:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:error_handling:negative
+// SW-REQ-126:error_handling:nominal
 func TestHealthCheckEndpoint(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
