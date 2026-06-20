@@ -5,7 +5,7 @@ priority: shall
 category: key_management
 req_type: guarantee
 fretish: the gateway_key_management shall always satisfy gateway_key_management_operation_terminal
-description: Gateway key management support shall make local helper operations terminal and deterministic for basic-auth password hash algorithm selection and password storage transformation, key add/update payload decoding and explicit malformed-input or missing-key errors, local add-key storage updates gated by organization, key detail retrieval with quota remaining calculation and basic-auth password redaction, key-list retrieval and API filtering, context-cancellation timeout reporting, internal quota/rate key exclusion, raw and hashed key deletion status handling with optional quota reset, and RPC sorted-set forwarding, without claiming password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
+description: Gateway key management support shall make local helper operations terminal and deterministic for basic-auth password hash algorithm selection and password storage transformation, tested key and organization-key route wrapper status handling, key add/update payload decoding and explicit malformed-input or missing-key errors, local add-key storage updates gated by organization, hashed-key policy update status handling, key detail retrieval with quota remaining calculation and basic-auth password redaction, key-list retrieval and API filtering, context-cancellation timeout reporting, internal quota/rate key exclusion, raw and hashed key deletion status handling with optional quota reset, and RPC sorted-set forwarding, without claiming password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -24,7 +24,7 @@ variables:
 traces:
     satisfies:
         - STK-REQ-053
-    reviewed_at: "2026-06-20T19:55:35.709755Z"
+    reviewed_at: "2026-06-20T20:52:11.753468Z"
     reviewed_by: human:buger
     reviewed_fingerprint: sha256:8837d35521afe2a69c3804a7ef2cd2b40f79a7daa02e209e6b8a14177f19e83a
 verification:
@@ -36,7 +36,7 @@ verification:
         role: requirements_owner
         reviewed_at: "2026-06-20T19:36:28Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway key management system scope is limited to local helper terminality for basic-auth hash algorithm selection and password storage transformation, key add/update request decoding and explicit error status handling, local add-key storage updates gated by organization, key detail retrieval with quota remaining calculation and basic-auth password redaction, key-list retrieval/filtering, context-cancellation timeout reporting, internal quota/rate key exclusion, raw and hashed key deletion status handling with optional quota reset, and RPC sorted-set forwarding. The FRETish invariant intentionally models local operation terminality without asserting password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway key management system scope is limited to local helper terminality for basic-auth hash algorithm selection and password storage transformation, tested key and organization-key route wrapper status handling, key add/update request decoding and explicit error status handling, local add-key storage updates gated by organization, hashed-key policy update status handling, key detail retrieval with quota remaining calculation and basic-auth password redaction, key-list retrieval/filtering, context-cancellation timeout reporting, internal quota/rate key exclusion, raw and hashed key deletion status handling with optional quota reset, and RPC sorted-set forwarding. The FRETish invariant intentionally models local operation terminality without asserting password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
         ai_generated: false
     gaps_reviewed_at: "2026-06-20T20:45:32.916935Z"
     gaps_reviewed_by: human:buger
@@ -50,7 +50,7 @@ history:
     created_by: agent:codex
     created_at: "2026-06-20T19:36:28Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-20T19:52:01Z"
+    last_modified_at: "2026-06-20T21:08:00Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -68,4 +68,9 @@ lifecycle:
           from: approved
           to: approved
           reason: Extended local gateway key management helper scope to raw/hashed deletion and RPC sorted-set forwarding.
+          changed_by: human:buger
+        - date: "2026-06-20T21:08:00Z"
+          from: approved
+          to: approved
+          reason: Extended local gateway key management system requirement to route wrappers and hashed-key policy updates.
           changed_by: human:buger

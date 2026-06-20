@@ -5,7 +5,7 @@ priority: shall
 category: control_api
 req_type: guarantee
 fretish: ""
-description: The gateway control API implementation shall preserve local helper behavior for status helper construction, JSON response writing, JSON export writing, method-not-allowed responses, secure no-cache header wrapping, allowed-method filtering, tested API and OAS route-dispatch wrappers, organization-scoped API lookup, API ID listing, API definition listing with explicit MCP inclusion filtering, classic and OAS API retrieval status handling, OAS list delegation, public OAS extension removal, API add/update/delete status handling, local filesystem write status handling, static mTLS certificate-binding existence and organization-prefix validation, and new-certificate delta calculation, without claiming TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, reload durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.
+description: The gateway control API implementation shall preserve local helper behavior for status helper construction, JSON response writing, JSON export writing, method-not-allowed responses, secure no-cache header wrapping, allowed-method filtering, tested API and OAS route-dispatch wrappers including OAS export response shaping, organization-scoped API lookup, API ID listing, API definition listing with explicit MCP inclusion filtering, classic and OAS API retrieval status handling, OAS list delegation, public OAS extension removal, API add/update/delete status handling, local filesystem write status handling, static mTLS certificate-binding existence and organization-prefix validation, and new-certificate delta calculation, without claiming TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, reload durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.
 formalization_strategy: informal
 informal_verification:
     method: unit_tests
@@ -24,7 +24,7 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-139
-    reviewed_at: "2026-06-20T20:43:00.503092Z"
+    reviewed_at: "2026-06-20T20:52:02.750734Z"
     reviewed_by: human:buger
     reviewed_fingerprint: sha256:43f5d074fa9c7542113a5c125aa7e09e77b41162c2f53184966b402dae09be6b
 verification:

@@ -1832,6 +1832,7 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
+// SW-REQ-126
 func (gw *Gateway) apiOASExportHandler(w http.ResponseWriter, r *http.Request) {
 	const (
 		baseFileName       = "TykOasApiDef"
@@ -1862,6 +1863,7 @@ func (gw *Gateway) apiOASExportHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONExport(w, code, obj, fmt.Sprintf("%s.%s", fileName, fileTypeJSON))
 }
 
+// SW-REQ-128
 func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 	keyName := mux.Vars(r)["keyName"]
 	apiID := r.URL.Query().Get("api_id")
@@ -1942,6 +1944,7 @@ type PolicyUpdateObj struct {
 	ApplyPolicies []string `json:"apply_policies"`
 }
 
+// SW-REQ-128
 func (gw *Gateway) policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	log.Warning("Hashed key change request detected!")
 
@@ -1961,6 +1964,7 @@ func (gw *Gateway) policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
+// SW-REQ-128
 func (gw *Gateway) handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{}, int) {
 	var orgID string
 
@@ -2013,6 +2017,7 @@ func (gw *Gateway) handleUpdateHashedKey(keyName string, applyPolicies []string)
 	return statusObj, http.StatusOK
 }
 
+// SW-REQ-128
 func (gw *Gateway) orgHandler(w http.ResponseWriter, r *http.Request) {
 	orgID := mux.Vars(r)["keyName"]
 	filter := r.URL.Query().Get("filter")

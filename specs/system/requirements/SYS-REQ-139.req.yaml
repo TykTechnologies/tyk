@@ -5,7 +5,7 @@ priority: shall
 category: control_api
 req_type: guarantee
 fretish: the gateway_control_api shall always satisfy gateway_control_api_operation_terminal
-description: Gateway control API support shall make local response, routing, API inventory, API selection, API add/update/delete, local persistence, and static mTLS binding validation operations terminal and deterministic for status helper construction, JSON response writing, JSON export writing, method-not-allowed responses, secure no-cache header wrapping, allowed-method filtering, tested API and OAS route-dispatch wrappers, organization-scoped API lookup, API ID listing, API definition listing with explicit MCP inclusion filtering, classic and OAS API retrieval status handling, OAS list delegation, public OAS extension removal, API add/update/delete status handling, local filesystem write status handling, certificate-binding existence and organization-prefix validation, and new-certificate delta calculation, without claiming TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, reload durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.
+description: Gateway control API support shall make local response, routing, API inventory, API selection, API add/update/delete, local persistence, and static mTLS binding validation operations terminal and deterministic for status helper construction, JSON response writing, JSON export writing, method-not-allowed responses, secure no-cache header wrapping, allowed-method filtering, tested API and OAS route-dispatch wrappers including OAS export response shaping, organization-scoped API lookup, API ID listing, API definition listing with explicit MCP inclusion filtering, classic and OAS API retrieval status handling, OAS list delegation, public OAS extension removal, API add/update/delete status handling, local filesystem write status handling, certificate-binding existence and organization-prefix validation, and new-certificate delta calculation, without claiming TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, reload durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -23,7 +23,7 @@ variables:
 traces:
     satisfies:
         - STK-REQ-051
-    reviewed_at: "2026-06-20T20:43:00.675987Z"
+    reviewed_at: "2026-06-20T20:52:02.543689Z"
     reviewed_by: human:buger
     reviewed_fingerprint: sha256:2aa59c338bc6ea8e0e44c9ab472219661a1997f2aafe311fac5182af900dd247
 verification:

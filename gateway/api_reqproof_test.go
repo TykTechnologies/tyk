@@ -692,6 +692,57 @@ func TestGatewayControlAPIRouteHandlers(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// STK-REQ-051:error_handling:negative
+// STK-REQ-051:error_handling:nominal
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:error_handling:negative
+// SYS-REQ-139:error_handling:nominal
+// SYS-REQ-139:encoding_safety:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:error_handling:negative
+// SW-REQ-126:error_handling:nominal
+// SW-REQ-126:encoding_safety:nominal
+// SW-REQ-126:determinism:nominal
+func TestGatewayControlAPIOASExportHandler(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	oasSpec := BuildOASAPI(func(oasDef *oas.OAS) {
+		tykExt := oasDef.GetTykExtension()
+		tykExt.Info.ID = "export-oas"
+		tykExt.Info.Name = "Export OAS"
+		tykExt.Server.ListenPath.Value = "/export-oas/"
+	})[0]
+	ts.Gw.LoadAPI(oasSpec)
+
+	t.Run("exports one oas api with private filename", func(t *testing.T) {
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodGet, "/tyk/apis/oas/export/export-oas", nil), map[string]string{"apiID": "export-oas"})
+		rec := httptest.NewRecorder()
+
+		ts.Gw.apiOASExportHandler(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Header().Get("Content-Disposition"), "TykOasApiDef-export-oas.json")
+		assert.Contains(t, rec.Body.String(), `"x-tyk-api-gateway"`)
+	})
+
+	t.Run("exports public list with public filename", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/tyk/apis/oas/export?mode=public", nil)
+		rec := httptest.NewRecorder()
+
+		ts.Gw.apiOASExportHandler(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Header().Get("Content-Disposition"), "oas.json")
+		assert.NotContains(t, rec.Body.String(), `"x-tyk-api-gateway"`)
+	})
+}
+
 func apiDefinitionIDs(definitions []*apidef.APIDefinition) []string {
 	ids := make([]string, 0, len(definitions))
 	for _, definition := range definitions {
@@ -1241,6 +1292,81 @@ func TestGatewayKeyManagementSortedSetForwarding(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, values)
 	assert.Empty(t, scores)
+}
+
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// STK-REQ-053:error_handling:negative
+// STK-REQ-053:error_handling:nominal
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SYS-REQ-141:error_handling:negative
+// SYS-REQ-141:error_handling:nominal
+// SYS-REQ-141:determinism:nominal
+// SW-REQ-128:nominal:nominal
+// SW-REQ-128:boundary:nominal
+// SW-REQ-128:error_handling:negative
+// SW-REQ-128:error_handling:nominal
+// SW-REQ-128:determinism:nominal
+func TestGatewayKeyManagementRouteHandlers(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("key handler rejects hashed key listing when disabled", func(t *testing.T) {
+		conf := ts.Gw.GetConfig()
+		conf.HashKeys = true
+		conf.EnableHashedKeysListing = false
+		ts.Gw.SetConfig(conf)
+
+		req := httptest.NewRequest(http.MethodGet, "/tyk/keys", nil)
+		rec := httptest.NewRecorder()
+
+		ts.Gw.keyHandler(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Hashed key listing is disabled")
+	})
+
+	t.Run("policy update handler rejects malformed instructions", func(t *testing.T) {
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodPost, "/tyk/keys/policy/key", strings.NewReader("{")), map[string]string{"keyName": "key"})
+		rec := httptest.NewRecorder()
+
+		ts.Gw.policyUpdateHandler(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Couldn't decode instruction")
+	})
+
+	t.Run("policy update handler updates hashed key policies", func(t *testing.T) {
+		policyID := ts.CreatePolicy(func(p *user.Policy) {
+			p.ID = "hashed-policy"
+			p.OrgID = "default"
+		})
+		keyName := storage.HashKey(ts.Gw.generateToken("default", "policy-update"), true)
+		session := CreateStandardSession()
+		require.NoError(t, ts.Gw.GlobalSessionManager.UpdateSession(keyName, session, 0, true))
+		body := strings.NewReader(`{"policy":"` + policyID + `"}`)
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodPost, "/tyk/keys/policy/"+keyName, body), map[string]string{"keyName": keyName})
+		rec := httptest.NewRecorder()
+
+		ts.Gw.policyUpdateHandler(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), `"action":"updated"`)
+		stored, found := ts.Gw.GlobalSessionManager.SessionDetail("default", keyName, true)
+		require.True(t, found)
+		assert.Equal(t, []string{policyID}, stored.ApplyPolicies)
+	})
+
+	t.Run("org handler returns explicit missing org status", func(t *testing.T) {
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodGet, "/tyk/org/keys/missing-org", nil), map[string]string{"keyName": "missing-org"})
+		rec := httptest.NewRecorder()
+
+		ts.Gw.orgHandler(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Org not found")
+	})
 }
 
 // Verifies: STK-REQ-054, SYS-REQ-142, SW-REQ-129
