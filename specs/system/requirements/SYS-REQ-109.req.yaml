@@ -5,7 +5,7 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the cache shall always satisfy !cache_operation_requested | cache_operation_determined
-description: Cache helper handling shall determine in-memory cache operation results for construction, set, get, item expiration checks, item listing, delete, cleanup, count, flush, close, repository delegation, default timeout handling, and janitor cleanup or close operations.
+description: Cache helper handling shall determine in-memory cache operation results for construction, set, get, item expiration checks, item listing, delete, cleanup, count, flush, close, repository delegation, default timeout handling, janitor cleanup or close operations, and DNS cache manager wrapping of dial requests through enabled local address storage.
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -13,12 +13,13 @@ informal_verification:
     verified: false
 parent: STK-REQ-021
 component: cache
-rationale: This system requirement owns deterministic in-process cache helper behavior. It does not claim distributed cache behavior, persistence, external storage semantics, caller cache-key policy, cross-process consistency, or gateway endpoint outcomes.
+rationale: This system requirement owns deterministic in-process cache helper behavior, including local DNS cache manager decisions. It does not claim distributed cache behavior, persistence, external storage semantics, DNS server availability, resolver correctness, caller cache-key policy, cross-process consistency, network connection success, or gateway endpoint outcomes.
 tags:
     - cache
     - ttl
     - cleanup
     - in-process
+    - dns
 variables:
     - cache_operation_requested
     - cache_operation_determined
@@ -32,26 +33,27 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-19T22:22:41Z"
-        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Cache requirements are scoped to internal/cache in-process TTL cache and repository behavior: construction, set/get, missing lookup, expiration checks, item snapshots, delete, cleanup, count, flush, close, default timeout handling, janitor cleanup, and repeated or concurrent janitor close. Focused internal/cache tests passed, including race. This approval does not claim distributed cache behavior, persistence, Redis or other external storage semantics, caller cache-key policy, cross-process consistency, or gateway endpoint outcomes.'
-        fingerprint: sha256:a43ddad21fad6df44595bbe2a734b4120d365e836e5b60abab9bd9ad2bbb7ec1
+        reviewed_at: "2026-06-20T00:23:32Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Cache scope now includes dnscache manager dialer-wrapping behavior in addition to internal/cache and dnscache storage behavior: manager construction, storage replacement and observation, enabled/disabled state, idempotent initialization, disabled-cache and IP-literal bypass, malformed host:port errors, cached host lookup, pick-first/no-cache/random multi-IP strategy decisions, cached-host deletion after failed cached dials, fetch-error fallback, random-strategy guard errors, and enabled cache disposal. Focused dnscache tests passed with race. This approval does not claim distributed cache behavior, persistence, Redis or other external storage semantics, DNS server availability, resolver correctness, caller cache-key policy, cross-process consistency, network connection success, or gateway endpoint outcomes.'
+        fingerprint: sha256:7f039f549682183daeec7b1957a3e530392a92fd5e2c83f09587b30e202f1337
         ai_generated: false
-    gaps_reviewed_at: "2026-06-19T22:22:57.058889Z"
+    gaps_reviewed_at: "2026-06-20T00:23:41.100755Z"
     gaps_reviewed_by: human:buger
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-109|cache_operation_determined
           reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-109's cache_operation_determined variable is decomposed by SW-REQ-029 for in-process cache construction, set/get, missing lookup, expiration checks, item snapshots, delete, cleanup, count, flush, close, default timeout handling, repository delegation, janitor cleanup, and repeated or concurrent janitor close. This review is limited to internal/cache helper behavior and does not claim distributed cache behavior, persistence, external storage semantics, caller cache-key policy, cross-process consistency, or gateway endpoint outcomes.
-          reviewed_at: "2026-06-19T22:22:57.058889Z"
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-109's cache_operation_determined variable is decomposed by SW-REQ-029 for internal/cache in-process cache construction, set/get, missing lookup, expiration checks, item snapshots, delete, cleanup, count, flush, close, repository delegation, default timeout handling, janitor cleanup, and repeated or concurrent janitor close; by SW-REQ-035 for dnscache local storage construction, address-list set/get/list/delete/clear behavior, empty-host lookup rejection, and successful lookup caching; and by SW-REQ-038 for dnscache manager construction, storage replacement and observation, enabled/disabled state, idempotent initialization, disabled-cache and IP-literal bypass, malformed host:port errors, cached host lookup, pick-first/no-cache/random multi-IP strategy decisions, cached-host deletion after failed cached dials, fetch-error fallback, random-strategy guard errors, and enabled cache disposal. This review does not claim distributed cache behavior, persistence, external storage semantics, DNS server availability, resolver correctness, caller cache-key policy, cross-process consistency, network connection success, or gateway endpoint outcomes.
+          reviewed_at: "2026-06-20T00:23:41.100755Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T00:00:00Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-19T22:22:41Z"
+    last_modified_at: "2026-06-20T00:23:32Z"
 obligation_checklist:
     - nominal
     - boundary
+    - error_handling
     - idempotency
     - concurrent
 lifecycle:
@@ -61,3 +63,8 @@ lifecycle:
           to: review
           reason: Ready for delegated requirements-owner review after focused internal/cache tests passed
           changed_by: agent:codex
+        - date: "2026-06-20T00:23:32Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-19T22:22:41Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Cache requirements are scoped to internal/cache in-process TTL cache and repository behavior: construction, set/get, missing lookup, expiration checks, item snapshots, delete, cleanup, count, flush, close, default timeout handling, janitor cleanup, and repeated or concurrent janitor close. Focused internal/cache tests passed, including race. This approval does not claim distributed cache behavior, persistence, Redis or other external storage semantics, caller cache-key policy, cross-process consistency, or gateway endpoint outcomes.")'
+          changed_by: human:buger

@@ -162,6 +162,9 @@ project:
             - apidef/mcp/linter_test.go
             - apidef/mcp/validator.go
             - apidef/mcp/validator_test.go
+            - dnscache/manager.go
+            - dnscache/manager_reqproof_test.go
+            - dnscache/manager_test.go
             - dnscache/storage.go
             - dnscache/storage_reqproof_test.go
             - header/header.go

@@ -10,6 +10,16 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
+// Verifies: STK-REQ-021, SYS-REQ-109, SW-REQ-038
+// STK-REQ-021:nominal:nominal
+// STK-REQ-021:boundary:boundary
+// STK-REQ-021:error_handling:negative
+// SYS-REQ-109:nominal:nominal
+// SYS-REQ-109:boundary:boundary
+// SYS-REQ-109:error_handling:negative
+// SW-REQ-038:nominal:nominal
+// SW-REQ-038:boundary:boundary
+// SW-REQ-038:error_handling:negative
 func TestWrapDialerDialContextFunc(t *testing.T) {
 	tearDownTestStorageFetchItem := setupTestStorageFetchItem(&configTestStorageFetchItem{t, etcHostsMap, etcHostsErrorMap})
 	defer tearDownTestStorageFetchItem()

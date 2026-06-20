@@ -1,0 +1,54 @@
+id: SW-REQ-038
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The dnscache manager shall construct disabled managers with a configured multi-IP strategy, expose and replace cache storage, report whether caching is enabled, initialize storage only when disabled, wrap dial requests through cached host lookup when enabled, bypass cache lookup for disabled caching or IP literals, reject malformed host:port addresses, select cached addresses according to pick-first, no-cache, and random strategies, delete cached host entries after failed cached dials, and clear storage when disposing an enabled cache.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-109
+component: cache
+rationale: This software requirement owns only dnscache manager decisions around local cache storage and dialer wrapping. It does not claim DNS server availability, resolver correctness, network connection success, distributed cache behavior, persistence, caller cache-key policy, cross-process consistency, or gateway endpoint outcomes.
+tags:
+    - cache
+    - dns
+    - dialer
+    - in-process
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-109
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T00:23:32Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Cache scope now includes dnscache manager dialer-wrapping behavior in addition to internal/cache and dnscache storage behavior: manager construction, storage replacement and observation, enabled/disabled state, idempotent initialization, disabled-cache and IP-literal bypass, malformed host:port errors, cached host lookup, pick-first/no-cache/random multi-IP strategy decisions, cached-host deletion after failed cached dials, fetch-error fallback, random-strategy guard errors, and enabled cache disposal. Focused dnscache tests passed with race. This approval does not claim distributed cache behavior, persistence, Redis or other external storage semantics, DNS server availability, resolver correctness, caller cache-key policy, cross-process consistency, network connection success, or gateway endpoint outcomes.'
+        fingerprint: sha256:74b3532c37f471cbb3f050fbc675d04ed73d2fec230cfeb7e324a1d675d401bf
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T00:23:32Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - idempotency
+lifecycle:
+    change_history:
+        - date: "2026-06-20T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added DNS cache manager dialer-wrapping software requirement under existing in-process cache helper behavior.
+          changed_by: agent:codex

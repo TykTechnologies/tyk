@@ -49,19 +49,23 @@ type DnsCacheManager struct {
 }
 
 // NewDnsCacheManager returns new empty/non-initialized DnsCacheManager
+// SW-REQ-038
 func NewDnsCacheManager(multipleIPsHandleStrategy config.IPsHandleStrategy) *DnsCacheManager {
 	manager := &DnsCacheManager{nil, multipleIPsHandleStrategy, nil}
 	return manager
 }
 
+// SW-REQ-038
 func (m *DnsCacheManager) SetCacheStorage(cache IDnsCacheStorage) {
 	m.cacheStorage = cache
 }
 
+// SW-REQ-038
 func (m *DnsCacheManager) CacheStorage() IDnsCacheStorage {
 	return m.cacheStorage
 }
 
+// SW-REQ-038
 func (m *DnsCacheManager) IsCacheEnabled() bool {
 	return m.cacheStorage != nil
 }
@@ -70,12 +74,14 @@ func (m *DnsCacheManager) IsCacheEnabled() bool {
 //
 // Actual dns server call occures in net.Resolver#LookupIPAddr method,
 // linked to net.Dialer instance by net.Dialer#Resolver field
+// SW-REQ-038
 func (m *DnsCacheManager) WrapDialer(dialer *net.Dialer) DialContextFunc {
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		return m.doCachedDial(dialer, ctx, network, address)
 	}
 }
 
+// SW-REQ-038
 func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, network, address string) (net.Conn, error) {
 	safeDial := func(addr string, itemKey string) (net.Conn, error) {
 		conn, err := d.DialContext(ctx, network, addr)
@@ -126,6 +132,7 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 	return safeDial(ips[0]+":"+port, host)
 }
 
+// SW-REQ-038
 func (m *DnsCacheManager) getRandomIp(ips []string) (string, error) {
 	if m.strategy != config.RandomStrategy {
 		return "", fmt.Errorf(
@@ -147,6 +154,7 @@ func (m *DnsCacheManager) getRandomIp(ips []string) (string, error) {
 // Initialized cache storage enables caching of previously hoooked net.Dialer DialContext calls
 //
 // Otherwise leave storage as is.
+// SW-REQ-038
 func (m *DnsCacheManager) InitDNSCaching(ttl, checkInterval time.Duration) {
 	if !m.IsCacheEnabled() {
 		logger.Infof("Initializing dns cache with ttl=%s, duration=%s", ttl, checkInterval)
@@ -156,6 +164,7 @@ func (m *DnsCacheManager) InitDNSCaching(ttl, checkInterval time.Duration) {
 }
 
 // DisposeCache clear all entries from cache and disposes/disables caching of dns queries
+// SW-REQ-038
 func (m *DnsCacheManager) DisposeCache() {
 	m.cacheStorage.Clear()
 	m.cacheStorage = nil
