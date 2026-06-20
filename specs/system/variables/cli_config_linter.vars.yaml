@@ -1,0 +1,14 @@
+component: cli_config_linter
+no_interface:
+    declared: true
+    reason: The cli/linter package is exercised as a local command helper for configuration file linting; gateway startup behavior, runtime configuration interpretation, persistence, analytics, network binding, and request handling are outside this local component boundary.
+variables:
+    - name: cli_lint_operation_requested
+      type: bool
+      direction: input
+      description: Gateway CLI code requests configuration linting, configuration file loading, schema validation, legacy Monitor normalization, custom path/host format checking, warning formatting, or local config rewrite.
+
+    - name: cli_lint_result_determined
+      type: bool
+      direction: output
+      description: CLI linter support returns the checked configuration path with warnings, accepts supported local configuration shapes, returns explicit local load/decode errors, returns schema or custom format warnings, or rewrites accepted configuration through the local configuration writer.

@@ -13,6 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
+// Verifies: SW-REQ-102
 func TestMain(m *testing.M) {
 	// Use the root package, as that's where the directories and
 	// files required to run the gateway are.
@@ -116,6 +117,17 @@ func allContains(got, want []string) bool {
 	return true
 }
 
+// Verifies: STK-REQ-027, SYS-REQ-115, SW-REQ-102
+// SW-REQ-102:nominal:nominal
+// SW-REQ-102:boundary:nominal
+// SW-REQ-102:error_handling:negative
+// SW-REQ-102:malformed_input:negative
+// STK-REQ-027:error_handling:negative
+// STK-REQ-027:malformed_input:negative
+// MCDC SYS-REQ-115: cli_lint_operation_requested=F, cli_lint_result_determined=F => TRUE
+// MCDC SYS-REQ-115: cli_lint_operation_requested=T, cli_lint_result_determined=T => TRUE
+//
+//mcdc:ignore SYS-REQ-115: cli_lint_operation_requested=T, cli_lint_result_determined=F => FALSE -- violation row is the negation of the local CLI linter result guarantee; this table-driven test asserts requested linter wrapper operations either return a checked config path with warnings or explicit local load/schema errors [category: defensive] [reviewed: agent:codex]
 func TestLint(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

@@ -1,0 +1,71 @@
+id: SW-REQ-102
+version: 1
+status: approved
+priority: shall
+category: operational
+req_type: guarantee
+fretish: ""
+description: The cli/linter helper shall preserve local configuration lint behavior by loading the selected configuration file, rejecting malformed JSON and unsupported Go config decode shapes, validating the original JSON against the configured schema, normalizing the legacy Monitor key before schema validation, applying custom path and host-without-port format checks, returning deterministic warning strings for schema and custom format failures, rewriting accepted configuration through the local configuration writer, and returning the checked path with warnings without claiming complete gateway configuration semantics, gateway startup behavior, persistence, network binding, analytics, or final client-visible runtime behavior.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: cli/linter/linter_test.go; docs/cli-linter-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-115
+component: cli_config_linter
+rationale: >-
+    This software requirement owns only local cli/linter/linter.go helper behavior used by the CLI lint command. It does not claim complete gateway configuration semantics, gateway startup behavior, persistence, network binding, analytics, or final client-visible runtime behavior.
+tags:
+    - cli
+    - lint
+    - configuration
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-115
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T09:28:48Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. CLI linter scope is limited to local cli/linter/linter.go behavior: configuration loading errors, JSON decode errors, schema validation warnings, legacy Monitor key normalization, custom path and host-without-port format warnings, accepted empty/default/null-object cases, and local configuration rewrite through config.WriteConf. Existing table-driven cli/linter tests passed, including race, and the cli/linter package was added to configured build/test/lint gates. This approval does not claim full gateway configuration semantics, gateway startup behavior, persistence, network binding, analytics, or final client-visible runtime behavior.
+        fingerprint: sha256:1afa5052ae9f3445999e32d6885f5c15cae916548724a396ef4ffb52ded2c567
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-102
+          artifact: cli/linter/linter.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in cli/linter/linter.go adds ReqProof ownership annotations only; behavior evidence is provided by cli/linter/linter_test.go. The requirement remains scoped to local CLI configuration lint helper support without full gateway configuration semantics, gateway startup behavior, persistence, network binding, analytics, or final client-visible runtime behavior claims.
+          base: origin/master
+          requirement_fingerprint: sha256:ead6d5a274b101f3b83da09bd3bbfdc4b1c924e5a9ae8f0d3ff3fbad7b598080
+          approval_fingerprint: sha256:1afa5052ae9f3445999e32d6885f5c15cae916548724a396ef4ffb52ded2c567
+          artifact_fingerprint: sha256:1bd209610d5d78688912fc247952b99b87dc7f498ecfa300cb5bb95684c41b73
+          reviewed_at: "2026-06-20T09:29:00Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T09:24:08Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T09:28:48Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - malformed_input
+lifecycle:
+    change_history:
+        - date: "2026-06-20T09:24:08Z"
+          from: draft
+          to: review
+          reason: Added cli/linter configuration lint helper behavior under CLI config linter support.
+          changed_by: agent:codex
+        - date: "2026-06-20T09:28:48Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T09:24:08Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. CLI linter scope is limited to local cli/linter/linter.go behavior: configuration loading errors, JSON decode errors, schema validation warnings, legacy Monitor key normalization, custom path and host-without-port format warnings, accepted empty/default/null-object cases, and local configuration rewrite through config.WriteConf. Focused cli/linter table-driven tests passed, including race. This approval does not claim full gateway configuration semantics, gateway startup behavior, persistence, network binding, analytics, or final client-visible runtime behavior.")'
+          changed_by: human:buger

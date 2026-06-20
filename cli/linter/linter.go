@@ -11,6 +11,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 )
 
+// SW-REQ-102
 // Run will lint the configuration file. It will return the path to the
 // config file that was checked, a list of warnings and an error, if any
 // happened.
@@ -53,8 +54,10 @@ func Run(schm string, paths []string) (string, []string, error) {
 	return conf.Private.OriginalPath, resultWarns(result), nil
 }
 
+// SW-REQ-102
 type stringFormat func(string) bool
 
+// SW-REQ-102
 func (f stringFormat) IsFormat(v interface{}) bool {
 	s := v.(string)
 	if s == "" {
@@ -63,6 +66,7 @@ func (f stringFormat) IsFormat(v interface{}) bool {
 	return f(s)
 }
 
+// SW-REQ-102
 func addFormats(chain *gojsonschema.FormatCheckerChain) {
 	chain.Add("path", stringFormat(func(path string) bool {
 		_, err := os.Stat(path)
@@ -79,6 +83,7 @@ func addFormats(chain *gojsonschema.FormatCheckerChain) {
 	}))
 }
 
+// SW-REQ-102
 func resultWarns(result *gojsonschema.Result) []string {
 	warns := result.Errors()
 	strs := make([]string, len(warns))

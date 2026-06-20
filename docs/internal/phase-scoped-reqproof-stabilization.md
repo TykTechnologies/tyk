@@ -44,7 +44,7 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 149/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `verification_scope_complete` | 150/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
 | `mcdc_coverage` | 52/394 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
@@ -350,6 +350,17 @@ fixed or to hide them from the current strict audit.
   request admission, persistence, analytics, or final client-visible runtime
   behavior. It moves the visible production coverage baseline from 148/447 to
   149/447.
+- `SW-REQ-102` onboarded `cli/linter/linter.go` with a new CLI configuration
+  linter stakeholder/system/software chain and existing table-driven evidence
+  for local config lint behavior: malformed JSON and config decode errors,
+  schema warnings for unknown fields/enums/nested shapes, legacy `Monitor`
+  normalization, custom path and host-without-port format warnings, accepted
+  empty/default/null-object cases, and local config rewrite through
+  `config.WriteConf`. This increment is scoped to local CLI lint support and
+  does not claim full gateway configuration semantics, gateway startup
+  behavior, persistence, network binding, analytics, or final client-visible
+  runtime behavior. It moves the visible production coverage baseline from
+  149/447 to 150/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

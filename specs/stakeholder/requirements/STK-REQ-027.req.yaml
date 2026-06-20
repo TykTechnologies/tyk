@@ -1,0 +1,74 @@
+id: STK-REQ-027
+version: 1
+status: approved
+priority: shall
+category: operational
+req_type: guarantee
+fretish: ""
+description: Gateway configuration lint tooling shall give operators predictable local validation feedback for configuration files by rejecting malformed or unsupported configuration shapes, preserving legacy-compatible input where supported, reporting schema and custom format warnings, and rewriting accepted configuration through the local configuration writer without claiming complete gateway configuration semantics or runtime behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: cli_config_linter
+rationale: Configuration linting is operator-facing CLI support. This stakeholder requirement owns only local lint command helper behavior around file loading, schema validation, custom format checks, legacy Monitor normalization, and local config rewrite.
+tags:
+    - cli
+    - lint
+    - configuration
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T09:28:48Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. CLI linter scope is limited to local cli/linter/linter.go behavior: configuration loading errors, JSON decode errors, schema validation warnings, legacy Monitor key normalization, custom path and host-without-port format warnings, accepted empty/default/null-object cases, and local configuration rewrite through config.WriteConf. Existing table-driven cli/linter tests passed, including race, and the cli/linter package was added to configured build/test/lint gates. This approval does not claim full gateway configuration semantics, gateway startup behavior, persistence, network binding, analytics, or final client-visible runtime behavior.
+        fingerprint: sha256:6134d1639bd06abc9bd2b2f19e43a6b83745caeff631874319eb5541595a4b38
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T09:24:08Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T09:28:48Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - malformed_input
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need the config linter to reject malformed local configuration files and report schema/format warnings before I use them to start a gateway.
+    acceptance_criteria:
+        - id: STK-REQ-027-AC-01
+          text: Given an empty, default, legacy Monitor, or supported null-object configuration, when the linter runs, then it completes without schema warnings for those supported local shapes.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-115
+        - id: STK-REQ-027-AC-02
+          text: Given malformed JSON, unsupported field types, unknown fields, invalid enum values, or malformed nested configuration shapes, when the linter runs, then it returns explicit local load or schema warnings.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-115
+        - id: STK-REQ-027-AC-03
+          text: Given local fields governed by custom path or host-without-port formats, when those fields are invalid, then the linter returns clear local format warnings.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-115
+lifecycle:
+    change_history:
+        - date: "2026-06-20T09:24:08Z"
+          from: draft
+          to: review
+          reason: Added CLI linter stakeholder requirement for cli/linter onboarding.
+          changed_by: agent:codex
+        - date: "2026-06-20T09:28:48Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T09:24:08Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. CLI linter scope is limited to local cli/linter/linter.go behavior: configuration loading errors, JSON decode errors, schema validation warnings, legacy Monitor key normalization, custom path and host-without-port format warnings, accepted empty/default/null-object cases, and local configuration rewrite through config.WriteConf. Focused cli/linter table-driven tests passed, including race. This approval does not claim full gateway configuration semantics, gateway startup behavior, persistence, network binding, analytics, or final client-visible runtime behavior.")'
+          changed_by: human:buger
