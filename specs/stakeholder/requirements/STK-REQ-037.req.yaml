@@ -5,22 +5,22 @@ priority: shall
 category: request_context
 req_type: guarantee
 fretish: ""
-description: Request context helper support shall provide local typed storage and retrieval of gateway request state for sessions, auth tokens, API definitions, OAS definitions, error classification, and JSON-RPC/MCP metric fields, without claiming gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, or final request handling.
+description: Request context helper support shall provide local typed storage and retrieval of gateway request state for sessions, auth tokens, API definitions, OAS definitions, error classification, cache and endpoint tracking state, request timing and version metadata, URL rewrite state, loop/throttle counters, GraphQL request state, request status, and JSON-RPC/MCP metric fields, without claiming gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, caller ordering, or final request handling.
 formalization_strategy: informal
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: request_context
-rationale: The ctx package is a local request-context helper boundary. This stakeholder requirement owns helper storage and retrieval behavior only; gateway middleware and plugin semantics require separate requirements.
+rationale: The ctx package and gateway package wrapper helpers form a local request-context helper boundary. This stakeholder requirement owns helper storage, retrieval, and documented local helper decisions only; gateway middleware and plugin semantics require separate requirements.
 tags:
     - request-context
     - helper
 variables: []
 traces:
-    reviewed_at: "2026-06-20T13:34:00.693239Z"
+    reviewed_at: "2026-06-20T22:23:07.462714Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:61e3a4decf1492ec043f55c35f73a4d3edb861ffffc1cad120e23b743884d5fa
+    reviewed_fingerprint: sha256:0803e9ecf1163533d8d7a3adab7ba3245d26d0eeb3ea649e11c86205447b6dce
 verification:
     assurance_level: A
     formalization_status: none
@@ -30,7 +30,7 @@ verification:
         role: requirements_owner
         reviewed_at: "2026-06-20T10:54:37Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Request context scope is limited to local ctx package helper behavior: context key uniqueness, session/auth-token storage and retrieval, API/OAS definition cloning, error-classification storage, and JSON-RPC/MCP metric field getters. The focused ctx package tests passed and the known single-argument SetSession hash override issue is tracked separately as KI-CTX-SESSION-HASH-OVERRIDE. This approval does not claim gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, or final request handling.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Request context scope is limited to local ctx package helper behavior and gateway package request-context wrapper behavior: context key uniqueness, session/auth-token storage and retrieval, API/OAS definition cloning, error-classification storage, cache and endpoint tracking state, request timing/version metadata, URL rewrite state, loop/throttle counters, GraphQL request state, request status, and JSON-RPC/MCP metric field getters. The focused ctx and gateway package tests passed and the known single-argument SetSession hash override issue is tracked separately as KI-CTX-SESSION-HASH-OVERRIDE. This approval does not claim gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, caller ordering, or final request handling.
         ai_generated: false
 history:
     created_by: agent:codex
@@ -51,7 +51,7 @@ stakeholder:
           derived_reqs:
             - SYS-REQ-125
         - id: STK-REQ-037-AC-02
-          text: Given API definition, OAS definition, session, error classification, auth token, and JSON-RPC/MCP metric context fields, when local context helpers are used, then helper behavior remains local to request context storage and retrieval.
+          text: Given API definition, OAS definition, session, error classification, auth token, cache state, endpoint tracking flags, request metadata, URL rewrite state, GraphQL state, request status, and JSON-RPC/MCP metric context fields, when local context helpers are used, then helper behavior remains local to request context storage, retrieval, and documented local helper decisions.
           verification_method: test
           derived_reqs:
             - SYS-REQ-125

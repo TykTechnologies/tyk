@@ -5,7 +5,7 @@ priority: shall
 category: request_context
 req_type: guarantee
 fretish: the request_context shall always satisfy !request_context_operation_requested | request_context_result_determined
-description: Request context helper support shall determine local context helper results for session/auth-token storage, API and OAS definition cloning, error-classification storage, unique context keys, and JSON-RPC/MCP metric field getters, without claiming gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, or final request handling.
+description: Request context helper support shall determine local context helper results for session/auth-token storage, API and OAS definition cloning, error-classification storage, unique context keys, cache and endpoint tracking state, request timing and version metadata, URL rewrite state, loop/throttle counters, GraphQL request state, request status, and JSON-RPC/MCP metric field getters, without claiming gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, caller ordering, or final request handling.
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: STK-REQ-037
 component: request_context
-rationale: This system requirement owns local ctx/ctx.go helper behavior. The single-argument SetSession hash override defect is tracked as KI-CTX-SESSION-HASH-OVERRIDE rather than hidden inside the requirement scope.
+rationale: This system requirement owns local ctx/ctx.go helper behavior and gateway/api.go request-context wrapper behavior. The single-argument SetSession hash override defect is tracked as KI-CTX-SESSION-HASH-OVERRIDE rather than hidden inside the requirement scope.
 tags:
     - request-context
     - helper
@@ -23,7 +23,7 @@ variables:
 traces:
     satisfies:
         - STK-REQ-037
-    reviewed_at: "2026-06-20T13:34:09.695974Z"
+    reviewed_at: "2026-06-20T22:23:08.267792Z"
     reviewed_by: human:buger
     reviewed_fingerprint: sha256:692fca10cda7d66ea8583a91d7629e9df63c9d275815b26677ef51351bddd7ea
 verification:
@@ -35,7 +35,7 @@ verification:
         role: requirements_owner
         reviewed_at: "2026-06-20T10:54:37Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Request context scope is limited to local ctx package helper behavior: context key uniqueness, session/auth-token storage and retrieval, API/OAS definition cloning, error-classification storage, and JSON-RPC/MCP metric field getters. The focused ctx package tests passed and the known single-argument SetSession hash override issue is tracked separately as KI-CTX-SESSION-HASH-OVERRIDE. This approval does not claim gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, or final request handling.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Request context scope is limited to local ctx package helper behavior and gateway package request-context wrapper behavior: context key uniqueness, session/auth-token storage and retrieval, API/OAS definition cloning, error-classification storage, cache and endpoint tracking state, request timing/version metadata, URL rewrite state, loop/throttle counters, GraphQL request state, request status, and JSON-RPC/MCP metric field getters. The focused ctx and gateway package tests passed and the known single-argument SetSession hash override issue is tracked separately as KI-CTX-SESSION-HASH-OVERRIDE. This approval does not claim gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, caller ordering, or final request handling.
         ai_generated: false
     gaps_reviewed_at: "2026-06-20T11:12:28.060512Z"
     gaps_reviewed_by: human:buger
@@ -43,7 +43,7 @@ verification:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-125|request_context_result_determined
           reviewer: human:buger
-          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final requirement approval. SYS-REQ-125''s request_context_result_determined variable is decomposed by SW-REQ-112 for local ctx/ctx.go behavior: context key uniqueness, session/auth-token storage and retrieval, API/OAS definition clone retrieval, error-classification storage, nil-session panic behavior, JSON-compatible session fallback retrieval, and JSON-RPC/MCP metric getter defaults and typed values. The known single-argument SetSession hash override defect is tracked separately as KI-CTX-SESSION-HASH-OVERRIDE. This review is limited to local request context helper mechanics and does not claim gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, or final request handling.'
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final requirement approval. SYS-REQ-125''s request_context_result_determined variable is decomposed by SW-REQ-112 for local ctx/ctx.go behavior and gateway/api.go wrapper behavior: context key uniqueness, session/auth-token storage and retrieval, API/OAS definition clone retrieval, error-classification storage, nil-session panic behavior, JSON-compatible session fallback retrieval, cache and endpoint tracking state, request timing/version metadata, URL rewrite state, loop/throttle counters, GraphQL request state, request status, and JSON-RPC/MCP metric getter defaults and typed values. The known single-argument SetSession hash override defect is tracked separately as KI-CTX-SESSION-HASH-OVERRIDE. This review is limited to local request context helper mechanics and does not claim gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, caller ordering, or final request handling.'
           reviewed_at: "2026-06-20T11:12:28.060512Z"
 history:
     created_by: agent:codex

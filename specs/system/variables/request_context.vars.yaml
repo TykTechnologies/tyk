@@ -1,12 +1,12 @@
 component: request_context
 no_interface:
     declared: true
-    reason: The ctx package is exercised as local request context helper support; gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, and final request handling are outside this component boundary.
+    reason: The ctx package and gateway package request-context wrappers are exercised as local request context helper support; gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, caller ordering, and final request handling are outside this component boundary.
 variables:
     - name: request_context_operation_requested
       type: bool
       direction: input
-      description: Gateway code or tests request local request context helper behavior such as storing or retrieving session, auth token, definition, error-classification, or JSON-RPC/MCP metric fields.
+      description: Gateway code or tests request local request context helper behavior such as storing or retrieving session, auth token, definition, error-classification, cache, endpoint tracking, request metadata, URL rewrite, GraphQL, request status, or JSON-RPC/MCP metric fields.
 
     - name: request_context_result_determined
       type: bool

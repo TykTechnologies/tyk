@@ -3378,29 +3378,35 @@ func (gw *Gateway) makeImportedOASTykAPI(next http.HandlerFunc) http.HandlerFunc
 	}
 }
 
+// SW-REQ-112
 // ctxSetCacheOptions sets a cache key to use for the http request
 func ctxSetCacheOptions(r *http.Request, options *cacheOptions) {
 	setCtxValue(r, ctx.CacheOptions, options)
 }
 
+// SW-REQ-112
 // ctxGetCacheOptions returns a cache key if we need to cache request
 func ctxGetCacheOptions(r *http.Request) *cacheOptions {
 	key, _ := r.Context().Value(ctx.CacheOptions).(*cacheOptions)
 	return key
 }
 
+// SW-REQ-112
 func ctxGetSession(r *http.Request) *user.SessionState {
 	return ctx.GetSession(r)
 }
 
+// SW-REQ-112
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
 	ctx.SetSession(r, s, scheduleUpdate, hashKey)
 }
 
+// SW-REQ-112
 func ctxGetAuthToken(r *http.Request) string {
 	return ctx.GetAuthToken(r)
 }
 
+// SW-REQ-112
 func ctxGetTrackedPath(r *http.Request) string {
 	if v := r.Context().Value(ctx.TrackThisEndpoint); v != nil {
 		return v.(string)
@@ -3408,6 +3414,7 @@ func ctxGetTrackedPath(r *http.Request) string {
 	return ""
 }
 
+// SW-REQ-112
 func ctxSetTrackedPath(r *http.Request, p string) {
 	if p == "" {
 		panic("setting a nil context TrackThisEndpoint")
@@ -3415,18 +3422,22 @@ func ctxSetTrackedPath(r *http.Request, p string) {
 	setCtxValue(r, ctx.TrackThisEndpoint, p)
 }
 
+// SW-REQ-112
 func ctxGetDoNotTrack(r *http.Request) bool {
 	return r.Context().Value(ctx.DoNotTrackThisEndpoint) == true
 }
 
+// SW-REQ-112
 func ctxSetDoNotTrack(r *http.Request, b bool) {
 	setCtxValue(r, ctx.DoNotTrackThisEndpoint, b)
 }
 
+// SW-REQ-112
 func ctxSetRequestStartTime(r *http.Request, t time.Time) {
 	setCtxValue(r, ctx.RequestStartTime, t)
 }
 
+// SW-REQ-112
 func ctxGetRequestStartTime(r *http.Request) time.Time {
 	if v := r.Context().Value(ctx.RequestStartTime); v != nil {
 		if t, ok := v.(time.Time); ok {
@@ -3436,6 +3447,7 @@ func ctxGetRequestStartTime(r *http.Request) time.Time {
 	return time.Time{}
 }
 
+// SW-REQ-112
 func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
 	if v := r.Context().Value(ctx.VersionData); v != nil {
 		return v.(*apidef.VersionInfo)
@@ -3443,10 +3455,12 @@ func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
 	return nil
 }
 
+// SW-REQ-112
 func ctxSetVersionInfo(r *http.Request, v *apidef.VersionInfo) {
 	setCtxValue(r, ctx.VersionData, v)
 }
 
+// SW-REQ-112
 func ctxGetVersionName(r *http.Request) *string {
 	if v := r.Context().Value(ctx.VersionName); v != nil {
 		return v.(*string)
@@ -3455,14 +3469,17 @@ func ctxGetVersionName(r *http.Request) *string {
 	return nil
 }
 
+// SW-REQ-112
 func ctxSetVersionName(r *http.Request, vName *string) {
 	setCtxValue(r, ctx.VersionName, vName)
 }
 
+// SW-REQ-112
 func ctxSetOrigRequestURL(r *http.Request, url *url.URL) {
 	setCtxValue(r, ctx.OrigRequestURL, url)
 }
 
+// SW-REQ-112
 func ctxGetOrigRequestURL(r *http.Request) *url.URL {
 	if v := r.Context().Value(ctx.OrigRequestURL); v != nil {
 		if urlVal, ok := v.(*url.URL); ok {
@@ -3473,10 +3490,12 @@ func ctxGetOrigRequestURL(r *http.Request) *url.URL {
 	return nil
 }
 
+// SW-REQ-112
 func ctxSetURLRewriteTarget(r *http.Request, url *url.URL) {
 	setCtxValue(r, ctx.UrlRewriteTarget, url)
 }
 
+// SW-REQ-112
 func ctxGetURLRewriteTarget(r *http.Request) *url.URL {
 	if v := r.Context().Value(ctx.UrlRewriteTarget); v != nil {
 		if urlVal, ok := v.(*url.URL); ok {
@@ -3487,10 +3506,12 @@ func ctxGetURLRewriteTarget(r *http.Request) *url.URL {
 	return nil
 }
 
+// SW-REQ-112
 func ctxSetUrlRewritePath(r *http.Request, path string) {
 	setCtxValue(r, ctx.UrlRewritePath, path)
 }
 
+// SW-REQ-112
 func ctxGetUrlRewritePath(r *http.Request) string {
 	if v := r.Context().Value(ctx.UrlRewritePath); v != nil {
 		if strVal, ok := v.(string); ok {
@@ -3500,10 +3521,12 @@ func ctxGetUrlRewritePath(r *http.Request) string {
 	return ""
 }
 
+// SW-REQ-112
 func ctxSetInternalRedirectTarget(r *http.Request, u *url.URL) {
 	setCtxValue(r, ctx.InternalRedirectTarget, u)
 }
 
+// SW-REQ-112
 func ctxGetInternalRedirectTarget(r *http.Request) *url.URL {
 	if v := r.Context().Value(ctx.InternalRedirectTarget); v != nil {
 		if val, ok := v.(*url.URL); ok {
@@ -3519,10 +3542,12 @@ func ctxGetInternalRedirectTarget(r *http.Request) *url.URL {
 	return &clone
 }
 
+// SW-REQ-112
 func ctxSetCheckLoopLimits(r *http.Request, b bool) {
 	setCtxValue(r, ctx.CheckLoopLimits, b)
 }
 
+// SW-REQ-112
 // Should we check Rate limits and Quotas?
 func ctxCheckLimits(r *http.Request) bool {
 	// Check explicit flag first - allows MCP sequential routing to opt into limits at each VEM stage
@@ -3545,10 +3570,12 @@ func ctxCheckLimits(r *http.Request) bool {
 	return false
 }
 
+// SW-REQ-112
 func ctxSetRequestMethod(r *http.Request, path string) {
 	setCtxValue(r, ctx.RequestMethod, path)
 }
 
+// SW-REQ-112
 func ctxGetRequestMethod(r *http.Request) string {
 	if v := r.Context().Value(ctx.RequestMethod); v != nil {
 		if strVal, ok := v.(string); ok {
@@ -3558,10 +3585,12 @@ func ctxGetRequestMethod(r *http.Request) string {
 	return r.Method
 }
 
+// SW-REQ-112
 func ctxSetTransformRequestMethod(r *http.Request, path string) {
 	setCtxValue(r, ctx.TransformedRequestMethod, path)
 }
 
+// SW-REQ-112
 func ctxGetTransformRequestMethod(r *http.Request) string {
 	if v := r.Context().Value(ctx.TransformedRequestMethod); v != nil {
 		if strVal, ok := v.(string); ok {
@@ -3571,10 +3600,12 @@ func ctxGetTransformRequestMethod(r *http.Request) string {
 	return r.Method
 }
 
+// SW-REQ-112
 func ctxSetGraphQLRequest(r *http.Request, gqlRequest *gql.Request) {
 	setCtxValue(r, ctx.GraphQLRequest, gqlRequest)
 }
 
+// SW-REQ-112
 func ctxGetGraphQLRequest(r *http.Request) (gqlRequest *gql.Request) {
 	if v := r.Context().Value(ctx.GraphQLRequest); v != nil {
 		if gqlRequest, ok := v.(*gql.Request); ok {
@@ -3584,10 +3615,12 @@ func ctxGetGraphQLRequest(r *http.Request) (gqlRequest *gql.Request) {
 	return nil
 }
 
+// SW-REQ-112
 func ctxSetGraphQLRequestV2(r *http.Request, gqlRequest *gqlv2.Request) {
 	setCtxValue(r, ctx.GraphQLRequest, gqlRequest)
 }
 
+// SW-REQ-112
 func ctxGetGraphQLRequestV2(r *http.Request) (gqlRequest *gqlv2.Request) {
 	if v := r.Context().Value(ctx.GraphQLRequest); v != nil {
 		if gqlRequest, ok := v.(*gqlv2.Request); ok {
@@ -3597,10 +3630,12 @@ func ctxGetGraphQLRequestV2(r *http.Request) (gqlRequest *gqlv2.Request) {
 	return nil
 }
 
+// SW-REQ-112
 func ctxSetGraphQLIsWebSocketUpgrade(r *http.Request, isWebSocketUpgrade bool) {
 	setCtxValue(r, ctx.GraphQLIsWebSocketUpgrade, isWebSocketUpgrade)
 }
 
+// SW-REQ-112
 func ctxGetGraphQLIsWebSocketUpgrade(r *http.Request) (isWebSocketUpgrade bool) {
 	if v := r.Context().Value(ctx.GraphQLIsWebSocketUpgrade); v != nil {
 		if isWebSocketUpgrade, ok := v.(bool); ok {
@@ -3611,18 +3646,22 @@ func ctxGetGraphQLIsWebSocketUpgrade(r *http.Request) (isWebSocketUpgrade bool) 
 	return false
 }
 
+// SW-REQ-112
 func ctxGetDefaultVersion(r *http.Request) bool {
 	return r.Context().Value(ctx.VersionDefault) != nil
 }
 
+// SW-REQ-112
 func ctxSetDefaultVersion(r *http.Request) {
 	setCtxValue(r, ctx.VersionDefault, true)
 }
 
+// SW-REQ-112
 func ctxLoopingEnabled(r *http.Request) bool {
 	return ctxLoopLevel(r) > 0
 }
 
+// SW-REQ-112
 func ctxLoopLevel(r *http.Request) int {
 	if v := r.Context().Value(ctx.LoopLevel); v != nil {
 		if intVal, ok := v.(int); ok {
@@ -3633,15 +3672,18 @@ func ctxLoopLevel(r *http.Request) int {
 	return 0
 }
 
+// SW-REQ-112
 func ctxSetLoopLevel(r *http.Request, value int) {
 	setCtxValue(r, ctx.LoopLevel, value)
 }
 
+// SW-REQ-112
 func ctxIncLoopLevel(r *http.Request, loopLimit int) {
 	ctxSetLoopLimit(r, loopLimit)
 	ctxSetLoopLevel(r, ctxLoopLevel(r)+1)
 }
 
+// SW-REQ-112
 func ctxLoopLevelLimit(r *http.Request) int {
 	if v := r.Context().Value(ctx.LoopLevelLimit); v != nil {
 		if intVal, ok := v.(int); ok {
@@ -3652,6 +3694,7 @@ func ctxLoopLevelLimit(r *http.Request) int {
 	return 0
 }
 
+// SW-REQ-112
 func ctxSetLoopLimit(r *http.Request, limit int) {
 	// Can be set only one time per request
 	if ctxLoopLevelLimit(r) == 0 && limit > 0 {
@@ -3659,6 +3702,7 @@ func ctxSetLoopLimit(r *http.Request, limit int) {
 	}
 }
 
+// SW-REQ-112
 func ctxThrottleLevelLimit(r *http.Request) int {
 	if v := r.Context().Value(ctx.ThrottleLevelLimit); v != nil {
 		if intVal, ok := v.(int); ok {
@@ -3669,6 +3713,7 @@ func ctxThrottleLevelLimit(r *http.Request) int {
 	return 0
 }
 
+// SW-REQ-112
 func ctxThrottleLevel(r *http.Request) int {
 	if v := r.Context().Value(ctx.ThrottleLevel); v != nil {
 		if intVal, ok := v.(int); ok {
@@ -3679,6 +3724,7 @@ func ctxThrottleLevel(r *http.Request) int {
 	return 0
 }
 
+// SW-REQ-112
 func ctxSetThrottleLimit(r *http.Request, limit int) {
 	// Can be set only one time per request
 	if ctxThrottleLevelLimit(r) == 0 && limit > 0 {
@@ -3686,21 +3732,25 @@ func ctxSetThrottleLimit(r *http.Request, limit int) {
 	}
 }
 
+// SW-REQ-112
 func ctxSetThrottleLevel(r *http.Request, value int) {
 	setCtxValue(r, ctx.ThrottleLevel, value)
 }
 
+// SW-REQ-112
 func ctxIncThrottleLevel(r *http.Request, throttleLimit int) {
 	ctxSetThrottleLimit(r, throttleLimit)
 	ctxSetThrottleLevel(r, ctxThrottleLevel(r)+1)
 }
 
+// SW-REQ-112
 func ctxSetSpanAttributes(r *http.Request, mwName string, attrs ...otel.SpanAttribute) {
 	if len(attrs) > 0 {
 		setCtxValue(r, mwName, attrs)
 	}
 }
 
+// SW-REQ-112
 func ctxGetSpanAttributes(r *http.Request, mwName string) (attrs []otel.SpanAttribute) {
 	if v := r.Context().Value(mwName); v != nil {
 		got, ok := v.([]otel.SpanAttribute)
@@ -3711,10 +3761,12 @@ func ctxGetSpanAttributes(r *http.Request, mwName string) (attrs []otel.SpanAttr
 	return
 }
 
+// SW-REQ-112
 func ctxSetRequestStatus(r *http.Request, stat RequestStatus) {
 	setCtxValue(r, ctx.RequestStatus, stat)
 }
 
+// SW-REQ-112
 func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 	if v := r.Context().Value(ctx.RequestStatus); v != nil {
 		stat = v.(RequestStatus)
@@ -3722,34 +3774,42 @@ func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 	return
 }
 
+// SW-REQ-112
 func ctxSetMCPMethod(r *http.Request, method string) {
 	setCtxValue(r, ctx.MCPMethod, method)
 }
 
+// SW-REQ-112
 func ctxGetMCPMethod(r *http.Request) string {
 	return ctx.GetMCPMethod(r)
 }
 
+// SW-REQ-112
 func ctxSetMCPPrimitiveType(r *http.Request, primitiveType string) {
 	setCtxValue(r, ctx.MCPPrimitiveType, primitiveType)
 }
 
+// SW-REQ-112
 func ctxGetMCPPrimitiveType(r *http.Request) string {
 	return ctx.GetMCPPrimitiveType(r)
 }
 
+// SW-REQ-112
 func ctxSetMCPPrimitiveName(r *http.Request, name string) {
 	setCtxValue(r, ctx.MCPPrimitiveName, name)
 }
 
+// SW-REQ-112
 func ctxGetMCPPrimitiveName(r *http.Request) string {
 	return ctx.GetMCPPrimitiveName(r)
 }
 
+// SW-REQ-112
 func ctxSetJSONRPCErrorCode(r *http.Request, code int) {
 	setCtxValue(r, ctx.JSONRPCErrorCode, code)
 }
 
+// SW-REQ-112
 func ctxGetJSONRPCErrorCode(r *http.Request) int {
 	return ctx.GetJSONRPCErrorCode(r)
 }

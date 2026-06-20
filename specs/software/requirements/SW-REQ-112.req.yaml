@@ -5,16 +5,16 @@ priority: shall
 category: request_context
 req_type: guarantee
 fretish: ""
-description: The ctx helpers shall preserve local request context behavior for context key uniqueness, session/auth-token storage and retrieval, API and OAS definition cloning, error-classification storage, and JSON-RPC/MCP metric field getters, without claiming gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, or final request handling.
+description: The request context helpers shall preserve local request context behavior for context key uniqueness, session/auth-token storage and retrieval, API and OAS definition cloning, error-classification storage, gateway wrapper storage/retrieval of cache and endpoint tracking state, request timing and version metadata, URL rewrite state, loop/throttle counters, GraphQL request state, request status, and JSON-RPC/MCP metric field getters, without claiming gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, caller ordering, or final request handling.
 formalization_strategy: informal
 informal_verification:
     method: unit_tests
-    evidence: ctx/ctx_test.go; docs/request-context-requirements-evidence.md
+    evidence: ctx/ctx_test.go; gateway/api_test.go; docs/request-context-requirements-evidence.md
     verified: true
 parent: SYS-REQ-125
 component: request_context
 rationale: >-
-    This software requirement owns local ctx/ctx.go helper behavior. The known SetSession single-argument hash override defect is tracked as KI-CTX-SESSION-HASH-OVERRIDE and remains visible until fixed.
+    This software requirement owns local ctx/ctx.go helper behavior and gateway/api.go request-context wrapper behavior. The known SetSession single-argument hash override defect is tracked as KI-CTX-SESSION-HASH-OVERRIDE and remains visible until fixed.
 tags:
     - request-context
     - helper
@@ -23,7 +23,7 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-125
-    reviewed_at: "2026-06-20T13:34:08.253099Z"
+    reviewed_at: "2026-06-20T22:23:09.037994Z"
     reviewed_by: human:buger
     reviewed_fingerprint: sha256:38717d324679ea0e47f3e69662812a8abc6a62ef72177a36e2b8ba7afde6375f
 verification:
@@ -35,7 +35,7 @@ verification:
         role: requirements_owner
         reviewed_at: "2026-06-20T10:54:37Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Request context scope is limited to local ctx package helper behavior: context key uniqueness, session/auth-token storage and retrieval, API/OAS definition cloning, error-classification storage, and JSON-RPC/MCP metric field getters. The focused ctx package tests passed and the known single-argument SetSession hash override issue is tracked separately as KI-CTX-SESSION-HASH-OVERRIDE. This approval does not claim gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, or final request handling.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Request context scope is limited to local ctx package helper behavior and gateway package request-context wrapper behavior: context key uniqueness, session/auth-token storage and retrieval, API/OAS definition cloning, error-classification storage, cache and endpoint tracking state, request timing/version metadata, URL rewrite state, loop/throttle counters, GraphQL request state, request status, and JSON-RPC/MCP metric field getters. The focused ctx and gateway package tests passed and the known single-argument SetSession hash override issue is tracked separately as KI-CTX-SESSION-HASH-OVERRIDE. This approval does not claim gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, caller ordering, or final request handling.
         ai_generated: false
 history:
     created_by: agent:codex

@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -20,6 +21,9 @@ import (
 	"testing"
 	"time"
 
+	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -32,6 +36,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	internalmodel "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/pkg/identifier"
@@ -2114,6 +2119,11 @@ func BenchmarkApiReload(b *testing.B) {
 	}
 }
 
+// Verifies: STK-REQ-037, SYS-REQ-125, SW-REQ-112
+// STK-REQ-037:STK-REQ-037-AC-01:acceptance
+// STK-REQ-037:STK-REQ-037-AC-02:acceptance
+// SW-REQ-112:nominal:nominal
+// SW-REQ-112:boundary:nominal
 func TestContextData(t *testing.T) {
 	r := new(http.Request)
 	if ctxGetData(r) != nil {
@@ -2125,6 +2135,10 @@ func TestContextData(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-037, SYS-REQ-125, SW-REQ-112
+// STK-REQ-037:STK-REQ-037-AC-01:acceptance
+// SW-REQ-112:nominal:nominal
+// SW-REQ-112:boundary:nominal
 func TestContextSession(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -2148,6 +2162,245 @@ func TestContextSession(t *testing.T) {
 		}
 	}()
 	ctxSetSession(r, nil, false, false)
+}
+
+// Verifies: STK-REQ-037, SYS-REQ-125, SW-REQ-112
+// STK-REQ-037:STK-REQ-037-AC-01:acceptance
+// STK-REQ-037:STK-REQ-037-AC-02:acceptance
+// SW-REQ-112:nominal:nominal
+// SW-REQ-112:boundary:nominal
+// SW-REQ-112:error_handling:nominal
+func TestGatewayRequestContextHelpers(t *testing.T) {
+	cases := []struct {
+		name   string
+		verify func(t *testing.T, r *http.Request)
+	}{
+		{
+			name: "cache options",
+			verify: func(t *testing.T, r *http.Request) {
+				require.Nil(t, ctxGetCacheOptions(r))
+
+				options := &cacheOptions{
+					key:                    "cache-key",
+					cacheOnlyResponseCodes: []int{http.StatusOK, http.StatusAccepted},
+					timeout:                30,
+				}
+				ctxSetCacheOptions(r, options)
+
+				assert.Same(t, options, ctxGetCacheOptions(r))
+			},
+		},
+		{
+			name: "session and auth token",
+			verify: func(t *testing.T, r *http.Request) {
+				require.Nil(t, ctxGetSession(r))
+				assert.Empty(t, ctxGetAuthToken(r))
+
+				session := &user.SessionState{KeyID: "token-id"}
+				ctxSetSession(r, session, false, false)
+
+				assert.Same(t, session, ctxGetSession(r))
+				assert.Equal(t, "token-id", ctxGetAuthToken(r))
+			},
+		},
+		{
+			name: "endpoint tracking",
+			verify: func(t *testing.T, r *http.Request) {
+				assert.Empty(t, ctxGetTrackedPath(r))
+				assert.False(t, ctxGetDoNotTrack(r))
+
+				ctxSetTrackedPath(r, "/widgets/{id}")
+				ctxSetDoNotTrack(r, true)
+
+				assert.Equal(t, "/widgets/{id}", ctxGetTrackedPath(r))
+				assert.True(t, ctxGetDoNotTrack(r))
+			},
+		},
+		{
+			name: "request timing",
+			verify: func(t *testing.T, r *http.Request) {
+				assert.True(t, ctxGetRequestStartTime(r).IsZero())
+
+				startedAt := time.Unix(1700000000, 123)
+				ctxSetRequestStartTime(r, startedAt)
+
+				assert.Equal(t, startedAt, ctxGetRequestStartTime(r))
+			},
+		},
+		{
+			name: "version metadata",
+			verify: func(t *testing.T, r *http.Request) {
+				assert.Nil(t, ctxGetVersionInfo(r))
+				assert.Nil(t, ctxGetVersionName(r))
+				assert.False(t, ctxGetDefaultVersion(r))
+
+				versionName := "v1"
+				versionInfo := &apidef.VersionInfo{Name: versionName}
+				ctxSetVersionInfo(r, versionInfo)
+				ctxSetVersionName(r, &versionName)
+				ctxSetDefaultVersion(r)
+
+				assert.Same(t, versionInfo, ctxGetVersionInfo(r))
+				assert.Equal(t, &versionName, ctxGetVersionName(r))
+				assert.True(t, ctxGetDefaultVersion(r))
+			},
+		},
+		{
+			name: "request urls",
+			verify: func(t *testing.T, r *http.Request) {
+				assert.Nil(t, ctxGetOrigRequestURL(r))
+				assert.Nil(t, ctxGetURLRewriteTarget(r))
+				assert.Empty(t, ctxGetUrlRewritePath(r))
+
+				originalURL := &url.URL{Path: "/before"}
+				rewriteTarget := &url.URL{Path: "/after"}
+				ctxSetOrigRequestURL(r, originalURL)
+				ctxSetURLRewriteTarget(r, rewriteTarget)
+				ctxSetUrlRewritePath(r, "/rewritten")
+
+				assert.Same(t, originalURL, ctxGetOrigRequestURL(r))
+				assert.Same(t, rewriteTarget, ctxGetURLRewriteTarget(r))
+				assert.Equal(t, "/rewritten", ctxGetUrlRewritePath(r))
+			},
+		},
+		{
+			name: "internal redirect target",
+			verify: func(t *testing.T, r *http.Request) {
+				fallbackTarget := ctxGetInternalRedirectTarget(r)
+				require.NotNil(t, fallbackTarget)
+				assert.Equal(t, r.URL, fallbackTarget)
+				assert.NotSame(t, r.URL, fallbackTarget)
+
+				redirectTarget := &url.URL{Path: "/internal"}
+				ctxSetInternalRedirectTarget(r, redirectTarget)
+
+				assert.Same(t, redirectTarget, ctxGetInternalRedirectTarget(r))
+			},
+		},
+		{
+			name: "request methods",
+			verify: func(t *testing.T, r *http.Request) {
+				assert.Equal(t, http.MethodPost, ctxGetRequestMethod(r))
+				assert.Equal(t, http.MethodPost, ctxGetTransformRequestMethod(r))
+
+				ctxSetRequestMethod(r, http.MethodPatch)
+				ctxSetTransformRequestMethod(r, http.MethodPut)
+
+				assert.Equal(t, http.MethodPatch, ctxGetRequestMethod(r))
+				assert.Equal(t, http.MethodPut, ctxGetTransformRequestMethod(r))
+			},
+		},
+		{
+			name: "graphql request fields",
+			verify: func(t *testing.T, r *http.Request) {
+				assert.Nil(t, ctxGetGraphQLRequest(r))
+				assert.Nil(t, ctxGetGraphQLRequestV2(r))
+				assert.False(t, ctxGetGraphQLIsWebSocketUpgrade(r))
+
+				gqlRequest := &gql.Request{OperationName: "QueryOne", Query: "query QueryOne { one }"}
+				ctxSetGraphQLRequest(r, gqlRequest)
+
+				assert.Same(t, gqlRequest, ctxGetGraphQLRequest(r))
+				assert.Nil(t, ctxGetGraphQLRequestV2(r))
+
+				gqlRequestV2 := &gqlv2.Request{OperationName: "QueryTwo", Query: "query QueryTwo { two }"}
+				ctxSetGraphQLRequestV2(r, gqlRequestV2)
+				ctxSetGraphQLIsWebSocketUpgrade(r, true)
+
+				assert.Nil(t, ctxGetGraphQLRequest(r))
+				assert.Same(t, gqlRequestV2, ctxGetGraphQLRequestV2(r))
+				assert.True(t, ctxGetGraphQLIsWebSocketUpgrade(r))
+			},
+		},
+		{
+			name: "loop and throttle counters",
+			verify: func(t *testing.T, r *http.Request) {
+				assert.Zero(t, ctxLoopLevel(r))
+				assert.Zero(t, ctxLoopLevelLimit(r))
+				assert.Zero(t, ctxThrottleLevel(r))
+				assert.Zero(t, ctxThrottleLevelLimit(r))
+				assert.False(t, ctxLoopingEnabled(r))
+
+				ctxIncLoopLevel(r, 2)
+				ctxIncLoopLevel(r, 4)
+				ctxIncThrottleLevel(r, 3)
+				ctxIncThrottleLevel(r, 5)
+
+				assert.Equal(t, 2, ctxLoopLevel(r))
+				assert.Equal(t, 2, ctxLoopLevelLimit(r))
+				assert.Equal(t, 2, ctxThrottleLevel(r))
+				assert.Equal(t, 3, ctxThrottleLevelLimit(r))
+				assert.True(t, ctxLoopingEnabled(r))
+			},
+		},
+		{
+			name: "limit checking",
+			verify: func(t *testing.T, r *http.Request) {
+				assert.True(t, ctxCheckLimits(r))
+
+				ctxSetLoopLevel(r, 1)
+				assert.False(t, ctxCheckLimits(r))
+
+				ctxSetCheckLoopLimits(r, true)
+				assert.True(t, ctxCheckLimits(r))
+
+				ctxSetCheckLoopLimits(r, false)
+				assert.False(t, ctxCheckLimits(r))
+
+				selfLoopReq := httptest.NewRequest(http.MethodGet, "/", nil)
+				httpctx.SetSelfLooping(selfLoopReq, true)
+				assert.False(t, ctxCheckLimits(selfLoopReq))
+			},
+		},
+		{
+			name: "span attributes",
+			verify: func(t *testing.T, r *http.Request) {
+				assert.Nil(t, ctxGetSpanAttributes(r, "middleware"))
+
+				ctxSetSpanAttributes(r, "middleware")
+				assert.Nil(t, ctxGetSpanAttributes(r, "middleware"))
+
+				attr := tyktrace.NewAttribute("tyk.test", "value")
+				ctxSetSpanAttributes(r, "middleware", attr)
+
+				assert.Equal(t, []tyktrace.Attribute{attr}, ctxGetSpanAttributes(r, "middleware"))
+			},
+		},
+		{
+			name: "request status and metric dimensions",
+			verify: func(t *testing.T, r *http.Request) {
+				assert.Empty(t, ctxGetRequestStatus(r))
+				assert.Empty(t, ctxGetMCPMethod(r))
+				assert.Empty(t, ctxGetMCPPrimitiveType(r))
+				assert.Empty(t, ctxGetMCPPrimitiveName(r))
+				assert.Zero(t, ctxGetJSONRPCErrorCode(r))
+
+				ctxSetRequestStatus(r, StatusOkAndIgnore)
+				ctxSetMCPMethod(r, "tools/call")
+				ctxSetMCPPrimitiveType(r, "tool")
+				ctxSetMCPPrimitiveName(r, "lookup")
+				ctxSetJSONRPCErrorCode(r, -32601)
+
+				assert.Equal(t, StatusOkAndIgnore, ctxGetRequestStatus(r))
+				assert.Equal(t, "tools/call", ctxGetMCPMethod(r))
+				assert.Equal(t, "tool", ctxGetMCPPrimitiveType(r))
+				assert.Equal(t, "lookup", ctxGetMCPPrimitiveName(r))
+				assert.Equal(t, -32601, ctxGetJSONRPCErrorCode(r))
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.verify(t, httptest.NewRequest(http.MethodPost, "/from-request", nil))
+		})
+	}
+
+	t.Run("empty tracked path panics", func(t *testing.T) {
+		require.Panics(t, func() {
+			ctxSetTrackedPath(httptest.NewRequest(http.MethodGet, "/", nil), "")
+		})
+	})
 }
 
 func TestRotateClientSecretHandler(t *testing.T) {
