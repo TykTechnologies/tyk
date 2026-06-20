@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/adapter/gqlengineadapter"
 )
 
+// SW-REQ-077
 type Supergraph struct {
 	ApiDefinition   *apidef.APIDefinition
 	HttpClient      *http.Client
@@ -18,6 +19,7 @@ type Supergraph struct {
 	subscriptionClientFactory graphqldatasource.GraphQLSubscriptionClientFactory
 }
 
+// SW-REQ-077
 func (s *Supergraph) EngineConfigV3() (*graphql.EngineV2Configuration, error) {
 	dataSourceConfs := s.subgraphDataSourceConfigs()
 	var federationConfigV2Factory *graphql.FederationEngineConfigFactory
@@ -43,6 +45,7 @@ func (s *Supergraph) EngineConfigV3() (*graphql.EngineV2Configuration, error) {
 	return &conf, nil
 }
 
+// SW-REQ-077
 func (s *Supergraph) subgraphDataSourceConfigs() []graphqldatasource.Configuration {
 	confs := make([]graphqldatasource.Configuration, 0)
 	if len(s.ApiDefinition.GraphQL.Supergraph.Subgraphs) == 0 {
@@ -70,6 +73,7 @@ func (s *Supergraph) subgraphDataSourceConfigs() []graphqldatasource.Configurati
 	return confs
 }
 
+// SW-REQ-077
 func graphqlDataSourceConfiguration(url string, method string, headers map[string]string, subscriptionType apidef.SubscriptionType) graphqldatasource.Configuration {
 	dataSourceHeaders := make(map[string]string)
 	for name, value := range headers {

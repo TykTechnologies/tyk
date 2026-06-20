@@ -32,6 +32,7 @@
 <!-- documents SW-REQ-074 -->
 <!-- documents SW-REQ-075 -->
 <!-- documents SW-REQ-076 -->
+<!-- documents SW-REQ-077 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -54,7 +55,7 @@ selection behavior, AsyncAPI adapter support-shape generation, and OpenAPI
 adapter support-shape generation, and GraphQL engine adapter utility behavior
 and proxy-only, supergraph, and universal-data-graph engine adapter
 configuration behavior, plus engine v3 proxy-only adapter configuration
-behavior, without silent data-shape drift.
+and supergraph adapter configuration behavior, without silent data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -440,3 +441,20 @@ subscription transport execution, REST or GraphQL upstream availability,
 gateway API loading, route generation, request matching, gateway request
 admission, middleware execution, persistence, analytics, or final
 client-visible runtime behavior.
+
+`SW-REQ-077` owns the concrete
+`apidef/adapter/gqlengineadapter/enginev3` supergraph engine adapter
+configuration assembly. Its evidence covers conversion of non-empty subgraph
+entries into federation-enabled GraphQL datasource configuration, empty-SDL
+subgraph skipping, subgraph/global header merging with subgraph precedence and
+canonical HTTP names, internal Tyk subgraph URL conversion with the internal API
+header, subgraph subscription type mapping, caller-supplied HTTP, streaming,
+and subscription-client factory inputs in the generated federation datasource
+factory, merged SDL error propagation, empty-subgraph boundary behavior, and
+repeated-input determinism. This evidence does not claim GraphQL federation
+semantic correctness beyond local config assembly and upstream error
+propagation, correctness of the upstream graphql-go-tools/v2 federation config
+factory, GraphQL execution, subscription transport execution, REST or GraphQL
+upstream availability, gateway API loading, route generation, request matching,
+gateway request admission, middleware execution, persistence, analytics, or
+final client-visible runtime behavior.
