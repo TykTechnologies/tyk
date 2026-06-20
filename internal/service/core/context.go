@@ -15,12 +15,14 @@ const (
 )
 
 // SetContext updates the context of a request.
+// SW-REQ-036
 func SetContext(r *http.Request, ctx context.Context) {
 	r2 := r.WithContext(ctx)
 	*r = *r2
 }
 
 // SetUpstreamAuth sets the header name to be used for upstream authentication.
+// SW-REQ-036
 func SetUpstreamAuth(r *http.Request, auth model.UpstreamAuthProvider) {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, upstreamAuth, auth)
@@ -28,6 +30,7 @@ func SetUpstreamAuth(r *http.Request, auth model.UpstreamAuthProvider) {
 }
 
 // GetUpstreamAuth returns the header name to be used for upstream authentication.
+// SW-REQ-036
 func GetUpstreamAuth(r *http.Request) model.UpstreamAuthProvider {
 	auth := r.Context().Value(upstreamAuth)
 	if auth == nil {

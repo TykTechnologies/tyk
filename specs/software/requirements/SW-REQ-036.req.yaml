@@ -1,0 +1,55 @@
+id: SW-REQ-036
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal/service/core request-context helpers shall replace a request context, store an upstream-auth provider in the request context, retrieve the provider when the stored value has the expected interface type, and return nil when the provider is absent or type-mismatched.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-108
+component: httpctx
+rationale: This software requirement owns only the in-process request-context helper behavior in internal/service/core. It does not claim which gateway middleware writes the upstream-auth provider, upstream authentication execution, authorization decisions, analytics persistence, network transport behavior, or final HTTP status generation.
+tags:
+    - request-context
+    - upstream-auth
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-108
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T00:05:55Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-036 is scoped to internal/service/core request-context replacement and upstream-auth provider context storage/retrieval under the existing in-process httpctx component; focused internal/service/core tests passed with race. This approval does not claim caller ordering, middleware authorization decisions, upstream authentication execution, analytics persistence, network transport behavior, or final HTTP status generation.
+        fingerprint: sha256:3e2b08d3984d41d058e3e78670a74f4acf505f2f858bcbf99669c96a831a7881
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T00:05:55Z"
+obligation_checklist:
+    - nominal
+    - boundary
+lifecycle:
+    change_history:
+        - date: "2026-06-20T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added internal/service/core upstream-auth request-context helper decomposition under existing request-context metadata behavior.
+          changed_by: agent:codex
+        - date: "2026-06-20T00:05:55Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T00:04:53Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Request-context scope now includes internal/service/core upstream-auth provider context storage/retrieval in addition to existing internal/httpctx metadata behavior; focused internal/httpctx and internal/service/core tests passed with race. This approval does not claim caller ordering, middleware authorization decisions, upstream authentication execution, JSON-RPC body parsing, API definition synthesis, analytics persistence, network transport behavior, or final HTTP status generation.")'
+          changed_by: human:buger

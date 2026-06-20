@@ -18,6 +18,10 @@ func createReq(tb testing.TB) *http.Request {
 	return req
 }
 
+// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-036
+// STK-REQ-020:nominal:nominal
+// SYS-REQ-108:nominal:nominal
+// SW-REQ-036:nominal:nominal
 func TestUpstreamAuth(t *testing.T) {
 	t.Run("valid auth provider", func(t *testing.T) {
 		mockAuthProvider := &model.MockUpstreamAuthProvider{}
@@ -32,6 +36,10 @@ func TestUpstreamAuth(t *testing.T) {
 	})
 
 	t.Run("no auth provider", func(t *testing.T) {
+		// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-036
+		// STK-REQ-020:boundary:boundary
+		// SYS-REQ-108:boundary:boundary
+		// SW-REQ-036:boundary:boundary
 		req := createReq(t)
 
 		retrievedAuth := core.GetUpstreamAuth(req)
@@ -39,6 +47,10 @@ func TestUpstreamAuth(t *testing.T) {
 	})
 
 	t.Run("invalid auth provider", func(t *testing.T) {
+		// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-036
+		// STK-REQ-020:boundary:boundary
+		// SYS-REQ-108:boundary:boundary
+		// SW-REQ-036:boundary:boundary
 		req := createReq(t)
 
 		// Set a context with a value that is not of type proxy.UpstreamAuthProvider
@@ -50,6 +62,10 @@ func TestUpstreamAuth(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-036
+// STK-REQ-020:nominal:nominal
+// SYS-REQ-108:nominal:nominal
+// SW-REQ-036:nominal:nominal
 func TestSetContext(t *testing.T) {
 	t.Run("add key", func(t *testing.T) {
 		req := createReq(t)
@@ -66,7 +82,6 @@ func TestSetContext(t *testing.T) {
 	})
 
 	t.Run("override key", func(t *testing.T) {
-
 		req := createReq(t)
 		existingCtx := context.WithValue(context.Background(), core.ContextKey("existingKey"), "existingValue")
 		req = req.WithContext(existingCtx)
@@ -82,6 +97,10 @@ func TestSetContext(t *testing.T) {
 	})
 
 	t.Run("empty context", func(t *testing.T) {
+		// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-036
+		// STK-REQ-020:boundary:boundary
+		// SYS-REQ-108:boundary:boundary
+		// SW-REQ-036:boundary:boundary
 		req := createReq(t)
 
 		emptyCtx := context.Background()
