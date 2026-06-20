@@ -2,6 +2,7 @@ package oas
 
 import "github.com/getkin/kin-openapi/openapi3"
 
+// SW-REQ-052
 // ExampleExtractor returns an example payload according to the openapi3.SchemaRef object.
 func ExampleExtractor(schema *openapi3.SchemaRef) interface{} {
 	if schema == nil {
@@ -32,6 +33,7 @@ func ExampleExtractor(schema *openapi3.SchemaRef) interface{} {
 	}
 }
 
+// SW-REQ-052
 func emptyExampleVal(schema *openapi3.Schema) interface{} {
 	switch {
 	case schema.Type.Is(openapi3.TypeString):

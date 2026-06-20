@@ -5,14 +5,14 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the model shall always satisfy !api_definition_support_requested | api_definition_support_shape_preserved
-description: Gateway API definition support model helpers shall preserve typed health-check wire values, deterministic host-list access behavior, error-override matcher/template state, embedded Classic API definition schema data, OAS helper path/server shapes, OAS schema visitor/unicode-escape helper behavior, custom middleware definition enablement classification, OAS extension header name/value helper shapes, and OAS extension error-override helper shapes so API definition, RPC, and configuration flows can exchange these helper shapes without silent data-shape drift.
+description: Gateway API definition support model helpers shall preserve typed health-check wire values, deterministic host-list access behavior, error-override matcher/template state, embedded Classic API definition schema data, OAS helper path/server shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example extraction shapes, custom middleware definition enablement classification, OAS extension header name/value helper shapes, and OAS extension error-override helper shapes so API definition, RPC, and configuration flows can exchange these helper shapes without silent data-shape drift.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: model
-rationale: This system-level requirement owns small API-definition support helper behavior only. It does not claim API import, full OAS conversion, route generation, request matching, gateway request admission, middleware execution, final client-visible header or error-response behavior, or full API definition lifecycle behavior, which require separate black-box or adapter evidence.
+rationale: This system-level requirement owns small API-definition support helper behavior only. It does not claim API import, full OAS conversion, route generation, request matching, gateway request admission, middleware execution, final client-visible header or error-response behavior, mock-response execution, or full API definition lifecycle behavior, which require separate black-box or adapter evidence.
 tags:
     - api-definition
     - oas
@@ -32,23 +32,23 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-20T01:44:20Z"
-        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-051 is scoped to the local apidef/oas error-override shape mapping helpers: Classic disabled flag to OAS enabled flag mapping, nil and empty override maps, status-code override lists, optional matcher fields, response status/body/message/template/header fields, nil-match overrides, nil receiver extraction, and deterministic repeated Fill/ExtractTo round trips. Focused apidef/oas tests passed with race, go vet, and go build. This approval does not claim gateway error response selection, matcher evaluation, template rendering or execution, response-body matching, middleware execution, API import, route generation, request matching, gateway request admission, or final client-visible response behavior.'
-        fingerprint: sha256:22a4b06d86c96336b6cfc5d3fda9948eea701c4db2f0a441b4c5409fdc4053d5
+        reviewed_at: "2026-06-20T01:51:58Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-052 is scoped to the local apidef/oas schema example extraction helper: nil schema references, explicit example precedence, object property recursion, array item example derivation, first enum value fallback, primitive defaults, unknown-type nil fallback, and deterministic repeated extraction for valid schema references with non-nil schema values. Focused apidef/oas tests passed with race, go vet, and go build. This approval does not claim full OAS conversion, schema validation, response selection, mock-response middleware execution, API import, route generation, request matching, gateway request admission, non-nil schema references with nil schema values, or final client-visible response behavior.'
+        fingerprint: sha256:919f3097c6d65c49d5c21b90b32549ea025f5aa1c634c20446f55dae9f3f19e2
         ai_generated: false
-    gaps_reviewed_at: "2026-06-20T01:44:32.458305Z"
+    gaps_reviewed_at: "2026-06-20T01:52:11.513689Z"
     gaps_reviewed_by: human:buger
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-104|api_definition_support_shape_preserved
           reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-104's api_definition_support_shape_preserved variable is decomposed across SW-REQ-019 health-check wire constants/JSON shapes, SW-REQ-020 HostList constructor/access/error behavior, SW-REQ-021 apidef error-override template and matcher state, SW-REQ-033 embedded Classic API definition schema data, SW-REQ-042 internal/oasutil path ordering plus server URL template parsing, SW-REQ-044 pkg/schema OAS visitor traversal plus unicode-escape conversion/restoration helpers, SW-REQ-045 internal/middleware custom middleware definition enablement classification, SW-REQ-047 apidef/oas header helper shape behavior, and SW-REQ-051 apidef/oas error-override shape mapping covering Classic disabled flag to OAS enabled flag mapping, nil and empty override maps, status-code override lists, optional matcher fields, response status/body/message/template/header fields, nil-match overrides, nil receiver extraction, and deterministic repeated Fill/ExtractTo round trips. The review is limited to these API-definition support helpers and does not claim full API-definition validation, schema completeness, API import, full OAS conversion, route generation, request matching, middleware chain construction, plugin loading, middleware execution, gateway request admission, final client-visible header or error-response behavior, or full API definition lifecycle coverage.
-          reviewed_at: "2026-06-20T01:44:32.458305Z"
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-104's api_definition_support_shape_preserved variable is decomposed across SW-REQ-019 health-check wire constants/JSON shapes, SW-REQ-020 HostList constructor/access/error behavior, SW-REQ-021 apidef error-override template and matcher state, SW-REQ-033 embedded Classic API definition schema data, SW-REQ-042 internal/oasutil path ordering plus server URL template parsing, SW-REQ-044 pkg/schema OAS visitor traversal plus unicode-escape conversion/restoration helpers, SW-REQ-045 internal/middleware custom middleware definition enablement classification, SW-REQ-047 apidef/oas header helper shape behavior, SW-REQ-051 apidef/oas error-override shape mapping, and SW-REQ-052 apidef/oas schema example extraction covering nil schema references, explicit example precedence, object property recursion, array item example derivation, first enum value fallback, primitive defaults, unknown-type nil fallback, and deterministic repeated extraction for valid schema references with non-nil schema values. The review is limited to these API-definition support helpers and does not claim full API-definition validation, schema completeness, API import, full OAS conversion, route generation, request matching, middleware chain construction, plugin loading, middleware execution, mock-response runtime behavior, gateway request admission, final client-visible header or error-response behavior, or full API definition lifecycle coverage.
+          reviewed_at: "2026-06-20T01:52:11.513689Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-19T21:10:22Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-20T01:44:20Z"
+    last_modified_at: "2026-06-20T01:51:58Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -84,4 +84,9 @@ lifecycle:
           from: approved
           to: approved
           reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T01:20:01Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-047 is scoped to the local apidef/oas header helper shape behavior: Add appends header name/value pairs in order, Map returns populated maps, nil and empty header lists return explicit empty maps, duplicate header names collapse with last-value-wins behavior, NewHeaders returns deterministic name-sorted lists, and nil or empty input maps return explicit empty header lists. Focused apidef/oas tests passed with race, and the full configured ReqProof implement-stage test evidence passed. This approval does not claim full OAS conversion, header transformation middleware execution, API import, route generation, request matching, gateway request admission, or final client-visible header behavior.")'
+          changed_by: human:buger
+        - date: "2026-06-20T01:51:58Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T01:44:20Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-051 is scoped to the local apidef/oas error-override shape mapping helpers: Classic disabled flag to OAS enabled flag mapping, nil and empty override maps, status-code override lists, optional matcher fields, response status/body/message/template/header fields, nil-match overrides, nil receiver extraction, and deterministic repeated Fill/ExtractTo round trips. Focused apidef/oas tests passed with race, go vet, and go build. This approval does not claim gateway error response selection, matcher evaluation, template rendering or execution, response-body matching, middleware execution, API import, route generation, request matching, gateway request admission, or final client-visible response behavior.")'
           changed_by: human:buger

@@ -10,6 +10,7 @@
 <!-- documents SW-REQ-045 -->
 <!-- documents SW-REQ-047 -->
 <!-- documents SW-REQ-051 -->
+<!-- documents SW-REQ-052 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -19,9 +20,10 @@ admission, or the full API definition lifecycle.
 `SYS-REQ-104` covers API-definition support model helpers that preserve typed
 health-check wire values, host-list access behavior, and error-override helper
 state, embedded Classic API definition schema data, OAS path/server helper
-shapes, OAS schema visitor/unicode-escape helper behavior, custom middleware
-definition enablement classification, OAS extension header name/value helper
-shapes, and OAS extension error-override helper shapes without silent
+shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
+extraction shapes, custom middleware definition enablement classification, OAS
+extension header name/value helper shapes, and OAS extension error-override
+helper shapes without silent
 data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
@@ -102,3 +104,14 @@ Fill/ExtractTo round trips. This evidence does not claim gateway error response
 selection, matcher evaluation, template rendering or execution, response-body
 matching, middleware execution, API import, route generation, request matching,
 gateway request admission, or final client-visible response behavior.
+
+`SW-REQ-052` owns the concrete `apidef/oas` schema example extraction helper
+used by API-definition support shapes. Its evidence covers nil schema
+references, explicit example precedence, object property recursion, array item
+example derivation, first-enum-value fallback, primitive defaults, unknown-type
+nil fallback, and deterministic repeated extraction for valid schema references
+with non-nil schema values. This evidence does not claim full OAS conversion,
+schema validation, response selection, mock-response middleware execution, API
+import, route generation, request matching, gateway request admission, non-nil
+schema references with nil schema values, or final client-visible response
+behavior.
