@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestResponseFlagConstants(t *testing.T) {
 	// Verify all 22 flag values are distinct and have expected string representations
 	flags := []struct {
@@ -51,6 +52,7 @@ func TestResponseFlagConstants(t *testing.T) {
 	assert.Len(t, flags, 22, "should have exactly 22 response flags")
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestNewErrorClassification(t *testing.T) {
 	t.Run("creates classification with flag and details", func(t *testing.T) {
 		ec := NewErrorClassification(TLE, "tls_certificate_expired")
@@ -69,6 +71,7 @@ func TestNewErrorClassification(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestErrorClassificationBuilderChaining(t *testing.T) {
 	t.Run("WithSource returns same instance", func(t *testing.T) {
 		ec := NewErrorClassification(UCF, "connection_refused")

@@ -27,6 +27,7 @@ const (
 // 6. Context errors (context.Canceled)
 // 7. String-based fallback detection
 // 8. Generic fallback (UPE)
+// SW-REQ-041
 func ClassifyUpstreamError(err error, target string) *ErrorClassification {
 	if err == nil {
 		return nil
@@ -93,6 +94,7 @@ func ClassifyUpstreamError(err error, target string) *ErrorClassification {
 }
 
 // classifyTLSError checks for TLS-related errors and returns appropriate classification.
+// SW-REQ-041
 func classifyTLSError(err error, target string) *ErrorClassification {
 	// Check for certificate invalid error
 	var certInvalidErr x509.CertificateInvalidError
@@ -157,6 +159,7 @@ func classifyTLSError(err error, target string) *ErrorClassification {
 }
 
 // classifySyscallError checks for syscall-level connection errors.
+// SW-REQ-041
 func classifySyscallError(err error, target string) *ErrorClassification {
 	// Handle both direct syscall.Errno and wrapped errors
 	var errno syscall.Errno
@@ -168,6 +171,7 @@ func classifySyscallError(err error, target string) *ErrorClassification {
 }
 
 // classifyErrno maps syscall.Errno values to error classifications.
+// SW-REQ-041
 func classifyErrno(errno syscall.Errno, target string) *ErrorClassification {
 	switch errno {
 	case syscall.ECONNREFUSED:
@@ -207,6 +211,7 @@ func classifyErrno(errno syscall.Errno, target string) *ErrorClassification {
 }
 
 // classifyDNSError checks for DNS resolution errors.
+// SW-REQ-041
 func classifyDNSError(err error, target string) *ErrorClassification {
 	var dnsErr *net.DNSError
 	if As(err, &dnsErr) {
@@ -228,6 +233,7 @@ func classifyDNSError(err error, target string) *ErrorClassification {
 }
 
 // classifyByErrorString performs string-based pattern matching as a fallback.
+// SW-REQ-041
 func classifyByErrorString(err error, target string) *ErrorClassification {
 	errStr := strings.ToLower(err.Error())
 
@@ -299,6 +305,7 @@ func classifyByErrorString(err error, target string) *ErrorClassification {
 }
 
 // ClassifyCircuitBreakerError creates an error classification for circuit breaker events.
+// SW-REQ-041
 func ClassifyCircuitBreakerError(target, state string) *ErrorClassification {
 	return NewErrorClassification(CBO, "circuit_breaker_open").
 		WithSource(sourceReverseProxy).
@@ -307,6 +314,7 @@ func ClassifyCircuitBreakerError(target, state string) *ErrorClassification {
 }
 
 // ClassifyNoHealthyUpstreamsError creates an error classification when no healthy upstreams are available.
+// SW-REQ-041
 func ClassifyNoHealthyUpstreamsError(target string) *ErrorClassification {
 	return NewErrorClassification(NHU, "no_healthy_upstreams").
 		WithSource(sourceReverseProxy).
@@ -315,6 +323,7 @@ func ClassifyNoHealthyUpstreamsError(target string) *ErrorClassification {
 
 // ClassifyUpstreamResponse creates an error classification for 5XX upstream responses.
 // Unlike connection errors, the upstream received the request and responded with an error.
+// SW-REQ-041
 func ClassifyUpstreamResponse(statusCode int, target string) *ErrorClassification {
 	return NewErrorClassification(URS, "upstream_response_5xx").
 		WithSource(sourceUpstream).
@@ -324,6 +333,7 @@ func ClassifyUpstreamResponse(statusCode int, target string) *ErrorClassificatio
 
 // ClassifyAuthError maps TykError IDs to ErrorClassification for authentication errors.
 // Returns nil for unknown error IDs.
+// SW-REQ-041
 func ClassifyAuthError(errorID string, source string) *ErrorClassification {
 	switch errorID {
 	// Auth key errors
@@ -359,6 +369,7 @@ func ClassifyAuthError(errorID string, source string) *ErrorClassification {
 
 // ClassifyRateLimitError maps rate limit error types to ErrorClassification.
 // Returns nil for unknown error types.
+// SW-REQ-041
 func ClassifyRateLimitError(errorType string, source string) *ErrorClassification {
 	switch errorType {
 	case ErrTypeSessionRateLimit:
@@ -373,12 +384,14 @@ func ClassifyRateLimitError(errorType string, source string) *ErrorClassificatio
 }
 
 // ClassifyQuotaExceededError creates an error classification for quota exceeded events.
+// SW-REQ-041
 func ClassifyQuotaExceededError(source string) *ErrorClassification {
 	return NewErrorClassification(QEX, detailQuotaExceeded).WithSource(source)
 }
 
 // ClassifyJWTError maps JWT-specific error types to ErrorClassification.
 // Returns nil for unknown error types.
+// SW-REQ-041
 func ClassifyJWTError(errorType string, source string) *ErrorClassification {
 	switch errorType {
 	case ErrTypeAuthFieldMissing:
@@ -398,6 +411,7 @@ func ClassifyJWTError(errorType string, source string) *ErrorClassification {
 
 // ClassifyBasicAuthError maps basic auth error types to ErrorClassification.
 // Returns nil for unknown error types.
+// SW-REQ-041
 func ClassifyBasicAuthError(errorType string, source string) *ErrorClassification {
 	switch errorType {
 	case ErrTypeAuthFieldMissing:
@@ -418,6 +432,7 @@ func ClassifyBasicAuthError(errorType string, source string) *ErrorClassificatio
 }
 
 // ClassifyRequestSizeError maps request size error types to ErrorClassification.
+// SW-REQ-041
 func ClassifyRequestSizeError(errorType string, source string) *ErrorClassification {
 	switch errorType {
 	case ErrTypeContentLengthMissing:
@@ -430,6 +445,7 @@ func ClassifyRequestSizeError(errorType string, source string) *ErrorClassificat
 }
 
 // ClassifyJSONValidationError maps JSON validation error types to ErrorClassification.
+// SW-REQ-041
 func ClassifyJSONValidationError(errorType string, source string) *ErrorClassification {
 	switch errorType {
 	case ErrTypeJSONParseError:

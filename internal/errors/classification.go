@@ -63,6 +63,7 @@ const (
 )
 
 // String returns the string representation of the ResponseFlag.
+// SW-REQ-041
 func (f ResponseFlag) String() string {
 	return string(f)
 }
@@ -198,6 +199,7 @@ type ErrorClassification struct {
 }
 
 // NewErrorClassification creates a new ErrorClassification with the given flag and details.
+// SW-REQ-041
 func NewErrorClassification(flag ResponseFlag, details string) *ErrorClassification {
 	return &ErrorClassification{
 		Flag:    flag,
@@ -206,18 +208,21 @@ func NewErrorClassification(flag ResponseFlag, details string) *ErrorClassificat
 }
 
 // WithSource sets the error source and returns the classification for chaining.
+// SW-REQ-041
 func (ec *ErrorClassification) WithSource(source string) *ErrorClassification {
 	ec.Source = source
 	return ec
 }
 
 // WithTarget sets the upstream target and returns the classification for chaining.
+// SW-REQ-041
 func (ec *ErrorClassification) WithTarget(target string) *ErrorClassification {
 	ec.Target = target
 	return ec
 }
 
 // WithTLSInfo sets the TLS certificate information and returns the classification for chaining.
+// SW-REQ-041
 func (ec *ErrorClassification) WithTLSInfo(expiry time.Time, subject string) *ErrorClassification {
 	ec.TLSCertExpiry = expiry
 	ec.TLSCertSubject = subject
@@ -225,12 +230,14 @@ func (ec *ErrorClassification) WithTLSInfo(expiry time.Time, subject string) *Er
 }
 
 // WithCircuitBreakerState sets the circuit breaker state and returns the classification for chaining.
+// SW-REQ-041
 func (ec *ErrorClassification) WithCircuitBreakerState(state string) *ErrorClassification {
 	ec.CircuitBreakerState = state
 	return ec
 }
 
 // WithUpstreamStatus sets the upstream HTTP status code and returns the classification for chaining.
+// SW-REQ-041
 func (ec *ErrorClassification) WithUpstreamStatus(status int) *ErrorClassification {
 	ec.UpstreamStatus = status
 	return ec
@@ -238,6 +245,7 @@ func (ec *ErrorClassification) WithUpstreamStatus(status int) *ErrorClassificati
 
 // WithTemplateData sets arbitrary template variables and returns the classification for chaining.
 // The keys are exposed as top-level template variables in error override templates.
+// SW-REQ-041
 func (ec *ErrorClassification) WithTemplateData(data map[string]any) *ErrorClassification {
 	ec.TemplateData = data
 	return ec

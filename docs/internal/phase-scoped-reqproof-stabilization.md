@@ -44,7 +44,7 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 79/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `verification_scope_complete` | 81/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
 | `mcdc_coverage` | 52/385 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
@@ -179,5 +179,6 @@ requirement ignores.
      `dnscache` local DNS cache storage and manager behavior,
      `internal/service/core` upstream-auth request-context helpers, and
      `apidef/mcp` embedded MCP schema validation with the local
-     `internal/service/gojsonschema` and `internal/errors` facades. They reduce
-     the visible scope gap but do not change the remaining warning disposition.
+     `internal/service/gojsonschema` and `internal/errors` facades, and
+     `internal/errors` diagnostic classification. They reduce the visible scope
+     gap but do not change the remaining warning disposition.

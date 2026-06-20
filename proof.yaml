@@ -176,6 +176,10 @@ project:
             - pkg/validator/validator_test.go
             - request/real_ip.go
             - request/real_ip_test.go
+            - internal/errors/classification.go
+            - internal/errors/classification_test.go
+            - internal/errors/classifier.go
+            - internal/errors/classifier_test.go
             - internal/errors/errors.go
             - internal/errors/errors_test.go
             - internal/jsonrpc/errors/mapper.go

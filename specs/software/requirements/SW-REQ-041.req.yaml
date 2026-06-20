@@ -1,0 +1,54 @@
+id: SW-REQ-041
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal/errors classifier shall expose stable response-flag and error-type constants, construct chainable ErrorClassification metadata, classify upstream TLS/connection/DNS/context/timeout/string/generic failures, classify circuit-breaker/no-healthy-upstream/upstream-response failures, and classify known authentication, OAuth, rate-limit, quota, JWT, basic-auth, request-size, and JSON-validation identifiers while returning nil for nil upstream errors and unknown typed identifiers.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: internal/errors/classification_test.go; internal/errors/classifier_test.go; docs/error-classification-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-082
+component: observability
+rationale: This software requirement owns only the local internal/errors classification constants, builders, and mapping helpers. It does not claim reverse-proxy execution, middleware ordering, access-log emission, analytics persistence, network transport success, upstream availability, or final HTTP status generation.
+tags:
+    - observability
+    - error-classification
+    - access-log
+    - diagnostics
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-082
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T00:43:25Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-041 is scoped to the local internal/errors diagnostic classifier: response-flag string values, ErrorClassification construction and chaining, upstream TLS/connection/DNS/context/timeout/string/generic classification, circuit-breaker/no-healthy-upstream/upstream-response classification, typed auth/OAuth/rate-limit/quota/JWT/basic-auth/request-size/JSON-validation classification, nil upstream error handling, and nil results for unknown typed identifiers. Focused internal/errors tests passed with race. This approval does not claim reverse-proxy execution, gateway middleware ordering, access-log emission, analytics persistence, network transport success, upstream availability, or final HTTP status generation.'
+        fingerprint: sha256:2710e3ac68fd78f40a4ea177656e65704c14b65839d45bd39fd68e736df47cd3
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T00:43:25Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added internal/errors classifier software decomposition under diagnostic classification behavior.
+          changed_by: agent:codex

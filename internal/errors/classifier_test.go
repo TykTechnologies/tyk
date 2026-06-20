@@ -17,11 +17,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyUpstreamError_Nil(t *testing.T) {
 	result := ClassifyUpstreamError(nil, "api.backend.com:443")
 	assert.Nil(t, result)
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyUpstreamError_TLSErrors(t *testing.T) {
 	target := "api.backend.com:443"
 
@@ -90,6 +92,7 @@ func TestClassifyUpstreamError_TLSErrors(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyUpstreamError_ConnectionErrors(t *testing.T) {
 	target := "api.backend.com:443"
 
@@ -141,6 +144,7 @@ func TestClassifyUpstreamError_ConnectionErrors(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyUpstreamError_WrappedErrors(t *testing.T) {
 	target := "api.backend.com:443"
 
@@ -183,6 +187,7 @@ func TestClassifyUpstreamError_WrappedErrors(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyUpstreamError_DNSErrors(t *testing.T) {
 	target := "unknown.host.com:443"
 
@@ -233,6 +238,7 @@ func TestClassifyUpstreamError_DNSErrors(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyUpstreamError_TimeoutErrors(t *testing.T) {
 	target := "slow.backend.com:443"
 
@@ -252,6 +258,7 @@ func TestClassifyUpstreamError_TimeoutErrors(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyUpstreamError_ContextErrors(t *testing.T) {
 	target := "api.backend.com:443"
 
@@ -263,6 +270,7 @@ func TestClassifyUpstreamError_ContextErrors(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyUpstreamError_StringFallback(t *testing.T) {
 	target := "api.backend.com:443"
 
@@ -313,6 +321,7 @@ func TestClassifyUpstreamError_StringFallback(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyUpstreamError_GenericFallback(t *testing.T) {
 	target := "api.backend.com:443"
 
@@ -325,6 +334,7 @@ func TestClassifyUpstreamError_GenericFallback(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyCircuitBreakerError(t *testing.T) {
 	t.Run("circuit breaker open", func(t *testing.T) {
 		result := ClassifyCircuitBreakerError("api.backend.com:443", "OPEN")
@@ -343,6 +353,7 @@ func TestClassifyCircuitBreakerError(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyNoHealthyUpstreamsError(t *testing.T) {
 	result := ClassifyNoHealthyUpstreamsError("api.backend.com:443")
 	require.NotNil(t, result)
@@ -352,6 +363,7 @@ func TestClassifyNoHealthyUpstreamsError(t *testing.T) {
 	assert.Equal(t, "api.backend.com:443", result.Target)
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyUpstreamResponse(t *testing.T) {
 	target := "api.backend.com:443"
 
@@ -400,6 +412,7 @@ func (e *timeoutError) Error() string   { return "timeout error" }
 func (e *timeoutError) Timeout() bool   { return e.timeout }
 func (e *timeoutError) Temporary() bool { return e.temporary }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyUpstreamError_AdditionalTLSErrors(t *testing.T) {
 	target := "api.backend.com:443"
 
@@ -441,6 +454,7 @@ func TestClassifyUpstreamError_AdditionalTLSErrors(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyUpstreamError_AdditionalSyscallErrors(t *testing.T) {
 	target := "api.backend.com:443"
 
@@ -482,6 +496,7 @@ func TestClassifyUpstreamError_AdditionalSyscallErrors(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyUpstreamError_WrappedAdditionalErrors(t *testing.T) {
 	target := "api.backend.com:443"
 
@@ -520,6 +535,7 @@ func TestClassifyUpstreamError_WrappedAdditionalErrors(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyUpstreamError_TLSStringFallback(t *testing.T) {
 	target := "api.backend.com:443"
 
@@ -600,6 +616,7 @@ func TestClassifyUpstreamError_TLSStringFallback(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyUpstreamError_EdgeCases(t *testing.T) {
 	t.Run("empty target string", func(t *testing.T) {
 		err := syscall.ECONNREFUSED
@@ -688,6 +705,7 @@ func TestClassifyUpstreamError_EdgeCases(t *testing.T) {
 
 // 4XX Error Classification Tests
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestResponseFlag4XXConstants(t *testing.T) {
 	testCases := []struct {
 		flag     ResponseFlag
@@ -716,6 +734,7 @@ func TestResponseFlag4XXConstants(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyAuthError(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -817,11 +836,14 @@ func TestClassifyAuthError(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
+// SW-REQ-041:error_handling:negative
 func TestClassifyAuthErrorUnknown(t *testing.T) {
 	ec := ClassifyAuthError("unknown.error", "TestSource")
 	assert.Nil(t, ec)
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyRateLimitError(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -864,11 +886,13 @@ func TestClassifyRateLimitError(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyRateLimitErrorUnknown(t *testing.T) {
 	ec := ClassifyRateLimitError("unknown_type", "TestSource")
 	assert.Nil(t, ec)
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyQuotaExceededError(t *testing.T) {
 	ec := ClassifyQuotaExceededError("RateLimitAndQuotaCheck")
 
@@ -878,6 +902,7 @@ func TestClassifyQuotaExceededError(t *testing.T) {
 	assert.Equal(t, "RateLimitAndQuotaCheck", ec.Source)
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyJWTError(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -935,11 +960,13 @@ func TestClassifyJWTError(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyJWTErrorUnknown(t *testing.T) {
 	ec := ClassifyJWTError("unknown_error", "JWTMiddleware")
 	assert.Nil(t, ec)
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyBasicAuthError(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -1004,11 +1031,13 @@ func TestClassifyBasicAuthError(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyBasicAuthErrorUnknown(t *testing.T) {
 	ec := ClassifyBasicAuthError("unknown_error", "BasicAuthKeyIsValid")
 	assert.Nil(t, ec)
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyRequestSizeError(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -1045,11 +1074,13 @@ func TestClassifyRequestSizeError(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyRequestSizeErrorUnknown(t *testing.T) {
 	ec := ClassifyRequestSizeError("unknown_error", "RequestSizeLimitMiddleware")
 	assert.Nil(t, ec)
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyJSONValidationError(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -1086,6 +1117,7 @@ func TestClassifyJSONValidationError(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-041
 func TestClassifyJSONValidationErrorUnknown(t *testing.T) {
 	ec := ClassifyJSONValidationError("unknown_error", "ValidateJSON")
 	assert.Nil(t, ec)
