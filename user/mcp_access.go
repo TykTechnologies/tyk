@@ -18,11 +18,13 @@ type AccessControlRules struct {
 }
 
 // IsEmpty returns true if there are no access control rules configured.
+// SW-REQ-043
 func (a AccessControlRules) IsEmpty() bool {
 	return len(a.Allowed) == 0 && len(a.Blocked) == 0
 }
 
 // IsZero implements the omitzero interface for JSON serialization.
+// SW-REQ-043
 func (a AccessControlRules) IsZero() bool {
 	return a.IsEmpty()
 }
@@ -53,6 +55,7 @@ var validMCPPrimitiveTypes = map[string]bool{
 }
 
 // Validate returns an error if Type is not one of the known MCP primitive types.
+// SW-REQ-043
 func (m MCPPrimitiveLimit) Validate() error {
 	if !validMCPPrimitiveTypes[m.Type] {
 		return fmt.Errorf("invalid MCP primitive type %q: must be one of tool, resource, prompt", m.Type)
@@ -68,11 +71,13 @@ type MCPAccessRights struct {
 }
 
 // IsEmpty returns true if there are no MCP access rights configured.
+// SW-REQ-043
 func (m MCPAccessRights) IsEmpty() bool {
 	return m.Tools.IsEmpty() && m.Resources.IsEmpty() && m.Prompts.IsEmpty()
 }
 
 // IsZero implements the omitzero interface for JSON serialization.
+// SW-REQ-043
 func (m MCPAccessRights) IsZero() bool {
 	return m.IsEmpty()
 }

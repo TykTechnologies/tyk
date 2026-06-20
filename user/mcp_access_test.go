@@ -10,6 +10,9 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-043
+// SW-REQ-043:nominal:nominal
+// SW-REQ-043:boundary:boundary
 func TestAccessControlRules_IsEmpty(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -51,6 +54,9 @@ func TestAccessControlRules_IsEmpty(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-043
+// SW-REQ-043:nominal:nominal
+// SW-REQ-043:boundary:boundary
 func TestMCPAccessRights_IsEmpty(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -93,6 +99,8 @@ func TestMCPAccessRights_IsEmpty(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-043
+// SW-REQ-043:encoding_safety:nominal
 func TestAccessControlRules_JSONRoundtrip(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -128,6 +136,8 @@ func TestAccessControlRules_JSONRoundtrip(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-043
+// SW-REQ-043:encoding_safety:nominal
 func TestJSONRPCMethodLimit_JSONRoundtrip(t *testing.T) {
 	input := user.JSONRPCMethodLimit{
 		Name:  "tools/call",
@@ -142,6 +152,8 @@ func TestJSONRPCMethodLimit_JSONRoundtrip(t *testing.T) {
 	assert.Equal(t, input, out)
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-043
+// SW-REQ-043:encoding_safety:nominal
 func TestMCPPrimitiveLimit_JSONRoundtrip(t *testing.T) {
 	input := user.MCPPrimitiveLimit{
 		Type:  "tool",
@@ -157,6 +169,8 @@ func TestMCPPrimitiveLimit_JSONRoundtrip(t *testing.T) {
 	assert.Equal(t, input, out)
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-043
+// SW-REQ-043:encoding_safety:nominal
 func TestAccessDefinition_MCPFields_JSONRoundtrip(t *testing.T) {
 	input := user.AccessDefinition{
 		APIID:   "test-api",
@@ -188,6 +202,9 @@ func TestAccessDefinition_MCPFields_JSONRoundtrip(t *testing.T) {
 	assert.Equal(t, input.MCPAccessRights, out.MCPAccessRights)
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-043
+// SW-REQ-043:nominal:nominal
+// SW-REQ-043:error_handling:negative
 func TestMCPPrimitiveLimit_Validate(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -215,6 +232,9 @@ func TestMCPPrimitiveLimit_Validate(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-043
+// SW-REQ-043:encoding_safety:nominal
+// SW-REQ-043:boundary:boundary
 func TestAccessDefinition_ZeroMCPFields_OmittedFromJSON(t *testing.T) {
 	input := user.AccessDefinition{
 		APIID:   "test-api",
