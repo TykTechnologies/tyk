@@ -11,6 +11,7 @@ import (
 )
 
 // Middleware holds configuration for Tyk's native middleware.
+// SW-REQ-089
 type Middleware struct {
 	// Global contains configuration for middleware that affects the whole API (all endpoints).
 	Global *Global `bson:"global,omitempty" json:"global,omitempty"`
@@ -29,6 +30,7 @@ type Middleware struct {
 }
 
 // Fill fills *Middleware from apidef.APIDefinition.
+// SW-REQ-089
 func (m *Middleware) Fill(api apidef.APIDefinition) {
 	if m.Global == nil {
 		m.Global = &Global{}
@@ -41,6 +43,7 @@ func (m *Middleware) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts *Middleware into *apidef.APIDefinition.
+// SW-REQ-089
 func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	if m.Global == nil {
 		m.Global = &Global{}
@@ -53,12 +56,14 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // HasMCPPrimitivesMocks checks if any MCP primitives (tools, resources, prompts) have enabled mock responses.
+// SW-REQ-089
 func (m *Middleware) HasMCPPrimitivesMocks() bool {
 	return hasMockInPrimitives(m.McpTools) ||
 		hasMockInPrimitives(m.McpResources) ||
 		hasMockInPrimitives(m.McpPrompts)
 }
 
+// SW-REQ-089
 func (m *Middleware) ExtractPrimitivesToExtendedPaths(ep *apidef.ExtendedPathsSet) {
 	if ep == nil || m == nil {
 		return
@@ -87,6 +92,7 @@ func (m *Middleware) ExtractPrimitivesToExtendedPaths(ep *apidef.ExtendedPathsSe
 }
 
 // hasMockInPrimitives checks if any primitive in the collection has an enabled mock response.
+// SW-REQ-089
 func hasMockInPrimitives(primitives MCPPrimitives) bool {
 	for _, primitive := range primitives {
 		if primitive.MockResponse != nil && primitive.MockResponse.Enabled {
@@ -97,6 +103,7 @@ func hasMockInPrimitives(primitives MCPPrimitives) bool {
 }
 
 // Global contains configuration that affects the whole API (all endpoints).
+// SW-REQ-089
 type Global struct {
 	// PluginConfig contains the common configuration for custom plugins.
 	PluginConfig *PluginConfig `bson:"pluginConfig,omitempty" json:"pluginConfig,omitempty"`
@@ -179,6 +186,7 @@ type Global struct {
 // to facilitate a smooth migration from deprecated fields that were previously used to represent
 // the same data. This custom marshaller ensures backwards compatibility and proper handling of the
 // deprecated fields during the migration process.
+// SW-REQ-089
 func (g *Global) MarshalJSON() ([]byte, error) {
 	if g == nil {
 		return nil, nil
@@ -213,6 +221,7 @@ func (g *Global) MarshalJSON() ([]byte, error) {
 }
 
 // Fill fills *Global from apidef.APIDefinition.
+// SW-REQ-089
 func (g *Global) Fill(api apidef.APIDefinition) {
 	if g.PluginConfig == nil {
 		g.PluginConfig = &PluginConfig{}
@@ -307,6 +316,7 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	g.fillSkips(api)
 }
 
+// SW-REQ-089
 func (g *Global) fillTrafficLogs(api apidef.APIDefinition) {
 	if g.TrafficLogs == nil {
 		g.TrafficLogs = &TrafficLogs{}
@@ -318,6 +328,7 @@ func (g *Global) fillTrafficLogs(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-089
 func (g *Global) fillRequestSizeLimit(api apidef.APIDefinition) {
 	if g.RequestSizeLimit == nil {
 		g.RequestSizeLimit = &GlobalRequestSizeLimit{}
@@ -329,6 +340,7 @@ func (g *Global) fillRequestSizeLimit(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-089
 func (g *Global) fillContextVariables(api apidef.APIDefinition) {
 	if g.ContextVariables == nil {
 		g.ContextVariables = &ContextVariables{}
@@ -340,6 +352,7 @@ func (g *Global) fillContextVariables(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-089
 func (g *Global) fillSkips(api apidef.APIDefinition) {
 	g.SkipRateLimit = api.DisableRateLimit
 	g.SkipQuota = api.DisableQuota
@@ -347,6 +360,7 @@ func (g *Global) fillSkips(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts *Global into *apidef.APIDefinition.
+// SW-REQ-089
 func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	if g.PluginConfig == nil {
 		g.PluginConfig = &PluginConfig{}
@@ -425,6 +439,7 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	g.extractSkipsTo(api)
 }
 
+// SW-REQ-089
 func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {
 	if g.TrafficLogs == nil {
 		g.TrafficLogs = &TrafficLogs{}
@@ -436,6 +451,7 @@ func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {
 	g.TrafficLogs.ExtractTo(api)
 }
 
+// SW-REQ-089
 func (g *Global) extractRequestSizeLimitTo(api *apidef.APIDefinition) {
 	if g.RequestSizeLimit == nil {
 		g.RequestSizeLimit = &GlobalRequestSizeLimit{}
@@ -447,6 +463,7 @@ func (g *Global) extractRequestSizeLimitTo(api *apidef.APIDefinition) {
 	g.RequestSizeLimit.ExtractTo(api)
 }
 
+// SW-REQ-089
 func (g *Global) extractContextVariablesTo(api *apidef.APIDefinition) {
 	if g.ContextVariables == nil {
 		g.ContextVariables = &ContextVariables{}
@@ -458,6 +475,7 @@ func (g *Global) extractContextVariablesTo(api *apidef.APIDefinition) {
 	g.ContextVariables.ExtractTo(api)
 }
 
+// SW-REQ-089
 func (g *Global) extractPrePluginsTo(api *apidef.APIDefinition) {
 	defer func() {
 		g.PrePlugin = nil
@@ -477,6 +495,7 @@ func (g *Global) extractPrePluginsTo(api *apidef.APIDefinition) {
 	g.PrePlugin.ExtractTo(api)
 }
 
+// SW-REQ-089
 func (g *Global) extractPostAuthenticationPluginsTo(api *apidef.APIDefinition) {
 	defer func() {
 		g.PostAuthenticationPlugin = nil
@@ -495,6 +514,7 @@ func (g *Global) extractPostAuthenticationPluginsTo(api *apidef.APIDefinition) {
 	g.PostAuthenticationPlugin.ExtractTo(api)
 }
 
+// SW-REQ-089
 func (g *Global) extractPostPluginsTo(api *apidef.APIDefinition) {
 	defer func() {
 		g.PostPlugin = nil
@@ -513,6 +533,7 @@ func (g *Global) extractPostPluginsTo(api *apidef.APIDefinition) {
 	g.PostPlugin.ExtractTo(api)
 }
 
+// SW-REQ-089
 func (g *Global) extractResponsePluginsTo(api *apidef.APIDefinition) {
 	defer func() {
 		g.ResponsePlugin = nil
@@ -531,6 +552,7 @@ func (g *Global) extractResponsePluginsTo(api *apidef.APIDefinition) {
 	g.ResponsePlugin.ExtractTo(api)
 }
 
+// SW-REQ-089
 func (g *Global) extractSkipsTo(api *apidef.APIDefinition) {
 	api.DisableRateLimit = g.SkipRateLimit
 	api.DisableQuota = g.SkipQuota
@@ -538,6 +560,7 @@ func (g *Global) extractSkipsTo(api *apidef.APIDefinition) {
 }
 
 // PluginConfigData configures config data for custom plugins.
+// SW-REQ-089
 type PluginConfigData struct {
 	// Enabled activates custom plugin config data.
 	//
@@ -551,18 +574,21 @@ type PluginConfigData struct {
 }
 
 // Fill fills PluginConfigData from apidef.
+// SW-REQ-089
 func (p *PluginConfigData) Fill(api apidef.APIDefinition) {
 	p.Enabled = !api.ConfigDataDisabled
 	p.Value = api.ConfigData
 }
 
 // ExtractTo extracts *PluginConfigData into *apidef.
+// SW-REQ-089
 func (p *PluginConfigData) ExtractTo(api *apidef.APIDefinition) {
 	api.ConfigDataDisabled = !p.Enabled
 	api.ConfigData = p.Value
 }
 
 // PluginConfig holds configuration for custom plugins.
+// SW-REQ-089
 type PluginConfig struct {
 	// Driver configures which custom plugin driver to use.
 	// The value should be set to one of the following:
@@ -584,6 +610,7 @@ type PluginConfig struct {
 }
 
 // Fill fills PluginConfig from apidef.
+// SW-REQ-089
 func (p *PluginConfig) Fill(api apidef.APIDefinition) {
 	p.Driver = api.CustomMiddleware.Driver
 
@@ -607,6 +634,7 @@ func (p *PluginConfig) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts *PluginConfig into *apidef.
+// SW-REQ-089
 func (p *PluginConfig) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.Driver = p.Driver
 
@@ -630,6 +658,7 @@ func (p *PluginConfig) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // PluginBundle holds configuration for custom plugins.
+// SW-REQ-089
 type PluginBundle struct {
 	// Enabled activates the custom plugin bundles.
 	//
@@ -641,18 +670,21 @@ type PluginBundle struct {
 }
 
 // Fill fills PluginBundle from apidef.
+// SW-REQ-089
 func (p *PluginBundle) Fill(api apidef.APIDefinition) {
 	p.Enabled = !api.CustomMiddlewareBundleDisabled
 	p.Path = api.CustomMiddlewareBundle
 }
 
 // ExtractTo extracts *PluginBundle into *apidef.
+// SW-REQ-089
 func (p *PluginBundle) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddlewareBundleDisabled = !p.Enabled
 	api.CustomMiddlewareBundle = p.Path
 }
 
 // CORS holds configuration for cross-origin resource sharing.
+// SW-REQ-089
 type CORS struct {
 	// Enabled is a boolean flag, if set to `true`, this option enables CORS processing.
 	//
@@ -707,6 +739,7 @@ type CORS struct {
 }
 
 // Fill fills *CORS from apidef.CORSConfig.
+// SW-REQ-089
 func (c *CORS) Fill(cors apidef.CORSConfig) {
 	c.Enabled = cors.Enable
 	c.MaxAge = cors.MaxAge
@@ -720,6 +753,7 @@ func (c *CORS) Fill(cors apidef.CORSConfig) {
 }
 
 // ExtractTo extracts *CORS into *apidef.CORSConfig.
+// SW-REQ-089
 func (c *CORS) ExtractTo(cors *apidef.CORSConfig) {
 	cors.Enable = c.Enabled
 	cors.MaxAge = c.MaxAge
@@ -733,6 +767,7 @@ func (c *CORS) ExtractTo(cors *apidef.CORSConfig) {
 }
 
 // Cache holds configuration for caching the requests.
+// SW-REQ-089
 type Cache struct {
 	// Enabled turns global cache middleware on or off. It is still possible to enable caching on a per-path basis
 	// by explicitly setting the endpoint cache middleware.
@@ -773,6 +808,7 @@ type Cache struct {
 }
 
 // Fill fills *Cache from apidef.CacheOptions.
+// SW-REQ-089
 func (c *Cache) Fill(cache apidef.CacheOptions) {
 	c.Enabled = cache.EnableCache
 	c.Timeout = cache.CacheTimeout
@@ -784,6 +820,7 @@ func (c *Cache) Fill(cache apidef.CacheOptions) {
 }
 
 // ExtractTo extracts *Cache into *apidef.CacheOptions.
+// SW-REQ-089
 func (c *Cache) ExtractTo(cache *apidef.CacheOptions) {
 	cache.EnableCache = c.Enabled
 	cache.CacheTimeout = c.Timeout
@@ -796,9 +833,11 @@ func (c *Cache) ExtractTo(cache *apidef.CacheOptions) {
 
 // Paths is a mapping of API endpoints to Path plugin configurations. This field is part of the [Middleware](#middleware) structure.
 // The string keys in this object represent URL path patterns (e.g. `/users`, `/users/{id}`, `/api/*`) that match API endpoints.
+// SW-REQ-089
 type Paths map[string]*Path
 
 // Fill fills *Paths (map) from apidef.ExtendedPathSet.
+// SW-REQ-089
 func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
 	ps.fillAllowance(ep.WhiteList, allow)
 	ps.fillAllowance(ep.BlackList, block)
@@ -808,6 +847,7 @@ func (ps Paths) Fill(ep apidef.ExtendedPathsSet) {
 	ps.fillEnforceTimeout(ep.HardTimeouts)
 }
 
+// SW-REQ-089
 func (ps Paths) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
 	for _, em := range endpointMetas {
 		if _, ok := ps[em.Path]; !ok {
@@ -845,6 +885,7 @@ func (ps Paths) fillAllowance(endpointMetas []apidef.EndPointMeta, typ Allowance
 	}
 }
 
+// SW-REQ-089
 func (ps Paths) fillTransformRequestMethod(metas []apidef.MethodTransformMeta) {
 	for _, meta := range metas {
 		if _, ok := ps[meta.Path]; !ok {
@@ -863,6 +904,7 @@ func (ps Paths) fillTransformRequestMethod(metas []apidef.MethodTransformMeta) {
 	}
 }
 
+// SW-REQ-089
 func (ps Paths) fillCache(cacheMetas []apidef.CacheMeta) {
 	for _, cm := range cacheMetas {
 		if _, ok := ps[cm.Path]; !ok {
@@ -881,6 +923,7 @@ func (ps Paths) fillCache(cacheMetas []apidef.CacheMeta) {
 	}
 }
 
+// SW-REQ-089
 func (ps Paths) fillEnforceTimeout(metas []apidef.HardTimeoutMeta) {
 	for _, meta := range metas {
 		if _, ok := ps[meta.Path]; !ok {
@@ -900,6 +943,7 @@ func (ps Paths) fillEnforceTimeout(metas []apidef.HardTimeoutMeta) {
 }
 
 // ExtractTo extracts Paths into *apidef.ExtendedPathsSet.
+// SW-REQ-089
 func (ps Paths) ExtractTo(ep *apidef.ExtendedPathsSet) {
 	var paths []string
 	for path := range ps {
@@ -914,6 +958,7 @@ func (ps Paths) ExtractTo(ep *apidef.ExtendedPathsSet) {
 }
 
 // Path holds plugin configurations for HTTP method verbs.
+// SW-REQ-089
 type Path struct {
 	// Delete holds plugin configuration for DELETE requests.
 	Delete *Plugins `bson:"DELETE,omitempty" json:"DELETE,omitempty"`
@@ -936,6 +981,7 @@ type Path struct {
 }
 
 // ExtractTo extracts *Path into *apidef.ExtendedPathSet.
+// SW-REQ-089
 func (p *Path) ExtractTo(ep *apidef.ExtendedPathsSet, path string) {
 	if p.Get != nil {
 		p.Get.ExtractTo(ep, path, http.MethodGet)
@@ -974,6 +1020,7 @@ func (p *Path) ExtractTo(ep *apidef.ExtendedPathsSet, path string) {
 	}
 }
 
+// SW-REQ-089
 func (p *Path) getMethod(name string) *Plugins {
 	switch {
 	case strings.EqualFold(http.MethodGet, name):
@@ -1040,6 +1087,7 @@ func (p *Path) getMethod(name string) *Plugins {
 }
 
 // Plugins configures common settings for each plugin, allowances, transforms, caching and timeouts.
+// SW-REQ-089
 type Plugins struct {
 	// Allow request by allowance.
 	Allow *Allowance `bson:"allow,omitempty" json:"allow,omitempty"`
@@ -1063,6 +1111,7 @@ type Plugins struct {
 }
 
 // ExtractTo extracts *Plugins into *apidef.ExtendedPathsSet.
+// SW-REQ-089
 func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	p.extractAllowanceTo(ep, path, method, allow)
 	p.extractAllowanceTo(ep, path, method, block)
@@ -1072,6 +1121,7 @@ func (p *Plugins) ExtractTo(ep *apidef.ExtendedPathsSet, path string, method str
 	p.extractEnforcedTimeoutTo(ep, path, method)
 }
 
+// SW-REQ-089
 func (p *Plugins) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
 	allowance := p.Allow
 	endpointMetas := &ep.WhiteList
@@ -1094,6 +1144,7 @@ func (p *Plugins) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, m
 	*endpointMetas = append(*endpointMetas, endpointMeta)
 }
 
+// SW-REQ-089
 func (p *Plugins) extractTransformRequestMethodTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if p.TransformRequestMethod == nil {
 		return
@@ -1104,6 +1155,7 @@ func (p *Plugins) extractTransformRequestMethodTo(ep *apidef.ExtendedPathsSet, p
 	ep.MethodTransforms = append(ep.MethodTransforms, meta)
 }
 
+// SW-REQ-089
 func (p *Plugins) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if p.Cache == nil {
 		return
@@ -1117,6 +1169,7 @@ func (p *Plugins) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, metho
 	ep.AdvanceCacheConfig = append(ep.AdvanceCacheConfig, newCacheMeta)
 }
 
+// SW-REQ-089
 func (p *Plugins) extractEnforcedTimeoutTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if p.EnforceTimeout == nil {
 		return
@@ -1128,6 +1181,7 @@ func (p *Plugins) extractEnforcedTimeoutTo(ep *apidef.ExtendedPathsSet, path str
 }
 
 // Allowance describes allowance actions and behaviour.
+// SW-REQ-089
 type Allowance struct {
 	// Enabled is a boolean flag, if set to `true`, then individual allowances (allow, block, ignore) will be enforced.
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -1137,23 +1191,27 @@ type Allowance struct {
 }
 
 // Fill fills *Allowance from apidef.EndPointMeta.
+// SW-REQ-089
 func (a *Allowance) Fill(endpointMeta apidef.EndPointMeta) {
 	a.Enabled = !endpointMeta.Disabled
 	a.IgnoreCase = endpointMeta.IgnoreCase
 }
 
 // ExtractTo extracts the *Allowance into *apidef.EndPointMeta.
+// SW-REQ-089
 func (a *Allowance) ExtractTo(endpointMeta *apidef.EndPointMeta) {
 	endpointMeta.Disabled = !a.Enabled
 	endpointMeta.IgnoreCase = a.IgnoreCase
 }
 
 // Import enables an allowance based on the enabled argument.
+// SW-REQ-089
 func (a *Allowance) Import(enabled bool) {
 	a.Enabled = enabled
 }
 
 // TransformRequestMethod holds configuration for rewriting request methods.
+// SW-REQ-089
 type TransformRequestMethod struct {
 	// Enabled activates Method Transform for the given path and method.
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -1162,18 +1220,21 @@ type TransformRequestMethod struct {
 }
 
 // Fill fills *TransformRequestMethod from apidef.MethodTransformMeta.
+// SW-REQ-089
 func (tm *TransformRequestMethod) Fill(meta apidef.MethodTransformMeta) {
 	tm.Enabled = !meta.Disabled
 	tm.ToMethod = meta.ToMethod
 }
 
 // ExtractTo extracts *TransformRequestMethod into *apidef.MethodTransformMeta.
+// SW-REQ-089
 func (tm *TransformRequestMethod) ExtractTo(meta *apidef.MethodTransformMeta) {
 	meta.Disabled = !tm.Enabled
 	meta.ToMethod = tm.ToMethod
 }
 
 // TransformBody holds configuration about request/response body transformations.
+// SW-REQ-089
 type TransformBody struct {
 	// Enabled activates transform request/request body middleware.
 	//
@@ -1194,6 +1255,7 @@ type TransformBody struct {
 }
 
 // Fill fills *TransformBody from apidef.TemplateMeta.
+// SW-REQ-089
 func (tr *TransformBody) Fill(meta apidef.TemplateMeta) {
 	tr.Enabled = !meta.Disabled
 	tr.Format = meta.TemplateData.Input
@@ -1205,6 +1267,7 @@ func (tr *TransformBody) Fill(meta apidef.TemplateMeta) {
 }
 
 // ExtractTo extracts data from *TransformBody into *apidef.TemplateMeta.
+// SW-REQ-089
 func (tr *TransformBody) ExtractTo(meta *apidef.TemplateMeta) {
 	meta.Disabled = !tr.Enabled
 	meta.TemplateData.Input = tr.Format
@@ -1219,6 +1282,7 @@ func (tr *TransformBody) ExtractTo(meta *apidef.TemplateMeta) {
 }
 
 // TransformHeaders holds configuration about request/response header transformations.
+// SW-REQ-089
 type TransformHeaders struct {
 	// Enabled activates Header Transform for the given path and method.
 	//
@@ -1235,11 +1299,13 @@ type TransformHeaders struct {
 }
 
 // AppendAddOp appends add operation to TransformHeaders middleware.
+// SW-REQ-089
 func (th *TransformHeaders) AppendAddOp(name, value string) {
 	th.Add = append(th.Add, Header{Name: name, Value: value})
 }
 
 // Fill fills *TransformHeaders from apidef.HeaderInjectionMeta.
+// SW-REQ-089
 func (th *TransformHeaders) Fill(meta apidef.HeaderInjectionMeta) {
 	th.Enabled = !meta.Disabled
 	th.Remove = meta.DeleteHeaders
@@ -1251,6 +1317,7 @@ func (th *TransformHeaders) Fill(meta apidef.HeaderInjectionMeta) {
 }
 
 // ExtractTo extracts *TransformHeaders into *apidef.HeaderInjectionMeta.
+// SW-REQ-089
 func (th *TransformHeaders) ExtractTo(meta *apidef.HeaderInjectionMeta) {
 	meta.Disabled = !th.Enabled
 	meta.DeleteHeaders = th.Remove
@@ -1262,6 +1329,7 @@ func (th *TransformHeaders) ExtractTo(meta *apidef.HeaderInjectionMeta) {
 }
 
 // CachePlugin holds the configuration for the cache plugins.
+// SW-REQ-089
 type CachePlugin struct {
 	// Enabled is a boolean flag. If set to `true`, the advanced caching plugin will be enabled.
 	//
@@ -1287,6 +1355,7 @@ type CachePlugin struct {
 }
 
 // Fill fills *CachePlugin from apidef.CacheMeta.
+// SW-REQ-089
 func (a *CachePlugin) Fill(cm apidef.CacheMeta) {
 	a.Enabled = !cm.Disabled
 	a.CacheByRegex = cm.CacheKeyRegex
@@ -1300,6 +1369,7 @@ func (a *CachePlugin) Fill(cm apidef.CacheMeta) {
 }
 
 // ExtractTo extracts *CachePlugin values to *apidef.CacheMeta.
+// SW-REQ-089
 func (a *CachePlugin) ExtractTo(cm *apidef.CacheMeta) {
 	cm.Disabled = !a.Enabled
 	cm.CacheKeyRegex = a.CacheByRegex
@@ -1308,6 +1378,7 @@ func (a *CachePlugin) ExtractTo(cm *apidef.CacheMeta) {
 }
 
 // EnforceTimeout holds the configuration for enforcing request timeouts.
+// SW-REQ-089
 type EnforceTimeout struct {
 	// Enabled is a boolean flag. If set to `true`, requests will enforce a configured timeout.
 	//
@@ -1321,18 +1392,21 @@ type EnforceTimeout struct {
 }
 
 // Fill fills *EnforceTimeout from apidef.HardTimeoutMeta.
+// SW-REQ-089
 func (et *EnforceTimeout) Fill(meta apidef.HardTimeoutMeta) {
 	et.Enabled = !meta.Disabled
 	et.Value = meta.TimeOut
 }
 
 // ExtractTo extracts *EnforceTimeout to *apidef.HardTimeoutMeta.
+// SW-REQ-089
 func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 	meta.Disabled = !et.Enabled
 	meta.TimeOut = et.Value
 }
 
 // CustomPlugin configures custom plugin.
+// SW-REQ-089
 type CustomPlugin struct {
 	// Enabled activates the custom plugin.
 	//
@@ -1363,9 +1437,11 @@ type CustomPlugin struct {
 }
 
 // CustomPlugins is a list of CustomPlugin objects.
+// SW-REQ-089
 type CustomPlugins []CustomPlugin
 
 // Fill fills CustomPlugins from supplied Middleware definitions.
+// SW-REQ-089
 func (c *CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
 	if len(mwDefs) == 0 {
 		return
@@ -1386,6 +1462,7 @@ func (c *CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
 }
 
 // ExtractTo extracts CustomPlugins into supplied Middleware definitions.
+// SW-REQ-089
 func (c *CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
 	if c == nil {
 		return
@@ -1407,6 +1484,7 @@ func (c *CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
 // Pre-request plugins are executed before the request is sent to the
 // upstream target and before any authentication information is extracted
 // from the header or parameter list of the request.
+// SW-REQ-089
 type PrePlugin struct {
 	// Plugins configures custom plugins to be run on pre authentication stage.
 	// The plugins would be executed in the order of configuration in the list.
@@ -1414,6 +1492,7 @@ type PrePlugin struct {
 }
 
 // Fill fills PrePlugin from supplied Tyk classic api definition.
+// SW-REQ-089
 func (p *PrePlugin) Fill(api apidef.APIDefinition) {
 	if len(api.CustomMiddleware.Pre) == 0 {
 		p.Plugins = nil
@@ -1425,6 +1504,7 @@ func (p *PrePlugin) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts PrePlugin into Tyk classic api definition.
+// SW-REQ-089
 func (p *PrePlugin) ExtractTo(api *apidef.APIDefinition) {
 	if len(p.Plugins) == 0 {
 		api.CustomMiddleware.Pre = nil
@@ -1436,6 +1516,7 @@ func (p *PrePlugin) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // PostAuthenticationPlugin configures post authentication plugins.
+// SW-REQ-089
 type PostAuthenticationPlugin struct {
 	// Plugins configures custom plugins to be run on pre authentication stage.
 	// The plugins would be executed in the order of configuration in the list.
@@ -1443,6 +1524,7 @@ type PostAuthenticationPlugin struct {
 }
 
 // Fill fills PostAuthenticationPlugin from supplied Tyk classic api definition.
+// SW-REQ-089
 func (p *PostAuthenticationPlugin) Fill(api apidef.APIDefinition) {
 	if len(api.CustomMiddleware.PostKeyAuth) == 0 {
 		p.Plugins = nil
@@ -1454,6 +1536,7 @@ func (p *PostAuthenticationPlugin) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts PostAuthenticationPlugin into Tyk classic api definition.
+// SW-REQ-089
 func (p *PostAuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 	if len(p.Plugins) == 0 {
 		api.CustomMiddleware.PostKeyAuth = nil
@@ -1465,6 +1548,7 @@ func (p *PostAuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // PostPlugin configures post plugins.
+// SW-REQ-089
 type PostPlugin struct {
 	// Plugins configures custom plugins to be run on post stage.
 	// The plugins would be executed in the order of configuration in the list.
@@ -1472,6 +1556,7 @@ type PostPlugin struct {
 }
 
 // Fill fills PostPlugin from supplied Tyk classic api definition.
+// SW-REQ-089
 func (p *PostPlugin) Fill(api apidef.APIDefinition) {
 	if len(api.CustomMiddleware.Post) == 0 {
 		p.Plugins = nil
@@ -1483,6 +1568,7 @@ func (p *PostPlugin) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts PostPlugin into Tyk classic api definition.
+// SW-REQ-089
 func (p *PostPlugin) ExtractTo(api *apidef.APIDefinition) {
 	if len(p.Plugins) == 0 {
 		api.CustomMiddleware.Post = nil
@@ -1494,6 +1580,7 @@ func (p *PostPlugin) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // ResponsePlugin configures response plugins.
+// SW-REQ-089
 type ResponsePlugin struct {
 	// Plugins configures custom plugins to be run on post stage.
 	// The plugins would be executed in the order of configuration in the list.
@@ -1501,6 +1588,7 @@ type ResponsePlugin struct {
 }
 
 // Fill fills ResponsePlugin from supplied Tyk classic api definition.
+// SW-REQ-089
 func (p *ResponsePlugin) Fill(api apidef.APIDefinition) {
 	if len(api.CustomMiddleware.Response) == 0 {
 		p.Plugins = nil
@@ -1512,6 +1600,7 @@ func (p *ResponsePlugin) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts PostPlugin into Tyk classic api definition.
+// SW-REQ-089
 func (p *ResponsePlugin) ExtractTo(api *apidef.APIDefinition) {
 	if len(p.Plugins) == 0 {
 		api.CustomMiddleware.Response = nil
@@ -1523,6 +1612,7 @@ func (p *ResponsePlugin) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // VirtualEndpoint contains virtual endpoint configuration.
+// SW-REQ-089
 type VirtualEndpoint struct {
 	// Enabled activates virtual endpoint.
 	//
@@ -1556,6 +1646,7 @@ type VirtualEndpoint struct {
 // MarshalJSON is a custom JSON marshaler for the VirtualEndpoint struct. It is implemented
 // to facilitate a smooth migration from deprecated fields that were previously used to represent
 // the same data.
+// SW-REQ-089
 func (v *VirtualEndpoint) MarshalJSON() ([]byte, error) {
 	if v == nil {
 		return nil, nil
@@ -1575,6 +1666,7 @@ func (v *VirtualEndpoint) MarshalJSON() ([]byte, error) {
 }
 
 // Fill fills *VirtualEndpoint from apidef.VirtualMeta.
+// SW-REQ-089
 func (v *VirtualEndpoint) Fill(meta apidef.VirtualMeta) {
 	v.Enabled = !meta.Disabled
 	v.FunctionName = meta.ResponseFunctionName
@@ -1589,6 +1681,7 @@ func (v *VirtualEndpoint) Fill(meta apidef.VirtualMeta) {
 }
 
 // ExtractTo extracts *VirtualEndpoint to *apidef.VirtualMeta.
+// SW-REQ-089
 func (v *VirtualEndpoint) ExtractTo(meta *apidef.VirtualMeta) {
 	meta.Disabled = !v.Enabled
 	if v.FunctionName != "" {
@@ -1610,9 +1703,11 @@ func (v *VirtualEndpoint) ExtractTo(meta *apidef.VirtualMeta) {
 }
 
 // EndpointPostPlugins is a list of EndpointPostPlugins. It's used where multiple plugins can be run.
+// SW-REQ-089
 type EndpointPostPlugins []EndpointPostPlugin
 
 // EndpointPostPlugin contains endpoint level post plugin configuration.
+// SW-REQ-089
 type EndpointPostPlugin struct {
 	// Enabled activates post plugin.
 	//
@@ -1634,6 +1729,7 @@ type EndpointPostPlugin struct {
 // MarshalJSON is a custom JSON marshaler for the EndpointPostPlugin struct. It is implemented
 // to facilitate a smooth migration from deprecated fields that were previously used to represent
 // the same data.
+// SW-REQ-089
 func (ep *EndpointPostPlugin) MarshalJSON() ([]byte, error) {
 	if ep == nil {
 		return nil, nil
@@ -1652,6 +1748,7 @@ func (ep *EndpointPostPlugin) MarshalJSON() ([]byte, error) {
 }
 
 // Fill fills *EndpointPostPlugin from apidef.GoPluginMeta.
+// SW-REQ-089
 func (e EndpointPostPlugins) Fill(meta apidef.GoPluginMeta) {
 	if len(e) == 0 {
 		return
@@ -1665,6 +1762,7 @@ func (e EndpointPostPlugins) Fill(meta apidef.GoPluginMeta) {
 }
 
 // ExtractTo extracts *EndpointPostPlugin to *apidef.GoPluginMeta.
+// SW-REQ-089
 func (e EndpointPostPlugins) ExtractTo(meta *apidef.GoPluginMeta) {
 	if len(e) == 0 {
 		return
@@ -1681,6 +1779,7 @@ func (e EndpointPostPlugins) ExtractTo(meta *apidef.GoPluginMeta) {
 
 // CircuitBreaker holds configuration for the circuit breaker middleware.
 // Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*]`.
+// SW-REQ-089
 type CircuitBreaker struct {
 	// Enabled activates the Circuit Breaker functionality.
 	//
@@ -1705,6 +1804,7 @@ type CircuitBreaker struct {
 }
 
 // Fill fills *CircuitBreaker from apidef.CircuitBreakerMeta.
+// SW-REQ-089
 func (cb *CircuitBreaker) Fill(circuitBreaker apidef.CircuitBreakerMeta) {
 	cb.Enabled = !circuitBreaker.Disabled
 	cb.Threshold = circuitBreaker.ThresholdPercent
@@ -1714,6 +1814,7 @@ func (cb *CircuitBreaker) Fill(circuitBreaker apidef.CircuitBreakerMeta) {
 }
 
 // ExtractTo extracts *CircuitBreaker into *apidef.CircuitBreakerMeta.
+// SW-REQ-089
 func (cb *CircuitBreaker) ExtractTo(circuitBreaker *apidef.CircuitBreakerMeta) {
 	circuitBreaker.Disabled = !cb.Enabled
 	circuitBreaker.ThresholdPercent = cb.Threshold
@@ -1723,6 +1824,7 @@ func (cb *CircuitBreaker) ExtractTo(circuitBreaker *apidef.CircuitBreakerMeta) {
 }
 
 // RequestSizeLimit limits the maximum allowed size of the request body in bytes.
+// SW-REQ-089
 type RequestSizeLimit struct {
 	// Enabled activates the Request Size Limit functionality.
 	//
@@ -1735,18 +1837,21 @@ type RequestSizeLimit struct {
 }
 
 // Fill fills *RequestSizeLimit from apidef.RequestSizeMeta.
+// SW-REQ-089
 func (r *RequestSizeLimit) Fill(meta apidef.RequestSizeMeta) {
 	r.Enabled = !meta.Disabled
 	r.Value = meta.SizeLimit
 }
 
 // ExtractTo extracts *RequestSizeLimiter into *apidef.RequestSizeMeta.
+// SW-REQ-089
 func (r *RequestSizeLimit) ExtractTo(meta *apidef.RequestSizeMeta) {
 	meta.Disabled = !r.Enabled
 	meta.SizeLimit = r.Value
 }
 
 // TrafficLogs holds configuration about API log analytics.
+// SW-REQ-089
 type TrafficLogs struct {
 	// Enabled enables traffic log analytics for the API.
 	// Tyk classic API definition: `do_not_track`.
@@ -1763,6 +1868,7 @@ type TrafficLogs struct {
 }
 
 // Fill fills *TrafficLogs from apidef.APIDefinition.
+// SW-REQ-089
 func (t *TrafficLogs) Fill(api apidef.APIDefinition) {
 	t.Enabled = !api.DoNotTrack
 	t.TagHeaders = api.TagHeaders
@@ -1778,6 +1884,7 @@ func (t *TrafficLogs) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts *TrafficLogs into *apidef.APIDefinition.
+// SW-REQ-089
 func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
 	api.DoNotTrack = !t.Enabled
 	api.TagHeaders = t.TagHeaders
@@ -1793,9 +1900,11 @@ func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // CustomAnalyticsPlugins is a list of CustomPlugin objects for analytics.
+// SW-REQ-089
 type CustomAnalyticsPlugins []CustomPlugin
 
 // Fill fills CustomAnalyticsPlugins from AnalyticsPlugin in the supplied api.
+// SW-REQ-089
 func (c *CustomAnalyticsPlugins) Fill(api apidef.APIDefinition) {
 	if api.AnalyticsPlugin.Enabled {
 		customPlugins := []CustomPlugin{
@@ -1810,6 +1919,7 @@ func (c *CustomAnalyticsPlugins) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts CustomAnalyticsPlugins into AnalyticsPlugin of supplied api.
+// SW-REQ-089
 func (c *CustomAnalyticsPlugins) ExtractTo(api *apidef.APIDefinition) {
 	if len(*c) > 0 {
 		// extract the first item in the customAnalyticsPlugin into apidef
@@ -1821,6 +1931,7 @@ func (c *CustomAnalyticsPlugins) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // GlobalRequestSizeLimit holds configuration about the global limits for request sizes.
+// SW-REQ-089
 type GlobalRequestSizeLimit struct {
 	// Enabled activates the Request Size Limit.
 	//
@@ -1833,6 +1944,7 @@ type GlobalRequestSizeLimit struct {
 }
 
 // Fill fills *GlobalRequestSizeLimit from apidef.APIDefinition.
+// SW-REQ-089
 func (g *GlobalRequestSizeLimit) Fill(api apidef.APIDefinition) {
 	ok := false
 	if api.VersionData.Versions != nil {
@@ -1849,6 +1961,7 @@ func (g *GlobalRequestSizeLimit) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts *GlobalRequestSizeLimit into *apidef.APIDefinition.
+// SW-REQ-089
 func (g *GlobalRequestSizeLimit) ExtractTo(api *apidef.APIDefinition) {
 	mainVersion := requireMainVersion(api)
 	defer func() {
@@ -1866,6 +1979,7 @@ func (g *GlobalRequestSizeLimit) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // ContextVariables holds the configuration related to Tyk context variables.
+// SW-REQ-089
 type ContextVariables struct {
 	// Enabled provides access to context variables from specific Tyk middleware (URL rewrite, header and body transform).
 	//
@@ -1874,17 +1988,20 @@ type ContextVariables struct {
 }
 
 // Fill fills *ContextVariables from apidef.APIDefinition.
+// SW-REQ-089
 func (c *ContextVariables) Fill(api apidef.APIDefinition) {
 	c.Enabled = api.EnableContextVars
 }
 
 // ExtractTo extracts *ContextVariables into *apidef.APIDefinition.
+// SW-REQ-089
 func (c *ContextVariables) ExtractTo(api *apidef.APIDefinition) {
 	api.EnableContextVars = c.Enabled
 }
 
 // IgnoreCase will make route matching be case insensitive.
 // This accepts request to `/AAA` or `/aaa` if set to true.
+// SW-REQ-089
 type IgnoreCase struct {
 	// Enabled activates case insensitive route matching.
 	//
@@ -1893,6 +2010,7 @@ type IgnoreCase struct {
 }
 
 // Fill fills *IgnoreCase from apidef.APIDefinition.
+// SW-REQ-089
 func (p *IgnoreCase) Fill(api apidef.APIDefinition) {
 	ok := false
 	if api.VersionData.Versions != nil {
@@ -1906,6 +2024,7 @@ func (p *IgnoreCase) Fill(api apidef.APIDefinition) {
 	p.Enabled = api.VersionData.Versions[Main].IgnoreEndpointCase
 }
 
+// SW-REQ-089
 func (g *Global) fillIgnoreCase(api apidef.APIDefinition) {
 	if g.IgnoreCase == nil {
 		g.IgnoreCase = &IgnoreCase{}
@@ -1918,6 +2037,7 @@ func (g *Global) fillIgnoreCase(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-089
 func (g *Global) extractIgnoreCase(api *apidef.APIDefinition) {
 	if g.IgnoreCase == nil {
 		g.IgnoreCase = &IgnoreCase{}
@@ -1930,6 +2050,7 @@ func (g *Global) extractIgnoreCase(api *apidef.APIDefinition) {
 }
 
 // ExtractTo extracts *IgnoreCase into *apidef.APIDefinition.
+// SW-REQ-089
 func (p *IgnoreCase) ExtractTo(api *apidef.APIDefinition) {
 	mainVersion := requireMainVersion(api)
 	defer func() {

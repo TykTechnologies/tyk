@@ -44,6 +44,7 @@
 <!-- documents SW-REQ-086 -->
 <!-- documents SW-REQ-087 -->
 <!-- documents SW-REQ-088 -->
+<!-- documents SW-REQ-089 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -57,7 +58,8 @@ helper behavior, importer source dispatcher behavior, Apiary Blueprint importer
 conversion behavior, Swagger importer conversion behavior, WSDL importer
 conversion behavior, Classic API definition migration helper behavior,
 notification helper behavior, OAS authentication helper shapes, OAS path/server
-helper shapes, OAS default-extension helper shapes, OAS root extension helper shapes, OAS server model helper shapes, OAS URL rewrite helper shapes,
+helper shapes, OAS default-extension helper shapes, OAS middleware helper
+shapes, OAS root extension helper shapes, OAS server model helper shapes, OAS URL rewrite helper shapes,
 OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint
 helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes,
@@ -78,7 +80,7 @@ behavior, and importer source dispatcher behavior, without silent data-shape
 drift, plus Swagger importer conversion behavior and WSDL importer conversion
 behavior, plus Classic API definition migration helper behavior and
 notification helper behavior, plus OAS authentication helper behavior.
-It also includes OAS default-extension helper behavior.
+It also includes OAS default-extension and middleware helper behavior.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -564,6 +566,26 @@ semantics, gateway authentication enforcement, route generation, request
 matching, request validation execution, allow-list enforcement, mock-response
 execution, middleware execution, upstream availability, gateway API loading,
 persistence, analytics, or final client-visible runtime behavior.
+
+`SW-REQ-089` owns the concrete `apidef/oas/middleware.go` middleware helper
+shapes. Its evidence covers aggregate global middleware Fill/ExtractTo
+conversion, plugin configuration data and bundles, CORS, global cache options,
+global request and response header transforms, context variables, traffic-log
+analytics plugin and retention conversion, global request-size limits,
+ignore-case and skip flags, deprecated singular plugin JSON migration to plural
+plugin arrays, path-level allow/block/ignore-authentication/method-transform/
+cache/enforced-timeout extraction, HTTP method helper selection, MCP primitive
+mock detection and ExtendedPaths extraction boundaries, scalar allowance,
+transform, cache, timeout, custom plugin, virtual endpoint, endpoint post
+plugin, circuit-breaker, request-size, context-variable, and ignore-case helper
+conversion, nil optional helper boundaries, and endpoint cache default timeout
+behavior. This evidence does not claim actual gateway middleware execution,
+route matching, authentication enforcement, CORS enforcement, cache storage
+behavior, runtime header mutation, virtual endpoint JavaScript execution, Go
+plugin loading or execution, analytics delivery, traffic-log persistence,
+circuit-breaker runtime behavior, request-size enforcement, MCP JSON-RPC
+execution, gateway API loading, route generation, request admission,
+persistence backend correctness, or final client-visible runtime behavior.
 
 `SW-REQ-086` owns the concrete `apidef/notifications.go` notification helper.
 Its evidence covers bounded HTTP client construction, notification manager
