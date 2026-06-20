@@ -4,6 +4,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// SW-REQ-054
 // TrackEndpoint configures Track or DoNotTrack behaviour for an endpoint.
 // Tyk classic API definition: `version_data.versions..extended_paths.track_endpoints`, `version_data.versions..extended_paths.do_not_track_endpoints`.
 type TrackEndpoint struct {
@@ -12,16 +13,19 @@ type TrackEndpoint struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 }
 
+// SW-REQ-054
 // Fill fills *TrackEndpoint receiver with data from apidef.TrackEndpointMeta.
 func (i *TrackEndpoint) Fill(meta apidef.TrackEndpointMeta) {
 	i.Enabled = !meta.Disabled
 }
 
+// SW-REQ-054
 // ExtractTo fills *apidef.TrackEndpointMeta from *TrackEndpoint.
 func (i *TrackEndpoint) ExtractTo(meta *apidef.TrackEndpointMeta) {
 	meta.Disabled = !i.Enabled
 }
 
+// SW-REQ-054
 func (s *OAS) fillTrackEndpoint(metas []apidef.TrackEndpointMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
@@ -38,6 +42,7 @@ func (s *OAS) fillTrackEndpoint(metas []apidef.TrackEndpointMeta) {
 	}
 }
 
+// SW-REQ-054
 func (s *OAS) fillDoNotTrackEndpoint(metas []apidef.TrackEndpointMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
@@ -54,6 +59,7 @@ func (s *OAS) fillDoNotTrackEndpoint(metas []apidef.TrackEndpointMeta) {
 	}
 }
 
+// SW-REQ-054
 func (o *Operation) extractTrackEndpointTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.TrackEndpoint == nil {
 		return
@@ -64,6 +70,7 @@ func (o *Operation) extractTrackEndpointTo(ep *apidef.ExtendedPathsSet, path str
 	ep.TrackEndpoints = append(ep.TrackEndpoints, meta)
 }
 
+// SW-REQ-054
 func (o *Operation) extractDoNotTrackEndpointTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.DoNotTrackEndpoint == nil {
 		return

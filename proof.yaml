@@ -164,6 +164,8 @@ project:
             - apidef/oas/mcp_primitive_reqproof_test.go
             - apidef/oas/time.go
             - apidef/oas/time_reqproof_test.go
+            - apidef/oas/track_endpoint.go
+            - apidef/oas/track_endpoint_reqproof_test.go
             - apidef/rate_limit_smoothing.go
             - apidef/rate_limit_smoothing_test.go
             - apidef/rpc.go
