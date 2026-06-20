@@ -155,6 +155,8 @@ project:
             - apidef/importer/blueprint_reqproof_test.go
             - apidef/importer/importer.go
             - apidef/importer/importer_reqproof_test.go
+            - apidef/importer/swagger.go
+            - apidef/importer/swagger_reqproof_test.go
             - apidef/adapter/asyncapi.go
             - apidef/adapter/asyncapi_test.go
             - apidef/adapter/import_adapter.go

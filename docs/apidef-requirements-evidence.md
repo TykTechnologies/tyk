@@ -38,6 +38,7 @@
 <!-- documents SW-REQ-080 -->
 <!-- documents SW-REQ-081 -->
 <!-- documents SW-REQ-082 -->
+<!-- documents SW-REQ-083 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -48,7 +49,7 @@ admission, or the full API definition lifecycle.
 health-check wire values, host-list access behavior, and error-override helper
 state, embedded Classic API definition schema data, Classic API definition core
 helper behavior, importer source dispatcher behavior, Apiary Blueprint importer
-conversion behavior, OAS path/server helper shapes, OAS root extension helper shapes, OAS server model helper
+conversion behavior, Swagger importer conversion behavior, OAS path/server helper shapes, OAS root extension helper shapes, OAS server model helper
 shapes, OAS URL rewrite helper shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint
 helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes,
@@ -66,7 +67,7 @@ and supergraph adapter configuration behavior, and engine v3 utility behavior,
 engine v3 universal-data-graph adapter configuration behavior, and Classic API
 definition core model helper behavior, and Apiary Blueprint importer conversion
 behavior, and importer source dispatcher behavior, without silent data-shape
-drift.
+drift, plus Swagger importer conversion behavior.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -547,3 +548,17 @@ evidence does not claim Blueprint, Swagger, or WSDL parse or conversion
 correctness, gateway API loading, route generation, request matching, gateway
 request admission, persistence, analytics, or final client-visible runtime
 behavior.
+
+`SW-REQ-083` owns the concrete `apidef/importer/swagger.go` Swagger importer
+conversion behavior. Its evidence covers JSON load success and malformed JSON
+errors, empty path-set errors, unsupported direct mock-version conversion,
+conversion of defined Swagger path methods into Classic API whitelist and
+track-endpoint metadata, deterministic path and method ordering, skipping paths
+without defined methods, version insertion into API definitions, top-level
+API-definition build behavior that ignores the unsupported mock flag, and
+deterministic active keyless API-definition versioning/proxy shape apart from
+generated API IDs. This evidence does not claim Swagger/OpenAPI specification
+completeness, semantic validation of schemas or response objects, mock import
+support, upstream availability, gateway API loading, route generation, request
+matching, gateway request admission, persistence, analytics, or final
+client-visible runtime behavior.

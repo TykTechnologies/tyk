@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -12,19 +13,23 @@ import (
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
+// SW-REQ-083
 const SwaggerSource APIImporterSource = "swagger"
 
+// SW-REQ-083
 type DefinitionObjectFormatAST struct {
 	Format string `json:"format"`
 	Type   string `json:"type"`
 }
 
+// SW-REQ-083
 type DefinitionObjectAST struct {
 	Type       string                               `json:"type"`
 	Required   []string                             `json:"required"`
 	Properties map[string]DefinitionObjectFormatAST `json:"properties"`
 }
 
+// SW-REQ-083
 type ResponseCodeObjectAST struct {
 	Description string `json:"description"`
 	Schema      struct {
@@ -33,12 +38,14 @@ type ResponseCodeObjectAST struct {
 	} `json:"schema"`
 }
 
+// SW-REQ-083
 type PathMethodObject struct {
 	Description string                           `json:"description"`
 	OperationID string                           `json:"operationId"`
 	Responses   map[string]ResponseCodeObjectAST `json:"responses"`
 }
 
+// SW-REQ-083
 type PathItemObject struct {
 	Get     PathMethodObject `json:"get"`
 	Put     PathMethodObject `json:"put"`
@@ -49,6 +56,7 @@ type PathItemObject struct {
 	Head    PathMethodObject `json:"head"`
 }
 
+// SW-REQ-083
 type SwaggerAST struct {
 	BasePath    string                         `json:"basePath"`
 	Consumes    []string                       `json:"consumes"`
@@ -75,10 +83,12 @@ type SwaggerAST struct {
 	Swagger  string                    `json:"swagger"`
 }
 
+// SW-REQ-083
 func (s *SwaggerAST) LoadFrom(r io.Reader) error {
 	return json.NewDecoder(r).Decode(&s)
 }
 
+// SW-REQ-083
 func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, error) {
 	versionInfo := apidef.VersionInfo{}
 
@@ -92,7 +102,14 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, err
 	if len(s.Paths) == 0 {
 		return versionInfo, errors.New("no paths defined in swagger file")
 	}
-	for pathName, pathSpec := range s.Paths {
+	pathNames := make([]string, 0, len(s.Paths))
+	for pathName := range s.Paths {
+		pathNames = append(pathNames, pathName)
+	}
+	sort.Strings(pathNames)
+
+	for _, pathName := range pathNames {
+		pathSpec := s.Paths[pathName]
 		whitelistMeta := apidef.EndPointMeta{
 			Path:          pathName,
 			MethodActions: map[string]apidef.EndpointMethodMeta{},
@@ -103,17 +120,22 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, err
 		}
 
 		// We just want the paths here, no mocks
-		methods := map[string]PathMethodObject{
-			"GET":     pathSpec.Get,
-			"PUT":     pathSpec.Put,
-			"POST":    pathSpec.Post,
-			"HEAD":    pathSpec.Head,
-			"PATCH":   pathSpec.Patch,
-			"OPTIONS": pathSpec.Options,
-			"DELETE":  pathSpec.Delete,
+		methods := []struct {
+			name   string
+			method PathMethodObject
+		}{
+			{name: "DELETE", method: pathSpec.Delete},
+			{name: "GET", method: pathSpec.Get},
+			{name: "HEAD", method: pathSpec.Head},
+			{name: "OPTIONS", method: pathSpec.Options},
+			{name: "PATCH", method: pathSpec.Patch},
+			{name: "POST", method: pathSpec.Post},
+			{name: "PUT", method: pathSpec.Put},
 		}
 
-		for methodName, m := range methods {
+		for _, entry := range methods {
+			methodName := entry.name
+			m := entry.method
 			// skip methods that are not defined
 			if len(m.Responses) == 0 && m.Description == "" && m.OperationID == "" {
 				continue
@@ -128,18 +150,22 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, err
 			versionInfo.ExtendedPaths.TrackEndpoints = append(versionInfo.ExtendedPaths.TrackEndpoints, trackMeta)
 		}
 
-		versionInfo.ExtendedPaths.WhiteList = append(versionInfo.ExtendedPaths.WhiteList, whitelistMeta)
+		if len(whitelistMeta.MethodActions) > 0 {
+			versionInfo.ExtendedPaths.WhiteList = append(versionInfo.ExtendedPaths.WhiteList, whitelistMeta)
+		}
 	}
 
 	return versionInfo, nil
 }
 
+// SW-REQ-083
 func (s *SwaggerAST) InsertIntoAPIDefinitionAsVersion(version apidef.VersionInfo, def *apidef.APIDefinition, versionName string) error {
 	def.VersionData.NotVersioned = false
 	def.VersionData.Versions[versionName] = version
 	return nil
 }
 
+// SW-REQ-083
 func (s *SwaggerAST) ToAPIDefinition(orgId, upstreamURL string, as_mock bool) (*apidef.APIDefinition, error) {
 	ad := apidef.APIDefinition{
 		Name:             s.Info.Title,
