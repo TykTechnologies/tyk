@@ -10,6 +10,10 @@ import (
 	"github.com/TykTechnologies/tyk/pkg/errpack"
 )
 
+// Verifies: SYS-REQ-082, SW-REQ-066
+// SW-REQ-066:boundary:nominal
+// SW-REQ-066:error_handling:negative
+// SW-REQ-066:determinism:nominal
 func Test_Errpack(t *testing.T) {
 	logLevels := func() []logrus.Level {
 		return []logrus.Level{
