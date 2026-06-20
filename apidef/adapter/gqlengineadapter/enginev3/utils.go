@@ -16,6 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/adapter/gqlengineadapter"
 )
 
+// SW-REQ-078
 func extractURLQueryParamsForEngineV2(url string, providedApiDefQueries []apidef.QueryVariable) (urlWithoutParams string, engineV2Queries []restdatasource.QueryConfiguration, err error) {
 	urlParts := strings.Split(url, "?")
 	urlWithoutParams = urlParts[0]
@@ -41,6 +42,7 @@ func extractURLQueryParamsForEngineV2(url string, providedApiDefQueries []apidef
 	return urlWithoutParams, engineV2Queries, nil
 }
 
+// SW-REQ-078
 func appendURLQueryParamsToEngineV2Queries(engineV2Queries *[]restdatasource.QueryConfiguration, queryValues neturl.Values) {
 	for queryKey, queryValue := range queryValues {
 		*engineV2Queries = append(*engineV2Queries, restdatasource.QueryConfiguration{
@@ -54,6 +56,7 @@ func appendURLQueryParamsToEngineV2Queries(engineV2Queries *[]restdatasource.Que
 	})
 }
 
+// SW-REQ-078
 func appendApiDefQueriesConfigToEngineV2Queries(engineV2Queries *[]restdatasource.QueryConfiguration, apiDefQueries []apidef.QueryVariable) {
 	if len(apiDefQueries) == 0 {
 		return
@@ -69,6 +72,7 @@ func appendApiDefQueriesConfigToEngineV2Queries(engineV2Queries *[]restdatasourc
 	}
 }
 
+// SW-REQ-078
 func ConvertApiDefinitionHeadersToHttpHeaders(apiDefHeaders map[string]string) http.Header {
 	if len(apiDefHeaders) == 0 {
 		return nil
@@ -83,6 +87,7 @@ func ConvertApiDefinitionHeadersToHttpHeaders(apiDefHeaders map[string]string) h
 
 }
 
+// SW-REQ-078
 func generateRestDataSourceFromGraphql(config apidef.GraphQLEngineDataSourceConfigGraphQL) (json.RawMessage, error) {
 	if !config.HasOperation {
 		return nil, gqlengineadapter.ErrGraphQLConfigIsMissingOperation
@@ -106,6 +111,7 @@ func generateRestDataSourceFromGraphql(config apidef.GraphQLEngineDataSourceConf
 	return customMessage, nil
 }
 
+// SW-REQ-078
 type createGraphQLDataSourceFactoryParams struct {
 	graphqlConfig             apidef.GraphQLEngineDataSourceConfigGraphQL
 	subscriptionClientFactory graphqldatasource.GraphQLSubscriptionClientFactory
@@ -113,6 +119,7 @@ type createGraphQLDataSourceFactoryParams struct {
 	streamingClient           *http.Client
 }
 
+// SW-REQ-078
 func createGraphQLDataSourceFactory(params createGraphQLDataSourceFactoryParams) (*graphqldatasource.Factory, error) {
 	factory := &graphqldatasource.Factory{
 		HTTPClient:      params.httpClient,
@@ -135,6 +142,7 @@ func createGraphQLDataSourceFactory(params createGraphQLDataSourceFactoryParams)
 	return factory, nil
 }
 
+// SW-REQ-078
 func graphqlDataSourceWebSocketProtocol(subscriptionType apidef.SubscriptionType) string {
 	wsProtocol := graphqldatasource.ProtocolGraphQLWS
 	if subscriptionType == apidef.GQLSubscriptionTransportWS {
@@ -143,6 +151,7 @@ func graphqlDataSourceWebSocketProtocol(subscriptionType apidef.SubscriptionType
 	return wsProtocol
 }
 
+// SW-REQ-078
 func createArgumentConfigurationsForArgumentNames(argumentNames ...string) plan.ArgumentsConfigurations {
 	argConfs := plan.ArgumentsConfigurations{}
 	for _, argName := range argumentNames {

@@ -33,6 +33,7 @@
 <!-- documents SW-REQ-075 -->
 <!-- documents SW-REQ-076 -->
 <!-- documents SW-REQ-077 -->
+<!-- documents SW-REQ-078 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -55,7 +56,8 @@ selection behavior, AsyncAPI adapter support-shape generation, and OpenAPI
 adapter support-shape generation, and GraphQL engine adapter utility behavior
 and proxy-only, supergraph, and universal-data-graph engine adapter
 configuration behavior, plus engine v3 proxy-only adapter configuration
-and supergraph adapter configuration behavior, without silent data-shape drift.
+and supergraph adapter configuration behavior, and engine v3 utility behavior,
+without silent data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -458,3 +460,19 @@ factory, GraphQL execution, subscription transport execution, REST or GraphQL
 upstream availability, gateway API loading, route generation, request matching,
 gateway request admission, middleware execution, persistence, analytics, or
 final client-visible runtime behavior.
+
+`SW-REQ-078` owns the concrete
+`apidef/adapter/gqlengineadapter/enginev3` utility helpers used by GraphQL
+engine v3 adapter configuration assembly. Its evidence covers API-definition
+header conversion, GraphQL-operation-to-REST datasource conversion, missing
+operation errors, ordered field-argument configuration, deterministic URL query
+extraction with explicit API-definition query appending, invalid query errors,
+websocket subprotocol selection for subscription types, GraphQL datasource
+factory construction with caller-supplied HTTP clients and subscription-client
+factory inputs, and invalid subscription-client factory errors. This evidence
+does not claim correctness of proxy-only, supergraph, or universal-data-graph
+adapter end-to-end configuration generation; GraphQL schema semantic
+completeness; REST or GraphQL upstream availability; subscription transport
+execution; Kafka connectivity or consumption behavior; gateway API loading;
+route generation; request matching; gateway request admission; middleware
+execution; persistence; analytics; or final client-visible runtime behavior.

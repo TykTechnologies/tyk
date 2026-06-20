@@ -166,6 +166,8 @@ project:
             - apidef/adapter/gqlengineadapter/enginev3/adapter_proxy_only_reqproof_test.go
             - apidef/adapter/gqlengineadapter/enginev3/adapter_supergraph.go
             - apidef/adapter/gqlengineadapter/enginev3/adapter_supergraph_reqproof_test.go
+            - apidef/adapter/gqlengineadapter/enginev3/utils.go
+            - apidef/adapter/gqlengineadapter/enginev3/utils_reqproof_test.go
             - apidef/adapter/gqlengineadapter/utils.go
             - apidef/adapter/gqlengineadapter/utils_engine_v2.go
             - apidef/adapter/gqlengineadapter/utils_reqproof_test.go
