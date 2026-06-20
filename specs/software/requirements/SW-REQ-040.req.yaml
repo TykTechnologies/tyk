@@ -1,0 +1,53 @@
+id: SW-REQ-040
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal/errors facade shall expose the standard error construction, comparison, wrapping, joining, unwrapping, and unsupported-error symbols used by gateway helpers, and shall format aggregated validation errors as newline-separated messages while preserving empty and single-error outputs.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-107
+component: mcp_protocol
+rationale: This software requirement owns only the local error facade and formatter behavior required by in-process MCP schema validation error aggregation. It does not claim upstream validation correctness, reverse-proxy/access-log error classification, gateway API loading, persistence, session-right retrieval, middleware execution, analytics, network transport behavior, or final HTTP status generation.
+tags:
+    - mcp
+    - schema-validation
+    - error-formatting
+    - facade
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-107
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T00:32:27Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-040 is scoped to the local internal/errors facade and newline formatter used by MCP validation error aggregation: standard error construction/comparison/joining/unwrapping/as-casting symbol exposure, unsupported-error identity, empty aggregate formatting, single-error formatting, and newline-separated multi-error formatting. Focused internal/errors tests passed with race. This approval does not claim upstream validation correctness, reverse-proxy/access-log error classification, gateway API loading, persistence, session-right retrieval, middleware execution, analytics, network transport behavior, or final HTTP status generation.'
+        fingerprint: sha256:6a5c232d25c26e79c42c43c1503df1470729aa99afb48605acb9b9f21b696ee2
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T00:32:27Z"
+obligation_checklist:
+    - nominal
+    - error_handling
+    - encoding_safety
+lifecycle:
+    change_history:
+        - date: "2026-06-20T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added internal/errors facade and validation-error formatter decomposition under existing MCP schema-validation behavior.
+          changed_by: agent:codex

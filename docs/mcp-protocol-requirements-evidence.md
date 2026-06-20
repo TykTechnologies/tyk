@@ -6,6 +6,7 @@
 <!-- documents SW-REQ-026 -->
 <!-- documents SW-REQ-037 -->
 <!-- documents SW-REQ-039 -->
+<!-- documents SW-REQ-040 -->
 
 This document records the MCP protocol helper proof slice. The slice is limited
 to `internal/mcp` helper behavior, the shared `internal/jsonrpc` router
@@ -15,7 +16,8 @@ the local `internal/service/gojsonschema` facade used by that validation path.
 It does not claim gateway middleware sequencing, gateway API loading or API
 definition synthesis beyond in-process MCP schema validation, session-right
 retrieval, analytics, network transport behavior, upstream JSON-schema library
-correctness, or final HTTP status generation.
+correctness, reverse-proxy/access-log error classification, or final HTTP
+status generation.
 
 `STK-REQ-019` owns the MCP client need for deterministic routing and list
 filtering and the operator-facing need for deterministic MCP API-definition
@@ -59,3 +61,10 @@ exposed bytes and Go loaders, validation call, valid-result reporting,
 invalid-result error exposure, result-error string access, and format-checker
 registry availability. This evidence does not claim correctness of the upstream
 JSON Schema implementation.
+
+`SW-REQ-040` owns the local `internal/errors` facade and validation-error
+formatter used by MCP schema validation. Evidence in `internal/errors` tests
+covers standard error construction/comparison/joining/unwrapping/as-casting
+symbol exposure, unsupported-error identity, empty aggregate formatting,
+single-error formatting, and newline-separated multi-error formatting. This
+evidence does not claim reverse-proxy or access-log error classification.
