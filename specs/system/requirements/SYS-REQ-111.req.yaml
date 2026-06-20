@@ -1,0 +1,63 @@
+id: SYS-REQ-111
+version: 1
+status: approved
+priority: shall
+category: security
+req_type: guarantee
+fretish: the certificate_lifecycle shall always satisfy !certificate_material_operation_requested | certificate_material_result_determined
+description: Gateway certificate lifecycle support shall determine local certificate and public-key lifecycle results by constructing managers with default and configured retry/cache settings, parsing encrypted or unencrypted PEM blocks, deriving stable certificate and public-key IDs, rejecting malformed, expired, duplicate, mixed public-key/certificate, multiple-private-key, and mismatched private-key material, storing certificate chains with encrypted private keys, preserving organization-scoped indexes, listing storage-backed and file-backed certificates according to public/private/any modes, listing and parsing public keys, returning raw stored material, deleting storage/cache/index entries, building CA pools from certificate entries while skipping raw public keys, and exposing certificate metadata and masked IDs without claiming TLS handshake enforcement, mutual-TLS request authentication, upstream TLS validation, live MDCB availability, Redis durability, certificate expiry monitoring, or gateway request admission.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-023
+component: certificate_lifecycle
+rationale: This system requirement owns local certificate lifecycle support behavior used by certificate-consuming gateway flows. It does not claim network TLS negotiation, runtime authentication enforcement, upstream certificate validation, external storage durability, MDCB availability, expiry monitoring jobs, or final gateway request admission behavior.
+tags:
+    - certificates
+    - tls
+    - storage
+    - security
+variables:
+    - certificate_material_operation_requested
+    - certificate_material_result_determined
+traces:
+    satisfies:
+        - STK-REQ-023
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T08:29:05Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Certificate lifecycle scope is limited to local certs/manager.go helper behavior: certificate manager construction with default and overridden retry/cache settings, encrypted and unencrypted PEM parsing, stable certificate and public-key ID derivation, malformed/expired/duplicate/mixed/multiple-key/mismatched material rejection, private-key encryption before storage, organization-scoped index behavior, storage-backed and file-backed list behavior, public-key fingerprint and raw-key helpers, raw material retrieval, delete/cache/storage mutation behavior, CA pool construction that skips raw public keys, certificate metadata extraction, and masked certificate ID output. Focused certs manager ReqProof tests passed, including race, and the certs package was added to configured build/test/lint gates. This approval does not claim TLS handshake enforcement, mutual-TLS request authentication, upstream TLS validation, live MDCB availability, Redis or external-storage durability, certificate expiry monitoring, gateway request admission, or final client-visible behavior.'
+        fingerprint: sha256:70b0b1607c1c7e84e59ef7112642b66d5d06724209b5753266e3adde9ada6308
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T08:29:18.190821Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-111|certificate_material_result_determined
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-111''s certificate_material_result_determined variable is decomposed by SW-REQ-098 for local certs/manager.go certificate lifecycle helper behavior: construction/options, PEM parsing and decryption, ID derivation, invalid material rejection, encrypted private-key storage, organization indexes, list modes, public-key helpers, raw retrieval, delete/cache/storage mutation, CA pool construction, metadata extraction, and masked IDs. This review is limited to local certificate manager helper behavior and does not claim TLS handshake enforcement, runtime mTLS request authentication, upstream TLS validation, live MDCB availability, external storage durability, certificate expiry monitoring, gateway request admission, or final client-visible behavior.'
+          reviewed_at: "2026-06-20T08:29:18.190821Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T08:23:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T08:29:05Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - security
+lifecycle:
+    change_history:
+        - date: "2026-06-20T08:23:00Z"
+          from: draft
+          to: review
+          reason: Added certificate lifecycle support system requirement for certs manager onboarding.
+          changed_by: agent:codex

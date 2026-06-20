@@ -1,0 +1,69 @@
+id: STK-REQ-023
+version: 1
+status: approved
+priority: shall
+category: security
+req_type: guarantee
+fretish: ""
+description: Gateway certificate lifecycle support shall preserve certificate and public-key material, identifiers, metadata, storage indexes, local cache behavior, and retrieval fallback decisions so gateway TLS and certificate-consuming flows can use the intended configured material without silent certificate-shape drift.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: certificate_lifecycle
+rationale: Certificate material is security-sensitive gateway configuration. This stakeholder requirement owns local certificate lifecycle support behavior only; it does not claim TLS handshake enforcement, mutual-TLS request authentication, upstream TLS validation, live MDCB availability, Redis durability, certificate expiry monitoring, or gateway request admission.
+tags:
+    - certificates
+    - tls
+    - storage
+    - security
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T08:29:05Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Certificate lifecycle scope is limited to local certs/manager.go helper behavior: certificate manager construction with default and overridden retry/cache settings, encrypted and unencrypted PEM parsing, stable certificate and public-key ID derivation, malformed/expired/duplicate/mixed/multiple-key/mismatched material rejection, private-key encryption before storage, organization-scoped index behavior, storage-backed and file-backed list behavior, public-key fingerprint and raw-key helpers, raw material retrieval, delete/cache/storage mutation behavior, CA pool construction that skips raw public keys, certificate metadata extraction, and masked certificate ID output. Focused certs manager ReqProof tests passed, including race, and the certs package was added to configured build/test/lint gates. This approval does not claim TLS handshake enforcement, mutual-TLS request authentication, upstream TLS validation, live MDCB availability, Redis or external-storage durability, certificate expiry monitoring, gateway request admission, or final client-visible behavior.'
+        fingerprint: sha256:47ee40020f48060460423d949ceeaac69e35711f8b5adbe2cc963fc626cad557
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T08:23:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T08:29:05Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - security
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need configured certificate and public-key material to be parsed, stored, listed, retrieved, and removed predictably so TLS-consuming gateway flows use the intended material.
+    acceptance_criteria:
+        - id: STK-REQ-023-AC-01
+          text: Given valid certificate, certificate-chain/private-key, or public-key PEM material, when certificate lifecycle support stores or parses it, then stable identifiers, encrypted private-key storage, listable certificate/public-key shapes, and metadata are produced.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-111
+        - id: STK-REQ-023-AC-02
+          text: Given malformed, expired, duplicate, or mismatched certificate material, when certificate lifecycle support processes it, then explicit local errors are returned and invalid material is not accepted as a valid certificate.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-111
+        - id: STK-REQ-023-AC-03
+          text: Given stored or file-backed certificate and public-key identifiers, when list, raw retrieval, index listing, delete, cache flush, or cert-pool construction is requested, then local storage/cache/index state and fallback decisions are deterministic.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-111
+lifecycle:
+    change_history:
+        - date: "2026-06-20T08:23:00Z"
+          from: draft
+          to: review
+          reason: Added certificate lifecycle support stakeholder requirement for certs manager onboarding.
+          changed_by: agent:codex

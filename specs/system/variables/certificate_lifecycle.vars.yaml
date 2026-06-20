@@ -1,0 +1,14 @@
+component: certificate_lifecycle
+no_interface:
+    declared: true
+    reason: The certs package certificate manager is exercised as an in-process lifecycle helper in this proof slice; live TLS handshakes, gateway middleware, MDCB availability, and external storage durability are outside this local component boundary.
+variables:
+    - name: certificate_material_operation_requested
+      type: bool
+      direction: input
+      description: Gateway helper code requests local certificate or public-key parsing, ID derivation, storage, listing, raw retrieval, deletion, index migration, cache flushing, or certificate-pool construction.
+
+    - name: certificate_material_result_determined
+      type: bool
+      direction: output
+      description: Certificate lifecycle support returns the parsed certificate/public-key shape, stable ID, stored raw material, list result, metadata, index/cache mutation, certificate pool, explicit local error, or nil result for missing or malformed material according to the requested operation.

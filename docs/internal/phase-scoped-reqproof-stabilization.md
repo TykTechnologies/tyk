@@ -44,7 +44,7 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 145/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `verification_scope_complete` | 146/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
 | `mcdc_coverage` | 52/385 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
@@ -305,6 +305,18 @@ fixed or to hide them from the current strict audit.
   execution, load-balancer traffic distribution, invalid-index `ErrorAt`
   behavior, or final client-visible behavior. It moves the visible production
   coverage baseline from 144/447 to 145/447.
+- `SW-REQ-098` onboarded `certs/manager.go` with a new certificate lifecycle
+  stakeholder/system/software chain and focused evidence for local certificate
+  manager helper behavior: PEM parsing, certificate/public-key ID derivation,
+  malformed/expired/duplicate/mismatched material rejection, private-key
+  encryption before storage, list modes, raw retrieval, org indexes, cache
+  flushing, public-key helpers, metadata extraction, masked IDs, and CA pool
+  assembly. This increment is scoped to local certificate lifecycle support and
+  does not claim TLS handshake enforcement, runtime mTLS request
+  authentication, upstream TLS validation, live MDCB availability, external
+  storage durability, certificate expiry monitoring, or gateway request
+  admission. It moves the visible production coverage baseline from 145/447 to
+  146/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

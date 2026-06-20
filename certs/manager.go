@@ -25,6 +25,7 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
+// SW-REQ-098
 const (
 	cacheDefaultTTL    = 300 // 5 minutes.
 	cacheCleanInterval = 600 // 10 minutes.
@@ -59,18 +60,21 @@ const (
 	DefaultRPCCertFetchMaxRetries = 5
 )
 
+// SW-REQ-098
 var (
 	CertManagerLogPrefix = "cert_storage"
 )
 
+// SW-REQ-098
 var (
 	GenCertificate       = tykcrypto.GenCertificate
 	GenServerCertificate = tykcrypto.GenServerCertificate
 	HexSHA256            = tykcrypto.HexSHA256
 )
 
+// SW-REQ-098
+//
 //go:generate mockgen -destination=./mock/mock.go -package=mock . CertificateManager
-
 type CertificateManager interface {
 	List(certIDs []string, mode CertificateType) (out []*tls.Certificate)
 	ListPublicKeys(keyIDs []string) (out []string)
@@ -84,10 +88,12 @@ type CertificateManager interface {
 	CertificateManagerIdGetter
 }
 
+// SW-REQ-098
 type CertificateManagerIdGetter interface {
 	GetId(certData []byte) (id string, err error)
 }
 
+// SW-REQ-098
 type certificateManager struct {
 	IdGetter
 	storage                  storage.Handler
@@ -102,9 +108,11 @@ type certificateManager struct {
 	certFetchMaxRetries      int
 }
 
+// SW-REQ-098
 // CertificateManagerOption is a functional option for configuring certificate manager.
 type CertificateManagerOption func(*certificateManager)
 
+// SW-REQ-098
 // WithRetryEnabled enables or disables retry logic for MDCB certificate fetching.
 func WithRetryEnabled(enabled bool) CertificateManagerOption {
 	return func(cm *certificateManager) {
@@ -112,6 +120,7 @@ func WithRetryEnabled(enabled bool) CertificateManagerOption {
 	}
 }
 
+// SW-REQ-098
 // WithMaxRetries sets the maximum number of retry attempts (0 = unlimited, time-based only).
 func WithMaxRetries(maxRetries int) CertificateManagerOption {
 	return func(cm *certificateManager) {
@@ -119,6 +128,7 @@ func WithMaxRetries(maxRetries int) CertificateManagerOption {
 	}
 }
 
+// SW-REQ-098
 // WithBackoffIntervals configures the exponential backoff intervals.
 func WithBackoffIntervals(maxElapsed, initial, max time.Duration) CertificateManagerOption {
 	return func(cm *certificateManager) {
@@ -134,6 +144,7 @@ func WithBackoffIntervals(maxElapsed, initial, max time.Duration) CertificateMan
 	}
 }
 
+// SW-REQ-098
 // NewCertificateManager creates a certificate manager with optional retry configuration.
 // Maintains backward compatibility: calling without options uses defaults.
 //
@@ -174,12 +185,14 @@ func NewCertificateManager(storageHandler storage.Handler, secret string, logger
 	return cm
 }
 
+// SW-REQ-098
 func getOrgFromKeyID(key, certID string) string {
 	orgId := strings.ReplaceAll(key, "raw-", "")
 	orgId = strings.ReplaceAll(orgId, certID, "")
 	return orgId
 }
 
+// SW-REQ-098
 func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
 		logger = logrus.New()
@@ -217,6 +230,7 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 	return cm
 }
 
+// SW-REQ-098
 // Extracted from: https://golang.org/src/crypto/tls/tls.go
 //
 // Attempt to parse the given private key DER block. OpenSSL 0.9.8 generates
@@ -242,6 +256,7 @@ func parsePrivateKey(der []byte) (crypto.PrivateKey, error) {
 	return nil, errors.New("tls: failed to parse private key")
 }
 
+// SW-REQ-098
 func isSHA256(value string) bool {
 	// check if hex encoded
 	if _, err := hex.DecodeString(value); err != nil {
@@ -251,6 +266,7 @@ func isSHA256(value string) bool {
 	return true
 }
 
+// SW-REQ-098
 func ParsePEM(data []byte, secret string) ([]*pem.Block, error) {
 	var pemBlocks []*pem.Block
 
@@ -279,6 +295,7 @@ func ParsePEM(data []byte, secret string) ([]*pem.Block, error) {
 	return pemBlocks, nil
 }
 
+// SW-REQ-098
 func publicKey(priv interface{}) interface{} {
 	switch k := priv.(type) {
 	case *rsa.PrivateKey:
@@ -290,6 +307,7 @@ func publicKey(priv interface{}) interface{} {
 	}
 }
 
+// SW-REQ-098
 func ParsePEMCertificate(data []byte, secret string) (*tls.Certificate, error) {
 	var cert tls.Certificate
 
@@ -342,14 +360,17 @@ func ParsePEMCertificate(data []byte, secret string) (*tls.Certificate, error) {
 	return &cert, nil
 }
 
+// SW-REQ-098
 type CertificateType int
 
+// SW-REQ-098
 const (
 	CertificatePrivate CertificateType = iota
 	CertificatePublic
 	CertificateAny
 )
 
+// SW-REQ-098
 func isPrivateKeyEmpty(cert *tls.Certificate) bool {
 	switch priv := cert.PrivateKey.(type) {
 	default:
@@ -361,6 +382,7 @@ func isPrivateKeyEmpty(cert *tls.Certificate) bool {
 	return false
 }
 
+// SW-REQ-098
 func isCertCanBeListed(cert *tls.Certificate, mode CertificateType) bool {
 	switch mode {
 	case CertificatePrivate:
@@ -372,6 +394,7 @@ func isCertCanBeListed(cert *tls.Certificate, mode CertificateType) bool {
 	return true
 }
 
+// SW-REQ-098
 type CertificateBasics struct {
 	ID            string    `json:"id"`
 	IssuerCN      string    `json:"issuer_cn"`
@@ -383,6 +406,7 @@ type CertificateBasics struct {
 	IsCA          bool      `json:"is_ca"`
 }
 
+// SW-REQ-098
 func ExtractCertificateBasics(cert *tls.Certificate, certID string) *CertificateBasics {
 	return &CertificateBasics{
 		ID:            certID,
@@ -396,6 +420,7 @@ func ExtractCertificateBasics(cert *tls.Certificate, certID string) *Certificate
 	}
 }
 
+// SW-REQ-098
 type CertificateMeta struct {
 	ID            string    `json:"id"`
 	Fingerprint   string    `json:"fingerprint"`
@@ -408,6 +433,7 @@ type CertificateMeta struct {
 	IsCA          bool      `json:"is_ca"`
 }
 
+// SW-REQ-098
 // ToCertificateBasics converts a CertificateMeta to a CertificateBasics struct.
 func (cm *CertificateMeta) ToCertificateBasics() *CertificateBasics {
 	return &CertificateBasics{
@@ -422,6 +448,7 @@ func (cm *CertificateMeta) ToCertificateBasics() *CertificateBasics {
 	}
 }
 
+// SW-REQ-098
 func ExtractCertificateMeta(cert *tls.Certificate, certID string) *CertificateMeta {
 	return &CertificateMeta{
 		ID:            certID,
@@ -436,6 +463,7 @@ func ExtractCertificateMeta(cert *tls.Certificate, certID string) *CertificateMe
 	}
 }
 
+// SW-REQ-098
 func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error) {
 	var keyPEM, keyRaw []byte
 	var publicKeyPem []byte
@@ -526,6 +554,7 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error
 	return certID, certChainPEM, nil
 }
 
+// SW-REQ-098
 // fetchCertificateWithRetry retrieves a certificate from storage with optional retry support.
 func (c *certificateManager) fetchCertificateWithRetry(id string, sharedBackoff backoff.BackOff) (string, error) {
 	c.logger.WithFields(logrus.Fields{
@@ -579,6 +608,7 @@ func (c *certificateManager) fetchCertificateWithRetry(id string, sharedBackoff 
 	return val, err
 }
 
+// SW-REQ-098
 func (c *certificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
 	var cert *tls.Certificate
 	var rawCert []byte
@@ -643,6 +673,7 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 	return out
 }
 
+// SW-REQ-098
 // Returns list of fingerprints
 func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 	var rawKey []byte
@@ -687,6 +718,7 @@ func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 	return out
 }
 
+// SW-REQ-098
 // Returns list of fingerprints
 func (c *certificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 	var rawKey []byte
@@ -723,6 +755,7 @@ func (c *certificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 	return out
 }
 
+// SW-REQ-098
 func (c *certificateManager) ListAllIds(prefix string) (out []string) {
 	indexKey := prefix + "-index"
 	exists, _ := c.storage.Exists(indexKey)
@@ -752,6 +785,7 @@ func (c *certificateManager) ListAllIds(prefix string) (out []string) {
 	return out
 }
 
+// SW-REQ-098
 // MaskCertID truncates certificate IDs for logging to prevent information leakage.
 // Certificate IDs can be derived from API keys/auth tokens and should not be logged in clear text.
 // Returns first 8 characters plus length for debugging while protecting sensitive data.
@@ -762,10 +796,12 @@ func MaskCertID(certID string) string {
 	return certID[:8] + "***[len=" + strconv.Itoa(len(certID)) + "]"
 }
 
+// SW-REQ-098
 func (c *certificateManager) GetRaw(certID string) (string, error) {
 	return c.storage.GetKey("raw-" + certID)
 }
 
+// SW-REQ-098
 func (c *certificateManager) Add(certData []byte, orgID string) (string, error) {
 
 	certID, certChainPEM, err := GetCertIDAndChainPEM(certData, c.secret)
@@ -791,6 +827,7 @@ func (c *certificateManager) Add(certData []byte, orgID string) (string, error) 
 	return certID, nil
 }
 
+// SW-REQ-098
 func (c *certificateManager) Delete(certID string, orgID string) {
 
 	if orgID != "" {
@@ -801,6 +838,7 @@ func (c *certificateManager) Delete(certID string, orgID string) {
 	c.cache.Delete(certID)
 }
 
+// SW-REQ-098
 func (c *certificateManager) CertPool(certIDs []string) *x509.CertPool {
 	pool := x509.NewCertPool()
 
@@ -813,24 +851,29 @@ func (c *certificateManager) CertPool(certIDs []string) *x509.CertPool {
 	return pool
 }
 
+// SW-REQ-098
 func (c *certificateManager) FlushCache() {
 	c.cache.Flush()
 }
 
+// SW-REQ-098
 func (c *certificateManager) flushStorage() {
 	c.storage.DeleteScanMatch("*")
 }
 
+// SW-REQ-098
 func NewIdGetter(secret string) IdGetter {
 	return IdGetter{
 		secret: secret,
 	}
 }
 
+// SW-REQ-098
 type IdGetter struct {
 	secret string
 }
 
+// SW-REQ-098
 func (c *IdGetter) GetId(certData []byte) (id string, err error) {
 	certID, _, err := GetCertIDAndChainPEM(certData, c.secret)
 	return certID, err
