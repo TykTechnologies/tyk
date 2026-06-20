@@ -1,0 +1,14 @@
+component: gateway_api_definition_path_compilation
+no_interface:
+    declared: true
+    reason: The gateway API definition path-compilation proof slice covers local gateway/api_definition.go helper behavior only; middleware execution, route matching correctness, upstream behavior, storage durability, gateway request admission, and final client-visible behavior are outside this component boundary.
+variables:
+    - name: gateway_api_definition_path_compilation_operation_requested
+      type: bool
+      direction: input
+      description: A caller requests a local gateway API definition path-compilation helper operation such as classic path list conversion, extended endpoint conversion, cache control conversion, template loading, transform compilation, header injection compilation, method-transform compilation, hard-timeout compilation, or request-size compilation.
+
+    - name: gateway_api_definition_path_compilation_operation_terminal
+      type: bool
+      direction: output
+      description: 'A local gateway API definition path-compilation helper operation reaches a terminal observable result: URLSpec records are returned, disabled entries are skipped, status-specific metadata is preserved, regex/status fields are assigned, templates are loaded, or invalid template inputs are skipped through explicit local errors.'

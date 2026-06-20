@@ -1,0 +1,65 @@
+id: SYS-REQ-145
+version: 1
+status: approved
+priority: shall
+category: api_definition_path_compilation
+req_type: guarantee
+fretish: the gateway_api_definition_path_compilation shall always satisfy !gateway_api_definition_path_compilation_operation_requested | gateway_api_definition_path_compilation_operation_terminal
+description: Gateway API definition path compilation support shall make local path-spec compilation helper operations terminal and deterministic for classic path lists, extended endpoint lists, cache controls, transform templates, header injection, method transforms, hard timeouts, and request-size limits, without claiming middleware execution, route matching correctness, upstream behavior, storage durability, gateway request admission, or final client-visible behavior.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-057
+component: gateway_api_definition_path_compilation
+rationale: This system requirement owns local gateway API definition path-compilation helper terminality only. Middleware execution, route matching correctness, upstream behavior, storage durability, gateway request admission, and runtime request outcomes are outside this proof slice.
+tags:
+    - gateway
+    - api-definition
+    - path-compilation
+variables:
+    - gateway_api_definition_path_compilation_operation_requested
+    - gateway_api_definition_path_compilation_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-057
+    reviewed_at: "2026-06-20T23:36:20.843958Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:729156ceaa057d2b94456b159183ebffa2e2defe8128569319dc088e883215e2
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API definition path-compilation system scope is limited to local helper terminality when a local path-compilation operation is requested for classic path lists, extended endpoint lists, cache controls, transform templates, header injection, method transforms, hard timeouts, and request-size limits. The FRETish invariant intentionally models requested local operation terminality without asserting middleware execution, route matching correctness, upstream behavior, storage durability, gateway request admission, or final client-visible behavior.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-21T00:00:00Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-145|gateway_api_definition_path_compilation_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21 after requirement approval. SYS-REQ-145''s requested local operation terminality is decomposed by SW-REQ-132 for local gateway/api_definition.go path-compilation helper behavior: classic path lists, extended endpoint lists, cache controls, transform templates, header injection, method transforms, hard timeouts, and request-size limits. This review is limited to local helper mechanics and does not claim middleware execution, route matching correctness, upstream behavior, storage durability, gateway request admission, or final client-visible behavior.'
+          reviewed_at: "2026-06-21T00:00:00Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API definition path-compilation system requirement.
+          changed_by: human:buger

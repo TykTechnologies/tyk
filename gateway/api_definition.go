@@ -809,6 +809,7 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 	return a.MakeSpec(&nestDef, nil)
 }
 
+// SW-REQ-132
 func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo, conf config.Config) ([]URLSpec, bool) {
 	ignoredPaths := a.compilePathSpec(apiVersionDef.Paths.Ignored, Ignored, conf)
 	blackListPaths := a.compilePathSpec(apiVersionDef.Paths.BlackList, BlackList, conf)
@@ -822,6 +823,7 @@ func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo, conf
 	return combinedPath, len(whiteListPaths) > 0
 }
 
+// SW-REQ-132
 func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus, conf config.Config) {
 	var (
 		pattern string
@@ -846,6 +848,7 @@ func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, 
 	newSpec.spec = asRegex
 }
 
+// SW-REQ-132
 func (a APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus, conf config.Config) []URLSpec {
 	// transform a configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
@@ -860,6 +863,7 @@ func (a APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus,
 	return urlSpec
 }
 
+// SW-REQ-132
 func (a APIDefinitionLoader) compileExtendedPathSpec(ignoreEndpointCase bool, paths []apidef.EndPointMeta, specType URLStatus, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
@@ -891,6 +895,7 @@ func (a APIDefinitionLoader) compileExtendedPathSpec(ignoreEndpointCase bool, pa
 	return urlSpec
 }
 
+// SW-REQ-132
 func (a APIDefinitionLoader) compileMockResponsePathSpec(ignoreEndpointCase bool, paths []apidef.MockResponseMeta, specType URLStatus, conf config.Config) []URLSpec {
 	var urlSpec []URLSpec
 
@@ -909,6 +914,7 @@ func (a APIDefinitionLoader) compileMockResponsePathSpec(ignoreEndpointCase bool
 	return urlSpec
 }
 
+// SW-REQ-132
 func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths []apidef.CacheMeta, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
@@ -941,6 +947,7 @@ func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths [
 	return urlSpec
 }
 
+// SW-REQ-132
 func (a APIDefinitionLoader) filterSprigFuncs() texttemplate.FuncMap {
 	tmp := sprig.GenericFuncMap()
 	delete(tmp, "env")
@@ -949,12 +956,14 @@ func (a APIDefinitionLoader) filterSprigFuncs() texttemplate.FuncMap {
 	return texttemplate.FuncMap(tmp)
 }
 
+// SW-REQ-132
 func (a APIDefinitionLoader) loadFileTemplate(path string) (*texttemplate.Template, error) {
 	log.Debug("-- Loading template: ", path)
 	tmpName := filepath.Base(path)
 	return apidef.Template.New(tmpName).Funcs(a.filterSprigFuncs()).ParseFiles(path)
 }
 
+// SW-REQ-132
 func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*texttemplate.Template, error) {
 	log.Debug("-- Loading blob")
 	uDec, err := base64.StdEncoding.DecodeString(blob)
@@ -964,6 +973,7 @@ func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*texttemplate.Templa
 	return apidef.Template.New("").Funcs(a.filterSprigFuncs()).Parse(string(uDec))
 }
 
+// SW-REQ-132
 func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMeta, stat URLStatus, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
@@ -1015,6 +1025,7 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 	return urlSpec
 }
 
+// SW-REQ-132
 func (a APIDefinitionLoader) compileInjectedHeaderSpec(paths []apidef.HeaderInjectionMeta, stat URLStatus, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
@@ -1040,6 +1051,7 @@ func (a APIDefinitionLoader) compileInjectedHeaderSpec(paths []apidef.HeaderInje
 	return urlSpec
 }
 
+// SW-REQ-132
 func (a APIDefinitionLoader) compileMethodTransformSpec(paths []apidef.MethodTransformMeta, stat URLStatus, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
@@ -1060,6 +1072,7 @@ func (a APIDefinitionLoader) compileMethodTransformSpec(paths []apidef.MethodTra
 	return urlSpec
 }
 
+// SW-REQ-132
 func (a APIDefinitionLoader) compileTimeoutPathSpec(paths []apidef.HardTimeoutMeta, stat URLStatus, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
@@ -1081,6 +1094,7 @@ func (a APIDefinitionLoader) compileTimeoutPathSpec(paths []apidef.HardTimeoutMe
 	return urlSpec
 }
 
+// SW-REQ-132
 func (a APIDefinitionLoader) compileRequestSizePathSpec(paths []apidef.RequestSizeMeta, stat URLStatus, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status

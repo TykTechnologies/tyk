@@ -1319,6 +1319,250 @@ func TestAPIDefinitionLoader(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-057, SYS-REQ-145, SW-REQ-132
+// STK-REQ-057:STK-REQ-057-AC-01:acceptance
+// SYS-REQ-145:nominal:nominal
+// SYS-REQ-145:boundary:nominal
+// SYS-REQ-145:error_handling:nominal
+// SYS-REQ-145:determinism:nominal
+// MCDC SYS-REQ-145: gateway_api_definition_path_compilation_operation_requested=F, gateway_api_definition_path_compilation_operation_terminal=F => TRUE
+// MCDC SYS-REQ-145: gateway_api_definition_path_compilation_operation_requested=T, gateway_api_definition_path_compilation_operation_terminal=T => TRUE
+//
+// SW-REQ-132:nominal:nominal
+// SW-REQ-132:boundary:nominal
+// SW-REQ-132:error_handling:nominal
+// SW-REQ-132:determinism:nominal
+//
+//mcdc:ignore SYS-REQ-145: gateway_api_definition_path_compilation_operation_requested=T, gateway_api_definition_path_compilation_operation_terminal=F => FALSE -- violation row is the negation of the local API definition path-compilation helper guarantee; these tests assert requested helpers return deterministic URLSpec records, skipped disabled entries, loaded templates, explicit template errors, or status-specific metadata [category: defensive] [reviewed: human:buger]
+func TestAPIDefinitionLoaderPathCompilation(t *testing.T) {
+	loader := APIDefinitionLoader{}
+	conf := config.Config{}
+
+	t.Run("classic paths preserve order and whitelist flag", func(t *testing.T) {
+		version := apidef.VersionInfo{}
+		version.Paths.Ignored = []string{"/ignored"}
+		version.Paths.BlackList = []string{"/blocked"}
+		version.Paths.WhiteList = []string{"/allowed"}
+
+		specs, whitelistEnabled := loader.getPathSpecs(version, conf)
+
+		assert.True(t, whitelistEnabled)
+		assert.Len(t, specs, 3)
+		assert.Equal(t, Ignored, specs[0].Status)
+		assert.Equal(t, BlackList, specs[1].Status)
+		assert.Equal(t, WhiteList, specs[2].Status)
+		assert.True(t, specs[0].spec.MatchString("/ignored"))
+		assert.True(t, specs[1].spec.MatchString("/blocked"))
+		assert.True(t, specs[2].spec.MatchString("/allowed"))
+	})
+
+	t.Run("classic paths report whitelist disabled when none compile", func(t *testing.T) {
+		version := apidef.VersionInfo{}
+		version.Paths.Ignored = []string{"/ignored"}
+
+		specs, whitelistEnabled := loader.getPathSpecs(version, conf)
+
+		assert.False(t, whitelistEnabled)
+		assert.Len(t, specs, 1)
+		assert.Equal(t, Ignored, specs[0].Status)
+	})
+
+	t.Run("regex options assign status and case-insensitive matching", func(t *testing.T) {
+		spec := URLSpec{IgnoreCase: true}
+
+		loader.generateRegex("/Mixed", &spec, BlackList, conf)
+
+		assert.Equal(t, BlackList, spec.Status)
+		assert.True(t, spec.spec.MatchString("/mixed"))
+	})
+
+	t.Run("extended endpoints skip disabled entries and preserve metadata", func(t *testing.T) {
+		methodActions := map[string]apidef.EndpointMethodMeta{
+			http.MethodGet: {Code: http.StatusAccepted},
+		}
+		paths := []apidef.EndPointMeta{
+			{Disabled: true, Path: "/disabled", Method: http.MethodGet},
+			{Path: "/allowed", Method: http.MethodGet, MethodActions: methodActions},
+		}
+
+		specs := loader.compileExtendedPathSpec(false, paths, WhiteList, conf)
+
+		assert.Len(t, specs, 1)
+		assert.Equal(t, WhiteList, specs[0].Status)
+		assert.Equal(t, "/allowed", specs[0].Whitelist.Path)
+		assert.Equal(t, methodActions, specs[0].MethodActions)
+		assert.True(t, specs[0].spec.MatchString("/allowed"))
+	})
+
+	t.Run("cache specs combine legacy and advanced entries", func(t *testing.T) {
+		specs := loader.compileCachedPathSpec(
+			[]string{"/legacy-cache"},
+			[]apidef.CacheMeta{
+				{Disabled: true, Path: "/disabled-cache", Method: http.MethodGet},
+				{Path: "/advanced-cache", Method: http.MethodPost, CacheKeyRegex: "id=(.*)", CacheOnlyResponseCodes: []int{http.StatusOK}, Timeout: 7},
+			},
+			conf,
+		)
+
+		assert.Len(t, specs, 2)
+		assert.Equal(t, Cached, specs[0].Status)
+		assert.Equal(t, SAFE_METHODS, specs[0].CacheConfig.Method)
+		assert.Equal(t, Cached, specs[1].Status)
+		assert.Equal(t, http.MethodPost, specs[1].CacheConfig.Method)
+		assert.Equal(t, "id=(.*)", specs[1].CacheConfig.CacheKeyRegex)
+		assert.Equal(t, []int{http.StatusOK}, specs[1].CacheConfig.CacheOnlyResponseCodes)
+		assert.Equal(t, int64(7), specs[1].CacheConfig.Timeout)
+	})
+}
+
+// Verifies: STK-REQ-057, SYS-REQ-145, SW-REQ-132
+// STK-REQ-057:STK-REQ-057-AC-01:acceptance
+// SYS-REQ-145:nominal:nominal
+// SYS-REQ-145:boundary:nominal
+// SYS-REQ-145:error_handling:negative
+// SW-REQ-132:nominal:nominal
+// SW-REQ-132:boundary:nominal
+// SW-REQ-132:error_handling:negative
+func TestAPIDefinitionLoaderTemplatePathCompilation(t *testing.T) {
+	loader := APIDefinitionLoader{}
+	conf := config.Config{}
+
+	t.Run("filterSprigFuncs removes environment helpers", func(t *testing.T) {
+		funcs := loader.filterSprigFuncs()
+
+		assert.NotContains(t, funcs, "env")
+		assert.NotContains(t, funcs, "expandenv")
+		assert.Contains(t, funcs, "upper")
+	})
+
+	t.Run("file and blob templates execute deterministic output", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		templatePath := filepath.Join(tmpDir, "transform.tmpl")
+		assert.NoError(t, os.WriteFile(templatePath, []byte(`{"value":"{{ .value }}"}`), 0644))
+
+		fileTemplate, err := loader.loadFileTemplate(templatePath)
+		assert.NoError(t, err)
+
+		blobTemplate, err := loader.loadBlobTemplate(base64.StdEncoding.EncodeToString([]byte(`{"value":"{{ .value }}"}`)))
+		assert.NoError(t, err)
+
+		for name, template := range map[string]*texttemplate.Template{
+			"file": fileTemplate,
+			"blob": blobTemplate,
+		} {
+			t.Run(name, func(t *testing.T) {
+				var output bytes.Buffer
+				assert.NoError(t, template.Execute(&output, map[string]string{"value": "compiled"}))
+				assert.Equal(t, `{"value":"compiled"}`, output.String())
+			})
+		}
+	})
+
+	t.Run("invalid blob returns explicit error", func(t *testing.T) {
+		template, err := loader.loadBlobTemplate("not-valid-base64")
+
+		assert.Error(t, err)
+		assert.Nil(t, template)
+	})
+
+	t.Run("transform compilation loads valid templates and skips invalid modes", func(t *testing.T) {
+		validBlob := base64.StdEncoding.EncodeToString([]byte(`{"value":"{{ .value }}"}`))
+		paths := []apidef.TemplateMeta{
+			{Disabled: true, Path: "/disabled", Method: http.MethodPost, TemplateData: apidef.TemplateData{Mode: apidef.UseBlob, TemplateSource: validBlob}},
+			{Path: "/valid", Method: http.MethodPost, TemplateData: apidef.TemplateData{Mode: apidef.UseBlob, TemplateSource: validBlob}},
+			{Path: "/invalid-mode", Method: http.MethodPost, TemplateData: apidef.TemplateData{Mode: apidef.SourceMode("invalid"), TemplateSource: validBlob}},
+		}
+
+		specs := loader.compileTransformPathSpec(paths, Transformed, conf)
+
+		assert.Len(t, specs, 1)
+		assert.Equal(t, Transformed, specs[0].Status)
+		assert.Equal(t, "/valid", specs[0].TransformAction.Path)
+		assert.NotNil(t, specs[0].TransformAction.Template)
+	})
+}
+
+// Verifies: STK-REQ-057, SYS-REQ-145, SW-REQ-132
+// STK-REQ-057:STK-REQ-057-AC-01:acceptance
+// SYS-REQ-145:nominal:nominal
+// SYS-REQ-145:boundary:nominal
+// SW-REQ-132:nominal:nominal
+// SW-REQ-132:boundary:nominal
+func TestAPIDefinitionLoaderStatusSpecificPathCompilation(t *testing.T) {
+	loader := APIDefinitionLoader{}
+	conf := config.Config{}
+
+	t.Run("header injection preserves request and response metadata", func(t *testing.T) {
+		paths := []apidef.HeaderInjectionMeta{
+			{Disabled: true, Path: "/disabled", Method: http.MethodGet},
+			{Path: "/headers", Method: http.MethodGet, AddHeaders: map[string]string{"X-Test": "1"}},
+		}
+
+		requestSpecs := loader.compileInjectedHeaderSpec(paths, HeaderInjected, conf)
+		responseSpecs := loader.compileInjectedHeaderSpec(paths, HeaderInjectedResponse, conf)
+
+		assert.Len(t, requestSpecs, 1)
+		assert.Equal(t, HeaderInjected, requestSpecs[0].Status)
+		assert.Equal(t, "1", requestSpecs[0].InjectHeaders.AddHeaders["X-Test"])
+		assert.Len(t, responseSpecs, 1)
+		assert.Equal(t, HeaderInjectedResponse, responseSpecs[0].Status)
+		assert.Equal(t, "1", responseSpecs[0].InjectHeadersResponse.AddHeaders["X-Test"])
+	})
+
+	testCases := []struct {
+		name   string
+		status URLStatus
+		assert func(t *testing.T)
+	}{
+		{
+			name:   "method transform",
+			status: MethodTransformed,
+			assert: func(t *testing.T) {
+				specs := loader.compileMethodTransformSpec([]apidef.MethodTransformMeta{
+					{Disabled: true, Path: "/disabled", Method: http.MethodGet, ToMethod: http.MethodPost},
+					{Path: "/method", Method: http.MethodGet, ToMethod: http.MethodPost},
+				}, MethodTransformed, conf)
+
+				assert.Len(t, specs, 1)
+				assert.Equal(t, MethodTransformed, specs[0].Status)
+				assert.Equal(t, http.MethodPost, specs[0].MethodTransform.ToMethod)
+			},
+		},
+		{
+			name:   "hard timeout",
+			status: HardTimeout,
+			assert: func(t *testing.T) {
+				specs := loader.compileTimeoutPathSpec([]apidef.HardTimeoutMeta{
+					{Disabled: true, Path: "/disabled", Method: http.MethodGet, TimeOut: 1},
+					{Path: "/timeout", Method: http.MethodGet, TimeOut: 3},
+				}, HardTimeout, conf)
+
+				assert.Len(t, specs, 1)
+				assert.Equal(t, HardTimeout, specs[0].Status)
+				assert.Equal(t, 3, specs[0].HardTimeout.TimeOut)
+			},
+		},
+		{
+			name:   "request size",
+			status: RequestSizeLimit,
+			assert: func(t *testing.T) {
+				specs := loader.compileRequestSizePathSpec([]apidef.RequestSizeMeta{
+					{Disabled: true, Path: "/disabled", Method: http.MethodPost, SizeLimit: 1},
+					{Path: "/size", Method: http.MethodPost, SizeLimit: 512},
+				}, RequestSizeLimit, conf)
+
+				assert.Len(t, specs, 1)
+				assert.Equal(t, RequestSizeLimit, specs[0].Status)
+				assert.Equal(t, int64(512), specs[0].RequestSize.SizeLimit)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.assert)
+	}
+}
+
 // Verifies: STK-REQ-056, SYS-REQ-144, SW-REQ-131
 // STK-REQ-056:STK-REQ-056-AC-01:acceptance
 // SYS-REQ-144:nominal:nominal
