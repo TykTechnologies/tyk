@@ -90,6 +90,7 @@ func TestRouter_ToolsCall_NotFound_AllowListEnabled(t *testing.T) {
 // STK-REQ-019:error_handling:negative
 // SYS-REQ-107:error_handling:negative
 // SW-REQ-025:error_handling:negative
+// MCDC SYS-REQ-107: mcp_protocol_decision_requested=T, mcp_protocol_decision_determined=F => FALSE
 func TestRouter_ToolsCall_MissingParams(t *testing.T) {
 	router := NewRouter()
 	primitives := map[string]string{}

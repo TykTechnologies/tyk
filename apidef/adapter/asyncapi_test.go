@@ -489,6 +489,7 @@ func TestAsyncAPIAdapterKafkaServerSelectionAndArgumentTemplates(t *testing.T) {
 
 // Verifies: SYS-REQ-104, SW-REQ-070
 // SW-REQ-070:error_handling:negative
+// MCDC SYS-REQ-104: api_definition_support_requested=T, api_definition_support_shape_preserved=F => FALSE
 func TestAsyncAPIAdapterRejectsMalformedAndUnsupportedKafkaInput(t *testing.T) {
 	_, err := NewAsyncAPIAdapter("my-org-id", []byte("asyncapi: [")).Import()
 	require.Error(t, err)

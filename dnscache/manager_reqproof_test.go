@@ -52,6 +52,7 @@ func TestDnsCacheManagerRequirementStorageLifecycle(t *testing.T) {
 // STK-REQ-021:error_handling:negative
 // SYS-REQ-109:error_handling:negative
 // SW-REQ-038:error_handling:negative
+// MCDC SYS-REQ-109: cache_operation_requested=T, cache_operation_determined=F => FALSE
 func TestDnsCacheManagerRequirementRandomStrategyGuard(t *testing.T) {
 	manager := NewDnsCacheManager(config.PickFirstStrategy)
 
