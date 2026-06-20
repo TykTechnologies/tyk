@@ -11,7 +11,7 @@ helpers including context-cancellation handling and internal quota/rate key
 exclusion. The same local proof slice covers raw and hashed key deletion status
 handling with optional quota reset, RPC sorted-set forwarding helpers, tested
 key route wrapper status handling, hashed-key policy update status handling,
-and organization-key route wrapper status handling.
+and organization-key route/helper status handling.
 
 The proof slice is intentionally local. It does not claim password strength,
 credential validity for runtime authentication, middleware request admission,

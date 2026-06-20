@@ -1369,6 +1369,75 @@ func TestGatewayKeyManagementRouteHandlers(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// STK-REQ-053:error_handling:negative
+// STK-REQ-053:error_handling:nominal
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SYS-REQ-141:error_handling:negative
+// SYS-REQ-141:error_handling:nominal
+// SYS-REQ-141:determinism:nominal
+// SW-REQ-128:nominal:nominal
+// SW-REQ-128:boundary:nominal
+// SW-REQ-128:error_handling:negative
+// SW-REQ-128:error_handling:nominal
+// SW-REQ-128:determinism:nominal
+func TestGatewayKeyManagementOrgKeyHelpers(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	loadedSpecs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "org-api"
+		spec.OrgID = "org-a"
+		spec.Name = "Org API"
+	})
+	require.Len(t, loadedSpecs, 1)
+	spec := loadedSpecs[0]
+
+	session := CreateStandardSession()
+	session.OrgID = "org-a"
+	payload, err := json.Marshal(session)
+	require.NoError(t, err)
+
+	created, code := ts.Gw.handleOrgAddOrUpdate("org-a", httptest.NewRequest(http.MethodPost, "/tyk/org/keys/org-a", bytes.NewReader(payload)))
+
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, apiModifyKeySuccess{Key: "org-a", Status: "ok", Action: "added"}, created)
+	assert.False(t, spec.OrgHasNoSession)
+
+	got, code := ts.Gw.handleGetOrgDetail("org-a")
+
+	require.Equal(t, http.StatusOK, code)
+	gotSession := got.(user.SessionState)
+	assert.Equal(t, "org-a", gotSession.OrgID)
+
+	require.NoError(t, spec.OrgSessionManager.UpdateSession(QuotaKeyPrefix+"org-a", CreateStandardSession(), 0, false))
+	require.NoError(t, spec.OrgSessionManager.UpdateSession(RateLimitKeyPrefix+"org-a", CreateStandardSession(), 0, false))
+	require.NoError(t, spec.OrgSessionManager.UpdateSession("visible-org-key", CreateStandardSession(), 0, false))
+
+	list, code := ts.Gw.handleGetAllOrgKeys("")
+
+	require.Equal(t, http.StatusOK, code)
+	assert.Contains(t, list.(apiAllKeys).APIKeys, "visible-org-key")
+	assert.NotContains(t, list.(apiAllKeys).APIKeys, QuotaKeyPrefix+"org-a")
+	assert.NotContains(t, list.(apiAllKeys).APIKeys, RateLimitKeyPrefix+"org-a")
+
+	deleted, code := ts.Gw.handleDeleteOrgKey("org-a")
+
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, apiModifyKeySuccess{Key: "org-a", Status: "ok", Action: "deleted"}, deleted)
+	assert.True(t, spec.OrgHasNoSession)
+
+	missing, code := ts.Gw.handleDeleteOrgKey("org-a")
+	require.Equal(t, http.StatusBadRequest, code)
+	assert.Equal(t, apiError("Failed to remove the key"), missing)
+
+	malformed, code := ts.Gw.handleOrgAddOrUpdate("org-a", httptest.NewRequest(http.MethodPost, "/tyk/org/keys/org-a", strings.NewReader("{")))
+	require.Equal(t, http.StatusBadRequest, code)
+	assert.Equal(t, apiError("Request malformed"), malformed)
+}
+
 // Verifies: STK-REQ-054, SYS-REQ-142, SW-REQ-129
 // STK-REQ-054:STK-REQ-054-AC-01:acceptance
 // SYS-REQ-142:nominal:nominal

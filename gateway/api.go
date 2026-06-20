@@ -2045,6 +2045,7 @@ func (gw *Gateway) orgHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
+// SW-REQ-128
 func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interface{}, int) {
 	newSession := new(user.SessionState)
 
@@ -2109,6 +2110,7 @@ func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interfac
 	return response, http.StatusOK
 }
 
+// SW-REQ-128
 func (gw *Gateway) handleGetOrgDetail(orgID string) (interface{}, int) {
 	spec := gw.getSpecForOrg(orgID)
 	if spec == nil {
@@ -2133,6 +2135,7 @@ func (gw *Gateway) handleGetOrgDetail(orgID string) (interface{}, int) {
 	return session.Clone(), http.StatusOK
 }
 
+// SW-REQ-128
 func (gw *Gateway) handleGetAllOrgKeys(filter string) (interface{}, int) {
 	spec := gw.getSpecForOrg("")
 	if spec == nil {
@@ -2150,6 +2153,7 @@ func (gw *Gateway) handleGetAllOrgKeys(filter string) (interface{}, int) {
 	return sessionsObj, http.StatusOK
 }
 
+// SW-REQ-128
 func (gw *Gateway) handleDeleteOrgKey(orgID string) (interface{}, int) {
 	spec := gw.getSpecForOrg(orgID)
 	if spec == nil {

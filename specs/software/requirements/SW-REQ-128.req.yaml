@@ -5,7 +5,7 @@ priority: shall
 category: key_management
 req_type: guarantee
 fretish: ""
-description: The gateway key management implementation shall preserve local helper behavior for basic-auth password hash algorithm selection and password storage transformation, tested key and organization-key route wrapper status handling, key add/update payload decoding and explicit malformed-input or missing-key errors, local add-key storage updates gated by organization, hashed-key policy update status handling, key detail retrieval with quota remaining calculation and basic-auth password redaction, key-list retrieval and API filtering, context-cancellation timeout reporting, internal quota/rate key exclusion, raw and hashed key deletion status handling with optional quota reset, and RPC sorted-set forwarding, without claiming password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
+description: The gateway key management implementation shall preserve local helper behavior for basic-auth password hash algorithm selection and password storage transformation, tested key and organization-key route/helper status handling, key add/update payload decoding and explicit malformed-input or missing-key errors, local add-key and organization-key storage updates gated by organization, hashed-key policy update status handling, key detail retrieval with quota remaining calculation and basic-auth password redaction, key-list retrieval and API filtering, context-cancellation timeout reporting, internal quota/rate key exclusion, raw, hashed, and organization-key deletion status handling with optional quota reset, and RPC sorted-set forwarding, without claiming password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
 formalization_strategy: informal
 informal_verification:
     method: unit_tests
@@ -24,7 +24,7 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-141
-    reviewed_at: "2026-06-20T20:52:11.85064Z"
+    reviewed_at: "2026-06-20T21:03:01.09938Z"
     reviewed_by: human:buger
     reviewed_fingerprint: sha256:adce1fe6e90edf602d2f0dadd435f3d5ee825c02a62fdc83e5a9d5532e2f4007
 verification:
@@ -36,7 +36,7 @@ verification:
         role: requirements_owner
         reviewed_at: "2026-06-20T19:36:28Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-128 is scoped to local gateway/api.go helper behavior: basic-auth hash algorithm selection and password storage transformation, tested key and organization-key route wrapper status handling, key add/update request decoding and explicit error status handling, local add-key storage updates gated by organization, hashed-key policy update status handling, key detail retrieval with quota remaining calculation and basic-auth password redaction, key-list retrieval/filtering, context-cancellation timeout reporting, internal quota/rate key exclusion, raw and hashed key deletion status handling with optional quota reset, and RPC sorted-set forwarding. Focused gateway helper tests are being validated in a clean worktree. This approval does not claim password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-128 is scoped to local gateway/api.go helper behavior: basic-auth hash algorithm selection and password storage transformation, tested key and organization-key route/helper status handling, key add/update request decoding and explicit error status handling, local add-key and organization-key storage updates gated by organization, hashed-key policy update status handling, key detail retrieval with quota remaining calculation and basic-auth password redaction, key-list retrieval/filtering, context-cancellation timeout reporting, internal quota/rate key exclusion, raw, hashed, and organization-key deletion status handling with optional quota reset, and RPC sorted-set forwarding. Focused gateway helper tests are being validated in a clean worktree. This approval does not claim password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
         ai_generated: false
 history:
     created_by: agent:codex

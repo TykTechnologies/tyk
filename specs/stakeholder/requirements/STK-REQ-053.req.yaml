@@ -5,7 +5,7 @@ priority: shall
 category: key_management
 req_type: guarantee
 fretish: ""
-description: Gateway key management support shall locally select basic-auth password hash algorithms with deterministic fallback, transform stored basic-auth passwords according to the selected hash type, decode key add/update payloads with explicit malformed-input and missing-key errors, dispatch tested key and organization-key route wrappers, apply local add-key storage updates only for matching organizations, update hashed-key policies with explicit status handling, retrieve key details with quota remaining calculation and basic-auth password redaction, list keys with API filtering, context-cancellation timeout reporting, and internal quota/rate key exclusion, delete raw and hashed keys with explicit status handling and optional quota reset, and forward RPC sorted-set operations, without claiming password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
+description: Gateway key management support shall locally select basic-auth password hash algorithms with deterministic fallback, transform stored basic-auth passwords according to the selected hash type, decode key add/update payloads with explicit malformed-input and missing-key errors, dispatch tested key and organization-key route wrappers, apply local add-key and organization-key storage updates only for matching organizations, update hashed-key policies with explicit status handling, retrieve key details with quota remaining calculation and basic-auth password redaction, list keys with API filtering, context-cancellation timeout reporting, and internal quota/rate key exclusion, delete raw, hashed, and organization keys with explicit status handling and optional quota reset, and forward RPC sorted-set operations, without claiming password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
 formalization_strategy: informal
 informal_verification:
     method: ""
@@ -20,9 +20,9 @@ tags:
     - control-api
 variables: []
 traces:
-    reviewed_at: "2026-06-20T20:52:02.812173Z"
+    reviewed_at: "2026-06-20T20:57:05.311944Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:7c9c92e7970881645c8aa375d89dfc33878da8e94eafbd40d95f5e25a83c2e1e
+    reviewed_fingerprint: sha256:73a1c539ed11a32632cfad054b40b7b47c7fe7d01cff5e934e779fb17cc82b76
 verification:
     assurance_level: A
     formalization_status: none
@@ -32,7 +32,7 @@ verification:
         role: requirements_owner
         reviewed_at: "2026-06-20T19:36:28Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway key management scope is limited to local gateway/api.go helper behavior: basic-auth hash algorithm selection and password storage transformation, key route wrapper status handling, key add/update request decoding and explicit error status handling, local add-key storage updates gated by organization, hashed-key policy update status handling, organization-key route wrapper status handling, key detail retrieval with quota remaining calculation and basic-auth password redaction, key-list retrieval/filtering, context-cancellation timeout reporting, internal quota/rate key exclusion, raw and hashed key deletion status handling with optional quota reset, and RPC sorted-set forwarding. This approval does not claim password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway key management scope is limited to local gateway/api.go helper behavior: basic-auth hash algorithm selection and password storage transformation, key route wrapper status handling, key add/update request decoding and explicit error status handling, local add-key storage updates gated by organization, hashed-key policy update status handling, organization-key route/helper status handling, key detail retrieval with quota remaining calculation and basic-auth password redaction, key-list retrieval/filtering, context-cancellation timeout reporting, internal quota/rate key exclusion, raw, hashed, and organization-key deletion status handling with optional quota reset, and RPC sorted-set forwarding. This approval does not claim password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
         ai_generated: false
 history:
     created_by: agent:codex
@@ -50,7 +50,7 @@ stakeholder:
     story: As a gateway operator, I need local key management helpers to transform basic-auth credentials, update and delete keys, retrieve redacted key details, list keys, and forward required sorted-set operations predictably before broader runtime behavior depends on those results.
     acceptance_criteria:
         - id: STK-REQ-053-AC-01
-          text: Given local gateway key management helper inputs, when basic-auth hash selection, password storage transformation, key route dispatch, add/update decoding, local add-key storage update, hashed-key policy update, organization-key route dispatch, key detail retrieval, key-list filtering, timeout, internal-key exclusion, raw or hashed key deletion, optional quota reset, or sorted-set forwarding paths are exercised, then deterministic local helper outcomes or explicit error statuses are produced for the tested inputs.
+          text: Given local gateway key management helper inputs, when basic-auth hash selection, password storage transformation, key route dispatch, add/update decoding, local add-key storage update, hashed-key policy update, organization-key route/helper paths, key detail retrieval, key-list filtering, timeout, internal-key exclusion, raw, hashed, or organization-key deletion, optional quota reset, or sorted-set forwarding paths are exercised, then deterministic local helper outcomes or explicit error statuses are produced for the tested inputs.
           verification_method: test
           derived_reqs:
             - SYS-REQ-141
