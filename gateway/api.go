@@ -3819,6 +3819,7 @@ var createOauthClientSecret = func() string {
 	return base64.StdEncoding.EncodeToString([]byte(secret))
 }
 
+// SW-REQ-126
 // invalidate tokens if we had a new policy
 func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAuthClient, oauthManager OAuthManagerInterface) {
 	if prevPolicy := prevClient.GetPolicyID(); prevPolicy != "" && prevPolicy != updatedClient.PolicyID {
@@ -3835,6 +3836,7 @@ func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAut
 	}
 }
 
+// SW-REQ-126
 func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	var oasObj oas.OAS
 	reqBodyInBytes, err := ioutil.ReadAll(reqBody)
@@ -3862,6 +3864,7 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	return reqBodyInBytes, &oasObj, nil
 }
 
+// SW-REQ-126
 func validateAPIDef(apiDef *apidef.APIDefinition) *apiStatusMessage {
 	validationResult := apidef.Validate(apiDef, apidef.DefaultValidationRuleSet)
 	if !validationResult.IsValid {

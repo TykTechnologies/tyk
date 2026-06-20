@@ -1712,6 +1712,33 @@ func TestGatewayOAuthClientManagementHelpers(t *testing.T) {
 
 	assert.Empty(t, ts.Gw.getApisForOauthClientId("missing-client", "default"))
 
+	policyClientID := "client-policy"
+	ts.createOAuthClientIDAndTokens(t, spec, policyClientID)
+	tokens, err := spec.OAuthManager.Storage().GetClientTokens(policyClientID)
+	require.NoError(t, err)
+	require.Len(t, tokens, 3)
+
+	nextPolicyID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			spec.APIID: {
+				APIID: spec.APIID,
+			},
+		}
+	})
+	policyUpdatePayload, err := json.Marshal(NewClientRequest{
+		ClientRedirectURI: authRedirectUri,
+		PolicyID:          nextPolicyID,
+	})
+	require.NoError(t, err)
+
+	policyUpdated, code := ts.Gw.updateOauthClient(policyClientID, spec.APIID, httptest.NewRequest(http.MethodPut, "/tyk/oauth/clients/999999/client-policy", bytes.NewReader(policyUpdatePayload)))
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, nextPolicyID, policyUpdated.(NewClientRequest).PolicyID)
+
+	tokens, err = spec.OAuthManager.Storage().GetClientTokens(policyClientID)
+	require.NoError(t, err)
+	assert.Empty(t, tokens)
+
 	for _, tc := range []struct {
 		name string
 		req  *http.Request
@@ -1890,6 +1917,91 @@ func TestGatewayOAuthClientManagementHelpers(t *testing.T) {
 			assert.Equal(t, tc.wantMsg, got)
 		})
 	}
+}
+
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// STK-REQ-051:error_handling:negative
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:error_handling:negative
+// SYS-REQ-139:encoding_safety:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:error_handling:negative
+// SW-REQ-126:encoding_safety:nominal
+func TestGatewayControlAPIValidationHelpers(t *testing.T) {
+	t.Run("extract OAS request body", func(t *testing.T) {
+		for _, tc := range []struct {
+			name    string
+			body    string
+			wantErr bool
+		}{
+			{
+				name: "valid OAS",
+				body: `{"openapi":"3.0.3","info":{"title":"doc","version":"1"},"paths":{}}`,
+			},
+			{
+				name:    "malformed OAS",
+				body:    `{`,
+				wantErr: true,
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				bodyBytes, oasObj, err := extractOASObjFromReq(strings.NewReader(tc.body))
+
+				if tc.wantErr {
+					require.ErrorIs(t, err, ErrRequestMalformed)
+					assert.Nil(t, bodyBytes)
+					assert.Nil(t, oasObj)
+					return
+				}
+
+				require.NoError(t, err)
+				require.NotNil(t, oasObj)
+				require.NotNil(t, oasObj.Info)
+				assert.Equal(t, "doc", oasObj.Info.Title)
+				assert.JSONEq(t, tc.body, string(bodyBytes))
+			})
+		}
+	})
+
+	t.Run("validate API definition", func(t *testing.T) {
+		validAPI := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "valid-api"
+			spec.Proxy.ListenPath = "/valid-api/"
+			spec.Proxy.TargetURL = TestHttpAny
+		})[0].APIDefinition
+
+		for _, tc := range []struct {
+			name    string
+			apiDef  *apidef.APIDefinition
+			wantErr bool
+		}{
+			{
+				name:   "valid definition",
+				apiDef: validAPI,
+			},
+			{
+				name:    "invalid definition",
+				apiDef:  &apidef.APIDefinition{EnableIpWhiteListing: true, AllowedIPs: []string{"not-an-ip"}},
+				wantErr: true,
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				got := validateAPIDef(tc.apiDef)
+
+				if tc.wantErr {
+					require.NotNil(t, got)
+					assert.Equal(t, "error", got.Status)
+					assert.Contains(t, got.Message, "Validation of API Definition failed")
+					return
+				}
+
+				assert.Nil(t, got)
+			})
+		}
+	})
 }
 
 // Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
