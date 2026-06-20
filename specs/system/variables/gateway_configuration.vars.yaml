@@ -1,0 +1,14 @@
+component: gateway_configuration
+no_interface:
+    declared: true
+    reason: The config/config.go file is exercised as a local configuration loading/defaulting helper; gateway runtime interpretation of individual fields, network binding, storage connectivity, analytics delivery, tracing export delivery, API loading, request admission, and request handling are outside this local component boundary.
+variables:
+    - name: gateway_configuration_operation_requested
+      type: bool
+      direction: input
+      description: Gateway code or tests request local configuration defaulting, file loading, JSON writing, environment override processing, custom decoder execution, event-trigger field migration, ignored-IP evaluation, certificate monitor defaulting, or tracing/OpenTelemetry parsing.
+
+    - name: gateway_configuration_result_determined
+      type: bool
+      direction: output
+      description: Gateway configuration support returns deterministic defaults, written configuration JSON, layered file/env override results, decoded custom values, migrated event triggers, ignored-IP analytics decisions, certificate monitor values, tracing/OpenTelemetry configuration values, or explicit local errors for missing files or malformed decoder input.

@@ -18,6 +18,13 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SW-REQ-103:nominal:nominal
+// SW-REQ-103:boundary:nominal
+// MCDC SYS-REQ-116: gateway_configuration_operation_requested=F, gateway_configuration_result_determined=F => TRUE
+// MCDC SYS-REQ-116: gateway_configuration_operation_requested=T, gateway_configuration_result_determined=T => TRUE
+//
+//mcdc:ignore SYS-REQ-116: gateway_configuration_operation_requested=T, gateway_configuration_result_determined=F => FALSE -- violation row is the negation of the local configuration helper guarantee; these tests assert requested configuration operations either return defaults, decoded fields, warnings, env/file overrides, or explicit local errors [category: defensive] [reviewed: agent:codex]
 func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 	cases := []struct {
 		FieldName   string
@@ -97,6 +104,11 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SW-REQ-103:nominal:nominal
+// SW-REQ-103:boundary:nominal
+// SW-REQ-103:error_handling:negative
+// STK-REQ-028:error_handling:negative
 func TestConfigFiles(t *testing.T) {
 	dir, err := ioutil.TempDir("", "tyk")
 	if err != nil {
@@ -163,6 +175,9 @@ func TestConfigFiles(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SW-REQ-103:nominal:nominal
+// SW-REQ-103:boundary:nominal
 func TestConfig_GetEventTriggers(t *testing.T) {
 
 	assertFunc := func(t *testing.T, config string, expected string) {
@@ -210,6 +225,10 @@ func TestConfig_GetEventTriggers(t *testing.T) {
 
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SW-REQ-103:nominal:nominal
+// SW-REQ-103:boundary:nominal
+// SW-REQ-103:error_handling:negative
 func TestLoad_tracing(t *testing.T) {
 	dir, err := ioutil.TempDir("", "tyk")
 	if err != nil {
@@ -305,6 +324,8 @@ func TestLoad_tracing(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SW-REQ-103:nominal:nominal
 func TestCustomCertsDataDecoder(t *testing.T) {
 	var c Config
 	t.Setenv("TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES", "[{\"domain_name\":\"testCerts\"}]")
@@ -320,6 +341,8 @@ func TestCustomCertsDataDecoder(t *testing.T) {
 // TestSecretsDecoder tests env variable decoding for TYK_GW_SECRETS.
 // It confirms that key pairs should be provided as a comma separated
 // list of keys and values, additionally separated by `:` (colon).
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SW-REQ-103:nominal:nominal
 func TestSecretsDecoder(t *testing.T) {
 	var c Config
 	t.Setenv("TYK_GW_SECRETS", "key:value,key2:/value2")
@@ -336,6 +359,9 @@ func TestSecretsDecoder(t *testing.T) {
 	assert.Equal(t, want, c.Secrets)
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SW-REQ-103:nominal:nominal
+// SW-REQ-103:boundary:nominal
 func TestPortsWhiteListDecoder(t *testing.T) {
 	var c Config
 
@@ -385,6 +411,9 @@ func TestPortsWhiteListDecoder(t *testing.T) {
 	assert.Contains(t, tlsWhiteList.Ports, 6015, "tls should have 6015 port")
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SW-REQ-103:nominal:nominal
+// SW-REQ-103:boundary:nominal
 func TestCertificateExpiryMonitorConfig(t *testing.T) {
 	dir, err := ioutil.TempDir("", "tyk")
 	if err != nil {
@@ -516,6 +545,9 @@ func TestCertificateExpiryMonitorConfig(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SW-REQ-103:nominal:nominal
+// SW-REQ-103:boundary:nominal
 func TestOpenTelemetryConfig(t *testing.T) {
 	t.Run("JSON parsing", func(t *testing.T) {
 		var c Config

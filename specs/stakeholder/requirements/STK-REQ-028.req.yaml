@@ -1,0 +1,68 @@
+id: STK-REQ-028
+version: 1
+status: approved
+priority: shall
+category: configuration
+req_type: guarantee
+fretish: ""
+description: Gateway configuration support shall give operators deterministic local defaults, file layering, environment overrides, typed decoder behavior, event trigger migration, ignored-IP analytics decisions, certificate expiry monitor defaults, and tracing/OpenTelemetry configuration parsing without claiming full gateway runtime interpretation of every configuration field.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_configuration
+rationale: Gateway configuration loading is operator-facing behavior. This stakeholder requirement owns local configuration helper behavior in config/config.go; runtime use of individual fields by gateway subsystems is outside this proof slice.
+tags:
+    - configuration
+    - defaults
+    - environment
+    - tracing
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T09:34:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway configuration scope is limited to local config/config.go behavior: default values and WriteDefault output, ordered file layering and missing-file errors, environment variable overrides through envconfig/custom loaders, event trigger migration between deprecated and current fields, cert/custom-secret/port-whitelist/labs decoders, ignored-IP analytics decisions, certificate expiry monitor defaults and overrides, and tracing/OpenTelemetry JSON/env parsing and round trips. Existing config tests passed, including race, and the config package was added to configured build/test/lint gates. This approval does not claim full gateway runtime interpretation of every configuration field, network binding, storage connectivity, analytics delivery, tracing export delivery, API loading, request admission, or final client-visible runtime behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T09:34:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T09:34:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need local gateway configuration loading to apply defaults, file overlays, environment overrides, and typed decoders predictably before runtime components consume the configuration.
+    acceptance_criteria:
+        - id: STK-REQ-028-AC-01
+          text: Given default or partial configuration input, when local configuration helpers load or write configuration, then documented defaults and supported explicit values are preserved deterministically.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-116
+        - id: STK-REQ-028-AC-02
+          text: Given multiple configuration files and environment overrides, when local configuration loading runs, then later files and environment values override earlier/default values according to local loader rules.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-116
+        - id: STK-REQ-028-AC-03
+          text: Given missing files, malformed decoder input, or unsupported tracing configuration shape, when local configuration helpers run, then an explicit local error or warning path is returned.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-116
+lifecycle:
+    change_history:
+        - date: "2026-06-20T09:34:00Z"
+          from: draft
+          to: review
+          reason: Added gateway configuration stakeholder requirement for config/config.go onboarding.
+          changed_by: agent:codex

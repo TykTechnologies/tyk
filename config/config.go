@@ -517,6 +517,7 @@ type LocalSessionCacheConf struct {
 }
 type CertsData []CertData
 
+// SW-REQ-103
 func (certs *CertsData) Decode(value string) error {
 	err := json.Unmarshal([]byte(value), certs)
 	if err != nil {
@@ -817,6 +818,7 @@ type PortWhiteList struct {
 }
 
 // Match returns true if port is acceptable from the PortWhiteList.
+// SW-REQ-103
 func (p PortWhiteList) Match(port int) bool {
 	for _, v := range p.Ports {
 		if port == v {
@@ -838,12 +840,14 @@ type PortRange struct {
 }
 
 // Match returns true if port is within the range
+// SW-REQ-103
 func (r PortRange) Match(port int) bool {
 	return r.From <= port && r.To >= port
 }
 
 type PortsWhiteList map[string]PortWhiteList
 
+// SW-REQ-103
 func (pwl *PortsWhiteList) Decode(value string) error {
 	err := json.Unmarshal([]byte(value), pwl)
 	if err != nil {
@@ -1414,6 +1418,7 @@ type Config struct {
 type LabsConfig map[string]interface{}
 
 // Decode unmarshals json config into the Labs config
+// SW-REQ-103
 func (lc *LabsConfig) Decode(value string) error {
 	var temp map[string]interface{}
 	if err := json.Unmarshal([]byte(value), &temp); err != nil {
@@ -1520,6 +1525,7 @@ type ConsulConfig struct {
 
 // GetEventTriggers returns event triggers. There was a typo in the json tag.
 // To maintain backward compatibility, this solution is chosen.
+// SW-REQ-103
 func (c Config) GetEventTriggers() map[apidef.TykEvent][]TykEventHandler {
 	if c.EventTriggersDefunct == nil {
 		return c.EventTriggers
@@ -1534,6 +1540,7 @@ func (c Config) GetEventTriggers() map[apidef.TykEvent][]TykEventHandler {
 }
 
 // SetEventTriggers sets events for backwards compatibility
+// SW-REQ-103
 func (c *Config) SetEventTriggers(eventTriggers map[apidef.TykEvent][]TykEventHandler) {
 	c.EventTriggersDefunct = eventTriggers
 }
@@ -1563,6 +1570,7 @@ type TykEventHandler interface {
 // Global function that will return the config of the gw running
 var Global func() Config
 
+// SW-REQ-103
 func WriteConf(path string, conf *Config) error {
 	bs, err := json.MarshalIndent(conf, "", "    ")
 	if err != nil {
@@ -1573,6 +1581,7 @@ func WriteConf(path string, conf *Config) error {
 
 // writeDefault will set conf to the default config and write it to disk
 // in path, if the path is non-empty.
+// SW-REQ-103
 func WriteDefault(in string, conf *Config) error {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -1598,6 +1607,7 @@ func WriteDefault(in string, conf *Config) error {
 //
 // An error will be returned only if any of the paths existed but was
 // not a valid config file.
+// SW-REQ-103
 func Load(paths []string, conf *Config) error {
 	var r io.ReadCloser
 	for _, filename := range paths {
@@ -1639,6 +1649,7 @@ func Load(paths []string, conf *Config) error {
 }
 
 // FillEnv will inspect the environment and fill the config.
+// SW-REQ-103
 func FillEnv(conf *Config) error {
 	shouldOmit, omitEnvExist := os.LookupEnv(envPrefix + "_OMITCONFIGFILE")
 	if omitEnvExist && strings.ToLower(shouldOmit) == "true" {
@@ -1654,6 +1665,7 @@ func FillEnv(conf *Config) error {
 	return nil
 }
 
+// SW-REQ-103
 func (c *Config) LoadIgnoredIPs() {
 	c.AnalyticsConfig.ignoredIPsCompiled = make(map[string]bool, len(c.AnalyticsConfig.IgnoredIPs))
 	for _, ip := range c.AnalyticsConfig.IgnoredIPs {
@@ -1661,6 +1673,7 @@ func (c *Config) LoadIgnoredIPs() {
 	}
 }
 
+// SW-REQ-103
 func (c *Config) StoreAnalytics(ip string) bool {
 	if !c.EnableAnalytics {
 		return false
@@ -1673,6 +1686,7 @@ func (c *Config) StoreAnalytics(ip string) bool {
 // be called in the order they are passed. Any function that returns an error
 // then that error will be returned and no further processing will be
 // happenning.
+// SW-REQ-103
 func processCustom(prefix string, c *Config, custom ...func(prefix string, c *Config) error) error {
 	for _, fn := range custom {
 		if err := fn(prefix, c); err != nil {
