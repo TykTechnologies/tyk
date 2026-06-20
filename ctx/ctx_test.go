@@ -227,6 +227,7 @@ func TestErrorClassificationContext_NilSafe(t *testing.T) {
 // Verifies: STK-REQ-037, SYS-REQ-125, SW-REQ-112
 // SW-REQ-112:nominal:nominal
 // SW-REQ-112:boundary:nominal
+// SW-REQ-112:error_handling:nominal
 // STK-REQ-037:error_handling:negative
 // SYS-REQ-125:error_handling:negative
 // SW-REQ-112:error_handling:negative

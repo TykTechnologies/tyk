@@ -25,14 +25,18 @@ import (
 // STK-REQ-045:determinism:nominal
 // SYS-REQ-133:nominal:nominal
 // SYS-REQ-133:boundary:nominal
+// SYS-REQ-133:error_handling:nominal
 // SYS-REQ-133:error_handling:negative
 // SYS-REQ-133:cancellation_observed:nominal
+// SYS-REQ-133:concurrent:nominal
 // SYS-REQ-133:concurrent:race
 // SYS-REQ-133:determinism:nominal
 // SW-REQ-120:nominal:nominal
 // SW-REQ-120:boundary:nominal
+// SW-REQ-120:error_handling:nominal
 // SW-REQ-120:error_handling:negative
 // SW-REQ-120:cancellation_observed:nominal
+// SW-REQ-120:concurrent:nominal
 // SW-REQ-120:concurrent:race
 // SW-REQ-120:determinism:nominal
 //

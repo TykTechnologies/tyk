@@ -285,11 +285,18 @@ func TestAcceptance_IdleNilStoreAndActiveIdleTransitions(t *testing.T) {
 
 // Verifies: STK-REQ-007 [boundary]
 func TestAcceptance_ApplyCompletesWithinPolicyCountBounds(t *testing.T) {
-	for _, count := range []int{10, 50} {
-		t.Run("policy_count", func(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		count int
+	}{
+		{name: "one_policy", count: 1},
+		{name: "ten_policies", count: 10},
+		{name: "fifty_policies", count: 50},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			orgID := "org1"
-			policies := make([]user.Policy, count)
-			ids := make([]string, count)
+			policies := make([]user.Policy, tc.count)
+			ids := make([]string, tc.count)
 			for i := range policies {
 				p := acceptancePolicy(orgID, "bounded-"+string(rune('a'+i)))
 				p.Rate = float64(100 + i)

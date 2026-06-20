@@ -83,6 +83,7 @@ func TestLegacyCipherSuites(t *testing.T) {
 
 // Verifies: SYS-REQ-129, SW-REQ-116
 // SW-REQ-116:nominal:nominal
+// SW-REQ-116:error_handling:nominal
 // SW-REQ-116:error_handling:negative
 func TestResolveCipher(t *testing.T) {
 	testCases := []struct {
