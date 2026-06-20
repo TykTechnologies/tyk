@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-097
 func TestValidationResult_HasErrors(t *testing.T) {
 	result := ValidationResult{}
 	assert.False(t, result.HasErrors())
@@ -16,6 +17,7 @@ func TestValidationResult_HasErrors(t *testing.T) {
 	assert.True(t, result.HasErrors())
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-097
 func TestValidationResult_FirstError(t *testing.T) {
 	firstErr := errors.New("first")
 	secondErr := errors.New("second")
@@ -27,6 +29,7 @@ func TestValidationResult_FirstError(t *testing.T) {
 	assert.Equal(t, firstErr, result.FirstError())
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-097
 func TestValidationResult_ErrorStrings(t *testing.T) {
 	result := ValidationResult{
 		Errors: []error{
@@ -50,6 +53,7 @@ func runValidationTest(apiDef *APIDefinition, ruleSet ValidationRuleSet, expecte
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-097
 func TestRuleUniqueDataSourceNames_Validate(t *testing.T) {
 	ruleSet := ValidationRuleSet{
 		&RuleUniqueDataSourceNames{},
@@ -124,6 +128,7 @@ func TestRuleUniqueDataSourceNames_Validate(t *testing.T) {
 
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-097
 func TestRuleAtLeastEnableOneAuthConfig_Validate(t *testing.T) {
 	ruleSet := ValidationRuleSet{
 		&RuleAtLeastEnableOneAuthSource{},
@@ -220,6 +225,7 @@ func TestRuleAtLeastEnableOneAuthConfig_Validate(t *testing.T) {
 	))
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-097
 func TestRuleValidateIPList_Validate(t *testing.T) {
 	ruleSet := ValidationRuleSet{
 		&RuleValidateIPList{},
@@ -334,6 +340,7 @@ func TestRuleValidateIPList_Validate(t *testing.T) {
 	))
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-097
 func TestRuleValidateEnforceTimeout_Validate(t *testing.T) {
 	ruleSet := ValidationRuleSet{
 		&RuleValidateEnforceTimeout{},
@@ -417,6 +424,7 @@ func TestRuleValidateEnforceTimeout_Validate(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-097
 func TestRuleUpstreamAuth_Validate(t *testing.T) {
 	ruleSet := ValidationRuleSet{
 		&RuleUpstreamAuth{},
@@ -509,6 +517,7 @@ func TestRuleUpstreamAuth_Validate(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-097
 func TestRuleLoadBalancingTargets_Validate(t *testing.T) {
 	ruleSet := ValidationRuleSet{
 		&RuleLoadBalancingTargets{},

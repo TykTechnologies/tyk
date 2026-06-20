@@ -13,6 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestAPIDefinition_JsonRpcVersion(t *testing.T) {
 	t.Run("json-rpc version field marshaling", func(t *testing.T) {
 		api := APIDefinition{
@@ -52,6 +53,7 @@ func TestAPIDefinition_JsonRpcVersion(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestAPIDefinition_ApplicationProtocol(t *testing.T) {
 	t.Run("application protocol field marshaling", func(t *testing.T) {
 		api := APIDefinition{
@@ -107,6 +109,7 @@ func TestAPIDefinition_ApplicationProtocol(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestAPIDefinition_SetProtocol(t *testing.T) {
 	t.Run("sets transport and application protocol", func(t *testing.T) {
 		api := APIDefinition{}
@@ -165,6 +168,7 @@ func TestAPIDefinition_SetProtocol(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestAPIDefinition_MarkAsMCP(t *testing.T) {
 	t.Run("marks API as MCP", func(t *testing.T) {
 		api := APIDefinition{}
@@ -233,6 +237,7 @@ func TestAPIDefinition_MarkAsMCP(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestSchema(t *testing.T) {
 	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
 
@@ -250,6 +255,7 @@ func TestSchema(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestStringRegexMap(t *testing.T) {
 	var v StringRegexMap
 	assert.True(t, v.Empty())
@@ -261,6 +267,7 @@ func TestStringRegexMap(t *testing.T) {
 	assert.False(t, v.Empty())
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestRoutingTriggerOptions(t *testing.T) {
 	opts := NewRoutingTriggerOptions()
 
@@ -272,6 +279,7 @@ func TestRoutingTriggerOptions(t *testing.T) {
 	assert.Empty(t, opts.PayloadMatches)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestEncodeForDB(t *testing.T) {
 	t.Run("EncodeForDB persist schema objects from extended path", func(t *testing.T) {
 		spec := DummyAPI()
@@ -286,6 +294,7 @@ func TestEncodeForDB(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestDecodeFromDB(t *testing.T) {
 	t.Run("json schema validation middleware", func(t *testing.T) {
 		apiDef := DummyAPI()
@@ -318,6 +327,7 @@ func TestDecodeFromDB(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestSchemaGraphqlConfig(t *testing.T) {
 	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
 
@@ -338,6 +348,7 @@ func TestSchemaGraphqlConfig(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestAPIDefinition_DecodeFromDB_AuthDeprecation(t *testing.T) {
 	const authHeader = "authorization"
 
@@ -360,12 +371,14 @@ func TestAPIDefinition_DecodeFromDB_AuthDeprecation(t *testing.T) {
 
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestAPIDefinition_GenerateAPIID(t *testing.T) {
 	a := APIDefinition{}
 	a.GenerateAPIID()
 	assert.NotEmpty(t, a.APIID)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestAPIDefinition_GetScopeClaimName(t *testing.T) {
 	var (
 		scopeName        = "scope"
@@ -456,6 +469,7 @@ func TestAPIDefinition_GetScopeClaimName(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestAPIDefinition_GetScopeToPolicyMapping(t *testing.T) {
 	var (
 		scopeToPolicyMapping        = map[string]string{"jwtClaim": "pol1"}
@@ -547,6 +561,7 @@ func TestAPIDefinition_GetScopeToPolicyMapping(t *testing.T) {
 
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestJSVMEventHandlerConf_Scan(t *testing.T) {
 	jsvmEventMeta := map[string]any{
 		"disabled": true,
@@ -569,6 +584,7 @@ func TestJSVMEventHandlerConf_Scan(t *testing.T) {
 	assert.Equal(t, expected, jsvmEventConf)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestLogEventHandlerConf_Scan(t *testing.T) {
 	logEventMeta := map[string]any{
 		"disabled": true,
@@ -587,6 +603,7 @@ func TestLogEventHandlerConf_Scan(t *testing.T) {
 	assert.Equal(t, expected, logEventConf)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestAPIDefinition_IsChildAPI(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -641,6 +658,7 @@ func TestAPIDefinition_IsChildAPI(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestAPIDefinition_IsBaseAPI(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -720,6 +738,7 @@ func TestAPIDefinition_IsBaseAPI(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestAPIDefinition_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 	t.Run("basic error override", func(t *testing.T) {
 		jsonData := []byte(`{
@@ -972,6 +991,7 @@ func TestAPIDefinition_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestAPIDefinition_IsBaseAPIWithVersioning(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1060,6 +1080,7 @@ func TestAPIDefinition_IsBaseAPIWithVersioning(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestVersionDefinition_ResolvedDefault(t *testing.T) {
 	tests := []struct {
 		name     string

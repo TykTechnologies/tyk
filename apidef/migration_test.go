@@ -129,6 +129,7 @@ func oldTestAPI() APIDefinition {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 	base := oldTestAPI()
 	versions, err := base.MigrateVersioning()
@@ -182,6 +183,7 @@ func TestAPIDefinition_MigrateVersioning(t *testing.T) {
 	assert.Equal(t, expectedVersion, versions[0])
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_MigrateVersioning_Disabled(t *testing.T) {
 	base := oldTestAPI()
 	base.VersionData.NotVersioned = true
@@ -216,6 +218,7 @@ func TestAPIDefinition_MigrateVersioning_Disabled(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_MigrateVersioning_DefaultEmpty(t *testing.T) {
 	base := oldTestAPI()
 	base.VersionData.DefaultVersion = ""
@@ -282,6 +285,7 @@ func TestAPIDefinition_MigrateVersioning_DefaultEmpty(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_MigrateVersioning_Expires(t *testing.T) {
 	t.Run("version enabled", func(t *testing.T) {
 		base := oldTestAPI()
@@ -305,6 +309,7 @@ func TestAPIDefinition_MigrateVersioning_Expires(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_MigrateVersioning_OverrideTarget(t *testing.T) {
 	t.Run("base", func(t *testing.T) {
 		base := oldTestAPI()
@@ -333,6 +338,7 @@ func TestAPIDefinition_MigrateVersioning_OverrideTarget(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_MigrateVersioning_StripPath(t *testing.T) {
 	old := func() APIDefinition {
 		return APIDefinition{
@@ -381,6 +387,7 @@ func TestAPIDefinition_MigrateVersioning_StripPath(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_MigrateEndpointMeta(t *testing.T) {
 	const mockResponse = "mock response"
 	const path = "/mock"
@@ -491,6 +498,7 @@ func TestAPIDefinition_MigrateEndpointMeta(t *testing.T) {
 	assert.Equal(t, expectedMockResponse, api.VersionData.Versions[""].ExtendedPaths.MockResponse)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_MigrateAuthConfigNames(t *testing.T) {
 	base := oldTestAPI()
 	_, err := base.Migrate()
@@ -500,6 +508,7 @@ func TestAPIDefinition_MigrateAuthConfigNames(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_MigrateAuthentication(t *testing.T) {
 	base := oldTestAPI()
 	_, err := base.Migrate()
@@ -509,6 +518,7 @@ func TestAPIDefinition_MigrateAuthentication(t *testing.T) {
 	assert.Contains(t, base.AuthConfigs, OAuthType)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_isAuthTokenEnabled(t *testing.T) {
 	api := APIDefinition{UseKeylessAccess: false}
 	assert.True(t, api.isAuthTokenEnabled())
@@ -522,6 +532,7 @@ func TestAPIDefinition_isAuthTokenEnabled(t *testing.T) {
 	assert.True(t, api.isAuthTokenEnabled())
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_deleteAuthConfigsNotUsed(t *testing.T) {
 	api := APIDefinition{
 		UseKeylessAccess: true,
@@ -541,6 +552,7 @@ func TestAPIDefinition_deleteAuthConfigsNotUsed(t *testing.T) {
 	assert.Len(t, api.AuthConfigs, 0)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_migrateCustomPluginAuth(t *testing.T) {
 	testCases := []struct {
 		name           string
@@ -572,6 +584,7 @@ func TestAPIDefinition_migrateCustomPluginAuth(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestSetDisabledFlags(t *testing.T) {
 	apiDef := APIDefinition{
 		CustomMiddleware: MiddlewareSection{
@@ -695,6 +708,7 @@ func TestSetDisabledFlags(t *testing.T) {
 	assert.EqualValues(t, expectedAPIDef.EventHandlers, apiDef.EventHandlers)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_migrateIDExtractor(t *testing.T) {
 	base := oldTestAPI()
 	_, err := base.Migrate()
@@ -703,6 +717,7 @@ func TestAPIDefinition_migrateIDExtractor(t *testing.T) {
 	assert.True(t, base.CustomMiddleware.IdExtractor.Disabled)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_migratePluginConfigData(t *testing.T) {
 	base := oldTestAPI()
 	_, err := base.Migrate()
@@ -711,6 +726,7 @@ func TestAPIDefinition_migratePluginConfigData(t *testing.T) {
 	assert.True(t, base.ConfigDataDisabled)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_migrateScopeToPolicy(t *testing.T) {
 	var (
 		scopeName            = "scope"
@@ -754,6 +770,7 @@ func TestAPIDefinition_migrateScopeToPolicy(t *testing.T) {
 
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_migrateResponseProcessors(t *testing.T) {
 	base := oldTestAPI()
 	_, err := base.Migrate()
@@ -762,6 +779,7 @@ func TestAPIDefinition_migrateResponseProcessors(t *testing.T) {
 	assert.Empty(t, base.ResponseProcessors)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_migrateGlobalRateLimit(t *testing.T) {
 	t.Run("per=0,rate=0", func(t *testing.T) {
 		base := oldTestAPI()
@@ -800,6 +818,7 @@ func TestAPIDefinition_migrateGlobalRateLimit(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_migrateIPAccessControl(t *testing.T) {
 	t.Run("whitelisting", func(t *testing.T) {
 		t.Run("EnableIpWhitelisting=true, no whitelist", func(t *testing.T) {
@@ -875,6 +894,7 @@ func TestAPIDefinition_migrateIPAccessControl(t *testing.T) {
 
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_MigrateCachePlugin(t *testing.T) {
 	versionInfo := VersionInfo{
 		UseExtendedPaths: true,
@@ -918,6 +938,7 @@ func TestAPIDefinition_MigrateCachePlugin(t *testing.T) {
 	assert.Equal(t, expectedAdvCacheMethods, old.VersionData.Versions[""].ExtendedPaths.AdvanceCacheConfig)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestAPIDefinition_MigrateCachePlugin_MultipleMethods(t *testing.T) {
 	tests := []struct {
 		name string
@@ -1120,6 +1141,7 @@ func TestAPIDefinition_MigrateCachePlugin_MultipleMethods(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-085
 func TestCreateAdvancedCacheConfig(t *testing.T) {
 	tests := []struct {
 		name      string

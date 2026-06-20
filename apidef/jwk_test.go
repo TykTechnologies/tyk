@@ -7,6 +7,7 @@ import (
 	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-080
 func TestJWK_GetCacheTimeoutSeconds(t *testing.T) {
 	tests := []struct {
 		name              string

@@ -228,6 +228,7 @@ var testData = []testWSDLInput{
 	},
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-084
 func TestToAPIDefinition_WSDL(t *testing.T) {
 	for _, input := range testData {
 		wsdl_imp := &WSDLDef{}

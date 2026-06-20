@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-082, SW-REQ-083
 func TestToAPIDefinition_Swagger(t *testing.T) {
 	imp, err := GetImporterForSource(SwaggerSource)
 	if err != nil {
