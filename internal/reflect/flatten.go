@@ -5,9 +5,11 @@ import (
 	"reflect"
 )
 
+// SW-REQ-065
 // FlatMap is alias of map[string]any.
 type FlatMap map[string]any
 
+// SW-REQ-065
 // Flatten transforms deep map to flat map.
 // The numeric types are coalesced to float64.
 func Flatten(data map[string]any) (flatmap FlatMap, err error) {
@@ -21,6 +23,7 @@ func Flatten(data map[string]any) (flatmap FlatMap, err error) {
 	return
 }
 
+// SW-REQ-065
 // unlike maps.Flatten, this flatten coalesces numeric types to a float64 value.
 // this is used in yaml decoding to map[]any as a numeric type.
 func flatten(result FlatMap, prefix string, v reflect.Value) (err error) {
@@ -67,6 +70,7 @@ func flatten(result FlatMap, prefix string, v reflect.Value) (err error) {
 	return nil
 }
 
+// SW-REQ-065
 func flattenMap(result FlatMap, prefix string, v reflect.Value) (err error) {
 	for _, k := range v.MapKeys() {
 		if k.Kind() == reflect.Interface {
@@ -83,6 +87,7 @@ func flattenMap(result FlatMap, prefix string, v reflect.Value) (err error) {
 	return nil
 }
 
+// SW-REQ-065
 func flattenSliceArray(result FlatMap, prefix string, v reflect.Value) (err error) {
 	prefix = prefix + "."
 	for i := 0; i < v.Len(); i++ {
@@ -94,6 +99,7 @@ func flattenSliceArray(result FlatMap, prefix string, v reflect.Value) (err erro
 	return nil
 }
 
+// SW-REQ-065
 func flattenStruct(result FlatMap, prefix string, v reflect.Value) (err error) {
 	prefix = prefix + "."
 	ty := v.Type()

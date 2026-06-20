@@ -17,6 +17,8 @@ type subStruct struct {
 	SubMap map[string]string
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-065
+// SW-REQ-065:boundary:nominal
 func Test_IsEmpty(t *testing.T) {
 	v1 := testStruct{}
 	v2 := testStruct{Array: make([]string, 0), Map: make(map[string]string), SubStruct: &subStruct{}}
@@ -33,6 +35,9 @@ func Test_IsEmpty(t *testing.T) {
 	assert.False(t, IsEmpty(v6))
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-065
+// SW-REQ-065:nominal:nominal
+// SW-REQ-065:error_handling:negative
 func Test_Cast(t *testing.T) {
 	t.Run("int", func(t *testing.T) {
 		result, err := Cast[int](2)

@@ -22,6 +22,7 @@
 <!-- documents SW-REQ-061 -->
 <!-- documents SW-REQ-062 -->
 <!-- documents SW-REQ-063 -->
+<!-- documents SW-REQ-065 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -36,6 +37,7 @@ extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint
 helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes,
 OAS deprecated-wrapper conversion shapes, OAS Tyk streaming extension shape, OAS event-handler helper shapes,
 OAS server-regeneration helper shapes,
+internal reflection support helper behavior,
 custom middleware definition enablement classification, OAS extension header
 name/value helper shapes, and OAS extension error-override helper shapes without silent
 data-shape drift.
@@ -266,3 +268,15 @@ execution, request URL rewriting at runtime, request-context extraction,
 session metadata lookup, middleware execution, API import, full OAS conversion,
 route generation, gateway request admission, upstream request dispatch, or
 final client-visible routing behavior.
+
+`SW-REQ-065` owns the concrete `internal/reflect` support helpers used by
+API-definition support model flows. Its evidence covers Clone deep-copy wrapper
+behavior, OAS empty value classification for zero structs, empty maps/slices,
+nil/empty pointers and bool pointers, JSON-compatible Cast success and
+unmarshalable input errors, Flatten for nested maps/slices/structs, nils,
+strings, bools, numeric coalescing, unsupported value errors, non-string
+map-key rejection, and deterministic repeated helper results. This evidence
+does not claim arbitrary reflection correctness, upstream clone library
+correctness beyond wrapper behavior under test, full OAS conversion, API
+import, route generation, gateway request admission, middleware execution,
+persistence, or client-visible runtime behavior.

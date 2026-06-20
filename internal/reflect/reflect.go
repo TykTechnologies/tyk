@@ -6,11 +6,13 @@ import (
 	"reflect"
 )
 
+// SW-REQ-065
 // IsEmpty checks whether a field should be set to empty and omitted from OAS JSON.
 func IsEmpty(i interface{}) bool {
 	return IsZero(reflect.ValueOf(i))
 }
 
+// SW-REQ-065
 // IsZero is a customized implementation of reflect.Value.IsZero. The built-in function accepts slice, map and pointer fields
 // having 0 length as not zero. In OAS, we would like them to be counted as empty so we separated slice, map and pointer to
 // different cases.
@@ -63,6 +65,7 @@ func IsZero(v reflect.Value) bool {
 	}
 }
 
+// SW-REQ-065
 // Cast converts a value of type any to a specified type T.
 // It does this by first marshaling the source value to JSON,
 // and then unmarshaling the JSON byte slice into the destination type T.

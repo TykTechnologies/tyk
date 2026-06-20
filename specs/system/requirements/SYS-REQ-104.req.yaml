@@ -5,7 +5,7 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the model shall always satisfy !api_definition_support_requested | api_definition_support_shape_preserved
-description: Gateway API definition support model helpers shall preserve typed health-check wire values, deterministic host-list access behavior, error-override matcher/template state, embedded Classic API definition schema data, OAS helper path/server shapes, OAS root extension helper shapes, OAS server model helper shapes, OAS URL rewrite helper shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes, OAS deprecated-wrapper conversion shapes, OAS Tyk streaming extension shapes, OAS event-handler helper shapes, OAS server-regeneration helper shapes, custom middleware definition enablement classification, OAS extension header name/value helper shapes, and OAS extension error-override helper shapes so API definition, RPC, and configuration flows can exchange these helper shapes without silent data-shape drift.
+description: Gateway API definition support model helpers shall preserve typed health-check wire values, deterministic host-list access behavior, error-override matcher/template state, embedded Classic API definition schema data, OAS helper path/server shapes, OAS root extension helper shapes, OAS server model helper shapes, OAS URL rewrite helper shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes, OAS deprecated-wrapper conversion shapes, OAS Tyk streaming extension shapes, OAS event-handler helper shapes, OAS server-regeneration helper shapes, internal reflection support helper behavior, custom middleware definition enablement classification, OAS extension header name/value helper shapes, and OAS extension error-override helper shapes so API definition, RPC, and configuration flows can exchange these helper shapes without silent data-shape drift.
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -32,23 +32,23 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-20T03:06:20Z"
-        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-063 is scoped to local apidef/oas URL rewrite data-shape and Classic metadata conversion helpers: Classic URL rewrite metadata Fill and ExtractTo behavior; header, query, path, session metadata, request body, and request context trigger rule mapping; empty trigger and operation rewrite omission; deterministic input-kind and name sorting; URL rewrite input validation, stable indexes, and invalid-value errors; and operation-level fill/extract hooks. Focused apidef/oas tests passed with race, go vet, and go build. This approval does not claim gateway route matching, regular-expression execution, request URL rewriting at runtime, request-context extraction, session metadata lookup, middleware execution, API import, full OAS conversion, route generation, gateway request admission, upstream request dispatch, or final client-visible routing behavior.'
-        fingerprint: sha256:28f36a03519b8cf61b162bb530b49b61b85ead28c9de79532f2251cd7308d386
+        reviewed_at: "2026-06-20T03:21:18Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-065 is scoped to local internal/reflect support helper behavior used by API-definition support model flows: Clone wrapper deep-copy behavior, OAS-style empty/zero classification, JSON-compatible Cast conversion and unmarshalable input errors, and Flatten conversion for nested maps/slices/arrays/structs/nils/strings/bools/numerics with numeric coalescing, unsupported-value errors, non-string map-key rejection, and deterministic repeated helper results. Focused internal/reflect tests passed with race, go vet, and go build. This approval does not claim arbitrary reflection correctness, upstream clone library correctness beyond wrapper behavior under test, full OAS conversion, API import, route generation, gateway request admission, middleware execution, persistence, or client-visible runtime behavior.'
+        fingerprint: sha256:ab4497b8be9e3447f8c597ef6de567cc24dfb506e6d6d9fbdadcb54d958860e2
         ai_generated: false
-    gaps_reviewed_at: "2026-06-20T03:06:20.48096Z"
+    gaps_reviewed_at: "2026-06-20T03:21:27.021894Z"
     gaps_reviewed_by: human:buger
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-104|api_definition_support_shape_preserved
           reviewer: human:buger
-          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-104''s api_definition_support_shape_preserved variable is decomposed across the current API-definition support helper children including SW-REQ-063 for local apidef/oas URL rewrite helper behavior: Classic URL rewrite metadata mapping, trigger rule option mapping, empty rewrite omission, deterministic sorting, input validation and errors, and operation-level fill/extract hooks. This review is limited to these support helpers and does not claim gateway route matching, regular-expression execution, runtime URL rewriting, middleware execution, API import, full OAS conversion, gateway request admission, upstream request dispatch, or final client-visible routing behavior.'
-          reviewed_at: "2026-06-20T03:06:20.48096Z"
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-104''s api_definition_support_shape_preserved variable is decomposed across the current API-definition support helper children including SW-REQ-065 for local internal/reflect helper behavior: Clone wrapper deep-copy behavior, OAS-style empty/zero classification, JSON-compatible Cast conversion and unmarshalable input errors, Flatten conversion for nested maps/slices/arrays/structs/nils/strings/bools/numerics with numeric coalescing, unsupported-value errors, non-string map-key rejection, and deterministic repeated helper results. This review is limited to these support helpers and does not claim arbitrary reflection correctness, upstream clone library correctness beyond wrapper behavior under test, full OAS conversion, API import, route generation, gateway request admission, middleware execution, persistence, or client-visible runtime behavior.'
+          reviewed_at: "2026-06-20T03:21:27.021894Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-19T21:10:22Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-20T03:06:20Z"
+    last_modified_at: "2026-06-20T03:21:18Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -159,4 +159,9 @@ lifecycle:
           from: approved
           to: approved
           reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T03:05:53Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-063 is scoped to local apidef/oas URL rewrite data-shape and Classic metadata conversion helpers: Classic URL rewrite metadata Fill and ExtractTo behavior; header, query, path, session metadata, request body, and request context trigger rule mapping; empty trigger and operation rewrite omission; deterministic input-kind and name sorting; URL rewrite input validation, stable indexes, and invalid-value errors; and operation-level fill/extract hooks. Focused apidef/oas tests passed. This approval does not claim gateway route matching, regular-expression execution, request URL rewriting at runtime, request-context extraction, session metadata lookup, middleware execution, API import, full OAS conversion, route generation, gateway request admission, upstream request dispatch, or final client-visible routing behavior.")'
+          changed_by: human:buger
+        - date: "2026-06-20T03:21:18Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T03:06:20Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-063 is scoped to local apidef/oas URL rewrite data-shape and Classic metadata conversion helpers: Classic URL rewrite metadata Fill and ExtractTo behavior; header, query, path, session metadata, request body, and request context trigger rule mapping; empty trigger and operation rewrite omission; deterministic input-kind and name sorting; URL rewrite input validation, stable indexes, and invalid-value errors; and operation-level fill/extract hooks. Focused apidef/oas tests passed with race, go vet, and go build. This approval does not claim gateway route matching, regular-expression execution, request URL rewriting at runtime, request-context extraction, session metadata lookup, middleware execution, API import, full OAS conversion, route generation, gateway request admission, upstream request dispatch, or final client-visible routing behavior.")'
           changed_by: human:buger
