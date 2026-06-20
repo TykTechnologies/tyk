@@ -1,0 +1,14 @@
+component: configuration_utility
+no_interface:
+    declared: true
+    reason: The config/util.go file is exercised as local configuration utility helper support; full gateway startup behavior, storage connectivity, Redis dialing, gateway request admission, and final request handling are outside this local component boundary.
+variables:
+    - name: configuration_utility_operation_requested
+      type: bool
+      direction: input
+      description: Gateway code or tests request local configuration utility behavior such as file discovery, default cloning, environment fallback, or host address assembly.
+
+    - name: configuration_utility_result_determined
+      type: bool
+      direction: output
+      description: Configuration utility support returns the discovered config path, environment-filled defaults, cloned defaults with environment overrides, assembled host addresses, or explicit local missing-file errors.

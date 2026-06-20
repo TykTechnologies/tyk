@@ -177,6 +177,8 @@ project:
             - config/private_test.go
             - config/rate_limit.go
             - config/rate_limit_test.go
+            - config/util.go
+            - config/util_test.go
             - apidef/importer/blueprint.go
             - apidef/importer/blueprint_reqproof_test.go
             - apidef/importer/importer.go

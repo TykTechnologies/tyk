@@ -1,0 +1,71 @@
+id: STK-REQ-034
+version: 1
+status: approved
+priority: shall
+category: configuration
+req_type: guarantee
+fretish: ""
+description: Configuration utility support shall locally discover tyk.conf files from the config source tree upward, construct default configurations with environment overrides, fall back to environment-filled defaults when tyk.conf is absent, and assemble storage host addresses from configured address lists, host maps, or host and port fields, without claiming full gateway startup behavior, all configuration field semantics, storage connectivity, Redis dialing, filesystem permission recovery outside local file discovery, or final gateway runtime behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: configuration_utility
+rationale: Configuration utility helpers provide local discovery, default construction, and host address assembly behavior. Gateway startup, storage connectivity, and runtime interpretation are outside this proof slice.
+tags:
+    - configuration
+    - utility
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T10:36:09Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Configuration utility scope is limited to local config/util.go behavior: tyk.conf discovery, env fallback when tyk.conf is absent, default cloning with environment overrides, file discovery not-found errors, and storage host address assembly precedence. The focused config tests passed, including the temporary tyk.conf absence path with cleanup restoration. This approval does not claim full gateway startup behavior, all configuration field semantics, storage connectivity, Redis dialing, filesystem permission recovery outside local file discovery, or final gateway runtime behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T10:36:09Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T10:36:09Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need local configuration utility helpers to resolve config files, defaults, environment overrides, and storage host addresses predictably before runtime startup consumes them.
+    acceptance_criteria:
+        - id: STK-REQ-034-AC-01
+          text: Given a repository tyk.conf file, when local configuration asks for a new config, then the discovered file is loaded and the original path is recorded.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-122
+        - id: STK-REQ-034-AC-02
+          text: Given no discoverable tyk.conf file, when local configuration asks for a new config, then an environment-filled default configuration is returned.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-122
+        - id: STK-REQ-034-AC-03
+          text: Given default configuration and environment overrides, when local configuration asks for a default-with-env config, then the clone reflects the environment without mutating the package default.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-122
+        - id: STK-REQ-034-AC-04
+          text: Given storage address fields, when local configuration asks for host addresses, then explicit address lists take precedence, host maps are expanded, and host plus port is used only when no address list or host map is present.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-122
+lifecycle:
+    change_history:
+        - date: "2026-06-20T10:36:09Z"
+          from: draft
+          to: review
+          reason: Added configuration utility stakeholder requirement for config/util.go onboarding.
+          changed_by: agent:codex

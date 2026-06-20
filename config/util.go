@@ -12,6 +12,7 @@ import (
 
 // New produces a new config object by parsing
 // the default configuration for the values.
+// SW-REQ-109
 func New() (*Config, error) {
 	cfg := new(Config)
 
@@ -36,6 +37,7 @@ func New() (*Config, error) {
 
 // NewDefaultWithEnv gives a deep clone of the Default configuration and
 // fills it from environment provided.
+// SW-REQ-109
 func NewDefaultWithEnv() (*Config, error) {
 	cfg := new(Config)
 
@@ -55,6 +57,7 @@ func NewDefaultWithEnv() (*Config, error) {
 	return cfg, nil
 }
 
+// SW-REQ-109
 func findFile(filename string) (string, error) {
 	// Get folder in which current file lives
 	_, testFile, _, _ := runtime.Caller(0)
@@ -86,6 +89,7 @@ func findFile(filename string) (string, error) {
 }
 
 // HostAddrs returns a sanitized list of hosts to connect to.
+// SW-REQ-109
 func (config *StorageOptionsConf) HostAddrs() (addrs []string) {
 	if len(config.Addrs) != 0 {
 		addrs = config.Addrs

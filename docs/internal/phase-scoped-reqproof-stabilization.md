@@ -44,8 +44,8 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 157/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
-| `mcdc_coverage` | 52/418 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
+| `verification_scope_complete` | 158/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `mcdc_coverage` | 52/421 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
 
@@ -429,6 +429,16 @@ fixed or to hide them from the current strict audit.
   unsupported non-serializable in-memory Go values, or final gateway runtime
   behavior. It moves the visible production coverage baseline from 156/447 to
   157/447.
+- `SW-REQ-109` onboarded `config/util.go` with a new configuration utility
+  stakeholder/system/software chain and focused config tests for local utility
+  behavior: discovered `tyk.conf` loading, environment fallback when the config
+  file is absent, default cloning with environment overrides, file discovery
+  success and not-found errors, and storage host address assembly precedence.
+  This increment is scoped to local configuration utility helper support and
+  does not claim full gateway startup behavior, all configuration field
+  semantics, storage connectivity, Redis dialing, filesystem permission
+  recovery outside local file discovery, or final gateway runtime behavior. It
+  moves the visible production coverage baseline from 157/447 to 158/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

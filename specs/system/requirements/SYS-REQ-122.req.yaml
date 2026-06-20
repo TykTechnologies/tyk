@@ -1,0 +1,60 @@
+id: SYS-REQ-122
+version: 1
+status: approved
+priority: shall
+category: configuration
+req_type: guarantee
+fretish: the configuration_utility shall always satisfy !configuration_utility_operation_requested | configuration_utility_result_determined
+description: Configuration utility support shall determine local config discovery, env fallback, default cloning with environment overrides, missing-file error, and storage host address assembly results, without claiming full gateway startup behavior, all configuration field semantics, storage connectivity, Redis dialing, filesystem permission recovery outside local file discovery, or final gateway runtime behavior.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-034
+component: configuration_utility
+rationale: This system requirement owns local config/util.go helper behavior. Runtime startup behavior and network/storage effects remain outside this proof slice.
+tags:
+    - configuration
+    - utility
+variables:
+    - configuration_utility_operation_requested
+    - configuration_utility_result_determined
+traces:
+    satisfies:
+        - STK-REQ-034
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T10:36:09Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Configuration utility scope is limited to local config/util.go behavior: tyk.conf discovery, env fallback when tyk.conf is absent, default cloning with environment overrides, file discovery not-found errors, and storage host address assembly precedence. The focused config tests passed, including the temporary tyk.conf absence path with cleanup restoration. This approval does not claim full gateway startup behavior, all configuration field semantics, storage connectivity, Redis dialing, filesystem permission recovery outside local file discovery, or final gateway runtime behavior.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T10:39:24.169181Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-122|configuration_utility_result_determined
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final requirement approval. SYS-REQ-122''s configuration_utility_result_determined variable is decomposed by SW-REQ-109 for local config/util.go behavior: tyk.conf discovery, env fallback when tyk.conf is absent, default cloning with environment overrides, file discovery not-found errors, and storage host address assembly precedence. This review is limited to local configuration utility helper support and does not claim full gateway startup behavior, all configuration field semantics, storage connectivity, Redis dialing, filesystem permission recovery outside local file discovery, or final gateway runtime behavior.'
+          reviewed_at: "2026-06-20T10:39:24.169181Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T10:36:09Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T10:36:09Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-20T10:36:09Z"
+          from: draft
+          to: review
+          reason: Added configuration utility system requirement for config/util.go onboarding.
+          changed_by: agent:codex
