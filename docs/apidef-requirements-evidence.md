@@ -11,6 +11,7 @@
 <!-- documents SW-REQ-047 -->
 <!-- documents SW-REQ-051 -->
 <!-- documents SW-REQ-052 -->
+<!-- documents SW-REQ-053 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -21,9 +22,9 @@ admission, or the full API definition lifecycle.
 health-check wire values, host-list access behavior, and error-override helper
 state, embedded Classic API definition schema data, OAS path/server helper
 shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
-extraction shapes, custom middleware definition enablement classification, OAS
-extension header name/value helper shapes, and OAS extension error-override
-helper shapes without silent
+extraction shapes, OAS internal endpoint helper shapes, custom middleware
+definition enablement classification, OAS extension header name/value helper
+shapes, and OAS extension error-override helper shapes without silent
 data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
@@ -115,3 +116,13 @@ schema validation, response selection, mock-response middleware execution, API
 import, route generation, request matching, gateway request admission, non-nil
 schema references with nil schema values, or final client-visible response
 behavior.
+
+`SW-REQ-053` owns the concrete `apidef/oas` internal endpoint shape mapping
+helper used by API-definition extension models. Its evidence covers Classic
+Disabled to OAS Enabled inversion, OAS Enabled to Classic Disabled inversion
+while preserving endpoint path and method metadata, nil/no-op operation
+extraction, enabled operation filling, disabled empty internal configuration
+omission, and deterministic repeated Fill/ExtractTo behavior. This evidence
+does not claim API import, route generation, request matching, gateway request
+admission, internal-looping behavior, middleware execution, access-control
+enforcement, or final client-visible routing behavior.

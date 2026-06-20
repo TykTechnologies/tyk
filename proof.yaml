@@ -158,6 +158,8 @@ project:
             - apidef/oas/example_reqproof_test.go
             - apidef/oas/header.go
             - apidef/oas/header_test.go
+            - apidef/oas/internal.go
+            - apidef/oas/internal_reqproof_test.go
             - apidef/oas/mcp_primitive.go
             - apidef/oas/mcp_primitive_reqproof_test.go
             - apidef/oas/time.go

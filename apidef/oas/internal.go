@@ -2,6 +2,7 @@ package oas
 
 import "github.com/TykTechnologies/tyk/apidef"
 
+// SW-REQ-053
 // Internal holds the endpoint configuration, configuring the endpoint for internal requests.
 // Tyk classic API definition: `version_data.versions...extended_paths.internal[*]`.
 type Internal struct {
@@ -9,16 +10,19 @@ type Internal struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 }
 
+// SW-REQ-053
 // Fill fills *Internal receiver with data from apidef.InternalMeta.
 func (i *Internal) Fill(meta apidef.InternalMeta) {
 	i.Enabled = !meta.Disabled
 }
 
+// SW-REQ-053
 // ExtractTo fills *apidef.InternalMeta from *Internal.
 func (i *Internal) ExtractTo(meta *apidef.InternalMeta) {
 	meta.Disabled = !i.Enabled
 }
 
+// SW-REQ-053
 func (s *OAS) fillInternal(metas []apidef.InternalMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
@@ -35,6 +39,7 @@ func (s *OAS) fillInternal(metas []apidef.InternalMeta) {
 	}
 }
 
+// SW-REQ-053
 func (o *Operation) extractInternalTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.Internal == nil {
 		return
