@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -10,6 +11,8 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-044
+// SW-REQ-044:nominal:nominal
 func TestNewVisitor(t *testing.T) {
 	visitor := NewVisitor()
 
@@ -20,6 +23,8 @@ func TestNewVisitor(t *testing.T) {
 	assert.Empty(t, visitor.visited)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-044
+// SW-REQ-044:nominal:nominal
 func TestVisitor_AddManipulation(t *testing.T) {
 	visitor := NewVisitor()
 
@@ -30,6 +35,9 @@ func TestVisitor_AddManipulation(t *testing.T) {
 	assert.Len(t, visitor.manipulations, 1)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-044
+// SW-REQ-044:nominal:nominal
+// SW-REQ-044:determinism:nominal
 func TestVisitor_applyManipulations(t *testing.T) {
 	visitor := NewVisitor()
 
@@ -55,6 +63,9 @@ func TestVisitor_applyManipulations(t *testing.T) {
 	assert.Equal(t, schemaTitle, schema.Title)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-044
+// SW-REQ-044:boundary:boundary
+// SW-REQ-044:idempotency:nominal
 func TestVisitor_isVisited_and_resetVisited(t *testing.T) {
 	visitor := NewVisitor()
 	schema := openapi3.NewSchema()
@@ -67,6 +78,8 @@ func TestVisitor_isVisited_and_resetVisited(t *testing.T) {
 	assert.False(t, visitor.isVisited(schema))
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-044
+// SW-REQ-044:nominal:nominal
 func TestVisitor_ProcessOAS_Components(t *testing.T) {
 	schema1 := openapi3.NewSchema()
 	schema2 := openapi3.NewSchema()
@@ -98,10 +111,30 @@ func TestVisitor_ProcessOAS_Components(t *testing.T) {
 	assert.Equal(t, schemaDesc, schema2.Description)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-044
+// SW-REQ-044:nominal:nominal
+// SW-REQ-044:boundary:boundary
 func TestVisitor_ProcessOAS_Paths(t *testing.T) {
 	paramSchema := openapi3.NewSchema()
 	reqBodySchema := openapi3.NewSchema()
 	respSchema := openapi3.NewSchema()
+	headerSchema := openapi3.NewSchema()
+	callbackSchema := openapi3.NewSchema()
+
+	callback := openapi3.NewCallback()
+	callback.Set("/callback", &openapi3.PathItem{
+		Post: &openapi3.Operation{
+			RequestBody: &openapi3.RequestBodyRef{
+				Value: &openapi3.RequestBody{
+					Content: openapi3.Content{
+						header.ApplicationJSON: &openapi3.MediaType{
+							Schema: openapi3.NewSchemaRef("", callbackSchema),
+						},
+					},
+				},
+			},
+		},
+	})
 
 	pathItem := &openapi3.PathItem{
 		Get: &openapi3.Operation{
@@ -128,14 +161,27 @@ func TestVisitor_ProcessOAS_Paths(t *testing.T) {
 							Schema: openapi3.NewSchemaRef("", respSchema),
 						},
 					},
+					Headers: openapi3.Headers{
+						"X-Test": &openapi3.HeaderRef{
+							Value: &openapi3.Header{
+								Parameter: openapi3.Parameter{
+									Schema: openapi3.NewSchemaRef("", headerSchema),
+								},
+							},
+						},
+					},
 				},
 				}),
 			),
+			Callbacks: openapi3.Callbacks{
+				"onEvent": &openapi3.CallbackRef{Value: callback},
+			},
 		},
 	}
 
 	paths := openapi3.NewPaths()
 	paths.Set("/test", pathItem)
+	paths.Set("/nil", nil)
 
 	doc := &oas.OAS{
 		T: openapi3.T{
@@ -154,12 +200,18 @@ func TestVisitor_ProcessOAS_Paths(t *testing.T) {
 
 	visitor.ProcessOAS(doc)
 
-	assert.Equal(t, 3, visitCount)
+	assert.Equal(t, 5, visitCount)
 	assert.Equal(t, schemaDesc, paramSchema.Description)
 	assert.Equal(t, schemaDesc, reqBodySchema.Description)
 	assert.Equal(t, schemaDesc, respSchema.Description)
+	assert.Equal(t, schemaDesc, headerSchema.Description)
+	assert.Equal(t, schemaDesc, callbackSchema.Description)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-044
+// SW-REQ-044:nominal:nominal
+// SW-REQ-044:boundary:boundary
+// SW-REQ-044:nil_safety:negative
 func TestVisitor_processSchema(t *testing.T) {
 	rootSchema := openapi3.NewSchema()
 	propSchema := openapi3.NewSchema()
@@ -223,6 +275,9 @@ func TestVisitor_processSchema(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-044
+// SW-REQ-044:encoding_safety:nominal
+// SW-REQ-044:boundary:boundary
 func TestVisitor_regexpManipulations(t *testing.T) {
 	tcTransformUnicodeEscapesToRE2 := []struct {
 		name     string
@@ -352,6 +407,18 @@ func TestVisitor_regexpManipulations(t *testing.T) {
 			})
 		}
 	})
+}
+
+// Verifies: SYS-REQ-104, SW-REQ-044
+// SW-REQ-044:encoding_safety:nominal
+// SW-REQ-044:error_handling:negative
+// SW-REQ-044:nil_safety:negative
+func TestRestoreUnicodeEscapesInError(t *testing.T) {
+	assert.NoError(t, RestoreUnicodeEscapesInError(nil))
+
+	err := RestoreUnicodeEscapesInError(errors.New("pattern uses \\x{0041}"))
+
+	assert.EqualError(t, err, "pattern uses \\u0041")
 }
 
 func resetVisitor(visitor *Visitor) {

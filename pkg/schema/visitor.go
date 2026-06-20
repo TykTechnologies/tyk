@@ -15,6 +15,7 @@ var (
 	re2Regex     = regexp.MustCompile(`\\x\{([0-9a-fA-F]{4})}`)
 )
 
+// SW-REQ-044
 func NewVisitor() *Visitor {
 	return &Visitor{
 		manipulations: make(Manipulations, 0),
@@ -31,10 +32,12 @@ type Visitor struct {
 	visited map[*openapi3.Schema]bool
 }
 
+// SW-REQ-044
 func (v *Visitor) AddSchemaManipulation(manipulation Manipulation) {
 	v.manipulations = append(v.manipulations, manipulation)
 }
 
+// SW-REQ-044
 func (v *Visitor) ProcessOAS(doc *oas.OAS) {
 	if doc.Components != nil && doc.Components.Schemas != nil {
 		for _, schemaRef := range doc.Components.Schemas {
@@ -47,6 +50,7 @@ func (v *Visitor) ProcessOAS(doc *oas.OAS) {
 	}
 }
 
+// SW-REQ-044
 func (v *Visitor) ProcessSchema(schemaRef *openapi3.SchemaRef) {
 	if schemaRef == nil || schemaRef.Value == nil {
 		return
@@ -81,6 +85,7 @@ func (v *Visitor) ProcessSchema(schemaRef *openapi3.SchemaRef) {
 	}
 }
 
+// SW-REQ-044
 func (v *Visitor) processOASPaths(paths map[string]*openapi3.PathItem) {
 	for _, pathItem := range paths {
 		if pathItem == nil {
@@ -95,6 +100,7 @@ func (v *Visitor) processOASPaths(paths map[string]*openapi3.PathItem) {
 	}
 }
 
+// SW-REQ-044
 func (v *Visitor) processOperationCallbacks(op *openapi3.Operation) {
 	for _, callbackRef := range op.Callbacks {
 		if callbackRef.Value != nil {
@@ -103,6 +109,7 @@ func (v *Visitor) processOperationCallbacks(op *openapi3.Operation) {
 	}
 }
 
+// SW-REQ-044
 func (v *Visitor) processOperationResponses(op *openapi3.Operation) {
 	for _, respRef := range op.Responses.Map() {
 		if respRef.Value != nil {
@@ -118,6 +125,7 @@ func (v *Visitor) processOperationResponses(op *openapi3.Operation) {
 	}
 }
 
+// SW-REQ-044
 func (v *Visitor) processOperationContent(op *openapi3.Operation) {
 	if op.RequestBody != nil && op.RequestBody.Value != nil {
 		for _, mediaType := range op.RequestBody.Value.Content {
@@ -126,6 +134,7 @@ func (v *Visitor) processOperationContent(op *openapi3.Operation) {
 	}
 }
 
+// SW-REQ-044
 func (v *Visitor) processOperationParameters(op *openapi3.Operation) {
 	for _, paramRef := range op.Parameters {
 		if paramRef.Value != nil && paramRef.Value.Schema != nil {
@@ -134,12 +143,14 @@ func (v *Visitor) processOperationParameters(op *openapi3.Operation) {
 	}
 }
 
+// SW-REQ-044
 func (v *Visitor) applyManipulations(schema *openapi3.Schema) {
 	for _, operation := range v.manipulations {
 		operation(schema)
 	}
 }
 
+// SW-REQ-044
 func (v *Visitor) isVisited(schema *openapi3.Schema) bool {
 	if _, ok := v.visited[schema]; ok {
 		return true
@@ -149,10 +160,12 @@ func (v *Visitor) isVisited(schema *openapi3.Schema) bool {
 	return false
 }
 
+// SW-REQ-044
 func (v *Visitor) resetVisited() {
 	v.visited = make(map[*openapi3.Schema]bool)
 }
 
+// SW-REQ-044
 func TransformUnicodeEscapesToRE2Manipulation(schema *openapi3.Schema) {
 	if schema == nil || schema.Pattern == "" {
 		return
@@ -168,6 +181,7 @@ func TransformUnicodeEscapesToRE2Manipulation(schema *openapi3.Schema) {
 	})
 }
 
+// SW-REQ-044
 func RestoreUnicodeEscapesFromRE2Manipulation(schema *openapi3.Schema) {
 	if schema == nil || schema.Pattern == "" {
 		return
@@ -176,6 +190,7 @@ func RestoreUnicodeEscapesFromRE2Manipulation(schema *openapi3.Schema) {
 	schema.Pattern = RestoreUnicodeEscapesFromRE2(schema.Pattern)
 }
 
+// SW-REQ-044
 func RestoreUnicodeEscapesFromRE2(str string) string {
 	return re2Regex.ReplaceAllStringFunc(str, func(match string) string {
 		var sb strings.Builder
@@ -186,6 +201,7 @@ func RestoreUnicodeEscapesFromRE2(str string) string {
 	})
 }
 
+// SW-REQ-044
 func RestoreUnicodeEscapesInError(err error) error {
 	if err == nil {
 		return nil

@@ -5,15 +5,18 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the model shall always satisfy !api_definition_support_requested | api_definition_support_shape_preserved
-description: Gateway API definition support model helpers shall preserve typed health-check wire values, deterministic host-list access behavior, error-override matcher/template state, embedded Classic API definition schema data, and OAS helper path/server shapes so API definition, RPC, and configuration flows can exchange these helper shapes without silent data-shape drift.
+description: Gateway API definition support model helpers shall preserve typed health-check wire values, deterministic host-list access behavior, error-override matcher/template state, embedded Classic API definition schema data, OAS helper path/server shapes, and OAS schema visitor/unicode-escape helper behavior so API definition, RPC, and configuration flows can exchange these helper shapes without silent data-shape drift.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: model
-rationale: This system-level requirement owns small API-definition support helper behavior only. It does not claim API import, full OAS conversion, route generation, gateway request admission, or full API definition lifecycle behavior, which require separate black-box or adapter evidence.
-tags: []
+rationale: This system-level requirement owns small API-definition support helper behavior only. It does not claim API import, full OAS conversion, route generation, request matching, gateway request admission, or full API definition lifecycle behavior, which require separate black-box or adapter evidence.
+tags:
+    - api-definition
+    - oas
+    - schema
 variables:
     - api_definition_support_requested
     - api_definition_support_shape_preserved
@@ -27,23 +30,23 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-19T21:17:16Z"
-        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after linking to the existing API-inventory stakeholder parent and adding FRETish formalization. Requirement is scoped to small API-definition support model helpers only; focused SW child tests passed. This approval does not waive MC/DC, API import, OAS conversion, route generation, gateway request admission, or full API definition lifecycle evidence.
-        fingerprint: sha256:6df5468d0c32f5b7c151cbc6a22d42f8d584de9a35a10f47e7433758dbb46cdf
+        reviewed_at: "2026-06-20T01:02:51Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-044 is scoped to local pkg/schema OAS visitor and unicode-escape helper behavior: visitor initialization, manipulation registration and insertion-order application, visited-state reset, one-time traversal of component schemas, operation parameters, request bodies, response bodies, response headers, callbacks, nested schema branches, circular-reference stopping, nil schema references, nil path items, JSON-schema unicode escape conversion to RE2 syntax, RE2 restoration in schema patterns and error strings, empty pattern handling, non-matching pattern preservation, and already-converted input preservation. SYS-REQ-104 description was refreshed only to include this helper boundary. Focused pkg/schema tests passed with race. This approval does not claim full API-definition validation, schema completeness, API import, OAS conversion, route generation, request matching, gateway request admission, or correctness of the upstream OpenAPI library.'
+        fingerprint: sha256:76c6d76be6ab238b0ed7c273ce45d23e51f03c88edd62696134547d3de45169e
         ai_generated: false
-    gaps_reviewed_at: "2026-06-20T00:49:58.56521Z"
+    gaps_reviewed_at: "2026-06-20T01:02:59.828578Z"
     gaps_reviewed_by: human:buger
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-104|api_definition_support_shape_preserved
           reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-104's api_definition_support_shape_preserved variable is decomposed across SW-REQ-019 health-check wire constants/JSON shapes, SW-REQ-020 HostList constructor/access/error behavior, SW-REQ-021 error-override template and matcher state, SW-REQ-033 embedded Classic API definition schema data, and SW-REQ-042 internal/oasutil path ordering plus server URL template parsing. The review is limited to these API-definition support helpers and does not claim API import, full OAS conversion, route generation, gateway request admission, request matching, or full API definition lifecycle coverage.
-          reviewed_at: "2026-06-20T00:49:58.56521Z"
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-104's api_definition_support_shape_preserved variable is decomposed across SW-REQ-019 health-check wire constants/JSON shapes, SW-REQ-020 HostList constructor/access/error behavior, SW-REQ-021 error-override template and matcher state, SW-REQ-033 embedded Classic API definition schema data, SW-REQ-042 internal/oasutil path ordering plus server URL template parsing, and SW-REQ-044 pkg/schema OAS visitor traversal plus unicode-escape conversion/restoration helpers. The review is limited to these API-definition support helpers and does not claim full API-definition validation, schema completeness, API import, full OAS conversion, route generation, request matching, gateway request admission, or full API definition lifecycle coverage.
+          reviewed_at: "2026-06-20T01:02:59.828578Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-19T21:10:22Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-19T21:17:16Z"
+    last_modified_at: "2026-06-20T01:02:51Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -59,4 +62,9 @@ lifecycle:
           from: approved
           to: approved
           reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-19T21:13:36Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Requirement is scoped to small API-definition support model helpers only; focused SW child tests passed. This approval does not waive MC/DC, API import, OAS conversion, route generation, gateway request admission, or full API definition lifecycle evidence.")'
+          changed_by: human:buger
+        - date: "2026-06-20T01:02:51Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-19T21:17:16Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after linking to the existing API-inventory stakeholder parent and adding FRETish formalization. Requirement is scoped to small API-definition support model helpers only; focused SW child tests passed. This approval does not waive MC/DC, API import, OAS conversion, route generation, gateway request admission, or full API definition lifecycle evidence.")'
           changed_by: human:buger

@@ -6,6 +6,7 @@
 <!-- documents SW-REQ-021 -->
 <!-- documents SW-REQ-033 -->
 <!-- documents SW-REQ-042 -->
+<!-- documents SW-REQ-044 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -14,8 +15,9 @@ admission, or the full API definition lifecycle.
 
 `SYS-REQ-104` covers API-definition support model helpers that preserve typed
 health-check wire values, host-list access behavior, and error-override helper
-state, embedded Classic API definition schema data, and OAS path/server helper
-shapes without silent data-shape drift.
+state, embedded Classic API definition schema data, OAS path/server helper
+shapes, and OAS schema visitor/unicode-escape helper behavior without silent
+data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -53,3 +55,17 @@ variable names, duplicate variable names, invalid regex patterns, and rejected
 capturing groups. This evidence does not claim gateway route generation, API
 import, request matching, full OAS conversion, or correctness of the upstream
 OpenAPI library.
+
+`SW-REQ-044` owns the concrete `pkg/schema` OAS visitor and unicode-escape
+conversion helpers. Its evidence covers visitor initialization, manipulation
+registration and insertion-order application, visited-state reset, one-time
+schema visitation for components, operation parameters, request bodies,
+response bodies, response headers, callbacks, properties, items, additional
+properties, not/allOf/anyOf/oneOf branches, circular-reference stopping, nil
+schema references, nil path items, JSON-schema unicode escape conversion to RE2
+syntax, RE2 escape restoration in schema patterns and error strings, empty
+pattern handling, non-matching pattern preservation, and already-converted input
+preservation. This evidence does not claim full API-definition validation,
+schema completeness, API import, OAS conversion, route generation, request
+matching, gateway request admission, or correctness of the upstream OpenAPI
+library.
