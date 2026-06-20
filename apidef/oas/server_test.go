@@ -9,6 +9,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-062
 func TestServer(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		t.Parallel()
@@ -44,6 +45,7 @@ func TestServer(t *testing.T) {
 
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-062
 func TestListenPath(t *testing.T) {
 	t.Parallel()
 
@@ -58,6 +60,7 @@ func TestListenPath(t *testing.T) {
 	assert.Equal(t, emptyListenPath, resultListenPath)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-062
 func TestGatewayTags(t *testing.T) {
 	t.Parallel()
 
@@ -129,6 +132,7 @@ func TestGatewayTags(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-062
 func TestClientCertificates(t *testing.T) {
 	t.Parallel()
 
@@ -143,6 +147,7 @@ func TestClientCertificates(t *testing.T) {
 	assert.Equal(t, emptyClientCertificates, resultClientCertificates)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-062
 func TestCustomDomain(t *testing.T) {
 	certs := []string{"c1", "c2"}
 	t.Run("extractTo api definition", func(t *testing.T) {
@@ -222,6 +227,7 @@ func TestCustomDomain(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-062
 func TestTagsExportServer(t *testing.T) {
 	t.Parallel()
 
@@ -275,6 +281,7 @@ func TestTagsExportServer(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-062
 func TestFillDetailedTracing(t *testing.T) {
 	t.Parallel()
 
@@ -308,6 +315,7 @@ func TestFillDetailedTracing(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-062
 func TestExportDetailedTracing(t *testing.T) {
 	t.Parallel()
 
@@ -344,6 +352,7 @@ func TestExportDetailedTracing(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-062
 func TestIPAccessControl(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var emptyIPAccessControl IPAccessControl
@@ -378,6 +387,7 @@ func TestIPAccessControl(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-062
 func TestBatchProcessing(t *testing.T) {
 	t.Run("fill", func(t *testing.T) {
 		type testCase struct {

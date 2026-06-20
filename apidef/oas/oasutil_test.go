@@ -18,6 +18,7 @@ type subStruct struct {
 	SubMap map[string]string
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-055
 func TestShouldOmit(t *testing.T) {
 	v1 := testStruct{}
 	v2 := testStruct{Array: make([]string, 0), Map: make(map[string]string), SubStruct: &subStruct{}}

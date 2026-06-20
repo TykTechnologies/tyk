@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestBuildServerURL(t *testing.T) {
 	t.Parallel()
 
@@ -95,6 +96,7 @@ func TestBuildServerURL(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestNormalizeServerURL(t *testing.T) {
 	t.Parallel()
 
@@ -140,6 +142,7 @@ func TestNormalizeServerURL(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestBuildVersionedServerURL(t *testing.T) {
 	t.Parallel()
 
@@ -214,6 +217,7 @@ func TestBuildVersionedServerURL(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestDetermineHosts(t *testing.T) {
 	t.Parallel()
 
@@ -353,6 +357,7 @@ func TestDetermineHosts(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestRemoveTykGeneratedURLs(t *testing.T) {
 	t.Parallel()
 
@@ -435,6 +440,7 @@ func TestRemoveTykGeneratedURLs(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestGenerateStandardServers(t *testing.T) {
 	t.Parallel()
 
@@ -516,6 +522,7 @@ func TestGenerateStandardServers(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestGenerateVersionedServers(t *testing.T) {
 	t.Parallel()
 
@@ -668,6 +675,7 @@ func TestGenerateVersionedServers(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestRegenerateServers(t *testing.T) {
 	t.Parallel()
 
@@ -874,6 +882,7 @@ func TestRegenerateServers(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestGenerateTykServersBaseAPIWithVersioning(t *testing.T) {
 	t.Parallel()
 
@@ -916,6 +925,7 @@ func TestGenerateTykServersBaseAPIWithVersioning(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestOAS_GenerateTykServers(t *testing.T) {
 	t.Parallel()
 
@@ -1097,6 +1107,7 @@ func TestOAS_GenerateTykServers(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestShouldUpdateChildAPIs(t *testing.T) {
 	t.Parallel()
 
@@ -1385,6 +1396,7 @@ func TestShouldUpdateChildAPIs(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestExtractUserServers(t *testing.T) {
 	t.Parallel()
 
@@ -1676,6 +1688,7 @@ func TestExtractUserServers(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestExtractUserServers_EdgeCases(t *testing.T) {
 	t.Parallel()
 
@@ -1801,6 +1814,7 @@ func TestExtractUserServers_EdgeCases(t *testing.T) {
 // TestGenerateVersionedServers_Scenario1 tests that when versioning is enabled
 // but no default version is set (or fallbackToDefault is false), the URL
 // MUST include the version identifier.
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestGenerateVersionedServers_Scenario1_VersionRequired(t *testing.T) {
 	t.Parallel()
 
@@ -1908,6 +1922,7 @@ func TestGenerateVersionedServers_Scenario1_VersionRequired(t *testing.T) {
 // enabled with a default version and fallbackToDefault is true, BOTH URLs are valid:
 // 1. {protocol}://{host}/{listen-path}/{versionName}/
 // 2. {protocol}://{host}/{listen-path}/
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestGenerateVersionedServers_Scenario2_BaseAPIWithFallback(t *testing.T) {
 	t.Parallel()
 
@@ -2024,6 +2039,7 @@ func TestGenerateVersionedServers_Scenario2_BaseAPIWithFallback(t *testing.T) {
 // when the default version value (stored in baseAPI) is the same as the child
 // version name, and fallbackToDefault is true, then the fallback URL
 // {protocol}://{host}/{base-listen-path}/ makes sense for that specific version.
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestGenerateVersionedServers_Scenario3_ChildAPIMatchingDefault(t *testing.T) {
 	t.Parallel()
 
@@ -2185,6 +2201,7 @@ func TestGenerateVersionedServers_Scenario3_ChildAPIMatchingDefault(t *testing.T
 
 // TestGenerateVersionedServers_QueryParamVersioning tests that fallback URLs
 // work correctly with query parameter versioning.
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestGenerateVersionedServers_QueryParamVersioning(t *testing.T) {
 	t.Parallel()
 
@@ -2274,6 +2291,7 @@ func TestGenerateVersionedServers_QueryParamVersioning(t *testing.T) {
 
 // TestRegenerateServers_FallbackToDefaultTransition tests that when fallbackToDefault
 // is changed from true to false, the fallback URL is correctly removed.
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestRegenerateServers_FallbackToDefaultTransition(t *testing.T) {
 	t.Parallel()
 
@@ -2465,6 +2483,7 @@ func TestRegenerateServers_FallbackToDefaultTransition(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestRegenerateServers_BaseAPILosesFallbackWhenNewDefaultSet(t *testing.T) {
 	t.Parallel()
 
@@ -2626,6 +2645,7 @@ func TestRegenerateServers_BaseAPILosesFallbackWhenNewDefaultSet(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestDetermineHosts_MDCB(t *testing.T) {
 	t.Parallel()
 
@@ -2788,6 +2808,7 @@ func TestDetermineHosts_MDCB(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestFindEndpointsMatchingTags(t *testing.T) {
 	t.Parallel()
 
@@ -2852,6 +2873,7 @@ func TestFindEndpointsMatchingTags(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestHasAnyTagMatch(t *testing.T) {
 	t.Parallel()
 
@@ -2909,6 +2931,7 @@ func TestHasAnyTagMatch(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestBuildTagSet(t *testing.T) {
 	t.Parallel()
 
@@ -2958,6 +2981,7 @@ func TestBuildTagSet(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestAppendRelativePathIfNotPresent(t *testing.T) {
 	t.Parallel()
 
@@ -2998,6 +3022,7 @@ func TestAppendRelativePathIfNotPresent(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
 func TestGenerateStandardServers_MDCB(t *testing.T) {
 	t.Parallel()
 

@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestGetJWTConfiguration(t *testing.T) {
 	t.Run("should retrieve successfully", func(t *testing.T) {
 		var api apidef.APIDefinition
@@ -88,6 +89,7 @@ func TestGetJWTConfiguration(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_Security(t *testing.T) {
 	var auth apidef.AuthConfig
 	Fill(t, &auth, 0)
@@ -110,6 +112,7 @@ func TestOAS_Security(t *testing.T) {
 	assert.Equal(t, api, convertedAPI)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_ApiKeyScheme(t *testing.T) {
 	const (
 		authName   = "my-auth"
@@ -228,6 +231,7 @@ func TestOAS_ApiKeyScheme(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_Token(t *testing.T) {
 	const securityName = "custom"
 
@@ -304,6 +308,7 @@ func TestOAS_Token(t *testing.T) {
 
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_Token_MultipleSecuritySchemes(t *testing.T) {
 	const securityName = "custom"
 	const securityName2 = "custom2"
@@ -360,6 +365,7 @@ func TestOAS_Token_MultipleSecuritySchemes(t *testing.T) {
 	assert.Contains(t, convertedOAS.getTykSecuritySchemes(), securityName)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_AppendSecurity(t *testing.T) {
 	oas := OAS{}
 	oas.Security = openapi3.SecurityRequirements{
@@ -401,6 +407,7 @@ func TestOAS_AppendSecurity(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_JWT(t *testing.T) {
 	const securityName = "custom"
 
@@ -498,6 +505,7 @@ func TestOAS_JWT(t *testing.T) {
 	assert.Equal(t, oas, convertedOAS)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestMergeStringFirst(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -551,6 +559,7 @@ func TestMergeStringFirst(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestFillJWT_MergeClassicIntoOASSlices(t *testing.T) {
 	const securityName = "jwtAuth"
 
@@ -686,6 +695,7 @@ func TestFillJWT_MergeClassicIntoOASSlices(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_Basic(t *testing.T) {
 	const securityName = "custom"
 
@@ -733,6 +743,7 @@ func TestOAS_Basic(t *testing.T) {
 	assert.Equal(t, oas, convertedOAS)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_OAuth(t *testing.T) {
 	const securityName = "custom"
 	scopes := map[string]string{
@@ -797,6 +808,7 @@ func TestOAS_OAuth(t *testing.T) {
 	assert.Equal(t, oas, convertedOAS)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_ExternalOAuth(t *testing.T) {
 	const securityName = "custom"
 	scopes := map[string]string{
@@ -877,6 +889,7 @@ func TestOAS_ExternalOAuth(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_OIDC(t *testing.T) {
 	var oas OAS
 	var oidc OIDC
@@ -914,6 +927,7 @@ func TestOAS_OIDC(t *testing.T) {
 	assert.Equal(t, oas, convertedOAS)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_CustomPlugin(t *testing.T) {
 	var oas OAS
 	var customPlugin CustomPluginAuthentication
@@ -939,6 +953,7 @@ func TestOAS_CustomPlugin(t *testing.T) {
 	assert.Equal(t, oas, convertedOAS)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_TykAuthentication_NoOASSecurity(t *testing.T) {
 	var hmac HMAC
 	Fill(t, &hmac, 0)
@@ -965,6 +980,7 @@ func TestOAS_TykAuthentication_NoOASSecurity(t *testing.T) {
 	assert.Equal(t, oas, convertedOAS)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_fillSecurity_CentralizedManagement(t *testing.T) {
 	t.Run("should manage Security requirements centrally", func(t *testing.T) {
 		var api apidef.APIDefinition
@@ -1033,6 +1049,7 @@ func TestOAS_fillSecurity_CentralizedManagement(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_extractSecurityTo_ORLogic(t *testing.T) {
 	t.Run("should extract multiple Security requirements as OR logic", func(t *testing.T) {
 		var oas OAS
@@ -1137,6 +1154,7 @@ func TestOAS_extractSecurityTo_ORLogic(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_extractSecurityTo_VendorExtensionSecurity(t *testing.T) {
 	t.Run("should extract JWT from vendor extension security in compliant mode", func(t *testing.T) {
 		var oas OAS
@@ -1276,6 +1294,7 @@ func TestOAS_extractSecurityTo_VendorExtensionSecurity(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_GetJWTConfiguration_VendorSecurity(t *testing.T) {
 	t.Run("should return JWT config from vendor security in compliant mode", func(t *testing.T) {
 		var oas OAS
@@ -1330,6 +1349,7 @@ func TestOAS_GetJWTConfiguration_VendorSecurity(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_GetJWTConfiguration_EmptySecurity(t *testing.T) {
 	t.Run("should return nil when Security array is nil", func(t *testing.T) {
 		var oas OAS
@@ -1448,6 +1468,7 @@ func TestOAS_GetJWTConfiguration_EmptySecurity(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_SecurityRequirements_RoundTrip(t *testing.T) {
 	t.Run("should round-trip OR logic correctly", func(t *testing.T) {
 		var originalAPI apidef.APIDefinition
@@ -1505,6 +1526,7 @@ func TestOAS_SecurityRequirements_RoundTrip(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestOAS_fillSecurity_BackwardCompatibility(t *testing.T) {
 	t.Run("should maintain backward compatibility with tests calling fill methods directly", func(t *testing.T) {
 		var api apidef.APIDefinition
@@ -1531,6 +1553,7 @@ func TestOAS_fillSecurity_BackwardCompatibility(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestSecurityRequirementsPreservation(t *testing.T) {
 	testCases := []struct {
 		name            string
@@ -1727,6 +1750,7 @@ func createTestTykExtension() *XTykAPIGateway {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestIsProprietaryAuth(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -1788,6 +1812,7 @@ func TestIsProprietaryAuth(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestCompliantModeSecuritySeparation(t *testing.T) {
 	t.Run("compliant mode separates OAS and vendor security", func(t *testing.T) {
 		// Create API with mixed security requirements
@@ -1985,6 +2010,7 @@ func TestCompliantModeSecuritySeparation(t *testing.T) {
 // TestGetJWTConfiguration_ORAuthentication tests GetJWTConfiguration with OR authentication scenarios
 // This test ensures that the JWT configuration is correctly retrieved based on the security processing mode
 // and prevents regression of the panic issue when JWT is not the first security requirement.
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestGetJWTConfiguration_ORAuthentication(t *testing.T) {
 	// Helper function to create test OAS with JWT as second security requirement
 	createTestOAS := func(processingMode string) *OAS {
@@ -2344,6 +2370,7 @@ func TestGetJWTConfiguration_ORAuthentication(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestIsProprietaryAuthScheme(t *testing.T) {
 	t.Run("should identify known proprietary type names", func(t *testing.T) {
 		oas := &OAS{}
@@ -2461,6 +2488,7 @@ func TestIsProprietaryAuthScheme(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestIsInVendorSecurity(t *testing.T) {
 	t.Run("should find scheme in vendor security requirements", func(t *testing.T) {
 		oas := &OAS{}
@@ -2507,6 +2535,7 @@ func TestIsInVendorSecurity(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestIsProprietaryInVendor(t *testing.T) {
 	t.Run("should return true when scheme not in OAS Components", func(t *testing.T) {
 		oas := &OAS{}
@@ -2572,6 +2601,7 @@ func TestIsProprietaryInVendor(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestIsProprietaryInSecuritySchemes(t *testing.T) {
 	t.Run("should return false when SecuritySchemes is nil", func(t *testing.T) {
 		oas := &OAS{}
@@ -2621,6 +2651,7 @@ func TestIsProprietaryInSecuritySchemes(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestIsInOASComponents(t *testing.T) {
 	t.Run("should return true when scheme exists in Components", func(t *testing.T) {
 		oas := &OAS{}
@@ -2676,6 +2707,7 @@ func TestIsInOASComponents(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestIsProprietarySchemeType(t *testing.T) {
 	t.Run("should return false for JWT type", func(t *testing.T) {
 		oas := &OAS{}
@@ -2735,6 +2767,7 @@ func TestIsProprietarySchemeType(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestModeSwitching(t *testing.T) {
 	t.Run("legacy to compliant with mixed auth", func(t *testing.T) {
 		// Setup: Legacy mode with mixed auth (both standard and proprietary in OAS security)
@@ -3331,6 +3364,7 @@ func TestModeSwitching(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestHasCertificateAuthEnabled(t *testing.T) {
 	t.Run("returns false when authentication is nil", func(t *testing.T) {
 		oas := OAS{}
@@ -3385,6 +3419,7 @@ func TestHasCertificateAuthEnabled(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestHasCertificateAuth(t *testing.T) {
 	t.Run("returns false when authentication is nil", func(t *testing.T) {
 		oas := OAS{}
@@ -3439,6 +3474,7 @@ func TestHasCertificateAuth(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-092
 func TestTokenHasCertificateEnabled(t *testing.T) {
 	t.Run("returns false when scheme name is empty", func(t *testing.T) {
 		oas := OAS{}

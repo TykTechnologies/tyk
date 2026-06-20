@@ -12,6 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/time"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-058
 func TestEventHandlers(t *testing.T) {
 	t.Parallel()
 
@@ -454,6 +455,7 @@ func TestEventHandlers(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-058
 func TestEventHandler_MarshalJSON(t *testing.T) {
 	type testCase struct {
 		title    string
@@ -557,6 +559,7 @@ func TestEventHandler_MarshalJSON(t *testing.T) {
 
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-058
 func TestEventHandler_UnmarshalJSON(t *testing.T) {
 	type testCase struct {
 		title    string

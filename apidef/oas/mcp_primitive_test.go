@@ -12,6 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/mcp"
 )
 
+// Verifies: SYS-REQ-107, SW-REQ-048
 func TestMCPPrimitive_Embedding(t *testing.T) {
 	t.Run("all Operation fields accessible", func(t *testing.T) {
 		primitive := &MCPPrimitive{}
@@ -53,6 +54,7 @@ func TestMCPPrimitive_Embedding(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-107, SW-REQ-048
 func TestMCPPrimitive_JSONMarshaling(t *testing.T) {
 	t.Run("marshal and unmarshal with middleware", func(t *testing.T) {
 		primitive := &MCPPrimitive{}
@@ -122,6 +124,7 @@ func TestMCPPrimitive_JSONMarshaling(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-107, SW-REQ-048
 func TestMCPPrimitives_MapOperations(t *testing.T) {
 	t.Run("create and access primitives map", func(t *testing.T) {
 		getWeather := &MCPPrimitive{}
@@ -221,6 +224,7 @@ func TestMCPPrimitives_MapOperations(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-107, SW-REQ-048
 func TestMCPPrimitive_DisabledMiddleware(t *testing.T) {
 	vemPath := mcp.ToolPrefix + "test"
 
@@ -355,6 +359,7 @@ func TestMCPPrimitive_DisabledMiddleware(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-107, SW-REQ-048
 func TestMCPPrimitive_EnsureNotBypassingOverride(t *testing.T) {
 	t.Run("accepts valid primitive without panic", func(t *testing.T) {
 		primitive := &MCPPrimitive{}
@@ -402,6 +407,7 @@ func TestMCPPrimitive_EnsureNotBypassingOverride(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-107, SW-REQ-048
 func TestMCPPrimitive_NilSafety(t *testing.T) {
 	t.Run("default fields are nil", func(t *testing.T) {
 		primitive := &MCPPrimitive{}
@@ -412,6 +418,7 @@ func TestMCPPrimitive_NilSafety(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-107, SW-REQ-048
 func TestMCPPrimitive_MultipleMiddlewareScenarios(t *testing.T) {
 	t.Run("tool with rate limit and cache", func(t *testing.T) {
 		primitive := &MCPPrimitive{}
@@ -436,6 +443,7 @@ func TestMCPPrimitive_MultipleMiddlewareScenarios(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-107, SW-REQ-048
 func TestOperation_ExtractToExtendedPaths_ValidateRequestAndMockResponse(t *testing.T) {
 	t.Run("extracts ValidateRequest middleware", func(t *testing.T) {
 		op := &Operation{

@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/errors"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-051
 func TestErrorOverridesMap_FillAndExtract(t *testing.T) {
 	internalMatch := &apidef.ErrorMatcher{
 		Flag:           errors.TLE,
@@ -111,6 +112,7 @@ func TestErrorOverridesMap_FillAndExtract(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-051
 func TestErrorOverridesMap_NilSafety(t *testing.T) {
 	t.Run("ExtractTo with nil receiver", func(t *testing.T) {
 		var nilMap ErrorOverridesMap
@@ -141,6 +143,7 @@ func TestErrorOverridesMap_NilSafety(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-051
 func TestErrorOverride_FillAndExtract(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -217,6 +220,7 @@ func TestErrorOverride_FillAndExtract(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-051
 func TestErrorMatcher_ExtractTo(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -256,6 +260,7 @@ func TestErrorMatcher_ExtractTo(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-051
 func TestErrorResponse_ExtractTo(t *testing.T) {
 	tests := []struct {
 		name  string

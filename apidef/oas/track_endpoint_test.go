@@ -8,6 +8,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-054
 func TestTrackEndpoint_Fill(t *testing.T) {
 	var (
 		enabled  = apidef.TrackEndpointMeta{Disabled: false}
@@ -28,6 +29,7 @@ func TestTrackEndpoint_Fill(t *testing.T) {
 	assert.Equal(t, wantDisabled, got)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-054
 func TestTrackEndpoint_ExtractTo(t *testing.T) {
 	var (
 		wantEnabled  = apidef.TrackEndpointMeta{Disabled: false}

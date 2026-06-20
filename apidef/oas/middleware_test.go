@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestMiddleware(t *testing.T) {
 	var emptyMiddleware Middleware
 
@@ -137,6 +138,7 @@ func TestMiddleware(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestGlobal(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var emptyGlobal Global
@@ -227,6 +229,7 @@ func TestGlobal(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestTrafficLogs(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 
@@ -321,6 +324,7 @@ func TestTrafficLogs(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestPluginConfig(t *testing.T) {
 	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
@@ -386,6 +390,7 @@ func TestPluginConfig(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestPluginBundle(t *testing.T) {
 	t.Parallel()
 
@@ -419,6 +424,7 @@ func TestPluginBundle(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestCORS(t *testing.T) {
 	var emptyCORS CORS
 
@@ -431,6 +437,7 @@ func TestCORS(t *testing.T) {
 	assert.Equal(t, emptyCORS, resultCORS)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestCache(t *testing.T) {
 	var emptyCache Cache
 
@@ -443,6 +450,7 @@ func TestCache(t *testing.T) {
 	assert.Equal(t, emptyCache, resultCache)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestExtendedPaths(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		paths := make(Paths)
@@ -470,6 +478,7 @@ func TestExtendedPaths(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestTransformBody(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var emptyTransformBody TransformBody
@@ -558,6 +567,7 @@ func TestTransformBody(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestAuthenticationPlugin(t *testing.T) {
 	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
@@ -595,6 +605,7 @@ func TestAuthenticationPlugin(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestPrePlugin(t *testing.T) {
 	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
@@ -636,6 +647,7 @@ func TestPrePlugin(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestCustomPlugins(t *testing.T) {
 	t.Parallel()
 	t.Run("nil", func(t *testing.T) {
@@ -686,6 +698,7 @@ func TestCustomPlugins(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestPostAuthenticationPlugin(t *testing.T) {
 	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
@@ -727,6 +740,7 @@ func TestPostAuthenticationPlugin(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestPostPlugin(t *testing.T) {
 	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
@@ -768,6 +782,7 @@ func TestPostPlugin(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestResponsePlugin(t *testing.T) {
 	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
@@ -809,6 +824,7 @@ func TestResponsePlugin(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestPluginConfigData(t *testing.T) {
 	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
@@ -846,6 +862,7 @@ func TestPluginConfigData(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestCircuitBreaker(t *testing.T) {
 	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
@@ -880,6 +897,7 @@ func TestCircuitBreaker(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestVirtualEndpoint(t *testing.T) {
 	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
@@ -1023,6 +1041,7 @@ func TestVirtualEndpoint(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestEndpointPostPlugins(t *testing.T) {
 	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
@@ -1104,6 +1123,7 @@ func TestEndpointPostPlugins(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestTransformHeaders(t *testing.T) {
 	var emptyTransformHeaders TransformHeaders
 
@@ -1116,6 +1136,7 @@ func TestTransformHeaders(t *testing.T) {
 	assert.Equal(t, emptyTransformHeaders, resultTransformHeaders)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestContextVariables(t *testing.T) {
 	t.Parallel()
 	t.Run("fill", func(t *testing.T) {
@@ -1187,6 +1208,7 @@ func TestContextVariables(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestGlobalRequestSizeLimit(t *testing.T) {
 	t.Parallel()
 	t.Run("fill", func(t *testing.T) {
@@ -1331,6 +1353,7 @@ func TestGlobalRequestSizeLimit(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestCachePlugin_Fill(t *testing.T) {
 	t.Run("should fill cache plugin with provided values", func(t *testing.T) {
 		cacheMeta := apidef.CacheMeta{
@@ -1455,6 +1478,7 @@ func TestCachePlugin_Fill(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestMiddleware_HasMCPPrimitivesMocks(t *testing.T) {
 	t.Run("empty middleware returns false", func(t *testing.T) {
 		middleware := &Middleware{}
@@ -1547,6 +1571,7 @@ func TestMiddleware_HasMCPPrimitivesMocks(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestMiddleware_ExtractPrimitivesToExtendedPaths(t *testing.T) {
 	t.Run("basic extraction", func(t *testing.T) {
 		middleware := &Middleware{

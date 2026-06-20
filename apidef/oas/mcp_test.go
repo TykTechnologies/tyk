@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestMiddleware_MCPTools(t *testing.T) {
 	t.Run("mcpTools field marshaling", func(t *testing.T) {
 		middleware := Middleware{
@@ -61,6 +62,7 @@ func TestMiddleware_MCPTools(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestMiddleware_MCPResources(t *testing.T) {
 	t.Run("mcpResources field marshaling", func(t *testing.T) {
 		middleware := Middleware{
@@ -112,6 +114,7 @@ func TestMiddleware_MCPResources(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestMiddleware_MCPPrompts(t *testing.T) {
 	t.Run("mcpPrompts field marshaling", func(t *testing.T) {
 		middleware := Middleware{
@@ -163,6 +166,7 @@ func TestMiddleware_MCPPrompts(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-089
 func TestMiddleware_Fill_MCP(t *testing.T) {
 	t.Run("does not populate MCP fields when API is not MCP", func(t *testing.T) {
 		api := apidef.APIDefinition{

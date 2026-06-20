@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-052
 func Test_exampleExtractor(t *testing.T) {
 	cases := []struct {
 		name        string

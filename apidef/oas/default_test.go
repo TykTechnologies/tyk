@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-088
 func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 	t.Parallel()
 
@@ -1623,6 +1624,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-088
 func TestGetTykExtensionConfigParams(t *testing.T) {
 	trueVal, falseVal := true, false
 	t.Run("extract all params when provided", func(t *testing.T) {
@@ -1720,6 +1722,7 @@ func TestGetTykExtensionConfigParams(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-088
 func TestOAS_importAuthentication(t *testing.T) {
 	const (
 		testSecurityNameToken = "my_auth_token"
@@ -1925,6 +1928,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-088
 func TestSecuritySchemes_Import(t *testing.T) {
 	const (
 		testSecurityNameToken       = "my_auth_token"
@@ -2067,6 +2071,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-088
 func TestSecuritySchemes_GetBaseIdentityProvider(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		ss := SecuritySchemes{}
@@ -2104,6 +2109,7 @@ func TestSecuritySchemes_GetBaseIdentityProvider(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-088
 func TestToken_Import(t *testing.T) {
 	const testHeaderName = "my-auth-token-header"
 	const testCookieName = "my-auth-token-cookie"
@@ -2141,6 +2147,7 @@ func TestToken_Import(t *testing.T) {
 	assert.Equal(t, expectedToken, token)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-088
 func TestAuthSources_Import(t *testing.T) {
 	expectedAuthSource := &AuthSource{Enabled: true}
 
@@ -2166,6 +2173,7 @@ func TestAuthSources_Import(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-088
 func TestJWT_Import(t *testing.T) {
 	jwt := &JWT{}
 	jwt.Import(true)
@@ -2176,6 +2184,7 @@ func TestJWT_Import(t *testing.T) {
 	assert.Equal(t, expectedJWT, jwt)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-088
 func TestBasic_Import(t *testing.T) {
 	basic := &Basic{}
 	basic.Import(true)
@@ -2186,6 +2195,7 @@ func TestBasic_Import(t *testing.T) {
 	assert.Equal(t, expectedBasic, basic)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-088
 func TestOAuth_Import(t *testing.T) {
 	oauth := &OAuth{}
 	oauth.Import(true)

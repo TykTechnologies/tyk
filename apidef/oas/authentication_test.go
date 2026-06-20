@@ -11,6 +11,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestAuthentication(t *testing.T) {
 	var emptyAuthentication Authentication
 
@@ -23,6 +24,7 @@ func TestAuthentication(t *testing.T) {
 	assert.Equal(t, emptyAuthentication, resultAuthentication)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestScopes(t *testing.T) {
 	t.Run("default", func(t *testing.T) {
 		var emptyScopes Scopes
@@ -61,6 +63,7 @@ func TestScopes(t *testing.T) {
 
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestAuthSources(t *testing.T) {
 	var emptyAuthSources AuthSources
 
@@ -73,6 +76,7 @@ func TestAuthSources(t *testing.T) {
 	assert.Equal(t, emptyAuthSources, resultAuthSources)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestAuthSource(t *testing.T) {
 	t.Run("param", func(t *testing.T) {
 		var emptyParamSource AuthSource
@@ -99,6 +103,7 @@ func TestAuthSource(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestSignature(t *testing.T) {
 	var emptySignature Signature
 
@@ -111,6 +116,7 @@ func TestSignature(t *testing.T) {
 	assert.Equal(t, emptySignature, resultSignature)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestHMAC(t *testing.T) {
 	var emptyHMAC HMAC
 
@@ -123,6 +129,7 @@ func TestHMAC(t *testing.T) {
 	assert.Equal(t, emptyHMAC, resultHMAC)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestOIDC(t *testing.T) {
 	var emptyOIDC OIDC
 
@@ -155,6 +162,7 @@ func TestOIDC(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestCertificateAuthPrecedence(t *testing.T) {
 	t.Run("certificate auth field exists", func(t *testing.T) {
 		const securityName = "custom"
@@ -250,6 +258,7 @@ func TestCertificateAuthPrecedence(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestCertificateAuth(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var emptyCertificateAuth CertificateAuth
@@ -281,6 +290,7 @@ func TestCertificateAuth(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestCertificateAuthContractPreservation(t *testing.T) {
 	t.Run("old contract preserved - token with enableClientCertificate", func(t *testing.T) {
 		// Old contract: token.enableClientCertificate exists, certificateAuth should be nil
@@ -439,6 +449,7 @@ func TestCertificateAuthContractPreservation(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestKeyRetentionPeriod(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var emptyCustomKeyLifetime CustomKeyLifetime
@@ -474,6 +485,7 @@ func TestKeyRetentionPeriod(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestCustomPlugin(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var emptyCustomPlugin CustomPluginAuthentication
@@ -541,6 +553,7 @@ func TestCustomPlugin(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestIDExtractorConfig(t *testing.T) {
 	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
@@ -579,6 +592,7 @@ func TestIDExtractorConfig(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestIDExtractor(t *testing.T) {
 	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
@@ -622,6 +636,7 @@ func TestIDExtractor(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestSecurityProcessingMode(t *testing.T) {
 	t.Run("DefaultValues", func(t *testing.T) {
 		testCases := []struct {
@@ -755,6 +770,7 @@ func TestSecurityProcessingMode(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestVendorExtensionSecurity(t *testing.T) {
 	t.Run("Security array field", func(t *testing.T) {
 		auth := &Authentication{
@@ -775,6 +791,7 @@ func TestVendorExtensionSecurity(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestProtectedResourceMetadata_Validate(t *testing.T) {
 	t.Parallel()
 
@@ -845,6 +862,7 @@ func TestProtectedResourceMetadata_Validate(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestProtectedResourceMetadata_GetWellKnownPath(t *testing.T) {
 	t.Parallel()
 
@@ -867,6 +885,7 @@ func TestProtectedResourceMetadata_GetWellKnownPath(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-087
 func TestProtectedResourceMetadata_JSON(t *testing.T) {
 	t.Parallel()
 

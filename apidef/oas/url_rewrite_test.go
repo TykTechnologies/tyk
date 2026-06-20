@@ -14,6 +14,7 @@ import (
 //go:embed testdata/urlRewrite-*.json
 var urlRewriteFS embed.FS
 
+// Verifies: SYS-REQ-104, SW-REQ-063
 func TestURLRewrite_Fill(t *testing.T) {
 	var (
 		native apidef.URLRewriteMeta
@@ -31,6 +32,7 @@ func TestURLRewrite_Fill(t *testing.T) {
 	assert.Equal(t, oasDef, filled)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-063
 func TestURLRewrite_ExtractTo(t *testing.T) {
 	var (
 		native apidef.URLRewriteMeta

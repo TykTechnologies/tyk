@@ -31,6 +31,7 @@ func minimumValidOAS() OAS {
 //go:embed testdata/urlSorting.json
 var urlSortingFS embed.FS
 
+// Verifies: SYS-REQ-104, SW-REQ-091
 func TestOAS_PathsAndOperations_sorting(t *testing.T) {
 	var oasDef OAS
 	var classicDef apidef.APIDefinition
@@ -60,6 +61,7 @@ func TestOAS_PathsAndOperations_sorting(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-091
 func TestOAS_PathsAndOperations(t *testing.T) {
 	t.Parallel()
 
@@ -139,6 +141,7 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-091
 func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 	t.Parallel()
 
@@ -385,6 +388,7 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-091
 func TestOAS_PathsAndOperationsRegex(t *testing.T) {
 	t.Parallel()
 
@@ -435,6 +439,7 @@ func TestOAS_PathsAndOperationsRegex(t *testing.T) {
 	assert.Equal(t, expectedPathItems, oas.Paths, "expected path item differs")
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-091
 func TestOAS_RegexOperationIDs(t *testing.T) {
 	t.Parallel()
 
@@ -467,6 +472,7 @@ func TestOAS_RegexOperationIDs(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-091
 func TestOAS_RegexPaths(t *testing.T) {
 	t.Parallel()
 
@@ -533,6 +539,7 @@ var methodSetters = map[string]func(*openapi3.PathItem, *openapi3.Operation){
 	"OPTIONS": func(p *openapi3.PathItem, op *openapi3.Operation) { p.SetOperation("OPTIONS", op) },
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-091
 func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 	t.Parallel()
 
@@ -1053,6 +1060,7 @@ func verifyOASOperation(t *testing.T, spec *OAS, op *openapi3.Operation, method 
 	require.Nil(t, tykOperation.Allow)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-091
 func TestOAS_fillAllowance(t *testing.T) {
 	t.Run("should fill allow list correctly", func(t *testing.T) {
 		s := &OAS{
@@ -1236,6 +1244,7 @@ func TestOAS_fillAllowance(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-091
 func TestSplitPath(t *testing.T) {
 	tests := map[string]struct {
 		input     string
@@ -1325,6 +1334,7 @@ func TestSplitPath(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-091
 func TestGetOperationID(t *testing.T) {
 	type expectedParam struct {
 		pattern   string
@@ -1465,6 +1475,7 @@ func TestGetOperationID(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-091
 func TestOAS_ExtractTo_DoesNotExtractPrimitives(t *testing.T) {
 	oasAPI := minimumValidOAS()
 
@@ -1499,6 +1510,7 @@ func TestOAS_ExtractTo_DoesNotExtractPrimitives(t *testing.T) {
 	assert.Empty(t, versionInfo.ExtendedPaths.TransformHeader, "Primitives should not be in ExtendedPaths after ExtractTo")
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-091
 func TestExtractPrimitivesToExtendedPaths_DoesNotOverwriteOperations(t *testing.T) {
 	ep := &apidef.ExtendedPathsSet{
 		RateLimit: []apidef.RateLimitMeta{

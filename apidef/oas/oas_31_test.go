@@ -10,6 +10,7 @@ import (
 
 // TestOAS_Validate_OAS31_NullType tests OAS 3.1 null type validation
 // These tests will initially fail as OAS 3.1 validation is not yet fully implemented
+// Verifies: SYS-REQ-104, SW-REQ-060
 func TestOAS_Validate_OAS31_NullType(t *testing.T) {
 	t.Parallel()
 

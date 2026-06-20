@@ -23,6 +23,7 @@ func getBoolPointer(b bool) *bool {
 	return &b
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-060
 func TestValidateOASObject(t *testing.T) {
 	t.Parallel()
 	validOASObject := OAS{
@@ -197,6 +198,7 @@ func TestValidateOASObject(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-060
 func TestValidateOASObject_3_1(t *testing.T) {
 	t.Parallel()
 
@@ -249,6 +251,7 @@ func TestValidateOASObject_3_1(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-060
 func TestValidateOASTemplate(t *testing.T) {
 	t.Run("empty x-tyk ext", func(t *testing.T) {
 		body, err := oasTemplateFS.ReadFile("testdata/empty-x-tyk-ext-oas-template.json")
@@ -265,6 +268,7 @@ func TestValidateOASTemplate(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-060
 func TestValidateOASTemplate_3_1(t *testing.T) {
 	t.Parallel()
 
@@ -286,6 +290,7 @@ func TestValidateOASTemplate_3_1(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-060
 func Test_loadOASSchema(t *testing.T) {
 	t.Parallel()
 	t.Run("load OAS schemas", func(t *testing.T) {
@@ -324,6 +329,7 @@ func Test_loadOASSchema(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-060
 func TestGetDefinitionsKey(t *testing.T) {
 	t.Parallel()
 
@@ -356,6 +362,7 @@ func TestGetDefinitionsKey(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-060
 func Test_findDefaultVersion(t *testing.T) {
 	t.Parallel()
 	t.Run("single version", func(t *testing.T) {
@@ -371,6 +378,7 @@ func Test_findDefaultVersion(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-060
 func Test_setDefaultVersion(t *testing.T) {
 	err := loadOASSchema()
 	assert.NoError(t, err)
@@ -379,6 +387,7 @@ func Test_setDefaultVersion(t *testing.T) {
 	assert.Equal(t, "3.0", defaultVersion)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-060
 func TestGetOASSchema(t *testing.T) {
 	err := loadOASSchema()
 	assert.NoError(t, err)

@@ -14,6 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-061
 func TestXTykAPIGateway(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var emptyXTykAPIGateway XTykAPIGateway
@@ -95,6 +96,7 @@ func TestXTykAPIGateway(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-061
 func TestXTykAPIGateway_EnableContextVariables(t *testing.T) {
 	t.Parallel()
 	enabledExpectation := XTykAPIGateway{
@@ -189,6 +191,7 @@ func TestXTykAPIGateway_EnableContextVariables(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-061
 func TestInfo(t *testing.T) {
 	var emptyInfo Info
 
@@ -201,6 +204,7 @@ func TestInfo(t *testing.T) {
 	assert.Equal(t, emptyInfo, resultInfo)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-061
 func TestState(t *testing.T) {
 	var emptyState State
 
@@ -422,6 +426,7 @@ func FillTestVersionData(t *testing.T, index int) apidef.VersionData {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-061
 func TestVersioning(t *testing.T) {
 	var emptyVersioning Versioning
 	emptyVersioning.Versions = []VersionToID{}
@@ -435,6 +440,7 @@ func TestVersioning(t *testing.T) {
 	assert.Equal(t, emptyVersioning, resultVersioning)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-061
 func TestXTykAPIGateway_enableTrafficLogsIfEmpty(t *testing.T) {
 	t.Parallel()
 	enabledExpectation := XTykAPIGateway{
@@ -528,6 +534,8 @@ func TestXTykAPIGateway_enableTrafficLogsIfEmpty(t *testing.T) {
 		})
 	}
 }
+
+// Verifies: SYS-REQ-104, SW-REQ-061
 func TestFillWithContext(t *testing.T) {
 	t.Run("FillContextMCP fills MCP fields", func(t *testing.T) {
 		m := &Middleware{}
@@ -570,6 +578,7 @@ func TestFillWithContext(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-061
 func TestErrorOverrides_FillExtract(t *testing.T) {
 	t.Run("fill and extract with error overrides enabled", func(t *testing.T) {
 		api := apidef.APIDefinition{
@@ -697,6 +706,7 @@ func TestErrorOverrides_FillExtract(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-061
 func TestErrorOverrides_EmptyMap(t *testing.T) {
 	t.Run("nil error overrides", func(t *testing.T) {
 		api := apidef.APIDefinition{
@@ -737,6 +747,7 @@ func TestErrorOverrides_EmptyMap(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-061
 func TestErrorOverrides_EdgeCases(t *testing.T) {
 	t.Run("error override without match criteria", func(t *testing.T) {
 		api := apidef.APIDefinition{

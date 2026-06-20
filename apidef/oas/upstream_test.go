@@ -14,6 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/time"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-093
 func TestCacheOptions(t *testing.T) {
 	t.Parallel()
 
@@ -100,6 +101,7 @@ func TestCacheOptions(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-093
 func TestUpstream(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var emptyUpstream Upstream
@@ -139,6 +141,7 @@ func TestUpstream(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-093
 func TestServiceDiscovery(t *testing.T) {
 	var emptyServiceDiscovery ServiceDiscovery
 
@@ -151,6 +154,7 @@ func TestServiceDiscovery(t *testing.T) {
 	assert.Equal(t, emptyServiceDiscovery, resultServiceDiscovery)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-093
 func TestUptimeTests(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var emptyTest UptimeTests
@@ -228,6 +232,7 @@ func TestUptimeTests(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-093
 func TestUpstreamMutualTLS(t *testing.T) {
 	t.Parallel()
 	t.Run("extractTo api definition", func(t *testing.T) {
@@ -367,6 +372,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-093
 func TestPinnedPublicKeys(t *testing.T) {
 	t.Parallel()
 
@@ -382,6 +388,7 @@ func TestPinnedPublicKeys(t *testing.T) {
 	assert.Equal(t, pinnedPublicKeys, resultPinnedPublicKeys)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-093
 func TestCertificatePinning(t *testing.T) {
 	t.Run("extractTo api definition", func(t *testing.T) {
 		testcases := []struct {
@@ -542,6 +549,7 @@ func TestCertificatePinning(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-093
 func TestUpstreamRequestSigning(t *testing.T) {
 	t.Parallel()
 	t.Run("fill", func(t *testing.T) {
@@ -678,6 +686,7 @@ func TestUpstreamRequestSigning(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-093
 func TestTLSTransportProxy(t *testing.T) {
 	t.Run("with tls settings", func(t *testing.T) {
 		transport := TLSTransport{
@@ -732,6 +741,7 @@ func TestTLSTransportProxy(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-093
 func TestLoadBalancing(t *testing.T) {
 	t.Parallel()
 	t.Run("fill", func(t *testing.T) {
@@ -929,6 +939,7 @@ func TestLoadBalancing(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-093
 func TestLoadBalancingWeightZeroTargets(t *testing.T) {
 	t.Parallel()
 
@@ -1262,6 +1273,7 @@ func TestLoadBalancingWeightZeroTargets(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-093
 func TestPreserveHostHeader(t *testing.T) {
 	t.Run("fill", func(t *testing.T) {
 		type testCase struct {
