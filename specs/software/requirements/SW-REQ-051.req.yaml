@@ -1,0 +1,54 @@
+id: SW-REQ-051
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The apidef/oas error-override helper shall preserve OAS extension error-override shapes by mapping the Classic disabled flag to the OAS enabled flag, preserving nil and empty override maps, preserving status-code override lists, optional matcher fields, response status/body/message/template/header fields, nil-match overrides, and deterministic repeated Fill/ExtractTo round trips.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: apidef/oas/error_overrides_reqproof_test.go; docs/apidef-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-104
+component: model
+rationale: This software requirement owns only the local apidef/oas error-override shape mapping helpers used by API-definition extension models. It does not claim gateway error response selection, matcher evaluation, template rendering or execution, response-body matching, middleware execution, API import, route generation, request matching, gateway request admission, or final client-visible response behavior.
+tags:
+    - api-definition
+    - oas
+    - error-overrides
+    - model
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-104
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T01:44:20Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-051 is scoped to the local apidef/oas error-override shape mapping helpers: Classic disabled flag to OAS enabled flag mapping, nil and empty override maps, status-code override lists, optional matcher fields, response status/body/message/template/header fields, nil-match overrides, nil receiver extraction, and deterministic repeated Fill/ExtractTo round trips. Focused apidef/oas tests passed with race, go vet, and go build. This approval does not claim gateway error response selection, matcher evaluation, template rendering or execution, response-body matching, middleware execution, API import, route generation, request matching, gateway request admission, or final client-visible response behavior.'
+        fingerprint: sha256:1db56633ff52d2ee6ea0fc128daf5ad66ba5ebeb3e928db34088554c5fc4599b
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T01:44:20Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added apidef/oas error-override shape mapping decomposition under API-definition support model behavior.
+          changed_by: agent:codex

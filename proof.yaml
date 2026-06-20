@@ -152,6 +152,8 @@ project:
             - apidef/error_overrides.go
             - apidef/health_check.go
             - apidef/host_list.go
+            - apidef/oas/error_overrides.go
+            - apidef/oas/error_overrides_reqproof_test.go
             - apidef/oas/header.go
             - apidef/oas/header_test.go
             - apidef/oas/mcp_primitive.go

@@ -23,6 +23,7 @@ type ErrorOverrides struct {
 	Value ErrorOverridesMap `bson:"value,omitempty" json:"value,omitempty"`
 }
 
+// SW-REQ-051
 func (e *ErrorOverrides) Fill(api apidef.APIDefinition) {
 	e.Enabled = !api.ErrorOverridesDisabled
 
@@ -32,6 +33,7 @@ func (e *ErrorOverrides) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-051
 func (e *ErrorOverrides) ExtractTo(api *apidef.APIDefinition) {
 	api.ErrorOverridesDisabled = !e.Enabled
 
@@ -48,6 +50,7 @@ func (e *ErrorOverrides) ExtractTo(api *apidef.APIDefinition) {
 // ErrorOverridesMap maps status codes to their override rules.
 type ErrorOverridesMap map[string][]ErrorOverride
 
+// SW-REQ-051
 func (e *ErrorOverridesMap) Fill(api apidef.APIDefinition) {
 	if len(api.ErrorOverrides) == 0 {
 		return
@@ -68,6 +71,7 @@ func (e *ErrorOverridesMap) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-051
 func (e *ErrorOverridesMap) ExtractTo(api *apidef.APIDefinition) {
 	if e == nil || len(*e) == 0 {
 		return
@@ -97,6 +101,7 @@ type ErrorOverride struct {
 	Response ErrorResponse `bson:"response" json:"response"`
 }
 
+// SW-REQ-051
 func (eo *ErrorOverride) Fill(api apidef.ErrorOverride) {
 	if api.Match != nil {
 		eo.Match = &ErrorMatcher{
@@ -115,6 +120,7 @@ func (eo *ErrorOverride) Fill(api apidef.ErrorOverride) {
 	}
 }
 
+// SW-REQ-051
 func (eo *ErrorOverride) ExtractTo(api *apidef.ErrorOverride) {
 	if eo.Match != nil {
 		api.Match = &apidef.ErrorMatcher{}
@@ -139,6 +145,7 @@ type ErrorMatcher struct {
 	BodyValue string `bson:"bodyValue,omitempty" json:"bodyValue,omitempty"`
 }
 
+// SW-REQ-051
 func (em *ErrorMatcher) ExtractTo(api *apidef.ErrorMatcher) {
 	api.Flag = em.Flag
 	api.MessagePattern = em.MessagePattern
@@ -164,6 +171,7 @@ type ErrorResponse struct {
 	Headers map[string]string `bson:"headers,omitempty" json:"headers,omitempty"`
 }
 
+// SW-REQ-051
 func (er ErrorResponse) ExtractTo(api *apidef.ErrorResponse) {
 	api.StatusCode = er.StatusCode
 	api.Body = er.Body
