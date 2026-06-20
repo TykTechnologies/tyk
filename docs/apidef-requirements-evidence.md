@@ -37,6 +37,7 @@
 <!-- documents SW-REQ-079 -->
 <!-- documents SW-REQ-080 -->
 <!-- documents SW-REQ-081 -->
+<!-- documents SW-REQ-082 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -46,8 +47,8 @@ admission, or the full API definition lifecycle.
 `SYS-REQ-104` covers API-definition support model helpers that preserve typed
 health-check wire values, host-list access behavior, and error-override helper
 state, embedded Classic API definition schema data, Classic API definition core
-helper behavior, Apiary Blueprint importer conversion behavior, OAS path/server
-helper shapes, OAS root extension helper shapes, OAS server model helper
+helper behavior, importer source dispatcher behavior, Apiary Blueprint importer
+conversion behavior, OAS path/server helper shapes, OAS root extension helper shapes, OAS server model helper
 shapes, OAS URL rewrite helper shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint
 helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes,
@@ -64,7 +65,8 @@ configuration behavior, plus engine v3 proxy-only adapter configuration
 and supergraph adapter configuration behavior, and engine v3 utility behavior,
 engine v3 universal-data-graph adapter configuration behavior, and Classic API
 definition core model helper behavior, and Apiary Blueprint importer conversion
-behavior, without silent data-shape drift.
+behavior, and importer source dispatcher behavior, without silent data-shape
+drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -535,3 +537,13 @@ completeness, semantic validation of Blueprint parameters or schemas, upstream
 availability, gateway API loading, route generation, request matching, gateway
 request admission, mock-response middleware execution, persistence, analytics,
 or final client-visible runtime behavior.
+
+`SW-REQ-082` owns the concrete `apidef/importer/importer.go` source dispatcher
+and importer interface shape. Its evidence covers supported source selection
+for Apiary Blueprint, Swagger, and WSDL, fresh concrete importer allocation for
+repeated equivalent requests, deterministic returned importer types, and
+unsupported source rejection with no importer and an explicit error. This
+evidence does not claim Blueprint, Swagger, or WSDL parse or conversion
+correctness, gateway API loading, route generation, request matching, gateway
+request admission, persistence, analytics, or final client-visible runtime
+behavior.

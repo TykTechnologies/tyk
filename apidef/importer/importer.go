@@ -10,6 +10,7 @@ import (
 
 var log = logger.Get()
 
+// SW-REQ-082
 type APIImporter interface {
 	LoadFrom(io.Reader) error
 	ConvertIntoApiVersion(bool) (apidef.VersionInfo, error)
@@ -17,8 +18,10 @@ type APIImporter interface {
 	ToAPIDefinition(string, string, bool) (*apidef.APIDefinition, error)
 }
 
+// SW-REQ-082
 type APIImporterSource string
 
+// SW-REQ-082
 func GetImporterForSource(source APIImporterSource) (APIImporter, error) {
 	// Extend to add new importers
 	switch source {
