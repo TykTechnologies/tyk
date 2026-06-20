@@ -2959,6 +2959,7 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 	return reportableClientData, http.StatusOK
 }
 
+// SW-REQ-126
 func (gw *Gateway) oAuthTokensHandler(w http.ResponseWriter, r *http.Request) {
 	if !r.URL.Query().Has("scope") {
 		doJSONWrite(w, http.StatusUnprocessableEntity, apiError("scope parameter is required"))
@@ -2980,6 +2981,7 @@ func (gw *Gateway) oAuthTokensHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Delete Client
+// SW-REQ-126
 func (gw *Gateway) handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
 	storageID := oauthClientStorageID(keyName)
 
@@ -3028,6 +3030,7 @@ const oauthClientSecretEmpty = "client_secret is required"
 const oauthClientSecretWrong = "client secret is wrong"
 const oauthTokenEmpty = "token is required"
 
+// SW-REQ-126
 func (gw *Gateway) getApiClients(apiID string) ([]ExtendedOsinClientInterface, apiStatusMessage, int) {
 	var err error
 	filterID := prefixClient
@@ -3062,6 +3065,7 @@ func (gw *Gateway) getApiClients(apiID string) ([]ExtendedOsinClientInterface, a
 }
 
 // List Clients
+// SW-REQ-126
 func (gw *Gateway) getOauthClients(apiID string) (interface{}, int) {
 
 	clientData, _, apiStatusCode := gw.getApiClients(apiID)
@@ -3092,6 +3096,7 @@ func (gw *Gateway) getOauthClients(apiID string) (interface{}, int) {
 	return clients, http.StatusOK
 }
 
+// SW-REQ-126
 func (gw *Gateway) getApisForOauthClientId(oauthClientId string, orgId string) []string {
 	apis := []string{}
 	orgApis := gw.getApisIdsForOrg(orgId)

@@ -1694,6 +1694,24 @@ func TestGatewayOAuthClientManagementHelpers(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &appAPIs))
 	assert.Contains(t, appAPIs, spec.APIID)
 
+	clientsData, _, statusCode := ts.Gw.getApiClients(spec.APIID)
+	require.Equal(t, http.StatusOK, statusCode)
+	require.Len(t, clientsData, 1)
+	assert.Equal(t, "client-a", clientsData[0].GetId())
+
+	listed, code := ts.Gw.getOauthClients(spec.APIID)
+	require.Equal(t, http.StatusOK, code)
+	listedClients, ok := listed.([]NewClientRequest)
+	require.True(t, ok)
+	require.Len(t, listedClients, 1)
+	assert.Equal(t, "client-a", listedClients[0].ClientID)
+
+	missingList, code := ts.Gw.getOauthClients("missing-api")
+	require.Equal(t, http.StatusNotFound, code)
+	assert.Nil(t, missingList)
+
+	assert.Empty(t, ts.Gw.getApisForOauthClientId("missing-client", "default"))
+
 	for _, tc := range []struct {
 		name string
 		req  *http.Request
@@ -1720,6 +1738,78 @@ func TestGatewayOAuthClientManagementHelpers(t *testing.T) {
 
 			require.Equal(t, tc.want, rec.Code)
 			assert.JSONEq(t, tc.body, rec.Body.String())
+		})
+	}
+
+	for _, tc := range []struct {
+		name   string
+		target string
+		want   int
+		body   string
+	}{
+		{
+			name:   "purge missing scope",
+			target: "/tyk/oauth/tokens",
+			want:   http.StatusUnprocessableEntity,
+			body:   `{"status":"error","message":"scope parameter is required"}`,
+		},
+		{
+			name:   "purge unknown scope",
+			target: "/tyk/oauth/tokens?scope=expired",
+			want:   http.StatusBadRequest,
+			body:   `{"status":"error","message":"unknown scope"}`,
+		},
+		{
+			name:   "purge lapsed tokens",
+			target: "/tyk/oauth/tokens?scope=lapsed",
+			want:   http.StatusOK,
+			body:   `{"status":"ok","message":"lapsed tokens purged"}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+
+			ts.Gw.oAuthTokensHandler(rec, httptest.NewRequest(http.MethodDelete, tc.target, nil))
+
+			require.Equal(t, tc.want, rec.Code)
+			assert.JSONEq(t, tc.body, rec.Body.String())
+		})
+	}
+
+	for _, tc := range []struct {
+		name    string
+		keyName string
+		apiID   string
+		want    int
+		wantMsg interface{}
+	}{
+		{
+			name:    "delete client",
+			keyName: "client-a",
+			apiID:   spec.APIID,
+			want:    http.StatusOK,
+			wantMsg: apiModifyKeySuccess{Key: "client-a", Status: "ok", Action: "deleted"},
+		},
+		{
+			name:    "delete already absent client",
+			keyName: "client-a",
+			apiID:   spec.APIID,
+			want:    http.StatusOK,
+			wantMsg: apiModifyKeySuccess{Key: "client-a", Status: "ok", Action: "deleted"},
+		},
+		{
+			name:    "delete missing api",
+			keyName: "client-a",
+			apiID:   "missing-api",
+			want:    http.StatusNotFound,
+			wantMsg: apiError("OAuth Client ID not found"),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, code := ts.Gw.handleDeleteOAuthClient(tc.keyName, tc.apiID)
+
+			require.Equal(t, tc.want, code)
+			assert.Equal(t, tc.wantMsg, got)
 		})
 	}
 
