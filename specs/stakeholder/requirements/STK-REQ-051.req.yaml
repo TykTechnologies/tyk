@@ -5,7 +5,7 @@ priority: shall
 category: control_api
 req_type: guarantee
 fretish: ""
-description: Gateway control API support shall produce deterministic local status and JSON responses, attach secure no-cache headers to wrapped control handlers, filter allowed control API methods, perform organization-scoped local API lookup, API ID listing, API definition inventory listing and retrieval, OAS inventory retrieval, and local API add, update, delete, and persistence helper outcomes, and validate static mTLS certificate bindings for key create and update operations without claiming TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, reload durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.
+description: Gateway control API support shall produce deterministic local status and JSON responses, attach secure no-cache headers to wrapped control handlers, filter allowed control API methods, dispatch tested local API and OAS route wrappers, perform organization-scoped local API lookup, API ID listing, API definition inventory listing and retrieval, OAS inventory retrieval, and local API add, update, delete, and persistence helper outcomes, and validate static mTLS certificate bindings for key create and update operations without claiming TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, reload durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.
 formalization_strategy: informal
 informal_verification:
     method: ""
@@ -19,9 +19,9 @@ tags:
     - mtls
 variables: []
 traces:
-    reviewed_at: "2026-06-20T20:26:00.620555Z"
+    reviewed_at: "2026-06-20T20:34:32.248393Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:f12f1f2533e0b82b73c9a34831d973f84e8c385cd22019f078e9dcd3dd07d52a
+    reviewed_fingerprint: sha256:67d6ee91d3425cd4a4a6289bd641454cb8061100522e4d708e7c1163cd1028fc
 verification:
     assurance_level: A
     formalization_status: none
@@ -31,13 +31,13 @@ verification:
         role: requirements_owner
         reviewed_at: "2026-06-20T19:20:00Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway control API scope is limited to local status/JSON response helpers, secure/cache-control wrapper headers, allowed-method filtering, organization-scoped API lookup and API ID listing helpers, API definition inventory listing/retrieval helpers with explicit MCP inclusion filtering, OAS inventory list/retrieval helpers with public extension removal, API add/update/delete helper status outcomes, local filesystem write helper outcomes, static mTLS certificate-binding validation helpers, new-certificate delta calculation, and tested key create/update responses for valid and invalid certificate bindings. This approval does not claim TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, reload durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway control API scope is limited to local status/JSON response helpers, secure/cache-control wrapper headers, allowed-method filtering, tested local API/OAS route-dispatch wrappers, organization-scoped API lookup and API ID listing helpers, API definition inventory listing/retrieval helpers with explicit MCP inclusion filtering, OAS inventory list/retrieval helpers with public extension removal, API add/update/delete helper status outcomes, local filesystem write helper outcomes, static mTLS certificate-binding validation helpers, new-certificate delta calculation, and tested key create/update responses for valid and invalid certificate bindings. This approval does not claim TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, reload durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.
         ai_generated: false
 history:
     created_by: agent:codex
     created_at: "2026-06-20T19:00:00Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-20T20:35:00Z"
+    last_modified_at: "2026-06-20T20:54:00Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -49,7 +49,7 @@ stakeholder:
     story: As a gateway operator, I need control API helper responses and static mTLS certificate-binding validation to be deterministic before key configuration changes are accepted.
     acceptance_criteria:
         - id: STK-REQ-051-AC-01
-          text: Given local control API response and routing helpers, when success, error, JSON write, export, method-not-allowed, secure-header, allowed-method, organization API lookup, API definition inventory list/get, OAS inventory list/get, API add/update/delete, or local persistence helper paths are exercised, then deterministic status objects, content type, status code, body, download headers, secure no-cache headers, allowed-method dispatch, API lookup or list results, OAS extension shaping, add/update/delete status outcomes, filesystem write outcomes, or explicit error statuses are produced.
+          text: Given local control API response and routing helpers, when success, error, JSON write, export, method-not-allowed, secure-header, allowed-method, API/OAS route dispatch, organization API lookup, API definition inventory list/get, OAS inventory list/get, API add/update/delete, or local persistence helper paths are exercised, then deterministic status objects, content type, status code, body, download headers, secure no-cache headers, allowed-method dispatch, route wrapper status/header outcomes, API lookup or list results, OAS extension shaping, add/update/delete status outcomes, filesystem write outcomes, or explicit error statuses are produced.
           verification_method: test
           derived_reqs:
             - SYS-REQ-139
@@ -79,4 +79,9 @@ lifecycle:
           from: approved
           to: approved
           reason: Extended gateway control API helper scope to include API add/update/delete and local persistence helpers.
+          changed_by: human:buger
+        - date: "2026-06-20T20:54:00Z"
+          from: approved
+          to: approved
+          reason: Extended gateway control API helper scope to include tested API and OAS route-dispatch wrappers.
           changed_by: human:buger

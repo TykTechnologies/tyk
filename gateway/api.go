@@ -1596,6 +1596,7 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 	return buildSuccessResponse(apiID, "deleted")
 }
 
+// SW-REQ-129
 func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
 	polID := mux.Vars(r)["polID"]
 
@@ -1633,6 +1634,7 @@ func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
+// SW-REQ-126
 func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 
@@ -1676,6 +1678,7 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
+// SW-REQ-126
 func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 	var (
 		apiID = mux.Vars(r)["apiID"]
@@ -1703,6 +1706,7 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, jsonBytes)
 }
 
+// SW-REQ-126
 func (gw *Gateway) apiOASPostHandler(w http.ResponseWriter, r *http.Request) {
 	var (
 		obj  interface{}
@@ -1715,6 +1719,7 @@ func (gw *Gateway) apiOASPostHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
+// SW-REQ-126
 func (gw *Gateway) apiOASPutHandler(w http.ResponseWriter, r *http.Request) {
 	var (
 		apiID = mux.Vars(r)["apiID"]
@@ -1731,6 +1736,7 @@ func (gw *Gateway) apiOASPutHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
+// SW-REQ-126
 func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := strings.TrimSpace(mux.Vars(r)["apiID"])
 	if apiID == "" {

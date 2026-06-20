@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -582,6 +583,112 @@ func TestGatewayControlAPIAddUpdateDeleteHandlers(t *testing.T) {
 
 		require.Equal(t, http.StatusNotFound, code)
 		assert.Equal(t, apiError(apidef.ErrAPINotFound.Error()), response)
+	})
+}
+
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// STK-REQ-051:error_handling:negative
+// STK-REQ-051:error_handling:nominal
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:error_handling:negative
+// SYS-REQ-139:error_handling:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:error_handling:negative
+// SW-REQ-126:error_handling:nominal
+// SW-REQ-126:determinism:nominal
+func TestGatewayControlAPIRouteHandlers(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	classic := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "route-classic"
+		spec.Name = "Route Classic"
+		spec.VersionDefinition.BaseID = "base-api"
+	})[0]
+	oasSpec := BuildOASAPI(func(oasDef *oas.OAS) {
+		tykExt := oasDef.GetTykExtension()
+		tykExt.Info.ID = "route-oas"
+		tykExt.Info.Name = "Route OAS"
+		tykExt.Server.ListenPath.Value = "/route-oas/"
+	})[0]
+	loadedSpecs := ts.Gw.LoadAPI(classic, oasSpec)
+	require.Len(t, loadedSpecs, 2)
+	loadedSpecs[0].VersionDefinition.BaseID = "base-api"
+
+	t.Run("api handler gets a classic api and sets base header", func(t *testing.T) {
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodGet, "/tyk/apis/route-classic", nil), map[string]string{"apiID": "route-classic"})
+		rec := httptest.NewRecorder()
+
+		ts.Gw.apiHandler(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, "base-api", rec.Header().Get(apidef.HeaderBaseAPIID))
+		assert.Contains(t, rec.Body.String(), `"api_id":"route-classic"`)
+	})
+
+	t.Run("api handler rejects update without api id", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPut, "/tyk/apis", strings.NewReader(`{}`))
+		rec := httptest.NewRecorder()
+
+		ts.Gw.apiHandler(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Must specify an apiID to update")
+	})
+
+	t.Run("oas get handler returns oas api", func(t *testing.T) {
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodGet, "/tyk/apis/oas/route-oas", nil), map[string]string{"apiID": "route-oas"})
+		rec := httptest.NewRecorder()
+
+		ts.Gw.apiOASGetHandler(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), `"x-tyk-api-gateway"`)
+		assert.Contains(t, rec.Body.String(), `"id":"route-oas"`)
+	})
+
+	t.Run("oas post handler rejects malformed body", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/tyk/apis/oas", strings.NewReader("{"))
+		rec := httptest.NewRecorder()
+
+		ts.Gw.apiOASPostHandler(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Request malformed")
+	})
+
+	t.Run("oas put handler rejects update without api id", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPut, "/tyk/apis/oas", strings.NewReader(`{}`))
+		rec := httptest.NewRecorder()
+
+		ts.Gw.apiOASPutHandler(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Must specify an apiID to update")
+	})
+
+	t.Run("oas patch handler rejects missing api id", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPatch, "/tyk/apis/oas", strings.NewReader(`{}`))
+		rec := httptest.NewRecorder()
+
+		ts.Gw.apiOASPatchHandler(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Must specify an apiID to patch")
+	})
+
+	t.Run("oas patch handler rejects classic api", func(t *testing.T) {
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodPatch, "/tyk/apis/oas/route-classic", strings.NewReader(`{}`)), map[string]string{"apiID": "route-classic"})
+		rec := httptest.NewRecorder()
+
+		ts.Gw.apiOASPatchHandler(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), apidef.ErrAPINotMigrated.Error())
 	})
 }
 
@@ -1320,4 +1427,57 @@ func TestGatewayPolicyManagementDeletePolicy(t *testing.T) {
 	failed, code := ts.Gw.handleDeletePolicy(policy.ID)
 	require.Equal(t, http.StatusInternalServerError, code)
 	assert.Equal(t, apiError("Delete failed"), failed)
+}
+
+// Verifies: STK-REQ-054, SYS-REQ-142, SW-REQ-129
+// STK-REQ-054:STK-REQ-054-AC-01:acceptance
+// STK-REQ-054:error_handling:negative
+// STK-REQ-054:error_handling:nominal
+// SYS-REQ-142:nominal:nominal
+// SYS-REQ-142:boundary:nominal
+// SYS-REQ-142:error_handling:negative
+// SYS-REQ-142:error_handling:nominal
+// SYS-REQ-142:determinism:nominal
+// SW-REQ-129:nominal:nominal
+// SW-REQ-129:boundary:nominal
+// SW-REQ-129:error_handling:negative
+// SW-REQ-129:error_handling:nominal
+// SW-REQ-129:determinism:nominal
+func TestGatewayPolicyManagementRouteHandler(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	policyID := ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "policy-route"
+	})
+
+	t.Run("get dispatches to policy lookup", func(t *testing.T) {
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodGet, "/tyk/policies/policy-route", nil), map[string]string{"polID": policyID})
+		rec := httptest.NewRecorder()
+
+		ts.Gw.polHandler(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), `"id":"policy-route"`)
+	})
+
+	t.Run("put without policy id is rejected", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPut, "/tyk/policies", strings.NewReader(`{}`))
+		rec := httptest.NewRecorder()
+
+		ts.Gw.polHandler(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Must specify an apiID to update")
+	})
+
+	t.Run("delete without policy id is rejected", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodDelete, "/tyk/policies", nil)
+		rec := httptest.NewRecorder()
+
+		ts.Gw.polHandler(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Must specify an apiID to delete")
+	})
 }

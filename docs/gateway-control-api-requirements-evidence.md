@@ -15,6 +15,8 @@ The evidence scope includes:
 - secure/cache-control header wrapping before control API handler execution
 - allowed-method filtering that either invokes the wrapped handler or returns a
   method-not-allowed JSON response
+- local API and OAS route-dispatch wrappers for tested GET, POST, PUT, and
+  PATCH status/header outcomes
 - organization-scoped API lookup and API ID listing helpers, including fallback
   behavior when no exact organization match exists
 - API definition inventory listing and retrieval helpers, including explicit

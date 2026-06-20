@@ -5,7 +5,7 @@ priority: shall
 category: control_api
 req_type: guarantee
 fretish: the gateway_control_api shall always satisfy gateway_control_api_operation_terminal
-description: Gateway control API support shall make local response, routing, API inventory, API selection, API add/update/delete, local persistence, and static mTLS binding validation operations terminal and deterministic for status helper construction, JSON response writing, JSON export writing, method-not-allowed responses, secure no-cache header wrapping, allowed-method filtering, organization-scoped API lookup, API ID listing, API definition listing with explicit MCP inclusion filtering, classic and OAS API retrieval status handling, OAS list delegation, public OAS extension removal, API add/update/delete status handling, local filesystem write status handling, certificate-binding existence and organization-prefix validation, and new-certificate delta calculation, without claiming TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, reload durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.
+description: Gateway control API support shall make local response, routing, API inventory, API selection, API add/update/delete, local persistence, and static mTLS binding validation operations terminal and deterministic for status helper construction, JSON response writing, JSON export writing, method-not-allowed responses, secure no-cache header wrapping, allowed-method filtering, tested API and OAS route-dispatch wrappers, organization-scoped API lookup, API ID listing, API definition listing with explicit MCP inclusion filtering, classic and OAS API retrieval status handling, OAS list delegation, public OAS extension removal, API add/update/delete status handling, local filesystem write status handling, certificate-binding existence and organization-prefix validation, and new-certificate delta calculation, without claiming TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, reload durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -23,7 +23,7 @@ variables:
 traces:
     satisfies:
         - STK-REQ-051
-    reviewed_at: "2026-06-20T20:26:00.642789Z"
+    reviewed_at: "2026-06-20T20:34:32.290258Z"
     reviewed_by: human:buger
     reviewed_fingerprint: sha256:2aa59c338bc6ea8e0e44c9ab472219661a1997f2aafe311fac5182af900dd247
 verification:
@@ -35,7 +35,7 @@ verification:
         role: requirements_owner
         reviewed_at: "2026-06-20T19:20:00Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway control API system scope is limited to local helper terminality for status helper construction, JSON response/export writing, method-not-allowed responses, secure/cache-control wrapper headers, allowed-method filtering, organization-scoped API lookup, API ID listing, API definition listing with explicit MCP inclusion filtering, classic and OAS API retrieval status handling, OAS list delegation, public OAS extension removal, API add/update/delete status handling, local filesystem write status handling, static mTLS certificate-binding validation, and new-certificate delta calculation. The FRETish invariant intentionally models local operation terminality without asserting TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, reload durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway control API system scope is limited to local helper terminality for status helper construction, JSON response/export writing, method-not-allowed responses, secure/cache-control wrapper headers, allowed-method filtering, tested API/OAS route-dispatch wrappers, organization-scoped API lookup, API ID listing, API definition listing with explicit MCP inclusion filtering, classic and OAS API retrieval status handling, OAS list delegation, public OAS extension removal, API add/update/delete status handling, local filesystem write status handling, static mTLS certificate-binding validation, and new-certificate delta calculation. The FRETish invariant intentionally models local operation terminality without asserting TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, reload durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.
         ai_generated: false
     gaps_reviewed_at: "2026-06-20T19:20:00Z"
     gaps_reviewed_by: human:buger
@@ -43,13 +43,13 @@ verification:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-139|gateway_control_api_operation_terminal
           reviewer: human:buger
-          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after requirement approval. SYS-REQ-139''s gateway_control_api_operation_terminal variable is decomposed by SW-REQ-126 for local gateway control API behavior: status helper construction, JSON response/export writing, method-not-allowed responses, secure/cache-control wrapper headers, allowed-method filtering, organization-scoped API lookup, API ID listing, API definition listing with explicit MCP inclusion filtering, classic and OAS API retrieval status handling, OAS list delegation, public OAS extension removal, API add/update/delete status handling, local filesystem write status handling, static mTLS certificate-binding validation, and new-certificate delta calculation. This review is limited to local control API helper mechanics and does not claim TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, reload durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.'
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after requirement approval. SYS-REQ-139''s gateway_control_api_operation_terminal variable is decomposed by SW-REQ-126 for local gateway control API behavior: status helper construction, JSON response/export writing, method-not-allowed responses, secure/cache-control wrapper headers, allowed-method filtering, tested API/OAS route-dispatch wrappers, organization-scoped API lookup, API ID listing, API definition listing with explicit MCP inclusion filtering, classic and OAS API retrieval status handling, OAS list delegation, public OAS extension removal, API add/update/delete status handling, local filesystem write status handling, static mTLS certificate-binding validation, and new-certificate delta calculation. This review is limited to local control API helper mechanics and does not claim TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, reload durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.'
           reviewed_at: "2026-06-20T19:20:00Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T19:00:00Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-20T20:35:00Z"
+    last_modified_at: "2026-06-20T20:54:00Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -77,4 +77,9 @@ lifecycle:
           from: approved
           to: approved
           reason: Extended gateway control API system requirement to include API add/update/delete and local persistence helpers.
+          changed_by: human:buger
+        - date: "2026-06-20T20:54:00Z"
+          from: approved
+          to: approved
+          reason: Extended gateway control API system requirement to include tested API and OAS route-dispatch wrappers.
           changed_by: human:buger
