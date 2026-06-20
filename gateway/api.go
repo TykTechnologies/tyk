@@ -107,10 +107,12 @@ type apiStatusMessage struct {
 	Message string `json:"message"`
 }
 
+// SW-REQ-126
 func apiOk(msg string) apiStatusMessage {
 	return apiStatusMessage{"ok", msg}
 }
 
+// SW-REQ-126
 func apiError(msg string) apiStatusMessage {
 	return apiStatusMessage{"error", msg}
 }
@@ -118,6 +120,7 @@ func apiError(msg string) apiStatusMessage {
 // validateMtlsStaticCertificateBindings validates that all certificate IDs in the
 // mtls_static_certificate_bindings array exist in the certificate manager.
 // Returns an error with the specific certificate ID if validation fails.
+// SW-REQ-126
 func (gw *Gateway) validateMtlsStaticCertificateBindings(certIDs []string, orgID string) error {
 	if len(certIDs) == 0 {
 		return nil
@@ -148,6 +151,7 @@ func (gw *Gateway) validateMtlsStaticCertificateBindings(certIDs []string, orgID
 
 // getNewCertIDs returns only the certificate IDs that are in newCerts but not in originalCerts.
 // Used for optimizing updates to only validate newly added certificates.
+// SW-REQ-126
 func getNewCertIDs(originalCerts, newCerts []string) []string {
 	if len(originalCerts) == 0 {
 		return newCerts
@@ -196,6 +200,7 @@ type VersionMeta struct {
 	IsDefaultVersion bool   `json:"isDefaultVersion"`
 }
 
+// SW-REQ-126
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(code)
@@ -216,6 +221,7 @@ func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 	}
 }
 
+// SW-REQ-126
 func doJSONExport(w http.ResponseWriter, code int, obj interface{}, fileName string) {
 
 	if code != http.StatusOK {
@@ -244,10 +250,12 @@ func doJSONExport(w http.ResponseWriter, code int, obj interface{}, fileName str
 
 type MethodNotAllowedHandler struct{}
 
+// SW-REQ-126
 func (m MethodNotAllowedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusMethodNotAllowed, apiError("Method not supported"))
 }
 
+// SW-REQ-126
 func addSecureAndCacheHeaders(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Setting OWASP Secure Headers

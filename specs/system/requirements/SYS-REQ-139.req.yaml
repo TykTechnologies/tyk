@@ -1,0 +1,65 @@
+id: SYS-REQ-139
+version: 1
+status: approved
+priority: shall
+category: control_api
+req_type: guarantee
+fretish: the gateway_control_api shall always satisfy gateway_control_api_operation_terminal
+description: Gateway control API support shall make local response and static mTLS binding validation operations terminal and deterministic for status helper construction, JSON response writing, JSON export writing, method-not-allowed responses, secure no-cache header wrapping, certificate-binding existence and organization-prefix validation, and new-certificate delta calculation, without claiming TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, dashboard behavior, network transport behavior, or final client-visible behavior beyond the local control API helper and tested handler responses.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-051
+component: gateway_control_api
+rationale: This system requirement owns local gateway control API helper terminality and static certificate-binding validation decisions only. Runtime TLS authentication, persistence durability, and broader control-plane behavior are outside this proof slice.
+tags:
+    - gateway
+    - control-api
+    - mtls
+variables:
+    - gateway_control_api_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-051
+    reviewed_at: "2026-06-20T19:08:58.173011Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:2aa59c338bc6ea8e0e44c9ab472219661a1997f2aafe311fac5182af900dd247
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T19:00:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway control API system scope is limited to local helper terminality for status helper construction, JSON response/export writing, method-not-allowed responses, secure/cache-control wrapper headers, static mTLS certificate-binding validation, and new-certificate delta calculation. The FRETish invariant intentionally models local operation terminality without asserting TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, dashboard behavior, network transport behavior, or final client-visible behavior beyond the local control API helper and tested handler responses.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T19:00:00Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-139|gateway_control_api_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after requirement approval. SYS-REQ-139''s gateway_control_api_operation_terminal variable is decomposed by SW-REQ-126 for local gateway control API behavior: status helper construction, JSON response/export writing, method-not-allowed responses, secure/cache-control wrapper headers, static mTLS certificate-binding validation, and new-certificate delta calculation. This review is limited to local control API helper mechanics and does not claim TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, dashboard behavior, network transport behavior, or final client-visible behavior beyond the local control API helper and tested handler responses.'
+          reviewed_at: "2026-06-20T19:00:00Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T19:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T19:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T19:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway control API system requirement for local helper and static mTLS binding validation behavior.
+          changed_by: human:buger

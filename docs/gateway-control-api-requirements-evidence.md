@@ -1,0 +1,27 @@
+# Gateway Control API Requirements Evidence
+
+<!-- documents STK-REQ-051 SYS-REQ-139 SW-REQ-126 -->
+
+`STK-REQ-051`, `SYS-REQ-139`, and `SW-REQ-126` cover local gateway
+control API helper behavior in `gateway/api.go`.
+
+The evidence scope includes:
+
+- stable control API status helper objects for success and error messages
+- JSON response writing for structured objects, pre-encoded byte payloads, and
+  method-not-allowed responses
+- JSON export response writing for successful downloads and non-success
+  delegation to the normal JSON writer
+- secure/cache-control header wrapping before control API handler execution
+- static mTLS certificate-binding helper validation for empty bindings,
+  existing certificate IDs, organization-prefixed certificate IDs, wrong-org
+  IDs, path traversal-shaped IDs, and missing certificates
+- new-certificate delta calculation for key update validation
+- create-key and update-key control API paths accepting valid static mTLS
+  certificate bindings and rejecting invalid new bindings
+
+This evidence intentionally does not claim TLS handshake enforcement, runtime
+certificate authentication decisions, upstream TLS validation, certificate
+storage durability, dashboard behavior, network transport behavior, or final
+client-visible behavior beyond the local control API helper and tested handler
+responses.

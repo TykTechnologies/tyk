@@ -5782,6 +5782,12 @@ func TestHandleDeleteMCPAPI_RemoveVersionAtomically(t *testing.T) {
 	}...)
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-02:acceptance
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:determinism:nominal
 func TestGetNewCertIDs(t *testing.T) {
 	t.Run("Empty original, non-empty new", func(t *testing.T) {
 		original := []string{}
@@ -5826,6 +5832,14 @@ func TestGetNewCertIDs(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-02:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:error_handling:negative
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:error_handling:negative
 func TestValidateMtlsStaticCertificateBindings(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -5914,6 +5928,12 @@ func TestValidateMtlsStaticCertificateBindings(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-02:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:error_handling:negative
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:error_handling:negative
 func TestCreateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -5991,6 +6011,14 @@ func TestCreateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-02:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:error_handling:negative
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:error_handling:negative
 func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

@@ -19,8 +19,9 @@ tags:
     - oauth
 variables: []
 traces:
-    reviewed_at: "2026-06-20T18:20:00Z"
+    reviewed_at: "2026-06-20T19:09:39.770135Z"
     reviewed_by: human:buger
+    reviewed_fingerprint: sha256:50198187ec0d7cc5f36549209d2ed8dd5b981e508e5084c0494a2fadc9b58831
 verification:
     assurance_level: A
     formalization_status: none
