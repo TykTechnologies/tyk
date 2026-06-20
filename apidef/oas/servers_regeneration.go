@@ -10,6 +10,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
+// SW-REQ-059
 // ServerRegenerationConfig holds the configuration required for server URL regeneration.
 type ServerRegenerationConfig struct {
 	// Protocol is the URL scheme (http:// or https://).
@@ -22,6 +23,7 @@ type ServerRegenerationConfig struct {
 	HybridEnabled bool
 }
 
+// SW-REQ-059
 // EdgeEndpoint represents an edge gateway endpoint configuration.
 type EdgeEndpoint struct {
 	// Endpoint is the edge gateway URL (e.g., "http://edge1.example.com").
@@ -30,12 +32,14 @@ type EdgeEndpoint struct {
 	Tags []string
 }
 
+// SW-REQ-059
 // serverInfo holds information about a server URL to be added to OAS.
 type serverInfo struct {
 	url         string
 	description string
 }
 
+// SW-REQ-059
 // RegenerateServers updates the servers section of an OAS API definition
 //  1. Computes old Tyk-generated servers from oldAPIData state (if provided)
 //  2. Removes old Tyk servers from the OAS spec
@@ -96,6 +100,7 @@ func (s *OAS) RegenerateServers(
 	return nil
 }
 
+// SW-REQ-059
 // GenerateTykServers generates and returns only Tyk-managed server URLs for an API.
 // This is a convenience method that generates servers without modifying the OAS spec.
 // Unlike RegenerateServers, this does not include user-defined servers and does not
@@ -119,6 +124,7 @@ func (s *OAS) GenerateTykServers(
 	return servers
 }
 
+// SW-REQ-059
 // generateTykServers generates all Tyk-managed server URLs for an API.
 func generateTykServers(
 	apiData *apidef.APIDefinition,
@@ -140,6 +146,7 @@ func generateTykServers(
 	return generateStandardServers(apiData, config)
 }
 
+// SW-REQ-059
 // generateStandardServers generates server URLs for non-versioned APIs.
 func generateStandardServers(apiData *apidef.APIDefinition, config ServerRegenerationConfig) []serverInfo {
 	hosts := determineHosts(apiData, config)
@@ -156,6 +163,7 @@ func generateStandardServers(apiData *apidef.APIDefinition, config ServerRegener
 	return servers
 }
 
+// SW-REQ-059
 // generateVersionedServers generates server URLs for versioned child APIs.
 // It builds URLs according to the base API's versioning method.
 func generateVersionedServers(
@@ -236,6 +244,7 @@ func generateVersionedServers(
 	return servers
 }
 
+// SW-REQ-059
 // determineHosts determines which hosts to use for server URL generation.
 func determineHosts(apiData *apidef.APIDefinition, config ServerRegenerationConfig) []string {
 	if domain := apiData.GetAPIDomain(); domain != "" {
@@ -246,6 +255,7 @@ func determineHosts(apiData *apidef.APIDefinition, config ServerRegenerationConf
 	return appendRelativePathIfNotPresent(hosts)
 }
 
+// SW-REQ-059
 // determineHostsWithEdgeSupport determines hosts based on edge endpoints and API tags.
 func determineHostsWithEdgeSupport(apiData *apidef.APIDefinition, config ServerRegenerationConfig) []string {
 	if apiData.TagsDisabled {
@@ -274,6 +284,7 @@ func determineHostsWithEdgeSupport(apiData *apidef.APIDefinition, config ServerR
 	return appendRelativePathIfNotPresent(matchingHosts)
 }
 
+// SW-REQ-059
 // findEndpointsMatchingTags returns edge endpoint URLs with at least one matching tag.
 func findEndpointsMatchingTags(apiTags []string, edgeEndpoints []EdgeEndpoint) []string {
 	var matchingHosts []string
@@ -287,6 +298,7 @@ func findEndpointsMatchingTags(apiTags []string, edgeEndpoints []EdgeEndpoint) [
 	return matchingHosts
 }
 
+// SW-REQ-059
 // buildTagSet creates a map for O(1) tag lookups.
 func buildTagSet(tags []string) map[string]bool {
 	tagSet := make(map[string]bool, len(tags))
@@ -296,6 +308,7 @@ func buildTagSet(tags []string) map[string]bool {
 	return tagSet
 }
 
+// SW-REQ-059
 // hasAnyTagMatch returns true if any API tag matches any endpoint tag.
 func hasAnyTagMatch(apiTags []string, endpointTags []string) bool {
 	tagSet := buildTagSet(endpointTags)
@@ -307,6 +320,7 @@ func hasAnyTagMatch(apiTags []string, endpointTags []string) bool {
 	return false
 }
 
+// SW-REQ-059
 // appendRelativePathIfNotPresent adds a relative path (empty string) if not present.
 func appendRelativePathIfNotPresent(hosts []string) []string {
 	for _, host := range hosts {
@@ -317,6 +331,7 @@ func appendRelativePathIfNotPresent(hosts []string) []string {
 	return append(hosts, "")
 }
 
+// SW-REQ-059
 // buildServerURL constructs a server URL. Returns relative path if host is empty.
 func buildServerURL(protocol, host, listenPath string) string {
 	if !strings.HasPrefix(listenPath, "/") {
@@ -341,6 +356,7 @@ func buildServerURL(protocol, host, listenPath string) string {
 	return protocol + host + listenPath
 }
 
+// SW-REQ-059
 // buildVersionedServerURL constructs a server URL for a versioned API
 // based on the versioning method (URL path, query param, or header).
 func buildVersionedServerURL(
@@ -369,6 +385,7 @@ func buildVersionedServerURL(
 	return baseURL, description
 }
 
+// SW-REQ-059
 // removeTykGeneratedURLs removes Tyk-generated server URLs from the servers list.
 // It uses URL normalization for robust matching and preserves all other servers.
 func removeTykGeneratedURLs(servers openapi3.Servers, tykURLs []string) openapi3.Servers {
@@ -395,6 +412,7 @@ func removeTykGeneratedURLs(servers openapi3.Servers, tykURLs []string) openapi3
 	return userServers
 }
 
+// SW-REQ-059
 // normalizeServerURL normalizes a server URL for comparison.
 // This handles trailing slashes, double slashes, and other URL inconsistencies.
 func normalizeServerURL(rawURL string) string {
@@ -413,6 +431,7 @@ func normalizeServerURL(rawURL string) string {
 	return u.String()
 }
 
+// SW-REQ-059
 // containsString checks if a string slice contains a specific string.
 func containsString(slice []string, item string) bool {
 	for _, s := range slice {
@@ -423,6 +442,7 @@ func containsString(slice []string, item string) bool {
 	return false
 }
 
+// SW-REQ-059
 // ShouldUpdateChildAPIs checks if child APIs need server updates after a base API change.
 //
 // Configuration changes that trigger child API updates:
@@ -473,6 +493,7 @@ func ShouldUpdateChildAPIs(newAPI, oldAPI *apidef.APIDefinition) bool {
 	return false
 }
 
+// SW-REQ-059
 // ShouldUpdateOldDefaultChild determines if the old default child API needs server regeneration
 // when creating a new child version with set_default=true. This is necessary to remove the
 // fallback URL from the old default child since it's no longer the default.
@@ -510,6 +531,7 @@ func ShouldUpdateOldDefaultChild(
 	return true
 }
 
+// SW-REQ-059
 // ExtractUserServers extracts user provided servers from an existing OAS API
 // by regenerating what the Tyk servers should be and filtering them out.
 func ExtractUserServers(
