@@ -1,84 +1,77 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-20T13:04:43Z"
+generated_at: "2026-06-20T13:30:24Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
       decision: no-authored-change
-      change_type: refactor
-      reviewer: agent:codex
-      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      reviewer: human:buger
+      reason: Reviewed current branch production diffs for osutil, sanitize, and policy apply; changes are ReqProof annotations or fixes/restorations already covered by existing requirements and design notes, so no authored requirement text change is needed.
       base: origin/master
-      requirement_fingerprint: sha256:c047c407da7dd577411c57f62c7d9380d105c33ec042a54e1d4374d93b4f8590
+      requirement_fingerprint: sha256:de13e8599a696f0dab5d3141d391a60380c38f13b68c3736b70df110a396cc0e
       approval_fingerprint: sha256:23071baf4eeb9959df9e4254d278a7731a74c82a5f3f838d7106f11e50fe5de1
       artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
-      reviewed_at: "2026-06-19T11:14:52Z"
+      reviewed_at: "2026-06-20T13:29:48Z"
     - requirement: STK-REQ-002
       artifact: internal/policy/apply.go
       decision: no-authored-change
-      change_type: refactor
-      reviewer: agent:codex
-      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      reviewer: human:buger
+      reason: Reviewed current branch production diffs for osutil, sanitize, and policy apply; changes are ReqProof annotations or fixes/restorations already covered by existing requirements and design notes, so no authored requirement text change is needed.
       base: origin/master
-      requirement_fingerprint: sha256:46fe1a71febd56a2cf6a47d3b261886b4832645adb79be1a56129b2243f2e2cc
+      requirement_fingerprint: sha256:36f6a42cabf800134080acda5d0bb36e67929257f72f5baa1cca665a01ad2ce6
       approval_fingerprint: sha256:9106997346062b9c765406137492c2492631bed5f9f25f881dd7cf106e73c5f2
       artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
-      reviewed_at: "2026-06-19T11:14:52Z"
+      reviewed_at: "2026-06-20T13:29:48Z"
     - requirement: STK-REQ-003
       artifact: internal/policy/apply.go
       decision: no-authored-change
-      change_type: refactor
-      reviewer: agent:codex
-      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      reviewer: human:buger
+      reason: Reviewed current branch production diffs for osutil, sanitize, and policy apply; changes are ReqProof annotations or fixes/restorations already covered by existing requirements and design notes, so no authored requirement text change is needed.
       base: origin/master
-      requirement_fingerprint: sha256:6cab2673baf528f841761e7d835ff4c7c86d97c6f320d2e708f63e1596ac8f07
+      requirement_fingerprint: sha256:b8ff483db4a0a3fd84ed803ede6f7e374994a03a7a5db01503a3077a50f1d306
       approval_fingerprint: sha256:a186daee7253389c030e08887cbe5492444875e343ceec74ce7ef67db9a0e9e6
       artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
-      reviewed_at: "2026-06-19T11:14:52Z"
+      reviewed_at: "2026-06-20T13:29:48Z"
     - requirement: STK-REQ-004
       artifact: internal/policy/apply.go
       decision: no-authored-change
-      change_type: refactor
-      reviewer: agent:codex
-      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      reviewer: human:buger
+      reason: Reviewed current branch production diffs for osutil, sanitize, and policy apply; changes are ReqProof annotations or fixes/restorations already covered by existing requirements and design notes, so no authored requirement text change is needed.
       base: origin/master
-      requirement_fingerprint: sha256:890faecaf8cb433a4c57861c5afd5bc9894cc610f2e4bd503de591c7f8832b31
+      requirement_fingerprint: sha256:ecf8534441acfbe8e6574ad96df53538872c3d5ef8b5218310eb358c072b77df
       approval_fingerprint: sha256:3d32f9e7a3cdf23d4d9c677ded8ca3cc3c4ba6cac0e9f10daa6622b7a7bf9acf
       artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
-      reviewed_at: "2026-06-19T11:14:52Z"
+      reviewed_at: "2026-06-20T13:29:48Z"
     - requirement: STK-REQ-005
       artifact: internal/policy/apply.go
       decision: no-authored-change
-      change_type: refactor
-      reviewer: agent:codex
-      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      reviewer: human:buger
+      reason: Reviewed current branch production diffs for osutil, sanitize, and policy apply; changes are ReqProof annotations or fixes/restorations already covered by existing requirements and design notes, so no authored requirement text change is needed.
       base: origin/master
-      requirement_fingerprint: sha256:9898a196dc70687ca71eea8a96cc6f26da34adf6209dde915605347cac1091e3
+      requirement_fingerprint: sha256:9a626a44c180fdb42db2ea8e3f64ef3c9790e94a580033e925fa6eb1bec6de0f
       approval_fingerprint: sha256:303fb9a0b2e1e65181b46a10cd8307a4b852da7b3343695e022686804bc91040
       artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
-      reviewed_at: "2026-06-19T11:14:52Z"
+      reviewed_at: "2026-06-20T13:29:48Z"
     - requirement: STK-REQ-006
       artifact: internal/policy/apply.go
       decision: no-authored-change
-      change_type: refactor
-      reviewer: agent:codex
-      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      reviewer: human:buger
+      reason: Reviewed current branch production diffs for osutil, sanitize, and policy apply; changes are ReqProof annotations or fixes/restorations already covered by existing requirements and design notes, so no authored requirement text change is needed.
       base: origin/master
-      requirement_fingerprint: sha256:f9248c403e1e4f235a531d1bdfc0c09285fd54dfdedd075f992700d9ea5503bc
+      requirement_fingerprint: sha256:fa32a7f2a107644353ce1653d2383114ff9a8b13a4b6752d380cc6cf4207901b
       approval_fingerprint: sha256:c7db53feabf89b737e5e359915956002591a01af2572c2d1eb9568819e5e4348
       artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
-      reviewed_at: "2026-06-19T11:14:52Z"
+      reviewed_at: "2026-06-20T13:29:48Z"
     - requirement: STK-REQ-007
       artifact: internal/policy/apply.go
       decision: no-authored-change
-      change_type: refactor
-      reviewer: agent:codex
-      reason: 'Reviewed policy apply.go proof-annotation cleanup: removed an unfaithful Duration assume and unproved duration-branch lemma claim; production runtime behavior and SYS-REQ-035 rate-boundary assumption remain unchanged.'
+      reviewer: human:buger
+      reason: Reviewed current branch production diffs for osutil, sanitize, and policy apply; changes are ReqProof annotations or fixes/restorations already covered by existing requirements and design notes, so no authored requirement text change is needed.
       base: origin/master
-      requirement_fingerprint: sha256:24b7a1135aa1cbd93113f6ad7b7a995e6d8af17a3fba694477306b3f6132a144
+      requirement_fingerprint: sha256:d4c77a532e96175ec960f7d944a36de94aa839769b04c2fdf55ec528b8b5f99d
       approval_fingerprint: sha256:9a3f20b699c12d36a6e06a77e8c047c30b486497329ddcf77677540609fa9ff1
       artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
-      reviewed_at: "2026-06-19T11:14:52Z"
+      reviewed_at: "2026-06-20T13:29:48Z"
     - requirement: SW-REQ-002
       artifact: internal/policy/apply.go
       decision: no-authored-change
@@ -1105,99 +1098,90 @@ reviews:
     - requirement: SYS-REQ-091
       artifact: internal/sanitize/path.go
       decision: no-authored-change
-      change_type: refactor
-      reviewer: agent:codex
-      reason: 'Reviewed internal/sanitize/path.go changes for SYS-REQ-091 through SYS-REQ-094: added unexported seams that default to the same filepath.IsAbs, filepath.VolumeName, and filepath.Rel functions for direct defensive-path evidence; rewrote the bounded URL decode loop to the same three decode attempts; removed only the second decoded-empty check because empty component input is rejected before decoding and successful URL unescape of a non-empty string cannot produce a zero-length string. Requirement intent and product behavior are unchanged except that the newly documented KnownIssue reproducers expose pre-existing sanitizer defects.'
+      reviewer: human:buger
+      reason: Reviewed current branch production diffs for osutil, sanitize, and policy apply; changes are ReqProof annotations or fixes/restorations already covered by existing requirements and design notes, so no authored requirement text change is needed.
       base: origin/master
       requirement_fingerprint: sha256:8d1bb25559e3b4014ca42de0eb346cef4f6bb65a95e916f643f930bace643915
       approval_fingerprint: sha256:7e6f6617f0c21aeed7194ea177bfa7014fbdeabb3ecc395b4ce34fc4791e6d81
-      artifact_fingerprint: sha256:d46784507cc214aa8932513b2cf2a3d13d42617a6f0bd6a72deb35c915924358
-      reviewed_at: "2026-06-18T21:53:37Z"
+      artifact_fingerprint: sha256:2d7a9103a34a9859e79e0ce389402e0c6c7f40246271ca6e8879cdccbc16eb39
+      reviewed_at: "2026-06-20T13:29:48Z"
     - requirement: SYS-REQ-092
       artifact: internal/sanitize/path.go
       decision: no-authored-change
-      change_type: refactor
-      reviewer: agent:codex
-      reason: 'Reviewed internal/sanitize/path.go changes for SYS-REQ-091 through SYS-REQ-094: added unexported seams that default to the same filepath.IsAbs, filepath.VolumeName, and filepath.Rel functions for direct defensive-path evidence; rewrote the bounded URL decode loop to the same three decode attempts; removed only the second decoded-empty check because empty component input is rejected before decoding and successful URL unescape of a non-empty string cannot produce a zero-length string. Requirement intent and product behavior are unchanged except that the newly documented KnownIssue reproducers expose pre-existing sanitizer defects.'
+      reviewer: human:buger
+      reason: Reviewed current branch production diffs for osutil, sanitize, and policy apply; changes are ReqProof annotations or fixes/restorations already covered by existing requirements and design notes, so no authored requirement text change is needed.
       base: origin/master
       requirement_fingerprint: sha256:0c822b09e3ef27df2ff7d18ee91cb6777dcd9b05ea9b56570d0c5ed90b44adea
       approval_fingerprint: sha256:c7b3217c3b0bb4db19e36e62a9c2970dd44d676fdf24a4317bdd30f645e1819a
-      artifact_fingerprint: sha256:d46784507cc214aa8932513b2cf2a3d13d42617a6f0bd6a72deb35c915924358
-      reviewed_at: "2026-06-18T21:53:37Z"
+      artifact_fingerprint: sha256:2d7a9103a34a9859e79e0ce389402e0c6c7f40246271ca6e8879cdccbc16eb39
+      reviewed_at: "2026-06-20T13:29:48Z"
     - requirement: SYS-REQ-093
       artifact: internal/sanitize/path.go
       decision: no-authored-change
-      change_type: refactor
-      reviewer: agent:codex
-      reason: 'Reviewed internal/sanitize/path.go changes for SYS-REQ-091 through SYS-REQ-094: added unexported seams that default to the same filepath.IsAbs, filepath.VolumeName, and filepath.Rel functions for direct defensive-path evidence; rewrote the bounded URL decode loop to the same three decode attempts; removed only the second decoded-empty check because empty component input is rejected before decoding and successful URL unescape of a non-empty string cannot produce a zero-length string. Requirement intent and product behavior are unchanged except that the newly documented KnownIssue reproducers expose pre-existing sanitizer defects.'
+      reviewer: human:buger
+      reason: Reviewed current branch production diffs for osutil, sanitize, and policy apply; changes are ReqProof annotations or fixes/restorations already covered by existing requirements and design notes, so no authored requirement text change is needed.
       base: origin/master
       requirement_fingerprint: sha256:5ec1ce6a793853ae1003b5e7e0f1e2bb386e47d684ab8d7c8640e2366a8cfe0f
       approval_fingerprint: sha256:f65c1f5bdf694341c125d5dc66ed1daa0a4865e2a4a893a0ad6ccf0be0dfd8c5
-      artifact_fingerprint: sha256:d46784507cc214aa8932513b2cf2a3d13d42617a6f0bd6a72deb35c915924358
-      reviewed_at: "2026-06-18T21:53:37Z"
+      artifact_fingerprint: sha256:2d7a9103a34a9859e79e0ce389402e0c6c7f40246271ca6e8879cdccbc16eb39
+      reviewed_at: "2026-06-20T13:29:48Z"
     - requirement: SYS-REQ-094
       artifact: internal/sanitize/path.go
       decision: no-authored-change
-      change_type: refactor
-      reviewer: agent:codex
-      reason: 'Reviewed internal/sanitize/path.go changes for SYS-REQ-091 through SYS-REQ-094: added unexported seams that default to the same filepath.IsAbs, filepath.VolumeName, and filepath.Rel functions for direct defensive-path evidence; rewrote the bounded URL decode loop to the same three decode attempts; removed only the second decoded-empty check because empty component input is rejected before decoding and successful URL unescape of a non-empty string cannot produce a zero-length string. Requirement intent and product behavior are unchanged except that the newly documented KnownIssue reproducers expose pre-existing sanitizer defects.'
+      reviewer: human:buger
+      reason: Reviewed current branch production diffs for osutil, sanitize, and policy apply; changes are ReqProof annotations or fixes/restorations already covered by existing requirements and design notes, so no authored requirement text change is needed.
       base: origin/master
       requirement_fingerprint: sha256:c119c332e35bb7b31164a1d04e304505aa0d3c3eeed9825212d4574cc3ff245b
       approval_fingerprint: sha256:94391f6f11ac6995257721e34bf6be384ff6930f0ed07eaa133be1b062716e6b
-      artifact_fingerprint: sha256:d46784507cc214aa8932513b2cf2a3d13d42617a6f0bd6a72deb35c915924358
-      reviewed_at: "2026-06-18T21:53:37Z"
+      artifact_fingerprint: sha256:2d7a9103a34a9859e79e0ce389402e0c6c7f40246271ca6e8879cdccbc16eb39
+      reviewed_at: "2026-06-20T13:29:48Z"
     - requirement: SYS-REQ-098
       artifact: internal/osutil/osutil.go
       decision: no-authored-change
-      change_type: refactor
-      reviewer: agent:codex
-      reason: 'Reviewed internal/osutil/osutil.go changes for SYS-REQ-098, SYS-REQ-099, and SYS-REQ-102: introduced unexported seams that default to the same filepath.Abs, os.Stat, os.WriteFile, and os.Remove functions, plus requirement trace comments. Runtime behavior remains unchanged; the symlink escape behavior is pre-existing and is tracked separately as KI-OSUTIL-SYMLINK-ESCAPE with a reproducer.'
+      reviewer: human:buger
+      reason: Reviewed current branch production diffs for osutil, sanitize, and policy apply; changes are ReqProof annotations or fixes/restorations already covered by existing requirements and design notes, so no authored requirement text change is needed.
       base: origin/master
       requirement_fingerprint: sha256:e8684285a85b7ec0bdd9e6e1b3916c28d05cc1b16045d740d713b30080643346
       approval_fingerprint: sha256:4fc87f1a3598a37a4440721d936d5ec06aaa9b560ec3d65068ceb0dcdf78d754
-      artifact_fingerprint: sha256:723e27cf714204b562a50cf3da39e6e7edb82b384895b4e273887edd04b6f135
-      reviewed_at: "2026-06-19T06:21:38Z"
+      artifact_fingerprint: sha256:cc044bf87d947904725c36e1adbfe7b84448d5702004b5db737d45344efdfc9e
+      reviewed_at: "2026-06-20T13:29:48Z"
     - requirement: SYS-REQ-099
       artifact: internal/osutil/osutil.go
       decision: no-authored-change
-      change_type: refactor
-      reviewer: agent:codex
-      reason: 'Reviewed internal/osutil/osutil.go changes for SYS-REQ-098, SYS-REQ-099, and SYS-REQ-102: introduced unexported seams that default to the same filepath.Abs, os.Stat, os.WriteFile, and os.Remove functions, plus requirement trace comments. Runtime behavior remains unchanged; the symlink escape behavior is pre-existing and is tracked separately as KI-OSUTIL-SYMLINK-ESCAPE with a reproducer.'
+      reviewer: human:buger
+      reason: Reviewed current branch production diffs for osutil, sanitize, and policy apply; changes are ReqProof annotations or fixes/restorations already covered by existing requirements and design notes, so no authored requirement text change is needed.
       base: origin/master
       requirement_fingerprint: sha256:9fd6d3e1c5233e458a9b135d62cc73343f93696a765c6780f2c420e75fc3b0ab
       approval_fingerprint: sha256:1837dd5feb775f73ff54515f1ccc2e194723c9d5d88e472d19881b1cf40915b2
-      artifact_fingerprint: sha256:723e27cf714204b562a50cf3da39e6e7edb82b384895b4e273887edd04b6f135
-      reviewed_at: "2026-06-19T06:21:38Z"
+      artifact_fingerprint: sha256:cc044bf87d947904725c36e1adbfe7b84448d5702004b5db737d45344efdfc9e
+      reviewed_at: "2026-06-20T13:29:48Z"
     - requirement: SYS-REQ-100
       artifact: internal/osutil/osutil.go
       decision: no-authored-change
-      change_type: refactor
-      reviewer: agent:codex
-      reason: 'Reviewed internal/osutil/osutil.go changes for SYS-REQ-100 and SYS-REQ-101: requirement trace comments were added and shared defaulted test seams were introduced for neighboring filesystem helpers. The Ensure path-resolution logic itself is unchanged; lexical in-root resolution and lexical escape rejection behavior remain as specified and tested.'
+      reviewer: human:buger
+      reason: Reviewed osutil production diff; remaining changes are ReqProof trace annotations on existing scoped path helpers, with no runtime behavior or authored requirement contract change.
       base: origin/master
       requirement_fingerprint: sha256:9821e33f89ca1c821e07dcc2e3e074e454b8c81f2c7c574d5c0ee5e24173a1d3
       approval_fingerprint: sha256:f6dd9ff5259afcf6ed584e8963824a5a035f4b260843c9033b07fe9e54ed2405
-      artifact_fingerprint: sha256:723e27cf714204b562a50cf3da39e6e7edb82b384895b4e273887edd04b6f135
-      reviewed_at: "2026-06-19T06:22:36Z"
+      artifact_fingerprint: sha256:cc044bf87d947904725c36e1adbfe7b84448d5702004b5db737d45344efdfc9e
+      reviewed_at: "2026-06-20T13:30:24Z"
     - requirement: SYS-REQ-101
       artifact: internal/osutil/osutil.go
       decision: no-authored-change
-      change_type: refactor
-      reviewer: agent:codex
-      reason: 'Reviewed internal/osutil/osutil.go changes for SYS-REQ-100 and SYS-REQ-101: requirement trace comments were added and shared defaulted test seams were introduced for neighboring filesystem helpers. The Ensure path-resolution logic itself is unchanged; lexical in-root resolution and lexical escape rejection behavior remain as specified and tested.'
+      reviewer: human:buger
+      reason: Reviewed osutil production diff; remaining changes are ReqProof trace annotations on existing scoped path helpers, with no runtime behavior or authored requirement contract change.
       base: origin/master
       requirement_fingerprint: sha256:4cee9ca829a33c3a9ef760c9ee4fab1ffee59dfe479be5b31f09adf3b48fbb02
       approval_fingerprint: sha256:4395375840db1727b16b5cb675123dcef3ce239e4dd71495b9d0f0bcae7b1707
-      artifact_fingerprint: sha256:723e27cf714204b562a50cf3da39e6e7edb82b384895b4e273887edd04b6f135
-      reviewed_at: "2026-06-19T06:22:36Z"
+      artifact_fingerprint: sha256:cc044bf87d947904725c36e1adbfe7b84448d5702004b5db737d45344efdfc9e
+      reviewed_at: "2026-06-20T13:30:24Z"
     - requirement: SYS-REQ-102
       artifact: internal/osutil/osutil.go
       decision: no-authored-change
-      change_type: refactor
-      reviewer: agent:codex
-      reason: 'Reviewed internal/osutil/osutil.go changes for SYS-REQ-098, SYS-REQ-099, and SYS-REQ-102: introduced unexported seams that default to the same filepath.Abs, os.Stat, os.WriteFile, and os.Remove functions, plus requirement trace comments. Runtime behavior remains unchanged; the symlink escape behavior is pre-existing and is tracked separately as KI-OSUTIL-SYMLINK-ESCAPE with a reproducer.'
+      reviewer: human:buger
+      reason: Reviewed osutil production diff; remaining changes are ReqProof trace annotations on existing scoped path helpers, with no runtime behavior or authored requirement contract change.
       base: origin/master
       requirement_fingerprint: sha256:873dc0eba43fb2c692ee382bc2443f348f8f20a93be34066cdfbd37df3b39a96
       approval_fingerprint: sha256:a4f18d68d3220aab8f0f28e1aed2ccf6818bef57fb2acd51cfa8e7d5b66b707b
-      artifact_fingerprint: sha256:723e27cf714204b562a50cf3da39e6e7edb82b384895b4e273887edd04b6f135
-      reviewed_at: "2026-06-19T06:21:38Z"
+      artifact_fingerprint: sha256:cc044bf87d947904725c36e1adbfe7b84448d5702004b5db737d45344efdfc9e
+      reviewed_at: "2026-06-20T13:30:24Z"
