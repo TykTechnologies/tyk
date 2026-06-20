@@ -44,8 +44,8 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 147/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
-| `mcdc_coverage` | 52/391 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
+| `verification_scope_complete` | 148/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `mcdc_coverage` | 52/394 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
 
@@ -328,6 +328,16 @@ fixed or to hide them from the current strict audit.
   tuning, log transport delivery, operator remediation, gateway request
   admission, analytics pipeline durability, or final client-visible behavior. It
   moves the visible production coverage baseline from 146/447 to 147/447.
+- `SW-REQ-100` onboarded `cli/bundler/bundler.go` with a new plugin bundle CLI
+  stakeholder/system/software chain and focused evidence for local bundle
+  command behavior: command registration, manifest loading, malformed JSON and
+  validation errors, missing referenced file rejection, checksum calculation,
+  unsigned ZIP bundle creation, RSA private-key signing, and verifiable base64
+  signature storage. This increment is scoped to local CLI bundle construction
+  support and does not claim gateway-side signature verification, plugin
+  loading, plugin execution, bundle distribution, persistence, hot reload, or
+  final gateway request behavior. It moves the visible production coverage
+  baseline from 147/447 to 148/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

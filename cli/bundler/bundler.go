@@ -21,6 +21,7 @@ import (
 )
 
 const (
+	// SW-REQ-100
 	cmdName = "bundle"
 	cmdDesc = "Manage plugin bundles"
 
@@ -30,6 +31,7 @@ const (
 )
 
 var (
+	// SW-REQ-100
 	bundler *Bundler = &Bundler{}
 
 	errNoHooks      = errors.New("No hooks defined")
@@ -41,6 +43,7 @@ var (
 	log = logger.Get().WithField("prefix", "tyk")
 )
 
+// SW-REQ-100
 // Bundler wraps the bundler data structure.
 type Bundler struct {
 	keyPath      *string
@@ -49,11 +52,13 @@ type Bundler struct {
 	manifestPath *string
 }
 
+// SW-REQ-100
 // Bundle is the entrypoint function for this subcommand.
 func (b *Bundler) Bundle(ctx *kingpin.ParseContext) error {
 	return nil
 }
 
+// SW-REQ-100
 // Build builds a bundle.
 func (b *Bundler) Build(ctx *kingpin.ParseContext) error {
 	manifestPath := *b.manifestPath
@@ -145,6 +150,7 @@ func (b *Bundler) Build(ctx *kingpin.ParseContext) error {
 	return nil
 }
 
+// SW-REQ-100
 func (b *Bundler) sign(key string, manifest *apidef.BundleManifest, bundle *bytes.Buffer) (err error) {
 	signer, err := goverify.LoadPrivateKeyFromFile(key)
 	if err != nil {
@@ -159,6 +165,7 @@ func (b *Bundler) sign(key string, manifest *apidef.BundleManifest, bundle *byte
 	return nil
 }
 
+// SW-REQ-100
 func (b *Bundler) validateManifest(manifest *apidef.BundleManifest) (err error) {
 	for _, f := range manifest.FileList {
 		if _, err := os.Stat(f); err != nil {
@@ -187,6 +194,7 @@ func (b *Bundler) validateManifest(manifest *apidef.BundleManifest) (err error) 
 	return nil
 }
 
+// SW-REQ-100
 func (b *Bundler) loadManifest(path string) (manifest *apidef.BundleManifest, err error) {
 	rawManifest, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -203,6 +211,7 @@ func (b *Bundler) loadManifest(path string) (manifest *apidef.BundleManifest, er
 	return manifest, err
 }
 
+// SW-REQ-100
 // AddTo initializes an importer object.
 func AddTo(app *kingpin.Application) {
 	cmd := app.Command(cmdName, cmdDesc)

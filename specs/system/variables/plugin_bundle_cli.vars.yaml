@@ -1,0 +1,14 @@
+component: plugin_bundle_cli
+no_interface:
+    declared: true
+    reason: The cli/bundler package is exercised as a local command helper for building plugin bundle archives; gateway-side signature verification, plugin loading, plugin execution, bundle distribution, persistence, hot reload, and request handling are outside this local component boundary.
+variables:
+    - name: plugin_bundle_operation_requested
+      type: bool
+      direction: input
+      description: Gateway CLI code requests plugin bundle command registration, manifest loading, manifest validation, checksum calculation, ZIP bundle creation, unsigned output, or private-key signing.
+
+    - name: plugin_bundle_result_determined
+      type: bool
+      direction: output
+      description: Plugin bundle CLI support returns a registered command, explicit local validation or parsing error, written bundle archive, updated manifest checksum, unsigned bundle warning path, or base64 encoded signature over bundled file bytes.

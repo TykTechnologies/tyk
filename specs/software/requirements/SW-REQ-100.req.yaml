@@ -1,0 +1,73 @@
+id: SW-REQ-100
+version: 1
+status: approved
+priority: shall
+category: operational
+req_type: guarantee
+fretish: ""
+description: The cli/bundler helper shall preserve local plugin bundle command behavior by registering the bundle build command and flags, loading JSON manifests, rejecting missing manifests, malformed JSON, missing driver configuration, missing hooks, and missing referenced files, computing checksums over bundled file bytes, writing ZIP archives containing bundled files and an updated manifest, supporting unsigned bundle output when skip-signing is set, signing bundled bytes with a configured RSA private key, and storing a verifiable base64 signature without claiming gateway-side signature verification, plugin loading, plugin execution, bundle distribution, persistence, hot reload, or final gateway request behavior.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: cli/bundler/bundler_test.go; docs/plugin-bundle-cli-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-113
+component: plugin_bundle_cli
+rationale: >-
+    This software requirement owns only local cli/bundler/bundler.go helper behavior used by the CLI bundle command. It does not claim gateway runtime bundle consumption, gateway-side signature verification, plugin loading, plugin execution, bundle distribution, persistence, hot reload, or final gateway request behavior.
+tags:
+    - cli
+    - plugin-bundle
+    - manifest
+    - signing
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-113
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T08:59:32Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Plugin bundle CLI scope is limited to local cli/bundler/bundler.go behavior: bundle command registration, default flag wiring, manifest loading, JSON parse errors, manifest validation for existing files/hooks/drivers, explicit local errors for malformed inputs, unsigned bundle confirmation bypass through skip-signing, checksum calculation over bundled file bytes, ZIP archive creation with bundled files and updated manifest, RSA private-key signing, and verifiable signature storage. Focused bundler tests passed, including race, and the cli/bundler package was added to configured build/test/lint gates. This approval does not claim gateway-side signature verification, plugin loading, plugin execution, bundle distribution, persistence, hot reload, or final gateway request behavior.
+        fingerprint: sha256:5945a4404ae0eeefcb8674ae268adfad20729fece042885db7efeed27ecad24a
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-100
+          artifact: cli/bundler/bundler.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in cli/bundler/bundler.go adds ReqProof ownership annotations only; behavior evidence is provided by cli/bundler/bundler_test.go. The requirement remains scoped to local CLI plugin bundle construction support without gateway-side signature verification, plugin loading, plugin execution, bundle distribution, persistence, hot reload, or final gateway request behavior claims.
+          base: origin/master
+          requirement_fingerprint: sha256:6304144ac86550425107c265a962c1f9d464f72506410bef3e7449bfaa63bae8
+          approval_fingerprint: sha256:5945a4404ae0eeefcb8674ae268adfad20729fece042885db7efeed27ecad24a
+          artifact_fingerprint: sha256:15f69e7b135d34d52848bdd7161a6e8689c7e6968b99e765f44bd6f80bc45c4f
+          reviewed_at: "2026-06-20T08:59:46Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T08:57:05Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T08:59:32Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - security
+lifecycle:
+    change_history:
+        - date: "2026-06-20T08:57:05Z"
+          from: draft
+          to: review
+          reason: Added cli/bundler plugin bundle helper behavior under plugin bundle CLI support.
+          changed_by: agent:codex
+        - date: "2026-06-20T08:59:32Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T08:57:05Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-100 is scoped to local cli/bundler/bundler.go plugin bundle CLI helper behavior: bundle command registration, default flag wiring, manifest loading, JSON parse errors, manifest validation for existing files/hooks/drivers, explicit local errors for malformed inputs, unsigned bundle confirmation bypass through skip-signing, checksum calculation over bundled file bytes, ZIP archive creation with bundled files and updated manifest, RSA private-key signing, and verifiable signature storage. Focused bundler tests passed, including race. This approval does not claim gateway-side signature verification, plugin loading, plugin execution, bundle distribution, persistence, hot reload, or final gateway request behavior.")'
+          changed_by: human:buger

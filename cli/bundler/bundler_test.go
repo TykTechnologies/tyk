@@ -3,13 +3,16 @@ package bundler
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/apidef"
 
 	kingpin "github.com/alecthomas/kingpin/v2"
@@ -31,6 +34,30 @@ var (
 	}
 )
 
+const testPrivateKey = `-----BEGIN RSA PRIVATE KEY-----
+MIICXgIBAAKBgQDCFENGw33yGihy92pDjZQhl0C36rPJj+CvfSC8+q28hxA161QF
+NUd13wuCTUcq0Qd2qsBe/2hFyc2DCJJg0h1L78+6Z4UMR7EOcpfdUE9Hf3m/hs+F
+UR45uBJeDK1HSFHD8bHKD6kv8FPGfJTotc+2xjJwoYi+1hqp1fIekaxsyQIDAQAB
+AoGBAJR8ZkCUvx5kzv+utdl7T5MnordT1TvoXXJGXK7ZZ+UuvMNUCdN2QPc4sBiA
+QWvLw1cSKt5DsKZ8UETpYPy8pPYnnDEz2dDYiaew9+xEpubyeW2oH4Zx71wqBtOK
+kqwrXa/pzdpiucRRjk6vE6YY7EBBs/g7uanVpGibOVAEsqH1AkEA7DkjVH28WDUg
+f1nqvfn2Kj6CT7nIcE3jGJsZZ7zlZmBmHFDONMLUrXR/Zm3pR5m0tCmBqa5RK95u
+412jt1dPIwJBANJT3v8pnkth48bQo/fKel6uEYyboRtA5/uHuHkZ6FQF7OUkGogc
+mSJluOdc5t6hI1VsLn0QZEjQZMEOWr+wKSMCQQCC4kXJEsHAve77oP6HtG/IiEn7
+kpyUXRNvFsDE0czpJJBvL/aRFUJxuRK91jhjC68sA7NsKMGg5OXb5I5Jj36xAkEA
+gIT7aFOYBFwGgQAQkWNKLvySgKbAZRTeLBacpHMuQdl1DfdntvAyqpAZ0lY0RKmW
+G6aFKaqQfOXKCyWoUiVknQJAXrlgySFci/2ueKlIE1QqIiLSZ8V8OlpFLRnb1pzI
+7U1yQXnTAEFYM560yJlzUpOb1V4cScGd365tiSMvxLOvTA==
+-----END RSA PRIVATE KEY-----`
+
+const testPublicKey = `-----BEGIN PUBLIC KEY-----
+MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDCFENGw33yGihy92pDjZQhl0C3
+6rPJj+CvfSC8+q28hxA161QFNUd13wuCTUcq0Qd2qsBe/2hFyc2DCJJg0h1L78+6
+Z4UMR7EOcpfdUE9Hf3m/hs+FUR45uBJeDK1HSFHD8bHKD6kv8FPGfJTotc+2xjJw
+oYi+1hqp1fIekaxsyQIDAQAB
+-----END PUBLIC KEY-----`
+
+// Verifies: SW-REQ-100
 func TestMain(m *testing.M) {
 	testApp = kingpin.New("tyk-cli", "")
 	AddTo(testApp)
@@ -65,6 +92,13 @@ func writeManifestFile(t testing.TB, manifest interface{}, filename string) *str
 	return &filename
 }
 
+// Verifies: STK-REQ-025, SYS-REQ-113, SW-REQ-100
+// SW-REQ-100:nominal:nominal
+// SW-REQ-100:boundary:nominal
+// MCDC SYS-REQ-113: plugin_bundle_operation_requested=F, plugin_bundle_result_determined=F => TRUE
+// MCDC SYS-REQ-113: plugin_bundle_operation_requested=T, plugin_bundle_result_determined=T => TRUE
+//
+//mcdc:ignore SYS-REQ-113: plugin_bundle_operation_requested=T, plugin_bundle_result_determined=F => FALSE -- violation row is the negation of the plugin-bundle result guarantee; these tests assert requested bundle operations either register commands, produce bundles/signatures/checksums, or return explicit local errors [category: defensive] [reviewed: agent:codex]
 func TestCommands(t *testing.T) {
 	defer os.Remove(defaultManifestPath)
 	writeManifestFile(t, standardManifest, defaultManifestPath)
@@ -74,6 +108,11 @@ func TestCommands(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-025, SYS-REQ-113, SW-REQ-100
+// SW-REQ-100:nominal:nominal
+// SW-REQ-100:boundary:nominal
+// SW-REQ-100:error_handling:negative
+// STK-REQ-025:error_handling:negative
 func TestBuild(t *testing.T) {
 	defer os.Remove(defaultManifestPath)
 
@@ -214,4 +253,105 @@ func TestBuild(t *testing.T) {
 			t.Fatalf("Bundle driver doesn't match, got %s, expected %s", manifest.CustomMiddleware.Driver, apidef.PythonDriver)
 		}
 	})
+}
+
+// Verifies: STK-REQ-025, SYS-REQ-113, SW-REQ-100
+// SW-REQ-100:security:nominal
+func TestBuildSignedBundleIncludesVerifiableSignature(t *testing.T) {
+	dir := t.TempDir()
+	manifestPath := filepath.Join(dir, defaultManifestPath)
+	bundlePath := filepath.Join(dir, defaultBundlePath)
+	middlewarePath := filepath.Join(dir, "middleware.py")
+	keyPath := filepath.Join(dir, "private.pem")
+	middlewareData := []byte("def middleware(request, session, metadata, spec):\n    return request, session, metadata\n")
+
+	if err := ioutil.WriteFile(middlewarePath, middlewareData, 0600); err != nil {
+		t.Fatalf("Couldn't write middleware file: %s", err.Error())
+	}
+	if err := ioutil.WriteFile(keyPath, []byte(testPrivateKey), 0600); err != nil {
+		t.Fatalf("Couldn't write private key: %s", err.Error())
+	}
+
+	filename := writeManifestFile(t, &apidef.BundleManifest{
+		FileList: []string{
+			middlewarePath,
+		},
+		CustomMiddleware: apidef.MiddlewareSection{
+			Pre: []apidef.MiddlewareDefinition{
+				{
+					Name: "MyPreHook",
+				},
+			},
+			Driver: "python",
+		},
+	}, manifestPath)
+	key := keyPath
+	skipSigning := false
+	prevManifestPath := bundler.manifestPath
+	prevBundlePath := bundler.bundlePath
+	prevKeyPath := bundler.keyPath
+	prevSkipSigning := bundler.skipSigning
+	bundler.manifestPath = filename
+	bundler.bundlePath = &bundlePath
+	bundler.keyPath = &key
+	bundler.skipSigning = &skipSigning
+	t.Cleanup(func() {
+		bundler.manifestPath = prevManifestPath
+		bundler.bundlePath = prevBundlePath
+		bundler.keyPath = prevKeyPath
+		bundler.skipSigning = prevSkipSigning
+	})
+
+	if err := bundler.Build(&kingpin.ParseContext{}); err != nil {
+		t.Fatalf("Expected signed bundle to build, got: %s", err.Error())
+	}
+
+	manifest := readBundleManifest(t, bundlePath)
+	if manifest.Signature == "" {
+		t.Fatal("Expected bundle manifest signature to be populated")
+	}
+	signature, err := base64.StdEncoding.DecodeString(manifest.Signature)
+	if err != nil {
+		t.Fatalf("Expected bundle signature to be valid base64, got: %s", err.Error())
+	}
+	verifier, err := goverify.LoadPublicKeyFromString(testPublicKey)
+	if err != nil {
+		t.Fatalf("Couldn't load public key: %s", err.Error())
+	}
+	if err := verifier.Verify(middlewareData, signature); err != nil {
+		t.Fatalf("Expected bundle signature to verify middleware bytes: %s", err.Error())
+	}
+}
+
+func readBundleManifest(t testing.TB, bundlePath string) apidef.BundleManifest {
+	t.Helper()
+
+	zipFile, err := zip.OpenReader(bundlePath)
+	if err != nil {
+		t.Fatalf("Couldn't initialize ZIP reader: %s", err.Error())
+	}
+	defer zipFile.Close()
+
+	for _, f := range zipFile.File {
+		if f.Name != defaultManifestPath {
+			continue
+		}
+		reader, err := f.Open()
+		if err != nil {
+			t.Fatalf("Couldn't read manifest from ZIP file: %s", err.Error())
+		}
+		defer reader.Close()
+		var buf bytes.Buffer
+		if _, err = buf.ReadFrom(reader); err != nil {
+			t.Fatalf("Couldn't read manifest data from ZIP file: %s", err.Error())
+		}
+		var manifest apidef.BundleManifest
+		if err := json.Unmarshal(buf.Bytes(), &manifest); err != nil {
+			t.Fatalf("Couldn't decode manifest data: %s", err.Error())
+		}
+		return manifest
+	}
+
+	t.Fatal("Couldn't find manifest data in bundle")
+	return apidef.BundleManifest{}
 }

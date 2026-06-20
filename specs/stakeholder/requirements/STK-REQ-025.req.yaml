@@ -1,0 +1,75 @@
+id: STK-REQ-025
+version: 1
+status: approved
+priority: shall
+category: operational
+req_type: guarantee
+fretish: ""
+description: Gateway plugin bundle tooling shall let operators build deterministic local plugin bundle archives from manifests, reject malformed or incomplete bundle inputs, and optionally attach a verifiable local signature without claiming gateway plugin loading or runtime plugin execution.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: plugin_bundle_cli
+rationale: Plugin bundle creation is operator-facing CLI support. This stakeholder requirement owns only local bundle command behavior; it does not claim bundle distribution, gateway-side signature verification, plugin loading, plugin execution, hot reload, persistence, or final gateway request behavior.
+tags:
+    - cli
+    - plugin-bundle
+    - manifest
+    - signing
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T08:59:32Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Plugin bundle CLI scope is limited to local cli/bundler/bundler.go behavior: bundle command registration, default flag wiring, manifest loading, JSON parse errors, manifest validation for existing files/hooks/drivers, explicit local errors for malformed inputs, unsigned bundle confirmation bypass through skip-signing, checksum calculation over bundled file bytes, ZIP archive creation with bundled files and updated manifest, RSA private-key signing, and verifiable signature storage. Focused bundler tests passed, including race, and the cli/bundler package was added to configured build/test/lint gates. This approval does not claim gateway-side signature verification, plugin loading, plugin execution, bundle distribution, persistence, hot reload, or final gateway request behavior.
+        fingerprint: sha256:738ceaabafd0cf5ccc8b17dc73b94e1cf1a977c9f0c7d4b8e912758e2b3c339a
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T08:57:05Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T08:59:32Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - security
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need plugin bundle tooling to produce deterministic local bundle archives and reject bad bundle inputs before distributing them to a gateway.
+    acceptance_criteria:
+        - id: STK-REQ-025-AC-01
+          text: Given a valid plugin bundle manifest with existing files, at least one middleware hook, and a driver, when the bundle build command runs with skip-signing, then a ZIP archive is written with the bundled file and updated manifest checksum.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-113
+        - id: STK-REQ-025-AC-02
+          text: Given a missing manifest, malformed JSON, missing driver, missing hooks, or missing bundled file, when bundle validation or build runs, then an explicit local error is returned and the bad input is not accepted as a valid bundle.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-113
+        - id: STK-REQ-025-AC-03
+          text: Given a valid private signing key, when the bundle build command signs the bundled bytes, then the updated manifest contains a base64 signature that verifies against the corresponding public key.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-113
+lifecycle:
+    change_history:
+        - date: "2026-06-20T08:57:05Z"
+          from: draft
+          to: review
+          reason: Added plugin bundle CLI stakeholder requirement for cli/bundler onboarding.
+          changed_by: agent:codex
+        - date: "2026-06-20T08:59:32Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T08:57:05Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Plugin bundle CLI scope is limited to local cli/bundler/bundler.go behavior: bundle command registration, default flag wiring, manifest loading, JSON parse errors, manifest validation for existing files/hooks/drivers, explicit local errors for malformed inputs, unsigned bundle confirmation bypass through skip-signing, checksum calculation over bundled file bytes, ZIP archive creation with bundled files and updated manifest, RSA private-key signing, and verifiable signature storage. Focused bundler tests passed, including race. This approval does not claim gateway-side signature verification, plugin loading, plugin execution, bundle distribution, persistence, hot reload, or final gateway request behavior.")'
+          changed_by: human:buger
