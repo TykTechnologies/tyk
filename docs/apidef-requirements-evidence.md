@@ -5,7 +5,7 @@
 <!-- documents SW-REQ-053 SW-REQ-054 SW-REQ-055 SW-REQ-056 SW-REQ-057 SW-REQ-058 SW-REQ-059 SW-REQ-060 SW-REQ-061 SW-REQ-062 -->
 <!-- documents SW-REQ-063 SW-REQ-065 SW-REQ-068 SW-REQ-069 SW-REQ-070 SW-REQ-071 SW-REQ-072 SW-REQ-073 SW-REQ-074 SW-REQ-075 -->
 <!-- documents SW-REQ-076 SW-REQ-077 SW-REQ-078 SW-REQ-079 SW-REQ-080 SW-REQ-081 SW-REQ-082 SW-REQ-083 SW-REQ-084 SW-REQ-085 -->
-<!-- documents SW-REQ-086 SW-REQ-087 SW-REQ-088 SW-REQ-089 SW-REQ-090 SW-REQ-091 SW-REQ-092 SW-REQ-093 SW-REQ-094 SW-REQ-095 -->
+<!-- documents SW-REQ-086 SW-REQ-087 SW-REQ-088 SW-REQ-089 SW-REQ-090 SW-REQ-091 SW-REQ-092 SW-REQ-093 SW-REQ-094 SW-REQ-095 SW-REQ-096 -->
 <!-- documents SW-REQ-019 -->
 <!-- documents SW-REQ-020 -->
 <!-- documents SW-REQ-021 -->
@@ -65,13 +65,14 @@ helper shapes, OAS default-extension helper shapes, OAS middleware helper
 shapes, OAS root document helper behavior, OAS operation document helper
 behavior, OAS security document helper behavior, OAS upstream document helper
 behavior, Bento configuration schema-generation helper behavior, Bento
-configuration validator helper behavior, OAS root extension helper shapes, OAS
-server model helper shapes, OAS URL rewrite helper shapes, OAS schema
-visitor/unicode-escape helper behavior, OAS schema example extraction shapes,
-OAS schema-validation helper behavior, OAS internal endpoint helper shapes, OAS
-endpoint tracking helper shapes, OAS utility helper shapes, OAS
-deprecated-wrapper conversion shapes, OAS Tyk streaming extension shape, OAS
-event-handler helper shapes, OAS server-regeneration helper shapes,
+configuration validator helper behavior, Tyk Streams OAS validation helper
+behavior, OAS root extension helper shapes, OAS server model helper shapes, OAS
+URL rewrite helper shapes, OAS schema visitor/unicode-escape helper behavior,
+OAS schema example extraction shapes, OAS schema-validation helper behavior,
+OAS internal endpoint helper shapes, OAS endpoint tracking helper shapes, OAS
+utility helper shapes, OAS deprecated-wrapper conversion shapes, OAS Tyk
+streaming extension shape, OAS event-handler helper shapes,
+OAS server-regeneration helper shapes,
 internal reflection support helper behavior,
 custom middleware definition enablement classification, OAS extension header
 name/value helper shapes, OAS extension error-override helper shapes, adapter
@@ -89,7 +90,8 @@ behavior, plus Classic API definition migration helper behavior and
 notification helper behavior, plus OAS authentication helper behavior.
 It also includes OAS default-extension, middleware, root document, operation
 document, security document, upstream document, and Bento configuration
-schema-generation and validation helper behavior.
+schema-generation and validation helper behavior, plus Tyk Streams OAS
+validation helper behavior.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -686,6 +688,21 @@ completeness, Bento component correctness, stream configuration semantic
 correctness, stream runtime execution, gateway API loading, route generation,
 request matching, gateway request admission, persistence, analytics, or final
 client-visible behavior.
+
+`SW-REQ-096` owns the concrete `apidef/streams/validator.go` Tyk Streams OAS
+validator helpers. Its evidence covers one-time embedded OAS and Tyk extension
+schema loading, x-tyk-streaming and x-tyk-api-gateway schema injection for
+supported OAS minor versions, default and enable-all-experimental Bento
+validator registration, deterministic default-version selection with the
+current 3.0 override, major/minor/patch version resolution, OAS object and
+template validation through the local `gojsonschema` facade, template required
+field relaxation for Tyk extensions, aggregated OAS validation errors, explicit
+unsupported-version and malformed-document errors, stream-scoped Bento
+configuration validation errors, and enable-all/disable-validator bypasses.
+This evidence does not claim embedded schema completeness, Bento schema
+completeness, stream configuration semantic correctness, stream runtime
+execution, gateway API loading, route generation, request matching, gateway
+request admission, persistence, analytics, or final client-visible behavior.
 
 `SW-REQ-086` owns the concrete `apidef/notifications.go` notification helper.
 Its evidence covers bounded HTTP client construction, notification manager

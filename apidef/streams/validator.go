@@ -21,9 +21,12 @@ import (
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 )
 
+// SW-REQ-096
+//
 //go:embed schema/*
 var schemaDir embed.FS
 
+// SW-REQ-096
 const (
 	keyStreams                  = "streams"
 	keyDefinitions              = "definitions"
@@ -33,6 +36,7 @@ const (
 	oasSchemaVersionNotFoundFmt = "schema not found for version %q"
 )
 
+// SW-REQ-096
 var (
 	schemaOnce sync.Once
 
@@ -43,6 +47,7 @@ var (
 	defaultVersion string
 )
 
+// SW-REQ-096
 func loadSchemas() error {
 	loadOAS := func() error {
 		xTykStreamingSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", oas.ExtensionTykStreaming))
@@ -143,6 +148,7 @@ func loadSchemas() error {
 	return err
 }
 
+// SW-REQ-096
 func validateBentoConfiguration(document []byte, bentoValidatorKind bento.ValidatorKind) error {
 	streams, _, _, err := jsonparser.Get(document, oas.ExtensionTykStreaming, keyStreams)
 	if errors.Is(err, jsonparser.KeyPathNotFoundError) {
@@ -169,6 +175,7 @@ func validateBentoConfiguration(document []byte, bentoValidatorKind bento.Valida
 	})
 }
 
+// SW-REQ-096
 func validateJSON(schema, document []byte, bentoValidatorKind bento.ValidatorKind) error {
 	schemaLoader := gojsonschema.NewBytesLoader(schema)
 	documentLoader := gojsonschema.NewBytesLoader(document)
@@ -195,6 +202,7 @@ func validateJSON(schema, document []byte, bentoValidatorKind bento.ValidatorKin
 
 }
 
+// SW-REQ-096
 // ValidateOASObjectWithBentoConfigValidator validates a Tyk Streams document against a particular OAS version and takes an optional ConfigValidator
 func ValidateOASObjectWithBentoConfigValidator(documentBody []byte, oasVersion string, bentoValidatorKind bento.ValidatorKind) error {
 	oasSchema, err := GetOASSchema(oasVersion)
@@ -204,11 +212,13 @@ func ValidateOASObjectWithBentoConfigValidator(documentBody []byte, oasVersion s
 	return validateJSON(oasSchema, documentBody, bentoValidatorKind)
 }
 
+// SW-REQ-096
 // ValidateOASObject validates a Tyk Streams document against a particular OAS version.
 func ValidateOASObject(documentBody []byte, oasVersion string) error {
 	return ValidateOASObjectWithBentoConfigValidator(documentBody, oasVersion, bento.DefaultValidator)
 }
 
+// SW-REQ-096
 // ValidateOASObjectWithConfig validates a Tyk Streams document against a particular OAS version,
 // using the provided configuration to determine if validation should be disabled.
 func ValidateOASObjectWithConfig(documentBody []byte, oasVersion string, disableValidator bool) error {
@@ -219,12 +229,14 @@ func ValidateOASObjectWithConfig(documentBody []byte, oasVersion string, disable
 	return ValidateOASObjectWithBentoConfigValidator(documentBody, oasVersion, validatorKind)
 }
 
+// SW-REQ-096
 // ValidateOASTemplate checks a Tyk Streams OAS API template for necessary fields,
 // acknowledging that some standard Tyk OAS API fields are optional in templates.
 func ValidateOASTemplate(documentBody []byte, oasVersion string) error {
 	return ValidateOASTemplateWithBentoValidator(documentBody, oasVersion, bento.DefaultValidator)
 }
 
+// SW-REQ-096
 func ValidateOASTemplateWithBentoValidator(documentBody []byte, oasVersion string, bentoValidatorKind bento.ValidatorKind) error {
 	oasSchema, err := GetOASSchema(oasVersion)
 	if err != nil {
@@ -262,6 +274,7 @@ func ValidateOASTemplateWithBentoValidator(documentBody []byte, oasVersion strin
 	return validateJSON(oasSchema, documentBody, bentoValidatorKind)
 }
 
+// SW-REQ-096
 // GetOASSchema returns an oas schema for a particular version.
 func GetOASSchema(version string) ([]byte, error) {
 	if err := loadSchemas(); err != nil {
@@ -285,6 +298,7 @@ func GetOASSchema(version string) ([]byte, error) {
 	return oasSchema, nil
 }
 
+// SW-REQ-096
 func findDefaultVersion(rawVersions []string) string {
 	versions := make([]*pkgver.Version, len(rawVersions))
 	for i, raw := range rawVersions {
@@ -298,6 +312,7 @@ func findDefaultVersion(rawVersions []string) string {
 	return latestMinor
 }
 
+// SW-REQ-096
 func setDefaultVersion() {
 	var versions []string
 	for k := range oasJSONSchemas {
@@ -315,6 +330,7 @@ func setDefaultVersion() {
 	}
 }
 
+// SW-REQ-096
 func getMinorVersion(version string) (string, error) {
 	v, err := pkgver.NewVersion(version)
 	if err != nil {
