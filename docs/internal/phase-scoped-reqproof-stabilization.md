@@ -44,7 +44,7 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 128/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `verification_scope_complete` | 129/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
 | `mcdc_coverage` | 52/385 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
@@ -166,6 +166,13 @@ fixed or to hide them from the current strict audit.
   matcher/template helpers, default shape construction, and event-handler scan
   conversion. This increment does not close the full-scope warning; it moves the
   visible production coverage baseline from 127/447 to 128/447.
+- `SW-REQ-081` onboarded `apidef/importer/blueprint.go` with focused evidence
+  for Apiary Blueprint JSON loading, error handling, resource/method/header
+  conversion, mock versus non-mock action selection, status fallback, version
+  insertion, and API-definition proxy/versioning shape. This increment also
+  fixes local Blueprint conversion drift where multiple resources and response
+  headers were not fully preserved. It moves the visible production coverage
+  baseline from 128/447 to 129/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

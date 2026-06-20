@@ -1,0 +1,65 @@
+id: SW-REQ-081
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The apidef/importer Apiary Blueprint importer shall load Blueprint JSON into its typed AST, reject malformed JSON and structurally empty Blueprint inputs, convert Blueprint resources into versioned Classic API whitelist endpoint metadata while preserving all converted resources, methods, response bodies, response headers, parsed status codes, and deterministic non-mock versus mock actions, fall back to HTTP 200 for non-numeric Blueprint response names, insert converted versions into API definitions as versioned entries, and build active keyless Classic API definitions with deterministic versioning and proxy shape apart from the generated API ID.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: apidef/importer/blueprint_reqproof_test.go; docs/apidef-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-104
+component: model
+rationale: This software requirement owns only local apidef/importer/blueprint.go Blueprint importer shape conversion into Classic API definition data. It does not claim API Blueprint specification completeness, semantic validation of Blueprint parameters or schemas, upstream availability, gateway API loading, route generation, request matching, gateway request admission, mock-response middleware execution, persistence, analytics, or final client-visible runtime behavior.
+tags:
+    - api-definition
+    - classic-api
+    - importer
+    - blueprint
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-104
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T05:29:56Z"
+        comment: "Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-081 is scoped to local apidef/importer/blueprint.go Apiary Blueprint importer conversion behavior: JSON load and malformed-input errors, missing resource/resource-group errors, Blueprint resource-to-Classic-version whitelist conversion, preservation of multiple converted resources and response headers, mock versus non-mock method actions, response body/status mapping, HTTP 200 fallback for non-numeric response names, version insertion, and deterministic active keyless API-definition proxy/versioning shape apart from generated API IDs. Focused apidef/importer tests passed and local conversion drift for resource/header preservation was fixed. This approval does not claim API Blueprint specification completeness, semantic validation of Blueprint parameters or schemas, upstream availability, gateway API loading, route generation, request matching, gateway request admission, mock-response middleware execution, persistence, analytics, or final client-visible runtime behavior."
+        fingerprint: sha256:782a918435f449d747cc7cbb84ebb160380475618a3309f09d5ba5858c3e983b
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-081
+          artifact: apidef/importer/blueprint.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The blueprint importer implementation intentionally changed to preserve all converted resources and response headers; SW-REQ-081 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence that behavior, so no additional authored requirement/design change is required for this implementation delta.
+          base: origin/master
+          requirement_fingerprint: sha256:7955ef47930e9ba7d4eae8aeb25bf34e7b0218ce2d4d41b1e01f0824fa03c111
+          approval_fingerprint: sha256:782a918435f449d747cc7cbb84ebb160380475618a3309f09d5ba5858c3e983b
+          artifact_fingerprint: sha256:b6d9baa2ad2b36dc013c07e45c38fff8dac4fdf5eaf99a4601ac43de07da4c51
+          reviewed_at: "2026-06-20T05:32:27Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T05:28:50Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T05:29:56Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T05:28:50Z"
+          from: draft
+          to: review
+          reason: Added apidef/importer Apiary Blueprint importer conversion behavior under API-definition support model behavior.
+          changed_by: agent:codex

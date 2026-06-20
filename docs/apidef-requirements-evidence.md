@@ -36,6 +36,7 @@
 <!-- documents SW-REQ-078 -->
 <!-- documents SW-REQ-079 -->
 <!-- documents SW-REQ-080 -->
+<!-- documents SW-REQ-081 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -45,8 +46,9 @@ admission, or the full API definition lifecycle.
 `SYS-REQ-104` covers API-definition support model helpers that preserve typed
 health-check wire values, host-list access behavior, and error-override helper
 state, embedded Classic API definition schema data, Classic API definition core
-helper behavior, OAS path/server helper shapes, OAS root extension helper
-shapes, OAS server model helper shapes, OAS URL rewrite helper shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
+helper behavior, Apiary Blueprint importer conversion behavior, OAS path/server
+helper shapes, OAS root extension helper shapes, OAS server model helper
+shapes, OAS URL rewrite helper shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint
 helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes,
 OAS deprecated-wrapper conversion shapes, OAS Tyk streaming extension shape, OAS event-handler helper shapes,
@@ -61,7 +63,8 @@ and proxy-only, supergraph, and universal-data-graph engine adapter
 configuration behavior, plus engine v3 proxy-only adapter configuration
 and supergraph adapter configuration behavior, and engine v3 utility behavior,
 engine v3 universal-data-graph adapter configuration behavior, and Classic API
-definition core model helper behavior, without silent data-shape drift.
+definition core model helper behavior, and Apiary Blueprint importer conversion
+behavior, without silent data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -517,3 +520,18 @@ admission, middleware execution, upstream authentication execution, webhook
 delivery, JavaScript execution, log emission, persistence backend correctness,
 analytics, GraphQL execution, streaming execution, or final client-visible
 runtime behavior.
+
+`SW-REQ-081` owns the concrete `apidef/importer/blueprint.go` Apiary Blueprint
+importer conversion behavior. Its evidence covers JSON load success and
+malformed JSON errors, missing resource-group and empty resource errors,
+conversion of Blueprint resources into Classic API version whitelist metadata,
+preservation of multiple converted resources and response headers, method
+action selection for mock and non-mock imports, response body and status-code
+mapping, HTTP 200 fallback for non-numeric Blueprint response names, skipping
+actions without response examples, version insertion into API definitions, and
+deterministic active keyless API-definition versioning/proxy shape apart from
+generated API IDs. This evidence does not claim API Blueprint specification
+completeness, semantic validation of Blueprint parameters or schemas, upstream
+availability, gateway API loading, route generation, request matching, gateway
+request admission, mock-response middleware execution, persistence, analytics,
+or final client-visible runtime behavior.

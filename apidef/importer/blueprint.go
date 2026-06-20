@@ -12,8 +12,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
+// SW-REQ-081
 const ApiaryBluePrint APIImporterSource = "blueprint"
 
+// SW-REQ-081
 type BluePrintAST struct {
 	Version     string `json:"_version"`
 	Description string `json:"description"`
@@ -94,10 +96,12 @@ type BluePrintAST struct {
 	} `json:"resourceGroups"`
 }
 
+// SW-REQ-081
 func (b *BluePrintAST) LoadFrom(r io.Reader) error {
 	return json.NewDecoder(r).Decode(&b)
 }
 
+// SW-REQ-081
 func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, error) {
 	versionInfo := apidef.VersionInfo{}
 	versionInfo.UseExtendedPaths = true
@@ -135,16 +139,14 @@ func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, e
 					endPointMethodMeta.Action = apidef.NoAction
 				}
 
+				endPointMethodMeta.Headers = make(map[string]string)
 				for _, h := range action.Examples[0].Responses[0].Headers {
-					endPointMethodMeta.Headers = make(map[string]string)
 					endPointMethodMeta.Headers[h.Name] = h.Value
 				}
 				endPointMethodMeta.Data = action.Examples[0].Responses[0].Body
 				newMetaData.MethodActions[action.Method] = endPointMethodMeta
 			}
 
-			// Add it to the version
-			versionInfo.ExtendedPaths.WhiteList = make([]apidef.EndPointMeta, 0)
 			versionInfo.ExtendedPaths.WhiteList = append(versionInfo.ExtendedPaths.WhiteList, newMetaData)
 		}
 
@@ -153,12 +155,14 @@ func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, e
 	return versionInfo, nil
 }
 
+// SW-REQ-081
 func (b *BluePrintAST) InsertIntoAPIDefinitionAsVersion(version apidef.VersionInfo, def *apidef.APIDefinition, versionName string) error {
 	def.VersionData.NotVersioned = false
 	def.VersionData.Versions[versionName] = version
 	return nil
 }
 
+// SW-REQ-081
 func (b *BluePrintAST) ToAPIDefinition(orgID, upstreamURL string, asMock bool) (*apidef.APIDefinition, error) {
 	ad := apidef.APIDefinition{
 		Name:             b.Name,
