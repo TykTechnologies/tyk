@@ -236,6 +236,8 @@ project:
             - internal/middleware/middleware_test.go
             - internal/httputil/accesslog/filter.go
             - internal/httputil/accesslog/filter_test.go
+            - internal/httputil/accesslog/record.go
+            - internal/httputil/accesslog/record_reqproof_test.go
             - user/mcp_access.go
             - user/mcp_access_test.go
             - internal/policy/**

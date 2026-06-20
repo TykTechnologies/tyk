@@ -4,12 +4,13 @@
 <!-- documents SW-REQ-004 -->
 <!-- documents SW-REQ-041 -->
 <!-- documents SW-REQ-046 -->
+<!-- documents SW-REQ-049 -->
 
 This document records the proof scope expansion into `internal/event`.
 
 `SYS-REQ-082` covers the gateway-observable observability metadata behavior:
 event display names, accumulated context events, serializable request snapshots,
-structured diagnostic error classifications, and filtered access-log field maps
+structured diagnostic error classifications, and access-log record field maps
 are preserved for event handlers, analytics, audit flows, access logs, and
 error-override consumers.
 
@@ -31,3 +32,13 @@ omission, and deterministic results. This evidence does not claim request
 record construction, access-log emission, template rendering, analytics
 persistence, logger behavior, network transport success, or final HTTP status
 generation.
+
+`SW-REQ-049` owns the concrete `internal/httputil/accesslog.Record` helper
+behavior used to assemble access-log field maps before filtering and formatting:
+prefix initialization, request/response metadata copying, API identity/type
+metadata preservation, configured API-key obfuscation or hashing, optional
+trace/error/MCP metadata preservation, optional-field omission, and filtered
+field-map output. This evidence does not claim access-log emission, template
+rendering, analytics persistence, logger behavior, reverse-proxy execution,
+gateway middleware ordering, network transport success, upstream availability,
+or final HTTP status generation.

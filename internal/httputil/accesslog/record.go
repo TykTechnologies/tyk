@@ -20,6 +20,7 @@ type Record struct {
 	fields logrus.Fields
 }
 
+// SW-REQ-049
 // NewRecord returns a Record object.
 func NewRecord() *Record {
 	fields := logrus.Fields{
@@ -30,6 +31,7 @@ func NewRecord() *Record {
 	}
 }
 
+// SW-REQ-049
 // WithApiKey sets the access token from the request under APIKey.
 // The access token is obfuscated, or hashed depending on passed arguments.
 func (a *Record) WithApiKey(req *http.Request, hashKeys bool, obfuscate func(string) string) *Record {
@@ -42,6 +44,7 @@ func (a *Record) WithApiKey(req *http.Request, hashKeys bool, obfuscate func(str
 	return a
 }
 
+// SW-REQ-049
 // WithRequest fills fields from the http request.
 func (a *Record) WithRequest(req *http.Request, latency analytics.Latency) *Record {
 	upstreamAddress := &url.URL{
@@ -65,12 +68,14 @@ func (a *Record) WithRequest(req *http.Request, latency analytics.Latency) *Reco
 	return a
 }
 
+// SW-REQ-049
 // WithResponse fills response details into the log fields.
 func (a *Record) WithResponse(resp *http.Response) *Record {
 	a.fields["status"] = resp.StatusCode
 	return a
 }
 
+// SW-REQ-049
 // WithTraceID adds the OpenTelemetry trace ID to the access log record.
 // The trace ID is only added if a trace context exists in the request.
 func (a *Record) WithTraceID(req *http.Request) *Record {
@@ -81,6 +86,7 @@ func (a *Record) WithTraceID(req *http.Request) *Record {
 	return a
 }
 
+// SW-REQ-049
 // WithAPIID adds API identification fields to the access log record.
 func (a *Record) WithAPIID(apiID, apiName, orgID string) *Record {
 	if apiID != "" {
@@ -95,6 +101,7 @@ func (a *Record) WithAPIID(apiID, apiName, orgID string) *Record {
 	return a
 }
 
+// SW-REQ-049
 // WithErrorClassification adds structured error classification fields to the access log record.
 // Fields are only added when the classification is non-nil and individual fields are non-empty/non-zero.
 // This enables operators to distinguish between error types (TLS expired, connection refused, timeout, etc.)
@@ -137,12 +144,14 @@ func (a *Record) WithErrorClassification(ec *errors.ErrorClassification) *Record
 	return a
 }
 
+// SW-REQ-049
 // WithAPIType adds the api_type field based on the API definition characteristics.
 func (a *Record) WithAPIType(apiType string) *Record {
 	a.fields["api_type"] = apiType
 	return a
 }
 
+// SW-REQ-049
 // WithMCP adds MCP-specific fields from the request context.
 // Fields are only added when non-empty/non-zero to avoid log noise.
 func (a *Record) WithMCP(req *http.Request) *Record {
@@ -161,6 +170,7 @@ func (a *Record) WithMCP(req *http.Request) *Record {
 	return a
 }
 
+// SW-REQ-049
 // Fields returns a logrus.Fields intended for logging.
 func (a *Record) Fields(allowedKeys []string) logrus.Fields {
 	return Filter(a.fields, allowedKeys)
