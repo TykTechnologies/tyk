@@ -24,6 +24,7 @@
 <!-- documents SW-REQ-063 -->
 <!-- documents SW-REQ-065 -->
 <!-- documents SW-REQ-068 -->
+<!-- documents SW-REQ-069 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -40,9 +41,9 @@ OAS deprecated-wrapper conversion shapes, OAS Tyk streaming extension shape, OAS
 OAS server-regeneration helper shapes,
 internal reflection support helper behavior,
 custom middleware definition enablement classification, OAS extension header
-name/value helper shapes, OAS extension error-override helper shapes, and
-adapter interface and GraphQL utility helper behavior without silent data-shape
-drift.
+name/value helper shapes, OAS extension error-override helper shapes, adapter
+interface and GraphQL utility helper behavior, and GraphQL config adapter
+selection behavior without silent data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -296,3 +297,16 @@ GraphQL schema parsing, GraphQL engine configuration generation, gateway API
 loading, route generation, request matching, gateway request admission,
 middleware execution, upstream GraphQL execution, persistence, analytics, or
 final client-visible runtime behavior.
+
+`SW-REQ-069` owns the concrete `apidef/adapter` GraphQL config adapter used by
+API-definition adapter flows. Its evidence covers V2 and V3 schema option
+plumbing, HTTP and streaming client option plumbing, nonnil default clients,
+zero-timeout streaming defaults, explicit unsupported-version and
+unsupported-mode errors, V2 selection for proxy-only, subgraph-as-proxy-only,
+supergraph, and universal data graph modes, V3 selection for supported
+proxy-only and universal data graph modes, and local rejection of V3 supergraph
+mode. This evidence does not claim correctness of downstream GraphQL engine
+adapter packages, GraphQL schema parsing, GraphQL execution, AsyncAPI or
+OpenAPI import correctness, gateway API loading, route generation, request
+matching, gateway request admission, middleware execution, upstream
+availability, persistence, analytics, or final client-visible runtime behavior.

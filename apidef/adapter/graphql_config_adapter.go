@@ -17,40 +17,48 @@ import (
 var ErrUnsupportedGraphQLConfigVersion = errors.New("provided version of GraphQL config is not supported for this operation")
 var ErrUnsupportedGraphQLExecutionMode = errors.New("provided execution mode of GraphQL config is not supported for this operation")
 
+// SW-REQ-069
 type GraphQLEngineAdapter interface {
 	EngineConfig() (*graphql.EngineV2Configuration, error)
 }
 
+// SW-REQ-069
 type GraphQLEngineAdapterV3 interface {
 	EngineConfigV3() (*gqlv2.EngineV2Configuration, error)
 }
 
+// SW-REQ-069
 type GraphQLConfigAdapterOption func(adapter *GraphQLConfigAdapter)
 
+// SW-REQ-069
 func WithSchema(schema *graphql.Schema) GraphQLConfigAdapterOption {
 	return func(adapter *GraphQLConfigAdapter) {
 		adapter.schema = schema
 	}
 }
 
+// SW-REQ-069
 func WithV2Schema(schema *gqlv2.Schema) GraphQLConfigAdapterOption {
 	return func(adapter *GraphQLConfigAdapter) {
 		adapter.schemaV2 = schema
 	}
 }
 
+// SW-REQ-069
 func WithHttpClient(httpClient *http.Client) GraphQLConfigAdapterOption {
 	return func(adapter *GraphQLConfigAdapter) {
 		adapter.httpClient = httpClient
 	}
 }
 
+// SW-REQ-069
 func WithStreamingClient(streamingClient *http.Client) GraphQLConfigAdapterOption {
 	return func(adapter *GraphQLConfigAdapter) {
 		adapter.streamingClient = streamingClient
 	}
 }
 
+// SW-REQ-069
 type GraphQLConfigAdapter struct {
 	apiDefinition   *apidef.APIDefinition
 	httpClient      *http.Client
@@ -59,6 +67,7 @@ type GraphQLConfigAdapter struct {
 	schemaV2        *gqlv2.Schema
 }
 
+// SW-REQ-069
 func NewGraphQLConfigAdapter(apiDefinition *apidef.APIDefinition, options ...GraphQLConfigAdapterOption) GraphQLConfigAdapter {
 	adapter := GraphQLConfigAdapter{
 		apiDefinition: apiDefinition,
@@ -70,6 +79,7 @@ func NewGraphQLConfigAdapter(apiDefinition *apidef.APIDefinition, options ...Gra
 	return adapter
 }
 
+// SW-REQ-069
 func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration, error) {
 	if g.apiDefinition.GraphQL.Version != apidef.GraphQLConfigVersion2 {
 		return nil, ErrUnsupportedGraphQLConfigVersion
@@ -105,6 +115,7 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 	return engineAdapter.EngineConfig()
 }
 
+// SW-REQ-069
 func (g *GraphQLConfigAdapter) EngineConfigV3() (*gqlv2.EngineV2Configuration, error) {
 	if g.apiDefinition.GraphQL.Version != apidef.GraphQLConfigVersion3Preview {
 		return nil, ErrUnsupportedGraphQLConfigVersion
@@ -136,6 +147,7 @@ func (g *GraphQLConfigAdapter) EngineConfigV3() (*gqlv2.EngineV2Configuration, e
 	return engineAdapter.EngineConfigV3()
 }
 
+// SW-REQ-069
 func (g *GraphQLConfigAdapter) getHttpClient() *http.Client {
 	if g.httpClient == nil {
 		g.httpClient = httpclient.DefaultNetHttpClient
@@ -144,6 +156,7 @@ func (g *GraphQLConfigAdapter) getHttpClient() *http.Client {
 	return g.httpClient
 }
 
+// SW-REQ-069
 func (g *GraphQLConfigAdapter) getStreamingClient() *http.Client {
 	if g.streamingClient == nil {
 		g.streamingClient = httpclient.DefaultNetHttpClient

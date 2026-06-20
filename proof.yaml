@@ -150,6 +150,8 @@ project:
     verification_scope:
         include:
             - apidef/adapter/import_adapter.go
+            - apidef/adapter/graphql_config_adapter.go
+            - apidef/adapter/graphql_config_adapter_test.go
             - apidef/adapter/utils.go
             - apidef/adapter/utils_reqproof_test.go
             - apidef/adapter/utils_test.go

@@ -2,14 +2,23 @@ package adapter
 
 import (
 	"encoding/json"
+	"errors"
+	"net/http"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-069
+// SW-REQ-069:nominal:nominal
+// SW-REQ-069:error_handling:negative
 func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 	t.Run("should return no error when having a proxy-only config", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
@@ -95,6 +104,96 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Equal(t, ErrUnsupportedGraphQLConfigVersion, err)
+	})
+}
+
+// Verifies: SYS-REQ-104, SW-REQ-069
+// SW-REQ-069:nominal:nominal
+// SW-REQ-069:boundary:nominal
+// SW-REQ-069:error_handling:negative
+// SW-REQ-069:determinism:nominal
+func TestGraphQLConfigAdapterPreservesLocalSelectionAndOptions(t *testing.T) {
+	t.Run("constructor applies supplied options and preserves API definition", func(t *testing.T) {
+		apiDef := &apidef.APIDefinition{Name: "orders"}
+		schema := &graphql.Schema{}
+		schemaV2 := &gqlv2.Schema{}
+		httpClient := &http.Client{Timeout: time.Second}
+		streamingClient := &http.Client{Timeout: 2 * time.Second}
+
+		adapter := NewGraphQLConfigAdapter(
+			apiDef,
+			WithSchema(schema),
+			WithV2Schema(schemaV2),
+			WithHttpClient(httpClient),
+			WithStreamingClient(streamingClient),
+		)
+
+		assert.Same(t, apiDef, adapter.apiDefinition)
+		assert.Same(t, schema, adapter.schema)
+		assert.Same(t, schemaV2, adapter.schemaV2)
+		assert.Same(t, httpClient, adapter.getHttpClient())
+		assert.Same(t, streamingClient, adapter.getStreamingClient())
+	})
+
+	t.Run("nil clients are initialized to deterministic nonnil defaults", func(t *testing.T) {
+		adapter := NewGraphQLConfigAdapter(&apidef.APIDefinition{})
+
+		assert.NotNil(t, adapter.getHttpClient())
+		streamingClient := adapter.getStreamingClient()
+		require.NotNil(t, streamingClient)
+		assert.Equal(t, time.Duration(0), streamingClient.Timeout)
+		assert.Same(t, streamingClient, adapter.getStreamingClient())
+	})
+
+	t.Run("v3 rejects unsupported version, supergraph mode, and unknown execution mode explicitly", func(t *testing.T) {
+		legacy := NewGraphQLConfigAdapter(&apidef.APIDefinition{
+			GraphQL: apidef.GraphQLConfig{
+				Enabled:       true,
+				Version:       apidef.GraphQLConfigVersion2,
+				ExecutionMode: apidef.GraphQLExecutionModeProxyOnly,
+			},
+		})
+		_, err := legacy.EngineConfigV3()
+		assert.ErrorIs(t, err, ErrUnsupportedGraphQLConfigVersion)
+
+		supergraph := NewGraphQLConfigAdapter(&apidef.APIDefinition{
+			GraphQL: apidef.GraphQLConfig{
+				Enabled:       true,
+				Version:       apidef.GraphQLConfigVersion3Preview,
+				ExecutionMode: apidef.GraphQLExecutionModeSupergraph,
+			},
+		})
+		_, err = supergraph.EngineConfigV3()
+		assert.ErrorIs(t, err, ErrUnsupportedGraphQLConfigVersion)
+
+		unknown := NewGraphQLConfigAdapter(&apidef.APIDefinition{
+			GraphQL: apidef.GraphQLConfig{
+				Enabled:       true,
+				Version:       apidef.GraphQLConfigVersion3Preview,
+				ExecutionMode: apidef.GraphQLExecutionMode("unknown"),
+			},
+		})
+		_, err = unknown.EngineConfigV3()
+		assert.ErrorIs(t, err, ErrUnsupportedGraphQLExecutionMode)
+	})
+
+	t.Run("v3 proxy-only and universal data graph configs delegate without local selection error", func(t *testing.T) {
+		for name, config := range map[string]string{
+			"proxy only":           graphqlMinimalProxyOnlyConfig,
+			"universal data graph": graphqlMinimalUniversalDataGraphConfig,
+		} {
+			t.Run(name, func(t *testing.T) {
+				var gqlConfig apidef.GraphQLConfig
+				v3Config := strings.Replace(config, `"version": "2"`, `"version": "3-preview"`, 1)
+				require.NoError(t, json.Unmarshal([]byte(v3Config), &gqlConfig))
+
+				adapter := NewGraphQLConfigAdapter(&apidef.APIDefinition{GraphQL: gqlConfig})
+				_, err := adapter.EngineConfigV3()
+
+				assert.False(t, errors.Is(err, ErrUnsupportedGraphQLConfigVersion))
+				assert.False(t, errors.Is(err, ErrUnsupportedGraphQLExecutionMode))
+			})
+		}
 	})
 }
 
