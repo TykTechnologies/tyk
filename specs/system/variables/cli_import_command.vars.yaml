@@ -1,0 +1,14 @@
+component: cli_import_command
+no_interface:
+    declared: true
+    reason: The cli/importer package is exercised as a local command wrapper for import command setup, validation, local file loading, and JSON output formatting; gateway API loading, route generation, request matching, persistence, analytics, and runtime request handling are outside this local component boundary.
+variables:
+    - name: cli_import_operation_requested
+      type: bool
+      direction: input
+      description: Gateway CLI code requests import command registration, mode flag binding, create/version input validation, valid WSDL service-port mapping, local import source loading, local API definition loading, or API definition JSON printing.
+
+    - name: cli_import_result_determined
+      type: bool
+      direction: output
+      description: CLI import support returns a registered command, bound mode/input values, accepted valid inputs, explicit local validation or file decode errors, selected Blueprint/Swagger/WSDL loader results, decoded API definition JSON, or printed API definition JSON with empty BSON-only IDs removed.

@@ -18,16 +18,19 @@ import (
 )
 
 const (
+	// SW-REQ-101
 	cmdName = "import"
 	cmdDesc = "Imports a BluePrint/Swagger/WSDL file"
 )
 
 var (
+	// SW-REQ-101
 	imp *Importer = &Importer{}
 
 	errUnknownMode = errors.New("unknown mode")
 )
 
+// SW-REQ-101
 // Importer wraps the import functionality.
 type Importer struct {
 	input          *string
@@ -43,6 +46,7 @@ type Importer struct {
 	asVersion      *string
 }
 
+// SW-REQ-101
 // AddTo initializes an importer object.
 func AddTo(app *kingpin.Application) {
 	cmd := app.Command(cmdName, cmdDesc)
@@ -60,6 +64,7 @@ func AddTo(app *kingpin.Application) {
 	cmd.Action(imp.Import)
 }
 
+// SW-REQ-101
 // Import performs the import process.
 func (i *Importer) Import(_ *kingpin.ParseContext) (err error) {
 	if *i.swaggerMode {
@@ -84,6 +89,7 @@ func (i *Importer) Import(_ *kingpin.ParseContext) (err error) {
 	return nil
 }
 
+// SW-REQ-101
 func (i *Importer) validateInput() error {
 
 	if *i.createAPI {
@@ -103,6 +109,7 @@ func (i *Importer) validateInput() error {
 	return nil
 }
 
+// SW-REQ-101
 func (i *Importer) processPortNames() map[string]string {
 	p := make(map[string]string)
 
@@ -120,6 +127,7 @@ func (i *Importer) processPortNames() map[string]string {
 	return p
 }
 
+// SW-REQ-101
 func (i *Importer) handleBluePrintMode() error {
 	if !*i.createAPI {
 		// Different branch, here we need an API Definition to modify
@@ -172,6 +180,7 @@ func (i *Importer) handleBluePrintMode() error {
 	return nil
 }
 
+// SW-REQ-101
 func (i *Importer) handleSwaggerMode() error {
 	if *i.createAPI {
 		if *i.upstreamTarget != "" && *i.orgID != "" {
@@ -227,6 +236,7 @@ func (i *Importer) handleSwaggerMode() error {
 	return nil
 }
 
+// SW-REQ-101
 func (i *Importer) handleWSDLMode() error {
 	var def *apidef.APIDefinition
 
@@ -273,6 +283,7 @@ func (i *Importer) handleWSDLMode() error {
 	return nil
 }
 
+// SW-REQ-101
 func (i *Importer) printDef(def *apidef.APIDefinition) {
 	asJSON, err := json.MarshalIndent(def, "", "    ")
 	if err != nil {
@@ -284,6 +295,7 @@ func (i *Importer) printDef(def *apidef.APIDefinition) {
 	fmt.Println(fixed)
 }
 
+// SW-REQ-101
 func (i *Importer) swaggerLoadFile(path string) (*importer.SwaggerAST, error) {
 	swagger, err := importer.GetImporterForSource(importer.SwaggerSource)
 	if err != nil {
@@ -302,6 +314,7 @@ func (i *Importer) swaggerLoadFile(path string) (*importer.SwaggerAST, error) {
 	return swagger.(*importer.SwaggerAST), nil
 }
 
+// SW-REQ-101
 func (i *Importer) wsdlLoadFile(path string) (*importer.WSDLDef, error) {
 	wsdl, err := importer.GetImporterForSource(importer.WSDLSource)
 	if err != nil {
@@ -320,6 +333,7 @@ func (i *Importer) wsdlLoadFile(path string) (*importer.WSDLDef, error) {
 	return wsdl.(*importer.WSDLDef), nil
 }
 
+// SW-REQ-101
 func (i *Importer) bluePrintLoadFile(path string) (*importer.BluePrintAST, error) {
 	blueprint, err := importer.GetImporterForSource(importer.ApiaryBluePrint)
 	if err != nil {
@@ -339,6 +353,7 @@ func (i *Importer) bluePrintLoadFile(path string) (*importer.BluePrintAST, error
 	return blueprint.(*importer.BluePrintAST), nil
 }
 
+// SW-REQ-101
 func (i *Importer) apiDefLoadFile(path string) (*apidef.APIDefinition, error) {
 	f, err := os.Open(path)
 	if err != nil {

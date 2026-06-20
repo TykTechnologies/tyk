@@ -44,7 +44,7 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 148/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `verification_scope_complete` | 149/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
 | `mcdc_coverage` | 52/394 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
@@ -338,6 +338,18 @@ fixed or to hide them from the current strict audit.
   loading, plugin execution, bundle distribution, persistence, hot reload, or
   final gateway request behavior. It moves the visible production coverage
   baseline from 147/447 to 148/447.
+- `SW-REQ-101` onboarded `cli/importer/importer.go` with a new CLI import
+  command stakeholder/system/software chain and focused evidence for local
+  command wrapper behavior: command registration and flag binding, create/API
+  version input validation, valid WSDL service:port mapping, local API
+  definition JSON load/decode behavior, Blueprint/Swagger/WSDL loader
+  selection and missing-file errors, and printed API definition JSON formatting
+  without empty BSON-only IDs. This increment is scoped to local CLI import
+  support and does not claim full Blueprint, Swagger, or WSDL conversion
+  correctness, gateway API loading, route generation, request matching, gateway
+  request admission, persistence, analytics, or final client-visible runtime
+  behavior. It moves the visible production coverage baseline from 148/447 to
+  149/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or
