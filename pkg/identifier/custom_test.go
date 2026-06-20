@@ -12,7 +12,10 @@ import (
 
 // Verifies: SW-REQ-022
 // SW-REQ-022:nominal:nominal
+// SW-REQ-022:boundary:nominal
 // SW-REQ-022:boundary:boundary
+// SW-REQ-022:error_handling:nominal
+// SW-REQ-022:malformed_input:nominal
 func TestCustomPolicyIdStringAndValidCharacters(t *testing.T) {
 	t.Parallel()
 

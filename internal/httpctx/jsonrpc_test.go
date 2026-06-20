@@ -16,6 +16,7 @@ import (
 // SYS-REQ-108:nominal:nominal
 // SYS-REQ-108:boundary:boundary
 // SW-REQ-028:nominal:nominal
+// SW-REQ-028:boundary:nominal
 // SW-REQ-028:boundary:boundary
 func TestJSONRPCRequest_SetAndGet(t *testing.T) {
 	req := httptest.NewRequest("POST", "/", nil)
@@ -42,6 +43,7 @@ func TestJSONRPCRequest_SetAndGet(t *testing.T) {
 // SYS-REQ-108:nominal:nominal
 // SYS-REQ-108:boundary:boundary
 // SW-REQ-028:nominal:nominal
+// SW-REQ-028:boundary:nominal
 // SW-REQ-028:boundary:boundary
 func TestJsonRPCRoutingFlag(t *testing.T) {
 	req := httptest.NewRequest("POST", "/", nil)

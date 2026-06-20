@@ -17,6 +17,7 @@ func TestRegisterVEMPrefix(t *testing.T) {
 
 // Verifies: SYS-REQ-107, SW-REQ-027
 // SYS-REQ-107:boundary:boundary
+// SW-REQ-027:boundary:nominal
 // SW-REQ-027:boundary:boundary
 func TestIsProtocolVEMPath_UnregisteredPath(t *testing.T) {
 	if IsProtocolVEMPath("/unregistered-agent-vem:operation") {

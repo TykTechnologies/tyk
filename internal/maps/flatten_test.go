@@ -15,6 +15,8 @@ type flattenTestStruct struct {
 // SYS-REQ-110:nominal:nominal
 // SYS-REQ-110:boundary:boundary
 // SW-REQ-030:nominal:nominal
+// SW-REQ-030:boundary:nominal
+// SW-REQ-030:malformed_input:nominal
 // SW-REQ-030:boundary:boundary
 // MCDC SYS-REQ-110: maps_operation_requested=T, maps_operation_determined=T => TRUE
 func TestFlatten(t *testing.T) {

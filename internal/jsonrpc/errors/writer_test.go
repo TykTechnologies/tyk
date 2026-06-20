@@ -17,6 +17,7 @@ import (
 // STK-REQ-018:nominal:nominal
 // SYS-REQ-106:nominal:nominal
 // SW-REQ-024:nominal:nominal
+// SW-REQ-024:error_handling:nominal
 func TestWriteJSONRPCError(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -142,6 +143,7 @@ func TestWriteJSONRPCError_MessageEscaping(t *testing.T) {
 // Verifies: STK-REQ-018, SYS-REQ-106, SW-REQ-024
 // STK-REQ-018:boundary:boundary
 // SYS-REQ-106:boundary:boundary
+// SW-REQ-024:boundary:nominal
 // SW-REQ-024:boundary:boundary
 func TestWriteJSONRPCError_DifferentIDTypes(t *testing.T) {
 	tests := []struct {

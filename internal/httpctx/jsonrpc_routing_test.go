@@ -45,6 +45,7 @@ func TestJSONRPCRoutingState_SetAndGet(t *testing.T) {
 // Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-028
 // STK-REQ-020:boundary:boundary
 // SYS-REQ-108:boundary:boundary
+// SW-REQ-028:boundary:nominal
 // SW-REQ-028:boundary:boundary
 func TestIsRoutingComplete(t *testing.T) {
 	tests := []struct {
@@ -117,6 +118,7 @@ func TestRoutingStatePreservation(t *testing.T) {
 // SYS-REQ-108:nominal:nominal
 // SYS-REQ-108:nil_safety:negative
 // SW-REQ-028:nominal:nominal
+// SW-REQ-028:nil_safety:nominal
 // SW-REQ-028:nil_safety:negative
 func TestRecordVEMVisit(t *testing.T) {
 	state := &JSONRPCRoutingState{

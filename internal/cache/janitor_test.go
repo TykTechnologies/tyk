@@ -43,6 +43,7 @@ func TestJanitor(t *testing.T) {
 // SYS-REQ-109:idempotency:nominal
 // SYS-REQ-109:concurrent:race
 // SW-REQ-029:idempotency:nominal
+// SW-REQ-029:concurrent:nominal
 // SW-REQ-029:concurrent:race
 func TestJanitor_MultipleClose(t *testing.T) {
 	cleanup := func() {}

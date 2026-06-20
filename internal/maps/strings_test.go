@@ -12,6 +12,7 @@ import (
 // SYS-REQ-110:nominal:nominal
 // SYS-REQ-110:boundary:boundary
 // SW-REQ-030:nominal:nominal
+// SW-REQ-030:boundary:nominal
 // SW-REQ-030:boundary:boundary
 func TestStringMap_SetGet(t *testing.T) {
 	m := NewStringMap()
@@ -30,6 +31,7 @@ func TestStringMap_SetGet(t *testing.T) {
 // Verifies: STK-REQ-022, SYS-REQ-110, SW-REQ-030
 // STK-REQ-022:concurrent:race
 // SYS-REQ-110:concurrent:race
+// SW-REQ-030:concurrent:nominal
 // SW-REQ-030:concurrent:race
 func TestStringMap_ConcurrentSetGet(t *testing.T) {
 	m := NewStringMap()

@@ -10,6 +10,7 @@ import (
 
 // Verifies: SYS-REQ-104, SW-REQ-019
 // SW-REQ-019:nominal:nominal
+// SW-REQ-019:boundary:nominal
 // SW-REQ-019:boundary:boundary
 // MCDC SYS-REQ-104: api_definition_support_requested=T, api_definition_support_shape_preserved=T => TRUE
 func TestHealthCheckResponseJSONShape(t *testing.T) {
@@ -58,7 +59,9 @@ func TestHealthCheckResponseJSONShape(t *testing.T) {
 
 // Verifies: SW-REQ-020
 // SW-REQ-020:nominal:nominal
+// SW-REQ-020:boundary:nominal
 // SW-REQ-020:boundary:boundary
+// SW-REQ-020:error_handling:nominal
 // SW-REQ-020:error_handling:negative
 func TestHostList(t *testing.T) {
 	t.Parallel()
@@ -97,6 +100,7 @@ func TestHostList(t *testing.T) {
 
 // Verifies: SW-REQ-021
 // SW-REQ-021:nominal:nominal
+// SW-REQ-021:boundary:nominal
 // SW-REQ-021:boundary:boundary
 func TestErrorOverrideCompiledTemplates(t *testing.T) {
 	t.Parallel()
@@ -117,7 +121,9 @@ func TestErrorOverrideCompiledTemplates(t *testing.T) {
 
 // Verifies: SW-REQ-021
 // SW-REQ-021:nominal:nominal
+// SW-REQ-021:boundary:nominal
 // SW-REQ-021:boundary:boundary
+// SW-REQ-021:error_handling:nominal
 // SW-REQ-021:error_handling:negative
 func TestErrorMatcherCompile(t *testing.T) {
 	t.Parallel()

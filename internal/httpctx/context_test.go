@@ -40,6 +40,7 @@ func TestValue_SetAndGet(t *testing.T) {
 // Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-028
 // STK-REQ-020:boundary:boundary
 // SYS-REQ-108:boundary:boundary
+// SW-REQ-028:boundary:nominal
 // SW-REQ-028:boundary:boundary
 func TestValue_GetWithMissingKey(t *testing.T) {
 	// Define a key and instantiate a new Value with type map[string]any
@@ -80,6 +81,7 @@ func TestValue_SetDifferentTypes(t *testing.T) {
 // Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-028
 // STK-REQ-020:boundary:boundary
 // SYS-REQ-108:boundary:boundary
+// SW-REQ-028:boundary:nominal
 // SW-REQ-028:boundary:boundary
 func TestValue_GetWithMismatchedType(t *testing.T) {
 	key := "typedKey"

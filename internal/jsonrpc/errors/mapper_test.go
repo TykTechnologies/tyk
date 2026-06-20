@@ -16,7 +16,9 @@ import (
 // SYS-REQ-106:boundary:boundary
 // SYS-REQ-106:error_handling:negative
 // SW-REQ-024:nominal:nominal
+// SW-REQ-024:boundary:nominal
 // SW-REQ-024:boundary:boundary
+// SW-REQ-024:error_handling:nominal
 // SW-REQ-024:error_handling:negative
 // MCDC SYS-REQ-106: jsonrpc_error_response_requested=T, jsonrpc_error_response_determined=T => TRUE
 func TestMapHTTPStatusToJSONRPCCode(t *testing.T) {

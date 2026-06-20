@@ -20,6 +20,7 @@ func TestPrefixes(t *testing.T) {
 // Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-025
 // STK-REQ-019:boundary:boundary
 // SYS-REQ-107:boundary:boundary
+// SW-REQ-025:boundary:nominal
 // SW-REQ-025:boundary:boundary
 func TestIsPrimitiveVEMPath(t *testing.T) {
 	tests := []struct {

@@ -19,6 +19,7 @@ func TestCache(t *testing.T) {
 // Verifies: STK-REQ-021, SYS-REQ-109, SW-REQ-029
 // STK-REQ-021:boundary:boundary
 // SYS-REQ-109:boundary:boundary
+// SW-REQ-029:boundary:nominal
 // SW-REQ-029:boundary:boundary
 func TestCache_Expired(t *testing.T) {
 	cache := &Cache{
