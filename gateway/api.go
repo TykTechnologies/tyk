@@ -2778,6 +2778,7 @@ func (gw *Gateway) invalidateOauthRefresh(w http.ResponseWriter, r *http.Request
 	doJSONWrite(w, http.StatusOK, success)
 }
 
+// SW-REQ-126
 func (gw *Gateway) rotateOauthClientHandler(w http.ResponseWriter, r *http.Request) {
 
 	apiID := mux.Vars(r)["apiID"]
@@ -2788,6 +2789,7 @@ func (gw *Gateway) rotateOauthClientHandler(w http.ResponseWriter, r *http.Reque
 	doJSONWrite(w, code, obj)
 }
 
+// SW-REQ-126
 func (gw *Gateway) getApisForOauthApp(w http.ResponseWriter, r *http.Request) {
 	apis := []string{}
 	appID := mux.Vars(r)["appID"]
@@ -2814,6 +2816,7 @@ func (gw *Gateway) getApisForOauthApp(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, apis)
 }
 
+// SW-REQ-126
 func (gw *Gateway) oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]
@@ -2840,6 +2843,7 @@ func (gw *Gateway) oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
+// SW-REQ-126
 func (gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]
@@ -2897,6 +2901,7 @@ func (gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Reque
 }
 
 // Get client details
+// SW-REQ-126
 func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 	storageID := oauthClientStorageID(keyName)
 	apiSpec := gw.getApiSpec(apiID)

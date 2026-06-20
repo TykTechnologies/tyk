@@ -1634,6 +1634,95 @@ func TestGatewayOAuthClientManagementHelpers(t *testing.T) {
 	assert.Equal(t, "rotated-secret", rotatedClient.ClientSecret)
 	assert.Equal(t, "updated description", rotatedClient.Description)
 
+	rec = httptest.NewRecorder()
+	ts.Gw.oAuthClientHandler(rec, mux.SetURLVars(httptest.NewRequest(http.MethodGet, "/tyk/oauth/clients/999999/client-a", nil), map[string]string{
+		"apiID":   spec.APIID,
+		"keyName": "client-a",
+	}))
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var detail NewClientRequest
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &detail))
+	assert.Equal(t, "client-a", detail.ClientID)
+	assert.Equal(t, "rotated-secret", detail.ClientSecret)
+
+	rec = httptest.NewRecorder()
+	ts.Gw.oAuthClientHandler(rec, mux.SetURLVars(httptest.NewRequest(http.MethodGet, "/tyk/oauth/clients/999999", nil), map[string]string{
+		"apiID": spec.APIID,
+	}))
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"client_id":"client-a"`)
+
+	handlerUpdatePayload, err := json.Marshal(NewClientRequest{Description: "handler updated"})
+	require.NoError(t, err)
+	rec = httptest.NewRecorder()
+	ts.Gw.oAuthClientHandler(rec, mux.SetURLVars(httptest.NewRequest(http.MethodPut, "/tyk/oauth/clients/999999/client-a", bytes.NewReader(handlerUpdatePayload)), map[string]string{
+		"apiID":   spec.APIID,
+		"keyName": "client-a",
+	}))
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var handlerUpdated NewClientRequest
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &handlerUpdated))
+	assert.Equal(t, "client-a", handlerUpdated.ClientID)
+	assert.Equal(t, "rotated-secret", handlerUpdated.ClientSecret)
+	assert.Equal(t, "handler updated", handlerUpdated.Description)
+
+	createOauthClientSecret = func() string {
+		return "handler-rotated-secret"
+	}
+	rec = httptest.NewRecorder()
+	ts.Gw.rotateOauthClientHandler(rec, mux.SetURLVars(httptest.NewRequest(http.MethodPut, "/tyk/oauth/clients/999999/client-a/rotate", nil), map[string]string{
+		"apiID":   spec.APIID,
+		"keyName": "client-a",
+	}))
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var handlerRotated NewClientRequest
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &handlerRotated))
+	assert.Equal(t, "client-a", handlerRotated.ClientID)
+	assert.Equal(t, "handler-rotated-secret", handlerRotated.ClientSecret)
+
+	rec = httptest.NewRecorder()
+	ts.Gw.getApisForOauthApp(rec, mux.SetURLVars(httptest.NewRequest(http.MethodGet, "/tyk/oauth/clients/client-a/apis?orgID=default", nil), map[string]string{
+		"appID": "client-a",
+	}))
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var appAPIs []string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &appAPIs))
+	assert.Contains(t, appAPIs, spec.APIID)
+
+	for _, tc := range []struct {
+		name string
+		req  *http.Request
+		want int
+		body string
+	}{
+		{
+			name: "tokens unknown api",
+			req:  mux.SetURLVars(httptest.NewRequest(http.MethodGet, "/tyk/oauth/clients/missing-api/client-a/tokens", nil), map[string]string{"apiID": "missing-api", "keyName": "client-a"}),
+			want: http.StatusNotFound,
+			body: `{"status":"error","message":"OAuth Client ID not found"}`,
+		},
+		{
+			name: "tokens empty list",
+			req:  mux.SetURLVars(httptest.NewRequest(http.MethodGet, "/tyk/oauth/clients/999999/client-a/tokens", nil), map[string]string{"apiID": spec.APIID, "keyName": "client-a"}),
+			want: http.StatusOK,
+			body: `[]`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+
+			ts.Gw.oAuthClientTokensHandler(rec, tc.req)
+
+			require.Equal(t, tc.want, rec.Code)
+			assert.JSONEq(t, tc.body, rec.Body.String())
+		})
+	}
+
 	for _, tc := range []struct {
 		name string
 		req  *http.Request
