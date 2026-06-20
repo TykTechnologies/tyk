@@ -1,9 +1,9 @@
 component: gateway_analytics
 no_interface:
     declared: true
-    reason: The gateway analytics proof slice covers local analytics handler, stream analytics response-writer, and helper behavior only; Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, stream backend delivery, network transport behavior, and final client-visible responses are outside this component boundary.
+    reason: The gateway analytics proof slice covers local analytics handler, stream analytics response-writer, Go analytics plugin adapter, and helper behavior only; Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, external Go plugin binary correctness, stream backend delivery, network transport behavior, and final client-visible responses are outside this component boundary.
 variables:
     - name: gateway_analytics_operation_terminal
       type: bool
       direction: output
-      description: 'The local gateway analytics operation reaches a terminal observable result: handler initialization, worker lifecycle transition, serializer selection, buffered storage append, preserved analytics record field, GeoIP lookup result or explicit local error, normalized path, selected request-header tag expansion, selected stream analytics recorder or response writer, stream write/hijack analytics result, flush delegation, non-hijackable writer error, or no-op stop/flush outcome.'
+      description: 'The local gateway analytics operation reaches a terminal observable result: handler initialization, worker lifecycle transition, serializer selection, buffered storage append, preserved analytics record field, GeoIP lookup result or explicit local error, normalized path, selected request-header tag expansion, selected stream analytics recorder or response writer, stream write/hijack analytics result, flush delegation, non-hijackable writer error, Go analytics plugin load result, plugin callback result, plugin panic recovery error, or no-op stop/flush outcome.'

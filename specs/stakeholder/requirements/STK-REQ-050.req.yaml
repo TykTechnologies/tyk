@@ -5,21 +5,21 @@ priority: shall
 category: observability
 req_type: guarantee
 fretish: ""
-description: Gateway analytics support shall locally buffer and persist analytics records for gateway outcomes, preserve configured detailed analytics fields, initialize and use GeoIP and URL-normalization helpers, append selected request-header tags, and wrap stream response writers so stream write and connection-upgrade paths record local analytics metadata without claiming Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, stream backend delivery, network transport behavior, or final client-visible responses.
+description: Gateway analytics support shall locally buffer and persist analytics records for gateway outcomes, preserve configured detailed analytics fields, initialize and use GeoIP and URL-normalization helpers, append selected request-header tags, wrap stream response writers so stream write and connection-upgrade paths record local analytics metadata, and invoke configured Go analytics plugin callbacks without claiming Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, external Go plugin binary correctness, stream backend delivery, network transport behavior, or final client-visible responses.
 formalization_strategy: informal
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: gateway_analytics
-rationale: Gateway operators depend on analytics records for operational observability. This proof slice owns the local gateway analytics handler and helper behavior that prepares and appends records to configured storage, including stream analytics response-writer wrapping; downstream analytics consumers, stream backend delivery, and storage durability are outside this boundary.
+rationale: Gateway operators depend on analytics records for operational observability. This proof slice owns the local gateway analytics handler and helper behavior that prepares and appends records to configured storage, including stream analytics response-writer wrapping and the local Go analytics plugin adapter; downstream analytics consumers, external plugin binary behavior, stream backend delivery, and storage durability are outside this boundary.
 tags:
     - analytics
     - observability
     - gateway
 variables: []
 traces:
-    reviewed_at: "2026-06-20T19:15:00Z"
+    reviewed_at: "2026-06-20T19:35:00Z"
     reviewed_by: human:buger
 verification:
     assurance_level: A
@@ -28,15 +28,15 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-20T19:15:00Z"
+        reviewed_at: "2026-06-20T19:35:00Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway analytics scope is limited to local gateway analytics handler and helper behavior: handler initialization, worker start/stop/flush lifecycle, serializer selection, buffered record append to configured analytics storage, status/detailed record preservation, local GeoIP lookup wiring, URL normalization for UUID/ULID/numeric/custom path fragments, selected request-header tag expansion, stream analytics recorder selection, response-writer wrapping, write-path analytics recording, connection-upgrade analytics recording, flush delegation, and non-hijackable writer error handling. This approval does not claim Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, stream backend delivery, network transport behavior, or final client-visible responses.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway analytics scope is limited to local gateway analytics handler and helper behavior: handler initialization, worker start/stop/flush lifecycle, serializer selection, buffered record append to configured analytics storage, status/detailed record preservation, local GeoIP lookup wiring, URL normalization for UUID/ULID/numeric/custom path fragments, selected request-header tag expansion, stream analytics recorder selection, response-writer wrapping, write-path analytics recording, connection-upgrade analytics recording, flush delegation, non-hijackable writer error handling, and local Go analytics plugin adapter loading and callback invocation. This approval does not claim Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, external Go plugin binary correctness, stream backend delivery, network transport behavior, or final client-visible responses.
         ai_generated: false
 history:
     created_by: agent:codex
     created_at: "2026-06-20T18:50:00Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-20T19:15:00Z"
+    last_modified_at: "2026-06-20T19:35:00Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -77,6 +77,11 @@ stakeholder:
           verification_method: test
           derived_reqs:
             - SYS-REQ-138
+        - id: STK-REQ-050-AC-07
+          text: Given configured Go analytics plugin settings or an initialized callback, when local analytics plugin loading or per-record processing is requested, then the adapter reports loader failure, reuses initialized handlers, invokes callbacks with the analytics record, and converts nil receiver or callback panic conditions into local errors without crashing the gateway.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-138
 lifecycle:
     change_history:
         - date: "2026-06-20T18:50:00Z"
@@ -88,4 +93,9 @@ lifecycle:
           from: approved
           to: approved
           reason: Extended gateway analytics scope to include local stream analytics recorder and response-writer behavior.
+          changed_by: human:buger
+        - date: "2026-06-20T19:35:00Z"
+          from: approved
+          to: approved
+          reason: Extended gateway analytics scope to include local Go analytics plugin adapter behavior.
           changed_by: human:buger

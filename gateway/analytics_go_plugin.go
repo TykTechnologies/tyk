@@ -18,6 +18,7 @@ type GoAnalyticsPlugin struct {
 	logger   *logrus.Entry
 }
 
+// SW-REQ-125
 func (m *GoAnalyticsPlugin) loadAnalyticsPlugin() bool {
 	m.logger = log.WithFields(logrus.Fields{
 		"mwPath":       m.Path,
@@ -40,6 +41,7 @@ func (m *GoAnalyticsPlugin) loadAnalyticsPlugin() bool {
 	return true
 }
 
+// SW-REQ-125
 func (m *GoAnalyticsPlugin) processRecord(record *analytics.AnalyticsRecord) (err error) {
 	if m == nil {
 		return errors.New("GoAnalyticsPlugin has nil value")
