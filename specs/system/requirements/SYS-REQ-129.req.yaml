@@ -1,11 +1,11 @@
 id: SYS-REQ-129
 version: 1
-status: approved
+status: review
 priority: shall
 category: security
 req_type: guarantee
 fretish: the crypto_helpers shall always satisfy crypto_helper_operation_terminal
-description: Internal crypto helper support shall make local helper operations terminal and deterministic for cipher metadata mapping and name resolution, hash algorithm selection and key hashing, token generation and token field parsing, certificate helper classification and CA-pool updates, public-key PEM helper generation, and local encrypt/decrypt helper outcomes, without claiming cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
+description: Internal crypto helper support shall make local helper operations terminal and deterministic for cipher metadata mapping and name resolution, hash algorithm selection and key hashing, token generation and token field parsing, Mashery signature hasher selection and clock-skew validation helper outcomes, certificate helper classification and CA-pool updates, public-key PEM helper generation, and local encrypt/decrypt helper outcomes, without claiming cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, request authentication middleware behavior, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: STK-REQ-041
 component: crypto_helpers
-rationale: This system requirement owns local internal/crypto helper terminality and deterministic helper behavior only. Broader product security outcomes remain outside this proof slice.
+rationale: This system requirement owns local internal/crypto and signature_validator helper terminality and deterministic helper behavior only. Broader product security outcomes remain outside this proof slice.
 tags:
     - crypto
     - security
@@ -23,33 +23,33 @@ variables:
 traces:
     satisfies:
         - STK-REQ-041
-    reviewed_at: "2026-06-20T13:34:09.745011Z"
-    reviewed_by: human:buger
+    reviewed_at: "2026-06-20T14:00:00Z"
+    reviewed_by: agent:codex
     reviewed_fingerprint: sha256:1322fcad914a613da30d44662bd35e80e66ba578d8408240fc5f0fa8ef4e1671
 verification:
     assurance_level: A
     formalization_status: valid
     review:
         status: approved
-        reviewer: human:buger
+        reviewer: agent:codex
         role: requirements_owner
-        reviewed_at: "2026-06-20T12:00:00Z"
+        reviewed_at: "2026-06-20T14:00:00Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Crypto helper system scope is limited to terminal local helper behavior in internal/crypto: cipher metadata mapping and name resolution, hash algorithm selection and key hashing, token generation and token field parsing, certificate helper classification and CA-pool updates, public-key PEM helper generation, and local encrypt/decrypt helper outcomes. The FRETish invariant intentionally models local operation terminality without asserting cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
-        ai_generated: false
-    gaps_reviewed_at: "2026-06-20T12:00:33.862377Z"
-    gaps_reviewed_by: human:buger
+            Agent review under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Crypto helper system scope is limited to terminal local helper behavior in internal/crypto and signature_validator: cipher metadata mapping and name resolution, hash algorithm selection and key hashing, token generation and token field parsing, Mashery signature hasher selection and clock-skew validation helper outcomes, certificate helper classification and CA-pool updates, public-key PEM helper generation, and local encrypt/decrypt helper outcomes. The FRETish invariant intentionally models local operation terminality without asserting cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, request authentication middleware behavior, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
+        ai_generated: true
+    gaps_reviewed_at: "2026-06-20T14:00:00Z"
+    gaps_reviewed_by: agent:codex
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-129|crypto_helper_operation_terminal
-          reviewer: human:buger
-          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final requirement approval. SYS-REQ-129''s crypto_helper_operation_terminal variable is decomposed by SW-REQ-116 for local internal/crypto behavior: cipher metadata mapping and name resolution, hash algorithm selection and key hashing, token generation and token field parsing, certificate helper classification and CA-pool updates, public-key PEM helper generation, and local encrypt/decrypt helper outcomes. This review is limited to local crypto helper mechanics and does not claim cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.'
-          reviewed_at: "2026-06-20T12:00:33.862377Z"
+          reviewer: agent:codex
+          reason: 'Agent review under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-129''s crypto_helper_operation_terminal variable is decomposed by SW-REQ-116 for local internal/crypto behavior and SW-REQ-122 for local signature_validator behavior: cipher metadata mapping and name resolution, hash algorithm selection and key hashing, token generation and token field parsing, Mashery signature hasher selection and clock-skew validation helper outcomes, certificate helper classification and CA-pool updates, public-key PEM helper generation, and local encrypt/decrypt helper outcomes. This review is limited to local crypto helper mechanics and does not claim cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, request authentication middleware behavior, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.'
+          reviewed_at: "2026-06-20T14:00:00Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T12:00:00Z"
-    last_modified_by: human:buger
-    last_modified_at: "2026-06-20T12:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-20T14:00:00Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -61,4 +61,9 @@ lifecycle:
           from: draft
           to: review
           reason: Added crypto helper system requirement for internal/crypto onboarding.
+          changed_by: agent:codex
+        - date: "2026-06-20T14:00:00Z"
+          from: approved
+          to: review
+          reason: Added signature_validator local helper behavior under existing crypto helper system scope.
           changed_by: agent:codex

@@ -10,13 +10,14 @@ import (
 
 type Validator interface {
 	Init(hasherName string) error
-	Validate(attempt, actual string, allowedClockSkew int64) error
+	Validate(signature, key, secret string, allowedClockSkew int64) error
 }
 
 type SignatureValidator struct {
 	h Hasher
 }
 
+// SW-REQ-122
 func (v *SignatureValidator) Init(hasherName string) error {
 	switch hasherName {
 	case "MasherySHA256":
@@ -30,6 +31,7 @@ func (v *SignatureValidator) Init(hasherName string) error {
 	return nil
 }
 
+// SW-REQ-122
 func (v SignatureValidator) Validate(signature, key, secret string, allowedClockSkew int64) error {
 	signatureBytes, _ := hex.DecodeString(signature)
 	now := time.Now().Unix()

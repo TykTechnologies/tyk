@@ -1,0 +1,54 @@
+id: SW-REQ-122
+version: 1
+status: review
+priority: shall
+category: security
+req_type: guarantee
+fretish: ""
+description: The signature validator helper shall expose Mashery SHA-256 and MD5 hasher names, compute deterministic Mashery signature digests from token, shared-secret, and timestamp inputs, initialize only supported Mashery hashers, reject unsupported hasher names, and validate hex signatures within the configured clock-skew window while rejecting missing, malformed, or outside-window signatures.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: signature_validator/hash_test.go; signature_validator/validate_test.go; docs/crypto-helpers-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-129
+component: crypto_helpers
+rationale: >-
+    This software requirement owns only local signature_validator helper mechanics used by gateway authentication code. It does not claim cryptographic strength, replay protection policy, request authentication middleware behavior, key lookup, clock synchronization, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
+tags:
+    - crypto
+    - security
+    - signature
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-129
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: agent:codex
+        role: requirements_owner
+        reviewed_at: "2026-06-20T14:00:00Z"
+        comment: >-
+            Agent review under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-122 is scoped to local signature_validator helper behavior: Mashery SHA-256 and MD5 hasher names and deterministic digest construction, supported and unsupported hasher initialization, public Validator interface conformance, and configured clock-skew validation for missing, malformed, valid, too-old, and too-new signatures. Focused signature_validator tests passed locally. This approval does not claim cryptographic strength, replay protection policy, request authentication middleware behavior, key lookup, clock synchronization, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
+        ai_generated: true
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T14:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-20T14:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T14:00:00Z"
+          from: draft
+          to: review
+          reason: Added signature_validator local helper behavior under crypto helper support.
+          changed_by: agent:codex
