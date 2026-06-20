@@ -9,6 +9,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// SW-REQ-076
 type ProxyOnly struct {
 	ApiDefinition   *apidef.APIDefinition
 	HttpClient      *http.Client
@@ -18,6 +19,7 @@ type ProxyOnly struct {
 	subscriptionClientFactory graphqldatasource.GraphQLSubscriptionClientFactory
 }
 
+// SW-REQ-076
 func (p *ProxyOnly) EngineConfigV3() (*graphql.EngineV2Configuration, error) {
 	var err error
 	if p.Schema == nil {
@@ -56,6 +58,7 @@ func (p *ProxyOnly) EngineConfigV3() (*graphql.EngineV2Configuration, error) {
 	return &v2Config, err
 }
 
+// SW-REQ-076
 func parseSchema(schemaAsString string) (parsedSchema *graphql.Schema, err error) {
 	parsedSchema, err = graphql.NewSchemaFromString(schemaAsString)
 	if err != nil {
@@ -74,6 +77,7 @@ func parseSchema(schemaAsString string) (parsedSchema *graphql.Schema, err error
 	return parsedSchema, nil
 }
 
+// SW-REQ-076
 func graphqlSubscriptionType(subscriptionType apidef.SubscriptionType) graphql.SubscriptionType {
 	switch subscriptionType {
 	case apidef.GQLSubscriptionWS:
@@ -87,6 +91,7 @@ func graphqlSubscriptionType(subscriptionType apidef.SubscriptionType) graphql.S
 	}
 }
 
+// SW-REQ-076
 func subscriptionClientFactoryOrDefault(providedSubscriptionClientFactory graphqldatasource.GraphQLSubscriptionClientFactory) graphqldatasource.GraphQLSubscriptionClientFactory {
 	if providedSubscriptionClientFactory != nil {
 		return providedSubscriptionClientFactory

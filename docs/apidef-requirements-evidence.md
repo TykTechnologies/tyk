@@ -31,6 +31,7 @@
 <!-- documents SW-REQ-073 -->
 <!-- documents SW-REQ-074 -->
 <!-- documents SW-REQ-075 -->
+<!-- documents SW-REQ-076 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -52,7 +53,8 @@ interface and GraphQL utility helper behavior, GraphQL config adapter
 selection behavior, AsyncAPI adapter support-shape generation, and OpenAPI
 adapter support-shape generation, and GraphQL engine adapter utility behavior
 and proxy-only, supergraph, and universal-data-graph engine adapter
-configuration behavior without silent data-shape drift.
+configuration behavior, plus engine v3 proxy-only adapter configuration
+behavior, without silent data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -421,3 +423,20 @@ upstream availability, Kafka broker availability or consumption behavior,
 GraphQL execution, subscription transport execution, gateway API loading, route
 generation, request matching, gateway request admission, middleware execution,
 persistence, analytics, or final client-visible runtime behavior.
+
+`SW-REQ-076` owns the concrete
+`apidef/adapter/gqlengineadapter/enginev3` proxy-only engine adapter
+configuration assembly. Its evidence covers local schema parsing when no schema
+is supplied, caller-supplied schema reuse, proxy request header conversion into
+static upstream headers, internal Tyk URL conversion with the internal API
+header, proxy subscription type mapping, caller-supplied HTTP and streaming
+clients in the datasource factory, configured subscription-client factory use,
+schema-derived datasource and field argument configuration, repeated-input
+determinism, default subscription-client factory selection, and schema parse
+error propagation. This evidence does not claim GraphQL schema semantic
+completeness beyond local parse/normalize result propagation, correctness of
+the upstream graphql-go-tools/v2 proxy config factory, GraphQL execution,
+subscription transport execution, REST or GraphQL upstream availability,
+gateway API loading, route generation, request matching, gateway request
+admission, middleware execution, persistence, analytics, or final
+client-visible runtime behavior.

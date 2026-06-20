@@ -1,0 +1,55 @@
+id: SW-REQ-076
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The apidef/adapter GraphQL engine v3 proxy-only adapter shall preserve API-definition support adapter behavior by parsing API-definition GraphQL schema only when no caller-supplied schema is present; converting proxy request headers into static upstream headers; converting internal Tyk proxy target URLs to HTTP URLs with the internal API header; mapping proxy subscription type settings; constructing proxy engine configuration with caller-supplied HTTP, streaming, and subscription-client factory inputs; preserving schema-derived datasource and field argument configuration; propagating schema parse or proxy engine configuration errors; and producing deterministic proxy datasource and field configuration for repeated equivalent input.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: apidef/adapter/gqlengineadapter/enginev3/adapter_proxy_only_reqproof_test.go; docs/apidef-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-104
+component: model
+rationale: This software requirement owns only the local apidef/adapter/gqlengineadapter/enginev3 proxy-only engine adapter configuration assembly. It does not claim GraphQL schema semantic completeness beyond local parse/normalize result propagation, correctness of the upstream graphql-go-tools/v2 proxy config factory, GraphQL execution, subscription transport execution, REST or GraphQL upstream availability, gateway API loading, route generation, request matching, gateway request admission, middleware execution, persistence, analytics, or final client-visible runtime behavior.
+tags:
+    - api-definition
+    - graphql
+    - engine-v3
+    - proxy-only
+    - adapter
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-104
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T04:56:38Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-076 is scoped to local apidef/adapter/gqlengineadapter/enginev3 proxy-only engine adapter configuration assembly: schema parse or caller-supplied schema reuse, proxy request headers as static upstream headers, internal Tyk URL conversion with the internal API header, proxy subscription type mapping, caller-supplied HTTP, streaming, and subscription-client factory inputs, schema-derived datasource and field argument configuration, default subscription-client factory selection, schema error propagation, and deterministic repeated configuration. Focused enginev3 gqlengineadapter test passed. This approval does not claim GraphQL schema semantic completeness beyond local parse/normalize result propagation, correctness of the upstream graphql-go-tools/v2 proxy config factory, GraphQL execution, subscription transport execution, REST or GraphQL upstream availability, gateway API loading, route generation, request matching, gateway request admission, middleware execution, persistence, analytics, or final client-visible runtime behavior.'
+        fingerprint: sha256:622c4ac3c3866c59f1e58dd505e4bd6fb0283b1fef18276ff4579d9ad6f58452
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T04:56:38Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added apidef/adapter GraphQL engine v3 proxy-only adapter decomposition under API-definition support model behavior.
+          changed_by: agent:codex
