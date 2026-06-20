@@ -21,6 +21,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// Verifies: SW-REQ-102
 // onDefaults overlays src as a JSON string on top of the default config
 // as a JSON. This can be useful to change the default config in ways
 // that would not be possible via the config.Config struct, such as
@@ -105,6 +106,7 @@ var tests = []struct {
 	},
 }
 
+// Verifies: SW-REQ-102
 func allContains(got, want []string) bool {
 	if len(want) != len(got) {
 		return false

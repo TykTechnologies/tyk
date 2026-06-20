@@ -221,6 +221,7 @@ func TestCLIImporterReqProof_FileLoadersAndOutputFormatting(t *testing.T) {
 	assert.NotContains(t, output, `"id": ""`)
 }
 
+// Verifies: SW-REQ-101
 func testImporter(createAPI bool, orgID, upstreamTarget, forAPI, asVersion string) *Importer {
 	return &Importer{
 		createAPI:      &createAPI,
@@ -231,6 +232,7 @@ func testImporter(createAPI bool, orgID, upstreamTarget, forAPI, asVersion strin
 	}
 }
 
+// Verifies: SW-REQ-101
 func writeImporterTestFile(t testing.TB, dir, name, contents string) string {
 	t.Helper()
 
@@ -239,6 +241,7 @@ func writeImporterTestFile(t testing.TB, dir, name, contents string) string {
 	return path
 }
 
+// Verifies: SW-REQ-101
 func captureStdout(t testing.TB, fn func()) string {
 	t.Helper()
 
@@ -260,6 +263,7 @@ func captureStdout(t testing.TB, fn func()) string {
 	return string(output)
 }
 
+// Verifies: SW-REQ-101
 func commandModel(t testing.TB, app *kingpin.Application, name string) *kingpin.CmdModel {
 	t.Helper()
 
@@ -272,6 +276,7 @@ func commandModel(t testing.TB, app *kingpin.Application, name string) *kingpin.
 	return nil
 }
 
+// Verifies: SW-REQ-101
 func flagNames(cmd *kingpin.CmdModel) []string {
 	names := make([]string, 0, len(cmd.Flags))
 	for _, flag := range cmd.Flags {

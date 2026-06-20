@@ -71,6 +71,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// Verifies: SW-REQ-100
 func writeManifestFile(t testing.TB, manifest interface{}, filename string) *string {
 	t.Helper()
 	var data []byte
@@ -325,6 +326,7 @@ func TestBuildSignedBundleIncludesVerifiableSignature(t *testing.T) {
 	}
 }
 
+// Verifies: SW-REQ-100
 func readBundleManifest(t testing.TB, bundlePath string) apidef.BundleManifest {
 	t.Helper()
 
