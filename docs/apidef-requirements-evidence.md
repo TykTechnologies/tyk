@@ -29,6 +29,7 @@
 <!-- documents SW-REQ-071 -->
 <!-- documents SW-REQ-072 -->
 <!-- documents SW-REQ-073 -->
+<!-- documents SW-REQ-074 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -49,8 +50,8 @@ name/value helper shapes, OAS extension error-override helper shapes, adapter
 interface and GraphQL utility helper behavior, GraphQL config adapter
 selection behavior, AsyncAPI adapter support-shape generation, and OpenAPI
 adapter support-shape generation, and GraphQL engine adapter utility behavior
-and proxy-only engine adapter configuration behavior without silent
-data-shape drift.
+and proxy-only and supergraph engine adapter configuration behavior without
+silent data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -383,3 +384,21 @@ proxy-only configuration shape, GraphQL execution, subscription transport
 execution, REST or GraphQL upstream availability, gateway API loading, route
 generation, request matching, gateway request admission, middleware execution,
 persistence, analytics, or final client-visible runtime behavior.
+
+`SW-REQ-074` owns the concrete `apidef/adapter/gqlengineadapter` supergraph
+engine adapter configuration assembly. Its evidence covers conversion of
+non-empty subgraph entries into federation-enabled GraphQL datasource
+configuration, empty-SDL subgraph skipping, subgraph/global header merging with
+subgraph precedence and canonical HTTP names, internal Tyk subgraph URL
+conversion with the internal API header, subgraph subscription settings
+including SSE POST mode, caller-supplied HTTP, streaming, and subscription
+client inputs in the generated federation datasource factory, batch datasource
+factory presence or absence based on the disable-query-batching flag, merged SDL
+error propagation, empty-subgraph boundary behavior, and repeated-input
+determinism. This evidence does not claim GraphQL federation semantic
+correctness beyond local config assembly and upstream error propagation,
+correctness of the upstream graphql-go-tools federation config factory, GraphQL
+execution, subscription transport execution, REST or GraphQL upstream
+availability, gateway API loading, route generation, request matching, gateway
+request admission, middleware execution, persistence, analytics, or final
+client-visible runtime behavior.

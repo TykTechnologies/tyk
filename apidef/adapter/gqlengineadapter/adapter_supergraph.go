@@ -9,6 +9,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// SW-REQ-074
 type Supergraph struct {
 	ApiDefinition   *apidef.APIDefinition
 	HttpClient      *http.Client
@@ -17,6 +18,7 @@ type Supergraph struct {
 	subscriptionClientFactory graphqldatasource.GraphQLSubscriptionClientFactory
 }
 
+// SW-REQ-074
 func (s *Supergraph) EngineConfig() (*graphql.EngineV2Configuration, error) {
 	dataSourceConfs := s.subgraphDataSourceConfigs()
 	var federationConfigV2Factory *graphql.FederationEngineConfigFactory
@@ -56,6 +58,7 @@ func (s *Supergraph) EngineConfig() (*graphql.EngineV2Configuration, error) {
 	return &conf, nil
 }
 
+// SW-REQ-074
 func (s *Supergraph) subgraphDataSourceConfigs() []graphqldatasource.Configuration {
 	confs := make([]graphqldatasource.Configuration, 0)
 	if len(s.ApiDefinition.GraphQL.Supergraph.Subgraphs) == 0 {
