@@ -40,6 +40,7 @@ type Middleware struct {
 var _ model.Middleware = &Middleware{}
 
 // NewMiddleware returns a new instance of Middleware.
+// SW-REQ-114
 func NewMiddleware(gw Gateway, mw BaseMiddleware, spec *APISpec, analyticsFactory StreamAnalyticsFactory) *Middleware {
 	return &Middleware{
 		base:             mw,
@@ -50,16 +51,19 @@ func NewMiddleware(gw Gateway, mw BaseMiddleware, spec *APISpec, analyticsFactor
 }
 
 // Logger returns a logger with middleware filled out.
+// SW-REQ-114
 func (s *Middleware) Logger() *logrus.Entry {
 	return s.base.Logger().WithField("mw", s.Name())
 }
 
 // Name returns the name for the middleware.
+// SW-REQ-114
 func (s *Middleware) Name() string {
 	return "StreamingMiddleware"
 }
 
 // EnabledForSpec checks if streaming is enabled on the config.
+// SW-REQ-114
 func (s *Middleware) EnabledForSpec() bool {
 	s.Logger().Debug("Checking if streaming is enabled")
 
@@ -83,6 +87,7 @@ func (s *Middleware) EnabledForSpec() bool {
 }
 
 // Init initializes the middleware
+// SW-REQ-114
 func (s *Middleware) Init() {
 	s.Logger().Debug("Initializing Middleware")
 	s.ctx, s.cancel = context.WithCancel(context.Background())
@@ -114,6 +119,7 @@ func (s *Middleware) Init() {
 }
 
 // CreateStreamManager creates or retrieves a stream manager based on the request.
+// SW-REQ-114
 func (s *Middleware) CreateStreamManager(r *http.Request) *Manager {
 	streamsConfig := s.getStreamsConfig(r)
 	configJSON, _ := json.Marshal(streamsConfig)
@@ -145,6 +151,7 @@ func (s *Middleware) CreateStreamManager(r *http.Request) *Manager {
 }
 
 // GC removes inactive stream managers.
+// SW-REQ-114
 func (s *Middleware) GC() {
 	s.Logger().Debug("Starting garbage collection for inactive stream managers")
 
@@ -171,6 +178,7 @@ func (s *Middleware) GC() {
 	})
 }
 
+// SW-REQ-114
 func (s *Middleware) getStreamsConfig(r *http.Request) *StreamsConfig {
 	config := &StreamsConfig{Streams: make(map[string]any)}
 	if !s.Spec.IsOAS {
@@ -187,6 +195,7 @@ func (s *Middleware) getStreamsConfig(r *http.Request) *StreamsConfig {
 	return config
 }
 
+// SW-REQ-114
 func (s *Middleware) processStreamsConfig(r *http.Request, streams map[string]any, config *StreamsConfig) {
 	for streamID, stream := range streams {
 		if r == nil {
@@ -219,6 +228,7 @@ func (s *Middleware) processStreamsConfig(r *http.Request, streams map[string]an
 }
 
 // ProcessRequest will handle the streaming functionality.
+// SW-REQ-114
 func (s *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	strippedPath := s.Spec.StripListenPath(r.URL.Path)
 	if !s.defaultManager.hasPath(strippedPath) {
@@ -258,6 +268,7 @@ func (s *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	return nil, middleware.StatusRespond
 }
 
+// SW-REQ-114
 func (s *Middleware) resetStream(streamValue any) {
 	if stream, ok := streamValue.(*Stream); ok {
 		if err := stream.Reset(); err != nil {
@@ -267,6 +278,7 @@ func (s *Middleware) resetStream(streamValue any) {
 }
 
 // Unload closes and remove active streams. This method is called when the API is removed.
+// SW-REQ-114
 func (s *Middleware) Unload() {
 	s.Logger().Debugf("Unloading streaming middleware %s", s.Spec.Name)
 
@@ -299,6 +311,7 @@ func (s *Middleware) Unload() {
 	s.Logger().Info("All streams successfully removed")
 }
 
+// SW-REQ-114
 func (s *Middleware) SetAnalyticsFactory(factory StreamAnalyticsFactory) {
 	if factory == nil {
 		factory = &NoopStreamAnalyticsFactory{}
@@ -307,6 +320,7 @@ func (s *Middleware) SetAnalyticsFactory(factory StreamAnalyticsFactory) {
 	s.defaultManager.SetAnalyticsFactory(factory)
 }
 
+// SW-REQ-114
 func (s *Middleware) GetStreamManager() *Manager {
 	return s.defaultManager
 }

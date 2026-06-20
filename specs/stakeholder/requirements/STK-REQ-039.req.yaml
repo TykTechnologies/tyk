@@ -1,0 +1,69 @@
+id: STK-REQ-039
+version: 1
+status: approved
+priority: shall
+category: enterprise
+req_type: guarantee
+fretish: ""
+description: Enterprise streaming middleware support shall locally derive stream runtime configuration, route metadata, lifecycle outcomes, unsafe-component filtering, Bento log translation, and analytics no-op behavior deterministically, without claiming external Bento delivery correctness, upstream authentication behavior, gateway API loading, network transport delivery, persistence, or final client-visible gateway behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: enterprise_streams
+rationale: The enterprise streams middleware package owns local stream helper mechanics. End-to-end streaming delivery and final gateway behavior remain outside this proof slice.
+tags:
+    - enterprise
+    - streams
+    - middleware
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T11:29:21Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Enterprise streams scope is limited to local ee/middleware/streams behavior: OAS stream config extraction, request-scoped variable replacement, HTTP path extraction and matching, manager cache/fallback mechanics, unsafe-component filtering, Bento log translation, stream start/stop outcomes, and no-op analytics defaults. This approval does not claim external Bento delivery correctness, upstream authentication behavior, gateway API loading, network transport delivery, persistence, or final client-visible gateway behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T11:29:21Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T11:29:21Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - access_denied
+    - determinism
+stakeholder:
+    persona: Enterprise gateway operator
+    story: As an enterprise gateway operator, I need stream middleware configuration and local runtime helpers to behave deterministically before external stream delivery is attempted.
+    acceptance_criteria:
+        - id: STK-REQ-039-AC-01
+          text: Given an OAS stream extension and request context, when local stream middleware derives stream configuration, then request-scoped variable replacement and stream map extraction complete deterministically.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-127
+        - id: STK-REQ-039-AC-02
+          text: Given stream HTTP server configuration, when local stream middleware inspects route paths, then default, explicit, broker, and duplicate paths are classified deterministically.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-127
+        - id: STK-REQ-039-AC-03
+          text: Given unsafe stream components, Bento log lines, lifecycle operations, or analytics defaults, when the local streams package handles them, then unsafe components are filtered unless allow-listed, malformed logs return explicit errors, stream start/stop outcomes are terminal, and missing analytics factories fall back to no-op behavior.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-127
+lifecycle:
+    change_history:
+        - date: "2026-06-20T11:29:21Z"
+          from: draft
+          to: review
+          reason: Added enterprise streams stakeholder requirement for ee/middleware/streams onboarding.
+          changed_by: agent:codex

@@ -15,6 +15,7 @@ type HandleFuncAdapter struct {
 	Logger           *logrus.Entry
 }
 
+// SW-REQ-114
 func (h *HandleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, *http.Request)) {
 	h.Logger.Debugf("Registering streaming handleFunc for path: %s", path)
 
@@ -37,6 +38,7 @@ func (h *HandleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 }
 
 // Helper function to extract paths from an http_server configuration
+// SW-REQ-114
 func extractPaths(httpConfig map[string]interface{}) []string {
 	var paths []string
 	defaultPaths := map[string]string{
@@ -55,6 +57,7 @@ func extractPaths(httpConfig map[string]interface{}) []string {
 }
 
 // extractHTTPServerPaths is a helper function to extract HTTP server paths from a given configuration.
+// SW-REQ-114
 func extractHTTPServerPaths(config map[string]interface{}) []string {
 	if httpServerConfig, ok := config["http_server"].(map[string]interface{}); ok {
 		return extractPaths(httpServerConfig)
@@ -63,6 +66,7 @@ func extractHTTPServerPaths(config map[string]interface{}) []string {
 }
 
 // handleBroker is a helper function to handle broker configurations.
+// SW-REQ-114
 func handleBroker(brokerConfig map[string]interface{}) []string {
 	var paths []string
 	for _, ioKey := range []string{"inputs", "outputs"} {
@@ -78,6 +82,7 @@ func handleBroker(brokerConfig map[string]interface{}) []string {
 }
 
 // GetHTTPPaths is the main function to get HTTP paths from the stream configuration.
+// SW-REQ-114
 func GetHTTPPaths(streamConfig map[string]interface{}) []string {
 	var paths []string
 	for _, component := range []string{"input", "output"} {

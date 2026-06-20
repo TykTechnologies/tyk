@@ -25,6 +25,7 @@ type Stream struct {
 }
 
 // NewStream creates a new stream without initializing it
+// SW-REQ-114
 func NewStream(allowUnsafe []string, logger *logrus.Entry) *Stream {
 	if len(allowUnsafe) > 0 {
 		logger.Warnf("Allowing unsafe components: %v", allowUnsafe)
@@ -37,6 +38,7 @@ func NewStream(allowUnsafe []string, logger *logrus.Entry) *Stream {
 }
 
 // Start loads up the configuration and starts the stream. Non-blocking
+// SW-REQ-114
 func (s *Stream) Start(config map[string]interface{}, mux service.HTTPMultiplexer) error {
 	s.logger.Debugf("Starting stream")
 
@@ -95,6 +97,7 @@ func (s *Stream) Start(config map[string]interface{}, mux service.HTTPMultiplexe
 }
 
 // Stop cleans up the stream
+// SW-REQ-114
 func (s *Stream) Stop() error {
 	s.logger.Printf("Stopping stream")
 
@@ -129,11 +132,13 @@ func (s *Stream) Stop() error {
 }
 
 // GetConfig returns the configuration of the stream
+// SW-REQ-114
 func (s *Stream) GetConfig() string {
 	return s.streamConfig
 }
 
 // Reset stops the stream
+// SW-REQ-114
 func (s *Stream) Reset() error {
 	return s.Stop()
 }
@@ -152,6 +157,7 @@ var unsafeComponents = []string{
 	"file",
 }
 
+// SW-REQ-114
 func (s *Stream) removeUnsafe(yamlBytes []byte) []byte {
 	filteredUnsafeComponents := []string{}
 

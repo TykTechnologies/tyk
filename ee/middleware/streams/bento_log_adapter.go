@@ -18,6 +18,7 @@ type bentoLogAdapter struct {
 	logger *logrus.Entry
 }
 
+// SW-REQ-114
 func newBentoLogAdapter(logger *logrus.Entry) *bentoLogAdapter {
 	return &bentoLogAdapter{logger: logger}
 }
@@ -36,6 +37,7 @@ type bentoLogLine struct {
 
 // Write processes a log entry in JSON format, parses its fields, and logs the message using the embedded logger.
 // Returns the number of bytes written (always 0) and an error if parsing fails.
+// SW-REQ-114
 func (w *bentoLogAdapter) Write(p []byte) (n int, err error) {
 	line := bentoLogLine{
 		fields: make(map[string]interface{}),

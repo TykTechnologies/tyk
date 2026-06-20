@@ -18,10 +18,12 @@ type StreamAnalyticsFactory interface {
 
 type NoopStreamAnalyticsFactory struct{}
 
+// SW-REQ-114
 func (n *NoopStreamAnalyticsFactory) CreateRecorder(r *http.Request) StreamAnalyticsRecorder {
 	return &NoopStreamAnalyticsRecorder{}
 }
 
+// SW-REQ-114
 func (n *NoopStreamAnalyticsFactory) CreateResponseWriter(w http.ResponseWriter, r *http.Request, streamID string, recorder StreamAnalyticsRecorder) http.ResponseWriter {
 	return w
 }
@@ -33,9 +35,11 @@ type StreamAnalyticsRecorder interface {
 
 type NoopStreamAnalyticsRecorder struct{}
 
+// SW-REQ-114
 func (n *NoopStreamAnalyticsRecorder) PrepareRecord(r *http.Request) {
 }
 
+// SW-REQ-114
 func (n *NoopStreamAnalyticsRecorder) RecordHit(statusCode int, latency analytics.Latency) error {
 	return nil
 }

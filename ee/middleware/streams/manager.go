@@ -22,6 +22,7 @@ type Manager struct {
 	analyticsFactory StreamAnalyticsFactory
 }
 
+// SW-REQ-114
 func (sm *Manager) initStreams(r *http.Request, config *StreamsConfig) {
 	// Clear existing routes for this consumer group
 	sm.muxer = mux.NewRouter()
@@ -40,6 +41,7 @@ func (sm *Manager) initStreams(r *http.Request, config *StreamsConfig) {
 	}
 }
 
+// SW-REQ-114
 func (sm *Manager) setUpOrDryRunStream(streamConfig any, streamID string) {
 	if streamMap, ok := streamConfig.(map[string]interface{}); ok {
 		httpPaths := GetHTTPPaths(streamMap)
@@ -62,6 +64,7 @@ func (sm *Manager) setUpOrDryRunStream(streamConfig any, streamID string) {
 }
 
 // removeStream removes a stream
+// SW-REQ-114
 func (sm *Manager) removeStream(streamID string) error {
 	if streamValue, exists := sm.streams.Load(streamID); exists {
 		stream, ok := streamValue.(*Stream)
@@ -80,6 +83,7 @@ func (sm *Manager) removeStream(streamID string) error {
 }
 
 // createStream creates a new stream
+// SW-REQ-114
 func (sm *Manager) createStream(streamID string, config map[string]interface{}) error {
 	streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
 	sm.mw.Logger().Debugf("Creating stream: %s", streamFullID)
@@ -114,6 +118,7 @@ func (sm *Manager) createStream(streamID string, config map[string]interface{}) 
 	return nil
 }
 
+// SW-REQ-114
 func (sm *Manager) hasPath(path string) bool {
 	for _, p := range sm.listenPaths {
 		if strings.TrimPrefix(path, "/") == strings.TrimPrefix(p, "/") {
@@ -123,6 +128,7 @@ func (sm *Manager) hasPath(path string) bool {
 	return false
 }
 
+// SW-REQ-114
 func (sm *Manager) SetAnalyticsFactory(factory StreamAnalyticsFactory) {
 	if factory == nil {
 		factory = &NoopStreamAnalyticsFactory{}

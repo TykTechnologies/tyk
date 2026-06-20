@@ -9,6 +9,9 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// Verifies: SYS-REQ-127, SW-REQ-114
+// SW-REQ-114:nominal:nominal
+// SW-REQ-114:error_handling:negative
 func TestStreamStart(t *testing.T) {
 	str := NewStream(nil, testLogger())
 	require.NotNil(t, str)
@@ -46,6 +49,9 @@ func TestStreamStart(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-127, SW-REQ-114
+// SW-REQ-114:nominal:nominal
+// SW-REQ-114:boundary:nominal
 func TestStreamStop(t *testing.T) {
 	logger := testLogger()
 	validConfig := map[string]interface{}{
@@ -83,64 +89,53 @@ func TestStreamStop(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-127, SW-REQ-114
+// SW-REQ-114:access_denied:nominal
+// SW-REQ-114:boundary:nominal
 func TestRemoveAndWhitelistUnsafeComponents(t *testing.T) {
 	logger := logrus.NewEntry(logrus.New())
-	t.Run("Remove Unsafe Components", func(t *testing.T) {
-		stream := NewStream(nil, logger)
-		unsafeConfig := map[string]interface{}{
-			"input": map[string]interface{}{
-				"type": "file",
-				"file": map[string]interface{}{
-					"paths": []string{"test.txt"},
-				},
+	unsafeConfig := map[string]interface{}{
+		"input": map[string]interface{}{
+			"file": map[string]interface{}{
+				"paths": []string{"test.txt"},
 			},
-			"output": map[string]interface{}{
-				"type": "socket",
-				"socket": map[string]interface{}{
-					"network": "tcp",
-					"address": "localhost:1234",
-				},
+		},
+		"output": map[string]interface{}{
+			"socket": map[string]interface{}{
+				"network": "tcp",
+				"address": "localhost:1234",
 			},
-		}
+		},
+	}
 
-		configPayload, err := yaml.Marshal(unsafeConfig)
-		if err != nil {
-			t.Fatalf("Failed to marshal unsafe config: %v", err)
-		}
+	tests := []struct {
+		name          string
+		allowUnsafe   []string
+		wantUnsafeKey bool
+	}{
+		{
+			name:          "remove unsafe components by default",
+			allowUnsafe:   nil,
+			wantUnsafeKey: false,
+		},
+		{
+			name:          "preserve whitelisted unsafe components",
+			allowUnsafe:   []string{"file", "socket"},
+			wantUnsafeKey: true,
+		},
+	}
 
-		sanitizedConfig := stream.removeUnsafe(configPayload)
-		if containsUnsafeComponent(sanitizedConfig) {
-			t.Fatalf("Unsafe components were not removed: \n%s", string(sanitizedConfig))
-		}
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stream := NewStream(tt.allowUnsafe, logger)
 
-	t.Run("Whitelist Components", func(t *testing.T) {
-		stream := NewStream([]string{"file", "socket"}, logger)
+			configPayload, err := yaml.Marshal(unsafeConfig)
+			require.NoError(t, err)
 
-		unsafeConfig := map[string]interface{}{
-			"input": map[string]interface{}{
-				"file": map[string]interface{}{
-					"paths": []string{"test.txt"},
-				},
-			},
-			"output": map[string]interface{}{
-				"socket": map[string]interface{}{
-					"network": "tcp",
-					"address": "localhost:1234",
-				},
-			},
-		}
-
-		configPayload, err := yaml.Marshal(unsafeConfig)
-		if err != nil {
-			t.Fatalf("Failed to marshal unsafe config: %v", err)
-		}
-
-		sanitizedConfig := stream.removeUnsafe(configPayload)
-		if !containsUnsafeComponent(sanitizedConfig) {
-			t.Fatalf("Whitelisted components were removed: \n%s", string(sanitizedConfig))
-		}
-	})
+			sanitizedConfig := stream.removeUnsafe(configPayload)
+			require.Equal(t, tt.wantUnsafeKey, containsUnsafeComponent(sanitizedConfig), string(sanitizedConfig))
+		})
+	}
 }
 
 // Helper function to check if the config contains any unsafe component

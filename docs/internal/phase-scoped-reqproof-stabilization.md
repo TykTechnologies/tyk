@@ -480,6 +480,19 @@ fixed or to hide them from the current strict audit.
   authentication behavior, license enforcement behavior, or final gateway
   request handling. It moves the visible production coverage baseline from
   161/447 to 162/447.
+- `SW-REQ-114` onboarded `ee/middleware/streams` with a new enterprise streams
+  stakeholder/system/software chain and focused package evidence for OAS stream
+  config extraction, request-scoped variable replacement, HTTP path extraction
+  and matching, manager analytics fallback behavior, unsafe-component filtering
+  and allow-listing, Bento structured log translation and malformed-log errors,
+  and stream start/stop terminal outcomes. The system formula is a local
+  terminality invariant, with the unreachable non-terminal invariant-violation
+  row documented rather than covered by a fake runtime witness. This increment
+  is scoped to local enterprise stream middleware helper mechanics and does not
+  claim external Bento delivery correctness, upstream authentication behavior,
+  gateway API loading, network transport delivery, persistence, or final
+  client-visible gateway behavior. It moves the visible production coverage
+  baseline from 162/447 to 169/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

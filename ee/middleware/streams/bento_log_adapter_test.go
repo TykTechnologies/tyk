@@ -43,6 +43,9 @@ func pruneTimeSection(line string) string {
 	return re.ReplaceAllString(line, "")
 }
 
+// Verifies: SYS-REQ-127, SW-REQ-114
+// SW-REQ-114:nominal:nominal
+// SW-REQ-114:determinism:nominal
 func TestBentoLogAdapter(t *testing.T) {
 	type testDefinition struct {
 		bentoLogLine       string
@@ -71,6 +74,9 @@ func TestBentoLogAdapter(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-127, SW-REQ-114
+// STK-REQ-039:error_handling:negative
+// SW-REQ-114:error_handling:negative
 func TestBentoLogAdapter_Corrupt_Log_Line(t *testing.T) {
 	output := bytes.NewBuffer(nil)
 	adapter := newBentoLogAdapter(newLogrusInstance(output))
