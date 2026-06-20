@@ -4,6 +4,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// SW-REQ-046
 // Filter filters the input logrus fields and retains only the allowed fields.
 // The function is case sensitive so keys have to match the case exactly.
 func Filter(in logrus.Fields, allowedFields []string) logrus.Fields {

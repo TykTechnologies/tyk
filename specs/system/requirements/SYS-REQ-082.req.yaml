@@ -1,24 +1,25 @@
 id: SYS-REQ-082
 version: 1
-status: review
+status: approved
 priority: shall
 category: functional
 req_type: guarantee
 fretish: the observability shall always satisfy !event_metadata_exchange_requested | event_metadata_result_preserved
-description: Gateway observability metadata shall preserve stable event display names, accumulated request-context event slices, serializable HTTP request snapshots, and structured diagnostic error classifications so event handlers, analytics, audit flows, access logs, and error-override consumers receive the intended metadata, including explicit empty snapshots when request encoding fails and stable response flags/details for classified failures.
+description: Gateway observability metadata shall preserve stable event display names, accumulated request-context event slices, serializable HTTP request snapshots, structured diagnostic error classifications, and filtered access-log field maps so event handlers, analytics, audit flows, access logs, and error-override consumers receive the intended metadata, including explicit empty snapshots when request encoding fails, stable response flags/details for classified failures, and exact configured access-log fields plus the prefix field when filtering is enabled.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: observability
-rationale: Gateway event handlers, metadata builders, access logs, and error-override consumers rely on stable event strings, accumulated request-context events, encoded request snapshots, and structured diagnostic classification metadata. The concrete internal/event helper implementation is decomposed into SW-REQ-004, and the concrete internal/errors classification implementation is decomposed into SW-REQ-041.
+rationale: Gateway event handlers, metadata builders, access logs, and error-override consumers rely on stable event strings, accumulated request-context events, encoded request snapshots, structured diagnostic classification metadata, and configured access-log field filtering. The concrete internal/event helper implementation is decomposed into SW-REQ-004, the concrete internal/errors classification implementation is decomposed into SW-REQ-041, and the concrete access-log field filter is decomposed into SW-REQ-046.
 tags:
     - observability
     - event-metadata
     - context
     - request-encoding
     - error-classification
+    - access-log
 variables:
     - event_metadata_exchange_requested
     - event_metadata_result_preserved
@@ -34,21 +35,24 @@ verification:
     review:
         status: approved
         reviewer: human:buger
-        reviewed_at: "2026-06-18T00:00:00Z"
-        ai_generated: true
-    gaps_reviewed_at: "2026-06-20T00:43:25.687306Z"
+        role: requirements_owner
+        reviewed_at: "2026-06-20T01:15:52Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-046 is scoped to the local internal/httputil/accesslog field filter: empty allowed-field configuration returns the original field map, configured filtering keeps exact case-sensitive allowed keys, the prefix field is retained by default when present, absent allowed keys are omitted, and repeated filtering over the same inputs is deterministic. Focused internal/httputil/accesslog tests passed with race, and the full configured ReqProof implement-stage test evidence passed. This approval does not claim request record construction, access-log emission, template rendering, analytics persistence, logger behavior, network transport success, upstream availability, or final HTTP status generation.'
+        fingerprint: sha256:3d3e3814b846fe5ad3fd1fc2bde333c13893e6037b6f442d0df4d77b8ca0e361
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T01:16:03.006909Z"
     gaps_reviewed_by: human:buger
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-082|event_metadata_result_preserved
           reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-082's event_metadata_result_preserved variable is decomposed by SW-REQ-004 for internal/event event-name, request-context event slice, and request-snapshot encoding behavior, and by SW-REQ-041 for internal/errors diagnostic classification metadata used by access-log and error-override consumers. This review is limited to observability metadata helper behavior and does not claim reverse-proxy execution, gateway middleware ordering, access-log emission, analytics persistence, network transport success, upstream availability, or final HTTP status generation.
-          reviewed_at: "2026-06-20T00:43:25.687306Z"
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-082's event_metadata_result_preserved variable is decomposed by SW-REQ-004 for internal/event event-name, request-context event slice, and request-snapshot encoding behavior; by SW-REQ-041 for internal/errors diagnostic classification metadata used by access-log and error-override consumers; and by SW-REQ-046 for the local internal/httputil/accesslog field-filtering helper covering empty allow-list passthrough, exact case-sensitive allowed-key retention, default prefix retention, absent-key omission, and deterministic field maps. This review is limited to observability metadata helper behavior and does not claim request record construction, access-log emission, template rendering, reverse-proxy execution, gateway middleware ordering, analytics persistence, logger behavior, network transport success, upstream availability, or final HTTP status generation.
+          reviewed_at: "2026-06-20T01:16:03.006909Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-18T00:00:00Z"
-    last_modified_by: agent:codex
-    last_modified_at: "2026-06-19T08:19:20Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T01:15:52Z"
 obligation_class: encoding_safety
 obligation_checklist:
     - nominal
