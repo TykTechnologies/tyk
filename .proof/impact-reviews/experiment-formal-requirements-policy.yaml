@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-20T13:30:24Z"
+generated_at: "2026-06-20T18:08:33Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -553,6 +553,56 @@ reviews:
       approval_fingerprint: sha256:5ddfea89a4688f9554cfef316f884491c2d5054ab566f4f14f79f3e5bca3d0db
       artifact_fingerprint: sha256:131e6b2e40af49f69ba325a030182f195dbc5df5fac1d1e1fddb64f5119abbc6
       reviewed_at: "2026-06-20T09:59:09Z"
+    - requirement: SW-REQ-109
+      artifact: config/util.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed config/util.go fix; it restores tyk.conf discovery from the caller working tree and keeps the existing configuration utility contract correct
+      base: origin/master
+      requirement_fingerprint: sha256:29a1b51a1292ec52405d600ebb43cf099ae0db9dd28f9fe33e5b6ab4cee54ba6
+      approval_fingerprint: sha256:93af297340b4ffeaf5833c5de9547041e006a3ffd3cd7f2ec9ad817eb81884ae
+      artifact_fingerprint: sha256:25c498e566822b5191cb3d9f40fa1932c5f1fa57a336a03b82c044fde4d60961
+      reviewed_at: "2026-06-20T18:08:33Z"
+    - requirement: SW-REQ-123
+      artifact: dlpython/binding.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed dlpython loader fixes; ldflags parsing and Python path environment updates restore behavior already specified by the dynamic Python loader contract
+      base: origin/master
+      requirement_fingerprint: sha256:59b3d9c67bdc5080d49e23e8f214f19b1f72f36657e0e6979c1a77d249fe73d1
+      approval_fingerprint: sha256:0522db80a99550b0fa56c0407b5d576274d3a60794e3475ad81ec483180ca500
+      artifact_fingerprint: sha256:8641767ac8719ea2634c87fb15b528669fc99b49b513d6cf8f5423533b34e2a6
+      reviewed_at: "2026-06-20T18:08:33Z"
+    - requirement: SW-REQ-123
+      artifact: dlpython/helpers.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed dlpython loader fixes; ldflags parsing and Python path environment updates restore behavior already specified by the dynamic Python loader contract
+      base: origin/master
+      requirement_fingerprint: sha256:59b3d9c67bdc5080d49e23e8f214f19b1f72f36657e0e6979c1a77d249fe73d1
+      approval_fingerprint: sha256:0522db80a99550b0fa56c0407b5d576274d3a60794e3475ad81ec483180ca500
+      artifact_fingerprint: sha256:fd8f43a69ba3906d343dad17a51078a832fd61174b521390b4da041bd771027b
+      reviewed_at: "2026-06-20T18:08:33Z"
+    - requirement: SW-REQ-123
+      artifact: dlpython/main.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed dlpython loader fixes; ldflags parsing and Python path environment updates restore behavior already specified by the dynamic Python loader contract
+      base: origin/master
+      requirement_fingerprint: sha256:59b3d9c67bdc5080d49e23e8f214f19b1f72f36657e0e6979c1a77d249fe73d1
+      approval_fingerprint: sha256:0522db80a99550b0fa56c0407b5d576274d3a60794e3475ad81ec483180ca500
+      artifact_fingerprint: sha256:5a0035f7620be1f6633ce16ff658f205b4e2d92511c1853eed811859e1ac5420
+      reviewed_at: "2026-06-20T18:08:33Z"
+    - requirement: SW-REQ-123
+      artifact: dlpython/version.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed dlpython loader fixes; ldflags parsing and Python path environment updates restore behavior already specified by the dynamic Python loader contract
+      base: origin/master
+      requirement_fingerprint: sha256:59b3d9c67bdc5080d49e23e8f214f19b1f72f36657e0e6979c1a77d249fe73d1
+      approval_fingerprint: sha256:0522db80a99550b0fa56c0407b5d576274d3a60794e3475ad81ec483180ca500
+      artifact_fingerprint: sha256:604d11b257f038b375cc9e8226dcd5de3878444d863130f2ae07c7b9200635d5
+      reviewed_at: "2026-06-20T18:08:33Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

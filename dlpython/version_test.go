@@ -6,7 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Verifies: SW-REQ-123
+// Verifies: SYS-REQ-136, SW-REQ-123
+// SYS-REQ-136:boundary:nominal
 // SW-REQ-123:boundary:nominal
 func TestDLPythonReqProof_VersionSelection(t *testing.T) {
 	t.Parallel()
