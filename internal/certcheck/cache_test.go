@@ -13,6 +13,7 @@ import (
 	storagemock "github.com/TykTechnologies/tyk/storage/mock"
 )
 
+// Verifies: SYS-REQ-130, SW-REQ-117
 func TestInMemoryCooldownCache_HasCheckCooldown(t *testing.T) {
 	t.Run("should return false when there is no entry in cache", func(t *testing.T) {
 		t.Cleanup(GetCooldownLRUCache().Purge)
@@ -39,6 +40,7 @@ func TestInMemoryCooldownCache_HasCheckCooldown(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-130, SW-REQ-117
 func TestInMemoryCooldownCache_SetCheckCooldown(t *testing.T) {
 	t.Run("should set cooldowns when there is no entry in cache", func(t *testing.T) {
 		t.Cleanup(GetCooldownLRUCache().Purge)
@@ -86,6 +88,7 @@ func TestInMemoryCooldownCache_SetCheckCooldown(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-130, SW-REQ-117
 func TestInMemoryCooldownCache_IsCheckCooldownActive(t *testing.T) {
 	t.Run("should return ErrCheckCooldownDoesNotExist when there is no entry in cache", func(t *testing.T) {
 		t.Cleanup(GetCooldownLRUCache().Purge)
@@ -126,6 +129,7 @@ func TestInMemoryCooldownCache_IsCheckCooldownActive(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-130, SW-REQ-117
 func TestInMemoryCooldownCache_HasFireEventCooldown(t *testing.T) {
 	t.Run("should return false when there is no entry in cache", func(t *testing.T) {
 		t.Cleanup(GetCooldownLRUCache().Purge)
@@ -152,6 +156,7 @@ func TestInMemoryCooldownCache_HasFireEventCooldown(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-130, SW-REQ-117
 func TestInMemoryCooldownCache_SetFireEventCooldown(t *testing.T) {
 	t.Cleanup(GetCooldownLRUCache().Purge)
 
@@ -170,6 +175,7 @@ func TestInMemoryCooldownCache_SetFireEventCooldown(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Verifies: SYS-REQ-130, SW-REQ-117
 func TestInMemoryCooldownCache_IsFireEventCooldownActive(t *testing.T) {
 	t.Run("should return ErrFireEventCooldownDoesNotExist when there is no entry in cache", func(t *testing.T) {
 		t.Cleanup(GetCooldownLRUCache().Purge)
@@ -210,6 +216,7 @@ func TestInMemoryCooldownCache_IsFireEventCooldownActive(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-130, SW-REQ-117
 func TestRedisCooldownCache_HasCheckCooldown(t *testing.T) {
 	t.Run("should return false and error if error occurs", func(t *testing.T) {
 		ctrl, redisStorageMock := createRedisStorageMock(t)
@@ -257,6 +264,7 @@ func TestRedisCooldownCache_HasCheckCooldown(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-130, SW-REQ-117
 func TestRedisCooldownCache_IsCheckCooldownActive(t *testing.T) {
 	t.Run("should return false and error if error occurs", func(t *testing.T) {
 		ctrl, redisStorageMock := createRedisStorageMock(t)
@@ -304,6 +312,7 @@ func TestRedisCooldownCache_IsCheckCooldownActive(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-130, SW-REQ-117
 func TestRedisCooldownCache_SetCheckCooldown(t *testing.T) {
 	t.Run("should return error if check cooldown cant be set", func(t *testing.T) {
 		ctrl, redisStorageMock := createRedisStorageMock(t)
@@ -334,6 +343,7 @@ func TestRedisCooldownCache_SetCheckCooldown(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-130, SW-REQ-117
 func TestRedisCooldownCache_HasFireEventCooldown(t *testing.T) {
 	t.Run("should return false and error if error occurs", func(t *testing.T) {
 		ctrl, redisStorageMock := createRedisStorageMock(t)
@@ -381,6 +391,7 @@ func TestRedisCooldownCache_HasFireEventCooldown(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-130, SW-REQ-117
 func TestRedisCooldownCache_IsFireEventCooldownActive(t *testing.T) {
 	t.Run("should return false and error if error occurs", func(t *testing.T) {
 		ctrl, redisStorageMock := createRedisStorageMock(t)
@@ -428,6 +439,7 @@ func TestRedisCooldownCache_IsFireEventCooldownActive(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-130, SW-REQ-117
 func TestRedisCooldownCache_SetFireEventCooldown(t *testing.T) {
 	t.Run("should return error if check cooldown cant be set", func(t *testing.T) {
 		ctrl, redisStorageMock := createRedisStorageMock(t)

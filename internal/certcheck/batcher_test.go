@@ -66,6 +66,7 @@ type BatcherMocks struct {
 	fallbackCacheMock *MockCooldownCache
 }
 
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestBatch(t *testing.T) {
 	batch := NewBatch()
 	assert.Equal(t, 0, batch.Size())
@@ -86,6 +87,7 @@ func TestBatch(t *testing.T) {
 
 }
 
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestNewCertificateExpiryCheckBatcher_Add(t *testing.T) {
 	ctrl, batcherMocks := createBatcherMocks(t)
 	t.Cleanup(ctrl.Finish)
@@ -99,6 +101,7 @@ func TestNewCertificateExpiryCheckBatcher_Add(t *testing.T) {
 	assert.Equal(t, 1, batcher.batch.Size())
 }
 
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestCertificateExpiryCheckBatcher(t *testing.T) {
 	t.Run("With check cooldown", func(t *testing.T) {
 		t.Run("Should skip event firing checks when the check cooldown is active in local cache", func(t *testing.T) {
@@ -747,6 +750,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestCertificateExpiryCheckBatcher_composeSoonToExpire(t *testing.T) {
 	t.Run("Should compose expiry message with days and hours", func(t *testing.T) {
 		batcher := CertificateExpiryCheckBatcher{}
@@ -770,6 +774,7 @@ func TestCertificateExpiryCheckBatcher_composeSoonToExpire(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestCertificateExpiryCheckBatcher_composeExpiredMessage(t *testing.T) {
 	t.Run("Should compose expiry message with days and hours", func(t *testing.T) {
 		batcher := CertificateExpiryCheckBatcher{}
@@ -793,6 +798,7 @@ func TestCertificateExpiryCheckBatcher_composeExpiredMessage(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestCertificateExpiryCheckBatcher_isCertificateExpired(t *testing.T) {
 	batcher := &CertificateExpiryCheckBatcher{}
 
@@ -992,6 +998,7 @@ func TestCertificateExpiryCheckBatcher_isCertificateExpired(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestCertificateExpiryCheckBatcher_isCertificateExpiringSoon(t *testing.T) {
 	tests := map[string]struct {
 		commonName           string
@@ -1154,6 +1161,7 @@ func TestCertificateExpiryCheckBatcher_isCertificateExpiringSoon(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestCertInfo_HoursUntilExpiry(t *testing.T) {
 	tests := map[string]struct {
 		secondsUntilExpiry int
@@ -1207,6 +1215,7 @@ func TestCertInfo_HoursUntilExpiry(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestCertInfo_MinutesUntilExpiry(t *testing.T) {
 	tests := map[string]struct {
 		secondsUntilExpiry int
@@ -1285,6 +1294,7 @@ func TestCertInfo_MinutesUntilExpiry(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestCertInfo_SecondsUntilExpiry(t *testing.T) {
 	tests := map[string]struct {
 		secondsUntilExpiry int
@@ -1361,6 +1371,7 @@ func createBatcherMocks(t *testing.T) (ctrl *gomock.Controller, batcherMocks *Ba
 	}
 }
 
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestCertInfo_DaysUntilExpiry(t *testing.T) {
 	tests := map[string]struct {
 		daysUntilExpiry int
@@ -1499,6 +1510,7 @@ func TestCertInfo_DaysUntilExpiry(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestApplyConfigDefaults(t *testing.T) {
 	t.Run("without provided values", func(t *testing.T) {
 		providedCfg := config.CertificateExpiryMonitorConfig{}

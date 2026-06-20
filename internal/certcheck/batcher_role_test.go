@@ -18,6 +18,7 @@ import (
 )
 
 // TestNewCertificateExpiryCheckBatcherWithRole_RoleParameter tests that the role is properly set
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestNewCertificateExpiryCheckBatcherWithRole_RoleParameter(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -62,6 +63,7 @@ func TestNewCertificateExpiryCheckBatcherWithRole_RoleParameter(t *testing.T) {
 }
 
 // TestNewCertificateExpiryCheckBatcher_DefaultsToClientRole tests backward compatibility
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestNewCertificateExpiryCheckBatcher_DefaultsToClientRole(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
@@ -82,6 +84,7 @@ func TestNewCertificateExpiryCheckBatcher_DefaultsToClientRole(t *testing.T) {
 }
 
 // TestCertificateExpiryCheckBatcher_RoleInExpiredEvent tests that expired events include cert_role
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestCertificateExpiryCheckBatcher_RoleInExpiredEvent(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -173,6 +176,7 @@ func TestCertificateExpiryCheckBatcher_RoleInExpiredEvent(t *testing.T) {
 }
 
 // TestCertificateExpiryCheckBatcher_RoleInExpiringSoonEvent tests that expiring soon events include cert_role
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestCertificateExpiryCheckBatcher_RoleInExpiringSoonEvent(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -265,6 +269,7 @@ func TestCertificateExpiryCheckBatcher_RoleInExpiringSoonEvent(t *testing.T) {
 }
 
 // TestCertificateExpiryCheckBatcher_RolePreservedThroughCooldowns tests that role is maintained through cooldown checks
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestCertificateExpiryCheckBatcher_RolePreservedThroughCooldowns(t *testing.T) {
 	var eventCount int
 	var lastEventMeta EventCertificateExpiringSoonMeta
@@ -336,6 +341,7 @@ func TestCertificateExpiryCheckBatcher_RolePreservedThroughCooldowns(t *testing.
 }
 
 // TestCertificateExpiryCheckBatcher_RoleWithCacheErrors tests that role is maintained even when cache operations fail
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
 func TestCertificateExpiryCheckBatcher_RoleWithCacheErrors(t *testing.T) {
 	var actualEventMeta EventCertificateExpiredMeta
 	fireEvent := func(_ event.Event, meta any) {
