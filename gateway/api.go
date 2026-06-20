@@ -318,6 +318,7 @@ func (gw *Gateway) getApisIdsForOrg(orgID string) []string {
 	return result
 }
 
+// SW-REQ-127
 func (gw *Gateway) checkAndApplyTrialPeriod(
 	keyName string,
 	newSession *user.SessionState,
@@ -348,6 +349,7 @@ func (gw *Gateway) checkAndApplyTrialPeriod(
 	}
 }
 
+// SW-REQ-127
 func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APISpec, isHashed bool) error {
 	// use basic middleware to apply policies to key/session (it also saves it)
 	mw := &BaseMiddleware{
@@ -366,6 +368,7 @@ func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionSta
 }
 
 // GetApiSpecsFromAccessRights from the session.AccessRights returns the collection of api specs
+// SW-REQ-127
 func (gw *Gateway) GetApiSpecsFromAccessRights(sess *user.SessionState) []*APISpec {
 	var apis []*APISpec
 	if sess != nil && len(sess.AccessRights) > 0 {
@@ -381,6 +384,7 @@ func (gw *Gateway) GetApiSpecsFromAccessRights(sess *user.SessionState) []*APISp
 }
 
 // ApplyLifetime calculates the lifetime for the key. It considers the access rights and the bigger lifetime will be used
+// SW-REQ-127
 func (gw *Gateway) ApplyLifetime(sess *user.SessionState, specs ...*APISpec) int64 {
 	var lifetime int64
 
@@ -405,6 +409,7 @@ func (gw *Gateway) ApplyLifetime(sess *user.SessionState, specs ...*APISpec) int
 	return lifetime
 }
 
+// SW-REQ-127
 func resetAPILimits(accessRights map[string]user.AccessDefinition) {
 	for apiID := range accessRights {
 		// reset API-level limit to nil if it has a zero-value

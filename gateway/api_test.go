@@ -4050,6 +4050,14 @@ func TestGetOASAPI_WithVersionBaseID(t *testing.T) {
 	}...)
 }
 
+// Verifies: STK-REQ-052, SYS-REQ-140, SW-REQ-127
+// STK-REQ-052:STK-REQ-052-AC-01:acceptance
+// SYS-REQ-140:nominal:nominal
+// SYS-REQ-140:boundary:nominal
+// SYS-REQ-140:determinism:nominal
+// SW-REQ-127:nominal:nominal
+// SW-REQ-127:boundary:nominal
+// SW-REQ-127:determinism:nominal
 func TestApplyLifetime(t *testing.T) {
 
 	ts := StartTest(nil)
@@ -4136,6 +4144,12 @@ func TestApplyLifetime(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-052, SYS-REQ-140, SW-REQ-127
+// STK-REQ-052:STK-REQ-052-AC-01:acceptance
+// SYS-REQ-140:nominal:nominal
+// SYS-REQ-140:boundary:nominal
+// SW-REQ-127:nominal:nominal
+// SW-REQ-127:boundary:nominal
 func TestApplyLifetime_PostExpiry(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -4217,6 +4231,12 @@ func TestApplyLifetime_PostExpiry(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-052, SYS-REQ-140, SW-REQ-127
+// STK-REQ-052:STK-REQ-052-AC-01:acceptance
+// SYS-REQ-140:nominal:nominal
+// SYS-REQ-140:determinism:nominal
+// SW-REQ-127:nominal:nominal
+// SW-REQ-127:determinism:nominal
 func TestApplyLifetime_PostExpiry_FromPolicy(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

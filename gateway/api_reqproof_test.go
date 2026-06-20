@@ -6,11 +6,13 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
@@ -241,4 +243,197 @@ func TestGatewayControlAPIOrgLookupHelpers(t *testing.T) {
 
 		assert.ElementsMatch(t, []string{"api-a", "api-b", "api-c"}, ids)
 	})
+}
+
+// Verifies: STK-REQ-052, SYS-REQ-140, SW-REQ-127
+// STK-REQ-052:STK-REQ-052-AC-01:acceptance
+// SYS-REQ-140:nominal:nominal
+// SYS-REQ-140:boundary:nominal
+// SYS-REQ-140:error_handling:nominal
+// SYS-REQ-140:determinism:nominal
+// MCDC SYS-REQ-140: gateway_session_lifecycle_operation_terminal=T => TRUE
+// SW-REQ-127:nominal:nominal
+// SW-REQ-127:boundary:nominal
+// SW-REQ-127:error_handling:nominal
+// SW-REQ-127:determinism:nominal
+func TestGatewaySessionLifecycleTrialPeriod(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	policyID := ts.CreatePolicy(func(p *user.Policy) {
+		p.KeyExpiresIn = 300
+		p.PostExpiryAction = user.PostExpiryActionRetain
+		p.PostExpiryGracePeriod = 45
+	})
+
+	existingSession := CreateStandardSession()
+	require.NoError(t, ts.Gw.GlobalSessionManager.UpdateSession("existing-key", existingSession, 60, false))
+
+	testCases := []struct {
+		name        string
+		keyName     string
+		policyIDs   []string
+		wantExpiry  bool
+		wantPostExp bool
+	}{
+		{
+			name:        "new key receives policy trial expiry and post expiry fields",
+			keyName:     "new-key",
+			policyIDs:   []string{policyID},
+			wantExpiry:  true,
+			wantPostExp: true,
+		},
+		{
+			name:        "existing key keeps current expiry but receives post expiry fields",
+			keyName:     "existing-key",
+			policyIDs:   []string{policyID},
+			wantPostExp: true,
+		},
+		{
+			name:      "missing policy leaves session unchanged",
+			keyName:   "missing-policy-key",
+			policyIDs: []string{"missing-policy"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			session := CreateStandardSession()
+			session.Expires = -1
+			session.ApplyPolicies = tc.policyIDs
+
+			before := time.Now().Unix()
+			ts.Gw.checkAndApplyTrialPeriod(tc.keyName, session, false)
+
+			if tc.wantExpiry {
+				assert.GreaterOrEqual(t, session.Expires, before+300)
+				assert.LessOrEqual(t, session.Expires, time.Now().Unix()+305)
+			} else {
+				assert.Equal(t, int64(-1), session.Expires)
+			}
+
+			if tc.wantPostExp {
+				assert.Equal(t, user.PostExpiryActionRetain, session.PostExpiryAction)
+				assert.Equal(t, int64(45), session.PostExpiryGracePeriod)
+			} else {
+				assert.Empty(t, session.PostExpiryAction)
+				assert.Zero(t, session.PostExpiryGracePeriod)
+			}
+		})
+	}
+}
+
+// Verifies: STK-REQ-052, SYS-REQ-140, SW-REQ-127
+// STK-REQ-052:STK-REQ-052-AC-01:acceptance
+// SYS-REQ-140:nominal:nominal
+// SYS-REQ-140:determinism:nominal
+// SW-REQ-127:nominal:nominal
+// SW-REQ-127:determinism:nominal
+func TestGatewaySessionLifecyclePolicySave(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "save-api"
+		spec.OrgID = "default"
+		spec.SessionLifetime = 120
+	})
+
+	session := CreateStandardSession()
+	session.AccessRights = map[string]user.AccessDefinition{
+		"save-api": {APIID: "save-api", Versions: []string{"Default"}},
+	}
+
+	require.NoError(t, ts.Gw.applyPoliciesAndSave("save-key", session, ts.Gw.getApiSpec("save-api"), false))
+
+	stored, found := ts.Gw.GlobalSessionManager.SessionDetail("default", "save-key", false)
+	require.True(t, found)
+	assert.Equal(t, session.AccessRights, stored.AccessRights)
+}
+
+// Verifies: STK-REQ-052, SYS-REQ-140, SW-REQ-127
+// STK-REQ-052:STK-REQ-052-AC-01:acceptance
+// STK-REQ-052:error_handling:negative
+// SYS-REQ-140:error_handling:negative
+// SW-REQ-127:error_handling:negative
+func TestGatewaySessionLifecyclePolicySaveRejectsPolicyErrors(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "error-api"
+		spec.OrgID = "default"
+	})
+
+	policyID := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = "other-org"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"error-api": {APIID: "error-api", Versions: []string{"Default"}},
+		}
+	})
+
+	session := CreateStandardSession()
+	session.ApplyPolicies = []string{policyID}
+	session.AccessRights = map[string]user.AccessDefinition{
+		"error-api": {APIID: "error-api", Versions: []string{"Default"}},
+	}
+
+	err := ts.Gw.applyPoliciesAndSave("policy-error-key", session, ts.Gw.getApiSpec("error-api"), false)
+
+	require.Error(t, err)
+	_, found := ts.Gw.GlobalSessionManager.SessionDetail("default", "policy-error-key", false)
+	assert.False(t, found)
+}
+
+// Verifies: STK-REQ-052, SYS-REQ-140, SW-REQ-127
+// STK-REQ-052:STK-REQ-052-AC-01:acceptance
+// SYS-REQ-140:nominal:nominal
+// SYS-REQ-140:boundary:nominal
+// SYS-REQ-140:determinism:nominal
+// SW-REQ-127:nominal:nominal
+// SW-REQ-127:boundary:nominal
+// SW-REQ-127:determinism:nominal
+func TestGatewaySessionLifecycleAccessRightsAndLimits(t *testing.T) {
+	specs := BuildAPI(
+		func(spec *APISpec) {
+			spec.APIID = "api-a"
+		},
+		func(spec *APISpec) {
+			spec.APIID = "api-b"
+		},
+	)
+	gw := &Gateway{
+		apisByID: map[string]*APISpec{
+			"api-a": specs[0],
+			"api-b": specs[1],
+		},
+	}
+
+	session := &user.SessionState{
+		AccessRights: map[string]user.AccessDefinition{
+			"api-a":       {APIID: "api-a"},
+			"missing-api": {APIID: "missing-api"},
+			"api-b":       {APIID: "api-b"},
+		},
+	}
+
+	gotSpecs := gw.GetApiSpecsFromAccessRights(session)
+	gotIDs := make([]string, 0, len(gotSpecs))
+	for _, spec := range gotSpecs {
+		gotIDs = append(gotIDs, spec.APIID)
+	}
+	assert.ElementsMatch(t, []string{"api-a", "api-b"}, gotIDs)
+	assert.Empty(t, gw.GetApiSpecsFromAccessRights(nil))
+
+	accessRights := map[string]user.AccessDefinition{
+		"zero-limit": {APIID: "zero-limit", Limit: user.APILimit{}},
+		"rate-limit": {
+			APIID: "rate-limit",
+			Limit: user.APILimit{RateLimit: user.RateLimit{Rate: 10, Per: 1}},
+		},
+	}
+	resetAPILimits(accessRights)
+
+	assert.Equal(t, user.APILimit{}, accessRights["zero-limit"].Limit)
+	assert.Equal(t, user.APILimit{RateLimit: user.RateLimit{Rate: 10, Per: 1}}, accessRights["rate-limit"].Limit)
 }

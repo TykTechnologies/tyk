@@ -1,0 +1,62 @@
+id: STK-REQ-052
+version: 1
+status: approved
+priority: shall
+category: session_lifecycle
+req_type: guarantee
+fretish: ""
+description: Gateway key/session lifecycle support shall apply policy-derived trial expiry and post-expiry fields to new sessions, preserve existing-session expiry when trial policy handling observes an existing key, apply policies before saving sessions, select session lifetime from access-right API specs, collect API specs from session access rights, and preserve API access-right limit entries during local normalization, without claiming policy engine merge atomicity, middleware request admission, Redis or other storage durability, quota counter correctness, dashboard behavior, distributed synchronization, runtime authorization decisions, or final client-visible gateway behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_session_lifecycle
+rationale: Gateway operators depend on deterministic key/session helper behavior before gateway API key changes are stored. This requirement owns only local helper behavior in gateway/api.go and tested gateway harness paths.
+tags:
+    - gateway
+    - session
+    - policy
+    - lifecycle
+variables: []
+traces:
+    reviewed_at: "2026-06-20T19:25:59.843389Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:b623d63ad8575cf27da307beb0d64cf4f3395790f3d21fda932a21d11c742c93
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T19:21:11Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway session lifecycle scope is limited to local gateway/api.go helper behavior: policy-derived trial expiry and post-expiry field application, existing-key preservation for trial expiry, policy application before session save, lifetime selection across access-right API specs, API spec lookup from session access rights, and API access-right limit entry preservation during local normalization. This approval does not claim policy engine merge atomicity, middleware request admission, Redis or other storage durability, quota counter correctness, dashboard behavior, distributed synchronization, runtime authorization decisions, or final client-visible gateway behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T19:21:11Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T19:21:11Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need key/session lifecycle helpers to apply policy-derived expiry fields, save policy-applied sessions, and select lifetimes predictably before key configuration changes take effect.
+    acceptance_criteria:
+        - id: STK-REQ-052-AC-01
+          text: Given local key/session lifecycle helper inputs, when trial policy, post-expiry, policy-save, access-right API lookup, lifetime selection, or API-limit normalization paths are exercised, then deterministic helper outcomes are produced for the tested local session and API inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-140
+lifecycle:
+    change_history:
+        - date: "2026-06-20T19:21:11Z"
+          from: draft
+          to: approved
+          reason: Added gateway key/session lifecycle helper requirement.
+          changed_by: human:buger

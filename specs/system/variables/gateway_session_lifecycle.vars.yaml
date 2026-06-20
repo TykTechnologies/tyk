@@ -1,0 +1,9 @@
+component: gateway_session_lifecycle
+no_interface:
+    declared: true
+    reason: The gateway session lifecycle proof slice covers local gateway/api.go helper behavior only; policy engine merge atomicity, middleware request admission, storage durability, quota counter correctness, dashboard behavior, distributed synchronization, runtime authorization decisions, and final client-visible gateway behavior are outside this component boundary.
+variables:
+    - name: gateway_session_lifecycle_operation_terminal
+      type: bool
+      direction: output
+      description: 'A local gateway key/session lifecycle helper operation reaches a terminal observable result: policy-derived trial expiry and post-expiry fields are applied or intentionally left unchanged, policy application before session save returns or reports an error, API specs are returned for matching access rights, the selected session lifetime is returned, or API access-right limit entries are preserved during local normalization.'
