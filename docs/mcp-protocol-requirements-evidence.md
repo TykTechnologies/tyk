@@ -8,18 +8,21 @@
 <!-- documents SW-REQ-039 -->
 <!-- documents SW-REQ-040 -->
 <!-- documents SW-REQ-043 -->
+<!-- documents SW-REQ-048 -->
 
 This document records the MCP protocol helper proof slice. The slice is limited
 to `internal/mcp` helper behavior, the shared `internal/jsonrpc` router
 interface, route-result shape, and JSON-RPC method VEM prefix constants that
 those helpers consume, the `apidef/mcp` embedded-schema validation helpers, the
 local `internal/service/gojsonschema` facade used by that validation path, and
-the user-package MCP access-right data model consumed by MCP helper flows. It
-does not claim gateway middleware sequencing, gateway API loading or API
-definition synthesis beyond in-process MCP schema validation, policy merge
-behavior, session-right retrieval, persistence, analytics, network transport
-behavior, upstream JSON-schema library correctness, reverse-proxy/access-log
-error classification, or final HTTP status generation.
+the user-package MCP access-right data model consumed by MCP helper flows, and
+the `apidef/oas` MCPPrimitive helper shape used by MCP API-definition helper
+flows. It does not claim gateway middleware sequencing, gateway API loading or
+API definition synthesis beyond in-process MCP schema validation and local
+MCPPrimitive extraction helpers, policy merge behavior, session-right
+retrieval, persistence, analytics, network transport behavior, upstream
+JSON-schema library correctness, reverse-proxy/access-log error classification,
+or final HTTP status generation.
 
 `STK-REQ-019` owns the MCP client need for deterministic routing and list
 filtering and the operator-facing need for deterministic MCP API-definition
@@ -29,7 +32,10 @@ classification, VEM prefix registration, MCP list access-rule evaluation,
 JSON-RPC list-response filtering, pass-through handling for unsupported or
 malformed responses, and MCP OAS document validation against supported embedded
 schemas, plus the user-package data-model helpers that preserve MCP and
-JSON-RPC access-right configuration shape before those helper flows consume it.
+JSON-RPC access-right configuration shape before those helper flows consume it,
+and the local OAS MCPPrimitive helper shape used to carry supported middleware
+configuration while omitting MCP-incompatible middleware families during
+extended-path extraction.
 
 `SW-REQ-025` owns `internal/mcp` routing and prefix helpers and the shared
 `internal/jsonrpc` declarations they use for router conformance, route results,
@@ -82,3 +88,14 @@ case-mismatched primitive types, and omission of zero MCP access-control fields
 from JSON. This evidence does not claim policy merge behavior, gateway session
 lookup, persistence backends, middleware enforcement, list filtering itself,
 analytics, network transport behavior, or final HTTP status generation.
+
+`SW-REQ-048` owns the local `apidef/oas.MCPPrimitive` helper behavior used by
+MCP API-definition helper flows. Evidence in
+`apidef/oas/mcp_primitive_reqproof_test.go` covers Operation-compatible JSON
+shape preservation, nil primitive and nil output safety, omission of
+MCP-incompatible middleware families during extraction, preservation of
+supported request/response header, rate-limit, and request-size middleware, and
+deterministic repeated extraction. This evidence does not claim full OAS
+conversion, gateway API loading, session-right lookup, middleware execution,
+policy merge behavior, persistence, analytics, network transport behavior, or
+final HTTP status generation.

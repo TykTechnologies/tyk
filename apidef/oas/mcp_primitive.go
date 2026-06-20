@@ -11,6 +11,8 @@ type MCPPrimitive struct {
 // extractTransformResponseBodyTo overrides Operation to disable response body transformation.
 // MCP responses must be returned as-is to maintain JSON-RPC protocol compliance.
 //
+// SW-REQ-048
+//
 //nolint:revive,unparam
 func (m *MCPPrimitive) extractTransformResponseBodyTo(_ *apidef.ExtendedPathsSet, _ string, _ string) {
 	// Intentionally empty - MCP primitives don't support response body transformation
@@ -18,11 +20,15 @@ func (m *MCPPrimitive) extractTransformResponseBodyTo(_ *apidef.ExtendedPathsSet
 
 // extractTransformRequestMethodTo disables method transformation for MCP (always POST).
 //
+// SW-REQ-048
+//
 //nolint:revive,unparam
 func (m *MCPPrimitive) extractTransformRequestMethodTo(_ *apidef.ExtendedPathsSet, _ string, _ string) {
 }
 
 // extractInternalTo disables internal endpoint configuration (managed by JSON-RPC router).
+//
+// SW-REQ-048
 //
 //nolint:revive,unparam
 func (m *MCPPrimitive) extractInternalTo(_ *apidef.ExtendedPathsSet, _ string, _ string) {
@@ -30,11 +36,15 @@ func (m *MCPPrimitive) extractInternalTo(_ *apidef.ExtendedPathsSet, _ string, _
 
 // extractURLRewriteTo disables URL rewriting (MCP uses fixed paths).
 //
+// SW-REQ-048
+//
 //nolint:revive,unparam
 func (m *MCPPrimitive) extractURLRewriteTo(_ *apidef.ExtendedPathsSet, _ string, _ string) {
 }
 
 // extractCacheTo disables per-endpoint caching (incompatible with JSON-RPC).
+//
+// SW-REQ-048
 //
 //nolint:revive,unparam
 func (m *MCPPrimitive) extractCacheTo(_ *apidef.ExtendedPathsSet, _ string, _ string) {
@@ -42,11 +52,15 @@ func (m *MCPPrimitive) extractCacheTo(_ *apidef.ExtendedPathsSet, _ string, _ st
 
 // extractValidateRequestTo disables OAS validation (handled by JSON-RPC middleware).
 //
+// SW-REQ-048
+//
 //nolint:revive,unparam
 func (m *MCPPrimitive) extractValidateRequestTo(_ *apidef.ExtendedPathsSet, _ string, _ string) {
 }
 
 // extractMockResponseTo disables mock responses (incompatible with JSON-RPC protocol).
+//
+// SW-REQ-048
 //
 //nolint:revive,unparam
 func (m *MCPPrimitive) extractMockResponseTo(_ *apidef.ExtendedPathsSet, _ string, _ string) {
@@ -56,6 +70,8 @@ func (m *MCPPrimitive) extractMockResponseTo(_ *apidef.ExtendedPathsSet, _ strin
 // but allowing MCPPrimitive-specific overrides. Methods without overrides are promoted
 // to Operation. Methods with empty overrides (like extractTransformResponseBodyTo) are
 // effectively disabled for MCP primitives.
+//
+// SW-REQ-048
 //
 //nolint:dupl // Intentional similarity to Operation.ExtractToExtendedPaths with MCP-specific behavior
 func (m *MCPPrimitive) ExtractToExtendedPaths(ep *apidef.ExtendedPathsSet, path string, method string) {

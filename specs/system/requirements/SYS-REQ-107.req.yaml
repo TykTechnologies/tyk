@@ -5,7 +5,7 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the mcp_protocol shall always satisfy !mcp_protocol_decision_requested | mcp_protocol_decision_determined
-description: MCP protocol helper handling shall determine stable VEM route chains for tool calls, resource reads, prompt gets, and generic operations; reject malformed primitive parameters; classify MCP primitive VEM paths; register MCP and JSON-RPC VEM prefixes; preserve the MCP and JSON-RPC access-right data-model shape consumed by helper flows; filter JSON-RPC list-response bodies according to allowed and blocked MCP access-control rules while passing through malformed or unsupported response shapes unmodified; and validate MCP OAS documents against supported embedded schemas with deterministic version selection and validation-error reporting.
+description: MCP protocol helper handling shall determine stable VEM route chains for tool calls, resource reads, prompt gets, and generic operations; reject malformed primitive parameters; classify MCP primitive VEM paths; register MCP and JSON-RPC VEM prefixes; preserve the MCP and JSON-RPC access-right data-model shape consumed by helper flows; preserve the local OAS MCPPrimitive middleware shape used by MCP API-definition helper flows while omitting MCP-incompatible middleware families during extended-path extraction; filter JSON-RPC list-response bodies according to allowed and blocked MCP access-control rules while passing through malformed or unsupported response shapes unmodified; and validate MCP OAS documents against supported embedded schemas with deterministic version selection and validation-error reporting.
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: STK-REQ-019
 component: mcp_protocol
-rationale: This system requirement owns deterministic MCP helper decisions used by gateway JSON-RPC/MCP flows, the local access-right data-model helpers those flows consume, and MCP API-definition validation. It does not claim gateway middleware sequencing, gateway API loading or API definition synthesis beyond in-process MCP schema validation, policy merge behavior, session-right retrieval, persistence, analytics recording, network write behavior, or final client transport behavior outside these helpers.
+rationale: This system requirement owns deterministic MCP helper decisions used by gateway JSON-RPC/MCP flows, the local access-right data-model helpers those flows consume, MCP API-definition validation, and the local OAS MCPPrimitive helper shape used by MCP API-definition helper flows. It does not claim gateway middleware sequencing, gateway API loading or API definition synthesis beyond in-process MCP schema validation and local MCPPrimitive extraction helpers, policy merge behavior, session-right retrieval, persistence, analytics recording, network write behavior, or final client transport behavior outside these helpers.
 tags:
     - mcp
     - json-rpc
@@ -22,6 +22,7 @@ tags:
     - access-control
     - session-rights
     - schema-validation
+    - api-definition
 variables:
     - mcp_protocol_decision_requested
     - mcp_protocol_decision_determined
@@ -35,23 +36,23 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-20T00:56:43Z"
-        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-043 is scoped to the user-package MCP access-right and primitive-limit data model: empty and zero-state detection, JSON roundtrips for access rules, JSON-RPC method limits, MCP primitive limits and configured access fields, primitive type validation for tool/resource/prompt values, rejected empty/unknown/case-mismatched primitive types, and omitted zero MCP access-control fields. SYS-REQ-107 description was refreshed only to include this local data-model helper boundary. Focused user tests passed with race. This approval does not claim policy merge behavior, gateway session lookup, persistence backends, middleware enforcement, list filtering itself, analytics, network transport behavior, or final HTTP status generation.'
-        fingerprint: sha256:eb0a444d1d1e9d64a5d55d9a7be13e2cf53ba3a42296871f739f11ea8fdbb242
+        reviewed_at: "2026-06-20T01:25:58Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-048 is scoped to the local apidef/oas MCPPrimitive helper shape and extraction override behavior: Operation-compatible JSON shape preservation, nil primitive and nil output safety, omission of MCP-incompatible middleware families during extended-path extraction, preservation of supported request/response header, rate-limit, and request-size middleware, and deterministic repeated extraction. Focused apidef/oas tests passed with race, and the full configured ReqProof implement-stage test evidence passed. This approval does not claim full OAS conversion, gateway API loading, session-right lookup, middleware execution, policy merge behavior, persistence, analytics, network transport behavior, or final HTTP status generation.'
+        fingerprint: sha256:4fa2c567a99301116c9af3b0cabf4489caff8c066984d740bbcee788396b919e
         ai_generated: false
-    gaps_reviewed_at: "2026-06-20T00:56:57.991178Z"
+    gaps_reviewed_at: "2026-06-20T01:26:09.491223Z"
     gaps_reviewed_by: human:buger
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-107|mcp_protocol_decision_determined
           reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-107's mcp_protocol_decision_determined variable is decomposed by SW-REQ-025 for MCP primitive VEM prefixes, prefix registration, route-chain construction, resource matching, and parameter-error behavior; by SW-REQ-026 for MCP list access-rule matching, malformed item pass-through, JSON-RPC body filtering, re-encoding, and unsupported-body pass-through; by SW-REQ-037 for apidef/mcp embedded schema loading, x-tyk-api-gateway schema injection, OAS 3.0/3.1 definition-key selection, version resolution, MCP document validation, aggregated validation errors, and unsupported or malformed version errors; by SW-REQ-039 for the local internal/service/gojsonschema facade symbols used by MCP schema validation; by SW-REQ-040 for the local internal/errors facade and newline formatter used by MCP validation error aggregation; and by SW-REQ-043 for the user-package MCP/JSON-RPC access-right and primitive-limit data model consumed by helper flows. This review is limited to in-process MCP helper, schema-validation, facade, and access-right data-model behavior and does not claim policy merge behavior, gateway session lookup, persistence backends, middleware enforcement, list filtering itself beyond SW-REQ-026, analytics, network transport behavior, schema completeness beyond embedded files under test, or final HTTP status generation.
-          reviewed_at: "2026-06-20T00:56:57.991178Z"
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-107's mcp_protocol_decision_determined variable is decomposed by SW-REQ-025 for MCP primitive VEM prefixes, prefix registration, route-chain construction, resource matching, and parameter-error behavior; by SW-REQ-026 for MCP list access-rule matching, malformed item pass-through, JSON-RPC body filtering, re-encoding, and unsupported-body pass-through; by SW-REQ-037 for apidef/mcp embedded schema loading, x-tyk-api-gateway schema injection, OAS 3.0/3.1 definition-key selection, version resolution, MCP document validation, aggregated validation errors, and unsupported or malformed version errors; by SW-REQ-039 for the local internal/service/gojsonschema facade symbols used by MCP schema validation; by SW-REQ-040 for the local internal/errors facade and newline formatter used by MCP validation error aggregation; by SW-REQ-043 for the user-package MCP/JSON-RPC access-right and primitive-limit data model consumed by helper flows; and by SW-REQ-048 for the local apidef/oas MCPPrimitive helper shape and extraction override behavior. This review is limited to in-process MCP helper, schema-validation, facade, access-right data-model, and local MCPPrimitive helper behavior and does not claim full OAS conversion, gateway API loading, policy merge behavior, gateway session lookup, persistence backends, middleware enforcement, list filtering itself beyond SW-REQ-026, analytics, network transport behavior, schema completeness beyond embedded files under test, or final HTTP status generation.
+          reviewed_at: "2026-06-20T01:26:09.491223Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T00:00:00Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-20T00:56:43Z"
+    last_modified_at: "2026-06-20T01:25:58Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -75,4 +76,9 @@ lifecycle:
           from: approved
           to: approved
           reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T00:15:40Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP protocol scope now includes apidef/mcp in-process embedded schema loading and validation in addition to internal/mcp routing/list-filtering helpers: supported OAS 3.0/3.1 schema definitions, x-tyk-api-gateway extension injection, version resolution, valid MCP document acceptance, malformed document validation errors, and unsupported/malformed version errors. Focused apidef/mcp tests passed with race after removing unsafe parallelism from shared fixture tests. This approval does not claim gateway API loading, persistence, session-right retrieval, middleware execution, analytics, network transport behavior, schema completeness beyond embedded files under test, or final HTTP status generation.")'
+          changed_by: human:buger
+        - date: "2026-06-20T01:25:58Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T00:56:43Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-043 is scoped to the user-package MCP access-right and primitive-limit data model: empty and zero-state detection, JSON roundtrips for access rules, JSON-RPC method limits, MCP primitive limits and configured access fields, primitive type validation for tool/resource/prompt values, rejected empty/unknown/case-mismatched primitive types, and omitted zero MCP access-control fields. SYS-REQ-107 description was refreshed only to include this local data-model helper boundary. Focused user tests passed with race. This approval does not claim policy merge behavior, gateway session lookup, persistence backends, middleware enforcement, list filtering itself, analytics, network transport behavior, or final HTTP status generation.")'
           changed_by: human:buger

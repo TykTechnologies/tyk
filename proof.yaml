@@ -154,6 +154,8 @@ project:
             - apidef/host_list.go
             - apidef/oas/header.go
             - apidef/oas/header_test.go
+            - apidef/oas/mcp_primitive.go
+            - apidef/oas/mcp_primitive_reqproof_test.go
             - apidef/rate_limit_smoothing.go
             - apidef/rate_limit_smoothing_test.go
             - apidef/rpc.go
