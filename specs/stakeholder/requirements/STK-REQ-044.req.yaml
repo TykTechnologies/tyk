@@ -1,0 +1,62 @@
+id: STK-REQ-044
+version: 1
+status: approved
+priority: shall
+category: observability
+req_type: guarantee
+fretish: ""
+description: Goroutine debug record support shall locally preserve goroutine dump parsing, ignore filtering, record diffing, count calculation, and formatted string output, without claiming scheduler behavior, goroutine leak policy, runtime profile completeness, production diagnostics workflow, logging behavior, or final gateway behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: goroutine_debug_record
+rationale: The internal/debug2 package owns local goroutine record parsing and formatting helpers used by diagnostics tests. Broader leak detection and production diagnostic outcomes remain outside this proof slice.
+tags:
+    - debug
+    - goroutine
+    - observability
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T12:26:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Goroutine debug record scope is limited to local internal/debug2 behavior: goroutine dump parsing, ignore filtering, record diffing, count calculation, and formatted string output. This approval does not claim scheduler behavior, goroutine leak policy, runtime profile completeness, production diagnostics workflow, logging behavior, or final gateway behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T12:26:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T12:26:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+stakeholder:
+    persona: Gateway diagnostics maintainer
+    story: As a gateway diagnostics maintainer, I need goroutine debug records to preserve local parsing, filtering, diffing, and formatting behavior so tests can compare helper-owned goroutine snapshots.
+    acceptance_criteria:
+        - id: STK-REQ-044-AC-01
+          text: Given a goroutine dump with multiple headers and stack lines, when the local record parser runs, then each header is represented once with its associated stack lines.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-132
+        - id: STK-REQ-044-AC-02
+          text: Given ignore strings and two records, when the local helpers filter, count, diff, or format the records, then ignored records are removed and newly observed records are reported deterministically.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-132
+lifecycle:
+    change_history:
+        - date: "2026-06-20T12:26:00Z"
+          from: draft
+          to: review
+          reason: Added goroutine debug record stakeholder requirement for internal/debug2 onboarding.
+          changed_by: agent:codex

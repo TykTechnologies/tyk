@@ -9,12 +9,14 @@ import (
 )
 
 // Record captures goroutine states
+// SW-REQ-119
 type Record struct {
 	buffer  *bytes.Buffer
 	ignores []string
 }
 
 // NewRecord creates a new Record and populates it with the current goroutine dump.
+// SW-REQ-119
 func NewRecord() *Record {
 	result := &Record{
 		buffer: bytes.NewBuffer([]byte{}),
@@ -28,14 +30,17 @@ func NewRecord() *Record {
 	return result
 }
 
+// SW-REQ-119
 func (r *Record) SetIgnores(ignores []string) {
 	r.ignores = ignores
 }
 
+// SW-REQ-119
 var headerMatchRe = regexp.MustCompile(`^[0-9]+ @ 0x.*`)
 
 // parseGoroutines parses goroutines from the buffer into a map where each key is a
 // goroutine header and the value is its stack trace as a slice of strings.
+// SW-REQ-119
 func (r *Record) parseGoroutines() map[string][]string {
 	goroutines := make(map[string][]string)
 	var currentHeader string
@@ -83,6 +88,7 @@ func (r *Record) parseGoroutines() map[string][]string {
 
 // Since compares the current Record with another Record and returns a new Record
 // containing only the goroutines found in the current Record but not in the last.
+// SW-REQ-119
 func (r *Record) Since(last *Record) *Record {
 	currentGoroutines := r.parseGoroutines()
 	lastGoroutines := last.parseGoroutines()
@@ -103,12 +109,14 @@ func (r *Record) Since(last *Record) *Record {
 }
 
 // Count returns the number of unique goroutines in the Record.
+// SW-REQ-119
 func (r *Record) Count() int {
 	return len(r.parseGoroutines())
 }
 
 // String implements the fmt.Stringer interface, providing a formatted view
 // of the goroutines in the Record.
+// SW-REQ-119
 func (r *Record) String() string {
 	goroutines := r.parseGoroutines()
 	var builder strings.Builder

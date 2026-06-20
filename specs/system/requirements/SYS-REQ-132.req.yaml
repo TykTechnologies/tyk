@@ -1,0 +1,60 @@
+id: SYS-REQ-132
+version: 1
+status: approved
+priority: shall
+category: observability
+req_type: guarantee
+fretish: the goroutine_debug_record shall always satisfy goroutine_debug_record_operation_terminal
+description: Goroutine debug record support shall make local helper operations terminal and deterministic for goroutine dump parsing, ignore filtering, record diffing, count calculation, and formatted string output, without claiming scheduler behavior, goroutine leak policy, runtime profile completeness, production diagnostics workflow, logging behavior, or final gateway behavior.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-044
+component: goroutine_debug_record
+rationale: This system requirement owns local internal/debug2 helper terminality and deterministic helper behavior only. Runtime scheduling and production diagnostics outcomes remain outside this proof slice.
+tags:
+    - debug
+    - goroutine
+    - observability
+variables:
+    - goroutine_debug_record_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-044
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T12:26:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Goroutine debug record system scope is limited to terminal local helper behavior in internal/debug2: goroutine dump parsing, ignore filtering, record diffing, count calculation, and formatted string output. The FRETish invariant intentionally models local operation terminality without asserting scheduler behavior, goroutine leak policy, runtime profile completeness, production diagnostics workflow, logging behavior, or final gateway behavior.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T12:29:55.214851Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-132|goroutine_debug_record_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final requirement approval. SYS-REQ-132''s goroutine_debug_record_operation_terminal variable is decomposed by SW-REQ-119 for local internal/debug2 behavior: goroutine dump parsing, ignore filtering, record diffing, count calculation, and formatted string output. This review is limited to local goroutine debug record helper mechanics and does not claim scheduler behavior, goroutine leak policy, runtime profile completeness, production diagnostics workflow, logging behavior, or final gateway behavior.'
+          reviewed_at: "2026-06-20T12:29:55.214851Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T12:26:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T12:26:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T12:26:00Z"
+          from: draft
+          to: review
+          reason: Added goroutine debug record system requirement for internal/debug2 onboarding.
+          changed_by: agent:codex

@@ -545,6 +545,16 @@ fixed or to hide them from the current strict audit.
   integration, synchronization behavior, deletion safety, certificate lifecycle
   policy, or final gateway behavior. It moves the visible production coverage
   baseline from 181/447 to 182/447.
+- `SW-REQ-119` onboarded `internal/debug2` with a new goroutine debug record
+  stakeholder/system/software chain and focused package evidence for goroutine
+  dump parsing, ignore filtering, record diffing, count calculation, and
+  formatted string output. The system formula is a local terminality invariant,
+  with the unreachable non-terminal invariant-violation row documented rather
+  than covered by a fake runtime witness. This increment is scoped to local
+  goroutine debug record helper mechanics and does not claim scheduler
+  behavior, goroutine leak policy, runtime profile completeness, production
+  diagnostics workflow, logging behavior, or final gateway behavior. It moves
+  the visible production coverage baseline from 182/447 to 183/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

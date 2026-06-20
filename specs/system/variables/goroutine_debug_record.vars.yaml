@@ -1,0 +1,9 @@
+component: goroutine_debug_record
+no_interface:
+    declared: true
+    reason: The internal/debug2 proof slice covers local goroutine record parsing and formatting helper behavior only; scheduler behavior, goroutine leak policy, runtime profile completeness, production diagnostics workflow, logging behavior, and final gateway behavior are outside this component boundary.
+variables:
+    - name: goroutine_debug_record_operation_terminal
+      type: bool
+      direction: output
+      description: 'The local goroutine debug record helper operation reaches a terminal observable result: parsed goroutine records, ignored records, a diff record, a count, or formatted string output.'
