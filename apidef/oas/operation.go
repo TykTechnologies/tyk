@@ -16,9 +16,11 @@ import (
 )
 
 // Operations holds Operation definitions. The string key in this object is the `operationID`, which is a unique identifier for each API operation.
+// SW-REQ-091
 type Operations map[string]*Operation
 
 // Operation holds a request operation configuration, allowances, tranformations, caching, timeouts and validation.
+// SW-REQ-091
 type Operation struct {
 	// Allow request by allowance.
 	Allow *Allowance `bson:"allow,omitempty" json:"allow,omitempty"`
@@ -93,6 +95,7 @@ type Operation struct {
 //
 // This enables reusing the existing classic middleware compilation pipeline for
 // non-OAS routing constructs (e.g., MCP primitive VEMs).
+// SW-REQ-091
 func (o *Operation) ExtractToExtendedPaths(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if ep == nil || o == nil {
 		return
@@ -122,8 +125,10 @@ func (o *Operation) ExtractToExtendedPaths(ep *apidef.ExtendedPathsSet, path str
 }
 
 // AllowanceType holds the valid allowance types values.
+// SW-REQ-091
 type AllowanceType int
 
+// SW-REQ-091
 const (
 	allow                AllowanceType = 0
 	block                AllowanceType = 1
@@ -133,6 +138,7 @@ const (
 )
 
 // Import takes the arguments and populates the receiver *Operation values.
+// SW-REQ-091
 func (o *Operation) Import(oasOperation *openapi3.Operation, overRideValues TykExtensionConfigParams) {
 	if overRideValues.AllowList != nil {
 		allow := o.Allow
@@ -174,6 +180,7 @@ func (o *Operation) Import(oasOperation *openapi3.Operation, overRideValues TykE
 	}
 }
 
+// SW-REQ-091
 func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	// Regardless if `ep` is a zero value, we need a non-nil paths
 	// to produce a valid OAS document
@@ -218,6 +225,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 // - Checking the Content-Type header if present
 // - Attempting to parse the body as JSON
 // - Defaulting to text/plain if neither above applies
+// SW-REQ-091
 func (s *OAS) fillMockResponsePaths(paths *openapi3.Paths, ep apidef.ExtendedPathsSet) {
 	for _, mock := range ep.MockResponse {
 		operationID := s.getOperationID(mock.Path, mock.Method)
@@ -271,6 +279,7 @@ func (s *OAS) fillMockResponsePaths(paths *openapi3.Paths, ep apidef.ExtendedPat
 	}
 }
 
+// SW-REQ-091
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 	ep.Clear()
 
@@ -312,6 +321,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 	sortMockResponseAllowList(ep)
 }
 
+// SW-REQ-091
 func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
 	for _, em := range endpointMetas {
 		operationID := s.getOperationID(em.Path, em.Method)
@@ -341,6 +351,7 @@ func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceTy
 	}
 }
 
+// SW-REQ-091
 func newAllowance(prev **Allowance) *Allowance {
 	if *prev == nil {
 		*prev = &Allowance{}
@@ -349,6 +360,7 @@ func newAllowance(prev **Allowance) *Allowance {
 	return *prev
 }
 
+// SW-REQ-091
 func (s *OAS) fillTransformRequestMethod(metas []apidef.MethodTransformMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
@@ -364,6 +376,7 @@ func (s *OAS) fillTransformRequestMethod(metas []apidef.MethodTransformMeta) {
 	}
 }
 
+// SW-REQ-091
 func (s *OAS) fillTransformRequestBody(metas []apidef.TemplateMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
@@ -380,6 +393,7 @@ func (s *OAS) fillTransformRequestBody(metas []apidef.TemplateMeta) {
 	}
 }
 
+// SW-REQ-091
 func (s *OAS) fillTransformResponseBody(metas []apidef.TemplateMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
@@ -396,6 +410,7 @@ func (s *OAS) fillTransformResponseBody(metas []apidef.TemplateMeta) {
 	}
 }
 
+// SW-REQ-091
 func (s *OAS) fillTransformRequestHeaders(metas []apidef.HeaderInjectionMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
@@ -412,6 +427,7 @@ func (s *OAS) fillTransformRequestHeaders(metas []apidef.HeaderInjectionMeta) {
 	}
 }
 
+// SW-REQ-091
 func (s *OAS) fillTransformResponseHeaders(metas []apidef.HeaderInjectionMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
@@ -428,6 +444,7 @@ func (s *OAS) fillTransformResponseHeaders(metas []apidef.HeaderInjectionMeta) {
 	}
 }
 
+// SW-REQ-091
 func (s *OAS) fillCache(metas []apidef.CacheMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
@@ -443,6 +460,7 @@ func (s *OAS) fillCache(metas []apidef.CacheMeta) {
 	}
 }
 
+// SW-REQ-091
 func (s *OAS) fillEnforceTimeout(metas []apidef.HardTimeoutMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
@@ -458,6 +476,7 @@ func (s *OAS) fillEnforceTimeout(metas []apidef.HardTimeoutMeta) {
 	}
 }
 
+// SW-REQ-091
 func (s *OAS) fillRequestSizeLimit(metas []apidef.RequestSizeMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
@@ -473,6 +492,7 @@ func (s *OAS) fillRequestSizeLimit(metas []apidef.RequestSizeMeta) {
 	}
 }
 
+// SW-REQ-091
 func (o *Operation) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
 	allowance := o.Allow
 	endpointMetas := &ep.WhiteList
@@ -495,6 +515,7 @@ func (o *Operation) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string,
 	*endpointMetas = append(*endpointMetas, endpointMeta)
 }
 
+// SW-REQ-091
 func (o *Operation) extractTransformRequestMethodTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.TransformRequestMethod == nil {
 		return
@@ -505,6 +526,7 @@ func (o *Operation) extractTransformRequestMethodTo(ep *apidef.ExtendedPathsSet,
 	ep.MethodTransforms = append(ep.MethodTransforms, meta)
 }
 
+// SW-REQ-091
 func (o *Operation) extractTransformRequestBodyTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.TransformRequestBody == nil {
 		return
@@ -515,6 +537,7 @@ func (o *Operation) extractTransformRequestBodyTo(ep *apidef.ExtendedPathsSet, p
 	ep.Transform = append(ep.Transform, meta)
 }
 
+// SW-REQ-091
 func (o *Operation) extractTransformResponseBodyTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.TransformResponseBody == nil {
 		return
@@ -525,6 +548,7 @@ func (o *Operation) extractTransformResponseBodyTo(ep *apidef.ExtendedPathsSet, 
 	ep.TransformResponse = append(ep.TransformResponse, meta)
 }
 
+// SW-REQ-091
 func (o *Operation) extractTransformRequestHeadersTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.TransformRequestHeaders == nil {
 		return
@@ -535,6 +559,7 @@ func (o *Operation) extractTransformRequestHeadersTo(ep *apidef.ExtendedPathsSet
 	ep.TransformHeader = append(ep.TransformHeader, meta)
 }
 
+// SW-REQ-091
 func (o *Operation) extractTransformResponseHeadersTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.TransformResponseHeaders == nil {
 		return
@@ -545,6 +570,7 @@ func (o *Operation) extractTransformResponseHeadersTo(ep *apidef.ExtendedPathsSe
 	ep.TransformResponseHeader = append(ep.TransformResponseHeader, meta)
 }
 
+// SW-REQ-091
 func (o *Operation) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.Cache == nil {
 		return
@@ -558,6 +584,7 @@ func (o *Operation) extractCacheTo(ep *apidef.ExtendedPathsSet, path string, met
 	ep.AdvanceCacheConfig = append(ep.AdvanceCacheConfig, newCacheMeta)
 }
 
+// SW-REQ-091
 func (o *Operation) extractEnforceTimeoutTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.EnforceTimeout == nil {
 		return
@@ -568,6 +595,7 @@ func (o *Operation) extractEnforceTimeoutTo(ep *apidef.ExtendedPathsSet, path st
 	ep.HardTimeouts = append(ep.HardTimeouts, meta)
 }
 
+// SW-REQ-091
 func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.RequestSizeLimit == nil {
 		return
@@ -578,6 +606,7 @@ func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path 
 	ep.SizeLimit = append(ep.SizeLimit, meta)
 }
 
+// SW-REQ-091
 func (o *Operation) extractValidateRequestTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.ValidateRequest == nil {
 		return
@@ -588,6 +617,7 @@ func (o *Operation) extractValidateRequestTo(ep *apidef.ExtendedPathsSet, path s
 	ep.ValidateRequest = append(ep.ValidateRequest, meta)
 }
 
+// SW-REQ-091
 func (o *Operation) extractMockResponseTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.MockResponse == nil {
 		return
@@ -603,16 +633,19 @@ func (o *Operation) extractMockResponseTo(ep *apidef.ExtendedPathsSet, path stri
 // - greedy match (.*)
 // - ungreedy match (.+)
 // - end of string ($).
+// SW-REQ-091
 var regexPatterns = []string{
 	".+", ".*", "[", "]", "$",
 }
 
+// SW-REQ-091
 type pathPart struct {
 	name    string
 	value   string
 	isRegex bool
 }
 
+// SW-REQ-091
 func (p pathPart) String() string {
 	if p.isRegex {
 		return "{" + p.name + "}"
@@ -622,6 +655,7 @@ func (p pathPart) String() string {
 }
 
 // isRegex checks if value has expected regular expression patterns.
+// SW-REQ-091
 func isRegex(value string) bool {
 	for _, pattern := range regexPatterns {
 		if strings.Contains(value, pattern) {
@@ -632,6 +666,7 @@ func isRegex(value string) bool {
 }
 
 // splitPath splits URL into folder parts, detecting regex patterns.
+// SW-REQ-091
 func splitPath(inPath string) ([]pathPart, bool) {
 	trimmedPath := strings.Trim(inPath, "/")
 
@@ -656,6 +691,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 
 // buildPath converts the URL paths with regex to named parameters
 // e.g. ["a", ".*"] becomes /a/{customRegex1}.
+// SW-REQ-091
 func buildPath(parts []pathPart, appendSlash bool) string {
 	newPath := ""
 
@@ -670,6 +706,7 @@ func buildPath(parts []pathPart, appendSlash bool) string {
 	return newPath
 }
 
+// SW-REQ-091
 func (s *OAS) getOperationID(inPath, method string) string {
 	operationID := strings.TrimPrefix(inPath, "/") + method
 
@@ -749,6 +786,7 @@ func (s *OAS) getOperationID(inPath, method string) string {
 	return operation.OperationID
 }
 
+// SW-REQ-091
 func (x *XTykAPIGateway) getOperation(operationID string) *Operation {
 	if x.Middleware == nil {
 		x.Middleware = &Middleware{}
@@ -770,6 +808,7 @@ func (x *XTykAPIGateway) getOperation(operationID string) *Operation {
 }
 
 // ValidateRequest holds configuration required for validating requests.
+// SW-REQ-091
 type ValidateRequest struct {
 	// Enabled is a boolean flag, if set to `true`, it enables request validation.
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -780,17 +819,20 @@ type ValidateRequest struct {
 }
 
 // Fill fills *ValidateRequest receiver from apidef.ValidateRequestMeta.
+// SW-REQ-091
 func (v *ValidateRequest) Fill(meta apidef.ValidatePathMeta) {
 	v.Enabled = !meta.Disabled
 	v.ErrorResponseCode = meta.ErrorResponseCode
 }
 
 // ExtractTo extracts *ValidateRequest into apidef.ValidateRequestMeta.
+// SW-REQ-091
 func (v *ValidateRequest) ExtractTo(meta *apidef.ValidateRequestMeta) {
 	meta.Enabled = v.Enabled
 	meta.ErrorResponseCode = v.ErrorResponseCode
 }
 
+// SW-REQ-091
 func (*ValidateRequest) shouldImport(operation *openapi3.Operation) bool {
 	if len(operation.Parameters) > 0 {
 		return true
@@ -812,11 +854,13 @@ func (*ValidateRequest) shouldImport(operation *openapi3.Operation) bool {
 }
 
 // Import populates *ValidateRequest with enabled argument and a default error response code.
+// SW-REQ-091
 func (v *ValidateRequest) Import(enabled bool) {
 	v.Enabled = enabled
 	v.ErrorResponseCode = http.StatusUnprocessableEntity
 }
 
+// SW-REQ-091
 func convertSchema(mapSchema map[string]interface{}) (*openapi3.Schema, error) {
 	bytes, err := json.Marshal(mapSchema)
 	if err != nil {
@@ -832,6 +876,7 @@ func convertSchema(mapSchema map[string]interface{}) (*openapi3.Schema, error) {
 	return schema, nil
 }
 
+// SW-REQ-091
 func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
@@ -869,6 +914,7 @@ func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta) {
 }
 
 // MockResponse configures the mock responses.
+// SW-REQ-091
 type MockResponse struct {
 	// Enabled activates the mock response middleware.
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -883,6 +929,7 @@ type MockResponse struct {
 }
 
 // Fill populates the MockResponse fields from a classic API MockResponseMeta.
+// SW-REQ-091
 func (m *MockResponse) Fill(op apidef.MockResponseMeta) {
 	headers := make([]Header, 0)
 	for k, v := range op.Headers {
@@ -903,6 +950,7 @@ func (m *MockResponse) Fill(op apidef.MockResponseMeta) {
 	m.Headers = headers
 }
 
+// SW-REQ-091
 func (m *MockResponse) ExtractTo(meta *apidef.MockResponseMeta) {
 	meta.Disabled = !m.Enabled
 	meta.Code = m.Code
@@ -921,6 +969,7 @@ func (m *MockResponse) ExtractTo(meta *apidef.MockResponseMeta) {
 }
 
 // FromOASExamples configures mock responses that should be returned from OAS example responses.
+// SW-REQ-091
 type FromOASExamples struct {
 	// Enabled activates getting a mock response from OAS examples or schemas documented in OAS.
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -932,6 +981,7 @@ type FromOASExamples struct {
 	ExampleName string `bson:"exampleName,omitempty" json:"exampleName,omitempty"`
 }
 
+// SW-REQ-091
 func (*MockResponse) shouldImport(operation *openapi3.Operation) bool {
 	for _, response := range operation.Responses.Map() {
 		for _, content := range response.Value.Content {
@@ -951,6 +1001,7 @@ func (*MockResponse) shouldImport(operation *openapi3.Operation) bool {
 }
 
 // Import populates *MockResponse with enabled argument for FromOASExamples.
+// SW-REQ-091
 func (m *MockResponse) Import(enabled bool) {
 	m.Enabled = enabled
 	m.FromOASExamples = &FromOASExamples{
@@ -958,6 +1009,7 @@ func (m *MockResponse) Import(enabled bool) {
 	}
 }
 
+// SW-REQ-091
 func (s *OAS) fillVirtualEndpoint(endpointMetas []apidef.VirtualMeta) {
 	for _, em := range endpointMetas {
 		operationID := s.getOperationID(em.Path, em.Method)
@@ -973,6 +1025,7 @@ func (s *OAS) fillVirtualEndpoint(endpointMetas []apidef.VirtualMeta) {
 	}
 }
 
+// SW-REQ-091
 func (o *Operation) extractVirtualEndpointTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.VirtualEndpoint == nil {
 		return
@@ -983,6 +1036,7 @@ func (o *Operation) extractVirtualEndpointTo(ep *apidef.ExtendedPathsSet, path s
 	ep.Virtual = append(ep.Virtual, meta)
 }
 
+// SW-REQ-091
 func (s *OAS) fillRateLimitEndpoints(endpointMetas []apidef.RateLimitMeta) {
 	for _, em := range endpointMetas {
 		operationID := s.getOperationID(em.Path, em.Method)
@@ -998,6 +1052,7 @@ func (s *OAS) fillRateLimitEndpoints(endpointMetas []apidef.RateLimitMeta) {
 	}
 }
 
+// SW-REQ-091
 func (o *Operation) extractRateLimitEndpointTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.RateLimit == nil {
 		return
@@ -1008,6 +1063,7 @@ func (o *Operation) extractRateLimitEndpointTo(ep *apidef.ExtendedPathsSet, path
 	ep.RateLimit = append(ep.RateLimit, meta)
 }
 
+// SW-REQ-091
 func (s *OAS) fillEndpointPostPlugins(endpointMetas []apidef.GoPluginMeta) {
 	for _, em := range endpointMetas {
 		operationID := s.getOperationID(em.Path, em.Method)
@@ -1023,6 +1079,7 @@ func (s *OAS) fillEndpointPostPlugins(endpointMetas []apidef.GoPluginMeta) {
 	}
 }
 
+// SW-REQ-091
 func (o *Operation) extractEndpointPostPluginTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.PostPlugins == nil {
 		return
@@ -1033,6 +1090,7 @@ func (o *Operation) extractEndpointPostPluginTo(ep *apidef.ExtendedPathsSet, pat
 	ep.GoPlugin = append(ep.GoPlugin, meta)
 }
 
+// SW-REQ-091
 func (o *Operation) extractCircuitBreakerTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.CircuitBreaker == nil {
 		return
@@ -1043,6 +1101,7 @@ func (o *Operation) extractCircuitBreakerTo(ep *apidef.ExtendedPathsSet, path st
 	ep.CircuitBreaker = append(ep.CircuitBreaker, meta)
 }
 
+// SW-REQ-091
 func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
@@ -1061,6 +1120,7 @@ func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 // detectMockResponseContentType determines the Content-Type of the mock response.
 // It first checks the headers for an explicit Content-Type, then attempts to detect
 // the type from the body content. Returns "text/plain" if no specific type can be determined.
+// SW-REQ-091
 func detectMockResponseContentType(mock apidef.MockResponseMeta) string {
 	const headerContentType = "Content-Type"
 
@@ -1090,6 +1150,7 @@ func detectMockResponseContentType(mock apidef.MockResponseMeta) string {
 
 // sortMockResponseAllowList sorts the mock response paths by path, method, and response code.
 // This ensures a deterministic order of mock responses.
+// SW-REQ-091
 func sortMockResponseAllowList(ep *apidef.ExtendedPathsSet) {
 	sort.Slice(ep.WhiteList, func(i, j int) bool {
 		// First sort by path
@@ -1116,6 +1177,7 @@ func sortMockResponseAllowList(ep *apidef.ExtendedPathsSet) {
 
 // hasMockResponse returns true if any method action has a Reply action type.
 // This is used to determine if an endpoint should be treated as a mock response.
+// SW-REQ-091
 func hasMockResponse(methodActions map[string]apidef.EndpointMethodMeta) bool {
 	for _, action := range methodActions {
 		if action.Action == apidef.Reply {
@@ -1127,6 +1189,7 @@ func hasMockResponse(methodActions map[string]apidef.EndpointMethodMeta) bool {
 }
 
 // parsePathSegment parses a single path segment and determines if it contains a regex pattern.
+// SW-REQ-091
 func parsePathSegment(segment string, regexCount int, hasRegex bool) (pathPart, int, bool) {
 	if strings.HasPrefix(segment, "{") && strings.HasSuffix(segment, "}") {
 		return parseMuxTemplate(segment, regexCount)
@@ -1139,6 +1202,7 @@ func parsePathSegment(segment string, regexCount int, hasRegex bool) (pathPart, 
 }
 
 // parseMuxTemplate parses a segment that is a mux template and extracts the name or assigns a custom regex name.
+// SW-REQ-091
 func parseMuxTemplate(segment string, regexCount int) (pathPart, int, bool) {
 	segment = strings.Trim(segment, "{}")
 
@@ -1151,6 +1215,7 @@ func parseMuxTemplate(segment string, regexCount int) (pathPart, int, bool) {
 	return pathPart{name: fmt.Sprintf("customRegex%d", regexCount), isRegex: true}, regexCount, true
 }
 
+// SW-REQ-091
 func isIdentifier(value string) bool {
 	matched, _ := regexp.MatchString(`^[a-zA-Z0-9._-]+$`, value) //nolint
 	return matched

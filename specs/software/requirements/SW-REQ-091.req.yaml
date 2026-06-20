@@ -1,0 +1,64 @@
+id: SW-REQ-091
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The apidef/oas operation document helpers shall preserve local OAS operation support behavior by maintaining operation middleware containers, operation-level import coordination from Tyk extension configuration parameters, Classic ExtendedPaths fill/extract orchestration for operation-scoped helper shapes, regex and mux-template path normalization into OpenAPI path parameters, deterministic operation ID creation and existing operation preservation, validate-request schema conversion and import gating, mock-response metadata conversion and OAS-example import gating, mock response content-type detection, deterministic mock allow-list ordering, and nil-safe primitive extraction without claiming gateway routing, request matching, request admission, runtime middleware execution, request validation execution, mock-response execution, upstream availability, persistence, analytics, or final client-visible behavior.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: apidef/oas/operation_reqproof_test.go; docs/apidef-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-104
+component: model
+rationale: >-
+    This software requirement owns only local apidef/oas/operation.go operation document helper behavior: operation middleware containers, local import coordination, ExtendedPaths fill/extract orchestration, regex path normalization, operation ID creation, validate-request schema conversion and import gating, mock-response metadata conversion and OAS-example import gating, mock content-type detection, and deterministic sorting. It does not claim gateway route matching, request admission, runtime middleware execution, request validation execution, mock-response execution, upstream availability, persistence backend correctness, analytics, or final client-visible behavior.
+tags:
+    - api-definition
+    - oas
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-104
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T07:11:27Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-091 is scoped to local apidef/oas/operation.go OAS operation document helper behavior: operation middleware containers, operation-level import coordination from Tyk extension configuration parameters, Classic ExtendedPaths fill/extract orchestration for operation-scoped helper shapes, regex and mux-template path normalization into OpenAPI path parameters, deterministic operation ID creation and existing operation preservation, validate-request schema conversion and import gating, mock-response metadata conversion and OAS-example import gating, mock response content-type detection, deterministic mock allow-list ordering, and nil-safe primitive extraction. Focused apidef/oas operation ReqProof tests passed. This approval does not claim gateway routing, request matching, request admission, runtime middleware execution, request validation execution, mock-response execution, upstream availability, persistence backend correctness, analytics, or final client-visible behavior.'
+        fingerprint: sha256:4997da35efc4a87227fab57c58e7ae676e261625f3f9dc82c77a1d7bffb2053b
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-091
+          artifact: apidef/oas/operation.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The apidef/oas/operation.go production delta in this slice adds ReqProof ownership annotations only; SW-REQ-091 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence existing OAS operation document helper behavior, so no additional authored requirement/design change is required for this implementation delta.
+          base: origin/master
+          requirement_fingerprint: sha256:58f4a4bd57d5e6f7972c0c17a58f6c3e40432ccfb6845e5a40fd1876a9cb8189
+          approval_fingerprint: sha256:4997da35efc4a87227fab57c58e7ae676e261625f3f9dc82c77a1d7bffb2053b
+          artifact_fingerprint: sha256:a7b7a6135660b842eed6d160c34e28c50f4bb0a93650f464562e3778fdd9b119
+          reviewed_at: "2026-06-20T07:12:02Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T07:10:25Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T07:11:27Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T07:10:25Z"
+          from: draft
+          to: review
+          reason: Added apidef/oas operation document helper behavior under API-definition support model behavior.
+          changed_by: agent:codex
