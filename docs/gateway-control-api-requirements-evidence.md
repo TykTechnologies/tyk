@@ -18,6 +18,8 @@ The evidence scope includes:
 - local API and OAS route-dispatch wrappers for tested GET, POST, PUT, and
   PATCH status/header outcomes, plus OAS export filename and public/private
   response shaping
+- tested local reload and group-reload handler status responses, including
+  callback scheduling through the gateway reload queue
 - organization-scoped API lookup and API ID listing helpers, including fallback
   behavior when no exact organization match exists
 - API definition inventory listing and retrieval helpers, including explicit

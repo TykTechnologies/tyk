@@ -3,8 +3,9 @@
 
 `STK-REQ-053`, `SYS-REQ-141`, and `SW-REQ-128` cover local gateway key
 management helper behavior in `gateway/api.go`: basic-auth password hash
-algorithm selection and password storage transformation, key add/update request
-decoding and error reporting, local add-key storage updates gated by
+algorithm selection and password storage transformation, key create/preview
+handler status handling, key add/update request decoding and error reporting,
+local add-key storage updates gated by
 organization, key detail retrieval with quota remaining
 calculation and basic-auth password redaction, and key-list retrieval/filtering
 helpers including context-cancellation handling and internal quota/rate key

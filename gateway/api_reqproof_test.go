@@ -743,6 +743,46 @@ func TestGatewayControlAPIOASExportHandler(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:determinism:nominal
+func TestGatewayControlAPIReloadHandlers(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.ReloadTestCase.Enable()
+	defer ts.Gw.ReloadTestCase.Disable()
+
+	called := make(chan struct{}, 1)
+	handler := ts.Gw.resetHandler(func() {
+		called <- struct{}{}
+	})
+	rec := httptest.NewRecorder()
+
+	handler(rec, httptest.NewRequest(http.MethodGet, "/tyk/reload", nil))
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.JSONEq(t, `{"status":"ok","message":""}`, rec.Body.String())
+
+	ts.Gw.ReloadTestCase.TickOk(t)
+	select {
+	case <-called:
+	case <-time.After(time.Second):
+		t.Fatal("reload callback was not invoked")
+	}
+
+	rec = httptest.NewRecorder()
+	ts.Gw.groupResetHandler(rec, httptest.NewRequest(http.MethodGet, "/tyk/reload/group", nil))
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.JSONEq(t, `{"status":"ok","message":""}`, rec.Body.String())
+}
+
 func apiDefinitionIDs(definitions []*apidef.APIDefinition) []string {
 	ids := make([]string, 0, len(definitions))
 	for _, definition := range definitions {
@@ -1020,6 +1060,85 @@ func TestGatewayKeyManagementBasicAuthHashing(t *testing.T) {
 			assert.Equal(t, tc.wantHash, session.BasicAuthData.Hash)
 			assert.NotEqual(t, "password", session.BasicAuthData.Password)
 			assert.NotEmpty(t, session.BasicAuthData.Password)
+		})
+	}
+}
+
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// STK-REQ-053:error_handling:negative
+// STK-REQ-053:error_handling:nominal
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SYS-REQ-141:error_handling:negative
+// SYS-REQ-141:error_handling:nominal
+// SYS-REQ-141:encoding_safety:nominal
+// SYS-REQ-141:determinism:nominal
+// SW-REQ-128:nominal:nominal
+// SW-REQ-128:boundary:nominal
+// SW-REQ-128:error_handling:negative
+// SW-REQ-128:error_handling:nominal
+// SW-REQ-128:encoding_safety:nominal
+// SW-REQ-128:determinism:nominal
+func TestGatewayKeyManagementCreateAndPreviewHandlers(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "create-api"
+		spec.OrgID = "default"
+		spec.Name = "Create API"
+	})
+
+	session := CreateStandardSession()
+	session.OrgID = "default"
+	session.AccessRights = map[string]user.AccessDefinition{
+		"create-api": {APIID: "create-api", Versions: []string{"Default"}},
+	}
+	payload, err := json.Marshal(session)
+	require.NoError(t, err)
+
+	rec := httptest.NewRecorder()
+	ts.Gw.createKeyHandler(rec, httptest.NewRequest(http.MethodPost, "/tyk/keys/create", bytes.NewReader(payload)))
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var created apiModifyKeySuccess
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &created))
+	assert.Equal(t, "ok", created.Status)
+	assert.Equal(t, "added", created.Action)
+	assert.NotEmpty(t, created.Key)
+
+	stored, found := ts.Gw.GlobalSessionManager.SessionDetail("default", created.Key, ts.Gw.GetConfig().HashKeys)
+	require.True(t, found)
+	assert.Equal(t, "default", stored.OrgID)
+	assert.Contains(t, stored.AccessRights, "create-api")
+
+	rec = httptest.NewRecorder()
+	ts.Gw.previewKeyHandler(rec, httptest.NewRequest(http.MethodPost, "/tyk/keys/preview", bytes.NewReader(payload)))
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var preview user.SessionState
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &preview))
+	assert.Equal(t, "default", preview.OrgID)
+	assert.NotEmpty(t, preview.LastUpdated)
+	assert.False(t, preview.DateCreated.IsZero())
+	assert.Contains(t, preview.AccessRights, "create-api")
+
+	for _, tc := range []struct {
+		name    string
+		path    string
+		handler http.HandlerFunc
+	}{
+		{name: "create", path: "/tyk/keys/create", handler: ts.Gw.createKeyHandler},
+		{name: "preview", path: "/tyk/keys/preview", handler: ts.Gw.previewKeyHandler},
+	} {
+		t.Run("malformed "+tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+
+			tc.handler(rec, httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader("{")))
+
+			require.Equal(t, http.StatusInternalServerError, rec.Code)
+			assert.JSONEq(t, `{"status":"error","message":"Unmarshalling failed"}`, rec.Body.String())
 		})
 	}
 }

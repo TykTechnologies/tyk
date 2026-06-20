@@ -2190,6 +2190,7 @@ func (gw *Gateway) handleDeleteOrgKey(orgID string) (interface{}, int) {
 	return statusObj, http.StatusOK
 }
 
+// SW-REQ-126
 func (gw *Gateway) groupResetHandler(w http.ResponseWriter, r *http.Request) {
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
@@ -2210,6 +2211,7 @@ func (gw *Gateway) groupResetHandler(w http.ResponseWriter, r *http.Request) {
 // was in the URL parameters, it will block until the reload is done.
 // Otherwise, it won't block and fn will be called once the reload is
 // finished.
+// SW-REQ-126
 func (gw *Gateway) resetHandler(fn func()) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var wg sync.WaitGroup
@@ -2229,6 +2231,7 @@ func (gw *Gateway) resetHandler(fn func()) http.HandlerFunc {
 	}
 }
 
+// SW-REQ-128
 func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession := new(user.SessionState)
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
@@ -2372,6 +2375,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, obj)
 }
 
+// SW-REQ-128
 func (gw *Gateway) previewKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession := new(user.SessionState)
 
