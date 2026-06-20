@@ -807,6 +807,14 @@ func BenchmarkKeyHandler_CreateKeyHandler(b *testing.B) {
 	}
 }
 
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SYS-REQ-141:determinism:nominal
+// SW-REQ-128:nominal:nominal
+// SW-REQ-128:boundary:nominal
+// SW-REQ-128:determinism:nominal
 func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
 	const testAPIID = "testAPIID"
 	const orgId = "default"

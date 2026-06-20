@@ -950,6 +950,7 @@ func (gw *Gateway) feedKeyListingWorkers(c context.Context, keys []string, jobs 
 	}
 }
 
+// SW-REQ-128
 func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 	sess := &user.SessionState{}
 	err := json.Unmarshal([]byte(sessionString), sess)
@@ -981,6 +982,7 @@ func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 	}).Info("Updated key in slave storage.")
 }
 
+// SW-REQ-128
 func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
 	session, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, false)
 	if !ok {
@@ -1047,6 +1049,7 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 }
 
 // handleDeleteHashedKeyWithLogs is a wrapper for handleDeleteHashedKey with logs
+// SW-REQ-128
 func (gw *Gateway) handleDeleteHashedKeyWithLogs(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
 	res, code := gw.handleDeleteHashedKey(keyName, orgID, apiID, resetQuota)
 
@@ -1067,6 +1070,7 @@ func (gw *Gateway) handleDeleteHashedKeyWithLogs(keyName, orgID, apiID string, r
 	return res, code
 }
 
+// SW-REQ-128
 func (gw *Gateway) handleDeleteHashedKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
 
 	session, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, true)
@@ -1106,14 +1110,17 @@ func (gw *Gateway) handleDeleteHashedKey(keyName, orgID, apiID string, resetQuot
 	return statusObj, http.StatusOK
 }
 
+// SW-REQ-128
 func (gw *Gateway) handleGlobalAddToSortedSet(keyName, value string, score float64) {
 	gw.GlobalSessionManager.Store().AddToSortedSet(keyName, value, score)
 }
 
+// SW-REQ-128
 func (gw *Gateway) handleGetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
 	return gw.GlobalSessionManager.Store().GetSortedSetRange(keyName, scoreFrom, scoreTo)
 }
 
+// SW-REQ-128
 func (gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
 	return gw.GlobalSessionManager.Store().RemoveSortedSetRange(keyName, scoreFrom, scoreTo)
 }

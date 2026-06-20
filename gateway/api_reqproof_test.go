@@ -660,3 +660,134 @@ func TestGatewayKeyManagementListKeys(t *testing.T) {
 	require.Equal(t, http.StatusGatewayTimeout, code)
 	assert.Equal(t, apiError("Request timeout while processing keys"), timeout)
 }
+
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// STK-REQ-053:error_handling:negative
+// STK-REQ-053:error_handling:nominal
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SYS-REQ-141:error_handling:negative
+// SYS-REQ-141:error_handling:nominal
+// SYS-REQ-141:encoding_safety:nominal
+// SYS-REQ-141:determinism:nominal
+// SW-REQ-128:nominal:nominal
+// SW-REQ-128:boundary:nominal
+// SW-REQ-128:error_handling:negative
+// SW-REQ-128:error_handling:nominal
+// SW-REQ-128:encoding_safety:nominal
+// SW-REQ-128:determinism:nominal
+func TestGatewayKeyManagementAddKeyStorageUpdate(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	keyName := ts.Gw.generateToken("default", "add-key")
+	session := CreateStandardSession()
+	payload, err := json.Marshal(session)
+	require.NoError(t, err)
+
+	ts.Gw.handleAddKey(keyName, string(payload), "default")
+
+	stored, found := ts.Gw.GlobalSessionManager.SessionDetail("default", keyName, ts.Gw.GetConfig().HashKeys)
+	require.True(t, found)
+	assert.Equal(t, "default", stored.OrgID)
+	assert.NotEmpty(t, stored.LastUpdated)
+
+	ts.Gw.handleAddKey("malformed-key", "{", "default")
+
+	_, found = ts.Gw.GlobalSessionManager.SessionDetail("default", "malformed-key", ts.Gw.GetConfig().HashKeys)
+	assert.False(t, found)
+
+	orgMismatch := CreateStandardSession()
+	orgMismatch.OrgID = "other"
+	payload, err = json.Marshal(orgMismatch)
+	require.NoError(t, err)
+
+	ts.Gw.handleAddKey("org-mismatch-key", string(payload), "default")
+
+	_, found = ts.Gw.GlobalSessionManager.SessionDetail("default", "org-mismatch-key", ts.Gw.GetConfig().HashKeys)
+	assert.False(t, found)
+}
+
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// STK-REQ-053:error_handling:negative
+// STK-REQ-053:error_handling:nominal
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SYS-REQ-141:error_handling:negative
+// SYS-REQ-141:error_handling:nominal
+// SYS-REQ-141:determinism:nominal
+// SW-REQ-128:nominal:nominal
+// SW-REQ-128:boundary:nominal
+// SW-REQ-128:error_handling:negative
+// SW-REQ-128:error_handling:nominal
+// SW-REQ-128:determinism:nominal
+func TestGatewayKeyManagementDeleteKeys(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	missing, code := ts.Gw.handleDeleteKey("missing-key", "default", "detail-api", false)
+	require.Equal(t, http.StatusNotFound, code)
+	assert.Equal(t, apiError("There is no such key found"), missing)
+
+	keyName := ts.Gw.generateToken("default", "delete-key")
+	session := CreateStandardSession()
+	require.NoError(t, ts.Gw.GlobalSessionManager.UpdateSession(keyName, session, 0, false))
+
+	deleted, code := ts.Gw.handleDeleteKey(keyName, "default", "detail-api", false)
+
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, apiModifyKeySuccess{Key: keyName, Status: "ok", Action: "deleted"}, deleted)
+	_, found := ts.Gw.GlobalSessionManager.SessionDetail("default", keyName, false)
+	assert.False(t, found)
+
+	hashedKey := storage.HashKey(ts.Gw.generateToken("default", "hashed-delete-key"), true)
+	hashedSession := CreateStandardSession()
+	require.NoError(t, ts.Gw.GlobalSessionManager.UpdateSession(hashedKey, hashedSession, 0, true))
+
+	deleted, code = ts.Gw.handleDeleteHashedKeyWithLogs(hashedKey, "default", "detail-api", false)
+
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, apiModifyKeySuccess{Key: hashedKey, Status: "ok", Action: "deleted"}, deleted)
+	_, found = ts.Gw.GlobalSessionManager.SessionDetail("default", hashedKey, true)
+	assert.False(t, found)
+
+	missing, code = ts.Gw.handleDeleteHashedKeyWithLogs("missing-hashed-key", "default", "detail-api", false)
+	require.Equal(t, http.StatusNotFound, code)
+	assert.Equal(t, apiError("There is no such key found"), missing)
+}
+
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// STK-REQ-053:error_handling:nominal
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SYS-REQ-141:error_handling:nominal
+// SYS-REQ-141:determinism:nominal
+// SW-REQ-128:nominal:nominal
+// SW-REQ-128:boundary:nominal
+// SW-REQ-128:error_handling:nominal
+// SW-REQ-128:determinism:nominal
+func TestGatewayKeyManagementSortedSetForwarding(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	setKey := "reqproof-sorted-set-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	ts.Gw.handleGlobalAddToSortedSet(setKey, "first", 1)
+	ts.Gw.handleGlobalAddToSortedSet(setKey, "second", 2)
+
+	values, scores, err := ts.Gw.handleGetSortedSetRange(setKey, "-inf", "+inf")
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"first", "second"}, values)
+	assert.Equal(t, []float64{1, 2}, scores)
+
+	require.NoError(t, ts.Gw.handleRemoveSortedSetRange(setKey, "-inf", "+inf"))
+
+	values, scores, err = ts.Gw.handleGetSortedSetRange(setKey, "-inf", "+inf")
+
+	require.NoError(t, err)
+	assert.Empty(t, values)
+	assert.Empty(t, scores)
+}
