@@ -1,0 +1,51 @@
+id: SW-REQ-039
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal/service/gojsonschema facade shall expose the upstream JSON loader, result, result-error, format-checker, bytes-loader, Go-loader, format-checker registry, and validation symbols so in-process MCP schema validation can load schemas and documents from bytes or Go values, report valid documents, and expose validation errors for invalid documents.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-107
+component: mcp_protocol
+rationale: This software requirement owns only the local facade symbols used by MCP schema validation code. It does not claim correctness of the upstream gojsonschema library, schema completeness, gateway API loading, persistence, session-right retrieval, middleware execution, analytics, network transport behavior, or final HTTP status generation.
+tags:
+    - mcp
+    - schema-validation
+    - facade
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-107
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T00:26:55Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-039 is scoped to the local internal/service/gojsonschema facade used by MCP schema validation: upstream loader/result/error/checker symbol exposure, bytes and Go loaders, validation call, valid result reporting, invalid result error exposure, result-error string access, and format-checker registry availability. Focused internal/service/gojsonschema tests passed with race. This approval does not claim correctness of the upstream gojsonschema library, schema completeness, gateway API loading, persistence, session-right retrieval, middleware execution, analytics, network transport behavior, or final HTTP status generation.'
+        fingerprint: sha256:e3a9efa79010782224cdbaa80f0d92ead5f39dbf97501108399d8648563a0bc3
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T00:26:55Z"
+obligation_checklist:
+    - nominal
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-20T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added gojsonschema facade decomposition under existing MCP schema-validation behavior.
+          changed_by: agent:codex
