@@ -271,6 +271,7 @@ func certMap(certData string, certIDs ...string) map[string]string {
 
 // TestCertificateLoadingWithRetry verifies the exponential backoff retry mechanism
 // for certificate loading when storage is temporarily unavailable.
+// Verifies: STK-REQ-023, SYS-REQ-111, SW-REQ-098
 func TestCertificateLoadingWithRetry(t *testing.T) {
 	certPEM := generateTestCert(t)
 
@@ -354,6 +355,7 @@ func TestCertificateLoadingWithRetry(t *testing.T) {
 }
 
 // TestCertificateLoadingWithFlakyConnection tests handling of intermittent MDCB failures
+// Verifies: STK-REQ-023, SYS-REQ-111, SW-REQ-098
 func TestCertificateLoadingWithFlakyConnection(t *testing.T) {
 	certPEM := generateTestCert(t)
 
@@ -391,6 +393,7 @@ func TestCertificateLoadingWithFlakyConnection(t *testing.T) {
 }
 
 // TestTT14618_MultipleCertificates verifies backoff only happens once for multiple certificates
+// Verifies: STK-REQ-023, SYS-REQ-111, SW-REQ-098
 func TestMultipleCertificatesLoading(t *testing.T) {
 	certPEM := generateTestCert(t)
 
@@ -439,6 +442,7 @@ func TestMultipleCertificatesLoading(t *testing.T) {
 }
 
 // TestTT14618_ScaleWith100Certs tests production-scale scenario with 100 certificates
+// Verifies: STK-REQ-023, SYS-REQ-111, SW-REQ-098
 func TestCertificateLoadingScale100(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping scale test in short mode")
@@ -504,6 +508,7 @@ func TestCertificateLoadingScale100(t *testing.T) {
 }
 
 // TestTT14618_ScaleWith1000Certs tests enterprise-scale scenario with 1000 certificates
+// Verifies: STK-REQ-023, SYS-REQ-111, SW-REQ-098
 func TestCertificateLoadingScale1000(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping large scale test in short mode")
@@ -680,6 +685,7 @@ func BenchmarkCertificateCacheHit(b *testing.B) {
 }
 
 // TestMaxRetriesLimit verifies that the maxRetries configuration limits retry attempts correctly
+// Verifies: STK-REQ-023, SYS-REQ-111, SW-REQ-098
 func TestMaxRetriesLimit(t *testing.T) {
 	certPEM := generateTestCert(t)
 
@@ -777,6 +783,7 @@ func TestMaxRetriesLimit(t *testing.T) {
 }
 
 // TestRetryEnabledFlag verifies that retry can be disabled via the retryEnabled flag
+// Verifies: STK-REQ-023, SYS-REQ-111, SW-REQ-098
 func TestRetryEnabledFlag(t *testing.T) {
 	certPEM := generateTestCert(t)
 
@@ -853,6 +860,7 @@ func TestRetryEnabledFlag(t *testing.T) {
 }
 
 // TestConfigDefaults verifies that default values are used correctly
+// Verifies: STK-REQ-023, SYS-REQ-111, SW-REQ-098
 func TestConfigDefaults(t *testing.T) {
 	certPEM := generateTestCert(t)
 

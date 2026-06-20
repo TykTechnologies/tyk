@@ -8,6 +8,7 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
+// Verifies: STK-REQ-023, SYS-REQ-111, SW-REQ-098
 func TestCertificateManager_GetRaw(t *testing.T) {
 	t.Run("returns cert from storage", func(t *testing.T) {
 		store := storage.NewDummyStorage()

@@ -59,6 +59,7 @@ func leafSubjectName(cert *tls.Certificate) string {
 	return cert.Leaf.Subject.CommonName
 }
 
+// Verifies: STK-REQ-023, SYS-REQ-111, SW-REQ-098
 func TestAddCertificate(t *testing.T) {
 	m := newManager()
 
@@ -116,6 +117,7 @@ func TestAddCertificate(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-023, SYS-REQ-111, SW-REQ-098
 func TestCertificateStorage(t *testing.T) {
 	m := newManager()
 	dir, _ := ioutil.TempDir("", "certs")
@@ -191,6 +193,7 @@ func TestCertificateStorage(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-023, SYS-REQ-111, SW-REQ-098
 func TestStorageIndex(t *testing.T) {
 	m := newManager()
 	storageCert, _ := genCertificateFromCommonName("dummy", false)
@@ -226,6 +229,7 @@ func TestStorageIndex(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-023, SYS-REQ-111, SW-REQ-098
 func TestToCertificateBasics(t *testing.T) {
 	now := time.Now()
 
