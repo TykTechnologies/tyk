@@ -23,7 +23,7 @@ variables:
 traces:
     satisfies:
         - STK-REQ-054
-    reviewed_at: "2026-06-20T20:34:41.2492Z"
+    reviewed_at: "2026-06-20T20:43:00.686458Z"
     reviewed_by: human:buger
     reviewed_fingerprint: sha256:4ea8c2a0d33d4d7ee3954adee8c67bd2e28e7616c4a045812039c458311d4913
 verification:
@@ -37,14 +37,14 @@ verification:
         comment: >-
             Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway policy management system scope is limited to local helper terminality for loaded-policy lookup/listing, tested policy route-dispatch wrappers, policy storage root selection, file-backed policy add/update status handling for malformed input, invalid or mismatched IDs, service policy-source rejection, missing IDs, storage-root errors, successful writes, and file-backed policy deletion status handling. The FRETish invariant intentionally models local operation terminality without asserting policy engine merge semantics, policy reload propagation, dashboard behavior, distributed synchronization, storage durability, filesystem permissions beyond returned helper errors, or final client-visible gateway authorization behavior.
         ai_generated: false
-    gaps_reviewed_at: "2026-06-20T19:58:42Z"
+    gaps_reviewed_at: "2026-06-20T20:43:32.949625Z"
     gaps_reviewed_by: human:buger
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-142|gateway_policy_management_operation_terminal
           reviewer: human:buger
-          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after requirement approval. SYS-REQ-142''s gateway_policy_management_operation_terminal variable is decomposed by SW-REQ-129 for local gateway/api.go helper behavior: loaded-policy lookup/listing, tested policy route-dispatch wrappers, policy storage root selection, file-backed policy add/update status handling for malformed input, invalid or mismatched IDs, service policy-source rejection, missing IDs, storage-root errors, successful writes, and file-backed policy deletion status handling. This review is limited to local helper mechanics and does not claim policy engine merge semantics, policy reload propagation, dashboard behavior, distributed synchronization, storage durability, filesystem permissions beyond returned helper errors, or final client-visible gateway authorization behavior.'
-          reviewed_at: "2026-06-20T19:58:42Z"
+          reason: 'Reviewed after gateway policy-management scope extension; SW-REQ-129 decomposes gateway_policy_management_operation_terminal for the local helper and tested route-dispatch behavior now claimed.'
+          reviewed_at: "2026-06-20T20:43:32.949625Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T19:58:42Z"

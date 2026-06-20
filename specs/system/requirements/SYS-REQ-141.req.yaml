@@ -38,14 +38,14 @@ verification:
         comment: >-
             Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway key management system scope is limited to local helper terminality for basic-auth hash algorithm selection and password storage transformation, key add/update request decoding and explicit error status handling, local add-key storage updates gated by organization, key detail retrieval with quota remaining calculation and basic-auth password redaction, key-list retrieval/filtering, context-cancellation timeout reporting, internal quota/rate key exclusion, raw and hashed key deletion status handling with optional quota reset, and RPC sorted-set forwarding. The FRETish invariant intentionally models local operation terminality without asserting password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
         ai_generated: false
-    gaps_reviewed_at: "2026-06-20T19:36:28Z"
+    gaps_reviewed_at: "2026-06-20T20:45:32.916935Z"
     gaps_reviewed_by: human:buger
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-141|gateway_key_management_operation_terminal
           reviewer: human:buger
-          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after requirement approval. SYS-REQ-141''s gateway_key_management_operation_terminal variable is decomposed by SW-REQ-128 for local gateway/api.go helper behavior: basic-auth hash algorithm selection and password storage transformation, key add/update request decoding and explicit error status handling, local add-key storage updates gated by organization, key detail retrieval with quota remaining calculation and basic-auth password redaction, key-list retrieval/filtering, context-cancellation timeout reporting, internal quota/rate key exclusion, raw and hashed key deletion status handling with optional quota reset, and RPC sorted-set forwarding. This review is limited to local helper mechanics and does not claim password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.'
-          reviewed_at: "2026-06-20T19:36:28Z"
+          reason: 'Reviewed after gateway key-management proof expansion; SW-REQ-128 decomposes gateway_key_management_operation_terminal for the local helper behavior currently claimed.'
+          reviewed_at: "2026-06-20T20:45:32.916935Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T19:36:28Z"
