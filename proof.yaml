@@ -180,6 +180,8 @@ project:
             - apidef/oas/track_endpoint_reqproof_test.go
             - apidef/oas/tyk_streaming_extension.go
             - apidef/oas/tyk_streaming_extension_reqproof_test.go
+            - apidef/oas/url_rewrite.go
+            - apidef/oas/url_rewrite_reqproof_test.go
             - apidef/oas/validator.go
             - apidef/oas/validator_reqproof_test.go
             - apidef/rate_limit_smoothing.go

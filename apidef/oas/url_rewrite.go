@@ -7,6 +7,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// SW-REQ-063
 // URLRewrite configures URL rewriting.
 // Tyk classic API definition: `version_data.versions..extended_paths.url_rewrite`.
 type URLRewrite struct {
@@ -25,6 +26,7 @@ type URLRewrite struct {
 	Triggers []*URLRewriteTrigger `bson:"triggers,omitempty" json:"triggers,omitempty"`
 }
 
+// SW-REQ-063
 // URLRewriteInput defines the input for an URL rewrite rule.
 // Tyk classic API definition: Input source for URL rewrite rules in `version_data.versions..extended_paths.url_rewrite[].triggers[].options`.
 //
@@ -41,6 +43,7 @@ type URLRewrite struct {
 // The default `url` is used as the input source.
 type URLRewriteInput string
 
+// SW-REQ-063
 // URLRewriteCondition defines the matching mode for an URL rewrite rules.
 // Tyk classic API definition: Matching condition in `version_data.versions..extended_paths.url_rewrite[].triggers[].on`.
 //
@@ -48,6 +51,7 @@ type URLRewriteInput string
 // - Value `all` means all the defined trigger rules must match.
 type URLRewriteCondition string
 
+// SW-REQ-063
 // Enumerated constants for inputs and conditions.
 const (
 	InputQuery           URLRewriteInput = "query"
@@ -62,12 +66,14 @@ const (
 )
 
 var (
+	// SW-REQ-063
 	// URLRewriteConditions contains all valid URL rewrite condition values.
 	URLRewriteConditions = []URLRewriteCondition{
 		ConditionAll,
 		ConditionAny,
 	}
 
+	// SW-REQ-063
 	// URLRewriteInputs contains all valid URL rewrite input values.
 	URLRewriteInputs = []URLRewriteInput{
 		InputQuery,
@@ -79,6 +85,7 @@ var (
 	}
 )
 
+// SW-REQ-063
 // URLRewriteTrigger represents a set of matching rules for a rewrite.
 // Tyk classic API definition: `version_data.versions..extended_paths.url_rewrite[].triggers`.
 type URLRewriteTrigger struct {
@@ -95,6 +102,7 @@ type URLRewriteTrigger struct {
 	RewriteTo string `bson:"rewriteTo" json:"rewriteTo"`
 }
 
+// SW-REQ-063
 // URLRewriteRule represents a rewrite matching rules.
 // Tyk classic API definition: `version_data.versions..extended_paths.url_rewrite[].triggers[].options`.
 type URLRewriteRule struct {
@@ -119,6 +127,7 @@ type URLRewriteRule struct {
 	Negate bool `bson:"negate,omitempty" json:"negate,omitempty"`
 }
 
+// SW-REQ-063
 // Fill fills *URLRewrite receiver from apidef.URLRewriteMeta.
 func (v *URLRewrite) Fill(meta apidef.URLRewriteMeta) {
 	v.Enabled = !meta.Disabled
@@ -134,6 +143,7 @@ func (v *URLRewrite) Fill(meta apidef.URLRewriteMeta) {
 	v.Sort()
 }
 
+// SW-REQ-063
 func (v *URLRewrite) fillTriggers(from []apidef.RoutingTrigger) []*URLRewriteTrigger {
 	result := make([]*URLRewriteTrigger, 0)
 	for _, t := range from {
@@ -152,6 +162,7 @@ func (v *URLRewrite) fillTriggers(from []apidef.RoutingTrigger) []*URLRewriteTri
 	return result
 }
 
+// SW-REQ-063
 // Sort reorders the internal trigger rules.
 func (v *URLRewrite) Sort() {
 	for _, t := range v.Triggers {
@@ -169,6 +180,7 @@ func (v *URLRewrite) Sort() {
 	}
 }
 
+// SW-REQ-063
 func (v *URLRewrite) fillRules(from apidef.RoutingTriggerOptions) []*URLRewriteRule {
 	result := []*URLRewriteRule{}
 
@@ -185,6 +197,7 @@ func (v *URLRewrite) fillRules(from apidef.RoutingTriggerOptions) []*URLRewriteR
 	return result
 }
 
+// SW-REQ-063
 func (*URLRewrite) appendRules(rules *[]*URLRewriteRule, from map[string]apidef.StringRegexMap, in URLRewriteInput) {
 	for name, v := range from {
 		if v.Empty() {
@@ -201,6 +214,7 @@ func (*URLRewrite) appendRules(rules *[]*URLRewriteRule, from map[string]apidef.
 	}
 }
 
+// SW-REQ-063
 // ExtractTo fills *apidef.URLRewriteMeta from *URLRewrite.
 func (v *URLRewrite) ExtractTo(dest *apidef.URLRewriteMeta) {
 	dest.Disabled = !v.Enabled
@@ -212,6 +226,7 @@ func (v *URLRewrite) ExtractTo(dest *apidef.URLRewriteMeta) {
 	}
 }
 
+// SW-REQ-063
 func (v *URLRewrite) extractTriggers() []apidef.RoutingTrigger {
 	triggers := make([]apidef.RoutingTrigger, len(v.Triggers))
 	for i, trigger := range v.Triggers {
@@ -225,6 +240,7 @@ func (v *URLRewrite) extractTriggers() []apidef.RoutingTrigger {
 	return triggers
 }
 
+// SW-REQ-063
 func (*URLRewrite) extractTriggerOptions(rules []*URLRewriteRule) apidef.RoutingTriggerOptions {
 	result := apidef.NewRoutingTriggerOptions()
 
@@ -253,6 +269,7 @@ func (*URLRewrite) extractTriggerOptions(rules []*URLRewriteRule) apidef.Routing
 	return result
 }
 
+// SW-REQ-063
 // Valid returns true if the type value matches valid values, false otherwise.
 func (i URLRewriteInput) Valid() bool {
 	switch i {
@@ -262,6 +279,7 @@ func (i URLRewriteInput) Valid() bool {
 	return false
 }
 
+// SW-REQ-063
 // Index returns the cardinal order for the value. Used for sorting.
 func (i URLRewriteInput) Index() int {
 	for k, v := range URLRewriteInputs {
@@ -272,6 +290,7 @@ func (i URLRewriteInput) Index() int {
 	return -1
 }
 
+// SW-REQ-063
 // Err returns an error if the type value is invalid, nil otherwise.
 func (i URLRewriteInput) Err() error {
 	if !i.Valid() {
@@ -280,6 +299,7 @@ func (i URLRewriteInput) Err() error {
 	return nil
 }
 
+// SW-REQ-063
 func (s *OAS) fillURLRewrite(metas []apidef.URLRewriteMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
@@ -296,6 +316,7 @@ func (s *OAS) fillURLRewrite(metas []apidef.URLRewriteMeta) {
 	}
 }
 
+// SW-REQ-063
 func (o *Operation) extractURLRewriteTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.URLRewrite == nil {
 		return

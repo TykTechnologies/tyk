@@ -21,6 +21,7 @@
 <!-- documents SW-REQ-060 -->
 <!-- documents SW-REQ-061 -->
 <!-- documents SW-REQ-062 -->
+<!-- documents SW-REQ-063 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -30,7 +31,7 @@ admission, or the full API definition lifecycle.
 `SYS-REQ-104` covers API-definition support model helpers that preserve typed
 health-check wire values, host-list access behavior, and error-override helper
 state, embedded Classic API definition schema data, OAS path/server helper
-shapes, OAS root extension helper shapes, OAS server model helper shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
+shapes, OAS root extension helper shapes, OAS server model helper shapes, OAS URL rewrite helper shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint
 helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes,
 OAS deprecated-wrapper conversion shapes, OAS Tyk streaming extension shape, OAS event-handler helper shapes,
@@ -253,3 +254,15 @@ activity log emission, detailed tracing export, IP access-control enforcement,
 batch request execution, full API import, full OAS conversion, route
 generation, gateway request admission, middleware execution, or final
 client-visible routing behavior.
+
+`SW-REQ-063` owns the concrete `apidef/oas` URL rewrite data shape and Classic
+metadata conversion helpers. Its evidence covers Classic URL rewrite metadata
+Fill and ExtractTo behavior, header, query, path, session metadata, request
+body, and request context trigger rule mapping, empty trigger and operation
+rewrite omission, deterministic input-kind and name sorting, URL rewrite input
+validation, invalid-value error reporting, and operation-level fill/extract
+hooks. This evidence does not claim gateway route matching, regular-expression
+execution, request URL rewriting at runtime, request-context extraction,
+session metadata lookup, middleware execution, API import, full OAS conversion,
+route generation, gateway request admission, upstream request dispatch, or
+final client-visible routing behavior.
