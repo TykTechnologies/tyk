@@ -54,7 +54,7 @@ func (streamTestAnalyticsFactory) CreateResponseWriter(w http.ResponseWriter, _ 
 // SW-REQ-114:boundary:nominal
 // SW-REQ-114:determinism:nominal
 //
-//mcdc:ignore SYS-REQ-127: enterprise_stream_operation_terminal=F => FALSE -- the onboarded stream middleware operations are synchronous local helpers that either return a value, return an explicit error, or update deterministic in-memory state before returning; a non-terminal result is not a reachable runtime state for these APIs [reviewed: human:buger]
+//mcdc:ignore SYS-REQ-127: enterprise_stream_operation_terminal=F => FALSE -- the onboarded stream middleware operations are synchronous local helpers that either return a value, return an explicit error, or update deterministic in-memory state before returning; a non-terminal result is not a reachable runtime state for these APIs [category: defensive] [reviewed: human:buger]
 func TestEnterpriseStreamsLocalHelpersPreserveBehavior(t *testing.T) {
 	t.Run("HTTP path extraction covers defaults brokers and deduplication", func(t *testing.T) {
 		tests := []struct {

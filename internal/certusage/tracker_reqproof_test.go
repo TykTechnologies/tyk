@@ -27,7 +27,7 @@ var _ Tracker = reqproofTracker{}
 // SW-REQ-118:boundary:nominal
 // SW-REQ-118:determinism:nominal
 //
-//mcdc:ignore SYS-REQ-131: certificate_usage_tracker_contract_available=F => FALSE -- the onboarded certificate usage tracker operation is a local Go interface contract that is either compile-time available with the Required and APIs method signatures or the package fails to compile; a runtime unavailable contract state is not reachable for these APIs [reviewed: human:buger]
+//mcdc:ignore SYS-REQ-131: certificate_usage_tracker_contract_available=F => FALSE -- the onboarded certificate usage tracker operation is a local Go interface contract that is either compile-time available with the Required and APIs method signatures or the package fails to compile; a runtime unavailable contract state is not reachable for these APIs [category: defensive] [reviewed: human:buger]
 func TestTrackerInterfaceContractPreservesLocalLookupShape(t *testing.T) {
 	tracker := Tracker(reqproofTracker{
 		required: map[string]bool{

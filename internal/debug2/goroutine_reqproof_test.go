@@ -18,7 +18,7 @@ func recordFromDump(dump string) *Record {
 // SW-REQ-119:boundary:nominal
 // SW-REQ-119:determinism:nominal
 //
-//mcdc:ignore SYS-REQ-132: goroutine_debug_record_operation_terminal=F => FALSE -- the onboarded goroutine debug record operations are synchronous local helpers that either parse records, apply ignore filtering, return a diff record, return a count, or format a string before returning; a non-terminal result is not a reachable runtime state for these APIs [reviewed: human:buger]
+//mcdc:ignore SYS-REQ-132: goroutine_debug_record_operation_terminal=F => FALSE -- the onboarded goroutine debug record operations are synchronous local helpers that either parse records, apply ignore filtering, return a diff record, return a count, or format a string before returning; a non-terminal result is not a reachable runtime state for these APIs [category: defensive] [reviewed: human:buger]
 func TestGoroutineDebugRecordPreservesLocalBehavior(t *testing.T) {
 	const baselineDump = `1 @ 0x100
 main.first()

@@ -42,7 +42,7 @@ func upstreamBasicAuthSpec(auth apidef.UpstreamAuth) *APISpec {
 // SW-REQ-115:boundary:nominal
 // SW-REQ-115:determinism:nominal
 //
-//mcdc:ignore SYS-REQ-128: upstream_basic_auth_operation_terminal=F => FALSE -- the onboarded upstream basic auth operations are synchronous local helpers that either return an enablement decision, install a provider in request context, or update a request header before returning; a non-terminal result is not a reachable runtime state for these APIs [reviewed: human:buger]
+//mcdc:ignore SYS-REQ-128: upstream_basic_auth_operation_terminal=F => FALSE -- the onboarded upstream basic auth operations are synchronous local helpers that either return an enablement decision, install a provider in request context, or update a request header before returning; a non-terminal result is not a reachable runtime state for these APIs [category: defensive] [reviewed: human:buger]
 func TestUpstreamBasicAuthMiddlewarePreservesLocalBehavior(t *testing.T) {
 	t.Run("enabled for spec requires global upstream auth and basic auth enablement", func(t *testing.T) {
 		tests := []struct {

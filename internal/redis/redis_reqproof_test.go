@@ -26,7 +26,7 @@ import (
 // SW-REQ-121:boundary:nominal
 // SW-REQ-121:determinism:nominal
 //
-//mcdc:ignore SYS-REQ-134: redis_aliases_available=F => FALSE -- the onboarded Redis alias package initializes exported aliases at package load time; unavailable aliases would be a compile-time or package-initialization failure rather than a reachable runtime state for this local proof slice [reviewed: human:buger]
+//mcdc:ignore SYS-REQ-134: redis_aliases_available=F => FALSE -- the onboarded Redis alias package initializes exported aliases at package load time; unavailable aliases would be a compile-time or package-initialization failure rather than a reachable runtime state for this local proof slice [category: defensive] [reviewed: human:buger]
 func TestRedisAliasesExposeUpstreamSymbols(t *testing.T) {
 	t.Run("constructor aliases preserve upstream function identity", func(t *testing.T) {
 		tests := []struct {

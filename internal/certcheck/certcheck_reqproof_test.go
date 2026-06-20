@@ -21,7 +21,7 @@ import (
 // SW-REQ-117:boundary:nominal
 // SW-REQ-117:determinism:nominal
 //
-//mcdc:ignore SYS-REQ-130: certificate_expiry_monitor_operation_terminal=F => FALSE -- the onboarded certificate expiry monitor operations are synchronous local helpers that either update local batch state, return cooldown/cache status, classify certificate timing, preserve role/configuration fields, convert durations, or construct event metadata/messages before returning; a non-terminal result is not a reachable runtime state for these APIs [reviewed: human:buger]
+//mcdc:ignore SYS-REQ-130: certificate_expiry_monitor_operation_terminal=F => FALSE -- the onboarded certificate expiry monitor operations are synchronous local helpers that either update local batch state, return cooldown/cache status, classify certificate timing, preserve role/configuration fields, convert durations, or construct event metadata/messages before returning; a non-terminal result is not a reachable runtime state for these APIs [category: defensive] [reviewed: human:buger]
 func TestCertificateExpiryMonitorPreservesLocalBehavior(t *testing.T) {
 	t.Run("batch deduplicates and drains queued certificates", func(t *testing.T) {
 		batch := NewBatch()

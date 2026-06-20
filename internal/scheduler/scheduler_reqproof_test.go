@@ -40,7 +40,7 @@ import (
 // SW-REQ-120:concurrent:race
 // SW-REQ-120:determinism:nominal
 //
-//mcdc:ignore SYS-REQ-133: scheduler_local_operation_terminal=F => FALSE -- the onboarded scheduler operations are synchronous local construction, logger decoration, start-loop termination, context shutdown, or close operations that return observable values or return from Start; a non-terminal local operation result is not a reachable API state in this proof slice [reviewed: human:buger]
+//mcdc:ignore SYS-REQ-133: scheduler_local_operation_terminal=F => FALSE -- the onboarded scheduler operations are synchronous local construction, logger decoration, start-loop termination, context shutdown, or close operations that return observable values or return from Start; a non-terminal local operation result is not a reachable API state in this proof slice [category: defensive] [reviewed: human:buger]
 func TestSchedulerPreservesLocalOperationBehavior(t *testing.T) {
 	t.Run("constructs jobs and scheduler logger deterministically", func(t *testing.T) {
 		run := func() error { return nil }

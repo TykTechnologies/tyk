@@ -17,7 +17,7 @@ import (
 // SW-REQ-116:boundary:nominal
 // SW-REQ-116:determinism:nominal
 //
-//mcdc:ignore SYS-REQ-129: crypto_helper_operation_terminal=F => FALSE -- the onboarded crypto helper operations are synchronous local helpers that either return mapped data, parsed token fields, generated artifacts, explicit empty/error outcomes, or deterministic in-memory certificate-pool updates before returning; a non-terminal result is not a reachable runtime state for these APIs [reviewed: human:buger]
+//mcdc:ignore SYS-REQ-129: crypto_helper_operation_terminal=F => FALSE -- the onboarded crypto helper operations are synchronous local helpers that either return mapped data, parsed token fields, generated artifacts, explicit empty/error outcomes, or deterministic in-memory certificate-pool updates before returning; a non-terminal result is not a reachable runtime state for these APIs [category: defensive] [reviewed: human:buger]
 func TestCryptoHelpersPreserveLocalBehavior(t *testing.T) {
 	t.Run("hash key returns raw or hashed value", func(t *testing.T) {
 		tests := []struct {
