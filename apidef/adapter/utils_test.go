@@ -8,6 +8,9 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-068
+// SW-REQ-068:nominal:nominal
+// SW-REQ-068:boundary:nominal
 func TestIsSupergraphAPIDefinition(t *testing.T) {
 	type testInput struct {
 		graphQLEnabled bool
@@ -65,6 +68,9 @@ func TestIsSupergraphAPIDefinition(t *testing.T) {
 	))
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-068
+// SW-REQ-068:nominal:nominal
+// SW-REQ-068:boundary:nominal
 func TestIsProxyOnlyAPIDefinition(t *testing.T) {
 	type testInput struct {
 		graphQLEnabled bool
@@ -122,6 +128,9 @@ func TestIsProxyOnlyAPIDefinition(t *testing.T) {
 	))
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-068
+// SW-REQ-068:nominal:nominal
+// SW-REQ-068:boundary:nominal
 func TestIsUniversalDataGraphAPIDefinition(t *testing.T) {
 	type testInput struct {
 		graphQLEnabled bool
@@ -179,6 +188,9 @@ func TestIsUniversalDataGraphAPIDefinition(t *testing.T) {
 	))
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-068
+// SW-REQ-068:nominal:nominal
+// SW-REQ-068:boundary:nominal
 func TestGraphqlEngineAdapterTypeFromApiDefinition(t *testing.T) {
 	type testInput struct {
 		executionMode  apidef.GraphQLExecutionMode

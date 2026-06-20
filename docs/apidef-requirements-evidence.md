@@ -23,6 +23,7 @@
 <!-- documents SW-REQ-062 -->
 <!-- documents SW-REQ-063 -->
 <!-- documents SW-REQ-065 -->
+<!-- documents SW-REQ-068 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -39,8 +40,9 @@ OAS deprecated-wrapper conversion shapes, OAS Tyk streaming extension shape, OAS
 OAS server-regeneration helper shapes,
 internal reflection support helper behavior,
 custom middleware definition enablement classification, OAS extension header
-name/value helper shapes, and OAS extension error-override helper shapes without silent
-data-shape drift.
+name/value helper shapes, OAS extension error-override helper shapes, and
+adapter interface and GraphQL utility helper behavior without silent data-shape
+drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -280,3 +282,17 @@ does not claim arbitrary reflection correctness, upstream clone library
 correctness beyond wrapper behavior under test, full OAS conversion, API
 import, route generation, gateway request admission, middleware execution,
 persistence, or client-visible runtime behavior.
+
+`SW-REQ-068` owns the concrete `apidef/adapter` import interface and GraphQL
+utility helpers used by API-definition adapter flows. Its evidence covers the
+ImportAdapter API-definition/error result shape, enabled and disabled GraphQL
+adapter classification for proxy-only, subgraph-as-proxy-only, supergraph,
+universal data graph, and unknown modes; construction of new GraphQL API
+definitions with active execution-engine defaults, initialized proxy auth
+headers, generated API IDs, default version metadata, and strip-listen-path
+behavior; and deterministic name sorting for field configurations and data
+sources. This evidence does not claim AsyncAPI or OpenAPI import correctness,
+GraphQL schema parsing, GraphQL engine configuration generation, gateway API
+loading, route generation, request matching, gateway request admission,
+middleware execution, upstream GraphQL execution, persistence, analytics, or
+final client-visible runtime behavior.

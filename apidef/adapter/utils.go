@@ -7,8 +7,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
+// SW-REQ-068
 type GraphQLEngineAdapterType int
 
+// SW-REQ-068
 const (
 	GraphQLEngineAdapterTypeUnknown = iota
 	GraphQLEngineAdapterTypeProxyOnly
@@ -16,19 +18,23 @@ const (
 	GraphQLEngineAdapterTypeUniversalDataGraph
 )
 
+// SW-REQ-068
 func isSupergraphAPIDefinition(apiDefinition *apidef.APIDefinition) bool {
 	return apiDefinition.GraphQL.Enabled && apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
 }
 
+// SW-REQ-068
 func isProxyOnlyAPIDefinition(apiDefinition *apidef.APIDefinition) bool {
 	return apiDefinition.GraphQL.Enabled &&
 		(apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly || apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph)
 }
 
+// SW-REQ-068
 func isUniversalDataGraphAPIDefinition(apiDefinition *apidef.APIDefinition) bool {
 	return apiDefinition.GraphQL.Enabled && apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeExecutionEngine
 }
 
+// SW-REQ-068
 func graphqlEngineAdapterTypeFromApiDefinition(apiDefinition *apidef.APIDefinition) GraphQLEngineAdapterType {
 	if isProxyOnlyAPIDefinition(apiDefinition) {
 		return GraphQLEngineAdapterTypeProxyOnly
@@ -45,6 +51,7 @@ func graphqlEngineAdapterTypeFromApiDefinition(apiDefinition *apidef.APIDefiniti
 	return GraphQLEngineAdapterTypeUnknown
 }
 
+// SW-REQ-068
 func newApiDefinition(name, orgId string) *apidef.APIDefinition {
 	return &apidef.APIDefinition{
 		Name:   name,
@@ -78,12 +85,14 @@ func newApiDefinition(name, orgId string) *apidef.APIDefinition {
 	}
 }
 
+// SW-REQ-068
 func sortFieldConfigsByName(apiDefinition *apidef.APIDefinition) {
 	sort.Slice(apiDefinition.GraphQL.Engine.FieldConfigs, func(i, j int) bool {
 		return apiDefinition.GraphQL.Engine.FieldConfigs[i].FieldName < apiDefinition.GraphQL.Engine.FieldConfigs[j].FieldName
 	})
 }
 
+// SW-REQ-068
 func sortDataSourcesByName(apiDefinition *apidef.APIDefinition) {
 	sort.Slice(apiDefinition.GraphQL.Engine.DataSources, func(i, j int) bool {
 		return apiDefinition.GraphQL.Engine.DataSources[i].Name < apiDefinition.GraphQL.Engine.DataSources[j].Name
