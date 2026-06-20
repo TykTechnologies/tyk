@@ -7,6 +7,7 @@
 <!-- documents SW-REQ-033 -->
 <!-- documents SW-REQ-042 -->
 <!-- documents SW-REQ-044 -->
+<!-- documents SW-REQ-045 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -16,8 +17,8 @@ admission, or the full API definition lifecycle.
 `SYS-REQ-104` covers API-definition support model helpers that preserve typed
 health-check wire values, host-list access behavior, and error-override helper
 state, embedded Classic API definition schema data, OAS path/server helper
-shapes, and OAS schema visitor/unicode-escape helper behavior without silent
-data-shape drift.
+shapes, OAS schema visitor/unicode-escape helper behavior, and custom
+middleware definition enablement classification without silent data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -69,3 +70,12 @@ preservation. This evidence does not claim full API-definition validation,
 schema completeness, API import, OAS conversion, route generation, request
 matching, gateway request admission, or correctness of the upstream OpenAPI
 library.
+
+`SW-REQ-045` owns the concrete `internal/middleware.Enabled` helper for
+custom-middleware definition enablement classification. Its evidence covers
+empty definition lists, disabled named definitions, unnamed definitions, mixed
+lists with no enabled named definition, named enabled definitions, and mixed
+lists where one enabled named definition makes the helper return enabled. This
+evidence does not claim middleware chain construction, plugin loading,
+middleware execution, response interruption status codes, gateway request
+handling, or final client-visible middleware behavior.

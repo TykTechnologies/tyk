@@ -1,0 +1,51 @@
+id: SW-REQ-045
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal/middleware custom-middleware enablement helper shall report middleware definitions as enabled only when at least one configured definition has a non-empty name and is not disabled, and shall report disabled for empty definition lists, disabled named definitions, unnamed definitions, and mixed lists that contain no enabled named definition.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: internal/middleware/middleware_test.go; docs/apidef-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-104
+component: model
+rationale: This software requirement owns only the local helper that interprets API-definition custom middleware definition shape for enablement checks. It does not claim middleware chain construction, plugin loading, middleware execution, response interruption status codes, gateway request handling, or final client-visible middleware behavior.
+tags:
+    - api-definition
+    - middleware
+    - custom-middleware
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-104
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T01:08:12Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-045 is scoped to local internal/middleware custom middleware definition enablement classification: empty lists, disabled named definitions, unnamed definitions, mixed lists with no enabled named definition, named enabled definitions, and mixed lists where one enabled named definition makes the helper return enabled. SYS-REQ-104 description was refreshed only to include this helper boundary. Focused internal/middleware tests passed with race. This approval does not claim middleware chain construction, plugin loading, middleware execution, response interruption status codes, gateway request handling, or final client-visible middleware behavior.'
+        fingerprint: sha256:9aca5834286310122fd404f95c8eacdb3e002611d40e71ef4b9288cb37bd807e
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T01:08:12Z"
+obligation_checklist:
+    - nominal
+    - boundary
+lifecycle:
+    change_history:
+        - date: "2026-06-20T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added internal/middleware custom middleware definition enablement helper decomposition under API-definition support helper behavior.
+          changed_by: agent:codex

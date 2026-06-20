@@ -6,6 +6,9 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-045
+// SW-REQ-045:nominal:nominal
+// SW-REQ-045:boundary:boundary
 func TestEnabled(t *testing.T) {
 	tests := []struct {
 		name string
@@ -13,7 +16,12 @@ func TestEnabled(t *testing.T) {
 		want bool
 	}{
 		{
-			name: "disabled",
+			name: "empty definitions",
+			mws:  nil,
+			want: false,
+		},
+		{
+			name: "named disabled definition",
 			mws: []apidef.MiddlewareDefinition{
 				{
 					Disabled: true,
@@ -24,7 +32,7 @@ func TestEnabled(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "enabled with empty name and path",
+			name: "enabled flag with empty name",
 			mws: []apidef.MiddlewareDefinition{
 				{
 					Disabled: false,
@@ -33,20 +41,41 @@ func TestEnabled(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "enabled with empty name and path",
+			name: "only unnamed and disabled definitions",
 			mws: []apidef.MiddlewareDefinition{
 				{
 					Disabled: false,
+				},
+				{
+					Disabled: true,
+					Name:     "mwFunc",
 				},
 			},
 			want: false,
 		},
 		{
-			name: "enabled",
+			name: "named enabled definition",
 			mws: []apidef.MiddlewareDefinition{
 				{
 					Disabled: false,
 					Name:     "mwFunc",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "mixed definitions with one enabled",
+			mws: []apidef.MiddlewareDefinition{
+				{
+					Disabled: true,
+					Name:     "mwDisabled",
+				},
+				{
+					Disabled: false,
+				},
+				{
+					Disabled: false,
+					Name:     "mwEnabled",
 				},
 			},
 			want: true,
