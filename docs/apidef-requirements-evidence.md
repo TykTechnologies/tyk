@@ -47,6 +47,7 @@
 <!-- documents SW-REQ-089 -->
 <!-- documents SW-REQ-090 -->
 <!-- documents SW-REQ-091 -->
+<!-- documents SW-REQ-092 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -62,8 +63,8 @@ conversion behavior, Classic API definition migration helper behavior,
 notification helper behavior, OAS authentication helper shapes, OAS path/server
 helper shapes, OAS default-extension helper shapes, OAS middleware helper
 shapes, OAS root document helper behavior, OAS operation document helper
-behavior, OAS root extension helper shapes, OAS server model helper shapes,
-OAS URL rewrite helper shapes,
+behavior, OAS security document helper behavior, OAS root extension helper
+shapes, OAS server model helper shapes, OAS URL rewrite helper shapes,
 OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint
 helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes,
@@ -84,8 +85,8 @@ behavior, and importer source dispatcher behavior, without silent data-shape
 drift, plus Swagger importer conversion behavior and WSDL importer conversion
 behavior, plus Classic API definition migration helper behavior and
 notification helper behavior, plus OAS authentication helper behavior.
-It also includes OAS default-extension, middleware, root document, and
-operation document helper behavior.
+It also includes OAS default-extension, middleware, root document, operation
+document, and security document helper behavior.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -619,6 +620,21 @@ evidence does not claim gateway routing, request matching, request admission,
 runtime middleware execution, request validation execution, mock-response
 execution, upstream availability, persistence, analytics, or final
 client-visible behavior.
+
+`SW-REQ-092` owns the concrete `apidef/oas/security.go` security document
+helpers. Its evidence covers token, JWT, basic, OAuth, and external-OAuth
+helper shapes; import and normalization defaults for authentication helper
+structs; JWT validation, introspection, introspection-cache, notification, and
+request-body credential extraction shape conversion; API-key and OAuth
+OpenAPI security-scheme construction and extraction; Tyk proprietary auth
+classification; OAS versus vendor-extension security requirement partitioning
+and recombination; aggregate Classic API definition security fill/extract
+coordination; JWT configuration lookup across legacy and compliant security
+processing modes; and Classic security-field reset behavior. This evidence
+does not claim token validation, signature verification, certificate
+validation, OAuth/OIDC provider execution, custom plugin execution, OpenAPI
+security evaluation semantics, gateway request admission, persistence,
+analytics, or final runtime authentication behavior.
 
 `SW-REQ-086` owns the concrete `apidef/notifications.go` notification helper.
 Its evidence covers bounded HTTP client construction, notification manager

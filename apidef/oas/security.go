@@ -8,6 +8,7 @@ import (
 	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
+// SW-REQ-092
 const (
 	typeAPIKey      = "apiKey"
 	typeHTTP        = "http"
@@ -24,6 +25,7 @@ const (
 )
 
 // Token holds the values related to authentication tokens.
+// SW-REQ-092
 type Token struct {
 	// Enabled activates the token based authentication mode.
 	//
@@ -45,11 +47,13 @@ type Token struct {
 }
 
 // Import populates *Token from argument values.
+// SW-REQ-092
 func (t *Token) Import(nativeSS *openapi3.SecurityScheme, enable bool) {
 	t.Enabled = &enable
 	t.AuthSources.Import(nativeSS.In)
 }
 
+// SW-REQ-092
 func (s *OAS) fillToken(api apidef.APIDefinition) {
 	authConfig, ok := api.AuthConfigs[apidef.AuthTokenType]
 	if !ok || authConfig.Name == "" {
@@ -83,6 +87,7 @@ func (s *OAS) fillToken(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-092
 func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 	authConfig, exists := api.AuthConfigs[apidef.AuthTokenType]
 	if !exists {
@@ -112,6 +117,7 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
+// SW-REQ-092
 func (s *OAS) hasCertificateAuthEnabled() bool {
 	tykAuth := s.getTykAuthentication()
 	if tykAuth == nil || tykAuth.CertificateAuth == nil {
@@ -120,12 +126,14 @@ func (s *OAS) hasCertificateAuthEnabled() bool {
 	return tykAuth.CertificateAuth.Enabled
 }
 
+// SW-REQ-092
 func (s *OAS) hasCertificateAuth() bool {
 	tykAuth := s.getTykAuthentication()
 	return tykAuth != nil && tykAuth.CertificateAuth != nil
 }
 
 // tokenHasCertificateEnabled checks if the token scheme uses the old contract (enableClientCertificate).
+// SW-REQ-092
 func (s *OAS) tokenHasCertificateEnabled(schemeName string) bool {
 	if schemeName == "" {
 		return false
@@ -135,6 +143,7 @@ func (s *OAS) tokenHasCertificateEnabled(schemeName string) bool {
 }
 
 // JWK represents a JSON Web Key Set containing configuration for the JWKS endpoint and its cache timeout.
+// SW-REQ-092
 type JWK struct {
 	// URL is the JWKS endpoint.
 	URL string `json:"url"`
@@ -143,6 +152,7 @@ type JWK struct {
 }
 
 // JWT holds the configuration for the JWT middleware.
+// SW-REQ-092
 type JWT struct {
 	// Enabled activates the basic authentication mode.
 	//
@@ -262,6 +272,7 @@ type JWT struct {
 }
 
 // CustomClaimValidationConfig defines the validation configuration for a custom JWT claim.
+// SW-REQ-092
 type CustomClaimValidationConfig struct {
 	// Type specifies the type of validation to perform on the claim.
 	// Supported types:
@@ -285,8 +296,10 @@ type CustomClaimValidationConfig struct {
 // CustomClaimValidationType represents how a JWT claim should be validated.
 // This determines the validation logic used to check the claim value.
 // The validation behavior varies based on both the type selected and the claim's data type.
+// SW-REQ-092
 type CustomClaimValidationType string
 
+// SW-REQ-092
 const (
 	// ClaimValidationTypeRequired indicates that the claim must exist in the token and be non-null.
 	// No value validation is performed - only existence is checked.
@@ -303,6 +316,7 @@ const (
 )
 
 // JTIValidation contains the configuration for the validation of the JWT ID.
+// SW-REQ-092
 type JTIValidation struct {
 	// Enabled indicates whether JWT ID claim is required.
 	// When true, tokens must include a 'jti' claim.
@@ -310,6 +324,7 @@ type JTIValidation struct {
 }
 
 // Import populates *JWT based on arguments.
+// SW-REQ-092
 func (j *JWT) Import(enable bool) {
 	j.Enabled = enable
 	j.Header = &AuthSource{
@@ -321,6 +336,7 @@ func (j *JWT) Import(enable bool) {
 // mergeStringFirst returns a slice with primary as the first element, followed by any
 // elements from existing that are not equal to primary. If primary is empty, existing
 // is returned unchanged.
+// SW-REQ-092
 func mergeStringFirst(primary string, existing []string) []string {
 	if primary == "" {
 		return existing
@@ -334,6 +350,7 @@ func mergeStringFirst(primary string, existing []string) []string {
 	return result
 }
 
+// SW-REQ-092
 func (j *JWT) Normalize() {
 	// copy the values of the new JWT validation
 	if j == nil {
@@ -350,6 +367,7 @@ func (j *JWT) Normalize() {
 	}
 }
 
+// SW-REQ-092
 func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	ac, ok := api.AuthConfigs[apidef.JWTType]
 	if !ok || ac.Name == "" {
@@ -440,6 +458,7 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-092
 func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 	ac := apidef.AuthConfig{Name: name, DisableHeader: true}
 
@@ -482,6 +501,7 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 }
 
 // Basic type holds configuration values related to http basic authentication.
+// SW-REQ-092
 type Basic struct {
 	// Enabled activates the basic authentication mode.
 	// Tyk classic API definition: `use_basic_auth`
@@ -500,6 +520,7 @@ type Basic struct {
 }
 
 // Import populates *Basic from it's arguments.
+// SW-REQ-092
 func (b *Basic) Import(enable bool) {
 	b.Enabled = enable
 	b.Header = &AuthSource{
@@ -508,6 +529,7 @@ func (b *Basic) Import(enable bool) {
 	}
 }
 
+// SW-REQ-092
 func (s *OAS) fillBasic(api apidef.APIDefinition) {
 	ac, ok := api.AuthConfigs[apidef.BasicType]
 	if !ok || ac.Name == "" {
@@ -555,6 +577,7 @@ func (s *OAS) fillBasic(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-092
 func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
 	ac := apidef.AuthConfig{Name: name, DisableHeader: true}
 
@@ -576,6 +599,7 @@ func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
 }
 
 // ExtractCredentialsFromBody configures extracting credentials from the request body.
+// SW-REQ-092
 type ExtractCredentialsFromBody struct {
 	// Enabled activates extracting credentials from body.
 	// Tyk classic API definition: `basic_auth.extract_from_body`
@@ -589,6 +613,7 @@ type ExtractCredentialsFromBody struct {
 }
 
 // Fill fills *ExtractCredentialsFromBody from apidef.APIDefinition.
+// SW-REQ-092
 func (e *ExtractCredentialsFromBody) Fill(api apidef.APIDefinition) {
 	e.Enabled = api.BasicAuth.ExtractFromBody
 	e.UserRegexp = api.BasicAuth.BodyUserRegexp
@@ -596,6 +621,7 @@ func (e *ExtractCredentialsFromBody) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts *ExtractCredentialsFromBody and populates *apidef.APIDefinition.
+// SW-REQ-092
 func (e *ExtractCredentialsFromBody) ExtractTo(api *apidef.APIDefinition) {
 	api.BasicAuth.ExtractFromBody = e.Enabled
 	api.BasicAuth.BodyUserRegexp = e.UserRegexp
@@ -603,6 +629,7 @@ func (e *ExtractCredentialsFromBody) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // OAuth configures the OAuth middleware.
+// SW-REQ-092
 type OAuth struct {
 	// Enabled activates the OAuth middleware.
 	//
@@ -634,6 +661,7 @@ type OAuth struct {
 }
 
 // Import populates *OAuth from it's arguments.
+// SW-REQ-092
 func (o *OAuth) Import(enable bool) {
 	o.Enabled = enable
 	o.Header = &AuthSource{
@@ -642,6 +670,7 @@ func (o *OAuth) Import(enable bool) {
 	}
 }
 
+// SW-REQ-092
 func (s *OAS) fillOAuth(api apidef.APIDefinition) {
 	authConfig, ok := api.AuthConfigs[apidef.OAuthType]
 	if !ok || authConfig.Name == "" {
@@ -680,6 +709,7 @@ func (s *OAS) fillOAuth(api apidef.APIDefinition) {
 	s.getTykSecuritySchemes()[authConfig.Name] = oauth
 }
 
+// SW-REQ-092
 func (s *OAS) extractOAuthTo(api *apidef.APIDefinition, name string) {
 	authConfig := apidef.AuthConfig{Name: name, DisableHeader: true}
 
@@ -704,6 +734,7 @@ func (s *OAS) extractOAuthTo(api *apidef.APIDefinition, name string) {
 }
 
 // OAuthProvider holds the configuration for validation and introspection of OAuth tokens.
+// SW-REQ-092
 type OAuthProvider struct {
 	// JWT configures JWT validation.
 	//
@@ -717,6 +748,7 @@ type OAuthProvider struct {
 
 // JWTValidation holds configuration for validating access tokens by inspecing them
 // against a third party API, usually one provided by the IDP.
+// SW-REQ-092
 type JWTValidation struct {
 	// Enabled activates OAuth access token validation.
 	//
@@ -758,6 +790,7 @@ type JWTValidation struct {
 	ExpiresAtValidationSkew uint64 `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
 }
 
+// SW-REQ-092
 func (j *JWTValidation) Fill(jwt apidef.JWTValidation) {
 	j.Enabled = jwt.Enabled
 	j.SigningMethod = jwt.SigningMethod
@@ -768,6 +801,7 @@ func (j *JWTValidation) Fill(jwt apidef.JWTValidation) {
 	j.ExpiresAtValidationSkew = jwt.ExpiresAtValidationSkew
 }
 
+// SW-REQ-092
 func (j *JWTValidation) ExtractTo(jwt *apidef.JWTValidation) {
 	jwt.Enabled = j.Enabled
 	jwt.SigningMethod = j.SigningMethod
@@ -779,6 +813,7 @@ func (j *JWTValidation) ExtractTo(jwt *apidef.JWTValidation) {
 }
 
 // Introspection holds configuration for OAuth token introspection.
+// SW-REQ-092
 type Introspection struct {
 	// Enabled activates OAuth access token validation by introspection to a third party.
 	//
@@ -806,6 +841,7 @@ type Introspection struct {
 	Cache *IntrospectionCache `bson:"cache,omitempty" json:"cache,omitempty"`
 }
 
+// SW-REQ-092
 func (i *Introspection) Fill(intros apidef.Introspection) {
 	i.Enabled = intros.Enabled
 	i.URL = intros.URL
@@ -823,6 +859,7 @@ func (i *Introspection) Fill(intros apidef.Introspection) {
 	}
 }
 
+// SW-REQ-092
 func (i *Introspection) ExtractTo(intros *apidef.Introspection) {
 	intros.Enabled = i.Enabled
 	intros.URL = i.URL
@@ -836,6 +873,7 @@ func (i *Introspection) ExtractTo(intros *apidef.Introspection) {
 }
 
 // IntrospectionCache holds configuration for caching introspection requests.
+// SW-REQ-092
 type IntrospectionCache struct {
 	// Enabled activates the caching mechanism for introspection responses.
 	//
@@ -848,11 +886,13 @@ type IntrospectionCache struct {
 	Timeout int64 `bson:"timeout" json:"timeout"`
 }
 
+// SW-REQ-092
 func (c *IntrospectionCache) Fill(cache apidef.IntrospectionCache) {
 	c.Enabled = cache.Enabled
 	c.Timeout = cache.Timeout
 }
 
+// SW-REQ-092
 func (c *IntrospectionCache) ExtractTo(cache *apidef.IntrospectionCache) {
 	cache.Enabled = c.Enabled
 	cache.Timeout = c.Timeout
@@ -862,6 +902,7 @@ func (c *IntrospectionCache) ExtractTo(cache *apidef.IntrospectionCache) {
 // Deprecated: ExternalOAuth support was deprecated in Tyk 5.7.0.
 // To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
 // as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
+// SW-REQ-092
 type ExternalOAuth struct {
 	// Enabled activates external oauth functionality.
 	//
@@ -877,6 +918,7 @@ type ExternalOAuth struct {
 	Providers []OAuthProvider `bson:"providers" json:"providers"` // required
 }
 
+// SW-REQ-092
 func (s *OAS) fillExternalOAuth(api apidef.APIDefinition) {
 	authConfig, ok := api.AuthConfigs[apidef.ExternalOAuthType]
 	if !ok || authConfig.Name == "" {
@@ -931,6 +973,7 @@ func (s *OAS) fillExternalOAuth(api apidef.APIDefinition) {
 	s.getTykSecuritySchemes()[authConfig.Name] = externalOAuth
 }
 
+// SW-REQ-092
 func (s *OAS) extractExternalOAuthTo(api *apidef.APIDefinition, name string) {
 	authConfig := apidef.AuthConfig{Name: name, DisableHeader: true}
 
@@ -957,6 +1000,7 @@ func (s *OAS) extractExternalOAuthTo(api *apidef.APIDefinition, name string) {
 }
 
 // Notifications holds configuration for updates to keys.
+// SW-REQ-092
 type Notifications struct {
 	// SharedSecret is the shared secret used in the notification request.
 	//
@@ -969,18 +1013,21 @@ type Notifications struct {
 }
 
 // Fill fills *Notifications from apidef.NotificationsManager.
+// SW-REQ-092
 func (n *Notifications) Fill(nm apidef.NotificationsManager) {
 	n.SharedSecret = nm.SharedSecret
 	n.OnKeyChangeURL = nm.OAuthKeyChangeURL
 }
 
 // ExtractTo extracts *Notifications into *apidef.NotificationsManager.
+// SW-REQ-092
 func (n *Notifications) ExtractTo(nm *apidef.NotificationsManager) {
 	nm.SharedSecret = n.SharedSecret
 	nm.OAuthKeyChangeURL = n.OnKeyChangeURL
 }
 
 // isProprietaryAuth checks if an auth method is Tyk proprietary (not standard OpenAPI)
+// SW-REQ-092
 func isProprietaryAuth(authMethod string) bool {
 	proprietary := []string{"hmac", "custom", "mtls", "coprocess"}
 	for _, p := range proprietary {
@@ -996,6 +1043,7 @@ func isProprietaryAuth(authMethod string) bool {
 // 1. Known proprietary type names (hmac, custom, mtls, coprocess)
 // 2. Presence in vendor extension security without corresponding OAS Component
 // 3. Type inspection of SecuritySchemes entries
+// SW-REQ-092
 func (s *OAS) isProprietaryAuthScheme(schemeName string) bool {
 	// Check known proprietary auth type names
 	if isProprietaryAuth(schemeName) {
@@ -1017,6 +1065,7 @@ func (s *OAS) isProprietaryAuthScheme(schemeName string) bool {
 }
 
 // isInVendorSecurity checks if a scheme name appears in vendor extension security requirements
+// SW-REQ-092
 func (s *OAS) isInVendorSecurity(schemeName string, tykAuth *Authentication) bool {
 	for _, vendorReq := range tykAuth.Security {
 		for _, vendorSchemeName := range vendorReq {
@@ -1029,6 +1078,7 @@ func (s *OAS) isInVendorSecurity(schemeName string, tykAuth *Authentication) boo
 }
 
 // isProprietaryInVendor determines if a scheme in vendor security is proprietary
+// SW-REQ-092
 func (s *OAS) isProprietaryInVendor(schemeName string, tykAuth *Authentication) bool {
 	// If not in OAS Components, it's proprietary
 	if !s.isInOASComponents(schemeName) {
@@ -1047,6 +1097,7 @@ func (s *OAS) isProprietaryInVendor(schemeName string, tykAuth *Authentication) 
 }
 
 // isProprietaryInSecuritySchemes checks if a scheme in SecuritySchemes is proprietary
+// SW-REQ-092
 func (s *OAS) isProprietaryInSecuritySchemes(schemeName string, tykAuth *Authentication) bool {
 	if tykAuth.SecuritySchemes == nil {
 		return false
@@ -1062,6 +1113,7 @@ func (s *OAS) isProprietaryInSecuritySchemes(schemeName string, tykAuth *Authent
 }
 
 // isInOASComponents checks if a scheme exists in OpenAPI Components
+// SW-REQ-092
 func (s *OAS) isInOASComponents(schemeName string) bool {
 	if s.Components == nil || s.Components.SecuritySchemes == nil {
 		return false
@@ -1071,6 +1123,7 @@ func (s *OAS) isInOASComponents(schemeName string) bool {
 }
 
 // isProprietarySchemeType checks if a SecurityScheme type is proprietary
+// SW-REQ-092
 func (s *OAS) isProprietarySchemeType(scheme interface{}) bool {
 	switch scheme.(type) {
 	case *JWT, *Token, *Basic, *OAuth, *ExternalOAuth:
@@ -1082,6 +1135,7 @@ func (s *OAS) isProprietarySchemeType(scheme interface{}) bool {
 	}
 }
 
+// SW-REQ-092
 func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	tykAuthentication := s.GetTykExtension().Server.Authentication
 	if tykAuthentication == nil {
@@ -1232,6 +1286,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-092
 func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	if s.getTykAuthentication() == nil {
 		s.GetTykExtension().Server.Authentication = &Authentication{}
@@ -1387,6 +1442,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-092
 func (s *OAS) GetJWTConfiguration() *JWT {
 	processingMode := SecurityProcessingModeLegacy
 	if s.getTykAuthentication() != nil && s.getTykAuthentication().SecurityProcessingMode != "" {
@@ -1445,6 +1501,7 @@ func (s *OAS) GetJWTConfiguration() *JWT {
 	return nil
 }
 
+// SW-REQ-092
 func resetSecuritySchemes(api *apidef.APIDefinition) {
 	api.AuthConfigs = nil
 
@@ -1504,6 +1561,7 @@ func resetSecuritySchemes(api *apidef.APIDefinition) {
 	api.CustomMiddleware.IdExtractor = apidef.MiddlewareIdExtractor{Disabled: true}
 }
 
+// SW-REQ-092
 func (s *OAS) fillAPIKeyScheme(ac *apidef.AuthConfig) {
 	ss := s.Components.SecuritySchemes
 	if ss == nil {
@@ -1544,6 +1602,7 @@ func (s *OAS) fillAPIKeyScheme(ac *apidef.AuthConfig) {
 	s.appendSecurity(ac.Name)
 }
 
+// SW-REQ-092
 func (s *OAS) extractAPIKeySchemeTo(ac *apidef.AuthConfig, name string) {
 	ref := s.Components.SecuritySchemes[name]
 	ac.Name = name
@@ -1561,6 +1620,7 @@ func (s *OAS) extractAPIKeySchemeTo(ac *apidef.AuthConfig, name string) {
 	}
 }
 
+// SW-REQ-092
 func (s *OAS) fillOAuthScheme(accessTypes []osin.AccessRequestType, name string) {
 	ss := s.Components.SecuritySchemes
 	if ss == nil {
@@ -1620,6 +1680,7 @@ func (s *OAS) fillOAuthScheme(accessTypes []osin.AccessRequestType, name string)
 	s.appendSecurity(name)
 }
 
+// SW-REQ-092
 func (s *OAS) fillOAuthSchemeForExternal(name string) {
 	ss := s.Components.SecuritySchemes
 	if ss == nil {
@@ -1653,6 +1714,7 @@ func (s *OAS) fillOAuthSchemeForExternal(name string) {
 	s.appendSecurity(name)
 }
 
+// SW-REQ-092
 func (s *OAS) extractOAuthSchemeTo(api *apidef.APIDefinition, name string) {
 	ref := s.Components.SecuritySchemes[name]
 
@@ -1678,6 +1740,7 @@ func (s *OAS) extractOAuthSchemeTo(api *apidef.APIDefinition, name string) {
 	}
 }
 
+// SW-REQ-092
 func (s *OAS) appendSecurity(name string) {
 	if len(s.Security) == 0 {
 		s.Security.With(openapi3.NewSecurityRequirement())
@@ -1688,18 +1751,21 @@ func (s *OAS) appendSecurity(name string) {
 	}
 }
 
+// SW-REQ-092
 func setAuthorizationURLIfEmpty(flow *openapi3.OAuthFlow) {
 	if flow.AuthorizationURL == "" {
 		flow.AuthorizationURL = "/oauth/authorize"
 	}
 }
 
+// SW-REQ-092
 func setTokenURLIfEmpty(flow *openapi3.OAuthFlow) {
 	if flow.TokenURL == "" {
 		flow.TokenURL = "/oauth/token"
 	}
 }
 
+// SW-REQ-092
 func setScopesIfEmpty(flow *openapi3.OAuthFlow) {
 	if flow.Scopes == nil {
 		flow.Scopes = make(map[string]string)
@@ -1712,6 +1778,7 @@ func setScopesIfEmpty(flow *openapi3.OAuthFlow) {
 // standard auth are required together (AND logic).
 //
 // Returns a map of scheme names that should not be duplicated in OAS security.
+// SW-REQ-092
 func (s *OAS) identifyMixedVendorAuthSchemes() map[string]bool {
 	mixedSchemes := make(map[string]bool)
 
@@ -1750,6 +1817,7 @@ func (s *OAS) identifyMixedVendorAuthSchemes() map[string]bool {
 // skipping any single-scheme requirements that are already part of mixed vendor requirements.
 // This prevents duplication when a scheme like "jwtAuth" appears both in OAS security
 // as a single requirement and in vendor security as part of a mixed requirement.
+// SW-REQ-092
 func (s *OAS) appendFilteredOASSecurityRequirements(apiSecurityReqs *[][]string, mixedVendorSchemes map[string]bool) {
 	for _, requirement := range s.Security {
 		schemes := make([]string, 0, len(requirement))
@@ -1772,6 +1840,7 @@ func (s *OAS) appendFilteredOASSecurityRequirements(apiSecurityReqs *[][]string,
 
 // appendVendorSecurityRequirements adds vendor extension security requirements
 // to the API definition if they exist.
+// SW-REQ-092
 func (s *OAS) appendVendorSecurityRequirements(apiSecurityReqs *[][]string) {
 	tykAuth := s.getTykAuthentication()
 	if tykAuth != nil && len(tykAuth.Security) > 0 {

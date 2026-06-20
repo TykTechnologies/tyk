@@ -44,7 +44,7 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 139/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `verification_scope_complete` | 140/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
 | `mcdc_coverage` | 52/385 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
@@ -249,6 +249,16 @@ fixed or to hide them from the current strict audit.
   increment is scoped to local OAS operation helper behavior and does not claim
   gateway route matching or runtime middleware execution. It moves the visible
   production coverage baseline from 138/447 to 139/447.
+- `SW-REQ-092` onboarded `apidef/oas/security.go` with focused evidence for
+  OAS security document helper behavior: standard auth helper shapes,
+  import/default/normalization behavior, nested provider support-shape
+  conversion, API-key and OAuth security-scheme construction/extraction,
+  proprietary-auth classification, OAS/vendor security requirement partitioning
+  and recombination, aggregate security fill/extract coordination, JWT
+  configuration lookup, and Classic security reset behavior. This increment is
+  scoped to local OAS security support-shape conversion and does not claim
+  runtime authentication execution. It moves the visible production coverage
+  baseline from 139/447 to 140/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or
