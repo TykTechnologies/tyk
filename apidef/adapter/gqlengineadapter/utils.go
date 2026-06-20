@@ -13,9 +13,11 @@ import (
 )
 
 var (
+	// SW-REQ-072
 	ErrGraphQLConfigIsMissingOperation = errors.New("graphql data source config is missing an operation")
 )
 
+// SW-REQ-072
 func parseSchema(schemaAsString string) (parsedSchema *graphql.Schema, err error) {
 	parsedSchema, err = graphql.NewSchemaFromString(schemaAsString)
 	if err != nil {
@@ -34,6 +36,7 @@ func parseSchema(schemaAsString string) (parsedSchema *graphql.Schema, err error
 	return parsedSchema, nil
 }
 
+// SW-REQ-072
 func graphqlDataSourceWebSocketProtocol(subscriptionType apidef.SubscriptionType) string {
 	wsProtocol := graphqldatasource.ProtocolGraphQLWS
 	if subscriptionType == apidef.GQLSubscriptionTransportWS {
@@ -42,6 +45,7 @@ func graphqlDataSourceWebSocketProtocol(subscriptionType apidef.SubscriptionType
 	return wsProtocol
 }
 
+// SW-REQ-072
 func graphqlSubscriptionType(subscriptionType apidef.SubscriptionType) graphql.SubscriptionType {
 	switch subscriptionType {
 	case apidef.GQLSubscriptionWS:
@@ -55,6 +59,7 @@ func graphqlSubscriptionType(subscriptionType apidef.SubscriptionType) graphql.S
 	}
 }
 
+// SW-REQ-072
 func ConvertApiDefinitionHeadersToHttpHeaders(apiDefHeaders map[string]string) http.Header {
 	if len(apiDefHeaders) == 0 {
 		return nil
@@ -68,6 +73,7 @@ func ConvertApiDefinitionHeadersToHttpHeaders(apiDefHeaders map[string]string) h
 	return engineV2Headers
 }
 
+// SW-REQ-072
 func RemoveDuplicateApiDefinitionHeaders(headers ...map[string]string) map[string]string {
 	hdr := make(map[string]string)
 	// headers priority depends on the order of arguments
@@ -84,6 +90,7 @@ func RemoveDuplicateApiDefinitionHeaders(headers ...map[string]string) map[strin
 	return hdr
 }
 
+// SW-REQ-072
 func generateRestDataSourceFromGraphql(config apidef.GraphQLEngineDataSourceConfigGraphQL) (json.RawMessage, error) {
 	if !config.HasOperation {
 		return nil, ErrGraphQLConfigIsMissingOperation

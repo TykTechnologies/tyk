@@ -156,6 +156,9 @@ project:
             - apidef/adapter/graphql_config_adapter_test.go
             - apidef/adapter/openapi.go
             - apidef/adapter/openapi_test.go
+            - apidef/adapter/gqlengineadapter/utils.go
+            - apidef/adapter/gqlengineadapter/utils_engine_v2.go
+            - apidef/adapter/gqlengineadapter/utils_reqproof_test.go
             - apidef/adapter/utils.go
             - apidef/adapter/utils_reqproof_test.go
             - apidef/adapter/utils_test.go

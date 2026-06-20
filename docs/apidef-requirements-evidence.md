@@ -27,6 +27,7 @@
 <!-- documents SW-REQ-069 -->
 <!-- documents SW-REQ-070 -->
 <!-- documents SW-REQ-071 -->
+<!-- documents SW-REQ-072 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -46,7 +47,8 @@ custom middleware definition enablement classification, OAS extension header
 name/value helper shapes, OAS extension error-override helper shapes, adapter
 interface and GraphQL utility helper behavior, GraphQL config adapter
 selection behavior, AsyncAPI adapter support-shape generation, and OpenAPI
-adapter support-shape generation without silent data-shape drift.
+adapter support-shape generation, and GraphQL engine adapter utility behavior
+without silent data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -345,3 +347,21 @@ GraphQL engine adapter correctness, REST upstream availability, GraphQL
 execution, gateway API loading, route generation, request matching, gateway
 request admission, middleware execution, persistence, analytics, or final
 client-visible runtime behavior.
+
+`SW-REQ-072` owns the concrete `apidef/adapter/gqlengineadapter` utility
+helpers used by GraphQL engine adapter configuration assembly. Its evidence
+covers schema parse/normalize result propagation, subscription protocol and
+type mapping, header conversion, canonical duplicate-header removal with
+first-map precedence, GraphQL-operation-to-REST datasource conversion, missing
+operation errors, internal Tyk URL conversion with internal API headers, SSE and
+SSE POST configuration, ordered field-argument configuration, deterministic URL
+query extraction with explicit API-definition query appending, invalid query
+errors, GraphQL datasource factory construction with caller-supplied HTTP
+clients, invalid subscription-client factory errors, and default subscription
+client factory selection. This evidence does not claim correctness of
+proxy-only, supergraph, or universal-data-graph adapter end-to-end
+configuration generation; GraphQL schema semantic completeness beyond local
+parse/normalize result propagation; REST or GraphQL upstream availability;
+subscription transport execution; gateway API loading; route generation;
+request matching; gateway request admission; middleware execution; persistence;
+analytics; or final client-visible runtime behavior.
