@@ -14,27 +14,34 @@ import (
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 )
 
+// SW-REQ-095
 type ConfigValidator interface {
 	Validate(document []byte) error
 }
 
+// SW-REQ-095
 type ValidatorKind string
 
+// SW-REQ-095
 const (
 	DefaultBentoConfigSchemaName string        = "bento-config-schema.json"
 	DefaultValidator             ValidatorKind = "default-validator"
 	EnableAllExperimental        ValidatorKind = "enable-all-experimental"
 )
 
+// SW-REQ-095
 var (
 	schemaOnce sync.Once
 
 	bentoSchemas = map[ValidatorKind][]byte{}
 )
 
+// SW-REQ-095
+//
 //go:embed schema/*
 var schemaDir embed.FS
 
+// SW-REQ-095
 func loadBentoSchemas() error {
 	load := func() error {
 		members, err := schemaDir.ReadDir("schema")
@@ -74,10 +81,12 @@ func loadBentoSchemas() error {
 	return err
 }
 
+// SW-REQ-095
 type DefaultConfigValidator struct {
 	schemaLoader gojsonschema.JSONLoader
 }
 
+// SW-REQ-095
 func NewDefaultConfigValidator() (*DefaultConfigValidator, error) {
 	err := loadBentoSchemas() // loads the schemas only one time
 	if err != nil {
@@ -90,6 +99,7 @@ func NewDefaultConfigValidator() (*DefaultConfigValidator, error) {
 	}, nil
 }
 
+// SW-REQ-095
 func (v *DefaultConfigValidator) Validate(document []byte) error {
 	documentLoader := gojsonschema.NewBytesLoader(document)
 	result, err := gojsonschema.Validate(v.schemaLoader, documentLoader)
@@ -110,14 +120,17 @@ func (v *DefaultConfigValidator) Validate(document []byte) error {
 }
 
 // EnableAllExperimentalConfigValidator is a validator that skips all validations
+// SW-REQ-095
 type EnableAllExperimentalConfigValidator struct{}
 
 // NewEnableAllExperimentalConfigValidator creates a new validator that skips all validations
+// SW-REQ-095
 func NewEnableAllExperimentalConfigValidator() *EnableAllExperimentalConfigValidator {
 	return &EnableAllExperimentalConfigValidator{}
 }
 
 // Validate always returns nil, effectively enabling all configurations
+// SW-REQ-095
 func (v *EnableAllExperimentalConfigValidator) Validate(_ []byte) error {
 	return nil
 }

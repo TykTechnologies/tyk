@@ -1,0 +1,66 @@
+id: SW-REQ-095
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The apidef/streams Bento configuration validator helpers shall preserve local API-definition support validation behavior by loading embedded Bento JSON schemas once, exposing default and enable-all-experimental validator kinds, constructing the default validator with the embedded default schema, validating documents through the local gojsonschema facade, returning nil for valid documents, aggregating schema validation errors with field-path details for invalid documents, propagating malformed-document loader errors, and intentionally accepting every document through the enable-all-experimental validator without claiming Bento schema completeness, Bento component correctness, stream configuration semantic correctness, stream runtime execution, gateway API loading, route generation, request matching, gateway request admission, persistence, analytics, or final client-visible behavior.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: apidef/streams/bento/validator_reqproof_test.go; docs/apidef-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-104
+component: model
+rationale: >-
+    This software requirement owns only the local apidef/streams/bento validator helper behavior: embedded schema loading and default schema selection, validator construction, validation through the local gojsonschema facade, validation error aggregation, malformed-document propagation, and the explicit no-op behavior of the enable-all-experimental validator. It does not claim Bento schema completeness, Bento component correctness, stream configuration semantic correctness, stream runtime execution, gateway API loading, route generation, request matching, gateway request admission, persistence, analytics, or final client-visible behavior.
+tags:
+    - api-definition
+    - streams
+    - bento
+    - schema-validation
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-104
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T07:51:22Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-095 is scoped to local apidef/streams/bento/validator.go Bento configuration validator helper behavior: one-time embedded schema loading, default and enable-all-experimental validator kind exposure, default validator construction from the embedded schema, validation through the local gojsonschema facade, nil valid-document results, aggregated field-path validation errors for invalid documents, malformed-document loader error propagation, and intentional accept-all behavior for the enable-all-experimental validator. Focused Bento validator ReqProof tests passed, including race, and the package was added to configured build/test/lint gates. This approval does not claim Bento schema completeness, Bento component correctness, stream configuration semantic correctness, stream runtime execution, gateway API loading, route generation, request matching, gateway request admission, persistence, analytics, or final client-visible behavior.'
+        fingerprint: sha256:e6338a3587a136dfb90dd24146e1162a9fc1d4d46074e9a0a70e13850e8be1b3
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-095
+          artifact: apidef/streams/bento/validator.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in apidef/streams/bento/validator.go adds ReqProof ownership annotations only; behavior evidence is provided by apidef/streams/bento/validator_reqproof_test.go and the requirement remains scoped to local validator helper behavior without stream runtime validation claims.
+          base: origin/master
+          requirement_fingerprint: sha256:e1f6e381db838437e1e8f45e9b2369cbdb5e3ab19ce29294ad6c860641d5f8da
+          approval_fingerprint: sha256:e6338a3587a136dfb90dd24146e1162a9fc1d4d46074e9a0a70e13850e8be1b3
+          artifact_fingerprint: sha256:07f7c5e56f3818e3512495be6241b5f0db93faa37d79bee02c824962ea2cac14
+          reviewed_at: "2026-06-20T07:51:34Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T08:03:10Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T07:51:22Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T08:03:10Z"
+          from: draft
+          to: review
+          reason: Added apidef/streams Bento configuration validator helper behavior under API-definition support model behavior.
+          changed_by: agent:codex
