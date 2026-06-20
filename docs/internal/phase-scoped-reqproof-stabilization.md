@@ -44,8 +44,8 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 158/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
-| `mcdc_coverage` | 52/421 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
+| `verification_scope_complete` | 159/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `mcdc_coverage` | 52/424 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
 
@@ -439,6 +439,15 @@ fixed or to hide them from the current strict audit.
   semantics, storage connectivity, Redis dialing, filesystem permission
   recovery outside local file discovery, or final gateway runtime behavior. It
   moves the visible production coverage baseline from 157/447 to 158/447.
+- `SW-REQ-110` onboarded `common/option/option.go` with a new reusable option
+  builder stakeholder/system/software chain and focused table-driven tests for
+  local generic helper behavior: `New` preserves supplied option slices,
+  `Build` returns a pointer to a copied base value, empty option collections
+  preserve the base value, and option functions apply in order. This increment
+  is scoped to local option builder mechanics and does not claim the domain
+  behavior of API definition versioning, OAS builders, gateway API loading,
+  mock response middleware, or any other downstream option consumer. It moves
+  the visible production coverage baseline from 158/447 to 159/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

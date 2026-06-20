@@ -1,0 +1,51 @@
+id: SW-REQ-110
+version: 1
+status: approved
+priority: shall
+category: helper
+req_type: guarantee
+fretish: ""
+description: The common/option helper shall preserve local option builder behavior by returning supplied option slices from New and applying option functions in order to a copy of a base value from Build, without claiming the domain behavior of API definition versioning, OAS builders, gateway API loading, mock response middleware, or any other downstream option consumer.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: common/option/option_test.go; docs/option-builder-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-123
+component: option_builder
+rationale: >-
+    This software requirement owns local common/option helper behavior. It does not claim the domain behavior of API definition versioning, OAS builders, gateway API loading, mock response middleware, or any other downstream option consumer.
+tags:
+    - helper
+    - option-builder
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-123
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T10:45:25Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Option builder scope is limited to local common/option behavior: New preserves the supplied option slice and Build applies option functions in order to a copy of the supplied base value. The focused table-driven option package tests passed. This approval does not claim the domain behavior of API definition versioning, OAS builders, gateway API loading, mock response middleware, or any other downstream option consumer.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T10:45:25Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T10:45:25Z"
+obligation_checklist:
+    - nominal
+    - boundary
+lifecycle:
+    change_history:
+        - date: "2026-06-20T10:45:25Z"
+          from: draft
+          to: review
+          reason: Added common/option local option builder behavior under reusable option builder support.
+          changed_by: agent:codex

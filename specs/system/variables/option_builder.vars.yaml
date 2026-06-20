@@ -1,0 +1,14 @@
+component: option_builder
+no_interface:
+    declared: true
+    reason: The common/option package is exercised as a local generic helper; API definition versioning, OAS builders, gateway API loading, mock response middleware, gateway request admission, and final request handling are outside this local component boundary.
+variables:
+    - name: option_builder_operation_requested
+      type: bool
+      direction: input
+      description: Gateway code or tests request local option builder behavior such as wrapping option slices or applying options to a base value.
+
+    - name: option_builder_result_determined
+      type: bool
+      direction: output
+      description: Option builder support returns the supplied option slice or a pointer to a copied base value after applying option functions in order.

@@ -1,0 +1,60 @@
+id: STK-REQ-035
+version: 1
+status: approved
+priority: shall
+category: helper
+req_type: guarantee
+fretish: ""
+description: Reusable option builder support shall locally preserve supplied option slices and apply option functions in order to a copy of a base value, without claiming the domain behavior of API definition versioning, OAS builders, gateway API loading, mock response middleware, or any other downstream option consumer.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: option_builder
+rationale: The common option package is a generic local helper used by several packages. This stakeholder requirement owns only the generic builder mechanics, not the behavior of downstream consumers.
+tags:
+    - helper
+    - option-builder
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T10:45:25Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Option builder scope is limited to local common/option behavior: New preserves the supplied option slice and Build applies option functions in order to a copy of the supplied base value. The focused table-driven option package tests passed. This approval does not claim the domain behavior of API definition versioning, OAS builders, gateway API loading, mock response middleware, or any other downstream option consumer.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T10:45:25Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T10:45:25Z"
+obligation_checklist:
+    - nominal
+    - boundary
+stakeholder:
+    persona: Gateway developer
+    story: As a gateway developer, I need reusable option builder helpers to apply local option functions predictably before package-specific code consumes the configured value.
+    acceptance_criteria:
+        - id: STK-REQ-035-AC-01
+          text: Given a supplied option function slice, when the option builder wraps it, then the resulting option collection preserves that slice content.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-123
+        - id: STK-REQ-035-AC-02
+          text: Given a base value and ordered option functions, when the option builder builds a value, then each option is applied in order to a copy of the base value and the built pointer contains the resulting value.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-123
+lifecycle:
+    change_history:
+        - date: "2026-06-20T10:45:25Z"
+          from: draft
+          to: review
+          reason: Added reusable option builder stakeholder requirement for common/option onboarding.
+          changed_by: agent:codex

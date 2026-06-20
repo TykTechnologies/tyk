@@ -1,0 +1,59 @@
+id: SYS-REQ-123
+version: 1
+status: approved
+priority: shall
+category: helper
+req_type: guarantee
+fretish: the option_builder shall always satisfy !option_builder_operation_requested | option_builder_result_determined
+description: Reusable option builder support shall determine local option builder results by preserving supplied option slices and applying option functions in order to a copy of a base value, without claiming the domain behavior of API definition versioning, OAS builders, gateway API loading, mock response middleware, or any other downstream option consumer.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-035
+component: option_builder
+rationale: This system requirement owns local common/option helper behavior. Downstream packages must carry their own requirements for their domain-specific option semantics.
+tags:
+    - helper
+    - option-builder
+variables:
+    - option_builder_operation_requested
+    - option_builder_result_determined
+traces:
+    satisfies:
+        - STK-REQ-035
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T10:45:25Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Option builder scope is limited to local common/option behavior: New preserves the supplied option slice and Build applies option functions in order to a copy of the supplied base value. The focused table-driven option package tests passed. This approval does not claim the domain behavior of API definition versioning, OAS builders, gateway API loading, mock response middleware, or any other downstream option consumer.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T10:50:38.769Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-123|option_builder_result_determined
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final requirement approval. SYS-REQ-123''s option_builder_result_determined variable is decomposed by SW-REQ-110 for local common/option behavior: New preserves the supplied option slice and Build applies option functions in order to a copy of the supplied base value. This review is limited to local reusable option builder mechanics and does not claim the domain behavior of API definition versioning, OAS builders, gateway API loading, mock response middleware, or any other downstream option consumer.'
+          reviewed_at: "2026-06-20T10:50:38.769Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T10:45:25Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T10:45:25Z"
+obligation_checklist:
+    - nominal
+    - boundary
+lifecycle:
+    change_history:
+        - date: "2026-06-20T10:45:25Z"
+          from: draft
+          to: review
+          reason: Added reusable option builder system requirement for common/option onboarding.
+          changed_by: agent:codex
