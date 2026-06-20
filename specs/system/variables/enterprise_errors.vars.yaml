@@ -1,0 +1,14 @@
+component: enterprise_errors
+no_interface:
+    declared: true
+    reason: The ee package proof slice covers a local sentinel error catalog only; stream middleware behavior, upstream authentication behavior, license enforcement behavior, and final gateway request handling are outside this component boundary.
+variables:
+    - name: enterprise_error_requested
+      type: bool
+      direction: input
+      description: Enterprise code or tests request the local enterprise error sentinel catalog.
+
+    - name: enterprise_error_available
+      type: bool
+      direction: output
+      description: The ee package exposes the expected action-not-allowed sentinel error.

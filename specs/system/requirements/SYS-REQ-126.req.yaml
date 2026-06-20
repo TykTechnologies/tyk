@@ -1,0 +1,59 @@
+id: SYS-REQ-126
+version: 1
+status: approved
+priority: shall
+category: enterprise
+req_type: guarantee
+fretish: the enterprise_errors shall always satisfy !enterprise_error_requested | enterprise_error_available
+description: Enterprise error catalog support shall make the local action-not-allowed sentinel error available as a stable non-nil comparable error value with the expected message, without claiming stream middleware behavior, upstream authentication behavior, license enforcement behavior, or final gateway request handling.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-038
+component: enterprise_errors
+rationale: This system requirement owns local ee/errors.go sentinel availability only. Enterprise middleware and licensing behavior remain outside this proof slice.
+tags:
+    - enterprise
+    - errors
+variables:
+    - enterprise_error_requested
+    - enterprise_error_available
+traces:
+    satisfies:
+        - STK-REQ-038
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T11:15:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Enterprise error scope is limited to the local ee.ErrActionNotAllowed sentinel and focused package evidence. This approval does not claim stream middleware behavior, upstream authentication behavior, license enforcement behavior, or final gateway request handling.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T11:20:57.200645Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-126|enterprise_error_available
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final requirement approval. SYS-REQ-126''s enterprise_error_available variable is decomposed by SW-REQ-113 for local ee/errors.go behavior: ErrActionNotAllowed is a stable non-nil comparable sentinel with message ''action not allowed''. This review is limited to local enterprise error catalog mechanics and does not claim stream middleware behavior, upstream authentication behavior, license enforcement behavior, or final gateway request handling.'
+          reviewed_at: "2026-06-20T11:20:57.200645Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T11:15:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T11:15:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+lifecycle:
+    change_history:
+        - date: "2026-06-20T11:15:00Z"
+          from: draft
+          to: review
+          reason: Added enterprise error system requirement for ee/errors.go onboarding.
+          changed_by: agent:codex

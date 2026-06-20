@@ -1,0 +1,60 @@
+id: STK-REQ-038
+version: 1
+status: approved
+priority: shall
+category: enterprise
+req_type: guarantee
+fretish: ""
+description: Enterprise error catalog support shall expose stable local sentinel errors for enterprise-only policy decisions, without claiming stream middleware behavior, upstream authentication behavior, license enforcement behavior, or final gateway request handling.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: enterprise_errors
+rationale: The ee package currently exposes a local sentinel error used by enterprise code. This stakeholder requirement owns only the sentinel catalog behavior.
+tags:
+    - enterprise
+    - errors
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T11:15:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Enterprise error scope is limited to the local ee.ErrActionNotAllowed sentinel and focused package evidence. This approval does not claim stream middleware behavior, upstream authentication behavior, license enforcement behavior, or final gateway request handling.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T11:15:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T11:15:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+stakeholder:
+    persona: Enterprise gateway developer
+    story: As an enterprise gateway developer, I need stable sentinel errors so enterprise-only code can report denied actions consistently.
+    acceptance_criteria:
+        - id: STK-REQ-038-AC-01
+          text: Given enterprise code needs to reject an action, when it uses the local enterprise error catalog, then a stable action-not-allowed sentinel is available.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-126
+        - id: STK-REQ-038-AC-02
+          text: Given the action-not-allowed sentinel, when code compares or renders it, then the sentinel remains non-nil, comparable through errors.Is, and retains its expected message.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-126
+lifecycle:
+    change_history:
+        - date: "2026-06-20T11:15:00Z"
+          from: draft
+          to: review
+          reason: Added enterprise error stakeholder requirement for ee/errors.go onboarding.
+          changed_by: agent:codex
