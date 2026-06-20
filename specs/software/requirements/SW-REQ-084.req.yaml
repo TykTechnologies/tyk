@@ -1,0 +1,65 @@
+id: SW-REQ-084
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The apidef/importer WSDL importer shall load WSDL 1.1 definitions into its typed model, reject malformed roots and WSDL 2.0 definitions, preserve service-port mapping on each importer instance without leaking mappings across importer instances, convert selected SOAP 1.1, SOAP 1.2, and HTTP bindings over HTTP into versioned Classic API track-endpoint and URL-rewrite metadata, apply HTTP urlReplacement wildcard conversion, reject unsupported transports, missing ports, missing selected ports, missing HTTP operation locations, and empty service sets as errors instead of panics, insert converted versions into API definitions as versioned entries, and build active keyless Classic API definitions with deterministic versioning and proxy shape apart from the generated API ID while ignoring the unsupported mock flag at the top-level API-definition build entry point.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: apidef/importer/wsdl_reqproof_test.go; docs/apidef-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-104
+component: model
+rationale: This software requirement owns only local apidef/importer/wsdl.go WSDL importer shape conversion into Classic API definition data. It does not claim complete WSDL specification support, WSDL 2.0 support, full XML schema or message validation, regex escaping semantics for arbitrary HTTP endpoint metacharacters, partial multi-service failure semantics, mock import support, upstream availability, gateway API loading, route generation, request matching, gateway request admission, persistence, analytics, or final client-visible runtime behavior.
+tags:
+    - api-definition
+    - classic-api
+    - importer
+    - wsdl
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-104
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T05:53:47Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-084 is scoped to local apidef/importer/wsdl.go WSDL importer conversion behavior: WSDL 1.1 load and malformed-root/WSDL 2.0 rejection, per-importer service-port mapping isolation, SOAP 1.1/SOAP 1.2/HTTP binding conversion into Classic API track-endpoint and URL-rewrite metadata, HTTP urlReplacement wildcard conversion, unsupported transport and malformed service-shape errors without panics, version insertion, and deterministic active keyless API-definition proxy/versioning shape apart from generated API IDs while the top-level API build ignores the unsupported mock flag. Focused apidef/importer WSDL tests passed and local conversion drift for global binding/port state plus malformed-shape panics was fixed. This approval does not claim complete WSDL specification support, WSDL 2.0 support, full XML schema or message validation, regex escaping semantics for arbitrary HTTP endpoint metacharacters, partial multi-service failure semantics, mock import support, upstream availability, gateway API loading, route generation, request matching, gateway request admission, persistence, analytics, or final client-visible runtime behavior.'
+        fingerprint: sha256:883454dcb9f8813b8cb90e02e6db4b465b05de94267f2cd3c07467b3a073a831
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-084
+          artifact: apidef/importer/wsdl.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The WSDL importer implementation intentionally changed to keep parsed binding and selected port state on each importer instance, consume unsupported binding protocol elements, and return controlled errors for empty service sets, missing ports, and missing HTTP operation locations instead of panicking or leaking state; SW-REQ-084 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence that behavior, so no additional authored requirement/design change is required for this implementation delta.
+          base: origin/master
+          requirement_fingerprint: sha256:58f102509cbf8c47ead3c6c4a4ae8a501b65fbb8c82c1c8bd007d7abd4c3c432
+          approval_fingerprint: sha256:883454dcb9f8813b8cb90e02e6db4b465b05de94267f2cd3c07467b3a073a831
+          artifact_fingerprint: sha256:a71d93325d88b16a41d0b9c874d5bb1e0ad63c74c606c6f14fc37f84e17a11d8
+          reviewed_at: "2026-06-20T05:54:09Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T05:52:05Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T05:53:47Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T05:52:05Z"
+          from: draft
+          to: review
+          reason: Added apidef/importer WSDL importer conversion behavior under API-definition support model behavior.
+          changed_by: agent:codex

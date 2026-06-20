@@ -39,6 +39,7 @@
 <!-- documents SW-REQ-081 -->
 <!-- documents SW-REQ-082 -->
 <!-- documents SW-REQ-083 -->
+<!-- documents SW-REQ-084 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -49,7 +50,8 @@ admission, or the full API definition lifecycle.
 health-check wire values, host-list access behavior, and error-override helper
 state, embedded Classic API definition schema data, Classic API definition core
 helper behavior, importer source dispatcher behavior, Apiary Blueprint importer
-conversion behavior, Swagger importer conversion behavior, OAS path/server helper shapes, OAS root extension helper shapes, OAS server model helper
+conversion behavior, Swagger importer conversion behavior, WSDL importer
+conversion behavior, OAS path/server helper shapes, OAS root extension helper shapes, OAS server model helper
 shapes, OAS URL rewrite helper shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint
 helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes,
@@ -67,7 +69,8 @@ and supergraph adapter configuration behavior, and engine v3 utility behavior,
 engine v3 universal-data-graph adapter configuration behavior, and Classic API
 definition core model helper behavior, and Apiary Blueprint importer conversion
 behavior, and importer source dispatcher behavior, without silent data-shape
-drift, plus Swagger importer conversion behavior.
+drift, plus Swagger importer conversion behavior and WSDL importer conversion
+behavior.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -562,3 +565,19 @@ completeness, semantic validation of schemas or response objects, mock import
 support, upstream availability, gateway API loading, route generation, request
 matching, gateway request admission, persistence, analytics, or final
 client-visible runtime behavior.
+
+`SW-REQ-084` owns the concrete `apidef/importer/wsdl.go` WSDL importer
+conversion behavior. Its evidence covers WSDL 1.1 load success, malformed-root
+and WSDL 2.0 rejection, per-importer service-port mapping isolation, SOAP 1.1,
+SOAP 1.2, and HTTP binding conversion into Classic API track-endpoint and
+URL-rewrite metadata, HTTP urlReplacement wildcard conversion, unsupported
+transport and malformed service-shape errors without panics, version insertion
+into API definitions, top-level API-definition build behavior that ignores the
+unsupported mock flag, and deterministic active keyless API-definition
+versioning/proxy shape apart from generated API IDs. This evidence does not
+claim complete WSDL specification support, WSDL 2.0 support, full XML schema or
+message validation, regex escaping semantics for arbitrary HTTP endpoint
+metacharacters, partial multi-service failure semantics, mock import support,
+upstream availability, gateway API loading, route generation, request matching,
+gateway request admission, persistence, analytics, or final client-visible
+runtime behavior.

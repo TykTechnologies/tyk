@@ -44,7 +44,7 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 131/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `verification_scope_complete` | 132/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
 | `mcdc_coverage` | 52/385 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
@@ -185,6 +185,14 @@ fixed or to hide them from the current strict audit.
   Swagger conversion drift where map iteration could reorder converted paths or
   methods and paths with no methods were emitted as empty whitelist entries. It
   moves the visible production coverage baseline from 130/447 to 131/447.
+- `SW-REQ-084` onboarded `apidef/importer/wsdl.go` with focused evidence for
+  WSDL 1.1 loading, malformed-root and WSDL 2.0 rejection, SOAP/HTTP binding
+  conversion, per-importer port mapping isolation, wildcard rewrite conversion,
+  malformed service-shape errors, version insertion, and API-definition
+  proxy/versioning shape. This increment also fixes local WSDL conversion drift
+  where parsed binding and selected port state could leak across importer
+  instances and malformed service shapes could panic. It moves the visible
+  production coverage baseline from 131/447 to 132/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

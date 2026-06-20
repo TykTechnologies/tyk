@@ -12,17 +12,20 @@ import (
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
+// SW-REQ-084
 const WSDLSource APIImporterSource = "wsdl"
 
-var portName = map[string]string{}
-var bindingList = map[string]*WSDLBinding{}
-
-func (*WSDLDef) SetServicePortMapping(input map[string]string) {
+// SW-REQ-084
+func (def *WSDLDef) SetServicePortMapping(input map[string]string) {
+	if def.servicePortNames == nil {
+		def.servicePortNames = map[string]string{}
+	}
 	for k, v := range input {
-		portName[k] = v
+		def.servicePortNames[k] = v
 	}
 }
 
+// SW-REQ-084
 const (
 	NS_WSDL20 = "http://www.w3.org/ns/wsdl"
 	NS_WSDL   = "http://schemas.xmlsoap.org/wsdl/"
@@ -31,36 +34,44 @@ const (
 	NS_HTTP   = "http://schemas.xmlsoap.org/wsdl/http/"
 )
 
+// SW-REQ-084
 const (
 	PROT_HTTP    = "http"
 	PROT_SOAP    = "soap"
 	PROT_SOAP_12 = "soap12"
 )
 
+// SW-REQ-084
 type WSDLDef struct {
-	Definition WSDL `xml:"http://schemas.xmlsoap.org/wsdl/ definitions"`
+	Definition       WSDL `xml:"http://schemas.xmlsoap.org/wsdl/ definitions"`
+	servicePortNames map[string]string
 }
 
+// SW-REQ-084
 type WSDL struct {
 	Services []*WSDLService `xml:"http://schemas.xmlsoap.org/wsdl/ service"`
 	Bindings []*WSDLBinding `xml:"http://schemas.xmlsoap.org/wsdl/ binding"`
 }
 
+// SW-REQ-084
 type WSDLService struct {
 	Name  string      `xml:"name,attr"`
 	Ports []*WSDLPort `xml:"http://schemas.xmlsoap.org/wsdl/ port"`
 }
 
+// SW-REQ-084
 type WSDLPort struct {
 	Name    string      `xml:"name,attr"`
 	Binding string      `xml:"binding,attr"`
 	Address WSDLAddress `xml:"address"`
 }
 
+// SW-REQ-084
 type WSDLAddress struct {
 	Location string `xml:"location,attr"`
 }
 
+// SW-REQ-084
 type WSDLBinding struct {
 	Name                string           `xml:"name,attr"`
 	Operations          []*WSDLOperation `xml:"http://schemas.xmlsoap.org/wsdl/ operation"`
@@ -69,12 +80,14 @@ type WSDLBinding struct {
 	isSupportedProtocol bool
 }
 
+// SW-REQ-084
 type WSDLOperation struct {
 	Name             string `xml:"name,attr"`
 	Endpoint         string
 	IsUrlReplacement bool
 }
 
+// SW-REQ-084
 func (def *WSDLDef) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	if start.Name.Space == NS_WSDL20 {
 		return errors.New("WSDL 2.0 is not supported")
@@ -85,6 +98,7 @@ func (def *WSDLDef) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	}
 }
 
+// SW-REQ-084
 func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	//Get value of name attribute
 	for _, attr := range start.Attr {
@@ -158,7 +172,9 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 							{
 								log.Debugf("Unsupported binding protocol is used %s:%s", t.Name.Space, t.Name.Local)
 								b.isSupportedProtocol = false
-								return nil
+								if err := d.Skip(); err != nil {
+									return err
+								}
 							}
 						}
 					}
@@ -183,7 +199,6 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 		case xml.EndElement:
 			{
 				if t.Name.Space == NS_WSDL && t.Name.Local == "binding" {
-					bindingList[b.Name] = b
 					return nil
 				}
 			}
@@ -191,6 +206,7 @@ func (b *WSDLBinding) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 	}
 }
 
+// SW-REQ-084
 func (op *WSDLOperation) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	for _, attr := range start.Attr {
 		if attr.Name.Local == "name" {
@@ -269,11 +285,18 @@ func (op *WSDLOperation) UnmarshalXML(d *xml.Decoder, start xml.StartElement) er
 	}
 }
 
+// SW-REQ-084
 func (s *WSDLDef) LoadFrom(r io.Reader) error {
+	s.Definition = WSDL{}
 	return xml.NewDecoder(r).Decode(&s)
 }
 
+// SW-REQ-084
 func (def *WSDLDef) ToAPIDefinition(orgId, upstreamURL string, as_mock bool) (*apidef.APIDefinition, error) {
+	if len(def.Definition.Services) == 0 {
+		return nil, errors.New("Error processing wsdl file")
+	}
+
 	ad := apidef.APIDefinition{
 		Name:             def.Definition.Services[0].Name,
 		Active:           true,
@@ -303,6 +326,7 @@ func (def *WSDLDef) ToAPIDefinition(orgId, upstreamURL string, as_mock bool) (*a
 	return &ad, nil
 }
 
+// SW-REQ-084
 func trimNamespace(s string) string {
 	parts := strings.SplitN(s, ":", 2)
 	if len(parts) == 1 {
@@ -312,6 +336,7 @@ func trimNamespace(s string) string {
 	}
 }
 
+// SW-REQ-084
 func (def *WSDLDef) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
 	versionInfo := apidef.VersionInfo{}
 	versionInfo.UseExtendedPaths = true
@@ -322,14 +347,24 @@ func (def *WSDLDef) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
 
 	var foundPort bool
 	var serviceCount int
+	bindings := make(map[string]*WSDLBinding, len(def.Definition.Bindings))
+	for _, binding := range def.Definition.Bindings {
+		if binding != nil {
+			bindings[binding.Name] = binding
+		}
+	}
 
 	for _, service := range def.Definition.Services {
 		foundPort = false
 		if service.Name == "" {
 			continue
 		}
+		if len(service.Ports) == 0 {
+			log.Errorf("No port found for service %s. Skiping processing of the service", service.Name)
+			continue
+		}
 		for _, port := range service.Ports {
-			portName := portName[service.Name]
+			portName := def.servicePortNames[service.Name]
 			if portName == "" {
 				portName = service.Ports[0].Name
 			}
@@ -338,7 +373,7 @@ func (def *WSDLDef) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
 
 				bindingName := trimNamespace(port.Binding)
 
-				binding := bindingList[bindingName]
+				binding := bindings[bindingName]
 				if binding == nil {
 					log.Errorf("Binding for port %s of service %s not found. Termination processing of the service", port.Name, service.Name)
 
@@ -362,6 +397,10 @@ func (def *WSDLDef) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
 
 				//Create endpoints for each operation
 				for _, op := range binding.Operations {
+					if binding.Protocol == PROT_HTTP && op.Endpoint == "" {
+						return versionInfo, errors.New("Error processing wsdl file")
+					}
+
 					operationTrackEndpoint := apidef.TrackEndpointMeta{}
 					operationUrlRewrite := apidef.URLRewriteMeta{}
 					path := ""
@@ -418,12 +457,14 @@ func (def *WSDLDef) ConvertIntoApiVersion(bool) (apidef.VersionInfo, error) {
 	return versionInfo, nil
 }
 
+// SW-REQ-084
 func (def *WSDLDef) InsertIntoAPIDefinitionAsVersion(version apidef.VersionInfo, apidef *apidef.APIDefinition, versionName string) error {
 	apidef.VersionData.NotVersioned = false
 	apidef.VersionData.Versions[versionName] = version
 	return nil
 }
 
+// SW-REQ-084
 func ReplaceWildCards(endpoint string) string {
 	var result []rune
 	var inside bool
