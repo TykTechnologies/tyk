@@ -12,6 +12,7 @@ risk: request_context_session_hashing
 cve_surface: none
 affected_api: ctx.SetSession
 attacker_input: 'non-attacker trigger: caller passes one hashKey override'
+introduced_in: 61ca289b6e82f0ca5be1f8e0f7422fba4d8ae8b7
 reproducer_command: go test ./ctx -run TestKnownIssue_SetSessionSingleHashOverrideIgnored -count=1
 minimization_status: minimized
 mitigation: Do not rely on the single variadic SetSession hashKey override until the helper uses len(hashKey) > 0; align config.Global().HashKeys with the intended hash behavior for call sites that reach this helper.
