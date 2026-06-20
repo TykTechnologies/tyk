@@ -94,6 +94,8 @@ func TestAllowance_Valid(t *testing.T) {
 // SYS-REQ-103:error_handling:negative
 // SW-REQ-006:error_handling:nominal
 // SW-REQ-006:error_handling:negative
+// MCDC SYS-REQ-103: rate_limit_allowance_operation_requested=T, rate_limit_allowance_state_result_returned=F => FALSE
+// MCDC SW-REQ-006: rate_limit_allowance_operation_requested=T, rate_limit_allowance_state_result_returned=F => FALSE
 func TestAllowance_Err(t *testing.T) {
 	t.Run("Valid allowance", func(t *testing.T) {
 		allowance := &Allowance{
