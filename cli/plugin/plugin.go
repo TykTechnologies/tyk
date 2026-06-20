@@ -21,7 +21,8 @@ type pluginLoader struct {
 	symbol *string
 }
 
-// Load tries to load a plugin
+// Load tries to load a plugin.
+// SW-REQ-122
 func (p *pluginLoader) Load(_ *kingpin.ParseContext) (err error) {
 	defer func() {
 		if thrown := recover(); thrown != nil {
@@ -33,6 +34,7 @@ func (p *pluginLoader) Load(_ *kingpin.ParseContext) (err error) {
 	return
 }
 
+// SW-REQ-122
 func (p *pluginLoader) load() error {
 	for _, filename := range strings.Split(*p.file, ",") {
 		funcSymbol, err := goplugin.GetSymbol(filename, *p.symbol)
@@ -45,12 +47,14 @@ func (p *pluginLoader) load() error {
 	return nil
 }
 
+// SW-REQ-122
 func (p *pluginLoader) info(message string) {
 }
 
 var loader = &pluginLoader{}
 
-// AddTo initializes an importer object.
+// AddTo initializes a plugin command.
+// SW-REQ-122
 func AddTo(app *kingpin.Application) {
 	cmd := app.Command(cmdName, cmdDesc)
 

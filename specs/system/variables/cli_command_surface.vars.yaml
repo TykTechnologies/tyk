@@ -1,0 +1,5 @@
+component: cli_command_surface
+no_interface:
+    declared: true
+    reason: The cli, cli/plugin, and cli/version packages are exercised as local command-surface helpers for command registration, flag parsing, plugin load checks, and version output; gateway startup, real plugin execution, gateway middleware effects, persistence, network binding, analytics, and runtime request handling are outside this local component boundary.
+variables: []

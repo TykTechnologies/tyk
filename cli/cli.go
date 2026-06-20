@@ -57,12 +57,14 @@ var initOnce sync.Once
 // Init sets all flags and subcommands.
 // It's only run once to avoid races over the globals.
 // The arguments are ignored for subsequent runs.
+// SW-REQ-122
 func Init(confPaths []string) {
 	initOnce.Do(func() {
 		setup(confPaths)
 	})
 }
 
+// SW-REQ-122
 func setup(confPaths []string) {
 	app = kingpin.New(appName, appDesc)
 	app.HelpFlag.Short('h')
@@ -124,6 +126,7 @@ func setup(confPaths []string) {
 }
 
 // Parse parses the command-line arguments.
+// SW-REQ-122
 func Parse() {
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }

@@ -1,0 +1,75 @@
+id: STK-REQ-047
+version: 1
+status: approved
+priority: shall
+category: operational
+req_type: guarantee
+fretish: ""
+description: Gateway CLI command-surface support shall give operators predictable local command setup for gateway start flags, plugin load checks, and version reporting without claiming gateway startup behavior, real plugin execution, configuration semantics, persistence, network binding, analytics, or final runtime request behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: cli_command_surface
+rationale: CLI command-surface behavior is operator-facing tooling. This stakeholder requirement owns only local command registration, flag binding, parsing dispatch, plugin-load local error handling, and version output formatting.
+tags:
+    - cli
+    - command
+    - plugin
+    - version
+variables: []
+traces:
+    reviewed_at: "2026-06-20T16:59:46Z"
+    reviewed_by: human:buger
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T16:59:46Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. CLI command-surface scope is limited to local cli/cli.go, cli/plugin/plugin.go, and cli/version/version.go behavior: one-time top-level command setup, start flag registration and parsing, Parse dispatch through the configured Kingpin application, plugin load command registration, file/symbol flag binding, local plugin load errors, panic-to-error conversion, deterministic version text output, JSON version output, and version command registration. This approval does not claim gateway startup behavior, real plugin execution, plugin runtime safety, gateway middleware effects, configuration semantics, process exit behavior for other commands, persistence, network binding, analytics, or final client-visible gateway behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T16:59:46Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T16:59:46Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need local CLI command setup for start flags, plugin load checks, and version reporting to behave predictably before I rely on the gateway binary.
+    acceptance_criteria:
+        - id: STK-REQ-047-AC-01
+          text: Given CLI initialization, when command setup runs more than once, then the global command application is configured once and the expected top-level commands are available.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-135
+        - id: STK-REQ-047-AC-02
+          text: Given a start command invocation, when local start flags are parsed, then the configured global start flag pointers receive the selected values and the default start action is selected.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-135
+        - id: STK-REQ-047-AC-03
+          text: Given a plugin load command invocation, when the local plugin file cannot be loaded or the loader panics, then an explicit local error is returned instead of silently accepting the input.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-135
+        - id: STK-REQ-047-AC-04
+          text: Given a version command invocation, when text or JSON output is requested, then the local version helper emits deterministic build and runtime fields.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-135
+lifecycle:
+    change_history:
+        - date: "2026-06-20T16:59:46Z"
+          from: draft
+          to: approved
+          reason: Added CLI command-surface stakeholder requirement for cli, cli/plugin, and cli/version onboarding.
+          changed_by: human:buger

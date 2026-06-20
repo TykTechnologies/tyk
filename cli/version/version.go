@@ -38,6 +38,7 @@ type runtimeInfo struct {
 }
 
 // String implements fmt.Stringer for the version info.
+// SW-REQ-122
 func (v *versionInfo) String() string {
 	var output strings.Builder
 	output.WriteString("Release version: " + v.Version + "\n")
@@ -50,6 +51,7 @@ func (v *versionInfo) String() string {
 }
 
 // Run is the entry point for printing out version information.
+// SW-REQ-122
 func (v *versionInfo) Run(ctx *kingpin.ParseContext) (err error) {
 	if *v.asJson {
 		out, err := json.MarshalIndent(v, "", "    ")
@@ -66,6 +68,7 @@ func (v *versionInfo) Run(ctx *kingpin.ParseContext) (err error) {
 }
 
 // AddTo initializes a version info object.
+// SW-REQ-122
 func AddTo(app *kingpin.Application) {
 	cmd := app.Command(cmdName, cmdDesc)
 

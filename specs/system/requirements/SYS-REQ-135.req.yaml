@@ -1,0 +1,54 @@
+id: SYS-REQ-135
+version: 1
+status: approved
+priority: shall
+category: operational
+req_type: guarantee
+fretish: ""
+description: Gateway CLI command-surface support shall determine local command results by registering top-level start, lint, version, import, bundle, and plugin commands; binding start profiling, config, port, debug, and instrumentation flags; dispatching Parse through the configured Kingpin application; registering plugin load file and symbol flags; returning explicit local plugin load or panic errors; and emitting deterministic version text or JSON output without claiming gateway startup behavior, real plugin execution, plugin runtime safety, gateway middleware effects, configuration semantics, persistence, network binding, analytics, or final client-visible gateway behavior.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: cli/cli_reqproof_test.go; cli/plugin/plugin_reqproof_test.go; cli/version/version_reqproof_test.go; docs/cli-command-surface-requirements-evidence.md
+    verified: true
+parent: STK-REQ-047
+component: cli_command_surface
+rationale: This system requirement owns only local command-surface setup and output behavior. Gateway startup, real plugin execution, runtime middleware effects, and final request behavior are outside this proof slice.
+tags:
+    - cli
+    - command
+    - plugin
+    - version
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-047
+    reviewed_at: "2026-06-20T16:59:46Z"
+    reviewed_by: human:buger
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T16:59:46Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. CLI command-surface scope is limited to local cli/cli.go, cli/plugin/plugin.go, and cli/version/version.go behavior: one-time top-level command setup, start flag registration and parsing, Parse dispatch through the configured Kingpin application, plugin load command registration, file/symbol flag binding, local plugin load errors, panic-to-error conversion, deterministic version text output, JSON version output, and version command registration. This approval does not claim gateway startup behavior, real plugin execution, plugin runtime safety, gateway middleware effects, configuration semantics, process exit behavior for other commands, persistence, network binding, analytics, or final client-visible gateway behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T16:59:46Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T16:59:46Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-20T16:59:46Z"
+          from: draft
+          to: approved
+          reason: Added CLI command-surface system requirement for cli, cli/plugin, and cli/version onboarding.
+          changed_by: human:buger
