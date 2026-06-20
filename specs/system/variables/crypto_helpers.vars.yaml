@@ -6,4 +6,4 @@ variables:
     - name: crypto_helper_operation_terminal
       type: bool
       direction: output
-      description: 'The local crypto helper operation reaches a terminal observable result: a mapped value, parsed token field, generated local artifact, signature validation result, returned error/empty value, or deterministic in-memory certificate-pool update.'
+      description: 'The local crypto helper operation reaches a terminal observable result: a mapped value, parsed token field, generated local artifact, returned error/empty value, or deterministic in-memory certificate-pool update.'

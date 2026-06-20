@@ -1,43 +1,43 @@
 id: STK-REQ-041
 version: 1
-status: review
+status: approved
 priority: shall
 category: security
 req_type: guarantee
 fretish: ""
-description: Internal crypto helper support shall locally preserve cipher metadata mapping, cipher name resolution, hash, token, and Mashery signature helper behavior, certificate helper classification and pool update behavior, and local encrypt/decrypt helper outcomes, without claiming cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
+description: Internal crypto helper support shall locally preserve cipher metadata mapping, cipher name resolution, hash and token helper behavior, certificate helper classification and pool update behavior, and local encrypt/decrypt helper outcomes, without claiming cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
 formalization_strategy: informal
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: crypto_helpers
-rationale: The internal/crypto and signature_validator packages own local helper transformations used by other packages. Product-level security guarantees remain outside this proof slice until those callers are onboarded with their own requirements and evidence.
+rationale: The internal/crypto package owns local helper transformations used by other packages. Product-level security guarantees remain outside this proof slice until those callers are onboarded with their own requirements and evidence.
 tags:
     - crypto
     - security
     - helpers
 variables: []
 traces:
-    reviewed_at: "2026-06-20T14:00:00Z"
-    reviewed_by: agent:codex
+    reviewed_at: "2026-06-20T13:34:00.930319Z"
+    reviewed_by: human:buger
     reviewed_fingerprint: sha256:239d148486156160793e1c278260a79c4ae373e0a4573c892eb2c173e5f466c6
 verification:
     assurance_level: A
     formalization_status: none
     review:
         status: approved
-        reviewer: agent:codex
+        reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-20T14:00:00Z"
+        reviewed_at: "2026-06-20T12:00:00Z"
         comment: >-
-            Agent review under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Crypto helper scope is limited to local internal/crypto and signature_validator behavior: cipher metadata mapping and name resolution, hash algorithm selection and key hashing, token generation and token field parsing, Mashery signature hasher selection and clock-skew validation helper outcomes, certificate helper classification and CA-pool updates, public-key PEM helper generation, and local encrypt/decrypt helper outcomes. This approval does not claim cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, request authentication middleware behavior, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
-        ai_generated: true
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Crypto helper scope is limited to local internal/crypto behavior: cipher metadata mapping and name resolution, hash algorithm selection and key hashing, token generation and token field parsing, certificate helper classification and CA-pool updates, public-key PEM helper generation, and local encrypt/decrypt helper outcomes. This approval does not claim cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
+        ai_generated: false
 history:
     created_by: agent:codex
     created_at: "2026-06-20T12:00:00Z"
-    last_modified_by: agent:codex
-    last_modified_at: "2026-06-20T14:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T12:00:00Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -45,7 +45,7 @@ obligation_checklist:
     - determinism
 stakeholder:
     persona: Gateway maintainer
-    story: As a gateway maintainer, I need local crypto and signature helpers to preserve their documented helper transformations so callers can rely on stable helper behavior while broader security outcomes are verified at the caller capability level.
+    story: As a gateway maintainer, I need local crypto helpers to preserve their documented helper transformations so callers can rely on stable helper behavior while broader security outcomes are verified at the caller capability level.
     acceptance_criteria:
         - id: STK-REQ-041-AC-01
           text: Given TLS cipher metadata or cipher names, when local helpers map or resolve them, then the helper returns the expected local cipher representation or an explicit not-found error.
@@ -53,7 +53,7 @@ stakeholder:
           derived_reqs:
             - SYS-REQ-129
         - id: STK-REQ-041-AC-02
-          text: Given token, hash, or Mashery signature helper inputs, when local helpers generate, parse, hash, or validate values, then they preserve the documented algorithm-selection, fallback, field-extraction, and local signature-window behavior.
+          text: Given token and hash helper inputs, when local helpers generate, parse, or hash values, then they preserve the documented algorithm-selection, fallback, and field-extraction behavior.
           verification_method: test
           derived_reqs:
             - SYS-REQ-129
@@ -68,9 +68,4 @@ lifecycle:
           from: draft
           to: review
           reason: Added crypto helper stakeholder requirement for internal/crypto onboarding.
-          changed_by: agent:codex
-        - date: "2026-06-20T14:00:00Z"
-          from: approved
-          to: review
-          reason: Added signature_validator local helper behavior under existing crypto helper stakeholder scope.
           changed_by: agent:codex
