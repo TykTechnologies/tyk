@@ -1,0 +1,9 @@
+component: upstream_oauth
+no_interface:
+    declared: true
+    reason: The ee/middleware/upstreamoauth proof slice covers local upstream OAuth middleware helper behavior only; upstream request execution, external OAuth server correctness, reverse-proxy behavior, credential validity, token cryptographic strength beyond existing helper use, network transport delivery, and final client-visible gateway behavior are outside this component boundary.
+variables:
+    - name: upstream_oauth_operation_terminal
+      type: bool
+      direction: output
+      description: 'The local upstream OAuth helper operation reaches a terminal observable result: an enablement decision, selected OAuth grant provider, bearer-token result or explicit local error, request-context provider installation, selected metadata update, cache result, HTTP client selection, or OAuth error event emission.'

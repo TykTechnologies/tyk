@@ -1,3 +1,4 @@
+// Verifies: STK-REQ-049, SYS-REQ-137, SW-REQ-124
 package upstreamoauth
 
 import (
@@ -17,6 +18,8 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 )
 
+// SW-REQ-124:nominal:nominal
+// SW-REQ-124:determinism:nominal
 func TestProvider_Fill(t *testing.T) {
 	logger := logrus.NewEntry(logrus.New())
 	provider := Provider{
@@ -366,6 +369,9 @@ func TestGenerateCacheKeys_Different(t *testing.T) {
 	assert.NotEqual(t, key1, key2, "Different configurations should produce different cache keys")
 }
 
+// STK-REQ-049:STK-REQ-049-AC-05:acceptance
+// STK-REQ-049:error_handling:negative
+// SW-REQ-124:error_handling:negative
 func TestHandleOAuthError(t *testing.T) {
 	// Setup mock middleware
 	mw := &Middleware{

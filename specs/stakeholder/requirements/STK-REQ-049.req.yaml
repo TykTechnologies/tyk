@@ -1,0 +1,80 @@
+id: STK-REQ-049
+version: 1
+status: approved
+priority: shall
+category: enterprise
+req_type: guarantee
+fretish: ""
+description: Enterprise upstream OAuth support shall locally decide middleware enablement, select exactly one configured OAuth grant provider, obtain or reuse client-credentials and password-grant bearer tokens, install the configured upstream authentication header provider into request context, preserve selected OAuth response metadata in request context, and emit local OAuth error events without claiming upstream request execution, external OAuth server correctness, reverse-proxy behavior, credential validity, token cryptographic strength beyond existing helper use, network transport delivery, or final client-visible gateway behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: upstream_oauth
+rationale: The upstream OAuth middleware package owns local provider selection, token/cache helper behavior, request-context provider installation, metadata propagation, and error event emission. External OAuth service behavior, reverse-proxy execution, and final client-visible gateway outcomes remain outside this proof slice.
+tags:
+    - enterprise
+    - upstream-auth
+    - oauth
+variables: []
+traces:
+    reviewed_at: "2026-06-20T18:20:00Z"
+    reviewed_by: human:buger
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T18:20:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Upstream OAuth scope is limited to local ee/middleware/upstreamoauth behavior: enablement decisions, provider selection for client-credentials or password grants, token cache key construction, cache hit/miss/error handling, encrypted token cache payload construction/parsing, selected metadata propagation into request context, default/custom upstream header selection, request-context provider installation, external-services HTTP client selection, and local OAuth error event emission. This approval does not claim upstream request execution, external OAuth server correctness, reverse-proxy behavior, credential validity, token cryptographic strength beyond existing helper use, network transport delivery, or final client-visible gateway behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T18:20:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T18:20:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Enterprise gateway operator
+    story: As an enterprise gateway operator, I need upstream OAuth middleware to install the intended upstream bearer-token provider before reverse-proxy code consumes request context.
+    acceptance_criteria:
+        - id: STK-REQ-049-AC-01
+          text: Given upstream authentication and upstream OAuth settings, when local middleware evaluates enablement, then it enables only when both upstream authentication and OAuth are enabled.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-137
+        - id: STK-REQ-049-AC-02
+          text: Given enabled client-credentials OAuth settings and a local token endpoint response, when local middleware processes requests, then it obtains or reuses a bearer token and stores an upstream authentication provider for the configured header.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-137
+        - id: STK-REQ-049-AC-03
+          text: Given enabled password-grant OAuth settings and a local token endpoint response, when local middleware processes requests, then it obtains or reuses a bearer token and stores an upstream authentication provider for the configured header.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-137
+        - id: STK-REQ-049-AC-04
+          text: Given cached token data or OAuth response metadata and a configured metadata key list, when local OAuth helpers process token data, then only non-empty selected metadata keys are stored in request context.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-137
+        - id: STK-REQ-049-AC-05
+          text: Given invalid OAuth provider configuration or a token acquisition/cache failure, when local OAuth helpers run, then they return explicit local errors and emit the local OAuth error event where middleware error handling owns the failure.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-137
+lifecycle:
+    change_history:
+        - date: "2026-06-20T18:20:00Z"
+          from: draft
+          to: approved
+          reason: Added upstream OAuth stakeholder requirement for ee/middleware/upstreamoauth onboarding.
+          changed_by: human:buger

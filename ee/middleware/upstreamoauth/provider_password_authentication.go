@@ -7,6 +7,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// SW-REQ-124
 func (client *PasswordClient) ObtainToken(ctx context.Context) (*oauth2.Token, error) {
 	cfg := newOAuth2PasswordConfig(client.mw)
 
@@ -18,6 +19,7 @@ func (client *PasswordClient) ObtainToken(ctx context.Context) (*oauth2.Token, e
 	return cfg.PasswordCredentialsToken(ctx, client.mw.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Username, client.mw.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Password)
 }
 
+// SW-REQ-124
 func (client *PasswordClient) GetToken(r *http.Request) (string, error) {
 	cacheKey := generatePasswordOAuthCacheKey(client.mw.Spec.UpstreamAuth.OAuth, client.mw.Spec.APIID)
 	secret := client.mw.Gw.GetConfig().Secret
@@ -31,6 +33,7 @@ func (client *PasswordClient) GetToken(r *http.Request) (string, error) {
 }
 
 // getHTTPClient creates an HTTP client with external services configuration if available
+// SW-REQ-124
 func (client *PasswordClient) getHTTPClient() *http.Client {
 	return createOAuthHTTPClient(client.mw)
 }

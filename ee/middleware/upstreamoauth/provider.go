@@ -28,6 +28,7 @@ type Provider struct {
 }
 
 // Fill sets the request's HeaderName with AuthValue
+// SW-REQ-124
 func (u Provider) Fill(r *http.Request) {
 	if r.Header.Get(u.HeaderName) != "" {
 		u.Logger.WithFields(logrus.Fields{
@@ -46,6 +47,7 @@ type OAuthHeaderProvider interface {
 	headerEnabled(mw *Middleware) bool
 }
 
+// SW-REQ-124
 func NewOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) (OAuthHeaderProvider, error) {
 	if !oauthConfig.IsEnabled() {
 		return nil, fmt.Errorf("upstream OAuth is not enabled")
@@ -65,6 +67,7 @@ func NewOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) (OAuthHeaderProvid
 	}
 }
 
+// SW-REQ-124
 func (p *ClientCredentialsOAuthProvider) getOAuthToken(r *http.Request, mw *Middleware) (string, error) {
 	client := ClientCredentialsClient{mw}
 	token, err := client.GetToken(r)
@@ -75,19 +78,23 @@ func (p *ClientCredentialsOAuthProvider) getOAuthToken(r *http.Request, mw *Midd
 	return fmt.Sprintf("Bearer %s", token), nil
 }
 
+// SW-REQ-124
 func handleOAuthError(r *http.Request, mw *Middleware, err error) (string, error) {
 	mw.FireEvent(r, event.UpstreamOAuthError, err.Error(), mw.Spec.APIID)
 	return "", err
 }
 
+// SW-REQ-124
 func (p *ClientCredentialsOAuthProvider) getHeaderName(OAuthSpec *Middleware) string {
 	return OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.Header.Name
 }
 
+// SW-REQ-124
 func (p *ClientCredentialsOAuthProvider) headerEnabled(OAuthSpec *Middleware) bool {
 	return OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.Header.Enabled
 }
 
+// SW-REQ-124
 func newOAuth2ClientCredentialsConfig(OAuthSpec *Middleware) oauth2clientcredentials.Config {
 	return oauth2clientcredentials.Config{
 		ClientID:     OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ClientID,
@@ -97,6 +104,7 @@ func newOAuth2ClientCredentialsConfig(OAuthSpec *Middleware) oauth2clientcredent
 	}
 }
 
+// SW-REQ-124
 func newOAuth2PasswordConfig(OAuthSpec *Middleware) oauth2.Config {
 	return oauth2.Config{
 		ClientID:     OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ClientID,
@@ -116,6 +124,7 @@ type PasswordClient struct {
 	mw *Middleware
 }
 
+// SW-REQ-124
 func generateClientCredentialsCacheKey(config apidef.UpstreamOAuth, apiId string) string {
 	key := fmt.Sprintf(
 		"cc-%s|%s|%s|%s",
@@ -129,6 +138,7 @@ func generateClientCredentialsCacheKey(config apidef.UpstreamOAuth, apiId string
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
+// SW-REQ-124
 func retryGetKeyAndLock(cacheKey string, cache Storage) (string, error) {
 	const maxRetries = 10
 	const retryDelay = 100 * time.Millisecond
@@ -154,6 +164,7 @@ func retryGetKeyAndLock(cacheKey string, cache Storage) (string, error) {
 	return "", fmt.Errorf("failed to acquire lock after retries: %w", err)
 }
 
+// SW-REQ-124
 func SetExtraMetadata(r *http.Request, keyList []string, metadata map[string]interface{}) {
 	contextDataObject := CtxGetData(r)
 	if contextDataObject == nil {
@@ -173,6 +184,7 @@ type EventUpstreamOAuthMeta struct {
 	APIID string
 }
 
+// SW-REQ-124
 func (p *PasswordOAuthProvider) getOAuthToken(r *http.Request, mw *Middleware) (string, error) {
 	client := PasswordClient{mw}
 	token, err := client.GetToken(r)
@@ -183,14 +195,17 @@ func (p *PasswordOAuthProvider) getOAuthToken(r *http.Request, mw *Middleware) (
 	return fmt.Sprintf("Bearer %s", token), nil
 }
 
+// SW-REQ-124
 func (p *PasswordOAuthProvider) getHeaderName(OAuthSpec *Middleware) string {
 	return OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Header.Name
 }
 
+// SW-REQ-124
 func (p *PasswordOAuthProvider) headerEnabled(OAuthSpec *Middleware) bool {
 	return OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Header.Enabled
 }
 
+// SW-REQ-124
 func generatePasswordOAuthCacheKey(config apidef.UpstreamOAuth, apiId string) string {
 	key := fmt.Sprintf(
 		"pw-%s|%s|%s|%s",

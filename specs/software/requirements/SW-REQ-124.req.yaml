@@ -1,0 +1,56 @@
+id: SW-REQ-124
+version: 1
+status: approved
+priority: shall
+category: enterprise
+req_type: guarantee
+fretish: ""
+description: The ee/middleware/upstreamoauth package shall preserve local upstream OAuth middleware behavior for enablement decisions, client-credentials and password provider selection, token cache key construction, cache hit/miss/error handling, encrypted token cache payload construction and parsing, selected metadata propagation into request context, default/custom upstream header selection, request-context provider installation, external-services HTTP client selection, and local OAuth error event emission, without claiming upstream request execution, external OAuth server correctness, reverse-proxy behavior, credential validity, token cryptographic strength beyond existing helper use, network transport delivery, or final client-visible gateway behavior.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: ee/middleware/upstreamoauth/middleware_test.go; ee/middleware/upstreamoauth/provider_test.go; ee/middleware/upstreamoauth/provider_comprehensive_test.go; ee/middleware/upstreamoauth/token_cache_test.go; ee/middleware/upstreamoauth/oauth_client_utils_test.go; ee/middleware/upstreamoauth/oauth_context_test.go; docs/upstream-oauth-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-137
+component: upstream_oauth
+rationale: >-
+    This software requirement owns local ee/middleware/upstreamoauth middleware mechanics only. It does not claim upstream request execution, external OAuth server correctness, reverse-proxy behavior, credential validity, token cryptographic strength beyond existing helper use, network transport delivery, or final client-visible gateway behavior.
+tags:
+    - enterprise
+    - upstream-auth
+    - oauth
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-137
+    reviewed_at: "2026-06-20T18:20:00Z"
+    reviewed_by: human:buger
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T18:20:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-124 is scoped to local ee/middleware/upstreamoauth behavior: enablement decisions, provider selection for client-credentials or password grants, token cache key construction, cache hit/miss/error handling, encrypted token cache payload construction/parsing, selected metadata propagation into request context, default/custom upstream header selection, request-context provider installation, external-services HTTP client selection, and local OAuth error event emission. Focused package tests passed locally. This approval does not claim upstream request execution, external OAuth server correctness, reverse-proxy behavior, credential validity, token cryptographic strength beyond existing helper use, network transport delivery, or final client-visible gateway behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T18:20:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T18:20:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T18:20:00Z"
+          from: draft
+          to: approved
+          reason: Added ee/middleware/upstreamoauth local middleware behavior under upstream OAuth support.
+          changed_by: human:buger

@@ -7,6 +7,7 @@ import (
 )
 
 // createOAuthHTTPClient creates an HTTP client for OAuth operations with proper mTLS error handling
+// SW-REQ-124
 func createOAuthHTTPClient(mw *Middleware) *http.Client {
 	gwConfig := mw.Gw.GetConfig()
 

@@ -71,6 +71,12 @@ func (m *mockStorage) Lock(key string, timeout time.Duration) (bool, error) {
 	return args.Bool(0), args.Error(1)
 }
 
+// Verifies: STK-REQ-049, SYS-REQ-137, SW-REQ-124
+// SYS-REQ-137:nominal:nominal
+// SW-REQ-124:nominal:nominal
+// SW-REQ-124:boundary:nominal
+// SW-REQ-124:determinism:nominal
+// MCDC SYS-REQ-137: upstream_oauth_operation_terminal=T => TRUE
 func TestMiddleware_NewMiddleware(t *testing.T) {
 	gw := &mockGateway{}
 	mw := &mockBaseMiddleware{}
@@ -88,11 +94,16 @@ func TestMiddleware_NewMiddleware(t *testing.T) {
 	assert.Equal(t, pwStorage, middleware.passwordStorageHandler)
 }
 
+// Verifies: SW-REQ-124
 func TestMiddleware_Name(t *testing.T) {
 	middleware := &Middleware{}
 	assert.Equal(t, MiddlewareName, middleware.Name())
 }
 
+// Verifies: STK-REQ-049, SYS-REQ-137, SW-REQ-124
+// STK-REQ-049:STK-REQ-049-AC-01:acceptance
+// SW-REQ-124:boundary:nominal
+// SW-REQ-124:determinism:nominal
 func TestMiddleware_EnabledForSpec(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -148,6 +159,9 @@ func TestMiddleware_EnabledForSpec(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-049, SYS-REQ-137, SW-REQ-124
+// STK-REQ-049:STK-REQ-049-AC-02:acceptance
+// SW-REQ-124:nominal:nominal
 func TestMiddleware_ProcessRequest_ClientCredentials(t *testing.T) {
 	// Setup OAuth server
 	oauthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -217,6 +231,9 @@ func TestMiddleware_ProcessRequest_ClientCredentials(t *testing.T) {
 	storage.AssertCalled(t, "SetKey", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("int64"))
 }
 
+// Verifies: STK-REQ-049, SYS-REQ-137, SW-REQ-124
+// STK-REQ-049:STK-REQ-049-AC-03:acceptance
+// SW-REQ-124:nominal:nominal
 func TestMiddleware_ProcessRequest_PasswordAuth(t *testing.T) {
 	// Setup OAuth server
 	oauthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -287,6 +304,10 @@ func TestMiddleware_ProcessRequest_PasswordAuth(t *testing.T) {
 	storage.AssertCalled(t, "SetKey", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("int64"))
 }
 
+// Verifies: STK-REQ-049, SYS-REQ-137, SW-REQ-124
+// STK-REQ-049:STK-REQ-049-AC-05:acceptance
+// STK-REQ-049:error_handling:negative
+// SW-REQ-124:error_handling:negative
 func TestMiddleware_ProcessRequest_InvalidConfig(t *testing.T) {
 	gw := &mockGateway{}
 	mw := &mockBaseMiddleware{}
@@ -316,6 +337,12 @@ func TestMiddleware_ProcessRequest_InvalidConfig(t *testing.T) {
 	assert.Contains(t, err.Error(), "no OAuth configuration selected")
 }
 
+// Verifies: STK-REQ-049, SYS-REQ-137, SW-REQ-124
+// STK-REQ-049:error_handling:negative
+// SYS-REQ-137:error_handling:nominal
+// SW-REQ-124:error_handling:nominal
+// SW-REQ-124:error_handling:negative
+// SW-REQ-124:boundary:nominal
 func TestNewOAuthHeaderProvider(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -396,6 +423,7 @@ func TestNewOAuthHeaderProvider(t *testing.T) {
 	}
 }
 
+// Verifies: SW-REQ-124
 func TestClientCredentialsClient_GetHTTPClient(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -470,6 +498,7 @@ func TestClientCredentialsClient_GetHTTPClient(t *testing.T) {
 	}
 }
 
+// Verifies: SW-REQ-124
 func TestPasswordClient_GetHTTPClient(t *testing.T) {
 	tests := []struct {
 		name     string

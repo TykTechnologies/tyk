@@ -7,6 +7,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// SW-REQ-124
 func (client *ClientCredentialsClient) ObtainToken(ctx context.Context) (*oauth2.Token, error) {
 	cfg := newOAuth2ClientCredentialsConfig(client.mw)
 
@@ -19,6 +20,7 @@ func (client *ClientCredentialsClient) ObtainToken(ctx context.Context) (*oauth2
 	return tokenSource.Token()
 }
 
+// SW-REQ-124
 func (client *ClientCredentialsClient) GetToken(r *http.Request) (string, error) {
 	cacheKey := generateClientCredentialsCacheKey(client.mw.Spec.UpstreamAuth.OAuth, client.mw.Spec.APIID)
 	secret := client.mw.Gw.GetConfig().Secret
@@ -32,6 +34,7 @@ func (client *ClientCredentialsClient) GetToken(r *http.Request) (string, error)
 }
 
 // getHTTPClient creates an HTTP client with external services configuration if available
+// SW-REQ-124
 func (client *ClientCredentialsClient) getHTTPClient() *http.Client {
 	return createOAuthHTTPClient(client.mw)
 }

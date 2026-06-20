@@ -19,6 +19,7 @@ type Cache interface {
 	ObtainToken(ctx context.Context) (*oauth2.Token, error)
 }
 
+// SW-REQ-124
 func getToken(r *http.Request, cacheKey string, obtainTokenFunc func(context.Context) (*oauth2.Token, error), secret string, extraMetadata []string, cache Storage) (string, error) {
 	tokenData, err := retryGetKeyAndLock(cacheKey, cache)
 	if err != nil {
@@ -56,11 +57,13 @@ func getToken(r *http.Request, cacheKey string, obtainTokenFunc func(context.Con
 	return token.AccessToken, nil
 }
 
+// SW-REQ-124
 func setTokenInCache(cache Storage, cacheKey string, token string, ttl time.Duration) error {
 	oauthTokenExpiry := time.Now().Add(ttl)
 	return cache.SetKey(cacheKey, token, int64(time.Until(oauthTokenExpiry).Seconds()))
 }
 
+// SW-REQ-124
 func CreateTokenDataBytes(encryptedToken string, token *oauth2.Token, extraMetadataKeys []string) ([]byte, error) {
 	td := TokenData{
 		Token:         encryptedToken,
@@ -69,6 +72,7 @@ func CreateTokenDataBytes(encryptedToken string, token *oauth2.Token, extraMetad
 	return json.Marshal(td)
 }
 
+// SW-REQ-124
 func UnmarshalTokenData(tokenData string) (TokenData, error) {
 	var tokenContents TokenData
 	err := json.Unmarshal([]byte(tokenData), &tokenContents)
@@ -78,6 +82,7 @@ func UnmarshalTokenData(tokenData string) (TokenData, error) {
 	return tokenContents, nil
 }
 
+// SW-REQ-124
 func BuildMetadataMap(token *oauth2.Token, extraMetadataKeys []string) map[string]interface{} {
 	metadataMap := make(map[string]interface{})
 	for _, key := range extraMetadataKeys {

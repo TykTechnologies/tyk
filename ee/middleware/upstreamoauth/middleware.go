@@ -23,6 +23,7 @@ type Middleware struct {
 	passwordStorageHandler          Storage
 }
 
+// SW-REQ-124
 func (m *Middleware) Unload() {
 	// nothing to do here
 }
@@ -31,6 +32,7 @@ func (m *Middleware) Unload() {
 var _ model.Middleware = &Middleware{}
 
 // NewMiddleware returns a new instance of Middleware.
+// SW-REQ-124
 func NewMiddleware(gw Gateway, mw BaseMiddleware, spec model.MergedAPI, ccStorageHandler Storage, pwStorageHandler Storage) *Middleware {
 	return &Middleware{
 		Base:                            mw,
@@ -42,16 +44,19 @@ func NewMiddleware(gw Gateway, mw BaseMiddleware, spec model.MergedAPI, ccStorag
 }
 
 // Logger returns a logger with middleware filled out.
+// SW-REQ-124
 func (m *Middleware) Logger() *logrus.Entry {
 	return m.Base.Logger().WithField("mw", m.Name())
 }
 
 // Name returns the name for the middleware.
+// SW-REQ-124
 func (m *Middleware) Name() string {
 	return MiddlewareName
 }
 
 // EnabledForSpec checks if streaming is enabled on the config.
+// SW-REQ-124
 func (m *Middleware) EnabledForSpec() bool {
 	if !m.Spec.UpstreamAuth.IsEnabled() {
 		return false
@@ -65,11 +70,13 @@ func (m *Middleware) EnabledForSpec() bool {
 }
 
 // Init initializes the middleware.
+// SW-REQ-124
 func (m *Middleware) Init() {
 	m.Logger().Debug("Initializing Upstream basic auth Middleware")
 }
 
 // ProcessRequest will handle upstream OAuth.
+// SW-REQ-124
 func (m *Middleware) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	provider, err := NewOAuthHeaderProvider(m.Spec.UpstreamAuth.OAuth)
 	if err != nil {
@@ -104,6 +111,7 @@ func (m *Middleware) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ in
 }
 
 // FireEvent emits an upstream OAuth event with an optional custom message.
+// SW-REQ-124
 func (mw *Middleware) FireEvent(r *http.Request, e event.Event, message string, apiId string) {
 	if message == "" {
 		message = event.String(e)

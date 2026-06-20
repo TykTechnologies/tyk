@@ -1,0 +1,63 @@
+id: SYS-REQ-137
+version: 1
+status: approved
+priority: shall
+category: enterprise
+req_type: guarantee
+fretish: the upstream_oauth shall always satisfy upstream_oauth_operation_terminal
+description: Enterprise upstream OAuth support shall make local middleware operations terminal and deterministic for enablement decisions, client-credentials and password provider selection, token cache key construction, cache hit/miss/error handling, encrypted token cache payload construction and parsing, selected metadata propagation into request context, default/custom upstream header selection, request-context provider installation, external-services HTTP client selection, and local OAuth error event emission, without claiming upstream request execution, external OAuth server correctness, reverse-proxy behavior, credential validity, token cryptographic strength beyond existing helper use, network transport delivery, or final client-visible gateway behavior.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-049
+component: upstream_oauth
+rationale: This system requirement owns local ee/middleware/upstreamoauth helper terminality and determinism only. External OAuth service behavior, reverse-proxy execution, and final response semantics remain outside this proof slice.
+tags:
+    - enterprise
+    - upstream-auth
+    - oauth
+variables:
+    - upstream_oauth_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-049
+    reviewed_at: "2026-06-20T18:20:00Z"
+    reviewed_by: human:buger
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T18:20:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Upstream OAuth system scope is limited to terminal local helper behavior in ee/middleware/upstreamoauth: enablement decisions, provider selection for client-credentials or password grants, token cache key construction, cache hit/miss/error handling, encrypted token cache payload construction/parsing, selected metadata propagation into request context, default/custom upstream header selection, request-context provider installation, external-services HTTP client selection, and local OAuth error event emission. The FRETish invariant intentionally models local operation terminality without asserting upstream request execution, external OAuth server correctness, reverse-proxy behavior, credential validity, token cryptographic strength beyond existing helper use, network transport delivery, or final client-visible gateway behavior.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T18:20:00Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-137|upstream_oauth_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after requirement approval. SYS-REQ-137''s upstream_oauth_operation_terminal variable is decomposed by SW-REQ-124 for local ee/middleware/upstreamoauth behavior: enablement decisions, provider selection for client-credentials or password grants, token cache key construction, cache hit/miss/error handling, encrypted token cache payload construction/parsing, selected metadata propagation into request context, default/custom upstream header selection, request-context provider installation, external-services HTTP client selection, and local OAuth error event emission. This review is limited to local upstream OAuth middleware helper mechanics and does not claim upstream request execution, external OAuth server correctness, reverse-proxy behavior, credential validity, token cryptographic strength beyond existing helper use, network transport delivery, or final client-visible gateway behavior.'
+          reviewed_at: "2026-06-20T18:20:00Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T18:20:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T18:20:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T18:20:00Z"
+          from: draft
+          to: approved
+          reason: Added upstream OAuth system requirement for ee/middleware/upstreamoauth onboarding.
+          changed_by: human:buger

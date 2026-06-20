@@ -1,3 +1,4 @@
+// Verifies: STK-REQ-049, SYS-REQ-137, SW-REQ-124
 package upstreamoauth
 
 import (
@@ -16,6 +17,8 @@ import (
 	"github.com/TykTechnologies/tyk/internal/crypto"
 )
 
+// STK-REQ-049:STK-REQ-049-AC-04:acceptance
+// SW-REQ-124:nominal:nominal
 func TestGetToken_CacheHit(t *testing.T) {
 	secret := "test-secret"
 	cacheKey := "test-cache-key"
@@ -62,6 +65,7 @@ func TestGetToken_CacheHit(t *testing.T) {
 	assert.Equal(t, "https://example.com", contextData["instance_url"])
 }
 
+// SW-REQ-124:nominal:nominal
 func TestGetToken_CacheMiss(t *testing.T) {
 	secret := "test-secret"
 	cacheKey := "test-cache-key"
@@ -104,6 +108,9 @@ func TestGetToken_CacheMiss(t *testing.T) {
 	assert.Equal(t, "read write admin", contextData["scope"])
 }
 
+// STK-REQ-049:STK-REQ-049-AC-05:acceptance
+// STK-REQ-049:error_handling:negative
+// SW-REQ-124:error_handling:negative
 func TestGetToken_ObtainTokenError(t *testing.T) {
 	secret := "test-secret"
 	cacheKey := "test-cache-key"
@@ -192,6 +199,7 @@ func TestUnmarshalTokenData(t *testing.T) {
 	assert.Equal(t, originalData.ExtraMetadata, result.ExtraMetadata)
 }
 
+// SW-REQ-124:error_handling:negative
 func TestUnmarshalTokenData_InvalidJSON(t *testing.T) {
 	invalidJSON := "invalid json"
 
@@ -258,6 +266,7 @@ func TestRetryGetKeyAndLock_LockAcquired(t *testing.T) {
 	storage.AssertCalled(t, "Lock", lockKey, 5*time.Second)
 }
 
+// SW-REQ-124:error_handling:negative
 func TestRetryGetKeyAndLock_MaxRetriesExceeded(t *testing.T) {
 	cacheKey := "test-key"
 	lockKey := cacheKey + ":lock"

@@ -1,3 +1,4 @@
+// Verifies: STK-REQ-049, SYS-REQ-137, SW-REQ-124
 package upstreamoauth_test
 
 import (
@@ -27,6 +28,9 @@ type APISpec = gateway.APISpec
 const ClientCredentialsAuthorizeType = upstreamoauth.ClientCredentialsAuthorizeType
 const PasswordAuthorizeType = upstreamoauth.PasswordAuthorizeType
 
+// STK-REQ-049:STK-REQ-049-AC-02:acceptance
+// SW-REQ-124:nominal:nominal
+// SW-REQ-124:determinism:nominal
 func TestProvider_ClientCredentialsAuthorizeType(t *testing.T) {
 	tst := StartTest(nil)
 	t.Cleanup(tst.Close)
@@ -129,6 +133,9 @@ func TestProvider_ClientCredentialsAuthorizeType(t *testing.T) {
 
 }
 
+// STK-REQ-049:STK-REQ-049-AC-03:acceptance
+// SW-REQ-124:nominal:nominal
+// SW-REQ-124:determinism:nominal
 func TestProvider_PasswordAuthorizeType(t *testing.T) {
 	tst := StartTest(nil)
 	t.Cleanup(tst.Close)
@@ -234,6 +241,8 @@ func TestProvider_PasswordAuthorizeType(t *testing.T) {
 	}...)
 }
 
+// STK-REQ-049:STK-REQ-049-AC-04:acceptance
+// SW-REQ-124:nominal:nominal
 func TestSetExtraMetadata(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://tykxample.com", nil)
 
