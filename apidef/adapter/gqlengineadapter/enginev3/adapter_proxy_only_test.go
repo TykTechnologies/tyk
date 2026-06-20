@@ -15,6 +15,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-076
 func TestProxyOnly_EngineConfigV2(t *testing.T) {
 	t.Run("should create v2 config for proxy-only mode", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig

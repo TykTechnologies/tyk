@@ -16,6 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-072
 func TestParseSchema(t *testing.T) {
 	inputSchema := `
 		type Query {
@@ -29,6 +30,7 @@ func TestParseSchema(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-072
 func TestGraphqlDataSourceWebSocketProtocol(t *testing.T) {
 	run := func(subscriptionType apidef.SubscriptionType, expectedWebSocketProtocol string) func(t *testing.T) {
 		return func(t *testing.T) {
@@ -55,6 +57,7 @@ func TestGraphqlDataSourceWebSocketProtocol(t *testing.T) {
 	)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-072
 func TestGraphqlSubscriptionType(t *testing.T) {
 	run := func(subscriptionType apidef.SubscriptionType, expectedGraphQLSubscriptionType graphql.SubscriptionType) func(t *testing.T) {
 		return func(t *testing.T) {
@@ -81,6 +84,7 @@ func TestGraphqlSubscriptionType(t *testing.T) {
 	)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-072
 func TestConvertApiDefinitionHeadersToHttpHeaders(t *testing.T) {
 	t.Run("should return nil for empty input", func(t *testing.T) {
 		assert.Nil(t, ConvertApiDefinitionHeadersToHttpHeaders(nil))
@@ -102,6 +106,7 @@ func TestConvertApiDefinitionHeadersToHttpHeaders(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-072
 func TestRemoveDuplicateApiDefinitionHeaders(t *testing.T) {
 	apiDefinitionHeadersFirstArgument := map[string]string{
 		"duplicate-header": "value",
@@ -120,6 +125,7 @@ func TestRemoveDuplicateApiDefinitionHeaders(t *testing.T) {
 	assert.Equal(t, expectedDeduplicatedHeaders, actualDeduplicatedHeaders)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-072
 func TestGenerateRestDataSourceFromGraphql(t *testing.T) {
 	t.Run("should return error if generation is not possible", func(t *testing.T) {
 		gqlConfig := apidef.GraphQLEngineDataSourceConfigGraphQL{

@@ -14,6 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-072
 func TestGraphqlDataSourceConfiguration(t *testing.T) {
 	type testInput struct {
 		url              string
@@ -117,6 +118,7 @@ func TestGraphqlDataSourceConfiguration(t *testing.T) {
 
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-072
 func TestCreateArgumentConfigurationsForArgumentNames(t *testing.T) {
 	expectedArgumentConfigurations := plan.ArgumentsConfigurations{
 		{
@@ -133,6 +135,7 @@ func TestCreateArgumentConfigurationsForArgumentNames(t *testing.T) {
 	assert.Equal(t, expectedArgumentConfigurations, actualArgumentConfigurations)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-072
 func TestExtractURLQueryParamsForEngineV2(t *testing.T) {
 	type expectedOutput struct {
 		urlWithoutParams string
@@ -200,6 +203,7 @@ func TestExtractURLQueryParamsForEngineV2(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-072
 func TestAppendURLQueryParamsToEngineV2Queries(t *testing.T) {
 	existingEngineV2Queries := &[]restdatasource.QueryConfiguration{
 		{
@@ -232,6 +236,7 @@ func TestAppendURLQueryParamsToEngineV2Queries(t *testing.T) {
 	assert.Equal(t, expectedEngineV2Queries, existingEngineV2Queries)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-072
 func TestAppendApiDefQueriesConfigToEngineV2Queries(t *testing.T) {
 	existingEngineV2Queries := &[]restdatasource.QueryConfiguration{
 		{
@@ -270,6 +275,7 @@ func TestAppendApiDefQueriesConfigToEngineV2Queries(t *testing.T) {
 	assert.Equal(t, expectedEngineV2Queries, existingEngineV2Queries)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-072
 func TestCreateGraphQLDataSourceFactory(t *testing.T) {
 	inputParams := createGraphQLDataSourceFactoryParams{
 		graphqlConfig: apidef.GraphQLEngineDataSourceConfigGraphQL{
@@ -299,6 +305,7 @@ func TestCreateGraphQLDataSourceFactory(t *testing.T) {
 	assert.Equal(t, expectedGraphQLDataSourceFactory, actualGraphQLDataSourceFactory)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-072
 func TestSubscriptionClientFactoryOrDefault(t *testing.T) {
 	t.Run("should return the provided subscriptionClientFactory if not nil", func(t *testing.T) {
 		factory := &MockSubscriptionClientFactory{}

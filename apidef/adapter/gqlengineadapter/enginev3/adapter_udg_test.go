@@ -16,6 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-079
 func TestUniversalDataGraph_EngineConfig(t *testing.T) {
 	t.Run("should create v2 config for engine execution mode without error", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
@@ -39,6 +40,7 @@ func TestUniversalDataGraph_EngineConfig(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-079
 func TestUniversalDataGraph_engineConfigV2FieldConfigs(t *testing.T) {
 	expectedFieldCfgs := plan.FieldConfigurations{
 		{
@@ -145,6 +147,7 @@ func TestUniversalDataGraph_engineConfigV2FieldConfigs(t *testing.T) {
 	assert.ElementsMatch(t, expectedFieldCfgs, actualFieldCfgs)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-079
 func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 	httpClient := &http.Client{}
 	streamingClient := &http.Client{}

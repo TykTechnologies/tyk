@@ -14,6 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-077
 func TestSupergraph_EngineConfigV2(t *testing.T) {
 	t.Run("should create v2 config for supergraph execution mode without error", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
@@ -102,6 +103,7 @@ func TestSupergraph_EngineConfigV2(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-077
 func TestSupergraph_supergraphDataSourceConfigs(t *testing.T) {
 	expectedDataSourceConfigs := []graphqldatasource.Configuration{
 		{
