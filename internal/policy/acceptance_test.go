@@ -31,6 +31,7 @@ func acceptancePolicy(orgID, id string) user.Policy {
 }
 
 // Verifies: STK-REQ-001, STK-REQ-005 [example]
+// STK-REQ-001:STK-REQ-001-AC-01:acceptance
 func TestAcceptance_ApplySinglePolicyMergesAllFields(t *testing.T) {
 	orgID := "org1"
 	svc := newTestService(orgID, []user.Policy{acceptancePolicy(orgID, "gold")})
@@ -50,6 +51,7 @@ func TestAcceptance_ApplySinglePolicyMergesAllFields(t *testing.T) {
 }
 
 // Verifies: STK-REQ-001 [example]
+// STK-REQ-001:STK-REQ-001-AC-02:acceptance
 func TestAcceptance_ApplyPerAPIPolicyAppliesIndependentLimits(t *testing.T) {
 	orgID := "org1"
 	pol := acceptancePolicy(orgID, "per-api")
@@ -91,6 +93,7 @@ func TestAcceptance_ApplyPerAPIPolicyAppliesIndependentLimits(t *testing.T) {
 }
 
 // Verifies: STK-REQ-001 [example]
+// STK-REQ-001:STK-REQ-001-AC-03:acceptance
 func TestAcceptance_ApplyPartitionedPolicyAppliesOnlyEnabledFields(t *testing.T) {
 	orgID := "org1"
 	pol := acceptancePolicy(orgID, "quota-acl")
@@ -127,6 +130,7 @@ func TestAcceptance_ApplyPartitionedPolicyAppliesOnlyEnabledFields(t *testing.T)
 }
 
 // Verifies: STK-REQ-001, STK-REQ-003 [example]
+// STK-REQ-001:STK-REQ-001-AC-04:acceptance
 func TestAcceptance_ApplyMultiplePoliciesHighestRateWins(t *testing.T) {
 	orgID := "org1"
 	low := acceptancePolicy(orgID, "low")
@@ -231,6 +235,7 @@ func TestAcceptance_ApplyPolicyNotFoundReportsErrorAndPreservesFields(t *testing
 }
 
 // Verifies: STK-REQ-001 [negative]
+// STK-REQ-001:STK-REQ-001-AC-05:acceptance
 func TestAcceptance_ApplyOrgMismatchReportsError(t *testing.T) {
 	orgID := "org1"
 	wrongOrg := acceptancePolicy("other", "wrong-org")
