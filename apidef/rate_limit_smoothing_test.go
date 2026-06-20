@@ -8,6 +8,7 @@ import (
 
 // Verifies: SW-REQ-032
 // SW-REQ-032:nominal:nominal
+// SW-REQ-032:error_handling:nominal
 // SW-REQ-032:error_handling:negative
 func TestRateLimitSmoothing_Valid(t *testing.T) {
 	t.Run("Valid case", func(t *testing.T) {
@@ -35,7 +36,9 @@ func TestRateLimitSmoothing_Valid(t *testing.T) {
 
 // Verifies: SW-REQ-032
 // SW-REQ-032:nominal:nominal
+// SW-REQ-032:boundary:nominal
 // SW-REQ-032:boundary:boundary
+// SW-REQ-032:error_handling:nominal
 // SW-REQ-032:error_handling:negative
 func TestRateLimitSmoothing_Err(t *testing.T) {
 	tests := []struct {
@@ -118,6 +121,7 @@ func TestRateLimitSmoothing_Err(t *testing.T) {
 }
 
 // Verifies: SW-REQ-032
+// SW-REQ-032:boundary:nominal
 // SW-REQ-032:boundary:boundary
 func TestRateLimitSmoothing_IsZero(t *testing.T) {
 	t.Run("nil smoothing is zero", func(t *testing.T) {

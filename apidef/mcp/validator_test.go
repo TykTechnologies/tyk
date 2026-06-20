@@ -22,6 +22,7 @@ func getStrPointer(str string) *string {
 // SYS-REQ-107:nominal:nominal
 // SYS-REQ-107:malformed_input:negative
 // SW-REQ-037:nominal:nominal
+// SW-REQ-037:malformed_input:nominal
 // SW-REQ-037:malformed_input:negative
 func TestValidateMCPObject(t *testing.T) {
 
@@ -337,6 +338,7 @@ func Test_loadMCPSchema(t *testing.T) {
 // Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-037
 // STK-REQ-019:boundary:boundary
 // SYS-REQ-107:boundary:boundary
+// SW-REQ-037:boundary:nominal
 // SW-REQ-037:boundary:boundary
 func TestGetDefinitionsKey(t *testing.T) {
 
@@ -368,6 +370,7 @@ func TestGetDefinitionsKey(t *testing.T) {
 // Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-037
 // STK-REQ-019:boundary:boundary
 // SYS-REQ-107:boundary:boundary
+// SW-REQ-037:boundary:nominal
 // SW-REQ-037:boundary:boundary
 func Test_findDefaultVersion(t *testing.T) {
 	t.Run("single version", func(t *testing.T) {
@@ -386,6 +389,7 @@ func Test_findDefaultVersion(t *testing.T) {
 // Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-037
 // STK-REQ-019:boundary:boundary
 // SYS-REQ-107:boundary:boundary
+// SW-REQ-037:boundary:nominal
 // SW-REQ-037:boundary:boundary
 func Test_setDefaultVersion(t *testing.T) {
 	err := loadMCPSchema()
@@ -401,6 +405,7 @@ func Test_setDefaultVersion(t *testing.T) {
 // SYS-REQ-107:nominal:nominal
 // SYS-REQ-107:error_handling:negative
 // SW-REQ-037:nominal:nominal
+// SW-REQ-037:error_handling:nominal
 // SW-REQ-037:error_handling:negative
 func TestGetMCPSchema(t *testing.T) {
 	err := loadMCPSchema()
@@ -532,6 +537,7 @@ func TestValidateMCPObject_WithPRM(t *testing.T) {
 // SYS-REQ-107:nominal:nominal
 // SYS-REQ-107:boundary:boundary
 // SW-REQ-037:nominal:nominal
+// SW-REQ-037:boundary:nominal
 // SW-REQ-037:boundary:boundary
 func TestValidateMCPObject_RestrictedMiddleware(t *testing.T) {
 

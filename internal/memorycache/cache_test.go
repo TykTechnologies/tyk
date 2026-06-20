@@ -13,6 +13,7 @@ import (
 // SYS-REQ-103:idempotency:nominal
 // SYS-REQ-103:boundary:boundary
 // SW-REQ-031:idempotency:nominal
+// SW-REQ-031:boundary:nominal
 // SW-REQ-031:boundary:boundary
 func TestCache_Shutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())

@@ -36,7 +36,9 @@ func TestMCPPrimitiveReqProof_JSONShape(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-107, SW-REQ-048
+// SW-REQ-048:boundary:nominal
 // SW-REQ-048:boundary:boundary
+// SW-REQ-048:nil_safety:nominal
 // SW-REQ-048:nil_safety:negative
 func TestMCPPrimitiveReqProof_ExtractNilSafety(t *testing.T) {
 	var primitive *MCPPrimitive
@@ -55,7 +57,9 @@ func TestMCPPrimitiveReqProof_ExtractNilSafety(t *testing.T) {
 
 // Verifies: SYS-REQ-107, SW-REQ-048
 // SW-REQ-048:nominal:nominal
+// SW-REQ-048:access_denied:nominal
 // SW-REQ-048:access_denied:negative
+// SW-REQ-048:boundary:nominal
 // SW-REQ-048:boundary:boundary
 func TestMCPPrimitiveReqProof_ExtractDisablesIncompatibleMiddleware(t *testing.T) {
 	primitive := &MCPPrimitive{}

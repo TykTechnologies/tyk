@@ -12,6 +12,7 @@ import (
 // SYS-REQ-107:nominal:nominal
 // SYS-REQ-107:error_handling:negative
 // SW-REQ-039:nominal:nominal
+// SW-REQ-039:error_handling:nominal
 // SW-REQ-039:error_handling:negative
 func TestGoJSONSchemaFacadeRequirement(t *testing.T) {
 	schema := map[string]any{

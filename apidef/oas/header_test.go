@@ -8,6 +8,7 @@ import (
 
 // Verifies: SYS-REQ-104, SW-REQ-047
 // SW-REQ-047:nominal:nominal
+// SW-REQ-047:boundary:nominal
 // SW-REQ-047:boundary:boundary
 // SW-REQ-047:determinism:nominal
 func TestHeaders_Map(t *testing.T) {
@@ -84,6 +85,7 @@ func TestHeaders_Add(t *testing.T) {
 
 // Verifies: SYS-REQ-104, SW-REQ-047
 // SW-REQ-047:nominal:nominal
+// SW-REQ-047:boundary:nominal
 // SW-REQ-047:boundary:boundary
 // SW-REQ-047:determinism:nominal
 func TestNewHeaders(t *testing.T) {

@@ -13,6 +13,7 @@ import (
 // Verifies: SYS-REQ-084, SW-REQ-050
 // SW-REQ-050:nominal:nominal
 // SW-REQ-050:boundary:nominal
+// SW-REQ-050:malformed_input:nominal
 // SW-REQ-050:malformed_input:negative
 // SW-REQ-050:encoding_safety:nominal
 // SW-REQ-050:determinism:nominal

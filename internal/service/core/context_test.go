@@ -39,6 +39,7 @@ func TestUpstreamAuth(t *testing.T) {
 		// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-036
 		// STK-REQ-020:boundary:boundary
 		// SYS-REQ-108:boundary:boundary
+		// SW-REQ-036:boundary:nominal
 		// SW-REQ-036:boundary:boundary
 		req := createReq(t)
 
@@ -50,6 +51,7 @@ func TestUpstreamAuth(t *testing.T) {
 		// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-036
 		// STK-REQ-020:boundary:boundary
 		// SYS-REQ-108:boundary:boundary
+		// SW-REQ-036:boundary:nominal
 		// SW-REQ-036:boundary:boundary
 		req := createReq(t)
 
@@ -100,6 +102,7 @@ func TestSetContext(t *testing.T) {
 		// Verifies: STK-REQ-020, SYS-REQ-108, SW-REQ-036
 		// STK-REQ-020:boundary:boundary
 		// SYS-REQ-108:boundary:boundary
+		// SW-REQ-036:boundary:nominal
 		// SW-REQ-036:boundary:boundary
 		req := createReq(t)
 

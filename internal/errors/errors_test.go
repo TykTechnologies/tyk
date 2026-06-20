@@ -51,6 +51,7 @@ func TestErrorFormatter(t *testing.T) {
 // SYS-REQ-107:nominal:nominal
 // SYS-REQ-107:error_handling:negative
 // SW-REQ-040:nominal:nominal
+// SW-REQ-040:error_handling:nominal
 // SW-REQ-040:error_handling:negative
 func TestErrorFacadeRequirement(t *testing.T) {
 	base := New("base")

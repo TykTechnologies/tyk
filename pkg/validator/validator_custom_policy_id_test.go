@@ -12,10 +12,13 @@ import (
 
 // Verifies: SW-REQ-034
 // SW-REQ-034:nominal:nominal
+// SW-REQ-034:boundary:nominal
 // SW-REQ-034:boundary:boundary
+// SW-REQ-034:error_handling:nominal
 // SW-REQ-034:error_handling:negative
+// SW-REQ-034:malformed_input:nominal
 // SW-REQ-034:malformed_input:negative
-func Test_customPolicyIdValidator(t *testing.T) {
+func TestCustomPolicyIDValidator(t *testing.T) {
 	type parentStruct struct {
 		Id string `validate:"custom_policy_id"`
 	}

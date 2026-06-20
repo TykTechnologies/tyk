@@ -64,6 +64,7 @@ func TestVisitor_applyManipulations(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-104, SW-REQ-044
+// SW-REQ-044:boundary:nominal
 // SW-REQ-044:boundary:boundary
 // SW-REQ-044:idempotency:nominal
 func TestVisitor_isVisited_and_resetVisited(t *testing.T) {
@@ -113,6 +114,7 @@ func TestVisitor_ProcessOAS_Components(t *testing.T) {
 
 // Verifies: SYS-REQ-104, SW-REQ-044
 // SW-REQ-044:nominal:nominal
+// SW-REQ-044:boundary:nominal
 // SW-REQ-044:boundary:boundary
 func TestVisitor_ProcessOAS_Paths(t *testing.T) {
 	paramSchema := openapi3.NewSchema()
@@ -210,7 +212,9 @@ func TestVisitor_ProcessOAS_Paths(t *testing.T) {
 
 // Verifies: SYS-REQ-104, SW-REQ-044
 // SW-REQ-044:nominal:nominal
+// SW-REQ-044:boundary:nominal
 // SW-REQ-044:boundary:boundary
+// SW-REQ-044:nil_safety:nominal
 // SW-REQ-044:nil_safety:negative
 func TestVisitor_processSchema(t *testing.T) {
 	rootSchema := openapi3.NewSchema()
@@ -277,6 +281,7 @@ func TestVisitor_processSchema(t *testing.T) {
 
 // Verifies: SYS-REQ-104, SW-REQ-044
 // SW-REQ-044:encoding_safety:nominal
+// SW-REQ-044:boundary:nominal
 // SW-REQ-044:boundary:boundary
 func TestVisitor_regexpManipulations(t *testing.T) {
 	tcTransformUnicodeEscapesToRE2 := []struct {
@@ -411,7 +416,9 @@ func TestVisitor_regexpManipulations(t *testing.T) {
 
 // Verifies: SYS-REQ-104, SW-REQ-044
 // SW-REQ-044:encoding_safety:nominal
+// SW-REQ-044:error_handling:nominal
 // SW-REQ-044:error_handling:negative
+// SW-REQ-044:nil_safety:nominal
 // SW-REQ-044:nil_safety:negative
 func TestRestoreUnicodeEscapesInError(t *testing.T) {
 	assert.NoError(t, RestoreUnicodeEscapesInError(nil))

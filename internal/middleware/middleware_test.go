@@ -8,6 +8,7 @@ import (
 
 // Verifies: SYS-REQ-104, SW-REQ-045
 // SW-REQ-045:nominal:nominal
+// SW-REQ-045:boundary:nominal
 // SW-REQ-045:boundary:boundary
 func TestEnabled(t *testing.T) {
 	tests := []struct {

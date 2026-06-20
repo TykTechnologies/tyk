@@ -9,6 +9,7 @@ import (
 
 // Verifies: SW-REQ-033
 // SW-REQ-033:nominal:nominal
+// SW-REQ-033:boundary:nominal
 // SW-REQ-033:boundary:boundary
 func TestSchemaEmbeddedDocument(t *testing.T) {
 	require.NotEmpty(t, Schema)

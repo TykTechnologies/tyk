@@ -11,6 +11,7 @@ import (
 
 // Verifies: SYS-REQ-082, SW-REQ-046
 // SW-REQ-046:nominal:nominal
+// SW-REQ-046:boundary:nominal
 // SW-REQ-046:boundary:boundary
 // SW-REQ-046:determinism:nominal
 func TestFilter(t *testing.T) {

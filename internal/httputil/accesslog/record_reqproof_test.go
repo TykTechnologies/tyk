@@ -21,6 +21,7 @@ import (
 
 // Verifies: SYS-REQ-082, SW-REQ-049
 // SW-REQ-049:nominal:nominal
+// SW-REQ-049:boundary:nominal
 // SW-REQ-049:boundary:boundary
 // SW-REQ-049:encoding_safety:nominal
 // SW-REQ-049:determinism:nominal
