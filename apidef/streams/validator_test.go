@@ -21,6 +21,7 @@ import (
 //go:embed testdata/*-oas-template.json
 var oasTemplateFS embed.FS
 
+// Verifies: SYS-REQ-104, SW-REQ-096
 func TestValidateTykStreamsOASObject(t *testing.T) {
 	t.Parallel()
 	validOASObject := oas.OAS{
@@ -125,6 +126,7 @@ func TestValidateTykStreamsOASObject(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-096
 func TestValidateTykStreamsOASObject_3_1(t *testing.T) {
 	t.Parallel()
 
@@ -167,6 +169,7 @@ func TestValidateTykStreamsOASObject_3_1(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-096
 func TestValidateOASTemplate(t *testing.T) {
 	t.Run("empty x-tyk ext", func(t *testing.T) {
 		body, err := oasTemplateFS.ReadFile("testdata/empty-x-tyk-ext-oas-template.json")
@@ -183,6 +186,7 @@ func TestValidateOASTemplate(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-096
 func TestValidateOASTemplate_3_1(t *testing.T) {
 	t.Parallel()
 
@@ -205,6 +209,7 @@ func TestValidateOASTemplate_3_1(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-096
 func Test_loadOASSchema(t *testing.T) {
 	t.Parallel()
 	t.Run("load Tyk Streams OAS schemas", func(t *testing.T) {
@@ -243,6 +248,7 @@ func Test_loadOASSchema(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-096
 func Test_findDefaultVersion(t *testing.T) {
 	t.Parallel()
 	t.Run("single version", func(t *testing.T) {
@@ -258,6 +264,7 @@ func Test_findDefaultVersion(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-096
 func Test_setDefaultVersion(t *testing.T) {
 	err := loadSchemas()
 	assert.NoError(t, err)
@@ -266,6 +273,7 @@ func Test_setDefaultVersion(t *testing.T) {
 	assert.Equal(t, "3.0", defaultVersion)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-096
 func TestGetOASSchema(t *testing.T) {
 	err := loadSchemas()
 	assert.NoError(t, err)
@@ -323,6 +331,7 @@ func TestGetOASSchema(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-096
 func TestValidateTykStreams_BentoConfigValidation(t *testing.T) {
 	var document = []byte(`{
     "info": {
@@ -373,6 +382,7 @@ func TestValidateTykStreams_BentoConfigValidation(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-096
 func TestValidateTykStreams_BentoConfigValidation_Invalid_Config(t *testing.T) {
 	var document = []byte(`{
     "info": {
@@ -420,6 +430,7 @@ func TestValidateTykStreams_BentoConfigValidation_Invalid_Config(t *testing.T) {
 	require.ErrorContains(t, err, "pipeline: Additional property bloblang is not allowed")
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-096
 func TestValidateTykStreams_BentoConfigValidation_Additional_Properties(t *testing.T) {
 	// Currently, we only support Kafka as input. The following document includes unsupported input & output methods,
 	// but it doesn't break the validation process.

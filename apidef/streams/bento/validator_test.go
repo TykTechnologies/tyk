@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-095
 func TestValidateBentoConfiguration(t *testing.T) {
 	validator, err := NewDefaultConfigValidator()
 	require.NoError(t, err)
@@ -87,6 +88,7 @@ func TestValidateBentoConfiguration(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-095
 func TestValidateBentoConfiguration_NewEnableAllExperimentalConfigValidator(t *testing.T) {
 	// The purpose of this test is to make SonarCloud happy. EnableAllExperimentalConfigValidator validates everything.
 	validator := NewEnableAllExperimentalConfigValidator()

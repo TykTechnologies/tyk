@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-094
 func TestGenerateBentoConfigSchema(t *testing.T) {
 	// temporary directory will be automatically removed when the test complete.
 	tempFile, err := os.CreateTemp(t.TempDir(), "test-output-*.json")
@@ -37,6 +38,7 @@ func TestGenerateBentoConfigSchema(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-094
 func TestAddURIFormatToHTTPClient(t *testing.T) {
 	// temporary directory will be automatically removed when the test complete.
 	tempFile, err := os.CreateTemp(t.TempDir(), "test-output-*.json")
@@ -66,6 +68,7 @@ func TestAddURIFormatToHTTPClient(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-094
 func TestAddURIFormatToHTTPClient_Malformed_input(t *testing.T) {
 	rule := &addURIFormatToHTTPClientRule{}
 
