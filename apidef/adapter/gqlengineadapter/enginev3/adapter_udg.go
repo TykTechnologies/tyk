@@ -12,6 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// SW-REQ-079
 type UniversalDataGraph struct {
 	ApiDefinition   *apidef.APIDefinition
 	HttpClient      *http.Client
@@ -21,6 +22,7 @@ type UniversalDataGraph struct {
 	subscriptionClientFactory graphqldatasource.GraphQLSubscriptionClientFactory
 }
 
+// SW-REQ-079
 func (u *UniversalDataGraph) EngineConfigV3() (*graphql.EngineV2Configuration, error) {
 	var err error
 	if u.Schema == nil {
@@ -45,6 +47,7 @@ func (u *UniversalDataGraph) EngineConfigV3() (*graphql.EngineV2Configuration, e
 	return &conf, nil
 }
 
+// SW-REQ-079
 func (u *UniversalDataGraph) engineConfigV2FieldConfigs() (planFieldConfigs plan.FieldConfigurations) {
 	for _, fc := range u.ApiDefinition.GraphQL.Engine.FieldConfigs {
 		planFieldConfig := plan.FieldConfiguration{
@@ -64,6 +67,7 @@ func (u *UniversalDataGraph) engineConfigV2FieldConfigs() (planFieldConfigs plan
 	return planFieldConfigs
 }
 
+// SW-REQ-079
 func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan.DataSourceConfiguration, err error) {
 	for _, ds := range u.ApiDefinition.GraphQL.Engine.DataSources {
 		planDataSource := plan.DataSourceConfiguration{
@@ -175,6 +179,7 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 	return planDataSources, err
 }
 
+// SW-REQ-079
 func (u *UniversalDataGraph) engineConfigV2Arguments(fieldConfs *plan.FieldConfigurations, generatedArgs map[graphql.TypeFieldLookupKey]graphql.TypeFieldArguments) {
 	for i := range *fieldConfs {
 		if len(generatedArgs) == 0 {
@@ -200,6 +205,7 @@ func (u *UniversalDataGraph) engineConfigV2Arguments(fieldConfs *plan.FieldConfi
 	}
 }
 
+// SW-REQ-079
 func (u *UniversalDataGraph) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {
 	for i := range planDataSources {
 		for j := range planDataSources[i].RootNodes {

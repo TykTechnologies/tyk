@@ -34,6 +34,7 @@
 <!-- documents SW-REQ-076 -->
 <!-- documents SW-REQ-077 -->
 <!-- documents SW-REQ-078 -->
+<!-- documents SW-REQ-079 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -57,7 +58,8 @@ adapter support-shape generation, and GraphQL engine adapter utility behavior
 and proxy-only, supergraph, and universal-data-graph engine adapter
 configuration behavior, plus engine v3 proxy-only adapter configuration
 and supergraph adapter configuration behavior, and engine v3 utility behavior,
-without silent data-shape drift.
+and engine v3 universal-data-graph adapter configuration behavior, without
+silent data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -476,3 +478,22 @@ completeness; REST or GraphQL upstream availability; subscription transport
 execution; Kafka connectivity or consumption behavior; gateway API loading;
 route generation; request matching; gateway request admission; middleware
 execution; persistence; analytics; or final client-visible runtime behavior.
+
+`SW-REQ-079` owns the concrete
+`apidef/adapter/gqlengineadapter/enginev3` universal-data-graph engine adapter
+configuration assembly. Its evidence covers schema parsing when no schema is
+supplied, caller-supplied schema reuse, preservation of explicit field path and
+default-mapping settings, schema-derived field argument configuration, REST
+datasource configuration with URL query extraction and explicit query
+variables, GraphQL datasource configuration with caller-supplied HTTP,
+streaming, and subscription-client factory inputs, GraphQL-operation-as-REST
+configuration, Kafka subscription datasource configuration, schema-derived
+child-node metadata, schema and datasource configuration error propagation, and
+repeated-input determinism. This evidence does not claim GraphQL schema
+semantic completeness beyond local parse/normalize result propagation,
+correctness of upstream graphql-go-tools/v2 datasource factories, REST or
+GraphQL upstream availability, Kafka broker availability or consumption
+behavior, GraphQL execution, subscription transport execution, gateway API
+loading, route generation, request matching, gateway request admission,
+middleware execution, persistence, analytics, or final client-visible runtime
+behavior.
