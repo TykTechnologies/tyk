@@ -18,9 +18,10 @@ strict:
 - no fake `// MCDC` witnesses
 - no no-op trigger-false witnesses
 
-Most production Go files are still visible as out of scope until they have real
-product requirements, traces, and evidence. The path to zero warnings is full
-onboarding, not narrowing the audit or hiding the warning.
+All declared production Go files are now inside the verification scope. The
+path to zero warnings is full onboarding: the broader scope intentionally
+surfaces untraced production functions, orphan code, and orphan tests instead
+of hiding them behind a narrow enabled slice.
 
 ## Current Audit Snapshot
 
@@ -34,7 +35,7 @@ Result:
 
 ```text
 Errors: 0
-Warnings: 2
+Warnings: 7
 ```
 
 The remaining warnings are intentionally not hidden. Each is classified below by
@@ -44,11 +45,22 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 162/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
-| `mcdc_coverage` | 52/433 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
+| `verification_scope_complete` | all 447 declared production source files covered, but six source-looking roots omitted | ReqProof tooling gap for omitted-root dispositions | `.conductor/`, `ci/`, `tests/`, `test/`, `middleware/`, and `bin/` are intentionally not part of the declared production Go universe, but current ReqProof has no structured rationale-backed omitted-root exclusion that clears the warning. |
+| `lint_clean` | 2574 untraced functions | full trace onboarding required | Expanding the scope exposed production functions in previously unonboarded packages. They need real requirement ownership and `// Implements:` annotations, not bulk placeholder traces. |
+| `orphan_code_clean` | 2570 code functions have no requirement annotation | full trace onboarding required | Same underlying production trace gap as `lint_clean`, reported by the orphan-code check. |
+| `orphan_tests_clean` | 2119 test functions have no `// Verifies:` annotation | full evidence onboarding required | Package-level tests in the newly scoped production roots must either become requirement evidence with correct `// Verifies:` annotations or be reclassified only when they are truly non-evidence scaffolding. |
+| `verify_passes` | wrapper warning: `lint: 2574 untraced functions` | dependent on trace onboarding | The formal verification wrapper is clean except for the lint warning it invokes internally. |
+| `mcdc_coverage` | 52/449 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
+| `acceptance_criteria_witnessed` | 104 acceptance criteria across 37 stakeholder requirements lack direct acceptance witnesses | real integrated acceptance tests required | Stakeholder acceptance criteria require end-to-end acceptance tests annotated `<STK-REQ>:<AC-id>:acceptance`; package-level unit/service tests and derived-requirement tests do not count. Three atomicity criteria are deferred to KnownIssues but still remain warning-visible. |
 
 Closed during this pass:
 
+- `obligation_evidence_complete` was closed by adding real annotation rows to
+  existing focused tests; the focused test batches and `proof validate` passed.
+- The production Go scope gap was reduced from a file-coverage warning to an
+  omitted-root disposition warning by adding broad production Go globs to
+  `verification_scope.include` and actual-scope excludes for generated/mock and
+  harness roots.
 - `authored_delta_expected` was closed by real impact reviews for
   `internal/policy/apply.go` and related `internal/policy/util.go` ownership.
 - `spec_lint_status_vs_review` was closed for `SW-REQ-007` and `SW-REQ-008`
@@ -75,6 +87,11 @@ The trigger-false/no-action witness gap is tracked upstream:
 
 - `probelabs/reqproof#257` -- Require explicit no-action evidence on
   trigger-false MC/DC row witnesses.
+
+The omitted-root disposition gap is tracked upstream:
+
+- `probelabs/reqproof#269` -- verification_scope_complete needs
+  rationale-backed omitted-root exclusions.
 
 ## Current MC/DC Backlog Classification
 
@@ -601,8 +618,13 @@ requirement ignores.
 
 2. Scope onboarding path:
    - Add product capability hierarchy by domain, not by package name.
-   - Bring production packages into `verification_scope.include` in batches only
-     after real STK/SYS/SW requirements, traces, and tests exist.
+   - Keep the declared production Go universe in `verification_scope.include`;
+     do not return to a narrow enabled slice to make the warnings disappear.
+   - Onboard untraced functions and orphan tests by domain waves with real
+     STK/SYS/SW ownership and focused evidence.
+   - Use the upstream omitted-root disposition mechanism when available for
+     source-looking roots that are intentionally outside the production Go
+     universe.
    - Recent increments include `pkg/validator` custom-policy-ID validation,
      `dnscache` local DNS cache storage and manager behavior,
      `internal/service/core` upstream-auth request-context helpers, and
