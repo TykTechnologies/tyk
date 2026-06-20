@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: operational
 req_type: guarantee
-fretish: ""
+fretish: the cli_command_surface shall always satisfy !cli_command_surface_operation_requested | cli_command_surface_result_determined
 description: Gateway CLI command-surface support shall determine local command results by registering top-level start, lint, version, import, bundle, and plugin commands; binding start profiling, config, port, debug, and instrumentation flags; dispatching Parse through the configured Kingpin application; registering plugin load file and symbol flags; returning explicit local plugin load or panic errors; and emitting deterministic version text or JSON output without claiming gateway startup behavior, real plugin execution, plugin runtime safety, gateway middleware effects, configuration semantics, persistence, network binding, analytics, or final client-visible gateway behavior.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: cli/cli_reqproof_test.go; cli/plugin/plugin_reqproof_test.go; cli/version/version_reqproof_test.go; docs/cli-command-surface-requirements-evidence.md
@@ -19,15 +19,18 @@ tags:
     - command
     - plugin
     - version
-variables: []
+variables:
+    - cli_command_surface_operation_requested
+    - cli_command_surface_result_determined
 traces:
     satisfies:
         - STK-REQ-047
-    reviewed_at: "2026-06-20T16:59:46Z"
+    reviewed_at: "2026-06-20T17:43:33.352283Z"
     reviewed_by: human:buger
+    reviewed_fingerprint: sha256:c5a5e4831a214126cd8cb23273a0428715c44a2e7e8ca626356fab661d282544
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger
@@ -36,6 +39,14 @@ verification:
         comment: >-
             Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. CLI command-surface scope is limited to local cli/cli.go, cli/plugin/plugin.go, and cli/version/version.go behavior: one-time top-level command setup, start flag registration and parsing, Parse dispatch through the configured Kingpin application, plugin load command registration, file/symbol flag binding, local plugin load errors, panic-to-error conversion, deterministic version text output, JSON version output, and version command registration. This approval does not claim gateway startup behavior, real plugin execution, plugin runtime safety, gateway middleware effects, configuration semantics, process exit behavior for other commands, persistence, network binding, analytics, or final client-visible gateway behavior.
         ai_generated: false
+    gaps_reviewed_at: "2026-06-20T18:00:00Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-135|cli_command_surface_result_determined
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after formalization refresh. SYS-REQ-135''s cli_command_surface_result_determined variable is decomposed by SW-REQ-122 for local cli/cli.go, cli/plugin/plugin.go, and cli/version/version.go behavior: one-time top-level command setup, start flag registration and parsing, Parse dispatch through the configured Kingpin application, plugin load command registration, file/symbol flag binding, local plugin load errors, panic-to-error conversion, deterministic version text output, JSON version output, and version command registration. This review is limited to local CLI command-surface support and does not claim gateway startup behavior, real plugin execution, plugin runtime safety, gateway middleware effects, configuration semantics, process exit behavior for other commands, persistence, network binding, analytics, or final client-visible gateway behavior.'
+          reviewed_at: "2026-06-20T18:00:00Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T16:59:46Z"

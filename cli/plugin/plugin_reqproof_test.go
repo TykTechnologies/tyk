@@ -10,9 +10,11 @@ import (
 // Verifies: STK-REQ-047, SYS-REQ-135, SW-REQ-122
 // STK-REQ-047:STK-REQ-047-AC-03:acceptance
 // SYS-REQ-135:nominal:nominal
+// SYS-REQ-135:error_handling:negative
 // SW-REQ-122:nominal:nominal
 // SW-REQ-122:error_handling:nominal
 // SW-REQ-122:error_handling:negative
+// STK-REQ-047:error_handling:negative
 func TestCLICommandSurfaceReqProof_PluginLoaderAndRegistration(t *testing.T) {
 	missingFile := "missing-plugin.so"
 	symbol := "TestSymbol"

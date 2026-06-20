@@ -4,9 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"path"
 	"path/filepath"
-	"runtime"
 	"strconv"
 )
 
@@ -59,10 +57,10 @@ func NewDefaultWithEnv() (*Config, error) {
 
 // SW-REQ-109
 func findFile(filename string) (string, error) {
-	// Get folder in which current file lives
-	_, testFile, _, _ := runtime.Caller(0)
-	// Strip the filename and produce the dir
-	currentDir := path.Dir(testFile)
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
 
 	// Traverse the current directory and its parent directories
 	for {

@@ -25,6 +25,12 @@ import (
 //mcdc:ignore SYS-REQ-122: configuration_utility_operation_requested=T, configuration_utility_result_determined=F => FALSE -- violation row is the negation of the local configuration utility guarantee; these tests assert requested utility operations either discover config files, fall back to env defaults, clone defaults with env overrides, assemble host addresses, or return explicit local errors [category: defensive] [reviewed: agent:codex]
 func TestConfigNew(t *testing.T) {
 	t.Run("loads discovered config file", func(t *testing.T) {
+		root := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(root, "tyk.conf"), []byte("{}"), 0o600))
+		workDir := filepath.Join(root, "nested")
+		require.NoError(t, os.Mkdir(workDir, 0o755))
+		withWorkingDir(t, workDir)
+
 		conf, err := New()
 
 		require.NoError(t, err)
@@ -34,15 +40,7 @@ func TestConfigNew(t *testing.T) {
 	})
 
 	t.Run("falls back to environment when config file is missing", func(t *testing.T) {
-		repoConfigPath := filepath.Clean(filepath.Join("..", "tyk.conf"))
-		hiddenConfigPath := repoConfigPath + ".reqproof-hidden"
-
-		require.FileExists(t, repoConfigPath)
-		require.NoFileExists(t, hiddenConfigPath)
-		require.NoError(t, os.Rename(repoConfigPath, hiddenConfigPath))
-		t.Cleanup(func() {
-			require.NoError(t, os.Rename(hiddenConfigPath, repoConfigPath))
-		})
+		withWorkingDir(t, t.TempDir())
 		t.Setenv("TYK_GW_LISTENPORT", "9091")
 
 		conf, err := New()
@@ -75,17 +73,41 @@ func TestNewDefaultWithEnv(t *testing.T) {
 // SW-REQ-109:error_handling:negative
 func TestFindFile(t *testing.T) {
 	t.Run("finds config in parent directories", func(t *testing.T) {
+		root := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(root, "tyk.conf"), []byte("{}"), 0o600))
+		workDir := filepath.Join(root, "nested", "child")
+		require.NoError(t, os.MkdirAll(workDir, 0o755))
+		withWorkingDir(t, workDir)
+
 		got, err := findFile("tyk.conf")
 
 		require.NoError(t, err)
 		assert.Equal(t, "tyk.conf", filepath.Base(got))
+		gotDir, err := filepath.EvalSymlinks(filepath.Dir(got))
+		require.NoError(t, err)
+		wantDir, err := filepath.EvalSymlinks(root)
+		require.NoError(t, err)
+		assert.Equal(t, wantDir, gotDir)
 	})
 
 	t.Run("returns not exist for missing file", func(t *testing.T) {
+		withWorkingDir(t, t.TempDir())
+
 		_, err := findFile("definitely-not-present-reqproof.conf")
 
 		require.Error(t, err)
 		assert.True(t, errors.Is(err, os.ErrNotExist))
+	})
+}
+
+func withWorkingDir(t *testing.T, dir string) {
+	t.Helper()
+
+	oldDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(dir))
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldDir))
 	})
 }
 

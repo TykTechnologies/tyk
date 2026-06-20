@@ -2,4 +2,13 @@ component: cli_command_surface
 no_interface:
     declared: true
     reason: The cli, cli/plugin, and cli/version packages are exercised as local command-surface helpers for command registration, flag parsing, plugin load checks, and version output; gateway startup, real plugin execution, gateway middleware effects, persistence, network binding, analytics, and runtime request handling are outside this local component boundary.
-variables: []
+variables:
+    - name: cli_command_surface_operation_requested
+      type: bool
+      direction: input
+      description: Gateway CLI code requests top-level command setup, start flag registration and parsing, Parse dispatch, plugin load command registration, local plugin load checks, panic conversion, deterministic version text output, or JSON version output.
+
+    - name: cli_command_surface_result_determined
+      type: bool
+      direction: output
+      description: CLI command-surface support returns registered top-level commands and flags, bound start globals, Parse-selected command state, registered plugin load flags, explicit local plugin load or panic errors, deterministic version text, JSON version output, or version command registration.

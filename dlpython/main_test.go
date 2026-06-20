@@ -14,9 +14,11 @@ import (
 // Verifies: STK-REQ-048, SYS-REQ-136, SW-REQ-123
 // STK-REQ-048:STK-REQ-048-AC-01:acceptance
 // SYS-REQ-136:nominal:nominal
+// SYS-REQ-136:error_handling:negative
 // SW-REQ-123:nominal:nominal
 // SW-REQ-123:boundary:nominal
 // SW-REQ-123:error_handling:negative
+// STK-REQ-048:error_handling:negative
 func TestDLPythonReqProof_FindPythonConfig(t *testing.T) {
 	t.Parallel()
 
@@ -117,6 +119,7 @@ func TestDLPythonReqProof_FindPythonConfig(t *testing.T) {
 // SW-REQ-123:nominal:nominal
 // SW-REQ-123:boundary:nominal
 // SW-REQ-123:error_handling:nominal
+// MCDC SYS-REQ-136: dynamic_python_loader_operation_requested=T, dynamic_python_loader_result_determined=T => TRUE
 func TestDLPythonReqProof_InitBindingsAndHelpers(t *testing.T) {
 	restoreDLPythonGlobals(t)
 

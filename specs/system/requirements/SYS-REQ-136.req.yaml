@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: coprocess
 req_type: guarantee
-fretish: ""
+fretish: the dynamic_python_loader shall always satisfy !dynamic_python_loader_operation_requested | dynamic_python_loader_result_determined
 description: Dynamic Python loader support shall determine local loader results by scanning PATH bin directories for python-config executables, selecting the latest or requested Python version, parsing ldflags into platform-specific dynamic library paths, returning explicit local errors for empty PATH, missing config, missing version, unsupported OS, missing library, or dlopen/dlsym failures, mapping required Python C API symbols, forwarding initialization and object helper calls through the mapped symbols, and setting Python path state without claiming real CPython semantic correctness, Python plugin execution, gateway coprocess middleware behavior, plugin isolation, filesystem trust, external Python package availability, persistence, analytics, or final client-visible gateway behavior.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: dlpython/main_test.go; dlpython/version_test.go; docs/dlpython-requirements-evidence.md
@@ -19,7 +19,9 @@ tags:
     - python
     - coprocess
     - dynamic-loading
-variables: []
+variables:
+    - dynamic_python_loader_operation_requested
+    - dynamic_python_loader_result_determined
 traces:
     satisfies:
         - STK-REQ-048
@@ -27,7 +29,7 @@ traces:
     reviewed_by: human:buger
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger
@@ -36,6 +38,14 @@ verification:
         comment: >-
             Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Dynamic Python loader scope is limited to local dlpython behavior: python-config discovery, latest/custom version selection, library path parsing from ldflags output, dynamic symbol mapping through a fake Python library, runtime initialization forwarding, Python path updates, and representative module/object/tuple/bytes helper wrappers. Focused dlpython tests passed locally with fake python-config binaries and a fake dynamic library. This approval does not claim real CPython semantic correctness, Python plugin execution, gateway coprocess middleware behavior, plugin isolation, filesystem trust, external Python package availability, gateway request admission, persistence, analytics, or final client-visible gateway behavior.
         ai_generated: false
+    gaps_reviewed_at: "2026-06-20T18:00:00Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-136|dynamic_python_loader_result_determined
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after formalization refresh. SYS-REQ-136''s dynamic_python_loader_result_determined variable is decomposed by SW-REQ-123 for local dlpython behavior: python-config discovery, latest/custom version selection, library path parsing from ldflags output, dynamic symbol mapping through a fake Python library, runtime initialization forwarding, Python path updates, and representative module/object/tuple/bytes helper wrappers. This review is limited to local dynamic Python loader helper support and does not claim real CPython semantic correctness, Python plugin execution, gateway coprocess middleware behavior, plugin isolation, filesystem trust, external Python package availability, gateway request admission, persistence, analytics, or final client-visible gateway behavior.'
+          reviewed_at: "2026-06-20T18:00:00Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T17:35:00Z"

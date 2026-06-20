@@ -14,6 +14,7 @@ import (
 // SYS-REQ-135:nominal:nominal
 // SW-REQ-122:nominal:nominal
 // SW-REQ-122:boundary:nominal
+// MCDC SYS-REQ-135: cli_command_surface_operation_requested=T, cli_command_surface_result_determined=T => TRUE
 func TestCLICommandSurfaceReqProof_InitSetupAndParse(t *testing.T) {
 	resetCLIForReqProofTest()
 	t.Cleanup(resetCLIForReqProofTest)

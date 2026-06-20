@@ -2,4 +2,13 @@ component: dynamic_python_loader
 no_interface:
     declared: true
     reason: The dlpython package is exercised as a local dynamic Python loader helper for runtime discovery, dynamic symbol binding, Python path setup, and helper forwarding; real CPython semantic correctness, Python plugin execution, gateway coprocess middleware effects, persistence, analytics, and runtime request handling are outside this local component boundary.
-variables: []
+variables:
+    - name: dynamic_python_loader_operation_requested
+      type: bool
+      direction: input
+      description: Gateway dlpython code requests python-config discovery, latest or requested version selection, ldflags library path parsing, dynamic Python C API symbol mapping, runtime initialization, Python path setup, or helper forwarding for modules, objects, tuples, bytes, strings, and reference counts.
+
+    - name: dynamic_python_loader_result_determined
+      type: bool
+      direction: output
+      description: Dynamic Python loader support returns a selected version and library path, explicit local discovery or loading errors, mapped symbol state, initialized runtime state, updated Python path state, or forwarded helper outputs and errors from the mapped Python C API symbols.
