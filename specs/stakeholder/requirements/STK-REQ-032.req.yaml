@@ -1,0 +1,65 @@
+id: STK-REQ-032
+version: 1
+status: approved
+priority: shall
+category: configuration
+req_type: guarantee
+fretish: ""
+description: Rate-limit configuration support shall provide deterministic local descriptions of the selected rate-limiter mode, including fixed-window precedence, Redis rolling, Sentinel, distributed Redis, distributed Sentinel, transaction versus pipeline wording, and smoothing wording, without claiming request throttling, quota enforcement, Redis connectivity, header emission, or final gateway runtime behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: rate_limit_configuration
+rationale: Rate-limit configuration contains local helper behavior used for operator-visible mode descriptions. Request enforcement and limiter algorithms are outside this proof slice.
+tags:
+    - configuration
+    - rate-limit
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T10:18:35Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Rate-limit configuration scope is limited to local config/rate_limit.go string description behavior: selected limiter mode descriptions, fixed-window precedence, transaction versus pipeline wording, and smoothing wording. The focused table-driven config test passed. This approval does not claim request throttling, quota enforcement, Redis connectivity, header emission, or final gateway runtime behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T10:18:35Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T10:18:35Z"
+obligation_checklist:
+    - nominal
+    - boundary
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need rate-limit configuration descriptions to identify the locally selected limiter mode predictably before runtime enforcement code consumes the configuration.
+    acceptance_criteria:
+        - id: STK-REQ-032-AC-01
+          text: Given no explicit rate-limit mode override, when local configuration asks for the rate-limit description, then the distributed Redis limiter description using transactions is returned.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-120
+        - id: STK-REQ-032-AC-02
+          text: Given fixed-window, Redis rolling, Sentinel, or distributed Sentinel limiter flags, when local configuration asks for the rate-limit description, then the selected branch and documented precedence are reflected in the returned description.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-120
+        - id: STK-REQ-032-AC-03
+          text: Given non-transactional or smoothing flags, when local configuration asks for the rate-limit description for a branch that includes shared limiter detail text, then the returned description reflects pipeline and smoothing wording.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-120
+lifecycle:
+    change_history:
+        - date: "2026-06-20T10:18:35Z"
+          from: draft
+          to: review
+          reason: Added rate-limit configuration stakeholder requirement for config/rate_limit.go onboarding.
+          changed_by: agent:codex

@@ -52,6 +52,7 @@ const (
 )
 
 // String returns a readable setting for the rate limiter in effect.
+// SW-REQ-107
 func (r *RateLimit) String() string {
 	info := "using transactions"
 	if r.EnableNonTransactionalRateLimiter {

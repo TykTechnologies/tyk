@@ -1,0 +1,59 @@
+id: SYS-REQ-120
+version: 1
+status: approved
+priority: shall
+category: configuration
+req_type: guarantee
+fretish: the rate_limit_configuration shall always satisfy !rate_limit_description_requested | rate_limit_description_determined
+description: Rate-limit configuration support shall determine local rate-limit mode description results for fixed-window, Redis rolling, Sentinel, distributed Redis, and distributed Sentinel selections, including fixed-window precedence, transaction versus pipeline wording, and smoothing wording, without claiming request throttling, quota enforcement, Redis connectivity, header emission, or final gateway runtime behavior.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-032
+component: rate_limit_configuration
+rationale: This system requirement owns local config/rate_limit.go helper behavior. Runtime limiter selection and request enforcement are covered elsewhere or remain outside this proof slice.
+tags:
+    - configuration
+    - rate-limit
+variables:
+    - rate_limit_description_requested
+    - rate_limit_description_determined
+traces:
+    satisfies:
+        - STK-REQ-032
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T10:18:35Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Rate-limit configuration scope is limited to local config/rate_limit.go string description behavior: selected limiter mode descriptions, fixed-window precedence, transaction versus pipeline wording, and smoothing wording. The focused table-driven config test passed. This approval does not claim request throttling, quota enforcement, Redis connectivity, header emission, or final gateway runtime behavior.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T10:22:21.061627Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-120|rate_limit_description_determined
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final requirement approval. SYS-REQ-120''s rate_limit_description_determined variable is decomposed by SW-REQ-107 for local config/rate_limit.go behavior: RateLimit.String returns deterministic descriptions for fixed-window, Redis rolling, Sentinel, distributed Redis, and distributed Sentinel selections, including fixed-window precedence, transaction versus pipeline wording, and smoothing wording. This review is limited to local rate-limit description helper support and does not claim request throttling, quota enforcement, Redis connectivity, header emission, or final gateway runtime behavior.'
+          reviewed_at: "2026-06-20T10:22:21.061627Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T10:18:35Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T10:18:35Z"
+obligation_checklist:
+    - nominal
+    - boundary
+lifecycle:
+    change_history:
+        - date: "2026-06-20T10:18:35Z"
+          from: draft
+          to: review
+          reason: Added rate-limit configuration system requirement for config/rate_limit.go onboarding.
+          changed_by: agent:codex

@@ -1,0 +1,14 @@
+component: rate_limit_configuration
+no_interface:
+    declared: true
+    reason: The config/rate_limit.go file is exercised as a local rate-limit configuration helper; request throttling, quota enforcement, Redis connectivity, header emission, gateway request admission, and final request handling are outside this local component boundary.
+variables:
+    - name: rate_limit_description_requested
+      type: bool
+      direction: input
+      description: Gateway code or tests request local rate-limit mode description selection.
+
+    - name: rate_limit_description_determined
+      type: bool
+      direction: output
+      description: Rate-limit configuration support returns the deterministic description for the locally selected limiter mode, transaction mode, and smoothing setting.

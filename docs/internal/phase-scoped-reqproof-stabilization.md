@@ -44,8 +44,8 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 155/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
-| `mcdc_coverage` | 52/412 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
+| `verification_scope_complete` | 156/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `mcdc_coverage` | 52/415 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
 
@@ -408,6 +408,16 @@ fixed or to hide them from the current strict audit.
   execution, scheduler behavior, customer JSON exposure, or final gateway
   runtime behavior. It moves the visible production coverage baseline from
   154/447 to 155/447.
+- `SW-REQ-107` onboarded `config/rate_limit.go` with a new rate-limit
+  configuration stakeholder/system/software chain and a focused table-driven
+  config test for local `RateLimit.String` behavior: default distributed Redis
+  description, transaction versus pipeline wording, fixed-window precedence,
+  Redis rolling selection, Sentinel selection, distributed Sentinel selection,
+  and smoothing wording. This increment is scoped to local rate-limit
+  description helper support and does not claim request throttling, quota
+  enforcement, Redis connectivity, header emission, or final gateway runtime
+  behavior. It moves the visible production coverage baseline from 155/447 to
+  156/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or
