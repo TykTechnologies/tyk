@@ -1,0 +1,54 @@
+id: SW-REQ-117
+version: 1
+status: approved
+priority: shall
+category: security
+req_type: guarantee
+fretish: ""
+description: The internal/certcheck package shall preserve local helper behavior for certificate batching, cooldown-cache decisions, expiry and expiring-soon classification, role selection, duration conversion, default configuration, and event metadata/message construction, without claiming certificate discovery or loading, Redis availability or distributed TTL correctness, background scheduler fairness, external event-bus delivery, gateway alerting semantics, client-visible gateway behavior, or final certificate trust and transport-security outcomes.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: internal/certcheck/certcheck_reqproof_test.go; docs/certificate-expiry-monitor-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-130
+component: certificate_expiry_monitor
+rationale: >-
+    This software requirement owns local internal/certcheck helper mechanics only. It does not claim certificate discovery or loading, Redis availability or distributed TTL correctness, background scheduler fairness, external event-bus delivery, gateway alerting semantics, client-visible gateway behavior, or final certificate trust and transport-security outcomes.
+tags:
+    - certificate
+    - expiry
+    - security
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-130
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T12:05:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-117 is scoped to local internal/certcheck behavior: batch deduplication and draining, cooldown-cache decisions, expiry and expiring-soon classification, role selection, duration conversion, default configuration, and event metadata/message construction. Focused package tests passed locally. This approval does not claim certificate discovery or loading, Redis availability or distributed TTL correctness, background scheduler fairness, external event-bus delivery, gateway alerting semantics, client-visible gateway behavior, or final certificate trust and transport-security outcomes.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T12:05:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T12:05:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T12:05:00Z"
+          from: draft
+          to: review
+          reason: Added internal/certcheck local helper behavior under certificate expiry monitor support.
+          changed_by: agent:codex

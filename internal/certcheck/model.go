@@ -9,6 +9,7 @@ import (
 
 const (
 	// CertRoleClient represents client certificates used for mTLS authentication
+	// SW-REQ-117
 	CertRoleClient = "client"
 	// CertRoleUpstream represents upstream certificates used for Gateway→Backend mTLS
 	CertRoleUpstream = "upstream"
@@ -18,15 +19,18 @@ const (
 )
 
 // FireEventFunc is a function that fires an event.
+// SW-REQ-117
 type FireEventFunc func(name apidef.TykEvent, meta interface{})
 
 // APIMetaData is a structure that holds information about an API.
+// SW-REQ-117
 type APIMetaData struct {
 	APIID   string
 	APIName string
 }
 
 // CertInfo is a structure that holds information about a certificate.
+// SW-REQ-117
 type CertInfo struct {
 	ID          string
 	CommonName  string
@@ -36,29 +40,34 @@ type CertInfo struct {
 
 // HoursUntilExpiry returns the number of hours until the certificate expires.
 // This is calculated from the UntilExpiry field for convenience.
+// SW-REQ-117
 func (c CertInfo) HoursUntilExpiry() int {
 	return int(c.UntilExpiry.Hours())
 }
 
 // MinutesUntilExpiry returns the number of minutes until the certificate expires.
 // This is calculated from the UntilExpiry field for convenience.
+// SW-REQ-117
 func (c CertInfo) MinutesUntilExpiry() int {
 	return int(c.UntilExpiry.Minutes())
 }
 
 // SecondsUntilExpiry returns the number of seconds until the certificate expires.
 // This is calculated from the UntilExpiry field for convenience.
+// SW-REQ-117
 func (c CertInfo) SecondsUntilExpiry() int {
 	return int(c.UntilExpiry.Seconds())
 }
 
 // DaysUntilExpiry returns the number of days until the certificate expires.
 // This is calculated from the UntilExpiry field for convenience.
+// SW-REQ-117
 func (c CertInfo) DaysUntilExpiry() int {
 	return c.HoursUntilExpiry() / 24
 }
 
 // EventCertificateExpiringSoonMeta is the metadata structure for certificate expiration events.
+// SW-REQ-117
 type EventCertificateExpiringSoonMeta struct {
 	model.EventMetaDefault
 	CertID        string    `json:"cert_id"`
@@ -70,6 +79,7 @@ type EventCertificateExpiringSoonMeta struct {
 }
 
 // EventCertificateExpiredMeta is the metadata structure for certificate expiration events.
+// SW-REQ-117
 type EventCertificateExpiredMeta struct {
 	model.EventMetaDefault
 	CertID          string    `json:"cert_id"`

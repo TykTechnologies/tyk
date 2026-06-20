@@ -21,10 +21,12 @@ import (
 
 var (
 	// ErrFallbackCooldownCheckFailed is returned when the fallback cache is used, and the check cooldown cannot be checked.
+	// SW-REQ-117
 	ErrFallbackCooldownCheckFailed = errors.New("failed to check cooldown in fallback cache")
 )
 
 // Batch is a queue of certificates that are ready to be checked.
+// SW-REQ-117
 type Batch struct {
 	lookupTable map[string]any
 	batchQueue  []CertInfo
@@ -32,6 +34,7 @@ type Batch struct {
 }
 
 // NewBatch creates a new Batch.
+// SW-REQ-117
 func NewBatch() *Batch {
 	return &Batch{
 		lookupTable: make(map[string]any),
@@ -41,6 +44,7 @@ func NewBatch() *Batch {
 }
 
 // Append adds a certificate to the batch.
+// SW-REQ-117
 func (b *Batch) Append(certInfo CertInfo) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -55,6 +59,7 @@ func (b *Batch) Append(certInfo CertInfo) {
 }
 
 // Size returns the number of certificates in the batch.
+// SW-REQ-117
 func (b *Batch) Size() int {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -62,6 +67,7 @@ func (b *Batch) Size() int {
 }
 
 // CopyAndClear returns a copy of the batch and clears the batch.
+// SW-REQ-117
 func (b *Batch) CopyAndClear() []CertInfo {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -76,11 +82,13 @@ func (b *Batch) CopyAndClear() []CertInfo {
 }
 
 // Batcher processes and manages the addition of CertInfo objects, ensuring they are handled in a batch-like manner.
+// SW-REQ-117
 type Batcher interface {
 	Add(cert CertInfo) error
 }
 
 // BackgroundBatcher is a Batcher that can be run in the background.
+// SW-REQ-117
 type BackgroundBatcher interface {
 	Batcher
 	RunInBackground(ctx context.Context)
@@ -88,6 +96,7 @@ type BackgroundBatcher interface {
 }
 
 // CertificateExpiryCheckBatcher is a Batcher that checks certificates for expiry.
+// SW-REQ-117
 type CertificateExpiryCheckBatcher struct {
 	logger                *logrus.Entry
 	apiMetaData           APIMetaData
@@ -105,12 +114,14 @@ type CertificateExpiryCheckBatcher struct {
 // NewCertificateExpiryCheckBatcher creates a new CertificateExpiryCheckBatcher.
 // This function maintains backward compatibility by defaulting to "client" certificate role.
 // For other certificate roles, use NewCertificateExpiryCheckBatcherWithRole.
+// SW-REQ-117
 func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, apiMetaData APIMetaData, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc) (*CertificateExpiryCheckBatcher, error) {
 	return NewCertificateExpiryCheckBatcherWithRole(logger, apiMetaData, cfg, fallbackStorage, eventFunc, CertRoleClient, nil, nil)
 }
 
 // NewCertificateExpiryCheckBatcherWithRole creates a new CertificateExpiryCheckBatcher with a specific certificate role.
 // The certificateRole parameter specifies the role of certificates being monitored: "client" or "upstream".
+// SW-REQ-117
 func NewCertificateExpiryCheckBatcherWithRole(logger *logrus.Entry, apiMetaData APIMetaData, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc, certificateRole string, certUsage certusage.Tracker, gwConfig *config.Config) (*CertificateExpiryCheckBatcher, error) {
 	inMemoryCache, err := NewInMemoryCooldownCache()
 	if err != nil {
@@ -142,12 +153,14 @@ func NewCertificateExpiryCheckBatcherWithRole(logger *logrus.Entry, apiMetaData 
 }
 
 // Add adds a certificate to the batch.
+// SW-REQ-117
 func (c *CertificateExpiryCheckBatcher) Add(cert CertInfo) error {
 	c.batch.Append(cert)
 	return nil
 }
 
 // RunInBackground runs the batcher in the background.
+// SW-REQ-117
 func (c *CertificateExpiryCheckBatcher) RunInBackground(ctx context.Context) {
 	for {
 		c.logger.
@@ -201,10 +214,12 @@ func (c *CertificateExpiryCheckBatcher) RunInBackground(ctx context.Context) {
 }
 
 // SetFlushInterval sets the interval at which the batcher will flush the batch.
+// SW-REQ-117
 func (c *CertificateExpiryCheckBatcher) SetFlushInterval(interval time.Duration) {
 	c.flushTicker.Reset(interval)
 }
 
+// SW-REQ-117
 func (c *CertificateExpiryCheckBatcher) checkCooldownExistsInLocalCache(certInfo CertInfo) (exists bool) {
 	var err error
 	exists, err = c.inMemoryCooldownCache.HasCheckCooldown(certInfo.ID)
@@ -217,6 +232,7 @@ func (c *CertificateExpiryCheckBatcher) checkCooldownExistsInLocalCache(certInfo
 	return exists
 }
 
+// SW-REQ-117
 func (c *CertificateExpiryCheckBatcher) isCheckCooldownActive(certInfo CertInfo, foundInLocalCache bool) (bool, error) {
 	checkCooldownActive := false
 	fallback := false
@@ -249,6 +265,7 @@ func (c *CertificateExpiryCheckBatcher) isCheckCooldownActive(certInfo CertInfo,
 	return checkCooldownActive, nil
 }
 
+// SW-REQ-117
 func (c *CertificateExpiryCheckBatcher) setCheckCooldown(certInfo CertInfo) {
 	err := c.inMemoryCooldownCache.SetCheckCooldown(certInfo.ID, int64(c.config.CheckCooldownSeconds))
 	if err != nil {
@@ -266,10 +283,12 @@ func (c *CertificateExpiryCheckBatcher) setCheckCooldown(certInfo CertInfo) {
 	}
 }
 
+// SW-REQ-117
 func (c *CertificateExpiryCheckBatcher) isCertificateExpired(certInfo CertInfo) bool {
 	return certInfo.UntilExpiry <= 0
 }
 
+// SW-REQ-117
 func (c *CertificateExpiryCheckBatcher) isCertificateExpiringSoon(certInfo CertInfo) bool {
 	warningThresholdDays := c.config.WarningThresholdDays
 
@@ -283,6 +302,7 @@ func (c *CertificateExpiryCheckBatcher) isCertificateExpiringSoon(certInfo CertI
 	return certInfo.UntilExpiry > 0 && certInfo.UntilExpiry <= warningThresholdDuration
 }
 
+// SW-REQ-117
 func (c *CertificateExpiryCheckBatcher) handleEventForCertificate(certInfo CertInfo, isExpired bool) {
 	exists := c.fireEventCooldownExistsInLocalCache(certInfo)
 	isFireEventCooldownActive, err := c.isFireEventCooldownActive(certInfo, exists)
@@ -308,6 +328,7 @@ func (c *CertificateExpiryCheckBatcher) handleEventForCertificate(certInfo CertI
 	c.setFireEventCooldown(certInfo)
 }
 
+// SW-REQ-117
 func (c *CertificateExpiryCheckBatcher) handleEventForExpiredCertificate(certInfo CertInfo) {
 	// Calculate days and hours since expiry (negative duration)
 	daysSinceExpiry := certInfo.DaysUntilExpiry() * -1
@@ -346,6 +367,7 @@ func (c *CertificateExpiryCheckBatcher) handleEventForExpiredCertificate(certInf
 	c.logger.WithFields(fields).Warn("certificate expired")
 }
 
+// SW-REQ-117
 func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(certInfo CertInfo) {
 	daysUntilExpiry := certInfo.DaysUntilExpiry()
 	remainingHours := int(certInfo.HoursUntilExpiry()) % 24
@@ -383,6 +405,7 @@ func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(ce
 	c.logger.WithFields(fields).Warn("certificate expiring soon")
 }
 
+// SW-REQ-117
 func (c *CertificateExpiryCheckBatcher) fireEventCooldownExistsInLocalCache(certInfo CertInfo) (exists bool) {
 	var err error
 	exists, err = c.inMemoryCooldownCache.HasFireEventCooldown(certInfo.ID)
@@ -395,6 +418,7 @@ func (c *CertificateExpiryCheckBatcher) fireEventCooldownExistsInLocalCache(cert
 	return exists
 }
 
+// SW-REQ-117
 func (c *CertificateExpiryCheckBatcher) isFireEventCooldownActive(certInfo CertInfo, foundInLocalCache bool) (bool, error) {
 	fireEventCooldownActive := false
 	useFallback := false
@@ -428,6 +452,7 @@ func (c *CertificateExpiryCheckBatcher) isFireEventCooldownActive(certInfo CertI
 	return fireEventCooldownActive, nil
 }
 
+// SW-REQ-117
 func (c *CertificateExpiryCheckBatcher) setFireEventCooldown(certInfo CertInfo) {
 	err := c.inMemoryCooldownCache.SetFireEventCooldown(certInfo.ID, int64(c.config.EventCooldownSeconds))
 	if err != nil {
@@ -445,6 +470,7 @@ func (c *CertificateExpiryCheckBatcher) setFireEventCooldown(certInfo CertInfo) 
 	}
 }
 
+// SW-REQ-117
 func (c *CertificateExpiryCheckBatcher) composeSoonToExpireMessage(certInfo CertInfo, daysUntilExpiry int, remainingHours int) string {
 	if daysUntilExpiry > 0 {
 		if remainingHours > 0 {
@@ -456,6 +482,7 @@ func (c *CertificateExpiryCheckBatcher) composeSoonToExpireMessage(certInfo Cert
 	return fmt.Sprintf("Certificate %s is expiring in %d hours", certInfo.CommonName, remainingHours)
 }
 
+// SW-REQ-117
 func (c *CertificateExpiryCheckBatcher) composeExpiredMessage(certInfo CertInfo, daysSinceExpiry int, hoursSinceExpiry int) string {
 	if daysSinceExpiry > 0 {
 		if hoursSinceExpiry > 0 {
@@ -467,6 +494,7 @@ func (c *CertificateExpiryCheckBatcher) composeExpiredMessage(certInfo CertInfo,
 	return fmt.Sprintf("Certificate %s is expired since %d hours", certInfo.CommonName, hoursSinceExpiry)
 }
 
+// SW-REQ-117
 func applyConfigDefaults(cfg config.CertificateExpiryMonitorConfig) config.CertificateExpiryMonitorConfig {
 	if cfg.WarningThresholdDays == 0 {
 		cfg.WarningThresholdDays = config.DefaultWarningThresholdDays
@@ -484,4 +512,5 @@ func applyConfigDefaults(cfg config.CertificateExpiryMonitorConfig) config.Certi
 }
 
 // Interface Guards
+// SW-REQ-117
 var _ BackgroundBatcher = (*CertificateExpiryCheckBatcher)(nil)

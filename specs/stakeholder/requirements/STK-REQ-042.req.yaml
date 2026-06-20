@@ -1,0 +1,68 @@
+id: STK-REQ-042
+version: 1
+status: approved
+priority: shall
+category: security
+req_type: guarantee
+fretish: ""
+description: Certificate expiry monitor support shall locally preserve certificate batching, cooldown-cache decisions, expiry and expiring-soon classification, role selection, duration conversion, default configuration, and event metadata/message construction, without claiming certificate discovery or loading, Redis availability or distributed TTL correctness, background scheduler fairness, external event-bus delivery, gateway alerting semantics, client-visible gateway behavior, or final certificate trust and transport-security outcomes.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: certificate_expiry_monitor
+rationale: The internal/certcheck package owns local expiry monitor helper mechanics. Product-level certificate lifecycle and gateway alerting outcomes remain outside this proof slice until the callers and event delivery paths are onboarded with their own requirements and evidence.
+tags:
+    - certificate
+    - expiry
+    - security
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T12:05:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Certificate expiry monitor scope is limited to local internal/certcheck behavior: batch deduplication and draining, cooldown-cache decisions, expiry and expiring-soon classification, role selection, duration conversion, default configuration, and event metadata/message construction. This approval does not claim certificate discovery or loading, Redis availability or distributed TTL correctness, background scheduler fairness, external event-bus delivery, gateway alerting semantics, client-visible gateway behavior, or final certificate trust and transport-security outcomes.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T12:05:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T12:05:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway operations maintainer
+    story: As a gateway operations maintainer, I need certificate expiry monitor helpers to preserve local batching, cooldown, classification, and event metadata behavior before broader gateway event delivery paths consume those results.
+    acceptance_criteria:
+        - id: STK-REQ-042-AC-01
+          text: Given certificate IDs queued for expiry checking, when the local batch helper appends and drains entries, then duplicate IDs are not enqueued twice and draining returns the queued entries while clearing local state.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-130
+        - id: STK-REQ-042-AC-02
+          text: Given local cooldown and certificate timing inputs, when certificate expiry monitor helpers evaluate them, then the helpers return the documented cooldown existence/activity and expiry classification results.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-130
+        - id: STK-REQ-042-AC-03
+          text: Given certificate role, API metadata, and expiry timing inputs, when local event metadata helpers run, then they preserve role, certificate, API, duration, and message fields in the constructed event metadata.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-130
+lifecycle:
+    change_history:
+        - date: "2026-06-20T12:05:00Z"
+          from: draft
+          to: review
+          reason: Added certificate expiry monitor stakeholder requirement for internal/certcheck onboarding.
+          changed_by: agent:codex

@@ -1,0 +1,9 @@
+component: certificate_expiry_monitor
+no_interface:
+    declared: true
+    reason: The internal/certcheck proof slice covers local certificate expiry monitor helper behavior only; certificate discovery/loading, Redis availability or distributed TTL correctness, background scheduler fairness, external event-bus delivery, gateway alerting semantics, client-visible gateway behavior, and final certificate trust or transport-security outcomes are outside this component boundary.
+variables:
+    - name: certificate_expiry_monitor_operation_terminal
+      type: bool
+      direction: output
+      description: 'The local certificate expiry monitor helper operation reaches a terminal observable result: a batch state update, cooldown-cache result, expiry classification, role selection, duration conversion, or event metadata/message construction.'

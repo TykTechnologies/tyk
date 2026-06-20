@@ -1,0 +1,61 @@
+id: SYS-REQ-130
+version: 1
+status: approved
+priority: shall
+category: security
+req_type: guarantee
+fretish: the certificate_expiry_monitor shall always satisfy certificate_expiry_monitor_operation_terminal
+description: Certificate expiry monitor support shall make local helper operations terminal and deterministic for certificate batching, cooldown-cache decisions, expiry and expiring-soon classification, role selection, duration conversion, default configuration, and event metadata/message construction, without claiming certificate discovery or loading, Redis availability or distributed TTL correctness, background scheduler fairness, external event-bus delivery, gateway alerting semantics, client-visible gateway behavior, or final certificate trust and transport-security outcomes.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-042
+component: certificate_expiry_monitor
+rationale: This system requirement owns local internal/certcheck helper terminality and deterministic helper behavior only. Broader certificate lifecycle, distributed cache, scheduler, and gateway event-delivery outcomes remain outside this proof slice.
+tags:
+    - certificate
+    - expiry
+    - security
+variables:
+    - certificate_expiry_monitor_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-042
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T12:05:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Certificate expiry monitor system scope is limited to terminal local helper behavior in internal/certcheck: batch deduplication and draining, cooldown-cache decisions, expiry and expiring-soon classification, role selection, duration conversion, default configuration, and event metadata/message construction. The FRETish invariant intentionally models local operation terminality without asserting certificate discovery or loading, Redis availability or distributed TTL correctness, background scheduler fairness, external event-bus delivery, gateway alerting semantics, client-visible gateway behavior, or final certificate trust and transport-security outcomes.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T12:13:26.985061Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-130|certificate_expiry_monitor_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final requirement approval. SYS-REQ-130''s certificate_expiry_monitor_operation_terminal variable is decomposed by SW-REQ-117 for local internal/certcheck behavior: batch deduplication and draining, cooldown-cache decisions, expiry and expiring-soon classification, role selection, duration conversion, default configuration, and event metadata/message construction. This review is limited to local certificate expiry monitor helper mechanics and does not claim certificate discovery or loading, Redis availability or distributed TTL correctness, background scheduler fairness, external event-bus delivery, gateway alerting semantics, client-visible gateway behavior, or final certificate trust and transport-security outcomes.'
+          reviewed_at: "2026-06-20T12:13:26.985061Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T12:05:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T12:05:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T12:05:00Z"
+          from: draft
+          to: review
+          reason: Added certificate expiry monitor system requirement for internal/certcheck onboarding.
+          changed_by: agent:codex

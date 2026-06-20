@@ -521,6 +521,19 @@ fixed or to hide them from the current strict audit.
   upstream or downstream transport security, secret storage, or final
   client-visible gateway behavior. It moves the visible production coverage
   baseline from 172/447 to 178/447.
+- `SW-REQ-117` onboarded `internal/certcheck` with a new certificate expiry
+  monitor stakeholder/system/software chain and focused table-driven package
+  evidence for batch deduplication and draining, cooldown-cache decisions,
+  expiry and expiring-soon classification, role selection, duration conversion,
+  default configuration, and event metadata/message construction. The system
+  formula is a local terminality invariant, with the unreachable non-terminal
+  invariant-violation row documented rather than covered by a fake runtime
+  witness. This increment is scoped to local certificate expiry monitor helper
+  mechanics and does not claim certificate discovery or loading, Redis
+  availability or distributed TTL correctness, background scheduler fairness,
+  external event-bus delivery, gateway alerting semantics, client-visible
+  gateway behavior, or final certificate trust and transport-security outcomes.
+  It moves the visible production coverage baseline from 178/447 to 181/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or
