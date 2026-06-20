@@ -1,0 +1,61 @@
+id: STK-REQ-055
+version: 1
+status: approved
+priority: shall
+category: api_definition_lifecycle
+req_type: guarantee
+fretish: ""
+description: Gateway API definition lifecycle support shall locally select session-lifetime precedence, execute API spec unload hooks while clearing local lifecycle state, validate HTTP/TCP/TLS API spec inputs with explicit local errors for missing TCP/TLS listen ports, and detect OAS streaming extension markers, without claiming full route generation, middleware execution, persistence durability, dashboard or RPC synchronization, network transport behavior, gateway request admission, or final client-visible behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_api_definition_lifecycle
+rationale: Gateway operators depend on deterministic local API definition lifecycle helper behavior before broader loading, routing, and runtime request handling consume API specs. This requirement owns only local helper behavior in gateway/api_definition.go and focused gateway tests.
+tags:
+    - gateway
+    - api-definition
+    - lifecycle
+variables: []
+traces:
+    reviewed_at: "2026-06-20T23:00:49.22425Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:d0f955b6ff992f67d38d0034b80da8f8a01e4719fba5713c9ce5e9f74f5921b6
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T22:45:27Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API definition lifecycle scope is limited to local gateway/api_definition.go helper behavior: session-lifetime precedence selection, unload hook execution and local state clearing, HTTP/TCP/TLS validation dispatch with missing listen-port errors, and OAS streaming extension marker detection. This approval does not claim full route generation, middleware execution, persistence durability, dashboard or RPC synchronization, network transport behavior, gateway request admission, or final client-visible behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T22:45:27Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T22:45:27Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need local API definition lifecycle helpers to select lifetime settings, validate protocol-specific API spec inputs, clean up API spec local state, and identify streaming definitions predictably before broader gateway loading and request handling depend on those specs.
+    acceptance_criteria:
+        - id: STK-REQ-055-AC-01
+          text: Given local gateway API definition lifecycle helper inputs, when session-lifetime precedence, unload hook cleanup, protocol validation, or OAS streaming marker detection paths are exercised, then deterministic helper outcomes or explicit local errors are produced for the tested API spec inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-143
+lifecycle:
+    change_history:
+        - date: "2026-06-20T22:45:27Z"
+          from: draft
+          to: approved
+          reason: Added gateway API definition lifecycle helper requirement.
+          changed_by: human:buger

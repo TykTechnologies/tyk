@@ -162,6 +162,7 @@ type OAuthManagerInterface interface {
 
 // GetSessionLifetimeRespectsKeyExpiration returns a boolean to tell whether session lifetime should respect to key expiration or not.
 // The global config takes the precedence. If the global one is `true`, value of the one in api level doesn't matter.
+// SW-REQ-130
 func (a *APISpec) GetSessionLifetimeRespectsKeyExpiration() bool {
 	if a.GlobalConfig.SessionLifetimeRespectsKeyExpiration {
 		return true
@@ -171,11 +172,13 @@ func (a *APISpec) GetSessionLifetimeRespectsKeyExpiration() bool {
 }
 
 // AddUnloadHook adds a function to be called when the API spec is unloaded
+// SW-REQ-130
 func (s *APISpec) AddUnloadHook(hook func()) {
 	s.unloadHooks = append(s.unloadHooks, hook)
 }
 
 // Release releases all resources associated with API spec
+// SW-REQ-130
 func (s *APISpec) Unload() {
 	s.Lock()
 	defer s.Unlock()
@@ -222,6 +225,7 @@ func (s *APISpec) Unload() {
 }
 
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
+// SW-REQ-130
 func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 	if s.IsOAS {
 		err := s.OAS.Validate(context.Background(), oas.GetValidationOptionsFromConfig(oasConfig)...)
@@ -239,6 +243,7 @@ func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 	}
 }
 
+// SW-REQ-130
 func (s *APISpec) validateTCP() error {
 	if s.ListenPort == 0 {
 		return errors.New("missing listening port")
@@ -246,11 +251,13 @@ func (s *APISpec) validateTCP() error {
 	return nil
 }
 
+// SW-REQ-130
 func (s *APISpec) validateHTTP() error {
 	// NOOP
 	return nil
 }
 
+// SW-REQ-130
 func (s *APISpec) isStreamingAPI() bool {
 	if s.OAS.T.Extensions == nil {
 		return false

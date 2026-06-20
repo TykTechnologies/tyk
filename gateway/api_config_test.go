@@ -100,9 +100,9 @@ func TestConfigInspectionEndpoints_AuthRequired(t *testing.T) {
 // Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
 // STK-REQ-028:STK-REQ-028-AC-01:acceptance
 // SYS-REQ-116:nominal:nominal
-// SYS-REQ-116:encoding_safety:nominal
+// SYS-REQ-116:boundary:nominal
 // SW-REQ-103:nominal:nominal
-// SW-REQ-103:encoding_safety:nominal
+// SW-REQ-103:boundary:nominal
 func TestConfigHandler_FullConfig(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -195,8 +195,8 @@ func TestConfigHandler_SingleField_NotFound(t *testing.T) {
 
 // Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
 // STK-REQ-028:STK-REQ-028-AC-01:acceptance
-// SYS-REQ-116:encoding_safety:nominal
-// SW-REQ-103:encoding_safety:nominal
+// SYS-REQ-116:boundary:nominal
+// SW-REQ-103:boundary:nominal
 func TestConfigHandler_SensitiveFieldRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -322,8 +322,8 @@ func TestEnvHandler_SingleEnvVar_NotFound(t *testing.T) {
 
 // Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
 // STK-REQ-028:STK-REQ-028-AC-02:acceptance
-// SYS-REQ-116:encoding_safety:nominal
-// SW-REQ-103:encoding_safety:nominal
+// SYS-REQ-116:boundary:nominal
+// SW-REQ-103:boundary:nominal
 func TestEnvHandler_SensitiveEnvVarRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -351,8 +351,8 @@ func TestEnvHandler_SensitiveEnvVarRedacted(t *testing.T) {
 }
 
 // Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
-// SYS-REQ-116:encoding_safety:nominal
-// SW-REQ-103:encoding_safety:nominal
+// SYS-REQ-116:boundary:nominal
+// SW-REQ-103:boundary:nominal
 func TestConfigHandler_StoragePasswordRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -463,8 +463,8 @@ func TestConfigHandler_NestedField(t *testing.T) {
 }
 
 // Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
-// SYS-REQ-116:encoding_safety:nominal
-// SW-REQ-103:encoding_safety:nominal
+// SYS-REQ-116:boundary:nominal
+// SW-REQ-103:boundary:nominal
 func TestConfigHandler_NodeSecretRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -493,8 +493,8 @@ func TestConfigHandler_NodeSecretRedacted(t *testing.T) {
 }
 
 // Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
-// SYS-REQ-116:encoding_safety:nominal
-// SW-REQ-103:encoding_safety:nominal
+// SYS-REQ-116:boundary:nominal
+// SW-REQ-103:boundary:nominal
 func TestEnvHandler_StoragePasswordRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -523,8 +523,8 @@ func TestEnvHandler_StoragePasswordRedacted(t *testing.T) {
 }
 
 // Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
-// SYS-REQ-116:encoding_safety:nominal
-// SW-REQ-103:encoding_safety:nominal
+// SYS-REQ-116:boundary:nominal
+// SW-REQ-103:boundary:nominal
 func TestConfigHandler_DBConnectionStringRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -553,8 +553,8 @@ func TestConfigHandler_DBConnectionStringRedacted(t *testing.T) {
 }
 
 // Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
-// SYS-REQ-116:encoding_safety:nominal
-// SW-REQ-103:encoding_safety:nominal
+// SYS-REQ-116:boundary:nominal
+// SW-REQ-103:boundary:nominal
 func TestConfigHandler_PolicyConnectionStringRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -583,8 +583,8 @@ func TestConfigHandler_PolicyConnectionStringRedacted(t *testing.T) {
 }
 
 // Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
-// SYS-REQ-116:encoding_safety:nominal
-// SW-REQ-103:encoding_safety:nominal
+// SYS-REQ-116:boundary:nominal
+// SW-REQ-103:boundary:nominal
 func TestConfigHandler_SentryCodeRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -613,8 +613,8 @@ func TestConfigHandler_SentryCodeRedacted(t *testing.T) {
 }
 
 // Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
-// SYS-REQ-116:encoding_safety:nominal
-// SW-REQ-103:encoding_safety:nominal
+// SYS-REQ-116:boundary:nominal
+// SW-REQ-103:boundary:nominal
 func TestConfigHandler_WebhookHeaderListRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -663,8 +663,8 @@ func TestConfigHandler_WebhookHeaderListRedacted(t *testing.T) {
 }
 
 // Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
-// SYS-REQ-116:encoding_safety:nominal
-// SW-REQ-103:encoding_safety:nominal
+// SYS-REQ-116:boundary:nominal
+// SW-REQ-103:boundary:nominal
 func TestConfigHandler_SecretsRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true

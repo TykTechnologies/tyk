@@ -1,0 +1,14 @@
+component: gateway_api_definition_lifecycle
+no_interface:
+    declared: true
+    reason: The gateway API definition lifecycle proof slice covers local gateway/api_definition.go helper behavior only; full route generation, middleware execution, persistence durability, dashboard or RPC synchronization, network transport behavior, gateway request admission, and final client-visible behavior are outside this component boundary.
+variables:
+    - name: gateway_api_definition_lifecycle_operation_requested
+      type: bool
+      direction: input
+      description: A caller requests a local gateway API definition lifecycle helper operation such as session-lifetime precedence selection, unload cleanup, protocol validation, or streaming marker detection.
+
+    - name: gateway_api_definition_lifecycle_operation_terminal
+      type: bool
+      direction: output
+      description: 'A local gateway API definition lifecycle helper operation reaches a terminal observable result: session-lifetime precedence is selected, unload hooks and local lifecycle state are cleared, HTTP/TCP/TLS validation dispatch returns success or an explicit local error, or a streaming extension marker is detected.'

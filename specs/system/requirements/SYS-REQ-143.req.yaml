@@ -1,0 +1,65 @@
+id: SYS-REQ-143
+version: 1
+status: approved
+priority: shall
+category: api_definition_lifecycle
+req_type: guarantee
+fretish: the gateway_api_definition_lifecycle shall always satisfy !gateway_api_definition_lifecycle_operation_requested | gateway_api_definition_lifecycle_operation_terminal
+description: Gateway API definition lifecycle support shall make local helper operations terminal and deterministic for session-lifetime precedence selection, API spec unload hook execution and local state clearing, HTTP/TCP/TLS validation dispatch with explicit missing listen-port errors, and OAS streaming extension marker detection, without claiming full route generation, middleware execution, persistence durability, dashboard or RPC synchronization, network transport behavior, gateway request admission, or final client-visible behavior.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-055
+component: gateway_api_definition_lifecycle
+rationale: This system requirement owns local gateway API definition lifecycle helper terminality only. Full API loading, route generation, request matching, middleware execution, external synchronization, and runtime request outcomes are outside this proof slice.
+tags:
+    - gateway
+    - api-definition
+    - lifecycle
+variables:
+    - gateway_api_definition_lifecycle_operation_requested
+    - gateway_api_definition_lifecycle_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-055
+    reviewed_at: "2026-06-20T23:00:50.141196Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:f2a07995b24ec0b10f1f1cac21e33e127176cf86cfd07e734f1a628185f75f8e
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T22:45:27Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API definition lifecycle system scope is limited to local helper terminality when a local lifecycle helper operation is requested for session-lifetime precedence selection, unload hook execution and local state clearing, HTTP/TCP/TLS validation dispatch with missing listen-port errors, and OAS streaming extension marker detection. The FRETish invariant intentionally models requested local operation terminality without asserting full route generation, middleware execution, persistence durability, dashboard or RPC synchronization, network transport behavior, gateway request admission, or final client-visible behavior.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T22:45:27Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-143|gateway_api_definition_lifecycle_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21 after requirement approval. SYS-REQ-143''s requested local operation terminality is decomposed by SW-REQ-130 for local gateway/api_definition.go helper behavior: session-lifetime precedence selection, unload hook execution and local state clearing, HTTP/TCP/TLS validation dispatch with missing listen-port errors, and OAS streaming extension marker detection. This review is limited to local helper mechanics and does not claim full route generation, middleware execution, persistence durability, dashboard or RPC synchronization, network transport behavior, gateway request admission, or final client-visible behavior.'
+          reviewed_at: "2026-06-20T22:45:27Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T22:45:27Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T22:45:27Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T22:45:27Z"
+          from: draft
+          to: approved
+          reason: Added gateway API definition lifecycle system requirement.
+          changed_by: human:buger

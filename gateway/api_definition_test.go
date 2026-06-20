@@ -1421,26 +1421,146 @@ func TestEnforcedTimeout(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-055, SYS-REQ-143, SW-REQ-130
+// STK-REQ-055:STK-REQ-055-AC-01:acceptance
+// SYS-REQ-143:nominal:nominal
+// SYS-REQ-143:determinism:nominal
+// MCDC SYS-REQ-143: gateway_api_definition_lifecycle_operation_requested=F, gateway_api_definition_lifecycle_operation_terminal=F => TRUE
+// MCDC SYS-REQ-143: gateway_api_definition_lifecycle_operation_requested=T, gateway_api_definition_lifecycle_operation_terminal=T => TRUE
+//
+// SW-REQ-130:nominal:nominal
+// SW-REQ-130:determinism:nominal
+//
+//mcdc:ignore SYS-REQ-143: gateway_api_definition_lifecycle_operation_requested=T, gateway_api_definition_lifecycle_operation_terminal=F => FALSE -- violation row is the negation of the local API definition lifecycle helper guarantee; these tests assert requested helpers return a deterministic selected value, cleanup state, success, explicit local error, or marker result [category: defensive] [reviewed: human:buger]
 func TestAPISpec_GetSessionLifetimeRespectsKeyExpiration(t *testing.T) {
-	a := APISpec{APIDefinition: &apidef.APIDefinition{}}
+	testCases := []struct {
+		name       string
+		globalFlag bool
+		apiFlag    bool
+		want       bool
+	}{
+		{
+			name:       "global disabled and api disabled",
+			globalFlag: false,
+			apiFlag:    false,
+			want:       false,
+		},
+		{
+			name:       "global disabled and api enabled",
+			globalFlag: false,
+			apiFlag:    true,
+			want:       true,
+		},
+		{
+			name:       "global enabled overrides disabled api",
+			globalFlag: true,
+			apiFlag:    false,
+			want:       true,
+		},
+		{
+			name:       "global enabled and api enabled",
+			globalFlag: true,
+			apiFlag:    true,
+			want:       true,
+		},
+	}
 
-	t.Run("GetSessionLifetimeRespectsKeyExpiration=false", func(t *testing.T) {
-		a.GlobalConfig.SessionLifetimeRespectsKeyExpiration = false
-		a.SessionLifetimeRespectsKeyExpiration = false
-		assert.False(t, a.GetSessionLifetimeRespectsKeyExpiration())
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := APISpec{APIDefinition: &apidef.APIDefinition{}}
+			a.GlobalConfig.SessionLifetimeRespectsKeyExpiration = tc.globalFlag
+			a.SessionLifetimeRespectsKeyExpiration = tc.apiFlag
 
-		a.SessionLifetimeRespectsKeyExpiration = true
-		assert.True(t, a.GetSessionLifetimeRespectsKeyExpiration())
-	})
+			assert.Equal(t, tc.want, a.GetSessionLifetimeRespectsKeyExpiration())
+		})
+	}
+}
 
-	t.Run("GetSessionLifetimeRespectsKeyExpiration=true", func(t *testing.T) {
-		a.GlobalConfig.SessionLifetimeRespectsKeyExpiration = true
-		a.SessionLifetimeRespectsKeyExpiration = false
-		assert.True(t, a.GetSessionLifetimeRespectsKeyExpiration())
+// Verifies: STK-REQ-055, SYS-REQ-143, SW-REQ-130
+// STK-REQ-055:STK-REQ-055-AC-01:acceptance
+// SYS-REQ-143:boundary:nominal
+// SYS-REQ-143:determinism:nominal
+// SW-REQ-130:boundary:nominal
+// SW-REQ-130:determinism:nominal
+func TestAPISpec_UnloadHooksAndLocalState(t *testing.T) {
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{},
+		MCPPrimitives: map[string]string{"tool:get-weather": "/mcp-tool:get-weather"},
+	}
 
-		a.SessionLifetimeRespectsKeyExpiration = true
-		assert.True(t, a.GetSessionLifetimeRespectsKeyExpiration())
-	})
+	var calls []string
+	spec.AddUnloadHook(func() { calls = append(calls, "first") })
+	spec.AddUnloadHook(func() { calls = append(calls, "second") })
+
+	spec.Unload()
+
+	assert.Equal(t, []string{"first", "second"}, calls)
+	assert.Nil(t, spec.unloadHooks)
+	assert.Nil(t, spec.MCPPrimitives)
+}
+
+// Verifies: STK-REQ-055, SYS-REQ-143, SW-REQ-130
+// STK-REQ-055:STK-REQ-055-AC-01:acceptance
+// SYS-REQ-143:nominal:nominal
+// SYS-REQ-143:error_handling:nominal
+// SYS-REQ-143:error_handling:negative
+// SW-REQ-130:nominal:nominal
+// SW-REQ-130:error_handling:nominal
+// SW-REQ-130:error_handling:negative
+func TestAPISpecValidateProtocolDispatch(t *testing.T) {
+	testCases := []struct {
+		name     string
+		protocol string
+		port     int
+		wantErr  string
+	}{
+		{
+			name:     "http defaults to no-op validation",
+			protocol: "http",
+		},
+		{
+			name:     "empty protocol defaults to no-op validation",
+			protocol: "",
+		},
+		{
+			name:     "tcp requires listen port",
+			protocol: "tcp",
+			wantErr:  "missing listening port",
+		},
+		{
+			name:     "tls requires listen port",
+			protocol: "tls",
+			wantErr:  "missing listening port",
+		},
+		{
+			name:     "tcp accepts listen port",
+			protocol: "tcp",
+			port:     9090,
+		},
+		{
+			name:     "tls accepts listen port",
+			protocol: "tls",
+			port:     9443,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					Protocol:   tc.protocol,
+					ListenPort: tc.port,
+				},
+			}
+
+			err := spec.Validate(config.OASConfig{})
+			if tc.wantErr == "" {
+				assert.NoError(t, err)
+				return
+			}
+			assert.EqualError(t, err, tc.wantErr)
+		})
+	}
 }
 
 func TestAPISpec_isListeningOnPort(t *testing.T) {
@@ -1575,6 +1695,12 @@ func TestAPISpec_hasMock(t *testing.T) {
 	assert.True(t, s.hasActiveMock())
 }
 
+// Verifies: STK-REQ-055, SYS-REQ-143, SW-REQ-130
+// STK-REQ-055:STK-REQ-055-AC-01:acceptance
+// SYS-REQ-143:boundary:nominal
+// SYS-REQ-143:determinism:nominal
+// SW-REQ-130:boundary:nominal
+// SW-REQ-130:determinism:nominal
 func TestAPISpec_isStreamingAPI(t *testing.T) {
 	type testCase struct {
 		name           string
