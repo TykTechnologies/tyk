@@ -165,6 +165,8 @@ project:
             - cli/linter/linter_test.go
             - config/config.go
             - config/config_test.go
+            - config/external_service.go
+            - config/external_service_test.go
             - apidef/importer/blueprint.go
             - apidef/importer/blueprint_reqproof_test.go
             - apidef/importer/importer.go

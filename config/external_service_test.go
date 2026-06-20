@@ -8,6 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
+// SW-REQ-104:nominal:nominal
+// SW-REQ-104:boundary:nominal
+// MCDC SYS-REQ-117: external_service_configuration_operation_requested=F, external_service_configuration_result_determined=F => TRUE
+// MCDC SYS-REQ-117: external_service_configuration_operation_requested=T, external_service_configuration_result_determined=T => TRUE
+//
+//mcdc:ignore SYS-REQ-117: external_service_configuration_operation_requested=T, external_service_configuration_result_determined=F => FALSE -- violation row is the negation of the local external-service configuration helper guarantee; these tests assert requested configuration operations either preserve JSON fields, classify certificate modes, or return explicit local validation errors [category: defensive] [reviewed: agent:codex]
 func TestExternalServiceConfig_JSON(t *testing.T) {
 	// Test serialization and deserialization of the configuration
 	config := ExternalServiceConfig{
@@ -89,6 +96,8 @@ func TestExternalServiceConfig_JSON(t *testing.T) {
 	assert.Equal(t, config.Discovery.MTLS.KeyFile, unmarshaled.Discovery.MTLS.KeyFile)
 }
 
+// Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
+// SW-REQ-104:boundary:nominal
 func TestProxyConfig_Empty(t *testing.T) {
 	config := ProxyConfig{}
 
@@ -106,6 +115,8 @@ func TestProxyConfig_Empty(t *testing.T) {
 	assert.Empty(t, unmarshaled.BypassProxy)
 }
 
+// Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
+// SW-REQ-104:boundary:nominal
 func TestServiceConfig_Empty(t *testing.T) {
 	config := ServiceConfig{}
 
@@ -123,6 +134,9 @@ func TestServiceConfig_Empty(t *testing.T) {
 	assert.Empty(t, unmarshaled.MTLS.CertFile)
 }
 
+// Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
+// SW-REQ-104:nominal:nominal
+// SW-REQ-104:boundary:nominal
 func TestMTLSConfig_Validation(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -186,6 +200,8 @@ func TestMTLSConfig_Validation(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
+// SW-REQ-104:nominal:nominal
 func TestServiceTypeConstants(t *testing.T) {
 	// Test that all service type constants are defined correctly
 	expectedTypes := map[string]string{
@@ -201,6 +217,9 @@ func TestServiceTypeConstants(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
+// SW-REQ-104:nominal:nominal
+// SW-REQ-104:boundary:nominal
 func TestExternalServiceConfig_PartialConfiguration(t *testing.T) {
 	// Test various partial configurations that might be common in real usage
 	tests := []struct {
@@ -271,6 +290,9 @@ func TestExternalServiceConfig_PartialConfiguration(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
+// SW-REQ-104:nominal:nominal
+// SW-REQ-104:boundary:nominal
 func TestExternalServiceConfig_JSONTags(t *testing.T) {
 	// Test that JSON tags are working correctly by creating a minimal JSON and unmarshaling
 	jsonStr := `{
@@ -296,6 +318,9 @@ func TestExternalServiceConfig_JSONTags(t *testing.T) {
 	assert.Equal(t, "/cert.pem", config.OAuth.MTLS.CertFile)
 }
 
+// Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
+// SW-REQ-104:nominal:nominal
+// SW-REQ-104:boundary:nominal
 func TestExternalServiceConfig_JSONTagsWithCertificateStore(t *testing.T) {
 	// Test that JSON tags work correctly with new certificate store fields
 	jsonStr := `{
@@ -342,6 +367,8 @@ func TestExternalServiceConfig_JSONTagsWithCertificateStore(t *testing.T) {
 	assert.True(t, config.Storage.MTLS.IsFileBasedConfig())
 }
 
+// Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
+// SW-REQ-104:boundary:nominal
 func TestExternalServiceConfig_ZeroValues(t *testing.T) {
 	// Test that zero values are handled correctly
 	var config ExternalServiceConfig
@@ -366,6 +393,11 @@ func TestExternalServiceConfig_ZeroValues(t *testing.T) {
 	assert.False(t, unmarshaled.OAuth.MTLS.InsecureSkipVerify)
 }
 
+// Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
+// SW-REQ-104:nominal:nominal
+// SW-REQ-104:boundary:nominal
+// SW-REQ-104:error_handling:negative
+// STK-REQ-029:error_handling:negative
 func TestMTLSConfig_Validate(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -487,6 +519,9 @@ func TestMTLSConfig_Validate(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
+// SW-REQ-104:nominal:nominal
+// SW-REQ-104:boundary:nominal
 func TestMTLSConfig_IsFileBasedConfig(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -545,6 +580,9 @@ func TestMTLSConfig_IsFileBasedConfig(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
+// SW-REQ-104:nominal:nominal
+// SW-REQ-104:boundary:nominal
 func TestMTLSConfig_IsCertificateStoreConfig(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -603,6 +641,9 @@ func TestMTLSConfig_IsCertificateStoreConfig(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
+// SW-REQ-104:nominal:nominal
+// SW-REQ-104:boundary:nominal
 func TestMTLSConfig_JSONWithCertificateStore(t *testing.T) {
 	// Test JSON marshaling/unmarshaling with new certificate store fields
 	config := MTLSConfig{

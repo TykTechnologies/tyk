@@ -44,8 +44,8 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 151/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
-| `mcdc_coverage` | 52/403 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
+| `verification_scope_complete` | 152/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `mcdc_coverage` | 52/406 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
 
@@ -374,6 +374,19 @@ fixed or to hide them from the current strict audit.
   delivery, tracing export delivery, API loading, request admission, or final
   client-visible runtime behavior. It moves the visible production coverage
   baseline from 150/447 to 151/447.
+- `SW-REQ-104` onboarded `config/external_service.go` with a new external
+  service configuration stakeholder/system/software chain and existing
+  table-driven config tests for local helper behavior: JSON field preservation
+  for global proxy and service-specific mTLS fields, zero and partial
+  configuration shapes, service type constants, certificate-store JSON fields,
+  mTLS validation for disabled, file-based, certificate-store, CA-only,
+  conflicting, and incomplete configurations, and file-based versus
+  certificate-store helper classification. This increment is scoped to local
+  external service configuration helper support and does not claim proxy
+  transport behavior, certificate loading, TLS handshake enforcement, outbound
+  service connectivity, storage/OAuth/webhook/health/discovery delivery, or
+  final gateway runtime behavior. It moves the visible production coverage
+  baseline from 151/447 to 152/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

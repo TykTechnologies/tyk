@@ -100,6 +100,7 @@ const (
 )
 
 // Validate validates the MTLSConfig for consistency and completeness.
+// SW-REQ-104
 func (cfg *MTLSConfig) Validate() error {
 	if !cfg.Enabled {
 		return nil
@@ -126,11 +127,13 @@ func (cfg *MTLSConfig) Validate() error {
 }
 
 // IsFileBasedConfig returns true if the configuration uses file-based certificates.
+// SW-REQ-104
 func (cfg *MTLSConfig) IsFileBasedConfig() bool {
 	return cfg.CertFile != "" || cfg.KeyFile != ""
 }
 
 // IsCertificateStoreConfig returns true if the configuration uses certificate store.
+// SW-REQ-104
 func (cfg *MTLSConfig) IsCertificateStoreConfig() bool {
 	return cfg.CertID != ""
 }

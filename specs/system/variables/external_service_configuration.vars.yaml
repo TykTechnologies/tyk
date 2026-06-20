@@ -1,0 +1,14 @@
+component: external_service_configuration
+no_interface:
+    declared: true
+    reason: The config/external_service.go file is exercised as a local configuration data-shape and mTLS validation helper; proxy transport behavior, certificate loading, TLS handshake enforcement, outbound service connectivity, storage/OAuth/webhook/health/discovery delivery, and request handling are outside this local component boundary.
+variables:
+    - name: external_service_configuration_operation_requested
+      type: bool
+      direction: input
+      description: Gateway code or tests request local external service configuration JSON round-tripping, service type identifier lookup, mTLS validation, or mTLS configuration mode classification.
+
+    - name: external_service_configuration_result_determined
+      type: bool
+      direction: output
+      description: External service configuration support returns preserved proxy and mTLS JSON fields, stable service type identifiers, accepted validation results, explicit local validation errors for conflicting or incomplete enabled mTLS input, or deterministic file-based and certificate-store classification results.
