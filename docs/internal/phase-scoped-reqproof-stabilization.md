@@ -44,7 +44,7 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 144/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `verification_scope_complete` | 145/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
 | `mcdc_coverage` | 52/385 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
@@ -296,6 +296,15 @@ fixed or to hide them from the current strict audit.
   does not claim embedded schema completeness, Bento schema completeness, stream
   runtime execution, or final client-visible validation behavior. It moves the
   visible production coverage baseline from 143/447 to 144/447.
+- `SW-REQ-097` onboarded `apidef/validator.go` with focused evidence for
+  Classic API definition validator helper behavior: validation result state,
+  rule dispatch, duplicate GraphQL data-source names, auth-source enablement,
+  IP/CIDR syntax checks, hard-timeout boundaries, upstream-auth configuration,
+  and load-balancing target checks. This increment is scoped to local validator
+  helper behavior and does not claim gateway request admission, runtime auth
+  execution, load-balancer traffic distribution, invalid-index `ErrorAt`
+  behavior, or final client-visible behavior. It moves the visible production
+  coverage baseline from 144/447 to 145/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

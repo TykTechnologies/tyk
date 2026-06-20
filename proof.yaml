@@ -151,6 +151,8 @@ project:
         include:
             - apidef/api_definitions.go
             - apidef/api_definitions_reqproof_test.go
+            - apidef/validator.go
+            - apidef/validator_reqproof_test.go
             - apidef/importer/blueprint.go
             - apidef/importer/blueprint_reqproof_test.go
             - apidef/importer/importer.go

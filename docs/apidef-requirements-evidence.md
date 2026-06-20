@@ -5,7 +5,7 @@
 <!-- documents SW-REQ-053 SW-REQ-054 SW-REQ-055 SW-REQ-056 SW-REQ-057 SW-REQ-058 SW-REQ-059 SW-REQ-060 SW-REQ-061 SW-REQ-062 -->
 <!-- documents SW-REQ-063 SW-REQ-065 SW-REQ-068 SW-REQ-069 SW-REQ-070 SW-REQ-071 SW-REQ-072 SW-REQ-073 SW-REQ-074 SW-REQ-075 -->
 <!-- documents SW-REQ-076 SW-REQ-077 SW-REQ-078 SW-REQ-079 SW-REQ-080 SW-REQ-081 SW-REQ-082 SW-REQ-083 SW-REQ-084 SW-REQ-085 -->
-<!-- documents SW-REQ-086 SW-REQ-087 SW-REQ-088 SW-REQ-089 SW-REQ-090 SW-REQ-091 SW-REQ-092 SW-REQ-093 SW-REQ-094 SW-REQ-095 SW-REQ-096 -->
+<!-- documents SW-REQ-086 SW-REQ-087 SW-REQ-088 SW-REQ-089 SW-REQ-090 SW-REQ-091 SW-REQ-092 SW-REQ-093 SW-REQ-094 SW-REQ-095 SW-REQ-096 SW-REQ-097 -->
 <!-- documents SW-REQ-019 -->
 <!-- documents SW-REQ-020 -->
 <!-- documents SW-REQ-021 -->
@@ -57,9 +57,10 @@ admission, or the full API definition lifecycle.
 `SYS-REQ-104` covers API-definition support model helpers that preserve typed
 health-check wire values, host-list access behavior, and error-override helper
 state, embedded Classic API definition schema data, Classic API definition core
-helper behavior, importer source dispatcher behavior, Apiary Blueprint importer
-conversion behavior, Swagger importer conversion behavior, WSDL importer
-conversion behavior, Classic API definition migration helper behavior,
+helper behavior, Classic API definition validator helper behavior, importer
+source dispatcher behavior, Apiary Blueprint importer conversion behavior,
+Swagger importer conversion behavior, WSDL importer conversion behavior,
+Classic API definition migration helper behavior,
 notification helper behavior, OAS authentication helper shapes, OAS path/server
 helper shapes, OAS default-extension helper shapes, OAS middleware helper
 shapes, OAS root document helper behavior, OAS operation document helper
@@ -91,7 +92,8 @@ notification helper behavior, plus OAS authentication helper behavior.
 It also includes OAS default-extension, middleware, root document, operation
 document, security document, upstream document, and Bento configuration
 schema-generation and validation helper behavior, plus Tyk Streams OAS
-validation helper behavior.
+validation helper behavior, plus Classic API definition validator helper
+behavior.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -547,6 +549,19 @@ admission, middleware execution, upstream authentication execution, webhook
 delivery, JavaScript execution, log emission, persistence backend correctness,
 analytics, GraphQL execution, streaming execution, or final client-visible
 runtime behavior.
+
+`SW-REQ-097` owns the concrete `apidef/validator.go` Classic API definition
+validator helpers. Its evidence covers ValidationResult validity/error
+aggregation, configured validation rule dispatch, default rule-set exposure,
+duplicate GraphQL data-source name detection after trimming and case
+normalization, enabled-auth-source checks for enabled auth mechanisms, IP/CIDR
+validation for enabled allow/block lists, negative hard-timeout rejection,
+upstream-auth mode and OAuth authorization-type validation, and load-balancing
+target checks when load balancing is enabled. This evidence does not claim
+gateway API loading, route generation, request matching, gateway request
+admission, runtime authentication execution, upstream request execution,
+load-balancer traffic distribution, GraphQL execution, persistence, analytics,
+invalid-index `ErrorAt` behavior, or final client-visible behavior.
 
 `SW-REQ-087` owns the concrete `apidef/oas/authentication.go` OAS
 authentication helper shapes. Its evidence covers security-processing mode

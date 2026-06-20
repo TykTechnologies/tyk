@@ -8,19 +8,23 @@ import (
 	"strings"
 )
 
+// SW-REQ-097
 type ValidationResult struct {
 	IsValid bool
 	Errors  []error
 }
 
+// SW-REQ-097
 func (v *ValidationResult) AppendError(err error) {
 	v.Errors = append(v.Errors, err)
 }
 
+// SW-REQ-097
 func (v *ValidationResult) HasErrors() bool {
 	return v.ErrorCount() > 0
 }
 
+// SW-REQ-097
 func (v *ValidationResult) FirstError() error {
 	if v.ErrorCount() == 0 {
 		return nil
@@ -29,6 +33,7 @@ func (v *ValidationResult) FirstError() error {
 	return v.ErrorAt(0)
 }
 
+// SW-REQ-097
 func (v *ValidationResult) ErrorAt(i int) error {
 	if v.ErrorCount() < i {
 		return nil
@@ -37,10 +42,12 @@ func (v *ValidationResult) ErrorAt(i int) error {
 	return v.Errors[i]
 }
 
+// SW-REQ-097
 func (v *ValidationResult) ErrorCount() int {
 	return len(v.Errors)
 }
 
+// SW-REQ-097
 func (v *ValidationResult) ErrorStrings() []string {
 	var errorStrings []string
 	for _, err := range v.Errors {
@@ -50,8 +57,10 @@ func (v *ValidationResult) ErrorStrings() []string {
 	return errorStrings
 }
 
+// SW-REQ-097
 type ValidationRuleSet []ValidationRule
 
+// SW-REQ-097
 var DefaultValidationRuleSet = ValidationRuleSet{
 	&RuleUniqueDataSourceNames{},
 	&RuleAtLeastEnableOneAuthSource{},
@@ -61,6 +70,7 @@ var DefaultValidationRuleSet = ValidationRuleSet{
 	&RuleLoadBalancingTargets{},
 }
 
+// SW-REQ-097
 func Validate(definition *APIDefinition, ruleSet ValidationRuleSet) ValidationResult {
 	result := ValidationResult{
 		IsValid: true,
@@ -74,14 +84,18 @@ func Validate(definition *APIDefinition, ruleSet ValidationRuleSet) ValidationRe
 	return result
 }
 
+// SW-REQ-097
 type ValidationRule interface {
 	Validate(apiDef *APIDefinition, validationResult *ValidationResult)
 }
 
+// SW-REQ-097
 var ErrDuplicateDataSourceName = errors.New("duplicate data source names are not allowed")
 
+// SW-REQ-097
 type RuleUniqueDataSourceNames struct{}
 
+// SW-REQ-097
 func (r *RuleUniqueDataSourceNames) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
 	if apiDef.GraphQL.Engine.DataSources == nil || len(apiDef.GraphQL.Engine.DataSources) <= 1 {
 		return
@@ -100,10 +114,13 @@ func (r *RuleUniqueDataSourceNames) Validate(apiDef *APIDefinition, validationRe
 	}
 }
 
+// SW-REQ-097
 var ErrAllAuthSourcesDisabled = "all auth sources are disabled for %s, at least one of header/cookie/query must be enabled"
 
+// SW-REQ-097
 type RuleAtLeastEnableOneAuthSource struct{}
 
+// SW-REQ-097
 func (r *RuleAtLeastEnableOneAuthSource) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
 	authConfigs := make([]string, len(apiDef.AuthConfigs))
 	i := 0
@@ -124,6 +141,7 @@ func (r *RuleAtLeastEnableOneAuthSource) Validate(apiDef *APIDefinition, validat
 
 }
 
+// SW-REQ-097
 func shouldValidateAuthSource(authType string, apiDef *APIDefinition) bool {
 	switch authType {
 	case "authToken":
@@ -143,10 +161,13 @@ func shouldValidateAuthSource(authType string, apiDef *APIDefinition) bool {
 	return false
 }
 
+// SW-REQ-097
 var ErrInvalidIPCIDR = "invalid IP/CIDR %q"
 
+// SW-REQ-097
 type RuleValidateIPList struct{}
 
+// SW-REQ-097
 func (r *RuleValidateIPList) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
 	if apiDef.EnableIpWhiteListing {
 		if errs := r.validateIPAddr(apiDef.AllowedIPs); len(errs) > 0 {
@@ -163,6 +184,7 @@ func (r *RuleValidateIPList) Validate(apiDef *APIDefinition, validationResult *V
 	}
 }
 
+// SW-REQ-097
 func (r *RuleValidateIPList) validateIPAddr(ips []string) []error {
 	var errs []error
 	for _, ip := range ips {
@@ -184,10 +206,13 @@ func (r *RuleValidateIPList) validateIPAddr(ips []string) []error {
 	return errs
 }
 
+// SW-REQ-097
 var ErrInvalidTimeoutValue = errors.New("invalid timeout value")
 
+// SW-REQ-097
 type RuleValidateEnforceTimeout struct{}
 
+// SW-REQ-097
 func (r *RuleValidateEnforceTimeout) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
 	if apiDef.VersionData.Versions != nil {
 		for _, vInfo := range apiDef.VersionData.Versions {
@@ -202,6 +227,7 @@ func (r *RuleValidateEnforceTimeout) Validate(apiDef *APIDefinition, validationR
 	}
 }
 
+// SW-REQ-097
 var (
 	// ErrMultipleUpstreamAuthEnabled is the error to be returned when multiple upstream authentication modes are configured.
 	ErrMultipleUpstreamAuthEnabled = errors.New("multiple upstream authentication modes not allowed")
@@ -215,9 +241,11 @@ var (
 	ErrAllLoadBalancingTargetsZeroWeight = errors.New("all load balancing targets have weight 0, at least one target must have weight > 0")
 )
 
+// SW-REQ-097
 // RuleUpstreamAuth implements validations for upstream authentication configurations.
 type RuleUpstreamAuth struct{}
 
+// SW-REQ-097
 // Validate validates api definition upstream authentication configurations.
 func (r *RuleUpstreamAuth) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
 	upstreamAuth := apiDef.UpstreamAuth
@@ -254,9 +282,11 @@ func (r *RuleUpstreamAuth) Validate(apiDef *APIDefinition, validationResult *Val
 	}
 }
 
+// SW-REQ-097
 // RuleLoadBalancingTargets implements validations for load balancing target configurations.
 type RuleLoadBalancingTargets struct{}
 
+// SW-REQ-097
 // Validate validates that when load balancing is enabled, at least one target has weight > 0.
 func (r *RuleLoadBalancingTargets) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
 	if !apiDef.Proxy.EnableLoadBalancing {
