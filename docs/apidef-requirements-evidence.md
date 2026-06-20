@@ -19,6 +19,7 @@
 <!-- documents SW-REQ-058 -->
 <!-- documents SW-REQ-059 -->
 <!-- documents SW-REQ-060 -->
+<!-- documents SW-REQ-061 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -28,7 +29,7 @@ admission, or the full API definition lifecycle.
 `SYS-REQ-104` covers API-definition support model helpers that preserve typed
 health-check wire values, host-list access behavior, and error-override helper
 state, embedded Classic API definition schema data, OAS path/server helper
-shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
+shapes, OAS root extension helper shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint
 helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes,
 OAS deprecated-wrapper conversion shapes, OAS Tyk streaming extension shape, OAS event-handler helper shapes,
@@ -219,3 +220,18 @@ claim correctness of the upstream gojsonschema library, completeness of
 embedded OpenAPI schemas, API import, route generation, request matching,
 gateway request admission, persistence, middleware execution, or final
 client-visible validation responses.
+
+`SW-REQ-061` owns the concrete `apidef/oas` root extension data shape and
+Classic metadata conversion helpers. Its evidence covers top-level
+`x-tyk-api-gateway` info, upstream, server, middleware, state, versioning, and
+error-override mapping to and from Classic API definitions; deterministic
+version name-to-ID sorting; Classic unversioned `VersionData` default
+initialization during extraction; omission and temporary nil restoration for
+empty optional middleware and versioning shapes; explicit Classic
+error-override disablement when the OAS root has no error-override shape;
+present disabled error-override preservation; and import-time context-variable
+and traffic-log defaulting only when the corresponding global middleware helper
+is absent. This evidence does not claim full API import, full OAS conversion,
+route generation, request matching, gateway request admission, middleware
+execution, error response selection, context-variable runtime behavior,
+traffic-log emission, or final client-visible routing behavior.

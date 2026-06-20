@@ -8,6 +8,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// SW-REQ-061
 // XTykAPIGateway contains custom Tyk API extensions for the OpenAPI definition.
 // The values for the extensions are stored inside the OpenAPI document, under
 // the key `x-tyk-api-gateway`.
@@ -24,6 +25,7 @@ type XTykAPIGateway struct {
 	ErrorOverrides *ErrorOverrides `bson:"errorOverrides,omitempty" json:"errorOverrides,omitempty"`
 }
 
+// SW-REQ-061
 // Fill fills *XTykAPIGateway from apidef.APIDefinition.
 func (x *XTykAPIGateway) Fill(api apidef.APIDefinition) {
 	x.Info.Fill(api)
@@ -46,6 +48,7 @@ func (x *XTykAPIGateway) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-061
 // ExtractTo extracts *XTykAPIGateway into *apidef.APIDefinition.
 func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	api.SetDisabledFlags()
@@ -72,6 +75,7 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-061
 // Info contains the main metadata for the API definition.
 type Info struct {
 	// ID is the unique identifier of the API within Tyk.
@@ -95,6 +99,7 @@ type Info struct {
 	Versioning *Versioning `bson:"versioning,omitempty" json:"versioning,omitempty"`
 }
 
+// SW-REQ-061
 // Fill fills *Info from apidef.APIDefinition.
 func (i *Info) Fill(api apidef.APIDefinition) {
 	i.ID = api.APIID
@@ -114,6 +119,7 @@ func (i *Info) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-061
 // ExtractTo extracts *Info into an *apidef.APIDefinition.
 func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 	api.APIID = i.ID
@@ -142,6 +148,7 @@ func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-061
 // State holds configuration for the status of the API within Tyk - if it is currently active and if it is exposed externally.
 type State struct {
 	// Active enables the API so that Tyk will listen for and process requests made to the listenPath.
@@ -155,18 +162,21 @@ type State struct {
 	Internal bool `bson:"internal,omitempty" json:"internal,omitempty"`
 }
 
+// SW-REQ-061
 // Fill fills *State from apidef.APIDefinition.
 func (s *State) Fill(api apidef.APIDefinition) {
 	s.Active = api.Active
 	s.Internal = api.Internal
 }
 
+// SW-REQ-061
 // ExtractTo extracts *State to *apidef.APIDefinition.
 func (s *State) ExtractTo(api *apidef.APIDefinition) {
 	api.Active = s.Active
 	api.Internal = s.Internal
 }
 
+// SW-REQ-061
 // Versioning holds configuration for API versioning.
 //
 // Tyk classic API definition: `version_data`.
@@ -197,6 +207,7 @@ type Versioning struct {
 	FallbackToDefault bool `bson:"fallbackToDefault,omitempty" json:"fallbackToDefault,omitempty"`
 }
 
+// SW-REQ-061
 // Fill fills *Versioning from apidef.APIDefinition.
 func (v *Versioning) Fill(api apidef.APIDefinition) {
 	v.Enabled = api.VersionDefinition.Enabled
@@ -218,6 +229,7 @@ func (v *Versioning) Fill(api apidef.APIDefinition) {
 	v.UrlVersioningPattern = api.VersionDefinition.UrlVersioningPattern
 }
 
+// SW-REQ-061
 // ExtractTo extracts *Versioning into *apidef.APIDefinition.
 func (v *Versioning) ExtractTo(api *apidef.APIDefinition) {
 	api.VersionDefinition.Enabled = v.Enabled
@@ -240,6 +252,7 @@ func (v *Versioning) ExtractTo(api *apidef.APIDefinition) {
 	api.VersionDefinition.FallbackToDefault = v.FallbackToDefault
 }
 
+// SW-REQ-061
 // VersionToID contains a single mapping from a version name into an API ID.
 // Tyk classic API definition: Entry in `version_definition.versions` map.
 type VersionToID struct {
@@ -249,6 +262,7 @@ type VersionToID struct {
 	ID string `bson:"id" json:"id"`
 }
 
+// SW-REQ-061
 // enableContextVariablesIfEmpty enables context variables in middleware.global.contextVariables.
 // Context variables will be set only if it is not set, if it is already set to false, it won't be enabled.
 func (x *XTykAPIGateway) enableContextVariablesIfEmpty() {
@@ -267,6 +281,7 @@ func (x *XTykAPIGateway) enableContextVariablesIfEmpty() {
 	}
 }
 
+// SW-REQ-061
 // enableTrafficLogsIfEmpty enables traffic logs in middleware.global.trafficLogs.
 // Traffic logs will be set only if it is not set. If it is already set to false, it won't be enabled.
 func (x *XTykAPIGateway) enableTrafficLogsIfEmpty() {
