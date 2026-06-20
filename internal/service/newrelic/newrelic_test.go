@@ -9,6 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Verifies: SYS-REQ-082, SW-REQ-067
+// SW-REQ-067:nominal:nominal
+// SW-REQ-067:boundary:nominal
 func TestRenameRelicTransactionMiddleware(t *testing.T) {
 	app, err := newrelic.NewApplication(newrelic.ConfigEnabled(false))
 	assert.NoError(t, err)

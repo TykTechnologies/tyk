@@ -6,6 +6,7 @@
 <!-- documents SW-REQ-046 -->
 <!-- documents SW-REQ-049 -->
 <!-- documents SW-REQ-066 -->
+<!-- documents SW-REQ-067 -->
 
 This document records the proof scope expansion into `internal/event`.
 
@@ -13,7 +14,8 @@ This document records the proof scope expansion into `internal/event`.
 event display names, accumulated context events, serializable request snapshots,
 structured diagnostic error classifications, and access-log record field maps
 are preserved for event handlers, analytics, audit flows, access logs,
-validation helpers, model helpers, OAS helpers, and error-override consumers.
+validation helpers, model helpers, OAS helpers, New Relic setup, and
+error-override consumers.
 
 `SW-REQ-004` owns the concrete `internal/event` helper behavior that implements that system requirement: mapped event string rendering, unmapped raw values, context set/get/add behavior, nil retrieval from untouched contexts, base64 request encoding, and empty snapshots when request encoding fails.
 
@@ -34,6 +36,16 @@ This evidence does not claim caller selection of error categories, validation
 policy correctness, storage lookup behavior, access-log emission, analytics
 persistence, logger output behavior, gateway middleware ordering, or final HTTP
 status generation.
+
+`SW-REQ-067` owns the concrete `internal/service/newrelic` observability adapter
+helpers: upstream New Relic symbol exposure, nil-safe and configured Gorilla
+middleware mounting, request-path transaction naming, custom event name and
+parameter formatting for health events, and logrus-backed New Relic logger
+forwarding with field preservation and debug-enabled state. This evidence does
+not claim New Relic backend availability, network delivery, dashboard ingestion,
+correctness of the upstream New Relic agent or Gorilla integration, gateway
+middleware ordering outside this adapter, analytics persistence, trace/span
+semantic correctness, or final client-visible HTTP behavior.
 
 `SW-REQ-046` owns the concrete `internal/httputil/accesslog.Filter` helper
 behavior used to shape access-log field maps: empty allow-list passthrough,

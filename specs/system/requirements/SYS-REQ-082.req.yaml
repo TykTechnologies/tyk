@@ -5,14 +5,14 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the observability shall always satisfy !event_metadata_exchange_requested | event_metadata_result_preserved
-description: Gateway observability metadata shall preserve stable event display names, accumulated request-context event slices, serializable HTTP request snapshots, structured diagnostic error classifications, typed diagnostic error package metadata, and access-log record field maps so event handlers, analytics, audit flows, access logs, validation helpers, model helpers, OAS helpers, and error-override consumers receive the intended metadata, including explicit empty snapshots when request encoding fails, stable response flags/details for classified failures, stable typed error classifications and log-level metadata, configured access-log record fields, and exact configured access-log fields plus the prefix field when filtering is enabled.
+description: Gateway observability metadata shall preserve stable event display names, accumulated request-context event slices, serializable HTTP request snapshots, structured diagnostic error classifications, typed diagnostic error package metadata, New Relic adapter metadata, and access-log record field maps so event handlers, analytics, audit flows, access logs, validation helpers, model helpers, OAS helpers, New Relic setup, and error-override consumers receive the intended metadata, including explicit empty snapshots when request encoding fails, stable response flags/details for classified failures, stable typed error classifications and log-level metadata, configured New Relic transaction names, custom event names and parameters, logger fields, configured access-log record fields, and exact configured access-log fields plus the prefix field when filtering is enabled.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: observability
-rationale: Gateway event handlers, metadata builders, validation helpers, model helpers, OAS helpers, access logs, and error-override consumers rely on stable event strings, accumulated request-context events, encoded request snapshots, structured diagnostic classification metadata, typed diagnostic error package metadata, access-log record field assembly, and configured access-log field filtering. The concrete internal/event helper implementation is decomposed into SW-REQ-004, the concrete internal/errors classification implementation is decomposed into SW-REQ-041, the concrete pkg/errpack typed diagnostic error helper implementation is decomposed into SW-REQ-066, the concrete access-log field filter is decomposed into SW-REQ-046, and the concrete access-log record field assembly helper is decomposed into SW-REQ-049.
+rationale: Gateway event handlers, metadata builders, validation helpers, model helpers, OAS helpers, New Relic setup, access logs, and error-override consumers rely on stable event strings, accumulated request-context events, encoded request snapshots, structured diagnostic classification metadata, typed diagnostic error package metadata, New Relic adapter metadata, access-log record field assembly, and configured access-log field filtering. The concrete internal/event helper implementation is decomposed into SW-REQ-004, the concrete internal/errors classification implementation is decomposed into SW-REQ-041, the concrete pkg/errpack typed diagnostic error helper implementation is decomposed into SW-REQ-066, the concrete internal/service/newrelic adapter implementation is decomposed into SW-REQ-067, the concrete access-log field filter is decomposed into SW-REQ-046, and the concrete access-log record field assembly helper is decomposed into SW-REQ-049.
 tags:
     - observability
     - event-metadata
@@ -36,23 +36,23 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-20T03:29:14Z"
-        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-066 is scoped to local pkg/errpack typed diagnostic error helper behavior used by validation, model, and OAS helper flows: stable unknown/domain/application/infrastructure/not-found/broken-invariant classifications, stable messages, nil-preserving Wrap behavior, predecessor wrapping and chaining visible to standard error traversal, formatted domain errors preserving domain type metadata, optional log-level metadata, deterministic fallback log levels, and chain-aware errpack.Error identity. Focused pkg/errpack tests passed with race, go vet, and go build. This approval does not claim caller selection of error categories, HTTP response generation, access-log emission, analytics persistence, logger output behavior, validation policy correctness, storage lookup behavior, gateway middleware execution, or final client-visible status generation.'
-        fingerprint: sha256:f2750e51b5d514b8c53059e566a19054ced23a07023823270fbc37a3cfa05195
+        reviewed_at: "2026-06-20T03:46:12Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-067 is scoped to local internal/service/newrelic observability adapter helper behavior: upstream New Relic application, transaction, config, and logger symbol exposure; nil-safe Mount behavior; configured Gorilla middleware mounting; request-path transaction renaming when a transaction exists; next-handler execution without a transaction; health sink custom-event name formatting for event, error, timing, completion, and gauge paths; key/value parameter preservation; and logrus-backed New Relic logger forwarding with fields and entry-level debug-enabled state. Focused internal/service/newrelic tests passed with race, go vet, and go build. This approval does not claim New Relic backend availability, network delivery, dashboard ingestion, correctness of the upstream New Relic agent or Gorilla integration, gateway middleware ordering outside this adapter, analytics persistence, trace/span semantic correctness, or final client-visible HTTP behavior.'
+        fingerprint: sha256:968ac9947d048143cd357174cfaac49203ae4c87184e7144619baca48fc2a1d0
         ai_generated: false
-    gaps_reviewed_at: "2026-06-20T03:29:24.86816Z"
+    gaps_reviewed_at: "2026-06-20T03:46:20.858068Z"
     gaps_reviewed_by: human:buger
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-082|event_metadata_result_preserved
           reviewer: human:buger
-          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-082''s event_metadata_result_preserved variable is decomposed across the current observability metadata helper children including SW-REQ-066 for local pkg/errpack typed diagnostic error helper behavior: stable unknown/domain/application/infrastructure/not-found/broken-invariant classifications, stable messages, nil-preserving wrapping, predecessor wrapping and chaining visible to standard error traversal, formatted domain errors preserving domain type metadata, optional log-level metadata, deterministic fallback log levels, and chain-aware errpack.Error identity. This review is limited to observability and diagnostic metadata helper behavior and does not claim caller selection of error categories, HTTP response generation, access-log emission, analytics persistence, logger output behavior, validation policy correctness, storage lookup behavior, gateway middleware execution, or final client-visible status generation.'
-          reviewed_at: "2026-06-20T03:29:24.86816Z"
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-082''s event_metadata_result_preserved variable is decomposed across the current observability metadata helper children including SW-REQ-067 for local internal/service/newrelic adapter behavior: upstream New Relic symbol exposure, nil-safe Mount behavior, configured Gorilla middleware mounting, request-path transaction renaming, next-handler execution without a transaction, health sink custom-event name formatting and key/value parameter preservation, and logrus-backed New Relic logger forwarding with fields and entry-level debug-enabled state. This review is limited to observability adapter helper behavior and does not claim New Relic backend availability, network delivery, dashboard ingestion, correctness of the upstream New Relic agent or Gorilla integration, gateway middleware ordering outside this adapter, analytics persistence, trace/span semantic correctness, or final client-visible HTTP behavior.'
+          reviewed_at: "2026-06-20T03:46:20.858068Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-18T00:00:00Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-20T03:29:14Z"
+    last_modified_at: "2026-06-20T03:46:12Z"
 obligation_class: encoding_safety
 obligation_checklist:
     - nominal
@@ -75,4 +75,9 @@ lifecycle:
           from: approved
           to: approved
           reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T01:34:26Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-049 is scoped to the local internal/httputil/accesslog record field assembly helper: prefix initialization, request/response metadata copying, API identity/type preservation, configured API-key obfuscation or hashing, optional trace/error/MCP metadata preservation, optional-field omission, deterministic filtered field-map output, and delegation to the existing access-log allow-list filter. Focused internal/httputil/accesslog tests passed with race, go vet, and go build. This approval does not claim access-log emission, template rendering, analytics persistence, logger behavior, reverse-proxy execution, gateway middleware ordering, network transport success, upstream availability, or final HTTP status generation.")'
+          changed_by: human:buger
+        - date: "2026-06-20T03:46:12Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T03:29:14Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-066 is scoped to local pkg/errpack typed diagnostic error helper behavior used by validation, model, and OAS helper flows: stable unknown/domain/application/infrastructure/not-found/broken-invariant classifications, stable messages, nil-preserving Wrap behavior, predecessor wrapping and chaining visible to standard error traversal, formatted domain errors preserving domain type metadata, optional log-level metadata, deterministic fallback log levels, and chain-aware errpack.Error identity. Focused pkg/errpack tests passed with race, go vet, and go build. This approval does not claim caller selection of error categories, HTTP response generation, access-log emission, analytics persistence, logger output behavior, validation policy correctness, storage lookup behavior, gateway middleware execution, or final client-visible status generation.")'
           changed_by: human:buger

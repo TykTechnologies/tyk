@@ -1,0 +1,59 @@
+id: SW-REQ-067
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The internal/service/newrelic helpers shall preserve observability adapter behavior by exposing the upstream New Relic application, transaction, config, and logger symbols used by callers; mounting New Relic Gorilla middleware only when an application is configured; renaming request transactions to the request URL path when a transaction exists while still calling the next handler without a transaction; formatting health sink custom-event names for events, errors, timings, completions, and gauges while preserving key/value parameters; and forwarding New Relic logger messages with fields at error, warn, info, and debug levels with debug-enabled state matching the wrapped logrus entry.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: internal/service/newrelic/newrelic_reqproof_test.go; internal/service/newrelic/newrelic_test.go; docs/event-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-082
+component: observability
+rationale: This software requirement owns only the local internal/service/newrelic adapter helpers used by observability setup. It does not claim New Relic backend availability, network delivery, dashboard ingestion, correctness of the upstream New Relic agent or Gorilla integration, gateway middleware ordering outside this adapter, analytics persistence, trace/span semantic correctness, or final client-visible HTTP behavior.
+tags:
+    - observability
+    - newrelic
+    - adapter
+    - logging
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-082
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T03:46:12Z"
+        comment: "Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-067 is scoped to local internal/service/newrelic observability adapter helper behavior: upstream New Relic application, transaction, config, and logger symbol exposure; nil-safe Mount behavior; configured Gorilla middleware mounting; request-path transaction renaming when a transaction exists; next-handler execution without a transaction; health sink custom-event name formatting for event, error, timing, completion, and gauge paths; key/value parameter preservation; and logrus-backed New Relic logger forwarding with fields and entry-level debug-enabled state. Focused internal/service/newrelic tests passed with race, go vet, and go build. This approval does not claim New Relic backend availability, network delivery, dashboard ingestion, correctness of the upstream New Relic agent or Gorilla integration, gateway middleware ordering outside this adapter, analytics persistence, trace/span semantic correctness, or final client-visible HTTP behavior."
+        fingerprint: sha256:3329c4e8a60f460d4b7c87850c839c1a84b524f3af0b2b38ae80deff86f859e8
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T03:46:12Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added internal/service/newrelic adapter decomposition under observability metadata behavior.
+          changed_by: agent:codex
+        - date: "2026-06-20T03:46:12Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T00:00:00Z comment="Pending delegated review.")'
+          changed_by: human:buger

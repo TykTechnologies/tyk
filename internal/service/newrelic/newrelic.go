@@ -10,6 +10,7 @@ import (
 
 // Type aliases used from newrelic pkg.
 type (
+	// SW-REQ-067
 	Application  = newrelic.Application
 	Transaction  = newrelic.Transaction
 	ConfigOption = newrelic.ConfigOption
@@ -17,6 +18,7 @@ type (
 
 // Variable aliases used from newrelic pkg.
 var (
+	// SW-REQ-067
 	NewApplication = newrelic.NewApplication
 	FromContext    = newrelic.FromContext
 
@@ -27,6 +29,7 @@ var (
 	ConfigDistributedTracerEnabled = newrelic.ConfigDistributedTracerEnabled
 )
 
+// SW-REQ-067
 // Mount adds the nrgorilla middleware to the router. The application is added to the request context.
 // If app is nil, nothing will be done and the function will return.
 func Mount(router *mux.Router, app *Application) {
@@ -38,6 +41,7 @@ func Mount(router *mux.Router, app *Application) {
 	router.Use(renameRelicTransactionMiddleware)
 }
 
+// SW-REQ-067
 // renameRelicTransactionMiddleware renames transaction name with request path before any processing
 func renameRelicTransactionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
