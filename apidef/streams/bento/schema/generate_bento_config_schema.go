@@ -18,9 +18,11 @@ import (
 	"github.com/warpstreamlabs/bento/public/service"
 )
 
+// SW-REQ-094
 const defaultOutput = "bento-config-schema.json"
 
 // customValidationRule is an interface for defining custom validation rules for JSON schemas.
+// SW-REQ-094
 type customValidationRule interface {
 	// Name returns the name of the validation rule.
 	Name() string
@@ -30,8 +32,10 @@ type customValidationRule interface {
 	Apply(input []byte) ([]byte, error)
 }
 
+// SW-REQ-094
 var result = []byte(`{}`)
 
+// SW-REQ-094
 var properties = []string{
 	"http",
 	"input",
@@ -44,11 +48,13 @@ var properties = []string{
 	"pipeline",
 }
 
+// SW-REQ-094
 var definitions = []string{
 	"processor",
 	"scanner",
 }
 
+// SW-REQ-094
 var supportedSources = []string{
 	"broker",
 	"http_client",
@@ -59,11 +65,13 @@ var supportedSources = []string{
 	"mqtt",
 }
 
+// SW-REQ-094
 func printErrorAndExit(err error) {
 	_, _ = fmt.Fprint(os.Stdout, err)
 	os.Exit(1)
 }
 
+// SW-REQ-094
 func findTemplate(kind string, data []byte) ([]byte, error) {
 	kindData, _, _, err := jsonparser.Get(data, kind, "allOf")
 	if err != nil {
@@ -85,6 +93,7 @@ func findTemplate(kind string, data []byte) ([]byte, error) {
 	return template, err
 }
 
+// SW-REQ-094
 func scanProperties(data []byte) error {
 	return jsonparser.ObjectEach(data, func(key []byte, value []byte, _ jsonparser.ValueType, _ int) error {
 		var err error
@@ -100,6 +109,7 @@ func scanProperties(data []byte) error {
 	})
 }
 
+// SW-REQ-094
 func insertDefinitions(data []byte) error {
 	for _, kind := range []string{"input", "output"} {
 		template, err := findTemplate(kind, data)
@@ -119,6 +129,7 @@ func insertDefinitions(data []byte) error {
 	return nil
 }
 
+// SW-REQ-094
 func scanDefinitions(data []byte) error {
 	err := jsonparser.ObjectEach(data, func(key []byte, value []byte, _ jsonparser.ValueType, _ int) error {
 		var err error
@@ -139,6 +150,7 @@ func scanDefinitions(data []byte) error {
 	return insertDefinitions(data)
 }
 
+// SW-REQ-094
 func insertDefinitionKind(kind string, anyOfItems []byte) error {
 	_, err := jsonparser.ArrayEach(anyOfItems, func(value []byte, _ jsonparser.ValueType, _ int, _ error) {
 		for _, source := range supportedSources {
@@ -163,6 +175,7 @@ func insertDefinitionKind(kind string, anyOfItems []byte) error {
 	return err
 }
 
+// SW-REQ-094
 func scanDefinitionsForKind(kind string, data []byte) error {
 	bentoInputs, dataType, _, err := jsonparser.Get(data, kind, "allOf")
 	if err != nil {
@@ -194,6 +207,7 @@ func scanDefinitionsForKind(kind string, data []byte) error {
 	return err
 }
 
+// SW-REQ-094
 func saveFile(outputPath string) error {
 	file, err := os.Create(outputPath)
 	if err != nil {
@@ -223,6 +237,7 @@ func saveFile(outputPath string) error {
 	return nil
 }
 
+// SW-REQ-094
 func generateBentoConfigSchema(output string, rules []customValidationRule) error {
 	data, err := service.GlobalEnvironment().FullConfigSchema("", "").MarshalJSONSchema()
 	if err != nil {
@@ -259,6 +274,7 @@ func generateBentoConfigSchema(output string, rules []customValidationRule) erro
 	return saveFile(output)
 }
 
+// SW-REQ-094
 func usage() {
 	var msg = `Usage: generate_bent_config_schema [options] ...
 
@@ -275,6 +291,7 @@ Options:
 	}
 }
 
+// SW-REQ-094
 type arguments struct {
 	help   bool
 	output string
@@ -298,6 +315,7 @@ task generate-bento-config-validator-schema
 
 The task will automatically update `apidef/streams/bento/schema/bento-config-schema.json` file.
 */
+// SW-REQ-094
 func main() {
 	/*
 			How to add a new Input/Output source
@@ -341,14 +359,18 @@ func main() {
 // Custom rules defined here
 
 // addURIFormatToHTTPClientRule represents a custom rule for adding URI format validation to HTTP client URL properties in a schema.
+// SW-REQ-094
 type addURIFormatToHTTPClientRule struct{}
 
+// SW-REQ-094
 var _ customValidationRule = (*addURIFormatToHTTPClientRule)(nil)
 
+// SW-REQ-094
 func (a *addURIFormatToHTTPClientRule) Name() string {
 	return "add_uri_format_to_http_client"
 }
 
+// SW-REQ-094
 func (a *addURIFormatToHTTPClientRule) setModifiedURLSection(input, data []byte, keys ...string) ([]byte, error) {
 	data, err := jsonparser.Set(data, []byte("\"uri\""), "format")
 	if err != nil {
@@ -357,6 +379,7 @@ func (a *addURIFormatToHTTPClientRule) setModifiedURLSection(input, data []byte,
 	return jsonparser.Set(input, data, keys...)
 }
 
+// SW-REQ-094
 func (a *addURIFormatToHTTPClientRule) Apply(input []byte) ([]byte, error) {
 	for _, kind := range []string{"input", "output"} {
 		data, dataType, _, err := jsonparser.Get(input, "definitions", kind, "properties", "http_client", "properties", "url")
