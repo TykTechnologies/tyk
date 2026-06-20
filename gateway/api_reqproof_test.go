@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -378,6 +381,208 @@ func TestGatewayControlAPIInventoryGet(t *testing.T) {
 	privateOAS := got.(*oas.OAS)
 	require.NotNil(t, privateOAS.GetTykExtension())
 	assert.Equal(t, "oas-api", privateOAS.GetTykExtension().Info.ID)
+}
+
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// STK-REQ-051:error_handling:negative
+// STK-REQ-051:error_handling:nominal
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:error_handling:negative
+// SYS-REQ-139:error_handling:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:error_handling:negative
+// SW-REQ-126:error_handling:nominal
+// SW-REQ-126:determinism:nominal
+func TestGatewayControlAPIPersistenceWriteHelpers(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	appPath := "/apps"
+	testFs := afero.NewMemMapFs()
+	require.NoError(t, testFs.MkdirAll(appPath, 0755))
+
+	conf := ts.Gw.GetConfig()
+	conf.AppPath = appPath
+	ts.Gw.SetConfig(conf, true)
+
+	apiDef := apidef.DummyAPI()
+	apiDef.APIID = "classic-api"
+
+	err, code := ts.Gw.writeToFile(testFs, apiDef, apiDef.APIID)
+
+	require.NoError(t, err)
+	assert.Equal(t, 0, code)
+	raw, err := afero.ReadFile(testFs, filepath.Join(appPath, "classic-api.json"))
+	require.NoError(t, err)
+	var writtenDef apidef.APIDefinition
+	require.NoError(t, json.Unmarshal(raw, &writtenDef))
+	assert.Equal(t, "classic-api", writtenDef.APIID)
+
+	err, code = ts.Gw.writeToFile(testFs, apiDef, "../bad-api")
+
+	require.EqualError(t, err, "invalid API ID")
+	assert.Equal(t, http.StatusBadRequest, code)
+
+	writeCases := []struct {
+		name        string
+		spec        *APISpec
+		wantOASFile string
+	}{
+		{
+			name: "oas writes native and oas documents",
+			spec: BuildOASAPI(func(oasDef *oas.OAS) {
+				tykExt := oasDef.GetTykExtension()
+				tykExt.Info.ID = "oas-api"
+				tykExt.Info.Name = "OAS API"
+			})[0],
+			wantOASFile: "oas-api-oas.json",
+		},
+		{
+			name: "mcp writes native and mcp documents",
+			spec: BuildOASAPI(func(oasDef *oas.OAS) {
+				tykExt := oasDef.GetTykExtension()
+				tykExt.Info.ID = "mcp-api"
+				tykExt.Info.Name = "MCP API"
+			})[0],
+			wantOASFile: "mcp-api-mcp.json",
+		},
+	}
+	writeCases[1].spec.MarkAsMCP()
+
+	for _, tc := range writeCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err, code := ts.Gw.writeOASAndAPIDefToFile(testFs, tc.spec.APIDefinition, &tc.spec.OAS)
+
+			require.NoError(t, err)
+			assert.Equal(t, 0, code)
+			_, err = testFs.Stat(filepath.Join(appPath, tc.spec.APIID+".json"))
+			require.NoError(t, err)
+			_, err = testFs.Stat(filepath.Join(appPath, tc.wantOASFile))
+			require.NoError(t, err)
+		})
+	}
+}
+
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// STK-REQ-051:error_handling:negative
+// STK-REQ-051:error_handling:nominal
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:error_handling:negative
+// SYS-REQ-139:error_handling:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:error_handling:negative
+// SW-REQ-126:error_handling:nominal
+// SW-REQ-126:determinism:nominal
+func TestGatewayControlAPIAddUpdateDeleteHandlers(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	appPath := t.TempDir()
+	testFs := afero.NewMemMapFs()
+	require.NoError(t, testFs.MkdirAll(appPath, 0755))
+
+	conf := ts.Gw.GetConfig()
+	conf.AppPath = appPath
+	ts.Gw.SetConfig(conf, true)
+
+	newRequest := func(t *testing.T, method string, payload interface{}) *http.Request {
+		t.Helper()
+		body, err := json.Marshal(payload)
+		require.NoError(t, err)
+		req, err := http.NewRequest(method, "http://gateway", bytes.NewBuffer(body))
+		require.NoError(t, err)
+		return req
+	}
+
+	t.Run("add classic api", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = "added-api"
+
+		response, code := ts.Gw.handleAddApi(newRequest(t, http.MethodPost, apiDef), testFs, false)
+
+		require.Equal(t, http.StatusOK, code)
+		success := response.(apiModifyKeySuccess)
+		assert.Equal(t, "added-api", success.Key)
+		assert.Equal(t, "added", success.Action)
+		_, err := testFs.Stat(filepath.Join(appPath, "added-api.json"))
+		require.NoError(t, err)
+	})
+
+	t.Run("add rejects malformed json", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", strings.NewReader("{"))
+		require.NoError(t, err)
+
+		response, code := ts.Gw.handleAddApi(req, testFs, false)
+
+		require.Equal(t, http.StatusBadRequest, code)
+		assert.Equal(t, apiError("Request malformed"), response)
+	})
+
+	existing := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "existing-api"
+		spec.Name = "Existing API"
+	})[0]
+	ts.Gw.apisMu.Lock()
+	ts.Gw.apisByID = map[string]*APISpec{existing.APIID: existing}
+	ts.Gw.apisMu.Unlock()
+
+	t.Run("update classic api", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = existing.APIID
+
+		response, code := ts.Gw.handleUpdateApi(existing.APIID, newRequest(t, http.MethodPut, apiDef), testFs, false)
+
+		require.Equal(t, http.StatusOK, code)
+		success := response.(apiModifyKeySuccess)
+		assert.Equal(t, existing.APIID, success.Key)
+		assert.Equal(t, "modified", success.Action)
+	})
+
+	t.Run("update rejects api id mismatch", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = "different-api"
+
+		response, code := ts.Gw.handleUpdateApi(existing.APIID, newRequest(t, http.MethodPut, apiDef), testFs, false)
+
+		require.Equal(t, http.StatusBadRequest, code)
+		assert.Equal(t, apiError("Request APIID does not match that in Definition! For Update operations these must match."), response)
+	})
+
+	t.Run("delete classic api", func(t *testing.T) {
+		deleteSpec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "delete-api"
+			spec.Name = "Delete API"
+		})[0]
+		ts.Gw.apisMu.Lock()
+		ts.Gw.apisByID[deleteSpec.APIID] = deleteSpec
+		ts.Gw.apisMu.Unlock()
+		deletePath := filepath.Join(appPath, "delete-api.json")
+		require.NoError(t, os.WriteFile(deletePath, []byte(`{"api_id":"delete-api"}`), 0644))
+
+		response, code := ts.Gw.handleDeleteAPI(deleteSpec.APIID)
+
+		require.Equal(t, http.StatusOK, code)
+		success := response.(apiModifyKeySuccess)
+		assert.Equal(t, "delete-api", success.Key)
+		assert.Equal(t, "deleted", success.Action)
+		_, err := os.Stat(deletePath)
+		assert.True(t, os.IsNotExist(err))
+	})
+
+	t.Run("delete rejects missing api", func(t *testing.T) {
+		response, code := ts.Gw.handleDeleteAPI("missing-api")
+
+		require.Equal(t, http.StatusNotFound, code)
+		assert.Equal(t, apiError(apidef.ErrAPINotFound.Error()), response)
+	})
 }
 
 func apiDefinitionIDs(definitions []*apidef.APIDefinition) []string {

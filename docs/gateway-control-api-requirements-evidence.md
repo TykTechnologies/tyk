@@ -21,6 +21,9 @@ The evidence scope includes:
   MCP inclusion filtering and not-found / old-API-as-OAS error status handling
 - OAS inventory list and retrieval helpers, including public-mode Tyk extension
   removal on cloned OAS responses
+- API add, update, delete, and local persistence helper outcomes, including
+  malformed request handling, API ID mismatch handling, filesystem write status,
+  OAS/MCP companion document suffix selection, and delete-file status handling
 - static mTLS certificate-binding helper validation for empty bindings,
   existing certificate IDs, organization-prefixed certificate IDs, wrong-org
   IDs, path traversal-shaped IDs, and missing certificates
@@ -30,6 +33,6 @@ The evidence scope includes:
 
 This evidence intentionally does not claim TLS handshake enforcement, runtime
 certificate authentication decisions, upstream TLS validation, certificate
-storage durability, dashboard behavior, network transport behavior, OAS schema
-semantic correctness, or final client-visible behavior beyond the local control
-API helper and tested handler responses.
+storage durability, reload durability, dashboard behavior, network transport
+behavior, OAS schema semantic correctness, or final client-visible behavior
+beyond the local control API helper and tested handler responses.

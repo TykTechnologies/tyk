@@ -1335,6 +1335,7 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 	return obj, code
 }
 
+// SW-REQ-126
 func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
 	var (
 		newDef apidef.APIDefinition
@@ -1426,6 +1427,7 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 	return buildSuccessResponse(newDef.APIID, "added")
 }
 
+// SW-REQ-126
 func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
 	if err := sanitize.ValidatePathComponent(apiID); err != nil {
 		log.Errorf(errInvalidAPIIDFmt, apiID, err)
@@ -1498,6 +1500,7 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 	return buildSuccessResponse(newDef.APIID, "modified")
 }
 
+// SW-REQ-126
 func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefinition, oasObj *oas.OAS) (err error, errCode int) {
 	err, errCode = gw.writeToFile(fs, apiDef, apiDef.APIID)
 	if err != nil {
@@ -1522,6 +1525,7 @@ func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefini
 	return
 }
 
+// SW-REQ-126
 func (gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string) (err error, errCode int) {
 	if err := sanitize.ValidatePathComponent(filename); err != nil {
 		log.Errorf("Invalid filename %q: %v", filename, err)
@@ -1554,6 +1558,7 @@ func (gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string)
 	return nil, 0
 }
 
+// SW-REQ-126
 func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 	if err := sanitize.ValidatePathComponent(apiID); err != nil {
 		log.Errorf(errInvalidAPIIDFmt, apiID, err)
