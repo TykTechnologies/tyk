@@ -3249,6 +3249,7 @@ func (gw *Gateway) GetStorageForApi(apiID string) (ExtendedOsinStorageInterface,
 	return apiSpec.OAuthManager.Storage(), http.StatusOK, nil
 }
 
+// SW-REQ-126
 func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 

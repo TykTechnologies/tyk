@@ -1905,6 +1905,7 @@ func TestGatewayOAuthClientManagementHelpers(t *testing.T) {
 // SW-REQ-126:error_handling:negative
 // SW-REQ-126:error_handling:nominal
 // SW-REQ-126:determinism:nominal
+// Reproduces: KI-GATEWAY-OAUTH-REVOKEALL-WRONG-SECRET
 func TestGatewayControlAPIStatusHelpers(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -2058,6 +2059,60 @@ func TestGatewayControlAPIStatusHelpers(t *testing.T) {
 			assert.JSONEq(t, tc.body, rec.Body.String())
 		})
 	}
+
+	for _, tc := range []struct {
+		name string
+		form string
+		want int
+		body string
+	}{
+		{
+			name: "revoke all missing client",
+			form: "client_secret=status-secret&org_id=default",
+			want: http.StatusUnauthorized,
+			body: `{"status":"error","message":"client_id is required"}`,
+		},
+		{
+			name: "revoke all missing secret",
+			form: "client_id=status-client&org_id=default",
+			want: http.StatusUnauthorized,
+			body: `{"status":"error","message":"client_secret is required"}`,
+		},
+		{
+			name: "revoke all unknown client",
+			form: "client_id=missing-client&client_secret=status-secret&org_id=default",
+			want: http.StatusNotFound,
+			body: `{"status":"error","message":"oauth client doesn't exist"}`,
+		},
+		{
+			name: "revoke all accepted",
+			form: "client_id=status-client&client_secret=status-secret&org_id=default",
+			want: http.StatusOK,
+			body: `{"status":"ok","message":"tokens revoked successfully"}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/tyk/oauth/revoke-all", strings.NewReader(tc.form))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rec := httptest.NewRecorder()
+
+			ts.Gw.RevokeAllTokensHandler(rec, req)
+
+			require.Equal(t, tc.want, rec.Code)
+			assert.JSONEq(t, tc.body, rec.Body.String())
+		})
+	}
+
+	t.Run("known_issue_revoke_all_wrong_secret", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/tyk/oauth/revoke-all", strings.NewReader("client_id=status-client&client_secret=wrong-secret&org_id=default"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		ts.Gw.RevokeAllTokensHandler(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		assert.JSONEq(t, `{"status":"ok","message":"tokens revoked successfully"}`, rec.Body.String())
+	})
 }
 
 // Verifies: STK-REQ-054, SYS-REQ-142, SW-REQ-129
