@@ -1116,6 +1116,7 @@ func (a APIDefinitionLoader) compileRequestSizePathSpec(paths []apidef.RequestSi
 	return urlSpec
 }
 
+// SW-REQ-133
 func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.CircuitBreakerMeta, stat URLStatus, apiSpec *APISpec, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
@@ -1200,6 +1201,7 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 	return urlSpec
 }
 
+// SW-REQ-133
 func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewriteMeta, stat URLStatus, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
@@ -1222,6 +1224,7 @@ func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewrit
 	return urlSpec
 }
 
+// SW-REQ-133
 func (a APIDefinitionLoader) compileVirtualPathsSpec(paths []apidef.VirtualMeta, stat URLStatus, apiSpec *APISpec, conf config.Config) []URLSpec {
 	if !conf.EnableJSVM {
 		return nil
@@ -1248,6 +1251,7 @@ func (a APIDefinitionLoader) compileVirtualPathsSpec(paths []apidef.VirtualMeta,
 	return urlSpec
 }
 
+// SW-REQ-133
 func (a APIDefinitionLoader) compileGopluginPathsSpec(paths []apidef.GoPluginMeta, stat URLStatus, _ *APISpec, conf config.Config) []URLSpec {
 
 	// transform an extended configuration URL into an array of URLSpecs
@@ -1275,6 +1279,7 @@ func (a APIDefinitionLoader) compileGopluginPathsSpec(paths []apidef.GoPluginMet
 	return urlSpec
 }
 
+// SW-REQ-133
 func (a APIDefinitionLoader) compilePersistGraphQLPathSpec(paths []apidef.PersistGraphQLMeta, stat URLStatus, apiSpec *APISpec, conf config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
@@ -1295,6 +1300,7 @@ func (a APIDefinitionLoader) compilePersistGraphQLPathSpec(paths []apidef.Persis
 	return urlSpec
 }
 
+// SW-REQ-133
 func (a APIDefinitionLoader) compileTrackedEndpointPathsSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf config.Config) []URLSpec {
 
 	urlSpec := []URLSpec{}
@@ -1321,6 +1327,7 @@ func (a APIDefinitionLoader) compileTrackedEndpointPathsSpec(paths []apidef.Trac
 	return urlSpec
 }
 
+// SW-REQ-133
 func (a APIDefinitionLoader) compileValidateJSONPathsSpec(paths []apidef.ValidatePathMeta, stat URLStatus, conf config.Config) []URLSpec {
 	var urlSpec []URLSpec
 
@@ -1341,6 +1348,7 @@ func (a APIDefinitionLoader) compileValidateJSONPathsSpec(paths []apidef.Validat
 	return urlSpec
 }
 
+// SW-REQ-133
 func (a APIDefinitionLoader) compileUnTrackedEndpointPathsSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf config.Config) []URLSpec {
 	urlSpec := []URLSpec{}
 
@@ -1359,6 +1367,7 @@ func (a APIDefinitionLoader) compileUnTrackedEndpointPathsSpec(paths []apidef.Tr
 	return urlSpec
 }
 
+// SW-REQ-133
 func (a APIDefinitionLoader) compileInternalPathsSpec(paths []apidef.InternalMeta, stat URLStatus, conf config.Config) []URLSpec {
 	urlSpec := []URLSpec{}
 
@@ -1377,6 +1386,7 @@ func (a APIDefinitionLoader) compileInternalPathsSpec(paths []apidef.InternalMet
 	return urlSpec
 }
 
+// SW-REQ-133
 func (a APIDefinitionLoader) compileRateLimitPathsSpec(paths []apidef.RateLimitMeta, stat URLStatus, conf config.Config) []URLSpec {
 	urlSpec := []URLSpec{}
 

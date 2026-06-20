@@ -1,0 +1,14 @@
+component: gateway_api_definition_advanced_path_compilation
+no_interface:
+    declared: true
+    reason: The gateway API definition advanced path-compilation proof slice covers local gateway/api_definition.go helper behavior only; circuit-breaker event delivery, JavaScript execution, Go plugin execution, middleware enforcement, route matching correctness, upstream behavior, gateway request admission, and final client-visible behavior are outside this component boundary.
+variables:
+    - name: gateway_api_definition_advanced_path_compilation_operation_requested
+      type: bool
+      direction: input
+      description: A caller requests a local gateway API definition advanced path-compilation helper operation such as circuit breaker, URL rewrite, virtual path, Go plugin, persisted GraphQL, endpoint tracking, JSON validation, internal endpoint, or endpoint rate-limit compilation.
+
+    - name: gateway_api_definition_advanced_path_compilation_operation_terminal
+      type: bool
+      direction: output
+      description: 'A local gateway API definition advanced path-compilation helper operation reaches a terminal observable result: URLSpec records are returned, disabled entries are skipped, status-specific metadata is preserved, a circuit breaker is allocated, JSVM-disabled virtual paths are gated off, Go plugin metadata is assigned with a local load attempt, or JSON validation schema cache setup is attached.'

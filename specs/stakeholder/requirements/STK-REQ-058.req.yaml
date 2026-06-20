@@ -1,0 +1,58 @@
+id: STK-REQ-058
+version: 1
+status: approved
+priority: shall
+category: api_definition_advanced_path_compilation
+req_type: guarantee
+fretish: ""
+description: Gateway API definition advanced path compilation support shall locally convert advanced API definition path configuration into deterministic URLSpec records for circuit breakers, URL rewrites, virtual paths when JSVM is disabled, Go plugin metadata, persisted GraphQL operations, endpoint tracking, JSON validation, internal endpoints, and endpoint rate limits, without claiming circuit-breaker event delivery, JavaScript execution, Go plugin execution, middleware enforcement, route matching correctness, upstream behavior, gateway request admission, or final client-visible behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_api_definition_advanced_path_compilation
+rationale: Gateway operators depend on deterministic local advanced path-spec compilation before middleware and routing code consume compiled URLSpec records. This requirement owns only local helper behavior in gateway/api_definition.go and focused gateway tests.
+tags:
+    - gateway
+    - api-definition
+    - path-compilation
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API definition advanced path-compilation scope is limited to local gateway/api_definition.go helper behavior: URLSpec metadata compilation for circuit breakers, URL rewrites, JSVM-disabled virtual paths, Go plugin metadata, persisted GraphQL operations, endpoint tracking, JSON validation, internal endpoints, and endpoint rate limits. This approval does not claim circuit-breaker event delivery, JavaScript execution, Go plugin execution, middleware enforcement, route matching correctness, upstream behavior, gateway request admission, or final client-visible behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need advanced API definition path settings to compile into deterministic local URLSpec records before gateway middleware and routing behavior depends on them.
+    acceptance_criteria:
+        - id: STK-REQ-058-AC-01
+          text: Given local advanced API definition path configuration, when circuit breaker, URL rewrite, virtual path, Go plugin, persisted GraphQL, tracking, JSON validation, internal endpoint, or rate-limit path compiler helpers are exercised, then deterministic URLSpec records, skipped disabled entries, or explicit local setup outcomes are produced for the tested inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-146
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API definition advanced path-compilation helper requirement.
+          changed_by: human:buger

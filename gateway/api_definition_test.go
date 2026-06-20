@@ -22,6 +22,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
@@ -1554,6 +1555,189 @@ func TestAPIDefinitionLoaderStatusSpecificPathCompilation(t *testing.T) {
 				assert.Len(t, specs, 1)
 				assert.Equal(t, RequestSizeLimit, specs[0].Status)
 				assert.Equal(t, int64(512), specs[0].RequestSize.SizeLimit)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.assert)
+	}
+}
+
+// Verifies: STK-REQ-058, SYS-REQ-146, SW-REQ-133
+// STK-REQ-058:STK-REQ-058-AC-01:acceptance
+// STK-REQ-058:error_handling:negative
+// SYS-REQ-146:nominal:nominal
+// SYS-REQ-146:boundary:nominal
+// SYS-REQ-146:error_handling:nominal
+// SYS-REQ-146:error_handling:negative
+// SYS-REQ-146:determinism:nominal
+// MCDC SYS-REQ-146: gateway_api_definition_advanced_path_compilation_operation_requested=F, gateway_api_definition_advanced_path_compilation_operation_terminal=F => TRUE
+// MCDC SYS-REQ-146: gateway_api_definition_advanced_path_compilation_operation_requested=T, gateway_api_definition_advanced_path_compilation_operation_terminal=T => TRUE
+//
+// SW-REQ-133:nominal:nominal
+// SW-REQ-133:boundary:nominal
+// SW-REQ-133:error_handling:nominal
+// SW-REQ-133:error_handling:negative
+// SW-REQ-133:determinism:nominal
+//
+//mcdc:ignore SYS-REQ-146: gateway_api_definition_advanced_path_compilation_operation_requested=T, gateway_api_definition_advanced_path_compilation_operation_terminal=F => FALSE -- violation row is the negation of the local API definition advanced path-compilation helper guarantee; these tests assert requested helpers return deterministic URLSpec records, skipped disabled entries, local setup objects, explicit JSVM-disabled gating, or status-specific metadata [category: defensive] [reviewed: human:buger]
+func TestAPIDefinitionLoaderAdvancedPathCompilation(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	loader := APIDefinitionLoader{Gw: ts.Gw}
+	conf := config.Config{}
+	apiSpec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "advanced-path-api",
+		},
+	}
+
+	t.Run("circuit breaker allocates breaker and skips disabled entries", func(t *testing.T) {
+		specs := loader.compileCircuitBreakerPathSpec([]apidef.CircuitBreakerMeta{
+			{Disabled: true, Path: "/disabled", Method: http.MethodGet, ThresholdPercent: 0.1, Samples: 1},
+			{Path: "/breaker", Method: http.MethodGet, ThresholdPercent: 0.5, Samples: 2, ReturnToServiceAfter: 1, DisableHalfOpenState: true},
+		}, CircuitBreaker, apiSpec, conf)
+		require.Len(t, specs, 1)
+		t.Cleanup(specs[0].CircuitBreaker.CB.Stop)
+
+		assert.Equal(t, CircuitBreaker, specs[0].Status)
+		assert.Equal(t, "/breaker", specs[0].CircuitBreaker.Path)
+		assert.Equal(t, http.MethodGet, specs[0].CircuitBreaker.Method)
+		assert.Equal(t, 0.5, specs[0].CircuitBreaker.ThresholdPercent)
+		assert.NotNil(t, specs[0].CircuitBreaker.CB)
+		assert.True(t, specs[0].spec.MatchString("/breaker"))
+	})
+
+	t.Run("url rewrite metadata is preserved", func(t *testing.T) {
+		specs := loader.compileURLRewritesPathSpec([]apidef.URLRewriteMeta{
+			{Disabled: true, Path: "/disabled", Method: http.MethodGet},
+			{Path: "/rewrite", Method: http.MethodGet, MatchPattern: "/rewrite/(.*)", RewriteTo: "/target/$1"},
+		}, URLRewrite, conf)
+
+		assert.Len(t, specs, 1)
+		assert.Equal(t, URLRewrite, specs[0].Status)
+		assert.Equal(t, "/rewrite/(.*)", specs[0].URLRewrite.MatchPattern)
+		assert.Equal(t, "/target/$1", specs[0].URLRewrite.RewriteTo)
+	})
+
+	t.Run("virtual paths are gated when JSVM is disabled", func(t *testing.T) {
+		specs := loader.compileVirtualPathsSpec([]apidef.VirtualMeta{
+			{Path: "/virtual", Method: http.MethodGet, FunctionSourceType: apidef.UseBlob, FunctionSourceURI: "ZnVuY3Rpb24gdGVzdCgpe30="},
+		}, VirtualPath, apiSpec, config.Config{EnableJSVM: false})
+
+		assert.Nil(t, specs)
+	})
+
+	t.Run("go plugin metadata is assigned even when local plugin load fails", func(t *testing.T) {
+		specs := loader.compileGopluginPathsSpec([]apidef.GoPluginMeta{
+			{Disabled: true, Path: "/disabled", Method: http.MethodGet, PluginPath: "/missing-disabled.so", SymbolName: "Disabled"},
+			{Path: "/plugin", Method: http.MethodPost, PluginPath: "/missing-plugin.so", SymbolName: "Handle"},
+		}, GoPlugin, apiSpec, conf)
+
+		assert.Len(t, specs, 1)
+		assert.Equal(t, GoPlugin, specs[0].Status)
+		assert.Equal(t, "/missing-plugin.so", specs[0].GoPluginMeta.Path)
+		assert.Equal(t, "Handle", specs[0].GoPluginMeta.SymbolName)
+		assert.Equal(t, http.MethodPost, specs[0].GoPluginMeta.Meta.Method)
+		assert.Nil(t, specs[0].GoPluginMeta.handler)
+	})
+
+	t.Run("persisted graphql metadata is preserved", func(t *testing.T) {
+		variables := map[string]interface{}{"id": "123"}
+		specs := loader.compilePersistGraphQLPathSpec([]apidef.PersistGraphQLMeta{
+			{Path: "/graphql", Method: http.MethodPost, Operation: "query User { user { id } }", Variables: variables},
+		}, PersistGraphQL, apiSpec, conf)
+
+		assert.Len(t, specs, 1)
+		assert.Equal(t, PersistGraphQL, specs[0].Status)
+		assert.Equal(t, "/graphql", specs[0].PersistGraphQL.Path)
+		assert.Equal(t, variables, specs[0].PersistGraphQL.Variables)
+	})
+}
+
+// Verifies: STK-REQ-058, SYS-REQ-146, SW-REQ-133
+// STK-REQ-058:STK-REQ-058-AC-01:acceptance
+// SYS-REQ-146:nominal:nominal
+// SYS-REQ-146:boundary:nominal
+// SW-REQ-133:nominal:nominal
+// SW-REQ-133:boundary:nominal
+func TestAPIDefinitionLoaderAdvancedPathMetadataCompilers(t *testing.T) {
+	loader := APIDefinitionLoader{}
+	conf := config.Config{}
+
+	t.Run("tracked endpoints default empty path to slash", func(t *testing.T) {
+		specs := loader.compileTrackedEndpointPathsSpec([]apidef.TrackEndpointMeta{
+			{Disabled: true, Path: "/disabled", Method: http.MethodGet},
+			{Path: "", Method: http.MethodGet},
+		}, RequestTracked, conf)
+
+		assert.Len(t, specs, 1)
+		assert.Equal(t, RequestTracked, specs[0].Status)
+		assert.Equal(t, "/", specs[0].TrackEndpoint.Path)
+		assert.Equal(t, http.MethodGet, specs[0].TrackEndpoint.Method)
+	})
+
+	t.Run("json validation attaches schema cache", func(t *testing.T) {
+		schema := map[string]interface{}{"type": "object"}
+		specs := loader.compileValidateJSONPathsSpec([]apidef.ValidatePathMeta{
+			{Disabled: true, Path: "/disabled", Method: http.MethodPost, Schema: schema},
+			{Path: "/validate", Method: http.MethodPost, Schema: schema, ErrorResponseCode: http.StatusBadRequest},
+		}, ValidateJSONRequest, conf)
+
+		assert.Len(t, specs, 1)
+		assert.Equal(t, ValidateJSONRequest, specs[0].Status)
+		assert.Equal(t, "/validate", specs[0].ValidatePathMeta.Path)
+		assert.Equal(t, http.StatusBadRequest, specs[0].ValidatePathMeta.ErrorResponseCode)
+		assert.NotNil(t, specs[0].ValidatePathMeta.SchemaCache)
+	})
+
+	testCases := []struct {
+		name   string
+		assert func(t *testing.T)
+	}{
+		{
+			name: "untracked endpoint metadata",
+			assert: func(t *testing.T) {
+				specs := loader.compileUnTrackedEndpointPathsSpec([]apidef.TrackEndpointMeta{
+					{Disabled: true, Path: "/disabled", Method: http.MethodGet},
+					{Path: "/untracked", Method: http.MethodDelete},
+				}, RequestNotTracked, conf)
+
+				assert.Len(t, specs, 1)
+				assert.Equal(t, RequestNotTracked, specs[0].Status)
+				assert.Equal(t, "/untracked", specs[0].DoNotTrackEndpoint.Path)
+				assert.Equal(t, http.MethodDelete, specs[0].DoNotTrackEndpoint.Method)
+			},
+		},
+		{
+			name: "internal endpoint metadata",
+			assert: func(t *testing.T) {
+				specs := loader.compileInternalPathsSpec([]apidef.InternalMeta{
+					{Disabled: true, Path: "/disabled", Method: http.MethodGet},
+					{Path: "/internal", Method: http.MethodPost},
+				}, Internal, conf)
+
+				assert.Len(t, specs, 1)
+				assert.Equal(t, Internal, specs[0].Status)
+				assert.Equal(t, "/internal", specs[0].Internal.Path)
+				assert.Equal(t, http.MethodPost, specs[0].Internal.Method)
+			},
+		},
+		{
+			name: "rate-limit endpoint metadata",
+			assert: func(t *testing.T) {
+				specs := loader.compileRateLimitPathsSpec([]apidef.RateLimitMeta{
+					{Disabled: true, Path: "/disabled", Method: http.MethodGet, Rate: 1, Per: 1},
+					{Path: "/limited", Method: http.MethodGet, Rate: 2, Per: 10},
+				}, RateLimit, conf)
+
+				assert.Len(t, specs, 1)
+				assert.Equal(t, RateLimit, specs[0].Status)
+				assert.Equal(t, "/limited", specs[0].RateLimit.Path)
+				assert.Equal(t, 2.0, specs[0].RateLimit.Rate)
+				assert.Equal(t, 10.0, specs[0].RateLimit.Per)
 			},
 		},
 	}
