@@ -1,0 +1,14 @@
+component: development_configuration
+no_interface:
+    declared: true
+    reason: The config/development.go and config/development_off.go files are exercised as local build-tag-specific configuration helpers; rate limiter algorithm behavior, Redis connectivity, distributed storage behavior, gateway request admission, and request handling are outside this local component boundary.
+variables:
+    - name: development_configuration_operation_requested
+      type: bool
+      direction: input
+      description: Gateway code or tests request local build-tag-specific rate limiter storage selection.
+
+    - name: development_configuration_result_determined
+      type: bool
+      direction: output
+      description: Development configuration support returns the default gateway storage configuration or the development-build custom rate limiter storage configuration according to build tag and local configuration fields.

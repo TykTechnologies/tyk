@@ -1,0 +1,74 @@
+id: SW-REQ-105
+version: 1
+status: approved
+priority: shall
+category: configuration
+req_type: guarantee
+fretish: ""
+description: The config/development helpers shall preserve local build-tagged rate limiter storage selection by returning default gateway storage when development-build custom rate limiter storage is disabled or absent, returning configured rate limiter storage when development-build custom storage is enabled and present, and returning default gateway storage for release builds, without claiming rate limiter algorithm behavior, Redis connectivity, distributed storage behavior, gateway request admission, or final client-visible runtime behavior.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: config/development_test.go; config/development_off_test.go; docs/development-configuration-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-118
+component: development_configuration
+rationale: >-
+    This software requirement owns local config/development.go and config/development_off.go helper behavior. It does not claim rate limiter algorithm behavior, Redis connectivity, distributed storage behavior, gateway request admission, or final client-visible runtime behavior.
+tags:
+    - configuration
+    - development
+    - build-tags
+    - rate-limiter
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-118
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T09:58:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Development configuration scope is limited to local config/development.go and config/development_off.go behavior: dev builds select custom rate limiter storage only when enabled and configured, fall back to default storage otherwise, and release builds always use default storage. Tagged config tests passed for both dev and non-dev builds, including race. This approval does not claim rate limiter algorithm behavior, Redis connectivity, distributed storage behavior, gateway request admission, or final client-visible runtime behavior.
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-105
+          artifact: config/development.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in config/development.go adds ReqProof ownership annotations only; behavior evidence is provided by config/development_test.go under the dev build tag. The requirement remains scoped to local build-tag-specific rate limiter storage selection without rate limiter algorithm behavior, Redis connectivity, distributed storage behavior, gateway request admission, or final client-visible runtime behavior claims.
+          base: origin/master
+          requirement_fingerprint: sha256:51c0e3e5670763eddc79991794a45913b8733d3cfd800aa9abe8b76a9081a518
+          approval_fingerprint: sha256:5ddfea89a4688f9554cfef316f884491c2d5054ab566f4f14f79f3e5bca3d0db
+          artifact_fingerprint: sha256:147f1f2bdea7afc1462bd2781a8d5b6bbfb3c1c5e79338c9ff9364c2eb09ebf1
+          reviewed_at: "2026-06-20T09:59:09Z"
+        - requirement: SW-REQ-105
+          artifact: config/development_off.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in config/development_off.go adds ReqProof ownership annotations only; behavior evidence is provided by config/development_off_test.go under the default non-dev build. The requirement remains scoped to local build-tag-specific rate limiter storage selection without rate limiter algorithm behavior, Redis connectivity, distributed storage behavior, gateway request admission, or final client-visible runtime behavior claims.
+          base: origin/master
+          requirement_fingerprint: sha256:51c0e3e5670763eddc79991794a45913b8733d3cfd800aa9abe8b76a9081a518
+          approval_fingerprint: sha256:5ddfea89a4688f9554cfef316f884491c2d5054ab566f4f14f79f3e5bca3d0db
+          artifact_fingerprint: sha256:131e6b2e40af49f69ba325a030182f195dbc5df5fac1d1e1fddb64f5119abbc6
+          reviewed_at: "2026-06-20T09:59:09Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T09:58:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T09:58:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+lifecycle:
+    change_history:
+        - date: "2026-06-20T09:58:00Z"
+          from: draft
+          to: review
+          reason: Added config/development*.go local build-tagged rate limiter storage selection behavior under development configuration support.
+          changed_by: agent:codex

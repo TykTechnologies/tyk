@@ -44,8 +44,8 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 152/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
-| `mcdc_coverage` | 52/406 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
+| `verification_scope_complete` | 154/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `mcdc_coverage` | 52/409 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
 
@@ -387,6 +387,18 @@ fixed or to hide them from the current strict audit.
   service connectivity, storage/OAuth/webhook/health/discovery delivery, or
   final gateway runtime behavior. It moves the visible production coverage
   baseline from 151/447 to 152/447.
+- `SW-REQ-105` onboarded `config/development.go` and
+  `config/development_off.go` with a new development configuration
+  stakeholder/system/software chain, tagged dev/non-dev config tests, and
+  explicit `-tags dev` build/test/vet gates in `proof.yaml`. The evidence
+  covers dev builds falling back to default storage when custom rate limiter
+  storage is disabled or absent, dev builds selecting configured rate limiter
+  storage when enabled and present, and release builds always using default
+  storage. This increment is scoped to local build-tag-specific configuration
+  helper support and does not claim rate limiter algorithm behavior, Redis
+  connectivity, distributed storage behavior, gateway request admission, or
+  final client-visible runtime behavior. It moves the visible production
+  coverage baseline from 152/447 to 154/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

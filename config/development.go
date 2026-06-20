@@ -29,6 +29,7 @@ type DevelopmentConfig struct {
 }
 
 // GetRateLimiterStorage will return the storage configuration to use for rate limiters.
+// SW-REQ-105
 func (c *Config) GetRateLimiterStorage() *StorageOptionsConf {
 	if !c.EnableRateLimiterStorage {
 		return &c.Storage

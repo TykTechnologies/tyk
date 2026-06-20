@@ -1,0 +1,61 @@
+id: SYS-REQ-118
+version: 1
+status: approved
+priority: shall
+category: configuration
+req_type: guarantee
+fretish: the development_configuration shall always satisfy !development_configuration_operation_requested | development_configuration_result_determined
+description: Development configuration support shall determine local rate limiter storage selection by returning default gateway storage when development-build custom rate limiter storage is disabled or absent, returning configured rate limiter storage when development-build custom storage is enabled and present, and returning default gateway storage for release builds, without claiming rate limiter algorithm behavior, Redis connectivity, distributed storage behavior, gateway request admission, or final client-visible runtime behavior.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-030
+component: development_configuration
+rationale: This system requirement owns local build-tag-specific config/development*.go helper behavior. Runtime rate limiter storage use by gateway request processing is covered elsewhere or remains outside this proof slice.
+tags:
+    - configuration
+    - development
+    - build-tags
+    - rate-limiter
+variables:
+    - development_configuration_operation_requested
+    - development_configuration_result_determined
+traces:
+    satisfies:
+        - STK-REQ-030
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T09:58:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Development configuration scope is limited to local config/development.go and config/development_off.go behavior: dev builds select custom rate limiter storage only when enabled and configured, fall back to default storage otherwise, and release builds always use default storage. Tagged config tests passed for both dev and non-dev builds, including race. This approval does not claim rate limiter algorithm behavior, Redis connectivity, distributed storage behavior, gateway request admission, or final client-visible runtime behavior.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T09:58:57.611496Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-118|development_configuration_result_determined
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final requirement approval. SYS-REQ-118''s development_configuration_result_determined variable is decomposed by SW-REQ-105 for local config/development.go and config/development_off.go behavior: dev builds select custom rate limiter storage only when enabled and configured, dev builds fall back to default storage when disabled or absent, and release builds always use default storage. This review is limited to local build-tag-specific development configuration helper support and does not claim rate limiter algorithm behavior, Redis connectivity, distributed storage behavior, gateway request admission, or final client-visible runtime behavior.'
+          reviewed_at: "2026-06-20T09:58:57.611496Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T09:58:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T09:58:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+lifecycle:
+    change_history:
+        - date: "2026-06-20T09:58:00Z"
+          from: draft
+          to: review
+          reason: Added development configuration system requirement for build-tagged rate limiter storage selection onboarding.
+          changed_by: agent:codex
