@@ -1,0 +1,9 @@
+component: gateway_analytics
+no_interface:
+    declared: true
+    reason: The gateway analytics proof slice covers local analytics handler and helper behavior only; Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, network transport behavior, and final client-visible responses are outside this component boundary.
+variables:
+    - name: gateway_analytics_operation_terminal
+      type: bool
+      direction: output
+      description: 'The local gateway analytics operation reaches a terminal observable result: handler initialization, worker lifecycle transition, serializer selection, buffered storage append, preserved analytics record field, GeoIP lookup result or explicit local error, normalized path, selected request-header tag expansion, or no-op stop/flush outcome.'

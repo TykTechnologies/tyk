@@ -1,0 +1,81 @@
+id: STK-REQ-050
+version: 1
+status: approved
+priority: shall
+category: observability
+req_type: guarantee
+fretish: ""
+description: Gateway analytics support shall locally buffer and persist analytics records for gateway outcomes, preserve configured detailed analytics fields, initialize and use GeoIP and URL-normalization helpers, and append selected request-header tags without claiming Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, network transport behavior, or final client-visible responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_analytics
+rationale: Gateway operators depend on analytics records for operational observability. This proof slice owns the local gateway analytics handler and helper behavior that prepares and appends records to configured storage; downstream analytics consumers and storage durability are outside this boundary.
+tags:
+    - analytics
+    - observability
+    - gateway
+variables: []
+traces:
+    reviewed_at: "2026-06-20T18:50:00Z"
+    reviewed_by: human:buger
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T18:50:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway analytics scope is limited to local gateway analytics handler and helper behavior: handler initialization, worker start/stop/flush lifecycle, serializer selection, buffered record append to configured analytics storage, status/detailed record preservation, local GeoIP lookup wiring, URL normalization for UUID/ULID/numeric/custom path fragments, and selected request-header tag expansion. This approval does not claim Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, network transport behavior, or final client-visible responses.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T18:50:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T18:50:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need local analytics records to preserve response, detail, path, GeoIP, and configured tag metadata so operational analytics consumers receive the intended gateway signal.
+    acceptance_criteria:
+        - id: STK-REQ-050-AC-01
+          text: Given configured analytics serialization, when gateway requests produce error or success outcomes, then flushing analytics writes decodable records with the expected response codes to the configured analytics storage key.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-138
+        - id: STK-REQ-050-AC-02
+          text: Given detailed analytics settings, cache hits, upstream timeout behavior, or chunked upstream responses, when gateway analytics records are flushed, then detailed request/response, latency, cache/error status, API key, and de-chunked response metadata are preserved as applicable.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-138
+        - id: STK-REQ-050-AC-03
+          text: Given configured GeoIP support, when analytics GeoIP lookup receives empty, valid, or malformed address input, then it returns the expected local lookup result or explicit local error.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-138
+        - id: STK-REQ-050-AC-04
+          text: Given enabled analytics URL normalization, when paths contain UUID, ULID, numeric, or configured custom fragments, then local normalization replaces only the configured fragments with stable placeholders.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-138
+        - id: STK-REQ-050-AC-05
+          text: Given configured analytics tag headers and an existing tag list, when request headers are inspected, then matching header values are appended as lower-case header-value tags while non-configured headers are ignored.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-138
+lifecycle:
+    change_history:
+        - date: "2026-06-20T18:50:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway analytics stakeholder requirement for gateway analytics onboarding.
+          changed_by: human:buger

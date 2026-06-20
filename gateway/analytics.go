@@ -25,6 +25,7 @@ const (
 	recordsBufferForcedFlushInterval = 1 * time.Second
 )
 
+// SW-REQ-125
 func (gw *Gateway) initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
 	pats.UUIDs = regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
 	pats.ULIDs = regexp.MustCompile(`(?i)[0-7][0-9A-HJKMNP-TV-Z]{25}`)
@@ -42,6 +43,7 @@ func (gw *Gateway) initNormalisationPatterns() (pats config.NormaliseURLPatterns
 
 // RedisAnalyticsHandler will record analytics data to a redis back end
 // as defined in the Config object
+// SW-REQ-125
 type RedisAnalyticsHandler struct {
 	Store                       storage.AnalyticsHandler
 	GeoIPDB                     *maxminddb.Reader
@@ -61,6 +63,7 @@ type RedisAnalyticsHandler struct {
 	mockRecordHit func(record *analytics.AnalyticsRecord)
 }
 
+// SW-REQ-125
 func (r *RedisAnalyticsHandler) Init() {
 	r.globalConf = r.Gw.GetConfig()
 	if r.globalConf.AnalyticsConfig.EnableGeoIP {
@@ -83,6 +86,7 @@ func (r *RedisAnalyticsHandler) Init() {
 	r.Start()
 }
 
+// SW-REQ-125
 // Start initialize the records channel and spawn the record workers
 func (r *RedisAnalyticsHandler) Start() {
 	r.recordsChan = make(chan *analytics.AnalyticsRecord, r.globalConf.AnalyticsConfig.RecordsBufferSize)
@@ -93,6 +97,7 @@ func (r *RedisAnalyticsHandler) Start() {
 	}
 }
 
+// SW-REQ-125
 // Stop stops the analytics processing
 func (r *RedisAnalyticsHandler) Stop() {
 	// flag to stop sending records into channel
@@ -109,6 +114,7 @@ func (r *RedisAnalyticsHandler) Stop() {
 	r.poolWg.Wait()
 }
 
+// SW-REQ-125
 // Flush will stop the analytics processing and empty the analytics buffer and then re-init the workers again
 func (r *RedisAnalyticsHandler) Flush() {
 	r.Stop()
@@ -116,6 +122,7 @@ func (r *RedisAnalyticsHandler) Flush() {
 	r.Start()
 }
 
+// SW-REQ-125
 // RecordHit will store an analytics.Record in Redis
 func (r *RedisAnalyticsHandler) RecordHit(record *analytics.AnalyticsRecord) error {
 	if r.mockEnabled {
@@ -137,6 +144,7 @@ func (r *RedisAnalyticsHandler) RecordHit(record *analytics.AnalyticsRecord) err
 	return nil
 }
 
+// SW-REQ-125
 func (r *RedisAnalyticsHandler) recordWorker() {
 	defer r.poolWg.Done()
 
@@ -231,10 +239,12 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 	}
 }
 
+// SW-REQ-125
 func DurationToMillisecond(d time.Duration) float64 {
 	return float64(d) / 1e6
 }
 
+// SW-REQ-125
 func NormalisePath(a *analytics.AnalyticsRecord, globalConfig *config.Config) {
 
 	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {

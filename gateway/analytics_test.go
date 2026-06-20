@@ -17,6 +17,14 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+// Verifies: STK-REQ-050, SYS-REQ-138, SW-REQ-125
+// STK-REQ-050:STK-REQ-050-AC-01:acceptance
+// STK-REQ-050:STK-REQ-050-AC-02:acceptance
+// SYS-REQ-138:nominal:nominal
+// SYS-REQ-138:encoding_safety:nominal
+// SW-REQ-125:nominal:nominal
+// SW-REQ-125:encoding_safety:nominal
+// MCDC SYS-REQ-138: gateway_analytics_operation_terminal=T => TRUE
 func TestAnalytics_Write(t *testing.T) {
 	test.Flaky(t)
 	tcs := []struct {
@@ -526,6 +534,14 @@ func TestAnalytics_Write(t *testing.T) {
 
 }
 
+// Verifies: STK-REQ-050, SYS-REQ-138, SW-REQ-125
+// STK-REQ-050:STK-REQ-050-AC-03:acceptance
+// SYS-REQ-138:boundary:nominal
+// SYS-REQ-138:error_handling:nominal
+// SYS-REQ-138:error_handling:negative
+// SW-REQ-125:boundary:nominal
+// SW-REQ-125:error_handling:nominal
+// SW-REQ-125:error_handling:negative
 func TestGeoIPLookup(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -549,6 +565,12 @@ func TestGeoIPLookup(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-050, SYS-REQ-138, SW-REQ-125
+// STK-REQ-050:STK-REQ-050-AC-04:acceptance
+// SYS-REQ-138:boundary:nominal
+// SYS-REQ-138:determinism:nominal
+// SW-REQ-125:boundary:nominal
+// SW-REQ-125:determinism:nominal
 func TestURLReplacer(t *testing.T) {
 
 	ts := StartTest(func(globalConf *config.Config) {
@@ -658,6 +680,12 @@ func BenchmarkURLReplacer(b *testing.B) {
 	}
 }
 
+// Verifies: STK-REQ-050, SYS-REQ-138, SW-REQ-125
+// STK-REQ-050:STK-REQ-050-AC-05:acceptance
+// SYS-REQ-138:boundary:nominal
+// SYS-REQ-138:determinism:nominal
+// SW-REQ-125:boundary:nominal
+// SW-REQ-125:determinism:nominal
 func TestTagHeaders(t *testing.T) {
 	req := TestReq(t, "GET", "/tagmeplease", nil)
 	req.Header.Set("Content-Type", "application/json")

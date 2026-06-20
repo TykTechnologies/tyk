@@ -47,6 +47,7 @@ type SuccessHandler struct {
 	*BaseMiddleware
 }
 
+// SW-REQ-125
 func tagHeaders(r *http.Request, th []string, tags []string) []string {
 	for k, v := range r.Header {
 		cleanK := strings.ToLower(k)
