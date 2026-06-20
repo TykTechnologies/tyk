@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+// Verifies: SYS-REQ-129, SW-REQ-116
+// SW-REQ-116:nominal:nominal
 func TestNewCipher(t *testing.T) {
 	mockCipher := &tls.CipherSuite{
 		ID:                uint16(0x0001),
@@ -29,6 +31,8 @@ func TestNewCipher(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-129, SW-REQ-116
+// SW-REQ-116:nominal:nominal
 func TestGetCiphers(t *testing.T) {
 	ciphers := GetCiphers()
 	if len(ciphers) == 0 {
@@ -59,6 +63,8 @@ var legacyCipherSuites = []string{
 	"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
 }
 
+// Verifies: SYS-REQ-129, SW-REQ-116
+// SW-REQ-116:boundary:nominal
 func TestLegacyCipherSuites(t *testing.T) {
 	ciphers := GetCiphers()
 
@@ -75,6 +81,9 @@ func TestLegacyCipherSuites(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-129, SW-REQ-116
+// SW-REQ-116:nominal:nominal
+// SW-REQ-116:error_handling:negative
 func TestResolveCipher(t *testing.T) {
 	testCases := []struct {
 		name     string
@@ -107,6 +116,8 @@ func TestResolveCipher(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-129, SW-REQ-116
+// SW-REQ-116:boundary:nominal
 func TestTLSVersions(t *testing.T) {
 	testCases := []struct {
 		name     string
@@ -133,6 +144,8 @@ func TestTLSVersions(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-129, SW-REQ-116
+// SW-REQ-116:determinism:nominal
 func TestCipherNamesEqual(t *testing.T) {
 	cases := map[string]struct {
 		s1, s2   string

@@ -14,14 +14,18 @@ import (
 )
 
 // `{"` in base64
+// SW-REQ-116
 const B64JSONPrefix = "ey"
 
+// SW-REQ-116
 const DefaultHashAlgorithm = "murmur64"
 
+// SW-REQ-116
 const MongoBsonIdLength = 24
 
 // GenerateToken generates a token.
 // If hashing algorithm is empty, it uses legacy key generation.
+// SW-REQ-116
 func GenerateToken(orgID, keyID, hashAlgorithm string) (string, error) {
 	if keyID == "" {
 		keyID = uuid.NewHex()
@@ -41,6 +45,7 @@ func GenerateToken(orgID, keyID, hashAlgorithm string) (string, error) {
 	return orgID + keyID, nil
 }
 
+// SW-REQ-116
 func TokenHashAlgo(token string) string {
 	// Legacy tokens not b64 and not JSON records
 	if strings.HasPrefix(token, B64JSONPrefix) {
@@ -59,6 +64,7 @@ func TokenHashAlgo(token string) string {
 	return ""
 }
 
+// SW-REQ-116
 func TokenID(token string) (id string, err error) {
 	jsonToken, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
@@ -68,6 +74,7 @@ func TokenID(token string) (id string, err error) {
 	return jsonparser.GetString(jsonToken, "id")
 }
 
+// SW-REQ-116
 func TokenOrg(token string) string {
 	if strings.HasPrefix(token, B64JSONPrefix) {
 		if jsonToken, err := base64.StdEncoding.DecodeString(token); err == nil {

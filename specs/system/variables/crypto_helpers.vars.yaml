@@ -1,0 +1,9 @@
+component: crypto_helpers
+no_interface:
+    declared: true
+    reason: The internal/crypto proof slice covers local helper behavior only; cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, transport security, secret storage, and final client-visible gateway behavior are outside this component boundary.
+variables:
+    - name: crypto_helper_operation_terminal
+      type: bool
+      direction: output
+      description: 'The local crypto helper operation reaches a terminal observable result: a mapped value, parsed token field, generated local artifact, returned error/empty value, or deterministic in-memory certificate-pool update.'

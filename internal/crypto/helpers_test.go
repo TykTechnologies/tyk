@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Verifies: SYS-REQ-129, SW-REQ-116
+// SW-REQ-116:boundary:nominal
 func TestIsPublicKey(t *testing.T) {
 	tests := []struct {
 		name string
@@ -41,11 +43,17 @@ func TestIsPublicKey(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-129, SW-REQ-116
+// SW-REQ-116:nominal:nominal
 func TestGenerateRSAPublicKey(t *testing.T) {
 	pubKey := GenerateRSAPublicKey(t)
 	assert.Contains(t, string(pubKey), "PUBLIC KEY")
 }
 
+// Verifies: SYS-REQ-129, SW-REQ-116
+// SW-REQ-116:nominal:nominal
+// SW-REQ-116:boundary:nominal
+// SW-REQ-116:error_handling:negative
 func TestAddCACertificatesFromChainToPool(t *testing.T) {
 	t.Run("nil pool", func(t *testing.T) {
 		// Should not panic with nil pool

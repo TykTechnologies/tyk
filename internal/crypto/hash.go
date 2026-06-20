@@ -12,12 +12,14 @@ import (
 )
 
 const (
+	// SW-REQ-116
 	HashSha256    = "sha256"
 	HashMurmur32  = "murmur32"
 	HashMurmur64  = "murmur64"
 	HashMurmur128 = "murmur128"
 )
 
+// SW-REQ-116
 func hashFunction(algorithm string) (hash.Hash, error) {
 	switch algorithm {
 	case HashSha256:
@@ -33,6 +35,7 @@ func hashFunction(algorithm string) (hash.Hash, error) {
 	}
 }
 
+// SW-REQ-116
 func HashStr(in string, withAlg ...string) string {
 	var algo string
 	if len(withAlg) > 0 && withAlg[0] != "" {
@@ -51,6 +54,7 @@ func HashStr(in string, withAlg ...string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+// SW-REQ-116
 func HashKey(in string, hashKey bool) string {
 	if !hashKey {
 		// Not hashing? Return the raw key

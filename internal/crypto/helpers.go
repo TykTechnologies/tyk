@@ -29,6 +29,7 @@ import (
 )
 
 var (
+	// SW-REQ-116
 	ErrCertExpired = errors.New("Certificate has expired")
 	ErrTlsRequired = errpack.New(
 		"Client TLS certificate is required",
@@ -39,6 +40,7 @@ var (
 
 // HexSHA256 calculates the SHA256 hash of the provided certificate bytes
 // and returns the result as a hexadecimal string.
+// SW-REQ-116
 func HexSHA256(cert []byte) string {
 	certSHA := sha256.Sum256(cert)
 	return hex.EncodeToString(certSHA[:])
@@ -56,6 +58,7 @@ func HexSHA256(cert []byte) string {
 //
 // A tls.Certificate is created using the PEM-encoded certificate and private key.
 // If setLeaf is true, the certificate's Leaf field is set to the template.
+// SW-REQ-116
 func GenCertificate(template *x509.Certificate, setLeaf bool) ([]byte, []byte, []byte, tls.Certificate) {
 	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
 
@@ -89,6 +92,7 @@ func GenCertificate(template *x509.Certificate, setLeaf bool) ([]byte, []byte, [
 // GenServerCertificate generates a self-signed server certificate for "localhost"
 // with DNS names "localhost" and IP addresses 127.0.0.1 and ::.
 // It returns the certificate, private key, combined PEM bytes, and a tls.Certificate.
+// SW-REQ-116
 func GenServerCertificate() ([]byte, []byte, []byte, tls.Certificate) {
 	certPem, privPem, combinedPEM, cert := GenCertificate(&x509.Certificate{
 		DNSNames:    []string{"localhost"},
@@ -100,6 +104,7 @@ func GenServerCertificate() ([]byte, []byte, []byte, tls.Certificate) {
 
 // ValidateRequestCerts validates client TLS certificates against a list of allowed certificates configured in API definition.
 // It returns an error if TLS is not enabled, the client certificate is missing, or if it is not allowed or expired.
+// SW-REQ-116
 func ValidateRequestCerts(r *http.Request, certs []*tls.Certificate) error {
 	if r.TLS == nil {
 		return errors.New("TLS not enabled")
@@ -139,6 +144,7 @@ func ValidateRequestCerts(r *http.Request, certs []*tls.Certificate) error {
 	return errors.New("Certificate with SHA256 " + HexSHA256(r.TLS.PeerCertificates[0].Raw) + " not allowed")
 }
 
+// SW-REQ-116
 func verifyCertAgainstCA(caCert *tls.Certificate, peerCert *x509.Certificate) error {
 	// Create a certificate pool and add the CA certificate to it
 	roots := x509.NewCertPool()
@@ -155,6 +161,7 @@ func verifyCertAgainstCA(caCert *tls.Certificate, peerCert *x509.Certificate) er
 }
 
 // IsPublicKey verifies if given certificate is a public key only.
+// SW-REQ-116
 func IsPublicKey(cert *tls.Certificate) bool {
 	return cert.Leaf != nil && strings.HasPrefix(cert.Leaf.Subject.CommonName, "Public Key: ")
 }
@@ -169,6 +176,7 @@ func IsPublicKey(cert *tls.Certificate) bool {
 //
 // In both cases, only certificates with IsCA=true are added to the pool.
 // Parsing errors are logged but do not stop processing of remaining certificates in the chain.
+// SW-REQ-116
 func AddCACertificatesFromChainToPool(pool *x509.CertPool, cert *tls.Certificate) {
 	if pool == nil || cert == nil {
 		return
@@ -226,6 +234,7 @@ func AddCACertificatesFromChainToPool(pool *x509.CertPool, cert *tls.Certificate
 
 // PrefixPublicKeyCommonName returns x509.Certificate with prefixed CommonName.
 // This is used in UI/response to hint the type certificate during listing.
+// SW-REQ-116
 func PrefixPublicKeyCommonName(blockBytes []byte) *x509.Certificate {
 	return &x509.Certificate{
 		Subject: pkix.Name{
@@ -235,6 +244,7 @@ func PrefixPublicKeyCommonName(blockBytes []byte) *x509.Certificate {
 }
 
 // GenerateRSAPublicKey generates an RSA public key.
+// SW-REQ-116
 func GenerateRSAPublicKey(tb testing.TB) []byte {
 	tb.Helper()
 	// Generate a private key.
@@ -257,11 +267,13 @@ func GenerateRSAPublicKey(tb testing.TB) []byte {
 	return publicKeyPEM
 }
 
+// SW-REQ-116
 func GetPaddedString(str string) []byte {
 	return []byte(RightPad2Len(str, "=", 32))
 }
 
 // encrypt string to base64 crypto using AES
+// SW-REQ-116
 func Encrypt(key []byte, str string) string {
 	plaintext := []byte(str)
 
@@ -288,6 +300,7 @@ func Encrypt(key []byte, str string) string {
 }
 
 // Decrypt from base64 to decrypted string
+// SW-REQ-116
 func Decrypt(key []byte, cryptoText string) string {
 	ciphertext, err := base64.URLEncoding.DecodeString(cryptoText)
 	if err != nil {
@@ -318,6 +331,7 @@ func Decrypt(key []byte, cryptoText string) string {
 	return string(ciphertext)
 }
 
+// SW-REQ-116
 func RightPad2Len(s, padStr string, overallLen int) string {
 	padCountInt := 1 + (overallLen-len(padStr))/len(padStr)
 	retStr := s + strings.Repeat(padStr, padCountInt)

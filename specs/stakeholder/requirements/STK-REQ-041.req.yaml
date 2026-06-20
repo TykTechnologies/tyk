@@ -1,0 +1,68 @@
+id: STK-REQ-041
+version: 1
+status: approved
+priority: shall
+category: security
+req_type: guarantee
+fretish: ""
+description: Internal crypto helper support shall locally preserve cipher metadata mapping, cipher name resolution, hash and token helper behavior, certificate helper classification and pool update behavior, and local encrypt/decrypt helper outcomes, without claiming cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: crypto_helpers
+rationale: The internal/crypto package owns local helper transformations used by other packages. Product-level security guarantees remain outside this proof slice until those callers are onboarded with their own requirements and evidence.
+tags:
+    - crypto
+    - security
+    - helpers
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T12:00:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Crypto helper scope is limited to local internal/crypto behavior: cipher metadata mapping and name resolution, hash algorithm selection and key hashing, token generation and token field parsing, certificate helper classification and CA-pool updates, public-key PEM helper generation, and local encrypt/decrypt helper outcomes. This approval does not claim cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T12:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T12:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need local crypto helpers to preserve their documented helper transformations so callers can rely on stable helper behavior while broader security outcomes are verified at the caller capability level.
+    acceptance_criteria:
+        - id: STK-REQ-041-AC-01
+          text: Given TLS cipher metadata or cipher names, when local helpers map or resolve them, then the helper returns the expected local cipher representation or an explicit not-found error.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-129
+        - id: STK-REQ-041-AC-02
+          text: Given token and hash helper inputs, when local helpers generate, parse, or hash values, then they preserve the documented algorithm-selection, fallback, and field-extraction behavior.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-129
+        - id: STK-REQ-041-AC-03
+          text: Given certificate or symmetric encryption helper inputs, when local helpers classify certificates, update CA pools, or encrypt/decrypt local strings, then they return the expected local result or explicit empty/error outcome.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-129
+lifecycle:
+    change_history:
+        - date: "2026-06-20T12:00:00Z"
+          from: draft
+          to: review
+          reason: Added crypto helper stakeholder requirement for internal/crypto onboarding.
+          changed_by: agent:codex

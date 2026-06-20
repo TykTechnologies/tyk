@@ -8,6 +8,7 @@ import (
 
 // CipherSuite stores information about a cipher suite.
 // It shadows tls.CipherSuite but translates TLS versions to strings.
+// SW-REQ-116
 type CipherSuite struct {
 	ID       uint16   `json:"id"`
 	Name     string   `json:"name"`
@@ -16,6 +17,7 @@ type CipherSuite struct {
 }
 
 // NewCipher translates tls.CipherSuite to our local type.
+// SW-REQ-116
 func NewCipher(in *tls.CipherSuite) *CipherSuite {
 	return &CipherSuite{
 		ID:       in.ID,
@@ -26,11 +28,13 @@ func NewCipher(in *tls.CipherSuite) *CipherSuite {
 }
 
 // String returns a human-readable string for the cipher.
+// SW-REQ-116
 func (c *CipherSuite) String() string {
 	return fmt.Sprintf("Cipher ID: %d, Name: %s, Insecure: %t, TLS: %v", c.ID, c.Name, c.Insecure, c.TLS)
 }
 
 // TLSVersions will return a list of TLS versions as a string.
+// SW-REQ-116
 func TLSVersions(in []uint16) []string {
 	versions := make([]string, len(in))
 	for i, v := range in {
@@ -51,6 +55,7 @@ func TLSVersions(in []uint16) []string {
 }
 
 // GetCiphers generates a list of CipherSuite from the available ciphers.
+// SW-REQ-116
 func GetCiphers() []*CipherSuite {
 	ciphers := append(tls.CipherSuites(), tls.InsecureCipherSuites()...)
 
@@ -65,6 +70,7 @@ func GetCiphers() []*CipherSuite {
 
 // ResolveCipher translates a string representation of a cipher to its uint16 ID.
 // It's case-insensitive when matching the cipher by name.
+// SW-REQ-116
 func ResolveCipher(cipherName string) (uint16, error) {
 	ciphers := GetCiphers()
 	for _, cipher := range ciphers {
@@ -75,6 +81,7 @@ func ResolveCipher(cipherName string) (uint16, error) {
 	return 0, fmt.Errorf("cipher %s not found", cipherName)
 }
 
+// SW-REQ-116
 func cipherNamesEqual(s1, s2 string) bool {
 	// Legacy names for the corresponding cipher suites with the correct _SHA256
 	// suffix, retained for backward compatibility.

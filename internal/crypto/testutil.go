@@ -17,10 +17,12 @@ import (
 )
 
 const (
+	// SW-REQ-116
 	rsaPrivateKey = "RSA PRIVATE KEY"
 	certificate   = "CERTIFICATE"
 )
 
+// SW-REQ-116
 var certSubject = pkix.Name{
 	Organization:  []string{"Tyk Technologies Ltd"},
 	Country:       []string{"UK"},
@@ -39,6 +41,7 @@ var certSubject = pkix.Name{
 // - []byte: The root certificate in PEM format.
 // - []byte: The root private key in PEM format.
 // - error: Any error encountered during the generation.
+// SW-REQ-116
 func GenerateRootCertAndKey(tb testing.TB) ([]byte, []byte, error) {
 	tb.Helper()
 	// Generate RSA key pair
@@ -88,6 +91,7 @@ func GenerateRootCertAndKey(tb testing.TB) ([]byte, []byte, error) {
 // - *bytes.Buffer: The server certificate in PEM format.
 // - *bytes.Buffer: The server private key in PEM format.
 // - error: Any error encountered during the generation.
+// SW-REQ-116
 func GenerateServerCertAndKeyPEM(tb testing.TB, rootCertPEM, rootKeyPEM []byte) (*bytes.Buffer, *bytes.Buffer, error) {
 	tb.Helper()
 
@@ -142,6 +146,7 @@ func GenerateServerCertAndKeyPEM(tb testing.TB, rootCertPEM, rootKeyPEM []byte) 
 // - *bytes.Buffer: The server certificate chain in PEM format.
 // - *bytes.Buffer: The server private key in PEM format.
 // - error: Any error encountered during the generation.
+// SW-REQ-116
 func GenerateServerCertAndKeyChain(tb testing.TB, rootCertPEM, rootKeyPEM []byte) (*bytes.Buffer, *bytes.Buffer, error) {
 	tb.Helper()
 	serverCertPEM, serverKeyPEM, err := GenerateServerCertAndKeyPEM(tb, rootCertPEM, rootKeyPEM)
@@ -165,6 +170,7 @@ func GenerateServerCertAndKeyChain(tb testing.TB, rootCertPEM, rootKeyPEM []byte
 // - *bytes.Buffer: The client certificate in PEM format.
 // - *bytes.Buffer: The client private key in PEM format.
 // - error: Any error encountered during the generation.
+// SW-REQ-116
 func GenerateClientCertAndKeyPEM(tb testing.TB, rootCertPEM, rootKeyPEM []byte) (*bytes.Buffer, *bytes.Buffer, error) {
 	tb.Helper()
 
@@ -217,6 +223,7 @@ func GenerateClientCertAndKeyPEM(tb testing.TB, rootCertPEM, rootKeyPEM []byte) 
 // - *bytes.Buffer: The client certificate chain in PEM format.
 // - *bytes.Buffer: The client private key in PEM format.
 // - error: Any error encountered during the generation.
+// SW-REQ-116
 func GenerateClientCertAndKeyChain(tb testing.TB, rootCertPEM, rootKeyPEM []byte) (*bytes.Buffer, *bytes.Buffer, error) {
 	tb.Helper()
 	clientCertPEM, clientKeyPEM, err := GenerateClientCertAndKeyPEM(tb, rootCertPEM, rootKeyPEM)
@@ -227,6 +234,7 @@ func GenerateClientCertAndKeyChain(tb testing.TB, rootCertPEM, rootKeyPEM []byte
 	return clientCertPEM, clientKeyPEM, nil
 }
 
+// SW-REQ-116
 func decodeRootCertAndKey(rootCertPEM, rootKeyPEM []byte) (*x509.Certificate, *rsa.PrivateKey, error) {
 	// Decode the root certificate
 	rootCertBlock, _ := pem.Decode(rootCertPEM)
