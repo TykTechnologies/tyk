@@ -24,6 +24,7 @@ type configViewerCache struct {
 }
 
 // get returns the cached viewer, or nil if the cache is empty.
+// SW-REQ-103
 func (c *configViewerCache) get() *structviewer.Viewer {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -31,6 +32,7 @@ func (c *configViewerCache) get() *structviewer.Viewer {
 }
 
 // set stores a viewer in the cache.
+// SW-REQ-103
 func (c *configViewerCache) set(v *structviewer.Viewer) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -38,6 +40,7 @@ func (c *configViewerCache) set(v *structviewer.Viewer) {
 }
 
 // invalidate clears the cached viewer, forcing re-creation on next access.
+// SW-REQ-103
 func (c *configViewerCache) invalidate() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -46,6 +49,7 @@ func (c *configViewerCache) invalidate() {
 
 // getOrCreateConfigViewer returns a cached viewer or creates a new one.
 // The viewer is cached to avoid reflection overhead on every request.
+// SW-REQ-103
 func (gw *Gateway) getOrCreateConfigViewer() (*structviewer.Viewer, error) {
 	if gw.configViewerCache == nil {
 		gw.configViewerCache = &configViewerCache{}
@@ -65,6 +69,7 @@ func (gw *Gateway) getOrCreateConfigViewer() (*structviewer.Viewer, error) {
 }
 
 // initConfigViewer creates a new structviewer.Viewer for the current gateway configuration.
+// SW-REQ-103
 func (gw *Gateway) initConfigViewer() (*structviewer.Viewer, error) {
 	cfg := gw.GetConfig()
 	viewerCfg := &structviewer.Config{
@@ -77,6 +82,7 @@ func (gw *Gateway) initConfigViewer() (*structviewer.Viewer, error) {
 // configHandler handles GET /config requests.
 // Returns the full gateway configuration as JSON, or a specific field if ?field=<path> is provided.
 // Sensitive fields are automatically redacted based on structviewer:"obfuscate" tags.
+// SW-REQ-103
 func (gw *Gateway) configHandler(w http.ResponseWriter, r *http.Request) {
 	viewer, err := configViewerFactory(gw)
 	if err != nil {
@@ -90,6 +96,7 @@ func (gw *Gateway) configHandler(w http.ResponseWriter, r *http.Request) {
 // envHandler handles GET /env requests.
 // Returns all environment variable mappings, or a specific one if ?env=<ENV_VAR> is provided.
 // Sensitive fields are automatically redacted based on structviewer:"obfuscate" tags.
+// SW-REQ-103
 func (gw *Gateway) envHandler(w http.ResponseWriter, r *http.Request) {
 	viewer, err := configViewerFactory(gw)
 	if err != nil {

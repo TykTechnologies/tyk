@@ -5,14 +5,14 @@ priority: shall
 category: configuration
 req_type: guarantee
 fretish: ""
-description: Gateway configuration support shall give operators deterministic local defaults, file layering, environment overrides, typed decoder behavior, event trigger migration, ignored-IP analytics decisions, certificate expiry monitor defaults, and tracing/OpenTelemetry configuration parsing without claiming full gateway runtime interpretation of every configuration field.
+description: Gateway configuration support shall give operators deterministic local defaults, file layering, environment overrides, typed decoder behavior, event trigger migration, ignored-IP analytics decisions, certificate expiry monitor defaults, tracing/OpenTelemetry configuration parsing, and local authenticated config/env inspection with sensitive-value redaction without claiming full gateway runtime interpretation of every configuration field.
 formalization_strategy: informal
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: gateway_configuration
-rationale: Gateway configuration loading is operator-facing behavior. This stakeholder requirement owns local configuration helper behavior in config/config.go; runtime use of individual fields by gateway subsystems is outside this proof slice.
+rationale: Gateway configuration loading and local inspection are operator-facing behavior. This stakeholder requirement owns local configuration helper behavior in config/config.go and gateway/api_config.go; runtime use of individual fields by gateway subsystems is outside this proof slice.
 tags:
     - configuration
     - defaults
@@ -20,9 +20,9 @@ tags:
     - tracing
 variables: []
 traces:
-    reviewed_at: "2026-06-20T13:34:00.166352Z"
+    reviewed_at: "2026-06-20T22:41:09.223062Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:68af1fd3bc9e43c32a901a43330d8aaecae6c7b1933ddbf7f3ac04b177144617
+    reviewed_fingerprint: sha256:f6e777968faba4021a2afd5735cc5c16c726df440f0a2c7c648dbb7989fd9b11
 verification:
     assurance_level: A
     formalization_status: none
@@ -32,7 +32,7 @@ verification:
         role: requirements_owner
         reviewed_at: "2026-06-20T09:34:00Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway configuration scope is limited to local config/config.go behavior: default values and WriteDefault output, ordered file layering and missing-file errors, environment variable overrides through envconfig/custom loaders, event trigger migration between deprecated and current fields, cert/custom-secret/port-whitelist/labs decoders, ignored-IP analytics decisions, certificate expiry monitor defaults and overrides, and tracing/OpenTelemetry JSON/env parsing and round trips. Existing config tests passed, including race, and the config package was added to configured build/test/lint gates. This approval does not claim full gateway runtime interpretation of every configuration field, network binding, storage connectivity, analytics delivery, tracing export delivery, API loading, request admission, or final client-visible runtime behavior.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway configuration scope is limited to local config/config.go behavior and gateway/api_config.go inspection behavior: default values and WriteDefault output, ordered file layering and missing-file errors, environment variable overrides through envconfig/custom loaders, event trigger migration between deprecated and current fields, cert/custom-secret/port-whitelist/labs decoders, ignored-IP analytics decisions, certificate expiry monitor defaults and overrides, tracing/OpenTelemetry JSON/env parsing and round trips, config/env inspection endpoint gates, field/env lookup, sensitive-value redaction, viewer initialization errors, and viewer cache invalidation. Existing config and gateway API config tests passed. This approval does not claim full gateway runtime interpretation of every configuration field, network binding, storage connectivity, analytics delivery, tracing export delivery, API loading, general request admission, or final client-visible runtime behavior beyond the local inspection endpoint responses.
         ai_generated: false
 history:
     created_by: agent:codex
@@ -48,17 +48,17 @@ stakeholder:
     story: As a gateway operator, I need local gateway configuration loading to apply defaults, file overlays, environment overrides, and typed decoders predictably before runtime components consume the configuration.
     acceptance_criteria:
         - id: STK-REQ-028-AC-01
-          text: Given default or partial configuration input, when local configuration helpers load or write configuration, then documented defaults and supported explicit values are preserved deterministically.
+          text: Given default, partial, or locally inspected configuration input, when local configuration helpers load, write, or inspect configuration, then documented defaults and supported explicit values are preserved deterministically with sensitive values redacted.
           verification_method: test
           derived_reqs:
             - SYS-REQ-116
         - id: STK-REQ-028-AC-02
-          text: Given multiple configuration files and environment overrides, when local configuration loading runs, then later files and environment values override earlier/default values according to local loader rules.
+          text: Given multiple configuration files, environment overrides, or environment inspection requests, when local configuration support runs, then later files and environment values override earlier/default values according to local loader rules and env mappings remain inspectable through local helper output.
           verification_method: test
           derived_reqs:
             - SYS-REQ-116
         - id: STK-REQ-028-AC-03
-          text: Given missing files, malformed decoder input, or unsupported tracing configuration shape, when local configuration helpers run, then an explicit local error or warning path is returned.
+          text: Given missing files, malformed decoder input, unsupported tracing configuration shape, missing inspection fields/env vars, unauthenticated inspection requests, or viewer initialization errors, when local configuration helpers run, then an explicit local error, denial, or warning path is returned.
           verification_method: test
           derived_reqs:
             - SYS-REQ-116

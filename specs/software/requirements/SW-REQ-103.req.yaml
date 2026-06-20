@@ -5,16 +5,16 @@ priority: shall
 category: configuration
 req_type: guarantee
 fretish: ""
-description: The config/config helper shall preserve local gateway configuration behavior by applying deterministic defaults, writing default/config JSON, loading ordered configuration files, preserving original path metadata, applying environment overrides and custom tracing loaders, decoding cert/custom-secret/labs/port-whitelist values, migrating event trigger fields, evaluating ignored-IP analytics decisions, applying certificate expiry monitor defaults and overrides, and parsing/round-tripping tracing and OpenTelemetry configuration, while returning explicit local errors for missing files or malformed decoder input and without claiming full gateway runtime interpretation of every configuration field, network binding, storage connectivity, analytics delivery, tracing export delivery, API loading, request admission, or final client-visible runtime behavior.
+description: The gateway configuration helpers shall preserve local gateway configuration behavior by applying deterministic defaults, writing default/config JSON, loading ordered configuration files, preserving original path metadata, applying environment overrides and custom tracing loaders, decoding cert/custom-secret/labs/port-whitelist values, migrating event trigger fields, evaluating ignored-IP analytics decisions, applying certificate expiry monitor defaults and overrides, parsing/round-tripping tracing and OpenTelemetry configuration, and serving local authenticated config/env inspection results with sensitive-value redaction and viewer cache invalidation, while returning explicit local errors for missing files, malformed decoder input, missing inspection fields/env vars, unauthorized inspection requests, or viewer initialization errors and without claiming full gateway runtime interpretation of every configuration field, network binding, storage connectivity, analytics delivery, tracing export delivery, API loading, general request admission, or final client-visible runtime behavior beyond local inspection endpoint responses.
 formalization_strategy: informal
 informal_verification:
     method: unit_tests
-    evidence: config/config_test.go; docs/gateway-configuration-requirements-evidence.md
+    evidence: config/config_test.go; gateway/api_config_test.go; docs/gateway-configuration-requirements-evidence.md
     verified: true
 parent: SYS-REQ-116
 component: gateway_configuration
 rationale: >-
-    This software requirement owns local config/config.go helper behavior. It does not claim full gateway runtime interpretation of every configuration field, network binding, storage connectivity, analytics delivery, tracing export delivery, API loading, request admission, or final client-visible runtime behavior.
+    This software requirement owns local config/config.go helper behavior and gateway/api_config.go inspection helper behavior. It does not claim full gateway runtime interpretation of every configuration field, network binding, storage connectivity, analytics delivery, tracing export delivery, API loading, general request admission, or final client-visible runtime behavior beyond local inspection endpoint responses.
 tags:
     - configuration
     - defaults
@@ -25,7 +25,7 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-116
-    reviewed_at: "2026-06-20T13:34:07.921049Z"
+    reviewed_at: "2026-06-20T22:41:10.795147Z"
     reviewed_by: human:buger
     reviewed_fingerprint: sha256:8f44d8fd3b7b09cce0172a65da448a9ec738a38f08d87f188cc773603f1f8db5
 verification:
@@ -37,7 +37,7 @@ verification:
         role: requirements_owner
         reviewed_at: "2026-06-20T09:34:00Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway configuration scope is limited to local config/config.go behavior: default values and WriteDefault output, ordered file layering and missing-file errors, environment variable overrides through envconfig/custom loaders, event trigger migration between deprecated and current fields, cert/custom-secret/port-whitelist/labs decoders, ignored-IP analytics decisions, certificate expiry monitor defaults and overrides, and tracing/OpenTelemetry JSON/env parsing and round trips. Existing config tests passed, including race, and the config package was added to configured build/test/lint gates. This approval does not claim full gateway runtime interpretation of every configuration field, network binding, storage connectivity, analytics delivery, tracing export delivery, API loading, request admission, or final client-visible runtime behavior.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway configuration scope is limited to local config/config.go behavior and gateway/api_config.go inspection behavior: default values and WriteDefault output, ordered file layering and missing-file errors, environment variable overrides through envconfig/custom loaders, event trigger migration between deprecated and current fields, cert/custom-secret/port-whitelist/labs decoders, ignored-IP analytics decisions, certificate expiry monitor defaults and overrides, tracing/OpenTelemetry JSON/env parsing and round trips, config/env inspection endpoint gates, field/env lookup, sensitive-value redaction, viewer initialization errors, and viewer cache invalidation. Existing config and gateway API config tests passed. This approval does not claim full gateway runtime interpretation of every configuration field, network binding, storage connectivity, analytics delivery, tracing export delivery, API loading, general request admission, or final client-visible runtime behavior beyond the local inspection endpoint responses.
         ai_generated: false
 history:
     created_by: agent:codex

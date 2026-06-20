@@ -14,6 +14,10 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// STK-REQ-028:STK-REQ-028-AC-03:acceptance
+// SYS-REQ-116:boundary:nominal
+// SW-REQ-103:boundary:nominal
 func TestConfigInspectionEndpoints_Disabled(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = false
@@ -37,6 +41,10 @@ func TestConfigInspectionEndpoints_Disabled(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// STK-REQ-028:STK-REQ-028-AC-03:acceptance
+// SYS-REQ-116:boundary:nominal
+// SW-REQ-103:boundary:nominal
 func TestConfigInspectionEndpoints_EnabledWithoutSecret(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -53,6 +61,10 @@ func TestConfigInspectionEndpoints_EnabledWithoutSecret(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// STK-REQ-028:STK-REQ-028-AC-03:acceptance
+// SYS-REQ-116:error_handling:negative
+// SW-REQ-103:error_handling:negative
 func TestConfigInspectionEndpoints_AuthRequired(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -85,6 +97,12 @@ func TestConfigInspectionEndpoints_AuthRequired(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// STK-REQ-028:STK-REQ-028-AC-01:acceptance
+// SYS-REQ-116:nominal:nominal
+// SYS-REQ-116:encoding_safety:nominal
+// SW-REQ-103:nominal:nominal
+// SW-REQ-103:encoding_safety:nominal
 func TestConfigHandler_FullConfig(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -116,6 +134,10 @@ func TestConfigHandler_FullConfig(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// STK-REQ-028:STK-REQ-028-AC-01:acceptance
+// SYS-REQ-116:nominal:nominal
+// SW-REQ-103:nominal:nominal
 func TestConfigHandler_SingleField(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -145,6 +167,10 @@ func TestConfigHandler_SingleField(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// STK-REQ-028:STK-REQ-028-AC-03:acceptance
+// SYS-REQ-116:error_handling:negative
+// SW-REQ-103:error_handling:negative
 func TestConfigHandler_SingleField_NotFound(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -167,6 +193,10 @@ func TestConfigHandler_SingleField_NotFound(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// STK-REQ-028:STK-REQ-028-AC-01:acceptance
+// SYS-REQ-116:encoding_safety:nominal
+// SW-REQ-103:encoding_safety:nominal
 func TestConfigHandler_SensitiveFieldRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -193,6 +223,10 @@ func TestConfigHandler_SensitiveFieldRedacted(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// STK-REQ-028:STK-REQ-028-AC-02:acceptance
+// SYS-REQ-116:nominal:nominal
+// SW-REQ-103:nominal:nominal
 func TestEnvHandler_AllEnvVars(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -228,6 +262,10 @@ func TestEnvHandler_AllEnvVars(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// STK-REQ-028:STK-REQ-028-AC-02:acceptance
+// SYS-REQ-116:nominal:nominal
+// SW-REQ-103:nominal:nominal
 func TestEnvHandler_SingleEnvVar(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -256,6 +294,10 @@ func TestEnvHandler_SingleEnvVar(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// STK-REQ-028:STK-REQ-028-AC-03:acceptance
+// SYS-REQ-116:error_handling:negative
+// SW-REQ-103:error_handling:negative
 func TestEnvHandler_SingleEnvVar_NotFound(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -278,6 +320,10 @@ func TestEnvHandler_SingleEnvVar_NotFound(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// STK-REQ-028:STK-REQ-028-AC-02:acceptance
+// SYS-REQ-116:encoding_safety:nominal
+// SW-REQ-103:encoding_safety:nominal
 func TestEnvHandler_SensitiveEnvVarRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -304,6 +350,9 @@ func TestEnvHandler_SensitiveEnvVarRedacted(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SYS-REQ-116:encoding_safety:nominal
+// SW-REQ-103:encoding_safety:nominal
 func TestConfigHandler_StoragePasswordRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -331,6 +380,9 @@ func TestConfigHandler_StoragePasswordRedacted(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SYS-REQ-116:nominal:nominal
+// SW-REQ-103:nominal:nominal
 func TestInitConfigViewer(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -344,6 +396,45 @@ func TestInitConfigViewer(t *testing.T) {
 	assert.NotNil(t, viewer)
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SYS-REQ-116:nominal:nominal
+// SYS-REQ-116:boundary:nominal
+// SW-REQ-103:nominal:nominal
+// SW-REQ-103:boundary:nominal
+func TestConfigViewerCache(t *testing.T) {
+	ts := StartTest(func(cnf *config.Config) {
+		cnf.EnableConfigInspection = true
+		cnf.Secret = "test-secret"
+	})
+	defer ts.Close()
+
+	cache := &configViewerCache{}
+	assert.Nil(t, cache.get())
+
+	viewer, err := ts.Gw.initConfigViewer()
+	assert.NoError(t, err)
+
+	cache.set(viewer)
+	assert.Same(t, viewer, cache.get())
+
+	cache.invalidate()
+	assert.Nil(t, cache.get())
+
+	first, err := ts.Gw.getOrCreateConfigViewer()
+	assert.NoError(t, err)
+	second, err := ts.Gw.getOrCreateConfigViewer()
+	assert.NoError(t, err)
+	assert.Same(t, first, second)
+
+	conf := ts.Gw.GetConfig()
+	conf.ListenPort++
+	ts.Gw.SetConfig(conf)
+	assert.Nil(t, ts.Gw.configViewerCache.get())
+}
+
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SYS-REQ-116:nominal:nominal
+// SW-REQ-103:nominal:nominal
 func TestConfigHandler_NestedField(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -371,6 +462,9 @@ func TestConfigHandler_NestedField(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SYS-REQ-116:encoding_safety:nominal
+// SW-REQ-103:encoding_safety:nominal
 func TestConfigHandler_NodeSecretRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -398,6 +492,9 @@ func TestConfigHandler_NodeSecretRedacted(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SYS-REQ-116:encoding_safety:nominal
+// SW-REQ-103:encoding_safety:nominal
 func TestEnvHandler_StoragePasswordRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -425,6 +522,9 @@ func TestEnvHandler_StoragePasswordRedacted(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SYS-REQ-116:encoding_safety:nominal
+// SW-REQ-103:encoding_safety:nominal
 func TestConfigHandler_DBConnectionStringRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -452,6 +552,9 @@ func TestConfigHandler_DBConnectionStringRedacted(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SYS-REQ-116:encoding_safety:nominal
+// SW-REQ-103:encoding_safety:nominal
 func TestConfigHandler_PolicyConnectionStringRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -479,6 +582,9 @@ func TestConfigHandler_PolicyConnectionStringRedacted(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SYS-REQ-116:encoding_safety:nominal
+// SW-REQ-103:encoding_safety:nominal
 func TestConfigHandler_SentryCodeRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -506,6 +612,9 @@ func TestConfigHandler_SentryCodeRedacted(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SYS-REQ-116:encoding_safety:nominal
+// SW-REQ-103:encoding_safety:nominal
 func TestConfigHandler_WebhookHeaderListRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -553,6 +662,9 @@ func TestConfigHandler_WebhookHeaderListRedacted(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SYS-REQ-116:encoding_safety:nominal
+// SW-REQ-103:encoding_safety:nominal
 func TestConfigHandler_SecretsRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -579,6 +691,10 @@ func TestConfigHandler_SecretsRedacted(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// STK-REQ-028:STK-REQ-028-AC-03:acceptance
+// SYS-REQ-116:error_handling:negative
+// SW-REQ-103:error_handling:negative
 func TestConfigHandler_ViewerInitError(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
@@ -612,6 +728,10 @@ func TestConfigHandler_ViewerInitError(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// STK-REQ-028:STK-REQ-028-AC-03:acceptance
+// SYS-REQ-116:error_handling:negative
+// SW-REQ-103:error_handling:negative
 func TestEnvHandler_ViewerInitError(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
