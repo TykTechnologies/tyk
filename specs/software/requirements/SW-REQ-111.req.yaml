@@ -1,0 +1,51 @@
+id: SW-REQ-111
+version: 1
+status: approved
+priority: shall
+category: coprocess
+req_type: guarantee
+fretish: ""
+description: The coprocess dispatcher interface shall preserve the local dispatcher method surface for message dispatch, context-aware dispatch, event dispatch, object dispatch, module loading, middleware cache handling, and reload operations, without claiming gRPC transport behavior, Python runtime loading, Lua bundle execution, gateway middleware effects, generated protobuf serialization behavior, or downstream dispatcher implementation correctness.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: coprocess/dispatcher_reqproof_test.go; docs/coprocess-dispatcher-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-124
+component: coprocess_dispatcher
+rationale: >-
+    This software requirement owns local coprocess/dispatcher.go interface availability. It does not claim runtime dispatch semantics, language-specific transports, generated protobuf behavior, or downstream dispatcher implementation correctness.
+tags:
+    - coprocess
+    - dispatcher
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-124
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T10:54:37Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Coprocess dispatcher scope is limited to the local coprocess.Dispatcher interface method surface and compile-time conformance evidence. The focused coprocess package test passed. This approval does not claim gRPC transport behavior, Python runtime loading, Lua bundle execution, gateway middleware effects, generated protobuf serialization behavior, or downstream dispatcher implementation correctness.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T10:54:37Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T10:54:37Z"
+obligation_checklist:
+    - nominal
+    - boundary
+lifecycle:
+    change_history:
+        - date: "2026-06-20T10:54:37Z"
+          from: draft
+          to: review
+          reason: Added coprocess/dispatcher.go local interface behavior under coprocess dispatcher support.
+          changed_by: agent:codex

@@ -1,0 +1,14 @@
+component: coprocess_dispatcher
+no_interface:
+    declared: true
+    reason: The coprocess dispatcher proof slice covers a local Go interface surface only; gRPC transport behavior, Python runtime loading, Lua bundle execution, gateway middleware effects, and generated protobuf serialization behavior are outside this component boundary.
+variables:
+    - name: coprocess_dispatcher_surface_required
+      type: bool
+      direction: input
+      description: Gateway or binding code requires the local dispatcher interface surface for dispatch, event, cache, module loading, and reload operations.
+
+    - name: coprocess_dispatcher_surface_available
+      type: bool
+      direction: output
+      description: The coprocess package exposes a Dispatcher interface with the required local method signatures.

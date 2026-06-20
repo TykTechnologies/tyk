@@ -1,0 +1,60 @@
+id: STK-REQ-036
+version: 1
+status: approved
+priority: shall
+category: coprocess
+req_type: guarantee
+fretish: ""
+description: Coprocess dispatcher integration support shall expose the local dispatcher method surface needed by gateway and plugin bindings, without claiming gRPC transport behavior, Python runtime loading, Lua bundle execution, gateway middleware effects, or generated protobuf serialization behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: coprocess_dispatcher
+rationale: The coprocess dispatcher interface is a package boundary contract. This stakeholder requirement owns the local interface surface only; runtime dispatcher implementations and language-specific transports require separate requirements.
+tags:
+    - coprocess
+    - dispatcher
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T10:54:37Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Coprocess dispatcher scope is limited to the local coprocess.Dispatcher interface method surface and compile-time conformance evidence. The focused coprocess package test passed. This approval does not claim gRPC transport behavior, Python runtime loading, Lua bundle execution, gateway middleware effects, generated protobuf serialization behavior, or downstream dispatcher implementation correctness.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T10:54:37Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T10:54:37Z"
+obligation_checklist:
+    - nominal
+    - boundary
+stakeholder:
+    persona: Gateway extension developer
+    story: As a gateway extension developer, I need a stable local dispatcher interface so coprocess bindings and gateway integration code agree on the methods a dispatcher must provide.
+    acceptance_criteria:
+        - id: STK-REQ-036-AC-01
+          text: Given a dispatcher implementation, when it is used through the local coprocess dispatcher interface, then message dispatch, context-aware dispatch, event dispatch, object dispatch, module loading, middleware cache handling, and reload methods are all available.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-124
+        - id: STK-REQ-036-AC-02
+          text: Given the local dispatcher interface, when a conforming implementation is compiled, then the method signatures accept the expected coprocess object, context, event byte slice, bundle manifest, and base directory inputs.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-124
+lifecycle:
+    change_history:
+        - date: "2026-06-20T10:54:37Z"
+          from: draft
+          to: review
+          reason: Added coprocess dispatcher stakeholder requirement for coprocess/dispatcher.go onboarding.
+          changed_by: agent:codex

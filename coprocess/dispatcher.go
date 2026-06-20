@@ -6,6 +6,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// SW-REQ-111
 // Dispatcher defines a basic interface for the CP dispatcher, check PythonDispatcher for reference.
 type Dispatcher interface {
 	// Dispatch takes and returns a pointer to a CoProcessMessage struct, see coprocess/api.h for details. This is used by CP bindings.
