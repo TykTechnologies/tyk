@@ -44,7 +44,7 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 135/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `verification_scope_complete` | 136/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
 | `mcdc_coverage` | 52/385 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
@@ -216,6 +216,13 @@ fixed or to hide them from the current strict audit.
   conversion. This increment is scoped to local OAS/Classic data-shape
   conversion and does not claim runtime authentication enforcement. It moves
   the visible production coverage baseline from 134/447 to 135/447.
+- `SW-REQ-088` onboarded `apidef/oas/default.go` with focused evidence for
+  default x-tyk-api-gateway shape construction, server-variable substitution
+  and URL validation errors, query override parsing, authentication-source and
+  security-scheme import coordination, and local operation cleanup. This
+  increment is scoped to local OAS default-extension helper behavior and does
+  not claim full OAS import or gateway runtime execution. It moves the visible
+  production coverage baseline from 135/447 to 136/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

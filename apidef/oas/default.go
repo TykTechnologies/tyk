@@ -11,6 +11,7 @@ import (
 	"strings"
 )
 
+// SW-REQ-088
 const (
 	invalidServerURLFmt          = "Please update %q to be a valid URL and try again."
 	unsupportedSecuritySchemeFmt = "unsupported security scheme: %s"
@@ -20,6 +21,7 @@ const (
 	middlewareMockResponse    = "mockResponse"
 )
 
+// SW-REQ-088
 var (
 	errEmptyServersObject  = errors.New("The ‘servers’ object is empty in your OAS. You can either add a ‘servers’ section to your OpenAPI description or provide a Custom Upstream URL in the manual configuration options below.")
 	errEmptySecurityObject = errors.New("The ‘security’ object is empty in your OAS. When enabling authentication, your OpenAPI description must include a ‘security’ object that defines the authentication schemes. You can either add a ‘security’ object or disable authentication in the API settings.")
@@ -39,6 +41,7 @@ var (
 	}
 )
 
+// SW-REQ-088
 // TykExtensionConfigParams holds the essential configuration required for the Tyk Extension schema.
 type TykExtensionConfigParams struct {
 	// UpstreamURL configures the upstream URL.
@@ -66,6 +69,7 @@ type TykExtensionConfigParams struct {
 	pathItemHasParameters bool
 }
 
+// SW-REQ-088
 // BuildDefaultTykExtension builds a default tyk extension in *OAS based on function arguments.
 func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, isImport bool) error {
 	xTykAPIGateway := s.GetTykExtension()
@@ -151,6 +155,7 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 	return nil
 }
 
+// SW-REQ-088
 func generateUrlUsingDefaultVariableValues(s *OAS, upstreamURL string) (string, error) {
 	for name, variable := range s.Servers[0].Variables {
 		if strings.Contains(upstreamURL, "{"+name+"}") {
@@ -166,14 +171,17 @@ func generateUrlUsingDefaultVariableValues(s *OAS, upstreamURL string) (string, 
 	return upstreamURL, nil
 }
 
+// SW-REQ-088
 func isURLParametrized(url string) bool {
 	return strings.Contains(url, "{") && strings.Contains(url, "}")
 }
 
+// SW-REQ-088
 func replaceParameterWithValue(url string, name string, value string) string {
 	return strings.ReplaceAll(url, "{"+name+"}", value)
 }
 
+// SW-REQ-088
 func (s *OAS) importAuthentication(enable bool) error {
 	if len(s.Security) == 0 {
 		return errEmptySecurityObject
@@ -213,6 +221,7 @@ func (s *OAS) importAuthentication(enable bool) error {
 	return nil
 }
 
+// SW-REQ-088
 // Import populates *AuthSources based on arguments.
 func (as *AuthSources) Import(in string) {
 	source := &AuthSource{Enabled: true}
@@ -227,6 +236,7 @@ func (as *AuthSources) Import(in string) {
 	}
 }
 
+// SW-REQ-088
 func (s *OAS) ImportMiddlewares(overRideValues TykExtensionConfigParams) {
 	xTykAPIGateway := s.GetTykExtension()
 
@@ -255,6 +265,7 @@ func (s *OAS) ImportMiddlewares(overRideValues TykExtensionConfigParams) {
 	}
 }
 
+// SW-REQ-088
 func (s *OAS) removeObsoleteOperations(currentOperations []string) {
 	tykOperations := s.getTykOperations()
 	obsoleteOperations := make([]string, 0)
@@ -270,12 +281,14 @@ func (s *OAS) removeObsoleteOperations(currentOperations []string) {
 	}
 }
 
+// SW-REQ-088
 func (s *OAS) getTykOperation(method, path string) *Operation {
 	xTykAPIGateway := s.GetTykExtension()
 	operationID := s.getOperationID(path, method)
 	return xTykAPIGateway.getOperation(operationID)
 }
 
+// SW-REQ-088
 func (s *OAS) deleteTykOperationIfEmpty(tykOperation *Operation, method, path string) {
 	if reflect.DeepEqual(Operation{}, *tykOperation) {
 		operations := s.getTykOperations()
@@ -284,6 +297,7 @@ func (s *OAS) deleteTykOperationIfEmpty(tykOperation *Operation, method, path st
 	}
 }
 
+// SW-REQ-088
 func getURLFormatErr(fromParam bool, upstreamURL string) error {
 	parsedURL, err := url.Parse(upstreamURL)
 	if err != nil || !parsedURL.IsAbs() {
@@ -296,6 +310,7 @@ func getURLFormatErr(fromParam bool, upstreamURL string) error {
 	return nil
 }
 
+// SW-REQ-088
 // GetTykExtensionConfigParams extracts a *TykExtensionConfigParams from a *http.Request.
 func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 	overRideValues := TykExtensionConfigParams{}
@@ -328,6 +343,7 @@ func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 	return &overRideValues
 }
 
+// SW-REQ-088
 func getQueryValPtr(val string) *bool {
 	boolVal, err := strconv.ParseBool(val)
 	if err != nil {

@@ -165,6 +165,8 @@ project:
             - apidef/notifications_reqproof_test.go
             - apidef/oas/authentication.go
             - apidef/oas/authentication_reqproof_test.go
+            - apidef/oas/default.go
+            - apidef/oas/default_reqproof_test.go
             - apidef/adapter/asyncapi.go
             - apidef/adapter/asyncapi_test.go
             - apidef/adapter/import_adapter.go

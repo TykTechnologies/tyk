@@ -43,6 +43,7 @@
 <!-- documents SW-REQ-085 -->
 <!-- documents SW-REQ-086 -->
 <!-- documents SW-REQ-087 -->
+<!-- documents SW-REQ-088 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -56,7 +57,7 @@ helper behavior, importer source dispatcher behavior, Apiary Blueprint importer
 conversion behavior, Swagger importer conversion behavior, WSDL importer
 conversion behavior, Classic API definition migration helper behavior,
 notification helper behavior, OAS authentication helper shapes, OAS path/server
-helper shapes, OAS root extension helper shapes, OAS server model helper shapes, OAS URL rewrite helper shapes,
+helper shapes, OAS default-extension helper shapes, OAS root extension helper shapes, OAS server model helper shapes, OAS URL rewrite helper shapes,
 OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint
 helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes,
@@ -77,6 +78,7 @@ behavior, and importer source dispatcher behavior, without silent data-shape
 drift, plus Swagger importer conversion behavior and WSDL importer conversion
 behavior, plus Classic API definition migration helper behavior and
 notification helper behavior, plus OAS authentication helper behavior.
+It also includes OAS default-extension helper behavior.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -548,6 +550,20 @@ execution, custom plugin execution, ID extraction at runtime, full OAS
 import/export correctness, gateway API loading, route generation, request
 matching, gateway request admission, persistence, analytics, or final
 client-visible runtime behavior.
+
+`SW-REQ-088` owns the concrete `apidef/oas/default.go` default-extension
+helpers. Its evidence covers import and non-import default x-tyk-api-gateway
+shape construction, server-variable substitution, missing and unresolved
+server-variable errors, invalid manual upstream and server URL errors, missing
+server and security requirement errors, query override parsing with trimming
+and boolean validation, authentication-source selector mapping, distinct
+security-scheme import with base identity-provider precedence, obsolete
+operation cleanup, and empty operation/middleware pruning. This evidence does
+not claim full OpenAPI import correctness, OpenAPI security evaluation
+semantics, gateway authentication enforcement, route generation, request
+matching, request validation execution, allow-list enforcement, mock-response
+execution, middleware execution, upstream availability, gateway API loading,
+persistence, analytics, or final client-visible runtime behavior.
 
 `SW-REQ-086` owns the concrete `apidef/notifications.go` notification helper.
 Its evidence covers bounded HTTP client construction, notification manager
