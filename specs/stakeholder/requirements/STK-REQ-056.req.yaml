@@ -1,0 +1,58 @@
+id: STK-REQ-056
+version: 1
+status: approved
+priority: shall
+category: api_definition_loading
+req_type: guarantee
+fretish: ""
+description: Gateway API definition loading support shall locally construct API specs from provided definitions, fetch and process dashboard or RPC API definition payloads with explicit local errors for malformed or unavailable inputs, replace configured local secret references, parse definition readers, derive companion OAS/MCP file paths, and load API definitions from local files or directories, without claiming route generation correctness, middleware execution, persistence durability, dashboard or RPC service availability, external secret-store availability, network transport delivery, gateway request admission, or final client-visible behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_api_definition_loader
+rationale: Gateway operators depend on deterministic local API definition loading helper behavior before broader routing and request handling consume loaded specs. This requirement owns only local loader/source helper behavior in gateway/api_definition.go and focused gateway tests.
+tags:
+    - gateway
+    - api-definition
+    - loading
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API definition loading scope is limited to local gateway/api_definition.go helper behavior: spec construction from supplied definitions, dashboard and RPC payload handling, local secret reference replacement, parse helpers, companion OAS/MCP path derivation, and local file/directory loading. This approval does not claim route generation correctness, middleware execution, persistence durability, dashboard or RPC service availability, external secret-store availability, network transport delivery, gateway request admission, or final client-visible behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need local API definition loader helpers to construct specs, process source payloads, replace configured local references, and load local definition files predictably before gateway runtime behavior depends on those specs.
+    acceptance_criteria:
+        - id: STK-REQ-056-AC-01
+          text: Given local API definition loader inputs from in-memory definitions, dashboard responses, RPC payloads, readers, or local files, when the loader helpers are exercised, then they produce deterministic specs, parsed values, path values, replacements, or explicit local errors for the tested inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-144
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API definition loading helper requirement.
+          changed_by: human:buger

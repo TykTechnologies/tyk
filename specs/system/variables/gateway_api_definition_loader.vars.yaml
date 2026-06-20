@@ -1,0 +1,14 @@
+component: gateway_api_definition_loader
+no_interface:
+    declared: true
+    reason: The gateway API definition loading proof slice covers local gateway/api_definition.go loader/source helper behavior only; route generation correctness, middleware execution, persistence durability, dashboard or RPC service availability, external secret-store availability, network transport delivery, gateway request admission, and final client-visible behavior are outside this component boundary.
+variables:
+    - name: gateway_api_definition_loader_operation_requested
+      type: bool
+      direction: input
+      description: A caller requests a local gateway API definition loader/source helper operation such as spec construction, dashboard or RPC payload processing, configured local secret replacement, parse helper execution, companion path derivation, or local file/directory loading.
+
+    - name: gateway_api_definition_loader_operation_terminal
+      type: bool
+      direction: output
+      description: 'A local gateway API definition loader/source helper operation reaches a terminal observable result: a spec is constructed or reused, specs are returned, configured references are replaced or left unresolved with an explicit local error path, a reader is parsed, a companion path is derived, local definitions are loaded, or an explicit local error is returned.'

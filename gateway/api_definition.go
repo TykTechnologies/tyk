@@ -275,6 +275,7 @@ type APIDefinitionLoader struct {
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
+// SW-REQ-131
 func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry) (*APISpec, error) {
 	if logger == nil {
 		logger = logrus.NewEntry(log).WithFields(logrus.Fields{
@@ -427,6 +428,7 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 }
 
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
+// SW-REQ-131
 func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, error) {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
@@ -525,6 +527,7 @@ const (
 	vaultSecretPath = "secret/data/"
 )
 
+// SW-REQ-131
 func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 	input := string(in)
 
@@ -565,6 +568,7 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 	return []byte(input)
 }
 
+// SW-REQ-131
 func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
 	if err := a.Gw.setUpConsul(); err != nil {
 		return err
@@ -583,6 +587,7 @@ func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
 	return nil
 }
 
+// SW-REQ-131
 func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 	if err := a.Gw.setUpVault(); err != nil {
 		return err
@@ -625,6 +630,7 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
+// SW-REQ-131
 func (a APIDefinitionLoader) FromRPC(store RPCDataLoader, orgId string, gw *Gateway) ([]*APISpec, error) {
 	if rpc.IsEmergencyMode() {
 		return gw.LoadDefinitionsFromRPCBackup()
@@ -655,6 +661,7 @@ func (a APIDefinitionLoader) FromRPC(store RPCDataLoader, orgId string, gw *Gate
 	return a.processRPCDefinitions(apiCollection, gw)
 }
 
+// SW-REQ-131
 func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gateway) ([]*APISpec, error) {
 	var payload []model.MergedAPI
 	if err := json.Unmarshal([]byte(apiCollection), &payload); err != nil {
@@ -673,6 +680,7 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gat
 	return specs, nil
 }
 
+// SW-REQ-131
 func (a APIDefinitionLoader) prepareSpecs(apiDefs []model.MergedAPI, gwConfig config.Config, fromRPC bool) []*APISpec {
 	var specs []*APISpec
 
@@ -702,6 +710,7 @@ func (a APIDefinitionLoader) prepareSpecs(apiDefs []model.MergedAPI, gwConfig co
 	return specs
 }
 
+// SW-REQ-131
 func (a APIDefinitionLoader) ParseDefinition(r io.Reader) (api apidef.APIDefinition) {
 	if err := json.NewDecoder(r).Decode(&api); err != nil {
 		log.Error("Couldn't unmarshal api configuration: ", err)
@@ -710,6 +719,7 @@ func (a APIDefinitionLoader) ParseDefinition(r io.Reader) (api apidef.APIDefinit
 	return
 }
 
+// SW-REQ-131
 func (a APIDefinitionLoader) ParseOAS(r io.Reader) (oas oas.OAS) {
 	if err := json.NewDecoder(r).Decode(&oas); err != nil {
 		log.Error("Couldn't unmarshal oas configuration: ", err)
@@ -718,16 +728,19 @@ func (a APIDefinitionLoader) ParseOAS(r io.Reader) (oas oas.OAS) {
 	return
 }
 
+// SW-REQ-131
 func (a APIDefinitionLoader) GetOASFilepath(path string) string {
 	return strings.TrimSuffix(path, ".json") + "-oas.json"
 }
 
+// SW-REQ-131
 func (a APIDefinitionLoader) GetMCPFilepath(path string) string {
 	return strings.TrimSuffix(path, ".json") + "-mcp.json"
 }
 
 // FromDir will load APIDefinitions from a directory on the filesystem. Definitions need
 // to be the JSON representation of APIDefinition object
+// SW-REQ-131
 func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 	var specs []*APISpec
 	// Grab json files from directory
@@ -748,6 +761,8 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 	}
 	return specs
 }
+
+// SW-REQ-131
 func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, error) {
 	log.Info("Loading API Specification from ", filePath)
 

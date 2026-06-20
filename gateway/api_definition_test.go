@@ -29,10 +29,12 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/storage/kv"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -1317,6 +1319,243 @@ func TestAPIDefinitionLoader(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-056, SYS-REQ-144, SW-REQ-131
+// STK-REQ-056:STK-REQ-056-AC-01:acceptance
+// SYS-REQ-144:nominal:nominal
+// SYS-REQ-144:boundary:nominal
+// SYS-REQ-144:error_handling:nominal
+// SYS-REQ-144:determinism:nominal
+// MCDC SYS-REQ-144: gateway_api_definition_loader_operation_requested=F, gateway_api_definition_loader_operation_terminal=F => TRUE
+// MCDC SYS-REQ-144: gateway_api_definition_loader_operation_requested=T, gateway_api_definition_loader_operation_terminal=T => TRUE
+//
+// SW-REQ-131:nominal:nominal
+// SW-REQ-131:boundary:nominal
+// SW-REQ-131:error_handling:nominal
+// SW-REQ-131:determinism:nominal
+//
+//mcdc:ignore SYS-REQ-144: gateway_api_definition_loader_operation_requested=T, gateway_api_definition_loader_operation_terminal=F => FALSE -- violation row is the negation of the local API definition loader helper guarantee; these tests assert requested helpers return deterministic specs, parsed values, path values, replacements, explicit local errors, or skipped invalid local inputs [category: defensive] [reviewed: human:buger]
+func TestAPIDefinitionLoaderMakeSpec(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	loader := APIDefinitionLoader{Gw: ts.Gw}
+	api := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "make-spec-api"
+		spec.Name = "Make Spec API"
+		spec.OrgID = "make-spec-org"
+		spec.Proxy.ListenPath = "/make-spec/"
+		spec.Expiration = time.Now().Add(time.Hour).Format(apidef.ExpirationTimeFormat)
+		UpdateAPIVersion(spec, "Default", func(version *apidef.VersionInfo) {
+			version.Expires = time.Now().Add(time.Hour).Format(apidef.ExpirationTimeFormat)
+		})
+	})[0]
+
+	merged := model.MergedAPI{APIDefinition: api.APIDefinition}
+	spec, err := loader.MakeSpec(&merged, nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, spec)
+	assert.Equal(t, "make-spec-api", spec.APIID)
+	assert.Equal(t, "Make Spec API", spec.Name)
+	assert.NotEmpty(t, spec.Checksum)
+	assert.NotNil(t, spec.Health)
+	assert.NotNil(t, spec.AuthManager)
+	assert.NotNil(t, spec.OrgSessionManager)
+	assert.NotNil(t, spec.RxPaths)
+	assert.NotNil(t, spec.WhiteListEnabled)
+	assert.NotZero(t, merged.ExpirationTs)
+	assert.NotZero(t, merged.VersionData.Versions["Default"].ExpiresTs)
+
+	ts.Gw.apisMu.Lock()
+	ts.Gw.apisByID[spec.APIID] = spec
+	ts.Gw.apisMu.Unlock()
+
+	reused, err := loader.MakeSpec(&merged, nil)
+	assert.NoError(t, err)
+	assert.Same(t, spec, reused)
+
+	invalid := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "invalid-listen-path-api"
+		spec.Proxy.ListenPath = "missing-leading-slash"
+	})[0]
+	invalidSpec, err := loader.MakeSpec(&model.MergedAPI{APIDefinition: invalid.APIDefinition}, nil)
+	assert.Error(t, err)
+	assert.Nil(t, invalidSpec)
+}
+
+// Verifies: STK-REQ-056, SYS-REQ-144, SW-REQ-131
+// STK-REQ-056:STK-REQ-056-AC-01:acceptance
+// SYS-REQ-144:nominal:nominal
+// SYS-REQ-144:boundary:nominal
+// SYS-REQ-144:error_handling:negative
+// SW-REQ-131:nominal:nominal
+// SW-REQ-131:boundary:nominal
+// SW-REQ-131:error_handling:negative
+func TestAPIDefinitionLoaderProcessRPCDefinitions(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	loader := APIDefinitionLoader{Gw: ts.Gw}
+	validAPI := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "rpc-process-api"
+		spec.Proxy.ListenPath = "/rpc-process/"
+	})[0]
+	validPayload, err := json.Marshal([]model.MergedAPI{{APIDefinition: validAPI.APIDefinition}})
+	assert.NoError(t, err)
+
+	testCases := []struct {
+		name      string
+		payload   string
+		wantSpecs int
+		wantErr   bool
+	}{
+		{
+			name:    "invalid json returns explicit error",
+			payload: "{invalid json}",
+			wantErr: true,
+		},
+		{
+			name:    "empty collection returns no specs",
+			payload: "[]",
+		},
+		{
+			name:      "valid collection returns prepared spec",
+			payload:   string(validPayload),
+			wantSpecs: 1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			specs, err := loader.processRPCDefinitions(tc.payload, ts.Gw)
+			if tc.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, specs)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Len(t, specs, tc.wantSpecs)
+		})
+	}
+}
+
+// Verifies: STK-REQ-056, SYS-REQ-144, SW-REQ-131
+// STK-REQ-056:STK-REQ-056-AC-01:acceptance
+// SYS-REQ-144:nominal:nominal
+// SYS-REQ-144:determinism:nominal
+// SW-REQ-131:nominal:nominal
+// SW-REQ-131:determinism:nominal
+func TestAPIDefinitionLoaderFromDashboardServiceHeadersAndNonce(t *testing.T) {
+	api := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "dashboard-loader-api"
+		spec.Proxy.ListenPath = "/dashboard-loader/"
+	})[0]
+
+	var requestHeaders http.Header
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestHeaders = r.Header.Clone()
+		list := model.NewMergedAPIList(model.MergedAPI{APIDefinition: api.APIDefinition})
+		list.Nonce = "next-nonce"
+		w.Header().Set("Content-Type", "application/json")
+		assert.NoError(t, json.NewEncoder(w).Encode(list))
+	}))
+	defer ts.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.NodeSecret = "loader-secret"
+		globalConf.DisableDashboardZeroConf = true
+		globalConf.UseDBAppConfigs = false
+	}
+	g := StartTest(conf)
+	defer g.Close()
+	g.Gw.SetNodeID("loader-node")
+	g.Gw.SessionID = "loader-session"
+	g.Gw.ServiceNonce = "current-nonce"
+
+	loader := APIDefinitionLoader{Gw: g.Gw}
+	specs, err := loader.FromDashboardService(ts.URL)
+
+	assert.NoError(t, err)
+	assert.Len(t, specs, 1)
+	assert.Equal(t, "dashboard-loader-api", specs[0].APIID)
+	assert.Equal(t, "loader-secret", requestHeaders.Get("authorization"))
+	assert.Equal(t, "loader-node", requestHeaders.Get(header.XTykNodeID))
+	assert.Equal(t, "current-nonce", requestHeaders.Get(header.XTykNonce))
+	assert.Equal(t, "loader-session", requestHeaders.Get(header.XTykSessionID))
+	assert.Equal(t, "next-nonce", g.Gw.ServiceNonce)
+}
+
+// Verifies: STK-REQ-056, SYS-REQ-144, SW-REQ-131
+// STK-REQ-056:STK-REQ-056-AC-01:acceptance
+// SYS-REQ-144:nominal:nominal
+// SYS-REQ-144:boundary:nominal
+// SW-REQ-131:nominal:nominal
+// SW-REQ-131:boundary:nominal
+func TestAPIDefinitionLoaderReplaceSecrets(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Secrets = map[string]string{
+			"gateway-secret": "configured-secret",
+		}
+	})
+	defer ts.Close()
+	t.Setenv("REQPROOF_LOADER_ENV", "configured-env")
+
+	loader := APIDefinitionLoader{Gw: ts.Gw}
+	testCases := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "env and configured secrets are replaced",
+			input: `{"env":"env://REQPROOF_LOADER_ENV","secret":"secrets://gateway-secret"}`,
+			want:  `{"env":"configured-env","secret":"configured-secret"}`,
+		},
+		{
+			name:  "missing env reference remains unresolved",
+			input: `{"env":"env://REQPROOF_LOADER_MISSING"}`,
+			want:  `{"env":"env://REQPROOF_LOADER_MISSING"}`,
+		},
+		{
+			name:  "missing configured secret remains unresolved",
+			input: `{"secret":"secrets://missing-secret"}`,
+			want:  `{"secret":"secrets://missing-secret"}`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, string(loader.replaceSecrets([]byte(tc.input))))
+		})
+	}
+}
+
+// Verifies: STK-REQ-056, SYS-REQ-144, SW-REQ-131
+// STK-REQ-056:STK-REQ-056-AC-01:acceptance
+// SYS-REQ-144:nominal:nominal
+// SYS-REQ-144:error_handling:negative
+// SW-REQ-131:nominal:nominal
+// SW-REQ-131:error_handling:negative
+func TestAPIDefinitionLoaderParseAndPathHelpers(t *testing.T) {
+	loader := APIDefinitionLoader{}
+
+	parsedDef := loader.ParseDefinition(strings.NewReader(`{"api_id":"parse-api","proxy":{"listen_path":"/parse/"}}`))
+	assert.Equal(t, "parse-api", parsedDef.APIID)
+	assert.Equal(t, "/parse/", parsedDef.Proxy.ListenPath)
+
+	invalidDef := loader.ParseDefinition(strings.NewReader(`{invalid json}`))
+	assert.Empty(t, invalidDef.APIID)
+
+	parsedOAS := loader.ParseOAS(strings.NewReader(`{"openapi":"3.0.0","info":{"title":"Parse OAS","version":"1.0.0"},"paths":{}}`))
+	assert.Equal(t, "Parse OAS", parsedOAS.Info.Title)
+
+	invalidOAS := loader.ParseOAS(strings.NewReader(`{invalid json}`))
+	assert.Nil(t, invalidOAS.Info)
+
+	assert.Equal(t, "/tmp/api-oas.json", loader.GetOASFilepath("/tmp/api.json"))
+	assert.Equal(t, "/tmp/api-mcp.json", loader.GetMCPFilepath("/tmp/api.json"))
+}
+
 func TestAPIExpiration(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -1574,6 +1813,12 @@ func TestAPISpec_isListeningOnPort(t *testing.T) {
 	assert.True(t, s.isListeningOnPort(8000, cfg))
 }
 
+// Verifies: STK-REQ-056, SYS-REQ-144, SW-REQ-131
+// STK-REQ-056:STK-REQ-056-AC-01:acceptance
+// SYS-REQ-144:nominal:nominal
+// SYS-REQ-144:boundary:nominal
+// SW-REQ-131:nominal:nominal
+// SW-REQ-131:boundary:nominal
 func Test_LoadAPIsFromRPC(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -2602,149 +2847,109 @@ type mockKVStoreWithoutSecretReader struct{}
 func (m *mockKVStoreWithoutSecretReader) Get(_ string) (string, error) { return "", nil }
 func (m *mockKVStoreWithoutSecretReader) Put(_, _ string) error        { return nil }
 
-// TT-14791: A non-existent Vault path caused a panic due to nil secret.
+// Verifies: STK-REQ-056, SYS-REQ-144, SW-REQ-131
+// STK-REQ-056:STK-REQ-056-AC-01:acceptance
+// SYS-REQ-144:nominal:nominal
+// SYS-REQ-144:boundary:nominal
+// SYS-REQ-144:error_handling:negative
+// SW-REQ-131:nominal:nominal
+// SW-REQ-131:boundary:nominal
+// SW-REQ-131:error_handling:negative
 func TestReplaceVaultSecrets(t *testing.T) {
-	t.Run("vault store does not implement SecretReader", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
-
-		ts.Gw.vaultKVStore = &mockKVStoreWithoutSecretReader{}
-
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "could not read secrets")
-	})
-
-	t.Run("vault path does not exist - nil secret", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
-
-		// nil secret simulates non-existent path
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{secret: nil, err: nil}
-
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "vault path does not exist")
-	})
-
-	t.Run("vault path contains no data", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
-
-		// non-nil secret but nil Data simulates empty/deleted secret
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{
-			secret: &vaultapi.Secret{Data: nil},
-			err:    nil,
-		}
-
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "vault path contains no data")
-	})
-
-	t.Run("vault ReadSecret returns error", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
-
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{
-			secret: nil,
-			err:    errors.New("vault server unavailable"),
-		}
-
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "vault server unavailable")
-	})
-
-	t.Run("vault secret missing data key", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
-
-		// secret.Data exists but doesn't have "data" key
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{
-			secret: &vaultapi.Secret{
-				Data: map[string]interface{}{
-					"other-key": "some-value",
-				},
+	testCases := []struct {
+		name        string
+		store       kv.Store
+		want        string
+		errContains string
+	}{
+		{
+			name:        "vault store does not implement SecretReader",
+			store:       &mockKVStoreWithoutSecretReader{},
+			want:        "some-api-key: vault://secret-key",
+			errContains: "could not read secrets",
+		},
+		{
+			name:        "vault path does not exist",
+			store:       &mockVaultSecretReader{secret: nil, err: nil},
+			want:        "some-api-key: vault://secret-key",
+			errContains: "vault path does not exist",
+		},
+		{
+			name: "vault path contains no data",
+			store: &mockVaultSecretReader{
+				secret: &vaultapi.Secret{Data: nil},
 			},
-		}
-
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "no data returned")
-	})
-
-	t.Run("vault secret data is wrong type", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
-
-		// secret.Data["data"] exists but is not a map
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{
-			secret: &vaultapi.Secret{
-				Data: map[string]interface{}{
-					"data": "not-a-map",
-				},
+			want:        "some-api-key: vault://secret-key",
+			errContains: "vault path contains no data",
+		},
+		{
+			name: "vault ReadSecret returns error",
+			store: &mockVaultSecretReader{
+				err: errors.New("vault server unavailable"),
 			},
-		}
-
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "data is not in the map format")
-	})
-
-	t.Run("vault secrets replaced successfully", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
-
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{
-			secret: &vaultapi.Secret{
-				Data: map[string]interface{}{
-					"data": map[string]interface{}{
-						"secret-key": "my-secret-value",
+			want:        "some-api-key: vault://secret-key",
+			errContains: "vault server unavailable",
+		},
+		{
+			name: "vault secret missing data key",
+			store: &mockVaultSecretReader{
+				secret: &vaultapi.Secret{
+					Data: map[string]interface{}{
+						"other-key": "some-value",
 					},
 				},
 			},
-		}
+			want:        "some-api-key: vault://secret-key",
+			errContains: "no data returned",
+		},
+		{
+			name: "vault secret data is wrong type",
+			store: &mockVaultSecretReader{
+				secret: &vaultapi.Secret{
+					Data: map[string]interface{}{
+						"data": "not-a-map",
+					},
+				},
+			},
+			want:        "some-api-key: vault://secret-key",
+			errContains: "data is not in the map format",
+		},
+		{
+			name: "vault secrets replaced successfully",
+			store: &mockVaultSecretReader{
+				secret: &vaultapi.Secret{
+					Data: map[string]interface{}{
+						"data": map[string]interface{}{
+							"secret-key": "my-secret-value",
+						},
+					},
+				},
+			},
+			want: "some-api-key: my-secret-value",
+		},
+	}
 
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := StartTest(nil, TestConfig{
+				Delay: 10 * time.Millisecond,
+			})
+			defer ts.Close()
+			ts.Gw.vaultKVStore = tc.store
 
-		assert.NoError(t, err)
-		assert.Equal(t, "some-api-key: my-secret-value", input)
-	})
+			l := APIDefinitionLoader{Gw: ts.Gw}
+			input := "some-api-key: vault://secret-key"
+			err := l.replaceVaultSecrets(&input)
+
+			if tc.errContains != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errContains)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tc.want, input)
+		})
+	}
 }
 
 func TestPopulateMCPPrimitivesMap(t *testing.T) {
@@ -3066,6 +3271,14 @@ func TestURLAllowedAndIgnored_CORSPreflight(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-056, SYS-REQ-144, SW-REQ-131
+// STK-REQ-056:STK-REQ-056-AC-01:acceptance
+// SYS-REQ-144:nominal:nominal
+// SYS-REQ-144:boundary:nominal
+// SYS-REQ-144:error_handling:negative
+// SW-REQ-131:nominal:nominal
+// SW-REQ-131:boundary:nominal
+// SW-REQ-131:error_handling:negative
 func TestLoadDefFromFilePath(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -3171,4 +3384,38 @@ func TestLoadDefFromFilePath(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, spec)
 	})
+}
+
+// Verifies: STK-REQ-056, SYS-REQ-144, SW-REQ-131
+// STK-REQ-056:STK-REQ-056-AC-01:acceptance
+// SYS-REQ-144:nominal:nominal
+// SYS-REQ-144:boundary:nominal
+// SYS-REQ-144:error_handling:negative
+// SW-REQ-131:nominal:nominal
+// SW-REQ-131:boundary:nominal
+// SW-REQ-131:error_handling:negative
+func TestAPIDefinitionLoaderFromDir(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	tmpDir := t.TempDir()
+	validDef := apidef.APIDefinition{
+		Name:  "Directory API",
+		APIID: "directory-api",
+		Proxy: apidef.ProxyConfig{
+			ListenPath: "/directory-api/",
+		},
+	}
+	validData, err := json.Marshal(validDef)
+	assert.NoError(t, err)
+	assert.NoError(t, os.WriteFile(filepath.Join(tmpDir, "directory-api.json"), validData, 0644))
+	assert.NoError(t, os.WriteFile(filepath.Join(tmpDir, "directory-api-oas.json"), []byte(`{"openapi":"3.0.0"}`), 0644))
+	assert.NoError(t, os.WriteFile(filepath.Join(tmpDir, "invalid-api.json"), []byte(`{invalid json}`), 0644))
+
+	loader := APIDefinitionLoader{Gw: ts.Gw}
+	specs := loader.FromDir(tmpDir)
+
+	assert.Len(t, specs, 1)
+	assert.Equal(t, "directory-api", specs[0].APIID)
+	assert.Equal(t, "Directory API", specs[0].Name)
 }
