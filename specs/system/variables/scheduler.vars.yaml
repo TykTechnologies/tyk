@@ -1,0 +1,9 @@
+component: scheduler
+no_interface:
+    declared: true
+    reason: The internal/scheduler proof slice covers local scheduler helper construction, logger decoration, loop termination, context shutdown, non-break error logging, and Close behavior only; scheduler fairness, precise timing, gateway startup orchestration, background job policy, logging delivery, and final gateway behavior are outside this component boundary.
+variables:
+    - name: scheduler_local_operation_terminal
+      type: bool
+      direction: output
+      description: 'The local scheduler helper operation reaches a terminal observable result: constructed job state, decorated logger entry, returned Start loop, logged non-break job error, or completed Close operation.'

@@ -1,0 +1,63 @@
+id: SYS-REQ-133
+version: 1
+status: approved
+priority: shall
+category: reliability
+req_type: guarantee
+fretish: the scheduler shall always satisfy scheduler_local_operation_terminal
+description: Local job-loop support shall make construction, logger decoration, start-loop termination, context shutdown, non-break error logging, and repeated concurrent Close operations terminal and observable, without claiming fairness, precise timing, gateway startup orchestration, background job policy, logging delivery, or final gateway behavior.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-045
+component: scheduler
+rationale: This system requirement owns local internal/scheduler operation terminality only. Runtime scheduling guarantees and gateway lifecycle orchestration remain outside this proof slice.
+tags:
+    - job-loop
+    - reliability
+    - shutdown
+variables:
+    - scheduler_local_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-045
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T12:38:03Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Scheduler system scope is limited to local internal/scheduler operation terminality for construction, logger prefix decoration, Break termination, context-triggered shutdown, non-break error logging, and idempotent concurrent Close behavior. The FRETish invariant intentionally models local operation terminality without asserting scheduler fairness, precise timing, gateway startup orchestration, background job policy, logging delivery, or final gateway behavior.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T12:41:50.142204Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-133|scheduler_local_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final requirement approval. SYS-REQ-133''s scheduler_local_operation_terminal variable is decomposed by SW-REQ-120 for local internal/scheduler behavior: job construction, scheduler logger prefix decoration, immediate first run, Break-based loop termination, context-triggered shutdown, non-break error logging, and idempotent concurrent Close behavior. This review is limited to local scheduler helper mechanics and does not claim scheduler fairness, precise timing, gateway startup orchestration, background job policy, logging delivery, or final gateway behavior.'
+          reviewed_at: "2026-06-20T12:41:50.142204Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T12:38:03Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T12:38:03Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - cancellation_observed
+    - concurrent
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T12:38:03Z"
+          from: draft
+          to: review
+          reason: Added scheduler system requirement for internal/scheduler onboarding.
+          changed_by: agent:codex

@@ -555,6 +555,19 @@ fixed or to hide them from the current strict audit.
   behavior, goroutine leak policy, runtime profile completeness, production
   diagnostics workflow, logging behavior, or final gateway behavior. It moves
   the visible production coverage baseline from 182/447 to 183/447.
+- `SW-REQ-120` onboarded `internal/scheduler` with a new scheduler
+  stakeholder/system/software chain and focused package evidence for job
+  construction, scheduler logger prefix decoration, immediate first job
+  execution, Break-based loop termination, context-triggered shutdown,
+  non-break error logging, and idempotent concurrent Close behavior. New
+  construction and start-loop evidence uses table-driven tests where it
+  clarifies the behavior. The system formula is a local terminality invariant,
+  with the unreachable non-terminal invariant-violation row documented rather
+  than covered by a fake runtime witness. This increment is scoped to local
+  scheduler helper mechanics and does not claim scheduler fairness, precise
+  timing, gateway startup orchestration, background job policy, logging
+  delivery, or final gateway behavior. It moves the visible production coverage
+  baseline from 183/447 to 184/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

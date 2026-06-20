@@ -1,0 +1,65 @@
+id: STK-REQ-045
+version: 1
+status: approved
+priority: shall
+category: reliability
+req_type: guarantee
+fretish: ""
+description: Local job-loop support shall preserve job construction, log-entry prefix decoration, immediate job execution, Break-based loop termination, context-triggered shutdown, non-break error logging, and idempotent concurrent Close behavior, without claiming fairness, precise timing, gateway startup orchestration, background job policy, logging delivery, or final gateway behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: scheduler
+rationale: The internal/scheduler package owns a local helper loop and shutdown primitive. Broader runtime scheduling policy and gateway orchestration outcomes remain outside this proof slice.
+tags:
+    - job-loop
+    - reliability
+    - shutdown
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T12:38:03Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Scheduler scope is limited to local internal/scheduler behavior: job construction, logger prefix decoration, immediate first run, Break termination, context-triggered shutdown, non-break error logging, and idempotent concurrent Close behavior. This approval does not claim scheduler fairness, precise timing, gateway startup orchestration, background job policy, logging delivery, or final gateway behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T12:38:03Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T12:38:03Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - cancellation_observed
+    - concurrent
+    - determinism
+stakeholder:
+    persona: Gateway runtime maintainer
+    story: As a gateway runtime maintainer, I need the local scheduler helper to construct jobs, run them immediately, stop deterministically on Break or context cancellation, and close safely so background helpers can be controlled by their owner.
+    acceptance_criteria:
+        - id: STK-REQ-045-AC-01
+          text: Given a local scheduler job definition, when the helper constructs the job and logger, then the configured name, interval, run function, and scheduler prefix are preserved.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-133
+        - id: STK-REQ-045-AC-02
+          text: Given a local scheduler loop, when the job returns Break, context cancellation happens, or Close is called repeatedly and concurrently, then the loop or Close operation reaches a terminal local outcome without requiring a timer tick.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-133
+lifecycle:
+    change_history:
+        - date: "2026-06-20T12:38:03Z"
+          from: draft
+          to: review
+          reason: Added scheduler stakeholder requirement for internal/scheduler onboarding.
+          changed_by: agent:codex
