@@ -493,6 +493,19 @@ fixed or to hide them from the current strict audit.
   gateway API loading, network transport delivery, persistence, or final
   client-visible gateway behavior. It moves the visible production coverage
   baseline from 162/447 to 169/447.
+- `SW-REQ-115` onboarded `ee/middleware/upstreambasicauth` with a new upstream
+  basic auth stakeholder/system/software chain and focused table-driven package
+  evidence for enablement decisions, APISpec construction, default and custom
+  upstream authentication header selection, basic-auth provider installation
+  into request context, encoded basic-auth value construction, and request
+  header overwrite behavior. The system formula is a local terminality
+  invariant, with the unreachable non-terminal invariant-violation row
+  documented rather than covered by a fake runtime witness. This increment is
+  scoped to local upstream basic auth middleware helper mechanics and does not
+  claim upstream request execution, reverse-proxy behavior, credential
+  validation, secret storage, OAuth behavior, network transport delivery, or
+  final client-visible gateway behavior. It moves the visible production
+  coverage baseline from 169/447 to 172/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

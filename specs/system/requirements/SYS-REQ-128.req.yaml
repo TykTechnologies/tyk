@@ -1,0 +1,61 @@
+id: SYS-REQ-128
+version: 1
+status: approved
+priority: shall
+category: enterprise
+req_type: guarantee
+fretish: the upstream_basic_auth shall always satisfy upstream_basic_auth_operation_terminal
+description: Enterprise upstream basic authentication support shall make local middleware operations terminal and deterministic for enablement decisions, APISpec construction, basic-auth provider installation into request context, default/custom header selection, and request header overwrite behavior, without claiming upstream request execution, reverse-proxy behavior, credential validation, secret storage, OAuth behavior, network transport delivery, or final client-visible gateway behavior.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-040
+component: upstream_basic_auth
+rationale: This system requirement owns local ee/middleware/upstreambasicauth helper terminality and determinism only. Reverse-proxy execution, upstream credential acceptance, and final response semantics remain outside this proof slice.
+tags:
+    - enterprise
+    - upstream-auth
+    - basic-auth
+variables:
+    - upstream_basic_auth_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-040
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T11:45:01Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Upstream basic auth system scope is limited to terminal local helper behavior in ee/middleware/upstreambasicauth: enablement decisions, APISpec construction, basic-auth provider installation into request context, default/custom header selection, and request header overwrite behavior. The FRETish invariant intentionally models local operation terminality without asserting upstream request execution, reverse-proxy behavior, credential validation, secret storage, OAuth behavior, network transport delivery, or final client-visible gateway behavior.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T11:47:02.351219Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-128|upstream_basic_auth_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final requirement approval. SYS-REQ-128''s upstream_basic_auth_operation_terminal variable is decomposed by SW-REQ-115 for local ee/middleware/upstreambasicauth behavior: enablement decisions, APISpec construction, basic-auth provider installation into request context, default/custom header selection, and request header overwrite behavior. This review is limited to local upstream basic auth middleware helper mechanics and does not claim upstream request execution, reverse-proxy behavior, credential validation, secret storage, OAuth behavior, network transport delivery, or final client-visible gateway behavior.'
+          reviewed_at: "2026-06-20T11:47:02.351219Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T11:45:01Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T11:45:01Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T11:45:01Z"
+          from: draft
+          to: review
+          reason: Added upstream basic auth system requirement for ee/middleware/upstreambasicauth onboarding.
+          changed_by: agent:codex

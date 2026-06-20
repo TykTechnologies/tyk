@@ -17,6 +17,7 @@ type Provider struct {
 }
 
 // Fill sets the request's HeaderName with AuthValue
+// SW-REQ-115
 func (u Provider) Fill(r *http.Request) {
 	if r.Header.Get(u.HeaderName) != "" {
 		u.Logger.WithFields(logrus.Fields{

@@ -38,6 +38,7 @@ type APISpec struct {
 
 // NewAPISpec creates a new APISpec object based on the required inputs.
 // The resulting object is a subset of `*gateway.APISpec`.
+// SW-REQ-115
 func NewAPISpec(id string, name string, isOasDef bool, oasDef oas.OAS, upstreamAuth apidef.UpstreamAuth) *APISpec {
 	return &APISpec{
 		APIID:        id,

@@ -19,6 +19,7 @@ type Middleware struct {
 	base BaseMiddleware
 }
 
+// SW-REQ-115
 func (m *Middleware) Unload() {
 	// nothing to do here
 }
@@ -27,6 +28,7 @@ func (m *Middleware) Unload() {
 var _ model.Middleware = &Middleware{}
 
 // NewMiddleware returns a new instance of Middleware.
+// SW-REQ-115
 func NewMiddleware(gw Gateway, mw BaseMiddleware, spec *APISpec) *Middleware {
 	return &Middleware{
 		base: mw,
@@ -36,16 +38,19 @@ func NewMiddleware(gw Gateway, mw BaseMiddleware, spec *APISpec) *Middleware {
 }
 
 // Logger returns a logger with middleware filled out.
+// SW-REQ-115
 func (m *Middleware) Logger() *logrus.Entry {
 	return m.base.Logger().WithField("mw", m.Name())
 }
 
 // Name returns the name for the middleware.
+// SW-REQ-115
 func (m *Middleware) Name() string {
 	return "UpstreamBasicAuthMiddleware"
 }
 
 // EnabledForSpec checks if streaming is enabled on the config.
+// SW-REQ-115
 func (m *Middleware) EnabledForSpec() bool {
 	if !m.Spec.UpstreamAuth.IsEnabled() {
 		return false
@@ -59,11 +64,13 @@ func (m *Middleware) EnabledForSpec() bool {
 }
 
 // Init initializes the middleware.
+// SW-REQ-115
 func (m *Middleware) Init() {
 	m.Logger().Debug("Initializing Upstream basic auth Middleware")
 }
 
 // ProcessRequest will handle upstream basic auth.
+// SW-REQ-115
 func (m *Middleware) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	basicAuthConfig := m.Spec.UpstreamAuth.BasicAuth
 

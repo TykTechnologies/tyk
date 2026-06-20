@@ -1,0 +1,54 @@
+id: SW-REQ-115
+version: 1
+status: approved
+priority: shall
+category: enterprise
+req_type: guarantee
+fretish: ""
+description: The ee/middleware/upstreambasicauth package shall preserve local upstream basic-auth middleware behavior for enablement decisions, APISpec construction, basic-auth provider installation into request context, default/custom header selection, and request header overwrite behavior, without claiming upstream request execution, reverse-proxy behavior, credential validation, secret storage, OAuth behavior, network transport delivery, or final client-visible gateway behavior.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: ee/middleware/upstreambasicauth/middleware_reqproof_test.go; docs/upstream-basic-auth-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-128
+component: upstream_basic_auth
+rationale: >-
+    This software requirement owns local ee/middleware/upstreambasicauth middleware mechanics only. It does not claim upstream request execution, reverse-proxy behavior, credential validation, secret storage, OAuth behavior, network transport delivery, or final client-visible gateway behavior.
+tags:
+    - enterprise
+    - upstream-auth
+    - basic-auth
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-128
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T11:45:01Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-115 is scoped to local ee/middleware/upstreambasicauth behavior: enablement decisions, APISpec construction, basic-auth provider installation into request context, default/custom header selection, and request header overwrite behavior. Focused package tests passed locally. This approval does not claim upstream request execution, reverse-proxy behavior, credential validation, secret storage, OAuth behavior, network transport delivery, or final client-visible gateway behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T11:45:01Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T11:45:01Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T11:45:01Z"
+          from: draft
+          to: review
+          reason: Added ee/middleware/upstreambasicauth local middleware behavior under upstream basic auth support.
+          changed_by: agent:codex

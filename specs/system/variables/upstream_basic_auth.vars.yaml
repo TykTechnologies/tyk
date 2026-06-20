@@ -1,0 +1,9 @@
+component: upstream_basic_auth
+no_interface:
+    declared: true
+    reason: The ee/middleware/upstreambasicauth proof slice covers local upstream basic-auth middleware helper behavior only; upstream request execution, reverse-proxy behavior, credential validation, secret storage, OAuth behavior, network transport delivery, and final client-visible gateway behavior are outside this component boundary.
+variables:
+    - name: upstream_basic_auth_operation_terminal
+      type: bool
+      direction: output
+      description: 'The local upstream basic-auth helper operation reaches a terminal observable result: an enablement decision, a request-context provider installation, or a deterministic request header update.'

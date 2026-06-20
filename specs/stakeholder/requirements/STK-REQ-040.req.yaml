@@ -1,0 +1,68 @@
+id: STK-REQ-040
+version: 1
+status: approved
+priority: shall
+category: enterprise
+req_type: guarantee
+fretish: ""
+description: Enterprise upstream basic authentication support shall locally decide middleware enablement, install a basic-auth upstream provider into request context, and fill the configured upstream authentication header deterministically, without claiming upstream request execution, reverse-proxy behavior, credential validation, secret storage, OAuth behavior, network transport delivery, or final client-visible gateway behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: upstream_basic_auth
+rationale: The upstream basic auth middleware package owns local provider installation and header fill mechanics. Reverse-proxy execution and upstream authentication outcomes remain outside this proof slice.
+tags:
+    - enterprise
+    - upstream-auth
+    - basic-auth
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T11:45:01Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Upstream basic auth scope is limited to local ee/middleware/upstreambasicauth behavior: enablement decisions, APISpec construction, basic-auth provider installation into request context, default/custom header selection, and request header overwrite behavior. This approval does not claim upstream request execution, reverse-proxy behavior, credential validation, secret storage, OAuth behavior, network transport delivery, or final client-visible gateway behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T11:45:01Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T11:45:01Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Enterprise gateway operator
+    story: As an enterprise gateway operator, I need upstream basic-auth middleware to install the intended upstream authentication provider before reverse-proxy code consumes request context.
+    acceptance_criteria:
+        - id: STK-REQ-040-AC-01
+          text: Given upstream authentication and upstream basic authentication settings, when local middleware evaluates enablement, then it enables only when both upstream auth and basic auth are enabled.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-128
+        - id: STK-REQ-040-AC-02
+          text: Given enabled upstream basic authentication credentials, when local middleware processes a request, then a basic-auth provider with the expected encoded value and default or configured header name is stored in request context.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-128
+        - id: STK-REQ-040-AC-03
+          text: Given an upstream basic-auth provider and a request with or without an existing authentication header, when the provider fills the request, then the configured header contains the gateway upstream authentication value.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-128
+lifecycle:
+    change_history:
+        - date: "2026-06-20T11:45:01Z"
+          from: draft
+          to: review
+          reason: Added upstream basic auth stakeholder requirement for ee/middleware/upstreambasicauth onboarding.
+          changed_by: agent:codex
