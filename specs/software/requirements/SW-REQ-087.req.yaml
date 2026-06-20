@@ -1,0 +1,64 @@
+id: SW-REQ-087
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The apidef/oas authentication helpers shall validate supported security-processing modes, validate protected-resource metadata boundaries, default protected-resource metadata well-known paths, preserve OAS authentication aggregate shape fields when filling from and extracting to Classic API definitions, import supported OpenAPI API-key, JWT bearer, basic, and OAuth2 security schemes while rejecting unsupported schemes, derive base identity-provider precedence from imported schemes, convert Classic authentication sources, signatures, scopes, HMAC, OIDC providers and scope mappings, custom key lifetime, certificate auth, custom plugin authentication, authentication plugin, and ID-extractor configuration into deterministic OAS helper shapes and back into Classic API definition fields without panics on nil optional helper receivers.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: apidef/oas/authentication_reqproof_test.go; docs/apidef-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-104
+component: model
+rationale: This software requirement owns only local apidef/oas/authentication.go OAS authentication helper data-shape conversion, validation, ordering, and optional-helper behavior. It does not claim OpenAPI security requirement evaluation, gateway authentication enforcement, token validation, certificate validation, HMAC signature verification, OIDC provider execution, custom plugin execution, ID extraction at runtime, full OAS import/export correctness, gateway API loading, route generation, request matching, gateway request admission, persistence, analytics, or final client-visible runtime behavior.
+tags:
+    - api-definition
+    - authentication
+    - oas
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-104
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T06:22:23Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-087 is scoped to local apidef/oas/authentication.go OAS authentication helper behavior: security-processing mode validation, protected-resource metadata validation/defaulting, aggregate Authentication Fill/ExtractTo shape conversion, supported and unsupported OpenAPI security-scheme import, base identity-provider precedence, auth source/signature/scope mapping, HMAC and OIDC conversion, custom key lifetime and certificate auth conversion, custom plugin authentication and authentication plugin conversion, and ID-extractor configuration conversion. Focused apidef/oas authentication ReqProof tests passed. This approval does not claim OpenAPI security requirement evaluation, gateway authentication enforcement, token validation, certificate validation, HMAC signature verification, OIDC provider execution, custom plugin execution, ID extraction at runtime, full OAS import/export correctness, gateway API loading, route generation, request matching, gateway request admission, persistence, analytics, or final client-visible runtime behavior.'
+        fingerprint: sha256:40f4ed1e45debb849eaa652eff55359c4473474de57bc044cae3ce416715d542
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-087
+          artifact: apidef/oas/authentication.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The apidef/oas/authentication.go production delta in this slice adds ReqProof ownership annotations only; SW-REQ-087 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence existing OAS authentication helper behavior, so no additional authored requirement/design change is required for this implementation delta.
+          base: origin/master
+          requirement_fingerprint: sha256:5559a28dd60f0a261ba84ff7a737181c71a388b3fd7f3994b8ec9a670a7a3270
+          approval_fingerprint: sha256:40f4ed1e45debb849eaa652eff55359c4473474de57bc044cae3ce416715d542
+          artifact_fingerprint: sha256:abe9928f7317f6b7b52145434ec547d88d13f2707fabc3362f286be13a25fb31
+          reviewed_at: "2026-06-20T06:22:45Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T06:19:24Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T06:22:23Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T06:19:24Z"
+          from: draft
+          to: review
+          reason: Added apidef/oas authentication helper behavior under API-definition support model behavior.
+          changed_by: agent:codex

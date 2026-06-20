@@ -44,7 +44,7 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 134/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `verification_scope_complete` | 135/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
 | `mcdc_coverage` | 52/385 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
@@ -208,6 +208,14 @@ fixed or to hide them from the current strict audit.
   is scoped to local notification helper control flow and does not claim durable
   external delivery. It moves the visible production coverage baseline from
   133/447 to 134/447.
+- `SW-REQ-087` onboarded `apidef/oas/authentication.go` with focused evidence
+  for OAS authentication helper validation, security-scheme import,
+  identity-provider precedence, authentication sources and signatures, scope
+  mapping, HMAC/OIDC conversion, custom key lifetime and certificate auth,
+  custom plugin authentication, authentication plugin, and ID-extractor
+  conversion. This increment is scoped to local OAS/Classic data-shape
+  conversion and does not claim runtime authentication enforcement. It moves
+  the visible production coverage baseline from 134/447 to 135/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

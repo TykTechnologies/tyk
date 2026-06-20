@@ -14,6 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// SW-REQ-087
 // SecurityProcessingMode constants define how multiple security requirements are processed
 const (
 	// SecurityProcessingModeLegacy processes only the first security requirement and uses BaseIdentityProvider
@@ -23,19 +24,23 @@ const (
 	SecurityProcessingModeCompliant = "compliant"
 )
 
+// SW-REQ-087
 // DefaultPRMWellKnownPath is the default well-known path for OAuth 2.0 Protected Resource Metadata (RFC 9728).
 const DefaultPRMWellKnownPath = ".well-known/oauth-protected-resource"
 
+// SW-REQ-087
 // ValidateSecurityProcessingMode validates the security processing mode value.
 func ValidateSecurityProcessingMode(mode string) bool {
 	return mode == "" || mode == SecurityProcessingModeLegacy || mode == SecurityProcessingModeCompliant
 }
 
+// SW-REQ-087
 // GetDefaultSecurityProcessingMode returns the default security processing mode.
 func GetDefaultSecurityProcessingMode() string {
 	return SecurityProcessingModeLegacy
 }
 
+// SW-REQ-087
 // Authentication contains configuration about the authentication methods and security policies applied to requests.
 type Authentication struct {
 	// Enabled makes the API protected when one of the authentication modes is enabled.
@@ -103,6 +108,7 @@ type Authentication struct {
 	CertificateAuth *CertificateAuth `bson:"certificateAuth,omitempty" json:"certificateAuth,omitempty"`
 }
 
+// SW-REQ-087
 // ProtectedResourceMetadata holds the configuration for OAuth 2.0 Protected Resource Metadata (RFC 9728).
 // It enables MCP clients to discover which authorization server protects this API resource.
 type ProtectedResourceMetadata struct {
@@ -123,6 +129,7 @@ type ProtectedResourceMetadata struct {
 	ScopesSupported []string `bson:"scopesSupported,omitempty" json:"scopesSupported,omitempty"`
 }
 
+// SW-REQ-087
 // Validate validates the ProtectedResourceMetadata configuration.
 // When isMCP is true, authorizationServers must have at least one entry.
 func (prm *ProtectedResourceMetadata) Validate(isMCP bool) error {
@@ -141,6 +148,7 @@ func (prm *ProtectedResourceMetadata) Validate(isMCP bool) error {
 	return nil
 }
 
+// SW-REQ-087
 // GetWellKnownPath returns the well-known path for the PRM endpoint,
 // defaulting to DefaultPRMWellKnownPath if not set.
 func (prm *ProtectedResourceMetadata) GetWellKnownPath() string {
@@ -151,6 +159,7 @@ func (prm *ProtectedResourceMetadata) GetWellKnownPath() string {
 	return prm.WellKnownPath
 }
 
+// SW-REQ-087
 // CustomKeyLifetime contains configuration for custom key retention.
 type CustomKeyLifetime struct {
 	// Enabled enables custom maximum retention for keys for the API.
@@ -178,6 +187,7 @@ type CustomKeyLifetime struct {
 	RespectValidity bool `bson:"respectValidity,omitempty" json:"respectValidity,omitempty"`
 }
 
+// SW-REQ-087
 // CertificateAuth represents certificate-based authentication configuration.
 type CertificateAuth struct {
 	// Enabled activates the certificate-based authentication mode.
@@ -186,6 +196,7 @@ type CertificateAuth struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 }
 
+// SW-REQ-087
 func (c *CertificateAuth) Fill(api apidef.APIDefinition) {
 	authConfig, ok := api.AuthConfigs[apidef.AuthTokenType]
 	if !ok {
@@ -195,6 +206,7 @@ func (c *CertificateAuth) Fill(api apidef.APIDefinition) {
 	c.Enabled = authConfig.UseCertificate
 }
 
+// SW-REQ-087
 func (c *CertificateAuth) ExtractTo(api *apidef.APIDefinition) {
 	if api.AuthConfigs == nil {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
@@ -209,6 +221,7 @@ func (c *CertificateAuth) ExtractTo(api *apidef.APIDefinition) {
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
+// SW-REQ-087
 // Fill fills *CustomKeyLifetime from apidef.APIDefinition.
 func (k *CustomKeyLifetime) Fill(api apidef.APIDefinition) {
 	k.RespectValidity = api.SessionLifetimeRespectsKeyExpiration
@@ -221,6 +234,7 @@ func (k *CustomKeyLifetime) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-087
 // ExtractTo extracts *Authentication into *apidef.APIDefinition.
 func (k *CustomKeyLifetime) ExtractTo(api *apidef.APIDefinition) {
 	api.SessionLifetimeRespectsKeyExpiration = k.RespectValidity
@@ -232,6 +246,7 @@ func (k *CustomKeyLifetime) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-087
 // Fill fills *Authentication from apidef.APIDefinition.
 func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.Enabled = !api.UseKeylessAccess
@@ -295,6 +310,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-087
 // ExtractTo extracts *Authentication into *apidef.APIDefinition.
 func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	api.UseKeylessAccess = !a.Enabled
@@ -330,14 +346,17 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	a.CustomKeyLifetime.ExtractTo(api)
 }
 
+// SW-REQ-087
 // SecuritySchemes holds security scheme values, filled with Import().
 type SecuritySchemes map[string]interface{}
 
+// SW-REQ-087
 // SecurityScheme defines an Importer interface for security schemes.
 type SecurityScheme interface {
 	Import(nativeSS *openapi3.SecurityScheme, enable bool)
 }
 
+// SW-REQ-087
 // Import takes the openapi3.SecurityScheme as argument and applies it to the receiver. The
 // SecuritySchemes receiver is a map, so modification of the receiver is enabled, regardless
 // of the fact that the receiver isn't a pointer type. The map is a pointer type itself.
@@ -402,6 +421,7 @@ func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme,
 	return nil
 }
 
+// SW-REQ-087
 func baseIdentityProviderPrecedence(authType apidef.AuthTypeEnum) int {
 	switch authType {
 	case apidef.AuthToken:
@@ -417,6 +437,7 @@ func baseIdentityProviderPrecedence(authType apidef.AuthTypeEnum) int {
 	}
 }
 
+// SW-REQ-087
 // GetBaseIdentityProvider returns the identity provider by precedence from SecuritySchemes.
 func (ss SecuritySchemes) GetBaseIdentityProvider() (res apidef.AuthTypeEnum) {
 	if len(ss) < 2 {
@@ -442,6 +463,7 @@ func (ss SecuritySchemes) GetBaseIdentityProvider() (res apidef.AuthTypeEnum) {
 	return
 }
 
+// SW-REQ-087
 // AuthSources defines authentication source configuration: headers, cookies and query parameters.
 //
 // Tyk classic API definition: `auth_configs{}`.
@@ -462,6 +484,7 @@ type AuthSources struct {
 	Query *AuthSource `bson:"query,omitempty" json:"query,omitempty"`
 }
 
+// SW-REQ-087
 // Fill fills *AuthSources from apidef.AuthConfig.
 func (as *AuthSources) Fill(authConfig apidef.AuthConfig) {
 	// Allocate auth sources being filled.
@@ -492,6 +515,7 @@ func (as *AuthSources) Fill(authConfig apidef.AuthConfig) {
 	}
 }
 
+// SW-REQ-087
 // ExtractTo extracts *AuthSources to *apidef.AuthConfig.
 func (as *AuthSources) ExtractTo(authConfig *apidef.AuthConfig) {
 	// Extract Header auth source.
@@ -514,6 +538,7 @@ func (as *AuthSources) ExtractTo(authConfig *apidef.AuthConfig) {
 	}
 }
 
+// SW-REQ-087
 // AuthSource defines an authentication source.
 type AuthSource struct {
 	// Enabled activates the auth source.
@@ -526,18 +551,21 @@ type AuthSource struct {
 	Name string `bson:"name,omitempty" json:"name,omitempty"`
 }
 
+// SW-REQ-087
 // Fill fills *AuthSource with values from the parameters.
 func (as *AuthSource) Fill(enabled bool, name string) {
 	as.Enabled = enabled
 	as.Name = name
 }
 
+// SW-REQ-087
 // ExtractTo extracts *AuthSource into the function parameters.
 func (as *AuthSource) ExtractTo(enabled *bool, name *string) {
 	*enabled = as.Enabled
 	*name = as.Name
 }
 
+// SW-REQ-087
 // Signature holds the configuration for signature validation.
 type Signature struct {
 	// Enabled activates signature validation.
@@ -576,6 +604,7 @@ type Signature struct {
 	ErrorMessage string `bson:"errorMessage,omitempty" json:"errorMessage,omitempty"`
 }
 
+// SW-REQ-087
 // Fill fills *Signature from apidef.AuthConfig.
 func (s *Signature) Fill(authConfig apidef.AuthConfig) {
 	signature := authConfig.Signature
@@ -590,6 +619,7 @@ func (s *Signature) Fill(authConfig apidef.AuthConfig) {
 	s.ErrorMessage = signature.ErrorMessage
 }
 
+// SW-REQ-087
 // ExtractTo extracts *Signature to *apidef.AuthConfig.
 func (s *Signature) ExtractTo(authConfig *apidef.AuthConfig) {
 	authConfig.ValidateSignature = s.Enabled
@@ -603,6 +633,7 @@ func (s *Signature) ExtractTo(authConfig *apidef.AuthConfig) {
 	authConfig.Signature.ErrorMessage = s.ErrorMessage
 }
 
+// SW-REQ-087
 // Scopes holds the scope to policy mappings for a claim name.
 // This struct is used for both JWT and OIDC authentication.
 type Scopes struct {
@@ -625,6 +656,7 @@ type Scopes struct {
 	ScopeToPolicyMapping []ScopeToPolicy `bson:"scopeToPolicyMapping,omitempty" json:"scopeToPolicyMapping,omitempty"`
 }
 
+// SW-REQ-087
 // Fill fills *Scopes from *apidef.ScopeClaim.
 func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 	s.ClaimName = scopeClaim.ScopeClaimName
@@ -647,6 +679,7 @@ func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 	}
 }
 
+// SW-REQ-087
 // ExtractTo extracts *Scopes to *apidef.ScopeClaim.
 func (s *Scopes) ExtractTo(scopeClaim *apidef.ScopeClaim) {
 	scopeClaim.ScopeClaimName = s.ClaimName
@@ -657,6 +690,7 @@ func (s *Scopes) ExtractTo(scopeClaim *apidef.ScopeClaim) {
 	}
 }
 
+// SW-REQ-087
 // ScopeToPolicy contains a single scope to policy ID mapping.
 // This struct is used for both JWT and OIDC authentication.
 type ScopeToPolicy struct {
@@ -675,6 +709,7 @@ type ScopeToPolicy struct {
 	PolicyID string `bson:"policyId,omitempty" json:"policyId,omitempty"`
 }
 
+// SW-REQ-087
 // HMAC holds the configuration for the HMAC authentication mode.
 type HMAC struct {
 	// Enabled activates the HMAC authentication mode.
@@ -706,6 +741,7 @@ type HMAC struct {
 	AllowedClockSkew float64 `bson:"allowedClockSkew,omitempty" json:"allowedClockSkew,omitempty"`
 }
 
+// SW-REQ-087
 // Fill fills *HMAC from apidef.APIDefinition.
 func (h *HMAC) Fill(api apidef.APIDefinition) {
 	h.Enabled = api.EnableSignatureChecking
@@ -716,6 +752,7 @@ func (h *HMAC) Fill(api apidef.APIDefinition) {
 	h.AllowedClockSkew = api.HmacAllowedClockSkew
 }
 
+// SW-REQ-087
 // ExtractTo extracts *HMAC to *apidef.APIDefinition.
 func (h *HMAC) ExtractTo(api *apidef.APIDefinition) {
 	api.EnableSignatureChecking = h.Enabled
@@ -733,6 +770,7 @@ func (h *HMAC) ExtractTo(api *apidef.APIDefinition) {
 	api.HmacAllowedClockSkew = h.AllowedClockSkew
 }
 
+// SW-REQ-087
 // OIDC contains configuration for the OIDC authentication mode.
 // OIDC support will be deprecated starting from 5.7.0.
 // To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
@@ -760,6 +798,7 @@ type OIDC struct {
 	Scopes *Scopes `bson:"scopes,omitempty" json:"scopes,omitempty"`
 }
 
+// SW-REQ-087
 // Fill fills *OIDC from apidef.APIDefinition.
 func (o *OIDC) Fill(api apidef.APIDefinition) {
 	o.Enabled = api.UseOpenID
@@ -800,6 +839,7 @@ func (o *OIDC) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-087
 // ExtractTo extracts *OIDC to *apidef.APIDefinition.
 func (o *OIDC) ExtractTo(api *apidef.APIDefinition) {
 	api.UseOpenID = o.Enabled
@@ -830,6 +870,7 @@ func (o *OIDC) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-087
 // Provider defines an issuer to validate and the Client ID to Policy ID mappings.
 type Provider struct {
 	// Issuer contains a validation value for the issuer claim, usually a domain name e.g. `accounts.google.com` or similar.
@@ -843,6 +884,7 @@ type Provider struct {
 	ClientToPolicyMapping []ClientToPolicy `bson:"clientToPolicyMapping,omitempty" json:"clientToPolicyMapping,omitempty"`
 }
 
+// SW-REQ-087
 // ClientToPolicy contains a 1-1 mapping between Client ID and Policy ID.
 type ClientToPolicy struct {
 	// ClientID contains a Client ID.
@@ -856,6 +898,7 @@ type ClientToPolicy struct {
 	PolicyID string `bson:"policyId,omitempty" json:"policyId,omitempty"`
 }
 
+// SW-REQ-087
 // CustomPluginAuthentication holds configuration for custom plugins.
 type CustomPluginAuthentication struct {
 	// Enabled activates the CustomPluginAuthentication authentication mode.
@@ -875,6 +918,7 @@ type CustomPluginAuthentication struct {
 	AuthSources `bson:",inline" json:",inline"`
 }
 
+// SW-REQ-087
 // Fill fills *CustomPluginAuthentication from apidef.AuthConfig.
 func (c *CustomPluginAuthentication) Fill(api apidef.APIDefinition) {
 	c.Enabled = api.CustomPluginAuthEnabled
@@ -895,6 +939,7 @@ func (c *CustomPluginAuthentication) Fill(api apidef.APIDefinition) {
 	c.AuthSources.Fill(api.AuthConfigs[apidef.CoprocessType])
 }
 
+// SW-REQ-087
 // ExtractTo extracts *CustomPluginAuthentication to *apidef.APIDefinition.
 func (c *CustomPluginAuthentication) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomPluginAuthEnabled = c.Enabled
@@ -922,6 +967,7 @@ func (c *CustomPluginAuthentication) ExtractTo(api *apidef.APIDefinition) {
 	api.AuthConfigs[apidef.CoprocessType] = authConfig
 }
 
+// SW-REQ-087
 // AuthenticationPlugin holds the configuration for custom authentication plugin.
 type AuthenticationPlugin struct {
 	// Enabled activates custom authentication plugin.
@@ -950,6 +996,7 @@ type AuthenticationPlugin struct {
 	IDExtractor *IDExtractor `bson:"idExtractor,omitempty" json:"idExtractor,omitempty"`
 }
 
+// SW-REQ-087
 func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
 	ap.FunctionName = api.CustomMiddleware.AuthCheck.Name
 	ap.Path = api.CustomMiddleware.AuthCheck.Path
@@ -966,6 +1013,7 @@ func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-087
 func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.AuthCheck.Disabled = !ap.Enabled
 	api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
@@ -983,6 +1031,7 @@ func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 	ap.IDExtractor.ExtractTo(api)
 }
 
+// SW-REQ-087
 // IDExtractorConfig specifies the configuration for ID extractor.
 type IDExtractorConfig struct {
 	// HeaderName is the header name to extract ID from.
@@ -1013,6 +1062,7 @@ type IDExtractorConfig struct {
 	XPathExp string `bson:"xPathExp,omitempty" json:"xPathExp,omitempty"`
 }
 
+// SW-REQ-087
 // Fill fills IDExtractorConfig from supplied classic APIDefinition.
 func (id *IDExtractorConfig) Fill(api apidef.APIDefinition) {
 	var classicIDExtractorConfig apidef.IDExtractorConfig
@@ -1031,6 +1081,7 @@ func (id *IDExtractorConfig) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-087
 // ExtractTo extracts IDExtractorConfig into supplied classic API definition.
 func (id *IDExtractorConfig) ExtractTo(api *apidef.APIDefinition) {
 	classicIDExtractorConfig := apidef.IDExtractorConfig{
@@ -1060,6 +1111,7 @@ func (id *IDExtractorConfig) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.IdExtractor.ExtractorConfig = extractorConfigMap
 }
 
+// SW-REQ-087
 // IDExtractor configures ID Extractor.
 type IDExtractor struct {
 	// Enabled activates ID extractor with coprocess authentication.
@@ -1088,6 +1140,7 @@ type IDExtractor struct {
 	Config *IDExtractorConfig `bson:"config" json:"config"` // required
 }
 
+// SW-REQ-087
 // Fill fills IDExtractor from supplied classic APIDefinition.
 func (id *IDExtractor) Fill(api apidef.APIDefinition) {
 	id.Enabled = !api.CustomMiddleware.IdExtractor.Disabled
@@ -1104,6 +1157,7 @@ func (id *IDExtractor) Fill(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-087
 // ExtractTo extracts IDExtractor into supplied classic API definition.
 func (id *IDExtractor) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.IdExtractor.Disabled = !id.Enabled
