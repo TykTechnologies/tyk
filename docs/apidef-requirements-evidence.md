@@ -30,6 +30,7 @@
 <!-- documents SW-REQ-072 -->
 <!-- documents SW-REQ-073 -->
 <!-- documents SW-REQ-074 -->
+<!-- documents SW-REQ-075 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -50,8 +51,8 @@ name/value helper shapes, OAS extension error-override helper shapes, adapter
 interface and GraphQL utility helper behavior, GraphQL config adapter
 selection behavior, AsyncAPI adapter support-shape generation, and OpenAPI
 adapter support-shape generation, and GraphQL engine adapter utility behavior
-and proxy-only and supergraph engine adapter configuration behavior without
-silent data-shape drift.
+and proxy-only, supergraph, and universal-data-graph engine adapter
+configuration behavior without silent data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -402,3 +403,21 @@ execution, subscription transport execution, REST or GraphQL upstream
 availability, gateway API loading, route generation, request matching, gateway
 request admission, middleware execution, persistence, analytics, or final
 client-visible runtime behavior.
+
+`SW-REQ-075` owns the concrete `apidef/adapter/gqlengineadapter`
+universal-data-graph engine adapter configuration assembly. Its evidence covers
+schema parsing when no schema is supplied, caller-supplied schema reuse,
+preservation of explicit field path and default-mapping settings,
+schema-derived field argument configuration, REST datasource configuration with
+URL query extraction and explicit query variables, GraphQL datasource
+configuration with caller-supplied HTTP, streaming, and subscription-client
+factory inputs, GraphQL-operation-as-REST configuration, Kafka subscription
+datasource configuration, schema-derived child-node metadata for non-REST
+datasources, schema and datasource configuration error propagation, and
+repeated-input determinism. This evidence does not claim GraphQL schema
+semantic completeness beyond local parse/normalize result propagation,
+correctness of upstream graphql-go-tools datasource factories, REST or GraphQL
+upstream availability, Kafka broker availability or consumption behavior,
+GraphQL execution, subscription transport execution, gateway API loading, route
+generation, request matching, gateway request admission, middleware execution,
+persistence, analytics, or final client-visible runtime behavior.
