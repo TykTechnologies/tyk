@@ -13,6 +13,7 @@ type Header struct {
 // Headers is an array of Header.
 type Headers []Header
 
+// SW-REQ-047
 // Map transforms Headers into a map.
 func (hs *Headers) Map() map[string]string {
 	if hs == nil {
@@ -27,11 +28,13 @@ func (hs *Headers) Map() map[string]string {
 	return headersMap
 }
 
+// SW-REQ-047
 // Add new header entry.
 func (hs *Headers) Add(hdr, value string) {
 	*hs = append(*hs, Header{Name: hdr, Value: value})
 }
 
+// SW-REQ-047
 // NewHeaders creates Headers from in map.
 func NewHeaders(in map[string]string) Headers {
 	var headers = make(Headers, 0, len(in))

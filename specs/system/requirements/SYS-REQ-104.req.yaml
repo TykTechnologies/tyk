@@ -5,19 +5,20 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the model shall always satisfy !api_definition_support_requested | api_definition_support_shape_preserved
-description: Gateway API definition support model helpers shall preserve typed health-check wire values, deterministic host-list access behavior, error-override matcher/template state, embedded Classic API definition schema data, OAS helper path/server shapes, OAS schema visitor/unicode-escape helper behavior, and custom middleware definition enablement classification so API definition, RPC, and configuration flows can exchange these helper shapes without silent data-shape drift.
+description: Gateway API definition support model helpers shall preserve typed health-check wire values, deterministic host-list access behavior, error-override matcher/template state, embedded Classic API definition schema data, OAS helper path/server shapes, OAS schema visitor/unicode-escape helper behavior, custom middleware definition enablement classification, and OAS extension header name/value helper shapes so API definition, RPC, and configuration flows can exchange these helper shapes without silent data-shape drift.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: model
-rationale: This system-level requirement owns small API-definition support helper behavior only. It does not claim API import, full OAS conversion, route generation, request matching, gateway request admission, or full API definition lifecycle behavior, which require separate black-box or adapter evidence.
+rationale: This system-level requirement owns small API-definition support helper behavior only. It does not claim API import, full OAS conversion, route generation, request matching, gateway request admission, middleware execution, final client-visible header behavior, or full API definition lifecycle behavior, which require separate black-box or adapter evidence.
 tags:
     - api-definition
     - oas
     - schema
     - middleware
+    - headers
 variables:
     - api_definition_support_requested
     - api_definition_support_shape_preserved
@@ -31,23 +32,23 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-20T01:08:12Z"
-        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-045 is scoped to local internal/middleware custom middleware definition enablement classification: empty lists, disabled named definitions, unnamed definitions, mixed lists with no enabled named definition, named enabled definitions, and mixed lists where one enabled named definition makes the helper return enabled. SYS-REQ-104 description was refreshed only to include this helper boundary. Focused internal/middleware tests passed with race. This approval does not claim middleware chain construction, plugin loading, middleware execution, response interruption status codes, gateway request handling, or final client-visible middleware behavior.'
-        fingerprint: sha256:a42bf55fdecbed25b681798fb02cdd0d9ccfb35ee48ce9886bcbb8be014dfd5e
+        reviewed_at: "2026-06-20T01:20:01Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-047 is scoped to the local apidef/oas header helper shape behavior: Add appends header name/value pairs in order, Map returns populated maps, nil and empty header lists return explicit empty maps, duplicate header names collapse with last-value-wins behavior, NewHeaders returns deterministic name-sorted lists, and nil or empty input maps return explicit empty header lists. Focused apidef/oas tests passed with race, and the full configured ReqProof implement-stage test evidence passed. This approval does not claim full OAS conversion, header transformation middleware execution, API import, route generation, request matching, gateway request admission, or final client-visible header behavior.'
+        fingerprint: sha256:52700ef3b92018a28b934082373f9db5e8e79475923558c6c5076f7ce16e9bd2
         ai_generated: false
-    gaps_reviewed_at: "2026-06-20T01:08:21.353225Z"
+    gaps_reviewed_at: "2026-06-20T01:20:10.726748Z"
     gaps_reviewed_by: human:buger
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-104|api_definition_support_shape_preserved
           reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-104's api_definition_support_shape_preserved variable is decomposed across SW-REQ-019 health-check wire constants/JSON shapes, SW-REQ-020 HostList constructor/access/error behavior, SW-REQ-021 error-override template and matcher state, SW-REQ-033 embedded Classic API definition schema data, SW-REQ-042 internal/oasutil path ordering plus server URL template parsing, SW-REQ-044 pkg/schema OAS visitor traversal plus unicode-escape conversion/restoration helpers, and SW-REQ-045 internal/middleware custom middleware definition enablement classification. The review is limited to these API-definition support helpers and does not claim full API-definition validation, schema completeness, API import, full OAS conversion, route generation, request matching, middleware chain construction, plugin loading, middleware execution, gateway request admission, or full API definition lifecycle coverage.
-          reviewed_at: "2026-06-20T01:08:21.353225Z"
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-104's api_definition_support_shape_preserved variable is decomposed across SW-REQ-019 health-check wire constants/JSON shapes, SW-REQ-020 HostList constructor/access/error behavior, SW-REQ-021 error-override template and matcher state, SW-REQ-033 embedded Classic API definition schema data, SW-REQ-042 internal/oasutil path ordering plus server URL template parsing, SW-REQ-044 pkg/schema OAS visitor traversal plus unicode-escape conversion/restoration helpers, SW-REQ-045 internal/middleware custom middleware definition enablement classification, and SW-REQ-047 apidef/oas header helper shape behavior covering ordered append, map conversion, nil/empty boundaries, duplicate last-value-wins, and deterministic name-sorted list conversion. The review is limited to these API-definition support helpers and does not claim full API-definition validation, schema completeness, API import, full OAS conversion, route generation, request matching, middleware chain construction, plugin loading, middleware execution, gateway request admission, final client-visible header behavior, or full API definition lifecycle coverage.
+          reviewed_at: "2026-06-20T01:20:10.726748Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-19T21:10:22Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-20T01:08:12Z"
+    last_modified_at: "2026-06-20T01:20:01Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -73,4 +74,9 @@ lifecycle:
           from: approved
           to: approved
           reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T01:02:51Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-044 is scoped to local pkg/schema OAS visitor and unicode-escape helper behavior: visitor initialization, manipulation registration and insertion-order application, visited-state reset, one-time traversal of component schemas, operation parameters, request bodies, response bodies, response headers, callbacks, nested schema branches, circular-reference stopping, nil schema references, nil path items, JSON-schema unicode escape conversion to RE2 syntax, RE2 restoration in schema patterns and error strings, empty pattern handling, non-matching pattern preservation, and already-converted input preservation. SYS-REQ-104 description was refreshed only to include this helper boundary. Focused pkg/schema tests passed with race. This approval does not claim full API-definition validation, schema completeness, API import, OAS conversion, route generation, request matching, gateway request admission, or correctness of the upstream OpenAPI library.")'
+          changed_by: human:buger
+        - date: "2026-06-20T01:20:01Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T01:08:12Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-045 is scoped to local internal/middleware custom middleware definition enablement classification: empty lists, disabled named definitions, unnamed definitions, mixed lists with no enabled named definition, named enabled definitions, and mixed lists where one enabled named definition makes the helper return enabled. SYS-REQ-104 description was refreshed only to include this helper boundary. Focused internal/middleware tests passed with race. This approval does not claim middleware chain construction, plugin loading, middleware execution, response interruption status codes, gateway request handling, or final client-visible middleware behavior.")'
           changed_by: human:buger

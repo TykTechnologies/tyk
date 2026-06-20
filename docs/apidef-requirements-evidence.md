@@ -8,6 +8,7 @@
 <!-- documents SW-REQ-042 -->
 <!-- documents SW-REQ-044 -->
 <!-- documents SW-REQ-045 -->
+<!-- documents SW-REQ-047 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -18,7 +19,8 @@ admission, or the full API definition lifecycle.
 health-check wire values, host-list access behavior, and error-override helper
 state, embedded Classic API definition schema data, OAS path/server helper
 shapes, OAS schema visitor/unicode-escape helper behavior, and custom
-middleware definition enablement classification without silent data-shape drift.
+middleware definition enablement classification, and OAS extension header
+name/value helper shapes without silent data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -79,3 +81,12 @@ lists where one enabled named definition makes the helper return enabled. This
 evidence does not claim middleware chain construction, plugin loading,
 middleware execution, response interruption status codes, gateway request
 handling, or final client-visible middleware behavior.
+
+`SW-REQ-047` owns the concrete `apidef/oas` header helper behavior used by OAS
+extension shapes. Its evidence covers appending added headers in order, mapping
+populated header lists, explicit empty maps for nil and empty lists,
+last-value-wins duplicate header names, deterministic name-sorted conversion
+from maps to header lists, and explicit empty header lists for nil and empty
+maps. This evidence does not claim full OAS conversion, header transformation
+middleware execution, API import, route generation, request matching, gateway
+request admission, or final client-visible header behavior.
