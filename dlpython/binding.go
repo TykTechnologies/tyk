@@ -107,94 +107,117 @@ import (
 type dummyPtr unsafe.Pointer
 type pyobj C.PyObject
 
+// SW-REQ-123
 func PyObject_GetAttr(arg0 *C.PyObject, arg1 *C.PyObject) *C.PyObject {
 	return C.PyObject_GetAttr(arg0, arg1)
 }
 
+// SW-REQ-123
 func PyBytes_FromStringAndSize(arg0 *C.char, arg1 C.long) *C.PyObject {
 	return C.PyBytes_FromStringAndSize(arg0, arg1)
 }
 
+// SW-REQ-123
 func PyBytes_AsString(arg0 *C.PyObject) *C.char {
 	return C.PyBytes_AsString(arg0)
 }
 
+// SW-REQ-123
 func PyUnicode_FromString(u *C.char) *C.PyObject {
 	return C.PyUnicode_FromString(u)
 }
 
+// SW-REQ-123
 func PyLong_AsLong(arg0 *C.PyObject) C.long {
 	return C.PyLong_AsLong(arg0)
 }
 
+// SW-REQ-123
 func PyTuple_New(size C.long) *C.PyObject {
 	return C.PyTuple_New(size)
 }
 
+// SW-REQ-123
 func PyTuple_GetItem(arg0 *C.PyObject, arg1 C.long) *C.PyObject {
 	return C.PyTuple_GetItem(arg0, arg1)
 }
 
+// SW-REQ-123
 func PyTuple_SetItem(arg0 *C.PyObject, arg1 C.long, arg2 *C.PyObject) C.int {
 	return C.PyTuple_SetItem(arg0, arg1, arg2)
 }
 
+// SW-REQ-123
 func PyDict_GetItemString(dp *C.PyObject, key *C.char) *C.PyObject {
 	return C.PyDict_GetItemString(dp, key)
 }
 
+// SW-REQ-123
 func PyModule_GetDict(arg0 *C.PyObject) *C.PyObject {
 	return C.PyModule_GetDict(arg0)
 }
 
+// SW-REQ-123
 func PyGILState_Ensure() C.PyGILState_STATE {
 	return C.PyGILState_Ensure()
 }
 
+// SW-REQ-123
 func PyGILState_Release(arg0 C.PyGILState_STATE) {
 	C.PyGILState_Release(arg0)
 }
 
+// SW-REQ-123
 func PyRun_SimpleStringFlags(arg0 *C.char, arg1 unsafe.Pointer) C.int {
 	return C.PyRun_SimpleStringFlags(arg0, arg1)
 }
 
+// SW-REQ-123
 func PyErr_Print() {
 	C.PyErr_Print()
 }
 
+// SW-REQ-123
 func Py_Initialize() {
 	C.Py_Initialize()
 }
 
+// SW-REQ-123
 func Py_IsInitialized() C.int {
 	return C.Py_IsInitialized()
 }
 
+// SW-REQ-123
 func PyEval_SaveThread() *C.PyThreadState {
 	return C.PyEval_SaveThread()
 }
 
+// SW-REQ-123
 func PyEval_InitThreads() {
 	C.PyEval_InitThreads()
 }
 
+// SW-REQ-123
 func PyImport_Import(name *C.PyObject) *C.PyObject {
 	return C.PyImport_Import(name)
 }
 
+// SW-REQ-123
 func PyObject_CallObject(callable_object *C.PyObject, args *C.PyObject) *C.PyObject {
 	return C.PyObject_CallObject(callable_object, args)
 }
 
+// SW-REQ-123
 func Py_IncRef(object *C.PyObject) {
 	C.Py_IncRef(object)
 }
 
+// SW-REQ-123
 func Py_DecRef(object *C.PyObject) {
 	C.Py_DecRef(object)
 }
 
+// SW-REQ-123
 func mapCalls() error {
 	C.python_lib = C.dlopen(libPath, C.RTLD_NOW|C.RTLD_GLOBAL)
 
@@ -300,6 +323,7 @@ func mapCalls() error {
 	return nil
 }
 
+// SW-REQ-123
 func ToPyObject(p unsafe.Pointer) *C.PyObject {
 	o := (*C.PyObject)(p)
 	return o

@@ -1,0 +1,70 @@
+id: STK-REQ-048
+version: 1
+status: approved
+priority: shall
+category: coprocess
+req_type: guarantee
+fretish: ""
+description: Dynamic Python loader support shall provide predictable local Python runtime discovery, dynamic C API binding, Python path setup, and helper wrapper behavior for coprocess integrations without claiming real CPython semantic correctness, Python plugin execution, gateway middleware behavior, plugin isolation, persistence, analytics, or final runtime request behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: dynamic_python_loader
+rationale: Dynamic Python loading is an extensibility support boundary. This stakeholder requirement owns only local loader discovery and binding helper behavior; gateway coprocess execution and real Python plugin semantics require separate integration evidence.
+tags:
+    - dlpython
+    - python
+    - coprocess
+    - dynamic-loading
+variables: []
+traces:
+    reviewed_at: "2026-06-20T17:35:00Z"
+    reviewed_by: human:buger
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T17:35:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Dynamic Python loader scope is limited to local dlpython behavior: python-config discovery, latest/custom version selection, library path parsing from ldflags output, dynamic symbol mapping through a fake Python library, runtime initialization forwarding, Python path updates, and representative module/object/tuple/bytes helper wrappers. Focused dlpython tests passed locally with fake python-config binaries and a fake dynamic library. This approval does not claim real CPython semantic correctness, Python plugin execution, gateway coprocess middleware behavior, plugin isolation, filesystem trust, external Python package availability, gateway request admission, persistence, analytics, or final client-visible gateway behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T17:35:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T17:35:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+stakeholder:
+    persona: Gateway extension developer
+    story: As a gateway extension developer using Python coprocess support, I need local Python runtime discovery and binding helpers to behave predictably before gateway integration code invokes Python hooks.
+    acceptance_criteria:
+        - id: STK-REQ-048-AC-01
+          text: Given available python-config executables, when the local loader scans supported PATH entries, then it selects the latest version by default, accepts an explicitly requested version, and returns explicit errors for empty PATH, missing installations, or missing requested versions.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-136
+        - id: STK-REQ-048-AC-02
+          text: Given a selected python-config executable, when ldflags output identifies a Python library directory and name, then the local loader resolves the platform-specific dynamic library path and rejects missing libraries.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-136
+        - id: STK-REQ-048-AC-03
+          text: Given a dynamic library exporting the required Python C API symbols, when loader initialization and helper wrappers run, then symbol mapping succeeds and representative module, tuple, object, bytes, long, reference, and path helpers return deterministic local results or explicit local errors.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-136
+lifecycle:
+    change_history:
+        - date: "2026-06-20T17:35:00Z"
+          from: draft
+          to: approved
+          reason: Added dynamic Python loader stakeholder requirement for dlpython onboarding.
+          changed_by: human:buger

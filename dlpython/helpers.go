@@ -9,6 +9,7 @@ PyGILState_STATE gilState;
 import "C"
 import (
 	"errors"
+	"os"
 	"strings"
 	"unsafe"
 )
@@ -18,8 +19,10 @@ const (
 )
 
 // SetPythonPath is a helper for setting PYTHONPATH.
+// SW-REQ-123
 func SetPythonPath(p []string) {
 	mergedPaths := strings.Join(p, ":")
+	_ = os.Setenv(pythonPathKey, mergedPaths)
 	path := C.CString(mergedPaths)
 	defer C.free(unsafe.Pointer(path))
 	key := C.CString(pythonPathKey)
@@ -28,6 +31,7 @@ func SetPythonPath(p []string) {
 }
 
 // LoadModuleDict wraps PyModule_GetDict.
+// SW-REQ-123
 func LoadModuleDict(m string) (unsafe.Pointer, error) {
 	mod := C.CString(m)
 	defer C.free(unsafe.Pointer(mod))
@@ -47,6 +51,7 @@ func LoadModuleDict(m string) (unsafe.Pointer, error) {
 }
 
 // GetItem wraps PyDict_GetItemString
+// SW-REQ-123
 func GetItem(d unsafe.Pointer, k string) (unsafe.Pointer, error) {
 	key := C.CString(k)
 	defer C.free(unsafe.Pointer(key))
@@ -59,6 +64,7 @@ func GetItem(d unsafe.Pointer, k string) (unsafe.Pointer, error) {
 }
 
 // PyRunSimpleString wraps PyRun_SimpleStringFlags
+// SW-REQ-123
 func PyRunSimpleString(s string) {
 	cstr := C.CString(s)
 	defer C.free(unsafe.Pointer(cstr))
@@ -66,6 +72,7 @@ func PyRunSimpleString(s string) {
 }
 
 // PyTupleNew wraps PyTuple_New
+// SW-REQ-123
 func PyTupleNew(size int) (unsafe.Pointer, error) {
 	tup := PyTuple_New(C.long(size))
 	if tup == nil {
@@ -75,6 +82,7 @@ func PyTupleNew(size int) (unsafe.Pointer, error) {
 }
 
 // PyTupleSetItem wraps PyTuple_SetItem
+// SW-REQ-123
 func PyTupleSetItem(tup unsafe.Pointer, pos int, o interface{}) error {
 	switch o.(type) {
 	case string:
@@ -100,6 +108,7 @@ func PyTupleSetItem(tup unsafe.Pointer, pos int, o interface{}) error {
 }
 
 // PyTupleGetItem wraps PyTuple_GetItem
+// SW-REQ-123
 func PyTupleGetItem(tup unsafe.Pointer, pos int) (unsafe.Pointer, error) {
 	item := PyTuple_GetItem(ToPyObject(tup), C.long(pos))
 	if item == nil {
@@ -109,6 +118,7 @@ func PyTupleGetItem(tup unsafe.Pointer, pos int) (unsafe.Pointer, error) {
 }
 
 // PyObjectCallObject wraps PyObject_CallObject
+// SW-REQ-123
 func PyObjectCallObject(o unsafe.Pointer, args unsafe.Pointer) (unsafe.Pointer, error) {
 	ret := PyObject_CallObject(ToPyObject(o), ToPyObject(args))
 	if ret == nil {
@@ -118,6 +128,7 @@ func PyObjectCallObject(o unsafe.Pointer, args unsafe.Pointer) (unsafe.Pointer, 
 }
 
 // PyObjectGetAttr wraps PyObject_GetAttr
+// SW-REQ-123
 func PyObjectGetAttr(o unsafe.Pointer, attr interface{}) (unsafe.Pointer, error) {
 	switch attr.(type) {
 	case string:
@@ -137,6 +148,7 @@ func PyObjectGetAttr(o unsafe.Pointer, attr interface{}) (unsafe.Pointer, error)
 }
 
 // PyBytesFromString wraps PyBytesFromString
+// SW-REQ-123
 func PyBytesFromString(input []byte) (unsafe.Pointer, error) {
 	data := C.CBytes(input)
 	defer C.free(unsafe.Pointer(data))
@@ -148,6 +160,7 @@ func PyBytesFromString(input []byte) (unsafe.Pointer, error) {
 }
 
 // PyBytesAsString wraps PyBytes_AsString
+// SW-REQ-123
 func PyBytesAsString(o unsafe.Pointer, l int) ([]byte, error) {
 	obj := ToPyObject(o)
 	cstr := PyBytes_AsString(obj)
@@ -160,15 +173,18 @@ func PyBytesAsString(o unsafe.Pointer, l int) ([]byte, error) {
 }
 
 // PyLongAsLong wraps PyLong_AsLong
+// SW-REQ-123
 func PyLongAsLong(o unsafe.Pointer) int {
 	l := PyLong_AsLong(ToPyObject(o))
 	return int(l)
 }
 
+// SW-REQ-123
 func PyIncRef(o unsafe.Pointer) {
 	Py_IncRef(ToPyObject(o))
 }
 
+// SW-REQ-123
 func PyDecRef(o unsafe.Pointer) {
 	Py_DecRef(ToPyObject(o))
 }

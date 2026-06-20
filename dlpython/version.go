@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// SW-REQ-123
 func selectLatestVersion(versions []string) string {
 	// Sort the versions based on a custom comparison function
 	sort.Slice(versions, func(i, j int) bool {

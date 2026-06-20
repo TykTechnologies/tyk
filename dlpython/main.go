@@ -40,6 +40,7 @@ var (
 )
 
 // FindPythonConfig scans PATH for common python-config locations.
+// SW-REQ-123
 func FindPythonConfig(customVersion string) (selectedVersion string, err error) {
 	logger.Debugf("Requested python version: %q", customVersion)
 
@@ -124,6 +125,7 @@ func FindPythonConfig(customVersion string) (selectedVersion string, err error) 
 	return selectedVersion, nil
 }
 
+// SW-REQ-123
 func execPythonConfig() ([]byte, error) {
 	// Try to include the "embed" flag first
 	// introduced in Python 3.8: https://docs.python.org/3.8/whatsnew/3.8.html#debug-build-uses-the-same-abi-as-release-build
@@ -134,6 +136,7 @@ func execPythonConfig() ([]byte, error) {
 	return out, err
 }
 
+// SW-REQ-123
 func getLibraryPathFromCfg() error {
 	out, err := execPythonConfig()
 	if err != nil {
@@ -142,7 +145,7 @@ func getLibraryPathFromCfg() error {
 	}
 	outString := string(out)
 	var libDir, libName string
-	splits := strings.Split(outString, " ")
+	splits := strings.Fields(outString)
 	for _, v := range splits {
 		if len(v) <= 2 {
 			continue
@@ -178,6 +181,7 @@ func getLibraryPathFromCfg() error {
 var libPath *C.char
 
 // Init will initialize the Python runtime.
+// SW-REQ-123
 func Init() error {
 	// Set the library path:
 	libPath = C.CString(pythonLibraryPath)
