@@ -44,7 +44,7 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 132/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `verification_scope_complete` | 133/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
 | `mcdc_coverage` | 52/385 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
@@ -193,6 +193,14 @@ fixed or to hide them from the current strict audit.
   where parsed binding and selected port state could leak across importer
   instances and malformed service shapes could panic. It moves the visible
   production coverage baseline from 131/447 to 132/447.
+- `SW-REQ-085` onboarded `apidef/migration.go` with focused evidence for
+  Classic API definition version splitting, endpoint method-action migration,
+  cache migration, authentication config pruning, compatibility flag migration,
+  scope/response-processor migration, global rate-limit and IP access-control
+  migration, and OAS-origin disabled default initialization. This increment is
+  scoped to local data-shape migration helpers and does not close full API
+  lifecycle migration evidence. It moves the visible production coverage
+  baseline from 132/447 to 133/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

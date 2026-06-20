@@ -40,6 +40,7 @@
 <!-- documents SW-REQ-082 -->
 <!-- documents SW-REQ-083 -->
 <!-- documents SW-REQ-084 -->
+<!-- documents SW-REQ-085 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -51,7 +52,7 @@ health-check wire values, host-list access behavior, and error-override helper
 state, embedded Classic API definition schema data, Classic API definition core
 helper behavior, importer source dispatcher behavior, Apiary Blueprint importer
 conversion behavior, Swagger importer conversion behavior, WSDL importer
-conversion behavior, OAS path/server helper shapes, OAS root extension helper shapes, OAS server model helper
+conversion behavior, Classic API definition migration helper behavior, OAS path/server helper shapes, OAS root extension helper shapes, OAS server model helper
 shapes, OAS URL rewrite helper shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint
 helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes,
@@ -70,7 +71,7 @@ engine v3 universal-data-graph adapter configuration behavior, and Classic API
 definition core model helper behavior, and Apiary Blueprint importer conversion
 behavior, and importer source dispatcher behavior, without silent data-shape
 drift, plus Swagger importer conversion behavior and WSDL importer conversion
-behavior.
+behavior, plus Classic API definition migration helper behavior.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -526,6 +527,23 @@ admission, middleware execution, upstream authentication execution, webhook
 delivery, JavaScript execution, log emission, persistence backend correctness,
 analytics, GraphQL execution, streaming execution, or final client-visible
 runtime behavior.
+
+`SW-REQ-085` owns the concrete `apidef/migration.go` Classic API definition
+migration helpers. Its evidence covers old-to-new versioning migration error
+handling, deterministic base/child API split behavior apart from generated
+child API IDs, endpoint method-action expansion into method-specific endpoint
+metadata and mock-response metadata, simple-to-advanced cache migration,
+authentication config pruning and naming, legacy custom plugin auth migration,
+plugin bundle/config, mutual TLS, certificate pinning, gateway tag,
+authentication plugin, ID extractor, custom domain, scope-to-policy,
+response-processor, global header, global response-header, global rate-limit,
+and IP access-control compatibility shape migration, plus disabled default
+initialization for OAS-origin Classic API definitions. This evidence does not
+claim full API import correctness, persistence migration correctness, dashboard
+migration orchestration, gateway API loading, route generation, request
+matching, gateway request admission, middleware execution, authentication
+execution, upstream availability, analytics, or final client-visible runtime
+behavior.
 
 `SW-REQ-081` owns the concrete `apidef/importer/blueprint.go` Apiary Blueprint
 importer conversion behavior. Its evidence covers JSON load success and

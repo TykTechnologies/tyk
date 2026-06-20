@@ -11,16 +11,19 @@ import (
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
+// SW-REQ-085
 const (
 	ResponseProcessorResponseBodyTransform = "response_body_transform"
 	// DefaultCacheTimeout is the default cache TTL in seconds if not specified for api and endpoint level caching
 	DefaultCacheTimeout int64 = 60
 )
 
+// SW-REQ-085
 var (
 	ErrMigrationNewVersioningEnabled = errors.New("not migratable - new versioning is already enabled")
 )
 
+// SW-REQ-085
 func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error) {
 	if a.VersionDefinition.Enabled || len(a.VersionDefinition.Versions) != 0 {
 		return nil, ErrMigrationNewVersioningEnabled
@@ -150,18 +153,21 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 	return
 }
 
+// SW-REQ-085
 const (
 	typeWhitelist = 0
 	typeBlacklist = 1
 	typeIgnore    = 2
 )
 
+// SW-REQ-085
 func (a *APIDefinition) MigrateEndpointMeta() {
 	a.migrateEndpointMetaByType(typeIgnore)
 	a.migrateEndpointMetaByType(typeBlacklist)
 	a.migrateEndpointMetaByType(typeWhitelist)
 }
 
+// SW-REQ-085
 func (a *APIDefinition) migrateEndpointMetaByType(typ int) {
 	vInfo := a.VersionData.Versions[""]
 
@@ -236,6 +242,7 @@ func (a *APIDefinition) migrateEndpointMetaByType(typ int) {
 	a.VersionData.Versions[""] = vInfo
 }
 
+// SW-REQ-085
 func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.migrateCustomPluginAuth()
 	a.MigrateAuthentication()
@@ -271,12 +278,14 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	return versions, nil
 }
 
+// SW-REQ-085
 func (a *APIDefinition) migratePluginBundle() {
 	if !a.CustomMiddlewareBundleDisabled && a.CustomMiddlewareBundle == "" {
 		a.CustomMiddlewareBundleDisabled = true
 	}
 }
 
+// SW-REQ-085
 func (a *APIDefinition) migratePluginConfigData() {
 	if reflect.IsEmpty(a.ConfigData) {
 		a.ConfigDataDisabled = true
@@ -284,6 +293,7 @@ func (a *APIDefinition) migratePluginConfigData() {
 }
 
 // migrateCustomPluginAuth deprecates UseGoPluginAuth and EnableCoProcessAuth in favour of CustomPluginAuthEnabled.
+// SW-REQ-085
 func (a *APIDefinition) migrateCustomPluginAuth() {
 	if a.UseGoPluginAuth || a.EnableCoProcessAuth {
 		a.CustomPluginAuthEnabled = true
@@ -292,42 +302,49 @@ func (a *APIDefinition) migrateCustomPluginAuth() {
 	}
 }
 
+// SW-REQ-085
 func (a *APIDefinition) migrateMutualTLS() {
 	if !a.UpstreamCertificatesDisabled && len(a.UpstreamCertificates) == 0 {
 		a.UpstreamCertificatesDisabled = true
 	}
 }
 
+// SW-REQ-085
 func (a *APIDefinition) migrateCertificatePinning() {
 	if !a.CertificatePinningDisabled && len(a.PinnedPublicKeys) == 0 {
 		a.CertificatePinningDisabled = true
 	}
 }
 
+// SW-REQ-085
 func (a *APIDefinition) migrateGatewayTags() {
 	if !a.TagsDisabled && len(a.Tags) == 0 {
 		a.TagsDisabled = true
 	}
 }
 
+// SW-REQ-085
 func (a *APIDefinition) migrateAuthenticationPlugin() {
 	if reflect.IsEmpty(a.CustomMiddleware.AuthCheck) {
 		a.CustomMiddleware.AuthCheck.Disabled = true
 	}
 }
 
+// SW-REQ-085
 func (a *APIDefinition) migrateIDExtractor() {
 	if reflect.IsEmpty(a.CustomMiddleware.IdExtractor) {
 		a.CustomMiddleware.IdExtractor.Disabled = true
 	}
 }
 
+// SW-REQ-085
 func (a *APIDefinition) migrateCustomDomain() {
 	if !a.DomainDisabled && a.Domain == "" {
 		a.DomainDisabled = true
 	}
 }
 
+// SW-REQ-085
 func (a *APIDefinition) migrateGlobalHeaders() {
 	vInfo := a.VersionData.Versions[""]
 	if len(vInfo.GlobalHeaders) == 0 && len(vInfo.GlobalHeadersRemove) == 0 {
@@ -336,6 +353,7 @@ func (a *APIDefinition) migrateGlobalHeaders() {
 	}
 }
 
+// SW-REQ-085
 func (a *APIDefinition) migrateGlobalResponseHeaders() {
 	vInfo := a.VersionData.Versions[""]
 	if len(vInfo.GlobalResponseHeaders) == 0 && len(vInfo.GlobalResponseHeadersRemove) == 0 {
@@ -344,6 +362,7 @@ func (a *APIDefinition) migrateGlobalResponseHeaders() {
 	}
 }
 
+// SW-REQ-085
 func (a *APIDefinition) MigrateCachePlugin() {
 	vInfo := a.VersionData.Versions[""]
 	list := vInfo.ExtendedPaths.Cached
@@ -370,6 +389,7 @@ func (a *APIDefinition) MigrateCachePlugin() {
 }
 
 // createAdvancedCacheConfig creates a new CacheMeta configuration for advanced caching.
+// SW-REQ-085
 func createAdvancedCacheConfig(cacheOpts CacheOptions, path string, method string) CacheMeta {
 	// Default cache timeout in seconds if none is specified but caching is enabled
 	timeout := DefaultCacheTimeout
@@ -397,6 +417,7 @@ func createAdvancedCacheConfig(cacheOpts CacheOptions, path string, method strin
 	}
 }
 
+// SW-REQ-085
 func (a *APIDefinition) MigrateAuthentication() {
 	a.deleteAuthConfigsNotUsed()
 	for k, v := range a.AuthConfigs {
@@ -405,6 +426,7 @@ func (a *APIDefinition) MigrateAuthentication() {
 	}
 }
 
+// SW-REQ-085
 func (a *APIDefinition) deleteAuthConfigsNotUsed() {
 	if !a.isAuthTokenEnabled() {
 		delete(a.AuthConfigs, AuthTokenType)
@@ -439,6 +461,7 @@ func (a *APIDefinition) deleteAuthConfigsNotUsed() {
 	}
 }
 
+// SW-REQ-085
 func (a *APIDefinition) isAuthTokenEnabled() bool {
 	return a.UseStandardAuth ||
 		(!a.UseKeylessAccess &&
@@ -452,6 +475,7 @@ func (a *APIDefinition) isAuthTokenEnabled() bool {
 }
 
 // SetDisabledFlags set disabled flags to true, since by default they are not enabled in OAS API definition.
+// SW-REQ-085
 func (a *APIDefinition) SetDisabledFlags() {
 	a.CustomMiddleware.AuthCheck.Disabled = true
 	a.TagsDisabled = true
@@ -500,6 +524,7 @@ func (a *APIDefinition) SetDisabledFlags() {
 	a.ErrorOverridesDisabled = true
 }
 
+// SW-REQ-085
 func (a *APIDefinition) setEventHandlersDisabledFlags() {
 	for k := range a.EventHandlers.Events {
 		for i := range a.EventHandlers.Events[k] {
@@ -510,6 +535,7 @@ func (a *APIDefinition) setEventHandlersDisabledFlags() {
 	}
 }
 
+// SW-REQ-085
 func (a *APIDefinition) migrateScopeToPolicy() {
 	scopeClaim := ScopeClaim{
 		ScopeClaimName: a.JWTScopeClaimName,
@@ -527,6 +553,7 @@ func (a *APIDefinition) migrateScopeToPolicy() {
 	a.Scopes.JWT = scopeClaim
 }
 
+// SW-REQ-085
 func (a *APIDefinition) migrateResponseProcessors() {
 	var responseProcessors []ResponseProcessor
 	for i := range a.ResponseProcessors {
@@ -539,12 +566,14 @@ func (a *APIDefinition) migrateResponseProcessors() {
 	a.ResponseProcessors = responseProcessors
 }
 
+// SW-REQ-085
 func (a *APIDefinition) migrateGlobalRateLimit() {
 	if a.GlobalRateLimit.Per <= 0 || a.GlobalRateLimit.Rate <= 0 {
 		a.GlobalRateLimit.Disabled = true
 	}
 }
 
+// SW-REQ-085
 func (a *APIDefinition) migrateIPAccessControl() {
 	a.IPAccessControlDisabled = false
 
