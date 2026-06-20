@@ -1,0 +1,53 @@
+id: SW-REQ-080
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The apidef API-definition core model shall preserve Classic API definition wire-shape constants and structs, route/header/rate-limit/version/discovery/auth/scope classification helpers, database compatibility encoding and decoding of map keys and validation schemas, regex matcher initialization and match semantics, deterministic dummy API defaults, template JSON/XML marshaling helpers, JWK cache timeout fallback, uptime command append behavior, and event-handler scan conversion with explicit error propagation for unmarshalable input.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: apidef/api_definitions_reqproof_test.go; docs/apidef-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-104
+component: model
+rationale: This software requirement owns only the local apidef/api_definitions.go Classic API definition data model and helper behavior. It does not claim gateway API loading, API import or migration completeness, OAS conversion completeness, route generation, request matching, gateway request admission, middleware execution, upstream authentication execution, webhook delivery, JavaScript execution, log emission, persistence backend correctness, analytics, GraphQL execution, streaming execution, or final client-visible runtime behavior.
+tags:
+    - api-definition
+    - classic-api
+    - model
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-104
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T05:22:19Z"
+        comment: "Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-080 is scoped to local apidef/api_definitions.go Classic API definition model/helper behavior: wire-shape constants and structs, route/header/rate-limit/version/discovery/auth/scope helper classification, database compatibility encode/decode of version names, upstream certificate maps, pinned key maps and validation schemas, regex matcher behavior, dummy API defaults, template JSON/XML helpers, JWK timeout fallback, uptime command append behavior, and event-handler scan conversion/error propagation. Focused apidef reqproof tests passed. This approval does not claim gateway API loading, API import or migration completeness, OAS conversion completeness, route generation, request matching, gateway request admission, middleware execution, upstream authentication execution, webhook delivery, JavaScript execution, log emission, persistence backend correctness, analytics, GraphQL execution, streaming execution, or final client-visible runtime behavior."
+        fingerprint: sha256:b262aefa7d1ecf06165148ee9f48219189ec3907be92b668ca29f19807e67390
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T05:21:13Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T05:22:19Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T05:21:13Z"
+          from: draft
+          to: review
+          reason: Added apidef API-definition core model and helper behavior under API-definition support model behavior.
+          changed_by: agent:codex

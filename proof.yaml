@@ -149,6 +149,8 @@ project:
     waivers: []
     verification_scope:
         include:
+            - apidef/api_definitions.go
+            - apidef/api_definitions_reqproof_test.go
             - apidef/adapter/asyncapi.go
             - apidef/adapter/asyncapi_test.go
             - apidef/adapter/import_adapter.go

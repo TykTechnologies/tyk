@@ -221,6 +221,7 @@ type HeaderInjectionMeta struct {
 	ActOnResponse bool              `bson:"act_on" json:"act_on"`
 }
 
+// SW-REQ-080
 func (h *HeaderInjectionMeta) Enabled() bool {
 	return !h.Disabled && (len(h.AddHeaders) > 0 || len(h.DeleteHeaders) > 0)
 }
@@ -249,6 +250,7 @@ type RateLimitMeta struct {
 }
 
 // Valid will return true if the rate limit should be applied.
+// SW-REQ-080
 func (r *RateLimitMeta) Valid() bool {
 	if err := r.Err(); err != nil {
 		return false
@@ -258,6 +260,7 @@ func (r *RateLimitMeta) Valid() bool {
 
 // Err checks the rate limit configuration for validity and returns an error if it is not valid.
 // It checks for a nil value, the enabled flag and valid values for each setting.
+// SW-REQ-080
 func (r *RateLimitMeta) Err() error {
 	if r == nil || r.Disabled {
 		return errors.New("rate limit disabled")
@@ -301,6 +304,7 @@ type StringRegexMap struct {
 }
 
 // Empty is a utility function that returns true if the value is empty.
+// SW-REQ-080
 func (r StringRegexMap) Empty() bool {
 	return r.MatchPattern == "" && !r.Reverse
 }
@@ -315,6 +319,7 @@ type RoutingTriggerOptions struct {
 }
 
 // NewRoutingTriggerOptions allocates the maps inside RoutingTriggerOptions.
+// SW-REQ-080
 func NewRoutingTriggerOptions() RoutingTriggerOptions {
 	return RoutingTriggerOptions{
 		HeaderMatches:         make(map[string]StringRegexMap),
@@ -424,6 +429,7 @@ type ExtendedPathsSet struct {
 }
 
 // Clear omits values that have OAS API definition conversions in place.
+// SW-REQ-080
 func (e *ExtendedPathsSet) Clear() {
 	// The values listed within don't have a conversion from OAS in place.
 	// When the conversion is added, delete the individual field to clear it.
@@ -470,6 +476,7 @@ type VersionDefinition struct {
 	BaseID string `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
 }
 
+// SW-REQ-080
 func (v *VersionDefinition) ResolvedDefault() string {
 	if v.Default == Self {
 		return v.Name
@@ -506,14 +513,17 @@ type VersionInfo struct {
 	OverrideTarget                string            `bson:"override_target" json:"override_target"`
 }
 
+// SW-REQ-080
 func (v *VersionInfo) GlobalHeadersEnabled() bool {
 	return !v.GlobalHeadersDisabled && (len(v.GlobalHeaders) > 0 || len(v.GlobalHeadersRemove) > 0)
 }
 
+// SW-REQ-080
 func (v *VersionInfo) GlobalResponseHeadersEnabled() bool {
 	return !v.GlobalResponseHeadersDisabled && (len(v.GlobalResponseHeaders) > 0 || len(v.GlobalResponseHeadersRemove) > 0)
 }
 
+// SW-REQ-080
 func (v *VersionInfo) HasEndpointReqHeader() bool {
 	if !v.UseExtendedPaths {
 		return false
@@ -528,6 +538,7 @@ func (v *VersionInfo) HasEndpointReqHeader() bool {
 	return false
 }
 
+// SW-REQ-080
 func (v *VersionInfo) HasEndpointResHeader() bool {
 	if !v.UseExtendedPaths {
 		return false
@@ -633,6 +644,7 @@ type ServiceDiscoveryConfiguration struct {
 }
 
 // CacheOptions returns the timeout value in effect, and a bool if cache is enabled.
+// SW-REQ-080
 func (sd *ServiceDiscoveryConfiguration) CacheOptions() (int64, bool) {
 	return sd.CacheTimeout, !sd.CacheDisabled
 }
@@ -806,6 +818,7 @@ type JWK struct {
 }
 
 // GetCacheTimeoutSeconds returns the cache timeout in seconds, using the default expiration if CacheTimeout is zero or negative.
+// SW-REQ-080
 func (jwk *JWK) GetCacheTimeoutSeconds(defaultExpiration int64) int64 {
 	if jwk.CacheTimeout > 0 {
 		return int64(jwk.CacheTimeout.Seconds())
@@ -824,11 +837,13 @@ type UpstreamAuth struct {
 }
 
 // IsEnabled checks if UpstreamAuthentication is enabled for the API.
+// SW-REQ-080
 func (u *UpstreamAuth) IsEnabled() bool {
 	return u.Enabled && (u.BasicAuth.Enabled || u.OAuth.Enabled)
 }
 
 // IsEnabled checks if UpstreamOAuth is enabled for the API.
+// SW-REQ-080
 func (u UpstreamOAuth) IsEnabled() bool {
 	return u.Enabled
 }
@@ -913,11 +928,13 @@ type AuthSource struct {
 }
 
 // IsEnabled returns the enabled status of the auth source.
+// SW-REQ-080
 func (a AuthSource) IsEnabled() bool {
 	return a.Enabled
 }
 
 // AuthKeyName returns the key name to be used for the auth source.
+// SW-REQ-080
 func (a AuthSource) AuthKeyName() string {
 	if !a.IsEnabled() {
 		return ""
@@ -965,6 +982,7 @@ type HostCheckObject struct {
 }
 
 // AddCommand will append a new command to the test.
+// SW-REQ-080
 func (h *HostCheckObject) AddCommand(name, message string) {
 	command := CheckCommand{
 		Name:    name,
@@ -1255,6 +1273,7 @@ type GraphQLPlayground struct {
 }
 
 // EncodeForDB will encode map[string]struct variables for saving in URL format
+// SW-REQ-080
 func (a *APIDefinition) EncodeForDB() {
 	newVersion := make(map[string]VersionInfo)
 	for k, v := range a.VersionData.Versions {
@@ -1294,6 +1313,7 @@ func (a *APIDefinition) EncodeForDB() {
 	}
 }
 
+// SW-REQ-080
 func (a *APIDefinition) DecodeFromDB() {
 	newVersion := make(map[string]VersionInfo)
 	for k, v := range a.VersionData.Versions {
@@ -1362,6 +1382,7 @@ func (a *APIDefinition) DecodeFromDB() {
 
 // Expired returns true if this Version has expired
 // and false if it has not expired (or does not have any expiry)
+// SW-REQ-080
 func (v *VersionInfo) Expired() bool {
 	// Never expires
 	if v.Expires == "" || v.Expires == "-1" {
@@ -1378,6 +1399,7 @@ func (v *VersionInfo) Expired() bool {
 }
 
 // ExpiryTime returns the time that this version is due to expire
+// SW-REQ-080
 func (v *VersionInfo) ExpiryTime() (exp time.Time) {
 	if v.Expired() {
 		return exp
@@ -1386,6 +1408,7 @@ func (v *VersionInfo) ExpiryTime() (exp time.Time) {
 	return
 }
 
+// SW-REQ-080
 func (s *StringRegexMap) Check(value string) (match string) {
 	if s.matchRegex == nil {
 		return
@@ -1394,6 +1417,7 @@ func (s *StringRegexMap) Check(value string) (match string) {
 	return s.matchRegex.FindString(value)
 }
 
+// SW-REQ-080
 func (s *StringRegexMap) FindStringSubmatch(value string) (matched bool, match []string) {
 	if s.matchRegex == nil {
 		return
@@ -1409,6 +1433,7 @@ func (s *StringRegexMap) FindStringSubmatch(value string) (matched bool, match [
 	return
 }
 
+// SW-REQ-080
 func (s *StringRegexMap) FindAllStringSubmatch(value string, n int) (matched bool, matches [][]string) {
 	matches = s.matchRegex.FindAllStringSubmatch(value, n)
 	if !s.Reverse {
@@ -1420,6 +1445,7 @@ func (s *StringRegexMap) FindAllStringSubmatch(value string, n int) (matched boo
 	return
 }
 
+// SW-REQ-080
 func (s *StringRegexMap) Init() error {
 	var err error
 	if s.matchRegex, err = regexp.Compile(s.MatchPattern); err != nil {
@@ -1431,10 +1457,12 @@ func (s *StringRegexMap) Init() error {
 	return nil
 }
 
+// SW-REQ-080
 func (a *APIDefinition) GenerateAPIID() {
 	a.APIID = uuid.NewHex()
 }
 
+// SW-REQ-080
 func (a *APIDefinition) GetAPIDomain() string {
 	if a.DomainDisabled {
 		return ""
@@ -1443,29 +1471,34 @@ func (a *APIDefinition) GetAPIDomain() string {
 }
 
 // SetProtocol configures the transport and application protocol for the API.
+// SW-REQ-080
 func (a *APIDefinition) SetProtocol(transport, application string) {
 	a.JsonRpcVersion = transport
 	a.ApplicationProtocol = application
 }
 
 // IsMCP returns true if this API uses the Model Context Protocol.
+// SW-REQ-080
 func (a *APIDefinition) IsMCP() bool {
 	return a.ApplicationProtocol == AppProtocolMCP
 }
 
 // MarkAsMCP configures the API definition as a Model Context Protocol (MCP) API.
+// SW-REQ-080
 func (a *APIDefinition) MarkAsMCP() {
 	a.SetProtocol(JsonRPC20, AppProtocolMCP)
 }
 
 // IsChildAPI returns true if this API is a child API in a versioning hierarchy.
 // A child API is identified by having a BaseID that differs from its own APIID.
+// SW-REQ-080
 func (a *APIDefinition) IsChildAPI() bool {
 	return a.VersionDefinition.BaseID != "" && a.VersionDefinition.BaseID != a.APIID
 }
 
 // IsBaseAPI returns true if this API is a base API with child versions.
 // A base API is identified by having versions defined and either no BaseID or BaseID equal to its own APIID.
+// SW-REQ-080
 func (a *APIDefinition) IsBaseAPI() bool {
 	return len(a.VersionDefinition.Versions) > 0 &&
 		(a.VersionDefinition.BaseID == "" || a.VersionDefinition.BaseID == a.APIID)
@@ -1473,12 +1506,14 @@ func (a *APIDefinition) IsBaseAPI() bool {
 
 // IsBaseAPIWithVersioning returns true if this API is a base API with versioning explicitly enabled.
 // This is similar to IsBaseAPI but additionally requires versioning to be enabled and have a version name.
+// SW-REQ-080
 func (a *APIDefinition) IsBaseAPIWithVersioning() bool {
 	return a.VersionDefinition.Enabled &&
 		(a.VersionDefinition.BaseID == "" || a.VersionDefinition.BaseID == a.APIID) &&
 		a.VersionDefinition.Name != ""
 }
 
+// SW-REQ-080
 func DummyAPI() APIDefinition {
 	endpointMeta := EndPointMeta{
 		Path: "abc",
@@ -1663,6 +1698,7 @@ func DummyAPI() APIDefinition {
 	}
 }
 
+// SW-REQ-080
 func (a *APIDefinition) GetScopeClaimName() string {
 	if reflect.IsEmpty(a.Scopes) {
 		return a.JWTScopeClaimName
@@ -1675,6 +1711,7 @@ func (a *APIDefinition) GetScopeClaimName() string {
 	return a.Scopes.JWT.ScopeClaimName
 }
 
+// SW-REQ-080
 func (a *APIDefinition) GetScopeToPolicyMapping() map[string]string {
 	if reflect.IsEmpty(a.Scopes) {
 		return a.JWTScopeToPolicyMapping
@@ -1687,6 +1724,7 @@ func (a *APIDefinition) GetScopeToPolicyMapping() map[string]string {
 	return a.Scopes.JWT.ScopeToPolicy
 }
 
+// SW-REQ-080
 var Template = template.New("").Funcs(map[string]interface{}{
 	"jsonMarshal": func(v interface{}) (string, error) {
 		bs, err := json.Marshal(v)
@@ -1771,6 +1809,7 @@ type WebHookHandlerConf struct {
 }
 
 // Scan scans WebHookHandlerConf from `any` in.
+// SW-REQ-080
 func (w *WebHookHandlerConf) Scan(in any) error {
 	conf, err := reflect.Cast[WebHookHandlerConf](in)
 	if err != nil {
@@ -1794,6 +1833,7 @@ type JSVMEventHandlerConf struct {
 }
 
 // Scan populates the JSVMEventHandlerConf struct by casting and copying data from the provided input.
+// SW-REQ-080
 func (j *JSVMEventHandlerConf) Scan(in any) error {
 	conf, err := reflect.Cast[JSVMEventHandlerConf](in)
 	if err != nil {
@@ -1813,6 +1853,7 @@ type LogEventHandlerConf struct {
 }
 
 // Scan extracts data from the input into the LogEventHandlerConf struct by performing type conversion.
+// SW-REQ-080
 func (l *LogEventHandlerConf) Scan(in any) error {
 	conf, err := reflect.Cast[LogEventHandlerConf](in)
 	if err != nil {

@@ -35,6 +35,7 @@
 <!-- documents SW-REQ-077 -->
 <!-- documents SW-REQ-078 -->
 <!-- documents SW-REQ-079 -->
+<!-- documents SW-REQ-080 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -43,8 +44,9 @@ admission, or the full API definition lifecycle.
 
 `SYS-REQ-104` covers API-definition support model helpers that preserve typed
 health-check wire values, host-list access behavior, and error-override helper
-state, embedded Classic API definition schema data, OAS path/server helper
-shapes, OAS root extension helper shapes, OAS server model helper shapes, OAS URL rewrite helper shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
+state, embedded Classic API definition schema data, Classic API definition core
+helper behavior, OAS path/server helper shapes, OAS root extension helper
+shapes, OAS server model helper shapes, OAS URL rewrite helper shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint
 helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes,
 OAS deprecated-wrapper conversion shapes, OAS Tyk streaming extension shape, OAS event-handler helper shapes,
@@ -58,8 +60,8 @@ adapter support-shape generation, and GraphQL engine adapter utility behavior
 and proxy-only, supergraph, and universal-data-graph engine adapter
 configuration behavior, plus engine v3 proxy-only adapter configuration
 and supergraph adapter configuration behavior, and engine v3 utility behavior,
-and engine v3 universal-data-graph adapter configuration behavior, without
-silent data-shape drift.
+engine v3 universal-data-graph adapter configuration behavior, and Classic API
+definition core model helper behavior, without silent data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -497,3 +499,21 @@ behavior, GraphQL execution, subscription transport execution, gateway API
 loading, route generation, request matching, gateway request admission,
 middleware execution, persistence, analytics, or final client-visible runtime
 behavior.
+
+`SW-REQ-080` owns the concrete `apidef/api_definitions.go` Classic API
+definition data model and helper behavior. Its evidence covers wire-shape
+constants and struct preservation, route/header/rate-limit/version/discovery
+helper classification, upstream-auth and auth-source classification,
+scope-claim and scope-policy mapping selection, database compatibility
+encoding and decoding for version names, upstream certificate maps, pinned key
+maps, and validation schemas, legacy decode fallback behavior for unencoded
+keys, regex matcher initialization and normal/reverse matching, deterministic
+dummy API defaults, template JSON/XML marshaling helpers, JWK cache timeout
+fallback, uptime command append behavior, and webhook/JSVM/log event-handler
+scan conversion with explicit unmarshalable-input errors. This evidence does
+not claim gateway API loading, API import or migration completeness, OAS
+conversion completeness, route generation, request matching, gateway request
+admission, middleware execution, upstream authentication execution, webhook
+delivery, JavaScript execution, log emission, persistence backend correctness,
+analytics, GraphQL execution, streaming execution, or final client-visible
+runtime behavior.
