@@ -1,0 +1,74 @@
+id: STK-REQ-024
+version: 1
+status: approved
+priority: shall
+category: operational
+req_type: guarantee
+fretish: ""
+description: Gateway startup support shall surface local configuration risks and apply deterministic analytics defaults so operators and startup code can detect insecure, deprecated, missing-lifetime, default-secret, and undersized analytics settings before normal gateway operation proceeds.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: startup_checkup
+rationale: Startup diagnostics protect operators from silently running with risky local configuration. This stakeholder requirement owns only local checkup helper behavior; it does not claim operating-system tuning, log transport delivery, operator remediation, gateway request admission, analytics pipeline durability, or final client-visible behavior.
+tags:
+    - startup
+    - configuration
+    - diagnostics
+    - analytics
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T08:48:17Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Startup checkup scope is limited to local checkup/checkup.go helper behavior: warning emission for insecure configuration allowance, deprecated health checks, missing global session lifetime, retained default gateway/node secrets, analytics defaulting for pool size, records buffer size, and storage expiration, public Run orchestration, and host resource probe execution without mutation claims. Focused checkup ReqProof tests passed, including race, and the checkup package was added to configured build/test/lint gates. This approval does not claim OS resource tuning, log transport delivery, operator remediation, gateway request admission, analytics pipeline durability, or final client-visible behavior.
+        fingerprint: sha256:b3627ebf4ecb8398e02875642e3036891b7f83b2a18240a3956baa6de13b5eee
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T08:44:17Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T08:48:17Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need startup diagnostics to identify risky local configuration and deterministic analytics defaults so the gateway does not silently proceed with surprising startup settings.
+    acceptance_criteria:
+        - id: STK-REQ-024-AC-01
+          text: Given insecure configuration allowance, deprecated health checks, missing global session lifetime, or default gateway/node secrets, when startup checkup runs, then explicit local warnings are emitted for those risks.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-112
+        - id: STK-REQ-024-AC-02
+          text: Given analytics is disabled, when startup checkup evaluates analytics defaults, then zero analytics values are preserved.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-112
+        - id: STK-REQ-024-AC-03
+          text: Given analytics is enabled with missing or undersized local settings, when startup checkup evaluates analytics defaults, then deterministic pool size, records buffer size, and storage expiration defaults are applied while sufficient values are preserved.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-112
+lifecycle:
+    change_history:
+        - date: "2026-06-20T08:44:17Z"
+          from: draft
+          to: review
+          reason: Added startup checkup stakeholder requirement for checkup package onboarding.
+          changed_by: agent:codex
+        - date: "2026-06-20T08:48:17Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T08:44:17Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Startup checkup scope is limited to local checkup/checkup.go helper behavior: warning emission for insecure configuration allowance, deprecated health checks, missing global session lifetime, retained default gateway/node secrets, analytics defaulting for pool size, records buffer size, and storage expiration, public Run orchestration, and host resource probe execution without mutation claims. Focused checkup ReqProof tests passed. This approval does not claim OS resource tuning, log transport delivery, operator remediation, gateway request admission, analytics pipeline durability, or final client-visible behavior.")'
+          changed_by: human:buger

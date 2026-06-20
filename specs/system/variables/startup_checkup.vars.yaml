@@ -1,0 +1,14 @@
+component: startup_checkup
+no_interface:
+    declared: true
+    reason: The checkup package is exercised as an in-process startup configuration diagnostic helper in this proof slice; OS resource tuning, log shipping, operator remediation, gateway request admission, and analytics pipeline delivery are outside this local component boundary.
+variables:
+    - name: startup_checkup_requested
+      type: bool
+      direction: input
+      description: Gateway startup code requests local checkup warning evaluation, analytics defaulting, public Run orchestration, or host CPU/file-descriptor probe execution.
+
+    - name: startup_checkup_result_determined
+      type: bool
+      direction: output
+      description: Startup checkup support emits the relevant local warning, preserves safe or disabled analytics values, applies deterministic analytics defaults, or completes host resource probe execution without mutating gateway configuration.

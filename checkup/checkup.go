@@ -9,6 +9,7 @@ import (
 )
 
 var (
+	// SW-REQ-099
 	log            = logger.Get().WithField("prefix", "checkup")
 	defaultConfigs = config.Config{
 		Secret:     "352d20ee67be67f6340b4c0605b044b7",
@@ -19,12 +20,14 @@ var (
 	}
 )
 
+// SW-REQ-099
 const (
 	minCPU               = 2
 	minFileDescriptors   = 80000
 	minRecordsBufferSize = 1000
 )
 
+// SW-REQ-099
 func Run(c *config.Config) {
 	allowInsecureConfigs(c)
 	healthCheck(c)
@@ -36,6 +39,7 @@ func Run(c *config.Config) {
 	defaultAnalytics(c)
 }
 
+// SW-REQ-099
 func allowInsecureConfigs(c *config.Config) {
 	if c.AllowInsecureConfigs {
 		log.WithField("config.allow_insecure_configs", true).
@@ -43,12 +47,14 @@ func allowInsecureConfigs(c *config.Config) {
 	}
 }
 
+// SW-REQ-099
 func healthCheck(c *config.Config) {
 	if c.HealthCheck.EnableHealthChecks {
 		log.Warn("Health Checker is deprecated and not recommended")
 	}
 }
 
+// SW-REQ-099
 func sessionLifetimeCheck(c *config.Config) {
 	if c.GlobalSessionLifetime <= 0 {
 		log.Warn("Tyk has not detected any setting for session lifetime (`global_session_lifetime` defaults to 0 seconds). \n" +
@@ -59,6 +65,7 @@ func sessionLifetimeCheck(c *config.Config) {
 	}
 }
 
+// SW-REQ-099
 func fileDescriptors() {
 	rlimit := &syscall.Rlimit{}
 
@@ -72,6 +79,7 @@ func fileDescriptors() {
 	}
 }
 
+// SW-REQ-099
 func cpus() {
 	cpus := runtime.NumCPU()
 	if cpus < minCPU {
@@ -83,6 +91,7 @@ func cpus() {
 	}
 }
 
+// SW-REQ-099
 func defaultSecrets(c *config.Config) {
 	if c.Secret == defaultConfigs.Secret {
 		log.WithField("config.secret", defaultConfigs.Secret).
@@ -95,6 +104,7 @@ func defaultSecrets(c *config.Config) {
 	}
 }
 
+// SW-REQ-099
 func defaultAnalytics(c *config.Config) {
 	if !c.EnableAnalytics {
 		return
