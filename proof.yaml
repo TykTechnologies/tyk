@@ -163,6 +163,11 @@ project:
             - apidef/oas/internal.go
             - apidef/oas/internal_reqproof_test.go
             - apidef/oas/mcp_primitive.go
+            - apidef/oas/mcp_primitive_guard_dev.go
+            - apidef/oas/mcp_primitive_guard_release.go
+            - apidef/oas/mcp_primitive_guard_mode_dev_test.go
+            - apidef/oas/mcp_primitive_guard_mode_release_test.go
+            - apidef/oas/mcp_primitive_guard_reqproof_test.go
             - apidef/oas/mcp_primitive_reqproof_test.go
             - apidef/oas/oasutil.go
             - apidef/oas/oasutil_reqproof_test.go

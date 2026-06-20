@@ -2,6 +2,7 @@
 
 package oas
 
+// SW-REQ-064
 // ensureNotBypassingOverride is a no-op in release builds.
 // In development builds, this function validates correct usage of MCPPrimitive.
 func ensureNotBypassingOverride(v interface{}) {

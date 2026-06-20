@@ -375,9 +375,15 @@ func TestMCPPrimitive_EnsureNotBypassingOverride(t *testing.T) {
 		operation := &Operation{}
 		operation.Allow = &Allowance{Enabled: true}
 
-		assert.Panics(t, func() {
-			ensureNotBypassingOverride(operation)
-		})
+		if mcpPrimitiveGuardPanicsForOperation {
+			assert.Panics(t, func() {
+				ensureNotBypassingOverride(operation)
+			})
+		} else {
+			assert.NotPanics(t, func() {
+				ensureNotBypassingOverride(operation)
+			})
+		}
 	})
 
 	t.Run("gateway usage pattern", func(t *testing.T) {

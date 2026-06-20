@@ -2,6 +2,7 @@
 
 package oas
 
+// SW-REQ-064
 // ensureNotBypassingOverride validates that the caller passed *MCPPrimitive and not *Operation.
 // This development helper catches accidental usage of &primitive.Operation which would bypass overrides.
 // Only active in non-release builds to catch bugs during development and testing.

@@ -9,6 +9,7 @@
 <!-- documents SW-REQ-040 -->
 <!-- documents SW-REQ-043 -->
 <!-- documents SW-REQ-048 -->
+<!-- documents SW-REQ-064 -->
 
 This document records the MCP protocol helper proof slice. The slice is limited
 to `internal/mcp` helper behavior, the shared `internal/jsonrpc` router
@@ -16,7 +17,7 @@ interface, route-result shape, and JSON-RPC method VEM prefix constants that
 those helpers consume, the `apidef/mcp` embedded-schema validation helpers, the
 local `internal/service/gojsonschema` facade used by that validation path, and
 the user-package MCP access-right data model consumed by MCP helper flows, and
-the `apidef/oas` MCPPrimitive helper shape used by MCP API-definition helper
+the `apidef/oas` MCPPrimitive helper shape and build-mode guard used by MCP API-definition helper
 flows. It does not claim gateway middleware sequencing, gateway API loading or
 API definition synthesis beyond in-process MCP schema validation and local
 MCPPrimitive extraction helpers, policy merge behavior, session-right
@@ -35,7 +36,8 @@ schemas, plus the user-package data-model helpers that preserve MCP and
 JSON-RPC access-right configuration shape before those helper flows consume it,
 and the local OAS MCPPrimitive helper shape used to carry supported middleware
 configuration while omitting MCP-incompatible middleware families during
-extended-path extraction.
+extended-path extraction, including build-mode-specific guard behavior for
+direct Operation extraction inputs.
 
 `SW-REQ-025` owns `internal/mcp` routing and prefix helpers and the shared
 `internal/jsonrpc` declarations they use for router conformance, route results,
@@ -99,3 +101,13 @@ deterministic repeated extraction. This evidence does not claim full OAS
 conversion, gateway API loading, session-right lookup, middleware execution,
 policy merge behavior, persistence, analytics, network transport behavior, or
 final HTTP status generation.
+
+`SW-REQ-064` owns the local `apidef/oas` MCPPrimitive extraction guard selected
+by release and non-release build tags. Evidence in
+`apidef/oas/mcp_primitive_guard_reqproof_test.go` covers accepted MCPPrimitive
+and nil inputs in all builds, direct Operation input rejection by panic in
+non-release builds, and direct Operation no-op behavior under the `release`
+build tag. This evidence does not claim full OAS conversion, gateway API
+loading, middleware execution, policy merge behavior, session-right lookup,
+persistence, analytics, network transport behavior, or final HTTP status
+generation.
