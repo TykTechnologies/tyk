@@ -18,6 +18,7 @@ var oasTestAPIs embed.FS
 // TestLoad_URLRewrite(t *testing.T)
 //
 // - Loads the urlRewrite OAS spec with tyk extensions
+// Verifies: SYS-REQ-104, SW-REQ-090, SW-REQ-063
 func TestLoad_URLRewrite(t *testing.T) {
 	oasContents, err := oasTestAPIs.ReadFile("testdata/urlRewrite.json")
 	assert.NoError(t, err)
@@ -45,6 +46,7 @@ func TestLoad_URLRewrite(t *testing.T) {
 // - Loads the complete petstore,
 // - Imports the petstore,
 // - Asserts expected routes for validateRequest.
+// Verifies: SYS-REQ-104, SW-REQ-088, SW-REQ-090
 func TestImportValidateRequest(t *testing.T) {
 	// Load petstore
 	oasContents, err := oasTestAPIs.ReadFile("testdata/petstore-no-responses.json")

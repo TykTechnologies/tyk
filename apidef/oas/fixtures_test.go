@@ -217,6 +217,7 @@ func flatMap(tb testing.TB, src any, base map[string]any) map[string]any {
 // TestFixtures loads the fixtures configuration from the embedded fixtures.yml,
 // unmarshals the YAML content into a FixtureDocument, and logs the parsed fixtures.
 // This test currently only prints the YAML content for debugging purposes.
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestFixtures(t *testing.T) {
 	doc := Fixtures(t)
 

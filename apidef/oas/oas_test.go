@@ -118,6 +118,7 @@ func addMinimalTykExtension(oas *OAS) {
 	oas.SetTykExtension(xTykAPIGateway)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestOAS(t *testing.T) {
 	t.Parallel()
 
@@ -218,6 +219,7 @@ func TestOAS(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestOAS_ExtractTo_DontTouchExistingClassicFields(t *testing.T) {
 	var api apidef.APIDefinition
 	api.VersionData.Versions = map[string]apidef.VersionInfo{
@@ -236,6 +238,7 @@ func TestOAS_ExtractTo_DontTouchExistingClassicFields(t *testing.T) {
 	assert.Len(t, api.VersionData.Versions[Main].ExtendedPaths.PersistGraphQL, 1)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	var a apidef.APIDefinition
 	Fill(t, &a, 0)
@@ -405,6 +408,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	assert.Equal(t, expectedFields, noOASSupportFields)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestOAS_AddServers(t *testing.T) {
 	t.Parallel()
 	type fields struct {
@@ -526,6 +530,7 @@ func TestOAS_AddServers(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestOAS_UpdateServers(t *testing.T) {
 	t.Parallel()
 	type fields struct {
@@ -643,6 +648,7 @@ func TestOAS_UpdateServers(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestOAS_ReplaceServers(t *testing.T) {
 	t.Parallel()
 	type fields struct {
@@ -730,6 +736,7 @@ func TestOAS_ReplaceServers(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestOAS_GetSecuritySchemes(t *testing.T) {
 	token := Token{}
 	Fill(t, &token, 0)
@@ -783,6 +790,7 @@ func TestOAS_GetSecuritySchemes(t *testing.T) {
 	assert.Equal(t, &oauth, resOAS.getTykOAuthAuth("my_oauth"))
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func Test_toStructIfMap(t *testing.T) {
 	token := &Token{}
 	Fill(t, token, 0)
@@ -801,6 +809,7 @@ func Test_toStructIfMap(t *testing.T) {
 	assert.Equal(t, token, resToken)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestOAS_MarshalJSON(t *testing.T) {
 	t.Run("nil license and extenalDocs", func(t *testing.T) {
 		s := &OAS{
@@ -906,6 +915,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 	t.Run("basic error override", func(t *testing.T) {
 		jsonData := []byte(`{
@@ -1160,6 +1170,7 @@ func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestOAS_Clone(t *testing.T) {
 	s := &OAS{}
 	s.SetTykExtension(&XTykAPIGateway{Info: Info{
@@ -1216,6 +1227,7 @@ func BenchmarkOAS_Clone(b *testing.B) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestMigrateAndFillOAS(t *testing.T) {
 	var api apidef.APIDefinition
 	api.SetDisabledFlags()
@@ -1291,6 +1303,7 @@ func TestMigrateAndFillOAS(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 	api := apidef.APIDefinition{Name: "Furkan"}
 	api.Proxy.ListenPath = "/furkan"
@@ -1342,6 +1355,7 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestMigrateAndFillOAS_ValidateRequest(t *testing.T) {
 	newValidateJSONAPI := func(schema map[string]interface{}) *apidef.APIDefinition {
 		return &apidef.APIDefinition{
@@ -1392,6 +1406,7 @@ func TestMigrateAndFillOAS_ValidateRequest(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 	t.Run("goplugin", func(t *testing.T) {
 		api := apidef.APIDefinition{
@@ -1486,6 +1501,7 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 	t.Parallel()
 	t.Run("pre", func(t *testing.T) {
@@ -1641,6 +1657,7 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestMigrateAndFillOAS_PluginConfigData(t *testing.T) {
 	configData := map[string]interface{}{
 		"key": "value",
@@ -1671,6 +1688,7 @@ func TestMigrateAndFillOAS_PluginConfigData(t *testing.T) {
 	assert.Equal(t, expectedPluginConfigData, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Data)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestAPIContext_getValidationOptionsFromConfig(t *testing.T) {
 	t.Parallel()
 
@@ -1694,6 +1712,7 @@ func TestAPIContext_getValidationOptionsFromConfig(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestOAS_Normalize(t *testing.T) {
 	t.Run("should copy JWT validation fields correctly", func(t *testing.T) {
 		oas := &OAS{
@@ -1811,6 +1830,7 @@ func TestOAS_Normalize(t *testing.T) {
 
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestOAS_ValidateSecurity(t *testing.T) {
 	apiKey := "api_key"
 	oauth2 := "oauth2"
@@ -1974,6 +1994,7 @@ func TestOAS_ValidateSecurity(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 	t.Parallel()
 
@@ -2351,6 +2372,7 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestYaml(t *testing.T) {
 	oasDoc := OAS{}
 	Fill(t, &oasDoc, 0)
@@ -2401,6 +2423,7 @@ func TestYaml(t *testing.T) {
 	assert.Equal(t, oasDoc, yamlOASDoc)
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func TestOAS_Initialize(t *testing.T) {
 	t.Parallel()
 
@@ -2642,6 +2665,7 @@ func TestOAS_Initialize(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-090
 func Test_RemoveServer(t *testing.T) {
 	createOas := func() *OAS {
 		var spec openapi3.T

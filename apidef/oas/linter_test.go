@@ -67,6 +67,7 @@ func fixOperationsForValidation(operations map[string]*Operation) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-060
 func TestXTykGateway_Lint(t *testing.T) {
 	var err error
 
@@ -182,6 +183,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-060, SW-REQ-061
 func TestVersioningSchemaValidation(t *testing.T) {
 	schema, err := schemaDir.ReadFile("schema/x-tyk-api-gateway.strict.json")
 	require.NoError(t, err)
