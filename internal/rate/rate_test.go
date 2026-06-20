@@ -15,6 +15,7 @@ import (
 
 // Verifies: SW-REQ-010
 // SW-REQ-010:nominal:nominal
+// SW-REQ-010:boundary:nominal
 // SW-REQ-010:boundary:boundary
 func TestPrefix(t *testing.T) {
 	t.Parallel()
@@ -76,6 +77,7 @@ func TestRootAllowanceAliases(t *testing.T) {
 
 // Verifies: SW-REQ-013
 // SW-REQ-013:nominal:nominal
+// SW-REQ-013:boundary:nominal
 // SW-REQ-013:boundary:boundary
 func TestStatsHelpers(t *testing.T) {
 	t.Parallel()
@@ -93,24 +95,51 @@ func TestStatsHelpers(t *testing.T) {
 
 // Verifies: SW-REQ-013
 // SW-REQ-013:nominal:nominal
+// SW-REQ-013:error_handling:nominal
 // SW-REQ-013:error_handling:negative
 func TestAnonChecker(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("check failed")
-	checker := AnonChecker(func() (Stats, bool, error) {
-		return Stats{Count: 3, Limit: 2, Remaining: 0}, true, expectedErr
-	})
+	tests := []struct {
+		name        string
+		stats       Stats
+		blocked     bool
+		err         error
+		expectedErr error
+	}{
+		{
+			name:    "delegates successful checker result",
+			stats:   Stats{Count: 1, Limit: 2, Remaining: 1},
+			blocked: false,
+		},
+		{
+			name:        "preserves delegated checker error",
+			stats:       Stats{Count: 3, Limit: 2, Remaining: 0},
+			blocked:     true,
+			err:         expectedErr,
+			expectedErr: expectedErr,
+		},
+	}
 
-	stats, blocked, err := checker.Check()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			checker := AnonChecker(func() (Stats, bool, error) {
+				return tt.stats, tt.blocked, tt.err
+			})
 
-	assert.Equal(t, Stats{Count: 3, Limit: 2, Remaining: 0}, stats)
-	assert.True(t, blocked)
-	assert.ErrorIs(t, err, expectedErr)
+			stats, blocked, err := checker.Check()
+
+			assert.Equal(t, tt.stats, stats)
+			assert.Equal(t, tt.blocked, blocked)
+			assert.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
 }
 
 // Verifies: SW-REQ-015
 // SW-REQ-015:nominal:nominal
+// SW-REQ-015:boundary:nominal
 // SW-REQ-015:boundary:boundary
 func TestLimiterSelection(t *testing.T) {
 	t.Parallel()
@@ -131,6 +160,7 @@ func TestLimiterSelection(t *testing.T) {
 
 // Verifies: SW-REQ-015
 // SW-REQ-015:nominal:nominal
+// SW-REQ-015:boundary:nominal
 // SW-REQ-015:boundary:boundary
 func TestLimiterKey(t *testing.T) {
 	t.Parallel()

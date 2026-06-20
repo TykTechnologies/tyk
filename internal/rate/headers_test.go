@@ -16,6 +16,7 @@ import (
 
 // Verifies: SW-REQ-011
 // SW-REQ-011:nominal:nominal
+// SW-REQ-011:error_handling:nominal
 func Test_HeaderSender(t *testing.T) {
 	t.Run("NewSenderFactory", func(t *testing.T) {
 		t.Run("create quota sender", func(t *testing.T) {
@@ -37,6 +38,7 @@ func Test_HeaderSender(t *testing.T) {
 }
 
 // Verifies: SW-REQ-011
+// SW-REQ-011:error_handling:nominal
 // SW-REQ-011:error_handling:negative
 func Test_quotaSender(t *testing.T) {
 	t.Run("SendRateLimits", func(t *testing.T) {
@@ -81,7 +83,9 @@ func Test_quotaSender(t *testing.T) {
 
 // Verifies: SW-REQ-011
 // SW-REQ-011:nominal:nominal
+// SW-REQ-011:boundary:nominal
 // SW-REQ-011:boundary:boundary
+// SW-REQ-011:error_handling:nominal
 func Test_rateLimitSender(t *testing.T) {
 	t.Run("SendQuotas", func(t *testing.T) {
 		t.Run("clears quota headers", func(t *testing.T) {

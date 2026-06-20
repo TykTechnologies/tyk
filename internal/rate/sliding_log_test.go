@@ -18,7 +18,9 @@ import (
 
 // Verifies: SW-REQ-017
 // SW-REQ-017:nominal:nominal
+// SW-REQ-017:boundary:nominal
 // SW-REQ-017:boundary:boundary
+// SW-REQ-017:error_handling:nominal
 // TestSlidingLog_Do is an integration test that tests counter behaviour.
 func TestSlidingLog_Do(t *testing.T) {
 	t.Parallel()
@@ -70,6 +72,7 @@ func TestSlidingLog_Errors(t *testing.T) {
 
 // Verifies: SW-REQ-017
 // SW-REQ-017:nominal:nominal
+// SW-REQ-017:boundary:nominal
 // SW-REQ-017:boundary:boundary
 // TestSlidingLog_GetCount is an integration test that tests counter behaviour.
 func TestSlidingLog_GetCount(t *testing.T) {
@@ -94,6 +97,7 @@ func TestSlidingLog_GetCount(t *testing.T) {
 
 // Verifies: SW-REQ-017
 // SW-REQ-017:nominal:nominal
+// SW-REQ-017:boundary:nominal
 // SW-REQ-017:boundary:boundary
 // TestSlidingLog_Get is an integration test that tests log behaviour.
 func TestSlidingLog_Get(t *testing.T) {
@@ -159,6 +163,7 @@ func TestSlidingLog_pipelinerError(t *testing.T) {
 }
 
 // Verifies: SW-REQ-017
+// SW-REQ-017:boundary:nominal
 // SW-REQ-017:boundary:boundary
 func TestSlidingLog_SameTimestampRecordsDistinctPipelineHits(t *testing.T) {
 	ctx := context.Background()

@@ -26,6 +26,7 @@ func TestNewSmoothing(t *testing.T) {
 
 // Verifies: SW-REQ-012
 // SW-REQ-012:nominal:nominal
+// SW-REQ-012:boundary:nominal
 // SW-REQ-012:boundary:boundary
 func TestIncreaseRateAllowance(t *testing.T) {
 	session := &apidef.RateLimitSmoothing{
@@ -78,6 +79,7 @@ func TestIncreaseRateAllowance(t *testing.T) {
 
 // Verifies: SW-REQ-012
 // SW-REQ-012:nominal:nominal
+// SW-REQ-012:boundary:nominal
 // SW-REQ-012:boundary:boundary
 func TestDecreaseRateAllowance(t *testing.T) {
 	session := &apidef.RateLimitSmoothing{
@@ -130,7 +132,9 @@ func TestDecreaseRateAllowance(t *testing.T) {
 
 // Verifies: SW-REQ-012
 // SW-REQ-012:nominal:nominal
+// SW-REQ-012:boundary:nominal
 // SW-REQ-012:boundary:boundary
+// SW-REQ-012:error_handling:nominal
 // SW-REQ-012:error_handling:negative
 func TestSmoothing_Do(t *testing.T) {
 	ctx := context.Background()

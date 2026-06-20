@@ -32,6 +32,7 @@ func TestAllowanceStore_Locker(t *testing.T) {
 
 // Verifies: SW-REQ-009
 // SW-REQ-009:nominal:nominal
+// SW-REQ-009:boundary:nominal
 // SW-REQ-009:boundary:boundary
 func TestAllowanceStore_Get(t *testing.T) {
 	mockRedis, mock := redismock.NewClientMock()
@@ -68,6 +69,7 @@ func TestAllowanceStore_Get(t *testing.T) {
 
 // Verifies: SW-REQ-009
 // SW-REQ-009:nominal:nominal
+// SW-REQ-009:boundary:nominal
 // SW-REQ-009:boundary:boundary
 func TestAllowanceStore_Set(t *testing.T) {
 	mockRedis, mock := redismock.NewClientMock()

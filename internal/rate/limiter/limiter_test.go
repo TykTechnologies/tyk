@@ -29,6 +29,7 @@ func TestNewLimiter(t *testing.T) {
 
 // Verifies: SW-REQ-018
 // SW-REQ-018:nominal:nominal
+// SW-REQ-018:boundary:nominal
 // SW-REQ-018:boundary:boundary
 func TestLimiter_LocalAdapters(t *testing.T) {
 	t.Parallel()
@@ -44,6 +45,7 @@ func TestLimiter_LocalAdapters(t *testing.T) {
 
 // Verifies: SW-REQ-018
 // SW-REQ-018:nominal:nominal
+// SW-REQ-018:boundary:nominal
 // SW-REQ-018:boundary:boundary
 func TestLimiter_RedisAdapters(t *testing.T) {
 	ctx := context.Background()
@@ -62,6 +64,7 @@ func TestLimiter_RedisAdapters(t *testing.T) {
 
 // Verifies: SW-REQ-018
 // SW-REQ-018:nominal:nominal
+// SW-REQ-018:error_handling:nominal
 // SW-REQ-018:error_handling:negative
 func TestLimiter_Locker(t *testing.T) {
 	ctx := context.Background()
@@ -83,6 +86,7 @@ func TestLimiter_Locker(t *testing.T) {
 }
 
 // Verifies: SW-REQ-018
+// SW-REQ-018:error_handling:nominal
 // SW-REQ-018:error_handling:negative
 func TestLimiter_FixedWindowExhaustion(t *testing.T) {
 	t.Parallel()
