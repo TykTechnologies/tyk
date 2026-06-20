@@ -8,6 +8,9 @@ import (
 )
 
 // Verifies: SYS-REQ-082, SW-REQ-041
+// SW-REQ-041:nominal:nominal
+// SW-REQ-041:boundary:nominal
+// SW-REQ-041:determinism:nominal
 func TestResponseFlagConstants(t *testing.T) {
 	// Verify all 22 flag values are distinct and have expected string representations
 	flags := []struct {
@@ -53,6 +56,8 @@ func TestResponseFlagConstants(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-082, SW-REQ-041
+// SW-REQ-041:nominal:nominal
+// SW-REQ-041:boundary:nominal
 func TestNewErrorClassification(t *testing.T) {
 	t.Run("creates classification with flag and details", func(t *testing.T) {
 		ec := NewErrorClassification(TLE, "tls_certificate_expired")
@@ -72,6 +77,7 @@ func TestNewErrorClassification(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-082, SW-REQ-041
+// SW-REQ-041:nominal:nominal
 func TestErrorClassificationBuilderChaining(t *testing.T) {
 	t.Run("WithSource returns same instance", func(t *testing.T) {
 		ec := NewErrorClassification(UCF, "connection_refused")

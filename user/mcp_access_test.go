@@ -12,6 +12,7 @@ import (
 
 // Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-043
 // SW-REQ-043:nominal:nominal
+// SW-REQ-043:boundary:nominal
 // SW-REQ-043:boundary:boundary
 func TestAccessControlRules_IsEmpty(t *testing.T) {
 	tests := []struct {
@@ -56,6 +57,7 @@ func TestAccessControlRules_IsEmpty(t *testing.T) {
 
 // Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-043
 // SW-REQ-043:nominal:nominal
+// SW-REQ-043:boundary:nominal
 // SW-REQ-043:boundary:boundary
 func TestMCPAccessRights_IsEmpty(t *testing.T) {
 	tests := []struct {
@@ -204,6 +206,7 @@ func TestAccessDefinition_MCPFields_JSONRoundtrip(t *testing.T) {
 
 // Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-043
 // SW-REQ-043:nominal:nominal
+// SW-REQ-043:error_handling:nominal
 // SW-REQ-043:error_handling:negative
 func TestMCPPrimitiveLimit_Validate(t *testing.T) {
 	tests := []struct {
@@ -234,6 +237,7 @@ func TestMCPPrimitiveLimit_Validate(t *testing.T) {
 
 // Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-043
 // SW-REQ-043:encoding_safety:nominal
+// SW-REQ-043:boundary:nominal
 // SW-REQ-043:boundary:boundary
 func TestAccessDefinition_ZeroMCPFields_OmittedFromJSON(t *testing.T) {
 	input := user.AccessDefinition{

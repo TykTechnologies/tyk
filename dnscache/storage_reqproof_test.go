@@ -10,6 +10,7 @@ import (
 // Verifies: SW-REQ-035
 // SW-REQ-035:nominal:nominal
 // SW-REQ-035:boundary:nominal
+// SW-REQ-035:error_handling:nominal
 // SW-REQ-035:error_handling:negative
 func TestDnsCacheStorageRequirement(t *testing.T) {
 	storage := NewDnsCacheStorage(time.Minute, -1)

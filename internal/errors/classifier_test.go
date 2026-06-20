@@ -24,6 +24,7 @@ func TestClassifyUpstreamError_Nil(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-082, SW-REQ-041
+// SW-REQ-041:error_handling:nominal
 func TestClassifyUpstreamError_TLSErrors(t *testing.T) {
 	target := "api.backend.com:443"
 
@@ -93,6 +94,7 @@ func TestClassifyUpstreamError_TLSErrors(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-082, SW-REQ-041
+// SW-REQ-041:error_handling:nominal
 func TestClassifyUpstreamError_ConnectionErrors(t *testing.T) {
 	target := "api.backend.com:443"
 

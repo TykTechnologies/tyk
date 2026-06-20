@@ -18,7 +18,9 @@ import (
 // SYS-REQ-109:boundary:boundary
 // SYS-REQ-109:error_handling:negative
 // SW-REQ-038:nominal:nominal
+// SW-REQ-038:boundary:nominal
 // SW-REQ-038:boundary:boundary
+// SW-REQ-038:error_handling:nominal
 // SW-REQ-038:error_handling:negative
 func TestWrapDialerDialContextFunc(t *testing.T) {
 	tearDownTestStorageFetchItem := setupTestStorageFetchItem(&configTestStorageFetchItem{t, etcHostsMap, etcHostsErrorMap})
