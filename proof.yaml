@@ -161,6 +161,8 @@ project:
             - apidef/importer/wsdl_reqproof_test.go
             - apidef/migration.go
             - apidef/migration_reqproof_test.go
+            - apidef/notifications.go
+            - apidef/notifications_reqproof_test.go
             - apidef/adapter/asyncapi.go
             - apidef/adapter/asyncapi_test.go
             - apidef/adapter/import_adapter.go

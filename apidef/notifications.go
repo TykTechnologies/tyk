@@ -11,16 +11,21 @@ import (
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
+// SW-REQ-086
 var log = logger.Get()
+
+// SW-REQ-086
 var httpClient = initHttpNotificationClient()
 
 // NotificationsManager handles sending notifications to OAuth endpoints to notify the provider of key changes.
 // TODO: Make this more generic
+// SW-REQ-086
 type NotificationsManager struct {
 	SharedSecret      string `bson:"shared_secret" json:"shared_secret"`
 	OAuthKeyChangeURL string `bson:"oauth_on_keychange_url" json:"oauth_on_keychange_url"`
 }
 
+// SW-REQ-086
 func initHttpNotificationClient() *http.Client {
 	var netTransport = &http.Transport{
 		Dial: (&net.Dialer{
@@ -36,6 +41,7 @@ func initHttpNotificationClient() *http.Client {
 }
 
 // SendRequest sends the requested package (as a POST) to the defined
+// SW-REQ-086
 func (n NotificationsManager) SendRequest(wait bool, count int, notification interface{}) {
 	if n.OAuthKeyChangeURL == "" {
 		return
