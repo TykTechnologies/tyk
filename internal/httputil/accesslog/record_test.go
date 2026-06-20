@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/request"
 )
 
+// Verifies: SYS-REQ-082, SW-REQ-049
 func TestRecord(t *testing.T) {
 	latency := analytics.Latency{
 		Total:    150,
@@ -58,6 +59,7 @@ func TestRecord(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-049
 func TestWithTraceID(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -113,6 +115,7 @@ func TestWithTraceID(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-049
 func TestWithAPIID(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -173,6 +176,7 @@ func TestWithAPIID(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-049
 func TestWithAPIID_BuilderChaining(t *testing.T) {
 	record := accesslog.NewRecord()
 	result := record.WithAPIID("api-123", "Test API", "org-456")
@@ -180,6 +184,7 @@ func TestWithAPIID_BuilderChaining(t *testing.T) {
 	assert.Same(t, record, result, "WithAPIID should return the same Record for chaining")
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-049
 func TestWithErrorClassification(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -275,6 +280,7 @@ func TestWithErrorClassification(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-049
 func TestWithErrorClassification_BuilderChaining(t *testing.T) {
 	ec := errors.NewErrorClassification(errors.UCF, "connection_refused").
 		WithSource("ReverseProxy").
@@ -305,6 +311,7 @@ func requestWithMCPContext(method, primitiveType, primitiveName string, errorCod
 	return req.WithContext(ctx)
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-049
 func TestWithAPIType(t *testing.T) {
 	for _, apiType := range []string{"classic", "oas", "graphql", "mcp"} {
 		t.Run(apiType, func(t *testing.T) {
@@ -315,12 +322,14 @@ func TestWithAPIType(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-049
 func TestWithAPIType_BuilderChaining(t *testing.T) {
 	record := accesslog.NewRecord()
 	result := record.WithAPIType("mcp")
 	assert.Same(t, record, result, "WithAPIType should return the same Record for chaining")
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-049
 func TestWithMCP(t *testing.T) {
 	t.Run("populates all MCP fields", func(t *testing.T) {
 		req := requestWithMCPContext("tools/call", "tool", "get_weather", 0)
@@ -353,6 +362,7 @@ func TestWithMCP(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-049
 func TestWithMCP_BuilderChaining(t *testing.T) {
 	req := requestWithMCPContext("tools/call", "tool", "get_weather", 0)
 	record := accesslog.NewRecord()
@@ -360,6 +370,7 @@ func TestWithMCP_BuilderChaining(t *testing.T) {
 	assert.Same(t, record, result, "WithMCP should return the same Record for chaining")
 }
 
+// Verifies: SYS-REQ-082, SW-REQ-049
 func TestRecord_TemplateFiltering(t *testing.T) {
 	t.Run("api_type and mcp_method included when in template", func(t *testing.T) {
 		req := requestWithMCPContext("tools/call", "tool", "get_weather", 0)

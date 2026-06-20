@@ -12,6 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 )
 
+// Verifies: STK-REQ-045, SYS-REQ-133, SW-REQ-120
 func TestScheduler_Break(t *testing.T) {
 	logger, _ := logrus.NewNullLogger()
 
@@ -28,6 +29,7 @@ func TestScheduler_Break(t *testing.T) {
 	assert.NotNil(t, s)
 }
 
+// Verifies: STK-REQ-045, SYS-REQ-133, SW-REQ-120
 func TestScheduler_Close(t *testing.T) {
 	logger, _ := logrus.NewNullLogger()
 
@@ -43,6 +45,7 @@ func TestScheduler_Close(t *testing.T) {
 	assert.NotNil(t, s)
 }
 
+// Verifies: STK-REQ-045, SYS-REQ-133, SW-REQ-120
 func TestScheduler_Job_Errors(t *testing.T) {
 	logger, _ := logrus.NewNullLogger()
 
