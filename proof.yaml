@@ -170,6 +170,8 @@ project:
             - apidef/oas/old_oas_reqproof_test.go
             - apidef/oas/root.go
             - apidef/oas/root_reqproof_test.go
+            - apidef/oas/server.go
+            - apidef/oas/server_reqproof_test.go
             - apidef/oas/servers_regeneration.go
             - apidef/oas/servers_regeneration_reqproof_test.go
             - apidef/oas/time.go

@@ -20,6 +20,7 @@
 <!-- documents SW-REQ-059 -->
 <!-- documents SW-REQ-060 -->
 <!-- documents SW-REQ-061 -->
+<!-- documents SW-REQ-062 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -29,7 +30,7 @@ admission, or the full API definition lifecycle.
 `SYS-REQ-104` covers API-definition support model helpers that preserve typed
 health-check wire values, host-list access behavior, and error-override helper
 state, embedded Classic API definition schema data, OAS path/server helper
-shapes, OAS root extension helper shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
+shapes, OAS root extension helper shapes, OAS server model helper shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint
 helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes,
 OAS deprecated-wrapper conversion shapes, OAS Tyk streaming extension shape, OAS event-handler helper shapes,
@@ -235,3 +236,20 @@ is absent. This evidence does not claim full API import, full OAS conversion,
 route generation, request matching, gateway request admission, middleware
 execution, error response selection, context-variable runtime behavior,
 traffic-log emission, or final client-visible routing behavior.
+
+`SW-REQ-062` owns the concrete `apidef/oas` server data shape and Classic
+metadata conversion helpers. Its evidence covers protocol, port, listen path,
+static client certificate, gateway tag, custom domain, detailed activity log,
+detailed tracing, IP access-control, and batch-processing field mapping to and
+from Classic API definitions; empty optional child omission during Fill;
+default enabled inversion child preservation for tags, domains, and IP access
+control; temporary nil-child initialization and receiver restoration during
+ExtractTo; disabled/enabled inversion fields for tags, domains, and IP access
+control; zero-value boundary mappings; and deterministic repeated conversion
+behavior.
+This evidence does not claim gateway listener binding, request routing,
+authentication execution, mutual-TLS handshakes, event delivery, detailed
+activity log emission, detailed tracing export, IP access-control enforcement,
+batch request execution, full API import, full OAS conversion, route
+generation, gateway request admission, middleware execution, or final
+client-visible routing behavior.

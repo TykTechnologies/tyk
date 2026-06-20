@@ -4,6 +4,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// SW-REQ-062
 // Server contains the configuration that sets Tyk up to receive requests from the client applications.
 type Server struct {
 	// ListenPath is the base path on Tyk to which requests for this API should
@@ -63,6 +64,7 @@ type Server struct {
 	Port int `bson:"port,omitempty" json:"port,omitempty"`
 }
 
+// SW-REQ-062
 // Fill fills *Server from apidef.APIDefinition.
 func (s *Server) Fill(api apidef.APIDefinition) {
 	s.Protocol = api.Protocol
@@ -125,6 +127,7 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	s.fillBatchProcessing(api)
 }
 
+// SW-REQ-062
 // ExtractTo extracts *Server into *apidef.APIDefinition.
 func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	api.Protocol = s.Protocol
@@ -189,6 +192,7 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	s.extractBatchProcessingTo(api)
 }
 
+// SW-REQ-062
 // ListenPath is the base path on Tyk to which requests for this API
 // should be sent. Tyk listens out for any requests coming into the host at
 // this path, on the port that Tyk is configured to run on and processes
@@ -209,18 +213,21 @@ type ListenPath struct {
 	Strip bool `bson:"strip,omitempty" json:"strip,omitempty"`
 }
 
+// SW-REQ-062
 // Fill fills *ListenPath from apidef.APIDefinition.
 func (lp *ListenPath) Fill(api apidef.APIDefinition) {
 	lp.Value = api.Proxy.ListenPath
 	lp.Strip = api.Proxy.StripListenPath
 }
 
+// SW-REQ-062
 // ExtractTo extracts *ListenPath into *apidef.APIDefinition.
 func (lp *ListenPath) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.ListenPath = lp.Value
 	api.Proxy.StripListenPath = lp.Strip
 }
 
+// SW-REQ-062
 // ClientCertificates contains the configurations related to establishing static mutual TLS between the client and Tyk.
 type ClientCertificates struct {
 	// Enabled activates static mTLS for the API.
@@ -233,18 +240,21 @@ type ClientCertificates struct {
 	Allowlist []string `bson:"allowlist" json:"allowlist"`
 }
 
+// SW-REQ-062
 // Fill fills *ClientCertificates from apidef.APIDefinition.
 func (cc *ClientCertificates) Fill(api apidef.APIDefinition) {
 	cc.Enabled = api.UseMutualTLSAuth
 	cc.Allowlist = api.ClientCertificates
 }
 
+// SW-REQ-062
 // ExtractTo extracts *ClientCertificates into *apidef.APIDefinition.
 func (cc *ClientCertificates) ExtractTo(api *apidef.APIDefinition) {
 	api.UseMutualTLSAuth = cc.Enabled
 	api.ClientCertificates = cc.Allowlist
 }
 
+// SW-REQ-062
 // GatewayTags holds a list of segment tags that should apply for a gateway.
 type GatewayTags struct {
 	// Enabled activates use of segment tags.
@@ -257,18 +267,21 @@ type GatewayTags struct {
 	Tags []string `bson:"tags" json:"tags"`
 }
 
+// SW-REQ-062
 // Fill fills *GatewayTags from apidef.APIDefinition.
 func (gt *GatewayTags) Fill(api apidef.APIDefinition) {
 	gt.Enabled = !api.TagsDisabled
 	gt.Tags = api.Tags
 }
 
+// SW-REQ-062
 // ExtractTo extracts *GatewayTags into *apidef.APIDefinition.
 func (gt *GatewayTags) ExtractTo(api *apidef.APIDefinition) {
 	api.TagsDisabled = !gt.Enabled
 	api.Tags = gt.Tags
 }
 
+// SW-REQ-062
 // Domain holds the configuration of the domain name the server should listen on.
 type Domain struct {
 	// Enabled allow/disallow the usage of the domain.
@@ -286,6 +299,7 @@ type Domain struct {
 	Certificates []string `bson:"certificates,omitempty" json:"certificates,omitempty"`
 }
 
+// SW-REQ-062
 // ExtractTo extracts *Domain into *apidef.APIDefinition.
 func (cd *Domain) ExtractTo(api *apidef.APIDefinition) {
 	api.DomainDisabled = !cd.Enabled
@@ -293,6 +307,7 @@ func (cd *Domain) ExtractTo(api *apidef.APIDefinition) {
 	api.Certificates = cd.Certificates
 }
 
+// SW-REQ-062
 // Fill fills *Domain from apidef.APIDefinition.
 func (cd *Domain) Fill(api apidef.APIDefinition) {
 	cd.Enabled = !api.DomainDisabled
@@ -300,6 +315,7 @@ func (cd *Domain) Fill(api apidef.APIDefinition) {
 	cd.Certificates = api.Certificates
 }
 
+// SW-REQ-062
 // DetailedActivityLogs holds the configuration related to recording detailed analytics.
 type DetailedActivityLogs struct {
 	// Enabled activates detailed activity logs.
@@ -308,16 +324,19 @@ type DetailedActivityLogs struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 }
 
+// SW-REQ-062
 // ExtractTo extracts *DetailedActivityLogs into *apidef.APIDefinition.
 func (d *DetailedActivityLogs) ExtractTo(api *apidef.APIDefinition) {
 	api.EnableDetailedRecording = d.Enabled
 }
 
+// SW-REQ-062
 // Fill fills *DetailedActivityLogs from apidef.APIDefinition.
 func (d *DetailedActivityLogs) Fill(api apidef.APIDefinition) {
 	d.Enabled = api.EnableDetailedRecording
 }
 
+// SW-REQ-062
 // DetailedTracing holds the configuration of the detailed tracing.
 type DetailedTracing struct {
 	// Enabled activates detailed tracing.
@@ -326,16 +345,19 @@ type DetailedTracing struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 }
 
+// SW-REQ-062
 // Fill fills *DetailedTracing from apidef.APIDefinition.
 func (dt *DetailedTracing) Fill(api apidef.APIDefinition) {
 	dt.Enabled = api.DetailedTracing
 }
 
+// SW-REQ-062
 // ExtractTo extracts *DetailedTracing into *apidef.APIDefinition.
 func (dt *DetailedTracing) ExtractTo(api *apidef.APIDefinition) {
 	api.DetailedTracing = dt.Enabled
 }
 
+// SW-REQ-062
 // IPAccessControl represents IP access control configuration.
 type IPAccessControl struct {
 	// Enabled indicates whether IP access control is enabled.
@@ -356,6 +378,7 @@ type IPAccessControl struct {
 	Block []string `bson:"block,omitempty" json:"block,omitempty"`
 }
 
+// SW-REQ-062
 // Fill fills *IPAccessControl from apidef.APIDefinition.
 func (i *IPAccessControl) Fill(api apidef.APIDefinition) {
 	i.Enabled = !api.IPAccessControlDisabled
@@ -363,6 +386,7 @@ func (i *IPAccessControl) Fill(api apidef.APIDefinition) {
 	i.Allow = api.AllowedIPs
 }
 
+// SW-REQ-062
 // ExtractTo extracts *IPAccessControl into *apidef.APIDefinition.
 func (i *IPAccessControl) ExtractTo(api *apidef.APIDefinition) {
 	api.IPAccessControlDisabled = !i.Enabled
@@ -370,6 +394,7 @@ func (i *IPAccessControl) ExtractTo(api *apidef.APIDefinition) {
 	api.AllowedIPs = i.Allow
 }
 
+// SW-REQ-062
 func (s *Server) fillIPAccessControl(api apidef.APIDefinition) {
 	if s.IPAccessControl == nil {
 		s.IPAccessControl = &IPAccessControl{}
@@ -381,6 +406,7 @@ func (s *Server) fillIPAccessControl(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-062
 func (s *Server) extractIPAccessControlTo(api *apidef.APIDefinition) {
 	if s.IPAccessControl == nil {
 		s.IPAccessControl = &IPAccessControl{}
@@ -392,6 +418,7 @@ func (s *Server) extractIPAccessControlTo(api *apidef.APIDefinition) {
 	s.IPAccessControl.ExtractTo(api)
 }
 
+// SW-REQ-062
 // BatchProcessing represents the configuration for enabling or disabling batch request support for an API.
 type BatchProcessing struct {
 	// Enabled determines whether batch request support is enabled or disabled for the API.
@@ -400,16 +427,19 @@ type BatchProcessing struct {
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 }
 
+// SW-REQ-062
 // Fill updates the BatchProcessing configuration based on the EnableBatchRequestSupport value from the given APIDefinition.
 func (b *BatchProcessing) Fill(api apidef.APIDefinition) {
 	b.Enabled = api.EnableBatchRequestSupport
 }
 
+// SW-REQ-062
 // ExtractTo copies the Enabled state of BatchProcessing into the EnableBatchRequestSupport field of the provided APIDefinition.
 func (b *BatchProcessing) ExtractTo(api *apidef.APIDefinition) {
 	api.EnableBatchRequestSupport = b.Enabled
 }
 
+// SW-REQ-062
 func (s *Server) fillBatchProcessing(api apidef.APIDefinition) {
 	if s.BatchProcessing == nil {
 		s.BatchProcessing = &BatchProcessing{}
@@ -422,6 +452,7 @@ func (s *Server) fillBatchProcessing(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-062
 func (s *Server) extractBatchProcessingTo(api *apidef.APIDefinition) {
 	if s.BatchProcessing == nil {
 		s.BatchProcessing = &BatchProcessing{}
