@@ -1,18 +1,18 @@
 id: SYS-REQ-084
 version: 1
-status: review
+status: approved
 priority: shall
 category: functional
 req_type: guarantee
 fretish: the configuration_timing shall always satisfy !duration_exchange_requested | duration_exchange_result_preserved
-description: Gateway configuration and runtime timing behavior shall preserve readable duration values when duration settings are serialized, parsed, or converted, including normalized shorthand output, explicit malformed-JSON errors, zero fallback for invalid duration strings, and unit conversions matching the underlying duration.
+description: Gateway configuration and runtime timing behavior shall preserve readable duration values when duration settings are serialized, parsed, converted, or exposed through OAS configuration aliases, including normalized shorthand output, explicit malformed-JSON errors, zero fallback for invalid duration strings, unit conversions matching the underlying duration, and OAS alias behavior that does not change the underlying readable-duration semantics.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: configuration_timing
-rationale: Gateway timeout, window, delay, and interval values must preserve intended timing semantics at configuration and runtime boundaries. The concrete internal/time helper implementation is decomposed into SW-REQ-003.
+rationale: Gateway timeout, window, delay, and interval values must preserve intended timing semantics at configuration and runtime boundaries. The concrete internal/time helper implementation is decomposed into SW-REQ-003, and the OAS-facing ReadableDuration alias is decomposed into SW-REQ-050.
 tags:
     - configuration
     - timing
@@ -33,21 +33,24 @@ verification:
     review:
         status: approved
         reviewer: human:buger
-        reviewed_at: "2026-06-19T00:00:00Z"
-        ai_generated: true
-    gaps_reviewed_at: "2026-06-19T08:07:36.485908Z"
-    gaps_reviewed_by: buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T01:40:09Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-050 is scoped to the local apidef/oas ReadableDuration alias boundary: assignability to and from internal/time.ReadableDuration, JSON shorthand serialization, valid/empty/invalid/malformed JSON parsing behavior, unit conversion results, zero handling, and deterministic repeated serialization. Focused apidef/oas tests passed with race, go vet, and go build. This approval does not claim full OAS conversion, API import, route generation, request matching, gateway request admission, middleware execution, runtime timeout enforcement, or final HTTP behavior.'
+        fingerprint: sha256:373d864eb69a1308fe1af2e1a1301e45d3a986ca12a88330032d5feb0b19c5dd
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T01:40:17.851483Z"
+    gaps_reviewed_by: human:buger
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-084|duration_exchange_result_preserved
-          reviewer: buger
-          reason: Reviewed SYS-REQ-084 decomposition after moving internal/time helper behavior into SW-REQ-003; the parent owns gateway configuration timing preservation and the child owns the concrete ReadableDuration implementation evidence.
-          reviewed_at: "2026-06-19T08:07:36.485908Z"
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-084's duration_exchange_result_preserved variable is decomposed by SW-REQ-003 for internal/time.ReadableDuration serialization, parsing, malformed JSON errors, invalid-string zero fallback, and unit conversions; and by SW-REQ-050 for the apidef/oas ReadableDuration alias boundary covering assignability to and from the internal helper, JSON shorthand serialization, valid/empty/invalid/malformed parsing behavior, unit conversion results, zero handling, and deterministic repeated serialization. This review is limited to readable-duration helper behavior and does not claim full OAS conversion, API import, route generation, request matching, gateway request admission, middleware execution, runtime timeout enforcement, or final HTTP behavior.
+          reviewed_at: "2026-06-20T01:40:17.851483Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-19T00:00:00Z"
-    last_modified_by: agent:codex
-    last_modified_at: "2026-06-19T08:04:39Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T01:40:09Z"
 obligation_class: encoding_safety
 obligation_checklist:
     - nominal
