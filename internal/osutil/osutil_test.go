@@ -35,6 +35,7 @@ func setupTestDir(t *testing.T) string {
 // SYS-REQ-099:error_handling:nominal
 // SYS-REQ-099:error_handling:negative
 // MCDC SYS-REQ-098: root_creation_requested=T, root_directory_scoped=T => TRUE
+// MCDC SYS-REQ-098: root_creation_requested=T, root_directory_scoped=F => FALSE
 // MCDC SYS-REQ-099: invalid_root_path_presented=F, invalid_root_path_rejected=F => TRUE
 // MCDC SYS-REQ-099: invalid_root_path_presented=T, invalid_root_path_rejected=T => TRUE
 //mcdc:ignore SYS-REQ-099: invalid_root_path_presented=T, invalid_root_path_rejected=F => FALSE -- violation row is the negation of the invalid-root rejection guarantee; this test asserts non-existent and file paths are rejected [category: defensive] [reviewed: agent:codex]
@@ -77,6 +78,7 @@ func TestNewRoot(t *testing.T) {
 // SYS-REQ-101:malformed_input:negative
 // SYS-REQ-101:boundary:nominal
 // MCDC SYS-REQ-100: scoped_path_resolution_requested=T, scoped_path_returned=T => TRUE
+// MCDC SYS-REQ-100: scoped_path_resolution_requested=T, scoped_path_returned=F => FALSE
 // MCDC SYS-REQ-101: lexical_escape_path_presented=F, lexical_escape_rejected=F => TRUE
 // MCDC SYS-REQ-101: lexical_escape_path_presented=T, lexical_escape_rejected=T => TRUE
 //mcdc:ignore SYS-REQ-101: lexical_escape_path_presented=T, lexical_escape_rejected=F => FALSE -- violation row is the negation of the lexical-escape rejection guarantee; this test asserts escape paths are rejected [category: defensive] [reviewed: agent:codex]
