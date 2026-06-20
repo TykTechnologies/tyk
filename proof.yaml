@@ -164,6 +164,8 @@ project:
             - apidef/oas/mcp_primitive_reqproof_test.go
             - apidef/oas/oasutil.go
             - apidef/oas/oasutil_reqproof_test.go
+            - apidef/oas/old_oas.go
+            - apidef/oas/old_oas_reqproof_test.go
             - apidef/oas/time.go
             - apidef/oas/time_reqproof_test.go
             - apidef/oas/track_endpoint.go

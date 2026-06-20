@@ -5,14 +5,14 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the model shall always satisfy !api_definition_support_requested | api_definition_support_shape_preserved
-description: Gateway API definition support model helpers shall preserve typed health-check wire values, deterministic host-list access behavior, error-override matcher/template state, embedded Classic API definition schema data, OAS helper path/server shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example extraction shapes, OAS internal endpoint helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes, custom middleware definition enablement classification, OAS extension header name/value helper shapes, and OAS extension error-override helper shapes so API definition, RPC, and configuration flows can exchange these helper shapes without silent data-shape drift.
+description: Gateway API definition support model helpers shall preserve typed health-check wire values, deterministic host-list access behavior, error-override matcher/template state, embedded Classic API definition schema data, OAS helper path/server shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example extraction shapes, OAS internal endpoint helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes, OAS deprecated-wrapper conversion shapes, custom middleware definition enablement classification, OAS extension header name/value helper shapes, and OAS extension error-override helper shapes so API definition, RPC, and configuration flows can exchange these helper shapes without silent data-shape drift.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: model
-rationale: This system-level requirement owns small API-definition support helper behavior only. It does not claim API import, full OAS conversion, schema validation, route generation, request matching, gateway request admission, middleware execution, analytics collection, log emission, internal-looping behavior, final client-visible header, error-response, or routing behavior, mock-response execution, or full API definition lifecycle behavior, which require separate black-box or adapter evidence.
+rationale: This system-level requirement owns small API-definition support helper behavior only. It does not claim API import, full OAS conversion or migration correctness, exhaustive invalid-document validation, schema validation, route generation, request matching, gateway request admission, middleware execution, analytics collection, log emission, internal-looping behavior, final client-visible header, error-response, or routing behavior, mock-response execution, or full API definition lifecycle behavior, which require separate black-box or adapter evidence.
 tags:
     - api-definition
     - oas
@@ -32,23 +32,23 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-20T02:09:02Z"
-        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-055 is scoped to local apidef/oas utility helpers: valid map-shaped extension data conversion into target structs, non-map input rejection without target mutation, empty versus populated helper shape classification through the OAS ShouldOmit compatibility alias, missing Classic main version initialization, non-main version preservation, main version update behavior, and deterministic repeated main version observation. Focused apidef/oas tests passed with race, go vet, and go build. This approval does not claim full OAS conversion, schema validation, API import, route generation, request matching, gateway request admission, middleware execution, error reporting for malformed map contents, or final client-visible runtime behavior.'
-        fingerprint: sha256:df82f1c60ecfa6297fad77ece7659fe94ad4cdc5e7b525c1be07011b7e36b572
+        reviewed_at: "2026-06-20T02:13:15Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-056 is scoped to the local apidef/oas deprecated OldOAS conversion helper: valid deprecated wrapper serialization through the OpenAPI loader into the newer OAS wrapper while preserving core document fields, and unserializable deprecated wrapper data returning an error with no converted OAS object. Focused apidef/oas tests passed with race, go vet, and go build. This approval does not claim full API import, full migration correctness, route generation, request matching, gateway request admission, middleware execution, schema completeness, exhaustive invalid-document validation, or final client-visible runtime behavior.'
+        fingerprint: sha256:40f32accde6ed370ee2947147c0db0f23e018afa769aa066c5b8e2a5e280688a
         ai_generated: false
-    gaps_reviewed_at: "2026-06-20T02:09:14.341324Z"
+    gaps_reviewed_at: "2026-06-20T02:13:29.383781Z"
     gaps_reviewed_by: human:buger
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-104|api_definition_support_shape_preserved
           reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-104's api_definition_support_shape_preserved variable is decomposed across SW-REQ-019 health-check wire constants/JSON shapes, SW-REQ-020 HostList constructor/access/error behavior, SW-REQ-021 apidef error-override template and matcher state, SW-REQ-033 embedded Classic API definition schema data, SW-REQ-042 internal/oasutil path ordering plus server URL template parsing, SW-REQ-044 pkg/schema OAS visitor traversal plus unicode-escape conversion/restoration helpers, SW-REQ-045 internal/middleware custom middleware definition enablement classification, SW-REQ-047 apidef/oas header helper shape behavior, SW-REQ-051 apidef/oas error-override shape mapping, SW-REQ-052 apidef/oas schema example extraction, SW-REQ-053 apidef/oas internal endpoint shape mapping, SW-REQ-054 apidef/oas endpoint tracking shape mapping, and SW-REQ-055 apidef/oas utility helpers covering valid map-shaped extension data conversion, non-map rejection without target mutation, empty/populated helper shape classification through ShouldOmit, Classic main version initialization, non-main version preservation, main version update behavior, and deterministic repeated main version observation. The review is limited to these API-definition support helpers and does not claim full API-definition validation, schema completeness, API import, full OAS conversion, schema validation, route generation, request matching, middleware chain construction, plugin loading, middleware execution, analytics collection, log emission, internal-looping behavior, access-control behavior, malformed map-content error reporting, gateway request admission, final client-visible header/error/routing/runtime behavior, or full API definition lifecycle coverage.
-          reviewed_at: "2026-06-20T02:09:14.341324Z"
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-104's api_definition_support_shape_preserved variable is decomposed across SW-REQ-019 health-check wire constants/JSON shapes, SW-REQ-020 HostList constructor/access/error behavior, SW-REQ-021 apidef error-override template and matcher state, SW-REQ-033 embedded Classic API definition schema data, SW-REQ-042 internal/oasutil path ordering plus server URL template parsing, SW-REQ-044 pkg/schema OAS visitor traversal plus unicode-escape conversion/restoration helpers, SW-REQ-045 internal/middleware custom middleware definition enablement classification, SW-REQ-047 apidef/oas header helper shape behavior, SW-REQ-051 apidef/oas error-override shape mapping, SW-REQ-052 apidef/oas schema example extraction, SW-REQ-053 apidef/oas internal endpoint shape mapping, SW-REQ-054 apidef/oas endpoint tracking shape mapping, SW-REQ-055 apidef/oas utility helpers, and SW-REQ-056 apidef/oas deprecated OldOAS conversion covering valid deprecated wrapper conversion through the OpenAPI loader while preserving core document fields and unserializable deprecated wrapper data returning an error with no converted OAS object. The review is limited to these API-definition support helpers and does not claim full API-definition validation, schema completeness, API import, full OAS conversion or migration correctness, schema validation, exhaustive invalid-document validation, route generation, request matching, middleware chain construction, plugin loading, middleware execution, analytics collection, log emission, internal-looping behavior, access-control behavior, malformed map-content error reporting, gateway request admission, final client-visible header/error/routing/runtime behavior, or full API definition lifecycle coverage.
+          reviewed_at: "2026-06-20T02:13:29.383781Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-19T21:10:22Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-20T02:09:02Z"
+    last_modified_at: "2026-06-20T02:13:15Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -104,4 +104,9 @@ lifecycle:
           from: approved
           to: approved
           reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T02:03:24Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-054 is scoped to the local apidef/oas endpoint tracking shape mapping helpers: Classic TrackEndpointMeta Disabled flag to OAS Enabled flag inversion for trackEndpoint and doNotTrackEndpoint, OAS Enabled flag to Classic Disabled flag inversion into the correct Classic track or do-not-track extended-path list while preserving endpoint path/method metadata, nil/no-op operation extraction, enabled tracking operation filling, disabled empty tracking configuration omission, and deterministic repeated Fill/ExtractTo behavior. Focused apidef/oas tests passed with race, go vet, and go build. This approval does not claim analytics collection, log emission, request matching, gateway request admission, middleware execution, access-control behavior, or final client-visible runtime behavior.")'
+          changed_by: human:buger
+        - date: "2026-06-20T02:13:15Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T02:09:02Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-055 is scoped to local apidef/oas utility helpers: valid map-shaped extension data conversion into target structs, non-map input rejection without target mutation, empty versus populated helper shape classification through the OAS ShouldOmit compatibility alias, missing Classic main version initialization, non-main version preservation, main version update behavior, and deterministic repeated main version observation. Focused apidef/oas tests passed with race, go vet, and go build. This approval does not claim full OAS conversion, schema validation, API import, route generation, request matching, gateway request admission, middleware execution, error reporting for malformed map contents, or final client-visible runtime behavior.")'
           changed_by: human:buger

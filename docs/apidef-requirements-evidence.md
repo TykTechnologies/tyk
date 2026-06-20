@@ -14,6 +14,7 @@
 <!-- documents SW-REQ-053 -->
 <!-- documents SW-REQ-054 -->
 <!-- documents SW-REQ-055 -->
+<!-- documents SW-REQ-056 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -25,7 +26,8 @@ health-check wire values, host-list access behavior, and error-override helper
 state, embedded Classic API definition schema data, OAS path/server helper
 shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS internal endpoint helper shapes, OAS endpoint tracking
-helper shapes, OAS utility helper shapes, custom middleware definition
+helper shapes, OAS utility helper shapes, OAS deprecated-wrapper conversion
+shapes, custom middleware definition
 enablement classification, OAS extension header name/value helper shapes, and
 OAS extension error-override helper shapes without silent
 data-shape drift.
@@ -152,3 +154,13 @@ version observation. This evidence does not claim full OAS conversion, schema
 validation, API import, route generation, request matching, gateway request
 admission, middleware execution, error reporting for malformed map contents, or
 final client-visible runtime behavior.
+
+`SW-REQ-056` owns the concrete `apidef/oas` deprecated OldOAS conversion helper
+used by API-definition support models. Its evidence covers conversion of a
+valid deprecated wrapper into the newer OAS wrapper while preserving core
+OpenAPI document fields, and unserializable deprecated wrapper data returning
+an error with no converted OAS object. This evidence does not claim full API
+import, full migration correctness, route generation, request matching,
+gateway request admission, middleware execution, schema completeness,
+exhaustive invalid-document validation, or final client-visible runtime
+behavior.
