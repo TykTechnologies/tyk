@@ -13,6 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/debug2"
 )
 
+// Verifies: STK-REQ-044, SYS-REQ-132, SW-REQ-119
 func TestNewRecordWithGoroutines(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
