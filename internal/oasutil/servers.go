@@ -43,12 +43,14 @@ type ServerUrl struct {
 	Variables map[string]*openapi3.ServerVariable
 }
 
+// SW-REQ-042
 func newServerUrl(originUrl string) ServerUrl {
 	return ServerUrl{
 		Url: originUrl,
 	}
 }
 
+// SW-REQ-042
 func (u *ServerUrl) addVariable(name, defaultValue string) error {
 	if u.Variables == nil {
 		u.Variables = make(map[string]*openapi3.ServerVariable)
@@ -67,6 +69,7 @@ func (u *ServerUrl) addVariable(name, defaultValue string) error {
 
 // ParseServerUrl
 // Url template e.g. "{subdomain:[a-z]+}.example.com" or "api.example.com"
+// SW-REQ-042
 func ParseServerUrl(url string) (*ServerUrl, error) {
 	var parser serverUrlParser
 	return parser.parse(url)
@@ -82,6 +85,7 @@ type serverVariable struct {
 	name, pattern string
 }
 
+// SW-REQ-042
 func (p *serverUrlParser) parse(url string) (*ServerUrl, error) {
 	p.url = url
 
@@ -123,6 +127,7 @@ func (p *serverUrlParser) parse(url string) (*ServerUrl, error) {
 	return &result, nil
 }
 
+// SW-REQ-042
 func (p *serverUrlParser) extractValueBetweenBraces() (serverVariable, error) {
 	if p.url[p.pos] != openCurlyBrace {
 		return serverVariable{}, errUnreachable
@@ -175,15 +180,18 @@ func (p *serverUrlParser) extractValueBetweenBraces() (serverVariable, error) {
 	return serverVariable{}, fmt.Errorf("%w: expected closing curly brace at position %d", ErrParse, p.pos)
 }
 
+// SW-REQ-042
 func (p *serverUrlParser) nextParamName() string {
 	p.counter++
 	return fmt.Sprintf("%s%d", DefaultServerUrlPrefix, p.counter)
 }
 
+// SW-REQ-042
 func isValidIdentifier(name string) bool {
 	return identifierRe.MatchString(name)
 }
 
+// SW-REQ-042
 func hasCaptureGroups(re *regexp.Regexp) bool {
 	return re.NumSubexp() > 0
 }

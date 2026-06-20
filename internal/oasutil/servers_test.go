@@ -8,6 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-042
+// SW-REQ-042:nominal:nominal
+// SW-REQ-042:boundary:boundary
+// SW-REQ-042:error_handling:negative
 func TestParseServerUrl(t *testing.T) {
 	t.Run("positive test cases", func(t *testing.T) {
 		type testCase struct {

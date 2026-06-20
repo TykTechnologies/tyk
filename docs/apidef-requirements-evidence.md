@@ -5,15 +5,17 @@
 <!-- documents SW-REQ-020 -->
 <!-- documents SW-REQ-021 -->
 <!-- documents SW-REQ-033 -->
+<!-- documents SW-REQ-042 -->
 
 This document records the first API-definition support-model proof slice. The
-slice is deliberately limited to small `apidef` helper models and does not claim
-API import, OAS conversion, route generation, gateway request admission, or the
-full API definition lifecycle.
+slice is deliberately limited to small API-definition helper models and does
+not claim API import, full OAS conversion, route generation, gateway request
+admission, or the full API definition lifecycle.
 
 `SYS-REQ-104` covers API-definition support model helpers that preserve typed
 health-check wire values, host-list access behavior, and error-override helper
-state without silent data-shape drift.
+state, embedded Classic API definition schema data, and OAS path/server helper
+shapes without silent data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -41,3 +43,13 @@ parseability, and stable top-level schema metadata. It does not claim full API
 definition validation behavior, schema completeness, API import, OAS conversion,
 route generation, gateway request admission, or the full API definition
 lifecycle.
+
+`SW-REQ-042` owns the concrete `internal/oasutil` helper behavior for OAS path
+ordering and server URL template parsing. Its evidence covers ordered path
+extraction, Tyk path-priority sorting with parameterized paths, normalized
+server URL generation, deterministic server-variable defaults, empty URL
+handling, non-capturing regex patterns, malformed braces, empty or invalid
+variable names, duplicate variable names, invalid regex patterns, and rejected
+capturing groups. This evidence does not claim gateway route generation, API
+import, request matching, full OAS conversion, or correctness of the upstream
+OpenAPI library.

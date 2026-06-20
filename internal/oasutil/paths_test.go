@@ -16,6 +16,9 @@ func testOASPaths(paths []string) openapi3.Paths {
 }
 
 // TestSortByPathLength tests our custom sorting for the OAS paths.
+// Verifies: SYS-REQ-104, SW-REQ-042
+// SW-REQ-042:nominal:nominal
+// SW-REQ-042:determinism:nominal
 func TestSortByPathLength(t *testing.T) {
 	want := []string{
 		"/test/{id}/asset",
@@ -54,6 +57,9 @@ func TestSortByPathLength(t *testing.T) {
 }
 
 // TestExtractPath uses the upstream library to extract an ordered list of paths.
+// Verifies: SYS-REQ-104, SW-REQ-042
+// SW-REQ-042:nominal:nominal
+// SW-REQ-042:determinism:nominal
 func TestExtractPaths(t *testing.T) {
 	want := []string{
 		"/test/sub2",

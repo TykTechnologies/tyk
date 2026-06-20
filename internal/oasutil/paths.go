@@ -21,6 +21,7 @@ type PathItem struct {
 var PathParamRegex = regexp.MustCompile(`\{[^}]+\}`)
 
 // ExtractPaths will extract paths with the given order.
+// SW-REQ-042
 func ExtractPaths(in openapi3.Paths, order []string) []PathItem {
 	// collect url and pathItem
 	result := []PathItem{}
@@ -43,6 +44,8 @@ func ExtractPaths(in openapi3.Paths, order []string) []PathItem {
 //   - Sort by number of "/" segments (more segments first)
 //   - Sort by string length (longer first)
 //   - Alphabetical for equal length
+//
+// SW-REQ-042
 func PathLess(pathA, pathB string) bool {
 	a := PathParamRegex.ReplaceAllString(pathA, "")
 	b := PathParamRegex.ReplaceAllString(pathB, "")
@@ -73,6 +76,7 @@ func PathLess(pathA, pathB string) bool {
 // path parameters after the statically defined paths.
 //
 // Check the test function for sorting expectations.
+// SW-REQ-042
 func SortByPathLength(in openapi3.Paths) []PathItem {
 	// get urls
 	paths := []string{}
