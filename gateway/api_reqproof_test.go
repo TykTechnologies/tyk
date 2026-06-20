@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -475,4 +478,185 @@ func TestGatewaySessionLifecycleAccessRightsAndLimits(t *testing.T) {
 
 	assert.Equal(t, user.APILimit{}, accessRights["zero-limit"].Limit)
 	assert.Equal(t, user.APILimit{RateLimit: user.RateLimit{Rate: 10, Per: 1}}, accessRights["rate-limit"].Limit)
+}
+
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SYS-REQ-141:determinism:nominal
+// MCDC SYS-REQ-141: gateway_key_management_operation_terminal=T => TRUE
+// SW-REQ-128:nominal:nominal
+// SW-REQ-128:boundary:nominal
+// SW-REQ-128:determinism:nominal
+func TestGatewayKeyManagementBasicAuthHashing(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	testCases := []struct {
+		name       string
+		configured string
+		wantHash   user.HashType
+	}{
+		{name: "default empty falls back to bcrypt", configured: "", wantHash: user.HashBCrypt},
+		{name: "invalid falls back to bcrypt", configured: "invalid", wantHash: user.HashBCrypt},
+		{name: "sha256 is preserved", configured: string(user.HashSha256), wantHash: user.HashSha256},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			conf := ts.Gw.GetConfig()
+			conf.BasicAuthHashKeyFunction = tc.configured
+			ts.Gw.SetConfig(conf)
+
+			assert.Equal(t, string(tc.wantHash), ts.Gw.basicAuthHashAlgo())
+
+			session := CreateStandardSession()
+			session.BasicAuthData.Password = "password"
+			ts.Gw.setBasicAuthSessionPassword(session)
+
+			assert.Equal(t, tc.wantHash, session.BasicAuthData.Hash)
+			assert.NotEqual(t, "password", session.BasicAuthData.Password)
+			assert.NotEmpty(t, session.BasicAuthData.Password)
+		})
+	}
+}
+
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// STK-REQ-053:error_handling:negative
+// SYS-REQ-141:error_handling:negative
+// SYS-REQ-141:encoding_safety:nominal
+// SW-REQ-128:error_handling:negative
+// SW-REQ-128:encoding_safety:nominal
+func TestGatewayKeyManagementAddOrUpdateErrors(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("malformed request body", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/tyk/keys/bad", bytes.NewBufferString("{"))
+
+		got, code := ts.Gw.handleAddOrUpdate("bad", req, false)
+
+		require.Equal(t, http.StatusBadRequest, code)
+		assert.Equal(t, apiError("Request malformed"), got)
+	})
+
+	t.Run("missing key update", func(t *testing.T) {
+		session := CreateStandardSession()
+		payload, err := json.Marshal(session)
+		require.NoError(t, err)
+		body := bytes.NewReader(payload)
+		req := httptest.NewRequest(http.MethodPut, "/tyk/keys/missing-key", body)
+
+		got, code := ts.Gw.handleAddOrUpdate("missing-key", req, false)
+
+		require.Equal(t, http.StatusNotFound, code)
+		assert.Equal(t, apiError("Key is not found"), got)
+	})
+}
+
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SYS-REQ-141:determinism:nominal
+// SW-REQ-128:nominal:nominal
+// SW-REQ-128:boundary:nominal
+// SW-REQ-128:determinism:nominal
+func TestGatewayKeyManagementGetDetail(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "detail-api"
+		spec.OrgID = "default"
+	})
+
+	keyName := ts.Gw.generateToken("default", "detail-key")
+	session := CreateStandardSession()
+	session.QuotaMax = 10
+	session.AccessRights = map[string]user.AccessDefinition{
+		"detail-api": {
+			APIID:          "detail-api",
+			AllowanceScope: "detail-api",
+			Limit: user.APILimit{
+				QuotaMax: 5,
+			},
+		},
+	}
+
+	require.NoError(t, ts.Gw.GlobalSessionManager.UpdateSession(keyName, session, 0, false))
+	globalQuotaKey := QuotaKeyPrefix + storage.HashKey(keyName, false)
+	scopedQuotaKey := QuotaKeyPrefix + "detail-api-" + storage.HashKey(keyName, false)
+	require.NoError(t, ts.Gw.GlobalSessionManager.Store().SetRawKey(globalQuotaKey, "3", 0))
+	require.NoError(t, ts.Gw.GlobalSessionManager.Store().SetRawKey(scopedQuotaKey, "2", 0))
+
+	got, code := ts.Gw.handleGetDetail(keyName, "detail-api", "default", false)
+
+	require.Equal(t, http.StatusOK, code)
+	detail, ok := got.(user.SessionState)
+	require.True(t, ok)
+	assert.Equal(t, int64(7), detail.QuotaRemaining)
+	assert.Equal(t, int64(3), detail.AccessRights["detail-api"].Limit.QuotaRemaining)
+	assert.Equal(t, keyName, detail.KeyID)
+
+	basicAuthKey := ts.Gw.generateToken("default", "detail-basic-auth-key")
+	basicAuthSession := CreateStandardSession()
+	basicAuthSession.BasicAuthData.Password = "stored-password"
+	require.NoError(t, ts.Gw.GlobalSessionManager.UpdateSession(basicAuthKey, basicAuthSession, 0, false))
+
+	got, code = ts.Gw.handleGetDetail(basicAuthKey, "detail-api", "default", false)
+
+	require.Equal(t, http.StatusOK, code)
+	detail, ok = got.(user.SessionState)
+	require.True(t, ok)
+	assert.Empty(t, detail.BasicAuthData.Password)
+	assert.Equal(t, basicAuthKey, detail.KeyID)
+}
+
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// STK-REQ-053:error_handling:negative
+// STK-REQ-053:error_handling:nominal
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SYS-REQ-141:error_handling:negative
+// SYS-REQ-141:error_handling:nominal
+// SYS-REQ-141:determinism:nominal
+// SW-REQ-128:nominal:nominal
+// SW-REQ-128:boundary:nominal
+// SW-REQ-128:error_handling:negative
+// SW-REQ-128:error_handling:nominal
+// SW-REQ-128:determinism:nominal
+func TestGatewayKeyManagementListKeys(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	_, keyA := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{
+			"api-a": {APIID: "api-a", Versions: []string{"Default"}},
+		}
+	})
+	_, keyB := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{
+			"api-b": {APIID: "api-b", Versions: []string{"Default"}},
+		}
+	})
+
+	all, code := ts.Gw.handleGetAllKeys(context.Background(), "default", "", false)
+	require.Equal(t, http.StatusOK, code)
+	allKeys := all.(apiAllKeys).APIKeys
+	assert.Contains(t, allKeys, keyA)
+	assert.Contains(t, allKeys, keyB)
+
+	filtered, code := ts.Gw.handleGetAllKeys(context.Background(), "default", "api-a", false)
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, []string{keyA}, filtered.(apiAllKeys).APIKeys)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	timeout, code := ts.Gw.handleGetAllKeys(ctx, "default", "api-a", false)
+	require.Equal(t, http.StatusGatewayTimeout, code)
+	assert.Equal(t, apiError("Request timeout while processing keys"), timeout)
 }

@@ -1,0 +1,63 @@
+id: STK-REQ-053
+version: 1
+status: approved
+priority: shall
+category: key_management
+req_type: guarantee
+fretish: ""
+description: Gateway key management support shall locally select basic-auth password hash algorithms with deterministic fallback, transform stored basic-auth passwords according to the selected hash type, decode key add/update payloads with explicit malformed-input and missing-key errors, retrieve key details with quota remaining calculation and basic-auth password redaction, and list keys with API filtering, context-cancellation timeout reporting, and internal quota/rate key exclusion, without claiming password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_key_management
+rationale: Gateway operators depend on deterministic local key management helper behavior before key configuration and inspection responses are produced. This requirement owns only local gateway/api.go helper behavior and tested gateway harness paths.
+tags:
+    - gateway
+    - key-management
+    - basic-auth
+    - control-api
+variables: []
+traces:
+    reviewed_at: "2026-06-20T19:40:39.955555Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:59850d07d2aa5011b190094f6d932358e1fae9ee24a5146da4e1a4830296c79d
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T19:36:28Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway key management scope is limited to local gateway/api.go helper behavior: basic-auth hash algorithm selection and password storage transformation, key add/update request decoding and explicit error status handling, key detail retrieval with quota remaining calculation and basic-auth password redaction, key-list retrieval/filtering, context-cancellation timeout reporting, and internal quota/rate key exclusion. This approval does not claim password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T19:36:28Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T19:36:28Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need local key management helpers to transform basic-auth credentials, update keys, retrieve redacted key details, and list keys predictably before broader runtime behavior depends on those results.
+    acceptance_criteria:
+        - id: STK-REQ-053-AC-01
+          text: Given local gateway key management helper inputs, when basic-auth hash selection, password storage transformation, add/update decoding, key detail retrieval, key-list filtering, timeout, or internal-key exclusion paths are exercised, then deterministic local helper outcomes or explicit error statuses are produced for the tested inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-141
+lifecycle:
+    change_history:
+        - date: "2026-06-20T19:36:28Z"
+          from: draft
+          to: approved
+          reason: Added gateway key management helper requirement.
+          changed_by: human:buger

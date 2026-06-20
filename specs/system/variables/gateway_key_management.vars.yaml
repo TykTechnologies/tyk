@@ -1,0 +1,9 @@
+component: gateway_key_management
+no_interface:
+    declared: true
+    reason: The gateway key management proof slice covers local gateway/api.go helper behavior only; password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, and final client-visible gateway authorization behavior are outside this component boundary.
+variables:
+    - name: gateway_key_management_operation_terminal
+      type: bool
+      direction: output
+      description: 'A local gateway key management helper operation reaches a terminal observable result: basic-auth hash algorithm selection or password storage transformation completes, key add/update request decoding returns success or explicit error status, key detail retrieval returns a redacted session or explicit error status, key-list retrieval returns filtered keys or explicit timeout status, or worker helpers finish after filtering sessions and internal quota/rate keys.'

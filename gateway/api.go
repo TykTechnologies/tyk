@@ -496,6 +496,7 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 	return nil
 }
 
+// SW-REQ-128
 func (gw *Gateway) setBasicAuthSessionPassword(session *user.SessionState) {
 	basicAuthHashAlgo := gw.basicAuthHashAlgo()
 
@@ -516,6 +517,7 @@ func (gw *Gateway) setBasicAuthSessionPassword(session *user.SessionState) {
 	session.BasicAuthData.Hash = user.HashType(basicAuthHashAlgo)
 }
 
+// SW-REQ-128
 func (gw *Gateway) basicAuthHashAlgo() string {
 	config := gw.GetConfig()
 
@@ -532,6 +534,7 @@ func (gw *Gateway) basicAuthHashAlgo() string {
 	return algo
 }
 
+// SW-REQ-128
 func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {
 	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
 
@@ -707,6 +710,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	return response, http.StatusOK
 }
 
+// SW-REQ-128
 func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool) (interface{}, int) {
 	if byHash && !gw.GetConfig().HashKeys {
 		return apiError("Key requested by hash but key hashing is not enabled"), http.StatusBadRequest
@@ -813,6 +817,7 @@ type apiAllKeys struct {
 }
 
 // handleGetAllKeys retrieves keys and filters them by API ID using a Worker Pool.
+// SW-REQ-128
 func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID string, hashed bool) (interface{}, int) {
 	keys := gw.getAllSessionKeys(filter)
 
@@ -844,6 +849,7 @@ func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID stri
 }
 
 // filterKeysByAPIID handles the concurrent processing of key permissions
+// SW-REQ-128
 func (gw *Gateway) filterKeysByAPIID(c context.Context, keys []string, filter, apiID string, hashed bool) ([]string, error) {
 	numKeys := len(keys)
 	// the values for keyListingWorkerCount and keyListingBufferSize were averaged through profiling and benchmarking
@@ -896,6 +902,7 @@ func (gw *Gateway) filterKeysByAPIID(c context.Context, keys []string, filter, a
 
 // getAllSessionKeys handles the retrieval of raw keys from the session manager,
 // including the legacy base64 filter logic.
+// SW-REQ-128
 func (gw *Gateway) getAllSessionKeys(filter string) []string {
 	keys := gw.GlobalSessionManager.Sessions(filter)
 	if filter != "" {
@@ -908,6 +915,7 @@ func (gw *Gateway) getAllSessionKeys(filter string) []string {
 }
 
 // keyHasAccess checks if a specific key has access to the requested API ID.
+// SW-REQ-128
 func (gw *Gateway) keyHasAccess(filter, keyName, apiID string, hashed bool) bool {
 	session, found := gw.GlobalSessionManager.SessionDetail(filter, keyName, hashed)
 	if !found {
@@ -926,6 +934,7 @@ func (gw *Gateway) keyHasAccess(filter, keyName, apiID string, hashed bool) bool
 }
 
 // feedKeyListingWorkers pushes keys into the job channel while filtering out internal system keys.
+// SW-REQ-128
 func (gw *Gateway) feedKeyListingWorkers(c context.Context, keys []string, jobs chan<- string) {
 	defer close(jobs)
 	for _, k := range keys {

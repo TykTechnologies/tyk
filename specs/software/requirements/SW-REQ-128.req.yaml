@@ -1,0 +1,58 @@
+id: SW-REQ-128
+version: 1
+status: approved
+priority: shall
+category: key_management
+req_type: guarantee
+fretish: ""
+description: The gateway key management implementation shall preserve local helper behavior for basic-auth password hash algorithm selection and password storage transformation, key add/update payload decoding and explicit malformed-input or missing-key errors, key detail retrieval with quota remaining calculation and basic-auth password redaction, key-list retrieval and API filtering, context-cancellation timeout reporting, and internal quota/rate key exclusion, without claiming password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: gateway/api_reqproof_test.go; docs/gateway-key-management-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-141
+component: gateway_key_management
+rationale: This software requirement owns local gateway/api.go key management helper mechanics only. Runtime authentication, persistence durability, storage availability, and gateway authorization outcomes are outside this proof slice.
+tags:
+    - gateway
+    - key-management
+    - basic-auth
+    - control-api
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-141
+    reviewed_at: "2026-06-20T19:40:39.985219Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:adce1fe6e90edf602d2f0dadd435f3d5ee825c02a62fdc83e5a9d5532e2f4007
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T19:36:28Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-128 is scoped to local gateway/api.go helper behavior: basic-auth hash algorithm selection and password storage transformation, key add/update request decoding and explicit error status handling, key detail retrieval with quota remaining calculation and basic-auth password redaction, key-list retrieval/filtering, context-cancellation timeout reporting, and internal quota/rate key exclusion. Focused gateway helper tests are being validated in a clean worktree. This approval does not claim password strength, credential validity for runtime authentication, middleware request admission, distributed storage durability, Redis availability, dashboard behavior, MDCB synchronization, policy engine merge atomicity, or final client-visible gateway authorization behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T19:36:28Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T19:36:28Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T19:36:28Z"
+          from: draft
+          to: approved
+          reason: Added local gateway key management helper behavior.
+          changed_by: human:buger
