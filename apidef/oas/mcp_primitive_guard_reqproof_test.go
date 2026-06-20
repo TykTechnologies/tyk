@@ -8,6 +8,7 @@ import (
 
 // Verifies: SYS-REQ-107, SW-REQ-064
 // SW-REQ-064:nominal:nominal
+// SW-REQ-064:access_denied:nominal
 // SW-REQ-064:access_denied:negative
 // SW-REQ-064:boundary:nominal
 func TestMCPPrimitiveGuardBuildModeBehavior(t *testing.T) {

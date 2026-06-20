@@ -36,6 +36,7 @@ func (reqproofEngineV3BadSubscriptionClient) UniqueRequestID(ctx *resolve.Contex
 // Verifies: SYS-REQ-104, SW-REQ-078
 // SW-REQ-078:nominal:nominal
 // SW-REQ-078:boundary:nominal
+// SW-REQ-078:error_handling:nominal
 // SW-REQ-078:error_handling:negative
 // SW-REQ-078:determinism:nominal
 func TestEngineV3GraphQLEngineAdapterUtilitiesPreserveLocalConfigurationBehavior(t *testing.T) {

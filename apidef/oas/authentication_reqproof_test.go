@@ -14,7 +14,9 @@ import (
 
 // Verifies: SYS-REQ-104, SW-REQ-087
 // SW-REQ-087:nominal:nominal
+// SW-REQ-087:boundary:nominal
 // SW-REQ-087:boundary:boundary
+// SW-REQ-087:error_handling:nominal
 // SW-REQ-087:error_handling:negative
 // SW-REQ-087:determinism:nominal
 func TestAuthenticationReqProof_ModePRMSchemesAndSources(t *testing.T) {

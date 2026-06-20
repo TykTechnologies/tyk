@@ -416,6 +416,7 @@ channels:
 // Verifies: SYS-REQ-104, SW-REQ-070
 // SW-REQ-070:nominal:nominal
 // SW-REQ-070:boundary:nominal
+// SW-REQ-070:error_handling:nominal
 // SW-REQ-070:error_handling:negative
 // SW-REQ-070:determinism:nominal
 func TestGraphQLConfigAdapter_AsyncAPI(t *testing.T) {

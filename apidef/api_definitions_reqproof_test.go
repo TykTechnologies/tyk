@@ -16,6 +16,7 @@ import (
 // Verifies: SYS-REQ-104, SW-REQ-080
 // SW-REQ-080:nominal:nominal
 // SW-REQ-080:boundary:nominal
+// SW-REQ-080:error_handling:nominal
 // SW-REQ-080:error_handling:negative
 // SW-REQ-080:determinism:nominal
 func TestAPIDefinitionReqProof_CoreHelperClassifiers(t *testing.T) {

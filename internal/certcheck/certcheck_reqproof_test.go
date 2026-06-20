@@ -16,9 +16,11 @@ import (
 )
 
 // Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
+// SYS-REQ-130:nominal:nominal
 // MCDC SYS-REQ-130: certificate_expiry_monitor_operation_terminal=T => TRUE
 // SW-REQ-117:nominal:nominal
 // SW-REQ-117:boundary:nominal
+// SW-REQ-117:error_handling:nominal
 // SW-REQ-117:determinism:nominal
 //
 //mcdc:ignore SYS-REQ-130: certificate_expiry_monitor_operation_terminal=F => FALSE -- the onboarded certificate expiry monitor operations are synchronous local helpers that either update local batch state, return cooldown/cache status, classify certificate timing, preserve role/configuration fields, convert durations, or construct event metadata/messages before returning; a non-terminal result is not a reachable runtime state for these APIs [category: defensive] [reviewed: human:buger]

@@ -21,13 +21,16 @@ import (
 )
 
 // Verifies: STK-REQ-023, SYS-REQ-111, SW-REQ-098
+// SYS-REQ-111:nominal:nominal
 // SW-REQ-098:nominal:nominal
 // SW-REQ-098:boundary:nominal
+// SW-REQ-098:error_handling:nominal
 // SW-REQ-098:error_handling:negative
 // SW-REQ-098:security:nominal
 // STK-REQ-023:error_handling:negative
 // MCDC SYS-REQ-111: certificate_material_operation_requested=F, certificate_material_result_determined=F => TRUE
 // MCDC SYS-REQ-111: certificate_material_operation_requested=T, certificate_material_result_determined=T => TRUE
+//
 //mcdc:ignore SYS-REQ-111: certificate_material_operation_requested=T, certificate_material_result_determined=F => FALSE -- violation row is the negation of the certificate-material result guarantee; this test asserts requested certificate operations return parsed material, explicit errors, nil missing results, or storage/cache mutations [category: defensive] [reviewed: agent:codex]
 func TestCertificateManagerPreservesLifecycleSupportBehavior(t *testing.T) {
 	t.Run("constructors preserve defaults and option overrides", func(t *testing.T) {

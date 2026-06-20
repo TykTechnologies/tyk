@@ -13,6 +13,7 @@ import (
 // Verifies: SYS-REQ-104, SW-REQ-097
 // SW-REQ-097:nominal:nominal
 // SW-REQ-097:boundary:nominal
+// SW-REQ-097:error_handling:nominal
 // SW-REQ-097:error_handling:negative
 // SW-REQ-097:determinism:nominal
 func TestAPIDefinitionValidatorPreservesSupportBehavior(t *testing.T) {

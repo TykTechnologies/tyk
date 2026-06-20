@@ -16,6 +16,7 @@ import (
 // Verifies: SYS-REQ-104, SW-REQ-058
 // SW-REQ-058:nominal:nominal
 // SW-REQ-058:boundary:nominal
+// SW-REQ-058:error_handling:nominal
 // SW-REQ-058:error_handling:negative
 // SW-REQ-058:determinism:nominal
 func TestEventHandlersPreserveOASAndClassicShapes(t *testing.T) {

@@ -49,9 +49,11 @@ func (streamTestAnalyticsFactory) CreateResponseWriter(w http.ResponseWriter, _ 
 }
 
 // Verifies: STK-REQ-039, SYS-REQ-127, SW-REQ-114
+// SYS-REQ-127:nominal:nominal
 // MCDC SYS-REQ-127: enterprise_stream_operation_terminal=T => TRUE
 // SW-REQ-114:nominal:nominal
 // SW-REQ-114:boundary:nominal
+// SW-REQ-114:error_handling:nominal
 // SW-REQ-114:determinism:nominal
 //
 //mcdc:ignore SYS-REQ-127: enterprise_stream_operation_terminal=F => FALSE -- the onboarded stream middleware operations are synchronous local helpers that either return a value, return an explicit error, or update deterministic in-memory state before returning; a non-terminal result is not a reachable runtime state for these APIs [category: defensive] [reviewed: human:buger]

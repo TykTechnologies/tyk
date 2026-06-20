@@ -36,6 +36,7 @@ func resetReqProofGeneratorResult(t *testing.T) {
 // Verifies: SYS-REQ-104, SW-REQ-094
 // SW-REQ-094:nominal:nominal
 // SW-REQ-094:boundary:nominal
+// SW-REQ-094:error_handling:nominal
 // SW-REQ-094:error_handling:negative
 // SW-REQ-094:determinism:nominal
 func TestBentoConfigSchemaGeneratorPreservesSupportBehavior(t *testing.T) {

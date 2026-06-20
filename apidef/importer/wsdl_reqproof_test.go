@@ -13,6 +13,7 @@ import (
 // Verifies: SYS-REQ-104, SW-REQ-084
 // SW-REQ-084:nominal:nominal
 // SW-REQ-084:boundary:nominal
+// SW-REQ-084:error_handling:nominal
 // SW-REQ-084:error_handling:negative
 // SW-REQ-084:determinism:nominal
 func TestWSDLImporterReqProof_ConvertIntoApiVersion(t *testing.T) {

@@ -14,7 +14,9 @@ import (
 
 // Verifies: SYS-REQ-104, SW-REQ-088
 // SW-REQ-088:nominal:nominal
+// SW-REQ-088:boundary:nominal
 // SW-REQ-088:boundary:boundary
+// SW-REQ-088:error_handling:nominal
 // SW-REQ-088:error_handling:negative
 // SW-REQ-088:determinism:nominal
 func TestDefaultReqProof_BuildDefaultsURLsAndQueryParams(t *testing.T) {

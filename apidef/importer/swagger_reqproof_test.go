@@ -13,6 +13,7 @@ import (
 // Verifies: SYS-REQ-104, SW-REQ-083
 // SW-REQ-083:nominal:nominal
 // SW-REQ-083:boundary:nominal
+// SW-REQ-083:error_handling:nominal
 // SW-REQ-083:error_handling:negative
 // SW-REQ-083:determinism:nominal
 func TestSwaggerImporterReqProof_ConvertIntoApiVersion(t *testing.T) {

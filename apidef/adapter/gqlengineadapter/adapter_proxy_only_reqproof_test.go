@@ -15,6 +15,7 @@ import (
 // Verifies: SYS-REQ-104, SW-REQ-073
 // SW-REQ-073:nominal:nominal
 // SW-REQ-073:boundary:nominal
+// SW-REQ-073:error_handling:nominal
 // SW-REQ-073:error_handling:negative
 // SW-REQ-073:determinism:nominal
 func TestProxyOnlyEngineConfigPreservesLocalProxyConfiguration(t *testing.T) {

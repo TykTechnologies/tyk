@@ -118,9 +118,12 @@ func allContains(got, want []string) bool {
 }
 
 // Verifies: STK-REQ-027, SYS-REQ-115, SW-REQ-102
+// SYS-REQ-115:nominal:nominal
 // SW-REQ-102:nominal:nominal
 // SW-REQ-102:boundary:nominal
+// SW-REQ-102:error_handling:nominal
 // SW-REQ-102:error_handling:negative
+// SW-REQ-102:malformed_input:nominal
 // SW-REQ-102:malformed_input:negative
 // STK-REQ-027:error_handling:negative
 // STK-REQ-027:malformed_input:negative

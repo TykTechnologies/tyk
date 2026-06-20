@@ -37,6 +37,7 @@ func Test_IsEmpty(t *testing.T) {
 
 // Verifies: SYS-REQ-104, SW-REQ-065
 // SW-REQ-065:nominal:nominal
+// SW-REQ-065:error_handling:nominal
 // SW-REQ-065:error_handling:negative
 func Test_Cast(t *testing.T) {
 	t.Run("int", func(t *testing.T) {

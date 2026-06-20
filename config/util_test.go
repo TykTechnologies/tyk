@@ -11,8 +11,10 @@ import (
 )
 
 // Verifies: STK-REQ-034, SYS-REQ-122, SW-REQ-109
+// SYS-REQ-122:nominal:nominal
 // SW-REQ-109:nominal:nominal
 // SW-REQ-109:boundary:nominal
+// SW-REQ-109:error_handling:nominal
 // SW-REQ-109:error_handling:negative
 // STK-REQ-034:error_handling:negative
 // MCDC SYS-REQ-122: configuration_utility_operation_requested=F, configuration_utility_result_determined=F => TRUE

@@ -13,6 +13,7 @@ import (
 // Verifies: SYS-REQ-104, SW-REQ-081
 // SW-REQ-081:nominal:nominal
 // SW-REQ-081:boundary:nominal
+// SW-REQ-081:error_handling:nominal
 // SW-REQ-081:error_handling:negative
 // SW-REQ-081:determinism:nominal
 func TestBluePrintImporterReqProof_ConvertIntoApiVersion(t *testing.T) {

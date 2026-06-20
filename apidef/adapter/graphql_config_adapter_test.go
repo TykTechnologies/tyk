@@ -18,6 +18,7 @@ import (
 
 // Verifies: SYS-REQ-104, SW-REQ-069
 // SW-REQ-069:nominal:nominal
+// SW-REQ-069:error_handling:nominal
 // SW-REQ-069:error_handling:negative
 func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 	t.Run("should return no error when having a proxy-only config", func(t *testing.T) {
@@ -110,6 +111,7 @@ func TestGraphQLConfigAdapter_EngineConfigV2(t *testing.T) {
 // Verifies: SYS-REQ-104, SW-REQ-069
 // SW-REQ-069:nominal:nominal
 // SW-REQ-069:boundary:nominal
+// SW-REQ-069:error_handling:nominal
 // SW-REQ-069:error_handling:negative
 // SW-REQ-069:determinism:nominal
 func TestGraphQLConfigAdapterPreservesLocalSelectionAndOptions(t *testing.T) {

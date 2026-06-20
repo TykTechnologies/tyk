@@ -14,6 +14,7 @@ import (
 // Verifies: SYS-REQ-104, SW-REQ-059
 // SW-REQ-059:nominal:nominal
 // SW-REQ-059:boundary:nominal
+// SW-REQ-059:error_handling:nominal
 // SW-REQ-059:error_handling:negative
 // SW-REQ-059:determinism:nominal
 func TestServerRegenerationPreservesTykAndUserServerShapes(t *testing.T) {

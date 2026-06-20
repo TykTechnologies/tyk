@@ -9,6 +9,7 @@ import (
 )
 
 // Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
+// SYS-REQ-117:nominal:nominal
 // SW-REQ-104:nominal:nominal
 // SW-REQ-104:boundary:nominal
 // MCDC SYS-REQ-117: external_service_configuration_operation_requested=F, external_service_configuration_result_determined=F => TRUE
@@ -396,6 +397,7 @@ func TestExternalServiceConfig_ZeroValues(t *testing.T) {
 // Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
 // SW-REQ-104:nominal:nominal
 // SW-REQ-104:boundary:nominal
+// SW-REQ-104:error_handling:nominal
 // SW-REQ-104:error_handling:negative
 // STK-REQ-029:error_handling:negative
 func TestMTLSConfig_Validate(t *testing.T) {

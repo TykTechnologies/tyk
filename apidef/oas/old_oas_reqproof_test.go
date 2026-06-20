@@ -11,6 +11,7 @@ import (
 // Verifies: SYS-REQ-104, SW-REQ-056
 // SW-REQ-056:nominal:nominal
 // SW-REQ-056:boundary:nominal
+// SW-REQ-056:error_handling:nominal
 // SW-REQ-056:error_handling:negative
 func TestOldOASConversionPreservesDocumentShape(t *testing.T) {
 	t.Run("valid deprecated wrapper converts to newer OAS wrapper", func(t *testing.T) {

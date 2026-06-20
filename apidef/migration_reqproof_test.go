@@ -12,7 +12,9 @@ import (
 
 // Verifies: SYS-REQ-104, SW-REQ-085
 // SW-REQ-085:nominal:nominal
+// SW-REQ-085:boundary:nominal
 // SW-REQ-085:boundary:boundary
+// SW-REQ-085:error_handling:nominal
 // SW-REQ-085:error_handling:negative
 // SW-REQ-085:determinism:nominal
 func TestMigrationReqProof_VersionEndpointAndCacheMigration(t *testing.T) {

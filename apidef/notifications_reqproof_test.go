@@ -21,7 +21,9 @@ func (f reqproofRoundTripFunc) RoundTrip(req *http.Request) (*http.Response, err
 
 // Verifies: SYS-REQ-104, SW-REQ-086
 // SW-REQ-086:nominal:nominal
+// SW-REQ-086:boundary:nominal
 // SW-REQ-086:boundary:boundary
+// SW-REQ-086:error_handling:nominal
 // SW-REQ-086:error_handling:negative
 // SW-REQ-086:determinism:nominal
 func TestNotificationsReqProof_ClientAndSuccessfulSend(t *testing.T) {

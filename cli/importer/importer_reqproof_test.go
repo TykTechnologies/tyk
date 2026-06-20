@@ -16,8 +16,10 @@ import (
 )
 
 // Verifies: STK-REQ-026, SYS-REQ-114, SW-REQ-101
+// SYS-REQ-114:nominal:nominal
 // SW-REQ-101:nominal:nominal
 // SW-REQ-101:boundary:nominal
+// SW-REQ-101:error_handling:nominal
 // SW-REQ-101:error_handling:negative
 // STK-REQ-026:error_handling:negative
 // MCDC SYS-REQ-114: cli_import_operation_requested=F, cli_import_result_determined=F => TRUE

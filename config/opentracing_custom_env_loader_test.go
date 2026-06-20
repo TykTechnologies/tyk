@@ -10,6 +10,7 @@ import (
 )
 
 // Verifies: STK-REQ-033, SYS-REQ-121, SW-REQ-108
+// SYS-REQ-121:nominal:nominal
 // SW-REQ-108:nominal:nominal
 // SW-REQ-108:boundary:nominal
 // MCDC SYS-REQ-121: opentracing_configuration_operation_requested=F, opentracing_configuration_result_determined=F => TRUE
@@ -117,6 +118,7 @@ func TestLoadJaeger(t *testing.T) {
 // Verifies: STK-REQ-033, SYS-REQ-121, SW-REQ-108
 // SW-REQ-108:nominal:nominal
 // SW-REQ-108:boundary:nominal
+// SW-REQ-108:error_handling:nominal
 // SW-REQ-108:error_handling:negative
 func TestOpenTracingDecodeHelpers(t *testing.T) {
 	t.Run("DecodeJSON converts map to typed zipkin config", func(t *testing.T) {

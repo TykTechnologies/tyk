@@ -13,6 +13,7 @@ import (
 // Verifies: SYS-REQ-082, SW-REQ-066
 // SW-REQ-066:nominal:nominal
 // SW-REQ-066:boundary:nominal
+// SW-REQ-066:error_handling:nominal
 // SW-REQ-066:error_handling:negative
 // SW-REQ-066:determinism:nominal
 func TestErrpackPreservesDiagnosticErrorMetadata(t *testing.T) {

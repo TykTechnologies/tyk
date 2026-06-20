@@ -13,6 +13,7 @@ import (
 // Verifies: SYS-REQ-104, SW-REQ-077
 // SW-REQ-077:nominal:nominal
 // SW-REQ-077:boundary:nominal
+// SW-REQ-077:error_handling:nominal
 // SW-REQ-077:error_handling:negative
 // SW-REQ-077:determinism:nominal
 func TestEngineV3SupergraphEngineConfigPreservesLocalSubgraphConfiguration(t *testing.T) {

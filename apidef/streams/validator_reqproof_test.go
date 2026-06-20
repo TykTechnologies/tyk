@@ -15,6 +15,7 @@ import (
 // Verifies: SYS-REQ-104, SW-REQ-096
 // SW-REQ-096:nominal:nominal
 // SW-REQ-096:boundary:nominal
+// SW-REQ-096:error_handling:nominal
 // SW-REQ-096:error_handling:negative
 // SW-REQ-096:determinism:nominal
 func TestStreamsValidatorPreservesSupportBehavior(t *testing.T) {

@@ -14,7 +14,9 @@ import (
 
 // Verifies: SYS-REQ-104, SW-REQ-089
 // SW-REQ-089:nominal:nominal
+// SW-REQ-089:boundary:nominal
 // SW-REQ-089:boundary:boundary
+// SW-REQ-089:error_handling:nominal
 // SW-REQ-089:error_handling:negative
 // SW-REQ-089:determinism:nominal
 func TestMiddlewareReqProof_GlobalAggregateAndDeprecatedJSON(t *testing.T) {

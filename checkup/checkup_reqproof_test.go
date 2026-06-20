@@ -12,8 +12,10 @@ import (
 )
 
 // Verifies: STK-REQ-024, SYS-REQ-112, SW-REQ-099
+// SYS-REQ-112:nominal:nominal
 // SW-REQ-099:nominal:nominal
 // SW-REQ-099:boundary:nominal
+// SW-REQ-099:error_handling:nominal
 // SW-REQ-099:error_handling:negative
 // STK-REQ-024:error_handling:negative
 // MCDC SYS-REQ-112: startup_checkup_requested=F, startup_checkup_result_determined=F => TRUE

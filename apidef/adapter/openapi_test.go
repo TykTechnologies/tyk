@@ -369,6 +369,7 @@ paths:
 // Verifies: SYS-REQ-104, SW-REQ-071
 // SW-REQ-071:nominal:nominal
 // SW-REQ-071:boundary:nominal
+// SW-REQ-071:error_handling:nominal
 // SW-REQ-071:error_handling:negative
 // SW-REQ-071:determinism:nominal
 func TestGraphQLConfigAdapter_OpenAPI(t *testing.T) {

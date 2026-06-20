@@ -93,6 +93,7 @@ func writeManifestFile(t testing.TB, manifest interface{}, filename string) *str
 }
 
 // Verifies: STK-REQ-025, SYS-REQ-113, SW-REQ-100
+// SYS-REQ-113:nominal:nominal
 // SW-REQ-100:nominal:nominal
 // SW-REQ-100:boundary:nominal
 // MCDC SYS-REQ-113: plugin_bundle_operation_requested=F, plugin_bundle_result_determined=F => TRUE
@@ -111,6 +112,7 @@ func TestCommands(t *testing.T) {
 // Verifies: STK-REQ-025, SYS-REQ-113, SW-REQ-100
 // SW-REQ-100:nominal:nominal
 // SW-REQ-100:boundary:nominal
+// SW-REQ-100:error_handling:nominal
 // SW-REQ-100:error_handling:negative
 // STK-REQ-025:error_handling:negative
 func TestBuild(t *testing.T) {

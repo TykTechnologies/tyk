@@ -10,6 +10,7 @@ import (
 // Verifies: SYS-REQ-104, SW-REQ-082
 // SW-REQ-082:nominal:nominal
 // SW-REQ-082:boundary:nominal
+// SW-REQ-082:error_handling:nominal
 // SW-REQ-082:error_handling:negative
 // SW-REQ-082:determinism:nominal
 func TestImporterDispatcherReqProof_GetImporterForSource(t *testing.T) {

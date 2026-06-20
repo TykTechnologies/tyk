@@ -12,6 +12,7 @@ import (
 // Verifies: SYS-REQ-104, SW-REQ-060
 // SW-REQ-060:nominal:nominal
 // SW-REQ-060:boundary:nominal
+// SW-REQ-060:error_handling:nominal
 // SW-REQ-060:error_handling:negative
 // SW-REQ-060:determinism:nominal
 func TestOASValidatorPreservesSchemaValidationBehavior(t *testing.T) {

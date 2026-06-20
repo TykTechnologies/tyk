@@ -17,6 +17,7 @@ import (
 // Verifies: SYS-REQ-104, SW-REQ-079
 // SW-REQ-079:nominal:nominal
 // SW-REQ-079:boundary:nominal
+// SW-REQ-079:error_handling:nominal
 // SW-REQ-079:error_handling:negative
 // SW-REQ-079:determinism:nominal
 func TestEngineV3UniversalDataGraphEngineConfigPreservesLocalDatasourceConfiguration(t *testing.T) {

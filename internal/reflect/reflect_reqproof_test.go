@@ -23,6 +23,7 @@ type reqproofSample struct {
 // Verifies: SYS-REQ-104, SW-REQ-065
 // SW-REQ-065:nominal:nominal
 // SW-REQ-065:boundary:nominal
+// SW-REQ-065:error_handling:nominal
 // SW-REQ-065:error_handling:negative
 // SW-REQ-065:determinism:nominal
 func TestReflectSupportHelpersPreserveModelUtilityBehavior(t *testing.T) {

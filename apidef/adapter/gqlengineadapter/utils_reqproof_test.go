@@ -36,6 +36,7 @@ func (reqproofBadSubscriptionClient) Subscribe(ctx context.Context, options grap
 // Verifies: SYS-REQ-104, SW-REQ-072
 // SW-REQ-072:nominal:nominal
 // SW-REQ-072:boundary:nominal
+// SW-REQ-072:error_handling:nominal
 // SW-REQ-072:error_handling:negative
 // SW-REQ-072:determinism:nominal
 func TestGraphQLEngineAdapterUtilitiesPreserveLocalConfigurationBehavior(t *testing.T) {

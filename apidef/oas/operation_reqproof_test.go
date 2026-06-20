@@ -14,6 +14,7 @@ import (
 // Verifies: SYS-REQ-104, SW-REQ-091
 // SW-REQ-091:nominal:nominal
 // SW-REQ-091:boundary:nominal
+// SW-REQ-091:error_handling:nominal
 // SW-REQ-091:error_handling:negative
 // SW-REQ-091:determinism:nominal
 func TestOperationDocumentHelpersPreserveSupportBehavior(t *testing.T) {

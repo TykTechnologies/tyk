@@ -19,6 +19,7 @@ import (
 )
 
 // Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// SYS-REQ-116:nominal:nominal
 // SW-REQ-103:nominal:nominal
 // SW-REQ-103:boundary:nominal
 // MCDC SYS-REQ-116: gateway_configuration_operation_requested=F, gateway_configuration_result_determined=F => TRUE
@@ -107,6 +108,7 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 // Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
 // SW-REQ-103:nominal:nominal
 // SW-REQ-103:boundary:nominal
+// SW-REQ-103:error_handling:nominal
 // SW-REQ-103:error_handling:negative
 // STK-REQ-028:error_handling:negative
 func TestConfigFiles(t *testing.T) {

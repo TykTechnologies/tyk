@@ -22,6 +22,7 @@ func (reqproofEngineV3SubscriptionClientFactory) NewSubscriptionClient(httpClien
 // Verifies: SYS-REQ-104, SW-REQ-076
 // SW-REQ-076:nominal:nominal
 // SW-REQ-076:boundary:nominal
+// SW-REQ-076:error_handling:nominal
 // SW-REQ-076:error_handling:negative
 // SW-REQ-076:determinism:nominal
 func TestEngineV3ProxyOnlyEngineConfigPreservesLocalProxyConfiguration(t *testing.T) {

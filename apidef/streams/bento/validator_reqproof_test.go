@@ -11,6 +11,7 @@ import (
 // Verifies: SYS-REQ-104, SW-REQ-095
 // SW-REQ-095:nominal:nominal
 // SW-REQ-095:boundary:nominal
+// SW-REQ-095:error_handling:nominal
 // SW-REQ-095:error_handling:negative
 // SW-REQ-095:determinism:nominal
 func TestBentoConfigValidatorPreservesSupportBehavior(t *testing.T) {

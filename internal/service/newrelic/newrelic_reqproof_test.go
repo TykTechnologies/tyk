@@ -17,6 +17,7 @@ import (
 // Verifies: SYS-REQ-082, SW-REQ-067
 // SW-REQ-067:nominal:nominal
 // SW-REQ-067:boundary:nominal
+// SW-REQ-067:error_handling:nominal
 // SW-REQ-067:error_handling:negative
 // SW-REQ-067:determinism:nominal
 func TestNewRelicServiceHelpersPreserveObservabilityAdapterBehavior(t *testing.T) {
