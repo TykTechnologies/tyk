@@ -111,6 +111,8 @@ func TestCommands(t *testing.T) {
 }
 
 // Verifies: STK-REQ-025, SYS-REQ-113, SW-REQ-100
+// STK-REQ-025:STK-REQ-025-AC-01:acceptance
+// STK-REQ-025:STK-REQ-025-AC-02:acceptance
 // SW-REQ-100:nominal:nominal
 // SW-REQ-100:boundary:nominal
 // SW-REQ-100:error_handling:nominal
@@ -259,6 +261,7 @@ func TestBuild(t *testing.T) {
 }
 
 // Verifies: STK-REQ-025, SYS-REQ-113, SW-REQ-100
+// STK-REQ-025:STK-REQ-025-AC-03:acceptance
 // SW-REQ-100:security:nominal
 func TestBuildSignedBundleIncludesVerifiableSignature(t *testing.T) {
 	dir := t.TempDir()

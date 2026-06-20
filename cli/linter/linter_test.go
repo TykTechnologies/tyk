@@ -120,6 +120,9 @@ func allContains(got, want []string) bool {
 }
 
 // Verifies: STK-REQ-027, SYS-REQ-115, SW-REQ-102
+// STK-REQ-027:STK-REQ-027-AC-01:acceptance
+// STK-REQ-027:STK-REQ-027-AC-02:acceptance
+// STK-REQ-027:STK-REQ-027-AC-03:acceptance
 // SYS-REQ-115:nominal:nominal
 // SW-REQ-102:nominal:nominal
 // SW-REQ-102:boundary:nominal

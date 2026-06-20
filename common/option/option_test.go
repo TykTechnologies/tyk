@@ -14,6 +14,7 @@ type sampleConfig struct {
 }
 
 // Verifies: STK-REQ-035, SYS-REQ-123, SW-REQ-110
+// STK-REQ-035:STK-REQ-035-AC-01:acceptance
 // SW-REQ-110:nominal:nominal
 // SW-REQ-110:boundary:nominal
 // MCDC SYS-REQ-123: option_builder_operation_requested=F, option_builder_result_determined=F => TRUE
@@ -37,6 +38,7 @@ func TestNew(t *testing.T) {
 }
 
 // Verifies: STK-REQ-035, SYS-REQ-123, SW-REQ-110
+// STK-REQ-035:STK-REQ-035-AC-02:acceptance
 // SW-REQ-110:nominal:nominal
 // SW-REQ-110:boundary:nominal
 func TestOptionsBuild(t *testing.T) {

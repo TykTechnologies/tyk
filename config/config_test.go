@@ -19,6 +19,8 @@ import (
 )
 
 // Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// STK-REQ-028:STK-REQ-028-AC-01:acceptance
+// STK-REQ-028:STK-REQ-028-AC-02:acceptance
 // SYS-REQ-116:nominal:nominal
 // SW-REQ-103:nominal:nominal
 // SW-REQ-103:boundary:nominal
@@ -106,6 +108,7 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 }
 
 // Verifies: STK-REQ-028, SYS-REQ-116, SW-REQ-103
+// STK-REQ-028:STK-REQ-028-AC-03:acceptance
 // SW-REQ-103:nominal:nominal
 // SW-REQ-103:boundary:nominal
 // SW-REQ-103:error_handling:nominal

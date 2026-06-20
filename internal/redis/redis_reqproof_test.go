@@ -15,6 +15,8 @@ import (
 )
 
 // Verifies: STK-REQ-046, SYS-REQ-134, SW-REQ-121
+// STK-REQ-046:STK-REQ-046-AC-01:acceptance
+// STK-REQ-046:STK-REQ-046-AC-02:acceptance
 // MCDC SYS-REQ-134: redis_aliases_available=T => TRUE
 // STK-REQ-046:nominal:nominal
 // STK-REQ-046:boundary:nominal

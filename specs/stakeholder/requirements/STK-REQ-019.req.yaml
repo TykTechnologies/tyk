@@ -1,6 +1,6 @@
 id: STK-REQ-019
 version: 1
-status: approved
+status: rejected
 priority: shall
 category: functional
 req_type: guarantee
@@ -38,8 +38,8 @@ verification:
 history:
     created_by: agent:codex
     created_at: "2026-06-20T00:00:00Z"
-    last_modified_by: human:buger
-    last_modified_at: "2026-06-20T00:15:40Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-20T16:18:33Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -83,3 +83,8 @@ lifecycle:
           to: approved
           reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-19T22:00:04Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP protocol requirements are scoped to internal/mcp helper behavior for primitive VEM prefix classification and registration, MCP method-to-VEM route construction, parameter validation, access-rule matching, JSON-RPC list filtering, pass-through handling, and envelope re-encoding only; focused internal/mcp tests passed. This approval does not claim gateway middleware sequencing, API definition synthesis, session-right retrieval, analytics, network transport behavior, or final HTTP status generation.")'
           changed_by: human:buger
+        - date: "2026-06-20T16:18:33Z"
+          from: approved
+          to: rejected
+          reason: '[REQPROOF-LAYERING-REPAIR] Helper-domain acceptance criteria belong below stakeholder level; active behavior remains owned by SYS-REQ-107 and its SW children until a true gateway-level MCP client acceptance requirement and test exist.'
+          changed_by: agent:codex

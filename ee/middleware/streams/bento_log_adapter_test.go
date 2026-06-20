@@ -43,7 +43,8 @@ func pruneTimeSection(line string) string {
 	return re.ReplaceAllString(line, "")
 }
 
-// Verifies: SYS-REQ-127, SW-REQ-114
+// Verifies: STK-REQ-039, SYS-REQ-127, SW-REQ-114
+// STK-REQ-039:STK-REQ-039-AC-03:acceptance
 // SW-REQ-114:nominal:nominal
 // SW-REQ-114:determinism:nominal
 func TestBentoLogAdapter(t *testing.T) {
@@ -74,7 +75,8 @@ func TestBentoLogAdapter(t *testing.T) {
 	}
 }
 
-// Verifies: SYS-REQ-127, SW-REQ-114
+// Verifies: STK-REQ-039, SYS-REQ-127, SW-REQ-114
+// STK-REQ-039:STK-REQ-039-AC-03:acceptance
 // STK-REQ-039:error_handling:negative
 // SW-REQ-114:error_handling:negative
 func TestBentoLogAdapter_Corrupt_Log_Line(t *testing.T) {

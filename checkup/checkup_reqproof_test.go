@@ -12,6 +12,9 @@ import (
 )
 
 // Verifies: STK-REQ-024, SYS-REQ-112, SW-REQ-099
+// STK-REQ-024:STK-REQ-024-AC-01:acceptance
+// STK-REQ-024:STK-REQ-024-AC-02:acceptance
+// STK-REQ-024:STK-REQ-024-AC-03:acceptance
 // SYS-REQ-112:nominal:nominal
 // SW-REQ-099:nominal:nominal
 // SW-REQ-099:boundary:nominal

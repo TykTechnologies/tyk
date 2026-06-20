@@ -13,6 +13,8 @@ func recordFromDump(dump string) *Record {
 }
 
 // Verifies: STK-REQ-044, SYS-REQ-132, SW-REQ-119
+// STK-REQ-044:STK-REQ-044-AC-01:acceptance
+// STK-REQ-044:STK-REQ-044-AC-02:acceptance
 // MCDC SYS-REQ-132: goroutine_debug_record_operation_terminal=T => TRUE
 // SW-REQ-119:nominal:nominal
 // SW-REQ-119:boundary:nominal

@@ -16,6 +16,8 @@ import (
 )
 
 // Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
+// STK-REQ-042:STK-REQ-042-AC-01:acceptance
+// STK-REQ-042:STK-REQ-042-AC-03:acceptance
 // SYS-REQ-130:nominal:nominal
 // MCDC SYS-REQ-130: certificate_expiry_monitor_operation_terminal=T => TRUE
 // SW-REQ-117:nominal:nominal
@@ -195,7 +197,8 @@ func TestCertificateExpiryMonitorPreservesLocalBehavior(t *testing.T) {
 	})
 }
 
-// Verifies: SYS-REQ-130, SW-REQ-117
+// Verifies: STK-REQ-042, SYS-REQ-130, SW-REQ-117
+// STK-REQ-042:STK-REQ-042-AC-02:acceptance
 // STK-REQ-042:error_handling:negative
 // SW-REQ-117:error_handling:negative
 func TestCertificateExpiryMonitorCooldownCacheLocalOutcomes(t *testing.T) {

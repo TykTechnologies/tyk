@@ -16,6 +16,8 @@ import (
 )
 
 // Verifies: STK-REQ-026, SYS-REQ-114, SW-REQ-101
+// STK-REQ-026:STK-REQ-026-AC-01:acceptance
+// STK-REQ-026:STK-REQ-026-AC-02:acceptance
 // SYS-REQ-114:nominal:nominal
 // SW-REQ-101:nominal:nominal
 // SW-REQ-101:boundary:nominal
@@ -150,6 +152,7 @@ func TestCLIImporterReqProof_ProcessPortNames(t *testing.T) {
 }
 
 // Verifies: STK-REQ-026, SYS-REQ-114, SW-REQ-101
+// STK-REQ-026:STK-REQ-026-AC-03:acceptance
 // SW-REQ-101:nominal:nominal
 // SW-REQ-101:error_handling:negative
 func TestCLIImporterReqProof_FileLoadersAndOutputFormatting(t *testing.T) {

@@ -59,6 +59,8 @@ func (d *recordingDispatcher) Reload() {
 }
 
 // Verifies: STK-REQ-036, SYS-REQ-124, SW-REQ-111
+// STK-REQ-036:STK-REQ-036-AC-01:acceptance
+// STK-REQ-036:STK-REQ-036-AC-02:acceptance
 // SW-REQ-111:nominal:nominal
 // SW-REQ-111:boundary:nominal
 // MCDC SYS-REQ-124: coprocess_dispatcher_surface_required=F, coprocess_dispatcher_surface_available=F => TRUE

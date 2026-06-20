@@ -9,6 +9,8 @@ import (
 )
 
 // Verifies: STK-REQ-038, SYS-REQ-126, SW-REQ-113
+// STK-REQ-038:STK-REQ-038-AC-01:acceptance
+// STK-REQ-038:STK-REQ-038-AC-02:acceptance
 // SW-REQ-113:nominal:nominal
 // SW-REQ-113:boundary:nominal
 // MCDC SYS-REQ-126: enterprise_error_requested=F, enterprise_error_available=F => TRUE

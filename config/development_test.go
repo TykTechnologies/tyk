@@ -10,6 +10,8 @@ import (
 )
 
 // Verifies: STK-REQ-030, SYS-REQ-118, SW-REQ-105
+// STK-REQ-030:STK-REQ-030-AC-01:acceptance
+// STK-REQ-030:STK-REQ-030-AC-02:acceptance
 // SW-REQ-105:nominal:nominal
 // SW-REQ-105:boundary:nominal
 // MCDC SYS-REQ-118: development_configuration_operation_requested=F, development_configuration_result_determined=F => TRUE

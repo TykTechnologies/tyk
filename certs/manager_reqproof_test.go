@@ -21,6 +21,9 @@ import (
 )
 
 // Verifies: STK-REQ-023, SYS-REQ-111, SW-REQ-098
+// STK-REQ-023:STK-REQ-023-AC-01:acceptance
+// STK-REQ-023:STK-REQ-023-AC-02:acceptance
+// STK-REQ-023:STK-REQ-023-AC-03:acceptance
 // SYS-REQ-111:nominal:nominal
 // SW-REQ-098:nominal:nominal
 // SW-REQ-098:boundary:nominal

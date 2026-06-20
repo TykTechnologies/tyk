@@ -10,7 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Verifies: SYS-REQ-129, SW-REQ-116
+// Verifies: STK-REQ-041, SYS-REQ-129, SW-REQ-116
+// STK-REQ-041:STK-REQ-041-AC-03:acceptance
 // SW-REQ-116:boundary:nominal
 func TestIsPublicKey(t *testing.T) {
 	tests := []struct {
@@ -50,7 +51,8 @@ func TestGenerateRSAPublicKey(t *testing.T) {
 	assert.Contains(t, string(pubKey), "PUBLIC KEY")
 }
 
-// Verifies: SYS-REQ-129, SW-REQ-116
+// Verifies: STK-REQ-041, SYS-REQ-129, SW-REQ-116
+// STK-REQ-041:STK-REQ-041-AC-03:acceptance
 // SW-REQ-116:nominal:nominal
 // SW-REQ-116:boundary:nominal
 // SW-REQ-116:error_handling:negative

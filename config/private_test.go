@@ -8,6 +8,8 @@ import (
 )
 
 // Verifies: STK-REQ-031, SYS-REQ-119, SW-REQ-106
+// STK-REQ-031:STK-REQ-031-AC-01:acceptance
+// STK-REQ-031:STK-REQ-031-AC-02:acceptance
 // SW-REQ-106:nominal:nominal
 // SW-REQ-106:boundary:nominal
 // MCDC SYS-REQ-119: private_configuration_operation_requested=F, private_configuration_result_determined=F => TRUE

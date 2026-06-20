@@ -16,6 +16,8 @@ import (
 )
 
 // Verifies: STK-REQ-045, SYS-REQ-133, SW-REQ-120
+// STK-REQ-045:STK-REQ-045-AC-01:acceptance
+// STK-REQ-045:STK-REQ-045-AC-02:acceptance
 // MCDC SYS-REQ-133: scheduler_local_operation_terminal=T => TRUE
 // STK-REQ-045:nominal:nominal
 // STK-REQ-045:boundary:nominal

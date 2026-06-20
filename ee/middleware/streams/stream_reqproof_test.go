@@ -49,6 +49,8 @@ func (streamTestAnalyticsFactory) CreateResponseWriter(w http.ResponseWriter, _ 
 }
 
 // Verifies: STK-REQ-039, SYS-REQ-127, SW-REQ-114
+// STK-REQ-039:STK-REQ-039-AC-01:acceptance
+// STK-REQ-039:STK-REQ-039-AC-02:acceptance
 // SYS-REQ-127:nominal:nominal
 // MCDC SYS-REQ-127: enterprise_stream_operation_terminal=T => TRUE
 // SW-REQ-114:nominal:nominal
@@ -251,7 +253,8 @@ func TestEnterpriseStreamsLocalHelpersPreserveBehavior(t *testing.T) {
 	})
 }
 
-// Verifies: SYS-REQ-127, SW-REQ-114
+// Verifies: STK-REQ-039, SYS-REQ-127, SW-REQ-114
+// STK-REQ-039:STK-REQ-039-AC-03:acceptance
 // SW-REQ-114:nominal:nominal
 func TestEnterpriseStreamsAnalyticsNoopRecorderPreservesBehavior(t *testing.T) {
 	recorder := (&NoopStreamAnalyticsFactory{}).CreateRecorder(httptest.NewRequest(http.MethodGet, "/", nil))

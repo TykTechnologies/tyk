@@ -22,6 +22,8 @@ func (t reqproofTracker) APIs(certID string) []string {
 var _ Tracker = reqproofTracker{}
 
 // Verifies: STK-REQ-043, SYS-REQ-131, SW-REQ-118
+// STK-REQ-043:STK-REQ-043-AC-01:acceptance
+// STK-REQ-043:STK-REQ-043-AC-02:acceptance
 // MCDC SYS-REQ-131: certificate_usage_tracker_contract_available=T => TRUE
 // SW-REQ-118:nominal:nominal
 // SW-REQ-118:boundary:nominal

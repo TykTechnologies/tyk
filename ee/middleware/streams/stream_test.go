@@ -9,7 +9,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Verifies: SYS-REQ-127, SW-REQ-114
+// Verifies: STK-REQ-039, SYS-REQ-127, SW-REQ-114
+// STK-REQ-039:STK-REQ-039-AC-03:acceptance
 // SW-REQ-114:nominal:nominal
 // SW-REQ-114:error_handling:negative
 func TestStreamStart(t *testing.T) {
@@ -49,7 +50,8 @@ func TestStreamStart(t *testing.T) {
 	})
 }
 
-// Verifies: SYS-REQ-127, SW-REQ-114
+// Verifies: STK-REQ-039, SYS-REQ-127, SW-REQ-114
+// STK-REQ-039:STK-REQ-039-AC-03:acceptance
 // SW-REQ-114:nominal:nominal
 // SW-REQ-114:boundary:nominal
 func TestStreamStop(t *testing.T) {
@@ -89,7 +91,8 @@ func TestStreamStop(t *testing.T) {
 	})
 }
 
-// Verifies: SYS-REQ-127, SW-REQ-114
+// Verifies: STK-REQ-039, SYS-REQ-127, SW-REQ-114
+// STK-REQ-039:STK-REQ-039-AC-03:acceptance
 // SW-REQ-114:access_denied:nominal
 // SW-REQ-114:boundary:nominal
 func TestRemoveAndWhitelistUnsafeComponents(t *testing.T) {

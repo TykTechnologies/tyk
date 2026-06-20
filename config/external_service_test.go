@@ -9,6 +9,7 @@ import (
 )
 
 // Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
+// STK-REQ-029:STK-REQ-029-AC-01:acceptance
 // SYS-REQ-117:nominal:nominal
 // SW-REQ-104:nominal:nominal
 // SW-REQ-104:boundary:nominal
@@ -395,10 +396,12 @@ func TestExternalServiceConfig_ZeroValues(t *testing.T) {
 }
 
 // Verifies: STK-REQ-029, SYS-REQ-117, SW-REQ-104
+// STK-REQ-029:STK-REQ-029-AC-02:acceptance
 // SW-REQ-104:nominal:nominal
 // SW-REQ-104:boundary:nominal
 // SW-REQ-104:error_handling:nominal
 // SW-REQ-104:error_handling:negative
+// STK-REQ-029:STK-REQ-029-AC-03:acceptance
 // STK-REQ-029:error_handling:negative
 func TestMTLSConfig_Validate(t *testing.T) {
 	tests := []struct {

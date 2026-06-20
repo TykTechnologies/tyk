@@ -12,6 +12,7 @@ import (
 )
 
 // Verifies: STK-REQ-041, SYS-REQ-129, SW-REQ-116
+// STK-REQ-041:STK-REQ-041-AC-02:acceptance
 // MCDC SYS-REQ-129: crypto_helper_operation_terminal=T => TRUE
 // SW-REQ-116:nominal:nominal
 // SW-REQ-116:boundary:nominal
@@ -146,7 +147,8 @@ func TestCryptoHelpersPreserveLocalBehavior(t *testing.T) {
 	})
 }
 
-// Verifies: SYS-REQ-129, SW-REQ-116
+// Verifies: STK-REQ-041, SYS-REQ-129, SW-REQ-116
+// STK-REQ-041:STK-REQ-041-AC-03:acceptance
 // STK-REQ-041:error_handling:negative
 // SW-REQ-116:error_handling:negative
 func TestCryptoEncryptionHelpersReturnLocalOutcomes(t *testing.T) {

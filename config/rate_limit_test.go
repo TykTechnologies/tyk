@@ -7,6 +7,9 @@ import (
 )
 
 // Verifies: STK-REQ-032, SYS-REQ-120, SW-REQ-107
+// STK-REQ-032:STK-REQ-032-AC-01:acceptance
+// STK-REQ-032:STK-REQ-032-AC-02:acceptance
+// STK-REQ-032:STK-REQ-032-AC-03:acceptance
 // SW-REQ-107:nominal:nominal
 // SW-REQ-107:boundary:nominal
 // MCDC SYS-REQ-120: rate_limit_description_requested=F, rate_limit_description_determined=F => TRUE

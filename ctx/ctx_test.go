@@ -34,6 +34,55 @@ func setGlobalHashKeys(t *testing.T, hashKeys bool) {
 }
 
 // Verifies: STK-REQ-037, SYS-REQ-125, SW-REQ-112
+// STK-REQ-037:STK-REQ-037-AC-01:acceptance
+// STK-REQ-037:STK-REQ-037-AC-02:acceptance
+// SW-REQ-112:nominal:nominal
+// SW-REQ-112:boundary:nominal
+func TestRequestContextAcceptance_LocalStorageAndRetrieval(t *testing.T) {
+	setGlobalHashKeys(t, true)
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+
+	apiDef := &apidef.APIDefinition{APIID: "api-1"}
+	ctx.SetDefinition(req, apiDef)
+	require.Equal(t, apiDef, ctx.GetDefinition(req))
+	require.NotSame(t, apiDef, ctx.GetDefinition(req))
+
+	oasDef := &oas.OAS{}
+	oasDef.Info = &openapi3.Info{Title: "oas-api", Version: "1"}
+	ctx.SetOASDefinition(req, oasDef)
+	require.Equal(t, oasDef, ctx.GetOASDefinition(req))
+	require.NotSame(t, oasDef, ctx.GetOASDefinition(req))
+
+	session := &user.SessionState{KeyID: "token-1"}
+	ctx.SetSession(req, session, true)
+	require.Same(t, session, ctx.GetSession(req))
+	assert.Equal(t, "token-1", ctx.GetAuthToken(req))
+
+	errClass := errors.NewErrorClassification(errors.UCF, "connection_refused")
+	ctx.SetErrorClassification(req, errClass)
+	require.Equal(t, errClass, ctx.GetErrorClassification(req))
+
+	protocolFields := []struct {
+		name  string
+		key   ctx.Key
+		value any
+		get   func(*http.Request) any
+	}{
+		{name: "mcp method", key: ctx.MCPMethod, value: "tools/call", get: func(r *http.Request) any { return ctx.GetMCPMethod(r) }},
+		{name: "mcp primitive type", key: ctx.MCPPrimitiveType, value: "tool", get: func(r *http.Request) any { return ctx.GetMCPPrimitiveType(r) }},
+		{name: "mcp primitive name", key: ctx.MCPPrimitiveName, value: "get_weather", get: func(r *http.Request) any { return ctx.GetMCPPrimitiveName(r) }},
+		{name: "json rpc error code", key: ctx.JSONRPCErrorCode, value: -32601, get: func(r *http.Request) any { return ctx.GetJSONRPCErrorCode(r) }},
+	}
+
+	for _, field := range protocolFields {
+		t.Run(field.name, func(t *testing.T) {
+			fieldReq := req.WithContext(context.WithValue(req.Context(), field.key, field.value))
+			assert.Equal(t, field.value, field.get(fieldReq))
+		})
+	}
+}
+
+// Verifies: STK-REQ-037, SYS-REQ-125, SW-REQ-112
 // SW-REQ-112:nominal:nominal
 // SW-REQ-112:boundary:nominal
 func TestGetDefinition(t *testing.T) {

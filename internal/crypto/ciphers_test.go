@@ -81,7 +81,8 @@ func TestLegacyCipherSuites(t *testing.T) {
 	}
 }
 
-// Verifies: SYS-REQ-129, SW-REQ-116
+// Verifies: STK-REQ-041, SYS-REQ-129, SW-REQ-116
+// STK-REQ-041:STK-REQ-041-AC-01:acceptance
 // SW-REQ-116:nominal:nominal
 // SW-REQ-116:error_handling:nominal
 // SW-REQ-116:error_handling:negative

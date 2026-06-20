@@ -1,6 +1,6 @@
 id: STK-REQ-022
 version: 1
-status: approved
+status: rejected
 priority: shall
 category: functional
 req_type: guarantee
@@ -37,8 +37,8 @@ verification:
 history:
     created_by: agent:codex
     created_at: "2026-06-20T00:00:00Z"
-    last_modified_by: human:buger
-    last_modified_at: "2026-06-19T22:29:26Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-20T16:18:33Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -69,4 +69,9 @@ lifecycle:
           from: draft
           to: review
           reason: Ready for delegated requirements-owner review after focused internal/maps tests passed
+          changed_by: agent:codex
+        - date: "2026-06-20T16:18:33Z"
+          from: approved
+          to: rejected
+          reason: '[REQPROOF-LAYERING-REPAIR] Helper-domain acceptance criteria belong below stakeholder level; active behavior remains owned by SYS-REQ-110 and SW-REQ-030 until a true gateway-level map-helper acceptance requirement and test exist.'
           changed_by: agent:codex

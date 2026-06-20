@@ -1,6 +1,6 @@
 id: STK-REQ-018
 version: 1
-status: approved
+status: rejected
 priority: shall
 category: functional
 req_type: guarantee
@@ -36,8 +36,8 @@ verification:
 history:
     created_by: agent:codex
     created_at: "2026-06-20T00:00:00Z"
-    last_modified_by: human:buger
-    last_modified_at: "2026-06-19T21:52:32Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-20T16:18:33Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -68,4 +68,9 @@ lifecycle:
           from: draft
           to: review
           reason: Ready for delegated requirements-owner review after focused internal/jsonrpc/errors tests passed
+          changed_by: agent:codex
+        - date: "2026-06-20T16:18:33Z"
+          from: approved
+          to: rejected
+          reason: '[REQPROOF-LAYERING-REPAIR] Helper-domain acceptance criteria belong below stakeholder level; active behavior remains owned by SYS-REQ-106 and SW-REQ-024 until a true gateway-level JSON-RPC error acceptance requirement and test exist.'
           changed_by: agent:codex

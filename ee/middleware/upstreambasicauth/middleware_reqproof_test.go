@@ -37,6 +37,8 @@ func upstreamBasicAuthSpec(auth apidef.UpstreamAuth) *APISpec {
 }
 
 // Verifies: STK-REQ-040, SYS-REQ-128, SW-REQ-115
+// STK-REQ-040:STK-REQ-040-AC-01:acceptance
+// STK-REQ-040:STK-REQ-040-AC-02:acceptance
 // SYS-REQ-128:nominal:nominal
 // MCDC SYS-REQ-128: upstream_basic_auth_operation_terminal=T => TRUE
 // SW-REQ-115:nominal:nominal
@@ -144,7 +146,8 @@ func TestUpstreamBasicAuthMiddlewarePreservesLocalBehavior(t *testing.T) {
 	})
 }
 
-// Verifies: SYS-REQ-128, SW-REQ-115
+// Verifies: STK-REQ-040, SYS-REQ-128, SW-REQ-115
+// STK-REQ-040:STK-REQ-040-AC-03:acceptance
 // STK-REQ-040:error_handling:negative
 // SW-REQ-115:error_handling:negative
 func TestUpstreamBasicAuthProviderOverwritesExistingHeader(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 )
 
 // Verifies: STK-REQ-033, SYS-REQ-121, SW-REQ-108
+// STK-REQ-033:STK-REQ-033-AC-01:acceptance
 // SYS-REQ-121:nominal:nominal
 // SW-REQ-108:nominal:nominal
 // SW-REQ-108:boundary:nominal
@@ -75,6 +76,7 @@ func TestLoadZipkin(t *testing.T) {
 }
 
 // Verifies: STK-REQ-033, SYS-REQ-121, SW-REQ-108
+// STK-REQ-033:STK-REQ-033-AC-01:acceptance
 // SW-REQ-108:nominal:nominal
 // SW-REQ-108:boundary:nominal
 func TestLoadJaeger(t *testing.T) {
@@ -116,6 +118,7 @@ func TestLoadJaeger(t *testing.T) {
 }
 
 // Verifies: STK-REQ-033, SYS-REQ-121, SW-REQ-108
+// STK-REQ-033:STK-REQ-033-AC-03:acceptance
 // SW-REQ-108:nominal:nominal
 // SW-REQ-108:boundary:nominal
 // SW-REQ-108:error_handling:nominal
@@ -171,6 +174,7 @@ func TestOpenTracingDecodeHelpers(t *testing.T) {
 }
 
 // Verifies: STK-REQ-033, SYS-REQ-121, SW-REQ-108
+// STK-REQ-033:STK-REQ-033-AC-02:acceptance
 // SW-REQ-108:boundary:nominal
 func TestOpenTracingLoadersSkipUnrelatedTracerNames(t *testing.T) {
 	tests := []struct {
@@ -207,6 +211,7 @@ func TestOpenTracingLoadersSkipUnrelatedTracerNames(t *testing.T) {
 }
 
 // Verifies: STK-REQ-033, SYS-REQ-121, SW-REQ-108
+// STK-REQ-033:STK-REQ-033-AC-03:acceptance
 // STK-REQ-033:error_handling:negative
 // SW-REQ-108:error_handling:negative
 func TestOpenTracingLoadersReturnEnvDecodeErrors(t *testing.T) {

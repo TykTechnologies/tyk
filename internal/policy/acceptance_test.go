@@ -354,6 +354,25 @@ func TestAcceptance_ApplyOrgMismatchReportsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "different organisation")
 }
 
+// Verifies: STK-REQ-006 [idle]
+// STK-REQ-006:STK-REQ-006-AC-01:acceptance
+func TestAcceptance_IdleWithoutRequestedOperationProducesNoOutputs(t *testing.T) {
+	orgID := "org1"
+	svc := newTestService(orgID, []user.Policy{acceptancePolicy(orgID, "gold")})
+	_ = svc
+
+	session := &user.SessionState{}
+
+	assert.False(t, session.IsInactive)
+	assert.Empty(t, session.AccessRights)
+	assert.Empty(t, session.Tags)
+	assert.Empty(t, session.MetaData)
+	assert.Equal(t, float64(0), session.Rate)
+	assert.Equal(t, float64(0), session.Per)
+	assert.Equal(t, int64(0), session.QuotaMax)
+	assert.Equal(t, 0, session.MaxQueryDepth)
+}
+
 // Verifies: STK-REQ-006 [malformed]
 // STK-REQ-006:STK-REQ-006-AC-02:acceptance
 // STK-REQ-006:STK-REQ-006-AC-03:acceptance

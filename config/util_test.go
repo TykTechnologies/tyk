@@ -11,6 +11,8 @@ import (
 )
 
 // Verifies: STK-REQ-034, SYS-REQ-122, SW-REQ-109
+// STK-REQ-034:STK-REQ-034-AC-01:acceptance
+// STK-REQ-034:STK-REQ-034-AC-02:acceptance
 // SYS-REQ-122:nominal:nominal
 // SW-REQ-109:nominal:nominal
 // SW-REQ-109:boundary:nominal
@@ -52,6 +54,7 @@ func TestConfigNew(t *testing.T) {
 }
 
 // Verifies: STK-REQ-034, SYS-REQ-122, SW-REQ-109
+// STK-REQ-034:STK-REQ-034-AC-03:acceptance
 // SW-REQ-109:nominal:nominal
 func TestNewDefaultWithEnv(t *testing.T) {
 	t.Setenv("TYK_GW_LISTENPORT", "9092")
@@ -87,6 +90,7 @@ func TestFindFile(t *testing.T) {
 }
 
 // Verifies: STK-REQ-034, SYS-REQ-122, SW-REQ-109
+// STK-REQ-034:STK-REQ-034-AC-04:acceptance
 // SW-REQ-109:nominal:nominal
 // SW-REQ-109:boundary:nominal
 func TestHostAddrs(t *testing.T) {
