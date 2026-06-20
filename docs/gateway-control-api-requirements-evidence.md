@@ -29,6 +29,10 @@ The evidence scope includes:
 - API add, update, delete, and local persistence helper outcomes, including
   malformed request handling, API ID mismatch handling, filesystem write status,
   OAS/MCP companion document suffix selection, and delete-file status handling
+- OAuth client management helper outcomes, including storage ID construction,
+  API-scoped create-client responses, update-client mutable field responses
+  that preserve immutable ID/secret values, rotate-client secret replacement,
+  and refresh-token invalidation statuses
 - static mTLS certificate-binding helper validation for empty bindings,
   existing certificate IDs, organization-prefixed certificate IDs, wrong-org
   IDs, path traversal-shaped IDs, and missing certificates

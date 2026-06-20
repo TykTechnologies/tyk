@@ -1557,22 +1557,22 @@ func TestGatewayKeyManagementOrgKeyHelpers(t *testing.T) {
 	assert.Equal(t, apiError("Request malformed"), malformed)
 }
 
-// Verifies: STK-REQ-055, SYS-REQ-143, SW-REQ-130
-// STK-REQ-055:STK-REQ-055-AC-01:acceptance
-// STK-REQ-055:error_handling:negative
-// STK-REQ-055:error_handling:nominal
-// SYS-REQ-143:nominal:nominal
-// SYS-REQ-143:boundary:nominal
-// SYS-REQ-143:error_handling:negative
-// SYS-REQ-143:error_handling:nominal
-// SYS-REQ-143:encoding_safety:nominal
-// SYS-REQ-143:determinism:nominal
-// SW-REQ-130:nominal:nominal
-// SW-REQ-130:boundary:nominal
-// SW-REQ-130:error_handling:negative
-// SW-REQ-130:error_handling:nominal
-// SW-REQ-130:encoding_safety:nominal
-// SW-REQ-130:determinism:nominal
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// STK-REQ-051:error_handling:negative
+// STK-REQ-051:error_handling:nominal
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:error_handling:negative
+// SYS-REQ-139:error_handling:nominal
+// SYS-REQ-139:encoding_safety:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:error_handling:negative
+// SW-REQ-126:error_handling:nominal
+// SW-REQ-126:encoding_safety:nominal
+// SW-REQ-126:determinism:nominal
 func TestGatewayOAuthClientManagementHelpers(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
