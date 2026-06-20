@@ -15,6 +15,7 @@
 <!-- documents SW-REQ-054 -->
 <!-- documents SW-REQ-055 -->
 <!-- documents SW-REQ-056 -->
+<!-- documents SW-REQ-057 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -27,7 +28,7 @@ state, embedded Classic API definition schema data, OAS path/server helper
 shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS internal endpoint helper shapes, OAS endpoint tracking
 helper shapes, OAS utility helper shapes, OAS deprecated-wrapper conversion
-shapes, custom middleware definition
+shapes, OAS Tyk streaming extension shape, custom middleware definition
 enablement classification, OAS extension header name/value helper shapes, and
 OAS extension error-override helper shapes without silent
 data-shape drift.
@@ -164,3 +165,12 @@ import, full migration correctness, route generation, request matching,
 gateway request admission, middleware execution, schema completeness,
 exhaustive invalid-document validation, or final client-visible runtime
 behavior.
+
+`SW-REQ-057` owns the concrete `apidef/oas` Tyk streaming extension data shape.
+Its evidence covers the stable `streams` JSON field name, explicit nil and
+empty stream map representation without field omission, populated nested stream
+configuration preservation, and deterministic JSON round-trip decoding. This
+evidence does not claim extension attachment or removal lifecycle behavior,
+streaming engine execution, stream configuration validation, API import, route
+generation, request matching, gateway request admission, middleware execution,
+or final client-visible runtime behavior.

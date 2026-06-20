@@ -1,5 +1,6 @@
 package oas
 
+// SW-REQ-057
 // XTykStreaming represents the structure for Tyk streaming configurations.
 type XTykStreaming struct {
 	// Streams contains the configurations related to Tyk Streams.
