@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -383,6 +384,44 @@ func TestGatewaySessionLifecyclePolicySaveRejectsPolicyErrors(t *testing.T) {
 	require.Error(t, err)
 	_, found := ts.Gw.GlobalSessionManager.SessionDetail("default", "policy-error-key", false)
 	assert.False(t, found)
+}
+
+// Verifies: STK-REQ-052, SYS-REQ-140, SW-REQ-127
+// STK-REQ-052:STK-REQ-052-AC-01:acceptance
+// SYS-REQ-140:nominal:nominal
+// SYS-REQ-140:boundary:nominal
+// SYS-REQ-140:determinism:nominal
+// SW-REQ-127:nominal:nominal
+// SW-REQ-127:boundary:nominal
+// SW-REQ-127:determinism:nominal
+func TestGatewaySessionLifecycleAddOrUpdateStoresSessionMetadata(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "add-update-api"
+		spec.OrgID = "default"
+	})
+
+	session := CreateStandardSession()
+	session.QuotaRenewalRate = 300
+	session.AccessRights = map[string]user.AccessDefinition{
+		"add-update-api": {APIID: "add-update-api", Versions: []string{"Default"}},
+	}
+
+	before := time.Now().Unix()
+	keyName := ts.Gw.generateToken(session.OrgID, "add-update-key")
+
+	require.NoError(t, ts.Gw.doAddOrUpdate(keyName, session, false, false))
+
+	stored, found := ts.Gw.GlobalSessionManager.SessionDetail("default", keyName, false)
+	require.True(t, found)
+	require.NotEmpty(t, stored.LastUpdated)
+	lastUpdated, err := strconv.ParseInt(stored.LastUpdated, 10, 64)
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, lastUpdated, before)
+	assert.GreaterOrEqual(t, stored.QuotaRenews, before+session.QuotaRenewalRate)
+	assert.Contains(t, stored.AccessRights, "add-update-api")
 }
 
 // Verifies: STK-REQ-052, SYS-REQ-140, SW-REQ-127

@@ -420,6 +420,7 @@ func resetAPILimits(accessRights map[string]user.AccessDefinition) {
 	}
 }
 
+// SW-REQ-127
 func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool, isHashed bool) error {
 	// field last_updated plays an important role in in-mem rate limiter
 	// so update last_updated to current timestamp only if suppress_reset wasn't set to 1

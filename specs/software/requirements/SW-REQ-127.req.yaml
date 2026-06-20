@@ -5,7 +5,7 @@ priority: shall
 category: session_lifecycle
 req_type: guarantee
 fretish: ""
-description: The gateway key/session lifecycle implementation shall preserve local helper behavior for policy-derived trial expiry and post-expiry field application, existing-key preservation for trial expiry, policy application before session save, session lifetime selection across access-right API specs, API spec lookup from session access rights, and API access-right limit entry preservation during local normalization, without claiming policy engine merge atomicity, middleware request admission, Redis or other storage durability, quota counter correctness, dashboard behavior, distributed synchronization, runtime authorization decisions, or final client-visible gateway behavior.
+description: The gateway key/session lifecycle implementation shall preserve local helper behavior for policy-derived trial expiry and post-expiry field application, existing-key preservation for trial expiry, policy application before session save, session lifetime selection across access-right API specs, API spec lookup from session access rights, API access-right limit entry preservation during local normalization, and local add/update session storage orchestration with LastUpdated and quota-renewal metadata updates, without claiming policy engine merge atomicity, middleware request admission, Redis or other storage durability, quota counter correctness, dashboard behavior, distributed synchronization, runtime authorization decisions, or final client-visible gateway behavior.
 formalization_strategy: informal
 informal_verification:
     method: unit_tests
@@ -24,7 +24,7 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-140
-    reviewed_at: "2026-06-20T19:25:59.908523Z"
+    reviewed_at: "2026-06-20T19:32:17.073147Z"
     reviewed_by: human:buger
     reviewed_fingerprint: sha256:5fa66299b080b17027cfe5b253dde2cadbb1897617c968662a057798f1558dbd
 verification:
@@ -36,13 +36,13 @@ verification:
         role: requirements_owner
         reviewed_at: "2026-06-20T19:21:11Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-127 is scoped to local gateway/api.go helper behavior: policy-derived trial expiry and post-expiry field application, existing-key preservation for trial expiry, policy application before session save, lifetime selection across access-right API specs, API spec lookup from session access rights, and API access-right limit entry preservation during local normalization. Focused gateway helper and lifetime tests passed locally where gateway harness tests require Redis. This approval does not claim policy engine merge atomicity, middleware request admission, Redis or other storage durability, quota counter correctness, dashboard behavior, distributed synchronization, runtime authorization decisions, or final client-visible gateway behavior.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-127 is scoped to local gateway/api.go helper behavior: policy-derived trial expiry and post-expiry field application, existing-key preservation for trial expiry, policy application before session save, lifetime selection across access-right API specs, API spec lookup from session access rights, API access-right limit entry preservation during local normalization, and local add/update session storage orchestration with LastUpdated and quota-renewal metadata updates. Focused gateway helper and lifetime tests passed locally where gateway harness tests require Redis. This approval does not claim policy engine merge atomicity, middleware request admission, Redis or other storage durability, quota counter correctness, dashboard behavior, distributed synchronization, runtime authorization decisions, or final client-visible gateway behavior.
         ai_generated: false
 history:
     created_by: agent:codex
     created_at: "2026-06-20T19:21:11Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-20T19:21:11Z"
+    last_modified_at: "2026-06-20T19:35:00Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -54,4 +54,9 @@ lifecycle:
           from: draft
           to: approved
           reason: Added local gateway key/session lifecycle helper behavior.
+          changed_by: human:buger
+        - date: "2026-06-20T19:35:00Z"
+          from: approved
+          to: approved
+          reason: Extended local gateway key/session lifecycle helper behavior to include add/update session storage orchestration.
           changed_by: human:buger

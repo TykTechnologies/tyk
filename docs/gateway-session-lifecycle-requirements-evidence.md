@@ -5,8 +5,9 @@
 key/session lifecycle helper behavior in `gateway/api.go`: policy-derived trial
 expiry and post-expiry field application, policy application followed by session
 persistence, API spec lookup from session access rights, session lifetime
-selection across API specs, and API access-right limit normalization entry
-handling.
+selection across API specs, API access-right limit normalization entry handling,
+and the local add/update helper orchestration that updates `LastUpdated`, quota
+renewal metadata, policy-derived fields, and stored session state.
 
 The proof slice is intentionally local. It does not claim policy engine merge
 atomicity, middleware request admission, Redis or other storage durability,
