@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/pkg/identifier"
 	"github.com/TykTechnologies/tyk/storage"
@@ -248,6 +250,142 @@ func TestGatewayControlAPIOrgLookupHelpers(t *testing.T) {
 
 		assert.ElementsMatch(t, []string{"api-a", "api-b", "api-c"}, ids)
 	})
+}
+
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:determinism:nominal
+func TestGatewayControlAPIInventoryListFilters(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	classic := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "classic-api"
+		spec.Name = "Classic API"
+	})[0]
+	mcp := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "mcp-api"
+		spec.Name = "MCP API"
+		spec.MarkAsMCP()
+	})[0]
+	oasSpec := BuildOASAPI(func(oasDef *oas.OAS) {
+		tykExt := oasDef.GetTykExtension()
+		tykExt.Info.ID = "oas-api"
+		tykExt.Info.Name = "OAS API"
+		tykExt.Server.ListenPath.Value = "/oas-api/"
+	})[0]
+	loadedSpecs := ts.Gw.LoadAPI(classic, mcp, oasSpec)
+	require.Len(t, loadedSpecs, 3)
+
+	filterCases := []struct {
+		name         string
+		spec         *APISpec
+		includeTypes string
+		want         bool
+	}{
+		{name: "classic without include types", spec: loadedSpecs[0], want: true},
+		{name: "mcp without include types", spec: loadedSpecs[1], want: false},
+		{name: "mcp with explicit include type", spec: loadedSpecs[1], includeTypes: " json, mcp ", want: true},
+	}
+	for _, tc := range filterCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, shouldIncludeAPI(tc.spec, tc.includeTypes))
+		})
+	}
+
+	list, code := ts.Gw.handleGetAPIList(httptest.NewRequest(http.MethodGet, "/tyk/apis", nil))
+
+	require.Equal(t, http.StatusOK, code)
+	definitions := list.([]*apidef.APIDefinition)
+	assert.ElementsMatch(t, []string{"classic-api", "oas-api"}, apiDefinitionIDs(definitions))
+
+	list, code = ts.Gw.handleGetAPIList(httptest.NewRequest(http.MethodGet, "/tyk/apis?include_types=mcp", nil))
+
+	require.Equal(t, http.StatusOK, code)
+	definitions = list.([]*apidef.APIDefinition)
+	assert.ElementsMatch(t, []string{"classic-api", "mcp-api", "oas-api"}, apiDefinitionIDs(definitions))
+
+	oasList, code := ts.Gw.handleGetAPIListOAS(false)
+
+	require.Equal(t, http.StatusOK, code)
+	oasDefinitions := oasList.([]oas.OAS)
+	require.Len(t, oasDefinitions, 1)
+	assert.Equal(t, "oas-api", oasDefinitions[0].GetTykExtension().Info.ID)
+}
+
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// STK-REQ-051:error_handling:negative
+// STK-REQ-051:error_handling:nominal
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:error_handling:negative
+// SYS-REQ-139:error_handling:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:error_handling:negative
+// SW-REQ-126:error_handling:nominal
+// SW-REQ-126:determinism:nominal
+func TestGatewayControlAPIInventoryGet(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	classic := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "classic-api"
+		spec.Name = "Classic API"
+	})[0]
+	oasSpec := BuildOASAPI(func(oasDef *oas.OAS) {
+		tykExt := oasDef.GetTykExtension()
+		tykExt.Info.ID = "oas-api"
+		tykExt.Info.Name = "OAS API"
+		tykExt.Server.ListenPath.Value = "/oas-api/"
+	})[0]
+	loadedSpecs := ts.Gw.LoadAPI(classic, oasSpec)
+	require.Len(t, loadedSpecs, 2)
+	classic = loadedSpecs[0]
+
+	got, code := ts.Gw.handleGetAPI(classic.APIID, false)
+
+	require.Equal(t, http.StatusOK, code)
+	classicDef := got.(*apidef.APIDefinition)
+	assert.Equal(t, classic.APIID, classicDef.APIID)
+
+	got, code = ts.Gw.handleGetAPI(classic.APIID, true)
+
+	require.Equal(t, http.StatusBadRequest, code)
+	assert.Equal(t, apiError(apidef.ErrOASGetForOldAPI.Error()), got)
+
+	got, code = ts.Gw.handleGetAPI("missing-api", false)
+
+	require.Equal(t, http.StatusNotFound, code)
+	assert.Equal(t, apiError(apidef.ErrAPINotFound.Error()), got)
+
+	got, code = ts.Gw.handleGetAPIOAS("oas-api", true)
+
+	require.Equal(t, http.StatusOK, code)
+	publicOAS := got.(*oas.OAS)
+	assert.Nil(t, publicOAS.GetTykExtension())
+
+	got, code = ts.Gw.handleGetAPIOAS("oas-api", false)
+
+	require.Equal(t, http.StatusOK, code)
+	privateOAS := got.(*oas.OAS)
+	require.NotNil(t, privateOAS.GetTykExtension())
+	assert.Equal(t, "oas-api", privateOAS.GetTykExtension().Info.ID)
+}
+
+func apiDefinitionIDs(definitions []*apidef.APIDefinition) []string {
+	ids := make([]string, 0, len(definitions))
+	for _, definition := range definitions {
+		ids = append(ids, definition.APIID)
+	}
+	return ids
 }
 
 // Verifies: STK-REQ-052, SYS-REQ-140, SW-REQ-127

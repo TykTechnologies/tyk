@@ -5,7 +5,7 @@ priority: shall
 category: control_api
 req_type: guarantee
 fretish: ""
-description: The gateway control API implementation shall preserve local helper behavior for status helper construction, JSON response writing, JSON export writing, method-not-allowed responses, secure no-cache header wrapping, allowed-method filtering, organization-scoped API lookup, API ID listing, static mTLS certificate-binding existence and organization-prefix validation, and new-certificate delta calculation, without claiming TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, dashboard behavior, network transport behavior, or final client-visible behavior beyond the local control API helper and tested handler responses.
+description: The gateway control API implementation shall preserve local helper behavior for status helper construction, JSON response writing, JSON export writing, method-not-allowed responses, secure no-cache header wrapping, allowed-method filtering, organization-scoped API lookup, API ID listing, API definition listing with explicit MCP inclusion filtering, classic and OAS API retrieval status handling, OAS list delegation, public OAS extension removal, static mTLS certificate-binding existence and organization-prefix validation, and new-certificate delta calculation, without claiming TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.
 formalization_strategy: informal
 informal_verification:
     method: unit_tests
@@ -14,7 +14,7 @@ informal_verification:
 parent: SYS-REQ-139
 component: gateway_control_api
 rationale: >-
-    This software requirement owns local gateway control API helper mechanics and static mTLS certificate-binding validation before key create/update acceptance only. It does not claim TLS handshakes, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, dashboard behavior, network transport behavior, or final client-visible behavior beyond the local control API helper and tested handler responses.
+    This software requirement owns local gateway control API helper mechanics, local API inventory helper behavior, and static mTLS certificate-binding validation before key create/update acceptance only. It does not claim TLS handshakes, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.
 tags:
     - gateway
     - control-api
@@ -24,7 +24,7 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-139
-    reviewed_at: "2026-06-20T19:20:00Z"
+    reviewed_at: "2026-06-20T20:13:43.225691Z"
     reviewed_by: human:buger
     reviewed_fingerprint: sha256:43f5d074fa9c7542113a5c125aa7e09e77b41162c2f53184966b402dae09be6b
 verification:
@@ -36,13 +36,13 @@ verification:
         role: requirements_owner
         reviewed_at: "2026-06-20T19:20:00Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-126 is scoped to local gateway control API helper behavior: status helper construction, JSON response/export writing, method-not-allowed responses, secure/cache-control wrapper headers, allowed-method filtering, organization-scoped API lookup, API ID listing, static mTLS certificate-binding validation, and new-certificate delta calculation. Focused gateway tests passed locally with Redis available where gateway harness tests require it. This approval does not claim TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, dashboard behavior, network transport behavior, or final client-visible behavior beyond the local control API helper and tested handler responses.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-126 is scoped to local gateway control API helper behavior: status helper construction, JSON response/export writing, method-not-allowed responses, secure/cache-control wrapper headers, allowed-method filtering, organization-scoped API lookup, API ID listing, API definition listing with explicit MCP inclusion filtering, classic and OAS API retrieval status handling, OAS list delegation, public OAS extension removal, static mTLS certificate-binding validation, and new-certificate delta calculation. Focused gateway tests passed locally with Redis available where gateway harness tests require it. This approval does not claim TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, or final client-visible behavior beyond the local control API helper and tested handler responses.
         ai_generated: false
 history:
     created_by: agent:codex
     created_at: "2026-06-20T19:00:00Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-20T19:20:00Z"
+    last_modified_at: "2026-06-20T20:09:08Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -60,4 +60,9 @@ lifecycle:
           from: approved
           to: approved
           reason: Extended local gateway control API helper behavior to include allowed-method filtering and organization API lookup helpers.
+          changed_by: human:buger
+        - date: "2026-06-20T20:09:08Z"
+          from: approved
+          to: approved
+          reason: Extended local gateway control API helper behavior to include API inventory list/get and OAS retrieval helpers.
           changed_by: human:buger

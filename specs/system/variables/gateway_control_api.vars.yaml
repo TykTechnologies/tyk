@@ -1,9 +1,9 @@
 component: gateway_control_api
 no_interface:
     declared: true
-    reason: The gateway control API proof slice covers local helper behavior and tested control API handler responses only; TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, dashboard behavior, network transport behavior, and broader final client-visible behavior are outside this component boundary.
+    reason: The gateway control API proof slice covers local helper behavior and tested control API handler responses only; TLS handshake enforcement, runtime certificate authentication decisions, upstream TLS validation, certificate storage durability, dashboard behavior, network transport behavior, OAS schema semantic correctness, and broader final client-visible behavior are outside this component boundary.
 variables:
     - name: gateway_control_api_operation_terminal
       type: bool
       direction: output
-      description: 'The local gateway control API operation reaches a terminal observable result: success or error status object, JSON response body, JSON export body or delegated error response, method-not-allowed response, secure/cache-control wrapper headers, allowed-method dispatch result, organization API lookup result, API ID listing result, accepted static mTLS binding validation, explicit certificate-binding validation error, or new-certificate delta result.'
+      description: 'The local gateway control API operation reaches a terminal observable result: success or error status object, JSON response body, JSON export body or delegated error response, method-not-allowed response, secure/cache-control wrapper headers, allowed-method dispatch result, organization API lookup result, API ID listing result, API definition inventory list/get result, OAS inventory list/get result with public extension shaping, accepted static mTLS binding validation, explicit certificate-binding validation error, or new-certificate delta result.'

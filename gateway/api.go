@@ -1255,6 +1255,7 @@ func (gw *Gateway) handleDeletePolicy(polID string) (interface{}, int) {
 	return response, http.StatusOK
 }
 
+// SW-REQ-126
 func (gw *Gateway) handleGetAPIList(r *http.Request) (interface{}, int) {
 	includeTypes := r.URL.Query().Get("include_types")
 
@@ -1272,6 +1273,7 @@ func (gw *Gateway) handleGetAPIList(r *http.Request) (interface{}, int) {
 
 // shouldIncludeAPI checks if an API should be included in the listing.
 // MCP APIs are only included if explicitly requested in includeTypes.
+// SW-REQ-126
 func shouldIncludeAPI(apiSpec *APISpec, includeTypes string) bool {
 	if !apiSpec.IsMCP() {
 		return true
@@ -1284,10 +1286,12 @@ func shouldIncludeAPI(apiSpec *APISpec, includeTypes string) bool {
 	return false
 }
 
+// SW-REQ-126
 func (gw *Gateway) handleGetAPIListOAS(modePublic bool) (interface{}, int) {
 	return gw.handleGetOASList(isOASNotMCP, modePublic)
 }
 
+// SW-REQ-126
 func (gw *Gateway) handleGetAPI(apiID string, oasEndpoint bool) (interface{}, int) {
 	if spec := gw.getApiSpec(apiID); spec != nil {
 		if oasEndpoint && spec.IsOAS {
@@ -1308,6 +1312,7 @@ func (gw *Gateway) handleGetAPI(apiID string, oasEndpoint bool) (interface{}, in
 	return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
 }
 
+// SW-REQ-126
 func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, int) {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()

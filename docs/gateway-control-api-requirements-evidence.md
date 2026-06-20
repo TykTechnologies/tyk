@@ -17,6 +17,10 @@ The evidence scope includes:
   method-not-allowed JSON response
 - organization-scoped API lookup and API ID listing helpers, including fallback
   behavior when no exact organization match exists
+- API definition inventory listing and retrieval helpers, including explicit
+  MCP inclusion filtering and not-found / old-API-as-OAS error status handling
+- OAS inventory list and retrieval helpers, including public-mode Tyk extension
+  removal on cloned OAS responses
 - static mTLS certificate-binding helper validation for empty bindings,
   existing certificate IDs, organization-prefixed certificate IDs, wrong-org
   IDs, path traversal-shaped IDs, and missing certificates
@@ -26,6 +30,6 @@ The evidence scope includes:
 
 This evidence intentionally does not claim TLS handshake enforcement, runtime
 certificate authentication decisions, upstream TLS validation, certificate
-storage durability, dashboard behavior, network transport behavior, or final
-client-visible behavior beyond the local control API helper and tested handler
-responses.
+storage durability, dashboard behavior, network transport behavior, OAS schema
+semantic correctness, or final client-visible behavior beyond the local control
+API helper and tested handler responses.
