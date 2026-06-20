@@ -5,7 +5,7 @@ priority: shall
 category: observability
 req_type: guarantee
 fretish: the gateway_analytics shall always satisfy gateway_analytics_operation_terminal
-description: Gateway analytics support shall make local analytics operations terminal and deterministic for handler initialization, worker start/stop/flush lifecycle, serializer selection, buffered record append to configured analytics storage, status and detailed analytics preservation, local GeoIP lookup wiring, URL normalization for UUID, ULID, numeric, and custom path fragments, and selected request-header tag expansion, without claiming Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, network transport behavior, or final client-visible responses.
+description: Gateway analytics support shall make local analytics operations terminal and deterministic for handler initialization, worker start/stop/flush lifecycle, serializer selection, buffered record append to configured analytics storage, status and detailed analytics preservation, local GeoIP lookup wiring, URL normalization for UUID, ULID, numeric, and custom path fragments, selected request-header tag expansion, stream analytics recorder selection, response-writer wrapping, write-path analytics recording, connection-upgrade analytics recording, flush delegation, and non-hijackable writer error handling, without claiming Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, stream backend delivery, network transport behavior, or final client-visible responses.
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: STK-REQ-050
 component: gateway_analytics
-rationale: This system requirement owns local gateway analytics preparation and storage-append behavior only. Downstream analytics delivery, dashboard ingestion, and storage durability beyond the local append call remain outside this proof slice.
+rationale: This system requirement owns local gateway analytics preparation, stream analytics wrapping, and storage-append behavior only. Downstream analytics delivery, dashboard ingestion, stream backend delivery, and storage durability beyond the local append call remain outside this proof slice.
 tags:
     - analytics
     - observability
@@ -23,7 +23,7 @@ variables:
 traces:
     satisfies:
         - STK-REQ-050
-    reviewed_at: "2026-06-20T18:50:00Z"
+    reviewed_at: "2026-06-20T19:15:00Z"
     reviewed_by: human:buger
 verification:
     assurance_level: A
@@ -32,23 +32,23 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-20T18:50:00Z"
+        reviewed_at: "2026-06-20T19:15:00Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway analytics system scope is limited to local analytics handler and helper terminality: initialization, worker lifecycle, serializer selection, buffered record append to configured storage, response/detailed analytics preservation, GeoIP lookup wiring, URL normalization, and selected request-header tag expansion. The FRETish invariant intentionally models local operation terminality without asserting Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, network transport behavior, or final client-visible responses.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway analytics system scope is limited to local analytics handler and helper terminality: initialization, worker lifecycle, serializer selection, buffered record append to configured storage, response/detailed analytics preservation, GeoIP lookup wiring, URL normalization, selected request-header tag expansion, stream analytics recorder selection, response-writer wrapping, write-path analytics recording, connection-upgrade analytics recording, flush delegation, and non-hijackable writer error handling. The FRETish invariant intentionally models local operation terminality without asserting Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, stream backend delivery, network transport behavior, or final client-visible responses.
         ai_generated: false
-    gaps_reviewed_at: "2026-06-20T18:50:00Z"
+    gaps_reviewed_at: "2026-06-20T19:15:00Z"
     gaps_reviewed_by: human:buger
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-138|gateway_analytics_operation_terminal
           reviewer: human:buger
-          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after requirement approval. SYS-REQ-138''s gateway_analytics_operation_terminal variable is decomposed by SW-REQ-125 for local gateway analytics behavior: handler initialization, worker start/stop/flush lifecycle, serializer selection, buffered record append to configured analytics storage, status and detailed analytics preservation, local GeoIP lookup wiring, URL normalization for UUID/ULID/numeric/custom path fragments, and selected request-header tag expansion. This review is limited to local gateway analytics mechanics and does not claim Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, network transport behavior, or final client-visible responses.'
-          reviewed_at: "2026-06-20T18:50:00Z"
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after requirement approval. SYS-REQ-138''s gateway_analytics_operation_terminal variable is decomposed by SW-REQ-125 for local gateway analytics behavior: handler initialization, worker start/stop/flush lifecycle, serializer selection, buffered record append to configured analytics storage, status and detailed analytics preservation, local GeoIP lookup wiring, URL normalization for UUID/ULID/numeric/custom path fragments, selected request-header tag expansion, stream analytics recorder selection, response-writer wrapping, write-path analytics recording, connection-upgrade analytics recording, flush delegation, and non-hijackable writer error handling. This review is limited to local gateway analytics mechanics and does not claim Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, stream backend delivery, network transport behavior, or final client-visible responses.'
+          reviewed_at: "2026-06-20T19:15:00Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T18:50:00Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-20T18:50:00Z"
+    last_modified_at: "2026-06-20T19:15:00Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -61,4 +61,9 @@ lifecycle:
           from: draft
           to: approved
           reason: Added gateway analytics system requirement for gateway analytics onboarding.
+          changed_by: human:buger
+        - date: "2026-06-20T19:15:00Z"
+          from: approved
+          to: approved
+          reason: Extended gateway analytics system requirement to include local stream analytics recorder and response-writer behavior.
           changed_by: human:buger

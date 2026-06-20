@@ -5,16 +5,16 @@ priority: shall
 category: observability
 req_type: guarantee
 fretish: ""
-description: The gateway analytics implementation shall preserve local analytics handler and helper behavior for handler initialization, worker start/stop/flush lifecycle, serializer selection, buffered record append to configured analytics storage, status and detailed analytics preservation, local GeoIP lookup wiring, URL normalization for UUID, ULID, numeric, and custom path fragments, and selected request-header tag expansion, without claiming Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, network transport behavior, or final client-visible responses.
+description: The gateway analytics implementation shall preserve local analytics handler and helper behavior for handler initialization, worker start/stop/flush lifecycle, serializer selection, buffered record append to configured analytics storage, status and detailed analytics preservation, local GeoIP lookup wiring, URL normalization for UUID, ULID, numeric, and custom path fragments, selected request-header tag expansion, stream analytics recorder selection, response-writer wrapping, write-path analytics recording, connection-upgrade analytics recording, flush delegation, and non-hijackable writer error handling, without claiming Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, stream backend delivery, network transport behavior, or final client-visible responses.
 formalization_strategy: informal
 informal_verification:
     method: unit_tests
-    evidence: gateway/analytics_test.go; docs/gateway-analytics-requirements-evidence.md
+    evidence: gateway/analytics_test.go; gateway/analytics_streams_test.go; docs/gateway-analytics-requirements-evidence.md
     verified: true
 parent: SYS-REQ-138
 component: gateway_analytics
 rationale: >-
-    This software requirement owns local gateway analytics handler and helper mechanics only. It does not claim Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, network transport behavior, or final client-visible responses.
+    This software requirement owns local gateway analytics handler, stream analytics response-writer, and helper mechanics only. It does not claim Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, stream backend delivery, network transport behavior, or final client-visible responses.
 tags:
     - analytics
     - observability
@@ -24,7 +24,7 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-138
-    reviewed_at: "2026-06-20T18:50:00Z"
+    reviewed_at: "2026-06-20T19:15:00Z"
     reviewed_by: human:buger
 verification:
     assurance_level: A
@@ -33,15 +33,15 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-20T18:50:00Z"
+        reviewed_at: "2026-06-20T19:15:00Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-125 is scoped to local gateway analytics behavior: handler initialization, worker start/stop/flush lifecycle, serializer selection, buffered record append to configured analytics storage, status and detailed analytics preservation, local GeoIP lookup wiring, URL normalization for UUID/ULID/numeric/custom path fragments, and selected request-header tag expansion. Focused analytics tests passed locally under the gateway test harness when Redis is available. This approval does not claim Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, network transport behavior, or final client-visible responses.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-125 is scoped to local gateway analytics behavior: handler initialization, worker start/stop/flush lifecycle, serializer selection, buffered record append to configured analytics storage, status and detailed analytics preservation, local GeoIP lookup wiring, URL normalization for UUID/ULID/numeric/custom path fragments, selected request-header tag expansion, stream analytics recorder selection, response-writer wrapping, write-path analytics recording, connection-upgrade analytics recording, flush delegation, and non-hijackable writer error handling. Focused analytics tests passed locally under the gateway test harness when Redis is available. This approval does not claim Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, stream backend delivery, network transport behavior, or final client-visible responses.
         ai_generated: false
 history:
     created_by: agent:codex
     created_at: "2026-06-20T18:50:00Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-20T18:50:00Z"
+    last_modified_at: "2026-06-20T19:15:00Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -54,4 +54,9 @@ lifecycle:
           from: draft
           to: approved
           reason: Added local gateway analytics implementation behavior under gateway analytics support.
+          changed_by: human:buger
+        - date: "2026-06-20T19:15:00Z"
+          from: approved
+          to: approved
+          reason: Extended local gateway analytics implementation behavior to include stream analytics recorder and response-writer helpers.
           changed_by: human:buger

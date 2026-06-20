@@ -3,7 +3,8 @@
 <!-- documents STK-REQ-050 SYS-REQ-138 SW-REQ-125 -->
 
 `STK-REQ-050`, `SYS-REQ-138`, and `SW-REQ-125` cover local gateway
-analytics handler and helper behavior in `gateway/analytics.go` plus the
+analytics handler and helper behavior in `gateway/analytics.go`, stream
+analytics response-writer behavior in `gateway/analytics_streams.go`, and the
 selected request-header tag helper used by success and error analytics paths.
 
 The evidence scope includes:
@@ -18,9 +19,13 @@ The evidence scope includes:
 - URL normalization for UUID, ULID, numeric, and configured custom fragments
 - selected request-header tag expansion while preserving existing tags and
   ignoring non-configured headers
+- stream analytics recorder selection for regular HTTP and WebSocket upgrade
+  requests
+- stream response-writer wrapping, write-path status recording, connection
+  upgrade status recording, flush delegation, and non-hijackable writer error
+  handling
 
 This evidence intentionally does not claim Redis durability beyond the local
 configured storage append call, Pump ingestion, dashboard delivery, external
-GeoIP database correctness, network transport behavior, or final
-client-visible responses.
-
+GeoIP database correctness, stream backend delivery, network transport
+behavior, or final client-visible responses.

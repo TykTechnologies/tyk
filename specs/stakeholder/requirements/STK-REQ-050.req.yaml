@@ -5,21 +5,21 @@ priority: shall
 category: observability
 req_type: guarantee
 fretish: ""
-description: Gateway analytics support shall locally buffer and persist analytics records for gateway outcomes, preserve configured detailed analytics fields, initialize and use GeoIP and URL-normalization helpers, and append selected request-header tags without claiming Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, network transport behavior, or final client-visible responses.
+description: Gateway analytics support shall locally buffer and persist analytics records for gateway outcomes, preserve configured detailed analytics fields, initialize and use GeoIP and URL-normalization helpers, append selected request-header tags, and wrap stream response writers so stream write and connection-upgrade paths record local analytics metadata without claiming Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, stream backend delivery, network transport behavior, or final client-visible responses.
 formalization_strategy: informal
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: gateway_analytics
-rationale: Gateway operators depend on analytics records for operational observability. This proof slice owns the local gateway analytics handler and helper behavior that prepares and appends records to configured storage; downstream analytics consumers and storage durability are outside this boundary.
+rationale: Gateway operators depend on analytics records for operational observability. This proof slice owns the local gateway analytics handler and helper behavior that prepares and appends records to configured storage, including stream analytics response-writer wrapping; downstream analytics consumers, stream backend delivery, and storage durability are outside this boundary.
 tags:
     - analytics
     - observability
     - gateway
 variables: []
 traces:
-    reviewed_at: "2026-06-20T18:50:00Z"
+    reviewed_at: "2026-06-20T19:15:00Z"
     reviewed_by: human:buger
 verification:
     assurance_level: A
@@ -28,15 +28,15 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-20T18:50:00Z"
+        reviewed_at: "2026-06-20T19:15:00Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway analytics scope is limited to local gateway analytics handler and helper behavior: handler initialization, worker start/stop/flush lifecycle, serializer selection, buffered record append to configured analytics storage, status/detailed record preservation, local GeoIP lookup wiring, URL normalization for UUID/ULID/numeric/custom path fragments, and selected request-header tag expansion. This approval does not claim Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, network transport behavior, or final client-visible responses.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway analytics scope is limited to local gateway analytics handler and helper behavior: handler initialization, worker start/stop/flush lifecycle, serializer selection, buffered record append to configured analytics storage, status/detailed record preservation, local GeoIP lookup wiring, URL normalization for UUID/ULID/numeric/custom path fragments, selected request-header tag expansion, stream analytics recorder selection, response-writer wrapping, write-path analytics recording, connection-upgrade analytics recording, flush delegation, and non-hijackable writer error handling. This approval does not claim Redis durability beyond the configured storage append call, Pump ingestion, dashboard delivery, external GeoIP database correctness, stream backend delivery, network transport behavior, or final client-visible responses.
         ai_generated: false
 history:
     created_by: agent:codex
     created_at: "2026-06-20T18:50:00Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-20T18:50:00Z"
+    last_modified_at: "2026-06-20T19:15:00Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -72,10 +72,20 @@ stakeholder:
           verification_method: test
           derived_reqs:
             - SYS-REQ-138
+        - id: STK-REQ-050-AC-06
+          text: Given local stream analytics configuration and HTTP or WebSocket stream responses, when stream recorders and response writers are created or used, then the correct recorder/writer type is selected and write or hijack paths record the expected local analytics status and request metadata.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-138
 lifecycle:
     change_history:
         - date: "2026-06-20T18:50:00Z"
           from: draft
           to: approved
           reason: Added gateway analytics stakeholder requirement for gateway analytics onboarding.
+          changed_by: human:buger
+        - date: "2026-06-20T19:15:00Z"
+          from: approved
+          to: approved
+          reason: Extended gateway analytics scope to include local stream analytics recorder and response-writer behavior.
           changed_by: human:buger

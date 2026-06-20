@@ -24,6 +24,7 @@ type DefaultStreamAnalyticsFactory struct {
 	Spec   *APISpec
 }
 
+// SW-REQ-125
 func NewStreamAnalyticsFactory(logger *logrus.Entry, gw *Gateway, spec *APISpec) streams.StreamAnalyticsFactory {
 	return &DefaultStreamAnalyticsFactory{
 		Logger: logger,
@@ -32,6 +33,7 @@ func NewStreamAnalyticsFactory(logger *logrus.Entry, gw *Gateway, spec *APISpec)
 	}
 }
 
+// SW-REQ-125
 func (d *DefaultStreamAnalyticsFactory) CreateRecorder(r *http.Request) streams.StreamAnalyticsRecorder {
 	detailed := false
 	if recordDetailUnsafe(r, d.Spec) {
@@ -45,6 +47,7 @@ func (d *DefaultStreamAnalyticsFactory) CreateRecorder(r *http.Request) streams.
 	return NewDefaultStreamAnalyticsRecorder(d.Gw, d.Spec)
 }
 
+// SW-REQ-125
 func (d *DefaultStreamAnalyticsFactory) CreateResponseWriter(w http.ResponseWriter, r *http.Request, streamID string, recorder streams.StreamAnalyticsRecorder) http.ResponseWriter {
 	return NewStreamAnalyticsResponseWriter(d.Logger, w, r, streamID, recorder)
 }
@@ -56,6 +59,7 @@ type DefaultStreamAnalyticsRecorder struct {
 	respCopy *http.Response
 }
 
+// SW-REQ-125
 func NewDefaultStreamAnalyticsRecorder(gw *Gateway, spec *APISpec) *DefaultStreamAnalyticsRecorder {
 	return &DefaultStreamAnalyticsRecorder{
 		Gw:   gw,
@@ -63,6 +67,7 @@ func NewDefaultStreamAnalyticsRecorder(gw *Gateway, spec *APISpec) *DefaultStrea
 	}
 }
 
+// SW-REQ-125
 func (s *DefaultStreamAnalyticsRecorder) PrepareRecord(r *http.Request) {
 	s.reqCopy = r.Clone(r.Context())
 	s.respCopy = &http.Response{
@@ -75,6 +80,7 @@ func (s *DefaultStreamAnalyticsRecorder) PrepareRecord(r *http.Request) {
 	s.respCopy.ContentLength = 0
 }
 
+// SW-REQ-125
 func (s *DefaultStreamAnalyticsRecorder) RecordHit(statusCode int, latency analytics.Latency) error {
 	s.respCopy.StatusCode = statusCode
 
@@ -96,6 +102,7 @@ type WebSocketStreamAnalyticsRecorder struct {
 	simpleStreamAnalyticsRecorder *DefaultStreamAnalyticsRecorder
 }
 
+// SW-REQ-125
 func NewWebSocketStreamAnalyticsRecorder(gw *Gateway, spec *APISpec, detailed bool) *WebSocketStreamAnalyticsRecorder {
 	return &WebSocketStreamAnalyticsRecorder{
 		Gw:                            gw,
@@ -105,10 +112,12 @@ func NewWebSocketStreamAnalyticsRecorder(gw *Gateway, spec *APISpec, detailed bo
 	}
 }
 
+// SW-REQ-125
 func (d *WebSocketStreamAnalyticsRecorder) PrepareRecord(r *http.Request) {
 	d.simpleStreamAnalyticsRecorder.PrepareRecord(r)
 }
 
+// SW-REQ-125
 func (d *WebSocketStreamAnalyticsRecorder) RecordHit(statusCode int, latency analytics.Latency) error {
 	return d.simpleStreamAnalyticsRecorder.RecordHit(statusCode, latency)
 }
@@ -122,6 +131,7 @@ type StreamAnalyticsResponseWriter struct {
 	writtenStatusCode int
 }
 
+// SW-REQ-125
 func NewStreamAnalyticsResponseWriter(logger *logrus.Entry, w http.ResponseWriter, r *http.Request, streamID string, recorder streams.StreamAnalyticsRecorder) *StreamAnalyticsResponseWriter {
 	return &StreamAnalyticsResponseWriter{
 		logger:            logger,
@@ -133,14 +143,17 @@ func NewStreamAnalyticsResponseWriter(logger *logrus.Entry, w http.ResponseWrite
 	}
 }
 
+// SW-REQ-125
 func (s *StreamAnalyticsResponseWriter) SetStreamID(streamID string) {
 	s.streamID = streamID
 }
 
+// SW-REQ-125
 func (s *StreamAnalyticsResponseWriter) Header() http.Header {
 	return s.w.Header()
 }
 
+// SW-REQ-125
 func (s *StreamAnalyticsResponseWriter) Write(bytes []byte) (int, error) {
 	now := time.Now()
 	n, err := s.w.Write(bytes)
@@ -163,11 +176,13 @@ func (s *StreamAnalyticsResponseWriter) Write(bytes []byte) (int, error) {
 	return n, nil
 }
 
+// SW-REQ-125
 func (s *StreamAnalyticsResponseWriter) WriteHeader(statusCode int) {
 	s.writtenStatusCode = statusCode
 	s.w.WriteHeader(statusCode)
 }
 
+// SW-REQ-125
 func (s *StreamAnalyticsResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	hijackableWriter, ok := s.w.(http.Hijacker)
 	if !ok {
@@ -183,12 +198,14 @@ func (s *StreamAnalyticsResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, e
 	return hijackableWriter.Hijack()
 }
 
+// SW-REQ-125
 func (s *StreamAnalyticsResponseWriter) Flush() {
 	if flusher, ok := s.w.(http.Flusher); ok {
 		flusher.Flush()
 	}
 }
 
+// SW-REQ-125
 func isWebsocketUpgrade(r *http.Request) bool {
 	return strings.ToLower(r.Header.Get("Connection")) == "upgrade" && strings.ToLower(r.Header.Get("Upgrade")) == "websocket"
 }

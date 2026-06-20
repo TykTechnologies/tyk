@@ -22,6 +22,12 @@ import (
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 )
 
+// Verifies: STK-REQ-050, SYS-REQ-138, SW-REQ-125
+// STK-REQ-050:STK-REQ-050-AC-06:acceptance
+// SYS-REQ-138:boundary:nominal
+// SYS-REQ-138:determinism:nominal
+// SW-REQ-125:boundary:nominal
+// SW-REQ-125:determinism:nominal
 func TestIsWebsocketUpgrade(t *testing.T) {
 	type testCase struct {
 		name             string
@@ -73,6 +79,14 @@ func TestIsWebsocketUpgrade(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-050, SYS-REQ-138, SW-REQ-125
+// STK-REQ-050:STK-REQ-050-AC-06:acceptance
+// SYS-REQ-138:nominal:nominal
+// SYS-REQ-138:boundary:nominal
+// SYS-REQ-138:determinism:nominal
+// SW-REQ-125:nominal:nominal
+// SW-REQ-125:boundary:nominal
+// SW-REQ-125:determinism:nominal
 func TestDefaultStreamAnalyticsFactory_CreateRecorder(t *testing.T) {
 	type testCase struct {
 		name                      string
@@ -149,6 +163,9 @@ func TestDefaultStreamAnalyticsFactory_CreateRecorder(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-050, SYS-REQ-138, SW-REQ-125
+// STK-REQ-050:STK-REQ-050-AC-06:acceptance
+// SW-REQ-125:nominal:nominal
 func TestDefaultStreamAnalyticsRecorder_PrepareRecord(t *testing.T) {
 	t.Run("should prepare non-detailed record", func(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, "http://localhost:8080/path", nil)
@@ -164,6 +181,9 @@ func TestDefaultStreamAnalyticsRecorder_PrepareRecord(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-050, SYS-REQ-138, SW-REQ-125
+// STK-REQ-050:STK-REQ-050-AC-06:acceptance
+// SW-REQ-125:nominal:nominal
 func TestHandleFuncAdapter_HandleFunc(t *testing.T) {
 	logger, _ := logrus.NewNullLogger()
 	baseMid := &BaseMiddleware{
@@ -210,6 +230,10 @@ func TestHandleFuncAdapter_HandleFunc(t *testing.T) {
 	assert.Equal(t, http.StatusSwitchingProtocols, factory.responseWriter.responseRecorder.Code)
 }
 
+// Verifies: STK-REQ-050, SYS-REQ-138, SW-REQ-125
+// STK-REQ-050:STK-REQ-050-AC-06:acceptance
+// SYS-REQ-138:nominal:nominal
+// SW-REQ-125:nominal:nominal
 func TestStreamAnalyticsResponseWriter_Write(t *testing.T) {
 	logger, _ := logrus.NewNullLogger()
 	responseRecorder := httptest.NewRecorder()
@@ -227,6 +251,9 @@ func TestStreamAnalyticsResponseWriter_Write(t *testing.T) {
 	assert.Equal(t, "/path", analyticsRecorder.actualRecord.Path)
 }
 
+// Verifies: STK-REQ-050, SYS-REQ-138, SW-REQ-125
+// STK-REQ-050:STK-REQ-050-AC-06:acceptance
+// SW-REQ-125:nominal:nominal
 func TestStreamAnalyticsResponseWriter_WriteHeader(t *testing.T) {
 	logger, _ := logrus.NewNullLogger()
 	responseRecorder := httptest.NewRecorder()
@@ -238,6 +265,12 @@ func TestStreamAnalyticsResponseWriter_WriteHeader(t *testing.T) {
 	assert.Equal(t, http.StatusSwitchingProtocols, responseRecorder.Code)
 }
 
+// Verifies: STK-REQ-050, SYS-REQ-138, SW-REQ-125
+// STK-REQ-050:STK-REQ-050-AC-06:acceptance
+// SYS-REQ-138:boundary:nominal
+// SYS-REQ-138:error_handling:nominal
+// SW-REQ-125:boundary:nominal
+// SW-REQ-125:error_handling:nominal
 func TestStreamAnalyticsResponseWriter_Hijack(t *testing.T) {
 	logger, _ := logrus.NewNullLogger()
 	responseRecorder := &testStreamHijackableResponseRecorder{
@@ -254,6 +287,44 @@ func TestStreamAnalyticsResponseWriter_Hijack(t *testing.T) {
 	assert.Equal(t, "GET", analyticsRecorder.actualRecord.Method)
 	assert.Equal(t, "localhost", analyticsRecorder.actualRecord.Host)
 	assert.Equal(t, "/path", analyticsRecorder.actualRecord.Path)
+}
+
+// Verifies: STK-REQ-050, SYS-REQ-138, SW-REQ-125
+// STK-REQ-050:STK-REQ-050-AC-06:acceptance
+// SYS-REQ-138:error_handling:negative
+// SW-REQ-125:error_handling:negative
+func TestStreamAnalyticsResponseWriter_Hijack_NotHijackable(t *testing.T) {
+	logger, _ := logrus.NewNullLogger()
+	responseRecorder := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "http://localhost/path", nil)
+	analyticsRecorder := &testStreamAnalyticsRecorder{}
+
+	w := NewStreamAnalyticsResponseWriter(logger.WithContext(context.Background()), responseRecorder, r, "test", analyticsRecorder)
+	_, _, err := w.Hijack()
+
+	require.ErrorIs(t, err, streams.ErrResponseWriterNotHijackable)
+	assert.Nil(t, analyticsRecorder.actualRecord)
+}
+
+// Verifies: STK-REQ-050, SYS-REQ-138, SW-REQ-125
+// STK-REQ-050:STK-REQ-050-AC-06:acceptance
+// SW-REQ-125:nominal:nominal
+// SW-REQ-125:boundary:nominal
+func TestStreamAnalyticsResponseWriter_HeaderSetStreamIDAndFlush(t *testing.T) {
+	logger, _ := logrus.NewNullLogger()
+	responseRecorder := &testStreamHijackableResponseRecorder{
+		responseRecorder: httptest.NewRecorder(),
+	}
+	r := httptest.NewRequest("GET", "http://localhost/path", nil)
+	analyticsRecorder := &testStreamAnalyticsRecorder{}
+
+	w := NewStreamAnalyticsResponseWriter(logger.WithContext(context.Background()), responseRecorder, r, "old", analyticsRecorder)
+	w.SetStreamID("new")
+	w.Header().Set("X-Test", "value")
+	w.Flush()
+
+	assert.Equal(t, "new", w.streamID)
+	assert.Equal(t, "value", responseRecorder.Header().Get("X-Test"))
 }
 
 type testStreamAnalyticsFactory struct {
