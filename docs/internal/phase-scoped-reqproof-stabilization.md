@@ -534,6 +534,17 @@ fixed or to hide them from the current strict audit.
   external event-bus delivery, gateway alerting semantics, client-visible
   gateway behavior, or final certificate trust and transport-security outcomes.
   It moves the visible production coverage baseline from 178/447 to 181/447.
+- `SW-REQ-118` onboarded `internal/certusage` with a new certificate usage
+  tracker stakeholder/system/software chain and focused table-driven interface
+  contract evidence for the `Tracker` methods `Required(certID string) bool`
+  and `APIs(certID string) []string`. The system formula is a local contract
+  availability invariant, with the unreachable unavailable-contract row
+  documented rather than covered by a fake runtime witness. This increment is
+  scoped to the local Go interface contract and does not claim any concrete
+  tracker implementation, certificate discovery or loading, API lifecycle
+  integration, synchronization behavior, deletion safety, certificate lifecycle
+  policy, or final gateway behavior. It moves the visible production coverage
+  baseline from 181/447 to 182/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

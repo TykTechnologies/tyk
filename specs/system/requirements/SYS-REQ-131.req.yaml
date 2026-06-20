@@ -1,0 +1,60 @@
+id: SYS-REQ-131
+version: 1
+status: approved
+priority: shall
+category: security
+req_type: guarantee
+fretish: the certificate_usage_tracker shall always satisfy certificate_usage_tracker_contract_available
+description: Certificate usage tracking support shall make the local tracker interface contract available for certificate-required and certificate-API lookup calls, without claiming any concrete tracker implementation, certificate discovery or loading, API lifecycle integration, synchronization behavior, deletion safety, certificate lifecycle policy, or final gateway behavior.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-043
+component: certificate_usage_tracker
+rationale: This system requirement owns only local interface-contract availability. Runtime tracking behavior belongs to concrete implementations and callers.
+tags:
+    - certificate
+    - usage
+    - interface-contract
+variables:
+    - certificate_usage_tracker_contract_available
+traces:
+    satisfies:
+        - STK-REQ-043
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T12:12:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Certificate usage tracker system scope is limited to terminal local interface-contract availability for Required(certID string) bool and APIs(certID string) []string. The FRETish invariant intentionally models local contract availability without asserting any concrete tracker implementation, certificate discovery or loading, API lifecycle integration, synchronization behavior, deletion safety, certificate lifecycle policy, or final gateway behavior.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T12:20:44.751492Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-131|certificate_usage_tracker_contract_available
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final requirement approval. SYS-REQ-131''s certificate_usage_tracker_contract_available variable is decomposed by SW-REQ-118 for the local internal/certusage Tracker interface contract: Required(certID string) bool and APIs(certID string) []string. This review is limited to local interface-contract availability and does not claim any concrete tracker implementation, certificate discovery or loading, API lifecycle integration, synchronization behavior, deletion safety, certificate lifecycle policy, or final gateway behavior.'
+          reviewed_at: "2026-06-20T12:20:44.751492Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T12:12:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T12:12:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T12:12:00Z"
+          from: draft
+          to: review
+          reason: Added certificate usage tracker system requirement for internal/certusage onboarding.
+          changed_by: agent:codex

@@ -1,0 +1,62 @@
+id: STK-REQ-043
+version: 1
+status: approved
+priority: shall
+category: security
+req_type: guarantee
+fretish: ""
+description: Certificate usage tracking support shall locally expose a tracker interface contract for determining whether a certificate is required and which API IDs use a certificate, without claiming any concrete tracker implementation, certificate discovery or loading, API lifecycle integration, synchronization behavior, deletion safety, certificate lifecycle policy, or final gateway behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: certificate_usage_tracker
+rationale: The internal/certusage package owns only the local interface contract consumed by other packages. Concrete implementation and product-level behavior remain outside this proof slice.
+tags:
+    - certificate
+    - usage
+    - interface-contract
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T12:12:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Certificate usage tracker scope is limited to the local internal/certusage Tracker interface contract: Required(certID string) bool and APIs(certID string) []string. This approval does not claim any concrete tracker implementation, certificate discovery or loading, API lifecycle integration, synchronization behavior, deletion safety, certificate lifecycle policy, or final gateway behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T12:12:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T12:12:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+stakeholder:
+    persona: Gateway certificate maintainer
+    story: As a gateway certificate maintainer, I need a stable local interface for asking whether a certificate is required and which APIs use it before concrete tracker implementations are verified separately.
+    acceptance_criteria:
+        - id: STK-REQ-043-AC-01
+          text: Given a local implementation with certificate usage data, when it is assigned to the tracker interface, then the interface accepts required-certificate and API-ID lookup methods with the expected signatures.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-131
+        - id: STK-REQ-043-AC-02
+          text: Given a tracker interface value, when local callers invoke certificate-required or certificate-API lookup methods, then the calls return boolean usage status and API ID slices supplied by the implementation.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-131
+lifecycle:
+    change_history:
+        - date: "2026-06-20T12:12:00Z"
+          from: draft
+          to: review
+          reason: Added certificate usage tracker interface contract stakeholder requirement for internal/certusage onboarding.
+          changed_by: agent:codex

@@ -1,0 +1,9 @@
+component: certificate_usage_tracker
+no_interface:
+    declared: true
+    reason: The internal/certusage proof slice covers the local Go interface contract only; concrete tracker implementations, certificate discovery/loading, API lifecycle integration, synchronization behavior, deletion safety, certificate lifecycle policy, and final gateway behavior are outside this component boundary.
+variables:
+    - name: certificate_usage_tracker_contract_available
+      type: bool
+      direction: output
+      description: 'The local certificate usage tracker interface contract is available with methods for certificate-required and certificate-API lookup behavior.'

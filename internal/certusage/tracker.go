@@ -8,6 +8,8 @@ package certusage
 //   - Selective certificate synchronization in MDCB setups
 //   - Certificate lifecycle management
 //   - Dependency analysis for certificate deletion
+//
+// SW-REQ-118
 type Tracker interface {
 	// Required returns true if the certificate is used by any loaded API.
 	Required(certID string) bool
