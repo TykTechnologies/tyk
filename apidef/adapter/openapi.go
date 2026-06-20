@@ -24,6 +24,7 @@ const (
 	GraphQLTypeMutation = "Mutation"
 )
 
+// SW-REQ-071
 type openAPI struct {
 	orgId         string
 	input         []byte
@@ -32,6 +33,7 @@ type openAPI struct {
 	document      *openapi3.T
 }
 
+// SW-REQ-071
 func extractRequestBody(mime string, operation *openapi3.Operation) (*openapi3.SchemaRef, error) {
 	mediaType := operation.RequestBody.Value.Content.Get(mime)
 	if mediaType == nil {
@@ -44,6 +46,7 @@ func extractRequestBody(mime string, operation *openapi3.Operation) (*openapi3.S
 	return nil, fmt.Errorf("no schema found for mime type %s", mime)
 }
 
+// SW-REQ-071
 func (o *openAPI) prepareGraphQLEngineConfig() error {
 	if o.document == nil {
 		return fmt.Errorf("document is nil")
@@ -163,6 +166,7 @@ func (o *openAPI) prepareGraphQLEngineConfig() error {
 	return nil
 }
 
+// SW-REQ-071
 func (o *openAPI) Import() (*apidef.APIDefinition, error) {
 	document, err := openapi.ParseOpenAPIDocument(o.input)
 	if err != nil {
@@ -197,6 +201,7 @@ func (o *openAPI) Import() (*apidef.APIDefinition, error) {
 	return o.apiDefinition, nil
 }
 
+// SW-REQ-071
 func NewOpenAPIAdapter(orgId string, input []byte) ImportAdapter {
 	report := operationreport.Report{}
 	return &openAPI{

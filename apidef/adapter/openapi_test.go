@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/buger/jsonparser"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -327,6 +328,49 @@ const expectedOpenAPIGraphQLConfig = `{
     }
 }`
 
+const operationIDFallbackOpenAPI3 = `openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Fallback Operations
+servers:
+  - url: https://api.example.test/base
+paths:
+  /things/{thingId}/items:
+    get:
+      parameters:
+        - name: thingId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: filter
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+    delete:
+      parameters:
+        - name: thingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: deleted`
+
+// Verifies: SYS-REQ-104, SW-REQ-071
+// SW-REQ-071:nominal:nominal
+// SW-REQ-071:boundary:nominal
+// SW-REQ-071:error_handling:negative
+// SW-REQ-071:determinism:nominal
 func TestGraphQLConfigAdapter_OpenAPI(t *testing.T) {
 	adapter := NewOpenAPIAdapter("my-org-id", []byte(petstoreExpandedOpenAPI3))
 
@@ -349,4 +393,91 @@ func TestGraphQLConfigAdapter_OpenAPI(t *testing.T) {
 	err = json.Indent(dst, actualGraphqlConfig, "", "    ")
 	require.NoError(t, err)
 	require.Equal(t, expectedOpenAPIGraphQLConfig, dst.String())
+}
+
+// Verifies: SYS-REQ-104, SW-REQ-071
+// SW-REQ-071:boundary:nominal
+// SW-REQ-071:determinism:nominal
+func TestOpenAPIAdapterFallbackFieldsAndURLTemplates(t *testing.T) {
+	adapter := NewOpenAPIAdapter("my-org-id", []byte(operationIDFallbackOpenAPI3))
+
+	actualApiDefinition, err := adapter.Import()
+	require.NoError(t, err)
+
+	require.Equal(t, "Fallback Operations", actualApiDefinition.Name)
+	require.Equal(t, []apidef.GraphQLFieldConfig{
+		{
+			TypeName:              "Mutation",
+			FieldName:             "deleteThingsItems",
+			DisableDefaultMapping: true,
+			Path:                  []string{"deleteThingsItems"},
+		},
+		{
+			TypeName:              "Query",
+			FieldName:             "thingsItems",
+			DisableDefaultMapping: true,
+			Path:                  []string{"thingsItems"},
+		},
+	}, actualApiDefinition.GraphQL.Engine.FieldConfigs)
+
+	require.Len(t, actualApiDefinition.GraphQL.Engine.DataSources, 2)
+	var deleteConfig apidef.GraphQLEngineDataSourceConfigREST
+	require.NoError(t, json.Unmarshal(actualApiDefinition.GraphQL.Engine.DataSources[0].Config, &deleteConfig))
+	require.Equal(t, "https://api.example.test/base/things/{{.arguments.thingId}}/items", deleteConfig.URL)
+	require.Equal(t, "DELETE", deleteConfig.Method)
+
+	var queryConfig apidef.GraphQLEngineDataSourceConfigREST
+	require.NoError(t, json.Unmarshal(actualApiDefinition.GraphQL.Engine.DataSources[1].Config, &queryConfig))
+	require.Equal(t, "https://api.example.test/base/things/{{.arguments.thingId}}/items?filter={{.arguments.filter}}", queryConfig.URL)
+	require.Equal(t, "GET", queryConfig.Method)
+
+	repeatedAdapter := NewOpenAPIAdapter("my-org-id", []byte(operationIDFallbackOpenAPI3))
+	repeatedApiDefinition, err := repeatedAdapter.Import()
+	require.NoError(t, err)
+	require.Equal(t, actualApiDefinition.GraphQL.Engine.FieldConfigs, repeatedApiDefinition.GraphQL.Engine.FieldConfigs)
+	require.Equal(t, actualApiDefinition.GraphQL.Engine.DataSources, repeatedApiDefinition.GraphQL.Engine.DataSources)
+}
+
+// Verifies: SYS-REQ-104, SW-REQ-071
+// SW-REQ-071:error_handling:negative
+func TestOpenAPIAdapterRejectsMalformedAndUnsupportedLocalInputs(t *testing.T) {
+	_, err := NewOpenAPIAdapter("my-org-id", []byte("openapi: [")).Import()
+	require.Error(t, err)
+
+	err = (&openAPI{}).prepareGraphQLEngineConfig()
+	require.ErrorContains(t, err, "document is nil")
+
+	err = (&openAPI{
+		document:      &openapi3.T{Servers: openapi3.Servers{}},
+		apiDefinition: newApiDefinition("missing server", "my-org-id"),
+	}).prepareGraphQLEngineConfig()
+	require.ErrorContains(t, err, "no server defined in OpenAPI spec")
+
+	err = (&openAPI{
+		document: &openapi3.T{
+			Servers: openapi3.Servers{{URL: "http://%zz"}},
+		},
+		apiDefinition: newApiDefinition("bad server", "my-org-id"),
+	}).prepareGraphQLEngineConfig()
+	require.Error(t, err)
+
+	_, err = extractRequestBody(defaultRequestBodyMimeType, &openapi3.Operation{
+		RequestBody: &openapi3.RequestBodyRef{
+			Value: &openapi3.RequestBody{
+				Content: openapi3.Content{},
+			},
+		},
+	})
+	require.ErrorContains(t, err, "no media found for mime type application/json")
+
+	_, err = extractRequestBody(defaultRequestBodyMimeType, &openapi3.Operation{
+		RequestBody: &openapi3.RequestBodyRef{
+			Value: &openapi3.RequestBody{
+				Content: openapi3.Content{
+					defaultRequestBodyMimeType: &openapi3.MediaType{},
+				},
+			},
+		},
+	})
+	require.ErrorContains(t, err, "no schema found for mime type application/json")
 }

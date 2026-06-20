@@ -26,6 +26,7 @@
 <!-- documents SW-REQ-068 -->
 <!-- documents SW-REQ-069 -->
 <!-- documents SW-REQ-070 -->
+<!-- documents SW-REQ-071 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -44,8 +45,8 @@ internal reflection support helper behavior,
 custom middleware definition enablement classification, OAS extension header
 name/value helper shapes, OAS extension error-override helper shapes, adapter
 interface and GraphQL utility helper behavior, GraphQL config adapter
-selection behavior, and AsyncAPI adapter support-shape generation without
-silent data-shape drift.
+selection behavior, AsyncAPI adapter support-shape generation, and OpenAPI
+adapter support-shape generation without silent data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -327,4 +328,20 @@ GraphQL translator, downstream GraphQL engine adapter correctness, GraphQL
 execution, Kafka connectivity or consumption behavior, gateway API loading,
 route generation, request matching, gateway request admission, middleware
 execution, upstream availability, persistence, analytics, or final
+client-visible runtime behavior.
+
+`SW-REQ-071` owns the concrete `apidef/adapter` OpenAPI adapter used by
+API-definition adapter flows. Its evidence covers well-formed OpenAPI import
+into a new active GraphQL execution-engine API definition, REST data-source
+generation for supported query and mutation methods, first-server URL joining,
+path and query argument template conversion, operation-ID and endpoint/method
+field-name derivation, JSON request-body argument template creation,
+deterministic field/data-source sorting, schema printing into the API
+definition, malformed input errors, nil and serverless document errors,
+malformed server URL errors, and missing JSON request-body media or schema
+errors. This evidence does not claim complete OpenAPI specification coverage,
+correctness of the upstream OpenAPI parser or GraphQL translator, downstream
+GraphQL engine adapter correctness, REST upstream availability, GraphQL
+execution, gateway API loading, route generation, request matching, gateway
+request admission, middleware execution, persistence, analytics, or final
 client-visible runtime behavior.
