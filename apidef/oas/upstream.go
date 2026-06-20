@@ -11,6 +11,7 @@ import (
 )
 
 // Upstream holds configuration for the upstream server to which Tyk should proxy requests.
+// SW-REQ-093
 type Upstream struct {
 	// URL defines the upstream address (or target URL) to which requests should be proxied.
 	// Tyk classic API definition: `proxy.target_url`
@@ -63,6 +64,7 @@ type Upstream struct {
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
+// SW-REQ-093
 func (u *Upstream) Fill(api apidef.APIDefinition) {
 	u.URL = api.Proxy.TargetURL
 
@@ -141,6 +143,7 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	u.fillPreserveTrailingSlash(api)
 }
 
+// SW-REQ-093
 func (u *Upstream) fillPreserveTrailingSlash(api apidef.APIDefinition) {
 	if u.PreserveTrailingSlash == nil {
 		u.PreserveTrailingSlash = &PreserveTrailingSlash{}
@@ -152,6 +155,7 @@ func (u *Upstream) fillPreserveTrailingSlash(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-093
 func (u *Upstream) fillPreserveHostHeader(api apidef.APIDefinition) {
 	if u.PreserveHostHeader == nil {
 		u.PreserveHostHeader = &PreserveHostHeader{}
@@ -165,6 +169,7 @@ func (u *Upstream) fillPreserveHostHeader(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts *Upstream into *apidef.APIDefinition.
+// SW-REQ-093
 func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.TargetURL = u.URL
 
@@ -244,6 +249,7 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	u.preserveTrailingSlashExtractTo(api)
 }
 
+// SW-REQ-093
 func (u *Upstream) preserveHostHeaderExtractTo(api *apidef.APIDefinition) {
 	if u.PreserveHostHeader == nil {
 		u.PreserveHostHeader = &PreserveHostHeader{}
@@ -255,6 +261,7 @@ func (u *Upstream) preserveHostHeaderExtractTo(api *apidef.APIDefinition) {
 	u.PreserveHostHeader.ExtractTo(api)
 }
 
+// SW-REQ-093
 func (u *Upstream) preserveTrailingSlashExtractTo(api *apidef.APIDefinition) {
 	if u.PreserveTrailingSlash == nil {
 		u.PreserveTrailingSlash = &PreserveTrailingSlash{}
@@ -266,6 +273,7 @@ func (u *Upstream) preserveTrailingSlashExtractTo(api *apidef.APIDefinition) {
 	u.PreserveTrailingSlash.ExtractTo(api)
 }
 
+// SW-REQ-093
 func (u *Upstream) fillLoadBalancing(api apidef.APIDefinition) {
 	if u.LoadBalancing == nil {
 		u.LoadBalancing = &LoadBalancing{}
@@ -277,6 +285,7 @@ func (u *Upstream) fillLoadBalancing(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-093
 func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 	if u.LoadBalancing == nil {
 		u.LoadBalancing = &LoadBalancing{}
@@ -308,6 +317,7 @@ func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 //	```
 //
 // Tyk classic API definition: `proxy.transport`
+// SW-REQ-093
 type TLSTransport struct {
 	// InsecureSkipVerify controls whether a client verifies the server's certificate chain and host name.
 	// If InsecureSkipVerify is true, crypto/tls accepts any certificate presented by the server and any host name in that certificate.
@@ -336,6 +346,7 @@ type TLSTransport struct {
 }
 
 // Fill fills *TLSTransport from apidef.ServiceDiscoveryConfiguration.
+// SW-REQ-093
 func (t *TLSTransport) Fill(api apidef.APIDefinition) {
 	t.ForceCommonNameCheck = api.Proxy.Transport.SSLForceCommonNameCheck
 	t.Ciphers = api.Proxy.Transport.SSLCipherSuites
@@ -345,6 +356,7 @@ func (t *TLSTransport) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts *TLSTransport into *apidef.ServiceDiscoveryConfiguration.
+// SW-REQ-093
 func (t *TLSTransport) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.Transport.SSLForceCommonNameCheck = t.ForceCommonNameCheck
 	api.Proxy.Transport.SSLCipherSuites = t.Ciphers
@@ -354,6 +366,7 @@ func (t *TLSTransport) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // tlsVersionFromString converts v in the form of 1.2/1.3 to the version int
+// SW-REQ-093
 func (t *TLSTransport) tlsVersionFromString(v string) uint16 {
 	switch v {
 	case "1.0":
@@ -370,6 +383,7 @@ func (t *TLSTransport) tlsVersionFromString(v string) uint16 {
 }
 
 // tlsVersionFromString converts v from version into to the form 1.0/1.1
+// SW-REQ-093
 func (t *TLSTransport) tlsVersionToString(v uint16) string {
 	switch v {
 	case tls.VersionTLS10:
@@ -388,6 +402,7 @@ func (t *TLSTransport) tlsVersionToString(v uint16) string {
 // Proxy contains the configuration for an internal proxy.
 //
 // Tyk classic API definition: `proxy.proxy_url`
+// SW-REQ-093
 type Proxy struct {
 	// Enabled determines if the proxy is active.
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -397,16 +412,19 @@ type Proxy struct {
 }
 
 // Fill fills *Proxy from apidef.ServiceDiscoveryConfiguration.
+// SW-REQ-093
 func (p *Proxy) Fill(api apidef.APIDefinition) {
 	p.URL = api.Proxy.Transport.ProxyURL
 }
 
 // ExtractTo extracts *Proxy into *apidef.ServiceDiscoveryConfiguration.
+// SW-REQ-093
 func (p *Proxy) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.Transport.ProxyURL = p.URL
 }
 
 // ServiceDiscovery holds configuration required for service discovery.
+// SW-REQ-093
 type ServiceDiscovery struct {
 	// Enabled activates Service Discovery.
 	//
@@ -511,6 +529,7 @@ type ServiceDiscovery struct {
 }
 
 // ServiceDiscoveryCache holds configuration for caching ServiceDiscovery data.
+// SW-REQ-093
 type ServiceDiscoveryCache struct {
 	// Enabled turns service discovery cache on or off.
 	//
@@ -524,6 +543,7 @@ type ServiceDiscoveryCache struct {
 }
 
 // CacheOptions returns the timeout value in effect and a bool if cache is enabled.
+// SW-REQ-093
 func (sd *ServiceDiscovery) CacheOptions() (int64, bool) {
 	if sd.Cache != nil {
 		return sd.Cache.Timeout, sd.Cache.Enabled
@@ -533,6 +553,7 @@ func (sd *ServiceDiscovery) CacheOptions() (int64, bool) {
 }
 
 // Fill fills *ServiceDiscovery from apidef.ServiceDiscoveryConfiguration.
+// SW-REQ-093
 func (sd *ServiceDiscovery) Fill(serviceDiscovery apidef.ServiceDiscoveryConfiguration) {
 	sd.Enabled = serviceDiscovery.UseDiscoveryService
 	sd.EndpointReturnsList = serviceDiscovery.EndpointReturnsList
@@ -558,6 +579,7 @@ func (sd *ServiceDiscovery) Fill(serviceDiscovery apidef.ServiceDiscoveryConfigu
 }
 
 // ExtractTo extracts *ServiceDiscovery into *apidef.ServiceDiscoveryConfiguration.
+// SW-REQ-093
 func (sd *ServiceDiscovery) ExtractTo(serviceDiscovery *apidef.ServiceDiscoveryConfiguration) {
 	serviceDiscovery.UseDiscoveryService = sd.Enabled
 	serviceDiscovery.EndpointReturnsList = sd.EndpointReturnsList
@@ -578,6 +600,7 @@ func (sd *ServiceDiscovery) ExtractTo(serviceDiscovery *apidef.ServiceDiscoveryC
 }
 
 // UptimeTests configures uptime tests.
+// SW-REQ-093
 type UptimeTests struct {
 	// Enabled specifies whether the uptime tests are active or not.
 	// Tyk classic API definition: `uptime_tests.disabled`
@@ -601,6 +624,7 @@ type UptimeTests struct {
 }
 
 // UptimeTest configures an uptime test check.
+// SW-REQ-093
 type UptimeTest struct {
 	// CheckURL is the URL for a request. If service discovery is in use,
 	// the hostname will be resolved to a service host.
@@ -634,6 +658,7 @@ type UptimeTest struct {
 }
 
 // AddCommand will append a new command to the test.
+// SW-REQ-093
 func (t *UptimeTest) AddCommand(name, message string) {
 	command := UptimeTestCommand{
 		Name:    name,
@@ -644,6 +669,7 @@ func (t *UptimeTest) AddCommand(name, message string) {
 }
 
 // UptimeTestCommand handles additional checks for tcp connections.
+// SW-REQ-093
 type UptimeTestCommand struct {
 	// Name can be either `send` or `expect`, designating if the
 	// message should be sent, or read from the connection.
@@ -654,6 +680,7 @@ type UptimeTestCommand struct {
 }
 
 // Fill fills *UptimeTests from apidef.UptimeTests.
+// SW-REQ-093
 func (u *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
 	if u.ServiceDiscovery == nil {
 		u.ServiceDiscovery = &ServiceDiscovery{}
@@ -688,6 +715,7 @@ func (u *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
 }
 
 // ExtractTo extracts *UptimeTests into *apidef.UptimeTests.
+// SW-REQ-093
 func (u *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests) {
 	uptimeTests.Disabled = !u.Enabled
 
@@ -732,6 +760,7 @@ func (u *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests) {
 // fillCheckURL constructs a valid URL by appending the protocol to the provided URL, removing any existing protocol.
 // This needs to be done because classic can have invalid protocol and checkURL combinations, e.g.
 // protocol=tcp, checkURL=https://myservice.fake
+// SW-REQ-093
 func (u *UptimeTests) fillCheckURL(protocol string, checkURL string) string {
 	// in classic API, protocol can be empty so we need to check for that and return the original URL
 	if protocol == "" {
@@ -748,6 +777,7 @@ func (u *UptimeTests) fillCheckURL(protocol string, checkURL string) string {
 
 // extractToProtocolAndCheckURL splits a URL into its protocol and the remaining part of the URL, returning both as strings.
 // Classic has a special field for protocol while OAS only has checkURL. The protocol should remain inside checkURL.
+// SW-REQ-093
 func (u *UptimeTests) extractToProtocolAndCheckURL(checkURL string) (classicProtocol, classicCheckURL string) {
 	splitURL := strings.Split(checkURL, "://")
 	if len(splitURL) > 1 {
@@ -757,6 +787,7 @@ func (u *UptimeTests) extractToProtocolAndCheckURL(checkURL string) (classicProt
 }
 
 // MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
+// SW-REQ-093
 type MutualTLS struct {
 	// Enabled activates upstream mutual TLS for the API.
 	// Tyk classic API definition: `upstream_certificates_disabled`
@@ -768,6 +799,7 @@ type MutualTLS struct {
 }
 
 // DomainToCertificate holds a single mapping of domain name into a certificate.
+// SW-REQ-093
 type DomainToCertificate struct {
 	// Domain contains the domain name.
 	Domain string `bson:"domain" json:"domain"`
@@ -777,6 +809,7 @@ type DomainToCertificate struct {
 }
 
 // Fill fills *MutualTLS from apidef.APIDefinition.
+// SW-REQ-093
 func (m *MutualTLS) Fill(api apidef.APIDefinition) {
 	m.Enabled = !api.UpstreamCertificatesDisabled
 	m.DomainToCertificates = make([]DomainToCertificate, len(api.UpstreamCertificates))
@@ -793,6 +826,7 @@ func (m *MutualTLS) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts *MutualTLS into *apidef.APIDefinition.
+// SW-REQ-093
 func (m *MutualTLS) ExtractTo(api *apidef.APIDefinition) {
 	api.UpstreamCertificatesDisabled = !m.Enabled
 
@@ -808,6 +842,7 @@ func (m *MutualTLS) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // PinnedPublicKey contains a mapping from the domain name into a list of public keys.
+// SW-REQ-093
 type PinnedPublicKey struct {
 	// Domain contains the domain name.
 	Domain string `bson:"domain" json:"domain"`
@@ -817,9 +852,11 @@ type PinnedPublicKey struct {
 }
 
 // PinnedPublicKeys is a list of domains and pinned public keys for them.
+// SW-REQ-093
 type PinnedPublicKeys []PinnedPublicKey
 
 // Fill fills *PinnerPublicKeys (slice) from publicKeys argument.
+// SW-REQ-093
 func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
 	domains := make([]string, len(publicKeys))
 
@@ -841,6 +878,7 @@ func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
 }
 
 // ExtractTo extracts PinnedPublicKeys values into the publicKeys map.
+// SW-REQ-093
 func (ppk PinnedPublicKeys) ExtractTo(publicKeys map[string]string) {
 	for _, publicKey := range ppk {
 		publicKeys[publicKey.Domain] = strings.Join(publicKey.PublicKeys, ",")
@@ -848,6 +886,7 @@ func (ppk PinnedPublicKeys) ExtractTo(publicKeys map[string]string) {
 }
 
 // CertificatePinning holds the configuration about mapping of domains to pinned public keys.
+// SW-REQ-093
 type CertificatePinning struct {
 	// Enabled is a boolean flag, if set to `true`, it enables certificate pinning for the API.
 	//
@@ -861,6 +900,7 @@ type CertificatePinning struct {
 }
 
 // Fill fills *CertificatePinning from apidef.APIDefinition.
+// SW-REQ-093
 func (cp *CertificatePinning) Fill(api apidef.APIDefinition) {
 	cp.Enabled = !api.CertificatePinningDisabled
 
@@ -876,6 +916,7 @@ func (cp *CertificatePinning) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts *CertficiatePinning into *apidef.APIDefinition.
+// SW-REQ-093
 func (cp *CertificatePinning) ExtractTo(api *apidef.APIDefinition) {
 	api.CertificatePinningDisabled = !cp.Enabled
 
@@ -890,6 +931,7 @@ func (cp *CertificatePinning) ExtractTo(api *apidef.APIDefinition) {
 // RateLimit holds the configurations related to rate limit.
 // The API-level rate limit applies a base-line limit on the frequency of requests to the upstream service for all endpoints. The frequency of requests is configured in two parts: the time interval and the number of requests that can be made during each interval.
 // Tyk classic API definition: `global_rate_limit`.
+// SW-REQ-093
 type RateLimit struct {
 	// Enabled activates API level rate limiting for this API.
 	//
@@ -926,6 +968,7 @@ type RateLimit struct {
 }
 
 // Fill fills *RateLimit from apidef.APIDefinition.
+// SW-REQ-093
 func (r *RateLimit) Fill(api apidef.APIDefinition) {
 	r.Enabled = !api.GlobalRateLimit.Disabled
 	r.Rate = int(api.GlobalRateLimit.Rate)
@@ -933,6 +976,7 @@ func (r *RateLimit) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts *Ratelimit into *apidef.APIDefinition.
+// SW-REQ-093
 func (r *RateLimit) ExtractTo(api *apidef.APIDefinition) {
 	api.GlobalRateLimit.Disabled = !r.Enabled
 	api.GlobalRateLimit.Rate = float64(r.Rate)
@@ -940,9 +984,11 @@ func (r *RateLimit) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // RateLimitEndpoint carries same settings as RateLimit but for endpoints.
+// SW-REQ-093
 type RateLimitEndpoint RateLimit
 
 // Fill fills *RateLimit from apidef.RateLimitMeta.
+// SW-REQ-093
 func (r *RateLimitEndpoint) Fill(api apidef.RateLimitMeta) {
 	r.Enabled = !api.Disabled
 	r.Rate = int(api.Rate)
@@ -950,6 +996,7 @@ func (r *RateLimitEndpoint) Fill(api apidef.RateLimitMeta) {
 }
 
 // ExtractTo extracts *Ratelimit into *apidef.RateLimitMeta.
+// SW-REQ-093
 func (r *RateLimitEndpoint) ExtractTo(meta *apidef.RateLimitMeta) {
 	meta.Disabled = !r.Enabled
 	meta.Rate = float64(r.Rate)
@@ -957,6 +1004,7 @@ func (r *RateLimitEndpoint) ExtractTo(meta *apidef.RateLimitMeta) {
 }
 
 // UpstreamAuth holds the configurations related to upstream API authentication.
+// SW-REQ-093
 type UpstreamAuth struct {
 	// Enabled enables upstream API authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -969,6 +1017,7 @@ type UpstreamAuth struct {
 }
 
 // Fill fills *UpstreamAuth from apidef.APIDefinition.
+// SW-REQ-093
 func (u *UpstreamAuth) Fill(api apidef.APIDefinition) {
 	u.Enabled = api.UpstreamAuth.Enabled
 
@@ -992,6 +1041,7 @@ func (u *UpstreamAuth) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts *UpstreamAuth into *apidef.APIDefinition.
+// SW-REQ-093
 func (u *UpstreamAuth) ExtractTo(api *apidef.APIDefinition) {
 	api.UpstreamAuth.Enabled = u.Enabled
 
@@ -1014,6 +1064,7 @@ func (u *UpstreamAuth) ExtractTo(api *apidef.APIDefinition) {
 	u.requestSigningExtractTo(api)
 }
 
+// SW-REQ-093
 func (u *UpstreamAuth) fillRequestSigning(api apidef.APIDefinition) {
 	if u.RequestSigning == nil {
 		u.RequestSigning = &UpstreamRequestSigning{}
@@ -1024,6 +1075,7 @@ func (u *UpstreamAuth) fillRequestSigning(api apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-093
 func (u *UpstreamAuth) requestSigningExtractTo(api *apidef.APIDefinition) {
 	if u.RequestSigning == nil {
 		u.RequestSigning = &UpstreamRequestSigning{}
@@ -1035,6 +1087,7 @@ func (u *UpstreamAuth) requestSigningExtractTo(api *apidef.APIDefinition) {
 }
 
 // UpstreamBasicAuth holds upstream basic authentication configuration.
+// SW-REQ-093
 type UpstreamBasicAuth struct {
 	// Enabled enables upstream basic authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -1047,6 +1100,7 @@ type UpstreamBasicAuth struct {
 }
 
 // Fill fills *UpstreamBasicAuth from apidef.UpstreamBasicAuth.
+// SW-REQ-093
 func (u *UpstreamBasicAuth) Fill(api apidef.UpstreamBasicAuth) {
 	u.Enabled = api.Enabled
 	u.Username = api.Username
@@ -1062,6 +1116,7 @@ func (u *UpstreamBasicAuth) Fill(api apidef.UpstreamBasicAuth) {
 }
 
 // ExtractTo extracts *UpstreamBasicAuth into *apidef.UpstreamBasicAuth.
+// SW-REQ-093
 func (u *UpstreamBasicAuth) ExtractTo(api *apidef.UpstreamBasicAuth) {
 	api.Enabled = u.Enabled
 	api.Enabled = u.Enabled
@@ -1078,6 +1133,7 @@ func (u *UpstreamBasicAuth) ExtractTo(api *apidef.UpstreamBasicAuth) {
 }
 
 // UpstreamOAuth holds the configuration for OAuth2 Client Credentials flow.
+// SW-REQ-093
 type UpstreamOAuth struct {
 	// Enabled activates upstream OAuth2 authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -1090,6 +1146,7 @@ type UpstreamOAuth struct {
 }
 
 // PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.
+// SW-REQ-093
 type PasswordAuthentication struct {
 	ClientAuthData
 	// Header holds the configuration for the custom header to be used for OAuth authentication.
@@ -1108,6 +1165,7 @@ type PasswordAuthentication struct {
 }
 
 // ClientAuthData holds the client ID and secret for OAuth2 authentication.
+// SW-REQ-093
 type ClientAuthData struct {
 	// ClientID is the application's ID.
 	ClientID string `bson:"clientId" json:"clientId"`
@@ -1116,6 +1174,7 @@ type ClientAuthData struct {
 }
 
 // ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
+// SW-REQ-093
 type ClientCredentials struct {
 	ClientAuthData
 	// Header holds the configuration for the custom header to be used for OAuth authentication.
@@ -1129,6 +1188,7 @@ type ClientCredentials struct {
 	ExtraMetadata []string `bson:"extraMetadata" json:"extraMetadata,omitempty"`
 }
 
+// SW-REQ-093
 func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
 	c.ClientID = api.ClientID
 	c.ClientSecret = api.ClientSecret
@@ -1145,6 +1205,7 @@ func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
 	}
 }
 
+// SW-REQ-093
 func (p *PasswordAuthentication) Fill(api apidef.PasswordAuthentication) {
 	p.ClientID = api.ClientID
 	p.ClientSecret = api.ClientSecret
@@ -1162,6 +1223,7 @@ func (p *PasswordAuthentication) Fill(api apidef.PasswordAuthentication) {
 	}
 }
 
+// SW-REQ-093
 func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
 	u.Enabled = api.Enabled
 	u.AllowedAuthorizeTypes = api.AllowedAuthorizeTypes
@@ -1183,6 +1245,7 @@ func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
 	}
 }
 
+// SW-REQ-093
 func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
 	api.ClientID = c.ClientID
 	api.ClientSecret = c.ClientSecret
@@ -1199,6 +1262,7 @@ func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
 	c.Header.ExtractTo(&api.Header.Enabled, &api.Header.Name)
 }
 
+// SW-REQ-093
 func (p *PasswordAuthentication) ExtractTo(api *apidef.PasswordAuthentication) {
 	api.ClientID = p.ClientID
 	api.ClientSecret = p.ClientSecret
@@ -1217,6 +1281,7 @@ func (p *PasswordAuthentication) ExtractTo(api *apidef.PasswordAuthentication) {
 	p.Header.ExtractTo(&api.Header.Enabled, &api.Header.Name)
 }
 
+// SW-REQ-093
 func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 	api.Enabled = u.Enabled
 	api.AllowedAuthorizeTypes = u.AllowedAuthorizeTypes
@@ -1239,6 +1304,7 @@ func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 
 // UpstreamRequestSigning represents configuration for generating signed requests to an upstream API.
 // Tyk classic API definition: `request_signing`.
+// SW-REQ-093
 type UpstreamRequestSigning struct {
 	// Enabled determines if request signing is enabled or disabled.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
@@ -1257,6 +1323,7 @@ type UpstreamRequestSigning struct {
 }
 
 // Fill populates the UpstreamRequestSigning fields from the given apidef.APIDefinition configuration.
+// SW-REQ-093
 func (l *UpstreamRequestSigning) Fill(api apidef.APIDefinition) {
 	l.Enabled = api.RequestSigning.IsEnabled
 	l.SignatureHeader = api.RequestSigning.SignatureHeader
@@ -1268,6 +1335,7 @@ func (l *UpstreamRequestSigning) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo populates the given apidef.APIDefinition RequestSigning fields with values from the UpstreamRequestSigning.
+// SW-REQ-093
 func (l *UpstreamRequestSigning) ExtractTo(api *apidef.APIDefinition) {
 	api.RequestSigning.IsEnabled = l.Enabled
 	api.RequestSigning.SignatureHeader = l.SignatureHeader
@@ -1279,6 +1347,7 @@ func (l *UpstreamRequestSigning) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // LoadBalancing represents the configuration for load balancing between multiple upstream targets.
+// SW-REQ-093
 type LoadBalancing struct {
 	// Enabled determines if load balancing is active.
 	Enabled bool `json:"enabled" bson:"enabled"` // required
@@ -1290,6 +1359,7 @@ type LoadBalancing struct {
 }
 
 // LoadBalancingTarget represents a single upstream target for load balancing with a URL and an associated weight.
+// SW-REQ-093
 type LoadBalancingTarget struct {
 	// URL specifies the upstream target URL for load balancing, represented as a string.
 	URL string `json:"url" bson:"url"` // required
@@ -1298,6 +1368,7 @@ type LoadBalancingTarget struct {
 }
 
 // Fill populates the LoadBalancing structure based on the provided APIDefinition, including targets and their weights.
+// SW-REQ-093
 func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 	if len(api.Proxy.Targets) == 0 {
 		api.Proxy.EnableLoadBalancing = false
@@ -1351,6 +1422,7 @@ func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo populates an APIDefinition's proxy load balancing configuration with data from the LoadBalancing instance.
+// SW-REQ-093
 func (l *LoadBalancing) ExtractTo(api *apidef.APIDefinition) {
 	if len(l.Targets) == 0 {
 		api.Proxy.EnableLoadBalancing = false
@@ -1372,17 +1444,20 @@ func (l *LoadBalancing) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // PreserveHostHeader holds the configuration for preserving the host header.
+// SW-REQ-093
 type PreserveHostHeader struct {
 	// Enabled activates preserving the host header.
 	Enabled bool `json:"enabled" bson:"enabled"`
 }
 
 // Fill fills *PreserveHostHeader from apidef.APIDefinition.
+// SW-REQ-093
 func (p *PreserveHostHeader) Fill(api apidef.APIDefinition) {
 	p.Enabled = api.Proxy.PreserveHostHeader
 }
 
 // ExtractTo extracts *PreserveHostHeader into *apidef.APIDefinition.
+// SW-REQ-093
 func (p *PreserveHostHeader) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.PreserveHostHeader = p.Enabled
 }
@@ -1394,17 +1469,20 @@ func (p *PreserveHostHeader) ExtractTo(api *apidef.APIDefinition) {
 // the target URL when proxying the request upstream. In some use cases the
 // upstream might expect the trailing slash - or might consider /users/ to
 // be a different endpoint from /users (for example).
+// SW-REQ-093
 type PreserveTrailingSlash struct {
 	// Enabled activates preserving the trailing slash when routing requests.
 	Enabled bool `json:"enabled" bson:"enabled"` // required
 }
 
 // Fill fills *PreserveTrailingSlash from apidef.APIDefinition.
+// SW-REQ-093
 func (p *PreserveTrailingSlash) Fill(api apidef.APIDefinition) {
 	p.Enabled = api.Proxy.DisableStripSlash
 }
 
 // ExtractTo extracts *PreserveTrailingSlash into *apidef.APIDefinition.
+// SW-REQ-093
 func (p *PreserveTrailingSlash) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.DisableStripSlash = p.Enabled
 }

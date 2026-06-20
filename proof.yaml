@@ -175,6 +175,8 @@ project:
             - apidef/oas/operation_reqproof_test.go
             - apidef/oas/security.go
             - apidef/oas/security_reqproof_test.go
+            - apidef/oas/upstream.go
+            - apidef/oas/upstream_reqproof_test.go
             - apidef/adapter/asyncapi.go
             - apidef/adapter/asyncapi_test.go
             - apidef/adapter/import_adapter.go

@@ -1,0 +1,65 @@
+id: SW-REQ-093
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The apidef/oas upstream document helpers shall preserve local OAS upstream support behavior by maintaining upstream aggregate fill/extract coordination; service-discovery and service-discovery-cache support-shape conversion; uptime-test support-shape conversion, command preservation, and protocol/check-URL normalization; upstream mutual-TLS and certificate-pinning mapping conversion; API-level rate-limit metadata conversion; TLS transport version, cipher, proxy URL, insecure-skip-verify, and common-name-check conversion; internal proxy metadata conversion; upstream basic authentication, OAuth client-credentials, OAuth password authentication, and request-signing support-shape conversion; load-balancing target-weight aggregation, deterministic ordering, zero-weight target preservation, and weighted Classic target expansion; and preserve-host-header and preserve-trailing-slash flag conversion without claiming runtime proxying, service discovery execution, health-check execution, TLS handshake behavior, certificate validation, public-key validation, rate-limit enforcement, upstream authentication execution, request signing cryptography, load-balancer traffic distribution, gateway request admission, persistence, analytics, or final client-visible behavior.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: apidef/oas/upstream_reqproof_test.go; docs/apidef-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-104
+component: model
+rationale: >-
+    This software requirement owns only local apidef/oas/upstream.go upstream document helper behavior: aggregate upstream fill/extract coordination, service-discovery/cache conversion, uptime-test conversion and URL normalization, mutual-TLS and certificate-pinning map conversion, rate-limit metadata conversion, TLS transport/proxy metadata conversion, upstream authentication/request-signing support-shape conversion, load-balancing target weight conversion, and preserve-host/trailing-slash flag conversion. It does not claim runtime proxying, service discovery execution, health-check execution, TLS handshake behavior, certificate validation, public-key validation, rate-limit enforcement, upstream authentication execution, request signing cryptography, load-balancer traffic distribution, gateway request admission, persistence, analytics, or final client-visible behavior.
+tags:
+    - api-definition
+    - oas
+    - upstream
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-104
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T07:31:37Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-093 is scoped to local apidef/oas/upstream.go OAS upstream document helper behavior: aggregate upstream fill/extract coordination, service-discovery/cache conversion, uptime-test conversion and protocol/check-URL normalization, mutual-TLS and certificate-pinning map conversion, API-level rate-limit metadata conversion, TLS transport/proxy metadata conversion, upstream basic/OAuth/request-signing support-shape conversion, load-balancing target-weight aggregation/deterministic ordering/zero-weight preservation/weighted Classic expansion, and preserve-host-header/preserve-trailing-slash flag conversion. Focused apidef/oas upstream ReqProof tests passed. This approval does not claim runtime proxying, service discovery execution, health-check execution, TLS handshake behavior, certificate validation, public-key validation, rate-limit enforcement, upstream authentication execution, request signing cryptography, load-balancer traffic distribution, gateway request admission, persistence, analytics, or final client-visible behavior.'
+        fingerprint: sha256:8f67e67706f8d4a5c013f15d3842799c3482889ddb906784493ec4ef0e02d8a0
+        ai_generated: false
+    impact_reviews:
+        - requirement: SW-REQ-093
+          artifact: apidef/oas/upstream.go
+          decision: no-authored-change
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in apidef/oas/upstream.go adds ReqProof ownership annotations only; behavior evidence is provided by apidef/oas/upstream_reqproof_test.go and the requirement remains scoped to local upstream support-shape conversion without runtime proxying or upstream execution claims.
+          base: origin/master
+          requirement_fingerprint: sha256:8a6ec076116bd91131522d16b0aeeb9c1bedc4e8857a34fb8e6b3745157252d9
+          approval_fingerprint: sha256:8f67e67706f8d4a5c013f15d3842799c3482889ddb906784493ec4ef0e02d8a0
+          artifact_fingerprint: sha256:590dc21ea9ef92bf336b278113963ceb44c87cf300f24b2c4d1aa2737ab405e2
+          reviewed_at: "2026-06-20T07:31:48Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T07:42:21Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T07:31:37Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T07:42:21Z"
+          from: draft
+          to: review
+          reason: Added apidef/oas upstream document helper behavior under API-definition support model behavior.
+          changed_by: agent:codex

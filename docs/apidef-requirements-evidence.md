@@ -48,6 +48,7 @@
 <!-- documents SW-REQ-090 -->
 <!-- documents SW-REQ-091 -->
 <!-- documents SW-REQ-092 -->
+<!-- documents SW-REQ-093 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -63,8 +64,9 @@ conversion behavior, Classic API definition migration helper behavior,
 notification helper behavior, OAS authentication helper shapes, OAS path/server
 helper shapes, OAS default-extension helper shapes, OAS middleware helper
 shapes, OAS root document helper behavior, OAS operation document helper
-behavior, OAS security document helper behavior, OAS root extension helper
-shapes, OAS server model helper shapes, OAS URL rewrite helper shapes,
+behavior, OAS security document helper behavior, OAS upstream document helper
+behavior, OAS root extension helper shapes, OAS server model helper shapes,
+OAS URL rewrite helper shapes,
 OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint
 helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes,
@@ -86,7 +88,7 @@ drift, plus Swagger importer conversion behavior and WSDL importer conversion
 behavior, plus Classic API definition migration helper behavior and
 notification helper behavior, plus OAS authentication helper behavior.
 It also includes OAS default-extension, middleware, root document, operation
-document, and security document helper behavior.
+document, security document, and upstream document helper behavior.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -635,6 +637,25 @@ does not claim token validation, signature verification, certificate
 validation, OAuth/OIDC provider execution, custom plugin execution, OpenAPI
 security evaluation semantics, gateway request admission, persistence,
 analytics, or final runtime authentication behavior.
+
+`SW-REQ-093` owns the concrete `apidef/oas/upstream.go` upstream document
+helpers. Its evidence covers aggregate upstream fill/extract coordination;
+service-discovery and service-discovery-cache support-shape conversion;
+uptime-test support-shape conversion, command preservation, and
+protocol/check-URL normalization; upstream mutual-TLS and certificate-pinning
+mapping conversion; API-level rate-limit metadata conversion; TLS transport
+version, cipher, proxy URL, insecure-skip-verify, and common-name-check
+conversion; internal proxy metadata conversion; upstream basic authentication,
+OAuth client-credentials, OAuth password authentication, and request-signing
+support-shape conversion; load-balancing target-weight aggregation,
+deterministic ordering, zero-weight target preservation, and weighted Classic
+target expansion; and preserve-host-header and preserve-trailing-slash flag
+conversion. This evidence does not claim runtime proxying, service discovery
+execution, health-check execution, TLS handshake behavior, certificate
+validation, public-key validation, rate-limit enforcement, upstream
+authentication execution, request signing cryptography, load-balancer traffic
+distribution, gateway request admission, persistence, analytics, or final
+client-visible behavior.
 
 `SW-REQ-086` owns the concrete `apidef/notifications.go` notification helper.
 Its evidence covers bounded HTTP client construction, notification manager
