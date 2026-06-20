@@ -209,6 +209,7 @@ func BenchmarkRealIP_Context(b *testing.B) {
 // SW-REQ-023:boundary:boundary
 // SW-REQ-023:error_handling:nominal
 // SW-REQ-023:error_handling:negative
+// MCDC SYS-REQ-105: client_ip_resolution_requested=T, client_ip_result_determined=F => FALSE
 func TestXFFDepth(t *testing.T) {
 	// Define test cases for XFFDepth
 	testCases := []struct {
