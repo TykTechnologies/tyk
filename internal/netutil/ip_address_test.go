@@ -39,6 +39,7 @@ func (f fakeAddr) String() string  { return string(f) }
 // MCDC SYS-REQ-097: node_interface_enumeration_failed=T, node_interface_error_returned=T => TRUE
 //mcdc:ignore SYS-REQ-097: node_interface_enumeration_failed=T, node_interface_error_returned=F => FALSE -- violation row is the negation of the interface-enumeration error propagation guarantee; this test asserts enumeration failures return errors [category: defensive] [reviewed: agent:codex]
 // MCDC SW-REQ-005: netutil_address_lookup_requested=T, netutil_address_lookup_result_returned=T => TRUE
+// MCDC SW-REQ-005: netutil_address_lookup_requested=T, netutil_address_lookup_result_returned=F => FALSE
 func Test_GetIpAddress(t *testing.T) {
 	defer func() { netInterfaceAddrs = net.InterfaceAddrs }()
 

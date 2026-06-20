@@ -65,6 +65,7 @@ func TestAddEventToRequest(t *testing.T) {
 // Verifies: SYS-REQ-082, SW-REQ-004 [boundary]
 // SYS-REQ-082:encoding_safety:nominal
 // SW-REQ-004:encoding_safety:nominal
+// MCDC SW-REQ-004: event_operation_requested=T, event_operation_result_returned=F => FALSE
 func TestEncodeRequestToEvent(t *testing.T) {
 	t.Parallel()
 

@@ -109,6 +109,7 @@ func TestReadableDuration_Seconds(t *testing.T) {
 // SYS-REQ-084:malformed_input:negative
 // SW-REQ-003:malformed_input:nominal
 // SW-REQ-003:malformed_input:negative
+// MCDC SW-REQ-003: duration_operation_requested=T, duration_operation_result_returned=F => FALSE
 func TestReadableDuration_UnmarshalJSON(t *testing.T) {
 	t.Parallel()
 

@@ -8,6 +8,7 @@ import (
 )
 
 // Verifies: SYS-REQ-083, SW-REQ-001 [boundary]
+// MCDC SW-REQ-001: uuid_operation_requested=T, uuid_operation_result_returned=F => FALSE
 func TestCheckErrAndPanic(t *testing.T) {
 	require.NotPanics(t, func() {
 		checkErrAndPanic(nil, "uuid failed")
