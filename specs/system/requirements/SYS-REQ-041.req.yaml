@@ -57,27 +57,6 @@ verification:
           reviewer: buger
           reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
           reviewed_at: "2026-06-18T19:38:25.148877Z"
-    impact_reviews:
-        - requirement: SYS-REQ-041
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: agent:codex
-          reason: 'Reviewed internal/policy/apply.go diff against origin/master: nil session/store/API-limit guards, quota-unlimited renewal handling, deterministic single-API root variable selection, rights-map prefill/merge cleanup, and proof annotations are implementation/evidence changes under the existing policy requirements; no requirement or linked design text change is required, and existing non-atomic KnownIssues remain unresolved.'
-          base: origin/master
-          requirement_fingerprint: sha256:423cf0317319fec7da4094a9d9a385e3402c25870b108afdd450f5e58ac5a159
-          approval_fingerprint: sha256:095ba6b66fe7c04fd192f041a06726bbfc56b2773fa0d481067ebf16cced0333
-          artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
-          reviewed_at: "2026-06-19T17:43:36Z"
-        - requirement: SYS-REQ-041
-          artifact: internal/policy/util.go
-          decision: no-authored-change
-          reviewer: agent:codex
-          reason: 'Reviewed internal/policy/util.go diff against origin/master: added requirement/proof annotations to the existing unlimited-sentinel comparison helpers; executable comparison behavior remains under the existing equal-rate preservation requirement, so no requirement or linked design text change is required.'
-          base: origin/master
-          requirement_fingerprint: sha256:423cf0317319fec7da4094a9d9a385e3402c25870b108afdd450f5e58ac5a159
-          approval_fingerprint: sha256:095ba6b66fe7c04fd192f041a06726bbfc56b2773fa0d481067ebf16cced0333
-          artifact_fingerprint: sha256:e7c53482815efd8e708c449e82dfe958b6f957acb864490402c7aca5fbf9a9fc
-          reviewed_at: "2026-06-19T17:43:36Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T17:44:03Z"

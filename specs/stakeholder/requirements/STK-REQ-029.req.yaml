@@ -46,17 +46,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-029-AC-01
           text: Given external service proxy or mTLS configuration JSON, when local configuration helpers marshal or unmarshal the values, then supported global and service-specific fields are preserved by their documented JSON names.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-117
         - id: STK-REQ-029-AC-02
           text: Given file-based, certificate-store, CA-only, disabled, or zero external service mTLS configurations, when local helper classification or validation runs, then deterministic accepted results are returned.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-117
         - id: STK-REQ-029-AC-03
           text: Given conflicting or incomplete enabled mTLS configuration, when local validation runs, then an explicit local validation error is returned.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-117
 lifecycle:

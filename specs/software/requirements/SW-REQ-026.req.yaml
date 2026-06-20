@@ -34,17 +34,6 @@ verification:
         comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP protocol requirements are scoped to internal/mcp helper behavior for primitive VEM prefix classification and registration, MCP method-to-VEM route construction, parameter validation, access-rule matching, JSON-RPC list filtering, pass-through handling, and envelope re-encoding only; focused internal/mcp tests passed. This approval does not claim gateway middleware sequencing, API definition synthesis, session-right retrieval, analytics, network transport behavior, or final HTTP status generation.
         fingerprint: sha256:715917eef30c708c80266b3a456a0180038f4f18fb7fc5ccfe63db0bb782839e
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-026
-          artifact: internal/mcp/list_filter.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP list-filter production file received requirement trace annotations only; executable list filtering and access-rule behavior is unchanged and is covered by internal/mcp tests plus docs/mcp-protocol-requirements-evidence.md, so no further authored requirement or design text change is needed.
-          base: origin/master
-          requirement_fingerprint: sha256:37a1dc0e1ff1cbacebf764c9e552666718b57662db5c9bbb5707197fa837c577
-          approval_fingerprint: sha256:715917eef30c708c80266b3a456a0180038f4f18fb7fc5ccfe63db0bb782839e
-          artifact_fingerprint: sha256:a47da6b6de2bbfa2ddebcbd0f4e913660b0b34c520372c85a83e7e694452fc05
-          reviewed_at: "2026-06-19T22:00:20Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T00:00:00Z"

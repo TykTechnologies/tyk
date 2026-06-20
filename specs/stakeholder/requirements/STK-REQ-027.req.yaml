@@ -47,17 +47,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-027-AC-01
           text: Given an empty, default, legacy Monitor, or supported null-object configuration, when the linter runs, then it completes without schema warnings for those supported local shapes.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-115
         - id: STK-REQ-027-AC-02
           text: Given malformed JSON, unsupported field types, unknown fields, invalid enum values, or malformed nested configuration shapes, when the linter runs, then it returns explicit local load or schema warnings.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-115
         - id: STK-REQ-027-AC-03
           text: Given local fields governed by custom path or host-without-port formats, when those fields are invalid, then the linter returns clear local format warnings.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-115
 lifecycle:

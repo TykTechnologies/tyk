@@ -36,17 +36,6 @@ verification:
         comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-094 is scoped to local apidef/streams/bento/schema/generate_bento_config_schema.go Bento configuration schema generator behavior: selected top-level property copying, processor/scanner definition retention, supported input/output source extraction, unsupported source omission, deterministic JSON file writing, custom rule application with rule-name error wrapping, URI format insertion for input/output http_client URL schema sections, selected help/output CLI handling, and controlled local error propagation. Focused generator ReqProof tests passed, including race, and the package was added to the configured build/test/lint gates. This approval does not claim Bento schema completeness, Bento component correctness, stream configuration validation, stream runtime execution, gateway API loading, route generation, request matching, gateway request admission, persistence, analytics, or final client-visible behavior.'
         fingerprint: sha256:a7f955cdcc28b654681bb24fd166988fc81264d605dc17239314a1d2839309c3
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-094
-          artifact: apidef/streams/bento/schema/generate_bento_config_schema.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in apidef/streams/bento/schema/generate_bento_config_schema.go adds ReqProof ownership annotations only; behavior evidence is provided by apidef/streams/bento/schema/generate_bento_config_schema_reqproof_test.go and the requirement remains scoped to local generator support behavior without stream runtime validation claims.
-          base: origin/master
-          requirement_fingerprint: sha256:459809920e35adb608c4f8199030ec8d4861206aca2462f88d77b8734e7c1305
-          approval_fingerprint: sha256:a7f955cdcc28b654681bb24fd166988fc81264d605dc17239314a1d2839309c3
-          artifact_fingerprint: sha256:98a9e940e21b79c045de6dd3e4e4a19efdea12a8db875fddf1019a1fe626ac8d
-          reviewed_at: "2026-06-20T07:41:10Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T07:52:11Z"

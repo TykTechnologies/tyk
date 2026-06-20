@@ -48,17 +48,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-025-AC-01
           text: Given a valid plugin bundle manifest with existing files, at least one middleware hook, and a driver, when the bundle build command runs with skip-signing, then a ZIP archive is written with the bundled file and updated manifest checksum.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-113
         - id: STK-REQ-025-AC-02
           text: Given a missing manifest, malformed JSON, missing driver, missing hooks, or missing bundled file, when bundle validation or build runs, then an explicit local error is returned and the bad input is not accepted as a valid bundle.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-113
         - id: STK-REQ-025-AC-03
           text: Given a valid private signing key, when the bundle build command signs the bundled bytes, then the updated manifest contains a base64 signature that verifies against the corresponding public key.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-113
 lifecycle:

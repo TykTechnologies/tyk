@@ -33,27 +33,6 @@ verification:
         comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP protocol requirements are scoped to internal/mcp helper behavior for primitive VEM prefix classification and registration, MCP method-to-VEM route construction, parameter validation, access-rule matching, JSON-RPC list filtering, pass-through handling, and envelope re-encoding only; focused internal/mcp tests passed. This approval does not claim gateway middleware sequencing, API definition synthesis, session-right retrieval, analytics, network transport behavior, or final HTTP status generation.
         fingerprint: sha256:1d7677ccc08586180966126f1be4e3ac878ea8b141fc73a45616734b46f700c7
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-025
-          artifact: internal/mcp/mcp.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP routing production files received requirement trace annotations only; executable prefix, registration, and route-construction behavior is unchanged and is covered by internal/mcp tests plus docs/mcp-protocol-requirements-evidence.md, so no further authored requirement or design text change is needed.
-          base: origin/master
-          requirement_fingerprint: sha256:584a3d407c972a0b8b81c6cb60fb150fca18e1e0a9f583d4eb474b1f51f6bf3b
-          approval_fingerprint: sha256:1d7677ccc08586180966126f1be4e3ac878ea8b141fc73a45616734b46f700c7
-          artifact_fingerprint: sha256:f5a62987b88aae035a76fa5cabc54c4d42d2ac16c899b4e40a854a7c22b60053
-          reviewed_at: "2026-06-19T22:00:20Z"
-        - requirement: SW-REQ-025
-          artifact: internal/mcp/router.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP routing production files received requirement trace annotations only; executable prefix, registration, and route-construction behavior is unchanged and is covered by internal/mcp tests plus docs/mcp-protocol-requirements-evidence.md, so no further authored requirement or design text change is needed.
-          base: origin/master
-          requirement_fingerprint: sha256:584a3d407c972a0b8b81c6cb60fb150fca18e1e0a9f583d4eb474b1f51f6bf3b
-          approval_fingerprint: sha256:1d7677ccc08586180966126f1be4e3ac878ea8b141fc73a45616734b46f700c7
-          artifact_fingerprint: sha256:3133ebfd71c537cb6579dfb99ac22fd53cf2e7da916800ec8779c91eb3d048f3
-          reviewed_at: "2026-06-19T22:00:20Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T00:00:00Z"

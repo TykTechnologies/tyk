@@ -30,17 +30,6 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
-    impact_reviews:
-        - requirement: STK-REQ-005
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: agent:codex
-          reason: 'Reviewed internal/policy/apply.go diff against origin/master: nil session/store/API-limit guards, quota-unlimited renewal handling, deterministic single-API root variable selection, rights-map prefill/merge cleanup, and proof annotations are implementation/evidence changes under the existing policy requirements; no requirement or linked design text change is required, and existing non-atomic KnownIssues remain unresolved.'
-          base: origin/master
-          requirement_fingerprint: sha256:9898a196dc70687ca71eea8a96cc6f26da34adf6209dde915605347cac1091e3
-          approval_fingerprint: sha256:303fb9a0b2e1e65181b46a10cd8307a4b852da7b3343695e022686804bc91040
-          artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
-          reviewed_at: "2026-06-19T17:43:36Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"
@@ -61,7 +50,6 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-005-AC-01
           text: Given a successful policy application, then no error is reported and all fields are merged
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-028
@@ -71,46 +59,42 @@ stakeholder:
             - SYS-REQ-073
         - id: STK-REQ-005-AC-02
           text: Given a policy not found error, then an error is reported and no fields are merged
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-010
             - SYS-REQ-040
         - id: STK-REQ-005-AC-03
           text: Given an organization mismatch error, then an error is reported and no fields are merged
-          testable: true
           verification_method: test
-          witness_deferred:
-            reason: Organization mismatch currently reports an error after ClearSession has already cleared session fields; tracked as KI-POLICY-APPLY-NONATOMIC-ORG-MISMATCH until Apply validates before mutating or rolls back on error.
-            tracking: KI-POLICY-APPLY-NONATOMIC-ORG-MISMATCH
           derived_reqs:
             - SYS-REQ-011
             - SYS-REQ-024
             - SYS-REQ-025
             - SYS-REQ-026
             - SYS-REQ-038
+          witness_deferred:
+            reason: Organization mismatch currently reports an error after ClearSession has already cleared session fields; tracked as KI-POLICY-APPLY-NONATOMIC-ORG-MISMATCH until Apply validates before mutating or rolls back on error.
+            tracking: KI-POLICY-APPLY-NONATOMIC-ORG-MISMATCH
         - id: STK-REQ-005-AC-04
           text: Given a malformed policy (PerAPI+partition conflict), then an error is reported and no fields are merged
-          testable: true
           verification_method: test
-          witness_deferred:
-            reason: Malformed PerAPI+partition policies currently report an error after ClearSession has already cleared rate fields; tracked as KI-POLICY-APPLY-NONATOMIC-MALFORMED-PARTITION until Apply validates before mutating or rolls back on error.
-            tracking: KI-POLICY-APPLY-NONATOMIC-MALFORMED-PARTITION
           derived_reqs:
             - SYS-REQ-002
             - SYS-REQ-012
             - SYS-REQ-054
             - SYS-REQ-075
+          witness_deferred:
+            reason: Malformed PerAPI+partition policies currently report an error after ClearSession has already cleared rate fields; tracked as KI-POLICY-APPLY-NONATOMIC-MALFORMED-PARTITION until Apply validates before mutating or rolls back on error.
+            tracking: KI-POLICY-APPLY-NONATOMIC-MALFORMED-PARTITION
         - id: STK-REQ-005-AC-05
           text: At no point can both error_reported and access_rights_merged be true simultaneously
-          testable: true
           verification_method: test
-          witness_deferred:
-            reason: Multi-policy error handling can leave fields from an earlier policy merged after a later policy error; tracked as KI-POLICY-APPLY-PARTIAL-MULTIPOLICY-ERROR until Apply commits only after all policies validate successfully.
-            tracking: KI-POLICY-APPLY-PARTIAL-MULTIPOLICY-ERROR
           derived_reqs:
             - SYS-REQ-028
             - SYS-REQ-069
+          witness_deferred:
+            reason: Multi-policy error handling can leave fields from an earlier policy merged after a later policy error; tracked as KI-POLICY-APPLY-PARTIAL-MULTIPOLICY-ERROR until Apply commits only after all policies validate successfully.
+            tracking: KI-POLICY-APPLY-PARTIAL-MULTIPOLICY-ERROR
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

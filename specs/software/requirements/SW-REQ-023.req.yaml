@@ -34,17 +34,6 @@ verification:
         comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Software requirement is scoped to request.RealIP precedence, XFF depth selection, malformed-header fallback, and invalid-depth empty result only; focused request package tests passed. This approval does not waive gateway middleware use of the value, authorization decisions, trusted proxy configuration, non-string remote_addr context values, concurrent request.Global mutation, or MC/DC evidence.
         fingerprint: sha256:186e26b3a782ab82ac5d0819901d053da98791e8d8dadd7c94e48d52bacc742c
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-023
-          artifact: request/real_ip.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. request/real_ip.go received requirement trace annotations only; executable RealIP behavior is unchanged and is covered by request/real_ip_test.go plus docs/request-identity-requirements-evidence.md, so no further authored requirement or design text change is needed.
-          base: origin/master
-          requirement_fingerprint: sha256:9b148819ede974731e25e371bce785295ba720055130d53257c1256c6b1bdc06
-          approval_fingerprint: sha256:186e26b3a782ab82ac5d0819901d053da98791e8d8dadd7c94e48d52bacc742c
-          artifact_fingerprint: sha256:94957125126b13fbb2bacdcb1bd5c469a1e251f3f50c47ebf65a4355d206cb06
-          reviewed_at: "2026-06-19T21:40:31Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-19T21:38:27Z"

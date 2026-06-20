@@ -30,17 +30,6 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
-    impact_reviews:
-        - requirement: STK-REQ-001
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: agent:codex
-          reason: 'Reviewed internal/policy/apply.go diff against origin/master: nil session/store/API-limit guards, quota-unlimited renewal handling, deterministic single-API root variable selection, rights-map prefill/merge cleanup, and proof annotations are implementation/evidence changes under the existing policy requirements; no requirement or linked design text change is required, and existing non-atomic KnownIssues remain unresolved.'
-          base: origin/master
-          requirement_fingerprint: sha256:0dcdf3a6225f509af9d2b7895f5769eec1b598ae65c30c876b9ec406b9c9f157
-          approval_fingerprint: sha256:23071baf4eeb9959df9e4254d278a7731a74c82a5f3f838d7106f11e50fe5de1
-          artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
-          reviewed_at: "2026-06-19T17:43:36Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"
@@ -65,7 +54,6 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-001-AC-01
           text: Given a valid single-policy session, when Apply is called, then all policy fields are merged into the session
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-001
@@ -87,7 +75,6 @@ stakeholder:
             - SYS-REQ-068
         - id: STK-REQ-001-AC-02
           text: Given a per-API policy, when Apply is called, then per-API limits are applied independently
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-013
@@ -95,7 +82,6 @@ stakeholder:
             - SYS-REQ-015
         - id: STK-REQ-001-AC-03
           text: Given a partitioned policy, when Apply is called, then only the partitioned fields are applied
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-030
@@ -103,7 +89,6 @@ stakeholder:
             - SYS-REQ-032
         - id: STK-REQ-001-AC-04
           text: Given multiple policies, when Apply is called, then the highest-rate-wins rule resolves conflicts
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-016
@@ -115,7 +100,6 @@ stakeholder:
             - SYS-REQ-069
         - id: STK-REQ-001-AC-05
           text: Given a policy with an org mismatch, when Apply is called, then an error is returned
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-010

@@ -33,17 +33,6 @@ verification:
         reviewer: human:buger
         reviewed_at: "2026-06-19T00:00:00Z"
         ai_generated: false
-    impact_reviews:
-        - requirement: SYS-REQ-093
-          artifact: internal/sanitize/path.go
-          decision: no-authored-change
-          reviewer: agent:codex
-          reason: Reviewed comment-only MC/DC classification changes in internal/sanitize/path.go; executable behavior and documented requirement intent are unchanged
-          base: origin/master
-          requirement_fingerprint: sha256:5ec1ce6a793853ae1003b5e7e0f1e2bb386e47d684ab8d7c8640e2366a8cfe0f
-          approval_fingerprint: sha256:f65c1f5bdf694341c125d5dc66ed1daa0a4865e2a4a893a0ad6ccf0be0dfd8c5
-          artifact_fingerprint: sha256:2d7a9103a34a9859e79e0ce389402e0c6c7f40246271ca6e8879cdccbc16eb39
-          reviewed_at: "2026-06-19T16:19:58Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-19T00:00:00Z"

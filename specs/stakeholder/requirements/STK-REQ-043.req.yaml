@@ -45,12 +45,12 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-043-AC-01
           text: Given a local implementation with certificate usage data, when it is assigned to the tracker interface, then the interface accepts required-certificate and API-ID lookup methods with the expected signatures.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-131
         - id: STK-REQ-043-AC-02
           text: Given a tracker interface value, when local callers invoke certificate-required or certificate-API lookup methods, then the calls return boolean usage status and API ID slices supplied by the implementation.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-131
 lifecycle:

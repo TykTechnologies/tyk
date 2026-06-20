@@ -47,17 +47,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-024-AC-01
           text: Given insecure configuration allowance, deprecated health checks, missing global session lifetime, or default gateway/node secrets, when startup checkup runs, then explicit local warnings are emitted for those risks.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-112
         - id: STK-REQ-024-AC-02
           text: Given analytics is disabled, when startup checkup evaluates analytics defaults, then zero analytics values are preserved.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-112
         - id: STK-REQ-024-AC-03
           text: Given analytics is enabled with missing or undersized local settings, when startup checkup evaluates analytics defaults, then deterministic pool size, records buffer size, and storage expiration defaults are applied while sufficient values are preserved.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-112
 lifecycle:

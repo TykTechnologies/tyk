@@ -46,17 +46,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-018-AC-01
           text: Given an HTTP authentication, authorization, rate-limit, upstream, internal, bad-request, not-found, or method-not-allowed failure status, when the gateway creates a JSON-RPC error, then the JSON-RPC code is selected from the documented standard or server-defined range for that failure class.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-106
         - id: STK-REQ-018-AC-02
           text: Given a successful HTTP status, when only an error-code mapping is requested, then no JSON-RPC error code is returned.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-106
         - id: STK-REQ-018-AC-03
           text: Given a JSON-RPC error response write request, when the response is encoded, then the body contains jsonrpc version 2.0, the mapped error code and message, the original HTTP status in error data, and the original request identifier when it is JSON-encodable.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-106
 lifecycle:

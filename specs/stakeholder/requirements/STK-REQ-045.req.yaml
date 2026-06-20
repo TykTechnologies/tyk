@@ -48,12 +48,12 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-045-AC-01
           text: Given a local scheduler job definition, when the helper constructs the job and logger, then the configured name, interval, run function, and scheduler prefix are preserved.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-133
         - id: STK-REQ-045-AC-02
           text: Given a local scheduler loop, when the job returns Break, context cancellation happens, or Close is called repeatedly and concurrently, then the loop or Close operation reaches a terminal local outcome without requiring a timer tick.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-133
 lifecycle:

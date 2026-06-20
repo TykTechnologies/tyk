@@ -35,17 +35,6 @@ verification:
         comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-084 is scoped to local apidef/importer/wsdl.go WSDL importer conversion behavior: WSDL 1.1 load and malformed-root/WSDL 2.0 rejection, per-importer service-port mapping isolation, SOAP 1.1/SOAP 1.2/HTTP binding conversion into Classic API track-endpoint and URL-rewrite metadata, HTTP urlReplacement wildcard conversion, unsupported transport and malformed service-shape errors without panics, version insertion, and deterministic active keyless API-definition proxy/versioning shape apart from generated API IDs while the top-level API build ignores the unsupported mock flag. Focused apidef/importer WSDL tests passed and local conversion drift for global binding/port state plus malformed-shape panics was fixed. This approval does not claim complete WSDL specification support, WSDL 2.0 support, full XML schema or message validation, regex escaping semantics for arbitrary HTTP endpoint metacharacters, partial multi-service failure semantics, mock import support, upstream availability, gateway API loading, route generation, request matching, gateway request admission, persistence, analytics, or final client-visible runtime behavior.'
         fingerprint: sha256:883454dcb9f8813b8cb90e02e6db4b465b05de94267f2cd3c07467b3a073a831
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-084
-          artifact: apidef/importer/wsdl.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The WSDL importer implementation intentionally changed to keep parsed binding and selected port state on each importer instance, consume unsupported binding protocol elements, and return controlled errors for empty service sets, missing ports, and missing HTTP operation locations instead of panicking or leaking state; SW-REQ-084 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence that behavior, so no additional authored requirement/design change is required for this implementation delta.
-          base: origin/master
-          requirement_fingerprint: sha256:58f102509cbf8c47ead3c6c4a4ae8a501b65fbb8c82c1c8bd007d7abd4c3c432
-          approval_fingerprint: sha256:883454dcb9f8813b8cb90e02e6db4b465b05de94267f2cd3c07467b3a073a831
-          artifact_fingerprint: sha256:a71d93325d88b16a41d0b9c874d5bb1e0ad63c74c606c6f14fc37f84e17a11d8
-          reviewed_at: "2026-06-20T05:54:09Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T05:52:05Z"

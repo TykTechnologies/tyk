@@ -37,18 +37,6 @@ verification:
             Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Startup checkup scope is limited to local checkup/checkup.go helper behavior: warning emission for insecure configuration allowance, deprecated health checks, missing global session lifetime, retained default gateway/node secrets, analytics defaulting for pool size, records buffer size, and storage expiration, public Run orchestration, and host resource probe execution without mutation claims. Focused checkup ReqProof tests passed, including race, and the checkup package was added to configured build/test/lint gates. This approval does not claim OS resource tuning, log transport delivery, operator remediation, gateway request admission, analytics pipeline durability, or final client-visible behavior.
         fingerprint: sha256:e5d83904d854c85fec02273bd338f87d436a829b90ab9c44c4459b3df4ca5875
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-099
-          artifact: checkup/checkup.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in checkup/checkup.go adds ReqProof ownership annotations only; behavior evidence is provided by checkup/checkup_reqproof_test.go. The requirement remains scoped to local startup checkup helper behavior without OS resource tuning, log transport delivery, operator remediation, gateway request admission, analytics pipeline durability, or final client-visible behavior claims.
-          base: origin/master
-          requirement_fingerprint: sha256:737ac4b045aea1071a418e5cefccc696d1628053c349c53acf0d1499c5e3d6a3
-          approval_fingerprint: sha256:e5d83904d854c85fec02273bd338f87d436a829b90ab9c44c4459b3df4ca5875
-          artifact_fingerprint: sha256:e82622f4dba08b84ac42132bcfee4039b3a771fbcf4bd6869f02153758a1fe69
-          reviewed_at: "2026-06-20T08:48:29Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T08:44:17Z"

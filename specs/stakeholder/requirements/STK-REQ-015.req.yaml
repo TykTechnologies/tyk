@@ -47,26 +47,22 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-015-AC-01
           text: Given an existing directory, a missing path, and a file path, when scoped root creation is requested, then only the existing directory creates a root and invalid roots are rejected.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-098
             - SYS-REQ-099
         - id: STK-REQ-015-AC-02
           text: Given a relative path that lexically resolves inside the root, when scoped path resolution is requested, then the returned full path remains under the root.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-100
         - id: STK-REQ-015-AC-03
           text: Given traversal or sibling-prefix relative paths, when scoped path resolution is requested, then the escape attempt is rejected.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-101
         - id: STK-REQ-015-AC-04
           text: Given write, remove, and stat operations on scoped relative paths, when the operation is requested, then it is applied only after scoped path validation and filesystem errors are returned to the caller.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-102

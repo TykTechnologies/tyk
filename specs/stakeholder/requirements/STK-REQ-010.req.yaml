@@ -46,19 +46,16 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-010-AC-01
           text: Given a UUID generation request, when dashed or dash-free output is requested, then the returned string is non-empty, parseable as a UUID, and matches the requested dash format.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-083
         - id: STK-REQ-010-AC-02
           text: Given valid and malformed UUID strings, when validation is requested, then valid UUID strings are accepted and malformed strings are rejected.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-083
         - id: STK-REQ-010-AC-03
           text: Given an internal UUID generation error, when the panic guard receives that error, then it fails loudly with the supplied context message instead of returning an ambiguous identifier.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-083

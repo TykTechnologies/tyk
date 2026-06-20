@@ -34,17 +34,6 @@ verification:
         comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-085 is scoped to local apidef/migration.go Classic API definition migration helper behavior: old-to-new versioning migration errors, deterministic base/child API split apart from generated child API IDs, endpoint method-action expansion into method-specific endpoint and mock-response metadata, simple-to-advanced cache migration, authentication config pruning and naming, legacy custom plugin auth migration, compatibility flag and metadata migration, scope-to-policy migration, response-processor filtering, global header and response-header migration, global rate-limit and IP access-control classification, and disabled default initialization for OAS-origin Classic API definitions. Focused apidef migration ReqProof tests passed. This approval does not claim full API import correctness, persistence migration correctness, dashboard migration orchestration, gateway API loading, route generation, request matching, gateway request admission, middleware execution, authentication execution, upstream availability, analytics, or final client-visible runtime behavior.'
         fingerprint: sha256:0c54d80386e46feec037dab4cdd7a44b834d272f227b1710b9f7674fa8edb8dd
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-085
-          artifact: apidef/migration.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The apidef/migration.go production delta in this slice adds ReqProof ownership annotations only; SW-REQ-085 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence existing Classic API definition migration helper behavior, so no additional authored requirement/design change is required for this implementation delta.
-          base: origin/master
-          requirement_fingerprint: sha256:2b5429c680ff2cd639ddf39a9cff260b55d8fe370f8e0818d7c7b8943a1b0466
-          approval_fingerprint: sha256:0c54d80386e46feec037dab4cdd7a44b834d272f227b1710b9f7674fa8edb8dd
-          artifact_fingerprint: sha256:138b7bf2ee1494abbfaec01617696c4c27c0e09619fcf6bf56da66969a969624
-          reviewed_at: "2026-06-20T06:04:02Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T06:02:25Z"

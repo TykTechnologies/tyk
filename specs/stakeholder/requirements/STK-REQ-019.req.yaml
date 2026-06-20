@@ -50,22 +50,22 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-019-AC-01
           text: Given MCP tool, resource, prompt, or operation method input, when the MCP router builds an internal route, then it returns the expected operation VEM and primitive VEM chain or a parameter error for malformed primitive requests.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-107
         - id: STK-REQ-019-AC-02
           text: Given MCP list-response items and access-control rules, when list filtering is applied, then blocked items are removed, allowed-list misses are removed, allowed matches remain, and malformed item identifiers pass through unchanged.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-107
         - id: STK-REQ-019-AC-03
           text: Given malformed or non-list JSON-RPC response bodies, when list filtering is requested, then the helper reports that the original body should pass through unmodified.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-107
         - id: STK-REQ-019-AC-04
           text: Given MCP OAS documents and requested OAS schema versions, when MCP schema validation is requested, then supported valid documents pass, malformed documents return validation errors, unsupported versions return explicit errors, and supported OAS 3.0 and 3.1 schema-definition keys are selected consistently.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-107
 lifecycle:

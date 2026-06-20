@@ -46,17 +46,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-026-AC-01
           text: Given an import command invocation, when the operator selects Blueprint, Swagger, or WSDL mode and provides command flags, then the local command wrapper binds the selected mode, input file, and create/version parameters deterministically.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-114
         - id: STK-REQ-026-AC-02
           text: Given missing create-API or version-insert parameters, when local import input validation runs, then an explicit local error is returned before accepting the input as valid.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-114
         - id: STK-REQ-026-AC-03
           text: Given local API definition and import source files, when the importer wrapper loads or prints them, then valid files are decoded through the expected loader and missing or malformed local files return explicit errors.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-114
 lifecycle:

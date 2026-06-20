@@ -30,17 +30,6 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
-    impact_reviews:
-        - requirement: STK-REQ-006
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: agent:codex
-          reason: 'Reviewed internal/policy/apply.go diff against origin/master: nil session/store/API-limit guards, quota-unlimited renewal handling, deterministic single-API root variable selection, rights-map prefill/merge cleanup, and proof annotations are implementation/evidence changes under the existing policy requirements; no requirement or linked design text change is required, and existing non-atomic KnownIssues remain unresolved.'
-          base: origin/master
-          requirement_fingerprint: sha256:f9248c403e1e4f235a531d1bdfc0c09285fd54dfdedd075f992700d9ea5503bc
-          approval_fingerprint: sha256:c7db53feabf89b737e5e359915956002591a01af2572c2d1eb9568819e5e4348
-          artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
-          reviewed_at: "2026-06-19T17:43:36Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"
@@ -58,7 +47,6 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-006-AC-01
           text: Given no operation is requested, then all output variables remain false
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-004
@@ -68,7 +56,6 @@ stakeholder:
             - SYS-REQ-027
         - id: STK-REQ-006-AC-02
           text: Given the policy store is nil or unavailable, when any operation is attempted, then an error is reported immediately
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-042
@@ -78,7 +65,6 @@ stakeholder:
             - SYS-REQ-075
         - id: STK-REQ-006-AC-03
           text: Given a transition from idle to active and back, then state correctness is preserved
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-027

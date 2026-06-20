@@ -58,17 +58,6 @@ verification:
           reviewer: buger
           reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
           reviewed_at: "2026-06-18T19:38:25.148877Z"
-    impact_reviews:
-        - requirement: SYS-REQ-022
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: agent:codex
-          reason: 'Reviewed internal/policy/apply.go diff against origin/master: nil session/store/API-limit guards, quota-unlimited renewal handling, deterministic single-API root variable selection, rights-map prefill/merge cleanup, and proof annotations are implementation/evidence changes under the existing policy requirements; no requirement or linked design text change is required, and existing non-atomic KnownIssues remain unresolved.'
-          base: origin/master
-          requirement_fingerprint: sha256:704c4b981d59fa69f185efdec019c0c1f9740df78d8ed342bd2b3707070278dc
-          approval_fingerprint: sha256:382b1314e3c2d93c31ad4955c874df08996e99f80a026f36b6cb588dadfede0e
-          artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
-          reviewed_at: "2026-06-19T17:43:36Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:53Z"

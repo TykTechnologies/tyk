@@ -49,19 +49,16 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-012-AC-01
           text: Given a valid byte payload, when Zstd compression and decompression are performed, then the compressed payload is identified as a Zstd frame and decompression returns exactly the original bytes.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-085
         - id: STK-REQ-012-AC-02
           text: Given invalid, corrupted, too-short, or malformed Zstd input, when frame detection or decompression is requested, then detection reports only true Zstd magic-byte prefixes and decompression returns an error for invalid compressed frames.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-086
         - id: STK-REQ-012-AC-03
           text: Given a decompressed-size limit, when compressed data is decompressed, then data over the active limit is rejected, data within the active limit succeeds, and configured limits below the minimum are clamped to the minimum.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-087
@@ -69,7 +66,6 @@ stakeholder:
             - SYS-REQ-089
         - id: STK-REQ-012-AC-04
           text: Given an unavailable or invalid internal Zstd codec object, when compression or decompression is requested, then the helper returns an explicit error without panicking or treating the payload as valid.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-090

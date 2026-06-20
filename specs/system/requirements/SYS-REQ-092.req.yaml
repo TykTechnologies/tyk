@@ -34,17 +34,6 @@ verification:
         reviewer: human:buger
         reviewed_at: "2026-06-19T00:00:00Z"
         ai_generated: false
-    impact_reviews:
-        - requirement: SYS-REQ-092
-          artifact: internal/sanitize/path.go
-          decision: no-authored-change
-          reviewer: agent:codex
-          reason: Reviewed comment-only MC/DC classification changes in internal/sanitize/path.go; executable behavior and documented requirement intent are unchanged
-          base: origin/master
-          requirement_fingerprint: sha256:0c822b09e3ef27df2ff7d18ee91cb6777dcd9b05ea9b56570d0c5ed90b44adea
-          approval_fingerprint: sha256:c7b3217c3b0bb4db19e36e62a9c2970dd44d676fdf24a4317bdd30f645e1819a
-          artifact_fingerprint: sha256:2d7a9103a34a9859e79e0ce389402e0c6c7f40246271ca6e8879cdccbc16eb39
-          reviewed_at: "2026-06-19T16:19:58Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-19T00:00:00Z"

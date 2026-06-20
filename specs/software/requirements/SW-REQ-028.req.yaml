@@ -35,47 +35,6 @@ verification:
         comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. HTTP context requirements are scoped to internal/httpctx typed request-context storage and retrieval, JSON-RPC request metadata, JSON-RPC routing state and completion checks, VEM visit recording, JSON-RPC routing flags, and self-looping flags only; focused internal/httpctx tests passed. This approval does not claim caller ordering, middleware authorization decisions, JSON-RPC body parsing, API definition synthesis, analytics persistence, network transport behavior, or final HTTP status generation.
         fingerprint: sha256:7cfc5289407352480d7b9488969e117e4d629339940b2c1b4164cf227abbd096
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-028
-          artifact: internal/httpctx/context.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/httpctx production files received requirement trace annotations only; executable request-context behavior is unchanged and is covered by internal/httpctx tests plus docs/httpctx-requirements-evidence.md, so no further authored requirement or design text change is needed.
-          base: origin/master
-          requirement_fingerprint: sha256:90cfbf7b578f56c399a4b168a503f2d86beb8793c7775228335004c7c421edf4
-          approval_fingerprint: sha256:7cfc5289407352480d7b9488969e117e4d629339940b2c1b4164cf227abbd096
-          artifact_fingerprint: sha256:26c20d22776e32c634e482f01b5dda1581e199d3613fe394706eb3fe72c5700e
-          reviewed_at: "2026-06-19T22:12:39Z"
-        - requirement: SW-REQ-028
-          artifact: internal/httpctx/jsonrpc.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/httpctx production files received requirement trace annotations only; executable request-context behavior is unchanged and is covered by internal/httpctx tests plus docs/httpctx-requirements-evidence.md, so no further authored requirement or design text change is needed.
-          base: origin/master
-          requirement_fingerprint: sha256:90cfbf7b578f56c399a4b168a503f2d86beb8793c7775228335004c7c421edf4
-          approval_fingerprint: sha256:7cfc5289407352480d7b9488969e117e4d629339940b2c1b4164cf227abbd096
-          artifact_fingerprint: sha256:90d8914c71b02d53a4f98cfd26f86dbe3e03ce3ce63a43a06c9e95b2ae0de536
-          reviewed_at: "2026-06-19T22:12:39Z"
-        - requirement: SW-REQ-028
-          artifact: internal/httpctx/jsonrpc_routing.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/httpctx production files received requirement trace annotations only; executable request-context behavior is unchanged and is covered by internal/httpctx tests plus docs/httpctx-requirements-evidence.md, so no further authored requirement or design text change is needed.
-          base: origin/master
-          requirement_fingerprint: sha256:90cfbf7b578f56c399a4b168a503f2d86beb8793c7775228335004c7c421edf4
-          approval_fingerprint: sha256:7cfc5289407352480d7b9488969e117e4d629339940b2c1b4164cf227abbd096
-          artifact_fingerprint: sha256:a488b7234241af1c03cf3b7f0cc162ef151b2432118a558798791c6a76bfa863
-          reviewed_at: "2026-06-19T22:12:39Z"
-        - requirement: SW-REQ-028
-          artifact: internal/httpctx/looping.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/httpctx production files received requirement trace annotations only; executable request-context behavior is unchanged and is covered by internal/httpctx tests plus docs/httpctx-requirements-evidence.md, so no further authored requirement or design text change is needed.
-          base: origin/master
-          requirement_fingerprint: sha256:90cfbf7b578f56c399a4b168a503f2d86beb8793c7775228335004c7c421edf4
-          approval_fingerprint: sha256:7cfc5289407352480d7b9488969e117e4d629339940b2c1b4164cf227abbd096
-          artifact_fingerprint: sha256:bb16dd3b30f4b3223c9d6ab931241b4a0550e6c59b6461c6357f55c52a9ec32e
-          reviewed_at: "2026-06-19T22:12:39Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T00:00:00Z"

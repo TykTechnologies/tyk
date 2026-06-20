@@ -45,12 +45,12 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-046-AC-01
           text: Given Redis constructor, mock, pool, script, and sentinel error aliases, when callers reference the local alias package, then the aliases preserve the upstream symbol identity or error identity.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-134
         - id: STK-REQ-046-AC-02
           text: Given representative exported Redis data and client types, when callers assign upstream values through the local alias types, then the assignments remain compatible.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-134
 lifecycle:

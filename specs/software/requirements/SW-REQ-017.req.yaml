@@ -35,17 +35,6 @@ verification:
         comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19. Requirement is scoped to internal/rate sliding-log storage orchestration and Redis sorted-set/script mapping only; Redis-backed sliding-log tests passed with a temporary Redis 7 container, including same-timestamp member uniqueness regressions and static removal of native-int UnixNano formatting. This approval does not waive MC/DC, distributed Redis topology correctness, external limiter algorithm correctness, gateway admission, or product cooldown policy evidence.
         fingerprint: sha256:3ee482610e21a12d7ab8540b6cd94fc9d0f61e7a0709e556dce3343c53ec8164
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-017
-          artifact: internal/rate/sliding_log.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19 after adding the mustScript trace. internal/rate/sliding_log.go remains within newly authored SW-REQ-017 and docs/rate-requirements-evidence.md; the implementation change preserves timestamp scoring, uses unique sorted-set members to avoid same-timestamp undercounting, removes native-int UnixNano formatting, and Redis-backed sliding-log tests passed, so no further authored requirement or design text change is needed.'
-          base: origin/master
-          requirement_fingerprint: sha256:cd865ebbfaff01ca30c6adf18827f1e198d9878f3231cbb23c223335ac3cb363
-          approval_fingerprint: sha256:3ee482610e21a12d7ab8540b6cd94fc9d0f61e7a0709e556dce3343c53ec8164
-          artifact_fingerprint: sha256:c5f4ed9213e9c845a5b7c0af5bcdd7b95d8450cbda721ab4a7c64fe481594843
-          reviewed_at: "2026-06-19T21:00:03Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-19T20:51:52Z"

@@ -35,17 +35,6 @@ verification:
         comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-092 is scoped to local apidef/oas/security.go OAS security document helper behavior: token/JWT/basic/OAuth/external-OAuth helper shapes, import and normalization defaults, JWT validation/introspection/cache/notification/request-body credential support-shape conversion, API-key and OAuth OpenAPI security-scheme construction/extraction, Tyk proprietary auth classification, OAS versus vendor-extension security requirement partitioning/recombination, aggregate Classic API definition security fill/extract coordination, JWT configuration lookup across legacy/compliant modes, and Classic security-field reset behavior. Focused apidef/oas security ReqProof tests passed. This approval does not claim token validation, signature verification, certificate validation, OAuth/OIDC provider execution, custom plugin execution, OpenAPI security evaluation semantics, gateway request admission, persistence, analytics, or final runtime authentication behavior.'
         fingerprint: sha256:2d3e4d518980266800c43d264b2919e6b11481d725383ce6fb53a2d4e4531ad5
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-092
-          artifact: apidef/oas/security.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in apidef/oas/security.go adds ReqProof ownership annotations only; behavior evidence is provided by apidef/oas/security_reqproof_test.go and the requirement remains scoped to local support-shape conversion without runtime authentication claims.
-          base: origin/master
-          requirement_fingerprint: sha256:fc9bfe016454d2af103191b2a3cbe3d57f07fbb0b1eedc452734951f8e4d91d9
-          approval_fingerprint: sha256:2d3e4d518980266800c43d264b2919e6b11481d725383ce6fb53a2d4e4531ad5
-          artifact_fingerprint: sha256:1eab40b11d5c2536b279f92d235ce7b159abf142070116ca87a624a334e37b7e
-          reviewed_at: "2026-06-20T07:23:06Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T07:20:28Z"

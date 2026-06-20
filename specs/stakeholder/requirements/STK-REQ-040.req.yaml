@@ -46,17 +46,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-040-AC-01
           text: Given upstream authentication and upstream basic authentication settings, when local middleware evaluates enablement, then it enables only when both upstream auth and basic auth are enabled.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-128
         - id: STK-REQ-040-AC-02
           text: Given enabled upstream basic authentication credentials, when local middleware processes a request, then a basic-auth provider with the expected encoded value and default or configured header name is stored in request context.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-128
         - id: STK-REQ-040-AC-03
           text: Given an upstream basic-auth provider and a request with or without an existing authentication header, when the provider fills the request, then the configured header contains the gateway upstream authentication value.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-128
 lifecycle:

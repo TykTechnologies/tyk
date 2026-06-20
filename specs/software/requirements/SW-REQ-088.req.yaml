@@ -34,17 +34,6 @@ verification:
         comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-088 is scoped to local apidef/oas/default.go OAS default-extension helper behavior: import and non-import x-tyk-api-gateway default support-shape construction, server-variable substitution, missing and unresolved server-variable errors, invalid manual upstream and server URL errors, missing server/security requirement errors, query override parsing with trimming and boolean validation, authentication-source selector mapping, distinct supported security-scheme import coordination with base identity-provider derivation, obsolete operation cleanup, and empty operation/middleware pruning. Focused apidef/oas default ReqProof tests passed. This approval does not claim full OpenAPI import correctness, OpenAPI security evaluation semantics, gateway authentication enforcement, route generation, request matching, request validation execution, allow-list enforcement, mock-response execution, middleware execution, upstream availability, gateway API loading, persistence, analytics, or final client-visible runtime behavior.'
         fingerprint: sha256:c2e7957cdbb5ea8c6792ce4b42b8ab0d73e21c63bd639c921ae0a53fb434a0f3
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-088
-          artifact: apidef/oas/default.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The apidef/oas/default.go production delta in this slice adds ReqProof ownership annotations only; SW-REQ-088 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence existing OAS default-extension helper behavior, so no additional authored requirement/design change is required for this implementation delta.
-          base: origin/master
-          requirement_fingerprint: sha256:46e634f3cc3076bf31ad6f0884de6baaa2ce95bd4bfdb1e95baaea2f0a94dd96
-          approval_fingerprint: sha256:c2e7957cdbb5ea8c6792ce4b42b8ab0d73e21c63bd639c921ae0a53fb434a0f3
-          artifact_fingerprint: sha256:b9b1b59e3e75110f6ca2430df26649455f0a95134f3a316b5e25d06a82c15754
-          reviewed_at: "2026-06-20T06:33:39Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T06:32:13Z"

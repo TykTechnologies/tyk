@@ -36,17 +36,6 @@ verification:
         comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-096 is scoped to local apidef/streams/validator.go Tyk Streams OAS validation helper behavior: one-time embedded OAS and Tyk extension schema loading, x-tyk-streaming and x-tyk-api-gateway schema injection into supported OAS minor-version schemas, default and enable-all-experimental Bento validator registration, deterministic default OAS minor-version selection with the current 3.0 override, major/minor/patch version resolution, OAS object and template validation through the local gojsonschema facade, template required-field relaxation for Tyk extensions, aggregated OAS validation errors, explicit unsupported-version and malformed-document errors, stream-scoped Bento configuration validation errors, and enable-all/disable-validator bypasses. Focused streams validator ReqProof tests passed, including race, and the package was added to configured build/test/lint gates. This approval does not claim embedded schema completeness, Bento schema completeness, stream configuration semantic correctness, stream runtime execution, gateway API loading, route generation, request matching, gateway request admission, persistence, analytics, or final client-visible behavior.'
         fingerprint: sha256:010559e507a2774d4c67d6604daaedbc4b351bd63aa6565a8efd0aea1141dadf
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-096
-          artifact: apidef/streams/validator.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in apidef/streams/validator.go adds ReqProof ownership annotations only; behavior evidence is provided by apidef/streams/validator_reqproof_test.go and the requirement remains scoped to local Tyk Streams OAS validator helper behavior without stream runtime validation or final client-visible behavior claims.
-          base: origin/master
-          requirement_fingerprint: sha256:5bc56b32ce9eb719968be7dc7cfacd02c7ba10a11b285b2b97f802500f09f881
-          approval_fingerprint: sha256:010559e507a2774d4c67d6604daaedbc4b351bd63aa6565a8efd0aea1141dadf
-          artifact_fingerprint: sha256:36665478e7e9b997d7d638f3c075466c15be43ec953348c7a7ec509b15cc837b
-          reviewed_at: "2026-06-20T08:04:25Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T08:01:07Z"

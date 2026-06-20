@@ -29,17 +29,6 @@ verification:
         reviewer: human:leonidbugaev
         reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
-    impact_reviews:
-        - requirement: STK-REQ-003
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: agent:codex
-          reason: 'Reviewed internal/policy/apply.go diff against origin/master: nil session/store/API-limit guards, quota-unlimited renewal handling, deterministic single-API root variable selection, rights-map prefill/merge cleanup, and proof annotations are implementation/evidence changes under the existing policy requirements; no requirement or linked design text change is required, and existing non-atomic KnownIssues remain unresolved.'
-          base: origin/master
-          requirement_fingerprint: sha256:6cab2673baf528f841761e7d835ff4c7c86d97c6f320d2e708f63e1596ac8f07
-          approval_fingerprint: sha256:a186daee7253389c030e08887cbe5492444875e343ceec74ce7ef67db9a0e9e6
-          artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
-          reviewed_at: "2026-06-19T17:43:36Z"
 history:
     created_by: ai:claude
     created_at: "2026-04-14T10:00:00Z"
@@ -61,7 +50,6 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-003-AC-01
           text: Given a policy with a higher rate than the current session, when rate limits are applied, then the policy rate replaces the session rate
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-015
@@ -73,21 +61,18 @@ stakeholder:
             - SYS-REQ-073
         - id: STK-REQ-003-AC-02
           text: Given a policy with an empty rate (Rate=0 or Per=0), when rate limits are applied, then the empty rate is never applied
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-022
             - SYS-REQ-040
         - id: STK-REQ-003-AC-03
           text: Given a policy with an equal rate to the current session, when rate limits are applied, then the existing rate is preserved
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-041
             - SYS-REQ-046
         - id: STK-REQ-003-AC-04
           text: Given multiple policies with different rates, when they are merged, then the highest rate wins
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-016

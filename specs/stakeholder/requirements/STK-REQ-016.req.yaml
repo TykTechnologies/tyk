@@ -47,31 +47,26 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-016-AC-01
           text: Given stored allowance fields, when allowance state is decoded, then valid fields are preserved and malformed fields fall back to the zero state instead of producing corrupted values.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-103
         - id: STK-REQ-016-AC-02
           text: Given allowance timing configuration, when validation runs, then positive delay is accepted and non-positive delay is rejected with an error.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-103
         - id: STK-REQ-016-AC-03
           text: Given an allowance instance or a nil allowance receiver, when reset is requested, then mutable allowance state is cleared without panic.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-103
         - id: STK-REQ-016-AC-04
           text: Given allowance delay and current values, when get, set, touch, or expiry checks run, then current values and next-update timing are returned or updated consistently.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-103
         - id: STK-REQ-016-AC-05
           text: Given an allowance instance, when allowance state is exported for storage, then exported fields preserve delay, current allowance, and next-update time using the stored allowance field names.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-103

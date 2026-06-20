@@ -43,17 +43,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-032-AC-01
           text: Given no explicit rate-limit mode override, when local configuration asks for the rate-limit description, then the distributed Redis limiter description using transactions is returned.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-120
         - id: STK-REQ-032-AC-02
           text: Given fixed-window, Redis rolling, Sentinel, or distributed Sentinel limiter flags, when local configuration asks for the rate-limit description, then the selected branch and documented precedence are reflected in the returned description.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-120
         - id: STK-REQ-032-AC-03
           text: Given non-transactional or smoothing flags, when local configuration asks for the rate-limit description for a branch that includes shared limiter detail text, then the returned description reflects pipeline and smoothing wording.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-120
 lifecycle:

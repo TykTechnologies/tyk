@@ -48,25 +48,21 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-013-AC-01
           text: Given relative archive paths that resolve inside the target directory, when archive path validation is requested, then validation succeeds.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-091
         - id: STK-REQ-013-AC-02
           text: Given absolute, volume-qualified, traversal, or unresolvable archive paths, when archive path validation is requested, then validation returns an error and traversal attempts use ErrInvalidFilePath.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-092
         - id: STK-REQ-013-AC-03
           text: Given a non-empty single path component without separators after bounded URL decoding, when path-component validation is requested, then validation succeeds.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-093
         - id: STK-REQ-013-AC-04
           text: Given empty, dot, dot-dot, separator-containing, encoded traversal, encoded separator, or malformed encoded path components, when path-component validation is requested, then validation returns ErrInvalidFilePath.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-094

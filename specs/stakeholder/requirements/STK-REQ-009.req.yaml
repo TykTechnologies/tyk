@@ -47,19 +47,16 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-009-AC-01
           text: Given a known or unknown event value, when its display string is requested, then known mapped events return their readable description and unknown events return their raw value.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-082
         - id: STK-REQ-009-AC-02
           text: Given an HTTP request context, when events are set or added, then retrieving events returns exactly the accumulated ordered event slice and an untouched context returns no events.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-082
         - id: STK-REQ-009-AC-03
           text: Given an HTTP request, when request encoding is requested, then a writable request returns base64 wire-format data and an unwritable request returns an empty encoding result.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-082

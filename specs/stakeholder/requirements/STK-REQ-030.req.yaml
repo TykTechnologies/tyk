@@ -45,17 +45,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-030-AC-01
           text: Given a development build with custom rate limiter storage disabled or absent, when local configuration asks for rate limiter storage, then the default gateway storage configuration is returned.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-118
         - id: STK-REQ-030-AC-02
           text: Given a development build with custom rate limiter storage enabled and configured, when local configuration asks for rate limiter storage, then the configured rate limiter storage is returned.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-118
         - id: STK-REQ-030-AC-03
           text: Given a release build, when local configuration asks for rate limiter storage, then the default gateway storage configuration is returned.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-118
 lifecycle:

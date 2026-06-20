@@ -36,17 +36,6 @@ verification:
         comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Certificate lifecycle scope is limited to local certs/manager.go helper behavior: certificate manager construction with default and overridden retry/cache settings, encrypted and unencrypted PEM parsing, stable certificate and public-key ID derivation, malformed/expired/duplicate/mixed/multiple-key/mismatched material rejection, private-key encryption before storage, organization-scoped index behavior, storage-backed and file-backed list behavior, public-key fingerprint and raw-key helpers, raw material retrieval, delete/cache/storage mutation behavior, CA pool construction that skips raw public keys, certificate metadata extraction, and masked certificate ID output. Focused certs manager ReqProof tests passed, including race, and the certs package was added to configured build/test/lint gates. This approval does not claim TLS handshake enforcement, mutual-TLS request authentication, upstream TLS validation, live MDCB availability, Redis or external-storage durability, certificate expiry monitoring, gateway request admission, or final client-visible behavior.'
         fingerprint: sha256:62153118fbf22458a1de8438101bf9c3a925c32feebb00c7f2a83a79ba9c4ff9
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-098
-          artifact: certs/manager.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in certs/manager.go adds ReqProof ownership annotations only; behavior evidence is provided by certs/manager_reqproof_test.go and existing certs package tests. The requirement remains scoped to local certificate manager helper behavior without TLS handshake enforcement, runtime mTLS request authentication, upstream TLS validation, live MDCB availability, external storage durability, certificate expiry monitoring, gateway request admission, or final client-visible behavior claims.
-          base: origin/master
-          requirement_fingerprint: sha256:d49798d7a3398f174ff311e4102fdb79875bbf8106b8a356e34cbcbed14aa86a
-          approval_fingerprint: sha256:62153118fbf22458a1de8438101bf9c3a925c32feebb00c7f2a83a79ba9c4ff9
-          artifact_fingerprint: sha256:10ec5aae289584807ba6e343b4724b5dd22391c8f39efd8b24c9ecf4163d854b
-          reviewed_at: "2026-06-20T08:29:40Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T08:23:00Z"

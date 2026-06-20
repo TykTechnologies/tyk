@@ -34,17 +34,6 @@ verification:
         comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after moving the slice under the existing model component. Requirement is scoped to apidef health-check constants and JSON wire shapes only; focused health-check JSON tests passed. This approval does not waive MC/DC, runtime health computation, RPC synchronization, or gateway node health evidence.
         fingerprint: sha256:2d25b0708318ccf92a87ef5eb8fbdb57eb541b8256940ed8063e868700de3e63
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-019
-          artifact: apidef/health_check.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final parent/component updates. apidef/health_check.go received requirement trace annotations only and matches SW-REQ-019 plus docs/apidef-requirements-evidence.md; focused JSON shape tests passed, so no further authored requirement or design text change is needed.
-          base: origin/master
-          requirement_fingerprint: sha256:95935bfe49b3092ccb7ffd8e1c34e075fadbf732a1fbc3b0e8c4e22eac7b4498
-          approval_fingerprint: sha256:2d25b0708318ccf92a87ef5eb8fbdb57eb541b8256940ed8063e868700de3e63
-          artifact_fingerprint: sha256:17b193fd401c862d8c575952b9ef1b8cd5c0fad4ede293336dca79decfcdb034
-          reviewed_at: "2026-06-19T21:17:49Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-19T21:10:38Z"

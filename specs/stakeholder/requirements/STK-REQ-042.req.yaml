@@ -46,17 +46,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-042-AC-01
           text: Given certificate IDs queued for expiry checking, when the local batch helper appends and drains entries, then duplicate IDs are not enqueued twice and draining returns the queued entries while clearing local state.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-130
         - id: STK-REQ-042-AC-02
           text: Given local cooldown and certificate timing inputs, when certificate expiry monitor helpers evaluate them, then the helpers return the documented cooldown existence/activity and expiry classification results.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-130
         - id: STK-REQ-042-AC-03
           text: Given certificate role, API metadata, and expiry timing inputs, when local event metadata helpers run, then they preserve role, certificate, API, duration, and message fields in the constructed event metadata.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-130
 lifecycle:

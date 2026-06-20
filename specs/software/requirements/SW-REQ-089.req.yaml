@@ -34,17 +34,6 @@ verification:
         comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-089 is scoped to local apidef/oas/middleware.go OAS middleware support-shape helper behavior: aggregate global middleware Fill/ExtractTo conversion, plugin configuration data and bundles, CORS, global cache options, global request/response header transforms, context variables, traffic-log analytics configuration, global request-size limits, ignore-case and skip flags, custom middleware plugin lists, deprecated singular plugin/name JSON compatibility, path-level allow/block/ignore-authentication/method-transform/cache/enforced-timeout metadata, HTTP method helper selection, MCP primitive mock detection and ExtendedPaths extraction boundaries, scalar allowance/transform/cache/timeout/custom plugin/virtual endpoint/endpoint post plugin/circuit-breaker/request-size/context-variable/ignore-case conversion, nil optional helper boundaries, and endpoint cache default timeout behavior. Focused apidef/oas middleware ReqProof tests passed. This approval does not claim actual gateway middleware execution, route matching, authentication enforcement, CORS enforcement, cache storage behavior, runtime header mutation, virtual endpoint JavaScript execution, Go plugin loading or execution, analytics delivery, traffic-log persistence, circuit-breaker runtime behavior, request-size enforcement, MCP JSON-RPC execution, gateway API loading, route generation, request admission, persistence backend correctness, or final client-visible runtime behavior.'
         fingerprint: sha256:5de815e51329232640a45d90ee7dd3522a4fb7120cc2967de1585be0ed9a60bc
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-089
-          artifact: apidef/oas/middleware.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The apidef/oas/middleware.go production delta in this slice adds ReqProof ownership annotations only; SW-REQ-089 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence existing OAS middleware helper behavior, so no additional authored requirement/design change is required for this implementation delta.
-          base: origin/master
-          requirement_fingerprint: sha256:92e229078f4031d928fddd1947fdf52e2ff6fb4a54f51a0deffdeb58897e110b
-          approval_fingerprint: sha256:5de815e51329232640a45d90ee7dd3522a4fb7120cc2967de1585be0ed9a60bc
-          artifact_fingerprint: sha256:7cb59a9f005f1b176d5d8528e134a3fa71672b373c2e05e9ea9f223ccd208c87
-          reviewed_at: "2026-06-20T06:49:53Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T06:41:53Z"

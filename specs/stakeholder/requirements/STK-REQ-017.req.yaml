@@ -45,17 +45,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-017-AC-01
           text: Given a request with a string remote_addr context value, when client IP resolution is requested, then the context value is returned before header or connection-derived values.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-105
         - id: STK-REQ-017-AC-02
           text: Given requests with valid or invalid X-Real-IP and X-Forwarded-For headers, when client IP resolution is requested, then valid configured header values are selected and malformed header values fall back to RemoteAddr.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-105
         - id: STK-REQ-017-AC-03
           text: Given an invalid configured XFFDepth, when forwarded header resolution is requested, then no arbitrary forwarded address is selected.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-105
 lifecycle:

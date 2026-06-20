@@ -33,27 +33,6 @@ verification:
         comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. JSON-RPC error requirements are scoped to internal/jsonrpc/errors HTTP-status mapping and JSON-RPC 2.0 error envelope writing only; focused mapper/writer tests passed, including fallback behavior for response marshal failure. This approval does not claim JSON-RPC method routing, request parsing, middleware authorization decisions, analytics persistence, or network write success beyond net/http response handoff.
         fingerprint: sha256:91f790ac0ed04284c69bea291aa6e22dd0cd2ae4dccff682be9e31966a9a14f8
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-024
-          artifact: internal/jsonrpc/errors/mapper.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/jsonrpc/errors production files received requirement trace annotations only; executable mapper/writer behavior is unchanged and is covered by internal/jsonrpc/errors tests plus docs/jsonrpc-error-requirements-evidence.md, so no further authored requirement or design text change is needed.
-          base: origin/master
-          requirement_fingerprint: sha256:3f61c2bc25939850bcb9730849fe86b1e9e5e693da257ce901ea1f4b7d8aa129
-          approval_fingerprint: sha256:91f790ac0ed04284c69bea291aa6e22dd0cd2ae4dccff682be9e31966a9a14f8
-          artifact_fingerprint: sha256:008bc975f782001404fc89b31ea6f329ed1873a70c2bbe51455720f458730e3c
-          reviewed_at: "2026-06-19T21:52:48Z"
-        - requirement: SW-REQ-024
-          artifact: internal/jsonrpc/errors/writer.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/jsonrpc/errors production files received requirement trace annotations only; executable mapper/writer behavior is unchanged and is covered by internal/jsonrpc/errors tests plus docs/jsonrpc-error-requirements-evidence.md, so no further authored requirement or design text change is needed.
-          base: origin/master
-          requirement_fingerprint: sha256:3f61c2bc25939850bcb9730849fe86b1e9e5e693da257ce901ea1f4b7d8aa129
-          approval_fingerprint: sha256:91f790ac0ed04284c69bea291aa6e22dd0cd2ae4dccff682be9e31966a9a14f8
-          artifact_fingerprint: sha256:439a5c6e3aeea40e0e840f5925e9fda071c6b3128676dc2910a4156c3a3c28ce
-          reviewed_at: "2026-06-19T21:52:48Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T00:00:00Z"

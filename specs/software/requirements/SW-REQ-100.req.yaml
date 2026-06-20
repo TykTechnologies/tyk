@@ -37,18 +37,6 @@ verification:
             Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Plugin bundle CLI scope is limited to local cli/bundler/bundler.go behavior: bundle command registration, default flag wiring, manifest loading, JSON parse errors, manifest validation for existing files/hooks/drivers, explicit local errors for malformed inputs, unsigned bundle confirmation bypass through skip-signing, checksum calculation over bundled file bytes, ZIP archive creation with bundled files and updated manifest, RSA private-key signing, and verifiable signature storage. Focused bundler tests passed, including race, and the cli/bundler package was added to configured build/test/lint gates. This approval does not claim gateway-side signature verification, plugin loading, plugin execution, bundle distribution, persistence, hot reload, or final gateway request behavior.
         fingerprint: sha256:5945a4404ae0eeefcb8674ae268adfad20729fece042885db7efeed27ecad24a
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-100
-          artifact: cli/bundler/bundler.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in cli/bundler/bundler.go adds ReqProof ownership annotations only; behavior evidence is provided by cli/bundler/bundler_test.go. The requirement remains scoped to local CLI plugin bundle construction support without gateway-side signature verification, plugin loading, plugin execution, bundle distribution, persistence, hot reload, or final gateway request behavior claims.
-          base: origin/master
-          requirement_fingerprint: sha256:6304144ac86550425107c265a962c1f9d464f72506410bef3e7449bfaa63bae8
-          approval_fingerprint: sha256:5945a4404ae0eeefcb8674ae268adfad20729fece042885db7efeed27ecad24a
-          artifact_fingerprint: sha256:15f69e7b135d34d52848bdd7161a6e8689c7e6968b99e765f44bd6f80bc45c4f
-          reviewed_at: "2026-06-20T08:59:46Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T08:57:05Z"

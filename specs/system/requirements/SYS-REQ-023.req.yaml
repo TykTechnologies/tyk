@@ -42,17 +42,6 @@ verification:
           reviewer: buger
           reason: Reviewed active ambiguity findings after solver consistency and cross-spec consistency passed; overlaps are intentional shared policy-output constraints, not contradictory requirements
           reviewed_at: "2026-06-18T19:38:25.148877Z"
-    impact_reviews:
-        - requirement: SYS-REQ-023
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: agent:codex
-          reason: 'Reviewed internal/policy/apply.go diff against origin/master for endpoint, JSON-RPC, and MCP primitive limit merging helpers: merge behavior stays within the existing per-endpoint/per-method highest-rate and ACL-union requirements; proof annotations document the existing helper scope, and no requirement or linked design text change is required.'
-          base: origin/master
-          requirement_fingerprint: sha256:29206d85b613ea002272d8f31a4bc93200bb4caf40e7b375876b34cd1d224735
-          approval_fingerprint: sha256:37070049511df945602d785c4cee052a7f37f5a2f878ecc4f9bfdaf15a00fd45
-          artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
-          reviewed_at: "2026-06-19T17:44:23Z"
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:53Z"

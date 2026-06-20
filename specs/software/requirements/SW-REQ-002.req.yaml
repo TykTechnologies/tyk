@@ -39,17 +39,6 @@ verification:
         comment: Reviewed policy Service software decomposition under SYS-REQ-008; requirement scope and evidence annotations match Apply result-return behavior.
         fingerprint: sha256:e09dffa96bd391e57c7ee7dad4e4a78c42039d30705195c52bf52507125156bf
         ai_generated: true
-    impact_reviews:
-        - requirement: SW-REQ-002
-          artifact: internal/policy/apply.go
-          decision: no-authored-change
-          reviewer: agent:codex
-          reason: 'Reviewed internal/policy/apply.go diff against origin/master: nil session/store/API-limit guards, quota-unlimited renewal handling, deterministic single-API root variable selection, rights-map prefill/merge cleanup, and proof annotations are implementation/evidence changes under the existing policy requirements; no requirement or linked design text change is required, and existing non-atomic KnownIssues remain unresolved.'
-          base: origin/master
-          requirement_fingerprint: sha256:d022df1cc428940f08200fac471c6ce68f0abad40f3d8e0a6b05831bc2b6fe6b
-          approval_fingerprint: sha256:40a451ce868abe1d6731473d7ac2a02f576cba8dbaa730925cbe0bba8696e486
-          artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
-          reviewed_at: "2026-06-19T17:43:36Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-19T07:35:07Z"

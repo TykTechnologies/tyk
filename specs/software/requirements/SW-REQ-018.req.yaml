@@ -35,17 +35,6 @@ verification:
         comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19. Requirement is scoped to internal/rate/limiter adapter wiring only; local and Redis-backed adapter tests passed with a temporary Redis 7 container, including constructor defaults, lock selection, first-call delegation for all adapters, and fixed-window exhaustion propagation. This approval does not waive MC/DC, external limiter algorithm correctness, distributed lock robustness, Redis availability outside provisioned tests, or gateway admission evidence.
         fingerprint: sha256:edac4d47b79d4c9179cdad93fb9a93c80ce3364a180dc8d885ca84d86146a5cd
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-018
-          artifact: internal/rate/limiter/limiter_fixed_window.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19. internal/rate/limiter/limiter_fixed_window.go now matches newly authored SW-REQ-018 and docs/rate-requirements-evidence.md; the code comment was corrected to match observed adapter behavior, and local plus Redis-backed limiter adapter tests passed, so no further authored requirement or design text change is needed.
-          base: origin/master
-          requirement_fingerprint: sha256:bd6f770cbd4957bd9c8ab4caa29b2b9018ae9a4f9a25713c52dfd55baac37c01
-          approval_fingerprint: sha256:edac4d47b79d4c9179cdad93fb9a93c80ce3364a180dc8d885ca84d86146a5cd
-          artifact_fingerprint: sha256:6331da840b70d80509b4b2e8d21b1131d6a4fd783cb4a6545037b8cc54bb2023
-          reviewed_at: "2026-06-19T21:05:50Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-19T21:03:08Z"

@@ -44,17 +44,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-033-AC-01
           text: Given Zipkin or Jaeger tracing configuration with matching environment variables, when local configuration applies tracing option overrides, then the matching JSON/YAML-compatible tracer option map reflects those environment values.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-121
         - id: STK-REQ-033-AC-02
           text: Given a non-matching tracer name, when a tracing option loader is invoked, then the existing tracer options are left unchanged.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-121
         - id: STK-REQ-033-AC-03
           text: Given invalid environment values or malformed compatible decode destinations, when local tracing configuration helpers decode options, then an explicit local error is returned.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-121
 lifecycle:

@@ -44,12 +44,12 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-037-AC-01
           text: Given a request and supported context value, when a helper stores the value, then the matching helper retrieves the expected typed value or documented zero value.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-125
         - id: STK-REQ-037-AC-02
           text: Given API definition, OAS definition, session, error classification, auth token, and JSON-RPC/MCP metric context fields, when local context helpers are used, then helper behavior remains local to request context storage and retrieval.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-125
 lifecycle:

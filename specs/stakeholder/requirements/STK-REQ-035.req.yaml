@@ -43,12 +43,12 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-035-AC-01
           text: Given a supplied option function slice, when the option builder wraps it, then the resulting option collection preserves that slice content.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-123
         - id: STK-REQ-035-AC-02
           text: Given a base value and ordered option functions, when the option builder builds a value, then each option is applied in order to a copy of the base value and the built pointer contains the resulting value.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-123
 lifecycle:

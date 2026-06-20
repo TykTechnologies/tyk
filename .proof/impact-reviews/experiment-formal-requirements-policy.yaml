@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-19T12:15:07Z"
+generated_at: "2026-06-20T13:04:43Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -90,6 +90,476 @@ reviews:
       approval_fingerprint: sha256:40a451ce868abe1d6731473d7ac2a02f576cba8dbaa730925cbe0bba8696e486
       artifact_fingerprint: sha256:fe1c7dfa382fccd203fcc42adb16a8ae93db228937f97da99e0a329b97863f4c
       reviewed_at: "2026-06-19T11:14:52Z"
+    - requirement: SW-REQ-011
+      artifact: internal/rate/headers.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19. internal/rate/headers.go now matches the newly authored SW-REQ-011 header-sender requirement and docs/rate-requirements-evidence.md; the change fixes KI-RATE-QUOTA-HEADER-INT-NARROWING by formatting quota int64 values with strconv.FormatInt and is covered by focused header tests, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:3a2d5b4678a9c911e25eb19c25661b000abfb21b4949b9dba5b1f07cb75e685c
+      approval_fingerprint: sha256:f37bc69443c225116e4245df85a9eca7636d3bcfc96d7bcb96ef5ff595b2c185
+      artifact_fingerprint: sha256:f7b2b3a37d0ecc6eb6f7b23af1cdd9b8ed6f2fe37dbda5e5b36c98c046b89a76
+      reviewed_at: "2026-06-19T20:24:24Z"
+    - requirement: SW-REQ-017
+      artifact: internal/rate/sliding_log.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19 after adding the mustScript trace. internal/rate/sliding_log.go remains within newly authored SW-REQ-017 and docs/rate-requirements-evidence.md; the implementation change preserves timestamp scoring, uses unique sorted-set members to avoid same-timestamp undercounting, removes native-int UnixNano formatting, and Redis-backed sliding-log tests passed, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:cd865ebbfaff01ca30c6adf18827f1e198d9878f3231cbb23c223335ac3cb363
+      approval_fingerprint: sha256:3ee482610e21a12d7ab8540b6cd94fc9d0f61e7a0709e556dce3343c53ec8164
+      artifact_fingerprint: sha256:c5f4ed9213e9c845a5b7c0af5bcdd7b95d8450cbda721ab4a7c64fe481594843
+      reviewed_at: "2026-06-19T21:00:03Z"
+    - requirement: SW-REQ-018
+      artifact: internal/rate/limiter/limiter_fixed_window.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-19. internal/rate/limiter/limiter_fixed_window.go now matches newly authored SW-REQ-018 and docs/rate-requirements-evidence.md; the code comment was corrected to match observed adapter behavior, and local plus Redis-backed limiter adapter tests passed, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:bd6f770cbd4957bd9c8ab4caa29b2b9018ae9a4f9a25713c52dfd55baac37c01
+      approval_fingerprint: sha256:edac4d47b79d4c9179cdad93fb9a93c80ce3364a180dc8d885ca84d86146a5cd
+      artifact_fingerprint: sha256:6331da840b70d80509b4b2e8d21b1131d6a4fd783cb4a6545037b8cc54bb2023
+      reviewed_at: "2026-06-19T21:05:50Z"
+    - requirement: SW-REQ-019
+      artifact: apidef/health_check.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final parent/component updates. apidef/health_check.go received requirement trace annotations only and matches SW-REQ-019 plus docs/apidef-requirements-evidence.md; focused JSON shape tests passed, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:95935bfe49b3092ccb7ffd8e1c34e075fadbf732a1fbc3b0e8c4e22eac7b4498
+      approval_fingerprint: sha256:2d25b0708318ccf92a87ef5eb8fbdb57eb541b8256940ed8063e868700de3e63
+      artifact_fingerprint: sha256:17b193fd401c862d8c575952b9ef1b8cd5c0fad4ede293336dca79decfcdb034
+      reviewed_at: "2026-06-19T21:17:49Z"
+    - requirement: SW-REQ-022
+      artifact: pkg/identifier/custom.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. pkg/identifier/custom.go received requirement trace annotations only; executable CustomPolicyId behavior is unchanged and is covered by pkg/identifier/custom_test.go plus docs/custom-policy-identifier-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:1451b0a673a152c8ac5bd17c9d5211c89e508c7663da8c700e276c487f99247b
+      approval_fingerprint: sha256:e0da3c1795aaeb7d2970325eccd386ae442aba992cfa378f8d4ae9357f8c44b7
+      artifact_fingerprint: sha256:a47df7de44e3ac9a4d393d14e1a1bc686fbf273f49d7dd8e7c27cb1f5c06ebe0
+      reviewed_at: "2026-06-19T21:32:07Z"
+    - requirement: SW-REQ-023
+      artifact: request/real_ip.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. request/real_ip.go received requirement trace annotations only; executable RealIP behavior is unchanged and is covered by request/real_ip_test.go plus docs/request-identity-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:9b148819ede974731e25e371bce785295ba720055130d53257c1256c6b1bdc06
+      approval_fingerprint: sha256:186e26b3a782ab82ac5d0819901d053da98791e8d8dadd7c94e48d52bacc742c
+      artifact_fingerprint: sha256:94957125126b13fbb2bacdcb1bd5c469a1e251f3f50c47ebf65a4355d206cb06
+      reviewed_at: "2026-06-19T21:40:31Z"
+    - requirement: SW-REQ-024
+      artifact: internal/jsonrpc/errors/mapper.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/jsonrpc/errors production files received requirement trace annotations only; executable mapper/writer behavior is unchanged and is covered by internal/jsonrpc/errors tests plus docs/jsonrpc-error-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:3f61c2bc25939850bcb9730849fe86b1e9e5e693da257ce901ea1f4b7d8aa129
+      approval_fingerprint: sha256:91f790ac0ed04284c69bea291aa6e22dd0cd2ae4dccff682be9e31966a9a14f8
+      artifact_fingerprint: sha256:008bc975f782001404fc89b31ea6f329ed1873a70c2bbe51455720f458730e3c
+      reviewed_at: "2026-06-19T21:52:48Z"
+    - requirement: SW-REQ-024
+      artifact: internal/jsonrpc/errors/writer.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/jsonrpc/errors production files received requirement trace annotations only; executable mapper/writer behavior is unchanged and is covered by internal/jsonrpc/errors tests plus docs/jsonrpc-error-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:3f61c2bc25939850bcb9730849fe86b1e9e5e693da257ce901ea1f4b7d8aa129
+      approval_fingerprint: sha256:91f790ac0ed04284c69bea291aa6e22dd0cd2ae4dccff682be9e31966a9a14f8
+      artifact_fingerprint: sha256:439a5c6e3aeea40e0e840f5925e9fda071c6b3128676dc2910a4156c3a3c28ce
+      reviewed_at: "2026-06-19T21:52:48Z"
+    - requirement: SW-REQ-025
+      artifact: internal/mcp/mcp.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP routing production files received requirement trace annotations only; executable prefix, registration, and route-construction behavior is unchanged and is covered by internal/mcp tests plus docs/mcp-protocol-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:584a3d407c972a0b8b81c6cb60fb150fca18e1e0a9f583d4eb474b1f51f6bf3b
+      approval_fingerprint: sha256:1d7677ccc08586180966126f1be4e3ac878ea8b141fc73a45616734b46f700c7
+      artifact_fingerprint: sha256:f5a62987b88aae035a76fa5cabc54c4d42d2ac16c899b4e40a854a7c22b60053
+      reviewed_at: "2026-06-19T22:00:20Z"
+    - requirement: SW-REQ-025
+      artifact: internal/mcp/router.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP routing production files received requirement trace annotations only; executable prefix, registration, and route-construction behavior is unchanged and is covered by internal/mcp tests plus docs/mcp-protocol-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:584a3d407c972a0b8b81c6cb60fb150fca18e1e0a9f583d4eb474b1f51f6bf3b
+      approval_fingerprint: sha256:1d7677ccc08586180966126f1be4e3ac878ea8b141fc73a45616734b46f700c7
+      artifact_fingerprint: sha256:3133ebfd71c537cb6579dfb99ac22fd53cf2e7da916800ec8779c91eb3d048f3
+      reviewed_at: "2026-06-19T22:00:20Z"
+    - requirement: SW-REQ-026
+      artifact: internal/mcp/list_filter.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP list-filter production file received requirement trace annotations only; executable list filtering and access-rule behavior is unchanged and is covered by internal/mcp tests plus docs/mcp-protocol-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:37a1dc0e1ff1cbacebf764c9e552666718b57662db5c9bbb5707197fa837c577
+      approval_fingerprint: sha256:715917eef30c708c80266b3a456a0180038f4f18fb7fc5ccfe63db0bb782839e
+      artifact_fingerprint: sha256:a47da6b6de2bbfa2ddebcbd0f4e913660b0b34c520372c85a83e7e694452fc05
+      reviewed_at: "2026-06-19T22:00:20Z"
+    - requirement: SW-REQ-027
+      artifact: internal/agentprotocol/vem.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/agentprotocol/vem.go received requirement trace annotations only; executable registry behavior is unchanged and is covered by internal/agentprotocol/vem_test.go plus docs/agentprotocol-vem-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:f4bec51b9676ba63ddc012d4dadb1de2a0660cd9140ed04ac38284ffa70e22cc
+      approval_fingerprint: sha256:090ec2dd8b4b39d8cbf52f1aea7993884186271bdacea71fd662807d545b8e09
+      artifact_fingerprint: sha256:193e82f69672f870d86ae966d8c813f930d8e21ec6f4c43f3cd863c3dd3adea8
+      reviewed_at: "2026-06-19T22:05:17Z"
+    - requirement: SW-REQ-028
+      artifact: internal/httpctx/context.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/httpctx production files received requirement trace annotations only; executable request-context behavior is unchanged and is covered by internal/httpctx tests plus docs/httpctx-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:90cfbf7b578f56c399a4b168a503f2d86beb8793c7775228335004c7c421edf4
+      approval_fingerprint: sha256:7cfc5289407352480d7b9488969e117e4d629339940b2c1b4164cf227abbd096
+      artifact_fingerprint: sha256:26c20d22776e32c634e482f01b5dda1581e199d3613fe394706eb3fe72c5700e
+      reviewed_at: "2026-06-19T22:12:39Z"
+    - requirement: SW-REQ-028
+      artifact: internal/httpctx/jsonrpc.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/httpctx production files received requirement trace annotations only; executable request-context behavior is unchanged and is covered by internal/httpctx tests plus docs/httpctx-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:90cfbf7b578f56c399a4b168a503f2d86beb8793c7775228335004c7c421edf4
+      approval_fingerprint: sha256:7cfc5289407352480d7b9488969e117e4d629339940b2c1b4164cf227abbd096
+      artifact_fingerprint: sha256:90d8914c71b02d53a4f98cfd26f86dbe3e03ce3ce63a43a06c9e95b2ae0de536
+      reviewed_at: "2026-06-19T22:12:39Z"
+    - requirement: SW-REQ-028
+      artifact: internal/httpctx/jsonrpc_routing.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/httpctx production files received requirement trace annotations only; executable request-context behavior is unchanged and is covered by internal/httpctx tests plus docs/httpctx-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:90cfbf7b578f56c399a4b168a503f2d86beb8793c7775228335004c7c421edf4
+      approval_fingerprint: sha256:7cfc5289407352480d7b9488969e117e4d629339940b2c1b4164cf227abbd096
+      artifact_fingerprint: sha256:a488b7234241af1c03cf3b7f0cc162ef151b2432118a558798791c6a76bfa863
+      reviewed_at: "2026-06-19T22:12:39Z"
+    - requirement: SW-REQ-028
+      artifact: internal/httpctx/looping.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/httpctx production files received requirement trace annotations only; executable request-context behavior is unchanged and is covered by internal/httpctx tests plus docs/httpctx-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:90cfbf7b578f56c399a4b168a503f2d86beb8793c7775228335004c7c421edf4
+      approval_fingerprint: sha256:7cfc5289407352480d7b9488969e117e4d629339940b2c1b4164cf227abbd096
+      artifact_fingerprint: sha256:bb16dd3b30f4b3223c9d6ab931241b4a0550e6c59b6461c6357f55c52a9ec32e
+      reviewed_at: "2026-06-19T22:12:39Z"
+    - requirement: SW-REQ-029
+      artifact: internal/cache/cache.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/cache production files received requirement trace annotations only; executable cache behavior is unchanged and is covered by internal/cache tests plus docs/cache-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:86b2619ed007905d8569cd357714b74369dfafb0a5e07c243b37c7e084c2b7f7
+      approval_fingerprint: sha256:ac54b455819767d2d80454025afde9681a20b52c19b29377f02be5e6eed723f3
+      artifact_fingerprint: sha256:6083da56f8cd69543e58777c74f2f418b2dd42009b4145f9daef3e9b228d209a
+      reviewed_at: "2026-06-19T22:22:56Z"
+    - requirement: SW-REQ-029
+      artifact: internal/cache/item.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/cache production files received requirement trace annotations only; executable cache behavior is unchanged and is covered by internal/cache tests plus docs/cache-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:86b2619ed007905d8569cd357714b74369dfafb0a5e07c243b37c7e084c2b7f7
+      approval_fingerprint: sha256:ac54b455819767d2d80454025afde9681a20b52c19b29377f02be5e6eed723f3
+      artifact_fingerprint: sha256:0a9c00e244c654c95be8a0d49f7aa502542d0d573acc8852ecb0fa157649033d
+      reviewed_at: "2026-06-19T22:22:56Z"
+    - requirement: SW-REQ-029
+      artifact: internal/cache/janitor.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/cache production files received requirement trace annotations only; executable cache behavior is unchanged and is covered by internal/cache tests plus docs/cache-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:86b2619ed007905d8569cd357714b74369dfafb0a5e07c243b37c7e084c2b7f7
+      approval_fingerprint: sha256:ac54b455819767d2d80454025afde9681a20b52c19b29377f02be5e6eed723f3
+      artifact_fingerprint: sha256:81aa80a261066dcce0faad13f11d2ea0f29fa7af9df3a2bd4ab977550520cbd3
+      reviewed_at: "2026-06-19T22:22:56Z"
+    - requirement: SW-REQ-029
+      artifact: internal/cache/repository.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/cache production files received requirement trace annotations only; executable cache behavior is unchanged and is covered by internal/cache tests plus docs/cache-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:86b2619ed007905d8569cd357714b74369dfafb0a5e07c243b37c7e084c2b7f7
+      approval_fingerprint: sha256:ac54b455819767d2d80454025afde9681a20b52c19b29377f02be5e6eed723f3
+      artifact_fingerprint: sha256:9d9da5e1ffa74f9db5a36b549ec1685c42599444921742c60d3fc12075ae6291
+      reviewed_at: "2026-06-19T22:22:56Z"
+    - requirement: SW-REQ-030
+      artifact: internal/maps/flatten.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/maps production files received requirement trace annotations only; executable map helper behavior is unchanged and is covered by internal/maps tests plus docs/maps-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:7be5110b79c1fac7a10574c3ec24e4a3266a675c1b3cab434327c2b7e86c0a11
+      approval_fingerprint: sha256:0acb805adfa67e738fb7c30e17ef771e36de28f6c7ed15b9ad8074da85b90b33
+      artifact_fingerprint: sha256:39c9aaad343f18a2638f793dd8d2598ee6867107f53032dddf10586281ec3b84
+      reviewed_at: "2026-06-19T22:29:30Z"
+    - requirement: SW-REQ-030
+      artifact: internal/maps/strings.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/maps production files received requirement trace annotations only; executable map helper behavior is unchanged and is covered by internal/maps tests plus docs/maps-requirements-evidence.md, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:7be5110b79c1fac7a10574c3ec24e4a3266a675c1b3cab434327c2b7e86c0a11
+      approval_fingerprint: sha256:0acb805adfa67e738fb7c30e17ef771e36de28f6c7ed15b9ad8074da85b90b33
+      artifact_fingerprint: sha256:5537236680d62e95065f90de971ffac093b4a9e993d07e62c52881fa71f33565
+      reviewed_at: "2026-06-19T22:29:30Z"
+    - requirement: SW-REQ-081
+      artifact: apidef/importer/blueprint.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The blueprint importer implementation intentionally changed to preserve all converted resources and response headers; SW-REQ-081 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence that behavior, so no additional authored requirement/design change is required for this implementation delta.
+      base: origin/master
+      requirement_fingerprint: sha256:7955ef47930e9ba7d4eae8aeb25bf34e7b0218ce2d4d41b1e01f0824fa03c111
+      approval_fingerprint: sha256:782a918435f449d747cc7cbb84ebb160380475618a3309f09d5ba5858c3e983b
+      artifact_fingerprint: sha256:b6d9baa2ad2b36dc013c07e45c38fff8dac4fdf5eaf99a4601ac43de07da4c51
+      reviewed_at: "2026-06-20T05:32:27Z"
+    - requirement: SW-REQ-083
+      artifact: apidef/importer/swagger.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The Swagger importer implementation intentionally changed to provide deterministic path/method conversion order and skip empty whitelist entries; SW-REQ-083 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence that behavior, so no additional authored requirement/design change is required for this implementation delta.
+      base: origin/master
+      requirement_fingerprint: sha256:3d950906ea22940a59a5c62b694cbd4883856baa1d48867eb6287bab05c3c062
+      approval_fingerprint: sha256:d5b7efedfaeec045aaaa1d4b8427f4483a41addf080add5360545a8def034b5b
+      artifact_fingerprint: sha256:21429f614473700797f9a0ccff5b46ca69ea72e55860fc283d52d057894ab6c4
+      reviewed_at: "2026-06-20T05:43:02Z"
+    - requirement: SW-REQ-084
+      artifact: apidef/importer/wsdl.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The WSDL importer implementation intentionally changed to keep parsed binding and selected port state on each importer instance, consume unsupported binding protocol elements, and return controlled errors for empty service sets, missing ports, and missing HTTP operation locations instead of panicking or leaking state; SW-REQ-084 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence that behavior, so no additional authored requirement/design change is required for this implementation delta.
+      base: origin/master
+      requirement_fingerprint: sha256:58f102509cbf8c47ead3c6c4a4ae8a501b65fbb8c82c1c8bd007d7abd4c3c432
+      approval_fingerprint: sha256:883454dcb9f8813b8cb90e02e6db4b465b05de94267f2cd3c07467b3a073a831
+      artifact_fingerprint: sha256:a71d93325d88b16a41d0b9c874d5bb1e0ad63c74c606c6f14fc37f84e17a11d8
+      reviewed_at: "2026-06-20T05:54:09Z"
+    - requirement: SW-REQ-085
+      artifact: apidef/migration.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The apidef/migration.go production delta in this slice adds ReqProof ownership annotations only; SW-REQ-085 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence existing Classic API definition migration helper behavior, so no additional authored requirement/design change is required for this implementation delta.
+      base: origin/master
+      requirement_fingerprint: sha256:2b5429c680ff2cd639ddf39a9cff260b55d8fe370f8e0818d7c7b8943a1b0466
+      approval_fingerprint: sha256:0c54d80386e46feec037dab4cdd7a44b834d272f227b1710b9f7674fa8edb8dd
+      artifact_fingerprint: sha256:138b7bf2ee1494abbfaec01617696c4c27c0e09619fcf6bf56da66969a969624
+      reviewed_at: "2026-06-20T06:04:02Z"
+    - requirement: SW-REQ-086
+      artifact: apidef/notifications.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The apidef/notifications.go production delta in this slice adds ReqProof ownership annotations only; SW-REQ-086 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence existing notification helper behavior, so no additional authored requirement/design change is required for this implementation delta.
+      base: origin/master
+      requirement_fingerprint: sha256:d0980d691279ae593424f34b8651a158800423a929a12cf960465aa93828b132
+      approval_fingerprint: sha256:724b8d8bcd891a5797d28d556d21e4303cce8d735e2075484de00ca9e46d3822
+      artifact_fingerprint: sha256:1f40b6ee9c44cf7eed7034bc697edf084287fe0a6344ef7191c4eb6dfcc3135e
+      reviewed_at: "2026-06-20T06:12:22Z"
+    - requirement: SW-REQ-087
+      artifact: apidef/oas/authentication.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The apidef/oas/authentication.go production delta in this slice adds ReqProof ownership annotations only; SW-REQ-087 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence existing OAS authentication helper behavior, so no additional authored requirement/design change is required for this implementation delta.
+      base: origin/master
+      requirement_fingerprint: sha256:5559a28dd60f0a261ba84ff7a737181c71a388b3fd7f3994b8ec9a670a7a3270
+      approval_fingerprint: sha256:40f4ed1e45debb849eaa652eff55359c4473474de57bc044cae3ce416715d542
+      artifact_fingerprint: sha256:abe9928f7317f6b7b52145434ec547d88d13f2707fabc3362f286be13a25fb31
+      reviewed_at: "2026-06-20T06:22:45Z"
+    - requirement: SW-REQ-088
+      artifact: apidef/oas/default.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The apidef/oas/default.go production delta in this slice adds ReqProof ownership annotations only; SW-REQ-088 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence existing OAS default-extension helper behavior, so no additional authored requirement/design change is required for this implementation delta.
+      base: origin/master
+      requirement_fingerprint: sha256:46e634f3cc3076bf31ad6f0884de6baaa2ce95bd4bfdb1e95baaea2f0a94dd96
+      approval_fingerprint: sha256:c2e7957cdbb5ea8c6792ce4b42b8ab0d73e21c63bd639c921ae0a53fb434a0f3
+      artifact_fingerprint: sha256:b9b1b59e3e75110f6ca2430df26649455f0a95134f3a316b5e25d06a82c15754
+      reviewed_at: "2026-06-20T06:33:39Z"
+    - requirement: SW-REQ-089
+      artifact: apidef/oas/middleware.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The apidef/oas/middleware.go production delta in this slice adds ReqProof ownership annotations only; SW-REQ-089 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence existing OAS middleware helper behavior, so no additional authored requirement/design change is required for this implementation delta.
+      base: origin/master
+      requirement_fingerprint: sha256:92e229078f4031d928fddd1947fdf52e2ff6fb4a54f51a0deffdeb58897e110b
+      approval_fingerprint: sha256:5de815e51329232640a45d90ee7dd3522a4fb7120cc2967de1585be0ed9a60bc
+      artifact_fingerprint: sha256:7cb59a9f005f1b176d5d8528e134a3fa71672b373c2e05e9ea9f223ccd208c87
+      reviewed_at: "2026-06-20T06:49:53Z"
+    - requirement: SW-REQ-090
+      artifact: apidef/oas/oas.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The apidef/oas/oas.go production delta in this slice adds ReqProof ownership annotations only; SW-REQ-090 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence existing OAS root document helper behavior, so no additional authored requirement/design change is required for this implementation delta.
+      base: origin/master
+      requirement_fingerprint: sha256:78d67a4290ee75db4e4f485f6ab07930155707f33849490a1ea19b60a730fd1c
+      approval_fingerprint: sha256:d7094fef52db787ad404a1b1429438489e3ee20902e9b125fe07458b4c29c710
+      artifact_fingerprint: sha256:704e5b0618f51e76a01163d2eecc4d70c9d09d14bd95c119e84bd423a6dbd827
+      reviewed_at: "2026-06-20T07:01:03Z"
+    - requirement: SW-REQ-091
+      artifact: apidef/oas/operation.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The apidef/oas/operation.go production delta in this slice adds ReqProof ownership annotations only; SW-REQ-091 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence existing OAS operation document helper behavior, so no additional authored requirement/design change is required for this implementation delta.
+      base: origin/master
+      requirement_fingerprint: sha256:58f4a4bd57d5e6f7972c0c17a58f6c3e40432ccfb6845e5a40fd1876a9cb8189
+      approval_fingerprint: sha256:4997da35efc4a87227fab57c58e7ae676e261625f3f9dc82c77a1d7bffb2053b
+      artifact_fingerprint: sha256:a7b7a6135660b842eed6d160c34e28c50f4bb0a93650f464562e3778fdd9b119
+      reviewed_at: "2026-06-20T07:12:02Z"
+    - requirement: SW-REQ-092
+      artifact: apidef/oas/security.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in apidef/oas/security.go adds ReqProof ownership annotations only; behavior evidence is provided by apidef/oas/security_reqproof_test.go and the requirement remains scoped to local support-shape conversion without runtime authentication claims.
+      base: origin/master
+      requirement_fingerprint: sha256:fc9bfe016454d2af103191b2a3cbe3d57f07fbb0b1eedc452734951f8e4d91d9
+      approval_fingerprint: sha256:2d3e4d518980266800c43d264b2919e6b11481d725383ce6fb53a2d4e4531ad5
+      artifact_fingerprint: sha256:1eab40b11d5c2536b279f92d235ce7b159abf142070116ca87a624a334e37b7e
+      reviewed_at: "2026-06-20T07:23:06Z"
+    - requirement: SW-REQ-093
+      artifact: apidef/oas/upstream.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in apidef/oas/upstream.go adds ReqProof ownership annotations only; behavior evidence is provided by apidef/oas/upstream_reqproof_test.go and the requirement remains scoped to local upstream support-shape conversion without runtime proxying or upstream execution claims.
+      base: origin/master
+      requirement_fingerprint: sha256:8a6ec076116bd91131522d16b0aeeb9c1bedc4e8857a34fb8e6b3745157252d9
+      approval_fingerprint: sha256:8f67e67706f8d4a5c013f15d3842799c3482889ddb906784493ec4ef0e02d8a0
+      artifact_fingerprint: sha256:590dc21ea9ef92bf336b278113963ceb44c87cf300f24b2c4d1aa2737ab405e2
+      reviewed_at: "2026-06-20T07:31:48Z"
+    - requirement: SW-REQ-094
+      artifact: apidef/streams/bento/schema/generate_bento_config_schema.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in apidef/streams/bento/schema/generate_bento_config_schema.go adds ReqProof ownership annotations only; behavior evidence is provided by apidef/streams/bento/schema/generate_bento_config_schema_reqproof_test.go and the requirement remains scoped to local generator support behavior without stream runtime validation claims.
+      base: origin/master
+      requirement_fingerprint: sha256:459809920e35adb608c4f8199030ec8d4861206aca2462f88d77b8734e7c1305
+      approval_fingerprint: sha256:a7f955cdcc28b654681bb24fd166988fc81264d605dc17239314a1d2839309c3
+      artifact_fingerprint: sha256:98a9e940e21b79c045de6dd3e4e4a19efdea12a8db875fddf1019a1fe626ac8d
+      reviewed_at: "2026-06-20T07:41:10Z"
+    - requirement: SW-REQ-095
+      artifact: apidef/streams/bento/validator.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in apidef/streams/bento/validator.go adds ReqProof ownership annotations only; behavior evidence is provided by apidef/streams/bento/validator_reqproof_test.go and the requirement remains scoped to local validator helper behavior without stream runtime validation claims.
+      base: origin/master
+      requirement_fingerprint: sha256:e1f6e381db838437e1e8f45e9b2369cbdb5e3ab19ce29294ad6c860641d5f8da
+      approval_fingerprint: sha256:e6338a3587a136dfb90dd24146e1162a9fc1d4d46074e9a0a70e13850e8be1b3
+      artifact_fingerprint: sha256:07f7c5e56f3818e3512495be6241b5f0db93faa37d79bee02c824962ea2cac14
+      reviewed_at: "2026-06-20T07:51:34Z"
+    - requirement: SW-REQ-096
+      artifact: apidef/streams/validator.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in apidef/streams/validator.go adds ReqProof ownership annotations only; behavior evidence is provided by apidef/streams/validator_reqproof_test.go and the requirement remains scoped to local Tyk Streams OAS validator helper behavior without stream runtime validation or final client-visible behavior claims.
+      base: origin/master
+      requirement_fingerprint: sha256:5bc56b32ce9eb719968be7dc7cfacd02c7ba10a11b285b2b97f802500f09f881
+      approval_fingerprint: sha256:010559e507a2774d4c67d6604daaedbc4b351bd63aa6565a8efd0aea1141dadf
+      artifact_fingerprint: sha256:36665478e7e9b997d7d638f3c075466c15be43ec953348c7a7ec509b15cc837b
+      reviewed_at: "2026-06-20T08:04:25Z"
+    - requirement: SW-REQ-097
+      artifact: apidef/validator.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in apidef/validator.go adds ReqProof ownership annotations only; behavior evidence is provided by apidef/validator_reqproof_test.go and the requirement remains scoped to local Classic API definition validator helper behavior without gateway admission, runtime auth, upstream execution, load-balancer distribution, GraphQL execution, invalid-index ErrorAt, or final client-visible behavior claims.
+      base: origin/master
+      requirement_fingerprint: sha256:3feb1e597654da9141f65afe300dd3e9af5b154206a840d29e52031bce791091
+      approval_fingerprint: sha256:628576fdef38b5d7a7d4d872a9cb66fe4fd8d297bbe0d3c8ff2b583c8b4664ce
+      artifact_fingerprint: sha256:7e92b8eb65b0a6284dd9cdd2b3e7541741ffdab70fd2d5a1c6378bbca64bbe32
+      reviewed_at: "2026-06-20T08:13:30Z"
+    - requirement: SW-REQ-098
+      artifact: certs/manager.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in certs/manager.go adds ReqProof ownership annotations only; behavior evidence is provided by certs/manager_reqproof_test.go and existing certs package tests. The requirement remains scoped to local certificate manager helper behavior without TLS handshake enforcement, runtime mTLS request authentication, upstream TLS validation, live MDCB availability, external storage durability, certificate expiry monitoring, gateway request admission, or final client-visible behavior claims.
+      base: origin/master
+      requirement_fingerprint: sha256:d49798d7a3398f174ff311e4102fdb79875bbf8106b8a356e34cbcbed14aa86a
+      approval_fingerprint: sha256:62153118fbf22458a1de8438101bf9c3a925c32feebb00c7f2a83a79ba9c4ff9
+      artifact_fingerprint: sha256:10ec5aae289584807ba6e343b4724b5dd22391c8f39efd8b24c9ecf4163d854b
+      reviewed_at: "2026-06-20T08:29:40Z"
+    - requirement: SW-REQ-099
+      artifact: checkup/checkup.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in checkup/checkup.go adds ReqProof ownership annotations only; behavior evidence is provided by checkup/checkup_reqproof_test.go. The requirement remains scoped to local startup checkup helper behavior without OS resource tuning, log transport delivery, operator remediation, gateway request admission, analytics pipeline durability, or final client-visible behavior claims.
+      base: origin/master
+      requirement_fingerprint: sha256:737ac4b045aea1071a418e5cefccc696d1628053c349c53acf0d1499c5e3d6a3
+      approval_fingerprint: sha256:e5d83904d854c85fec02273bd338f87d436a829b90ab9c44c4459b3df4ca5875
+      artifact_fingerprint: sha256:e82622f4dba08b84ac42132bcfee4039b3a771fbcf4bd6869f02153758a1fe69
+      reviewed_at: "2026-06-20T08:48:29Z"
+    - requirement: SW-REQ-100
+      artifact: cli/bundler/bundler.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in cli/bundler/bundler.go adds ReqProof ownership annotations only; behavior evidence is provided by cli/bundler/bundler_test.go. The requirement remains scoped to local CLI plugin bundle construction support without gateway-side signature verification, plugin loading, plugin execution, bundle distribution, persistence, hot reload, or final gateway request behavior claims.
+      base: origin/master
+      requirement_fingerprint: sha256:6304144ac86550425107c265a962c1f9d464f72506410bef3e7449bfaa63bae8
+      approval_fingerprint: sha256:5945a4404ae0eeefcb8674ae268adfad20729fece042885db7efeed27ecad24a
+      artifact_fingerprint: sha256:15f69e7b135d34d52848bdd7161a6e8689c7e6968b99e765f44bd6f80bc45c4f
+      reviewed_at: "2026-06-20T08:59:46Z"
+    - requirement: SW-REQ-101
+      artifact: cli/importer/importer.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in cli/importer/importer.go adds ReqProof ownership annotations only; behavior evidence is provided by cli/importer/importer_reqproof_test.go. The requirement remains scoped to local CLI import command wrapper support without full Blueprint, Swagger, or WSDL conversion correctness, gateway API loading, route generation, request matching, gateway request admission, persistence, analytics, or final client-visible runtime behavior claims.
+      base: origin/master
+      requirement_fingerprint: sha256:d5840349b7a86c3ce4e3ea32a55d08b2f2cf2c7c0c027c167bac44f297003f56
+      approval_fingerprint: sha256:db9dbe6a8845f0ef4e8bf128354c6aef0f9350354dda44126c5ad4e262fd4809
+      artifact_fingerprint: sha256:799c233ad497b9a35c1ea18078a99f5ba5e9656f6fcdc54b614b1a77c855794e
+      reviewed_at: "2026-06-20T09:18:30Z"
+    - requirement: SW-REQ-102
+      artifact: cli/linter/linter.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in cli/linter/linter.go adds ReqProof ownership annotations only; behavior evidence is provided by cli/linter/linter_test.go. The requirement remains scoped to local CLI configuration lint helper support without full gateway configuration semantics, gateway startup behavior, persistence, network binding, analytics, or final client-visible runtime behavior claims.
+      base: origin/master
+      requirement_fingerprint: sha256:ead6d5a274b101f3b83da09bd3bbfdc4b1c924e5a9ae8f0d3ff3fbad7b598080
+      approval_fingerprint: sha256:1afa5052ae9f3445999e32d6885f5c15cae916548724a396ef4ffb52ded2c567
+      artifact_fingerprint: sha256:1bd209610d5d78688912fc247952b99b87dc7f498ecfa300cb5bb95684c41b73
+      reviewed_at: "2026-06-20T09:29:00Z"
+    - requirement: SW-REQ-103
+      artifact: config/config.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in config/config.go adds ReqProof ownership annotations only; behavior evidence is provided by config/config_test.go. The requirement remains scoped to local gateway configuration helper support without full gateway runtime interpretation of every configuration field, network binding, storage connectivity, analytics delivery, tracing export delivery, API loading, request admission, or final client-visible runtime behavior claims.
+      base: origin/master
+      requirement_fingerprint: sha256:8f44d8fd3b7b09cce0172a65da448a9ec738a38f08d87f188cc773603f1f8db5
+      approval_fingerprint: sha256:08a6eed4ff228ca7306fe5027b7fddad0464445b64cdac581bbf62442bb7d900
+      artifact_fingerprint: sha256:fc3d1828d82c0eb9ab612ea3f94c127ef26ed4eae02f35548ac8d616a8e1f585
+      reviewed_at: "2026-06-20T09:43:43Z"
+    - requirement: SW-REQ-104
+      artifact: config/external_service.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in config/external_service.go adds ReqProof ownership annotations only; behavior evidence is provided by config/external_service_test.go. The requirement remains scoped to local external service configuration helper support without proxy transport behavior, certificate loading, TLS handshake enforcement, outbound service connectivity, storage/OAuth/webhook/health/discovery delivery, or final gateway runtime behavior claims.
+      base: origin/master
+      requirement_fingerprint: sha256:a0d12fcd132e029876a9c93bcfce7f8319894b0a03426c889871e84dd815b45a
+      approval_fingerprint: sha256:62c153fa12ac92c824e9ec7f56e3322801ddcae9c2dc17b198be018fe5db89a3
+      artifact_fingerprint: sha256:a7e488035bf215d4baa51f57a3be79a4e2c27aa398663c1947684c313fd1de7a
+      reviewed_at: "2026-06-20T09:50:54Z"
+    - requirement: SW-REQ-105
+      artifact: config/development.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in config/development.go adds ReqProof ownership annotations only; behavior evidence is provided by config/development_test.go under the dev build tag. The requirement remains scoped to local build-tag-specific rate limiter storage selection without rate limiter algorithm behavior, Redis connectivity, distributed storage behavior, gateway request admission, or final client-visible runtime behavior claims.
+      base: origin/master
+      requirement_fingerprint: sha256:51c0e3e5670763eddc79991794a45913b8733d3cfd800aa9abe8b76a9081a518
+      approval_fingerprint: sha256:5ddfea89a4688f9554cfef316f884491c2d5054ab566f4f14f79f3e5bca3d0db
+      artifact_fingerprint: sha256:147f1f2bdea7afc1462bd2781a8d5b6bbfb3c1c5e79338c9ff9364c2eb09ebf1
+      reviewed_at: "2026-06-20T09:59:09Z"
+    - requirement: SW-REQ-105
+      artifact: config/development_off.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in config/development_off.go adds ReqProof ownership annotations only; behavior evidence is provided by config/development_off_test.go under the default non-dev build. The requirement remains scoped to local build-tag-specific rate limiter storage selection without rate limiter algorithm behavior, Redis connectivity, distributed storage behavior, gateway request admission, or final client-visible runtime behavior claims.
+      base: origin/master
+      requirement_fingerprint: sha256:51c0e3e5670763eddc79991794a45913b8733d3cfd800aa9abe8b76a9081a518
+      approval_fingerprint: sha256:5ddfea89a4688f9554cfef316f884491c2d5054ab566f4f14f79f3e5bca3d0db
+      artifact_fingerprint: sha256:131e6b2e40af49f69ba325a030182f195dbc5df5fac1d1e1fddb64f5119abbc6
+      reviewed_at: "2026-06-20T09:59:09Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

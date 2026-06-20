@@ -35,17 +35,6 @@ verification:
         comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-097 is scoped to local apidef/validator.go Classic API definition validator helper behavior: ValidationResult validity/error aggregation, configured validation rule dispatch, default validation rule set exposure, duplicate GraphQL data-source name detection after trimming and case normalization, enabled-auth-source checks for enabled auth mechanisms, IP/CIDR validation for enabled allow/block lists, negative hard-timeout rejection, upstream-auth mode and OAuth authorization-type validation, and load-balancing target checks when load balancing is enabled. Focused apidef validator ReqProof tests passed, including race. This approval does not claim gateway API loading, route generation, request matching, gateway request admission, runtime authentication execution, upstream request execution, load-balancer traffic distribution, GraphQL execution, persistence, analytics, invalid-index ErrorAt behavior, or final client-visible behavior.'
         fingerprint: sha256:628576fdef38b5d7a7d4d872a9cb66fe4fd8d297bbe0d3c8ff2b583c8b4664ce
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-097
-          artifact: apidef/validator.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The production delta in apidef/validator.go adds ReqProof ownership annotations only; behavior evidence is provided by apidef/validator_reqproof_test.go and the requirement remains scoped to local Classic API definition validator helper behavior without gateway admission, runtime auth, upstream execution, load-balancer distribution, GraphQL execution, invalid-index ErrorAt, or final client-visible behavior claims.
-          base: origin/master
-          requirement_fingerprint: sha256:3feb1e597654da9141f65afe300dd3e9af5b154206a840d29e52031bce791091
-          approval_fingerprint: sha256:628576fdef38b5d7a7d4d872a9cb66fe4fd8d297bbe0d3c8ff2b583c8b4664ce
-          artifact_fingerprint: sha256:7e92b8eb65b0a6284dd9cdd2b3e7541741ffdab70fd2d5a1c6378bbca64bbe32
-          reviewed_at: "2026-06-20T08:13:30Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T08:10:46Z"

@@ -44,22 +44,22 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-034-AC-01
           text: Given a repository tyk.conf file, when local configuration asks for a new config, then the discovered file is loaded and the original path is recorded.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-122
         - id: STK-REQ-034-AC-02
           text: Given no discoverable tyk.conf file, when local configuration asks for a new config, then an environment-filled default configuration is returned.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-122
         - id: STK-REQ-034-AC-03
           text: Given default configuration and environment overrides, when local configuration asks for a default-with-env config, then the clone reflects the environment without mutating the package default.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-122
         - id: STK-REQ-034-AC-04
           text: Given storage address fields, when local configuration asks for host addresses, then explicit address lists take precedence, host maps are expanded, and host plus port is used only when no address list or host map is present.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-122
 lifecycle:

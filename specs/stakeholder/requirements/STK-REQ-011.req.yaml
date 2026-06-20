@@ -48,19 +48,16 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-011-AC-01
           text: Given zero, positive, negative, and mixed-unit readable durations, when JSON serialization is requested, then the output is a quoted shorthand string with normalized unit order and zero encoded as "0s".
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-084
         - id: STK-REQ-011-AC-02
           text: Given valid, empty, invalid-duration, and malformed JSON duration input, when JSON parsing is requested, then valid values parse to the intended duration, empty or invalid-duration strings become zero, and malformed JSON returns an error.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-084
         - id: STK-REQ-011-AC-03
           text: Given a readable duration, when seconds, milliseconds, microseconds, or nanoseconds are requested, then the returned value matches the corresponding time.Duration conversion, with seconds rounded down.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-084

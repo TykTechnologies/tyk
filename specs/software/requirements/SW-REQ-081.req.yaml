@@ -35,17 +35,6 @@ verification:
         comment: "Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-081 is scoped to local apidef/importer/blueprint.go Apiary Blueprint importer conversion behavior: JSON load and malformed-input errors, missing resource/resource-group errors, Blueprint resource-to-Classic-version whitelist conversion, preservation of multiple converted resources and response headers, mock versus non-mock method actions, response body/status mapping, HTTP 200 fallback for non-numeric response names, version insertion, and deterministic active keyless API-definition proxy/versioning shape apart from generated API IDs. Focused apidef/importer tests passed and local conversion drift for resource/header preservation was fixed. This approval does not claim API Blueprint specification completeness, semantic validation of Blueprint parameters or schemas, upstream availability, gateway API loading, route generation, request matching, gateway request admission, mock-response middleware execution, persistence, analytics, or final client-visible runtime behavior."
         fingerprint: sha256:782a918435f449d747cc7cbb84ebb160380475618a3309f09d5ba5858c3e983b
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-081
-          artifact: apidef/importer/blueprint.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The blueprint importer implementation intentionally changed to preserve all converted resources and response headers; SW-REQ-081 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence that behavior, so no additional authored requirement/design change is required for this implementation delta.
-          base: origin/master
-          requirement_fingerprint: sha256:7955ef47930e9ba7d4eae8aeb25bf34e7b0218ce2d4d41b1e01f0824fa03c111
-          approval_fingerprint: sha256:782a918435f449d747cc7cbb84ebb160380475618a3309f09d5ba5858c3e983b
-          artifact_fingerprint: sha256:b6d9baa2ad2b36dc013c07e45c38fff8dac4fdf5eaf99a4601ac43de07da4c51
-          reviewed_at: "2026-06-20T05:32:27Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T05:28:50Z"

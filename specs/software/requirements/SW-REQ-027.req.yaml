@@ -34,17 +34,6 @@ verification:
         comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Agent protocol VEM registry requirement is scoped to internal/agentprotocol prefix registration and prefix-based path classification only; focused internal/agentprotocol tests passed. This approval does not claim which gateway components call registration, API definition synthesis, middleware routing, direct-client blocking, or final HTTP status behavior.
         fingerprint: sha256:090ec2dd8b4b39d8cbf52f1aea7993884186271bdacea71fd662807d545b8e09
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-027
-          artifact: internal/agentprotocol/vem.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. internal/agentprotocol/vem.go received requirement trace annotations only; executable registry behavior is unchanged and is covered by internal/agentprotocol/vem_test.go plus docs/agentprotocol-vem-requirements-evidence.md, so no further authored requirement or design text change is needed.
-          base: origin/master
-          requirement_fingerprint: sha256:f4bec51b9676ba63ddc012d4dadb1de2a0660cd9140ed04ac38284ffa70e22cc
-          approval_fingerprint: sha256:090ec2dd8b4b39d8cbf52f1aea7993884186271bdacea71fd662807d545b8e09
-          artifact_fingerprint: sha256:193e82f69672f870d86ae966d8c813f930d8e21ec6f4c43f3cd863c3dd3adea8
-          reviewed_at: "2026-06-19T22:05:17Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T00:00:00Z"

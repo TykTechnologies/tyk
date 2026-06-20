@@ -46,17 +46,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-028-AC-01
           text: Given default or partial configuration input, when local configuration helpers load or write configuration, then documented defaults and supported explicit values are preserved deterministically.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-116
         - id: STK-REQ-028-AC-02
           text: Given multiple configuration files and environment overrides, when local configuration loading runs, then later files and environment values override earlier/default values according to local loader rules.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-116
         - id: STK-REQ-028-AC-03
           text: Given missing files, malformed decoder input, or unsupported tracing configuration shape, when local configuration helpers run, then an explicit local error or warning path is returned.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-116
 lifecycle:

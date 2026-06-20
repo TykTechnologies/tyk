@@ -47,19 +47,16 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-014-AC-01
           text: Given interface enumeration returns IPv4 and IPv6 non-loopback addresses, when address discovery is requested, then those addresses are returned in enumeration order.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-095
         - id: STK-REQ-014-AC-02
           text: Given loopback, non-IPNet, malformed, or non-convertible interface addresses, when address discovery is requested, then those unusable addresses are excluded and no error is returned solely because they were present.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-096
         - id: STK-REQ-014-AC-03
           text: Given interface enumeration fails, when address discovery is requested, then the enumeration error is returned and no discovered addresses are reported.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-097

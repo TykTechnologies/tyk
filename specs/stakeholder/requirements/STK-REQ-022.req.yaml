@@ -47,17 +47,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-022-AC-01
           text: Given nested string-keyed map, slice, array, struct, scalar, boolean, numeric, string, or nil values, when flattening is requested, then the helper returns dotted keys with deterministic string values.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-110
         - id: STK-REQ-022-AC-02
           text: Given unsupported flattened value types or maps with non-string keys, when flattening reaches those values, then the helper reports the unsupported value or panics on the invalid key shape.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-110
         - id: STK-REQ-022-AC-03
           text: Given concurrent string-map readers and writers, when they set and get values, then access remains race-free and lookups report whether keys exist.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-110
 lifecycle:

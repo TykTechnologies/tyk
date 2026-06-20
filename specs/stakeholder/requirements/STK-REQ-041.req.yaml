@@ -46,17 +46,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-041-AC-01
           text: Given TLS cipher metadata or cipher names, when local helpers map or resolve them, then the helper returns the expected local cipher representation or an explicit not-found error.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-129
         - id: STK-REQ-041-AC-02
           text: Given token and hash helper inputs, when local helpers generate, parse, or hash values, then they preserve the documented algorithm-selection, fallback, and field-extraction behavior.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-129
         - id: STK-REQ-041-AC-03
           text: Given certificate or symmetric encryption helper inputs, when local helpers classify certificates, update CA pools, or encrypt/decrypt local strings, then they return the expected local result or explicit empty/error outcome.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-129
 lifecycle:

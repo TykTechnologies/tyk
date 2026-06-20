@@ -43,12 +43,12 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-038-AC-01
           text: Given enterprise code needs to reject an action, when it uses the local enterprise error catalog, then a stable action-not-allowed sentinel is available.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-126
         - id: STK-REQ-038-AC-02
           text: Given the action-not-allowed sentinel, when code compares or renders it, then the sentinel remains non-nil, comparable through errors.Is, and retains its expected message.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-126
 lifecycle:

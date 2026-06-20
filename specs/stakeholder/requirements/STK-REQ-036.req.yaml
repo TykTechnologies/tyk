@@ -43,12 +43,12 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-036-AC-01
           text: Given a dispatcher implementation, when it is used through the local coprocess dispatcher interface, then message dispatch, context-aware dispatch, event dispatch, object dispatch, module loading, middleware cache handling, and reload methods are all available.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-124
         - id: STK-REQ-036-AC-02
           text: Given the local dispatcher interface, when a conforming implementation is compiled, then the method signatures accept the expected coprocess object, context, event byte slice, bundle manifest, and base directory inputs.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-124
 lifecycle:

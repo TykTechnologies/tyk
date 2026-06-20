@@ -47,17 +47,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-023-AC-01
           text: Given valid certificate, certificate-chain/private-key, or public-key PEM material, when certificate lifecycle support stores or parses it, then stable identifiers, encrypted private-key storage, listable certificate/public-key shapes, and metadata are produced.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-111
         - id: STK-REQ-023-AC-02
           text: Given malformed, expired, duplicate, or mismatched certificate material, when certificate lifecycle support processes it, then explicit local errors are returned and invalid material is not accepted as a valid certificate.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-111
         - id: STK-REQ-023-AC-03
           text: Given stored or file-backed certificate and public-key identifiers, when list, raw retrieval, index listing, delete, cache flush, or cert-pool construction is requested, then local storage/cache/index state and fallback decisions are deterministic.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-111
 lifecycle:

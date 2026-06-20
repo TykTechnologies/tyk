@@ -34,17 +34,6 @@ verification:
         comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-086 is scoped to local apidef/notifications.go notification helper behavior: bounded HTTP client construction, notification manager shared-secret and OAuth key-change URL wire fields, empty URL no-op behavior, retry-limit stopping behavior, JSON POST request construction, user-agent/content-type/shared-secret headers, successful send handling, and handled marshal, request-construction, transport, response-body read, and non-200 response failures without panics. Focused apidef notification ReqProof tests passed. This approval does not claim OAuth manager correctness, asynchronous goroutine scheduling, external endpoint availability, durable delivery, retry backoff timing accuracy, log delivery, gateway API loading, route generation, request matching, gateway request admission, authentication execution, persistence, analytics, or final client-visible runtime behavior.'
         fingerprint: sha256:724b8d8bcd891a5797d28d556d21e4303cce8d735e2075484de00ca9e46d3822
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-086
-          artifact: apidef/notifications.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The apidef/notifications.go production delta in this slice adds ReqProof ownership annotations only; SW-REQ-086 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence existing notification helper behavior, so no additional authored requirement/design change is required for this implementation delta.
-          base: origin/master
-          requirement_fingerprint: sha256:d0980d691279ae593424f34b8651a158800423a929a12cf960465aa93828b132
-          approval_fingerprint: sha256:724b8d8bcd891a5797d28d556d21e4303cce8d735e2075484de00ca9e46d3822
-          artifact_fingerprint: sha256:1f40b6ee9c44cf7eed7034bc697edf084287fe0a6344ef7191c4eb6dfcc3135e
-          reviewed_at: "2026-06-20T06:12:22Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T06:10:42Z"

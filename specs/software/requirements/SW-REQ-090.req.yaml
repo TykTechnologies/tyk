@@ -34,17 +34,6 @@ verification:
         comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-090 is scoped to local apidef/oas/oas.go OAS root document helper behavior: x-tyk-api-gateway and x-tyk-streaming extension lifecycle helpers, JSON marshalling and clone behavior, eager typed initialization of lazy extension and security-scheme caches, typed authentication/security-scheme/middleware/operation accessors, local server add/remove/update/replace helpers, validation and normalization coordination for security and protected-resource metadata, Classic API definition migration/fill orchestration defaults, required OpenAPI info/path fields, selected Classic compatibility clearing, and validation-option derivation from OAS configuration. Focused apidef/oas OAS root ReqProof tests passed. This approval does not claim full OpenAPI import/export correctness, OpenAPI specification completeness, gateway API loading, route generation, request matching, request admission, runtime authentication enforcement, runtime middleware execution, upstream availability, persistence backend correctness, analytics, or final client-visible behavior.'
         fingerprint: sha256:d7094fef52db787ad404a1b1429438489e3ee20902e9b125fe07458b4c29c710
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-090
-          artifact: apidef/oas/oas.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The apidef/oas/oas.go production delta in this slice adds ReqProof ownership annotations only; SW-REQ-090 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence existing OAS root document helper behavior, so no additional authored requirement/design change is required for this implementation delta.
-          base: origin/master
-          requirement_fingerprint: sha256:78d67a4290ee75db4e4f485f6ab07930155707f33849490a1ea19b60a730fd1c
-          approval_fingerprint: sha256:d7094fef52db787ad404a1b1429438489e3ee20902e9b125fe07458b4c29c710
-          artifact_fingerprint: sha256:704e5b0618f51e76a01163d2eecc4d70c9d09d14bd95c119e84bd423a6dbd827
-          reviewed_at: "2026-06-20T07:01:03Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T06:58:59Z"

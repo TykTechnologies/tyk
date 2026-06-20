@@ -49,22 +49,22 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-021-AC-01
           text: Given a cache item stored with a non-expired TTL, when the item is retrieved, counted, listed, deleted, flushed, or closed, then the helper returns deterministic in-memory state changes.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-109
         - id: STK-REQ-021-AC-02
           text: Given expired, default-expiration, negative-expiration, or missing cache entries, when cache helpers inspect them, then expired entries are not returned as live items and missing entries return a negative lookup result.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-109
         - id: STK-REQ-021-AC-03
           text: Given a janitor with a cleanup interval, when it runs and is closed sequentially or concurrently, then cleanup is invoked before close and repeated close calls do not panic or deadlock.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-109
         - id: STK-REQ-021-AC-04
           text: Given a DNS cache manager with caching enabled or disabled, when a dial request is wrapped, then disabled caching dials the original address, IP literals bypass cache lookup, malformed host:port input returns an explicit error, cached hostnames are resolved through storage, configured multi-IP strategy determines the selected cached address, and failed cached dials remove the cached host entry.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-109
 lifecycle:

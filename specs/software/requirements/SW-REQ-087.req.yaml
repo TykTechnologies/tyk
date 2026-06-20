@@ -34,17 +34,6 @@ verification:
         comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-087 is scoped to local apidef/oas/authentication.go OAS authentication helper behavior: security-processing mode validation, protected-resource metadata validation/defaulting, aggregate Authentication Fill/ExtractTo shape conversion, supported and unsupported OpenAPI security-scheme import, base identity-provider precedence, auth source/signature/scope mapping, HMAC and OIDC conversion, custom key lifetime and certificate auth conversion, custom plugin authentication and authentication plugin conversion, and ID-extractor configuration conversion. Focused apidef/oas authentication ReqProof tests passed. This approval does not claim OpenAPI security requirement evaluation, gateway authentication enforcement, token validation, certificate validation, HMAC signature verification, OIDC provider execution, custom plugin execution, ID extraction at runtime, full OAS import/export correctness, gateway API loading, route generation, request matching, gateway request admission, persistence, analytics, or final client-visible runtime behavior.'
         fingerprint: sha256:40f4ed1e45debb849eaa652eff55359c4473474de57bc044cae3ce416715d542
         ai_generated: false
-    impact_reviews:
-        - requirement: SW-REQ-087
-          artifact: apidef/oas/authentication.go
-          decision: no-authored-change
-          reviewer: human:buger
-          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. The apidef/oas/authentication.go production delta in this slice adds ReqProof ownership annotations only; SW-REQ-087 and docs/apidef-requirements-evidence.md were authored in this slice to describe and evidence existing OAS authentication helper behavior, so no additional authored requirement/design change is required for this implementation delta.
-          base: origin/master
-          requirement_fingerprint: sha256:5559a28dd60f0a261ba84ff7a737181c71a388b3fd7f3994b8ec9a670a7a3270
-          approval_fingerprint: sha256:40f4ed1e45debb849eaa652eff55359c4473474de57bc044cae3ce416715d542
-          artifact_fingerprint: sha256:abe9928f7317f6b7b52145434ec547d88d13f2707fabc3362f286be13a25fb31
-          reviewed_at: "2026-06-20T06:22:45Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T06:19:24Z"

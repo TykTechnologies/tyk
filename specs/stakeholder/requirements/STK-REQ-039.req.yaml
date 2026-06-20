@@ -47,17 +47,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-039-AC-01
           text: Given an OAS stream extension and request context, when local stream middleware derives stream configuration, then request-scoped variable replacement and stream map extraction complete deterministically.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-127
         - id: STK-REQ-039-AC-02
           text: Given stream HTTP server configuration, when local stream middleware inspects route paths, then default, explicit, broker, and duplicate paths are classified deterministically.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-127
         - id: STK-REQ-039-AC-03
           text: Given unsafe stream components, Bento log lines, lifecycle operations, or analytics defaults, when the local streams package handles them, then unsafe components are filtered unless allow-listed, malformed logs return explicit errors, stream start/stop outcomes are terminal, and missing analytics factories fall back to no-op behavior.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-127
 lifecycle:

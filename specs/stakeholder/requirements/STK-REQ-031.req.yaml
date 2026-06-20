@@ -44,12 +44,12 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-031-AC-01
           text: Given no private OAuth token purge interval, when local configuration asks for the purge interval, then a one-hour default duration is returned.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-119
         - id: STK-REQ-031-AC-02
           text: Given a private OAuth token purge interval in seconds, when local configuration asks for the purge interval, then that configured duration is returned in seconds.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-119
 lifecycle:

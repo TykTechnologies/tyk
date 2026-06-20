@@ -46,17 +46,17 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-020-AC-01
           text: Given typed metadata stored in a request context, when downstream helper code retrieves it with the matching key and type, then the stored value is returned.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-108
         - id: STK-REQ-020-AC-02
           text: Given missing or type-mismatched request-context metadata, when downstream helper code retrieves it, then the helper returns the type zero value without panicking.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-108
         - id: STK-REQ-020-AC-03
           text: Given JSON-RPC request metadata, JSON-RPC routing state, JSON-RPC routing flags, upstream-auth provider state, or self-looping flags stored in a request context, when downstream helper code reads the same request, then it observes the stored state and routing-completion decisions consistently.
-          testable: true
+          verification_method: test
           derived_reqs:
             - SYS-REQ-108
 lifecycle:

@@ -42,26 +42,22 @@ stakeholder:
     acceptance_criteria:
         - id: STK-REQ-008-AC-01
           text: Given valid and invalid policy identifiers, when gateway or policy flows normalize identifiers, then valid identifiers are preserved or derived and invalid identifiers are rejected.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-077
         - id: STK-REQ-008-AC-02
           text: Given policy-store load, lookup, delete, enumeration, and collision-callback operations, when gateway or policy flows request policy inventory data, then lookups and misses return explicit results and enumeration or collision lists represent the expected unordered set of policies or database IDs.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-078
             - SYS-REQ-079
         - id: STK-REQ-008-AC-03
           text: Given merged API inventory construction and tag filtering, when gateway reporting or filtering is requested, then disabled filtering returns all APIs and enabled filtering returns only non-disabled APIs with matching tags.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-080
         - id: STK-REQ-008-AC-04
           text: Given adapter data used by RPC aliases, event metadata, and upstream-auth flows, when those adapters are used, then they preserve the expected data shape or complete without modifying the request.
-          testable: true
           verification_method: test
           derived_reqs:
             - SYS-REQ-081
