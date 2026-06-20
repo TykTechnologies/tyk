@@ -40,6 +40,7 @@ var (
 	defaultVersion string
 )
 
+// SW-REQ-060
 // GetDefinitionsKey returns the key used for definitions in the schema.
 // OAS 3.0 uses "definitions", OAS 3.1+ uses "$defs" (JSON Schema 2020-12).
 // Falls back to "definitions" if neither key is found.
@@ -52,6 +53,7 @@ func GetDefinitionsKey(schemaData []byte) string {
 	return keyDefinitions
 }
 
+// SW-REQ-060
 func loadOASSchema() error {
 	load := func() error {
 		xTykAPIGwSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykAPIGateway))
@@ -118,6 +120,7 @@ func loadOASSchema() error {
 	return err
 }
 
+// SW-REQ-060
 func validateJSON(schema, document []byte) error {
 	schemaLoader := gojsonschema.NewBytesLoader(schema)
 	documentLoader := gojsonschema.NewBytesLoader(document)
@@ -142,6 +145,7 @@ func validateJSON(schema, document []byte) error {
 
 }
 
+// SW-REQ-060
 // ValidateOASObject validates an OAS document against a particular OAS version.
 func ValidateOASObject(documentBody []byte, oasVersion string) error {
 	oasSchema, err := GetOASSchema(oasVersion)
@@ -152,6 +156,7 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 	return validateJSON(oasSchema, documentBody)
 }
 
+// SW-REQ-060
 // ValidateOASTemplate checks a Tyk OAS API template for necessary fields,
 // acknowledging that some standard Tyk OAS API fields are optional in templates.
 func ValidateOASTemplate(documentBody []byte, oasVersion string) error {
@@ -198,6 +203,7 @@ func ValidateOASTemplate(documentBody []byte, oasVersion string) error {
 	return validateJSON(oasSchema, documentBody)
 }
 
+// SW-REQ-060
 // GetOASSchema returns an oas schema for a particular version.
 func GetOASSchema(version string) ([]byte, error) {
 	if err := loadOASSchema(); err != nil {
@@ -221,6 +227,7 @@ func GetOASSchema(version string) ([]byte, error) {
 	return oasSchema, nil
 }
 
+// SW-REQ-060
 func findDefaultVersion(rawVersions []string) string {
 	versions := make([]*pkgver.Version, len(rawVersions))
 	for i, raw := range rawVersions {
@@ -234,6 +241,7 @@ func findDefaultVersion(rawVersions []string) string {
 	return latestMinor
 }
 
+// SW-REQ-060
 func setDefaultVersion() {
 	var versions []string
 	for k := range oasJSONSchemas {
@@ -251,6 +259,7 @@ func setDefaultVersion() {
 	}
 }
 
+// SW-REQ-060
 func getMinorVersion(version string) (string, error) {
 	v, err := pkgver.NewVersion(version)
 	if err != nil {

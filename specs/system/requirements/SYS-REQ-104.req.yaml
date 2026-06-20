@@ -5,14 +5,14 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: the model shall always satisfy !api_definition_support_requested | api_definition_support_shape_preserved
-description: Gateway API definition support model helpers shall preserve typed health-check wire values, deterministic host-list access behavior, error-override matcher/template state, embedded Classic API definition schema data, OAS helper path/server shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example extraction shapes, OAS internal endpoint helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes, OAS deprecated-wrapper conversion shapes, OAS Tyk streaming extension shapes, OAS event-handler helper shapes, OAS server-regeneration helper shapes, custom middleware definition enablement classification, OAS extension header name/value helper shapes, and OAS extension error-override helper shapes so API definition, RPC, and configuration flows can exchange these helper shapes without silent data-shape drift.
+description: Gateway API definition support model helpers shall preserve typed health-check wire values, deterministic host-list access behavior, error-override matcher/template state, embedded Classic API definition schema data, OAS helper path/server shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes, OAS deprecated-wrapper conversion shapes, OAS Tyk streaming extension shapes, OAS event-handler helper shapes, OAS server-regeneration helper shapes, custom middleware definition enablement classification, OAS extension header name/value helper shapes, and OAS extension error-override helper shapes so API definition, RPC, and configuration flows can exchange these helper shapes without silent data-shape drift.
 formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: model
-rationale: This system-level requirement owns small API-definition support helper behavior only. It does not claim API import, full OAS conversion or migration correctness, exhaustive invalid-document validation, schema validation, stream configuration validation, route generation, request matching, gateway request admission, middleware execution, streaming engine execution, event triggering, webhook delivery, JavaScript execution, analytics collection, log emission, internal-looping behavior, final client-visible header, error-response, or routing behavior, mock-response execution, or full API definition lifecycle behavior, which require separate black-box or adapter evidence.
+rationale: This system-level requirement owns small API-definition support helper behavior only. It does not claim API import, full OAS conversion or migration correctness, exhaustive invalid-document validation, completeness of embedded OpenAPI schemas, correctness of upstream schema-validation libraries, stream configuration validation, route generation, request matching, gateway request admission, middleware execution, streaming engine execution, event triggering, webhook delivery, JavaScript execution, analytics collection, log emission, internal-looping behavior, final client-visible header, error-response, validation-response, or routing behavior, mock-response execution, or full API definition lifecycle behavior, which require separate black-box or adapter evidence.
 tags:
     - api-definition
     - oas
@@ -32,23 +32,23 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-20T02:36:38Z"
-        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-059 is scoped to local apidef/oas server-regeneration helper behavior: Tyk-managed absolute and relative server URL generation from custom domains, default gateway hosts, edge endpoints, API tags, hybrid mode, listen paths, and base or child versioning configuration; URL-path, query-parameter, and header-versioned URL shapes; fallback-to-default and external-child direct-access behavior; replacing previously generated Tyk servers while preserving user-provided servers and deduplicating normalized URLs; extracting user-provided servers from mixed server lists; generated invalid server-template error propagation; and deterministic repeated generation. Focused apidef/oas tests passed with race, go vet, and go build. This approval does not claim API import, full OAS conversion, route generation, request matching, gateway request admission, gateway listener binding, edge gateway availability, middleware execution, or final client-visible routing behavior.'
-        fingerprint: sha256:716e8772e88d902e0f7e3eddfe6c38bd9f4619bb11768f23738f309be256124e
+        reviewed_at: "2026-06-20T02:41:36Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-060 is scoped to local apidef/oas embedded-schema loading and validation helper behavior: OAS definitions-key selection, embedded OAS schema loading with Tyk extension schema injection for supported OAS versions, deterministic default schema-version selection, major/minor/patch version resolution, OAS object and template validation, template allowance for intentionally omitted Tyk extension required fields, aggregated malformed-document validation errors, and unsupported or malformed schema-version errors. Focused apidef/oas tests passed with race, go vet, and go build. This approval does not claim correctness of the upstream gojsonschema library, completeness of embedded OpenAPI schemas, API import, route generation, request matching, gateway request admission, persistence, middleware execution, or final client-visible validation responses.'
+        fingerprint: sha256:5224072d00c7cffbef2566e4c68aff9563e2ba1b1410ba377deedd4900b44391
         ai_generated: false
-    gaps_reviewed_at: "2026-06-20T02:36:48.885787Z"
+    gaps_reviewed_at: "2026-06-20T02:41:36.719428Z"
     gaps_reviewed_by: human:buger
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-104|api_definition_support_shape_preserved
           reviewer: human:buger
-          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-104''s api_definition_support_shape_preserved variable is decomposed across the current API-definition support helper children including SW-REQ-059 for local apidef/oas server-regeneration helper behavior: Tyk-managed absolute and relative server URL generation from custom domains, default gateway hosts, edge endpoints, API tags, hybrid mode, listen paths, and base or child versioning configuration; URL-path, query-parameter, and header-versioned URL shapes; fallback-to-default and external-child direct-access behavior; replacement of old generated Tyk servers while preserving user-provided servers; normalized URL deduplication; user-server extraction from mixed lists; invalid generated server-template error propagation; and deterministic repeated generation. This review is limited to these support helpers and does not claim API import, full OAS conversion, route generation, request matching, gateway request admission, gateway listener binding, edge gateway availability, middleware execution, or final client-visible routing behavior.'
-          reviewed_at: "2026-06-20T02:36:48.885787Z"
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SYS-REQ-104''s api_definition_support_shape_preserved variable is decomposed across the current API-definition support helper children including SW-REQ-060 for local apidef/oas validator helper behavior: definitions-key selection, embedded OAS schema loading with Tyk extension injection, default schema-version selection, version resolution, OAS object/template validation, template required-field relaxation, aggregated validation errors, and unsupported or malformed schema-version errors. This review is limited to these support helpers and does not claim correctness of upstream validation libraries, completeness of embedded OpenAPI schemas, API import, route generation, request matching, gateway request admission, persistence, middleware execution, or final client-visible validation responses.'
+          reviewed_at: "2026-06-20T02:41:36.719428Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-19T21:10:22Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-20T02:36:38Z"
+    last_modified_at: "2026-06-20T02:41:36Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -124,4 +124,9 @@ lifecycle:
           from: approved
           to: approved
           reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T02:27:11Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-058 is scoped to local apidef/oas event-handler data-shape and Classic metadata conversion helpers: stable OAS aliases and handler kinds, webhook/JavaScript VM/log handler-specific JSON merge and decode behavior, malformed JSON rejection without receiver mutation, direct Classic config extraction, Fill conversion for supported Classic webhook/JSVM/log handler metadata, unsupported handler skipping, clearing supported OAS handlers when Classic input or OAS input is empty, ExtractTo replacement of supported existing Classic handlers while preserving unsupported existing handlers, and deterministic conversion behavior. Focused apidef/oas tests passed with race, go vet, and go build. This approval does not claim event triggering, webhook delivery, JavaScript execution, log emission, middleware execution, API import, route generation, request matching, gateway request admission, external handler plugin behavior, or final client-visible runtime behavior.")'
+          changed_by: human:buger
+        - date: "2026-06-20T02:41:36Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-20T02:36:38Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-059 is scoped to local apidef/oas server-regeneration helper behavior: Tyk-managed absolute and relative server URL generation from custom domains, default gateway hosts, edge endpoints, API tags, hybrid mode, listen paths, and base or child versioning configuration; URL-path, query-parameter, and header-versioned URL shapes; fallback-to-default and external-child direct-access behavior; replacing previously generated Tyk servers while preserving user-provided servers and deduplicating normalized URLs; extracting user-provided servers from mixed server lists; generated invalid server-template error propagation; and deterministic repeated generation. Focused apidef/oas tests passed with race, go vet, and go build. This approval does not claim API import, full OAS conversion, route generation, request matching, gateway request admission, gateway listener binding, edge gateway availability, middleware execution, or final client-visible routing behavior.")'
           changed_by: human:buger
