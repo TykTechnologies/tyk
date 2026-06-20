@@ -568,6 +568,13 @@ fixed or to hide them from the current strict audit.
   timing, gateway startup orchestration, background job policy, logging
   delivery, or final gateway behavior. It moves the visible production coverage
   baseline from 183/447 to 184/447.
+- `SW-REQ-116` was extended to cover the `pkg/alias/crypto` hash helper
+  compatibility shim with focused table-driven alias-equivalence evidence. This
+  increment is scoped to preserving the local alias relationship to
+  `internal/crypto.HashStr`; it does not claim new cryptographic strength,
+  caller authorization behavior, transport security, secret storage, or final
+  gateway behavior. It moves the visible production coverage baseline from
+  184/447 to 185/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

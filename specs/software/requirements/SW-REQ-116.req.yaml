@@ -5,16 +5,16 @@ priority: shall
 category: security
 req_type: guarantee
 fretish: ""
-description: The internal/crypto package shall preserve local helper behavior for cipher metadata mapping and name resolution, hash algorithm selection and key hashing, token generation and token field parsing, certificate helper classification and CA-pool updates, public-key PEM helper generation, and local encrypt/decrypt helper outcomes, without claiming cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
+description: The crypto helper packages shall preserve local helper behavior for cipher metadata mapping and name resolution, hash algorithm selection and key hashing, hash helper alias equivalence, token generation and token field parsing, certificate helper classification and CA-pool updates, public-key PEM helper generation, and local encrypt/decrypt helper outcomes, without claiming cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
 formalization_strategy: informal
 informal_verification:
     method: unit_tests
-    evidence: internal/crypto/ciphers_test.go; internal/crypto/crypto_reqproof_test.go; internal/crypto/helpers_test.go; docs/crypto-helpers-requirements-evidence.md
+    evidence: internal/crypto/ciphers_test.go; internal/crypto/crypto_reqproof_test.go; internal/crypto/helpers_test.go; pkg/alias/crypto/crypto_reqproof_test.go; docs/crypto-helpers-requirements-evidence.md
     verified: true
 parent: SYS-REQ-129
 component: crypto_helpers
 rationale: >-
-    This software requirement owns local internal/crypto helper mechanics only. It does not claim cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
+    This software requirement owns local crypto helper mechanics in internal/crypto and the compatibility alias package only. It does not claim cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
 tags:
     - crypto
     - security
@@ -33,7 +33,7 @@ verification:
         role: requirements_owner
         reviewed_at: "2026-06-20T12:00:00Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-116 is scoped to local internal/crypto behavior: cipher metadata mapping and name resolution, hash algorithm selection and key hashing, token generation and token field parsing, certificate helper classification and CA-pool updates, public-key PEM helper generation, and local encrypt/decrypt helper outcomes. Focused package tests passed locally. This approval does not claim cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-116 is scoped to local crypto helper behavior: cipher metadata mapping and name resolution, hash algorithm selection and key hashing, hash helper alias equivalence, token generation and token field parsing, certificate helper classification and CA-pool updates, public-key PEM helper generation, and local encrypt/decrypt helper outcomes. Focused package tests passed locally. This approval does not claim cryptographic strength, randomness quality, TLS handshake behavior, certificate trust-store policy, gateway authorization decisions, upstream or downstream transport security, secret storage, or final client-visible gateway behavior.
         ai_generated: false
 history:
     created_by: agent:codex
