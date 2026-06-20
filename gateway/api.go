@@ -2411,10 +2411,12 @@ type NewClientRequest struct {
 	Description       string      `json:"description"`
 }
 
+// SW-REQ-130
 func oauthClientStorageID(clientID string) string {
 	return prefixClient + clientID
 }
 
+// SW-REQ-130
 func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 	var newOauthClient NewClientRequest
 	if err := json.NewDecoder(r.Body).Decode(&newOauthClient); err != nil {
@@ -2580,6 +2582,7 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, http.StatusOK, clientData)
 }
 
+// SW-REQ-130
 func (gw *Gateway) rotateOauthClient(keyName, apiID string) (interface{}, int) {
 	// check API
 	apiSpec := gw.getApiSpec(apiID)
@@ -2632,6 +2635,7 @@ func (gw *Gateway) rotateOauthClient(keyName, apiID string) (interface{}, int) {
 }
 
 // Update Client
+// SW-REQ-130
 func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int) {
 	// read payload
 	var updateClientData NewClientRequest
@@ -2706,6 +2710,7 @@ func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (in
 	return replyData, http.StatusOK
 }
 
+// SW-REQ-130
 func (gw *Gateway) invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 	apiID := r.URL.Query().Get("api_id")
 	if apiID == "" {

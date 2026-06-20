@@ -1557,6 +1557,162 @@ func TestGatewayKeyManagementOrgKeyHelpers(t *testing.T) {
 	assert.Equal(t, apiError("Request malformed"), malformed)
 }
 
+// Verifies: STK-REQ-055, SYS-REQ-143, SW-REQ-130
+// STK-REQ-055:STK-REQ-055-AC-01:acceptance
+// STK-REQ-055:error_handling:negative
+// STK-REQ-055:error_handling:nominal
+// SYS-REQ-143:nominal:nominal
+// SYS-REQ-143:boundary:nominal
+// SYS-REQ-143:error_handling:negative
+// SYS-REQ-143:error_handling:nominal
+// SYS-REQ-143:encoding_safety:nominal
+// SYS-REQ-143:determinism:nominal
+// SW-REQ-130:nominal:nominal
+// SW-REQ-130:boundary:nominal
+// SW-REQ-130:error_handling:negative
+// SW-REQ-130:error_handling:nominal
+// SW-REQ-130:encoding_safety:nominal
+// SW-REQ-130:determinism:nominal
+func TestGatewayOAuthClientManagementHelpers(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	backupSecretCreator := createOauthClientSecret
+	defer func() {
+		createOauthClientSecret = backupSecretCreator
+	}()
+
+	spec := ts.LoadTestOAuthSpec()
+	assert.Equal(t, prefixClient+"client-a", oauthClientStorageID("client-a"))
+
+	createPayload, err := json.Marshal(NewClientRequest{
+		ClientID:          "client-a",
+		ClientRedirectURI: "http://client.example/callback",
+		APIID:             spec.APIID,
+		ClientSecret:      "initial-secret",
+		Description:       "initial description",
+	})
+	require.NoError(t, err)
+
+	rec := httptest.NewRecorder()
+	ts.Gw.createOauthClient(rec, httptest.NewRequest(http.MethodPost, "/tyk/oauth/clients/create", bytes.NewReader(createPayload)))
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var created NewClientRequest
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &created))
+	assert.Equal(t, "client-a", created.ClientID)
+	assert.Equal(t, "initial-secret", created.ClientSecret)
+	assert.Equal(t, "initial description", created.Description)
+
+	stored, err := spec.OAuthManager.Storage().GetExtendedClientNoPrefix(oauthClientStorageID("client-a"))
+	require.NoError(t, err)
+	assert.Equal(t, "client-a", stored.GetId())
+
+	updatePayload, err := json.Marshal(NewClientRequest{
+		ClientRedirectURI: "http://client.example/updated",
+		Description:       "updated description",
+	})
+	require.NoError(t, err)
+
+	updated, code := ts.Gw.updateOauthClient("client-a", spec.APIID, httptest.NewRequest(http.MethodPut, "/tyk/oauth/clients/999999/client-a", bytes.NewReader(updatePayload)))
+
+	require.Equal(t, http.StatusOK, code)
+	updatedClient := updated.(NewClientRequest)
+	assert.Equal(t, "client-a", updatedClient.ClientID)
+	assert.Equal(t, "initial-secret", updatedClient.ClientSecret)
+	assert.Equal(t, "http://client.example/updated", updatedClient.ClientRedirectURI)
+	assert.Equal(t, "updated description", updatedClient.Description)
+
+	createOauthClientSecret = func() string {
+		return "rotated-secret"
+	}
+	rotated, code := ts.Gw.rotateOauthClient("client-a", spec.APIID)
+
+	require.Equal(t, http.StatusOK, code)
+	rotatedClient := rotated.(NewClientRequest)
+	assert.Equal(t, "client-a", rotatedClient.ClientID)
+	assert.Equal(t, "rotated-secret", rotatedClient.ClientSecret)
+	assert.Equal(t, "updated description", rotatedClient.Description)
+
+	for _, tc := range []struct {
+		name string
+		req  *http.Request
+		want int
+		body string
+	}{
+		{
+			name: "missing api parameter",
+			req:  mux.SetURLVars(httptest.NewRequest(http.MethodDelete, "/tyk/oauth/refresh/refresh-a", nil), map[string]string{"keyName": "refresh-a"}),
+			want: http.StatusBadRequest,
+			body: `{"status":"error","message":"Missing parameter api_id"}`,
+		},
+		{
+			name: "unknown api",
+			req:  mux.SetURLVars(httptest.NewRequest(http.MethodDelete, "/tyk/oauth/refresh/refresh-a?api_id=missing-api", nil), map[string]string{"keyName": "refresh-a"}),
+			want: http.StatusNotFound,
+			body: `{"status":"error","message":"API for this refresh token not found"}`,
+		},
+		{
+			name: "accepted refresh delete",
+			req:  mux.SetURLVars(httptest.NewRequest(http.MethodDelete, "/tyk/oauth/refresh/refresh-a?api_id=999999", nil), map[string]string{"keyName": "refresh-a"}),
+			want: http.StatusOK,
+			body: `{"key":"refresh-a","status":"ok","action":"deleted"}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+
+			ts.Gw.invalidateOauthRefresh(rec, tc.req)
+
+			require.Equal(t, tc.want, rec.Code)
+			assert.JSONEq(t, tc.body, rec.Body.String())
+		})
+	}
+
+	errorCases := []struct {
+		name    string
+		call    func() (interface{}, int)
+		want    int
+		wantMsg apiStatusMessage
+	}{
+		{
+			name: "update malformed body",
+			call: func() (interface{}, int) {
+				return ts.Gw.updateOauthClient("client-a", spec.APIID, httptest.NewRequest(http.MethodPut, "/tyk/oauth/clients/999999/client-a", strings.NewReader("{")))
+			},
+			want:    http.StatusInternalServerError,
+			wantMsg: apiError("Unmarshalling failed"),
+		},
+		{
+			name: "rotate missing api",
+			call: func() (interface{}, int) {
+				return ts.Gw.rotateOauthClient("client-a", "missing-api")
+			},
+			want:    http.StatusNotFound,
+			wantMsg: apiError("API doesn't exist"),
+		},
+		{
+			name: "update missing client",
+			call: func() (interface{}, int) {
+				payload, err := json.Marshal(NewClientRequest{Description: "ignored"})
+				require.NoError(t, err)
+				return ts.Gw.updateOauthClient("missing-client", spec.APIID, httptest.NewRequest(http.MethodPut, "/tyk/oauth/clients/999999/missing-client", bytes.NewReader(payload)))
+			},
+			want:    http.StatusNotFound,
+			wantMsg: apiError("OAuth Client ID not found"),
+		},
+	}
+
+	for _, tc := range errorCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, code := tc.call()
+
+			require.Equal(t, tc.want, code)
+			assert.Equal(t, tc.wantMsg, got)
+		})
+	}
+}
+
 // Verifies: STK-REQ-054, SYS-REQ-142, SW-REQ-129
 // STK-REQ-054:STK-REQ-054-AC-01:acceptance
 // SYS-REQ-142:nominal:nominal
