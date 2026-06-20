@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// SW-REQ-073
 type ProxyOnly struct {
 	ApiDefinition   *apidef.APIDefinition
 	HttpClient      *http.Client
@@ -19,6 +20,7 @@ type ProxyOnly struct {
 	subscriptionClientFactory graphqldatasource.GraphQLSubscriptionClientFactory
 }
 
+// SW-REQ-073
 func (p *ProxyOnly) EngineConfig() (*graphql.EngineV2Configuration, error) {
 	var err error
 	if p.Schema == nil {

@@ -28,6 +28,7 @@
 <!-- documents SW-REQ-070 -->
 <!-- documents SW-REQ-071 -->
 <!-- documents SW-REQ-072 -->
+<!-- documents SW-REQ-073 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -48,7 +49,8 @@ name/value helper shapes, OAS extension error-override helper shapes, adapter
 interface and GraphQL utility helper behavior, GraphQL config adapter
 selection behavior, AsyncAPI adapter support-shape generation, and OpenAPI
 adapter support-shape generation, and GraphQL engine adapter utility behavior
-without silent data-shape drift.
+and proxy-only engine adapter configuration behavior without silent
+data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -365,3 +367,19 @@ parse/normalize result propagation; REST or GraphQL upstream availability;
 subscription transport execution; gateway API loading; route generation;
 request matching; gateway request admission; middleware execution; persistence;
 analytics; or final client-visible runtime behavior.
+
+`SW-REQ-073` owns the concrete `apidef/adapter/gqlengineadapter` proxy-only
+engine adapter configuration assembly. Its evidence covers local schema parsing
+when no schema is supplied, caller-supplied schema reuse, proxy request header
+conversion into static upstream headers, internal Tyk URL conversion with the
+internal API header, proxy subscription settings including SSE POST mode,
+caller-supplied HTTP and streaming clients in the datasource factory,
+configured subscription-client factory use, schema-derived datasource and field
+argument configuration, repeated-input determinism, and schema parse error
+propagation. This evidence does not claim GraphQL schema semantic completeness
+beyond local parse/normalize result propagation, correctness of the upstream
+graphql-go-tools proxy config factory, subgraph or federation semantics beyond
+proxy-only configuration shape, GraphQL execution, subscription transport
+execution, REST or GraphQL upstream availability, gateway API loading, route
+generation, request matching, gateway request admission, middleware execution,
+persistence, analytics, or final client-visible runtime behavior.
