@@ -3298,6 +3298,7 @@ func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request
 	doJSONWrite(w, http.StatusOK, apiOk("tokens revoked successfully"))
 }
 
+// SW-REQ-126
 func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqBodyInBytes, oasObj, err := extractOASObjFromReq(r.Body)
@@ -3332,6 +3333,7 @@ func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// SW-REQ-126
 func (gw *Gateway) blockInDashboardMode(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if gw.GetConfig().UseDBAppConfigs {
@@ -3343,6 +3345,7 @@ func (gw *Gateway) blockInDashboardMode(next http.HandlerFunc) http.HandlerFunc 
 	}
 }
 
+// SW-REQ-126
 func (gw *Gateway) makeImportedOASTykAPI(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, oasObj, err := extractOASObjFromReq(r.Body)
