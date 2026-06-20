@@ -45,6 +45,7 @@
 <!-- documents SW-REQ-087 -->
 <!-- documents SW-REQ-088 -->
 <!-- documents SW-REQ-089 -->
+<!-- documents SW-REQ-090 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -59,7 +60,8 @@ conversion behavior, Swagger importer conversion behavior, WSDL importer
 conversion behavior, Classic API definition migration helper behavior,
 notification helper behavior, OAS authentication helper shapes, OAS path/server
 helper shapes, OAS default-extension helper shapes, OAS middleware helper
-shapes, OAS root extension helper shapes, OAS server model helper shapes, OAS URL rewrite helper shapes,
+shapes, OAS root document helper behavior, OAS root extension helper shapes,
+OAS server model helper shapes, OAS URL rewrite helper shapes,
 OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS schema-validation helper behavior, OAS internal endpoint
 helper shapes, OAS endpoint tracking helper shapes, OAS utility helper shapes,
@@ -80,7 +82,8 @@ behavior, and importer source dispatcher behavior, without silent data-shape
 drift, plus Swagger importer conversion behavior and WSDL importer conversion
 behavior, plus Classic API definition migration helper behavior and
 notification helper behavior, plus OAS authentication helper behavior.
-It also includes OAS default-extension and middleware helper behavior.
+It also includes OAS default-extension, middleware, and root document helper
+behavior.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
 shapes. Its evidence covers status and component-type constants, populated JSON
@@ -586,6 +589,20 @@ plugin loading or execution, analytics delivery, traffic-log persistence,
 circuit-breaker runtime behavior, request-size enforcement, MCP JSON-RPC
 execution, gateway API loading, route generation, request admission,
 persistence backend correctness, or final client-visible runtime behavior.
+
+`SW-REQ-090` owns the concrete `apidef/oas/oas.go` root document helpers. Its
+evidence covers x-tyk-api-gateway and x-tyk-streaming extension lifecycle
+helpers, JSON marshalling and clone behavior, eager typed initialization of
+lazy extension and security-scheme caches, typed authentication,
+security-scheme, middleware, and operation accessors, local server
+add/remove/update/replace helpers, validation and normalization coordination,
+required-field defaulting, selected Classic compatibility clearing, and
+validation-option derivation from OAS configuration. This evidence does not
+claim full OpenAPI import/export correctness, OpenAPI specification
+completeness, gateway API loading, route generation, request matching, request
+admission, runtime authentication enforcement, runtime middleware execution,
+upstream availability, persistence backend correctness, analytics, or final
+client-visible behavior.
 
 `SW-REQ-086` owns the concrete `apidef/notifications.go` notification helper.
 Its evidence covers bounded HTTP client construction, notification manager

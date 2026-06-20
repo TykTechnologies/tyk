@@ -169,6 +169,8 @@ project:
             - apidef/oas/default_reqproof_test.go
             - apidef/oas/middleware.go
             - apidef/oas/middleware_reqproof_test.go
+            - apidef/oas/oas.go
+            - apidef/oas/oas_reqproof_test.go
             - apidef/adapter/asyncapi.go
             - apidef/adapter/asyncapi_test.go
             - apidef/adapter/import_adapter.go

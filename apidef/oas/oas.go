@@ -17,6 +17,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
+// SW-REQ-090
 const (
 	// ExtensionTykAPIGateway is the OAS schema key for the Tyk extension.
 	ExtensionTykAPIGateway = "x-tyk-api-gateway"
@@ -32,11 +33,13 @@ const (
 )
 
 // OAS holds the upstream OAS definition as well as adds functionality like custom JSON marshalling.
+// SW-REQ-090
 type OAS struct {
 	openapi3.T
 }
 
 // MarshalJSON implements json.Marshaller.
+// SW-REQ-090
 func (s *OAS) MarshalJSON() ([]byte, error) {
 	if ShouldOmit(s.ExternalDocs) { // for sql case
 		s.ExternalDocs = nil
@@ -70,6 +73,7 @@ func (s *OAS) MarshalJSON() ([]byte, error) {
 }
 
 // Fill fills *OAS definition from apidef.APIDefinition.
+// SW-REQ-090
 func (s *OAS) Fill(api apidef.APIDefinition) {
 	xTykAPIGateway := s.GetTykExtension()
 	if xTykAPIGateway == nil {
@@ -96,6 +100,7 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts *OAS into *apidef.APIDefinition.
+// SW-REQ-090
 func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
 	if s.GetTykExtension() == nil {
 		s.SetTykExtension(&XTykAPIGateway{})
@@ -114,6 +119,7 @@ func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
 	api.VersionData.Versions[Main] = vInfo
 }
 
+// SW-REQ-090
 func (s *OAS) SetTykStreamingExtension(xTykStreaming *XTykStreaming) {
 	if s.Extensions == nil {
 		s.Extensions = make(map[string]interface{})
@@ -122,6 +128,7 @@ func (s *OAS) SetTykStreamingExtension(xTykStreaming *XTykStreaming) {
 	s.Extensions[ExtensionTykStreaming] = xTykStreaming
 }
 
+// SW-REQ-090
 func (s *OAS) GetTykStreamingExtension() *XTykStreaming {
 	if s.Extensions == nil {
 		return nil
@@ -151,6 +158,7 @@ func (s *OAS) GetTykStreamingExtension() *XTykStreaming {
 	return nil
 }
 
+// SW-REQ-090
 func (s *OAS) RemoveTykStreamingExtension() {
 	if s.Extensions == nil {
 		return
@@ -160,6 +168,7 @@ func (s *OAS) RemoveTykStreamingExtension() {
 }
 
 // SetTykExtension populates our OAS schema extension inside *OAS.
+// SW-REQ-090
 func (s *OAS) SetTykExtension(xTykAPIGateway *XTykAPIGateway) {
 	if s.Extensions == nil {
 		s.Extensions = make(map[string]interface{})
@@ -169,6 +178,7 @@ func (s *OAS) SetTykExtension(xTykAPIGateway *XTykAPIGateway) {
 }
 
 // GetTykExtension returns our OAS schema extension from inside *OAS.
+// SW-REQ-090
 func (s *OAS) GetTykExtension() *XTykAPIGateway {
 	if s.Extensions == nil {
 		return nil
@@ -199,6 +209,7 @@ func (s *OAS) GetTykExtension() *XTykAPIGateway {
 }
 
 // RemoveTykExtension clears the Tyk extensions from *OAS.
+// SW-REQ-090
 func (s *OAS) RemoveTykExtension() {
 	if s.Extensions == nil {
 		return
@@ -208,6 +219,7 @@ func (s *OAS) RemoveTykExtension() {
 }
 
 // Clone creates a deep copy of the OAS object and returns a new instance.
+// SW-REQ-090
 func (s *OAS) Clone() (*OAS, error) {
 	return reflect.Clone(s), nil
 }
@@ -219,6 +231,7 @@ func (s *OAS) Clone() (*OAS, error) {
 // lazy initialization by converting map[string]interface{} to typed structs and
 // caching the result. When multiple goroutines do this concurrently, it causes
 // "concurrent map writes" panic.
+// SW-REQ-090
 func (s *OAS) Initialize() {
 	// First, ensure the main Tyk extensions are parsed and cached.
 	// These functions convert raw JSON to typed structs and cache them.
@@ -273,6 +286,7 @@ func (s *OAS) Initialize() {
 	}
 }
 
+// SW-REQ-090
 func (s *OAS) getTykAuthentication() (authentication *Authentication) {
 	if s.GetTykExtension() != nil {
 		authentication = s.GetTykExtension().Server.Authentication
@@ -281,6 +295,7 @@ func (s *OAS) getTykAuthentication() (authentication *Authentication) {
 	return
 }
 
+// SW-REQ-090
 func (s *OAS) getTykTokenAuth(name string) (token *Token) {
 	securityScheme := s.getTykSecurityScheme(name)
 	if securityScheme == nil {
@@ -301,6 +316,7 @@ func (s *OAS) getTykTokenAuth(name string) (token *Token) {
 	return
 }
 
+// SW-REQ-090
 func (s *OAS) getTykJWTAuth(name string) (jwt *JWT) {
 	securityScheme := s.getTykSecurityScheme(name)
 	if securityScheme == nil {
@@ -324,6 +340,7 @@ func (s *OAS) getTykJWTAuth(name string) (jwt *JWT) {
 // getTykBasicAuth retrieves the Basic auth configuration from Tyk extension.
 // It handles both typed (*Basic) and untyped (map[string]interface{}) security schemes.
 // When an untyped scheme is found, it converts it to *Basic and caches the result.
+// SW-REQ-090
 func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
 	securityScheme := s.getTykSecurityScheme(name)
 	if securityScheme == nil {
@@ -344,6 +361,7 @@ func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
 	return
 }
 
+// SW-REQ-090
 func (s *OAS) getTykOAuthAuth(name string) (oauth *OAuth) {
 	securityScheme := s.getTykSecurityScheme(name)
 	if securityScheme == nil {
@@ -364,6 +382,7 @@ func (s *OAS) getTykOAuthAuth(name string) (oauth *OAuth) {
 	return
 }
 
+// SW-REQ-090
 func (s *OAS) getTykExternalOAuthAuth(name string) (externalOAuth *ExternalOAuth) {
 	securityScheme := s.getTykSecurityScheme(name)
 	if securityScheme == nil {
@@ -384,6 +403,7 @@ func (s *OAS) getTykExternalOAuthAuth(name string) (externalOAuth *ExternalOAuth
 	return
 }
 
+// SW-REQ-090
 func (s *OAS) getTykSecuritySchemes() (securitySchemes SecuritySchemes) {
 	if s.getTykAuthentication() != nil {
 		securitySchemes = s.getTykAuthentication().SecuritySchemes
@@ -392,6 +412,7 @@ func (s *OAS) getTykSecuritySchemes() (securitySchemes SecuritySchemes) {
 	return
 }
 
+// SW-REQ-090
 func (s *OAS) getTykSecurityScheme(name string) interface{} {
 	securitySchemes := s.getTykSecuritySchemes()
 	if securitySchemes == nil {
@@ -402,6 +423,7 @@ func (s *OAS) getTykSecurityScheme(name string) interface{} {
 }
 
 // GetTykMiddleware returns middleware section from XTykAPIGateway.
+// SW-REQ-090
 func (s *OAS) GetTykMiddleware() (middleware *Middleware) {
 	if extension := s.GetTykExtension(); extension != nil {
 		middleware = extension.Middleware
@@ -410,6 +432,7 @@ func (s *OAS) GetTykMiddleware() (middleware *Middleware) {
 	return
 }
 
+// SW-REQ-090
 func (s *OAS) getTykOperations() (operations Operations) {
 	if s.GetTykMiddleware() != nil {
 		operations = s.GetTykMiddleware().Operations
@@ -420,6 +443,7 @@ func (s *OAS) getTykOperations() (operations Operations) {
 
 // RemoveServer removes the server from the server list if it's already present.
 // It accepts regex-based server URLs, such as https://{subdomain:[a-z]+}.example.com/{version}
+// SW-REQ-090
 func (s *OAS) RemoveServer(serverUrl string) error {
 	if len(serverUrl) == 0 {
 		return nil
@@ -439,6 +463,7 @@ func (s *OAS) RemoveServer(serverUrl string) error {
 }
 
 // AddServers adds a server into the servers definition if not already present.
+// SW-REQ-090
 func (s *OAS) AddServers(apiURLs ...string) error {
 	apiURLSet := make(map[string]struct{})
 	var newServers openapi3.Servers
@@ -481,6 +506,7 @@ func (s *OAS) AddServers(apiURLs ...string) error {
 }
 
 // UpdateServers sets or updates the first servers URL if it matches oldAPIURL.
+// SW-REQ-090
 func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
 	apiURLContainsNamedRegex := strings.Contains(apiURL, "{") && strings.Contains(apiURL, "}")
 	serverAddedByTyk := len(s.Servers) > 0 && s.Servers[0].URL == oldAPIURL
@@ -505,6 +531,7 @@ func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
 }
 
 // ReplaceServers replaces OAS servers entry having oldAPIURLs with new apiURLs .
+// SW-REQ-090
 func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
 	if len(s.Servers) == 0 && len(apiURLs) == 1 {
 		s.Servers = openapi3.Servers{
@@ -540,6 +567,7 @@ func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
 // For OAS 3.1+ documents, JSON Schema 2020-12 validation is automatically enabled.
 // In addition, it validates Security Requirement section and its requirements by
 // calling OAS.validateSecurity() function.
+// SW-REQ-090
 func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) error {
 	validationOpts := opts
 	if s.T.IsOpenAPI3_1() {
@@ -562,6 +590,7 @@ func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) e
 // and copying fields values necessary to work
 // any logic to ensure the Tyk oas API is backwards compatible with previous versions of the gateway
 // should be placed in here.
+// SW-REQ-090
 func (s *OAS) Normalize() {
 	// copy the values of the new JWT validation
 	jwtConfiguration := s.GetJWTConfiguration()
@@ -572,6 +601,7 @@ func (s *OAS) Normalize() {
 
 // validateSecurity verifies that existing Security Requirement Objects has Security Schemes declared in the Security
 // Schemes under the Components Object. This function closes gap in validation provided by OAS.Validate func.
+// SW-REQ-090
 func (s *OAS) validateSecurity() error {
 	if len(s.Security) == 0 {
 		return nil
@@ -598,6 +628,7 @@ func (s *OAS) validateSecurity() error {
 // validateCompliantModeAuthentication validates that all enabled auth methods in compliant mode
 // are properly configured in security requirements (either OAS security or vendor extension security).
 // This validation only runs when securityProcessingMode is set to "compliant".
+// SW-REQ-090
 func (s *OAS) validateCompliantModeAuthentication() error {
 	tykAuth := s.getTykAuthentication()
 	if tykAuth == nil {
@@ -719,6 +750,7 @@ func (s *OAS) validateCompliantModeAuthentication() error {
 
 // validatePRM validates the Protected Resource Metadata configuration.
 // For non-MCP validation, resource is required when PRM is enabled.
+// SW-REQ-090
 func (s *OAS) validatePRM() error {
 	tykAuth := s.getTykAuthentication()
 	if tykAuth == nil {
@@ -729,6 +761,7 @@ func (s *OAS) validatePRM() error {
 }
 
 // APIDef holds both OAS and Classic forms of an API definition.
+// SW-REQ-090
 type APIDef struct {
 	// OAS contains the OAS API definition.
 	OAS *OAS
@@ -738,6 +771,7 @@ type APIDef struct {
 
 // MigrateAndFillOAS migrates classic APIs to OAS-compatible forms. Then, it fills an OAS with it. To be able to make it
 // a valid OAS, it adds some required fields. It returns base API and its versions if any.
+// SW-REQ-090
 func MigrateAndFillOAS(api *apidef.APIDefinition) (APIDef, []APIDef, error) {
 	baseAPIDef := APIDef{Classic: api}
 
@@ -763,11 +797,13 @@ func MigrateAndFillOAS(api *apidef.APIDefinition) (APIDef, []APIDef, error) {
 	return baseAPIDef, versionAPIDefs, err
 }
 
+// SW-REQ-090
 func NewOASFromClassicAPIDefinition(api *apidef.APIDefinition) (*OAS, error) {
 	var oas OAS
 	return FillOASFromClassicAPIDefinition(api, &oas)
 }
 
+// SW-REQ-090
 func FillOASFromClassicAPIDefinition(api *apidef.APIDefinition, oas *OAS) (*OAS, error) {
 	api.IsOAS = true
 
@@ -792,6 +828,7 @@ func FillOASFromClassicAPIDefinition(api *apidef.APIDefinition, oas *OAS) (*OAS,
 }
 
 // setRequiredFields sets some required fields to make OAS object a valid one.
+// SW-REQ-090
 func (s *OAS) setRequiredFields(name string, versionName string) {
 	s.OpenAPI = DefaultOpenAPI
 	s.Info = &openapi3.Info{
@@ -803,6 +840,7 @@ func (s *OAS) setRequiredFields(name string, versionName string) {
 // clearClassicAPIForSomeFeatures clears some features that will be OAS-only.
 // For example, the new validate request will just be valid for OAS APIs so after migrating from classic API definition
 // the existing feature should be cleared to prevent ValidateJSON middleware interference.
+// SW-REQ-090
 func clearClassicAPIForSomeFeatures(api *apidef.APIDefinition) {
 	if len(api.VersionData.Versions) == 0 {
 		return
@@ -815,6 +853,7 @@ func clearClassicAPIForSomeFeatures(api *apidef.APIDefinition) {
 }
 
 // GetValidationOptionsFromConfig retrieves validation options based on the configuration settings.
+// SW-REQ-090
 func GetValidationOptionsFromConfig(oasConfig config.OASConfig) []openapi3.ValidationOption {
 	var opts []openapi3.ValidationOption
 
