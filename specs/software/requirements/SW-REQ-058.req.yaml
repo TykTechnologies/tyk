@@ -1,0 +1,54 @@
+id: SW-REQ-058
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The apidef/oas event handler helpers shall preserve API-definition support event shapes by exposing stable OAS aliases and handler kinds, merging and decoding webhook, JavaScript VM, and log handler-specific JSON fields, rejecting malformed JSON without mutating the receiver, converting supported Classic webhook, JavaScript VM, and log handler metadata to and from OAS event-handler shapes with Disabled/Enabled inversion and path, method, header, timeout, name, ID, function, script, and log-prefix fields preserved, skipping unsupported handler kinds, clearing supported OAS handlers when Classic input or OAS input is empty, replacing supported existing Classic handlers while preserving unsupported existing handlers, and producing deterministic repeated conversion behavior.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: apidef/oas/event_reqproof_test.go; docs/apidef-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-104
+component: model
+rationale: This software requirement owns only the local apidef/oas event-handler data-shape and Classic metadata conversion helpers. It does not claim event triggering, webhook delivery, JavaScript execution, log emission, middleware execution, API import, route generation, request matching, gateway request admission, external handler plugin behavior, or final client-visible runtime behavior.
+tags:
+    - api-definition
+    - oas
+    - events
+    - model
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-104
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T02:27:11Z"
+        comment: "Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. SW-REQ-058 is scoped to local apidef/oas event-handler data-shape and Classic metadata conversion helpers: stable OAS aliases and handler kinds, webhook/JavaScript VM/log handler-specific JSON merge and decode behavior, malformed JSON rejection without receiver mutation, direct Classic config extraction, Fill conversion for supported Classic webhook/JSVM/log handler metadata, unsupported handler skipping, clearing supported OAS handlers when Classic input or OAS input is empty, ExtractTo replacement of supported existing Classic handlers while preserving unsupported existing handlers, and deterministic conversion behavior. Focused apidef/oas tests passed with race, go vet, and go build. This approval does not claim event triggering, webhook delivery, JavaScript execution, log emission, middleware execution, API import, route generation, request matching, gateway request admission, external handler plugin behavior, or final client-visible runtime behavior."
+        fingerprint: sha256:0ccfd719968041fc31bbac2ae5d749a92e1a28b3248a690e8cb11b672746a27d
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T02:27:12Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added apidef/oas event-handler shape mapping decomposition under API-definition support model behavior.
+          changed_by: agent:codex

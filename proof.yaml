@@ -156,6 +156,8 @@ project:
             - apidef/oas/error_overrides_reqproof_test.go
             - apidef/oas/example.go
             - apidef/oas/example_reqproof_test.go
+            - apidef/oas/event.go
+            - apidef/oas/event_reqproof_test.go
             - apidef/oas/header.go
             - apidef/oas/header_test.go
             - apidef/oas/internal.go

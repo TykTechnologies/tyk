@@ -16,6 +16,7 @@
 <!-- documents SW-REQ-055 -->
 <!-- documents SW-REQ-056 -->
 <!-- documents SW-REQ-057 -->
+<!-- documents SW-REQ-058 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -28,9 +29,9 @@ state, embedded Classic API definition schema data, OAS path/server helper
 shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS internal endpoint helper shapes, OAS endpoint tracking
 helper shapes, OAS utility helper shapes, OAS deprecated-wrapper conversion
-shapes, OAS Tyk streaming extension shape, custom middleware definition
-enablement classification, OAS extension header name/value helper shapes, and
-OAS extension error-override helper shapes without silent
+shapes, OAS Tyk streaming extension shape, OAS event-handler helper shapes,
+custom middleware definition enablement classification, OAS extension header
+name/value helper shapes, and OAS extension error-override helper shapes without silent
 data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
@@ -174,3 +175,17 @@ evidence does not claim extension attachment or removal lifecycle behavior,
 streaming engine execution, stream configuration validation, API import, route
 generation, request matching, gateway request admission, middleware execution,
 or final client-visible runtime behavior.
+
+`SW-REQ-058` owns the concrete `apidef/oas` event-handler data-shape and
+Classic metadata conversion helpers. Its evidence covers stable event kind
+aliases, webhook, JavaScript VM, and log-specific JSON merge/decode behavior,
+malformed JSON rejection without receiver mutation, direct Classic configuration
+extraction for supported handler types, Classic Fill behavior for webhook,
+JavaScript VM, and log metadata, unsupported handler skipping, clearing OAS
+handlers when Classic input or OAS input is empty, ExtractTo replacement of
+supported existing Classic handlers while preserving unsupported existing handlers, and
+deterministic repeated conversion behavior. This evidence does not claim event
+triggering, webhook delivery, JavaScript execution, log emission, middleware
+execution, API import, route generation, request matching, gateway request
+admission, external handler plugin behavior, or final client-visible runtime
+behavior.

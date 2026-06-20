@@ -10,9 +10,11 @@ import (
 	"github.com/TykTechnologies/tyk/internal/time"
 )
 
+// SW-REQ-058
 // Kind is an alias maintained to be used in imports.
 type Kind = event.Kind
 
+// SW-REQ-058
 // WebhookKind is an alias maintained to be used in imports.
 const (
 	WebhookKind = event.WebhookKind
@@ -20,6 +22,7 @@ const (
 	LogKind     = event.LogKind
 )
 
+// SW-REQ-058
 // EventHandler holds information about individual event to be configured on the API.
 type EventHandler struct {
 	// Enabled enables the event handler.
@@ -53,6 +56,7 @@ type EventHandler struct {
 	LogEvent LogEvent `bson:"-" json:"-"`
 }
 
+// SW-REQ-058
 // MarshalJSON marshals EventHandler as per Tyk OAS API definition contract.
 func (e EventHandler) MarshalJSON() ([]byte, error) {
 	type helperEventHandler EventHandler
@@ -89,6 +93,7 @@ func (e EventHandler) MarshalJSON() ([]byte, error) {
 	return json.Marshal(outMapVal)
 }
 
+// SW-REQ-058
 // UnmarshalJSON unmarshal EventHandler as per Tyk OAS API definition contract.
 func (e *EventHandler) UnmarshalJSON(in []byte) error {
 	type helperEventHandler EventHandler
@@ -116,6 +121,7 @@ func (e *EventHandler) UnmarshalJSON(in []byte) error {
 	return nil
 }
 
+// SW-REQ-058
 // WebhookEvent stores the core information about a webhook event.
 type WebhookEvent struct {
 	// URL is the target URL for the webhook.
@@ -155,6 +161,7 @@ type WebhookEvent struct {
 	Headers Headers `json:"headers,omitempty" bson:"headers,omitempty"`
 }
 
+// SW-REQ-058
 // GetWebhookConf converts EventHandler.WebhookEvent apidef.WebHookHandlerConf.
 func (e *EventHandler) GetWebhookConf() apidef.WebHookHandlerConf {
 	return apidef.WebHookHandlerConf{
@@ -169,6 +176,7 @@ func (e *EventHandler) GetWebhookConf() apidef.WebHookHandlerConf {
 	}
 }
 
+// SW-REQ-058
 // JSVMEvent represents a JavaScript VM event configuration for event handlers.
 type JSVMEvent struct {
 	// FunctionName specifies the JavaScript function name to be executed.
@@ -181,6 +189,7 @@ type JSVMEvent struct {
 	Path string `json:"path" bson:"path"`
 }
 
+// SW-REQ-058
 // GetJSVMEventHandlerConf generates the JavaScript VM event handler configuration using the current EventHandler instance.
 func (e *EventHandler) GetJSVMEventHandlerConf() apidef.JSVMEventHandlerConf {
 	return apidef.JSVMEventHandlerConf{
@@ -191,6 +200,7 @@ func (e *EventHandler) GetJSVMEventHandlerConf() apidef.JSVMEventHandlerConf {
 	}
 }
 
+// SW-REQ-058
 // LogEvent represents the configuration for logging events within an event handler.
 type LogEvent struct {
 	// LogPrefix defines the prefix used for log messages in the logging event.
@@ -199,6 +209,7 @@ type LogEvent struct {
 	LogPrefix string `json:"logPrefix" bson:"logPrefix"`
 }
 
+// SW-REQ-058
 // GetLogEventHandlerConf creates and returns a LogEventHandlerConf based on the current EventHandler configuration.
 func (e *EventHandler) GetLogEventHandlerConf() apidef.LogEventHandlerConf {
 	return apidef.LogEventHandlerConf{
@@ -207,9 +218,11 @@ func (e *EventHandler) GetLogEventHandlerConf() apidef.LogEventHandlerConf {
 	}
 }
 
+// SW-REQ-058
 // EventHandlers holds the list of events to be processed for the API.
 type EventHandlers []EventHandler
 
+// SW-REQ-058
 // Fill fills EventHandlers from classic API definition. Currently only webhook and jsvm events are supported.
 func (e *EventHandlers) Fill(api apidef.APIDefinition) {
 	events := EventHandlers{}
@@ -291,6 +304,7 @@ func (e *EventHandlers) Fill(api apidef.APIDefinition) {
 	*e = events
 }
 
+// SW-REQ-058
 // ExtractTo EventHandlers events to apidef.APIDefinition.
 func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
 	if api.EventHandlers.Events == nil {
@@ -350,6 +364,7 @@ func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
+// SW-REQ-058
 func resetOASSupportedEventHandlers(api *apidef.APIDefinition) {
 	// this blocks helps with extracting OAS into APIDefinition.
 	// update this when new event handlers are added to OAS support.
