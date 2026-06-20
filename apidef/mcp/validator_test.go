@@ -16,8 +16,14 @@ func getStrPointer(str string) *string {
 	return &str
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-037
+// STK-REQ-019:nominal:nominal
+// STK-REQ-019:malformed_input:negative
+// SYS-REQ-107:nominal:nominal
+// SYS-REQ-107:malformed_input:negative
+// SW-REQ-037:nominal:nominal
+// SW-REQ-037:malformed_input:negative
 func TestValidateMCPObject(t *testing.T) {
-	t.Parallel()
 
 	validOASObject := oas.OAS{
 		T: openapi3.T{
@@ -62,13 +68,11 @@ func TestValidateMCPObject(t *testing.T) {
 	}
 
 	t.Run("valid MCP object", func(t *testing.T) {
-		t.Parallel()
 		err := ValidateMCPObject(validMCP3Definition, "3.0.3")
 		assert.Nil(t, err)
 	})
 
 	t.Run("valid MCP object with resources", func(t *testing.T) {
-		t.Parallel()
 		mcpWithResources := validOASObject
 		extWithResources := validXTykAPIGateway
 		extWithResources.Middleware = &oas.Middleware{
@@ -93,7 +97,6 @@ func TestValidateMCPObject(t *testing.T) {
 	})
 
 	t.Run("valid MCP object with prompts", func(t *testing.T) {
-		t.Parallel()
 		mcpWithPrompts := validOASObject
 		extWithPrompts := validXTykAPIGateway
 		extWithPrompts.Middleware = &oas.Middleware{
@@ -118,7 +121,6 @@ func TestValidateMCPObject(t *testing.T) {
 	})
 
 	t.Run("valid MCP object with all MCP fields", func(t *testing.T) {
-		t.Parallel()
 		mcpWithAll := validOASObject
 		extWithAll := validXTykAPIGateway
 		extWithAll.Middleware = &oas.Middleware{
@@ -165,7 +167,6 @@ func TestValidateMCPObject(t *testing.T) {
 	}
 
 	t.Run("invalid MCP object", func(t *testing.T) {
-		t.Parallel()
 		err := ValidateMCPObject(invalidMCP3Definition, "3.0.3")
 		expectedErrs := []string{
 			`x-tyk-api-gateway.info.name: Does not match pattern '\S+'`,
@@ -216,7 +217,6 @@ func TestValidateMCPObject(t *testing.T) {
 	}`)
 
 	t.Run("wrong typed MCP object", func(t *testing.T) {
-		t.Parallel()
 		err := ValidateMCPObject(wrongTypedMCPDefinition, "3.0.3")
 		expectedErr := fmt.Sprintf("%s\n%s",
 			"paths./test.get: responses is required",
@@ -225,7 +225,6 @@ func TestValidateMCPObject(t *testing.T) {
 	})
 
 	t.Run("should error when requested mcp schema not found", func(t *testing.T) {
-		t.Parallel()
 		reqOASVersion := "4.0.3"
 		err := ValidateMCPObject(validMCP3Definition, reqOASVersion)
 		expectedErr := fmt.Errorf(mcpSchemaVersionNotFoundFmt, reqOASVersion)
@@ -233,8 +232,11 @@ func TestValidateMCPObject(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-037
+// STK-REQ-019:nominal:nominal
+// SYS-REQ-107:nominal:nominal
+// SW-REQ-037:nominal:nominal
 func TestValidateMCPObject_3_1(t *testing.T) {
-	t.Parallel()
 
 	// Create minimal valid MCP 3.1 document
 	validMCP31Doc := []byte(`{
@@ -282,22 +284,22 @@ func TestValidateMCPObject_3_1(t *testing.T) {
 	}`)
 
 	t.Run("valid MCP 3.1 document with version 3.1.0", func(t *testing.T) {
-		t.Parallel()
 		err := ValidateMCPObject(validMCP31Doc, "3.1.0")
 		assert.NoError(t, err)
 	})
 
 	t.Run("valid MCP 3.1 document with version 3.1", func(t *testing.T) {
-		t.Parallel()
 		err := ValidateMCPObject(validMCP31Doc, "3.1")
 		assert.NoError(t, err)
 	})
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-037
+// STK-REQ-019:nominal:nominal
+// SYS-REQ-107:nominal:nominal
+// SW-REQ-037:nominal:nominal
 func Test_loadMCPSchema(t *testing.T) {
-	t.Parallel()
 	t.Run("load MCP schemas", func(t *testing.T) {
-		t.Parallel()
 		err := loadMCPSchema()
 		assert.Nil(t, err)
 		assert.NotNil(t, mcpJSONSchemas)
@@ -332,40 +334,42 @@ func Test_loadMCPSchema(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-037
+// STK-REQ-019:boundary:boundary
+// SYS-REQ-107:boundary:boundary
+// SW-REQ-037:boundary:boundary
 func TestGetDefinitionsKey(t *testing.T) {
-	t.Parallel()
 
 	t.Run("returns $defs for MCP 3.1 schema", func(t *testing.T) {
-		t.Parallel()
 		schema31 := []byte(`{"$defs": {}, "properties": {}}`)
 		key := GetDefinitionsKey(schema31)
 		assert.Equal(t, "$defs", key)
 	})
 
 	t.Run("returns definitions for MCP 3.0 schema", func(t *testing.T) {
-		t.Parallel()
 		schema30 := []byte(`{"definitions": {}, "properties": {}}`)
 		key := GetDefinitionsKey(schema30)
 		assert.Equal(t, "definitions", key)
 	})
 
 	t.Run("falls back to definitions when neither key exists", func(t *testing.T) {
-		t.Parallel()
 		schemaUnknown := []byte(`{"properties": {}}`)
 		key := GetDefinitionsKey(schemaUnknown)
 		assert.Equal(t, "definitions", key)
 	})
 
 	t.Run("prefers $defs when both keys exist", func(t *testing.T) {
-		t.Parallel()
 		schemaBoth := []byte(`{"$defs": {}, "definitions": {}, "properties": {}}`)
 		key := GetDefinitionsKey(schemaBoth)
 		assert.Equal(t, "$defs", key)
 	})
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-037
+// STK-REQ-019:boundary:boundary
+// SYS-REQ-107:boundary:boundary
+// SW-REQ-037:boundary:boundary
 func Test_findDefaultVersion(t *testing.T) {
-	t.Parallel()
 	t.Run("single version", func(t *testing.T) {
 		rawVersions := []string{"3.0"}
 
@@ -379,6 +383,10 @@ func Test_findDefaultVersion(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-037
+// STK-REQ-019:boundary:boundary
+// SYS-REQ-107:boundary:boundary
+// SW-REQ-037:boundary:boundary
 func Test_setDefaultVersion(t *testing.T) {
 	err := loadMCPSchema()
 	assert.NoError(t, err)
@@ -387,6 +395,13 @@ func Test_setDefaultVersion(t *testing.T) {
 	assert.Equal(t, "3.0", defaultVersion)
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-037
+// STK-REQ-019:nominal:nominal
+// STK-REQ-019:error_handling:negative
+// SYS-REQ-107:nominal:nominal
+// SYS-REQ-107:error_handling:negative
+// SW-REQ-037:nominal:nominal
+// SW-REQ-037:error_handling:negative
 func TestGetMCPSchema(t *testing.T) {
 	err := loadMCPSchema()
 	assert.NoError(t, err)
@@ -447,11 +462,13 @@ func TestGetMCPSchema(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-037
+// STK-REQ-019:nominal:nominal
+// SYS-REQ-107:nominal:nominal
+// SW-REQ-037:nominal:nominal
 func TestValidateMCPObject_WithPRM(t *testing.T) {
-	t.Parallel()
 
 	t.Run("valid MCP object with PRM configuration", func(t *testing.T) {
-		t.Parallel()
 
 		mcpWithPRM := oas.OAS{
 			T: openapi3.T{
@@ -509,8 +526,14 @@ func TestValidateMCPObject_WithPRM(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-037
+// STK-REQ-019:nominal:nominal
+// STK-REQ-019:boundary:boundary
+// SYS-REQ-107:nominal:nominal
+// SYS-REQ-107:boundary:boundary
+// SW-REQ-037:nominal:nominal
+// SW-REQ-037:boundary:boundary
 func TestValidateMCPObject_RestrictedMiddleware(t *testing.T) {
-	t.Parallel()
 
 	buildMCPDoc := func(toolMiddleware string) []byte {
 		return []byte(`{
@@ -542,7 +565,6 @@ func TestValidateMCPObject_RestrictedMiddleware(t *testing.T) {
 	}
 
 	t.Run("allowed fields pass validation", func(t *testing.T) {
-		t.Parallel()
 		doc := buildMCPDoc(`{
 			"allow": {"enabled": true},
 			"rateLimit": {"enabled": true, "rate": 100, "per": "1m"},
@@ -590,7 +612,6 @@ func TestValidateMCPObject_RestrictedMiddleware(t *testing.T) {
 
 	for _, tc := range restrictedFields {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
 			doc := buildMCPDoc(tc.middleware)
 			err := ValidateMCPObject(doc, "3.0.3")
 			assert.NoError(t, err, "Schema should accept %s for forward compatibility", tc.name)
@@ -598,14 +619,16 @@ func TestValidateMCPObject_RestrictedMiddleware(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-037
+// STK-REQ-019:encoding_safety:nominal
+// SYS-REQ-107:encoding_safety:nominal
+// SW-REQ-037:encoding_safety:nominal
 func TestGetMCPSchema_ContainsMCPExtensions(t *testing.T) {
-	t.Parallel()
 
 	err := loadMCPSchema()
 	assert.NoError(t, err)
 
 	t.Run("MCP schema contains x-tyk-api-gateway extension", func(t *testing.T) {
-		t.Parallel()
 		schema, err := GetMCPSchema("3.0")
 		assert.NoError(t, err)
 

@@ -43,6 +43,7 @@ var (
 // GetDefinitionsKey returns the key used for definitions in the schema.
 // OAS 3.0 uses "definitions", OAS 3.1+ uses "$defs" (JSON Schema 2020-12).
 // Falls back to "definitions" if neither key is found.
+// SW-REQ-037
 func GetDefinitionsKey(schemaData []byte) string {
 	// Try to find "$defs" first (OAS 3.1+)
 	if _, _, _, err := jsonparser.Get(schemaData, keyDefs); err == nil {
@@ -52,6 +53,7 @@ func GetDefinitionsKey(schemaData []byte) string {
 	return keyDefinitions
 }
 
+// SW-REQ-037
 func loadMCPSchema() error {
 	load := func() error {
 		// Load x-tyk-api-gateway extension schema
@@ -123,6 +125,7 @@ func loadMCPSchema() error {
 	return err
 }
 
+// SW-REQ-037
 func validateJSON(schema, document []byte) error {
 	schemaLoader := gojsonschema.NewBytesLoader(schema)
 	documentLoader := gojsonschema.NewBytesLoader(document)
@@ -148,6 +151,7 @@ func validateJSON(schema, document []byte) error {
 
 // ValidateMCPObject validates an MCP Proxy document against a particular OAS version.
 // MCP Proxies are OAS-based but with stricter requirements for MCP-specific fields.
+// SW-REQ-037
 func ValidateMCPObject(documentBody []byte, oasVersion string) error {
 	mcpSchema, err := GetMCPSchema(oasVersion)
 	if err != nil {
@@ -158,6 +162,7 @@ func ValidateMCPObject(documentBody []byte, oasVersion string) error {
 }
 
 // GetMCPSchema returns an MCP schema for a particular version.
+// SW-REQ-037
 func GetMCPSchema(version string) ([]byte, error) {
 	if err := loadMCPSchema(); err != nil {
 		return nil, fmt.Errorf("loadMCPSchema failed: %w", err)
@@ -180,6 +185,7 @@ func GetMCPSchema(version string) ([]byte, error) {
 	return mcpSchema, nil
 }
 
+// SW-REQ-037
 func findDefaultVersion(rawVersions []string) string {
 	versions := make([]*pkgver.Version, 0, len(rawVersions))
 	for _, raw := range rawVersions {
@@ -205,6 +211,7 @@ func findDefaultVersion(rawVersions []string) string {
 	return latestMinor
 }
 
+// SW-REQ-037
 func setDefaultVersion() {
 	var versions []string
 	for k := range mcpJSONSchemas {
@@ -222,6 +229,7 @@ func setDefaultVersion() {
 	}
 }
 
+// SW-REQ-037
 func getMinorVersion(version string) (string, error) {
 	v, err := pkgver.NewVersion(version)
 	if err != nil {

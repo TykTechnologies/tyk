@@ -5,19 +5,20 @@ priority: shall
 category: functional
 req_type: guarantee
 fretish: ""
-description: MCP gateway clients shall receive deterministic MCP JSON-RPC routing and list-filtering decisions so tool, resource, prompt, and operation requests are mapped to stable internal VEM paths and list responses expose only items permitted by MCP access-control rules.
+description: MCP gateway clients shall receive deterministic MCP JSON-RPC routing, list-filtering, and MCP API-definition schema-validation decisions so tool, resource, prompt, and operation requests are mapped to stable internal VEM paths, list responses expose only items permitted by MCP access-control rules, and MCP OAS documents are accepted or rejected consistently against the supported embedded schemas.
 formalization_strategy: informal
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: mcp_protocol
-rationale: MCP routing and list filtering influence client-visible protocol behavior and gateway access-control enforcement. This requirement owns the in-process MCP helper decisions only; it does not claim gateway middleware execution, session lookup, analytics, API definition synthesis, network transport behavior, or final HTTP status generation.
+rationale: MCP routing, list filtering, and MCP schema validation influence client-visible protocol behavior, gateway access-control enforcement, and API-definition acceptance. This requirement owns the in-process MCP helper decisions only; it does not claim gateway middleware execution, session lookup, analytics, gateway API loading or API definition synthesis beyond in-process MCP schema validation, network transport behavior, or final HTTP status generation.
 tags:
     - mcp
     - json-rpc
     - vem-routing
     - list-filtering
+    - schema-validation
 variables: []
 traces: {}
 verification:
@@ -27,15 +28,15 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-19T22:00:04Z"
-        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP protocol requirements are scoped to internal/mcp helper behavior for primitive VEM prefix classification and registration, MCP method-to-VEM route construction, parameter validation, access-rule matching, JSON-RPC list filtering, pass-through handling, and envelope re-encoding only; focused internal/mcp tests passed. This approval does not claim gateway middleware sequencing, API definition synthesis, session-right retrieval, analytics, network transport behavior, or final HTTP status generation.
-        fingerprint: sha256:fc338e4eb32ee2f3a6fe74b6eb343a2f9fe50a6f7b2b4709343fe6f92ce4ee8f
+        reviewed_at: "2026-06-20T00:15:40Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP protocol scope now includes apidef/mcp in-process embedded schema loading and validation in addition to internal/mcp routing/list-filtering helpers: supported OAS 3.0/3.1 schema definitions, x-tyk-api-gateway extension injection, version resolution, valid MCP document acceptance, malformed document validation errors, and unsupported/malformed version errors. Focused apidef/mcp tests passed with race after removing unsafe parallelism from shared fixture tests. This approval does not claim gateway API loading, persistence, session-right retrieval, middleware execution, analytics, network transport behavior, schema completeness beyond embedded files under test, or final HTTP status generation.'
+        fingerprint: sha256:535b8b50d986f13df0a1dbd57ed094c358964a446135d369cbf3320239d48cdf
         ai_generated: false
 history:
     created_by: agent:codex
     created_at: "2026-06-20T00:00:00Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-19T22:00:04Z"
+    last_modified_at: "2026-06-20T00:15:40Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -62,6 +63,11 @@ stakeholder:
           testable: true
           derived_reqs:
             - SYS-REQ-107
+        - id: STK-REQ-019-AC-04
+          text: Given MCP OAS documents and requested OAS schema versions, when MCP schema validation is requested, then supported valid documents pass, malformed documents return validation errors, unsupported versions return explicit errors, and supported OAS 3.0 and 3.1 schema-definition keys are selected consistently.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-107
 lifecycle:
     change_history:
         - date: "2026-06-19T22:00:04Z"
@@ -69,3 +75,8 @@ lifecycle:
           to: review
           reason: Ready for delegated requirements-owner review after focused internal/mcp tests passed
           changed_by: agent:codex
+        - date: "2026-06-20T00:15:40Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-19T22:00:04Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP protocol requirements are scoped to internal/mcp helper behavior for primitive VEM prefix classification and registration, MCP method-to-VEM route construction, parameter validation, access-rule matching, JSON-RPC list filtering, pass-through handling, and envelope re-encoding only; focused internal/mcp tests passed. This approval does not claim gateway middleware sequencing, API definition synthesis, session-right retrieval, analytics, network transport behavior, or final HTTP status generation.")'
+          changed_by: human:buger

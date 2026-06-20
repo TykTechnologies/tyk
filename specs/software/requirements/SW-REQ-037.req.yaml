@@ -1,0 +1,54 @@
+id: SW-REQ-037
+version: 1
+status: approved
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The apidef/mcp validator helpers shall load embedded MCP schemas, inject the x-tyk-api-gateway extension into supported OAS schema versions, select definition keys for OAS 3.0 and 3.1 schemas, choose the default MCP schema version, resolve requested major/minor/patch versions, validate MCP OAS documents, return aggregated validation errors for malformed documents, and report explicit errors for unsupported or malformed schema-version requests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: SYS-REQ-107
+component: mcp_protocol
+rationale: This software requirement owns only the in-process MCP schema loading and validation helpers in apidef/mcp. It does not claim gateway API loading, persistence, session-right retrieval, middleware execution, analytics, network transport behavior, schema completeness beyond the embedded files under test, or final HTTP status generation.
+tags:
+    - mcp
+    - api-definition
+    - schema-validation
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-107
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T00:15:40Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. MCP protocol scope now includes apidef/mcp in-process embedded schema loading and validation in addition to internal/mcp routing/list-filtering helpers: supported OAS 3.0/3.1 schema definitions, x-tyk-api-gateway extension injection, version resolution, valid MCP document acceptance, malformed document validation errors, and unsupported/malformed version errors. Focused apidef/mcp tests passed with race after removing unsafe parallelism from shared fixture tests. This approval does not claim gateway API loading, persistence, session-right retrieval, middleware execution, analytics, network transport behavior, schema completeness beyond embedded files under test, or final HTTP status generation.'
+        fingerprint: sha256:08e4849bef2f16d3a003c3e2986a1e877f796099ac5e80227e365eb21b734092
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T00:15:40Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - malformed_input
+    - encoding_safety
+lifecycle:
+    change_history:
+        - date: "2026-06-20T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added MCP API-definition schema validation helper decomposition under existing MCP protocol behavior.
+          changed_by: agent:codex

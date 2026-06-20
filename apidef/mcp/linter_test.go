@@ -9,6 +9,10 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-037
+// STK-REQ-019:nominal:nominal
+// SYS-REQ-107:nominal:nominal
+// SW-REQ-037:nominal:nominal
 func TestXTykAPIGateway_Lint_MCP(t *testing.T) {
 	oasObj := oas.OAS{
 		T: openapi3.T{
