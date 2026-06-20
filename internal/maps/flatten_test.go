@@ -70,6 +70,7 @@ func TestFlatten(t *testing.T) {
 // STK-REQ-022:malformed_input:negative
 // SYS-REQ-110:malformed_input:negative
 // SW-REQ-030:malformed_input:negative
+// MCDC SYS-REQ-110: maps_operation_requested=T, maps_operation_determined=F => FALSE
 func TestFlatten_UnsupportedValue(t *testing.T) {
 	_, err := Flatten(map[string]interface{}{
 		"unsupported": make(chan struct{}),

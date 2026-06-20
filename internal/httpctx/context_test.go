@@ -42,6 +42,7 @@ func TestValue_SetAndGet(t *testing.T) {
 // SYS-REQ-108:boundary:boundary
 // SW-REQ-028:boundary:nominal
 // SW-REQ-028:boundary:boundary
+// MCDC SYS-REQ-108: httpctx_context_metadata_requested=T, httpctx_context_metadata_determined=F => FALSE
 func TestValue_GetWithMissingKey(t *testing.T) {
 	// Define a key and instantiate a new Value with type map[string]any
 	key := "missingKey"
