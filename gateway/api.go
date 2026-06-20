@@ -272,6 +272,7 @@ func addSecureAndCacheHeaders(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// SW-REQ-126
 func allowMethods(next http.HandlerFunc, methods ...string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		for _, method := range methods {
@@ -284,6 +285,7 @@ func allowMethods(next http.HandlerFunc, methods ...string) http.HandlerFunc {
 	}
 }
 
+// SW-REQ-126
 func (gw *Gateway) getSpecForOrg(orgID string) *APISpec {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
@@ -300,6 +302,7 @@ func (gw *Gateway) getSpecForOrg(orgID string) *APISpec {
 	return nil
 }
 
+// SW-REQ-126
 func (gw *Gateway) getApisIdsForOrg(orgID string) []string {
 	result := []string{}
 

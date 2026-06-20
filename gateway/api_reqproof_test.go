@@ -144,3 +144,101 @@ func TestGatewayControlAPIMethodNotAllowedAndSecureHeaders(t *testing.T) {
 		assert.Equal(t, "0", recorder.Header().Get("Expires"))
 	})
 }
+
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:error_handling:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:error_handling:nominal
+func TestGatewayControlAPIAllowMethods(t *testing.T) {
+	t.Run("allowed method invokes handler", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		called := false
+		handler := allowMethods(func(w http.ResponseWriter, r *http.Request) {
+			called = true
+			w.WriteHeader(http.StatusAccepted)
+		}, http.MethodGet, http.MethodPost)
+
+		handler(recorder, httptest.NewRequest(http.MethodPost, "/tyk", nil))
+
+		require.True(t, called)
+		assert.Equal(t, http.StatusAccepted, recorder.Code)
+	})
+
+	t.Run("unsupported method returns json error", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		handler := allowMethods(func(w http.ResponseWriter, r *http.Request) {
+			t.Fatal("handler should not be called")
+		}, http.MethodGet)
+
+		handler(recorder, httptest.NewRequest(http.MethodDelete, "/tyk", nil))
+
+		require.Equal(t, http.StatusMethodNotAllowed, recorder.Code)
+		assert.JSONEq(t, `{"status":"error","message":"Method not supported"}`, recorder.Body.String())
+	})
+}
+
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:determinism:nominal
+func TestGatewayControlAPIOrgLookupHelpers(t *testing.T) {
+	specs := BuildAPI(
+		func(spec *APISpec) {
+			spec.APIID = "api-a"
+			spec.OrgID = "org-a"
+		},
+		func(spec *APISpec) {
+			spec.APIID = "api-b"
+			spec.OrgID = "org-b"
+		},
+		func(spec *APISpec) {
+			spec.APIID = "api-c"
+			spec.OrgID = "org-a"
+		},
+	)
+	gw := &Gateway{
+		apisByID: map[string]*APISpec{
+			"api-a": specs[0],
+			"api-b": specs[1],
+			"api-c": specs[2],
+		},
+	}
+
+	t.Run("get spec for matching org", func(t *testing.T) {
+		spec := gw.getSpecForOrg("org-b")
+
+		require.NotNil(t, spec)
+		assert.Equal(t, "api-b", spec.APIID)
+	})
+
+	t.Run("get spec falls back when org missing", func(t *testing.T) {
+		spec := gw.getSpecForOrg("missing-org")
+
+		require.NotNil(t, spec)
+		assert.Contains(t, []string{"api-a", "api-b", "api-c"}, spec.APIID)
+	})
+
+	t.Run("get spec returns nil with no apis", func(t *testing.T) {
+		empty := &Gateway{apisByID: map[string]*APISpec{}}
+
+		assert.Nil(t, empty.getSpecForOrg("org-a"))
+	})
+
+	t.Run("list api ids for org", func(t *testing.T) {
+		ids := gw.getApisIdsForOrg("org-a")
+
+		assert.ElementsMatch(t, []string{"api-a", "api-c"}, ids)
+	})
+
+	t.Run("list all api ids", func(t *testing.T) {
+		ids := gw.getApisIdsForOrg("")
+
+		assert.ElementsMatch(t, []string{"api-a", "api-b", "api-c"}, ids)
+	})
+}

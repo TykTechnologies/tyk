@@ -6,4 +6,4 @@ variables:
     - name: gateway_control_api_operation_terminal
       type: bool
       direction: output
-      description: 'The local gateway control API operation reaches a terminal observable result: success or error status object, JSON response body, JSON export body or delegated error response, method-not-allowed response, secure/cache-control wrapper headers, accepted static mTLS binding validation, explicit certificate-binding validation error, or new-certificate delta result.'
+      description: 'The local gateway control API operation reaches a terminal observable result: success or error status object, JSON response body, JSON export body or delegated error response, method-not-allowed response, secure/cache-control wrapper headers, allowed-method dispatch result, organization API lookup result, API ID listing result, accepted static mTLS binding validation, explicit certificate-binding validation error, or new-certificate delta result.'

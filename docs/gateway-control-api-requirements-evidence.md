@@ -13,6 +13,10 @@ The evidence scope includes:
 - JSON export response writing for successful downloads and non-success
   delegation to the normal JSON writer
 - secure/cache-control header wrapping before control API handler execution
+- allowed-method filtering that either invokes the wrapped handler or returns a
+  method-not-allowed JSON response
+- organization-scoped API lookup and API ID listing helpers, including fallback
+  behavior when no exact organization match exists
 - static mTLS certificate-binding helper validation for empty bindings,
   existing certificate IDs, organization-prefixed certificate IDs, wrong-org
   IDs, path traversal-shaped IDs, and missing certificates
