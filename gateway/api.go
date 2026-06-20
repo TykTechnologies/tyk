@@ -1125,6 +1125,7 @@ func (gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string
 	return gw.GlobalSessionManager.Store().RemoveSortedSetRange(keyName, scoreFrom, scoreTo)
 }
 
+// SW-REQ-129
 func (gw *Gateway) handleGetPolicy(polID string) (interface{}, int) {
 	if pol, ok := gw.policies.PolicyByID(model.NonScopedLastInsertedPolicyId(polID)); ok && pol.ID != "" {
 		return pol, http.StatusOK
@@ -1137,10 +1138,12 @@ func (gw *Gateway) handleGetPolicy(polID string) (interface{}, int) {
 	return apiError("Policy not found"), http.StatusNotFound
 }
 
+// SW-REQ-129
 func (gw *Gateway) handleGetPolicyList() (interface{}, int) {
 	return gw.policies.AsSlice(), http.StatusOK
 }
 
+// SW-REQ-129
 func (gw *Gateway) newPolicyPathRoot() (*osutil.Root, error) {
 	policyPath := gw.GetConfig().Policies.PolicyPath
 
@@ -1151,6 +1154,7 @@ func (gw *Gateway) newPolicyPathRoot() (*osutil.Root, error) {
 	return osutil.NewRoot(policyPath)
 }
 
+// SW-REQ-129
 func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
 	if gw.GetConfig().Policies.PolicySource == "service" {
 		log.Error("Rejected new policy due to PolicySource = service")
@@ -1220,6 +1224,7 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 	return response, http.StatusOK
 }
 
+// SW-REQ-129
 func (gw *Gateway) handleDeletePolicy(polID string) (interface{}, int) {
 	root, err := gw.newPolicyPathRoot()
 

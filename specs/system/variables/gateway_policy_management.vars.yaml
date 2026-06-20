@@ -1,0 +1,9 @@
+component: gateway_policy_management
+no_interface:
+    declared: true
+    reason: The gateway policy management proof slice covers local gateway/api.go helper behavior only; policy engine merge semantics, policy reload propagation, dashboard behavior, distributed synchronization, storage durability, filesystem permissions beyond returned helper errors, and final client-visible gateway authorization behavior are outside this component boundary.
+variables:
+    - name: gateway_policy_management_operation_terminal
+      type: bool
+      direction: output
+      description: 'A local gateway policy management helper operation reaches a terminal observable result: policy lookup returns a policy or explicit not-found status, policy listing returns the loaded policy slice, policy storage root selection returns a root or error, policy add/update returns success or explicit validation/storage error status, or policy deletion returns success or explicit storage error status.'

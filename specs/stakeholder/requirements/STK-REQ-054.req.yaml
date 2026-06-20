@@ -1,0 +1,62 @@
+id: STK-REQ-054
+version: 1
+status: approved
+priority: shall
+category: policy_management
+req_type: guarantee
+fretish: ""
+description: Gateway policy management support shall locally retrieve loaded policies, list loaded policies, choose a configured policy storage root, add or update file-backed policies with explicit malformed-input, invalid-ID, mismatched-ID, service-source, missing-ID, and storage errors, and delete file-backed policies with explicit status handling, without claiming policy engine merge semantics, policy reload propagation, dashboard behavior, distributed synchronization, storage durability, filesystem permissions beyond returned helper errors, or final client-visible gateway authorization behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_policy_management
+rationale: Gateway operators depend on deterministic local policy management helper behavior before broader policy reload and runtime authorization behavior depends on saved policy definitions. This requirement owns only local gateway/api.go helper behavior and tested gateway harness paths.
+tags:
+    - gateway
+    - policy-management
+    - control-api
+variables: []
+traces:
+    reviewed_at: "2026-06-20T20:04:02.164089Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:3b3fc29f0ff36e27ff9506031e89c55f2ae33a53482b1b4638f83c8795b944a8
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T19:58:42Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway policy management scope is limited to local gateway/api.go helper behavior: loaded-policy lookup/listing, policy storage root selection, file-backed policy add/update status handling for malformed input, invalid or mismatched IDs, service policy-source rejection, missing IDs, storage-root errors, successful writes, and file-backed policy deletion status handling. This approval does not claim policy engine merge semantics, policy reload propagation, dashboard behavior, distributed synchronization, storage durability, filesystem permissions beyond returned helper errors, or final client-visible gateway authorization behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T19:58:42Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T19:58:42Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need local policy management helpers to retrieve, list, write, and delete policy definitions predictably before broader reload and runtime behavior depends on those policy files.
+    acceptance_criteria:
+        - id: STK-REQ-054-AC-01
+          text: Given local gateway policy management helper inputs, when policy lookup, listing, storage-root selection, add/update validation, file write, or delete paths are exercised, then deterministic helper outcomes or explicit error statuses are produced for the tested inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-142
+lifecycle:
+    change_history:
+        - date: "2026-06-20T19:58:42Z"
+          from: draft
+          to: approved
+          reason: Added gateway policy management helper requirement.
+          changed_by: human:buger

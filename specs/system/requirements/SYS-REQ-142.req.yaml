@@ -1,0 +1,65 @@
+id: SYS-REQ-142
+version: 1
+status: approved
+priority: shall
+category: policy_management
+req_type: guarantee
+fretish: the gateway_policy_management shall always satisfy gateway_policy_management_operation_terminal
+description: Gateway policy management support shall make local helper operations terminal and deterministic for loaded-policy retrieval and listing, policy storage root selection, file-backed policy add/update validation and storage status handling, service-source rejection, and file-backed policy deletion status handling, without claiming policy engine merge semantics, policy reload propagation, dashboard behavior, distributed synchronization, storage durability, filesystem permissions beyond returned helper errors, or final client-visible gateway authorization behavior.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-054
+component: gateway_policy_management
+rationale: This system requirement owns local gateway policy management helper terminality only. Policy merge semantics, reload propagation, filesystem durability, and gateway authorization outcomes are outside this proof slice.
+tags:
+    - gateway
+    - policy-management
+    - control-api
+variables:
+    - gateway_policy_management_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-054
+    reviewed_at: "2026-06-20T20:02:24.842342Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:4ea8c2a0d33d4d7ee3954adee8c67bd2e28e7616c4a045812039c458311d4913
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T19:58:42Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway policy management system scope is limited to local helper terminality for loaded-policy lookup/listing, policy storage root selection, file-backed policy add/update status handling for malformed input, invalid or mismatched IDs, service policy-source rejection, missing IDs, storage-root errors, successful writes, and file-backed policy deletion status handling. The FRETish invariant intentionally models local operation terminality without asserting policy engine merge semantics, policy reload propagation, dashboard behavior, distributed synchronization, storage durability, filesystem permissions beyond returned helper errors, or final client-visible gateway authorization behavior.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T19:58:42Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-142|gateway_policy_management_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after requirement approval. SYS-REQ-142''s gateway_policy_management_operation_terminal variable is decomposed by SW-REQ-129 for local gateway/api.go helper behavior: loaded-policy lookup/listing, policy storage root selection, file-backed policy add/update status handling for malformed input, invalid or mismatched IDs, service policy-source rejection, missing IDs, storage-root errors, successful writes, and file-backed policy deletion status handling. This review is limited to local helper mechanics and does not claim policy engine merge semantics, policy reload propagation, dashboard behavior, distributed synchronization, storage durability, filesystem permissions beyond returned helper errors, or final client-visible gateway authorization behavior.'
+          reviewed_at: "2026-06-20T19:58:42Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T19:58:42Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T19:58:42Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T19:58:42Z"
+          from: draft
+          to: approved
+          reason: Added gateway policy management system requirement.
+          changed_by: human:buger

@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/pkg/identifier"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -790,4 +791,190 @@ func TestGatewayKeyManagementSortedSetForwarding(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, values)
 	assert.Empty(t, scores)
+}
+
+// Verifies: STK-REQ-054, SYS-REQ-142, SW-REQ-129
+// STK-REQ-054:STK-REQ-054-AC-01:acceptance
+// SYS-REQ-142:nominal:nominal
+// SYS-REQ-142:boundary:nominal
+// SYS-REQ-142:determinism:nominal
+// MCDC SYS-REQ-142: gateway_policy_management_operation_terminal=T => TRUE
+// SW-REQ-129:nominal:nominal
+// SW-REQ-129:boundary:nominal
+// SW-REQ-129:determinism:nominal
+func TestGatewayPolicyManagementLookupAndList(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	missing, code := ts.Gw.handleGetPolicy("missing-policy")
+	require.Equal(t, http.StatusNotFound, code)
+	assert.Equal(t, apiError("Policy not found"), missing)
+
+	policyID := ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "policy-management-lookup"
+	})
+
+	got, code := ts.Gw.handleGetPolicy(policyID)
+
+	require.Equal(t, http.StatusOK, code)
+	policy, ok := got.(user.Policy)
+	require.True(t, ok)
+	assert.Equal(t, policyID, policy.ID)
+
+	list, code := ts.Gw.handleGetPolicyList()
+
+	require.Equal(t, http.StatusOK, code)
+	assert.NotEmpty(t, list)
+
+	conf := ts.Gw.GetConfig()
+	conf.Policies.PolicyPath = ""
+	ts.Gw.SetConfig(conf)
+
+	root, err := ts.Gw.newPolicyPathRoot()
+
+	require.NoError(t, err)
+	assert.NotNil(t, root)
+}
+
+// Verifies: STK-REQ-054, SYS-REQ-142, SW-REQ-129
+// STK-REQ-054:STK-REQ-054-AC-01:acceptance
+// STK-REQ-054:error_handling:negative
+// STK-REQ-054:error_handling:nominal
+// SYS-REQ-142:nominal:nominal
+// SYS-REQ-142:boundary:nominal
+// SYS-REQ-142:error_handling:negative
+// SYS-REQ-142:error_handling:nominal
+// SYS-REQ-142:encoding_safety:nominal
+// SYS-REQ-142:determinism:nominal
+// SW-REQ-129:nominal:nominal
+// SW-REQ-129:boundary:nominal
+// SW-REQ-129:error_handling:negative
+// SW-REQ-129:error_handling:nominal
+// SW-REQ-129:encoding_safety:nominal
+// SW-REQ-129:determinism:nominal
+func TestGatewayPolicyManagementAddOrUpdate(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	policyDir := t.TempDir()
+	conf := ts.Gw.GetConfig()
+	conf.Policies.PolicyPath = policyDir
+	conf.Policies.PolicySource = "file"
+	conf.AllowUnsafePolicyIds = false
+	ts.Gw.SetConfig(conf)
+
+	policy := user.Policy{
+		ID:           "policy-management",
+		Rate:         100,
+		Per:          1,
+		OrgID:        "default",
+		AccessRights: map[string]user.AccessDefinition{},
+	}
+	payload, err := json.Marshal(policy)
+	require.NoError(t, err)
+
+	created, code := ts.Gw.handleAddOrUpdatePolicy("", httptest.NewRequest(http.MethodPost, "/tyk/policies", bytes.NewReader(payload)))
+
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, apiModifyKeySuccess{Key: policy.ID, Status: "ok", Action: "added"}, created)
+	assert.FileExists(t, policyDir+"/"+policy.ID+".json")
+
+	updated, code := ts.Gw.handleAddOrUpdatePolicy(policy.ID, httptest.NewRequest(http.MethodPut, "/tyk/policies/"+policy.ID, bytes.NewReader(payload)))
+
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, apiModifyKeySuccess{Key: policy.ID, Status: "ok", Action: "modified"}, updated)
+
+	malformed, code := ts.Gw.handleAddOrUpdatePolicy("", httptest.NewRequest(http.MethodPost, "/tyk/policies", strings.NewReader("{")))
+	require.Equal(t, http.StatusBadRequest, code)
+	assert.Equal(t, apiError("Request malformed"), malformed)
+
+	missingID, err := json.Marshal(user.Policy{})
+	require.NoError(t, err)
+	rejected, code := ts.Gw.handleAddOrUpdatePolicy("", httptest.NewRequest(http.MethodPost, "/tyk/policies", bytes.NewReader(missingID)))
+	require.Equal(t, http.StatusBadRequest, code)
+	assert.Equal(t, apiError("Unable to create policy without id."), rejected)
+
+	invalidID := policy
+	invalidID.ID = "invalid/id"
+	invalidPayload, err := json.Marshal(invalidID)
+	require.NoError(t, err)
+	rejected, code = ts.Gw.handleAddOrUpdatePolicy("", httptest.NewRequest(http.MethodPost, "/tyk/policies", bytes.NewReader(invalidPayload)))
+	require.Equal(t, http.StatusBadRequest, code)
+	assert.Equal(t, apiError(identifier.ErrInvalidCustomPolicyId.Error()), rejected)
+
+	mismatch := policy
+	mismatch.ID = "body-id"
+	mismatchPayload, err := json.Marshal(mismatch)
+	require.NoError(t, err)
+	rejected, code = ts.Gw.handleAddOrUpdatePolicy("path-id", httptest.NewRequest(http.MethodPut, "/tyk/policies/path-id", bytes.NewReader(mismatchPayload)))
+	require.Equal(t, http.StatusBadRequest, code)
+	assert.Equal(t, apiError("Request ID does not match that in policy! For Update operations these must match."), rejected)
+
+	conf = ts.Gw.GetConfig()
+	conf.Policies.PolicySource = "service"
+	ts.Gw.SetConfig(conf)
+	rejected, code = ts.Gw.handleAddOrUpdatePolicy("", httptest.NewRequest(http.MethodPost, "/tyk/policies", bytes.NewReader(payload)))
+	require.Equal(t, http.StatusInternalServerError, code)
+	assert.Equal(t, apiError("Due to enabled service policy source, please use the Dashboard API"), rejected)
+
+	conf.Policies.PolicySource = "file"
+	conf.Policies.PolicyPath = "api.go"
+	ts.Gw.SetConfig(conf)
+	rejected, code = ts.Gw.handleAddOrUpdatePolicy("", httptest.NewRequest(http.MethodPost, "/tyk/policies", bytes.NewReader(payload)))
+	require.Equal(t, http.StatusInternalServerError, code)
+	assert.Equal(t, apiError("Unable to access policy storage."), rejected)
+}
+
+// Verifies: STK-REQ-054, SYS-REQ-142, SW-REQ-129
+// STK-REQ-054:STK-REQ-054-AC-01:acceptance
+// STK-REQ-054:error_handling:negative
+// STK-REQ-054:error_handling:nominal
+// SYS-REQ-142:nominal:nominal
+// SYS-REQ-142:boundary:nominal
+// SYS-REQ-142:error_handling:negative
+// SYS-REQ-142:error_handling:nominal
+// SYS-REQ-142:determinism:nominal
+// SW-REQ-129:nominal:nominal
+// SW-REQ-129:boundary:nominal
+// SW-REQ-129:error_handling:negative
+// SW-REQ-129:error_handling:nominal
+// SW-REQ-129:determinism:nominal
+func TestGatewayPolicyManagementDeletePolicy(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	policyDir := t.TempDir()
+	conf := ts.Gw.GetConfig()
+	conf.Policies.PolicyPath = policyDir
+	conf.Policies.PolicySource = "file"
+	ts.Gw.SetConfig(conf)
+
+	policy := user.Policy{
+		ID:           "delete-policy",
+		Rate:         100,
+		Per:          1,
+		OrgID:        "default",
+		AccessRights: map[string]user.AccessDefinition{},
+	}
+	payload, err := json.Marshal(policy)
+	require.NoError(t, err)
+	_, code := ts.Gw.handleAddOrUpdatePolicy("", httptest.NewRequest(http.MethodPost, "/tyk/policies", bytes.NewReader(payload)))
+	require.Equal(t, http.StatusOK, code)
+
+	deleted, code := ts.Gw.handleDeletePolicy(policy.ID)
+
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, apiModifyKeySuccess{Key: policy.ID, Status: "ok", Action: "deleted"}, deleted)
+	assert.NoFileExists(t, policyDir+"/"+policy.ID+".json")
+
+	missing, code := ts.Gw.handleDeletePolicy("missing-policy")
+	require.Equal(t, http.StatusInternalServerError, code)
+	assert.Equal(t, apiError("Delete failed"), missing)
+
+	conf = ts.Gw.GetConfig()
+	conf.Policies.PolicyPath = "api.go"
+	ts.Gw.SetConfig(conf)
+	failed, code := ts.Gw.handleDeletePolicy(policy.ID)
+	require.Equal(t, http.StatusInternalServerError, code)
+	assert.Equal(t, apiError("Delete failed"), failed)
 }
