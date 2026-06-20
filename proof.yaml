@@ -162,6 +162,8 @@ project:
             - apidef/oas/internal_reqproof_test.go
             - apidef/oas/mcp_primitive.go
             - apidef/oas/mcp_primitive_reqproof_test.go
+            - apidef/oas/oasutil.go
+            - apidef/oas/oasutil_reqproof_test.go
             - apidef/oas/time.go
             - apidef/oas/time_reqproof_test.go
             - apidef/oas/track_endpoint.go

@@ -7,6 +7,7 @@ import (
 	internalreflect "github.com/TykTechnologies/tyk/internal/reflect"
 )
 
+// SW-REQ-055
 func toStructIfMap(input interface{}, val interface{}) bool {
 	mapInput, ok := input.(map[string]interface{})
 	if !ok {
@@ -26,9 +27,11 @@ func toStructIfMap(input interface{}, val interface{}) bool {
 	return true
 }
 
+// SW-REQ-055
 // ShouldOmit is a compatibility alias. It may be removed in the future.
 var ShouldOmit = internalreflect.IsEmpty
 
+// SW-REQ-055
 func requireMainVersion(api *apidef.APIDefinition) apidef.VersionInfo {
 	if len(api.VersionData.Versions) == 0 {
 		api.VersionData.Versions = map[string]apidef.VersionInfo{
@@ -43,6 +46,7 @@ func requireMainVersion(api *apidef.APIDefinition) apidef.VersionInfo {
 	return api.VersionData.Versions[Main]
 }
 
+// SW-REQ-055
 func updateMainVersion(api *apidef.APIDefinition, updatedMainVersion apidef.VersionInfo) {
 	api.VersionData.Versions[Main] = updatedMainVersion
 }

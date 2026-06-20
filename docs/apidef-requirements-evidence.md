@@ -13,6 +13,7 @@
 <!-- documents SW-REQ-052 -->
 <!-- documents SW-REQ-053 -->
 <!-- documents SW-REQ-054 -->
+<!-- documents SW-REQ-055 -->
 
 This document records the first API-definition support-model proof slice. The
 slice is deliberately limited to small API-definition helper models and does
@@ -24,9 +25,9 @@ health-check wire values, host-list access behavior, and error-override helper
 state, embedded Classic API definition schema data, OAS path/server helper
 shapes, OAS schema visitor/unicode-escape helper behavior, OAS schema example
 extraction shapes, OAS internal endpoint helper shapes, OAS endpoint tracking
-helper shapes, custom middleware definition enablement classification, OAS
-extension header name/value helper shapes, and OAS extension error-override
-helper shapes without silent
+helper shapes, OAS utility helper shapes, custom middleware definition
+enablement classification, OAS extension header name/value helper shapes, and
+OAS extension error-override helper shapes without silent
 data-shape drift.
 
 `SW-REQ-019` owns the concrete `apidef` health-check constants and JSON struct
@@ -139,3 +140,15 @@ configuration omission, and deterministic repeated Fill/ExtractTo behavior.
 This evidence does not claim analytics collection, log emission, request
 matching, gateway request admission, middleware execution, access-control
 behavior, or final client-visible runtime behavior.
+
+`SW-REQ-055` owns the concrete `apidef/oas` utility helpers used by
+API-definition extension model conversion. Its evidence covers valid
+map-shaped extension data conversion into target structs, non-map conversion
+input rejection without target mutation, empty versus populated shape
+classification through the OAS `ShouldOmit` compatibility alias, missing main
+version initialization, preservation of non-main version entries, updating only
+the main version entry requested by the caller, and deterministic repeated main
+version observation. This evidence does not claim full OAS conversion, schema
+validation, API import, route generation, request matching, gateway request
+admission, middleware execution, error reporting for malformed map contents, or
+final client-visible runtime behavior.
