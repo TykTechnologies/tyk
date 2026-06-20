@@ -1,0 +1,9 @@
+component: redis_aliases
+no_interface:
+    declared: true
+    reason: The internal/redis proof slice covers local alias availability and compatibility only; Redis server availability, network dialing, command execution, topology correctness, distributed locking, storage semantics, and final gateway behavior are outside this component boundary.
+variables:
+    - name: redis_aliases_available
+      type: bool
+      direction: output
+      description: 'The local Redis alias package exposes the expected constructor aliases, sentinel errors, script constructor, pool/mock constructors, and representative type aliases.'

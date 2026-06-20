@@ -1,0 +1,62 @@
+id: STK-REQ-046
+version: 1
+status: approved
+priority: shall
+category: maintainability
+req_type: guarantee
+fretish: ""
+description: Redis alias support shall preserve local constructor, sentinel error, script, pool, mock, and representative type alias availability for callers, without claiming Redis server availability, network dialing, command execution, topology correctness, distributed locking, storage semantics, or final gateway behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: redis_aliases
+rationale: The internal/redis package is a refactoring aid that centralizes upstream Redis symbols used by other packages. Runtime Redis behavior remains owned by storage and rate-limit requirements.
+tags:
+    - aliases
+    - redis
+    - maintainability
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T12:56:52Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Redis alias scope is limited to local internal/redis behavior: constructor alias identity, sentinel error identity, script constructor availability, pool and mock constructor availability, and representative exported type alias compatibility. This approval does not claim Redis server availability, network dialing, command execution, topology correctness, distributed locking, storage semantics, or final gateway behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T12:56:52Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T12:56:52Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+stakeholder:
+    persona: Gateway storage maintainer
+    story: As a gateway storage maintainer, I need Redis dependency aliases to stay locally compatible so refactoring can centralize imports without changing caller-facing symbol availability.
+    acceptance_criteria:
+        - id: STK-REQ-046-AC-01
+          text: Given Redis constructor, mock, pool, script, and sentinel error aliases, when callers reference the local alias package, then the aliases preserve the upstream symbol identity or error identity.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-134
+        - id: STK-REQ-046-AC-02
+          text: Given representative exported Redis data and client types, when callers assign upstream values through the local alias types, then the assignments remain compatible.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-134
+lifecycle:
+    change_history:
+        - date: "2026-06-20T12:56:52Z"
+          from: draft
+          to: review
+          reason: Added Redis alias stakeholder requirement for internal/redis onboarding.
+          changed_by: agent:codex

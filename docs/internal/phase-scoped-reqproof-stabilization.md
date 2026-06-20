@@ -575,6 +575,17 @@ fixed or to hide them from the current strict audit.
   caller authorization behavior, transport security, secret storage, or final
   gateway behavior. It moves the visible production coverage baseline from
   184/447 to 185/447.
+- `SW-REQ-121` onboarded `internal/redis` with a new Redis alias
+  stakeholder/system/software chain and focused table-driven package evidence
+  for constructor alias identity, sentinel error identity, script constructor
+  availability, pool and mock constructor availability, and representative type
+  alias compatibility. The system formula is a local alias-availability
+  invariant, with the unreachable unavailable-alias row documented rather than
+  covered by a fake runtime witness. This increment is scoped to local alias
+  compatibility and does not claim Redis server availability, network dialing,
+  command execution, topology correctness, distributed locking, storage
+  semantics, or final gateway behavior. It moves the visible production
+  coverage baseline from 185/447 to 186/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

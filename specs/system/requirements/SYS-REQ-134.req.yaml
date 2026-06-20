@@ -1,0 +1,60 @@
+id: SYS-REQ-134
+version: 1
+status: approved
+priority: shall
+category: maintainability
+req_type: guarantee
+fretish: the redis_aliases shall always satisfy redis_aliases_available
+description: Redis alias support shall make local constructor, sentinel error, script, pool, mock, and representative type aliases available and deterministic for callers, without claiming Redis server availability, network dialing, command execution, topology correctness, distributed locking, storage semantics, or final gateway behavior.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-046
+component: redis_aliases
+rationale: This system requirement owns local internal/redis alias availability only. Runtime Redis behavior remains outside this proof slice.
+tags:
+    - aliases
+    - redis
+    - maintainability
+variables:
+    - redis_aliases_available
+traces:
+    satisfies:
+        - STK-REQ-046
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T12:56:52Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Redis alias system scope is limited to terminal local alias availability in internal/redis: constructor alias identity, sentinel error identity, script constructor availability, pool and mock constructor availability, and representative exported type alias compatibility. The FRETish invariant intentionally models local alias availability without asserting Redis server availability, network dialing, command execution, topology correctness, distributed locking, storage semantics, or final gateway behavior.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-20T13:00:13.674379Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-134|redis_aliases_available
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20 after final requirement approval. SYS-REQ-134''s redis_aliases_available variable is decomposed by SW-REQ-121 for local internal/redis behavior: constructor alias identity, sentinel error identity, script constructor availability, pool and mock constructor availability, and representative exported type alias compatibility. This review is limited to local Redis alias compatibility and does not claim Redis server availability, network dialing, command execution, topology correctness, distributed locking, storage semantics, or final gateway behavior.'
+          reviewed_at: "2026-06-20T13:00:13.674379Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T12:56:52Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T12:56:52Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-20T12:56:52Z"
+          from: draft
+          to: review
+          reason: Added Redis alias system requirement for internal/redis onboarding.
+          changed_by: agent:codex

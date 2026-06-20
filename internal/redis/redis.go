@@ -10,6 +10,7 @@ import (
 	redis "github.com/redis/go-redis/v9"
 )
 
+// SW-REQ-121
 var (
 	NewFailoverClient = redis.NewFailoverClient
 	NewClusterClient  = redis.NewClusterClient
@@ -22,6 +23,7 @@ var (
 	NewScript = redis.NewScript
 )
 
+// SW-REQ-121
 type (
 	UniversalClient  = redis.UniversalClient
 	UniversalOptions = redis.UniversalOptions
