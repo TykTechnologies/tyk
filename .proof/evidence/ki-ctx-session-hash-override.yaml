@@ -1,0 +1,16 @@
+schema_version: proof.evidence_profile.v1
+results:
+    - profile: known_issue_reproducer
+      requirement: SYS-REQ-125
+      command: go test ./ctx -run TestKnownIssue_SetSessionSingleHashOverrideIgnored -count=1
+      status: pass
+      observed_result: known_issue_reproduced
+      executed_at: "2026-06-20T11:12:38Z"
+      input_set:
+        - KI-CTX-SESSION-HASH-OVERRIDE reproducer
+      freshness_hashes:
+        .proof/known-issues/KI-CTX-SESSION-HASH-OVERRIDE.yaml: sha256:3da55015a397d57f0626e9fcbd0595d8f7eb52884bad3feaf97a5eedbbdebe25
+        ctx/ctx_test.go: sha256:4fe4f6c79f21a2bdf0565eba6ef31ae8afb9006713c5a2c1aaa013b6d6514e47
+        proof.yaml: sha256:487bbe06668c7572fb93301aae08558789055c79842491ca3bf4449ac69e95e3
+      known_issues:
+        - KI-CTX-SESSION-HASH-OVERRIDE

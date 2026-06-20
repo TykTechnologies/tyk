@@ -44,8 +44,8 @@ the honest disposition required to close it.
 
 | Check | Current finding | Disposition | Why it remains |
 | --- | --- | --- | --- |
-| `verification_scope_complete` | 160/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
-| `mcdc_coverage` | 52/427 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
+| `verification_scope_complete` | 161/447 declared production source files covered | full-scope onboarding required | The current requirement hierarchy covers the scoped policy/helper slice only. Broad packages such as remaining `apidef`, `gateway`, `storage`, `rpc`, certificates, plugins, and coprocess need product-level STK/SYS hierarchy and package onboarding waves before the scope warning can honestly clear. |
+| `mcdc_coverage` | 52/430 uncovered rows across 29 partial requirements | ReqProof tooling gap and model refinement required | Remaining rows are trigger-false/no-action rows from implication-shaped requirements such as `!operation_requested | result_returned`, plus paired invariant-violation rows whose positive row set is still incomplete while the trigger-false row is unresolved. Direct helper tests cannot honestly prove the no-action row because calling the helper is the request. |
 
 Closed during this pass:
 
@@ -460,6 +460,19 @@ fixed or to hide them from the current strict audit.
   `coprocess/python/doc.go` remain omitted because their packages currently
   fail to load while the unrelated `internal/build` deletion is present. It
   moves the visible production coverage baseline from 159/447 to 160/447.
+- `SW-REQ-112` onboarded `ctx/ctx.go` with a new request context
+  stakeholder/system/software chain and focused tests for context key
+  uniqueness, session/auth-token storage and retrieval, API/OAS definition
+  clone retrieval, error-classification storage, JSON-compatible session
+  fallback retrieval, nil-session panic behavior, and table-driven JSON-RPC/MCP
+  metric getter defaults and typed values. The pass also records
+  `KI-CTX-SESSION-HASH-OVERRIDE` for the confirmed defect where a single
+  optional `SetSession(..., hashKey)` override is ignored and the global
+  `HashKeys` setting is used instead. This increment is scoped to local request
+  context helper mechanics and does not claim gateway middleware admission
+  behavior, downstream plugin behavior, storage persistence, access-control
+  decisions, or final request handling. It moves the visible production
+  coverage baseline from 160/447 to 161/447.
 
 Future changes that discover real bad behavior should add or update KnownIssues
 with reproducing evidence instead of using assumptions, accepted risks, or

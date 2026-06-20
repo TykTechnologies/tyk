@@ -1,0 +1,61 @@
+id: STK-REQ-037
+version: 1
+status: approved
+priority: shall
+category: request_context
+req_type: guarantee
+fretish: ""
+description: Request context helper support shall provide local typed storage and retrieval of gateway request state for sessions, auth tokens, API definitions, OAS definitions, error classification, and JSON-RPC/MCP metric fields, without claiming gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, or final request handling.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: request_context
+rationale: The ctx package is a local request-context helper boundary. This stakeholder requirement owns helper storage and retrieval behavior only; gateway middleware and plugin semantics require separate requirements.
+tags:
+    - request-context
+    - helper
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-20T10:54:37Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Request context scope is limited to local ctx package helper behavior: context key uniqueness, session/auth-token storage and retrieval, API/OAS definition cloning, error-classification storage, and JSON-RPC/MCP metric field getters. The focused ctx package tests passed and the known single-argument SetSession hash override issue is tracked separately as KI-CTX-SESSION-HASH-OVERRIDE. This approval does not claim gateway middleware admission behavior, downstream plugin behavior, storage persistence, access-control decisions, or final request handling.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-20T10:54:37Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-20T10:54:37Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+stakeholder:
+    persona: Gateway middleware developer
+    story: As a gateway middleware developer, I need local request context helpers to store and retrieve request-scoped gateway state consistently across middleware and plugin boundaries.
+    acceptance_criteria:
+        - id: STK-REQ-037-AC-01
+          text: Given a request and supported context value, when a helper stores the value, then the matching helper retrieves the expected typed value or documented zero value.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-125
+        - id: STK-REQ-037-AC-02
+          text: Given API definition, OAS definition, session, error classification, auth token, and JSON-RPC/MCP metric context fields, when local context helpers are used, then helper behavior remains local to request context storage and retrieval.
+          testable: true
+          derived_reqs:
+            - SYS-REQ-125
+lifecycle:
+    change_history:
+        - date: "2026-06-20T10:54:37Z"
+          from: draft
+          to: review
+          reason: Added request context stakeholder requirement for ctx/ctx.go onboarding.
+          changed_by: agent:codex

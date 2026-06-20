@@ -77,6 +77,7 @@ const (
 	JSONRPCErrorCode
 )
 
+// SW-REQ-112
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
 	if s == nil {
 		panic("setting a nil context SessionData")
@@ -102,6 +103,7 @@ func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, h
 	core.SetContext(r, ctx)
 }
 
+// SW-REQ-112
 func GetAuthToken(r *http.Request) string {
 	if v := r.Context().Value(AuthToken); v != nil {
 		value, ok := v.(string)
@@ -112,6 +114,7 @@ func GetAuthToken(r *http.Request) string {
 	return ""
 }
 
+// SW-REQ-112
 func GetSession(r *http.Request) *user.SessionState {
 	if v := r.Context().Value(SessionData); v != nil {
 		if val, ok := v.(*user.SessionState); ok {
@@ -129,6 +132,7 @@ func GetSession(r *http.Request) *user.SessionState {
 	return nil
 }
 
+// SW-REQ-112
 func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey ...bool) {
 	if len(hashKey) > 1 {
 		ctxSetSession(r, s, scheduleUpdate, hashKey[0])
@@ -137,6 +141,7 @@ func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hash
 	}
 }
 
+// SW-REQ-112
 // SetDefinition sets an API definition object to the request context.
 func SetDefinition(r *http.Request, s *apidef.APIDefinition) {
 	ctx := r.Context()
@@ -144,6 +149,7 @@ func SetDefinition(r *http.Request, s *apidef.APIDefinition) {
 	core.SetContext(r, ctx)
 }
 
+// SW-REQ-112
 // GetDefinition will return a deep copy of the API definition valid for the request.
 func GetDefinition(r *http.Request) *apidef.APIDefinition {
 	if v := r.Context().Value(Definition); v != nil {
@@ -155,6 +161,7 @@ func GetDefinition(r *http.Request) *apidef.APIDefinition {
 	return nil
 }
 
+// SW-REQ-112
 // SetOASDefinition sets an OAS API definition object to the request context.
 func SetOASDefinition(r *http.Request, s *oas.OAS) {
 	ctx := r.Context()
@@ -162,6 +169,7 @@ func SetOASDefinition(r *http.Request, s *oas.OAS) {
 	core.SetContext(r, ctx)
 }
 
+// SW-REQ-112
 // GetOASDefinition will return a deep copy of the OAS API definition valid for the request.
 func GetOASDefinition(r *http.Request) *oas.OAS {
 	if v := r.Context().Value(OASDefinition); v != nil {
@@ -173,6 +181,7 @@ func GetOASDefinition(r *http.Request) *oas.OAS {
 	return nil
 }
 
+// SW-REQ-112
 // SetErrorClassification sets the error classification for the request context.
 // This is used to store structured error information for access logs.
 func SetErrorClassification(r *http.Request, ec *errors.ErrorClassification) {
@@ -181,6 +190,7 @@ func SetErrorClassification(r *http.Request, ec *errors.ErrorClassification) {
 	core.SetContext(r, ctx)
 }
 
+// SW-REQ-112
 // GetErrorClassification retrieves the error classification from the request context.
 // Returns nil if no error classification has been set.
 func GetErrorClassification(r *http.Request) *errors.ErrorClassification {
@@ -192,6 +202,7 @@ func GetErrorClassification(r *http.Request) *errors.ErrorClassification {
 	return nil
 }
 
+// SW-REQ-112
 // GetMCPMethod returns the JSON-RPC method name stored in the request context.
 func GetMCPMethod(r *http.Request) string {
 	if v, ok := r.Context().Value(MCPMethod).(string); ok {
@@ -200,6 +211,7 @@ func GetMCPMethod(r *http.Request) string {
 	return ""
 }
 
+// SW-REQ-112
 // GetMCPPrimitiveType returns the MCP primitive type (tool/resource/prompt) from the request context.
 func GetMCPPrimitiveType(r *http.Request) string {
 	if v, ok := r.Context().Value(MCPPrimitiveType).(string); ok {
@@ -208,6 +220,7 @@ func GetMCPPrimitiveType(r *http.Request) string {
 	return ""
 }
 
+// SW-REQ-112
 // GetMCPPrimitiveName returns the MCP primitive name from the request context.
 func GetMCPPrimitiveName(r *http.Request) string {
 	if v, ok := r.Context().Value(MCPPrimitiveName).(string); ok {
@@ -216,6 +229,7 @@ func GetMCPPrimitiveName(r *http.Request) string {
 	return ""
 }
 
+// SW-REQ-112
 // GetJSONRPCErrorCode returns the JSON-RPC error code from the request context.
 func GetJSONRPCErrorCode(r *http.Request) int {
 	if v, ok := r.Context().Value(JSONRPCErrorCode).(int); ok {
