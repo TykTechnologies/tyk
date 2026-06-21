@@ -266,6 +266,7 @@ func (a APILimit) HasThrottleWindow() bool {
 }
 
 // IsZero returns true if FieldLimits is empty (for omitzero support).
+// SW-REQ-147
 func (f FieldLimits) IsZero() bool {
 	return f.MaxQueryDepth == 0
 }
@@ -286,6 +287,7 @@ type BasicAuthData struct {
 }
 
 // IsZero returns true if BasicAuthData is empty (for omitzero support).
+// SW-REQ-147
 func (b BasicAuthData) IsZero() bool {
 	return b.Password == "" && b.Hash == ""
 }
@@ -295,6 +297,7 @@ type JWTData struct {
 }
 
 // IsZero returns true if JWTData is empty (for omitzero support).
+// SW-REQ-147
 func (j JWTData) IsZero() bool {
 	return j.Secret == ""
 }
@@ -304,6 +307,7 @@ type Monitor struct {
 }
 
 // IsZero returns true if Monitor is empty (for omitzero support).
+// SW-REQ-147
 func (m Monitor) IsZero() bool {
 	return len(m.TriggerLimits) == 0
 }
@@ -314,16 +318,19 @@ func (m Monitor) IsZero() bool {
 type Endpoints []Endpoint
 
 // Len is used to implement sort interface.
+// SW-REQ-147
 func (es Endpoints) Len() int {
 	return len(es)
 }
 
 // Less is used to implement sort interface.
+// SW-REQ-147
 func (es Endpoints) Less(i, j int) bool {
 	return es[i].Path < es[j].Path
 }
 
 // Swap is used to implement sort interface.
+// SW-REQ-147
 func (es Endpoints) Swap(i, j int) {
 	es[i], es[j] = es[j], es[i]
 }
@@ -338,21 +345,25 @@ type Endpoint struct {
 type EndpointMethods []EndpointMethod
 
 // Len is used to implement sort interface.
+// SW-REQ-147
 func (em EndpointMethods) Len() int {
 	return len(em)
 }
 
 // Less is used to implement sort interface.
+// SW-REQ-147
 func (em EndpointMethods) Less(i, j int) bool {
 	return strings.ToUpper(em[i].Name) < strings.ToUpper(em[j].Name)
 }
 
 // Swap is used to implement sort interface.
+// SW-REQ-147
 func (em EndpointMethods) Swap(i, j int) {
 	em[i], em[j] = em[j], em[i]
 }
 
 // Contains is used to assert if a method exists in EndpointMethods.
+// SW-REQ-147
 func (em EndpointMethods) Contains(method string) bool {
 	for _, v := range em {
 		if strings.EqualFold(v.Name, method) {

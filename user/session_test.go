@@ -1080,6 +1080,9 @@ func TestRateLimit_IsZero(t *testing.T) {
 }
 
 // TestBasicAuthData_IsZero verifies BasicAuthData.IsZero() behavior.
+// Verifies: STK-REQ-072, SYS-REQ-160, SW-REQ-147
+// SW-REQ-147:nominal:nominal
+// SW-REQ-147:boundary:boundary
 func TestBasicAuthData_IsZero(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1102,6 +1105,9 @@ func TestBasicAuthData_IsZero(t *testing.T) {
 }
 
 // TestJWTData_IsZero verifies JWTData.IsZero() behavior.
+// Verifies: STK-REQ-072, SYS-REQ-160, SW-REQ-147
+// SW-REQ-147:nominal:nominal
+// SW-REQ-147:boundary:boundary
 func TestJWTData_IsZero(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1122,6 +1128,9 @@ func TestJWTData_IsZero(t *testing.T) {
 }
 
 // TestMonitor_IsZero verifies Monitor.IsZero() behavior.
+// Verifies: STK-REQ-072, SYS-REQ-160, SW-REQ-147
+// SW-REQ-147:nominal:nominal
+// SW-REQ-147:boundary:boundary
 func TestMonitor_IsZero(t *testing.T) {
 	tests := []struct {
 		name     string

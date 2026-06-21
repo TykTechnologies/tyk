@@ -1,0 +1,63 @@
+id: SYS-REQ-160
+version: 1
+status: approved
+priority: shall
+category: user_serialization_helpers
+req_type: guarantee
+fretish: the user_serialization_helpers shall always satisfy user_serialization_helper_operation_terminal
+description: User serialization and endpoint collection helper handling shall make local helper operations terminal and deterministic for FieldLimits, BasicAuthData, JWTData, and Monitor IsZero classification plus Endpoints and EndpointMethods length, path/name ordering, swapping, and case-insensitive method membership for tested paths, without claiming complete session JSON compatibility, policy merge behavior, gateway routing, endpoint rate-limit application, persistence backends, or final client responses.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-072
+component: user_serialization_helpers
+rationale: This system requirement owns local user-package serialization and endpoint collection helper decisions only. Integrated policy application, routing, persistence, endpoint rate-limit execution, and transport behavior remain outside this proof slice.
+tags:
+    - user
+    - serialization
+    - endpoints
+    - helper
+variables:
+    - user_serialization_helper_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-072
+    reviewed_at: "2026-06-21T04:35:18.643427Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:eb7458b47fafc1fe9be538e587d9a8837507874fb405abe5bf084113d5c3fd33
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. User serialization helper scope is limited to local user-package helpers: FieldLimits, BasicAuthData, JWTData, and Monitor IsZero behavior plus Endpoints and EndpointMethods length, ordering, swapping, and case-insensitive method membership. This approval does not claim complete session JSON compatibility, policy merge behavior, gateway routing, endpoint rate-limit application, persistence backends, or final client responses.'
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-21T00:00:00Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-160|user_serialization_helper_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. SYS-REQ-160''s user_serialization_helper_operation_terminal variable is decomposed by SW-REQ-147 for local user-package helper behavior only: FieldLimits, BasicAuthData, JWTData, and Monitor IsZero behavior plus Endpoints and EndpointMethods length, ordering, swapping, and case-insensitive method membership. Complete session JSON compatibility, policy merge behavior, gateway routing, endpoint rate-limit application, persistence backends, and final client responses remain outside this proof slice.'
+          reviewed_at: "2026-06-21T00:00:00Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added user serialization helper system requirement.
+          changed_by: agent:codex
