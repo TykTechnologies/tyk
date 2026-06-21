@@ -36,6 +36,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/storage/kv"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -2283,6 +2284,107 @@ func TestAPISpecRequestVersionPathHelpers(t *testing.T) {
 		spec.SanitizeProxyPaths(req)
 		assert.Equal(t, "/v1/resource", req.URL.Path)
 		assert.Equal(t, "/v1/resource", req.URL.RawPath)
+	})
+}
+
+type recordingSessionHandler struct {
+	initCalls int
+	initStore storage.Handler
+	stopped   bool
+}
+
+func (r *recordingSessionHandler) Init(store storage.Handler) {
+	r.initCalls++
+	r.initStore = store
+}
+
+func (r *recordingSessionHandler) Store() storage.Handler { return r.initStore }
+
+func (r *recordingSessionHandler) UpdateSession(string, *user.SessionState, int64, bool) error {
+	return nil
+}
+
+func (r *recordingSessionHandler) RemoveSession(string, string, bool) bool { return false }
+
+func (r *recordingSessionHandler) SessionDetail(string, string, bool) (user.SessionState, bool) {
+	return user.SessionState{}, false
+}
+
+func (r *recordingSessionHandler) KeyExpired(*user.SessionState) bool { return false }
+
+func (r *recordingSessionHandler) Sessions(string) []string { return nil }
+
+func (r *recordingSessionHandler) ResetQuota(string, *user.SessionState, bool) {}
+
+func (r *recordingSessionHandler) Stop() { r.stopped = true }
+
+type recordingHealthChecker struct {
+	initCalls int
+	initStore storage.Handler
+}
+
+func (r *recordingHealthChecker) Init(store storage.Handler) {
+	r.initCalls++
+	r.initStore = store
+}
+
+func (r *recordingHealthChecker) ApiHealthValues() (HealthCheckValues, error) {
+	return HealthCheckValues{}, nil
+}
+
+func (r *recordingHealthChecker) StoreCounterVal(HealthPrefix, string) {}
+
+// Verifies: STK-REQ-062, SYS-REQ-150, SW-REQ-137
+// STK-REQ-062:STK-REQ-062-AC-01:acceptance
+// SYS-REQ-150:nominal:nominal
+// SYS-REQ-150:boundary:nominal
+// SYS-REQ-150:error_handling:nominal
+// SYS-REQ-150:error_handling:negative
+// SYS-REQ-150:determinism:nominal
+// MCDC SYS-REQ-150: gateway_api_spec_lifecycle_helpers_operation_requested=F, gateway_api_spec_lifecycle_helpers_operation_terminal=F => TRUE
+// MCDC SYS-REQ-150: gateway_api_spec_lifecycle_helpers_operation_requested=T, gateway_api_spec_lifecycle_helpers_operation_terminal=T => TRUE
+//
+// SW-REQ-137:nominal:nominal
+// SW-REQ-137:boundary:nominal
+// SW-REQ-137:error_handling:nominal
+// SW-REQ-137:error_handling:negative
+// SW-REQ-137:determinism:nominal
+//
+//mcdc:ignore SYS-REQ-150: gateway_api_spec_lifecycle_helpers_operation_requested=T, gateway_api_spec_lifecycle_helpers_operation_terminal=F => FALSE -- violation row is the negation of the local API spec lifecycle helper guarantee; these tests assert requested helpers forward Init calls, stop the organization session manager, invoke configured certificate-monitor cancellation, or safely no-op when cancellation is absent [category: defensive] [reviewed: human:buger]
+func TestAPISpecLifecycleHelpers(t *testing.T) {
+	authManager := &recordingSessionHandler{}
+	orgManager := &recordingSessionHandler{}
+	health := &recordingHealthChecker{}
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "lifecycle-test",
+			Name:  "Lifecycle Test",
+		},
+		AuthManager:       authManager,
+		OrgSessionManager: orgManager,
+		Health:            health,
+	}
+
+	spec.Init(nil, nil, nil, nil)
+
+	assert.Equal(t, 1, authManager.initCalls)
+	assert.Equal(t, 1, health.initCalls)
+	assert.Equal(t, 1, orgManager.initCalls)
+
+	spec.StopSessionManagerPool()
+	assert.True(t, orgManager.stopped)
+
+	cancelCalls := 0
+	spec.upstreamCertExpiryCancelFunc = func() {
+		cancelCalls++
+	}
+	spec.UnloadUpstreamCertMonitoring()
+	assert.Equal(t, 1, cancelCalls)
+
+	spec.upstreamCertExpiryCancelFunc = nil
+	assert.NotPanics(t, func() {
+		spec.UnloadUpstreamCertMonitoring()
 	})
 }
 

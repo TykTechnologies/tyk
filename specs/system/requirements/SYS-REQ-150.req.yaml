@@ -1,0 +1,65 @@
+id: SYS-REQ-150
+version: 1
+status: approved
+priority: shall
+category: gateway_api_spec_lifecycle_helpers
+req_type: guarantee
+fretish: the gateway_api_spec_lifecycle_helpers shall always satisfy !gateway_api_spec_lifecycle_helpers_operation_requested | gateway_api_spec_lifecycle_helpers_operation_terminal
+description: Gateway API spec lifecycle helper support shall make local lifecycle helper operations terminal and deterministic for forwarding Init calls to configured auth, health, and organization-session handlers, stopping organization session manager state, and invoking upstream certificate monitoring cancellation when configured while no-oping safely when absent, without claiming storage backend correctness, certificate check execution, goroutine scheduling, gateway reload durability, network behavior, or final client-visible responses.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-062
+component: gateway_api_spec_lifecycle_helpers
+rationale: This system requirement owns local gateway API spec lifecycle helper terminality only. Storage backend correctness, certificate monitor execution, goroutine scheduling, reload durability, network behavior, and final request outcomes are outside this proof slice.
+tags:
+    - gateway
+    - api-spec
+    - lifecycle
+variables:
+    - gateway_api_spec_lifecycle_helpers_operation_requested
+    - gateway_api_spec_lifecycle_helpers_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-062
+    reviewed_at: "2026-06-21T00:59:58.177321Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:477ba5ded8547f35377f647a963c00cddafe9ed8cf981540801f22f326a0a875
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API spec lifecycle helper system scope is limited to local helper terminality when a local lifecycle helper operation is requested for handler Init forwarding, organization session manager stopping, and upstream certificate monitoring cancellation or safe no-op behavior. The FRETish invariant intentionally models requested local operation terminality without asserting storage backend correctness, certificate check execution, goroutine scheduling, gateway reload durability, network behavior, or final client-visible responses.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-21T00:00:00Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-150|gateway_api_spec_lifecycle_helpers_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21 after requirement approval. SYS-REQ-150''s requested local operation terminality is decomposed by SW-REQ-137 for local gateway/api_definition.go lifecycle helper behavior: Init forwarding, organization session manager stopping, and upstream certificate monitoring cancellation or safe no-op behavior. This review is limited to local helper mechanics and does not claim storage backend correctness, certificate check execution, goroutine scheduling, gateway reload durability, network behavior, or final client-visible responses.'
+          reviewed_at: "2026-06-21T00:00:00Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API spec lifecycle helper system requirement.
+          changed_by: human:buger

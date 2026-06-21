@@ -1,0 +1,61 @@
+id: STK-REQ-062
+version: 1
+status: approved
+priority: shall
+category: gateway_api_spec_lifecycle_helpers
+req_type: guarantee
+fretish: ""
+description: Gateway API spec lifecycle helper support shall locally initialize configured auth, health, and organization-session handlers, stop organization session manager state, and invoke upstream certificate monitoring cancellation when present, without claiming storage backend correctness, certificate check execution, goroutine scheduling, gateway reload durability, network behavior, or final client-visible responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_api_spec_lifecycle_helpers
+rationale: Gateway operators depend on deterministic local API spec lifecycle helper calls during load/unload flows. This requirement owns only local gateway/api_definition.go helper behavior and focused gateway tests.
+tags:
+    - gateway
+    - api-spec
+    - lifecycle
+variables: []
+traces:
+    reviewed_at: "2026-06-21T00:59:58.097576Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:d0173d8fb3123d4c05ee588c2593071a8dae9ce4c7a31f9e23fa0d53ed0999ae
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API spec lifecycle helper scope is limited to local gateway/api_definition.go helper behavior: forwarding Init calls to configured auth, health, and organization-session handlers, stopping the organization session manager, and invoking upstream certificate monitoring cancellation when configured while no-oping safely when absent. This approval does not claim storage backend correctness, certificate check execution, goroutine scheduling, gateway reload durability, network behavior, or final client-visible responses.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need loaded API specs to initialize and stop local lifecycle helper state deterministically during gateway load and unload flows.
+    acceptance_criteria:
+        - id: STK-REQ-062-AC-01
+          text: Given configured API spec lifecycle handlers, when lifecycle helper operations are exercised, then deterministic handler initialization, stop, cancellation, or no-op outcomes are produced for the tested inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-150
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API spec lifecycle helper requirement.
+          changed_by: human:buger

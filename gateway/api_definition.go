@@ -1984,12 +1984,14 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	return combinedPath, whiteListEnabled
 }
 
+// SW-REQ-137
 func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Handler) {
 	a.AuthManager.Init(authStore)
 	a.Health.Init(healthStore)
 	a.OrgSessionManager.Init(orgStore)
 }
 
+// SW-REQ-137
 func (a *APISpec) UnloadUpstreamCertMonitoring() {
 	if a.upstreamCertExpiryCancelFunc != nil {
 		log.
@@ -2001,6 +2003,7 @@ func (a *APISpec) UnloadUpstreamCertMonitoring() {
 	}
 }
 
+// SW-REQ-137
 func (a *APISpec) StopSessionManagerPool() {
 	a.OrgSessionManager.Stop()
 }
