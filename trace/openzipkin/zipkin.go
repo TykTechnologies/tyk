@@ -28,28 +28,34 @@ type Span struct {
 	tr   *zipkinTracer
 }
 
+// SW-REQ-164
 func (s Span) Context() opentracing.SpanContext {
 	return spanContext{s.span.Context()}
 }
 
+// SW-REQ-164
 func (s Span) Finish() {
 	s.span.Finish()
 }
 
+// SW-REQ-164
 func (s Span) FinishWithOptions(opts opentracing.FinishOptions) {
 	s.span.Finish()
 }
 
+// SW-REQ-164
 func (s Span) SetOperationName(operationName string) opentracing.Span {
 	s.span.SetName(operationName)
 	return s
 }
 
+// SW-REQ-164
 func (s Span) SetTag(key string, value interface{}) opentracing.Span {
 	s.span.Tag(key, fmt.Sprint(value))
 	return s
 }
 
+// SW-REQ-164
 func (s Span) LogFields(fields ...opentracinglog.Field) {
 	now := time.Now()
 	lg := &logEncoder{h: func(key string, value interface{}) {
@@ -64,35 +70,72 @@ type logEncoder struct {
 	h func(string, interface{})
 }
 
+// SW-REQ-164
 func (e *logEncoder) emit(key string, value interface{}) {
 	if e.h != nil {
 		e.h(key, value)
 	}
 }
-func (e *logEncoder) EmitString(key, value string)                   { e.emit(key, value) }
-func (e *logEncoder) EmitBool(key string, value bool)                { e.emit(key, value) }
-func (e *logEncoder) EmitInt(key string, value int)                  { e.emit(key, value) }
-func (e *logEncoder) EmitInt32(key string, value int32)              { e.emit(key, value) }
-func (e *logEncoder) EmitInt64(key string, value int64)              { e.emit(key, value) }
-func (e *logEncoder) EmitUint32(key string, value uint32)            { e.emit(key, value) }
-func (e *logEncoder) EmitUint64(key string, value uint64)            { e.emit(key, value) }
-func (e *logEncoder) EmitFloat32(key string, value float32)          { e.emit(key, value) }
-func (e *logEncoder) EmitFloat64(key string, value float64)          { e.emit(key, value) }
-func (e *logEncoder) EmitObject(key string, value interface{})       { e.emit(key, value) }
+
+// SW-REQ-164
+func (e *logEncoder) EmitString(key, value string) { e.emit(key, value) }
+
+// SW-REQ-164
+func (e *logEncoder) EmitBool(key string, value bool) { e.emit(key, value) }
+
+// SW-REQ-164
+func (e *logEncoder) EmitInt(key string, value int) { e.emit(key, value) }
+
+// SW-REQ-164
+func (e *logEncoder) EmitInt32(key string, value int32) { e.emit(key, value) }
+
+// SW-REQ-164
+func (e *logEncoder) EmitInt64(key string, value int64) { e.emit(key, value) }
+
+// SW-REQ-164
+func (e *logEncoder) EmitUint32(key string, value uint32) { e.emit(key, value) }
+
+// SW-REQ-164
+func (e *logEncoder) EmitUint64(key string, value uint64) { e.emit(key, value) }
+
+// SW-REQ-164
+func (e *logEncoder) EmitFloat32(key string, value float32) { e.emit(key, value) }
+
+// SW-REQ-164
+func (e *logEncoder) EmitFloat64(key string, value float64) { e.emit(key, value) }
+
+// SW-REQ-164
+func (e *logEncoder) EmitObject(key string, value interface{}) { e.emit(key, value) }
+
+// SW-REQ-164
 func (e *logEncoder) EmitLazyLogger(value opentracinglog.LazyLogger) {}
 
-func (s Span) LogKV(alternatingKeyValues ...interface{})                   {}
+// SW-REQ-164
+func (s Span) LogKV(alternatingKeyValues ...interface{}) {}
+
+// SW-REQ-164
 func (s Span) SetBaggageItem(restrictedKey, value string) opentracing.Span { return s }
-func (Span) BaggageItem(restrictedKey string) string                       { return "" }
-func (s Span) Tracer() opentracing.Tracer                                  { return s.tr }
-func (s Span) LogEvent(event string)                                       {}
-func (s Span) LogEventWithPayload(event string, payload interface{})       {}
-func (s Span) Log(data opentracing.LogData)                                {}
+
+// SW-REQ-164
+func (Span) BaggageItem(restrictedKey string) string { return "" }
+
+// SW-REQ-164
+func (s Span) Tracer() opentracing.Tracer { return s.tr }
+
+// SW-REQ-164
+func (s Span) LogEvent(event string) {}
+
+// SW-REQ-164
+func (s Span) LogEventWithPayload(event string, payload interface{}) {}
+
+// SW-REQ-164
+func (s Span) Log(data opentracing.LogData) {}
 
 type spanContext struct {
 	model.SpanContext
 }
 
+// SW-REQ-164
 func (spanContext) ForeachBaggageItem(handler func(k, v string) bool) {}
 
 type extractor interface {
@@ -101,6 +144,7 @@ type extractor interface {
 
 var emptyContext spanContext
 
+// SW-REQ-164
 func extractHTTPHeader(carrier interface{}) (spanContext, error) {
 	c, ok := carrier.(opentracing.HTTPHeadersCarrier)
 	if !ok {
@@ -153,6 +197,7 @@ func extractHTTPHeader(carrier interface{}) (spanContext, error) {
 
 type extractorFn func(carrier interface{}) (spanContext, error)
 
+// SW-REQ-164
 func (fn extractorFn) extract(carrier interface{}) (spanContext, error) {
 	return fn(carrier)
 }
@@ -161,6 +206,7 @@ type injector interface {
 	inject(ctx spanContext, carrier interface{}) error
 }
 
+// SW-REQ-164
 func injectHTTPHeaders(ctx spanContext, carrier interface{}) error {
 	c, ok := carrier.(opentracing.HTTPHeadersCarrier)
 	if !ok {
@@ -175,6 +221,7 @@ func injectHTTPHeaders(ctx spanContext, carrier interface{}) error {
 
 type injectorFn func(ctx spanContext, carrier interface{}) error
 
+// SW-REQ-164
 func (fn injectorFn) inject(ctx spanContext, carrier interface{}) error {
 	return fn(ctx, carrier)
 }
@@ -185,6 +232,7 @@ type zipkinTracer struct {
 	injectors  map[interface{}]injector
 }
 
+// SW-REQ-164
 func NewTracer(zip *zipkin.Tracer) *zipkinTracer {
 	return &zipkinTracer{
 		zip: zip,
@@ -197,6 +245,7 @@ func NewTracer(zip *zipkin.Tracer) *zipkinTracer {
 	}
 }
 
+// SW-REQ-164
 func (z *zipkinTracer) StartSpan(operationName string, opts ...opentracing.StartSpanOption) opentracing.Span {
 	var o []zipkin.SpanOption
 	if len(opts) > 0 {
@@ -225,6 +274,7 @@ func (z *zipkinTracer) StartSpan(operationName string, opts ...opentracing.Start
 	return Span{tr: z, span: sp}
 }
 
+// SW-REQ-164
 func (z *zipkinTracer) Extract(format interface{}, carrier interface{}) (opentracing.SpanContext, error) {
 	if x, ok := z.extractors[format]; ok {
 		return x.extract(carrier)
@@ -232,6 +282,7 @@ func (z *zipkinTracer) Extract(format interface{}, carrier interface{}) (opentra
 	return nil, opentracing.ErrUnsupportedFormat
 }
 
+// SW-REQ-164
 func (z *zipkinTracer) Inject(ctx opentracing.SpanContext, format interface{}, carrier interface{}) error {
 	c, ok := ctx.(spanContext)
 	if !ok {
@@ -248,10 +299,12 @@ type Tracer struct {
 	reporter.Reporter
 }
 
+// SW-REQ-164
 func (Tracer) Name() string {
 	return Name
 }
 
+// SW-REQ-164
 func Init(service string, opts map[string]interface{}) (*Tracer, error) {
 	c, err := Load(opts)
 	if err != nil {
@@ -279,6 +332,7 @@ func Init(service string, opts map[string]interface{}) (*Tracer, error) {
 	return &Tracer{Tracer: NewTracer(tr), Reporter: r}, nil
 }
 
+// SW-REQ-164
 func getSampler(s config.Sampler) (zipkin.Sampler, error) {
 	if s.Name == "" {
 		return zipkin.AlwaysSample, nil

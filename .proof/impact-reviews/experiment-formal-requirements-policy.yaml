@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T07:53:37Z"
+generated_at: "2026-06-21T08:12:44Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -923,6 +923,26 @@ reviews:
       approval_fingerprint: sha256:534281a60fab5a79ebd421ae77e2d1c6a3bca6e565d5d9b4c8690c0b5379bdb4
       artifact_fingerprint: sha256:5a273338dd0e55e8f9e78a23963d305cdb1e4bcc132214b7f9c6877954da23a2
       reviewed_at: "2026-06-21T07:53:37Z"
+    - requirement: SW-REQ-164
+      artifact: trace/openzipkin/config.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed OpenZipkin trace adapter implementation impact after adding ReqProof annotations and focused tests; production behavior and the approved OpenZipkin adapter requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:8c358e5e8a8875b5ecadb918fd93ef0a8f9f56eb44252a2fc2f0538143940cf6
+      approval_fingerprint: sha256:23582517a70bf72b11a30814f57ea4ec396176a3c39cbcb3a291d605c507c501
+      artifact_fingerprint: sha256:39810a5100b49a9ad6e44d0b36410d4d1205ae55879bdea54fe5ebb855aa7572
+      reviewed_at: "2026-06-21T08:12:44Z"
+    - requirement: SW-REQ-164
+      artifact: trace/openzipkin/zipkin.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed OpenZipkin trace adapter implementation impact after adding ReqProof annotations and focused tests; production behavior and the approved OpenZipkin adapter requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:8c358e5e8a8875b5ecadb918fd93ef0a8f9f56eb44252a2fc2f0538143940cf6
+      approval_fingerprint: sha256:23582517a70bf72b11a30814f57ea4ec396176a3c39cbcb3a291d605c507c501
+      artifact_fingerprint: sha256:92802c00f198b5a527ad49f1e35672492d49ea47123f9f0f0db0856d856f4151
+      reviewed_at: "2026-06-21T08:12:44Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

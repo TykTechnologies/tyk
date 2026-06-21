@@ -5,6 +5,7 @@ import (
 )
 
 // Load retusn a zipkin configuration from the opts.
+// SW-REQ-164
 func Load(opts map[string]interface{}) (*config.ZipkinConfig, error) {
 	var c config.ZipkinConfig
 	if err := config.DecodeJSON(&c, opts); err != nil {

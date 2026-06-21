@@ -1,0 +1,55 @@
+id: SW-REQ-164
+version: 1
+status: approved
+priority: shall
+category: observability
+req_type: guarantee
+fretish: ""
+description: The OpenZipkin trace adapter implementation shall preserve local adapter behavior for tested inputs by decoding JSON-compatible Zipkin option maps, selecting supported local samplers, returning the stable adapter name, constructing a local tracer when reporter URL and sampler options are valid, rejecting missing reporter URLs and unsupported sampler names, converting supported OpenTracing B3 HTTP header extraction and injection carriers, and forwarding local span facade operations to the wrapped Zipkin span, without claiming trace export delivery, collector connectivity, runtime sampling correctness beyond local sampler construction, span propagation through gateway requests, unsupported option value handling, environment override handling, full gateway tracing setup, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: trace/openzipkin/config_test.go; docs/openzipkin-trace-adapter-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-177
+component: openzipkin_trace_adapter
+rationale: This software requirement owns local trace/openzipkin adapter mechanics and focused package tests only. Integrated gateway tracing setup and exporter behavior are outside this proof slice.
+tags:
+    - observability
+    - tracing
+    - zipkin
+    - openzipkin
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-177
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T08:11:19Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. OpenZipkin trace adapter scope is limited to local trace/openzipkin behavior for tested JSON-compatible option map decoding, supported sampler construction, stable adapter naming, local tracer initialization success and local initialization errors, supported B3 HTTP header extraction and injection, and local span facade forwarding. This approval does not claim trace export delivery, collector connectivity, runtime sampling correctness beyond local sampler construction, span propagation through gateway requests, unsupported option value handling, environment override handling, full gateway tracing setup, or final client responses.
+        fingerprint: sha256:23582517a70bf72b11a30814f57ea4ec396176a3c39cbcb3a291d605c507c501
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T08:11:19Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added local OpenZipkin trace adapter behavior.
+          changed_by: agent:codex
