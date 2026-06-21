@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -157,6 +159,84 @@ func TestGatewayAPILoaderSkipInvalidSpecs(t *testing.T) {
 			assert.Equal(t, tt.wantSkip, gotSkip)
 			if tt.wantTargetURL != "" {
 				assert.Equal(t, tt.wantTargetURL, spec.Proxy.TargetURL)
+			}
+		})
+	}
+}
+
+// Verifies: STK-REQ-077, SYS-REQ-165, SW-REQ-152
+// STK-REQ-077:STK-REQ-077-AC-01:acceptance
+// SW-REQ-152:nominal:nominal
+// SW-REQ-152:boundary:nominal
+// SW-REQ-152:boundary:boundary
+// SW-REQ-152:determinism:nominal
+// SYS-REQ-165:determinism:nominal
+func TestGatewayAPILoaderLoopDetection(t *testing.T) {
+	tests := []struct {
+		name       string
+		targetURL  string
+		loopLevel  int
+		loopLimit  int
+		wantFound  bool
+		wantErr    bool
+		wantErrMsg string
+	}{
+		{
+			name:      "HTTP request is not a loop",
+			targetURL: "http://upstream.example.com/resource",
+		},
+		{
+			name:      "tyk request with default limit is a loop",
+			targetURL: "tyk://internal/resource",
+			wantFound: true,
+		},
+		{
+			name:      "tyk request at default limit is allowed",
+			targetURL: "tyk://internal/resource",
+			loopLevel: defaultLoopLevelLimit,
+			wantFound: true,
+		},
+		{
+			name:       "tyk request above default limit errors",
+			targetURL:  "tyk://internal/resource",
+			loopLevel:  defaultLoopLevelLimit + 1,
+			wantFound:  true,
+			wantErr:    true,
+			wantErrMsg: "Loop level too deep. Found more than 5 loops in single request",
+		},
+		{
+			name:      "tyk request at custom limit is allowed",
+			targetURL: "tyk://internal/resource",
+			loopLevel: 2,
+			loopLimit: 2,
+			wantFound: true,
+		},
+		{
+			name:       "tyk request above custom limit errors",
+			targetURL:  "tyk://internal/resource",
+			loopLevel:  3,
+			loopLimit:  2,
+			wantFound:  true,
+			wantErr:    true,
+			wantErrMsg: "Loop level too deep. Found more than 2 loops in single request",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tt.targetURL, nil)
+			ctxSetLoopLevel(req, tt.loopLevel)
+			if tt.loopLimit > 0 {
+				ctxSetLoopLimit(req, tt.loopLimit)
+			}
+
+			gotFound, err := isLoop(req)
+
+			assert.Equal(t, tt.wantFound, gotFound)
+			if tt.wantErr {
+				assert.EqualError(t, err, tt.wantErrMsg)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}

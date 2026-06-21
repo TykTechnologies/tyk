@@ -1,0 +1,53 @@
+id: SYS-REQ-165
+version: 1
+status: approved
+priority: shall
+category: gateway_api_loader_loop_detection
+req_type: guarantee
+fretish: ""
+description: Gateway API loader loop detection shall preserve deterministic local results for tested tyk and non-tyk request schemes and for loop levels below, at, and above default or explicit loop limits, without claiming internal proxy routing, loop request dispatch, middleware execution, upstream connectivity, distributed synchronization, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-077
+component: gateway_api_loader_loop_detection
+rationale: This system requirement owns local loop detection and limit checks only. Integrated loop dispatch and handler behavior remain outside this proof slice.
+tags:
+    - gateway
+    - api-loader
+    - loop-detection
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-077
+    reviewed_at: "2026-06-21T05:19:58.780413Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:97d9d6244f9a1c73705b418b1e243a39c646950f73cf78025481e1ac35e73c42
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API loader loop-detection scope is limited to local gateway/api_loader.go isLoop behavior for tested URL schemes and loop-level limits. This approval does not claim internal proxy routing, loop request dispatch, middleware execution, upstream connectivity, distributed synchronization, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API loader loop detection system requirement.
+          changed_by: agent:codex

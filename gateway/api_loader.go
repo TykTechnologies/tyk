@@ -671,6 +671,7 @@ func (gw *Gateway) configureAuthAndOrgStores(gs *generalStores, spec *APISpec) (
 // Check for recursion
 const defaultLoopLevelLimit = 5
 
+// SW-REQ-152
 func isLoop(r *http.Request) (bool, error) {
 	if r.URL.Scheme != "tyk" {
 		return false, nil
