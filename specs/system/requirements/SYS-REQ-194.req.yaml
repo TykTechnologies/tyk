@@ -1,0 +1,59 @@
+id: SYS-REQ-194
+version: 1
+status: approved
+priority: shall
+category: gateway_upstream_tls_validation
+req_type: guarantee
+fretish: ""
+description: Gateway upstream TLS validation shall preserve focused tested behavior by accepting upstream public keys that match configured API pins, rejecting mismatched pins, falling back to normal verification when API certificate pinning is disabled, applying configured global pins, validating pins through the tested proxy path, and applying forced CommonName validation for tested direct and proxied upstream inputs, without claiming complete TLS handshake semantics, certificate chain policy correctness, arbitrary proxy behavior, downstream client certificate selection, TLS version or cipher policy, certificate material storage durability, route generation, authentication enforcement, distributed synchronization, or final client-visible gateway behavior outside the focused upstream TLS validation tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-106
+component: gateway_upstream_tls_validation
+rationale: This system requirement owns focused upstream public-key pinning and CommonName validation behavior only. Broader TLS transport and certificate-management semantics remain outside this proof slice.
+tags:
+    - gateway
+    - certificate
+    - upstream
+    - tls
+    - pinning
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-106
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T11:29:12Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway upstream TLS validation scope is limited to focused tests for public-key pin enablement and fingerprint selection, pin match, pin mismatch, API pinning disabled behavior, global pinning behavior, tested proxy pinning path, and forced CommonName validation for tested direct and proxied upstream inputs. This approval does not claim complete TLS handshake semantics, certificate chain policy correctness, arbitrary proxy behavior, downstream client certificate selection, TLS version or cipher policy, certificate material storage durability, route generation, authentication enforcement, distributed synchronization, or final client-visible gateway behavior outside the focused upstream TLS validation tests.
+        fingerprint: sha256:8792ea6e2b9056a16c72c444498d4028c1ba6cde834b8129806fdec64c187bc4
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T12:40:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T11:29:12Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+lifecycle:
+    change_history:
+        - date: "2026-06-21T12:40:00Z"
+          from: draft
+          to: approved
+          reason: Added focused gateway upstream TLS validation system requirement.
+          changed_by: human:buger
+        - date: "2026-06-21T11:29:12Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-21T12:40:00Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway upstream TLS validation system scope is limited to focused tests for public-key pin match, pin mismatch, API pinning disabled behavior, global pinning behavior, tested proxy pinning path, and forced CommonName validation for tested direct and proxied upstream inputs. This approval does not claim complete TLS handshake semantics, certificate chain policy correctness, arbitrary proxy behavior, downstream client certificate selection, TLS version or cipher policy, certificate material storage durability, route generation, authentication enforcement, distributed synchronization, or final client-visible gateway behavior outside the focused upstream TLS validation tests.")'
+          changed_by: human:buger

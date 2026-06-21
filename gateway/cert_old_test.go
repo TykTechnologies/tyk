@@ -92,6 +92,20 @@ func setGODEBUG(t *testing.T) {
 	assert.NoError(t, os.Setenv("GODEBUG", goDebugVal))
 }
 
+// Verifies: STK-REQ-106, SYS-REQ-194, SW-REQ-182
+// STK-REQ-106:STK-REQ-106-AC-01:acceptance
+// STK-REQ-106:nominal:nominal
+// STK-REQ-106:boundary:nominal
+// STK-REQ-106:error_handling:negative
+// STK-REQ-106:error_handling:nominal
+// SYS-REQ-194:nominal:nominal
+// SYS-REQ-194:boundary:nominal
+// SYS-REQ-194:error_handling:negative
+// SYS-REQ-194:error_handling:nominal
+// SW-REQ-182:nominal:nominal
+// SW-REQ-182:boundary:nominal
+// SW-REQ-182:error_handling:negative
+// SW-REQ-182:error_handling:nominal
 func TestPublicKeyPinning(t *testing.T) {
 	test.Flaky(t) // TODO: TT-5260
 

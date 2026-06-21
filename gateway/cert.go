@@ -160,6 +160,7 @@ func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls
 	return certs[0]
 }
 
+// SW-REQ-182
 func (gw *Gateway) verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	if (spec == nil || spec.CertificatePinningDisabled || len(spec.PinnedPublicKeys) == 0) &&
 		len(gw.GetConfig().Security.PinnedPublicKeys) == 0 {
@@ -196,6 +197,7 @@ func (gw *Gateway) verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tl
 	}
 }
 
+// SW-REQ-182
 func (gw *Gateway) validatePublicKeys(host string, conn *tls.Conn, spec *APISpec) bool {
 	gwConf := gw.GetConfig()
 	certLog.Debug("Checking certificate public key for host:", host)
@@ -226,6 +228,7 @@ func (gw *Gateway) validatePublicKeys(host string, conn *tls.Conn, spec *APISpec
 	return isValid
 }
 
+// SW-REQ-182
 func validateCommonName(host string, cert *x509.Certificate) error {
 	certLog.Debug("Checking certificate CommonName for host :", host)
 
@@ -236,6 +239,7 @@ func validateCommonName(host string, cert *x509.Certificate) error {
 	return nil
 }
 
+// SW-REQ-182
 func (gw *Gateway) customDialTLSCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
 	var checkPinnedKeys, checkCommonName bool
 	gwConfig := gw.GetConfig()
@@ -282,6 +286,7 @@ func (gw *Gateway) customDialTLSCheck(spec *APISpec, tc *tls.Config) func(networ
 	}
 }
 
+// SW-REQ-182
 func (gw *Gateway) getPinnedPublicKeys(host string, spec *APISpec, conf config.Config) (fingerprint []string) {
 	var keyIDs string
 
