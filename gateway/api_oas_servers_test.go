@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Verifies: SYS-REQ-104, SW-REQ-059
+// SW-REQ-059:nominal:nominal
+// SW-REQ-059:boundary:nominal
+// SW-REQ-059:determinism:nominal
 func TestBuildServerRegenerationConfig(t *testing.T) {
 	t.Parallel()
 
@@ -98,6 +102,10 @@ func TestBuildServerRegenerationConfig(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
+// SW-REQ-059:nominal:nominal
+// SW-REQ-059:boundary:nominal
+// SW-REQ-059:determinism:nominal
 func TestExtractVersioningParams(t *testing.T) {
 	t.Parallel()
 
@@ -136,6 +144,10 @@ func TestExtractVersioningParams(t *testing.T) {
 	}
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
+// SW-REQ-059:nominal:nominal
+// SW-REQ-059:boundary:nominal
+// SW-REQ-059:determinism:nominal
 func TestHandleOASServersForNewAPI(t *testing.T) {
 	t.Parallel()
 
@@ -298,6 +310,10 @@ func TestHandleOASServersForNewAPI(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
+// SW-REQ-059:nominal:nominal
+// SW-REQ-059:boundary:nominal
+// SW-REQ-059:determinism:nominal
 func TestHandleOASServersForUpdate(t *testing.T) {
 	t.Parallel()
 
@@ -507,6 +523,11 @@ func TestHandleOASServersForUpdate(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-104, SW-REQ-059
+// SW-REQ-059:nominal:nominal
+// SW-REQ-059:boundary:nominal
+// SW-REQ-059:error_handling:nominal
+// SW-REQ-059:determinism:nominal
 func TestUpdateOldDefaultChildServersGW(t *testing.T) {
 	t.Parallel()
 

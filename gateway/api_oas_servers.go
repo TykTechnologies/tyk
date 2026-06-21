@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
+// SW-REQ-059
 // buildServerRegenerationConfig creates a ServerRegenerationConfig from Gateway config.
 func buildServerRegenerationConfig(conf config.Config) oas.ServerRegenerationConfig {
 	protocol := "http://"
@@ -39,6 +40,7 @@ func buildServerRegenerationConfig(conf config.Config) oas.ServerRegenerationCon
 	}
 }
 
+// SW-REQ-059
 // regenerateOASServers updates the servers section of an OAS API.
 // This preserves user provided servers while correctly updating Tyk generated ones.
 func (gw *Gateway) regenerateOASServers(
@@ -72,12 +74,14 @@ func (gw *Gateway) regenerateOASServers(
 	)
 }
 
+// SW-REQ-059
 // shouldUpdateChildAPIsGW checks if child APIs need server updates after base API changes.
 // Returns true if this is a base API with versions and versioning config changed.
 func (gw *Gateway) shouldUpdateChildAPIsGW(newBaseAPI, oldBaseAPI *apidef.APIDefinition) bool {
 	return oas.ShouldUpdateChildAPIs(newBaseAPI, oldBaseAPI)
 }
 
+// SW-REQ-059
 // updateChildAPIsServersGW updates server URLs for all child APIs when base API versioning changes.
 // This is called after updating a base API if versioning configuration changed.
 func (gw *Gateway) updateChildAPIsServersGW(newBaseAPISpec, oldBaseAPISpec *APISpec) error {
@@ -131,6 +135,7 @@ func (gw *Gateway) updateChildAPIsServersGW(newBaseAPISpec, oldBaseAPISpec *APIS
 	return nil
 }
 
+// SW-REQ-059
 // updateOldDefaultChildServersGW updates the server URLs for the old default child API
 // when a new version is set as default. This removes the fallback URL from the old default
 // since it's no longer the default version.
@@ -214,6 +219,7 @@ type versioningParams struct {
 	VersionName string
 }
 
+// SW-REQ-059
 // extractVersioningParams extracts versioning parameters from query string or returns empty if not versioned.
 // This helper makes it easy to get versioning info for server regeneration.
 func extractVersioningParams(baseAPIID, versionName string) versioningParams {
@@ -223,6 +229,7 @@ func extractVersioningParams(baseAPIID, versionName string) versioningParams {
 	}
 }
 
+// SW-REQ-059
 // handleOASServersForNewAPI handles OAS server creation when adding a new API.
 // It determines if this is a versioned child API and creates servers accordingly.
 func (gw *Gateway) handleOASServersForNewAPI(
@@ -241,6 +248,7 @@ func (gw *Gateway) handleOASServersForNewAPI(
 	return gw.regenerateOASServers(nil, apiDef, oasObj, baseAPISpec, versionName)
 }
 
+// SW-REQ-059
 // handleOASServersForUpdate handles OAS server regeneration and cascade updates when updating an API.
 // It regenerates servers for the updated API and triggers cascade updates to child APIs if needed.
 func (gw *Gateway) handleOASServersForUpdate(

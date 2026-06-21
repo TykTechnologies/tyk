@@ -73,7 +73,8 @@ OAS schema example extraction shapes, OAS schema-validation helper behavior,
 OAS internal endpoint helper shapes, OAS endpoint tracking helper shapes, OAS
 utility helper shapes, OAS deprecated-wrapper conversion shapes, OAS Tyk
 streaming extension shape, OAS event-handler helper shapes,
-OAS server-regeneration helper shapes,
+OAS server-regeneration helper shapes and gateway-side OAS server orchestration
+helper behavior,
 internal reflection support helper behavior,
 custom middleware definition enablement classification, OAS extension header
 name/value helper shapes, OAS extension error-override helper shapes, adapter
@@ -251,19 +252,21 @@ execution, API import, route generation, request matching, gateway request
 admission, external handler plugin behavior, or final client-visible runtime
 behavior.
 
-`SW-REQ-059` owns the concrete `apidef/oas` server-regeneration helpers used by
-API-definition support models. Its evidence covers Tyk-managed absolute and
-relative server URL generation from custom domains, default gateway hosts, edge
-endpoints, API tags, hybrid mode, listen paths, and base or child versioning
-configuration; URL-path, query-parameter, and header-versioned URL shapes;
-fallback-to-default and external-child direct-access behavior; replacement of
-previously generated Tyk servers while preserving user-provided servers;
-normalized URL deduplication; extraction of user-provided servers from mixed
-server lists; generated invalid server-template errors; and deterministic
-repeated generation. This evidence does not claim API import, full OAS
-conversion, route generation, request matching, gateway request admission,
-gateway listener binding, edge gateway availability, middleware execution, or
-final client-visible routing behavior.
+`SW-REQ-059` owns the concrete `apidef/oas` server-regeneration helpers and the
+local `gateway/api_oas_servers.go` orchestration helpers used by API-definition
+support models. Its evidence covers Tyk-managed absolute and relative server
+URL generation from custom domains, default gateway hosts, gateway listen
+configuration, edge endpoints, API tags, hybrid mode, listen paths, and base or
+child versioning configuration; URL-path, query-parameter, and header-versioned
+URL shapes; fallback-to-default and external-child direct-access behavior;
+replacement of previously generated Tyk servers while preserving user-provided
+servers; normalized URL deduplication; extraction of user-provided servers from
+mixed server lists; gateway-side new-API, update, child-cascade, and
+old-default-child regeneration helper flows; generated invalid server-template
+errors; and deterministic repeated generation. This evidence does not claim API
+import, full OAS conversion, route generation, request matching, gateway request
+admission, gateway listener binding, edge gateway availability, middleware
+execution, persistence durability, or final client-visible routing behavior.
 
 `SW-REQ-060` owns the concrete `apidef/oas` validator helpers used by
 API-definition support models. Its evidence covers OAS definitions-key
