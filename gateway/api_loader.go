@@ -95,10 +95,12 @@ func (gw *Gateway) skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) b
 	return false
 }
 
+// SW-REQ-149
 func generateDomainPath(hostname, listenPath string) string {
 	return hostname + listenPath
 }
 
+// SW-REQ-149
 func countApisByListenHash(specs []*APISpec) map[string]int {
 	count := make(map[string]int, len(specs))
 	// We must track the hostname no matter what
@@ -119,6 +121,7 @@ func countApisByListenHash(specs []*APISpec) map[string]int {
 	return count
 }
 
+// SW-REQ-149
 func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
 	for index := range funcs {
 		funcs[index].Path = filepath.Join(pathPrefix, funcs[index].Path)
