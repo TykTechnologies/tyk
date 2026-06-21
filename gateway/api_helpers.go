@@ -19,10 +19,12 @@ type apiFilterFunc func(*APISpec) bool
 
 type apiTypeCheck func(*APISpec) error
 
+// SW-REQ-126
 func isOASNotMCP(spec *APISpec) bool {
 	return spec.IsOAS && !spec.IsMCP()
 }
 
+// SW-REQ-126
 func typeCheckFunc(name string, predicate apiFilterFunc) apiTypeCheck {
 	return func(spec *APISpec) error {
 		if !predicate(spec) {
@@ -36,6 +38,7 @@ var (
 	mcpTypeCheck = typeCheckFunc("MCP Proxy", (*APISpec).IsMCP)
 )
 
+// SW-REQ-126
 func (gw *Gateway) setBaseAPIIDHeader(w http.ResponseWriter, oasObj *oas.OAS) {
 	if oasObj == nil {
 		return
@@ -52,6 +55,7 @@ func (gw *Gateway) setBaseAPIIDHeader(w http.ResponseWriter, oasObj *oas.OAS) {
 	}
 }
 
+// SW-REQ-126
 func ensureAndValidateAPIID(apiDef *apidef.APIDefinition) (interface{}, int) {
 	if apiDef.APIID == "" {
 		apiDef.GenerateAPIID()
@@ -65,6 +69,7 @@ func ensureAndValidateAPIID(apiDef *apidef.APIDefinition) (interface{}, int) {
 	return nil, 0
 }
 
+// SW-REQ-126
 func deleteAPIFiles(apiID, suffix, appPath string, fs afero.Fs) error {
 	defFilePath := filepath.Join(appPath, apiID+".json")
 	defFilePath = filepath.Clean(defFilePath)
@@ -92,6 +97,7 @@ func deleteAPIFiles(apiID, suffix, appPath string, fs afero.Fs) error {
 	return nil
 }
 
+// SW-REQ-126
 func validateSpecExists(spec *APISpec) (interface{}, int) {
 	if spec == nil {
 		return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
@@ -99,6 +105,7 @@ func validateSpecExists(spec *APISpec) (interface{}, int) {
 	return nil, 0
 }
 
+// SW-REQ-126
 func validateAPIIDMatch(pathAPIID, requestAPIID string) (interface{}, int) {
 	if pathAPIID != "" && requestAPIID != pathAPIID {
 		log.Error("PUT operation on different APIIDs")
@@ -107,6 +114,7 @@ func validateAPIIDMatch(pathAPIID, requestAPIID string) (interface{}, int) {
 	return nil, 0
 }
 
+// SW-REQ-126
 func (gw *Gateway) handleGetOASList(filter apiFilterFunc, modePublic bool) (interface{}, int) {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
@@ -126,6 +134,7 @@ func (gw *Gateway) handleGetOASList(filter apiFilterFunc, modePublic bool) (inte
 	return apisList, http.StatusOK
 }
 
+// SW-REQ-126
 func (gw *Gateway) handleGetOASByID(apiID string, typeCheck apiTypeCheck) (interface{}, int) {
 	if err := sanitize.ValidatePathComponent(apiID); err != nil {
 		log.Errorf("Invalid API ID %q: %v", apiID, err)
@@ -145,6 +154,7 @@ func (gw *Gateway) handleGetOASByID(apiID string, typeCheck apiTypeCheck) (inter
 	return &api.OAS, http.StatusOK
 }
 
+// SW-REQ-126
 func deepCopyViaJSON[T any](src *T) (*T, error) {
 	data, err := json.Marshal(src)
 	if err != nil {
@@ -159,16 +169,19 @@ func deepCopyViaJSON[T any](src *T) (*T, error) {
 	return &copy, nil
 }
 
+// SW-REQ-126
 func copyAPIDefForPersistence(apiDef *apidef.APIDefinition) (*apidef.APIDefinition, error) {
 	return deepCopyViaJSON(apiDef)
 }
 
+// SW-REQ-126
 func copyOASForPersistence(oasObj *oas.OAS) (*oas.OAS, error) {
 	return deepCopyViaJSON(oasObj)
 }
 
 // copyBaseAPIForPersistence creates copies of the API definition and OAS (if applicable) for persistence.
 // It returns the copies and any error encountered during the copy process.
+// SW-REQ-126
 func copyBaseAPIForPersistence(baseAPI *APISpec) (*apidef.APIDefinition, *oas.OAS, error) {
 	apiDefCopy, err := copyAPIDefForPersistence(baseAPI.APIDefinition)
 	if err != nil {
@@ -188,6 +201,7 @@ func copyBaseAPIForPersistence(baseAPI *APISpec) (*apidef.APIDefinition, *oas.OA
 
 // persistBaseAPI writes the base API to file, handling both OAS and non-OAS cases.
 // updateOldDefaultIfNeeded updates the old default child API if needed based on version parameters.
+// SW-REQ-126
 func (gw *Gateway) updateOldDefaultIfNeeded(
 	versionParams *lib.VersionQueryParameters,
 	baseAPIID string,
@@ -211,6 +225,7 @@ func (gw *Gateway) updateOldDefaultIfNeeded(
 	}
 }
 
+// SW-REQ-126
 func (gw *Gateway) updateBaseAPIWithNewVersion(
 	baseAPIID string,
 	versionParams *lib.VersionQueryParameters,
@@ -256,6 +271,7 @@ func (gw *Gateway) updateBaseAPIWithNewVersion(
 
 // removeVersionFromDefinition removes an API version from the version definition.
 // If the removed version was the default, it resets the default to the base version name.
+// SW-REQ-126
 func removeVersionFromDefinition(versionDef *apidef.VersionDefinition, apiID string) {
 	for versionName, versionAPIID := range versionDef.Versions {
 		if apiID == versionAPIID {
@@ -269,6 +285,7 @@ func removeVersionFromDefinition(versionDef *apidef.VersionDefinition, apiID str
 }
 
 // persistBaseAPIWithError writes the base API to file and returns any errors encountered.
+// SW-REQ-126
 func (gw *Gateway) persistBaseAPIWithError(fs afero.Fs, apiDefCopy *apidef.APIDefinition, oasCopy *oas.OAS, isOAS bool, apiID string) error {
 	if isOAS {
 		err, _ := gw.writeOASAndAPIDefToFile(fs, apiDefCopy, oasCopy)
@@ -286,6 +303,7 @@ func (gw *Gateway) persistBaseAPIWithError(fs afero.Fs, apiDefCopy *apidef.APIDe
 	return nil
 }
 
+// SW-REQ-126
 func (gw *Gateway) removeAPIFromBaseVersion(apiID string, baseAPIID string, fs afero.Fs) error {
 	gw.apisMu.Lock()
 
@@ -317,6 +335,7 @@ func (gw *Gateway) removeAPIFromBaseVersion(apiID string, baseAPIID string, fs a
 	return gw.persistBaseAPIWithError(fs, apiDefCopy, oasCopy, isOAS, apiIDStr)
 }
 
+// SW-REQ-126
 func buildSuccessResponse(apiID, action string) (interface{}, int) {
 	return apiModifyKeySuccess{
 		Key:    apiID,
@@ -325,6 +344,7 @@ func buildSuccessResponse(apiID, action string) (interface{}, int) {
 	}, http.StatusOK
 }
 
+// SW-REQ-126
 func handleBaseVersionCleanup(gw *Gateway, spec *APISpec, apiID string, fs afero.Fs) {
 	if spec.VersionDefinition.BaseID != "" {
 		if err := gw.removeAPIFromBaseVersion(apiID, spec.VersionDefinition.BaseID, fs); err != nil {
@@ -333,6 +353,7 @@ func handleBaseVersionCleanup(gw *Gateway, spec *APISpec, apiID string, fs afero
 	}
 }
 
+// SW-REQ-126
 func handleBaseVersionUpdate(gw *Gateway, versionParams *lib.VersionQueryParameters, newAPIID string, fs afero.Fs) (interface{}, int) {
 	if !versionParams.IsEmpty(lib.BaseAPIID) {
 		baseAPIID := versionParams.Get(lib.BaseAPIID)
