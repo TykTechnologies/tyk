@@ -1,0 +1,55 @@
+id: SYS-REQ-173
+version: 1
+status: approved
+priority: shall
+category: http_server_header_helpers
+req_type: guarantee
+fretish: ""
+description: HTTP server and header helper handling shall preserve deterministic local helper results for tested inputs by constructing connection watchers with zero count, applying explicit and connection-state count deltas, leaving non-counting connection states unchanged, reporting the current count, and constructing Basic Authorization header values from username and password pairs, without claiming nonnegative connection-count enforcement, full server lifecycle management, upstream authentication, credential validation, transport security, analytics, persistence, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-085
+component: http_server_header_helpers
+rationale: This system requirement owns local internal/httputil connection watcher and Basic auth header helper decisions only. Integrated gateway server lifecycle and upstream authentication behavior remain outside this proof slice.
+tags:
+    - http
+    - server
+    - header
+    - helper
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-085
+    reviewed_at: "2026-06-21T07:01:40.493774Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:0b491aa44003650368316747c591e383345381aad73e69835c15c4848a750e91
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. HTTP server/header helper scope is limited to local internal/httputil behavior for tested connection watcher construction, explicit count deltas, connection-state count deltas, non-counting state handling, count reporting, and Basic Authorization header construction. This approval does not claim nonnegative connection-count enforcement, full server lifecycle management, upstream authentication, credential validation, transport security, analytics, persistence, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added HTTP server/header helper system requirement.
+          changed_by: agent:codex

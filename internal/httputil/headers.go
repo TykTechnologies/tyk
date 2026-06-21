@@ -19,6 +19,7 @@ var CORSHeaders = []string{
 // AuthHeader will take username and password and return
 // "Basic " + base64 encoded `username:password` for use
 // in an Authorization header.
+// SW-REQ-160
 func AuthHeader(username, password string) string {
 	toEncode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(toEncode))

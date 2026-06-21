@@ -12,6 +12,7 @@ type ConnectionWatcher struct {
 }
 
 // NewConnectionWatcher returns a new *ConnectionWatcher.
+// SW-REQ-160
 func NewConnectionWatcher() *ConnectionWatcher {
 	return &ConnectionWatcher{}
 }
@@ -19,6 +20,7 @@ func NewConnectionWatcher() *ConnectionWatcher {
 // OnStateChange records open connections in response to connection
 // state changes. Set net/http Server.ConnState to this method
 // as value.
+// SW-REQ-160
 func (cw *ConnectionWatcher) OnStateChange(_ net.Conn, state http.ConnState) {
 	switch state {
 	case http.StateNew:
@@ -29,11 +31,13 @@ func (cw *ConnectionWatcher) OnStateChange(_ net.Conn, state http.ConnState) {
 }
 
 // Count returns the number of connections at the time the call.
+// SW-REQ-160
 func (cw *ConnectionWatcher) Count() int {
 	return int(atomic.LoadInt64(&cw.n))
 }
 
 // Add adds c to the number of active connections.
+// SW-REQ-160
 func (cw *ConnectionWatcher) Add(c int64) {
 	atomic.AddInt64(&cw.n, c)
 }

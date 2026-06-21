@@ -1,0 +1,61 @@
+id: STK-REQ-085
+version: 1
+status: approved
+priority: shall
+category: http_server_header_helpers
+req_type: guarantee
+fretish: ""
+description: HTTP server and header helper support shall preserve deterministic local helper behavior for tested inputs by constructing connection watchers with zero count, applying explicit and connection-state count deltas, leaving non-counting connection states unchanged, reporting the current count, and constructing Basic Authorization header values from username and password pairs, without claiming nonnegative connection-count enforcement, full server lifecycle management, upstream authentication, credential validation, transport security, analytics, persistence, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: http_server_header_helpers
+rationale: HTTP server and header helpers provide local count tracking and header construction before gateway server and upstream-auth flows consume them. This requirement owns only focused helper behavior under tests.
+tags:
+    - http
+    - server
+    - header
+    - helper
+variables: []
+traces:
+    reviewed_at: "2026-06-21T07:01:40.391119Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:def53323dfc562b903b320518273ce3b897750383940be3e39cd1032dca5ef74
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. HTTP server/header helper scope is limited to local internal/httputil behavior for tested connection watcher construction, explicit count deltas, connection-state count deltas, non-counting state handling, count reporting, and Basic Authorization header construction. This approval does not claim nonnegative connection-count enforcement, full server lifecycle management, upstream authentication, credential validation, transport security, analytics, persistence, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - encoding_safety
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need local HTTP server and header helpers to track tested connection-count changes and construct Basic Authorization header values consistently before gateway server and upstream-auth flows use those helper results.
+    acceptance_criteria:
+        - id: STK-REQ-085-AC-01
+          text: Given tested connection watcher and Basic auth inputs, when local helper functions are exercised, then zero initial counts, explicit deltas, connection-state deltas, ignored non-counting states, current count reporting, and Basic Authorization header encoding are produced as expected for those inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-173
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added HTTP server/header helper requirement for focused internal/httputil tests.
+          changed_by: agent:codex
