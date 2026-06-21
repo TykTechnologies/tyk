@@ -33,6 +33,7 @@ type DefaultSessionManager struct {
 	Gw    *Gateway `json:"-"`
 }
 
+// SW-REQ-179
 func (b *DefaultSessionManager) ResetQuotaObfuscateKey(keyName string) string {
 	if !b.Gw.GetConfig().HashKeys && !b.Gw.GetConfig().EnableKeyLogging {
 		return b.Gw.obfuscateKey(keyName)
@@ -40,12 +41,14 @@ func (b *DefaultSessionManager) ResetQuotaObfuscateKey(keyName string) string {
 	return keyName
 }
 
+// SW-REQ-179
 func (b *DefaultSessionManager) Init(store storage.Handler) {
 	b.store = store
 	b.store.Connect()
 }
 
 // KeyExpired checks if a key has expired, if the value of user.SessionState.Expires is 0, it will be ignored
+// SW-REQ-179
 func (b *DefaultSessionManager) KeyExpired(newSession *user.SessionState) bool {
 	if newSession.Expires >= 1 {
 		return time.Now().After(time.Unix(newSession.Expires, 0))
@@ -53,10 +56,12 @@ func (b *DefaultSessionManager) KeyExpired(newSession *user.SessionState) bool {
 	return false
 }
 
+// SW-REQ-179
 func (b *DefaultSessionManager) Store() storage.Handler {
 	return b.store
 }
 
+// SW-REQ-179
 func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.SessionState, isHashed bool) {
 	origKeyName := keyName
 
@@ -80,6 +85,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	b.store.DeleteRawKeys(keys)
 }
 
+// SW-REQ-179
 func rawKeysWithAllowanceScope(keys []string, keyName string, session *user.SessionState) []string {
 	for _, acl := range session.AccessRights {
 		if acl.AllowanceScope == "" {
@@ -90,6 +96,7 @@ func rawKeysWithAllowanceScope(keys []string, keyName string, session *user.Sess
 	return keys
 }
 
+// SW-REQ-179
 func (b *DefaultSessionManager) deleteRawKeysWithAllowanceScope(store storage.Handler, session *user.SessionState, keyName string) {
 	if store == nil || session == nil {
 		return
@@ -104,6 +111,7 @@ func (b *DefaultSessionManager) deleteRawKeysWithAllowanceScope(store storage.Ha
 	}
 }
 
+// SW-REQ-179
 func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 	cacheKey := keyName
 	if !hashed {
@@ -122,6 +130,7 @@ func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 }
 
 // UpdateSession updates the session state in the storage engine
+// SW-REQ-179
 func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState,
 	resetTTLTo int64, hashed bool) error {
 	defer b.clearCacheForKey(keyName, hashed)
@@ -144,6 +153,7 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 }
 
 // RemoveSession removes session from storage
+// SW-REQ-179
 func (b *DefaultSessionManager) RemoveSession(orgID string, keyName string, hashed bool) bool {
 	defer b.clearCacheForKey(keyName, hashed)
 
@@ -158,6 +168,7 @@ func (b *DefaultSessionManager) RemoveSession(orgID string, keyName string, hash
 }
 
 // SessionDetail returns the session detail using the storage engine (either in memory or Redis)
+// SW-REQ-179
 func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
 	var jsonKeyVal string
 	var err error
@@ -215,9 +226,11 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	return session.Clone(), true
 }
 
+// SW-REQ-179
 func (b *DefaultSessionManager) Stop() {}
 
 // Sessions returns all sessions in the key store that match a filter key (a prefix)
+// SW-REQ-179
 func (b *DefaultSessionManager) Sessions(filter string) []string {
 	return b.store.GetKeys(filter)
 }
@@ -226,6 +239,7 @@ type DefaultKeyGenerator struct {
 	Gw *Gateway `json:"-"`
 }
 
+// SW-REQ-179
 func (gw *Gateway) generateToken(orgID, keyID string, customHashKeyFunction ...string) string {
 	keyID = strings.TrimPrefix(keyID, orgID)
 	hashKeyFunction := gw.GetConfig().HashKeyFunction
@@ -246,11 +260,13 @@ func (gw *Gateway) generateToken(orgID, keyID string, customHashKeyFunction ...s
 }
 
 // GenerateAuthKey is a utility function for generating new auth keys. Returns the storage key name and the actual key
+// SW-REQ-179
 func (d DefaultKeyGenerator) GenerateAuthKey(orgID string) string {
 	return d.Gw.generateToken(orgID, "")
 }
 
 // GenerateHMACSecret is a utility function for generating new auth keys. Returns the storage key name and the actual key
+// SW-REQ-179
 func (DefaultKeyGenerator) GenerateHMACSecret() string {
 	return base64.StdEncoding.EncodeToString([]byte(uuid.NewHex()))
 }

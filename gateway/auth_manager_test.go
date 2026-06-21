@@ -252,6 +252,13 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 
 }
 
+// Verifies: SYS-REQ-141, SW-REQ-179
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SYS-REQ-141:determinism:nominal
+// SW-REQ-179:nominal:nominal
+// SW-REQ-179:boundary:nominal
+// SW-REQ-179:determinism:nominal
 func TestResetQuotaObfuscate(t *testing.T) {
 
 	t.Run("Obfuscate key", func(t *testing.T) {
@@ -383,6 +390,17 @@ func TestCustomKeysEdgeGw(t *testing.T) {
 
 }
 
+// Verifies: SYS-REQ-141, SW-REQ-179
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SYS-REQ-141:error_handling:negative
+// SYS-REQ-141:error_handling:nominal
+// SYS-REQ-141:determinism:nominal
+// SW-REQ-179:nominal:nominal
+// SW-REQ-179:boundary:nominal
+// SW-REQ-179:error_handling:negative
+// SW-REQ-179:error_handling:nominal
+// SW-REQ-179:determinism:nominal
 func TestDeleteRawKeysWithAllowanceScope(t *testing.T) {
 	sessionManager := DefaultSessionManager{}
 
@@ -442,6 +460,7 @@ func TestDeleteRawKeysWithAllowanceScope(t *testing.T) {
 type countingStorageHandler struct {
 	deleteRawKeyMutex *sync.Mutex
 	deleteRawKeyCount int
+	deletedRawKeys    []string
 }
 
 func newCountingStorageHandler() *countingStorageHandler {
@@ -495,6 +514,7 @@ func (c *countingStorageHandler) DeleteRawKey(s string) bool {
 	c.deleteRawKeyMutex.Lock()
 	defer c.deleteRawKeyMutex.Unlock()
 	c.deleteRawKeyCount++
+	c.deletedRawKeys = append(c.deletedRawKeys, s)
 	return true
 }
 
@@ -502,6 +522,7 @@ func (c *countingStorageHandler) DeleteRawKeys(keys []string) bool {
 	c.deleteRawKeyMutex.Lock()
 	defer c.deleteRawKeyMutex.Unlock()
 	c.deleteRawKeyCount += len(keys)
+	c.deletedRawKeys = append(c.deletedRawKeys, keys...)
 	return true
 }
 
