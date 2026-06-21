@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-20T18:08:33Z"
+generated_at: "2026-06-21T02:32:48Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -603,6 +603,106 @@ reviews:
       approval_fingerprint: sha256:0522db80a99550b0fa56c0407b5d576274d3a60794e3475ad81ec483180ca500
       artifact_fingerprint: sha256:604d11b257f038b375cc9e8226dcd5de3878444d863130f2ae07c7b9200635d5
       reviewed_at: "2026-06-20T18:08:33Z"
+    - requirement: SW-REQ-130
+      artifact: gateway/api_definition.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed implementation impact for gateway/api_definition.go after ReqProof annotation-only changes. Executable behavior did not change; SW-REQ-130 and linked evidence remain correct.
+      base: origin/master
+      requirement_fingerprint: sha256:ccd468850460acf9629df9c925a0b44c5d477f86c6effc457a3f81afc10f4475
+      approval_fingerprint: sha256:321687b97f8baa775b6d1d9988547e26df4a9a2970058593d413b8002400d988
+      artifact_fingerprint: sha256:b50ee6175c0f1aa6d686e7353c06f16794767510b5df6fb3238fbc4a7b195e87
+      reviewed_at: "2026-06-21T02:32:16Z"
+    - requirement: SW-REQ-131
+      artifact: gateway/api_definition.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed remaining pending implementation impact after ReqProof annotation-only changes. Executable behavior did not change; linked requirements and evidence remain correct.
+      base: origin/master
+      requirement_fingerprint: sha256:870d5d1b4e77823f3c0b8199a78545855dbb5b111f5adf0e7c07f6ae2a263c75
+      approval_fingerprint: sha256:4fe300f73c0355967140149e3ca9b5923c20abaf4f0c813a39382a0c3d18ed30
+      artifact_fingerprint: sha256:b50ee6175c0f1aa6d686e7353c06f16794767510b5df6fb3238fbc4a7b195e87
+      reviewed_at: "2026-06-21T02:32:48Z"
+    - requirement: SW-REQ-132
+      artifact: gateway/api_definition.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed remaining pending implementation impact after ReqProof annotation-only changes. Executable behavior did not change; linked requirements and evidence remain correct.
+      base: origin/master
+      requirement_fingerprint: sha256:ec0bfe2437f56d1b80ead2df8a2841aa933a159b9502f5cdc9ade86ddfc6276e
+      approval_fingerprint: sha256:6d07dd2dccb5246c3c609185bcf09715d02fab01bfd9d70264806759d1ddb851
+      artifact_fingerprint: sha256:b50ee6175c0f1aa6d686e7353c06f16794767510b5df6fb3238fbc4a7b195e87
+      reviewed_at: "2026-06-21T02:32:48Z"
+    - requirement: SW-REQ-133
+      artifact: gateway/api_definition.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed remaining pending implementation impact after ReqProof annotation-only changes. Executable behavior did not change; linked requirements and evidence remain correct.
+      base: origin/master
+      requirement_fingerprint: sha256:389d49ef43bb4d61a2b16cdc66e6158ed7402bce42b9745d94c577beeb4b709c
+      approval_fingerprint: sha256:65438a68874fb3309e0dd528ed7d526182adcdab72ebafe300b67870fa247f0b
+      artifact_fingerprint: sha256:b50ee6175c0f1aa6d686e7353c06f16794767510b5df6fb3238fbc4a7b195e87
+      reviewed_at: "2026-06-21T02:32:48Z"
+    - requirement: SW-REQ-134
+      artifact: gateway/api_definition.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed remaining pending implementation impact after ReqProof annotation-only changes. Executable behavior did not change; linked requirements and evidence remain correct.
+      base: origin/master
+      requirement_fingerprint: sha256:5f2e5513659261f2865b54ec666a8d46cf165fef8bf8501af8500967f764b030
+      approval_fingerprint: sha256:533c07ddf04847aa1081b05890ebb5d57683680403ecc0d30b870db732d7d713
+      artifact_fingerprint: sha256:b50ee6175c0f1aa6d686e7353c06f16794767510b5df6fb3238fbc4a7b195e87
+      reviewed_at: "2026-06-21T02:32:48Z"
+    - requirement: SW-REQ-134
+      artifact: gateway/model_apispec.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed implementation impact for gateway/model_apispec.go after ReqProof annotation-only changes. Executable behavior did not change; SW-REQ-134 and linked evidence remain correct.
+      base: origin/master
+      requirement_fingerprint: sha256:5f2e5513659261f2865b54ec666a8d46cf165fef8bf8501af8500967f764b030
+      approval_fingerprint: sha256:533c07ddf04847aa1081b05890ebb5d57683680403ecc0d30b870db732d7d713
+      artifact_fingerprint: sha256:a1eb52491db4a05fa7d0a0b68d5bb51de0e58a0613493adfa24df4667b37c32b
+      reviewed_at: "2026-06-21T02:32:32Z"
+    - requirement: SW-REQ-135
+      artifact: gateway/api_definition.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed remaining pending implementation impact after ReqProof annotation-only changes. Executable behavior did not change; linked requirements and evidence remain correct.
+      base: origin/master
+      requirement_fingerprint: sha256:58fe62a4dfc3b1ac9201ef73768b05f785ab6d12cb81b64fd407811079bca317
+      approval_fingerprint: sha256:1a79beb459860d929d1ef4b8c02719e08f17d058f09fb982c1554bbe1a5025b6
+      artifact_fingerprint: sha256:b50ee6175c0f1aa6d686e7353c06f16794767510b5df6fb3238fbc4a7b195e87
+      reviewed_at: "2026-06-21T02:32:48Z"
+    - requirement: SW-REQ-136
+      artifact: gateway/api_definition.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed remaining pending implementation impact after ReqProof annotation-only changes. Executable behavior did not change; linked requirements and evidence remain correct.
+      base: origin/master
+      requirement_fingerprint: sha256:400c4d01715dc341a20d3b021d56a494170267c8904affd54f0e5f728fb5eddc
+      approval_fingerprint: sha256:14c0e7f3f99cb2681a5ce3fa50928c5eb5da37e2c8d333efbaa012016ebe84cf
+      artifact_fingerprint: sha256:b50ee6175c0f1aa6d686e7353c06f16794767510b5df6fb3238fbc4a7b195e87
+      reviewed_at: "2026-06-21T02:32:48Z"
+    - requirement: SW-REQ-137
+      artifact: gateway/api_definition.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed remaining pending implementation impact after ReqProof annotation-only changes. Executable behavior did not change; linked requirements and evidence remain correct.
+      base: origin/master
+      requirement_fingerprint: sha256:27a1a10feccd1cd92ef579a838fd548e2998d2f7478194597977324f65827b5c
+      approval_fingerprint: sha256:fb39da9fd9248711f269690ee130ac7447f1c293afda099589fb6c0ba7640b76
+      artifact_fingerprint: sha256:b50ee6175c0f1aa6d686e7353c06f16794767510b5df6fb3238fbc4a7b195e87
+      reviewed_at: "2026-06-21T02:32:48Z"
+    - requirement: SW-REQ-138
+      artifact: gateway/api_definition.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed remaining pending implementation impact after ReqProof annotation-only changes. Executable behavior did not change; linked requirements and evidence remain correct.
+      base: origin/master
+      requirement_fingerprint: sha256:6d19053b86537e0149569a8ee04c53508132020ed1e36028368202110f174961
+      approval_fingerprint: sha256:091a315134fb533062d880d75c25cd17abafbd40d19f3a8da8dbbdcd14cc410d
+      artifact_fingerprint: sha256:b50ee6175c0f1aa6d686e7353c06f16794767510b5df6fb3238fbc4a7b195e87
+      reviewed_at: "2026-06-21T02:32:48Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change
