@@ -8,6 +8,10 @@ import (
 var tStr1 = "aαa⏰𐌈"
 var tStr2 = "bβb⏳𐌏"
 
+// Verifies: STK-REQ-068, SYS-REQ-156, SW-REQ-143
+// SW-REQ-143:nominal:nominal
+// SW-REQ-143:boundary:nominal
+// SW-REQ-143:determinism:nominal
 func TestKeyImmutabilityReset(t *testing.T) {
 	kb := keyBuilder{}
 
@@ -20,6 +24,10 @@ func TestKeyImmutabilityReset(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-068, SYS-REQ-156, SW-REQ-143
+// SW-REQ-143:nominal:nominal
+// SW-REQ-143:boundary:nominal
+// SW-REQ-143:determinism:nominal
 func TestKeyImmutabilityChangeBuilderState(t *testing.T) {
 	kb := keyBuilder{}
 
@@ -32,6 +40,10 @@ func TestKeyImmutabilityChangeBuilderState(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-068, SYS-REQ-156, SW-REQ-143
+// SW-REQ-143:nominal:nominal
+// SW-REQ-143:boundary:nominal
+// SW-REQ-143:determinism:nominal
 func TestAppendString(t *testing.T) {
 	kb := keyBuilder{}
 
@@ -45,6 +57,10 @@ func TestAppendString(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-068, SYS-REQ-156, SW-REQ-143
+// SW-REQ-143:nominal:nominal
+// SW-REQ-143:boundary:nominal
+// SW-REQ-143:determinism:nominal
 func TestAppendBytes(t *testing.T) {
 	kb := keyBuilder{}
 
@@ -58,6 +74,10 @@ func TestAppendBytes(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-068, SYS-REQ-156, SW-REQ-143
+// SW-REQ-143:nominal:nominal
+// SW-REQ-143:boundary:nominal
+// SW-REQ-143:determinism:nominal
 func TestAppendInt(t *testing.T) {
 	kb := keyBuilder{}
 
@@ -71,6 +91,10 @@ func TestAppendInt(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-068, SYS-REQ-156, SW-REQ-143
+// SW-REQ-143:nominal:nominal
+// SW-REQ-143:boundary:nominal
+// SW-REQ-143:determinism:nominal
 func TestWrite(t *testing.T) {
 	kb := keyBuilder{}
 
@@ -94,6 +118,10 @@ func TestWrite(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-068, SYS-REQ-156, SW-REQ-143
+// SW-REQ-143:nominal:nominal
+// SW-REQ-143:boundary:nominal
+// SW-REQ-143:determinism:nominal
 func TestAppendf(t *testing.T) {
 	kb := keyBuilder{}
 

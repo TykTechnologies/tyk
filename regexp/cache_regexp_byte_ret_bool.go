@@ -9,6 +9,7 @@ type regexpByteRetBoolCache struct {
 	*cache
 }
 
+// SW-REQ-143
 func newRegexpByteRetBoolCache(ttl time.Duration, isEnabled bool) *regexpByteRetBoolCache {
 	return &regexpByteRetBoolCache{
 		cache: newCache(
@@ -18,6 +19,7 @@ func newRegexpByteRetBoolCache(ttl time.Duration, isEnabled bool) *regexpByteRet
 	}
 }
 
+// SW-REQ-143
 func (c *regexpByteRetBoolCache) do(r *regexp.Regexp, b []byte, noCacheFn func([]byte) bool) bool {
 	// return if cache is not enabled
 	if !c.enabled() {

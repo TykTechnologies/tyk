@@ -18,6 +18,10 @@ tags:
     - errors
     - observability
 variables: []
+traces:
+    reviewed_at: "2026-06-21T03:46:04.190842Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:f1d9eba0d080af7b07b06b745411a1cf4a9cc71df6b115ac46f278a293a1dab6
 verification:
     assurance_level: A
     formalization_status: none
@@ -27,7 +31,6 @@ verification:
         role: requirements_owner
         reviewed_at: "2026-06-21T00:00:00Z"
         comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway error-handler scope is limited to local gateway/handler_error.go behavior: Tyk error map lookup/default/override behavior, JSON/XML/SOAP template response selection and headers, JSON-RPC error response selection when MCP JSON-RPC routing state exists, request-side error override response writing and fallback, and local analytics/access-log/status/latency/metrics/health recording for tested paths. This approval does not claim route generation, request matching/admission, authentication correctness beyond tested error triggers, upstream availability, analytics persistence, log transport, complete middleware ordering, full JSON-RPC routing/parser/method authorization, or general network transport behavior.'
-        fingerprint: ""
         ai_generated: false
 history:
     created_by: agent:codex

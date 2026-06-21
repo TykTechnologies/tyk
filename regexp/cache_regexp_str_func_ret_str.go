@@ -9,6 +9,7 @@ type regexpStrFuncRetStrCache struct {
 	*cache
 }
 
+// SW-REQ-143
 func newRegexpStrFuncRetStrCache(ttl time.Duration, isEnabled bool) *regexpStrFuncRetStrCache {
 	return &regexpStrFuncRetStrCache{
 		cache: newCache(
@@ -18,6 +19,7 @@ func newRegexpStrFuncRetStrCache(ttl time.Duration, isEnabled bool) *regexpStrFu
 	}
 }
 
+// SW-REQ-143
 func (c *regexpStrFuncRetStrCache) do(r *regexp.Regexp, src string, repl func(string) string, noCacheFn func(string, func(string) string) string) string {
 	// return if cache is not enabled
 	if !c.enabled() {

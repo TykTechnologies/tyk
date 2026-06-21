@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T02:32:48Z"
+generated_at: "2026-06-21T03:50:41Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -703,6 +703,116 @@ reviews:
       approval_fingerprint: sha256:091a315134fb533062d880d75c25cd17abafbd40d19f3a8da8dbbdcd14cc410d
       artifact_fingerprint: sha256:b50ee6175c0f1aa6d686e7353c06f16794767510b5df6fb3238fbc4a7b195e87
       reviewed_at: "2026-06-21T02:32:48Z"
+    - requirement: SW-REQ-143
+      artifact: regexp/cache.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed regexp package implementation impact after fixing Regexp.Longest nil-wrapper behavior and adding focused regexp package tests. SW-REQ-143 and docs/regexp-cache-requirements-evidence.md already describe nil-wrapper defaults, wrapper delegation, cache reset/disabled/oversized behavior, and local regexp cache behavior, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:e17ed1c2256dcf8c7025feeab4dd309283648c6ad9250fb8cb7c739317ad4bd9
+      approval_fingerprint: sha256:e08e7b189ca8eb64a78936d516586c0362d52d98d50b51cec76fac2aeb6726c9
+      artifact_fingerprint: sha256:118eba4001199743856dadb5bbe0aa03196b6d7ccfbeef29b7033b9d86bab640
+      reviewed_at: "2026-06-21T03:50:41Z"
+    - requirement: SW-REQ-143
+      artifact: regexp/cache_regexp.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed regexp package implementation impact after fixing Regexp.Longest nil-wrapper behavior and adding focused regexp package tests. SW-REQ-143 and docs/regexp-cache-requirements-evidence.md already describe nil-wrapper defaults, wrapper delegation, cache reset/disabled/oversized behavior, and local regexp cache behavior, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:e17ed1c2256dcf8c7025feeab4dd309283648c6ad9250fb8cb7c739317ad4bd9
+      approval_fingerprint: sha256:e08e7b189ca8eb64a78936d516586c0362d52d98d50b51cec76fac2aeb6726c9
+      artifact_fingerprint: sha256:d36ba13854c255297c6dd2334559731bca734a0e15e87f0c76d103cb8e5611a8
+      reviewed_at: "2026-06-21T03:50:41Z"
+    - requirement: SW-REQ-143
+      artifact: regexp/cache_regexp_byte_ret_bool.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed regexp package implementation impact after fixing Regexp.Longest nil-wrapper behavior and adding focused regexp package tests. SW-REQ-143 and docs/regexp-cache-requirements-evidence.md already describe nil-wrapper defaults, wrapper delegation, cache reset/disabled/oversized behavior, and local regexp cache behavior, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:e17ed1c2256dcf8c7025feeab4dd309283648c6ad9250fb8cb7c739317ad4bd9
+      approval_fingerprint: sha256:e08e7b189ca8eb64a78936d516586c0362d52d98d50b51cec76fac2aeb6726c9
+      artifact_fingerprint: sha256:2213508e2d11f5ba8d6a9105b2b333416113506e9b38b8db98f4c13a59879c15
+      reviewed_at: "2026-06-21T03:50:41Z"
+    - requirement: SW-REQ-143
+      artifact: regexp/cache_regexp_str_func_ret_str.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed regexp package implementation impact after fixing Regexp.Longest nil-wrapper behavior and adding focused regexp package tests. SW-REQ-143 and docs/regexp-cache-requirements-evidence.md already describe nil-wrapper defaults, wrapper delegation, cache reset/disabled/oversized behavior, and local regexp cache behavior, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:e17ed1c2256dcf8c7025feeab4dd309283648c6ad9250fb8cb7c739317ad4bd9
+      approval_fingerprint: sha256:e08e7b189ca8eb64a78936d516586c0362d52d98d50b51cec76fac2aeb6726c9
+      artifact_fingerprint: sha256:ff7f61b13f74149e8caea19bf6567e08932f96d57dd98afddb37d3bb278511f8
+      reviewed_at: "2026-06-21T03:50:41Z"
+    - requirement: SW-REQ-143
+      artifact: regexp/cache_regexp_str_int_ret_slice_slice_str.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed regexp package implementation impact after fixing Regexp.Longest nil-wrapper behavior and adding focused regexp package tests. SW-REQ-143 and docs/regexp-cache-requirements-evidence.md already describe nil-wrapper defaults, wrapper delegation, cache reset/disabled/oversized behavior, and local regexp cache behavior, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:e17ed1c2256dcf8c7025feeab4dd309283648c6ad9250fb8cb7c739317ad4bd9
+      approval_fingerprint: sha256:e08e7b189ca8eb64a78936d516586c0362d52d98d50b51cec76fac2aeb6726c9
+      artifact_fingerprint: sha256:9a728d987a212d8b4383729bdca89625fac21621ecc0fcf39962a7b7ba1b19e4
+      reviewed_at: "2026-06-21T03:50:41Z"
+    - requirement: SW-REQ-143
+      artifact: regexp/cache_regexp_str_int_ret_slice_str.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed regexp package implementation impact after fixing Regexp.Longest nil-wrapper behavior and adding focused regexp package tests. SW-REQ-143 and docs/regexp-cache-requirements-evidence.md already describe nil-wrapper defaults, wrapper delegation, cache reset/disabled/oversized behavior, and local regexp cache behavior, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:e17ed1c2256dcf8c7025feeab4dd309283648c6ad9250fb8cb7c739317ad4bd9
+      approval_fingerprint: sha256:e08e7b189ca8eb64a78936d516586c0362d52d98d50b51cec76fac2aeb6726c9
+      artifact_fingerprint: sha256:9b40ca693e923acde8de57e5aadf676f91c4e828a17f1fb4efc14b1a84783acc
+      reviewed_at: "2026-06-21T03:50:41Z"
+    - requirement: SW-REQ-143
+      artifact: regexp/cache_regexp_str_ret_bool.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed regexp package implementation impact after fixing Regexp.Longest nil-wrapper behavior and adding focused regexp package tests. SW-REQ-143 and docs/regexp-cache-requirements-evidence.md already describe nil-wrapper defaults, wrapper delegation, cache reset/disabled/oversized behavior, and local regexp cache behavior, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:e17ed1c2256dcf8c7025feeab4dd309283648c6ad9250fb8cb7c739317ad4bd9
+      approval_fingerprint: sha256:e08e7b189ca8eb64a78936d516586c0362d52d98d50b51cec76fac2aeb6726c9
+      artifact_fingerprint: sha256:41f4ca9c86c84da2a95c70028f57f5340a656426e251dd8328afb1e6dca92a7f
+      reviewed_at: "2026-06-21T03:50:41Z"
+    - requirement: SW-REQ-143
+      artifact: regexp/cache_regexp_str_ret_slice_str.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed regexp package implementation impact after fixing Regexp.Longest nil-wrapper behavior and adding focused regexp package tests. SW-REQ-143 and docs/regexp-cache-requirements-evidence.md already describe nil-wrapper defaults, wrapper delegation, cache reset/disabled/oversized behavior, and local regexp cache behavior, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:e17ed1c2256dcf8c7025feeab4dd309283648c6ad9250fb8cb7c739317ad4bd9
+      approval_fingerprint: sha256:e08e7b189ca8eb64a78936d516586c0362d52d98d50b51cec76fac2aeb6726c9
+      artifact_fingerprint: sha256:9503660dc1510cbfd23a2e7dd2bd8d1c3746b6a85cfd4719e48f8a66260bf236
+      reviewed_at: "2026-06-21T03:50:41Z"
+    - requirement: SW-REQ-143
+      artifact: regexp/cache_regexp_str_str_ret_str.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed regexp package implementation impact after fixing Regexp.Longest nil-wrapper behavior and adding focused regexp package tests. SW-REQ-143 and docs/regexp-cache-requirements-evidence.md already describe nil-wrapper defaults, wrapper delegation, cache reset/disabled/oversized behavior, and local regexp cache behavior, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:e17ed1c2256dcf8c7025feeab4dd309283648c6ad9250fb8cb7c739317ad4bd9
+      approval_fingerprint: sha256:e08e7b189ca8eb64a78936d516586c0362d52d98d50b51cec76fac2aeb6726c9
+      artifact_fingerprint: sha256:f2bea8009852368cf3adfe4591eb6ba96489f75e96ca5bbe585336470b9ad80c
+      reviewed_at: "2026-06-21T03:50:41Z"
+    - requirement: SW-REQ-143
+      artifact: regexp/keybuilder.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed regexp package implementation impact after fixing Regexp.Longest nil-wrapper behavior and adding focused regexp package tests. SW-REQ-143 and docs/regexp-cache-requirements-evidence.md already describe nil-wrapper defaults, wrapper delegation, cache reset/disabled/oversized behavior, and local regexp cache behavior, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:e17ed1c2256dcf8c7025feeab4dd309283648c6ad9250fb8cb7c739317ad4bd9
+      approval_fingerprint: sha256:e08e7b189ca8eb64a78936d516586c0362d52d98d50b51cec76fac2aeb6726c9
+      artifact_fingerprint: sha256:4e08bea1125c33d4f4d950ccb1382216ee806c5465d3bd4bbccd1e0fdf8614cf
+      reviewed_at: "2026-06-21T03:50:41Z"
+    - requirement: SW-REQ-143
+      artifact: regexp/regexp.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed regexp package implementation impact after fixing Regexp.Longest nil-wrapper behavior and adding focused regexp package tests. SW-REQ-143 and docs/regexp-cache-requirements-evidence.md already describe nil-wrapper defaults, wrapper delegation, cache reset/disabled/oversized behavior, and local regexp cache behavior, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:e17ed1c2256dcf8c7025feeab4dd309283648c6ad9250fb8cb7c739317ad4bd9
+      approval_fingerprint: sha256:e08e7b189ca8eb64a78936d516586c0362d52d98d50b51cec76fac2aeb6726c9
+      artifact_fingerprint: sha256:c2c035232c5cd8744ed4a1730dede987c137755a0bb87db8dcfddc9b11dbd623
+      reviewed_at: "2026-06-21T03:50:41Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

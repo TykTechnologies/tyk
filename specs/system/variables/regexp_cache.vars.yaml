@@ -1,0 +1,9 @@
+component: regexp_cache
+no_interface:
+    declared: true
+    reason: The regexp cache proof slice covers local regexp package behavior for cached regular-expression compilation, cached wrapper methods, key construction, disabled or oversized cache fallback, nil-wrapper defaults, and standard regexp delegation. Caller validation policy, endpoint behavior, persistence outside the in-memory cache, cache eviction timing beyond reset/TTL configuration, and the Go standard library regexp implementation are outside this component boundary.
+variables:
+    - name: regexp_cache_operation_terminal
+      type: bool
+      direction: output
+      description: Regexp cache operations return a terminal local result by compiling or reusing a regexp, delegating to the standard regexp implementation, returning a documented nil-wrapper default, returning an error or panic for invalid compile input, or bypassing cache storage for disabled or oversized cache cases before returning.

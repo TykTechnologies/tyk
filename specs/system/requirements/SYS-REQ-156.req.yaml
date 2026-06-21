@@ -1,0 +1,63 @@
+id: SYS-REQ-156
+version: 1
+status: approved
+priority: shall
+category: regexp_cache
+req_type: guarantee
+fretish: the regexp_cache shall always satisfy regexp_cache_operation_terminal
+description: Regexp cache support shall make local regexp wrapper operations terminal and deterministic for cached standard/POSIX compilation, invalid compile input errors or panics, cache-hit metadata, string/byte match caching, replacement/find/expand/split wrapper delegation, nil-wrapper defaults, key construction, reset/disabled behavior, and oversized key/value direct execution for tested paths, without claiming caller validation policy, endpoint behavior, persistence outside the in-memory cache, cache eviction timing beyond reset/TTL configuration, or the Go standard library regexp implementation.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-068
+component: regexp_cache
+rationale: This system requirement owns terminal local regexp wrapper/cache behavior only. Callers, endpoint behavior, non-local persistence, and upstream Go regexp semantics are outside this proof slice.
+tags:
+    - regexp
+    - cache
+    - helper
+variables:
+    - regexp_cache_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-068
+    reviewed_at: "2026-06-21T03:44:56.553359Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:c914ec314d0a638a2a8e58c0b7dedd0949195007a7c1652d02b160bd52c26c99
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Regexp cache scope is limited to local regexp package behavior: cached Compile/CompilePOSIX/MustCompile/MustCompilePOSIX results, Match/MatchString and replacement/find/split wrapper delegation, nil-wrapper defaults, invalid-pattern error or panic behavior, keyBuilder stable key construction, cache reset/disabled behavior, and oversized key/value direct execution for tested paths. This approval does not claim caller validation policy, endpoint behavior, persistence outside the in-memory cache, cache eviction timing beyond reset/TTL configuration, or the Go standard library regexp implementation.'
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-21T00:00:00Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-156|regexp_cache_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. SYS-REQ-156''s regexp_cache_operation_terminal variable is decomposed by SW-REQ-143 for local regexp package behavior only: cached standard/POSIX compilation, invalid compile input errors or panics, cache-hit metadata, string/byte match caching, replacement/find/expand/split wrapper delegation, nil-wrapper defaults, key construction, reset/disabled behavior, and oversized key/value direct execution for tested paths. Caller validation policy, endpoint behavior, persistence outside the in-memory cache, cache eviction timing beyond reset/TTL configuration, and the Go standard library regexp implementation remain outside this proof slice.'
+          reviewed_at: "2026-06-21T00:00:00Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added regexp cache system requirement.
+          changed_by: agent:codex

@@ -1,0 +1,60 @@
+id: STK-REQ-068
+version: 1
+status: approved
+priority: shall
+category: regexp_cache
+req_type: guarantee
+fretish: ""
+description: Regexp cache support shall locally preserve deterministic regular-expression wrapper behavior for tested inputs by compiling and caching standard and POSIX expressions, reporting cache-hit metadata, returning errors or panics for invalid compile inputs, delegating wrapper methods to Go regexp semantics, returning safe zero-value defaults for nil wrappers, constructing stable cache keys, and bypassing cache storage when disabled or key/value limits require direct execution, without claiming caller validation policy, endpoint behavior, persistence outside the in-memory cache, cache eviction timing beyond reset/TTL configuration, or the Go standard library regexp implementation.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: regexp_cache
+rationale: Gateway components share the local regexp wrapper for repeated pattern compilation and matching. This requirement owns the local regexp package behavior and focused regexp package tests only.
+tags:
+    - regexp
+    - cache
+    - helper
+variables: []
+traces:
+    reviewed_at: "2026-06-21T03:46:04.360596Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:eaf1df992398710d1f280d6c87ac5e7ac5e13bd8a6578ebc006dd96c77c1d175
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Regexp cache scope is limited to local regexp package behavior: cached Compile/CompilePOSIX/MustCompile/MustCompilePOSIX results, Match/MatchString and replacement/find/split wrapper delegation, nil-wrapper defaults, invalid-pattern error or panic behavior, keyBuilder stable key construction, cache reset/disabled behavior, and oversized key/value direct execution for tested paths. This approval does not claim caller validation policy, endpoint behavior, persistence outside the in-memory cache, cache eviction timing beyond reset/TTL configuration, or the Go standard library regexp implementation.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need the local regexp wrapper and cache to preserve deterministic regexp semantics and safe defaults while avoiding repeated compilation work.
+    acceptance_criteria:
+        - id: STK-REQ-068-AC-01
+          text: Given tested regexp wrapper and cache inputs, when compilation, cache reuse, matching, replacement, finding, expansion, splitting, nil-wrapper defaults, invalid expressions, key construction, disabled cache, and oversized cache limits are exercised, then deterministic local regexp package outcomes are produced for those inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-156
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added regexp cache requirement.
+          changed_by: agent:codex

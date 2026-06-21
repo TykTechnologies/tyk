@@ -30,6 +30,7 @@ type Regexp struct {
 }
 
 // ResetCache resets cache to initial state
+// SW-REQ-143
 func ResetCache(ttl time.Duration, isEnabled bool) {
 	if ttl == 0 {
 		ttl = defaultCacheItemTTL
@@ -48,16 +49,19 @@ func ResetCache(ttl time.Duration, isEnabled bool) {
 }
 
 // Compile does the same as regexp.Compile but returns cached *Regexp instead.
+// SW-REQ-143
 func Compile(expr string) (*Regexp, error) {
 	return compileCache.do(expr)
 }
 
 // CompilePOSIX does the same as regexp.CompilePOSIX but returns cached *Regexp instead.
+// SW-REQ-143
 func CompilePOSIX(expr string) (*Regexp, error) {
 	return compilePOSIXCache.do(expr)
 }
 
 // MustCompile is the same as regexp.MustCompile but returns cached *Regexp instead.
+// SW-REQ-143
 func MustCompile(str string) *Regexp {
 	regexp, err := Compile(str)
 	if err != nil {
@@ -67,6 +71,7 @@ func MustCompile(str string) *Regexp {
 }
 
 // MustCompilePOSIX is the same as regexp.MustCompilePOSIX but returns cached *Regexp instead.
+// SW-REQ-143
 func MustCompilePOSIX(str string) *Regexp {
 	regexp, err := CompilePOSIX(str)
 	if err != nil {
@@ -76,6 +81,7 @@ func MustCompilePOSIX(str string) *Regexp {
 }
 
 // MatchString is the same as regexp.MatchString but returns cached result instead.
+// SW-REQ-143
 func MatchString(pattern string, s string) (matched bool, err error) {
 	re, err := Compile(pattern)
 	if err != nil {
@@ -85,6 +91,7 @@ func MatchString(pattern string, s string) (matched bool, err error) {
 }
 
 // Match is the same as regexp.Match but returns cached result instead.
+// SW-REQ-143
 func Match(pattern string, b []byte) (matched bool, err error) {
 	re, err := Compile(pattern)
 	if err != nil {
@@ -94,11 +101,13 @@ func Match(pattern string, b []byte) (matched bool, err error) {
 }
 
 // QuoteMeta is the same as regexp.QuoteMeta but returns cached result instead.
+// SW-REQ-143
 func QuoteMeta(s string) string {
 	// TODO: add cache for QuoteMeta
 	return regexp.QuoteMeta(s)
 }
 
+// SW-REQ-143
 func quote(s string) string {
 	if strconv.CanBackquote(s) {
 		return "`" + s + "`"
@@ -107,6 +116,7 @@ func quote(s string) string {
 }
 
 // String returns the source text used to compile the wrapped regular expression.
+// SW-REQ-143
 func (re *Regexp) String() string {
 	if re.Regexp == nil {
 		return ""
@@ -118,6 +128,7 @@ func (re *Regexp) String() string {
 //
 // When using a Regexp in multiple goroutines, giving each goroutine
 // its own copy helps to avoid lock contention.
+// SW-REQ-143
 func (re *Regexp) Copy() *Regexp {
 	reCopy := &Regexp{
 		FromCache: re.FromCache,
@@ -129,13 +140,15 @@ func (re *Regexp) Copy() *Regexp {
 }
 
 // Longest calls regexp.Regexp.Longest of wrapped regular expression
+// SW-REQ-143
 func (re *Regexp) Longest() {
-	if re.Regexp == nil {
+	if re.Regexp != nil {
 		re.Regexp.Longest()
 	}
 }
 
 // NumSubexp returns result of regexp.Regexp.NumSubexp of wrapped regular expression.
+// SW-REQ-143
 func (re *Regexp) NumSubexp() int {
 	if re.Regexp == nil {
 		return 0
@@ -144,6 +157,7 @@ func (re *Regexp) NumSubexp() int {
 }
 
 // SubexpNames returns result of regexp.Regexp.SubexpNames of wrapped regular expression.
+// SW-REQ-143
 func (re *Regexp) SubexpNames() []string {
 	if re.Regexp == nil {
 		return []string{}
@@ -153,6 +167,7 @@ func (re *Regexp) SubexpNames() []string {
 
 // LiteralPrefix returns a literal string that must begin any match
 // Calls regexp.Regexp.LiteralPrefix
+// SW-REQ-143
 func (re *Regexp) LiteralPrefix() (prefix string, complete bool) {
 	if re.Regexp == nil {
 		return "", false
@@ -163,6 +178,7 @@ func (re *Regexp) LiteralPrefix() (prefix string, complete bool) {
 // MatchReader reports whether the Regexp matches the text read by the
 // RuneReader.
 // Calls regexp.Regexp.MatchReader (NO CACHE)
+// SW-REQ-143
 func (re *Regexp) MatchReader(r io.RuneReader) bool {
 	if re.Regexp == nil {
 		return false
@@ -171,6 +187,7 @@ func (re *Regexp) MatchReader(r io.RuneReader) bool {
 }
 
 // MatchString reports whether the Regexp matches the string s.
+// SW-REQ-143
 func (re *Regexp) MatchString(s string) bool {
 	if re.Regexp == nil {
 		return false
@@ -179,6 +196,7 @@ func (re *Regexp) MatchString(s string) bool {
 }
 
 // Match reports whether the Regexp matches the byte slice b.
+// SW-REQ-143
 func (re *Regexp) Match(b []byte) bool {
 	if re.Regexp == nil {
 		return false
@@ -187,6 +205,7 @@ func (re *Regexp) Match(b []byte) bool {
 }
 
 // ReplaceAllString is the same as regexp.Regexp.ReplaceAllString but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) ReplaceAllString(src, repl string) string {
 	if re.Regexp == nil {
 		return ""
@@ -195,6 +214,7 @@ func (re *Regexp) ReplaceAllString(src, repl string) string {
 }
 
 // ReplaceAllLiteralString is the same as regexp.Regexp.ReplaceAllLiteralString but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) ReplaceAllLiteralString(src, repl string) string {
 	if re.Regexp == nil {
 		return ""
@@ -203,6 +223,7 @@ func (re *Regexp) ReplaceAllLiteralString(src, repl string) string {
 }
 
 // ReplaceAllStringFunc is the same as regexp.Regexp.ReplaceAllStringFunc but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) ReplaceAllStringFunc(src string, repl func(string) string) string {
 	if re.Regexp == nil {
 		return ""
@@ -211,6 +232,7 @@ func (re *Regexp) ReplaceAllStringFunc(src string, repl func(string) string) str
 }
 
 // ReplaceAll is the same as regexp.Regexp.ReplaceAll but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) ReplaceAll(src, repl []byte) []byte {
 	if re.Regexp == nil {
 		return []byte{}
@@ -220,6 +242,7 @@ func (re *Regexp) ReplaceAll(src, repl []byte) []byte {
 }
 
 // ReplaceAllLiteral is the same as regexp.Regexp.ReplaceAllLiteral but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) ReplaceAllLiteral(src, repl []byte) []byte {
 	if re.Regexp == nil {
 		return []byte{}
@@ -229,6 +252,7 @@ func (re *Regexp) ReplaceAllLiteral(src, repl []byte) []byte {
 }
 
 // ReplaceAllFunc is the same as regexp.Regexp.ReplaceAllFunc but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) ReplaceAllFunc(src []byte, repl func([]byte) []byte) []byte {
 	if re.Regexp == nil {
 		return []byte{}
@@ -238,6 +262,7 @@ func (re *Regexp) ReplaceAllFunc(src []byte, repl func([]byte) []byte) []byte {
 }
 
 // Find is the same as regexp.Regexp.Find but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) Find(b []byte) []byte {
 	if re.Regexp == nil {
 		return []byte{}
@@ -247,6 +272,7 @@ func (re *Regexp) Find(b []byte) []byte {
 }
 
 // FindIndex is the same as regexp.Regexp.FindIndex but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) FindIndex(b []byte) (loc []int) {
 	if re.Regexp == nil {
 		return
@@ -256,6 +282,7 @@ func (re *Regexp) FindIndex(b []byte) (loc []int) {
 }
 
 // FindString is the same as regexp.Regexp.FindString but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) FindString(s string) string {
 	if re.Regexp == nil {
 		return ""
@@ -265,6 +292,7 @@ func (re *Regexp) FindString(s string) string {
 }
 
 // FindStringIndex is the same as regexp.Regexp.FindStringIndex but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) FindStringIndex(s string) (loc []int) {
 	if re.Regexp == nil {
 		return
@@ -274,6 +302,7 @@ func (re *Regexp) FindStringIndex(s string) (loc []int) {
 }
 
 // FindReaderIndex is the same as regexp.Regexp.FindReaderIndex (NO CACHE).
+// SW-REQ-143
 func (re *Regexp) FindReaderIndex(r io.RuneReader) (loc []int) {
 	if re.Regexp == nil {
 		return
@@ -282,6 +311,7 @@ func (re *Regexp) FindReaderIndex(r io.RuneReader) (loc []int) {
 }
 
 // FindSubmatch is the same as regexp.Regexp.FindSubmatch but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) FindSubmatch(b []byte) [][]byte {
 	if re.Regexp == nil {
 		return [][]byte{}
@@ -291,6 +321,7 @@ func (re *Regexp) FindSubmatch(b []byte) [][]byte {
 }
 
 // Expand is the same as regexp.Regexp.Expand but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) Expand(dst []byte, template []byte, src []byte, match []int) []byte {
 	if re.Regexp == nil {
 		return []byte{}
@@ -300,6 +331,7 @@ func (re *Regexp) Expand(dst []byte, template []byte, src []byte, match []int) [
 }
 
 // ExpandString is the same as regexp.Regexp.ExpandString but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) ExpandString(dst []byte, template string, src string, match []int) []byte {
 	if re.Regexp == nil {
 		return []byte{}
@@ -309,6 +341,7 @@ func (re *Regexp) ExpandString(dst []byte, template string, src string, match []
 }
 
 // FindSubmatchIndex is the same as regexp.Regexp.FindSubmatchIndex but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) FindSubmatchIndex(b []byte) []int {
 	if re.Regexp == nil {
 		return []int{}
@@ -318,6 +351,7 @@ func (re *Regexp) FindSubmatchIndex(b []byte) []int {
 }
 
 // FindStringSubmatch is the same as regexp.Regexp.FindStringSubmatch but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) FindStringSubmatch(s string) []string {
 	if re.Regexp == nil {
 		return []string{}
@@ -326,6 +360,7 @@ func (re *Regexp) FindStringSubmatch(s string) []string {
 }
 
 // FindStringSubmatchIndex is the same as regexp.Regexp.FindStringSubmatchIndex but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) FindStringSubmatchIndex(s string) []int {
 	if re.Regexp == nil {
 		return []int{}
@@ -335,6 +370,7 @@ func (re *Regexp) FindStringSubmatchIndex(s string) []int {
 }
 
 // FindReaderSubmatchIndex is the same as regexp.Regexp.FindReaderSubmatchIndex (NO CACHE).
+// SW-REQ-143
 func (re *Regexp) FindReaderSubmatchIndex(r io.RuneReader) []int {
 	if re.Regexp == nil {
 		return []int{}
@@ -343,6 +379,7 @@ func (re *Regexp) FindReaderSubmatchIndex(r io.RuneReader) []int {
 }
 
 // FindAll is the same as regexp.Regexp.FindAll but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) FindAll(b []byte, n int) [][]byte {
 	if re.Regexp == nil {
 		return [][]byte{}
@@ -352,6 +389,7 @@ func (re *Regexp) FindAll(b []byte, n int) [][]byte {
 }
 
 // FindAllIndex is the same as regexp.Regexp.FindAllIndex but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) FindAllIndex(b []byte, n int) [][]int {
 	if re.Regexp == nil {
 		return [][]int{}
@@ -361,6 +399,7 @@ func (re *Regexp) FindAllIndex(b []byte, n int) [][]int {
 }
 
 // FindAllString is the same as regexp.Regexp.FindAllString but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) FindAllString(s string, n int) []string {
 	if re.Regexp == nil {
 		return []string{}
@@ -369,6 +408,7 @@ func (re *Regexp) FindAllString(s string, n int) []string {
 }
 
 // FindAllStringIndex is the same as regexp.Regexp.FindAllStringIndex but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) FindAllStringIndex(s string, n int) [][]int {
 	if re.Regexp == nil {
 		return [][]int{}
@@ -378,6 +418,7 @@ func (re *Regexp) FindAllStringIndex(s string, n int) [][]int {
 }
 
 // FindAllSubmatch is the same as regexp.Regexp.FindAllSubmatch but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) FindAllSubmatch(b []byte, n int) [][][]byte {
 	if re.Regexp == nil {
 		return [][][]byte{}
@@ -387,6 +428,7 @@ func (re *Regexp) FindAllSubmatch(b []byte, n int) [][][]byte {
 }
 
 // FindAllSubmatchIndex is the same as regexp.Regexp.FindAllSubmatchIndex but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) FindAllSubmatchIndex(b []byte, n int) [][]int {
 	if re.Regexp == nil {
 		return [][]int{}
@@ -396,6 +438,7 @@ func (re *Regexp) FindAllSubmatchIndex(b []byte, n int) [][]int {
 }
 
 // FindAllStringSubmatch is the same as regexp.Regexp.FindAllStringSubmatch but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) FindAllStringSubmatch(s string, n int) [][]string {
 	if re.Regexp == nil {
 		return [][]string{}
@@ -404,6 +447,7 @@ func (re *Regexp) FindAllStringSubmatch(s string, n int) [][]string {
 }
 
 // FindAllStringSubmatchIndex is the same as regexp.Regexp.FindAllStringSubmatchIndex but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) FindAllStringSubmatchIndex(s string, n int) [][]int {
 	if re.Regexp == nil {
 		return [][]int{}
@@ -413,6 +457,7 @@ func (re *Regexp) FindAllStringSubmatchIndex(s string, n int) [][]int {
 }
 
 // Split is the same as regexp.Regexp.Split but returns cached result instead.
+// SW-REQ-143
 func (re *Regexp) Split(s string, n int) []string {
 	if re.Regexp == nil {
 		return []string{}
