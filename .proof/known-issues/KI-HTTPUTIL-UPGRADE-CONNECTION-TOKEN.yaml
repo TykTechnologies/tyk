@@ -1,0 +1,32 @@
+id: KI-HTTPUTIL-UPGRADE-CONNECTION-TOKEN
+title: HTTP streaming upgrade helper ignores Connection token lists
+description: 'internal/httputil.IsUpgrade requires the Connection header value to equal Upgrade after trimming and lowercasing, so a valid token-list form such as Connection: keep-alive, Upgrade is not classified as an upgrade request.'
+affected_requirements:
+    - SYS-REQ-170
+commands:
+    - go test ./internal/httputil -run TestKnownIssue_IsUpgradeIgnoresConnectionTokenList -count=1
+evidence_manifests:
+    - .proof/evidence/ki-httputil-upgrade-connection-token.yaml
+severity: medium
+risk: http_streaming_upgrade_detection
+cve_surface: none
+affected_api: internal/httputil.IsUpgrade
+attacker_input: HTTP request Connection and Upgrade headers
+reproducer_command: go test ./internal/httputil -run TestKnownIssue_IsUpgradeIgnoresConnectionTokenList -count=1
+introduced_in: unknown
+minimization_status: minimized
+mitigation: 'Avoid relying on comma-separated Connection upgrade tokens until IsUpgrade tokenizes Connection header values; send Connection: Upgrade exactly where this helper is in the path.'
+remediation: Tokenize the Connection header according to HTTP connection-option semantics and return true when any token equals Upgrade while preserving existing exact-token behavior; then convert the KnownIssue reproducer into the expected positive regression test.
+customer_impact: Requests whose Connection header contains Upgrade as one token among others can be treated as non-streaming by local helper classification and downstream reverse-proxy paths that depend on it.
+owner: human:buger
+review_date: "2026-07-21"
+release_disposition: ship_with_known_issue
+status: reviewed
+history:
+    - at: "2026-06-21T06:32:21Z"
+      by: agent:codex
+      action: created
+    - at: "2026-06-21T06:33:54Z"
+      by: agent:codex
+      action: review
+      detail: reviewer=human:buger,new_review_date=2026-07-21

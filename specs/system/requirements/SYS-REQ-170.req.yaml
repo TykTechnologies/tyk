@@ -1,0 +1,54 @@
+id: SYS-REQ-170
+version: 1
+status: approved
+priority: shall
+category: http_streaming_helpers
+req_type: guarantee
+fretish: ""
+description: HTTP streaming helper handling shall preserve deterministic local request and response classification results for tested inputs by identifying gRPC request streaming, SSE response content types with supported parameters, exact WebSocket upgrade requests, aggregate streaming request and response predicates, malformed SSE content-type rejection, and non-streaming fallbacks, without claiming complete HTTP token-list parsing, reverse-proxy forwarding behavior, upstream availability, MCP runtime handling, analytics, persistence, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-082
+component: http_streaming_helpers
+rationale: This system requirement owns local internal/httputil streaming classification decisions only. The comma-separated Connection header upgrade-token parsing defect is tracked as KI-HTTPUTIL-UPGRADE-CONNECTION-TOKEN rather than hidden inside the requirement scope.
+tags:
+    - http
+    - streaming
+    - helper
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-082
+    reviewed_at: "2026-06-21T06:35:24.236389Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:012e3459f3a84621fd1469833441f53e55ab633a7ad6e3716b017f3e8225bb81
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. HTTP streaming helper scope is limited to local internal/httputil request and response classification for tested gRPC, SSE, exact Upgrade, malformed content-type, and non-streaming inputs. The known comma-separated Connection header upgrade-token parsing defect is tracked separately as KI-HTTPUTIL-UPGRADE-CONNECTION-TOKEN. This approval does not claim complete HTTP token-list parsing, reverse-proxy forwarding behavior, upstream availability, MCP runtime handling, analytics, persistence, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added HTTP streaming helper system requirement.
+          changed_by: agent:codex

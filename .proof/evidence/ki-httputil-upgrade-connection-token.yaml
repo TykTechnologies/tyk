@@ -1,0 +1,17 @@
+schema_version: proof.evidence_profile.v1
+results:
+    - profile: known_issue_reproducer
+      requirement: SYS-REQ-170
+      command: go test ./internal/httputil -run TestKnownIssue_IsUpgradeIgnoresConnectionTokenList -count=1
+      status: pass
+      observed_result: known_issue_reproduced
+      executed_at: "2026-06-21T06:36:10Z"
+      input_set:
+        - KI-HTTPUTIL-UPGRADE-CONNECTION-TOKEN reproducer
+      freshness_hashes:
+        .proof/known-issues/KI-HTTPUTIL-UPGRADE-CONNECTION-TOKEN.yaml: sha256:567c05cf09d3d3db8a4aa48cbaf24ff407767d97700cc02042df1ce975e98d06
+        internal/httputil/streaming.go: sha256:29459b11ca5e1a941dbcdff5f7e897ae35d9bdd9af3ce47ecbaba5e7c1ef4443
+        internal/httputil/streaming_test.go: sha256:4cdf95380027a85e2198a20079191e135923fe8994ec388fdfd516b09f04a1ab
+        proof.yaml: sha256:889281c5f8186e4c48fe5321f61736ea8f9b9a76cda365f9a15a1dce594754ca
+      known_issues:
+        - KI-HTTPUTIL-UPGRADE-CONNECTION-TOKEN

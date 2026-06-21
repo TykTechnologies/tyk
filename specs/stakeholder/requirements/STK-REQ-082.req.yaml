@@ -1,0 +1,60 @@
+id: STK-REQ-082
+version: 1
+status: approved
+priority: shall
+category: http_streaming_helpers
+req_type: guarantee
+fretish: ""
+description: HTTP streaming helper support shall preserve deterministic local classification behavior for tested request and response inputs by identifying gRPC request streaming, SSE response content types with supported parameters, exact WebSocket upgrade requests, aggregate streaming request and response predicates, malformed SSE content-type rejection, and non-streaming fallbacks, without claiming complete HTTP token-list parsing, reverse-proxy forwarding behavior, upstream availability, MCP runtime handling, analytics, persistence, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: http_streaming_helpers
+rationale: HTTP streaming helpers classify local request and response metadata before gateway reverse-proxy flows consume the result. This requirement owns only the helper behavior under focused tests; comma-separated Connection header parsing is tracked separately as KI-HTTPUTIL-UPGRADE-CONNECTION-TOKEN.
+tags:
+    - http
+    - streaming
+    - helper
+variables: []
+traces:
+    reviewed_at: "2026-06-21T06:35:24.142177Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:f6d106c41f7782264280bf22f190fd8631f923b710a18d439cfcd227cceedc78
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. HTTP streaming helper scope is limited to local internal/httputil request and response classification for tested gRPC, SSE, exact Upgrade, malformed content-type, and non-streaming inputs. The known comma-separated Connection header upgrade-token parsing defect is tracked separately as KI-HTTPUTIL-UPGRADE-CONNECTION-TOKEN. This approval does not claim complete HTTP token-list parsing, reverse-proxy forwarding behavior, upstream availability, MCP runtime handling, analytics, persistence, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need local HTTP streaming helpers to classify tested gRPC, SSE, exact Upgrade, malformed content-type, and non-streaming request or response metadata consistently before reverse-proxy flows use those decisions.
+    acceptance_criteria:
+        - id: STK-REQ-082-AC-01
+          text: Given tested HTTP request and response metadata, when local streaming helper predicates are exercised, then gRPC request streaming, SSE response streaming, exact WebSocket upgrades, malformed SSE content-type rejection, aggregate streaming predicates, and non-streaming fallbacks are classified as expected for those inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-170
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added HTTP streaming helper requirement for focused internal/httputil tests.
+          changed_by: agent:codex
