@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: http_mux_path_helpers
 req_type: guarantee
-fretish: ""
+fretish: the http_mux_path_helpers shall always satisfy http_mux_path_helpers_operation_terminal
 description: HTTP mux path helper handling shall preserve deterministic local helper results for tested inputs by validating mux path patterns, compiling listen-path patterns into regular expressions, identifying mux template markers, stripping configured listen paths from request paths, matching single path patterns, and matching any path from a candidate set while returning errors for malformed regular expressions, without claiming gateway API loading, route registration, middleware authorization, upstream behavior, analytics, persistence, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -28,7 +28,7 @@ traces:
     reviewed_fingerprint: sha256:2db6118f7750ccd13e805b59c6c93335d86fd9f4523b919223dc8a5353e4241e
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

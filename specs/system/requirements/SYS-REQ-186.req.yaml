@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: storage
 req_type: guarantee
-fretish: ""
+fretish: the storage_mdcb shall always satisfy storage_mdcb_operation_terminal
 description: MDCB storage handling shall preserve deterministic local wrapper behavior for tested inputs by constructing storage wrappers, reading local keys before RPC fallback, returning the first successful multi-key read, classifying resource keys, caching RPC OAuth-client values locally, invoking certificate cache callbacks, writing only to local storage, falling back from local to RPC key listing and list range reads, combining local and RPC delete, scan-delete, connect, append, remove-list, and existence results, delegating selected set and filter operations, and preserving explicit panic behavior for unsupported MDCB storage methods without claiming real MDCB or Redis availability, distributed consistency, persistence durability, network transport behavior, RPC service correctness, certificate storage correctness beyond callback invocation, OAuth-client validity, concurrency safety, or final client-visible behavior beyond the focused local MDCB storage tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -27,7 +27,7 @@ traces:
     reviewed_fingerprint: sha256:6be043a6d72038efcca0336658e3b91012e2bb0a71fdffe108a7d56e06836b76
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

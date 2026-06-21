@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: observability
 req_type: guarantee
-fretish: ""
+fretish: the trace_manager shall always satisfy trace_manager_operation_terminal
 description: Trace manager handling shall preserve deterministic local tracing helper results for tested inputs by storing and reading service IDs in request contexts, enabling and disabling the global trace manager, registering configured tracer factories for services, returning no-op tracers when no service tracer is available, wrapping handlers with root-span setup, forwarding span extraction and injection to the selected tracer, forwarding helper log messages to both the supplied logger and active span, and selecting supported local tracing providers by name, without claiming trace export delivery, collector connectivity, runtime sampling correctness, full gateway trace propagation, final client responses, configured logger use during AddTracer, or close-error propagation from registered tracers.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -26,7 +26,7 @@ traces:
     reviewed_fingerprint: sha256:8ee07fb8b164ea43860d88b222af64715627e6c474169f3ea59d7be333eee5f4
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

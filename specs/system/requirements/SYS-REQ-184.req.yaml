@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: storage
 req_type: guarantee
-fretish: ""
+fretish: the storage_kv shall always satisfy storage_kv_operation_terminal
 description: Key-value storage adapter handling shall preserve deterministic local adapter results for tested inputs by constructing Consul and Vault adapters from configuration, reading missing and present Consul keys, writing Consul keys, configuring Vault clients and tokens, reading and writing Vault v1 and v2 key paths and payloads, rejecting malformed Vault keys and missing Vault tokens, and surfacing Vault read errors without claiming real Consul or Vault service availability, distributed durability, authentication or ACL correctness, TLS validation, secret encryption, production network behavior, gateway configuration loading, or final client-visible behavior beyond the focused key-value adapter tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -28,7 +28,7 @@ traces:
     reviewed_fingerprint: sha256:fc653332961e89dcd95445f7f11d164135d57cf2c86d5162e3e9473dc10e8c97
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

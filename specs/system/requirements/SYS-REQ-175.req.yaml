@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: authentication
 req_type: guarantee
-fretish: ""
+fretish: the signature_validator shall always satisfy signature_validator_operation_terminal
 description: Mashery signature validator handling shall preserve deterministic local helper results for tested inputs by exposing stable Mashery SHA256 and MD5 hasher names, constructing digests from token, shared secret, and timestamp values, initializing supported hashers while rejecting unsupported hasher names, rejecting missing and incorrect signature attempts, rejecting signatures outside allowed clock skew, and accepting current or within-skew signatures, without claiming gateway request admission, token lookup, secret resolution, API configuration selection, replay protection, constant-time comparison, behavior before successful validator initialization, full Mashery protocol compatibility, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -27,7 +27,7 @@ traces:
     reviewed_fingerprint: sha256:d98a128d9b3e7b5ed4d9185152cfa43adabd7bc915a3009f87cd487f61df53e5
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

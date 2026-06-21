@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_api_loader_validation
 req_type: guarantee
-fretish: ""
+fretish: the gateway_api_loader_validation shall always satisfy gateway_api_loader_validation_operation_terminal
 description: Gateway API loader validation shall preserve deterministic local skip decisions for tested API specs with empty or space-containing HTTP listen paths, malformed target URLs, valid target URLs, non-HTTP protocols, and config-secret target URL substitution before parsing, without claiming full API admission, route generation, middleware execution, upstream connectivity, distributed synchronization, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -27,7 +27,7 @@ traces:
     reviewed_fingerprint: sha256:a52353c6d285a576a20caf78279a6f56f483fffc4f2e6d3606a88c026048fec8
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

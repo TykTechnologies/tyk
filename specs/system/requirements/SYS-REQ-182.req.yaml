@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_runtime
 req_type: guarantee
-fretish: ""
+fretish: the external_http_client shall always satisfy external_http_client_operation_terminal
 description: External-service HTTP client handling shall preserve deterministic local client factory results for tested inputs by detecting and merging service configuration, constructing service-specific clients, applying service timeouts and transports, selecting and bypassing proxies, loading mTLS certificates and CA pools from files or the certificate store, classifying mTLS errors, and fetching JWK data through a supplied client and parser without claiming network reachability, external service availability, proxy server behavior, certificate authority trust correctness beyond the focused tests, production certificate-store persistence, JWK cryptographic validation, OAuth/JWT protocol correctness, or final client-visible gateway behavior beyond the focused HTTP client factory tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -27,7 +27,7 @@ traces:
     reviewed_fingerprint: sha256:eda0e7ff16e5831452e58916dde956fea782d035e1c54a1fb5cc3462e36a413f
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

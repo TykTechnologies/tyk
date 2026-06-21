@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: observability
 req_type: guarantee
-fretish: ""
+fretish: the jaeger_trace_adapter shall always satisfy jaeger_trace_adapter_operation_terminal
 description: Jaeger trace adapter handling shall preserve deterministic local adapter results for tested inputs by decoding JSON-compatible Jaeger option maps, returning the stable adapter name, forwarding logger errors, and constructing a local disabled Jaeger tracer with a service-name override, without claiming trace export delivery, collector connectivity, runtime sampling correctness, span propagation through gateway requests, unsupported option value handling, environment override handling, full gateway tracing setup, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -27,7 +27,7 @@ traces:
     reviewed_fingerprint: sha256:e36ff299d669e97ee6c4479898b5a1407fda19862a16139bcc9fedad7409ba98
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

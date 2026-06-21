@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_runtime
 req_type: guarantee
-fretish: ""
+fretish: the tcp_proxy shall always satisfy tcp_proxy_operation_terminal
 description: TCP proxy handling shall preserve deterministic local proxy results for tested inputs by managing domain-to-target handler configuration, selecting single-target, TLS SNI, and fallback targets, applying tested request and response modifiers, flushing local connection statistics, tracking graceful shutdown context and active connection completion, formatting connection endpoints, classifying closed-socket errors, and terminating local pipe loops on shutdown, modifier errors, read errors, write errors, or empty modified payloads without claiming production listener lifecycle integration, arbitrary TLS certificate validation, upstream availability, load-balancing, analytics delivery, end-to-end gateway API admission, or final client-visible behavior beyond the focused TCP proxy tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -27,7 +27,7 @@ traces:
     reviewed_fingerprint: sha256:3513e14743e1a5a02ccc518685882cdf42fe918c4ffbf36d4b7580b3535b3c6f
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

@@ -1,0 +1,9 @@
+component: signature_validator
+no_interface:
+    declared: true
+    reason: The signature validator proof slice covers focused local helper behavior under tested inputs only; cross-component runtime integration, external service availability, persistence durability, distributed behavior, and final client-visible behavior are outside this component boundary.
+variables:
+    - name: signature_validator_operation_terminal
+      type: bool
+      direction: output
+      description: The signature validator operation reaches a terminal local result for the focused tested inputs, such as returning the expected value, selecting the expected local branch, surfacing an explicit local error, or preserving the documented local fallback behavior.

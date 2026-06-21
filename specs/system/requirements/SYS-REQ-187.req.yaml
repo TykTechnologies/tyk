@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: storage
 req_type: guarantee
-fretish: ""
+fretish: the storage_redis_cluster shall always satisfy storage_redis_cluster_operation_terminal
 description: RedisCluster storage handling shall preserve deterministic adapter behavior for tested inputs by selecting the configured connection handler, deriving Redis addresses, gating operations on connection state, lazily constructing temporal storage adapters, applying key prefixes and hash selection, reading and writing keys, handling TTL and expiration calls, returning multi-key results, preserving raw-key operations, forwarding lock, increment, decrement, scan, filtering, delete, flush, pub/sub, publish, list, set, rolling-window, sorted-set, controller-initialization, and error-handling behavior for mocked or configured storage backends without claiming Redis server availability, Redis clustering correctness, third-party temporal storage library correctness, distributed lock safety beyond the wrapper SetIfNotExist call, timing precision for rolling windows or TTL expiry, pub/sub delivery guarantees beyond exercised handler paths, persistence durability, network partition behavior, concurrency safety beyond exercised lazy-storage mutex paths, or final client-visible gateway behavior outside these RedisCluster storage adapter tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -27,7 +27,7 @@ traces:
     reviewed_fingerprint: sha256:9f444b7f43ea21b40d332349937bbf145e63db8c34eb178313bd743f87cac3d9
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

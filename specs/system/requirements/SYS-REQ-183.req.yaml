@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: storage
 req_type: guarantee
-fretish: ""
+fretish: the storage_connection_handler shall always satisfy storage_connection_handler_operation_terminal
 description: Storage connection handling shall preserve deterministic local connection-handler and RedisController shim results for tested inputs by constructing handlers and shim controllers, tracking enablement and connection state, delegating shim connect, disable, connected, and wait-connect calls to the connection handler, waiting for connect success or timeout, delivering reconnect callbacks, initializing default/cache/analytics connectors, checking storage status, selecting configured connector slots, propagating disconnect errors, constructing Redis connector options, and configuring exponential backoff without claiming Redis server availability, distributed storage durability, Sentinel or cluster topology correctness, TLS certificate validation beyond connector option construction, gateway request admission, analytics delivery, cache correctness, Go plugin API compatibility beyond local shim delegation, or final client-visible behavior beyond the focused storage connection-handler tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -27,7 +27,7 @@ traces:
     reviewed_fingerprint: sha256:6eaa15b01de523362778b63657e7c0ebc0f1bb62de0044fa97f9ec37e20441e0
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

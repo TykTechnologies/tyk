@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: portal_webhook_helpers
 req_type: guarantee
-fretish: ""
+fretish: the portal_webhook_helpers shall always satisfy portal_webhook_helpers_operation_terminal
 description: Portal webhook helper handling shall preserve deterministic local portal client and Bento output results for tested inputs by normalizing portal API base URLs, fetching app webhook credentials while skipping apps without webhook URLs, registering and constructing the portal webhook output, sending generated messages to matching event-type webhooks, applying configured webhook headers, and returning explicit local errors for non-success webhook responses, without claiming external portal availability, webhook endpoint durability, Bento runtime completeness, gateway event triggering, persistence, analytics, network delivery outside local test servers, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -28,7 +28,7 @@ traces:
     reviewed_fingerprint: sha256:dea4fc6901f31f3ef57475bc5162c29e26768fd6e445feb734c85973c7670a0c
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

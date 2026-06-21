@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_upstream_certificate_selection
 req_type: guarantee
-fretish: ""
+fretish: the gateway_upstream_certificate_selection shall always satisfy gateway_upstream_certificate_selection_operation_terminal
 description: Gateway upstream certificate selection shall preserve focused tested behavior by selecting certificate IDs from global and API certificate maps using wildcard, exact host, wildcard subdomain, host-with-port, port-specific precedence, later-map override, unmatched-host empty results, IPv4 host-with-port, and bracketed IPv6 host-with-port inputs, and by allowing tested upstream mTLS requests to use configured API upstream certificates when matching hosts are present, without claiming complete mTLS handshake semantics, certificate material validation, private-key storage durability, certificate pinning, common-name validation, downstream client certificate selection, TLS version or cipher policy, proxy behavior, route generation, authentication enforcement, distributed synchronization, or final client-visible gateway behavior outside the focused upstream certificate selection tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -25,7 +25,7 @@ traces:
         - STK-REQ-105
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

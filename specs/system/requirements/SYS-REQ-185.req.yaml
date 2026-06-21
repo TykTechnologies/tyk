@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: storage
 req_type: guarantee
-fretish: ""
+fretish: the storage_dummy shall always satisfy storage_dummy_operation_terminal
 description: Dummy storage handling shall preserve deterministic local in-memory behavior for tested inputs by constructing empty data and index maps, reading present and missing keys, setting and deleting keys, deleting or listing wildcard-matched keys, appending, ranging, and removing list values, checking key existence across data and index maps, reporting connect success, and preserving explicit panic behavior for unsupported dummy storage methods without claiming production Redis behavior, persistence, TTL handling, sorted-set semantics, rolling-window semantics, raw-key mutation, bulk deletion semantics, concurrency safety, or final client-visible behavior beyond the focused dummy storage tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -27,7 +27,7 @@ traces:
     reviewed_fingerprint: sha256:197baf31711ab7410cc6a71e5a19f82333ea5fdef381e04a2efcdf5822db9ef1
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

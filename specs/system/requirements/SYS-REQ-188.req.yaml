@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_api_loader_auxiliary
 req_type: guarantee
-fretish: ""
+fretish: the gateway_api_loader_auxiliary shall always satisfy gateway_api_loader_auxiliary_operation_terminal
 description: Gateway API loader auxiliary handling shall preserve deterministic local results for tested GraphQL playground route registration and cloud endpoint selection, repeated HTTP service loading with New Relic middleware mounting, aggregate mTLS detection for loaded API specs, invalid-OAS panic recovery text, organization data-age enforcement when organization quotas are enabled, and quota-key option application, without claiming complete API loading, complete route generation, full middleware ordering or execution, New Relic agent correctness, upstream connectivity, GraphQL execution correctness, complete panic-recovery behavior, mTLS authentication enforcement, organization quota correctness, dashboard or RPC synchronization, distributed behavior, or final client-visible gateway behavior outside the focused API-loader auxiliary tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -27,7 +27,7 @@ traces:
     reviewed_fingerprint: sha256:34d104515a688a555b428d8c8a39f13086e232c6384c4f01425e46b8bb1d2ef9
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

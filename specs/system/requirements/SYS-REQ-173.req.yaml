@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: http_server_header_helpers
 req_type: guarantee
-fretish: ""
+fretish: the http_server_header_helpers shall always satisfy http_server_header_helpers_operation_terminal
 description: HTTP server and header helper handling shall preserve deterministic local helper results for tested inputs by constructing connection watchers with zero count, applying explicit and connection-state count deltas, leaving non-counting connection states unchanged, reporting the current count, and constructing Basic Authorization header values from username and password pairs, without claiming nonnegative connection-count enforcement, full server lifecycle management, upstream authentication, credential validation, transport security, analytics, persistence, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -28,7 +28,7 @@ traces:
     reviewed_fingerprint: sha256:0b491aa44003650368316747c591e383345381aad73e69835c15c4848a750e91
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

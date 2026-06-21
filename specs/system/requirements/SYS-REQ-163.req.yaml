@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_api_loader_storage
 req_type: guarantee
-fretish: ""
+fretish: the gateway_api_loader_storage shall always satisfy gateway_api_loader_storage_operation_terminal
 description: Gateway API loader storage handling shall prepare Redis-backed general stores and deterministically select authentication, organization, and session storage handlers for tested Redis, LDAP, and RPC storage-provider inputs, without claiming remote RPC connectivity, LDAP network authentication, Redis persistence behavior, route generation, middleware execution, API admission, dashboard or RPC synchronization, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -27,7 +27,7 @@ traces:
     reviewed_fingerprint: sha256:a7264ea3b401fd9c8e1e00c4bfe45b3ab777af32a3acae13d48d8fc95e264adf
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

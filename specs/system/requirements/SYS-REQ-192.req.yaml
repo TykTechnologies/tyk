@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_batch_requests
 req_type: guarantee
-fretish: ""
+fretish: the gateway_batch_requests shall always satisfy gateway_batch_requests_operation_terminal
 description: Gateway batch request handling shall preserve focused tested behavior by registering the batch endpoint for batch-enabled APIs, accepting valid batch POST requests, rejecting malformed batch request JSON with explicit bad-request responses, returning empty JSON arrays for empty batches, executing sequential and manual virtual-endpoint batch requests for tested inputs, preserving tested response metadata and order where sequential execution is requested, applying tested upstream certificate and insecure-TLS outcomes, and preserving configured non-canonical header names, without claiming arbitrary upstream transport correctness, complete TLS policy semantics, proxy behavior, rate-limit or authentication enforcement inside nested requests, JavaScript VM correctness beyond the tested TykBatchRequest call path, complete route-generation behavior, distributed behavior, analytics, or final client-visible behavior outside the focused batch request tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -24,7 +24,7 @@ traces:
         - STK-REQ-104
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

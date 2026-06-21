@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: observability
 req_type: guarantee
-fretish: ""
+fretish: the api_metrics shall always satisfy api_metrics_operation_terminal
 description: API metrics handling shall preserve deterministic local metric-definition results for tested inputs by decoding JSON metric configuration, providing default RED metric definitions, validating metric definitions, extracting configured dimensions with defaults, truncating API-key labels for cardinality control, compiling and matching filters, reusing dimension builders safely, creating instrument registries and source-need flags, and recording local counter and histogram values for tested request contexts without claiming collector/exporter delivery, OpenTelemetry SDK provider correctness, gateway middleware admission, full HTTP request lifecycle behavior, metric backend storage, dashboard visibility, cardinality safety for arbitrary operator-supplied labels, or final client-visible behavior beyond the focused API metrics tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -27,7 +27,7 @@ traces:
     reviewed_fingerprint: sha256:a8603841be52df19af7b87569002b4be5e962e65fff18f250f5c139c7b2cdd2d
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

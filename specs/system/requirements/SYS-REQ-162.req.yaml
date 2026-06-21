@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_api_loader_helpers
 req_type: guarantee
-fretish: ""
+fretish: the gateway_api_loader_helpers shall always satisfy gateway_api_loader_helpers_operation_terminal
 description: Gateway API loader helper handling shall preserve deterministic local helper results for domain/listen-path key construction, API count aggregation by host/listen path including disabled-domain APIs, custom middleware function path prefixing, API name normalization for loop lookup, fuzzy local API matching by API ID, object ID, or normalized loop name, and API spec ordering by listen-path specificity with tested custom-domain ordering for tested inputs, without claiming full route generation, middleware execution, storage initialization, API admission, internal proxy dispatch, dashboard or RPC synchronization, network transport behavior, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -28,7 +28,7 @@ traces:
     reviewed_fingerprint: sha256:b5aeb4988e009a1f266d8582150ce731bdec912c84758efa52f60f55f6c174df
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

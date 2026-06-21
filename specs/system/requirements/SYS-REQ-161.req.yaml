@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: user_session_lifetime_endpoint_maps
 req_type: guarantee
-fretish: ""
+fretish: the user_session_lifetime_endpoint_maps shall always satisfy user_session_lifetime_endpoint_maps_operation_terminal
 description: User session lifetime and endpoint map helper handling shall preserve deterministic local helper results for post-expiry lifetime selection, legacy lifetime fallback and key-expiration comparison, global lifetime override, endpoint collection flattening into method:path maps, and endpoint map expansion into sorted endpoint collections while skipping malformed map keys, without claiming Redis durability, policy merge behavior, gateway routing, endpoint rate-limit enforcement, distributed synchronization, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -29,7 +29,7 @@ traces:
     reviewed_fingerprint: sha256:b286a571e61c344878da3a02fd25aa9faa5d8059e03d6cbedd8ed0078f457121
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

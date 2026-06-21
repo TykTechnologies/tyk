@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: observability
 req_type: guarantee
-fretish: ""
+fretish: the otel_runtime shall always satisfy otel_runtime_operation_terminal
 description: OpenTelemetry runtime handling shall preserve deterministic local observability helper results for tested inputs by defaulting and inheriting trace and metrics configuration, selecting runtime-metrics enablement, constructing metric providers and gateway instruments, safely recording no-op and active local metric values, delegating API metric registry need flags and recording, intentionally panicking on invalid test registry definitions, initializing trace providers with local fallback behavior, generating API and gateway resource attributes, normalizing API version attributes, wrapping and extracting span contexts, extracting trace and span IDs, and adding trace IDs to response headers without claiming collector/exporter delivery, OpenTelemetry SDK provider correctness beyond local construction and fallback behavior, metric backend storage, runtime metric collection completeness, full gateway middleware admission, full HTTP request lifecycle behavior, trace propagation across services, dashboard visibility, or final client-visible behavior beyond the focused root OTEL tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -27,7 +27,7 @@ traces:
     reviewed_fingerprint: sha256:35fdd70b0ca45459a15ec18e12c3ff372326bf0eea45cf16888332d6591c24be
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

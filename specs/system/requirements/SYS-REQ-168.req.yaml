@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: user_session_json_serialization
 req_type: guarantee
-fretish: ""
+fretish: the user_session_json_serialization shall always satisfy user_session_json_serialization_operation_terminal
 description: User session JSON serialization handling shall preserve deterministic local JSON encoding and decoding results for tested session, policy, access-definition, limit, collection, MCP access-control, smoothing, and post-expiry fields by omitting zero values, preserving configured non-zero values, accepting legacy all-field session JSON, accepting compact session JSON with default zero values, and round-tripping post-expiry session fields, without claiming policy merge behavior, gateway authentication, persistence backends, runtime quota enforcement, session lifetime expiration behavior, endpoint limit execution, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -28,7 +28,7 @@ traces:
     reviewed_fingerprint: sha256:45889acfff977b0844009a76f021b415ebd81d8dab1d5ce3a5f714fa18bf441a
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

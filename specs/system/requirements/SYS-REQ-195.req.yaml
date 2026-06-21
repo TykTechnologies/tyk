@@ -4,10 +4,10 @@ status: approved
 priority: shall
 category: gateway_cipher_suite_selection
 req_type: guarantee
-fretish: ""
+fretish: the gateway_cipher_suite_selection shall always satisfy gateway_cipher_suite_selection_operation_terminal
 description: >-
     Gateway TLS cipher-suite selection shall preserve focused tested behavior by accepting tested HTTPS clients that offer configured cipher suites and rejecting tested HTTPS clients restricted to a non-configured cipher suite, without claiming complete TLS handshake semantics, TLS version policy, cipher-suite security policy, behavior for every supported cipher name, certificate material validation, downstream client certificate selection, upstream TLS behavior, route generation, authentication enforcement, distributed synchronization, or final client-visible gateway behavior outside the focused cipher-suite tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -27,7 +27,7 @@ traces:
         - STK-REQ-107
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

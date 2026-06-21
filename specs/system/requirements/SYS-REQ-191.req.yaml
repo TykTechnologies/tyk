@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_api_loader_tcp_service
 req_type: guarantee
-fretish: ""
+fretish: the gateway_api_loader_tcp_service shall always satisfy gateway_api_loader_tcp_service_operation_terminal
 description: Gateway API loader TCP service handling shall preserve deterministic local setup behavior for tested TCP API specs by initializing the spec authentication, organization, and health managers with the selected local or RPC stores and registering a TCP proxy entry when the tested TCP listen port differs from the gateway listen port while skipping TCP proxy creation when the tested listen port equals the gateway listen port, without claiming TCP forwarding correctness, listener startup, TLS or proxy-protocol behavior, service-discovery dialing, storage backend correctness, authentication or session semantics, route generation, middleware execution, distributed synchronization, or final client-visible gateway behavior outside the focused TCP service loader tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -24,7 +24,7 @@ traces:
         - STK-REQ-103
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

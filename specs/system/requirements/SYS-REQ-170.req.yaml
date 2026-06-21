@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: http_streaming_helpers
 req_type: guarantee
-fretish: ""
+fretish: the http_streaming_helpers shall always satisfy http_streaming_helpers_operation_terminal
 description: HTTP streaming helper handling shall preserve deterministic local request and response classification results for tested inputs by identifying gRPC request streaming, SSE response content types with supported parameters, exact WebSocket upgrade requests, aggregate streaming request and response predicates, malformed SSE content-type rejection, and non-streaming fallbacks, without claiming complete HTTP token-list parsing, reverse-proxy forwarding behavior, upstream availability, MCP runtime handling, analytics, persistence, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -27,7 +27,7 @@ traces:
     reviewed_fingerprint: sha256:012e3459f3a84621fd1469833441f53e55ab633a7ad6e3716b017f3e8225bb81
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

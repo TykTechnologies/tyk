@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: http_request_response_helpers
 req_type: guarantee
-fretish: ""
+fretish: the http_request_response_helpers shall always satisfy http_request_response_helpers_operation_terminal
 description: HTTP request and response helper handling shall preserve deterministic local helper results for tested inputs by reporting request transfer encoding presence, deriving request scheme from forwarded proto or TLS state, identifying configured CORS preflight markers, writing configured local HTTP error responses, and removing one matching response transfer-encoding value, without claiming full browser CORS policy enforcement, proxy forwarding behavior, upstream behavior, body streaming, analytics, persistence, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -28,7 +28,7 @@ traces:
     reviewed_fingerprint: sha256:545f9d7db53f26b718d2e73a8cc995ee3ec4230066e6a8efb35a15078bfaf6e1
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

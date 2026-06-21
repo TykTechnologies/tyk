@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_api_loader_explicit_route_subpaths
 req_type: guarantee
-fretish: ""
+fretish: the gateway_api_loader_explicit_route_subpaths shall always satisfy gateway_api_loader_explicit_route_subpaths_operation_terminal
 description: Gateway API loader explicit-route subpath handling shall preserve deterministic local wrapper results for tested disabled wrapping, trailing-slash prefixes, route-parameter prefixes, exact-prefix requests, nested subpath requests, sibling-path requests, and outside-path requests, without claiming full route generation, middleware execution, upstream connectivity, distributed synchronization, or final client responses beyond the local wrapper output.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: ""
     evidence: ""
@@ -27,7 +27,7 @@ traces:
     reviewed_fingerprint: sha256:3a59f1f30f31cbd3843600870f79d4ffc22f35e7e66ddd06a26fc70c010ea100
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger
