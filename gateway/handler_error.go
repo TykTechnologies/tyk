@@ -41,11 +41,13 @@ var errCustomBodyResponse = errors.New("errCustomBodyResponse")
 
 var TykErrors = make(map[string]config.TykError)
 
+// SW-REQ-142
 func errorAndStatusCode(errType string) (error, int) {
 	err := TykErrors[errType]
 	return errors.New(err.Message), err.Code
 }
 
+// SW-REQ-142
 func defaultTykErrors() {
 	TykErrors = make(map[string]config.TykError)
 
@@ -53,6 +55,7 @@ func defaultTykErrors() {
 	initOauth2KeyExistsErrors()
 }
 
+// SW-REQ-142
 func overrideTykErrors(gw *Gateway) {
 	gwConfig := gw.GetConfig()
 
@@ -96,6 +99,7 @@ type TemplateExecutor interface {
 }
 
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
+// SW-REQ-142
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
 	response := &http.Response{}
@@ -282,6 +286,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 // writeTemplateErrorResponse writes an error response using the configured error templates
 // and returns the corresponding http.Response for analytics recording.
+// SW-REQ-142
 func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http.Request, errMsg string, errCode int) *http.Response {
 	response := &http.Response{}
 
@@ -370,6 +375,7 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 
 // shouldWriteJSONRPCError returns true if this error should be formatted as JSON-RPC.
 // This checks if the API is an MCP with JSON-RPC 2.0 enabled and if the request has JSON-RPC routing state.
+// SW-REQ-142
 func (e *ErrorHandler) shouldWriteJSONRPCError(r *http.Request) bool {
 	if e.Spec.JsonRpcVersion != apidef.JsonRPC20 {
 		return false
@@ -381,6 +387,7 @@ func (e *ErrorHandler) shouldWriteJSONRPCError(r *http.Request) bool {
 
 // writeJSONRPCErrorResponse writes an error in JSON-RPC 2.0 format and returns the corresponding http.Response.
 // It extracts the request ID from the routing state and delegates to the jsonrpc errors package.
+// SW-REQ-142
 func (e *ErrorHandler) writeJSONRPCErrorResponse(w http.ResponseWriter, r *http.Request, errMsg string, httpCode int) *http.Response {
 	var requestID interface{}
 	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
@@ -400,6 +407,7 @@ func (e *ErrorHandler) writeJSONRPCErrorResponse(w http.ResponseWriter, r *http.
 
 // tryWriteOverride attempts to apply an error override and write the response.
 // Returns nil if no override applies, allowing fallback to the default template.
+// SW-REQ-142
 func (e *ErrorHandler) tryWriteOverride(w http.ResponseWriter, r *http.Request, errMsg string, errCode int) *http.Response {
 	// Fast path: check config map length before atomic load
 	if len(e.Spec.GlobalConfig.ErrorOverrides) == 0 &&
@@ -418,6 +426,7 @@ func (e *ErrorHandler) tryWriteOverride(w http.ResponseWriter, r *http.Request, 
 }
 
 // writeOverrideResponse writes the error override result.
+// SW-REQ-142
 func (e *ErrorHandler) writeOverrideResponse(w http.ResponseWriter, r *http.Request, result *OverrideResult, originalMsg string) *http.Response {
 	ctx := DetectErrorResponseContext(r)
 	respHeader := e.SetErrorResponseHeaders(w, ctx.ContentType)
@@ -466,6 +475,7 @@ func (e *ErrorHandler) writeOverrideResponse(w http.ResponseWriter, r *http.Requ
 }
 
 // writeDirectOverrideResponse writes the body directly without templating.
+// SW-REQ-142
 func (e *ErrorHandler) writeDirectOverrideResponse(w http.ResponseWriter, result *OverrideResult, respHeader http.Header) *http.Response {
 	w.WriteHeader(result.StatusCode)
 	bodyBytes := []byte(result.GetBody())

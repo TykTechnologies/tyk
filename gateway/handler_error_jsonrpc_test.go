@@ -21,6 +21,11 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:error_handling:nominal
+// SW-REQ-142:determinism:nominal
 func TestErrorHandler_HandleError_JSONRPCFormat(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -145,6 +150,10 @@ func TestErrorHandler_HandleError_JSONRPCFormat(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:determinism:nominal
 func TestErrorHandler_writeJSONRPCErrorResponse_ReturnsFullResponse(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -193,6 +202,10 @@ func TestErrorHandler_writeJSONRPCErrorResponse_ReturnsFullResponse(t *testing.T
 	assert.Equal(t, body, w.Body.Bytes())
 }
 
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:determinism:nominal
 func TestErrorHandler_shouldWriteJSONRPCError(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -261,6 +274,11 @@ func TestErrorHandler_shouldWriteJSONRPCError(t *testing.T) {
 // TestErrorHandler_OverrideMessages_AppliedToJSONRPCErrors proves that OverrideMessages
 // configuration affects both JSON-RPC and standard error responses equally.
 // This test addresses the security concern that JSON-RPC errors might bypass error message sanitization.
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:error_handling:nominal
+// SW-REQ-142:determinism:nominal
 func TestErrorHandler_OverrideMessages_AppliedToJSONRPCErrors(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -424,6 +442,10 @@ func TestErrorHandler_OverrideMessages_AppliedToJSONRPCErrors(t *testing.T) {
 
 // TestErrorHandler_OverrideMessages_ConsistentBehavior verifies that when the same error
 // is returned in both JSON-RPC and standard format, the message is identical.
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:determinism:nominal
 func TestErrorHandler_OverrideMessages_ConsistentBehavior(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -510,6 +532,11 @@ func TestErrorHandler_OverrideMessages_ConsistentBehavior(t *testing.T) {
 
 // TestErrorHandler_JSONRPCError_AccessLogStatusCode verifies that access logs
 // for JSON-RPC errors contain the correct HTTP status code, not zero.
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:error_handling:nominal
+// SW-REQ-142:determinism:nominal
 func TestErrorHandler_JSONRPCError_AccessLogStatusCode(t *testing.T) {
 	// Setup test gateway
 	ts := StartTest(nil)
@@ -624,6 +651,10 @@ func TestErrorHandler_JSONRPCError_AccessLogStatusCode(t *testing.T) {
 // TestErrorHandler_StandardError_RecordsAnalytics verifies that standard (non-JSON-RPC)
 // errors properly record analytics with the correct response code.
 // This test ensures refactoring recordErrorAnalytics doesn't break standard error paths.
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:error_handling:nominal
+// SW-REQ-142:determinism:nominal
 func TestErrorHandler_StandardError_RecordsAnalytics(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -655,6 +686,11 @@ func TestErrorHandler_StandardError_RecordsAnalytics(t *testing.T) {
 
 // TestErrorHandler_StandardError_StatusCodeAlwaysSet verifies that response.StatusCode
 // is set correctly in all standard error paths, including custom body responses.
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:error_handling:nominal
+// SW-REQ-142:determinism:nominal
 func TestErrorHandler_StandardError_StatusCodeAlwaysSet(t *testing.T) {
 	logger, hook := logrustest.NewNullLogger()
 
@@ -737,6 +773,10 @@ func TestErrorHandler_StandardError_StatusCodeAlwaysSet(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:error_handling:nominal
+// SW-REQ-142:determinism:nominal
 func TestErrorHandler_JSONRPC_LatencyRecording(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.AnalyticsConfig.EnableDetailedRecording = true
@@ -771,6 +811,11 @@ func TestErrorHandler_JSONRPC_LatencyRecording(t *testing.T) {
 	assert.Zero(t, record.Latency.Upstream)
 }
 
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:error_handling:nominal
+// SW-REQ-142:determinism:nominal
 func TestErrorHandler_AccessLogAndHealthUnconditional(t *testing.T) {
 	logger, hook := logrustest.NewNullLogger()
 

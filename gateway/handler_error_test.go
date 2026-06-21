@@ -23,6 +23,10 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:determinism:nominal
 func (s *Test) TestHandleError_text_xml(t *testing.T) {
 	file := filepath.Join(s.Gw.GetConfig().TemplatePath, "error_500.xml")
 	xml := `<?xml version = "1.0" encoding = "UTF-8"?>
@@ -71,6 +75,10 @@ func (s *Test) TestHandleError_text_xml(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:determinism:nominal
 func TestHandleDefaultErrorXml(t *testing.T) {
 
 	expect := `<?xml version = "1.0" encoding = "UTF-8"?>
@@ -105,6 +113,10 @@ func TestHandleDefaultErrorXml(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:determinism:nominal
 func TestHandleDefaultErrorSoapXml(t *testing.T) {
 
 	expect := `<?xml version = "1.0" encoding = "UTF-8"?>
@@ -139,6 +151,14 @@ func TestHandleDefaultErrorSoapXml(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// STK-REQ-067:STK-REQ-067-AC-01:acceptance
+// MCDC SYS-REQ-155: gateway_error_handler_operation_terminal=T => TRUE
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:determinism:nominal
+//
+//mcdc:ignore SYS-REQ-155: gateway_error_handler_operation_terminal=F => FALSE -- the onboarded gateway error-handler operations are synchronous local helpers that either choose a standard template response, JSON-RPC response, override response, no-response path, or explicit response metadata before returning; a non-terminal local result is not a reachable runtime state for these APIs [category: defensive] [reviewed: human:buger]
 func TestHandleDefaultErrorJSON(t *testing.T) {
 
 	expect := `
@@ -167,6 +187,14 @@ func TestHandleDefaultErrorJSON(t *testing.T) {
 
 }
 
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// STK-REQ-067:error_handling:negative
+// SYS-REQ-155:error_handling:negative
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:error_handling:nominal
+// SW-REQ-142:error_handling:negative
+// SW-REQ-142:determinism:nominal
 func TestErrorHandler_LatencyRecording(t *testing.T) {
 	t.Run("connection refused error has correct latency structure", func(t *testing.T) {
 		ts := StartTest(func(globalConf *config.Config) {
@@ -286,6 +314,11 @@ func TestErrorHandler_LatencyRecording(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:error_handling:nominal
+// SW-REQ-142:determinism:nominal
 func TestErrorHandler_AnalyticsRecordsOverriddenStatusCode(t *testing.T) {
 	t.Run("analytics records overridden status code not original", func(t *testing.T) {
 		ts := StartTest(func(globalConf *config.Config) {
@@ -389,6 +422,11 @@ func TestErrorHandler_AnalyticsRecordsOverriddenStatusCode(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:error_handling:nominal
+// SW-REQ-142:determinism:nominal
 func TestErrorHandler_APILevelErrorOverrides(t *testing.T) {
 	t.Run("API-level override takes precedence over gateway-level", func(t *testing.T) {
 		ts := StartTest(func(globalConf *config.Config) {

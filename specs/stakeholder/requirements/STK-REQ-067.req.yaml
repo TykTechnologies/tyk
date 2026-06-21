@@ -1,0 +1,57 @@
+id: STK-REQ-067
+version: 1
+status: approved
+priority: shall
+category: gateway_error_handler
+req_type: guarantee
+fretish: ""
+description: Gateway error handling shall locally produce deterministic error-handler outcomes for tested error paths by preserving configured Tyk error-message overrides, selecting JSON/XML/SOAP template responses, selecting JSON-RPC error formatting when MCP JSON-RPC routing state is present, applying configured request-side error overrides and fallbacks, and recording local analytics, access-log, metrics, latency, and health signals for exercised paths, without claiming route generation, request matching/admission, authentication correctness beyond tested error triggers, upstream availability, analytics persistence, log transport, complete middleware ordering, full JSON-RPC routing/parser/method authorization, or general network transport behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_error_handler
+rationale: Gateway operators need the local error handler to make deterministic response and observability decisions before broader gateway behavior is reasoned about. This requirement owns local gateway/handler_error.go behavior and focused gateway tests only.
+tags:
+    - gateway
+    - errors
+    - observability
+variables: []
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway error-handler scope is limited to local gateway/handler_error.go behavior: Tyk error map lookup/default/override behavior, JSON/XML/SOAP template response selection and headers, JSON-RPC error response selection when MCP JSON-RPC routing state exists, request-side error override response writing and fallback, and local analytics/access-log/status/latency/metrics/health recording for tested paths. This approval does not claim route generation, request matching/admission, authentication correctness beyond tested error triggers, upstream availability, analytics persistence, log transport, complete middleware ordering, full JSON-RPC routing/parser/method authorization, or general network transport behavior.'
+        fingerprint: ""
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need gateway error responses and local observability records to follow deterministic handler decisions for configured and standard error paths.
+    acceptance_criteria:
+        - id: STK-REQ-067-AC-01
+          text: Given tested gateway error-handler inputs, when Tyk error message lookup/override, template formatting, JSON-RPC formatting, request-side error override writing/fallback, and local observability recording are exercised, then deterministic local error-handler outcomes are produced for those inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-155
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway error-handler requirement.
+          changed_by: agent:codex

@@ -16,6 +16,11 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 )
 
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:error_handling:nominal
+// SW-REQ-142:determinism:nominal
 func TestWriteOverrideResponse(t *testing.T) {
 	createTestHandler := func() *ErrorHandler {
 		gw := &Gateway{}
@@ -321,6 +326,10 @@ func TestWriteOverrideResponse(t *testing.T) {
 }
 
 // TestWriteDirectOverrideResponse tests direct body writing
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:determinism:nominal
 func TestWriteDirectOverrideResponse(t *testing.T) {
 	createTestHandler := func() *ErrorHandler {
 		spec := &APISpec{
@@ -465,6 +474,10 @@ func TestWriteDirectOverrideResponse(t *testing.T) {
 }
 
 // TestOverrideResultBehavior tests the behavior determination of OverrideResult
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:determinism:nominal
 func TestOverrideResultBehavior(t *testing.T) {
 	t.Run("GetTemplateExecutor priority - body wins over template", func(t *testing.T) {
 		gw := &Gateway{}
@@ -551,6 +564,11 @@ func TestOverrideResultBehavior(t *testing.T) {
 }
 
 // TestErrorOverrideEdgeCases tests edge cases and error conditions
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:error_handling:nominal
+// SW-REQ-142:determinism:nominal
 func TestErrorOverrideEdgeCases(t *testing.T) {
 	t.Run("override with zero status code preserves original", func(t *testing.T) {
 		overrides := apidef.ErrorOverridesMap{

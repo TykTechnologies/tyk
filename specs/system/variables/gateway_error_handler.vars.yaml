@@ -1,0 +1,9 @@
+component: gateway_error_handler
+no_interface:
+    declared: true
+    reason: The gateway error-handler proof slice covers local gateway/handler_error.go behavior for standard error responses, JSON-RPC response selection, configured error overrides, Tyk error-message override lookup, and local observability record emission. Route generation, request matching/admission, authentication correctness beyond tested error triggers, upstream availability, analytics persistence, log transport, complete middleware ordering, full JSON-RPC routing/parser/method authorization, and general network transport behavior are outside this component boundary.
+variables:
+    - name: gateway_error_handler_operation_terminal
+      type: bool
+      direction: output
+      description: Gateway error-handler operations return a terminal local result by selecting a standard template, JSON-RPC response, override response, or no-response path, preserving the selected status for local analytics/access-log/metrics/health recording, and returning from helper APIs without a non-terminal local state for the exercised error-handling operation.

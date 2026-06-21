@@ -1897,6 +1897,11 @@ func TestCache_singleErrorResponse(t *testing.T) {
 	)
 }
 
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:error_handling:nominal
+// SW-REQ-142:determinism:nominal
 func TestOverrideErrors(t *testing.T) {
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
