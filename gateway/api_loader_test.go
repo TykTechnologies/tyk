@@ -102,6 +102,11 @@ func TestInternalAPIUsage(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-162, SW-REQ-149
+// SW-REQ-149:nominal:nominal
+// SW-REQ-149:boundary:boundary
+// SW-REQ-149:determinism:nominal
+// SYS-REQ-162:determinism:nominal
 func TestFuzzyFindAPI(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -161,6 +166,10 @@ func TestFuzzyFindAPI(t *testing.T) {
 	}
 }
 
+// Verifies: SW-REQ-149
+// SW-REQ-149:nominal:nominal
+// SW-REQ-149:boundary:boundary
+// SW-REQ-149:determinism:nominal
 func TestAPILoopingName(t *testing.T) {
 	cases := []struct {
 		apiName, expectedOut string

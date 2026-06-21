@@ -818,6 +818,7 @@ func (gw *Gateway) loadGlobalApps() {
 	gw.loadApps(specs)
 }
 
+// SW-REQ-149
 func trimCategories(name string) string {
 	if i := strings.Index(name, "#"); i != -1 {
 		return name[:i-1]
@@ -826,10 +827,12 @@ func trimCategories(name string) string {
 	return name
 }
 
+// SW-REQ-149
 func APILoopingName(name string) string {
 	return replaceNonAlphaNumeric(trimCategories(name))
 }
 
+// SW-REQ-149
 func (gw *Gateway) fuzzyFindAPI(search string) *APISpec {
 	if search == "" {
 		return nil
