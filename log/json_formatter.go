@@ -23,6 +23,7 @@ type JSONFormatter struct {
 }
 
 // Format renders a single log entry
+// SW-REQ-163
 func (f *JSONFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	data := make(logrus.Fields, len(entry.Data)+4)
 	for k, v := range entry.Data {

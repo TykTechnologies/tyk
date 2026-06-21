@@ -12,6 +12,7 @@ import (
 //
 // Example:   `{"foo": {"bar": "baz"}}`
 // Flattened: `foo.bar: baz`
+// SW-REQ-163
 func LoadTranslations(thing map[string]interface{}) {
 	// This wraps the existing formatter if translations are loaded.
 	log.Formatter = &TranslationFormatter{log.Formatter}
@@ -26,6 +27,7 @@ type TranslationFormatter struct {
 // Format will translate the log message based on the message code. This is
 // a HTTP response code if provided. The message is usually just "Finished"
 // for those cases, this would likely produce a better log message.
+// SW-REQ-163
 func (t *TranslationFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	if code, ok := entry.Data["code"]; ok {
 		if translation, ok := translations[code.(string)]; ok {

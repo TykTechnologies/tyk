@@ -18,15 +18,19 @@ var (
 type RawFormatter struct{}
 
 // Format returns the entry.Message as a []byte.
+// SW-REQ-163
 func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	return []byte(entry.Message), nil
 }
 
+// SW-REQ-163
+//
 //nolint:gochecknoinits
 func init() {
 	setupGlobals()
 }
 
+// SW-REQ-163
 func getenv(names ...string) string {
 	for _, name := range names {
 		val := os.Getenv(name)
@@ -45,6 +49,7 @@ var logLevels = map[string]logrus.Level{
 	"info":  logrus.InfoLevel,
 }
 
+// SW-REQ-163
 func setupGlobals() {
 	format := getenv("TYK_LOGFORMAT", "TYK_GW_LOGFORMAT")
 	logLevel := getenv("TYK_LOGLEVEL", "TYK_GW_LOGLEVEL")
@@ -59,11 +64,13 @@ func setupGlobals() {
 }
 
 // Get returns the default configured logger.
+// SW-REQ-163
 func Get() *logrus.Logger {
 	return log
 }
 
 // GetRaw is used internally. Should likely be removed first, do not rely on it.
+// SW-REQ-163
 func GetRaw() *logrus.Logger {
 	return rawLog
 }
@@ -87,6 +94,7 @@ var (
 	}
 )
 
+// SW-REQ-163
 func NewFormatter(format string) logrus.Formatter {
 	ctor, ok := formatterIndex[format]
 	if !ok {

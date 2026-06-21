@@ -1,0 +1,28 @@
+id: KI-LOG-TRANSLATION-NONSTRING-CODE-PANIC
+title: Log translation formatter panics on non-string code fields
+description: log.TranslationFormatter.Format type-asserts entry.Data["code"] to string. Gateway middleware writes the code field from middleware status values as an integer, so when translations are loaded a log entry with a non-string code value can panic during formatting instead of passing through or converting the code.
+affected_requirements:
+    - SYS-REQ-176
+commands:
+    - go test ./log -run TestKnownIssue_TranslationFormatterPanicsOnNonStringCode -count=1
+evidence_manifests:
+    - .proof/evidence/ki-log-translation-nonstring-code-panic.yaml
+severity: medium
+risk: logging_panic
+cve_surface: none
+affected_api: log.TranslationFormatter.Format
+attacker_input: Log entry fields produced by gateway middleware or in-process callers after translations are loaded
+reproducer_command: go test ./log -run TestKnownIssue_TranslationFormatterPanicsOnNonStringCode -count=1
+introduced_in: unknown
+minimization_status: minimized
+mitigation: Avoid loading log translations where middleware code fields are non-string, or ensure code fields are converted to strings before translation formatting runs.
+remediation: Change TranslationFormatter.Format to handle non-string code fields without panic, for example by type-checking or stringifying the code before lookup, then convert the KnownIssue reproducer into an expected passthrough or translation regression test.
+customer_impact: When log translations are enabled, gateway log formatting can panic on middleware log entries that carry numeric status code fields.
+owner: human:buger
+review_date: "2026-07-21"
+release_disposition: ship_with_known_issue
+status: reviewed
+history:
+    - at: "2026-06-21T07:48:04Z"
+      by: agent:codex
+      action: created

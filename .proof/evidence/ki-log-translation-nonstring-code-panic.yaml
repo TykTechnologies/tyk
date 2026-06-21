@@ -1,0 +1,16 @@
+schema_version: proof.evidence_profile.v1
+results:
+    - profile: known_issue_reproducer
+      requirement: SYS-REQ-176
+      command: go test ./log -run TestKnownIssue_TranslationFormatterPanicsOnNonStringCode -count=1
+      status: pass
+      observed_result: known_issue_reproduced
+      executed_at: "2026-06-21T07:48:45Z"
+      input_set:
+        - KI-LOG-TRANSLATION-NONSTRING-CODE-PANIC reproducer
+      freshness_hashes:
+        .proof/known-issues/KI-LOG-TRANSLATION-NONSTRING-CODE-PANIC.yaml: sha256:9da674378dec36d3777ee882e626ff0854d6b6ad6000de4e7974fb083730c00d
+        log/log_test.go: sha256:fa64a40ecd5b654f0f477baa129601c1688806ad755a3f79b01351653ee6a466
+        proof.yaml: sha256:889281c5f8186e4c48fe5321f61736ea8f9b9a76cda365f9a15a1dce594754ca
+      known_issues:
+        - KI-LOG-TRANSLATION-NONSTRING-CODE-PANIC
