@@ -19,7 +19,10 @@ tags:
     - consul
     - vault
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-21T09:37:31.208343Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:a34596184ab1814c1555b0367beaade2a77a4ef092fe1ab96f07b838ee196b62
 verification:
     assurance_level: A
     formalization_status: none
