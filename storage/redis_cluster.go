@@ -53,6 +53,7 @@ type RedisCluster struct {
 	sortedSetStorage model.SortedSet
 }
 
+// SW-REQ-174
 func (r *RedisCluster) getConnectionHandler() *ConnectionHandler {
 	if r.RedisController != nil {
 		return r.RedisController.connection
@@ -60,18 +61,21 @@ func (r *RedisCluster) getConnectionHandler() *ConnectionHandler {
 	return r.ConnectionHandler
 }
 
+// SW-REQ-174
 func getRedisAddrs(conf config.StorageOptionsConf) (addrs []string) {
 	return conf.HostAddrs()
 }
 
 // Connect will establish a connection this is always true because we are
 // dynamically using redis
+// SW-REQ-174
 func (r *RedisCluster) Connect() bool {
 	return r.getConnectionHandler().Connected()
 }
 
 // Client will return a redis v8 RedisClient. This function allows
 // implementation using the old storage clients.
+// SW-REQ-174
 func (r *RedisCluster) Client() (redis.UniversalClient, error) {
 	if err := r.up(); err != nil {
 		return nil, err
@@ -91,6 +95,7 @@ func (r *RedisCluster) Client() (redis.UniversalClient, error) {
 	return client, nil
 }
 
+// SW-REQ-174
 func (r *RedisCluster) kv() (model.KeyValue, error) {
 	if err := r.up(); err != nil {
 		return nil, err
@@ -117,6 +122,7 @@ func (r *RedisCluster) kv() (model.KeyValue, error) {
 	return kvStorage, nil
 }
 
+// SW-REQ-174
 func (r *RedisCluster) flusher() (model.Flusher, error) {
 	if err := r.up(); err != nil {
 		return nil, err
@@ -142,6 +148,7 @@ func (r *RedisCluster) flusher() (model.Flusher, error) {
 	return flusherStorage, nil
 }
 
+// SW-REQ-174
 func (r *RedisCluster) queue() (model.Queue, error) {
 	if err := r.up(); err != nil {
 		return nil, err
@@ -168,6 +175,7 @@ func (r *RedisCluster) queue() (model.Queue, error) {
 	return queueStorage, nil
 }
 
+// SW-REQ-174
 func (r *RedisCluster) list() (model.List, error) {
 	if err := r.up(); err != nil {
 		return nil, err
@@ -193,6 +201,7 @@ func (r *RedisCluster) list() (model.List, error) {
 	return listStorage, nil
 }
 
+// SW-REQ-174
 func (r *RedisCluster) set() (model.Set, error) {
 	if err := r.up(); err != nil {
 		return nil, err
@@ -217,6 +226,7 @@ func (r *RedisCluster) set() (model.Set, error) {
 	return setStorage, nil
 }
 
+// SW-REQ-174
 func (r *RedisCluster) sortedSet() (model.SortedSet, error) {
 	if err := r.up(); err != nil {
 		return nil, err
@@ -241,6 +251,7 @@ func (r *RedisCluster) sortedSet() (model.SortedSet, error) {
 	return sortedSetStorage, nil
 }
 
+// SW-REQ-174
 func (r *RedisCluster) hashKey(in string) string {
 	if !r.HashKeys {
 		// Not hashing? Return the raw key
@@ -249,14 +260,17 @@ func (r *RedisCluster) hashKey(in string) string {
 	return HashStr(in)
 }
 
+// SW-REQ-174
 func (r *RedisCluster) fixKey(keyName string) string {
 	return r.KeyPrefix + r.hashKey(keyName)
 }
 
+// SW-REQ-174
 func (r *RedisCluster) cleanKey(keyName string) string {
 	return strings.Replace(keyName, r.KeyPrefix, "", 1)
 }
 
+// SW-REQ-174
 func (r *RedisCluster) up() error {
 	if !r.getConnectionHandler().Connected() {
 		return ErrRedisIsDown
@@ -265,6 +279,7 @@ func (r *RedisCluster) up() error {
 }
 
 // GetKey will retrieve a key from the database
+// SW-REQ-174
 func (r *RedisCluster) GetKey(keyName string) (string, error) {
 	storage, err := r.kv()
 	if err != nil {
@@ -284,6 +299,7 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 }
 
 // GetMultiKey gets multiple keys from the database
+// SW-REQ-174
 func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 	storage, err := r.kv()
 	if err != nil {
@@ -320,6 +336,7 @@ func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 	return nil, ErrKeyNotFound
 }
 
+// SW-REQ-174
 func (r *RedisCluster) GetKeyTTL(keyName string) (ttl int64, err error) {
 	storage, err := r.kv()
 	if err != nil {
@@ -330,6 +347,7 @@ func (r *RedisCluster) GetKeyTTL(keyName string) (ttl int64, err error) {
 	return storage.TTL(context.Background(), r.fixKey(keyName))
 }
 
+// SW-REQ-174
 func (r *RedisCluster) GetRawKey(keyName string) (string, error) {
 	storage, err := r.kv()
 	if err != nil {
@@ -348,10 +366,12 @@ func (r *RedisCluster) GetRawKey(keyName string) (string, error) {
 	return value, nil
 }
 
+// SW-REQ-174
 func (r *RedisCluster) GetExp(keyName string) (int64, error) {
 	return r.GetKeyTTL(keyName)
 }
 
+// SW-REQ-174
 func (r *RedisCluster) SetExp(keyName string, timeout int64) error {
 	storage, err := r.kv()
 	if err != nil {
@@ -363,10 +383,12 @@ func (r *RedisCluster) SetExp(keyName string, timeout int64) error {
 }
 
 // SetKey will create (or update) a key value in the store
+// SW-REQ-174
 func (r *RedisCluster) SetKey(keyName, session string, timeout int64) error {
 	return r.SetRawKey(r.fixKey(keyName), session, timeout)
 }
 
+// SW-REQ-174
 func (r *RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
 	storage, err := r.kv()
 	if err != nil {
@@ -378,6 +400,7 @@ func (r *RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
 }
 
 // Lock implements a distributed lock in a cluster.
+// SW-REQ-174
 func (r *RedisCluster) Lock(key string, timeout time.Duration) (bool, error) {
 	storage, err := r.kv()
 	if err != nil {
@@ -394,6 +417,7 @@ func (r *RedisCluster) Lock(key string, timeout time.Duration) (bool, error) {
 }
 
 // Decrement will decrement a key in redis
+// SW-REQ-174
 func (r *RedisCluster) Decrement(keyName string) {
 	keyName = r.fixKey(keyName)
 	// log.Debug("Decrementing key: ", keyName)
@@ -410,6 +434,7 @@ func (r *RedisCluster) Decrement(keyName string) {
 }
 
 // IncrementWithExpire will increment a key in redis
+// SW-REQ-174
 func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 {
 	storage, err := r.kv()
 	if err != nil {
@@ -439,6 +464,7 @@ func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 
 }
 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
+// SW-REQ-174
 func (r *RedisCluster) GetKeys(filter string) []string {
 	filterHash := ""
 	if filter != "" {
@@ -462,6 +488,7 @@ func (r *RedisCluster) GetKeys(filter string) []string {
 }
 
 // GetKeysAndValuesWithFilter will return all keys and their values with a filter
+// SW-REQ-174
 func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]string {
 	storage, err := r.kv()
 	if err != nil {
@@ -488,11 +515,13 @@ func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]stri
 }
 
 // GetKeysAndValues will return all keys and their values - not to be used lightly
+// SW-REQ-174
 func (r *RedisCluster) GetKeysAndValues() map[string]string {
 	return r.GetKeysAndValuesWithFilter("")
 }
 
 // DeleteKey will remove a key from the database
+// SW-REQ-174
 func (r *RedisCluster) DeleteKey(keyName string) bool {
 	storage, err := r.kv()
 	if err != nil {
@@ -515,6 +544,7 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 }
 
 // DeleteAllKeys will remove all keys from the database.
+// SW-REQ-174
 func (r *RedisCluster) DeleteAllKeys() bool {
 	storage, err := r.flusher()
 	if err != nil {
@@ -532,6 +562,7 @@ func (r *RedisCluster) DeleteAllKeys() bool {
 }
 
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
+// SW-REQ-174
 func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 	storage, err := r.kv()
 	if err != nil {
@@ -548,6 +579,7 @@ func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 }
 
 // DeleteKeys will remove a group of keys in bulk
+// SW-REQ-174
 func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 	storage, err := r.kv()
 	if err != nil {
@@ -564,6 +596,7 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 	return true
 }
 
+// SW-REQ-174
 func (r *RedisCluster) DeleteRawKeys(keys []string) bool {
 	storage, err := r.kv()
 	if err != nil {
@@ -580,6 +613,7 @@ func (r *RedisCluster) DeleteRawKeys(keys []string) bool {
 }
 
 // DeleteKeys will remove a group of keys in bulk
+// SW-REQ-174
 func (r *RedisCluster) DeleteKeys(keys []string) bool {
 	storage, err := r.kv()
 	if err != nil {
@@ -601,6 +635,7 @@ func (r *RedisCluster) DeleteKeys(keys []string) bool {
 
 // StartPubSubHandler will listen for a signal and run the callback for
 // every subscription and message event.
+// SW-REQ-174
 func (r *RedisCluster) StartPubSubHandler(ctx context.Context, channel string, callback func(interface{})) error {
 	storage, err := r.queue()
 	if err != nil {
@@ -625,11 +660,13 @@ func (r *RedisCluster) StartPubSubHandler(ctx context.Context, channel string, c
 
 // handleReceive is split from pubsub inner loop to inject fake
 // receive function for code coverage tests.
+// SW-REQ-174
 func (r *RedisCluster) handleReceive(ctx context.Context, receiveFn func(context.Context) (model.Message, error), callback func(interface{})) error {
 	msg, err := receiveFn(ctx)
 	return r.handleMessage(msg, err, callback)
 }
 
+// SW-REQ-174
 func (r *RedisCluster) handleMessage(msg interface{}, err error, callback func(interface{})) error {
 	if err == nil {
 		if callback != nil {
@@ -649,6 +686,7 @@ func (r *RedisCluster) handleMessage(msg interface{}, err error, callback func(i
 	return err
 }
 
+// SW-REQ-174
 func (r *RedisCluster) Publish(channel, message string) error {
 	storage, err := r.queue()
 	if err != nil {
@@ -664,6 +702,7 @@ func (r *RedisCluster) Publish(channel, message string) error {
 	return nil
 }
 
+// SW-REQ-174
 func (r *RedisCluster) GetAndDeleteSet(keyName string) []interface{} {
 	storage, err := r.list()
 	if err != nil {
@@ -694,6 +733,7 @@ func (r *RedisCluster) GetAndDeleteSet(keyName string) []interface{} {
 	return result
 }
 
+// SW-REQ-174
 func (r *RedisCluster) AppendToSet(keyName, value string) {
 	fixedKey := r.fixKey(keyName)
 	log.WithField("keyName", keyName).Debug("Pushing to raw key list")
@@ -711,6 +751,7 @@ func (r *RedisCluster) AppendToSet(keyName, value string) {
 }
 
 // Exists check if keyName exists
+// SW-REQ-174
 func (r *RedisCluster) Exists(keyName string) (bool, error) {
 	fixedKey := r.fixKey(keyName)
 	log.WithField("keyName", fixedKey).Debug("Checking if exists")
@@ -730,6 +771,7 @@ func (r *RedisCluster) Exists(keyName string) (bool, error) {
 }
 
 // RemoveFromList delete an value from a list idetinfied with the keyName
+// SW-REQ-174
 func (r *RedisCluster) RemoveFromList(keyName, value string) error {
 	fixedKey := r.fixKey(keyName)
 	logEntry := logrus.Fields{
@@ -754,6 +796,7 @@ func (r *RedisCluster) RemoveFromList(keyName, value string) error {
 }
 
 // GetListRange gets range of elements of list identified by keyName
+// SW-REQ-174
 func (r *RedisCluster) GetListRange(keyName string, from, to int64) ([]string, error) {
 	fixedKey := r.fixKey(keyName)
 	logEntry := logrus.Fields{
@@ -779,6 +822,7 @@ func (r *RedisCluster) GetListRange(keyName string, from, to int64) ([]string, e
 	return elements, nil
 }
 
+// SW-REQ-174
 func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 	if len(values) == 0 {
 		return
@@ -797,6 +841,7 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 	}
 }
 
+// SW-REQ-174
 func (r *RedisCluster) GetSet(keyName string) (map[string]string, error) {
 	log.Debug("Getting from key set: ", keyName)
 	log.Debug("Getting from fixed key set: ", r.fixKey(keyName))
@@ -820,6 +865,7 @@ func (r *RedisCluster) GetSet(keyName string) (map[string]string, error) {
 	return result, nil
 }
 
+// SW-REQ-174
 func (r *RedisCluster) AddToSet(keyName, value string) {
 	log.Debug("Pushing to raw key set: ", keyName)
 	log.Debug("Pushing to fixed key set: ", r.fixKey(keyName))
@@ -835,6 +881,7 @@ func (r *RedisCluster) AddToSet(keyName, value string) {
 	}
 }
 
+// SW-REQ-174
 func (r *RedisCluster) RemoveFromSet(keyName, value string) {
 	log.Debug("Removing from raw key set: ", keyName)
 	log.Debug("Removing from fixed key set: ", r.fixKey(keyName))
@@ -850,6 +897,7 @@ func (r *RedisCluster) RemoveFromSet(keyName, value string) {
 	}
 }
 
+// SW-REQ-174
 func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 	storage, err := r.set()
 	if err != nil {
@@ -869,6 +917,7 @@ func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 }
 
 // SetRollingWindow will append to a sorted set in redis and extract a timed window of values
+// SW-REQ-174
 func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_override string, pipeline bool) (int, []interface{}) {
 	log.Debug("Incrementing raw key: ", keyName)
 	log.Debug("keyName is: ", keyName)
@@ -936,6 +985,7 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 	return intVal, result
 }
 
+// SW-REQ-174
 func (r *RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
 	now := time.Now()
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
@@ -985,11 +1035,13 @@ func (r *RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool
 }
 
 // GetPrefix returns storage key prefix
+// SW-REQ-174
 func (r *RedisCluster) GetKeyPrefix() string {
 	return r.KeyPrefix
 }
 
 // AddToSortedSet adds value with given score to sorted set identified by keyName
+// SW-REQ-174
 func (r *RedisCluster) AddToSortedSet(keyName, value string, score float64) {
 	fixedKey := r.fixKey(keyName)
 	logEntry := logrus.Fields{
@@ -1011,6 +1063,7 @@ func (r *RedisCluster) AddToSortedSet(keyName, value string, score float64) {
 }
 
 // GetSortedSetRange gets range of elements of sorted set identified by keyName
+// SW-REQ-174
 func (r *RedisCluster) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
 	fixedKey := r.fixKey(keyName)
 	logEntry := logrus.Fields{
@@ -1047,6 +1100,7 @@ func (r *RedisCluster) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]
 }
 
 // RemoveSortedSetRange removes range of elements from sorted set identified by keyName
+// SW-REQ-174
 func (r *RedisCluster) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
 	fixedKey := r.fixKey(keyName)
 	logEntry := logrus.Fields{
@@ -1072,11 +1126,13 @@ func (r *RedisCluster) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) 
 	return nil
 }
 
+// SW-REQ-174
 func (r *RedisCluster) ControllerInitiated() bool {
 	return r.getConnectionHandler() != nil
 }
 
 // ScanKeys will return all keys according to the pattern.
+// SW-REQ-174
 func (r *RedisCluster) ScanKeys(pattern string) ([]string, error) {
 	storage, err := r.kv()
 	if err != nil {

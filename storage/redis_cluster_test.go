@@ -19,6 +19,7 @@ import (
 
 var rc *ConnectionHandler
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestMain(m *testing.M) {
 	conf, err := config.New()
 	if err != nil {
@@ -39,6 +40,13 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
+// STK-REQ-099:nominal:nominal
+// STK-REQ-099:determinism:nominal
+// SYS-REQ-187:nominal:nominal
+// SYS-REQ-187:determinism:nominal
+// SW-REQ-174:nominal:nominal
+// SW-REQ-174:determinism:nominal
 func TestRedisClusterGetConnectionHandler(t *testing.T) {
 	// Scenario 1: RedisController is not nil.
 	t.Run("with RedisController", func(t *testing.T) {
@@ -70,6 +78,13 @@ func TestRedisClusterGetConnectionHandler(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
+// STK-REQ-099:error_handling:nominal
+// STK-REQ-099:error_handling:negative
+// SYS-REQ-187:error_handling:nominal
+// SYS-REQ-187:error_handling:negative
+// SW-REQ-174:error_handling:nominal
+// SW-REQ-174:error_handling:negative
 func TestHandleMessage(t *testing.T) {
 	cluster := &RedisCluster{}
 
@@ -96,6 +111,7 @@ func TestHandleMessage(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestHandleReceive(t *testing.T) {
 	cluster := &RedisCluster{}
 	ctx := context.Background()
@@ -109,6 +125,20 @@ func TestHandleReceive(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
+// STK-REQ-099:STK-REQ-099-AC-01:acceptance
+// STK-REQ-099:nominal:nominal
+// STK-REQ-099:boundary:nominal
+// STK-REQ-099:error_handling:nominal
+// STK-REQ-099:determinism:nominal
+// SYS-REQ-187:nominal:nominal
+// SYS-REQ-187:boundary:nominal
+// SYS-REQ-187:error_handling:nominal
+// SYS-REQ-187:determinism:nominal
+// SW-REQ-174:nominal:nominal
+// SW-REQ-174:boundary:nominal
+// SW-REQ-174:error_handling:nominal
+// SW-REQ-174:determinism:nominal
 func TestRedisClusterGetMultiKey(t *testing.T) {
 	keys := []string{"first", "second"}
 	r := RedisCluster{KeyPrefix: "test-cluster", ConnectionHandler: rc}
@@ -133,6 +163,13 @@ func TestRedisClusterGetMultiKey(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
+// STK-REQ-099:boundary:nominal
+// STK-REQ-099:encoding_safety:nominal
+// SYS-REQ-187:boundary:nominal
+// SYS-REQ-187:encoding_safety:nominal
+// SW-REQ-174:boundary:nominal
+// SW-REQ-174:encoding_safety:nominal
 func TestRedisAddressConfiguration(t *testing.T) {
 	t.Run("Host but no port", func(t *testing.T) {
 		cfg := config.StorageOptionsConf{Host: "host"}
@@ -190,6 +227,7 @@ func TestRedisAddressConfiguration(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestRedisExpirationTime(t *testing.T) {
 	storage := &RedisCluster{KeyPrefix: "test-", ConnectionHandler: rc}
 
@@ -222,6 +260,7 @@ func TestRedisExpirationTime(t *testing.T) {
 	assert.Equal(t, nil, errGetExp)
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestLock(t *testing.T) {
 	t.Run("redis down", func(t *testing.T) {
 		mockedKv := tempmocks.NewKeyValue(t)
@@ -287,6 +326,11 @@ func TestLock(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
+// SYS-REQ-187:nominal:nominal
+// SYS-REQ-187:error_handling:negative
+// SW-REQ-174:nominal:nominal
+// SW-REQ-174:error_handling:negative
 func TestInternalStorages(t *testing.T) {
 	tcs := []struct {
 		name         string
@@ -365,6 +409,7 @@ func TestInternalStorages(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestGetKey(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -414,6 +459,7 @@ func TestGetKey(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestGetMultiKey(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -464,6 +510,7 @@ func TestGetMultiKey(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestGetKeyTTL(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -513,6 +560,7 @@ func TestGetKeyTTL(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestGetRawKey(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -551,6 +599,7 @@ func TestGetRawKey(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestGetExp(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -600,6 +649,7 @@ func TestGetExp(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestSetExp(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -646,6 +696,7 @@ func TestSetExp(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestSetKey(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -692,6 +743,7 @@ func TestSetKey(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestSetRawKey(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -738,6 +790,7 @@ func TestSetRawKey(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestDecrement(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -778,6 +831,7 @@ func TestDecrement(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestIncrememntWithExpire(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -845,6 +899,7 @@ func TestIncrememntWithExpire(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestGetKeys(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -900,6 +955,7 @@ func TestGetKeys(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestGetKeysAndValuesWithFilter(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -955,6 +1011,7 @@ func TestGetKeysAndValuesWithFilter(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestGetKeysAndValues(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -990,6 +1047,7 @@ func TestGetKeysAndValues(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestDeleteKey(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1049,6 +1107,7 @@ func TestDeleteKey(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestDeleteAllKeys(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1084,6 +1143,7 @@ func TestDeleteAllKeys(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestDeleteRawKey(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1129,6 +1189,7 @@ func TestDeleteRawKey(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestDeleteScanMatch(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1174,6 +1235,7 @@ func TestDeleteScanMatch(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestDeleteRawKeys(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1230,6 +1292,7 @@ func TestDeleteRawKeys(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestDeleteKeys(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1286,6 +1349,7 @@ func TestDeleteKeys(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestGetAndDeleteSet(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1348,6 +1412,7 @@ func TestGetAndDeleteSet(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestAppendToSet(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1399,6 +1464,7 @@ func TestAppendToSet(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestExists(t *testing.T) {
 	t.Run("exists true", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1449,6 +1515,7 @@ func TestExists(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestRemoveFromList(t *testing.T) {
 	t.Run("remove from list success", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1502,6 +1569,7 @@ func TestRemoveFromList(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestGetListRange(t *testing.T) {
 	t.Run("get list range success", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1563,6 +1631,7 @@ func TestGetListRange(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestAppendToSetPipelined(t *testing.T) {
 	t.Run("append to set pipelined success", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1610,6 +1679,7 @@ func TestAppendToSetPipelined(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestGetSet(t *testing.T) {
 	t.Run("get set success", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1665,6 +1735,7 @@ func TestGetSet(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestAddToSet(t *testing.T) {
 	t.Run("add to set success", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1705,6 +1776,7 @@ func TestAddToSet(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestRemoveFromSet(t *testing.T) {
 	t.Run("remove from set success", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1746,6 +1818,7 @@ func TestRemoveFromSet(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestIsMemberOfSet(t *testing.T) {
 	t.Run("is member of set true", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1804,6 +1877,7 @@ func TestIsMemberOfSet(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestAddToSortedSet(t *testing.T) {
 	t.Run("add to sorted set success", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1847,6 +1921,7 @@ func TestAddToSortedSet(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestGetSortedSetRange(t *testing.T) {
 	t.Run("get sorted set range success", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1917,6 +1992,7 @@ func TestGetSortedSetRange(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestRemoveSortedSetRange(t *testing.T) {
 	t.Run("remove sorted set range success", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1962,6 +2038,7 @@ func TestRemoveSortedSetRange(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestScanKeys(t *testing.T) {
 	t.Run("scan keys success", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -2004,6 +2081,7 @@ func TestScanKeys(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestGetKeyPrefix(t *testing.T) {
 	t.Run("with prefix", func(t *testing.T) {
 		prefix := "prefix:"
@@ -2019,6 +2097,7 @@ func TestGetKeyPrefix(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestStartPubSubHandler(t *testing.T) {
 	t.Run("error on queue retrieval", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -2120,6 +2199,7 @@ func TestStartPubSubHandler(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 func TestPublish(t *testing.T) {
 	t.Run("error on queue retrieval", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}

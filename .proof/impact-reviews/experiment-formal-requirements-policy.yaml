@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T10:03:58Z"
+generated_at: "2026-06-21T10:14:12Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -1183,6 +1183,16 @@ reviews:
       approval_fingerprint: sha256:62e19024b7802edf365a8118d9ef47ce2bf08398d912063f32bbba743fca406a
       artifact_fingerprint: sha256:0efae262fb9b8365075a9ff008ff2889bd37984c8853f18f9a701dc4662c0d6b
       reviewed_at: "2026-06-21T10:03:58Z"
+    - requirement: SW-REQ-174
+      artifact: storage/redis_cluster.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed RedisCluster storage implementation impact after adding ReqProof annotations and focused evidence links; production behavior and the approved RedisCluster storage requirement remain unchanged except for proof annotations.
+      base: origin/master
+      requirement_fingerprint: sha256:a6f9a5d4d2d83bd1d4a9709e5bb409f2bff4111a2e3bbc87496dcd650859ccae
+      approval_fingerprint: sha256:c6386e04a25836fca97ac4f085ab614e119dd90463108119d9ee7ee16c97a632
+      artifact_fingerprint: sha256:c792320ba3c21ff7085f1f53eadce2f37ed5ee1061eb9571689ff39ec045f8c1
+      reviewed_at: "2026-06-21T10:14:12Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

@@ -1,0 +1,64 @@
+id: STK-REQ-099
+version: 1
+status: approved
+priority: shall
+category: storage
+req_type: guarantee
+fretish: ""
+description: RedisCluster storage support shall preserve deterministic adapter behavior for tested inputs by selecting the configured connection handler, deriving Redis addresses, gating operations on connection state, lazily constructing temporal storage adapters, applying key prefixes and hash selection, reading and writing keys, handling TTL and expiration calls, returning multi-key results, preserving raw-key operations, forwarding lock, increment, decrement, scan, filtering, delete, flush, pub/sub, publish, list, set, rolling-window, sorted-set, controller-initialization, and error-handling behavior for mocked or configured storage backends without claiming Redis server availability, Redis clustering correctness, third-party temporal storage library correctness, distributed lock safety beyond the wrapper SetIfNotExist call, timing precision for rolling windows or TTL expiry, pub/sub delivery guarantees beyond exercised handler paths, persistence durability, network partition behavior, concurrency safety beyond exercised lazy-storage mutex paths, or final client-visible gateway behavior outside these RedisCluster storage adapter tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: storage_redis_cluster
+rationale: RedisCluster wraps connection handlers and temporal storage adapters. This requirement owns the deterministic wrapper and adapter behavior covered by focused storage tests, not Redis or distributed-system correctness.
+tags:
+    - storage
+    - redis
+    - cluster
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T10:13:42Z"
+        comment: 'Reviewed under explicit chat delegation. RedisCluster storage scope is limited to tested adapter behavior: connection-handler selection, address derivation, connection gating, lazy temporal storage adapter creation, key prefix/hash handling, key, TTL, raw-key, lock, increment/decrement, scan/filter, delete/flush, pubsub/publish, list, set, rolling-window, sorted-set, controller-init, and error-handling paths. Does not claim Redis server availability, Redis clustering correctness, third-party temporal storage library correctness, distributed lock safety beyond wrapper calls, timing precision, pubsub delivery guarantees beyond exercised handler paths, persistence durability, network partition behavior, concurrency safety beyond exercised lazy-storage mutex paths, or final client-visible gateway behavior.'
+        fingerprint: sha256:568cdd90909278de7783ff9057aff89abd8552e65e8e3649221543a741be6e37
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T10:13:42Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need RedisCluster storage adapter calls to route predictably through configured Redis storage backends for tested conditions.
+    acceptance_criteria:
+        - id: STK-REQ-099-AC-01
+          text: Given configured or mocked RedisCluster storage backends, key prefixes, filters, timing inputs, pub/sub channels, and success or error responses, when RedisCluster storage adapter methods run, then they produce the tested values, booleans, errors, callbacks, or delegated calls without claiming Redis behavior outside the exercised adapter paths.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-187
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: draft
+          reason: Added RedisCluster storage adapter requirement for focused storage/redis_cluster tests.
+          changed_by: agent:codex
+        - date: "2026-06-21T10:13:33Z"
+          from: draft
+          to: review
+          reason: ""
+          changed_by: human:buger
