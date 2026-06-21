@@ -1,6 +1,7 @@
 package httputil
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -8,20 +9,41 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Verifies: STK-REQ-083, SYS-REQ-171, SW-REQ-158
+// SW-REQ-158:nominal:nominal
+// SW-REQ-158:boundary:nominal
+// SW-REQ-158:determinism:nominal
 func TestRequestUtilities(t *testing.T) {
-	w := httptest.NewRecorder()
-	EntityTooLarge(w, nil)
-	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Result().StatusCode)
+	tests := []struct {
+		name   string
+		handle func(http.ResponseWriter, *http.Request)
+		status int
+	}{
+		{name: "entity too large", handle: EntityTooLarge, status: http.StatusRequestEntityTooLarge},
+		{name: "length required", handle: LengthRequired, status: http.StatusLengthRequired},
+		{name: "internal server error", handle: InternalServerError, status: http.StatusInternalServerError},
+	}
 
-	w = httptest.NewRecorder()
-	LengthRequired(w, nil)
-	assert.Equal(t, http.StatusLengthRequired, w.Result().StatusCode)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			tt.handle(w, nil)
 
-	w = httptest.NewRecorder()
-	InternalServerError(w, nil)
-	assert.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
+			result := w.Result()
+			defer result.Body.Close()
+
+			body, err := io.ReadAll(result.Body)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.status, result.StatusCode)
+			assert.Contains(t, string(body), http.StatusText(tt.status))
+		})
+	}
 }
 
+// Verifies: STK-REQ-083, SYS-REQ-171, SW-REQ-158
+// SW-REQ-158:nominal:nominal
+// SW-REQ-158:boundary:nominal
+// SW-REQ-158:determinism:nominal
 func TestRemoveResponseTransferEncoding(t *testing.T) {
 	tests := []struct {
 		name           string

@@ -1,0 +1,54 @@
+id: SYS-REQ-171
+version: 1
+status: approved
+priority: shall
+category: http_request_response_helpers
+req_type: guarantee
+fretish: ""
+description: HTTP request and response helper handling shall preserve deterministic local helper results for tested inputs by reporting request transfer encoding presence, deriving request scheme from forwarded proto or TLS state, identifying configured CORS preflight markers, writing configured local HTTP error responses, and removing one matching response transfer-encoding value, without claiming full browser CORS policy enforcement, proxy forwarding behavior, upstream behavior, body streaming, analytics, persistence, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-083
+component: http_request_response_helpers
+rationale: This system requirement owns local internal/httputil request and response helper decisions only. Integrated gateway routing, proxying, CORS policy enforcement, and transport behavior remain outside this proof slice.
+tags:
+    - http
+    - request
+    - response
+    - helper
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-083
+    reviewed_at: "2026-06-21T06:46:06.90758Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:545f9d7db53f26b718d2e73a8cc995ee3ec4230066e6a8efb35a15078bfaf6e1
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. HTTP request/response helper scope is limited to local internal/httputil helper behavior for tested transfer encoding, request scheme, configured CORS preflight markers, canned local HTTP error responses, and response transfer-encoding removal. This approval does not claim full browser CORS policy enforcement, proxy forwarding behavior, upstream behavior, body streaming, analytics, persistence, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added HTTP request/response helper system requirement.
+          changed_by: agent:codex

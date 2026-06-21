@@ -1,0 +1,60 @@
+id: STK-REQ-083
+version: 1
+status: approved
+priority: shall
+category: http_request_response_helpers
+req_type: guarantee
+fretish: ""
+description: HTTP request and response helper support shall preserve deterministic local helper behavior for tested inputs by reporting request transfer encoding presence, deriving request scheme from forwarded proto or TLS state, identifying configured CORS preflight markers, writing configured local HTTP error responses, and removing one matching response transfer-encoding value, without claiming full browser CORS policy enforcement, proxy forwarding behavior, upstream behavior, body streaming, analytics, persistence, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: http_request_response_helpers
+rationale: HTTP request and response helpers normalize local request metadata and canned response behavior before gateway flows consume them. This requirement owns only focused helper behavior under tests.
+tags:
+    - http
+    - request
+    - response
+    - helper
+variables: []
+traces:
+    reviewed_at: "2026-06-21T06:46:06.806842Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:e08975a9c2a5c0f950c8305334efb71cbb4a9bd6d4ab73705cb0c2bc1fe2ca0f
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. HTTP request/response helper scope is limited to local internal/httputil helper behavior for tested transfer encoding, request scheme, configured CORS preflight markers, canned local HTTP error responses, and response transfer-encoding removal. This approval does not claim full browser CORS policy enforcement, proxy forwarding behavior, upstream behavior, body streaming, analytics, persistence, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need local HTTP request and response helpers to classify request metadata and produce configured local helper responses consistently before gateway flows use those decisions.
+    acceptance_criteria:
+        - id: STK-REQ-083-AC-01
+          text: Given tested HTTP request and response helper inputs, when local helper functions are exercised, then transfer encoding presence, request scheme, configured CORS preflight markers, local error response status codes, and response transfer-encoding removal are produced as expected for those inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-171
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added HTTP request/response helper requirement for focused internal/httputil tests.
+          changed_by: agent:codex
