@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -237,6 +238,102 @@ func TestGatewayAPILoaderLoopDetection(t *testing.T) {
 				assert.EqualError(t, err, tt.wantErrMsg)
 			} else {
 				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// Verifies: STK-REQ-078, SYS-REQ-166, SW-REQ-153
+// STK-REQ-078:STK-REQ-078-AC-01:acceptance
+// SW-REQ-153:nominal:nominal
+// SW-REQ-153:boundary:nominal
+// SW-REQ-153:boundary:boundary
+// SW-REQ-153:determinism:nominal
+// SYS-REQ-166:determinism:nominal
+func TestGatewayAPILoaderFindInternalHTTPHandler(t *testing.T) {
+	apiByID := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "api-by-id",
+			Name:  "API By ID",
+		},
+	}
+	apiByName := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "api-by-name",
+			Name:  "Internal API #category",
+		},
+	}
+	handlerByID := http.NewServeMux()
+	handlerByName := http.NewServeMux()
+
+	tests := []struct {
+		name        string
+		search      string
+		withAPIs    []*APISpec
+		withHandles map[string]http.Handler
+		wantAPI     *APISpec
+		wantHandler http.Handler
+		wantOK      bool
+	}{
+		{
+			name:   "missing API returns not found",
+			search: "missing",
+		},
+		{
+			name:     "matched API without handler returns not found",
+			search:   apiByID.APIID,
+			withAPIs: []*APISpec{apiByID},
+			wantOK:   false,
+		},
+		{
+			name:     "APIID match returns registered handler",
+			search:   apiByID.APIID,
+			withAPIs: []*APISpec{apiByID},
+			withHandles: map[string]http.Handler{
+				apiByID.APIID: handlerByID,
+			},
+			wantAPI:     apiByID,
+			wantHandler: handlerByID,
+			wantOK:      true,
+		},
+		{
+			name:     "looping name match returns registered handler",
+			search:   APILoopingName(apiByName.Name),
+			withAPIs: []*APISpec{apiByName},
+			withHandles: map[string]http.Handler{
+				apiByName.APIID: handlerByName,
+			},
+			wantAPI:     apiByName,
+			wantHandler: handlerByName,
+			wantOK:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gw := &Gateway{
+				apisByID:        make(map[string]*APISpec),
+				apisHandlesByID: new(sync.Map),
+			}
+			for _, spec := range tt.withAPIs {
+				gw.apisByID[spec.APIID] = spec
+			}
+			for apiID, handler := range tt.withHandles {
+				gw.apisHandlesByID.Store(apiID, &ChainObject{ThisHandler: handler})
+			}
+
+			gotHandler, gotAPI, gotOK := gw.findInternalHttpHandlerByNameOrID(tt.search)
+
+			assert.Equal(t, tt.wantOK, gotOK)
+			if tt.wantAPI == nil {
+				assert.Nil(t, gotAPI)
+			} else {
+				assert.Same(t, tt.wantAPI, gotAPI)
+			}
+			if tt.wantHandler == nil {
+				assert.Nil(t, gotHandler)
+			} else {
+				assert.Same(t, tt.wantHandler, gotHandler)
 			}
 		})
 	}

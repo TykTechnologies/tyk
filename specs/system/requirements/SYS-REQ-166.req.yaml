@@ -1,0 +1,53 @@
+id: SYS-REQ-166
+version: 1
+status: approved
+priority: shall
+category: gateway_api_loader_internal_handler_lookup
+req_type: guarantee
+fretish: ""
+description: Gateway API loader internal handler lookup shall preserve deterministic local results for tested API ID lookup, loop-name lookup, missing API lookup, and missing-handler lookup inputs, without claiming internal proxy routing, handler execution, route generation, middleware execution, upstream connectivity, distributed synchronization, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-078
+component: gateway_api_loader_internal_handler_lookup
+rationale: This system requirement owns local lookup of already-loaded API handlers only. Internal proxy routing and handler execution remain outside this proof slice.
+tags:
+    - gateway
+    - api-loader
+    - internal-handler
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-078
+    reviewed_at: "2026-06-21T05:28:03.977309Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:246de1279ea3f45fb1e1ca4ead852610094d11659c310284a955b5374acc8391
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API loader internal-handler lookup scope is limited to local gateway/api_loader.go findInternalHttpHandlerByNameOrID behavior for tested API ID, loop-name, missing API, and missing handler inputs. This approval does not claim internal proxy routing, handler execution, route generation, middleware execution, upstream connectivity, distributed synchronization, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API loader internal handler lookup system requirement.
+          changed_by: agent:codex

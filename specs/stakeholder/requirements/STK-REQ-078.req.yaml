@@ -1,0 +1,59 @@
+id: STK-REQ-078
+version: 1
+status: approved
+priority: shall
+category: gateway_api_loader_internal_handler_lookup
+req_type: guarantee
+fretish: ""
+description: Gateway API loader internal handler lookup shall deterministically return registered internal HTTP handlers for tested API ID and loop-name inputs, and report not found for tested missing APIs or APIs without registered handlers, without claiming internal proxy routing, handler execution, route generation, middleware execution, upstream connectivity, distributed synchronization, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_api_loader_internal_handler_lookup
+rationale: Internal proxy paths need a local lookup from API name or ID to the already-loaded HTTP handler before dispatch. This requirement owns only the local lookup behavior under focused tests.
+tags:
+    - gateway
+    - api-loader
+    - internal-handler
+variables: []
+traces:
+    reviewed_at: "2026-06-21T05:28:03.909609Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:9c3a515e7a2842bedfdb93bba1e63c332d35b0dbf6fb0cddd7b6dd635308fbbf
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API loader internal-handler lookup scope is limited to local gateway/api_loader.go findInternalHttpHandlerByNameOrID behavior for tested API ID, loop-name, missing API, and missing handler inputs. This approval does not claim internal proxy routing, handler execution, route generation, middleware execution, upstream connectivity, distributed synchronization, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need internal handler lookup to return the already-loaded handler for matching API IDs or loop names before internal routing dispatches.
+    acceptance_criteria:
+        - id: STK-REQ-078-AC-01
+          text: Given tested internal handler lookup inputs, when an API ID or loop name has a registered handler, then the matching API and handler are returned; when the API or registered handler is missing, then lookup reports not found.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-166
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API loader internal handler lookup requirement.
+          changed_by: agent:codex

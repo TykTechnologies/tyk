@@ -793,6 +793,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.SH.ServeHTTP(w, r)
 }
 
+// SW-REQ-153
 func (gw *Gateway) findInternalHttpHandlerByNameOrID(apiNameOrID string) (handler http.Handler, targetAPI *APISpec, ok bool) {
 	targetAPI = gw.fuzzyFindAPI(apiNameOrID)
 	if targetAPI == nil {
