@@ -727,6 +727,8 @@ func TestEndpointsMap_Endpoints(t *testing.T) {
 // STK-REQ-080:STK-REQ-080-AC-01:acceptance
 // SW-REQ-155:boundary:boundary
 // SW-REQ-155:encoding_safety:nominal
+// MCDC SW-REQ-155: user_session_json_serialization_operation_terminal=T => TRUE
+//mcdc:ignore:defensive SW-REQ-155: user_session_json_serialization_operation_terminal=F => FALSE -- false is the invariant-violation row for this local serialization terminal predicate; the positive row is witnessed by this test [reviewed: human:buger]
 func TestSessionState_EmptySessionOmitsZeroFields(t *testing.T) {
 	session := &SessionState{}
 	data, err := json.Marshal(session)

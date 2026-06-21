@@ -12,6 +12,7 @@ const (
 
 // AccessControlRules defines allow/block name lists for ACL enforcement.
 // Patterns in Allowed/Blocked are Go regexes anchored ^...$; exact strings work as-is.
+// SW-REQ-155
 type AccessControlRules struct {
 	Allowed []string `json:"allowed,omitempty" msg:"allowed"`
 	Blocked []string `json:"blocked,omitempty" msg:"blocked"`
@@ -25,6 +26,7 @@ func (a AccessControlRules) IsEmpty() bool {
 
 // IsZero implements the omitzero interface for JSON serialization.
 // SW-REQ-043
+// SW-REQ-155
 func (a AccessControlRules) IsZero() bool {
 	return a.IsEmpty()
 }
@@ -64,6 +66,7 @@ func (m MCPPrimitiveLimit) Validate() error {
 }
 
 // MCPAccessRights defines MCP primitive access rights — one AccessControlRules per primitive type.
+// SW-REQ-155
 type MCPAccessRights struct {
 	Tools     AccessControlRules `json:"tools,omitzero" msg:"tools"`
 	Resources AccessControlRules `json:"resources,omitzero" msg:"resources"`
@@ -78,6 +81,7 @@ func (m MCPAccessRights) IsEmpty() bool {
 
 // IsZero implements the omitzero interface for JSON serialization.
 // SW-REQ-043
+// SW-REQ-155
 func (m MCPAccessRights) IsZero() bool {
 	return m.IsEmpty()
 }

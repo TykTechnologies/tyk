@@ -52,6 +52,7 @@ type AccessSpec struct {
 }
 
 // RateLimit holds rate limit configuration.
+// SW-REQ-155
 type RateLimit struct {
 	// Rate is the allowed number of requests per interval.
 	Rate float64 `json:"rate,omitzero" msg:"rate"`
@@ -76,6 +77,7 @@ type RateLimit struct {
 // field QuotaRemaining int64
 // field QuotaRenewalRate int64
 // field SetBy string
+// SW-REQ-155
 type APILimit struct {
 	RateLimit
 	ThrottleInterval   float64 `json:"throttle_interval,omitzero" msg:"throttle_interval"`
@@ -135,6 +137,7 @@ func (r RateLimit) Duration() time.Duration {
 // field Endpoints Endpoints
 // field JSONRPCMethods JSONRPCMethodLimit
 // field MCPPrimitives MCPPrimitiveLimit
+// SW-REQ-155
 type AccessDefinition struct {
 	APIName              string                  `json:"api_name,omitzero" msg:"api_name"`
 	APIID                string                  `json:"api_id,omitzero" msg:"api_id"`
@@ -205,12 +208,14 @@ func (a APILimit) IsEmpty() bool {
 // IsZero returns true if APILimit is empty (for omitzero support).
 // This is an alias for IsEmpty() to satisfy the omitzero interface.
 // SW-REQ-145
+// SW-REQ-155
 func (a APILimit) IsZero() bool {
 	return a.IsEmpty()
 }
 
 // IsZero returns true if RateLimit is empty (for omitzero support).
 // SW-REQ-145
+// SW-REQ-155
 func (r RateLimit) IsZero() bool {
 	return r.Rate == 0 && r.Per == 0 && r.Smoothing == nil
 }
@@ -393,6 +398,7 @@ type EndpointMethod struct {
 // field ThrottleRetryLimit int
 // field Expires int64
 // field IsInactive bool
+// SW-REQ-155
 type SessionState struct {
 	LastCheck                     int64                       `json:"last_check,omitzero" msg:"last_check"`
 	Allowance                     float64                     `json:"allowance,omitzero" msg:"allowance"`
