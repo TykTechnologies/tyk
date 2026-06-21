@@ -19,6 +19,73 @@ func assertPanic(t *testing.T, f func()) {
 	f() // Call the provided function, expecting a panic
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
+// STK-REQ-097:STK-REQ-097-AC-01:acceptance
+// STK-REQ-097:error_handling:negative
+// SYS-REQ-185:nominal:nominal
+// SYS-REQ-185:boundary:nominal
+// SYS-REQ-185:error_handling:nominal
+// SYS-REQ-185:error_handling:negative
+// SYS-REQ-185:encoding_safety:nominal
+// SYS-REQ-185:determinism:nominal
+// SW-REQ-172:nominal:nominal
+// SW-REQ-172:boundary:nominal
+// SW-REQ-172:error_handling:nominal
+// SW-REQ-172:error_handling:negative
+// SW-REQ-172:encoding_safety:nominal
+// SW-REQ-172:determinism:nominal
+func TestDummyStorageAcceptance(t *testing.T) {
+	ds := NewDummyStorage()
+
+	assert.True(t, ds.Connect())
+	assert.NoError(t, ds.SetKey("data-key", "data-value", 0))
+
+	value, err := ds.GetKey("data-key")
+	assert.NoError(t, err)
+	assert.Equal(t, "data-value", value)
+
+	rawValue, err := ds.GetRawKey("data-key")
+	assert.NoError(t, err)
+	assert.Equal(t, "data-value", rawValue)
+
+	_, err = ds.GetKey("missing")
+	assert.EqualError(t, err, "Not found")
+
+	ds.AppendToSet("list-key", "one")
+	ds.AppendToSet("list-key", "two")
+	assert.True(t, mustExists(t, ds, "list-key"))
+
+	assert.NoError(t, ds.RemoveFromList("list-key", "one"))
+	listValues, err := ds.GetListRange("list-key", 0, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"two"}, listValues)
+
+	assert.True(t, ds.DeleteKey("data-key"))
+	assert.False(t, ds.DeleteKey("data-key"))
+
+	assert.NoError(t, ds.SetKey("wildcard-key", "value", 0))
+	assert.Equal(t, []string{"wildcard-key"}, sortedDummyKeys(ds.GetKeys("*")))
+	assert.True(t, ds.DeleteScanMatch("*"))
+
+	assert.PanicsWithValue(t, "implement me", func() {
+		_ = ds.SetExp("unsupported", 1)
+	})
+}
+
+func mustExists(t *testing.T, ds *DummyStorage, key string) bool {
+	t.Helper()
+
+	exists, err := ds.Exists(key)
+	assert.NoError(t, err)
+	return exists
+}
+
+func sortedDummyKeys(keys []string) []string {
+	sort.Strings(keys)
+	return keys
+}
+
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_GetMultiKey(t *testing.T) {
 	ds := NewDummyStorage()
 	ds.Data["key1"] = "value1"
@@ -58,6 +125,7 @@ func TestDummyStorage_GetMultiKey(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_GetRawKey(t *testing.T) {
 	ds := NewDummyStorage()
 	ds.Data["key1"] = "value1"
@@ -96,6 +164,7 @@ func TestDummyStorage_GetRawKey(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_SetRawKey(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -106,6 +175,7 @@ func TestDummyStorage_SetRawKey(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_SetExp(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -116,6 +186,7 @@ func TestDummyStorage_SetExp(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_GetExp(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -126,6 +197,7 @@ func TestDummyStorage_GetExp(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_DeleteAllKeys(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -133,6 +205,7 @@ func TestDummyStorage_DeleteAllKeys(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_DeleteRawKey(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -140,11 +213,13 @@ func TestDummyStorage_DeleteRawKey(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_Connect(t *testing.T) {
 	ds := NewDummyStorage()
 	assert.True(t, ds.Connect())
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_GetKeysAndValues(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -152,6 +227,7 @@ func TestDummyStorage_GetKeysAndValues(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_GetKeysAndValuesWithFilter(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -159,6 +235,7 @@ func TestDummyStorage_GetKeysAndValuesWithFilter(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_DeleteKeys(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -166,6 +243,7 @@ func TestDummyStorage_DeleteKeys(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_Decrement(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -173,6 +251,7 @@ func TestDummyStorage_Decrement(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_IncrememntWithExpire(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -180,6 +259,7 @@ func TestDummyStorage_IncrememntWithExpire(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_SetRollingWindow(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -187,6 +267,7 @@ func TestDummyStorage_SetRollingWindow(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_GetRollingWindow(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -194,6 +275,7 @@ func TestDummyStorage_GetRollingWindow(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_GetSet(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -204,6 +286,7 @@ func TestDummyStorage_GetSet(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_AddToSet(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -211,6 +294,7 @@ func TestDummyStorage_AddToSet(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_GetAndDeleteSet(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -218,6 +302,7 @@ func TestDummyStorage_GetAndDeleteSet(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_RemoveFromSet(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -225,6 +310,7 @@ func TestDummyStorage_RemoveFromSet(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_GetKeyPrefix(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -232,6 +318,7 @@ func TestDummyStorage_GetKeyPrefix(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_AddToSortedSet(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -239,6 +326,7 @@ func TestDummyStorage_AddToSortedSet(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_GetSortedSetRange(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -249,6 +337,7 @@ func TestDummyStorage_GetSortedSetRange(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_RemoveSortedSetRange(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
@@ -259,6 +348,7 @@ func TestDummyStorage_RemoveSortedSetRange(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_GetKey(t *testing.T) {
 	ds := NewDummyStorage()
 	ds.Data["existingKey"] = "value1"
@@ -303,6 +393,7 @@ func TestDummyStorage_GetKey(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_SetKey(t *testing.T) {
 	ds := NewDummyStorage()
 
@@ -336,6 +427,7 @@ func TestDummyStorage_SetKey(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_DeleteKey(t *testing.T) {
 	ds := NewDummyStorage()
 	ds.Data["key1"] = "value1"
@@ -376,6 +468,7 @@ func TestDummyStorage_DeleteKey(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_DeleteScanMatch(t *testing.T) {
 	ds := NewDummyStorage()
 	ds.Data["key1"] = "value1"
@@ -416,6 +509,7 @@ func TestDummyStorage_DeleteScanMatch(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_RemoveFromList(t *testing.T) {
 	ds := NewDummyStorage()
 
@@ -466,6 +560,7 @@ func TestDummyStorage_RemoveFromList(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_GetListRange(t *testing.T) {
 	ds := NewDummyStorage()
 	ds.IndexList["key1"] = []string{"value1", "value2", "value3"}
@@ -510,6 +605,7 @@ func TestDummyStorage_GetListRange(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_Exists(t *testing.T) {
 	ds := NewDummyStorage()
 	ds.Data["dataKey"] = "value1"
@@ -565,6 +661,7 @@ func TestDummyStorage_Exists(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_AppendToSet(t *testing.T) {
 	ds := NewDummyStorage()
 	ds.IndexList["existingKey"] = []string{"value1", "value2"}
@@ -601,6 +698,7 @@ func TestDummyStorage_AppendToSet(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
 func TestDummyStorage_GetKeys(t *testing.T) {
 	ds := NewDummyStorage()
 	ds.Data["key1"] = "value1"

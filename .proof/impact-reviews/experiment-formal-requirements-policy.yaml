@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T09:42:00Z"
+generated_at: "2026-06-21T09:50:02Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -1163,6 +1163,16 @@ reviews:
       approval_fingerprint: sha256:8e621dbe400acff5565515831e73c1a4642eb226d114951c4cd7052ff14778df
       artifact_fingerprint: sha256:34418f1bf349d5388658462daea7512b893019c7187ab30a60af3b64585c248d
       reviewed_at: "2026-06-21T09:35:01Z"
+    - requirement: SW-REQ-172
+      artifact: storage/dummy.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed storage DummyStorage implementation impact after adding ReqProof annotations and focused local tests; production behavior and the approved dummy storage requirement remain unchanged except for proof annotations.
+      base: origin/master
+      requirement_fingerprint: sha256:7d7c17dbe06613b92e750be79476d076a41f67fec4a71e9a7dc44f0f13053ba7
+      approval_fingerprint: sha256:54fb7ab1eaa37bc0c5133dbff6a9247e03490284a2fb021d0d57edd36d4c47c7
+      artifact_fingerprint: sha256:3bad4a8c59d457577e572a39b6da3492147d4e1769cd31b8edddc3157e84b270
+      reviewed_at: "2026-06-21T09:50:02Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

@@ -1,0 +1,53 @@
+id: SYS-REQ-185
+version: 1
+status: approved
+priority: shall
+category: storage
+req_type: guarantee
+fretish: ""
+description: Dummy storage handling shall preserve deterministic local in-memory behavior for tested inputs by constructing empty data and index maps, reading present and missing keys, setting and deleting keys, deleting or listing wildcard-matched keys, appending, ranging, and removing list values, checking key existence across data and index maps, reporting connect success, and preserving explicit panic behavior for unsupported dummy storage methods without claiming production Redis behavior, persistence, TTL handling, sorted-set semantics, rolling-window semantics, raw-key mutation, bulk deletion semantics, concurrency safety, or final client-visible behavior beyond the focused dummy storage tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-097
+component: storage_dummy
+rationale: This system requirement owns local DummyStorage behavior only. Production storage semantics and unsupported-method implementation remain outside this proof slice.
+tags:
+    - storage
+    - dummy
+    - in-memory
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-097
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T09:49:24Z"
+        comment: Reviewed under explicit chat delegation. Dummy storage scope is limited to local in-memory DummyStorage construction, tested data/index map operations, connect success, missing-key errors, wildcard key behavior, list append/range/remove behavior, existence checks, and explicit panic behavior for unsupported methods. Does not claim production Redis behavior, persistence, TTL handling, sorted-set semantics, rolling-window semantics, raw-key mutation, bulk deletion semantics, concurrency safety, or final client-visible behavior.
+        fingerprint: sha256:d5661aa8ac8b3a03f96f936f10a962aa6983e5a0c54c339094963104628e4f95
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T09:49:24Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added dummy storage system requirement.
+          changed_by: agent:codex
