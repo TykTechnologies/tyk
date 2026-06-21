@@ -2,8 +2,10 @@ package gateway
 
 import (
 	"context"
+	htmltemplate "html/template"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"sync"
 	"testing"
 
@@ -334,6 +336,138 @@ func TestGatewayAPILoaderFindInternalHTTPHandler(t *testing.T) {
 				assert.Nil(t, gotHandler)
 			} else {
 				assert.Same(t, tt.wantHandler, gotHandler)
+			}
+		})
+	}
+}
+
+// Verifies: STK-REQ-101, SYS-REQ-189, SW-REQ-176
+// STK-REQ-101:STK-REQ-101-AC-01:acceptance
+// STK-REQ-101:error_handling:negative
+// SW-REQ-176:nominal:nominal
+// SW-REQ-176:boundary:nominal
+// SW-REQ-176:error_handling:nominal
+// SW-REQ-176:error_handling:negative
+// SW-REQ-176:determinism:nominal
+// SYS-REQ-189:determinism:nominal
+// SYS-REQ-189:error_handling:nominal
+// SYS-REQ-189:error_handling:negative
+func TestGatewayAPILoaderDummyProxyLoopDispatch(t *testing.T) {
+	tests := []struct {
+		name            string
+		rewriteTarget   string
+		sourceHandler   bool
+		targetAPI       *APISpec
+		targetHandler   bool
+		wantStatus      int
+		wantBody        string
+		wantHandledBy   string
+		wantMethod      string
+		wantPath        string
+		wantRawQuery    string
+		wantLoopLevel   int
+		wantLoopLimit   int
+		wantCheckLimits bool
+	}{
+		{
+			name:            "self loop dispatch applies control params and strips them",
+			rewriteTarget:   "tyk://self/target?method=POST&loop_limit=3&check_limits=true&foo=bar",
+			sourceHandler:   true,
+			wantStatus:      http.StatusAccepted,
+			wantHandledBy:   "source",
+			wantMethod:      http.MethodPost,
+			wantPath:        "/target",
+			wantRawQuery:    "foo=bar",
+			wantLoopLevel:   1,
+			wantLoopLimit:   3,
+			wantCheckLimits: true,
+		},
+		{
+			name:          "named API loop dispatch selects matching loaded handler",
+			rewriteTarget: "tyk://target-api/resource?foo=bar",
+			targetAPI: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					APIID: "target-api",
+					Name:  "Target API",
+				},
+			},
+			targetHandler: true,
+			wantStatus:    http.StatusAccepted,
+			wantHandledBy: "target",
+			wantMethod:    http.MethodGet,
+			wantPath:      "/resource",
+			wantRawQuery:  "foo=bar",
+			wantLoopLevel: 1,
+		},
+		{
+			name:          "missing named API loop target returns local error",
+			rewriteTarget: "tyk://missing-api/resource",
+			wantStatus:    http.StatusInternalServerError,
+			wantBody:      "detect loop target",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sourceSpec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					APIID: "source-api",
+					Name:  "Source API",
+				},
+			}
+			metricInstruments, _ := testMetricInstruments(t, nil)
+			gw := &Gateway{
+				MetricInstruments: metricInstruments,
+				apisByID:          make(map[string]*APISpec),
+				apisHandlesByID:   new(sync.Map),
+				templates:         htmltemplate.Must(htmltemplate.New("error.json").Parse(`{"error":"{{.Message}}"}`)),
+			}
+			gw.apisByID[sourceSpec.APIID] = sourceSpec
+			if tt.targetAPI != nil {
+				gw.apisByID[tt.targetAPI.APIID] = tt.targetAPI
+			}
+
+			handledBy := ""
+			captureHandler := func(name string) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					handledBy = name
+					assert.Equal(t, tt.wantMethod, r.Method)
+					assert.Equal(t, tt.wantPath, r.URL.Path)
+					assert.Equal(t, tt.wantRawQuery, r.URL.RawQuery)
+					assert.Equal(t, tt.wantLoopLevel, ctxLoopLevel(r))
+					assert.Equal(t, tt.wantLoopLimit, ctxLoopLevelLimit(r))
+					assert.Equal(t, tt.wantCheckLimits, ctxCheckLimits(r))
+					w.WriteHeader(http.StatusAccepted)
+				})
+			}
+			if tt.sourceHandler {
+				gw.apisHandlesByID.Store(sourceSpec.APIID, &ChainObject{ThisHandler: captureHandler("source")})
+			}
+			if tt.targetHandler {
+				gw.apisHandlesByID.Store(tt.targetAPI.APIID, &ChainObject{ThisHandler: captureHandler("target")})
+			}
+
+			rewriteTarget, err := url.Parse(tt.rewriteTarget)
+			assert.NoError(t, err)
+			req := httptest.NewRequest(http.MethodGet, "http://gateway.local/entry?a=b", nil)
+			ctxSetURLRewriteTarget(req, rewriteTarget)
+			recorder := httptest.NewRecorder()
+			handler := &DummyProxyHandler{
+				SH: SuccessHandler{BaseMiddleware: &BaseMiddleware{
+					Spec:   sourceSpec,
+					Gw:     gw,
+					logger: logrus.NewEntry(logrus.New()),
+				}},
+				Gw: gw,
+			}
+
+			handler.ServeHTTP(recorder, req)
+
+			assert.Equal(t, tt.wantStatus, recorder.Code)
+			assert.Equal(t, tt.wantHandledBy, handledBy)
+			assert.Nil(t, ctxGetURLRewriteTarget(req))
+			if tt.wantBody != "" {
+				assert.Contains(t, recorder.Body.String(), tt.wantBody)
 			}
 		})
 	}

@@ -1,0 +1,52 @@
+id: SYS-REQ-189
+version: 1
+status: approved
+priority: shall
+category: gateway_api_loader_loop_dispatch
+req_type: guarantee
+fretish: ""
+description: Gateway API loader loop dispatch handling shall preserve deterministic local behavior for tested tyk-scheme rewrite targets by dispatching self-loop requests to the current API handler, dispatching named API loop requests to the matching loaded API handler, applying tested method, loop-limit, check-limits, and query control parameters, and returning an explicit local error when a tested loop target cannot be detected, without claiming URL rewrite rule selection, route generation, middleware chain correctness, authentication or rate-limit correctness, upstream connectivity, distributed synchronization, or final client-visible gateway behavior outside the focused dummy proxy handler tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-101
+component: gateway_api_loader_loop_dispatch
+rationale: This system requirement owns local loop-dispatch handling after a rewrite target has already been selected. Broader URL rewrite, route, middleware, and gateway request behavior remain outside this proof slice.
+tags:
+    - gateway
+    - api-loader
+    - loop-dispatch
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-101
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T10:43:09Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API loader loop-dispatch scope is limited to focused DummyProxyHandler tests for tested tyk-scheme self-loop and named API dispatch, method/loop_limit/check_limits/query control handling, loop counter updates, and missing-target local error behavior. This approval does not claim URL rewrite rule selection, route generation, middleware chain correctness, authentication or rate-limit correctness, upstream connectivity, distributed synchronization, or final client-visible gateway behavior outside the focused dummy proxy handler tests.
+        fingerprint: sha256:8901d143e0b543745ec2f8ac93c3de87a912351d3009ddbd1bd91b89ddafd67d
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T10:43:09Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added focused gateway API loader loop dispatch system requirement.
+          changed_by: agent:codex

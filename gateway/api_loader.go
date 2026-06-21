@@ -695,6 +695,7 @@ type DummyProxyHandler struct {
 	Gw *Gateway `json:"-"`
 }
 
+// SW-REQ-176
 func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if newURL := ctxGetURLRewriteTarget(r); newURL != nil {
 		r.URL = newURL

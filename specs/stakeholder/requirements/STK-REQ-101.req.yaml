@@ -1,0 +1,58 @@
+id: STK-REQ-101
+version: 1
+status: approved
+priority: shall
+category: gateway_api_loader_loop_dispatch
+req_type: guarantee
+fretish: ""
+description: Gateway API loader loop dispatch shall preserve deterministic local behavior for tested tyk-scheme rewrite targets by dispatching self-loop requests to the current API handler, dispatching named API loop requests to the matching loaded API handler, applying tested method, loop-limit, check-limits, and query control parameters, and returning an explicit local error when a tested loop target cannot be detected, without claiming URL rewrite rule selection, route generation, middleware chain correctness, authentication or rate-limit correctness, upstream connectivity, distributed synchronization, or final client-visible gateway behavior outside the focused dummy proxy handler tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_api_loader_loop_dispatch
+rationale: DummyProxyHandler is the local handoff point after earlier middleware places a tyk-scheme rewrite target on the request. This requirement owns only the focused dispatch/control-parameter behavior exercised by direct handler tests.
+tags:
+    - gateway
+    - api-loader
+    - loop-dispatch
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T10:43:09Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API loader loop-dispatch scope is limited to focused DummyProxyHandler tests for tested tyk-scheme self-loop and named API dispatch, method/loop_limit/check_limits/query control handling, loop counter updates, and missing-target local error behavior. This approval does not claim URL rewrite rule selection, route generation, middleware chain correctness, authentication or rate-limit correctness, upstream connectivity, distributed synchronization, or final client-visible gateway behavior outside the focused dummy proxy handler tests.
+        fingerprint: sha256:f5019f218b70a9e5fcdfefdf0305b696962a08792560d6993af18d1b87faa1ea
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T10:43:09Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need local dummy proxy loop dispatch to route tested tyk-scheme rewrite targets to the expected loaded handler while consuming documented loop control parameters.
+    acceptance_criteria:
+        - id: STK-REQ-101-AC-01
+          text: Given tested tyk-scheme rewrite targets, loaded API handler registrations, method, loop-limit, check-limits, and query parameters, when dummy proxy loop dispatch runs, then the expected local handler, method, path, preserved query parameters, loop counter, loop limit, check-limit state, or explicit missing-target error is produced.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-189
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added focused gateway API loader loop dispatch requirement.
+          changed_by: agent:codex
