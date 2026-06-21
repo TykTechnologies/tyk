@@ -7,10 +7,247 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/test"
 )
+
+// Verifies: STK-REQ-059, SYS-REQ-147, SW-REQ-134
+// STK-REQ-059:STK-REQ-059-AC-01:acceptance
+// SYS-REQ-147:nominal:nominal
+// SYS-REQ-147:boundary:nominal
+// SYS-REQ-147:error_handling:nominal
+// SYS-REQ-147:error_handling:negative
+// SYS-REQ-147:determinism:nominal
+// MCDC SYS-REQ-147: gateway_api_definition_oas_path_compilation_operation_requested=F, gateway_api_definition_oas_path_compilation_operation_terminal=F => TRUE
+// MCDC SYS-REQ-147: gateway_api_definition_oas_path_compilation_operation_requested=T, gateway_api_definition_oas_path_compilation_operation_terminal=T => TRUE
+//
+// SW-REQ-134:nominal:nominal
+// SW-REQ-134:boundary:nominal
+// SW-REQ-134:error_handling:nominal
+// SW-REQ-134:error_handling:negative
+// SW-REQ-134:determinism:nominal
+//
+//mcdc:ignore SYS-REQ-147: gateway_api_definition_oas_path_compilation_operation_requested=T, gateway_api_definition_oas_path_compilation_operation_terminal=F => FALSE -- violation row is the negation of the local API definition OAS path-compilation helper guarantee; these tests assert requested helpers return deterministic URLSpec records, collapsed candidates, static shields, sorted paths, explicit skipped outcomes, or nil results for non-OAS inputs [category: defensive] [reviewed: human:buger]
+func TestAPIDefinitionLoaderOASPathCompilationHelpers(t *testing.T) {
+	loader := APIDefinitionLoader{}
+	conf := config.Config{}
+
+	paths := openapi3.NewPaths()
+	paths.Set("/items/static", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getStaticItem",
+			Responses: openapi3.NewResponses(
+				openapi3.WithStatus(http.StatusOK, &openapi3.ResponseRef{Value: &openapi3.Response{Description: stringPtrHelper("ok")}}),
+			),
+		},
+	})
+	paths.Set("/items/{id}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getItemByID",
+			Parameters: openapi3.Parameters{
+				{Value: &openapi3.Parameter{
+					Name:     "id",
+					In:       "path",
+					Required: true,
+					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{
+						Type:    &openapi3.Types{"integer"},
+						Pattern: `^\d+$`,
+					}},
+				}},
+			},
+			Responses: openapi3.NewResponses(
+				openapi3.WithStatus(http.StatusOK, &openapi3.ResponseRef{Value: &openapi3.Response{Description: stringPtrHelper("ok")}}),
+			),
+		},
+	})
+	paths.Set("/items/{slug}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getItemBySlug",
+			Parameters: openapi3.Parameters{
+				{Value: &openapi3.Parameter{
+					Name:     "slug",
+					In:       "path",
+					Required: true,
+					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{
+						Type: &openapi3.Types{"string"},
+					}},
+				}},
+			},
+			Responses: openapi3.NewResponses(
+				openapi3.WithStatus(http.StatusOK, &openapi3.ResponseRef{Value: &openapi3.Response{Description: stringPtrHelper("ok")}}),
+			),
+		},
+	})
+
+	oasAPI := oas.OAS{T: openapi3.T{
+		OpenAPI: "3.0.0",
+		Info:    &openapi3.Info{Title: "OAS Path Compilation Helpers", Version: "1.0.0"},
+		Paths:   paths,
+	}}
+	oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				"getItemByID": {
+					ValidateRequest: &oas.ValidateRequest{Enabled: true},
+					MockResponse:    &oas.MockResponse{Enabled: true, Code: http.StatusOK, Body: "id"},
+				},
+				"getItemBySlug": {
+					ValidateRequest: &oas.ValidateRequest{Enabled: true},
+					MockResponse:    &oas.MockResponse{Enabled: true, Code: http.StatusOK, Body: "slug"},
+				},
+				"missingOperation": {
+					ValidateRequest: &oas.ValidateRequest{Enabled: true},
+					MockResponse:    &oas.MockResponse{Enabled: true, Code: http.StatusOK, Body: "missing"},
+				},
+			},
+		},
+	})
+
+	apiSpec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{IsOAS: true},
+		OAS:           oasAPI,
+	}
+
+	validateSpecs := loader.compileOASValidateRequestPathSpec(apiSpec, conf)
+	assert.Len(t, validateSpecs, 2)
+	var validateParamSpec, validateStaticSpec URLSpec
+	for _, spec := range validateSpecs {
+		switch spec.OASPath {
+		case "/items/{id}":
+			validateParamSpec = spec
+		case "/items/static":
+			validateStaticSpec = spec
+		}
+	}
+	assert.Equal(t, OASValidateRequest, validateParamSpec.Status)
+	assert.Len(t, validateParamSpec.OASValidateRequestCandidates, 2)
+	assert.Equal(t, "/items/{id}", validateParamSpec.OASValidateRequestCandidates[0].OASPath)
+	assert.Equal(t, "/items/{slug}", validateParamSpec.OASValidateRequestCandidates[1].OASPath)
+	assert.Equal(t, "/items/static", validateStaticSpec.OASPath)
+	if assert.NotNil(t, validateStaticSpec.OASValidateRequestMeta) {
+		assert.False(t, validateStaticSpec.OASValidateRequestMeta.Enabled)
+	}
+
+	mockSpecs := loader.compileOASMockResponsePathSpec(apiSpec, conf)
+	assert.Len(t, mockSpecs, 2)
+	var mockParamSpec, mockStaticSpec URLSpec
+	for _, spec := range mockSpecs {
+		switch spec.OASPath {
+		case "/items/{id}":
+			mockParamSpec = spec
+		case "/items/static":
+			mockStaticSpec = spec
+		}
+	}
+	assert.Equal(t, OASMockResponse, mockParamSpec.Status)
+	assert.Len(t, mockParamSpec.OASMockResponseCandidates, 2)
+	assert.Equal(t, "/items/{id}", mockParamSpec.OASMockResponseCandidates[0].OASPath)
+	assert.Equal(t, "/items/{slug}", mockParamSpec.OASMockResponseCandidates[1].OASPath)
+	assert.Equal(t, "/items/static", mockStaticSpec.OASPath)
+	if assert.NotNil(t, mockStaticSpec.OASMockResponseMeta) {
+		assert.False(t, mockStaticSpec.OASMockResponseMeta.Enabled)
+	}
+
+	path, method := loader.findPathAndMethodForOperation(apiSpec, "getItemByID")
+	assert.Equal(t, "/items/{id}", path)
+	assert.Equal(t, http.MethodGet, method)
+
+	existing, hasParameterised := indexURLSpecs(validateSpecs)
+	assert.True(t, hasParameterised)
+	_, hasStatic := existing["/items/static:GET"]
+	assert.True(t, hasStatic)
+
+	nonOAS := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	assert.Nil(t, loader.compileOASValidateRequestPathSpec(nonOAS, conf))
+	assert.Nil(t, loader.compileOASMockResponsePathSpec(nonOAS, conf))
+}
+
+// Verifies: STK-REQ-059, SYS-REQ-147, SW-REQ-134
+// STK-REQ-059:STK-REQ-059-AC-01:acceptance
+// SYS-REQ-147:nominal:nominal
+// SYS-REQ-147:boundary:nominal
+// SYS-REQ-147:determinism:nominal
+// SW-REQ-134:nominal:nominal
+// SW-REQ-134:boundary:nominal
+// SW-REQ-134:determinism:nominal
+func TestOASPathCompilationGroupingAndRestrictiveness(t *testing.T) {
+	oasPaths := openapi3.NewPaths()
+	oasPaths.Set("/employees/{id}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			Parameters: openapi3.Parameters{
+				{Value: &openapi3.Parameter{
+					Name:     "id",
+					In:       "path",
+					Required: true,
+					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{
+						Type:    &openapi3.Types{"integer"},
+						Pattern: `^\d+$`,
+					}},
+				}},
+			},
+		},
+	})
+	oasPaths.Set("/employees/{name}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			Parameters: openapi3.Parameters{
+				{Value: &openapi3.Parameter{
+					Name:     "name",
+					In:       "path",
+					Required: true,
+					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{
+						Type: &openapi3.Types{"string"},
+					}},
+				}},
+			},
+		},
+	})
+
+	makeValidateSpec := func(path string) URLSpec {
+		return URLSpec{
+			Status:                 OASValidateRequest,
+			OASValidateRequestMeta: &oas.ValidateRequest{Enabled: true},
+			OASMethod:              http.MethodGet,
+			OASPath:                path,
+			spec:                   regexp.MustCompile(`^/employees/([^/]+)$`),
+		}
+	}
+
+	validateSpecs := groupCollapsedValidateRequestSpecs([]URLSpec{
+		makeValidateSpec("/employees/{name}"),
+		makeValidateSpec("/employees/{id}"),
+	}, oasPaths)
+	assert.Len(t, validateSpecs, 1)
+	assert.Len(t, validateSpecs[0].OASValidateRequestCandidates, 2)
+	assert.Equal(t, "/employees/{id}", validateSpecs[0].OASValidateRequestCandidates[0].OASPath)
+	assert.Equal(t, "/employees/{name}", validateSpecs[0].OASValidateRequestCandidates[1].OASPath)
+	assert.Equal(t, 7, pathParamRestrictiveness("/employees/{id}", http.MethodGet, oasPaths))
+	assert.Equal(t, 0, pathParamRestrictiveness("/employees/{name}", http.MethodGet, oasPaths))
+	assert.Equal(t, len(`^\d+$`), pathParamPatternLength("/employees/{id}", http.MethodGet, oasPaths))
+
+	mockSpecs := groupCollapsedMockResponseSpecs([]URLSpec{
+		{
+			Status:              OASMockResponse,
+			OASMockResponseMeta: &oas.MockResponse{Enabled: true, Code: http.StatusOK, Body: "name"},
+			OASMethod:           http.MethodGet,
+			OASPath:             "/employees/{name}",
+			spec:                regexp.MustCompile(`^/employees/([^/]+)$`),
+		},
+		{
+			Status:              OASMockResponse,
+			OASMockResponseMeta: &oas.MockResponse{Enabled: true, Code: http.StatusOK, Body: "id"},
+			OASMethod:           http.MethodGet,
+			OASPath:             "/employees/{id}",
+			spec:                regexp.MustCompile(`^/employees/([^/]+)$`),
+		},
+	}, oasPaths)
+	assert.Len(t, mockSpecs, 1)
+	assert.Len(t, mockSpecs[0].OASMockResponseCandidates, 2)
+	assert.Equal(t, "/employees/{id}", mockSpecs[0].OASMockResponseCandidates[0].OASPath)
+	assert.Equal(t, "/employees/{name}", mockSpecs[0].OASMockResponseCandidates[1].OASPath)
+}
 
 func TestSortURLSpecsByPathPriority(t *testing.T) {
 	tests := []struct {

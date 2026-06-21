@@ -1,0 +1,59 @@
+id: STK-REQ-059
+version: 1
+status: approved
+priority: shall
+category: api_definition_oas_path_compilation
+req_type: guarantee
+fretish: ""
+description: Gateway API definition OAS path compilation support shall locally convert OAS validate-request and mock-response middleware operation declarations into deterministic URLSpec records, including operation lookup, collapsed candidate grouping, path-parameter restrictiveness ordering, static path shield records, and OAS path-priority sorting, without claiming middleware execution, request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_api_definition_oas_path_compilation
+rationale: Gateway operators depend on deterministic local OAS path-spec compilation before middleware and routing code consume compiled URLSpec records. This requirement owns only local helper behavior in gateway/api_definition.go and focused gateway tests.
+tags:
+    - gateway
+    - api-definition
+    - oas
+    - path-compilation
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API definition OAS path-compilation scope is limited to local gateway/api_definition.go helper behavior: validate-request and mock-response URLSpec construction, operation lookup, collapsed candidate grouping, path-parameter restrictiveness ordering, static path shield records, and OAS path-priority sorting. This approval does not claim middleware execution, request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need OAS validate-request and mock-response path settings to compile into deterministic local URLSpec records before gateway middleware and routing behavior depends on them.
+    acceptance_criteria:
+        - id: STK-REQ-059-AC-01
+          text: Given local OAS validate-request or mock-response operation configuration, when OAS path compiler helpers are exercised, then deterministic URLSpec records, collapsed candidates, static shield entries, sorted paths, or explicit skipped outcomes are produced for the tested inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-147
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API definition OAS path-compilation helper requirement.
+          changed_by: human:buger

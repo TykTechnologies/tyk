@@ -1,0 +1,14 @@
+component: gateway_api_definition_oas_path_compilation
+no_interface:
+    declared: true
+    reason: The gateway API definition OAS path-compilation proof slice covers local gateway/api_definition.go helper behavior only; middleware execution, request validation correctness, mock response delivery, upstream behavior, gateway request admission, and final client-visible behavior are outside this component boundary.
+variables:
+    - name: gateway_api_definition_oas_path_compilation_operation_requested
+      type: bool
+      direction: input
+      description: A caller requests a local gateway API definition OAS path-compilation helper operation such as validate-request or mock-response URLSpec construction, operation lookup, collapsed candidate grouping, path-parameter restrictiveness ordering, static path shield insertion, or path-priority sorting.
+
+    - name: gateway_api_definition_oas_path_compilation_operation_terminal
+      type: bool
+      direction: output
+      description: 'A local gateway API definition OAS path-compilation helper operation reaches a terminal observable result: URLSpec records are returned, disabled static shield entries are returned, collapsed candidate records are produced, sorted paths or candidates are returned, missing or disabled inputs are skipped, or nil/empty OAS inputs produce no path specs.'

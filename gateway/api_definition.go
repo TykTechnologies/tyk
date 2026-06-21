@@ -1405,6 +1405,7 @@ func (a APIDefinitionLoader) compileRateLimitPathsSpec(paths []apidef.RateLimitM
 	return urlSpec
 }
 
+// SW-REQ-134
 // compileOASValidateRequestPathSpec extracts ValidateRequest operations from OAS middleware
 // and converts them to URLSpec entries that use the standard regex-based path matching algorithm.
 // This ensures OAS validateRequest middleware respects gateway configurations like
@@ -1457,6 +1458,7 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 	return urlSpec
 }
 
+// SW-REQ-134
 // groupCollapsedValidateRequestSpecs detects URLSpec entries that compile to the same
 // regex+method pair and groups them as candidates on a single representative URLSpec.
 // Candidates are sorted so that more restrictive path parameter schemas are tried first.
@@ -1466,6 +1468,7 @@ func groupCollapsedValidateRequestSpecs(specs []URLSpec, oasPaths *openapi3.Path
 	})
 }
 
+// SW-REQ-134
 // groupCollapsedMockResponseSpecs is the mock response equivalent of
 // groupCollapsedValidateRequestSpecs.
 func groupCollapsedMockResponseSpecs(specs []URLSpec, oasPaths *openapi3.Paths) []URLSpec {
@@ -1474,6 +1477,7 @@ func groupCollapsedMockResponseSpecs(specs []URLSpec, oasPaths *openapi3.Paths) 
 	})
 }
 
+// SW-REQ-134
 // groupCollapsedSpecs is the shared grouping logic for both validate request and mock
 // response. It finds URLSpec entries with the same compiled regex+method, sorts them
 // by restrictiveness, and calls the provided merge function to build candidates.
@@ -1514,6 +1518,7 @@ func groupCollapsedSpecs(
 	return removeIndices(specs, toRemove)
 }
 
+// SW-REQ-134
 // mergeMockGroupIntoPrimary builds MockResponseCandidates from the sorted indices
 // and assigns them to the primary (first) spec.
 func mergeMockGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]bool) {
@@ -1536,6 +1541,7 @@ func mergeMockGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]
 	specs[primary].OASMockResponseCandidates = candidates
 }
 
+// SW-REQ-134
 // sortByRestrictiveness sorts spec indices so that more restrictive path parameter
 // schemas come first. Ties in restrictiveness score are broken by total pattern length
 // (longer patterns are more specific, e.g., ^\d+$ before .*), then alphabetically.
@@ -1555,6 +1561,7 @@ func sortByRestrictiveness(indices []int, specs []URLSpec, oasPaths *openapi3.Pa
 	})
 }
 
+// SW-REQ-134
 // mergeGroupIntoPrimary takes a sorted list of spec indices that share the same
 // regex+method, builds ValidateRequestCandidates from them, and assigns them to
 // the primary (first) spec. Non-primary indices are marked for removal.
@@ -1578,6 +1585,7 @@ func mergeGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]bool
 	specs[primary].OASValidateRequestCandidates = candidates
 }
 
+// SW-REQ-134
 // removeIndices returns a new slice with entries at the given indices removed.
 func removeIndices(specs []URLSpec, toRemove map[int]bool) []URLSpec {
 	if len(toRemove) == 0 {
@@ -1592,6 +1600,7 @@ func removeIndices(specs []URLSpec, toRemove map[int]bool) []URLSpec {
 	return result
 }
 
+// SW-REQ-134
 // pathParamRestrictiveness returns a score indicating how restrictive the path parameter
 // schemas are for a given OAS path+method. Higher scores mean more restrictive. A plain
 // type:string with no constraints scores 0 (catch-all), while type:number, type:integer,
@@ -1623,6 +1632,7 @@ func pathParamRestrictiveness(oasPath, method string, oasPaths *openapi3.Paths) 
 	return score
 }
 
+// SW-REQ-134
 // schemaRestrictiveness returns a score for how restrictive a single path parameter
 // schema is. The hierarchy from most to least restrictive:
 //
@@ -1663,6 +1673,7 @@ func schemaRestrictiveness(s *openapi3.Schema) int {
 	return 0
 }
 
+// SW-REQ-134
 // pathParamPatternLength returns the total length of all path parameter pattern strings
 // for a given OAS path+method. Used as a tie-breaker when restrictiveness scores are
 // equal — longer patterns tend to be more specific (e.g., ^\d+$ vs .*).
@@ -1691,6 +1702,7 @@ func pathParamPatternLength(oasPath, method string, oasPaths *openapi3.Paths) in
 	return total
 }
 
+// SW-REQ-134
 // compileOASMockResponsePathSpec extracts MockResponse operations from OAS middleware
 // and converts them to URLSpec entries that use the standard regex-based path matching algorithm.
 // This ensures OAS mockResponse middleware respects gateway configurations like
@@ -1743,6 +1755,7 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 	return urlSpec
 }
 
+// SW-REQ-134
 // addStaticPathShields adds synthetic disabled URLSpec entries for static OAS paths
 // that don't already have an entry in urlSpec. These entries act as shields: when the
 // middleware scans the path list, a static shield entry matches before any parameterised
@@ -1785,6 +1798,7 @@ func (a APIDefinitionLoader) addStaticPathShields(
 	return urlSpec
 }
 
+// SW-REQ-134
 // indexURLSpecs builds a set of "path:METHOD" keys from the given specs and reports
 // whether any spec uses a parameterised (mux-template) path.
 func indexURLSpecs(specs []URLSpec) (existing map[string]struct{}, hasParameterised bool) {
@@ -1798,6 +1812,7 @@ func indexURLSpecs(specs []URLSpec) (existing map[string]struct{}, hasParameteri
 	return
 }
 
+// SW-REQ-134
 // findPathAndMethodForOperation finds the path and method for a given operation ID
 // by searching through the OAS paths.
 func (a APIDefinitionLoader) findPathAndMethodForOperation(apiSpec *APISpec, operationID string) (string, string) {
@@ -1816,6 +1831,7 @@ func (a APIDefinitionLoader) findPathAndMethodForOperation(apiSpec *APISpec, ope
 	return "", ""
 }
 
+// SW-REQ-134
 // sortURLSpecsByPathPriority sorts URLSpec entries using the same path priority
 // rules as oasutil.SortByPathLength, ensuring consistent ordering across the gateway.
 func sortURLSpecsByPathPriority(specs []URLSpec) {
