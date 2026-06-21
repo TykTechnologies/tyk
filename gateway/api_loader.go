@@ -1009,6 +1009,7 @@ type generalStores struct {
 
 var playgroundTemplate *texttemplate.Template
 
+// SW-REQ-177
 func (gw *Gateway) readGraphqlPlaygroundTemplate() {
 	playgroundPath := filepath.Join(gw.GetConfig().TemplatePath, "playground")
 	files, err := ioutil.ReadDir(playgroundPath)

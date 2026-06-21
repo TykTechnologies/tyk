@@ -1,0 +1,53 @@
+id: SYS-REQ-190
+version: 1
+status: approved
+priority: shall
+category: gateway_api_loader_playground_templates
+req_type: guarantee
+fretish: ""
+description: Gateway API loader playground template handling shall preserve deterministic local template-cache behavior for tested template roots by parsing valid files from the configured playground template directory into the package playground template cache and leaving no cached playground template when the configured playground directory is missing or contains parse-invalid templates, without claiming route registration, GraphQL execution, template asset completeness, filesystem permissions beyond tested local paths, concurrent template-cache access, startup sequencing, dashboard synchronization, distributed behavior, or final client-visible gateway behavior outside the focused template-loader tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-102
+component: gateway_api_loader_playground_templates
+rationale: This system requirement owns local template-cache outcomes for the API-loader playground template reader only. Integrated GraphQL playground routing and request behavior remain outside this proof slice.
+tags:
+    - gateway
+    - api-loader
+    - graphql
+    - playground
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-102
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T10:53:51Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API loader playground-template scope is limited to focused readGraphqlPlaygroundTemplate tests for valid configured playground template files, missing playground directory behavior, parse-invalid template behavior, and package template-cache outcomes. This approval does not claim route registration, GraphQL execution, template asset completeness, filesystem permissions beyond tested local paths, concurrent template-cache access, startup sequencing, dashboard synchronization, distributed behavior, or final client-visible gateway behavior outside the focused template-loader tests.
+        fingerprint: sha256:49ac984617f70c753aa3b881ce8dad343f741da972e1182b8599a296889669ec
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T10:53:51Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added focused gateway API loader playground template system requirement.
+          changed_by: agent:codex

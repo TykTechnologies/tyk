@@ -1,0 +1,54 @@
+id: SW-REQ-177
+version: 1
+status: approved
+priority: shall
+category: gateway_api_loader_playground_templates
+req_type: guarantee
+fretish: ""
+description: The gateway package implementation shall preserve local GraphQL playground template-cache behavior for tested template roots by parsing valid files from the configured playground template directory into the package playground template cache and leaving no cached playground template when the configured playground directory is missing or contains parse-invalid templates, without claiming route registration, GraphQL execution, template asset completeness, filesystem permissions beyond tested local paths, concurrent template-cache access, startup sequencing, dashboard synchronization, distributed behavior, or final client-visible gateway behavior outside the focused template-loader tests.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: gateway/api_loader_reqproof_test.go; docs/gateway-api-loader-playground-template-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-190
+component: gateway_api_loader_playground_templates
+rationale: This software requirement owns local gateway/api_loader.go readGraphqlPlaygroundTemplate behavior under focused gateway package tests only. Full playground route handling and client responses remain outside this proof slice.
+tags:
+    - gateway
+    - api-loader
+    - graphql
+    - playground
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-190
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T10:53:51Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API loader playground-template scope is limited to focused readGraphqlPlaygroundTemplate tests for valid configured playground template files, missing playground directory behavior, parse-invalid template behavior, and package template-cache outcomes. This approval does not claim route registration, GraphQL execution, template asset completeness, filesystem permissions beyond tested local paths, concurrent template-cache access, startup sequencing, dashboard synchronization, distributed behavior, or final client-visible gateway behavior outside the focused template-loader tests.
+        fingerprint: sha256:c70eead5a116df4fd38d034282c67eb0654d2fc7f6272e07480dd1a944eb072c
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T10:53:51Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added focused local GraphQL playground template-loader behavior.
+          changed_by: agent:codex

@@ -1,13 +1,17 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
 	htmltemplate "html/template"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
+	texttemplate "text/template"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -468,6 +472,88 @@ func TestGatewayAPILoaderDummyProxyLoopDispatch(t *testing.T) {
 			assert.Nil(t, ctxGetURLRewriteTarget(req))
 			if tt.wantBody != "" {
 				assert.Contains(t, recorder.Body.String(), tt.wantBody)
+			}
+		})
+	}
+}
+
+// Verifies: STK-REQ-102, SYS-REQ-190, SW-REQ-177
+// STK-REQ-102:STK-REQ-102-AC-01:acceptance
+// STK-REQ-102:error_handling:negative
+// SW-REQ-177:nominal:nominal
+// SW-REQ-177:boundary:nominal
+// SW-REQ-177:error_handling:nominal
+// SW-REQ-177:error_handling:negative
+// SW-REQ-177:determinism:nominal
+// SYS-REQ-190:determinism:nominal
+// SYS-REQ-190:error_handling:nominal
+// SYS-REQ-190:error_handling:negative
+func TestGatewayAPILoaderReadGraphQLPlaygroundTemplate(t *testing.T) {
+	previousTemplate := playgroundTemplate
+	t.Cleanup(func() {
+		playgroundTemplate = previousTemplate
+	})
+
+	tests := []struct {
+		name          string
+		setup         func(t *testing.T, root string)
+		wantTemplate  bool
+		wantIndexBody string
+	}{
+		{
+			name: "valid playground templates are cached",
+			setup: func(t *testing.T, root string) {
+				t.Helper()
+				playgroundDir := filepath.Join(root, "playground")
+				assert.NoError(t, os.MkdirAll(playgroundDir, 0755))
+				assert.NoError(t, os.WriteFile(filepath.Join(playgroundDir, playgroundHTMLTemplateName), []byte(`endpoint={{.Endpoint}}`), 0644))
+				assert.NoError(t, os.WriteFile(filepath.Join(playgroundDir, playgroundJSTemplateName), []byte(`console.log("playground")`), 0644))
+			},
+			wantTemplate:  true,
+			wantIndexBody: "endpoint=/graphql/",
+		},
+		{
+			name: "missing playground directory clears cache",
+			setup: func(t *testing.T, root string) {
+				t.Helper()
+			},
+		},
+		{
+			name: "invalid playground template clears cache",
+			setup: func(t *testing.T, root string) {
+				t.Helper()
+				playgroundDir := filepath.Join(root, "playground")
+				assert.NoError(t, os.MkdirAll(playgroundDir, 0755))
+				assert.NoError(t, os.WriteFile(filepath.Join(playgroundDir, playgroundHTMLTemplateName), []byte(`{{`), 0644))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			tt.setup(t, root)
+			playgroundTemplate = texttemplate.Must(texttemplate.New("sentinel").Parse("stale"))
+			gw := &Gateway{}
+			gw.SetConfig(config.Config{TemplatePath: root})
+
+			gw.readGraphqlPlaygroundTemplate()
+
+			if !tt.wantTemplate {
+				assert.Nil(t, playgroundTemplate)
+				return
+			}
+
+			if assert.NotNil(t, playgroundTemplate) {
+				assert.NotNil(t, playgroundTemplate.Lookup(playgroundHTMLTemplateName))
+				assert.NotNil(t, playgroundTemplate.Lookup(playgroundJSTemplateName))
+
+				var rendered bytes.Buffer
+				err := playgroundTemplate.ExecuteTemplate(&rendered, playgroundHTMLTemplateName, struct {
+					Endpoint string
+				}{Endpoint: "/graphql/"})
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantIndexBody, rendered.String())
 			}
 		})
 	}
