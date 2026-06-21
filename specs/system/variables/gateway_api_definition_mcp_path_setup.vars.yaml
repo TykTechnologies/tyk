@@ -1,0 +1,14 @@
+component: gateway_api_definition_mcp_path_setup
+no_interface:
+    declared: true
+    reason: The gateway API definition MCP path setup proof slice covers local gateway/api_definition.go helper behavior only; JSON-RPC request execution, primitive authorization enforcement, middleware runtime behavior, route admission, persistence, upstream behavior, and final client-visible outcomes are outside this component boundary.
+variables:
+    - name: gateway_api_definition_mcp_path_setup_operation_requested
+      type: bool
+      direction: input
+      description: A caller requests a local gateway API definition MCP path setup helper operation such as primitive extraction into extended paths, built-in operation internal path insertion, primitive-to-VEM map construction, allow-list flag derivation, JSON-RPC router initialization, or extended-path aggregation/whitelist flag selection.
+
+    - name: gateway_api_definition_mcp_path_setup_operation_terminal
+      type: bool
+      direction: output
+      description: 'A local gateway API definition MCP path setup helper operation reaches a terminal observable result: primitive mappings are populated, internal path entries are appended, allow-list flags are set, a JSON-RPC router is initialized, combined URLSpec records and whitelist flags are returned, or missing/non-MCP inputs produce explicit skipped or empty outcomes.'

@@ -1840,6 +1840,7 @@ func sortURLSpecsByPathPriority(specs []URLSpec) {
 	})
 }
 
+// SW-REQ-135
 // extractMCPPrimitivesToPaths extracts MCP primitives (tools, resources, prompts) from the OAS
 // definition and populates them into the ExtendedPaths structure for each API version.
 // It also adds built-in MCP operation paths (tools/call, resources/read, prompts/get) to
@@ -1863,6 +1864,7 @@ func (a APIDefinitionLoader) extractMCPPrimitivesToPaths(spec *APISpec, def *mod
 	}
 }
 
+// SW-REQ-135
 // addInternalMWtoMCPOperations adds built-in MCP operation paths (tools/call, resources/read,
 // prompts/get) to the Internal middleware configuration if they exist in the OAS definition.
 func (a APIDefinitionLoader) addInternalMWtoMCPOperations(spec *APISpec, extendedPaths *apidef.ExtendedPathsSet) {
@@ -1883,6 +1885,7 @@ func (a APIDefinitionLoader) addInternalMWtoMCPOperations(spec *APISpec, extende
 	}
 }
 
+// SW-REQ-135
 // initMCPConfiguration initializes MCP-specific configuration for the API spec.
 // This includes registering VEM prefixes, populating the primitives map,
 // calculating allow-list flags, and setting up the JSON-RPC router if needed.
@@ -1896,6 +1899,7 @@ func (a APIDefinitionLoader) initMCPConfiguration(spec *APISpec) {
 	}
 }
 
+// SW-REQ-135
 func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec, conf config.Config) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
@@ -2548,6 +2552,7 @@ func (r *RoundRobin) WithLen(len int) int {
 	return int(cur) % len
 }
 
+// SW-REQ-135
 func (a APIDefinitionLoader) populateMCPPrimitivesMap(spec *APISpec) {
 	if !spec.IsMCP() {
 		return
@@ -2585,6 +2590,7 @@ func (a APIDefinitionLoader) populateMCPPrimitivesMap(spec *APISpec) {
 	}
 }
 
+// SW-REQ-135
 func (a APIDefinitionLoader) calculateMCPAllowlistFlags(spec *APISpec) {
 	middleware := spec.OAS.GetTykMiddleware()
 	if middleware == nil {

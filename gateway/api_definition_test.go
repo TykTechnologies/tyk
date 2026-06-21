@@ -31,6 +31,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -3551,7 +3552,230 @@ func TestCalculateMCPAllowlistFlags(t *testing.T) {
 	})
 }
 
-// TestExtractMCPPrimitivesToPaths tests the extraction of MCP primitives to ExtendedPaths.
+// Verifies: STK-REQ-060, SYS-REQ-148, SW-REQ-135
+// STK-REQ-060:STK-REQ-060-AC-01:acceptance
+// SYS-REQ-148:nominal:nominal
+// SYS-REQ-148:boundary:nominal
+// SYS-REQ-148:error_handling:nominal
+// SYS-REQ-148:error_handling:negative
+// SYS-REQ-148:determinism:nominal
+// MCDC SYS-REQ-148: gateway_api_definition_mcp_path_setup_operation_requested=F, gateway_api_definition_mcp_path_setup_operation_terminal=F => TRUE
+// MCDC SYS-REQ-148: gateway_api_definition_mcp_path_setup_operation_requested=T, gateway_api_definition_mcp_path_setup_operation_terminal=T => TRUE
+//
+// SW-REQ-135:nominal:nominal
+// SW-REQ-135:boundary:nominal
+// SW-REQ-135:error_handling:nominal
+// SW-REQ-135:error_handling:negative
+// SW-REQ-135:determinism:nominal
+//
+//mcdc:ignore SYS-REQ-148: gateway_api_definition_mcp_path_setup_operation_requested=T, gateway_api_definition_mcp_path_setup_operation_terminal=F => FALSE -- violation row is the negation of the local API definition MCP path-setup helper guarantee; these tests assert requested helpers return primitive mappings, internal path entries, allow-list flags, router setup, combined URLSpec records, whitelist flags, or explicit skipped outcomes for non-MCP or missing inputs [category: defensive] [reviewed: human:buger]
+func TestAPIDefinitionLoaderMCPPathSetupHelpers(t *testing.T) {
+	loader := APIDefinitionLoader{}
+	middleware := &oas.Middleware{
+		Operations: oas.Operations{
+			mcp.MethodToolsCall: {
+				Allow: &oas.Allowance{Enabled: true},
+			},
+		},
+		McpTools: oas.MCPPrimitives{
+			"get_users": {
+				Operation: oas.Operation{
+					Allow: &oas.Allowance{Enabled: true},
+				},
+			},
+		},
+		McpResources: oas.MCPPrimitives{
+			"file:///*": {},
+		},
+		McpPrompts: oas.MCPPrimitives{
+			"code-review": {},
+		},
+	}
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			ApplicationProtocol: apidef.AppProtocolMCP,
+			JsonRpcVersion:      apidef.JsonRPC20,
+		},
+		OAS: oas.OAS{
+			T: openapi3.T{Paths: openapi3.NewPaths()},
+		},
+	}
+	spec.OAS.Paths.Set("/"+mcp.MethodToolsCall, &openapi3.PathItem{})
+	spec.OAS.Paths.Set("/"+mcp.MethodResourcesRead, &openapi3.PathItem{})
+	spec.OAS.SetTykExtension(&oas.XTykAPIGateway{Middleware: middleware})
+
+	def := &model.MergedAPI{
+		APIDefinition: &apidef.APIDefinition{
+			VersionData: apidef.VersionData{
+				Versions: map[string]apidef.VersionInfo{
+					"v1": {Name: "v1"},
+					"v2": {Name: "v2"},
+				},
+			},
+		},
+	}
+
+	loader.extractMCPPrimitivesToPaths(spec, def)
+	for _, version := range []string{"v1", "v2"} {
+		paths := map[string]bool{}
+		for _, internal := range def.VersionData.Versions[version].ExtendedPaths.Internal {
+			assert.Equal(t, http.MethodPost, internal.Method)
+			assert.False(t, internal.Disabled)
+			paths[internal.Path] = true
+		}
+
+		assert.True(t, paths["/mcp-tool:get_users"])
+		assert.True(t, paths["/mcp-resource:file:///*"])
+		assert.True(t, paths["/mcp-prompt:code-review"])
+		assert.True(t, paths["/"+mcp.MethodToolsCall])
+		assert.True(t, paths["/"+mcp.MethodResourcesRead])
+		assert.False(t, paths["/"+mcp.MethodPromptsGet])
+	}
+
+	loader.initMCPConfiguration(spec)
+
+	require.NotNil(t, spec.JSONRPCRouter)
+	assert.Equal(t, "/mcp-tool:get_users", spec.MCPPrimitives["tool:get_users"])
+	assert.Equal(t, "/mcp-resource:file:///*", spec.MCPPrimitives["resource:file:///*"])
+	assert.Equal(t, "/mcp-prompt:code-review", spec.MCPPrimitives["prompt:code-review"])
+	assert.Equal(t, "/"+mcp.MethodToolsCall, spec.MCPPrimitives["operation:"+mcp.MethodToolsCall])
+	assert.Equal(t, "/"+mcp.MethodResourcesRead, spec.MCPPrimitives["operation:"+mcp.MethodResourcesRead])
+	assert.NotContains(t, spec.MCPPrimitives, "operation:"+mcp.MethodPromptsGet)
+	assert.True(t, spec.OperationsAllowListEnabled)
+	assert.True(t, spec.ToolsAllowListEnabled)
+	assert.False(t, spec.ResourcesAllowListEnabled)
+	assert.False(t, spec.PromptsAllowListEnabled)
+	assert.True(t, spec.MCPAllowListEnabled)
+
+	specWithoutMiddleware := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			ApplicationProtocol: apidef.AppProtocolMCP,
+			JsonRpcVersion:      apidef.JsonRPC20,
+		},
+		OAS: oas.OAS{},
+	}
+	defWithoutMiddleware := &model.MergedAPI{
+		APIDefinition: &apidef.APIDefinition{
+			VersionData: apidef.VersionData{
+				Versions: map[string]apidef.VersionInfo{
+					"v1": {Name: "v1"},
+				},
+			},
+		},
+	}
+
+	loader.extractMCPPrimitivesToPaths(specWithoutMiddleware, defWithoutMiddleware)
+	loader.initMCPConfiguration(specWithoutMiddleware)
+
+	assert.Empty(t, defWithoutMiddleware.VersionData.Versions["v1"].ExtendedPaths.Internal)
+	assert.Nil(t, specWithoutMiddleware.MCPPrimitives)
+	assert.False(t, specWithoutMiddleware.MCPAllowListEnabled)
+	require.NotNil(t, specWithoutMiddleware.JSONRPCRouter)
+
+	nonMCP := &APISpec{
+		APIDefinition: &apidef.APIDefinition{},
+		OAS:           oas.OAS{},
+	}
+	nonMCP.OAS.SetTykExtension(&oas.XTykAPIGateway{Middleware: middleware})
+	loader.populateMCPPrimitivesMap(nonMCP)
+	assert.Nil(t, nonMCP.MCPPrimitives)
+}
+
+// Verifies: STK-REQ-060, SYS-REQ-148, SW-REQ-135
+// STK-REQ-060:STK-REQ-060-AC-01:acceptance
+// SYS-REQ-148:nominal:nominal
+// SYS-REQ-148:boundary:nominal
+// SYS-REQ-148:error_handling:nominal
+// SYS-REQ-148:determinism:nominal
+// SW-REQ-135:nominal:nominal
+// SW-REQ-135:boundary:nominal
+// SW-REQ-135:error_handling:nominal
+// SW-REQ-135:determinism:nominal
+func TestAPIDefinitionLoaderExtendedPathSpecAggregation(t *testing.T) {
+	loader := APIDefinitionLoader{}
+	conf := config.Config{}
+
+	testCases := []struct {
+		name                 string
+		version              apidef.VersionInfo
+		spec                 *APISpec
+		wantStatuses         []URLStatus
+		wantWhitelistEnabled bool
+	}{
+		{
+			name: "classic whitelist path enables whitelist mode",
+			version: apidef.VersionInfo{
+				ExtendedPaths: apidef.ExtendedPathsSet{
+					WhiteList: []apidef.EndPointMeta{
+						{Path: "/allowed", Method: http.MethodGet},
+					},
+				},
+			},
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{},
+				OAS:           oas.OAS{},
+			},
+			wantStatuses:         []URLStatus{WhiteList},
+			wantWhitelistEnabled: true,
+		},
+		{
+			name: "operation allow flag enables whitelist mode without classic paths",
+			version: apidef.VersionInfo{
+				ExtendedPaths: apidef.ExtendedPathsSet{},
+			},
+			spec: &APISpec{
+				APIDefinition:              &apidef.APIDefinition{},
+				OAS:                        oas.OAS{},
+				OperationsAllowListEnabled: true,
+			},
+			wantWhitelistEnabled: true,
+		},
+		{
+			name: "MCP API leaves global whitelist mode disabled",
+			version: apidef.VersionInfo{
+				ExtendedPaths: apidef.ExtendedPathsSet{
+					WhiteList: []apidef.EndPointMeta{
+						{Path: "/mcp-tool:get_users", Method: http.MethodPost},
+					},
+				},
+			},
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					ApplicationProtocol: apidef.AppProtocolMCP,
+				},
+				OAS:                        oas.OAS{},
+				OperationsAllowListEnabled: true,
+			},
+			wantStatuses:         []URLStatus{WhiteList},
+			wantWhitelistEnabled: false,
+		},
+		{
+			name: "empty inputs produce no path specs and no whitelist mode",
+			version: apidef.VersionInfo{
+				ExtendedPaths: apidef.ExtendedPathsSet{},
+			},
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{},
+				OAS:           oas.OAS{},
+			},
+			wantWhitelistEnabled: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			specs, whitelistEnabled := loader.getExtendedPathSpecs(tc.version, tc.spec, conf)
+
+			assert.Equal(t, tc.wantWhitelistEnabled, whitelistEnabled)
+			require.Len(t, specs, len(tc.wantStatuses))
+
+			for i, wantStatus := range tc.wantStatuses {
+				assert.Equal(t, wantStatus, specs[i].Status)
+			}
+		})
+	}
+}
 
 // TestAddInternalMWtoMCPOperations tests adding internal middleware for MCP operations.
 func TestAddInternalMWtoMCPOperations(t *testing.T) {

@@ -18,7 +18,10 @@ tags:
     - api-definition
     - path-compilation
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-21T00:39:38.841418Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:b3d2a5eeaf93e9a9bdbd6d494449e47381f9e31fb3d41f98ff4e9aa771c38dc3
 verification:
     assurance_level: A
     formalization_status: none

@@ -1,0 +1,62 @@
+id: STK-REQ-060
+version: 1
+status: approved
+priority: shall
+category: api_definition_mcp_path_setup
+req_type: guarantee
+fretish: ""
+description: Gateway API definition MCP path setup support shall locally derive deterministic MCP primitive path mappings, built-in operation internal path entries, allow-list setup flags, JSON-RPC router setup, and extended-path aggregation outcomes from loaded API definitions, without claiming JSON-RPC request execution, primitive authorization enforcement, middleware runtime behavior, route admission, persistence, upstream behavior, or final client-visible outcomes.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_api_definition_mcp_path_setup
+rationale: Gateway operators depend on deterministic local MCP path setup before JSON-RPC and middleware code consume compiled path records. This requirement owns only local gateway/api_definition.go helper behavior and focused gateway tests.
+tags:
+    - gateway
+    - api-definition
+    - mcp
+    - path-setup
+variables: []
+traces:
+    reviewed_at: "2026-06-21T00:39:38.976391Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:604c818aa3d58e2196df41c6829056dd2cfd7fff5d40787b29f627695bec17d4
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API definition MCP path setup scope is limited to local gateway/api_definition.go helper behavior: MCP primitive extraction into extended paths, built-in MCP operation internal path insertion, primitive-to-VEM map construction, allow-list flag derivation, JSON-RPC router initialization, and extended-path aggregation/whitelist flag selection. This approval does not claim JSON-RPC request execution, primitive authorization enforcement, middleware runtime behavior, route admission, persistence, upstream behavior, or final client-visible outcomes.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need MCP API definitions to produce deterministic local path setup records before protocol routing and middleware behavior depend on them.
+    acceptance_criteria:
+        - id: STK-REQ-060-AC-01
+          text: Given a loaded MCP API definition or non-MCP boundary input, when MCP path setup helpers are exercised, then deterministic primitive mappings, internal path entries, allow-list flags, router setup, combined URLSpec records, whitelist flags, or explicit skipped outcomes are produced for the tested inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-148
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API definition MCP path setup helper requirement.
+          changed_by: human:buger

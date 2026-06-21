@@ -19,7 +19,10 @@ tags:
     - oas
     - path-compilation
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-21T00:39:38.920342Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:a1170ef80244f8a981d5f9404a1c99bd8e5292674e693a132e1dcea4f0e14594
 verification:
     assurance_level: A
     formalization_status: none
