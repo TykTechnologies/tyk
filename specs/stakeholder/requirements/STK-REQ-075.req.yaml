@@ -1,0 +1,59 @@
+id: STK-REQ-075
+version: 1
+status: approved
+priority: shall
+category: gateway_api_loader_storage
+req_type: guarantee
+fretish: ""
+description: Gateway API loader storage setup shall deterministically prepare local Redis-backed stores and select authentication, organization, and session stores for tested Redis, LDAP, and RPC storage-provider inputs, without claiming remote RPC connectivity, LDAP network authentication, Redis persistence behavior, route generation, middleware execution, API admission, dashboard or RPC synchronization, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_api_loader_storage
+rationale: Gateway API loading must bind API specs to the intended storage handlers before broader request handling uses them. This requirement owns only the local preparation and handler-selection behavior under focused gateway tests.
+tags:
+    - gateway
+    - api-loader
+    - storage
+variables: []
+traces:
+    reviewed_at: "2026-06-21T05:04:30.331973Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:174a8e0b9b3e62d2f2fcfd23a4731ca9e6e83f66f893310474fd9521cc7ba6fc
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API loader storage scope is limited to local gateway/api_loader.go store preparation and store-handler selection for tested Redis, LDAP, and RPC storage-provider inputs. This approval does not claim remote RPC connectivity, LDAP network authentication, Redis persistence behavior, route generation, middleware execution, API admission, dashboard or RPC synchronization, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need API loader storage setup to select the expected local storage handlers for each configured auth and session provider before loaded APIs use them.
+    acceptance_criteria:
+        - id: STK-REQ-075-AC-01
+          text: Given tested API storage-provider inputs, when the gateway prepares API loader stores and configures auth, organization, and session stores, then the selected handler classes match the provider configuration and the global session manager is initialized with the prepared Redis store.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-163
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API loader storage setup requirement.
+          changed_by: agent:codex

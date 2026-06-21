@@ -465,17 +465,31 @@ func httpCollectorMock(t *testing.T, fn http.HandlerFunc, address string) *httpt
 	return otelCollectorMock
 }
 
+// Verifies: STK-REQ-075, SYS-REQ-163, SW-REQ-150
+// STK-REQ-075:STK-REQ-075-AC-01:acceptance
+// SW-REQ-150:nominal:nominal
+// SW-REQ-150:boundary:nominal
+// SW-REQ-150:determinism:nominal
+// SYS-REQ-163:determinism:nominal
 func TestConfigureAuthAndOrgStores(t *testing.T) {
 
 	testCases := []struct {
 		name                 string
 		storageEngine        apidef.StorageEngineCode
+		sessionStorageEngine apidef.StorageEngineCode
 		expectedAuthStore    string
 		expectedOrgStore     string
 		expectedSessionStore string
 		configureGateway     func(gw *Gateway)
 	}{
 		{
+			name:                 "Default Redis-backed storage engine",
+			expectedAuthStore:    "*storage.RedisCluster",
+			expectedOrgStore:     "*storage.RedisCluster",
+			expectedSessionStore: "*storage.RedisCluster",
+			configureGateway: func(gw *Gateway) {
+			},
+		}, {
 			name:                 "LDAP Storage Engine",
 			storageEngine:        LDAPStorageEngine,
 			expectedAuthStore:    "*gateway.LDAPStorageHandler",
@@ -486,6 +500,7 @@ func TestConfigureAuthAndOrgStores(t *testing.T) {
 		}, {
 			name:                 "RPC Storage engine",
 			storageEngine:        RPCStorageEngine,
+			sessionStorageEngine: RPCStorageEngine,
 			expectedAuthStore:    "*gateway.RPCStorageHandler",
 			expectedOrgStore:     "*storage.MdcbStorage",
 			expectedSessionStore: "*gateway.RPCStorageHandler",
@@ -502,13 +517,16 @@ func TestConfigureAuthAndOrgStores(t *testing.T) {
 			gw := NewGateway(config.Config{}, context.Background())
 			tc.configureGateway(gw)
 			gs := gw.prepareStorage()
+			require.NotNil(t, gs.redisStore)
+			require.NotNil(t, gs.redisOrgStore)
+			require.NotNil(t, gs.healthStore)
+			require.NotNil(t, gs.rpcAuthStore)
+			require.NotNil(t, gs.rpcOrgStore)
+			require.Same(t, gs.redisStore, gw.GlobalSessionManager.Store())
 
 			spec := BuildAPI(func(spec *APISpec) {
 				spec.AuthProvider.StorageEngine = tc.storageEngine
-
-				if tc.storageEngine == RPCStorageEngine {
-					spec.SessionProvider.StorageEngine = RPCStorageEngine
-				}
+				spec.SessionProvider.StorageEngine = tc.sessionStorageEngine
 
 				if tc.storageEngine == LDAPStorageEngine {
 					// populate ldap meta

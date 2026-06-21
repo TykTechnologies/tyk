@@ -51,6 +51,7 @@ type ProcessSpecOptions struct {
 	quotaKey string
 }
 
+// SW-REQ-150
 func (gw *Gateway) prepareStorage() generalStores {
 	var gs generalStores
 
@@ -640,6 +641,7 @@ func (gw *Gateway) processSpec(
 	return &chainDef
 }
 
+// SW-REQ-150
 func (gw *Gateway) configureAuthAndOrgStores(gs *generalStores, spec *APISpec) (storage.Handler, storage.Handler, storage.Handler) {
 	authStore := gs.redisStore
 	orgStore := gs.redisOrgStore
