@@ -316,6 +316,7 @@ func (a *APISpec) findRouteForOASPath(oasPath, method, actualPath, fullRequestPa
 	return route, pathParams, nil
 }
 
+// SW-REQ-134
 // matchCandidatePath looks up the path item and operation from the OAS spec for a
 // candidate path+method, extracts path parameters from the actual request path, and
 // validates them against the operation's path parameter schemas. Returns the operation,
@@ -339,6 +340,7 @@ func (a *APISpec) matchCandidatePath(oasPath, oasMethod, strippedPath string) (*
 	return pathItem, operation, pathParams, true
 }
 
+// SW-REQ-134
 // extractPathParams extracts path parameter values from actualPath based on the
 // OAS path pattern. For example, if oasPath is "/users/{id}" and actualPath is
 // "/users/123", it returns map[string]string{"id": "123"}.

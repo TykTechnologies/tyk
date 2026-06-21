@@ -249,6 +249,161 @@ func TestOASPathCompilationGroupingAndRestrictiveness(t *testing.T) {
 	assert.Equal(t, "/employees/{name}", mockSpecs[0].OASMockResponseCandidates[1].OASPath)
 }
 
+// Verifies: STK-REQ-059, SYS-REQ-147, SW-REQ-134
+// STK-REQ-059:STK-REQ-059-AC-01:acceptance
+// SYS-REQ-147:nominal:nominal
+// SYS-REQ-147:boundary:nominal
+// SYS-REQ-147:error_handling:negative
+// SYS-REQ-147:determinism:nominal
+// SW-REQ-134:nominal:nominal
+// SW-REQ-134:boundary:nominal
+// SW-REQ-134:error_handling:negative
+// SW-REQ-134:determinism:nominal
+func TestOASCollapsedCandidateHelperChecks(t *testing.T) {
+	t.Run("candidate error response code", func(t *testing.T) {
+		tests := []struct {
+			name       string
+			candidates []ValidateRequestCandidate
+			expected   int
+		}{
+			{
+				name: "first custom response code wins",
+				candidates: []ValidateRequestCandidate{
+					{OASValidateRequestMeta: &oas.ValidateRequest{Enabled: true, ErrorResponseCode: http.StatusBadRequest}},
+					{OASValidateRequestMeta: &oas.ValidateRequest{Enabled: true, ErrorResponseCode: http.StatusConflict}},
+				},
+				expected: http.StatusBadRequest,
+			},
+			{
+				name: "default response code when no custom code exists",
+				candidates: []ValidateRequestCandidate{
+					{OASValidateRequestMeta: nil},
+					{OASValidateRequestMeta: &oas.ValidateRequest{Enabled: true}},
+				},
+				expected: http.StatusUnprocessableEntity,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				assert.Equal(t, tt.expected, candidatesErrorResponseCode(tt.candidates))
+			})
+		}
+	})
+
+	t.Run("schema values and formats", func(t *testing.T) {
+		maxLen := uint64(5)
+		schemaTests := []struct {
+			name     string
+			value    string
+			schema   *openapi3.Schema
+			expected bool
+		}{
+			{name: "integer accepts integer text", value: "42", schema: &openapi3.Schema{Type: &openapi3.Types{"integer"}}, expected: true},
+			{name: "integer rejects non-integer text", value: "abc", schema: &openapi3.Schema{Type: &openapi3.Types{"integer"}}, expected: false},
+			{name: "number accepts decimal text", value: "42.5", schema: &openapi3.Schema{Type: &openapi3.Types{"number"}}, expected: true},
+			{name: "boolean rejects non-boolean text", value: "maybe", schema: &openapi3.Schema{Type: &openapi3.Types{"boolean"}}, expected: false},
+			{name: "pattern accepts matching text", value: "ABC", schema: &openapi3.Schema{Type: &openapi3.Types{"string"}, Pattern: `^[A-Z]{3}$`}, expected: true},
+			{name: "pattern rejects non-matching text", value: "abc", schema: &openapi3.Schema{Type: &openapi3.Types{"string"}, Pattern: `^[A-Z]{3}$`}, expected: false},
+			{name: "enum accepts listed value", value: "admin", schema: &openapi3.Schema{Type: &openapi3.Types{"string"}, Enum: []any{"admin", "user"}}, expected: true},
+			{name: "enum rejects unlisted value", value: "guest", schema: &openapi3.Schema{Type: &openapi3.Types{"string"}, Enum: []any{"admin", "user"}}, expected: false},
+			{name: "length accepts value inside bounds", value: "abc", schema: &openapi3.Schema{Type: &openapi3.Types{"string"}, MinLength: 2, MaxLength: &maxLen}, expected: true},
+			{name: "length rejects value outside bounds", value: "abcdef", schema: &openapi3.Schema{Type: &openapi3.Types{"string"}, MinLength: 2, MaxLength: &maxLen}, expected: false},
+			{name: "format accepts valid date", value: "2026-01-15", schema: &openapi3.Schema{Type: &openapi3.Types{"string"}, Format: "date"}, expected: true},
+			{name: "format rejects invalid date", value: "not-a-date", schema: &openapi3.Schema{Type: &openapi3.Types{"string"}, Format: "date"}, expected: false},
+		}
+
+		for _, tt := range schemaTests {
+			t.Run(tt.name, func(t *testing.T) {
+				assert.Equal(t, tt.expected, valueMatchesSchema(tt.value, tt.schema))
+			})
+		}
+
+		formatTests := []struct {
+			name     string
+			value    string
+			format   string
+			expected bool
+		}{
+			{name: "date-time accepts RFC3339 value", value: "2026-01-15T10:30:00Z", format: "date-time", expected: true},
+			{name: "email requires at-sign", value: "user@example.com", format: "email", expected: true},
+			{name: "uuid accepts canonical UUID", value: "123e4567-e89b-12d3-a456-426614174000", format: "uuid", expected: true},
+			{name: "uuid rejects malformed UUID", value: "123e4567", format: "uuid", expected: false},
+			{name: "unknown format remains permissive", value: "anything", format: "custom-format", expected: true},
+		}
+
+		for _, tt := range formatTests {
+			t.Run(tt.name, func(t *testing.T) {
+				assert.Equal(t, tt.expected, valueMatchesFormat(tt.value, tt.format))
+			})
+		}
+	})
+
+	t.Run("path parameter operation matching", func(t *testing.T) {
+		operation := &openapi3.Operation{
+			Parameters: openapi3.Parameters{
+				{Value: &openapi3.Parameter{
+					Name: "id", In: "path", Required: true,
+					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"integer"}}},
+				}},
+				{Value: &openapi3.Parameter{
+					Name: "X-Ignored", In: "header", Required: true,
+					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
+				}},
+			},
+		}
+
+		tests := []struct {
+			name       string
+			pathParams map[string]string
+			expected   bool
+		}{
+			{name: "matching path parameter schema", pathParams: map[string]string{"id": "42"}, expected: true},
+			{name: "missing required path parameter", pathParams: map[string]string{}, expected: false},
+			{name: "path parameter fails schema", pathParams: map[string]string{"id": "abc"}, expected: false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				assert.Equal(t, tt.expected, pathParamsMatchOperation(tt.pathParams, operation))
+			})
+		}
+	})
+
+	t.Run("candidate path matching", func(t *testing.T) {
+		paths := openapi3.NewPaths()
+		paths.Set("/employees/{id}", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				Parameters: openapi3.Parameters{
+					{Value: &openapi3.Parameter{
+						Name: "id", In: "path", Required: true,
+						Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"integer"}}},
+					}},
+				},
+			},
+		})
+		apiSpec := &APISpec{OAS: oas.OAS{T: openapi3.T{Paths: paths}}}
+
+		params := extractPathParams("/employees/{id}", "/employees/42")
+		assert.Equal(t, map[string]string{"id": "42"}, params)
+
+		pathItem, operation, pathParams, ok := apiSpec.matchCandidatePath("/employees/{id}", http.MethodGet, "/employees/42")
+		assert.True(t, ok)
+		assert.NotNil(t, pathItem)
+		assert.NotNil(t, operation)
+		assert.Equal(t, map[string]string{"id": "42"}, pathParams)
+
+		_, _, _, ok = apiSpec.matchCandidatePath("/employees/{id}", http.MethodGet, "/employees/abc")
+		assert.False(t, ok)
+
+		_, _, _, ok = apiSpec.matchCandidatePath("/employees/{id}", http.MethodPost, "/employees/42")
+		assert.False(t, ok)
+
+		_, _, _, ok = apiSpec.matchCandidatePath("/unknown/{id}", http.MethodGet, "/unknown/42")
+		assert.False(t, ok)
+	})
+}
+
 func TestSortURLSpecsByPathPriority(t *testing.T) {
 	tests := []struct {
 		name     string

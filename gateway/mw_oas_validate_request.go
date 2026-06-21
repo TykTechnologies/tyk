@@ -241,6 +241,7 @@ func (k *ValidateRequest) validateRoute(r *http.Request, route *routers.Route, p
 	return http.StatusOK, nil
 }
 
+// SW-REQ-134
 // candidatesErrorResponseCode returns the error response code from the first enabled
 // candidate that has a custom code configured, defaulting to 422.
 func candidatesErrorResponseCode(candidates []ValidateRequestCandidate) int {
@@ -252,6 +253,7 @@ func candidatesErrorResponseCode(candidates []ValidateRequestCandidate) int {
 	return http.StatusUnprocessableEntity
 }
 
+// SW-REQ-134
 // pathParamsMatchOperation checks whether the given path parameter values satisfy
 // the path parameter schemas defined in the OAS operation. This is used as a quick
 // pre-filter before committing to full request validation.
@@ -277,6 +279,7 @@ func pathParamsMatchOperation(pathParams map[string]string, operation *openapi3.
 	return true
 }
 
+// SW-REQ-134
 // valueMatchesSchema checks if a path parameter string value satisfies the schema's
 // type, pattern, and enum constraints. This mirrors kin-openapi's parsing behavior
 // for path parameters.
@@ -336,6 +339,7 @@ func valueMatchesSchema(value string, s *openapi3.Schema) bool {
 	return true
 }
 
+// SW-REQ-134
 // valueMatchesFormat checks if a string value satisfies the given OAS format constraint.
 func valueMatchesFormat(value, format string) bool {
 	switch format {

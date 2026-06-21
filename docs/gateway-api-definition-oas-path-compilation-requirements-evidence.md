@@ -5,10 +5,14 @@
 definition OAS path-compilation helper behavior in `gateway/api_definition.go`:
 validate-request and mock-response URLSpec construction, operation lookup,
 collapsed candidate grouping, path-parameter restrictiveness ordering, static
-path shield records, and OAS path-priority sorting.
+path shield records, and OAS path-priority sorting. The same proof slice also
+owns local collapsed validate-request candidate disambiguation helper checks in
+`gateway/model_apispec.go` and `gateway/mw_oas_validate_request.go`: path
+parameter extraction, candidate path matching, schema matching, format matching,
+and candidate error-code selection.
 
 The proof slice is intentionally local. It does not claim middleware execution,
-request validation correctness, mock response delivery, upstream behavior,
+full request validation correctness, mock response delivery, upstream behavior,
 gateway request admission, or final client-visible behavior.
 
 Evidence is provided by focused gateway OAS path-priority and helper tests in

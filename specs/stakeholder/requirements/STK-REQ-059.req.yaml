@@ -5,14 +5,14 @@ priority: shall
 category: api_definition_oas_path_compilation
 req_type: guarantee
 fretish: ""
-description: Gateway API definition OAS path compilation support shall locally convert OAS validate-request and mock-response middleware operation declarations into deterministic URLSpec records, including operation lookup, collapsed candidate grouping, path-parameter restrictiveness ordering, static path shield records, and OAS path-priority sorting, without claiming middleware execution, request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.
+description: Gateway API definition OAS path compilation support shall locally convert OAS validate-request and mock-response middleware operation declarations into deterministic URLSpec records and local collapsed-candidate helper decisions, including operation lookup, collapsed candidate grouping, path-parameter restrictiveness ordering, static path shield records, OAS path-priority sorting, and collapsed validate-request candidate disambiguation helper checks, without claiming middleware execution, full request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.
 formalization_strategy: informal
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: gateway_api_definition_oas_path_compilation
-rationale: Gateway operators depend on deterministic local OAS path-spec compilation before middleware and routing code consume compiled URLSpec records. This requirement owns only local helper behavior in gateway/api_definition.go and focused gateway tests.
+rationale: Gateway operators depend on deterministic local OAS path-spec compilation before middleware and routing code consume compiled URLSpec records. This requirement owns only local helper behavior in gateway/api_definition.go, gateway/model_apispec.go, gateway/mw_oas_validate_request.go, and focused gateway tests.
 tags:
     - gateway
     - api-definition
@@ -20,9 +20,9 @@ tags:
     - path-compilation
 variables: []
 traces:
-    reviewed_at: "2026-06-21T00:39:38.920342Z"
+    reviewed_at: "2026-06-21T02:13:47.290666Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:a1170ef80244f8a981d5f9404a1c99bd8e5292674e693a132e1dcea4f0e14594
+    reviewed_fingerprint: sha256:7a8e2d9a3a3d5996e79d9572fc9a13d05de9f3e5c7903b6988244179133bb49f
 verification:
     assurance_level: A
     formalization_status: none
@@ -30,15 +30,16 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-21T00:00:00Z"
+        reviewed_at: "2026-06-21T02:12:12Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API definition OAS path-compilation scope is limited to local gateway/api_definition.go helper behavior: validate-request and mock-response URLSpec construction, operation lookup, collapsed candidate grouping, path-parameter restrictiveness ordering, static path shield records, and OAS path-priority sorting. This approval does not claim middleware execution, request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Scope expansion is limited to local collapsed validate-request candidate disambiguation helper checks tied to OAS path-compilation collapsed candidates. This approval does not claim middleware execution, full request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.
+        fingerprint: sha256:711eb144df0caebbcead33638b2a626d9d9444b2ad7faa785e1b57e1124d4cec
         ai_generated: false
 history:
     created_by: agent:codex
     created_at: "2026-06-21T00:00:00Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-21T00:00:00Z"
+    last_modified_at: "2026-06-21T02:12:12Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -49,7 +50,7 @@ stakeholder:
     story: As a gateway operator, I need OAS validate-request and mock-response path settings to compile into deterministic local URLSpec records before gateway middleware and routing behavior depends on them.
     acceptance_criteria:
         - id: STK-REQ-059-AC-01
-          text: Given local OAS validate-request or mock-response operation configuration, when OAS path compiler helpers are exercised, then deterministic URLSpec records, collapsed candidates, static shield entries, sorted paths, or explicit skipped outcomes are produced for the tested inputs.
+          text: Given local OAS validate-request or mock-response operation configuration, when OAS path compiler and collapsed-candidate helper checks are exercised, then deterministic URLSpec records, collapsed candidates, static shield entries, sorted paths, candidate schema-match decisions, error-code selections, or explicit skipped outcomes are produced for the tested inputs.
           verification_method: test
           derived_reqs:
             - SYS-REQ-147
@@ -59,4 +60,9 @@ lifecycle:
           from: draft
           to: approved
           reason: Added gateway API definition OAS path-compilation helper requirement.
+          changed_by: human:buger
+        - date: "2026-06-21T02:12:12Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-21T00:00:00Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API definition OAS path-compilation scope is limited to local gateway helper behavior: validate-request and mock-response URLSpec construction, operation lookup, collapsed candidate grouping, path-parameter restrictiveness ordering, static path shield records, OAS path-priority sorting, and collapsed validate-request candidate disambiguation helper checks. This approval does not claim middleware execution, full request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.")'
           changed_by: human:buger

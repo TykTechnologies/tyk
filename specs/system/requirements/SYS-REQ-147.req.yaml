@@ -5,7 +5,7 @@ priority: shall
 category: api_definition_oas_path_compilation
 req_type: guarantee
 fretish: the gateway_api_definition_oas_path_compilation shall always satisfy !gateway_api_definition_oas_path_compilation_operation_requested | gateway_api_definition_oas_path_compilation_operation_terminal
-description: Gateway API definition OAS path compilation support shall make local OAS path-compilation helper operations terminal and deterministic for validate-request and mock-response URLSpec construction, operation lookup, collapsed candidate grouping, path-parameter restrictiveness ordering, static path shield records, and OAS path-priority sorting, without claiming middleware execution, request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.
+description: Gateway API definition OAS path compilation support shall make local OAS path-compilation helper operations terminal and deterministic for validate-request and mock-response URLSpec construction, operation lookup, collapsed candidate grouping, path-parameter restrictiveness ordering, static path shield records, OAS path-priority sorting, and collapsed validate-request candidate disambiguation helper checks, without claiming middleware execution, full request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: STK-REQ-059
 component: gateway_api_definition_oas_path_compilation
-rationale: This system requirement owns local gateway API definition OAS path-compilation helper terminality only. Middleware execution, request validation correctness, mock response delivery, upstream behavior, gateway request admission, and runtime request outcomes are outside this proof slice.
+rationale: This system requirement owns local gateway OAS path-compilation helper terminality, including collapsed validate-request candidate disambiguation helper checks. Middleware execution, full request validation correctness, mock response delivery, upstream behavior, gateway request admission, and runtime request outcomes are outside this proof slice.
 tags:
     - gateway
     - api-definition
@@ -35,23 +35,24 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-21T00:00:00Z"
+        reviewed_at: "2026-06-21T02:12:12Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API definition OAS path-compilation system scope is limited to local helper terminality when a local OAS path-compilation operation is requested for validate-request and mock-response URLSpec construction, operation lookup, collapsed candidate grouping, path-parameter restrictiveness ordering, static path shield records, and OAS path-priority sorting. The FRETish invariant intentionally models requested local operation terminality without asserting middleware execution, request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Scope expansion is limited to local collapsed validate-request candidate disambiguation helper checks tied to OAS path-compilation collapsed candidates. This approval does not claim middleware execution, full request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.
+        fingerprint: sha256:e0af3723d8a4dd61617a531cbf756b3bc2cf34f374a3c240670cfae4677f0d2f
         ai_generated: false
-    gaps_reviewed_at: "2026-06-21T00:00:00Z"
+    gaps_reviewed_at: "2026-06-21T02:13:15.790792Z"
     gaps_reviewed_by: human:buger
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-147|gateway_api_definition_oas_path_compilation_operation_terminal
           reviewer: human:buger
-          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21 after requirement approval. SYS-REQ-147''s requested local operation terminality is decomposed by SW-REQ-134 for local gateway/api_definition.go OAS path-compilation helper behavior: validate-request and mock-response URLSpec construction, operation lookup, collapsed candidate grouping, path-parameter restrictiveness ordering, static path shield records, and OAS path-priority sorting. This review is limited to local helper mechanics and does not claim middleware execution, request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.'
-          reviewed_at: "2026-06-21T00:00:00Z"
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. SYS-REQ-147 terminality remains decomposed by SW-REQ-134 after the narrow scope expansion to local collapsed validate-request candidate disambiguation helper checks; no middleware execution, full request validation correctness, gateway admission, or final client-visible behavior is claimed.'
+          reviewed_at: "2026-06-21T02:13:15.790792Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-21T00:00:00Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-21T00:00:00Z"
+    last_modified_at: "2026-06-21T02:12:12Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -63,4 +64,9 @@ lifecycle:
           from: draft
           to: approved
           reason: Added gateway API definition OAS path-compilation system requirement.
+          changed_by: human:buger
+        - date: "2026-06-21T02:12:12Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-21T00:00:00Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API definition OAS path-compilation system scope is limited to local helper terminality when a local OAS path-compilation operation is requested for validate-request and mock-response URLSpec construction, operation lookup, collapsed candidate grouping, path-parameter restrictiveness ordering, static path shield records, OAS path-priority sorting, and collapsed validate-request candidate disambiguation helper checks. The FRETish invariant intentionally models requested local operation terminality without asserting middleware execution, full request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.")'
           changed_by: human:buger

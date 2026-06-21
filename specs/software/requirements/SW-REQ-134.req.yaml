@@ -5,7 +5,7 @@ priority: shall
 category: api_definition_oas_path_compilation
 req_type: guarantee
 fretish: ""
-description: The gateway API definition OAS path compilation implementation shall preserve local helper behavior for validate-request and mock-response URLSpec construction, operation lookup, collapsed candidate grouping, path-parameter restrictiveness ordering, static path shield records, and OAS path-priority sorting, without claiming middleware execution, request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.
+description: The gateway API definition OAS path compilation implementation shall preserve local helper behavior for validate-request and mock-response URLSpec construction, operation lookup, collapsed candidate grouping, path-parameter restrictiveness ordering, static path shield records, OAS path-priority sorting, and collapsed validate-request candidate disambiguation helper checks, without claiming middleware execution, full request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.
 formalization_strategy: informal
 informal_verification:
     method: unit_tests
@@ -13,7 +13,7 @@ informal_verification:
     verified: true
 parent: SYS-REQ-147
 component: gateway_api_definition_oas_path_compilation
-rationale: This software requirement owns local gateway/api_definition.go OAS path-compilation helper mechanics only. Middleware execution, request validation correctness, mock response delivery, upstream behavior, gateway request admission, and runtime request outcomes are outside this proof slice.
+rationale: This software requirement owns local OAS path-compilation helper mechanics in gateway/api_definition.go plus local collapsed validate-request candidate disambiguation helper checks in gateway/model_apispec.go and gateway/mw_oas_validate_request.go. Middleware execution, full request validation correctness, mock response delivery, upstream behavior, gateway request admission, and runtime request outcomes are outside this proof slice.
 tags:
     - gateway
     - api-definition
@@ -34,15 +34,16 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-21T00:00:00Z"
+        reviewed_at: "2026-06-21T02:12:12Z"
         comment: >-
-            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. SW-REQ-134 is scoped to local gateway/api_definition.go OAS path-compilation helper behavior: validate-request and mock-response URLSpec construction, operation lookup, collapsed candidate grouping, path-parameter restrictiveness ordering, static path shield records, and OAS path-priority sorting. Focused gateway OAS path-priority and helper tests are being validated in a clean worktree. This approval does not claim middleware execution, request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Scope expansion is limited to local collapsed validate-request candidate disambiguation helper checks tied to OAS path-compilation collapsed candidates. This approval does not claim middleware execution, full request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.
+        fingerprint: sha256:533c07ddf04847aa1081b05890ebb5d57683680403ecc0d30b870db732d7d713
         ai_generated: false
 history:
     created_by: agent:codex
     created_at: "2026-06-21T00:00:00Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-21T00:00:00Z"
+    last_modified_at: "2026-06-21T02:12:12Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -54,4 +55,9 @@ lifecycle:
           from: draft
           to: approved
           reason: Added local gateway API definition OAS path-compilation helper behavior.
+          changed_by: human:buger
+        - date: "2026-06-21T02:12:12Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-21T00:00:00Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. SW-REQ-134 is scoped to local gateway OAS path-compilation helper behavior: validate-request and mock-response URLSpec construction, operation lookup, collapsed candidate grouping, path-parameter restrictiveness ordering, static path shield records, OAS path-priority sorting, and collapsed validate-request candidate disambiguation helper checks. Focused gateway OAS path-priority and helper tests are being validated in a clean worktree. This approval does not claim middleware execution, full request validation correctness, mock response delivery, upstream behavior, gateway request admission, or final client-visible behavior.")'
           changed_by: human:buger
