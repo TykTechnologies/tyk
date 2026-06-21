@@ -18,7 +18,10 @@ tags:
     - http-client
     - external-services
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-21T09:25:57.79404Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:a7f8e99d08649ba1c40367d3b8934e7f087ea801596035663cd4fdecfd74b13c
 verification:
     assurance_level: A
     formalization_status: none

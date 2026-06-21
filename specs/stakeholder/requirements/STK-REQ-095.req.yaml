@@ -18,7 +18,10 @@ tags:
     - redis
     - connection
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-21T09:25:57.871469Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:c4031bd0c61c8b9d349503c62ad8e00a215419677e53e54c30f6c9c7ac01dde3
 verification:
     assurance_level: A
     formalization_status: none

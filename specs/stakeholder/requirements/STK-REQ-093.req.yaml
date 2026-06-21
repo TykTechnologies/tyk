@@ -18,7 +18,10 @@ tags:
     - metrics
     - tracing
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-21T09:25:57.651013Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:81c3f4acf9099b5d5c078627fd3fbef1ccfb651631081219ab858e41dedc2355
 verification:
     assurance_level: A
     formalization_status: none
