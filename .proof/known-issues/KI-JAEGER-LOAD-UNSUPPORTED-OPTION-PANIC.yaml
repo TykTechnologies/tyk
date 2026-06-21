@@ -13,7 +13,7 @@ cve_surface: none
 affected_api: trace/jaeger.Load; trace/jaeger.Init
 attacker_input: Gateway tracing configuration options supplied by operator configuration or in-process caller
 reproducer_command: go test ./trace/jaeger -run TestKnownIssue_LoadPanicsOnUnsupportedOptionValue -count=1
-introduced_in: unknown
+introduced_in: 5b372d3ca
 minimization_status: minimized
 mitigation: Use only JSON/YAML-compatible scalar, map, and list values in Jaeger tracing options until Load recovers from yaml marshal panics or validates option values before marshaling.
 remediation: Change Load to convert unsupported option values into returned errors, and ensure Init returns Load errors before dereferencing the configuration; then convert the KnownIssue reproducer into an expected error regression test.
@@ -26,3 +26,7 @@ history:
     - at: "2026-06-21T07:16:06Z"
       by: agent:codex
       action: created
+    - at: "2026-06-21T11:47:07Z"
+      by: agent:codex
+      action: edit
+      detail: introduced-in=5b372d3ca

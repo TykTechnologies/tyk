@@ -13,7 +13,7 @@ cve_surface: none
 affected_api: log.TranslationFormatter.Format
 attacker_input: Log entry fields produced by gateway middleware or in-process callers after translations are loaded
 reproducer_command: go test ./log -run TestKnownIssue_TranslationFormatterPanicsOnNonStringCode -count=1
-introduced_in: unknown
+introduced_in: 63c26ed4e
 minimization_status: minimized
 mitigation: Avoid loading log translations where middleware code fields are non-string, or ensure code fields are converted to strings before translation formatting runs.
 remediation: Change TranslationFormatter.Format to handle non-string code fields without panic, for example by type-checking or stringifying the code before lookup, then convert the KnownIssue reproducer into an expected passthrough or translation regression test.
@@ -26,3 +26,7 @@ history:
     - at: "2026-06-21T07:48:04Z"
       by: agent:codex
       action: created
+    - at: "2026-06-21T11:47:07Z"
+      by: agent:codex
+      action: edit
+      detail: introduced-in=63c26ed4e

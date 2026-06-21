@@ -13,7 +13,7 @@ cve_surface: none
 affected_api: trace.SetLogger; trace.AddTracer
 attacker_input: none
 reproducer_command: go test ./trace -run TestKnownIssue_AddTracerIgnoresConfiguredLogger -count=1
-introduced_in: unknown
+introduced_in: 70ca2f618
 minimization_status: minimized
 mitigation: Do not rely on trace.SetLogger to affect AddTracer provider initialization logging; provider initialization currently receives StdLogger.
 remediation: Change AddTracer to pass the configured package logger to initializer, then convert the KnownIssue reproducer into an expected custom-logger forwarding regression test.
@@ -26,3 +26,7 @@ history:
     - at: "2026-06-21T00:00:00Z"
       by: agent:codex
       action: created
+    - at: "2026-06-21T11:47:07Z"
+      by: agent:codex
+      action: edit
+      detail: introduced-in=70ca2f618

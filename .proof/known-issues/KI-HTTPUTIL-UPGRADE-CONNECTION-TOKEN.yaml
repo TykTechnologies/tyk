@@ -13,7 +13,7 @@ cve_surface: none
 affected_api: internal/httputil.IsUpgrade
 attacker_input: HTTP request Connection and Upgrade headers
 reproducer_command: go test ./internal/httputil -run TestKnownIssue_IsUpgradeIgnoresConnectionTokenList -count=1
-introduced_in: unknown
+introduced_in: c99221714
 minimization_status: minimized
 mitigation: 'Avoid relying on comma-separated Connection upgrade tokens until IsUpgrade tokenizes Connection header values; send Connection: Upgrade exactly where this helper is in the path.'
 remediation: Tokenize the Connection header according to HTTP connection-option semantics and return true when any token equals Upgrade while preserving existing exact-token behavior; then convert the KnownIssue reproducer into the expected positive regression test.
@@ -30,3 +30,7 @@ history:
       by: agent:codex
       action: review
       detail: reviewer=human:buger,new_review_date=2026-07-21
+    - at: "2026-06-21T11:47:07Z"
+      by: agent:codex
+      action: edit
+      detail: introduced-in=c99221714
