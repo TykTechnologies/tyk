@@ -2,6 +2,10 @@ package storage
 
 import "testing"
 
+// Verifies: STK-REQ-041, SYS-REQ-129, SW-REQ-116
+// SW-REQ-116:nominal:nominal
+// SW-REQ-116:boundary:nominal
+// SW-REQ-116:determinism:nominal
 func Test_TokenOrg(t *testing.T) {
 	tcs := []struct {
 		name           string
