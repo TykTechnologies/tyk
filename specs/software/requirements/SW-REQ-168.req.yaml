@@ -9,7 +9,7 @@ description: The OpenTelemetry runtime implementation shall preserve local obser
 formalization_strategy: informal
 informal_verification:
     method: unit_tests
-    evidence: internal/otel/*_test.go; docs/otel-runtime-requirements-evidence.md
+    evidence: internal/otel/config_test.go; internal/otel/metrics_instrument_test.go; internal/otel/metrics_runtime_test.go; internal/otel/metrics_test.go; internal/otel/otel_test.go; docs/otel-runtime-requirements-evidence.md
     verified: true
 parent: SYS-REQ-181
 component: otel_runtime

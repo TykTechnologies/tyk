@@ -9,7 +9,7 @@ description: The key-value storage adapter implementation shall preserve local a
 formalization_strategy: informal
 informal_verification:
     method: unit_tests
-    evidence: storage/kv/*_test.go; docs/storage-kv-requirements-evidence.md
+    evidence: storage/kv/consul_test.go; storage/kv/store_test.go; docs/storage-kv-requirements-evidence.md
     verified: true
 parent: SYS-REQ-184
 component: storage_kv

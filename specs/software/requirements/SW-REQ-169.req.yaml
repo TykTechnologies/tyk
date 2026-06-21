@@ -9,7 +9,7 @@ description: The external-service HTTP client implementation shall preserve loca
 formalization_strategy: informal
 informal_verification:
     method: unit_tests
-    evidence: internal/httpclient/*_test.go; docs/external-http-client-requirements-evidence.md
+    evidence: internal/httpclient/factory_test.go; internal/httpclient/factory_mtls_security_test.go; docs/external-http-client-requirements-evidence.md
     verified: true
 parent: SYS-REQ-182
 component: external_http_client

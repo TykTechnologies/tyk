@@ -9,7 +9,7 @@ description: The API metrics implementation shall preserve local metric-definiti
 formalization_strategy: informal
 informal_verification:
     method: unit_tests
-    evidence: internal/otel/apimetrics/*_test.go; docs/otel-api-metrics-requirements-evidence.md
+    evidence: internal/otel/apimetrics/builder_test.go; internal/otel/apimetrics/config_test.go; internal/otel/apimetrics/defaults_test.go; internal/otel/apimetrics/dimension_test.go; internal/otel/apimetrics/filter_test.go; internal/otel/apimetrics/recorder_test.go; internal/otel/apimetrics/registry_test.go; internal/otel/apimetrics/validation_test.go; docs/otel-api-metrics-requirements-evidence.md
     verified: true
 parent: SYS-REQ-180
 component: api_metrics
