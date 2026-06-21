@@ -19,7 +19,10 @@ tags:
     - graphql
     - playground
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-21T11:59:01.920188Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:4842bda7549df95dd18284567ce6f27a8a0cef4df02a380c8148a90596cfc7be
 verification:
     assurance_level: A
     formalization_status: none

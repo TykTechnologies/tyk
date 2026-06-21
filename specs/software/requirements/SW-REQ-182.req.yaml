@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_upstream_tls_validation
 req_type: guarantee
-fretish: ""
+fretish: the gateway_upstream_tls_validation shall always satisfy gateway_upstream_tls_validation_operation_terminal
 description: The gateway package implementation shall preserve focused upstream TLS validation behavior by enabling public-key pin validation only when API or global pins are configured, selecting pinned public-key fingerprints from global and API maps, accepting upstream public keys that match configured pins, rejecting mismatched pins, falling back to normal verification when API certificate pinning is disabled, applying configured global pins, validating pins through the tested proxy path, and applying forced CommonName validation for tested direct and proxied upstream inputs, without claiming complete TLS handshake semantics, certificate chain policy correctness, arbitrary proxy behavior, downstream client certificate selection, TLS version or cipher policy, certificate material storage durability, route generation, authentication enforcement, distributed synchronization, or final client-visible gateway behavior outside the focused upstream TLS validation tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: gateway/cert_test.go; gateway/cert_old_test.go; docs/gateway-upstream-tls-validation-requirements-evidence.md
@@ -25,9 +25,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-194
+    reviewed_at: "2026-06-21T11:59:05.460892Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:eb2f15887c62c305388e43954d9af1610b6ac14e5c4fb64788bd03fadf258f33
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

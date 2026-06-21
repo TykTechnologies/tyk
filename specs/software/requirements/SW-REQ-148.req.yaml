@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: user_session_lifetime_endpoint_maps
 req_type: guarantee
-fretish: ""
+fretish: the user_session_lifetime_endpoint_maps shall always satisfy user_session_lifetime_endpoint_maps_operation_terminal
 description: The user package implementation shall preserve local session lifetime and endpoint map helper behavior for post-expiry lifetime selection, legacy lifetime fallback and key-expiration comparison, global lifetime override, endpoint collection flattening into method:path maps, and endpoint map expansion into sorted endpoint collections while skipping malformed map keys, without claiming Redis durability, policy merge behavior, gateway routing, endpoint rate-limit enforcement, distributed synchronization, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: user/session_test.go; user/session_lifetime_endpoint_reqproof_test.go; docs/user-session-lifetime-endpoint-map-requirements-evidence.md
@@ -25,12 +25,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-161
-    reviewed_at: "2026-06-21T04:46:58.543849Z"
+    reviewed_at: "2026-06-21T11:59:02.220068Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:c9caa8aa6b84c0304bf1f6bc58b6d96c02fbd40e52dc5122ebf6970beaa68c13
+    reviewed_fingerprint: sha256:5cd9bc1108daf77f39573f648387cb172c95644ddac1f2af7ddaf1c647b6dd70
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

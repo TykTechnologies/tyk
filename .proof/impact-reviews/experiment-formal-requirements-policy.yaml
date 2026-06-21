@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T11:19:05Z"
+generated_at: "2026-06-21T12:05:55Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -887,12 +887,12 @@ reviews:
       artifact: user/session.go
       decision: no-authored-change
       reviewer: human:buger
-      reason: Reviewed user session lifetime and endpoint map helper impact after adding trace annotations and focused tests. user/session.go behavior is unchanged; SW-REQ-148 and docs/user-session-lifetime-endpoint-map-requirements-evidence.md describe the local lifetime selection and endpoint map conversion helper scope, so no further authored requirement or design text change is needed.
+      reason: Reviewed formalization-only requirement fingerprint updates; linked production implementation behavior and documented design intent remain unchanged.
       base: origin/master
-      requirement_fingerprint: sha256:c9caa8aa6b84c0304bf1f6bc58b6d96c02fbd40e52dc5122ebf6970beaa68c13
-      approval_fingerprint: sha256:10b471e25dc9dc31f14c5e593ef896bc36411cff07e9a72570bdec8834a0bcfe
+      requirement_fingerprint: sha256:5cd9bc1108daf77f39573f648387cb172c95644ddac1f2af7ddaf1c647b6dd70
+      approval_fingerprint: sha256:9f044fe8a37a1921e246e93ac18242186b9f30faf1440a988136d7bfb1cf6daa
       artifact_fingerprint: sha256:01dddd617a4becec1931bccff4a48c7e5c9b09b1bbb5eb516a0e382bc4fefee4
-      reviewed_at: "2026-06-21T04:46:47Z"
+      reviewed_at: "2026-06-21T12:05:55Z"
     - requirement: SW-REQ-149
       artifact: gateway/api_loader.go
       decision: no-authored-change
@@ -966,13 +966,13 @@ reviews:
     - requirement: SW-REQ-163
       artifact: log/log.go
       decision: no-authored-change
-      reviewer: buger
-      reason: Reviewed log package implementation impact after adding ReqProof annotations and focused tests; production behavior and the approved logging formatter requirement remain unchanged.
+      reviewer: human:buger
+      reason: Reviewed formalization-only requirement fingerprint updates; linked production implementation behavior and documented design intent remain unchanged.
       base: origin/master
-      requirement_fingerprint: sha256:2ddd07dda546bb8e6b01735fb487cb98713b9b5cbd294a8aa3f04536c41403e7
-      approval_fingerprint: sha256:534281a60fab5a79ebd421ae77e2d1c6a3bca6e565d5d9b4c8690c0b5379bdb4
+      requirement_fingerprint: sha256:70d8d2d08a1611e2187cf8374425c1f89313a21bbe7161fc4a030767459d3f46
+      approval_fingerprint: sha256:f71494f964e737483dcd8bf54707dfb541f39e423bc4c6303f18e21a2d443569
       artifact_fingerprint: sha256:d3c8e51daf8310fab471038cd774ebf9fdef15f91006fd818307836b5f9b3a03
-      reviewed_at: "2026-06-21T07:53:37Z"
+      reviewed_at: "2026-06-21T12:05:55Z"
     - requirement: SW-REQ-163
       artifact: log/translation_formatter.go
       decision: no-authored-change
@@ -996,13 +996,13 @@ reviews:
     - requirement: SW-REQ-164
       artifact: trace/openzipkin/zipkin.go
       decision: no-authored-change
-      reviewer: buger
-      reason: Reviewed OpenZipkin trace adapter implementation impact after adding ReqProof annotations and focused tests; production behavior and the approved OpenZipkin adapter requirement remain unchanged.
+      reviewer: human:buger
+      reason: Reviewed formalization-only requirement fingerprint updates; linked production implementation behavior and documented design intent remain unchanged.
       base: origin/master
-      requirement_fingerprint: sha256:8c358e5e8a8875b5ecadb918fd93ef0a8f9f56eb44252a2fc2f0538143940cf6
-      approval_fingerprint: sha256:23582517a70bf72b11a30814f57ea4ec396176a3c39cbcb3a291d605c507c501
+      requirement_fingerprint: sha256:b7ff6e64447ab5ef5c473c303ba17deb580fcf51754f7296e0f5f59dcfae79be
+      approval_fingerprint: sha256:40c6aa63a17da54d6250d1f17543c34f8c6d702505563f86436622317be788f9
       artifact_fingerprint: sha256:92802c00f198b5a527ad49f1e35672492d49ea47123f9f0f0db0856d856f4151
-      reviewed_at: "2026-06-21T08:12:44Z"
+      reviewed_at: "2026-06-21T12:05:55Z"
     - requirement: SW-REQ-165
       artifact: trace/handler.go
       decision: no-authored-change
@@ -1277,12 +1277,12 @@ reviews:
       artifact: gateway/server.go
       decision: no-authored-change
       reviewer: human:buger
-      reason: Reviewed gateway/server.go batch endpoint trace addition for SW-REQ-180; implementation behavior and authored batch request requirement/design scope remain unchanged.
+      reason: Reviewed formalization-only requirement fingerprint updates; linked production implementation behavior and documented design intent remain unchanged.
       base: origin/master
-      requirement_fingerprint: sha256:8ec45569dd29a769c63b772b11bd3985db3a2ce8b81d1e545b93617f0c8e807c
-      approval_fingerprint: sha256:9ec44fb33940e89894f935ab9f83f7d5ff85d6efb35cb1b0784642cba0cd12d5
+      requirement_fingerprint: sha256:dbf83f044d8a121784f391474c4d55d4ebbd781579c5d425dfa1128ab542c7f4
+      approval_fingerprint: sha256:444d0b04f97b19f22fb1c9ca49082439faf2c9c7db48b180725d1498cbc04e30
       artifact_fingerprint: sha256:0a2a5356e0958cc7bddf12fa60a033d72ab1a8ffe8aba9019c5aefeebb1c1dfa
-      reviewed_at: "2026-06-21T11:19:05Z"
+      reviewed_at: "2026-06-21T12:05:55Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

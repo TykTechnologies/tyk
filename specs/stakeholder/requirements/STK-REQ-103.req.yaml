@@ -18,7 +18,10 @@ tags:
     - api-loader
     - tcp
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-21T11:59:01.975076Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:85a5392255f5b00f3805348c3ee1eabea8b035f8cb2600889ace0851f4cfeaac
 verification:
     assurance_level: A
     formalization_status: none

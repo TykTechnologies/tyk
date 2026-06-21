@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_api_loader_explicit_route_subpaths
 req_type: guarantee
-fretish: ""
+fretish: the gateway_api_loader_explicit_route_subpaths shall always satisfy gateway_api_loader_explicit_route_subpaths_operation_terminal
 description: The gateway package implementation shall preserve local API loader explicit-route subpath wrapper behavior for tested disabled wrapping, trailing-slash prefixes, route-parameter prefixes, exact-prefix requests, nested subpath requests, sibling-path requests, and outside-path requests, without claiming full route generation, middleware execution, upstream connectivity, distributed synchronization, or final client responses beyond the local wrapper output.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: gateway/api_loader_reqproof_test.go; docs/gateway-api-loader-explicit-route-subpaths-requirements-evidence.md
@@ -23,12 +23,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-167
-    reviewed_at: "2026-06-21T05:44:08.989828Z"
+    reviewed_at: "2026-06-21T11:59:02.585686Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:1b1a6e870b43586b9280c6e1fac35ee1ccaa65ad0322cfbbe98cde4fd52764ba
+    reviewed_fingerprint: sha256:c12c11ba3cd674282637b90cc64d8b1a5a58536dea348f3aaf9c15d0b92f0099
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

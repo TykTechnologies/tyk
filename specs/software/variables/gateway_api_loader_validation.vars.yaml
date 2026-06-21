@@ -1,0 +1,6 @@
+component: gateway_api_loader_validation
+variables:
+    - name: gateway_api_loader_validation_operation_terminal
+      type: bool
+      direction: output
+      description: The gateway api loader validation implementation operation reaches a terminal local result for the focused tested inputs, such as returning the expected value, selecting the expected local branch, surfacing an explicit local error, or preserving the documented local fallback behavior.

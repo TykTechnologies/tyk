@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: http_request_response_helpers
 req_type: guarantee
-fretish: ""
+fretish: the http_request_response_helpers shall always satisfy http_request_response_helpers_operation_terminal
 description: The internal HTTP utility package implementation shall preserve local request and response helper behavior for tested inputs by reporting request transfer encoding presence, deriving request scheme from forwarded proto or TLS state, identifying configured CORS preflight markers, writing configured local HTTP error responses, and removing one matching response transfer-encoding value, without claiming full browser CORS policy enforcement, proxy forwarding behavior, upstream behavior, body streaming, analytics, persistence, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: internal/httputil/request_test.go; internal/httputil/response_test.go; docs/http-request-response-helper-requirements-evidence.md
@@ -24,12 +24,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-171
-    reviewed_at: "2026-06-21T06:46:06.869605Z"
+    reviewed_at: "2026-06-21T11:59:02.903922Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:f3cdd2a6992b78abc0990ea2e9197e19c053286b384314e82f5fc8f58d858ac4
+    reviewed_fingerprint: sha256:5a09e0ce5252716c7dab030e02b5cd3e3332b259171da4f21536db986ffd6a20
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

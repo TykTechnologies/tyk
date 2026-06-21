@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: observability
 req_type: guarantee
-fretish: ""
+fretish: the otel_runtime shall always satisfy otel_runtime_operation_terminal
 description: The OpenTelemetry runtime implementation shall preserve local observability helper behavior for tested inputs by defaulting and inheriting trace and metrics configuration, selecting runtime-metrics enablement, constructing metric providers and gateway instruments, safely recording no-op and active local metric values, delegating API metric registry need flags and recording, intentionally panicking on invalid test registry definitions, initializing trace providers with local fallback behavior, generating API and gateway resource attributes, normalizing API version attributes, wrapping and extracting span contexts, extracting trace and span IDs, and adding trace IDs to response headers without claiming collector/exporter delivery, OpenTelemetry SDK provider correctness beyond local construction and fallback behavior, metric backend storage, runtime metric collection completeness, full gateway middleware admission, full HTTP request lifecycle behavior, trace propagation across services, dashboard visibility, or final client-visible behavior beyond the focused root OTEL tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: internal/otel/config_test.go; internal/otel/metrics_instrument_test.go; internal/otel/metrics_runtime_test.go; internal/otel/metrics_test.go; internal/otel/otel_test.go; docs/otel-runtime-requirements-evidence.md
@@ -23,12 +23,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-181
-    reviewed_at: "2026-06-21T09:25:58.116791Z"
+    reviewed_at: "2026-06-21T11:59:04.337057Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:8dcf05ab9cf8b92bb3df2d3dde5ed80256b2c596025e5e03b17fcfc9ffe1ffa7
+    reviewed_fingerprint: sha256:1d03a931edb1987fec753e21962d4419e0b1ae2395c47c8070e4e54f651bead8
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

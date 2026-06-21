@@ -4,10 +4,10 @@ status: approved
 priority: shall
 category: gateway_cipher_suite_selection
 req_type: guarantee
-fretish: ""
+fretish: the gateway_cipher_suite_selection shall always satisfy gateway_cipher_suite_selection_operation_terminal
 description: >-
     The gateway package implementation shall preserve focused TLS cipher-suite selection behavior by resolving configured cipher-suite names to Go TLS cipher IDs, skipping unresolved cipher names, allowing tested HTTPS clients that offer configured cipher suites, and rejecting tested HTTPS clients restricted to a non-configured cipher suite, without claiming complete TLS handshake semantics, TLS version policy, cipher-suite security policy, behavior for every supported cipher name, certificate material validation, downstream client certificate selection, upstream TLS behavior, route generation, authentication enforcement, distributed synchronization, or final client-visible gateway behavior outside the focused cipher-suite tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: gateway/cert_test.go; docs/gateway-cipher-suite-selection-requirements-evidence.md
@@ -26,9 +26,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-195
+    reviewed_at: "2026-06-21T11:59:05.475857Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:7bb515fa5382dcb39cba17e6a7e647db666cd42bf81d4555c5c9c56579e31ab2
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

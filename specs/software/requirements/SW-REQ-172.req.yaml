@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: storage
 req_type: guarantee
-fretish: ""
+fretish: the storage_dummy shall always satisfy storage_dummy_operation_terminal
 description: The dummy storage implementation shall preserve local in-memory behavior for tested inputs by constructing empty data and index maps, reading present and missing keys, setting and deleting keys, deleting or listing wildcard-matched keys, appending, ranging, and removing list values, checking key existence across data and index maps, reporting connect success, and preserving explicit panic behavior for unsupported dummy storage methods without claiming production Redis behavior, persistence, TTL handling, sorted-set semantics, rolling-window semantics, raw-key mutation, bulk deletion semantics, concurrency safety, or final client-visible behavior beyond the focused dummy storage tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: storage/dummy_test.go; docs/storage-dummy-requirements-evidence.md
@@ -23,12 +23,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-185
-    reviewed_at: "2026-06-21T09:52:02.884858Z"
+    reviewed_at: "2026-06-21T11:59:04.954156Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:7d7c17dbe06613b92e750be79476d076a41f67fec4a71e9a7dc44f0f13053ba7
+    reviewed_fingerprint: sha256:30678f3a0b0bbff3aa4958d29d1e9f0b581ba460de2c1d96baaabff0a5b618dd
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

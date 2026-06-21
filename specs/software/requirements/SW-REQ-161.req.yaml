@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: observability
 req_type: guarantee
-fretish: ""
+fretish: the jaeger_trace_adapter shall always satisfy jaeger_trace_adapter_operation_terminal
 description: The Jaeger trace adapter implementation shall preserve local adapter behavior for tested inputs by decoding JSON-compatible Jaeger option maps, returning the stable adapter name, forwarding logger errors, and constructing a local disabled Jaeger tracer with a service-name override, without claiming trace export delivery, collector connectivity, runtime sampling correctness, span propagation through gateway requests, unsupported option value handling, environment override handling, full gateway tracing setup, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: trace/jaeger/config_test.go; docs/jaeger-trace-adapter-requirements-evidence.md
@@ -23,12 +23,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-174
-    reviewed_at: "2026-06-21T07:19:27.719715Z"
+    reviewed_at: "2026-06-21T11:59:03.251833Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:7cedd2a366ae40c12d35bd5bfeb25ce60f716bf4cae2ef9ff222e191ee7cdcfb
+    reviewed_fingerprint: sha256:51c3d0d5d72bca99514d31e2bc1705754c314e67c0aeeb89af08fc8e3038a133
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

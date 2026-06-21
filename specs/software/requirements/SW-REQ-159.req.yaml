@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: http_mux_path_helpers
 req_type: guarantee
-fretish: ""
+fretish: the http_mux_path_helpers shall always satisfy http_mux_path_helpers_operation_terminal
 description: The internal HTTP utility package implementation shall preserve local mux path helper behavior for tested inputs by validating mux path patterns, compiling listen-path patterns into regular expressions, identifying mux template markers, stripping configured listen paths from request paths, matching single path patterns, and matching any path from a candidate set while returning errors for malformed regular expressions, without claiming gateway API loading, route registration, middleware authorization, upstream behavior, analytics, persistence, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: internal/httputil/mux_test.go; docs/http-mux-path-helper-requirements-evidence.md
@@ -24,12 +24,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-172
-    reviewed_at: "2026-06-21T06:54:38.642866Z"
+    reviewed_at: "2026-06-21T11:59:03.037873Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:196c05133bb4f3b103ed14b4b954c98b3282461cd2608848e766b2bcab071504
+    reviewed_fingerprint: sha256:147bc875447a0768aac103c533779ff7090929abe43bba3b1aa3277e57ce3951
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

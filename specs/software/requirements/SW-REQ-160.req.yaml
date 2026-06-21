@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: http_server_header_helpers
 req_type: guarantee
-fretish: ""
+fretish: the http_server_header_helpers shall always satisfy http_server_header_helpers_operation_terminal
 description: The internal HTTP utility package implementation shall preserve local server and header helper behavior for tested inputs by constructing connection watchers with zero count, applying explicit and connection-state count deltas, leaving non-counting connection states unchanged, reporting the current count, and constructing Basic Authorization header values from username and password pairs, without claiming nonnegative connection-count enforcement, full server lifecycle management, upstream authentication, credential validation, transport security, analytics, persistence, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: internal/httputil/connection_watcher_test.go; internal/httputil/headers_test.go; docs/http-server-header-helper-requirements-evidence.md
@@ -24,12 +24,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-173
-    reviewed_at: "2026-06-21T07:01:40.450706Z"
+    reviewed_at: "2026-06-21T11:59:03.122372Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:2095608fe17688943f1831b3a19bb5332d523cfa2f05a9203a20e904e72f7d07
+    reviewed_fingerprint: sha256:445393f734a9d3749f85c5359249bb6e63f6552a060fa8d879dda85ad0be6680
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

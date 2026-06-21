@@ -21,7 +21,10 @@ tags:
     - tls
     - cipher
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-21T11:59:02.184653Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:b9b576f71d0605efd1a494ce87b3eaf9b41cb758cb4b0f59182a6f99fb196c6c
 verification:
     assurance_level: A
     formalization_status: none

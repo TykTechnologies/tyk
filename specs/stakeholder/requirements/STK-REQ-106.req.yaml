@@ -20,7 +20,10 @@ tags:
     - tls
     - pinning
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-21T11:59:02.129061Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:39b9b0d47beb4ddb38c0ed2d5dcbc26f269a97f2a49624c9f36eaa0d34daf262
 verification:
     assurance_level: A
     formalization_status: none

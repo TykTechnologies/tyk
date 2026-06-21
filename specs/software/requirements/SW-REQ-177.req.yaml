@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_api_loader_playground_templates
 req_type: guarantee
-fretish: ""
+fretish: the gateway_api_loader_playground_templates shall always satisfy gateway_api_loader_playground_templates_operation_terminal
 description: The gateway package implementation shall preserve local GraphQL playground template-cache behavior for tested template roots by parsing valid files from the configured playground template directory into the package playground template cache and leaving no cached playground template when the configured playground directory is missing or contains parse-invalid templates, without claiming route registration, GraphQL execution, template asset completeness, filesystem permissions beyond tested local paths, concurrent template-cache access, startup sequencing, dashboard synchronization, distributed behavior, or final client-visible gateway behavior outside the focused template-loader tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: gateway/api_loader_reqproof_test.go; docs/gateway-api-loader-playground-template-requirements-evidence.md
@@ -24,9 +24,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-190
+    reviewed_at: "2026-06-21T11:59:05.241895Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:f32096c0bcb4eec58bcfcd5de4e89ea751f8ed073f2173493edf3c5432945f17
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

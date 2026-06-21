@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_runtime
 req_type: guarantee
-fretish: ""
+fretish: the external_http_client shall always satisfy external_http_client_operation_terminal
 description: The external-service HTTP client implementation shall preserve local client factory behavior for tested inputs by detecting and merging service configuration, constructing service-specific clients, applying service timeouts and transports, selecting and bypassing proxies, loading mTLS certificates and CA pools from files or the certificate store, classifying mTLS errors, and fetching JWK data through a supplied client and parser without claiming network reachability, external service availability, proxy server behavior, certificate authority trust correctness beyond the focused tests, production certificate-store persistence, JWK cryptographic validation, OAuth/JWT protocol correctness, or final client-visible gateway behavior beyond the focused HTTP client factory tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: internal/httpclient/factory_test.go; internal/httpclient/factory_mtls_security_test.go; docs/external-http-client-requirements-evidence.md
@@ -23,12 +23,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-182
-    reviewed_at: "2026-06-21T09:25:58.218077Z"
+    reviewed_at: "2026-06-21T11:59:04.600654Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:5f855e73ff869bad791f60272caef0dc5d12adc2fb1e8967d2871183194d152e
+    reviewed_fingerprint: sha256:b0c5e21cf467e9e4718d3f5d1ced1f61665c446a584e6b9ccf3f088f66ad7ca9
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

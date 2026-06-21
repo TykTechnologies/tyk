@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: storage
 req_type: guarantee
-fretish: ""
+fretish: the storage_connection_handler shall always satisfy storage_connection_handler_operation_terminal
 description: The storage connection-handler implementation shall preserve local connection-handler and RedisController shim behavior for tested inputs by constructing handlers and shim controllers, tracking enablement and connection state, delegating shim connect, disable, connected, and wait-connect calls to the connection handler, waiting for connect success or timeout, delivering reconnect callbacks, initializing default/cache/analytics connectors, checking storage status, selecting configured connector slots, propagating disconnect errors, constructing Redis connector options, and configuring exponential backoff without claiming Redis server availability, distributed storage durability, Sentinel or cluster topology correctness, TLS certificate validation beyond connector option construction, gateway request admission, analytics delivery, cache correctness, Go plugin API compatibility beyond local shim delegation, or final client-visible behavior beyond the focused storage connection-handler tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: storage/connection_handler_test.go; storage/redis_shim_test.go; docs/storage-connection-handler-requirements-evidence.md
@@ -23,12 +23,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-183
-    reviewed_at: "2026-06-21T09:25:58.252056Z"
+    reviewed_at: "2026-06-21T11:59:04.701915Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:ff95b3114d7a8a0cc03d8bb966c8e58df0b2c35d310e88f8b853c504d7efddd3
+    reviewed_fingerprint: sha256:edc46194ea23f51374fffb73cca3b3e87589d26f7cafd336904b032d83d21072
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

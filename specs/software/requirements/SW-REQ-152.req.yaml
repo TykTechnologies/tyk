@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_api_loader_loop_detection
 req_type: guarantee
-fretish: ""
+fretish: the gateway_api_loader_loop_detection shall always satisfy gateway_api_loader_loop_detection_operation_terminal
 description: The gateway package implementation shall preserve local API loader loop detection for tested tyk and non-tyk request schemes and for loop levels below, at, and above default or explicit loop limits, without claiming internal proxy routing, loop request dispatch, middleware execution, upstream connectivity, distributed synchronization, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: gateway/api_loader_reqproof_test.go; docs/gateway-api-loader-loop-detection-requirements-evidence.md
@@ -23,12 +23,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-165
-    reviewed_at: "2026-06-21T05:19:58.751358Z"
+    reviewed_at: "2026-06-21T11:59:02.502729Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:ef7ec77e1b7e24c89e69ed7dd60903450627b58b24c21cf84cae9235b795190c
+    reviewed_fingerprint: sha256:3ddb32db72361b1e78cc8d20dc72189fe18bcb4bb01afac7190886a61a0d22e8
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

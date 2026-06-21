@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: storage
 req_type: guarantee
-fretish: ""
+fretish: the storage_redis_cluster shall always satisfy storage_redis_cluster_operation_terminal
 description: The RedisCluster storage implementation shall preserve adapter behavior for tested inputs by selecting the configured connection handler, deriving Redis addresses, gating operations on connection state, lazily constructing temporal storage adapters, applying key prefixes and hash selection, reading and writing keys, handling TTL and expiration calls, returning multi-key results, preserving raw-key operations, forwarding lock, increment, decrement, scan, filtering, delete, flush, pub/sub, publish, list, set, rolling-window, sorted-set, controller-initialization, and error-handling behavior for mocked or configured storage backends without claiming Redis server availability, Redis clustering correctness, third-party temporal storage library correctness, distributed lock safety beyond the wrapper SetIfNotExist call, timing precision for rolling windows or TTL expiry, pub/sub delivery guarantees beyond exercised handler paths, persistence durability, network partition behavior, concurrency safety beyond exercised lazy-storage mutex paths, or final client-visible gateway behavior outside these RedisCluster storage adapter tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: storage/redis_cluster_test.go; docs/storage-redis-cluster-requirements-evidence.md
@@ -23,12 +23,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-187
-    reviewed_at: "2026-06-21T10:16:09.919402Z"
+    reviewed_at: "2026-06-21T11:59:05.113264Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:a6f9a5d4d2d83bd1d4a9709e5bb409f2bff4111a2e3bbc87496dcd650859ccae
+    reviewed_fingerprint: sha256:33e12afd1fb94af1f6d8447be41e6579f17a79b4ec323cdf45abf09d9a1da2c4
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

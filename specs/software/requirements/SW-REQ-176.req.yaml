@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_api_loader_loop_dispatch
 req_type: guarantee
-fretish: ""
+fretish: the gateway_api_loader_loop_dispatch shall always satisfy gateway_api_loader_loop_dispatch_operation_terminal
 description: The gateway package implementation shall preserve local dummy proxy loop dispatch behavior for tested tyk-scheme rewrite targets by dispatching self-loop requests to the current API handler, dispatching named API loop requests to the matching loaded API handler, applying tested method, loop-limit, check-limits, and query control parameters, and returning an explicit local error when a tested loop target cannot be detected, without claiming URL rewrite rule selection, route generation, middleware chain correctness, authentication or rate-limit correctness, upstream connectivity, distributed synchronization, or final client-visible gateway behavior outside the focused dummy proxy handler tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: gateway/api_loader_reqproof_test.go; docs/gateway-api-loader-loop-dispatch-requirements-evidence.md
@@ -23,9 +23,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-189
+    reviewed_at: "2026-06-21T11:59:05.227791Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:e8c7cfd9c7d5e39cfdfeabcffe8fac245f47eded682bc4b559a374cb35bae70d
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: observability
 req_type: guarantee
-fretish: ""
+fretish: the openzipkin_trace_adapter shall always satisfy openzipkin_trace_adapter_operation_terminal
 description: The OpenZipkin trace adapter implementation shall preserve local adapter behavior for tested inputs by decoding JSON-compatible Zipkin option maps, selecting supported local samplers, returning the stable adapter name, constructing a local tracer when reporter URL and sampler options are valid, rejecting missing reporter URLs and unsupported sampler names, converting supported OpenTracing B3 HTTP header extraction and injection carriers, and forwarding local span facade operations to the wrapped Zipkin span, without claiming trace export delivery, collector connectivity, runtime sampling correctness beyond local sampler construction, span propagation through gateway requests, unsupported option value handling, environment override handling, full gateway tracing setup, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: trace/openzipkin/config_test.go; docs/openzipkin-trace-adapter-requirements-evidence.md
@@ -24,12 +24,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-177
-    reviewed_at: "2026-06-21T08:47:19.513594Z"
+    reviewed_at: "2026-06-21T11:59:03.61389Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:8c358e5e8a8875b5ecadb918fd93ef0a8f9f56eb44252a2fc2f0538143940cf6
+    reviewed_fingerprint: sha256:b7ff6e64447ab5ef5c473c303ba17deb580fcf51754f7296e0f5f59dcfae79be
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

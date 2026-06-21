@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: observability
 req_type: guarantee
-fretish: ""
+fretish: the api_metrics shall always satisfy api_metrics_operation_terminal
 description: The API metrics implementation shall preserve local metric-definition behavior for tested inputs by decoding JSON metric configuration, providing default RED metric definitions, validating metric definitions, extracting configured dimensions with defaults, truncating API-key labels for cardinality control, compiling and matching filters, reusing dimension builders safely, creating instrument registries and source-need flags, and recording local counter and histogram values for tested request contexts without claiming collector/exporter delivery, OpenTelemetry SDK provider correctness, gateway middleware admission, full HTTP request lifecycle behavior, metric backend storage, dashboard visibility, cardinality safety for arbitrary operator-supplied labels, or final client-visible behavior beyond the focused API metrics tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: internal/otel/apimetrics/builder_test.go; internal/otel/apimetrics/config_test.go; internal/otel/apimetrics/defaults_test.go; internal/otel/apimetrics/dimension_test.go; internal/otel/apimetrics/filter_test.go; internal/otel/apimetrics/recorder_test.go; internal/otel/apimetrics/registry_test.go; internal/otel/apimetrics/validation_test.go; docs/otel-api-metrics-requirements-evidence.md
@@ -23,12 +23,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-180
-    reviewed_at: "2026-06-21T09:25:57.926457Z"
+    reviewed_at: "2026-06-21T11:59:03.943188Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:3b4ad4e9dd28feada2ae5f2d23d0365016984826d72552e69314701b795c2227
+    reviewed_fingerprint: sha256:803a16499e5110aae62f6acbbcc297bb81ea1e6241b7af4d74aa428a31ca4904
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

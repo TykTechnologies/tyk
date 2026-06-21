@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: user_session_json_serialization
 req_type: guarantee
-fretish: ""
+fretish: the user_session_json_serialization shall always satisfy user_session_json_serialization_operation_terminal
 description: The user package implementation shall preserve local JSON encoding and decoding behavior for tested session, policy, access-definition, limit, collection, MCP access-control, smoothing, and post-expiry fields by omitting zero values, preserving configured non-zero values, accepting legacy all-field session JSON, accepting compact session JSON with default zero values, and round-tripping post-expiry session fields, without claiming policy merge behavior, gateway authentication, persistence backends, runtime quota enforcement, session lifetime expiration behavior, endpoint limit execution, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: user/session_test.go; user/custom_policies_test.go; docs/user-session-json-serialization-requirements-evidence.md
@@ -24,12 +24,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-168
-    reviewed_at: "2026-06-21T06:05:41.360802Z"
+    reviewed_at: "2026-06-21T11:59:02.624768Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:1529e7cf17edd5bf41fc7ba2eaeada02b63d1694def4c9e60f47e4439af31adc
+    reviewed_fingerprint: sha256:4503bf43dff215fc8acd5a8e770508c4a2063963518213565c21f63335d09a86
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

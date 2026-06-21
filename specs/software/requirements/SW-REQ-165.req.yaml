@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: observability
 req_type: guarantee
-fretish: ""
+fretish: the trace_manager shall always satisfy trace_manager_operation_terminal
 description: The trace manager implementation shall preserve local tracing helper behavior for tested inputs by storing and reading service IDs in request contexts, enabling and disabling the global trace manager, registering configured tracer factories for services, returning no-op tracers when no service tracer is available, wrapping handlers with root-span setup, forwarding span extraction and injection to the selected tracer, forwarding helper log messages to both the supplied logger and active span, and selecting supported local tracing providers by name, without claiming trace export delivery, collector connectivity, runtime sampling correctness, full gateway trace propagation, final client responses, configured logger use during AddTracer, or close-error propagation from registered tracers.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: trace/trace_test.go; docs/trace-manager-requirements-evidence.md
@@ -22,12 +22,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-178
-    reviewed_at: "2026-06-21T08:47:19.570572Z"
+    reviewed_at: "2026-06-21T11:59:03.716686Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:69a0fe52df8bb64add1815767ef00667384d037f3c3a9602f93cbcae76ce0b22
+    reviewed_fingerprint: sha256:8a243e6822c634b4ceacbd173057deb95709fc5bff60d5cd6d9f5491bea4c6bd
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

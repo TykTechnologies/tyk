@@ -18,7 +18,10 @@ tags:
     - api-loader
     - loop-dispatch
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-21T11:59:01.842198Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:d2ce7f9169a9d41fbd4ea71f9893e1517fc062eb4de7231bb62147b09070b895
 verification:
     assurance_level: A
     formalization_status: none

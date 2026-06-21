@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: observability
 req_type: guarantee
-fretish: ""
+fretish: the log_formatters shall always satisfy log_formatters_operation_terminal
 description: The logging formatter implementation shall preserve local helper behavior for tested inputs by selecting default, JSON, and registered formatters, falling back to the default formatter for unknown format names, applying environment-derived global formatter and level setup, formatting raw logger messages, preserving JSON formatter error values and optional logrus_error output, supporting nested JSON data fields and timestamp omission, and translating string-code log messages while passing through untranslated string codes, without claiming log delivery, external sink behavior, global logger thread-safety, middleware execution, non-string translation code handling, complete log schema compatibility, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: log/log_test.go; docs/log-formatter-requirements-evidence.md
@@ -23,12 +23,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-176
-    reviewed_at: "2026-06-21T07:50:06.866956Z"
+    reviewed_at: "2026-06-21T11:59:03.485647Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:2ddd07dda546bb8e6b01735fb487cb98713b9b5cbd294a8aa3f04536c41403e7
+    reviewed_fingerprint: sha256:70d8d2d08a1611e2187cf8374425c1f89313a21bbe7161fc4a030767459d3f46
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

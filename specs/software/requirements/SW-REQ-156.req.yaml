@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: portal_webhook_helpers
 req_type: guarantee
-fretish: ""
+fretish: the portal_webhook_helpers shall always satisfy portal_webhook_helpers_operation_terminal
 description: The internal portal package implementation shall preserve local portal client and Bento output helper behavior for tested inputs by normalizing portal API base URLs, fetching app webhook credentials while skipping apps without webhook URLs, registering and constructing the portal webhook output, sending generated messages to matching event-type webhooks, applying configured webhook headers, and returning explicit local errors for non-success webhook responses, without claiming external portal availability, webhook endpoint durability, Bento runtime completeness, gateway event triggering, persistence, analytics, network delivery outside local test servers, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: internal/portal/portal_test.go; internal/portal/portal_output_test.go; docs/portal-webhook-helper-requirements-evidence.md
@@ -24,12 +24,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-169
-    reviewed_at: "2026-06-21T06:15:37.276681Z"
+    reviewed_at: "2026-06-21T11:59:02.683728Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:8d381f3564ac29e11b4043323f8c6a7c94680f714881b5f4838cea6fad5614a7
+    reviewed_fingerprint: sha256:4df6f46da966176a8991495fdbd0a4ac26de9749bf47414d95fe6d317bf085ab
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

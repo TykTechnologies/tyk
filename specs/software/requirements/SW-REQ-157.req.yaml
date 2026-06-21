@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: http_streaming_helpers
 req_type: guarantee
-fretish: ""
+fretish: the http_streaming_helpers shall always satisfy http_streaming_helpers_operation_terminal
 description: The internal HTTP utility package implementation shall preserve local streaming classification behavior for tested request and response inputs by identifying gRPC request streaming, SSE response content types with supported parameters, exact WebSocket upgrade requests, aggregate streaming request and response predicates, malformed SSE content-type rejection, and non-streaming fallbacks, without claiming complete HTTP token-list parsing, reverse-proxy forwarding behavior, upstream availability, MCP runtime handling, analytics, persistence, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: internal/httputil/streaming_test.go; docs/http-streaming-helper-requirements-evidence.md
@@ -23,12 +23,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-170
-    reviewed_at: "2026-06-21T06:35:24.201465Z"
+    reviewed_at: "2026-06-21T11:59:02.816598Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:a80e2382ad08203468d7c389bac556997d5af95f686908235bcf45911eb4046f
+    reviewed_fingerprint: sha256:8611604e44dff2d6c8491819bfcde3b7412d934f5132ca66d7cb6bd387016c0b
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

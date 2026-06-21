@@ -19,7 +19,10 @@ tags:
     - upstream
     - tls
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-21T11:59:02.071239Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:4317f2f23eba5e344fb9bd431973f25e5317624dc66bd66cb2efd2c585b3da1f
 verification:
     assurance_level: A
     formalization_status: none

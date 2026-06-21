@@ -22,9 +22,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-098
-    reviewed_at: "2026-06-21T10:07:42.34309Z"
+    reviewed_at: "2026-06-21T11:59:05.820839Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:6be043a6d72038efcca0336658e3b91012e2bb0a71fdffe108a7d56e06836b76
+    reviewed_fingerprint: sha256:6ebdb0ec26650db434b81f549a5416f35d457556d7c13102e4fa452a61090c1d
 verification:
     assurance_level: A
     formalization_status: valid

@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_upstream_certificate_selection
 req_type: guarantee
-fretish: ""
+fretish: the gateway_upstream_certificate_selection shall always satisfy gateway_upstream_certificate_selection_operation_terminal
 description: The gateway package implementation shall preserve focused upstream certificate selection behavior by selecting certificate IDs from global and API certificate maps using wildcard, exact host, wildcard subdomain, host-with-port, port-specific precedence, later-map override, unmatched-host empty results, IPv4 host-with-port, and bracketed IPv6 host-with-port inputs, and by looking up configured upstream certificates for tested matching API upstream hosts, without claiming complete mTLS handshake semantics, certificate material validation, private-key storage durability, certificate pinning, common-name validation, downstream client certificate selection, TLS version or cipher policy, proxy behavior, route generation, authentication enforcement, distributed synchronization, or final client-visible gateway behavior outside the focused upstream certificate selection tests.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: gateway/cert_test.go; docs/gateway-upstream-certificate-selection-requirements-evidence.md
@@ -24,9 +24,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-193
+    reviewed_at: "2026-06-21T11:59:05.425858Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:4c0d8c6ee2cabd66aa6afe41a6da4db620bc1814c109aaabf1d2f7d68a7f31f0
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

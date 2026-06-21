@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: authentication
 req_type: guarantee
-fretish: ""
+fretish: the signature_validator shall always satisfy signature_validator_operation_terminal
 description: The Mashery signature validator implementation shall preserve local helper behavior for tested inputs by exposing stable Mashery SHA256 and MD5 hasher names, constructing digests from token, shared secret, and timestamp values, initializing supported hashers while rejecting unsupported hasher names, rejecting missing and incorrect signature attempts, rejecting signatures outside allowed clock skew, and accepting current or within-skew signatures, without claiming gateway request admission, token lookup, secret resolution, API configuration selection, replay protection, constant-time comparison, behavior before successful validator initialization, full Mashery protocol compatibility, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: signature_validator/hash_test.go; signature_validator/validate_test.go; docs/signature-validator-requirements-evidence.md
@@ -23,12 +23,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-175
-    reviewed_at: "2026-06-21T07:37:58.241628Z"
+    reviewed_at: "2026-06-21T11:59:03.356432Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:0f6c8e2638145bb2f6ee1b24c3c9a2a79bd42357b249ee4b6d1d685d1faeb088
+    reviewed_fingerprint: sha256:ba864a7f8403f55910a31c548d5a2302d45e9b9c55247ca6f4e31c3607d064b9
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

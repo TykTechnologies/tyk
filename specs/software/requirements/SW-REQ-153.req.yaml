@@ -4,9 +4,9 @@ status: approved
 priority: shall
 category: gateway_api_loader_internal_handler_lookup
 req_type: guarantee
-fretish: ""
+fretish: the gateway_api_loader_internal_handler_lookup shall always satisfy gateway_api_loader_internal_handler_lookup_operation_terminal
 description: The gateway package implementation shall preserve local API loader internal handler lookup for tested API ID lookup, loop-name lookup, missing API lookup, and missing-handler lookup inputs, without claiming internal proxy routing, handler execution, route generation, middleware execution, upstream connectivity, distributed synchronization, or final client responses.
-formalization_strategy: informal
+formalization_strategy: fretish
 informal_verification:
     method: unit_tests
     evidence: gateway/api_loader_reqproof_test.go; docs/gateway-api-loader-internal-handler-lookup-requirements-evidence.md
@@ -23,12 +23,12 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-166
-    reviewed_at: "2026-06-21T05:28:03.94643Z"
+    reviewed_at: "2026-06-21T11:59:02.543893Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:e8b9c5f0b23c312c4ceef1a056aebdcdcedce094dcafb98ab3581490963475a6
+    reviewed_fingerprint: sha256:ab27ce45b9a38d395a4d636ca8fc9c2e6776d5bf58f41792fb2af1593dd5f55a
 verification:
     assurance_level: A
-    formalization_status: none
+    formalization_status: valid
     review:
         status: approved
         reviewer: human:buger

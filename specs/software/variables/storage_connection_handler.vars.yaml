@@ -1,0 +1,6 @@
+component: storage_connection_handler
+variables:
+    - name: storage_connection_handler_operation_terminal
+      type: bool
+      direction: output
+      description: The storage connection handler implementation operation reaches a terminal local result for the focused tested inputs, such as returning the expected value, selecting the expected local branch, surfacing an explicit local error, or preserving the documented local fallback behavior.
