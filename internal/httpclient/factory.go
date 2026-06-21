@@ -28,6 +28,7 @@ var (
 )
 
 // IsMTLSError checks if the error is related to mTLS certificate loading
+// SW-REQ-169
 func IsMTLSError(err error) bool {
 	return errors.Is(err, ErrMTLSCertificateLoad) ||
 		errors.Is(err, ErrMTLSCertificateStore) ||
@@ -45,6 +46,7 @@ type ExternalHTTPClientFactory struct {
 }
 
 // NewExternalHTTPClientFactory creates a new HTTP client factory.
+// SW-REQ-169
 func NewExternalHTTPClientFactory(serviceConfig *config.ExternalServiceConfig, certManager CertificateManager) *ExternalHTTPClientFactory {
 	return &ExternalHTTPClientFactory{
 		config:      serviceConfig,
@@ -58,6 +60,7 @@ func NewExternalHTTPClientFactory(serviceConfig *config.ExternalServiceConfig, c
 // 2. Global configuration
 // 3. Environment variables (for proxy)
 // 4. Default settings
+// SW-REQ-169
 func (f *ExternalHTTPClientFactory) CreateClient(serviceType string) (*http.Client, error) {
 	// Check if external services are configured for this service type
 	if !f.isServiceConfigured(serviceType) {
@@ -92,31 +95,37 @@ func (f *ExternalHTTPClientFactory) CreateClient(serviceType string) (*http.Clie
 }
 
 // CreateOAuthClient creates an HTTP client for OAuth requests (including upstream OAuth).
+// SW-REQ-169
 func (f *ExternalHTTPClientFactory) CreateOAuthClient() (*http.Client, error) {
 	return f.CreateClient(config.ServiceTypeOAuth)
 }
 
 // CreateJWKClient creates an HTTP client specifically configured for JWK endpoint requests.
+// SW-REQ-169
 func (f *ExternalHTTPClientFactory) CreateJWKClient() (*http.Client, error) {
 	return f.CreateClient(config.ServiceTypeOAuth)
 }
 
 // CreateIntrospectionClient creates an HTTP client for OAuth introspection requests.
+// SW-REQ-169
 func (f *ExternalHTTPClientFactory) CreateIntrospectionClient() (*http.Client, error) {
 	return f.CreateClient(config.ServiceTypeOAuth)
 }
 
 // CreateWebhookClient creates an HTTP client for webhook requests.
+// SW-REQ-169
 func (f *ExternalHTTPClientFactory) CreateWebhookClient() (*http.Client, error) {
 	return f.CreateClient(config.ServiceTypeWebhook)
 }
 
 // CreateHealthCheckClient creates an HTTP client for health check requests.
+// SW-REQ-169
 func (f *ExternalHTTPClientFactory) CreateHealthCheckClient() (*http.Client, error) {
 	return f.CreateClient(config.ServiceTypeHealth)
 }
 
 // GetJWKWithClient fetches JWK using the provided HTTP client for proxy and mTLS support
+// SW-REQ-169
 func GetJWKWithClient(jwlUrl string, client *http.Client, parseJWK func([]byte) (*jose.JSONWebKeySet, error)) (*jose.JSONWebKeySet, error) {
 	resp, err := client.Get(jwlUrl)
 	if err != nil {
@@ -141,6 +150,7 @@ func GetJWKWithClient(jwlUrl string, client *http.Client, parseJWK func([]byte) 
 }
 
 // getServiceConfig returns the merged configuration for a specific service type.
+// SW-REQ-169
 func (f *ExternalHTTPClientFactory) getServiceConfig(serviceType string) config.ServiceConfig {
 	var serviceConfig config.ServiceConfig
 
@@ -176,6 +186,7 @@ func (f *ExternalHTTPClientFactory) getServiceConfig(serviceType string) config.
 }
 
 // isServiceConfigured checks if external services configuration is enabled for the given service type.
+// SW-REQ-169
 func (f *ExternalHTTPClientFactory) isServiceConfigured(serviceType string) bool {
 	// First check if global configuration is enabled - this applies to all services
 	if f.config.Global.Enabled {
@@ -214,6 +225,7 @@ func (f *ExternalHTTPClientFactory) isServiceConfigured(serviceType string) bool
 }
 
 // getProxyFunction returns the appropriate proxy function based on configuration.
+// SW-REQ-169
 func (f *ExternalHTTPClientFactory) getProxyFunction(serviceConfig config.ServiceConfig) (func(*http.Request) (*url.URL, error), error) {
 	// Priority: Service-specific → Global → Environment → Direct connection
 
@@ -246,6 +258,7 @@ func (f *ExternalHTTPClientFactory) getProxyFunction(serviceConfig config.Servic
 }
 
 // createCustomProxyFunc creates a custom proxy function based on the proxy configuration.
+// SW-REQ-169
 func (f *ExternalHTTPClientFactory) createCustomProxyFunc(proxyConfig config.ProxyConfig) func(*http.Request) (*url.URL, error) {
 	return func(req *http.Request) (*url.URL, error) {
 		var proxyURL string
@@ -274,6 +287,7 @@ func (f *ExternalHTTPClientFactory) createCustomProxyFunc(proxyConfig config.Pro
 }
 
 // shouldBypassProxy checks if a host should bypass the proxy based on bypass proxy configuration.
+// SW-REQ-169
 func (f *ExternalHTTPClientFactory) shouldBypassProxy(host, bypassProxy string) bool {
 	if bypassProxy == "" {
 		return false
@@ -290,6 +304,7 @@ func (f *ExternalHTTPClientFactory) shouldBypassProxy(host, bypassProxy string) 
 }
 
 // splitBypassProxy splits a bypass proxy string into individual hosts.
+// SW-REQ-169
 func splitBypassProxy(bypassProxy string) []string {
 	if bypassProxy == "" {
 		return nil
@@ -307,6 +322,7 @@ func splitBypassProxy(bypassProxy string) []string {
 
 // getTLSConfig creates TLS configuration based on mTLS settings.
 // It supports both file-based and certificate store configurations.
+// SW-REQ-169
 func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceConfig) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: serviceConfig.MTLS.InsecureSkipVerify,
@@ -360,6 +376,7 @@ func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceCon
 }
 
 // loadCertificateFromStore retrieves a certificate from the Tyk certificate store.
+// SW-REQ-169
 func (f *ExternalHTTPClientFactory) loadCertificateFromStore(certID string) (*tls.Certificate, error) {
 	if f.certManager == nil {
 		return nil, fmt.Errorf("certificate manager not available")
@@ -374,6 +391,7 @@ func (f *ExternalHTTPClientFactory) loadCertificateFromStore(certID string) (*tl
 }
 
 // loadCACertPoolFromStore creates a CA certificate pool from store certificate IDs.
+// SW-REQ-169
 func (f *ExternalHTTPClientFactory) loadCACertPoolFromStore(certIDs []string) *x509.CertPool {
 	if f.certManager == nil {
 		return nil
@@ -384,6 +402,7 @@ func (f *ExternalHTTPClientFactory) loadCACertPoolFromStore(certIDs []string) *x
 }
 
 // getServiceTimeout returns the appropriate timeout for different service types
+// SW-REQ-169
 func (f *ExternalHTTPClientFactory) getServiceTimeout(serviceType string) time.Duration {
 	switch serviceType {
 	case config.ServiceTypeOAuth:
@@ -408,6 +427,7 @@ func (f *ExternalHTTPClientFactory) getServiceTimeout(serviceType string) time.D
 }
 
 // getServiceTransport returns service-specific HTTP transport configuration
+// SW-REQ-169
 func (f *ExternalHTTPClientFactory) getServiceTransport(serviceType string) *http.Transport {
 	switch serviceType {
 	case config.ServiceTypeOAuth:

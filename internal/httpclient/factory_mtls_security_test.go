@@ -13,6 +13,14 @@ import (
 // TestExternalHTTPClientFactory_MTLSSecurityValidation tests that when mTLS is enabled
 // but certificate files don't exist, the factory returns an error instead of falling back
 // to a default HTTP client, which would bypass the required mutual TLS authentication.
+
+// Verifies: STK-REQ-094, SYS-REQ-182, SW-REQ-169
+// SW-REQ-169:nominal:nominal
+// SW-REQ-169:boundary:nominal
+// SW-REQ-169:error_handling:nominal
+// SW-REQ-169:error_handling:negative
+// SW-REQ-169:encoding_safety:nominal
+// SW-REQ-169:determinism:nominal
 func TestExternalHTTPClientFactory_MTLSSecurityValidation(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -99,6 +107,14 @@ func TestExternalHTTPClientFactory_MTLSSecurityValidation(t *testing.T) {
 
 // TestExternalHTTPClientFactory_MTLSFallbackSecurity tests that when mTLS configuration
 // fails, the system does not silently fall back to an insecure default client.
+
+// Verifies: STK-REQ-094, SYS-REQ-182, SW-REQ-169
+// SW-REQ-169:nominal:nominal
+// SW-REQ-169:boundary:nominal
+// SW-REQ-169:error_handling:nominal
+// SW-REQ-169:error_handling:negative
+// SW-REQ-169:encoding_safety:nominal
+// SW-REQ-169:determinism:nominal
 func TestExternalHTTPClientFactory_MTLSFallbackSecurity(t *testing.T) {
 	factory := &ExternalHTTPClientFactory{
 		config: &config.ExternalServiceConfig{
@@ -127,6 +143,14 @@ func TestExternalHTTPClientFactory_MTLSFallbackSecurity(t *testing.T) {
 
 // TestExternalHTTPClientFactory_ProxyOnlyConfiguration tests that proxy-only
 // configuration (without mTLS) works correctly and doesn't fail.
+
+// Verifies: STK-REQ-094, SYS-REQ-182, SW-REQ-169
+// SW-REQ-169:nominal:nominal
+// SW-REQ-169:boundary:nominal
+// SW-REQ-169:error_handling:nominal
+// SW-REQ-169:error_handling:negative
+// SW-REQ-169:encoding_safety:nominal
+// SW-REQ-169:determinism:nominal
 func TestExternalHTTPClientFactory_ProxyOnlyConfiguration(t *testing.T) {
 	factory := &ExternalHTTPClientFactory{
 		config: &config.ExternalServiceConfig{
@@ -150,6 +174,14 @@ func TestExternalHTTPClientFactory_ProxyOnlyConfiguration(t *testing.T) {
 }
 
 // TestExternalHTTPClientFactory_CreateWebhookClient tests webhook client creation
+
+// Verifies: STK-REQ-094, SYS-REQ-182, SW-REQ-169
+// SW-REQ-169:nominal:nominal
+// SW-REQ-169:boundary:nominal
+// SW-REQ-169:error_handling:nominal
+// SW-REQ-169:error_handling:negative
+// SW-REQ-169:encoding_safety:nominal
+// SW-REQ-169:determinism:nominal
 func TestExternalHTTPClientFactory_CreateWebhookClient(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -209,6 +241,14 @@ func TestExternalHTTPClientFactory_CreateWebhookClient(t *testing.T) {
 }
 
 // TestExternalHTTPClientFactory_CreateHealthCheckClient tests health check client creation
+
+// Verifies: STK-REQ-094, SYS-REQ-182, SW-REQ-169
+// SW-REQ-169:nominal:nominal
+// SW-REQ-169:boundary:nominal
+// SW-REQ-169:error_handling:nominal
+// SW-REQ-169:error_handling:negative
+// SW-REQ-169:encoding_safety:nominal
+// SW-REQ-169:determinism:nominal
 func TestExternalHTTPClientFactory_CreateHealthCheckClient(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -268,6 +308,14 @@ func TestExternalHTTPClientFactory_CreateHealthCheckClient(t *testing.T) {
 }
 
 // TestExternalHTTPClientFactory_CreateIntrospectionClient tests introspection client creation
+
+// Verifies: STK-REQ-094, SYS-REQ-182, SW-REQ-169
+// SW-REQ-169:nominal:nominal
+// SW-REQ-169:boundary:nominal
+// SW-REQ-169:error_handling:nominal
+// SW-REQ-169:error_handling:negative
+// SW-REQ-169:encoding_safety:nominal
+// SW-REQ-169:determinism:nominal
 func TestExternalHTTPClientFactory_CreateIntrospectionClient(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -327,6 +375,14 @@ func TestExternalHTTPClientFactory_CreateIntrospectionClient(t *testing.T) {
 }
 
 // TestIsMTLSError tests the IsMTLSError function
+
+// Verifies: STK-REQ-094, SYS-REQ-182, SW-REQ-169
+// SW-REQ-169:nominal:nominal
+// SW-REQ-169:boundary:nominal
+// SW-REQ-169:error_handling:nominal
+// SW-REQ-169:error_handling:negative
+// SW-REQ-169:encoding_safety:nominal
+// SW-REQ-169:determinism:nominal
 func TestIsMTLSError(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T09:13:47Z"
+generated_at: "2026-06-21T09:18:08Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -1113,6 +1113,16 @@ reviews:
       approval_fingerprint: sha256:37dfcf25e330e919402a12b3f5127569efc7be7c1b493d320127484898f0b714
       artifact_fingerprint: sha256:7e70b9dd60db23cb14796a0f2e16692045a010fb361f7edf5a9d66ce2a9034f7
       reviewed_at: "2026-06-21T09:13:47Z"
+    - requirement: SW-REQ-169
+      artifact: internal/httpclient/factory.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed external HTTP client implementation impact after adding ReqProof annotations; production behavior and the approved HTTP client factory requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:5f855e73ff869bad791f60272caef0dc5d12adc2fb1e8967d2871183194d152e
+      approval_fingerprint: sha256:67c77c4afd9690ce28508a94ed00de2282a9a98a611ea197cf2bc1c8cfc2d038
+      artifact_fingerprint: sha256:d71e4161eb68abe59125bd8971b12e8c0773745ebb366f7ae7ed76950a1ac918
+      reviewed_at: "2026-06-21T09:18:08Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

@@ -17,6 +17,21 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
+// Verifies: STK-REQ-094, SYS-REQ-182, SW-REQ-169
+// STK-REQ-094:STK-REQ-094-AC-01:acceptance
+// STK-REQ-094:error_handling:negative
+// SYS-REQ-182:nominal:nominal
+// SYS-REQ-182:boundary:nominal
+// SYS-REQ-182:error_handling:nominal
+// SYS-REQ-182:error_handling:negative
+// SYS-REQ-182:encoding_safety:nominal
+// SYS-REQ-182:determinism:nominal
+// SW-REQ-169:nominal:nominal
+// SW-REQ-169:boundary:nominal
+// SW-REQ-169:error_handling:nominal
+// SW-REQ-169:error_handling:negative
+// SW-REQ-169:encoding_safety:nominal
+// SW-REQ-169:determinism:nominal
 func TestExternalHTTPClientFactory_CreateClient(t *testing.T) {
 	// Test failure case separately
 	t.Run("no configuration", func(t *testing.T) {
@@ -137,6 +152,13 @@ func TestExternalHTTPClientFactory_CreateClient(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-094, SYS-REQ-182, SW-REQ-169
+// SW-REQ-169:nominal:nominal
+// SW-REQ-169:boundary:nominal
+// SW-REQ-169:error_handling:nominal
+// SW-REQ-169:error_handling:negative
+// SW-REQ-169:encoding_safety:nominal
+// SW-REQ-169:determinism:nominal
 func TestExternalHTTPClientFactory_CreateOAuthClient(t *testing.T) {
 	serviceConfig := &config.ExternalServiceConfig{
 		Global: config.GlobalProxyConfig{
@@ -152,6 +174,13 @@ func TestExternalHTTPClientFactory_CreateOAuthClient(t *testing.T) {
 	assert.Equal(t, 15*time.Second, client.Timeout) // OAuth-specific timeout
 }
 
+// Verifies: STK-REQ-094, SYS-REQ-182, SW-REQ-169
+// SW-REQ-169:nominal:nominal
+// SW-REQ-169:boundary:nominal
+// SW-REQ-169:error_handling:nominal
+// SW-REQ-169:error_handling:negative
+// SW-REQ-169:encoding_safety:nominal
+// SW-REQ-169:determinism:nominal
 func TestExternalHTTPClientFactory_CreateJWKClient(t *testing.T) {
 	t.Run("fails when external services not configured", func(t *testing.T) {
 		factory := NewExternalHTTPClientFactory(&config.ExternalServiceConfig{}, nil)
@@ -177,6 +206,13 @@ func TestExternalHTTPClientFactory_CreateJWKClient(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-094, SYS-REQ-182, SW-REQ-169
+// SW-REQ-169:nominal:nominal
+// SW-REQ-169:boundary:nominal
+// SW-REQ-169:error_handling:nominal
+// SW-REQ-169:error_handling:negative
+// SW-REQ-169:encoding_safety:nominal
+// SW-REQ-169:determinism:nominal
 func TestExternalHTTPClientFactory_getServiceConfig(t *testing.T) {
 	factory := &ExternalHTTPClientFactory{
 		config: &config.ExternalServiceConfig{
@@ -230,6 +266,13 @@ func TestExternalHTTPClientFactory_getServiceConfig(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-094, SYS-REQ-182, SW-REQ-169
+// SW-REQ-169:nominal:nominal
+// SW-REQ-169:boundary:nominal
+// SW-REQ-169:error_handling:nominal
+// SW-REQ-169:error_handling:negative
+// SW-REQ-169:encoding_safety:nominal
+// SW-REQ-169:determinism:nominal
 func TestExternalHTTPClientFactory_getProxyFunction(t *testing.T) {
 	factory := &ExternalHTTPClientFactory{}
 
@@ -295,6 +338,13 @@ func TestExternalHTTPClientFactory_getProxyFunction(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-094, SYS-REQ-182, SW-REQ-169
+// SW-REQ-169:nominal:nominal
+// SW-REQ-169:boundary:nominal
+// SW-REQ-169:error_handling:nominal
+// SW-REQ-169:error_handling:negative
+// SW-REQ-169:encoding_safety:nominal
+// SW-REQ-169:determinism:nominal
 func TestGetJWKWithClient(t *testing.T) {
 	// Mock parser function
 	parseJWK := func(_ []byte) (*jose.JSONWebKeySet, error) {
@@ -326,6 +376,13 @@ func TestGetJWKWithClient(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-094, SYS-REQ-182, SW-REQ-169
+// SW-REQ-169:nominal:nominal
+// SW-REQ-169:boundary:nominal
+// SW-REQ-169:error_handling:nominal
+// SW-REQ-169:error_handling:negative
+// SW-REQ-169:encoding_safety:nominal
+// SW-REQ-169:determinism:nominal
 func TestExternalHTTPClientFactory_CertificateStore(t *testing.T) {
 	tests := []struct {
 		name          string

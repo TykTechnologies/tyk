@@ -1,0 +1,53 @@
+id: SYS-REQ-182
+version: 1
+status: approved
+priority: shall
+category: gateway_runtime
+req_type: guarantee
+fretish: ""
+description: External-service HTTP client handling shall preserve deterministic local client factory results for tested inputs by detecting and merging service configuration, constructing service-specific clients, applying service timeouts and transports, selecting and bypassing proxies, loading mTLS certificates and CA pools from files or the certificate store, classifying mTLS errors, and fetching JWK data through a supplied client and parser without claiming network reachability, external service availability, proxy server behavior, certificate authority trust correctness beyond the focused tests, production certificate-store persistence, JWK cryptographic validation, OAuth/JWT protocol correctness, or final client-visible gateway behavior beyond the focused HTTP client factory tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-094
+component: external_http_client
+rationale: This system requirement owns local external HTTP client factory behavior only. Real external integrations and protocol-level behavior remain outside this proof slice.
+tags:
+    - gateway-runtime
+    - http-client
+    - external-services
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-094
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T09:17:47Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. External HTTP client scope is limited to local internal/httpclient behavior for tested service configuration detection and merging, service-specific client constructors, timeouts and transport settings, proxy selection and bypass behavior, mTLS file and certificate-store loading errors, mTLS error classification, certificate-store loading, and JWK fetching through a supplied client and parser. This approval does not claim network reachability, external service availability, proxy server behavior, certificate authority trust correctness beyond the focused tests, production certificate-store persistence, JWK cryptographic validation, OAuth/JWT protocol correctness, or final client-visible gateway behavior beyond the focused HTTP client factory tests.
+        fingerprint: sha256:6b4317a304754b0177a4b62787b584d8f46c34fb843c9a6ecd1a7f1185bdc9a9
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T09:17:47Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added external HTTP client system requirement.
+          changed_by: agent:codex
