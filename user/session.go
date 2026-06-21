@@ -88,6 +88,7 @@ type APILimit struct {
 }
 
 // Clone does a deepcopy of APILimit.
+// SW-REQ-145
 func (a APILimit) Clone() *APILimit {
 	var smoothingRef *apidef.RateLimitSmoothing
 	if a.Smoothing != nil {
@@ -114,6 +115,7 @@ func (a APILimit) Clone() *APILimit {
 
 // Duration returns the time between two allowed requests at the defined rate.
 // It's used to decide which rate limit has a bigger allowance.
+// SW-REQ-145
 func (r RateLimit) Duration() time.Duration {
 	if r.Per <= 0 || r.Rate <= 0 {
 		return 0
@@ -154,6 +156,7 @@ type AccessDefinition struct {
 }
 
 // IsEmpty checks if APILimit is empty.
+// SW-REQ-145
 func (a APILimit) IsEmpty() bool {
 	if a.Rate != 0 {
 		return false
@@ -200,11 +203,13 @@ func (a APILimit) IsEmpty() bool {
 
 // IsZero returns true if APILimit is empty (for omitzero support).
 // This is an alias for IsEmpty() to satisfy the omitzero interface.
+// SW-REQ-145
 func (a APILimit) IsZero() bool {
 	return a.IsEmpty()
 }
 
 // IsZero returns true if RateLimit is empty (for omitzero support).
+// SW-REQ-145
 func (r RateLimit) IsZero() bool {
 	return r.Rate == 0 && r.Per == 0 && r.Smoothing == nil
 }
@@ -224,6 +229,8 @@ func (r RateLimit) IsZero() bool {
 //	reqproof:lemma apilimit_isempty_when_all_fields_zero func(a APILimit) bool {
 //	  return a.Rate == 0.0 && a.Per == 0.0 && a.QuotaMax == 0 && a.QuotaRenews == 0 && a.QuotaRemaining == 0 && a.QuotaRenewalRate == 0
 //	}
+//
+// SW-REQ-145
 func (a APILimit) IsAllZero() bool {
 	return a.Rate == 0.0 && a.Per == 0.0 && a.QuotaMax == 0 && a.QuotaRenews == 0 && a.QuotaRemaining == 0 && a.QuotaRenewalRate == 0
 }
@@ -236,6 +243,8 @@ func (a APILimit) IsAllZero() bool {
 //	reqproof:lemma apilimit_nonempty_when_quota_set func(a APILimit) bool {
 //	  return a.QuotaMax > 0
 //	}
+//
+// SW-REQ-145
 func (a APILimit) HasQuotaConfigured() bool {
 	return a.QuotaMax > 0
 }
@@ -249,6 +258,8 @@ func (a APILimit) HasQuotaConfigured() bool {
 //	reqproof:lemma apilimit_throttle_window_positive_when_both_set func(a APILimit) bool {
 //	  return a.ThrottleInterval > 0.0 && a.ThrottleRetryLimit > 0
 //	}
+//
+// SW-REQ-145
 func (a APILimit) HasThrottleWindow() bool {
 	return a.ThrottleInterval > 0.0 && a.ThrottleRetryLimit > 0
 }
@@ -431,6 +442,7 @@ func NewSessionState() *SessionState {
 }
 
 // APILimit returns an user.APILimit from the session data.
+// SW-REQ-145
 func (s *SessionState) APILimit() APILimit {
 	return APILimit{
 		RateLimit: RateLimit{

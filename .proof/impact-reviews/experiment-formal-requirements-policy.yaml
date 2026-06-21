@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T03:50:41Z"
+generated_at: "2026-06-21T04:14:03Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -813,6 +813,26 @@ reviews:
       approval_fingerprint: sha256:e08e7b189ca8eb64a78936d516586c0362d52d98d50b51cec76fac2aeb6726c9
       artifact_fingerprint: sha256:c2c035232c5cd8744ed4a1730dede987c137755a0bb87db8dcfddc9b11dbd623
       reviewed_at: "2026-06-21T03:50:41Z"
+    - requirement: SW-REQ-145
+      artifact: user/policy.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed user limit model helper impact after adding trace annotations and focused tests. user/session.go and user/policy.go behavior is unchanged; SW-REQ-145 and docs/user-limit-model-requirements-evidence.md describe the local APILimit derivation, RateLimit/APILimit predicates, clone behavior, policy predicates, and partition enablement scope, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:b7373083bf33ad99f401baff12d3f46829cff2ac7acc95347d1f18e21110dd02
+      approval_fingerprint: sha256:e9efebc8c71101ac1e33293bb31b4f6bb77e0d7ec10958ffaee39f41d4ec79ee
+      artifact_fingerprint: sha256:84e6662e7512a3113542fd483f241ee557e243db76909d81345d2b3d5b77ec4f
+      reviewed_at: "2026-06-21T04:14:03Z"
+    - requirement: SW-REQ-145
+      artifact: user/session.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed user limit model helper impact after adding trace annotations and focused tests. user/session.go and user/policy.go behavior is unchanged; SW-REQ-145 and docs/user-limit-model-requirements-evidence.md describe the local APILimit derivation, RateLimit/APILimit predicates, clone behavior, policy predicates, and partition enablement scope, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:b7373083bf33ad99f401baff12d3f46829cff2ac7acc95347d1f18e21110dd02
+      approval_fingerprint: sha256:e9efebc8c71101ac1e33293bb31b4f6bb77e0d7ec10958ffaee39f41d4ec79ee
+      artifact_fingerprint: sha256:e8fcc140fb470f96cc10e6c1d61625c452bcbd8d84c58f196ffbdff1f7a05f13
+      reviewed_at: "2026-06-21T04:14:03Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

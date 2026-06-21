@@ -1,0 +1,64 @@
+id: SYS-REQ-158
+version: 1
+status: approved
+priority: shall
+category: user_limit_model
+req_type: guarantee
+fretish: the user_limit_model shall always satisfy user_limit_model_operation_terminal
+description: User limit model helper handling shall make local limit and policy predicate operations terminal and deterministic for APILimit derivation from policies and sessions, APILimit/RateLimit empty and configured predicates, APILimit clone behavior, rate duration calculation, policy active-quota/rate/throttle predicates, and policy partition enablement for tested paths, without claiming policy merge behavior, gateway enforcement, persistence backends, quota accounting, rate limiting execution, or final client responses.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-070
+component: user_limit_model
+rationale: This system requirement owns local user-package limit data-model helper decisions only. Integrated policy application, gateway enforcement, persistence, quota accounting, runtime rate limiting, and transport behavior remain outside this proof slice.
+tags:
+    - user
+    - policy
+    - session
+    - rate-limit
+    - quota
+variables:
+    - user_limit_model_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-070
+    reviewed_at: "2026-06-21T04:14:36.561871Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:9d5e8ba873d0ad80302d00bfc0b0a362f3ae8085ba63d54f9b62579079dc6716
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. User limit model scope is limited to local user-package helpers: APILimit derivation from policy/session fields, APILimit/RateLimit empty and configured predicates, APILimit clone behavior, rate duration calculation, policy active-quota/rate/throttle predicates, and policy partition enablement. This approval does not claim policy merge behavior, gateway enforcement, persistence backends, quota accounting, rate limiting execution, or final client responses.'
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-21T00:00:00Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-158|user_limit_model_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. SYS-REQ-158''s user_limit_model_operation_terminal variable is decomposed by SW-REQ-145 for local user-package limit helper behavior only: APILimit derivation from policy/session fields, APILimit/RateLimit empty and configured predicates, APILimit clone behavior, rate duration calculation, policy active-quota/rate/throttle predicates, and policy partition enablement. Policy merge behavior, gateway enforcement, persistence backends, quota accounting, rate limiting execution, and final client responses remain outside this proof slice.'
+          reviewed_at: "2026-06-21T00:00:00Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added user limit model helper system requirement.
+          changed_by: agent:codex

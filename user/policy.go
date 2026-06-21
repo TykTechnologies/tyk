@@ -50,6 +50,7 @@ type Policy struct {
 	Smoothing *apidef.RateLimitSmoothing `json:"smoothing" bson:"smoothing"`
 }
 
+// SW-REQ-145
 func (p *Policy) APILimit() APILimit {
 	return APILimit{
 		QuotaMax:           p.QuotaMax,
@@ -74,6 +75,7 @@ type PolicyPartitions struct {
 }
 
 // Enabled reports if partitioning is enabled.
+// SW-REQ-145
 func (p PolicyPartitions) Enabled() bool {
 	return p.Quota || p.RateLimit || p.Acl || p.Complexity
 }
@@ -86,9 +88,12 @@ func (p PolicyPartitions) Enabled() bool {
 // reqproof:requires p.QuotaMax > 0
 // reqproof:requires p.Active == true
 // reqproof:requires p.IsInactive == false
-// reqproof:lemma policy_meets_quota_when_active_and_quota_positive func(p Policy) bool {
-//   return p.QuotaMax > 0 && p.Active && !p.IsInactive
-// }
+//
+//	reqproof:lemma policy_meets_quota_when_active_and_quota_positive func(p Policy) bool {
+//	  return p.QuotaMax > 0 && p.Active && !p.IsInactive
+//	}
+//
+// SW-REQ-145
 func (p Policy) IsActiveQuotaConfigured() bool {
 	return p.QuotaMax > 0 && p.Active && !p.IsInactive
 }
@@ -98,9 +103,12 @@ func (p Policy) IsActiveQuotaConfigured() bool {
 // Admin API validation guarantees QuotaMax >= 0.
 //
 // reqproof:requires p.QuotaMax >= 0
-// reqproof:lemma policy_quota_max_valid_iff_nonneg func(p Policy) bool {
-//   return p.QuotaMax >= 0
-// }
+//
+//	reqproof:lemma policy_quota_max_valid_iff_nonneg func(p Policy) bool {
+//	  return p.QuotaMax >= 0
+//	}
+//
+// SW-REQ-145
 func (p Policy) HasNonNegativeQuota() bool {
 	return p.QuotaMax >= 0
 }
@@ -111,9 +119,12 @@ func (p Policy) HasNonNegativeQuota() bool {
 //
 // reqproof:requires p.Rate > 0.0
 // reqproof:requires p.Per > 0.0
-// reqproof:lemma policy_rate_pair_consistency func(p Policy) bool {
-//   return p.Rate > 0.0 && p.Per > 0.0
-// }
+//
+//	reqproof:lemma policy_rate_pair_consistency func(p Policy) bool {
+//	  return p.Rate > 0.0 && p.Per > 0.0
+//	}
+//
+// SW-REQ-145
 func (p Policy) HasConfiguredRate() bool {
 	return p.Rate > 0.0 && p.Per > 0.0
 }
@@ -122,9 +133,12 @@ func (p Policy) HasConfiguredRate() bool {
 // is positive — i.e. retries are enabled with a finite budget.
 //
 // reqproof:requires p.ThrottleRetryLimit > 0
-// reqproof:lemma policy_throttle_configured_when_positive func(p Policy) bool {
-//   return p.ThrottleRetryLimit > 0
-// }
+//
+//	reqproof:lemma policy_throttle_configured_when_positive func(p Policy) bool {
+//	  return p.ThrottleRetryLimit > 0
+//	}
+//
+// SW-REQ-145
 func (p Policy) HasConfiguredThrottle() bool {
 	return p.ThrottleRetryLimit > 0
 }

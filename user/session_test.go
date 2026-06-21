@@ -256,6 +256,9 @@ func Test_calculateLifetime(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-070, SYS-REQ-158, SW-REQ-145
+// SW-REQ-145:nominal:nominal
+// SW-REQ-145:boundary:boundary
 func TestAPILimit_Duration(t *testing.T) {
 	t.Run("valid limit", func(t *testing.T) {
 		limit := APILimit{
@@ -291,6 +294,10 @@ func TestAPILimit_Duration(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-070, SYS-REQ-158, SW-REQ-145
+// SW-REQ-145:nominal:nominal
+// SW-REQ-145:boundary:nominal
+// SW-REQ-145:boundary:boundary
 func TestAPILimit_IsEmpty(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -398,6 +405,9 @@ func TestAPILimit_IsEmpty(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-070, SYS-REQ-158, SW-REQ-145
+// SW-REQ-145:nominal:nominal
+// SW-REQ-145:determinism:nominal
 func TestAPILimit_Clone(t *testing.T) {
 	tests := []struct {
 		name  string

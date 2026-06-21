@@ -1,0 +1,61 @@
+id: STK-REQ-070
+version: 1
+status: approved
+priority: shall
+category: user_limit_model
+req_type: guarantee
+fretish: ""
+description: User limit model helpers shall preserve deterministic local limit and policy predicate behavior for tested inputs by deriving APILimit values from policies and sessions, detecting empty and configured rate/quota/throttle state, cloning APILimit values without sharing smoothing configuration, computing rate durations, reporting active quota eligibility, and reporting partition enablement, without claiming policy merge behavior, gateway enforcement, persistence backends, quota accounting, rate limiting execution, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: user_limit_model
+rationale: User policy/session limit helpers provide local data-model decisions consumed by higher-level policy and gateway flows. This requirement owns only the local helper behavior under focused tests.
+tags:
+    - user
+    - policy
+    - session
+    - rate-limit
+    - quota
+variables: []
+traces:
+    reviewed_at: "2026-06-21T04:14:36.452399Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:cca2ac71c6ed06e0097bced2d57373c5e884988612d97167b0fb3caf35f651e5
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. User limit model scope is limited to local user-package helpers: APILimit derivation from policy/session fields, APILimit/RateLimit empty and configured predicates, APILimit clone behavior, rate duration calculation, policy active-quota/rate/throttle predicates, and policy partition enablement. This approval does not claim policy merge behavior, gateway enforcement, persistence backends, quota accounting, rate limiting execution, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need local user policy and session limit helpers to derive and classify limit state consistently before higher-level policy and gateway flows consume it.
+    acceptance_criteria:
+        - id: STK-REQ-070-AC-01
+          text: Given tested user policy and session limit inputs, when APILimit derivation, duration calculation, empty/configured predicates, clone behavior, active quota classification, and partition enablement are exercised, then deterministic local user limit model outcomes are produced for those inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-158
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added user limit model helper requirement.
+          changed_by: agent:codex

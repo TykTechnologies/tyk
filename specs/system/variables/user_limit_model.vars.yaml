@@ -1,0 +1,9 @@
+component: user_limit_model
+no_interface:
+    declared: true
+    reason: The user limit model proof slice covers local user-package helper behavior for deriving APILimit values and classifying limit/policy state. Policy merge behavior, gateway enforcement, persistence backends, quota accounting, runtime rate limiting execution, and final client responses are outside this component boundary.
+variables:
+    - name: user_limit_model_operation_terminal
+      type: bool
+      direction: output
+      description: User limit model helper operations return a terminal local result by deriving an APILimit value, computing a rate duration or zero-duration disabled result, reporting empty/configured predicate state, cloning APILimit data, reporting policy quota/rate/throttle state, or reporting policy partition enablement for tested paths.
