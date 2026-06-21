@@ -16,6 +16,72 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
+// Verifies: STK-REQ-066, SYS-REQ-154, SW-REQ-141
+// SW-REQ-141:nominal:nominal
+// SW-REQ-141:boundary:nominal
+// SW-REQ-141:determinism:nominal
+func TestResponseErrorOverrideMiddlewareBasics(t *testing.T) {
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	middleware := &ResponseErrorOverrideMiddleware{}
+
+	require.NoError(t, middleware.Init(nil, spec))
+	assert.Same(t, spec, middleware.Spec)
+	assert.Same(t, &middleware.BaseTykResponseHandler, middleware.Base())
+	assert.Equal(t, "ResponseErrorOverrideMiddleware", middleware.Name())
+	assert.NotPanics(t, func() {
+		middleware.HandleError(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+	})
+
+	tests := []struct {
+		name    string
+		spec    *APISpec
+		enabled bool
+	}{
+		{
+			name:    "disabled without overrides",
+			spec:    &APISpec{APIDefinition: &apidef.APIDefinition{}},
+			enabled: false,
+		},
+		{
+			name: "enabled by API overrides",
+			spec: &APISpec{APIDefinition: &apidef.APIDefinition{
+				ErrorOverrides: apidef.ErrorOverridesMap{"500": []apidef.ErrorOverride{{}}},
+			}},
+			enabled: true,
+		},
+		{
+			name: "enabled by gateway overrides",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{},
+				GlobalConfig: config.Config{
+					ErrorOverrides: apidef.ErrorOverridesMap{"500": []apidef.ErrorOverride{{}}},
+				},
+			},
+			enabled: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			middleware := &ResponseErrorOverrideMiddleware{
+				BaseTykResponseHandler: BaseTykResponseHandler{Spec: tt.spec},
+			}
+			assert.Equal(t, tt.enabled, middleware.Enabled())
+		})
+	}
+}
+
+// Verifies: STK-REQ-066, SYS-REQ-154, SW-REQ-141
+// STK-REQ-066:STK-REQ-066-AC-01:acceptance
+// STK-REQ-066:error_handling:negative
+// MCDC SYS-REQ-154: gateway_response_error_override_operation_terminal=T => TRUE
+// SW-REQ-141:nominal:nominal
+// SW-REQ-141:boundary:nominal
+// SW-REQ-141:error_handling:nominal
+// SW-REQ-141:error_handling:negative
+// SW-REQ-141:determinism:nominal
+//
+//mcdc:ignore SYS-REQ-154: gateway_response_error_override_operation_terminal=F => FALSE -- the onboarded gateway response error override middleware operations are synchronous local response-handler helpers that either skip processing, preserve or restore upstream bodies, apply configured response-object mutations, or return explicit nil/error-free helper outcomes before returning; a non-terminal result is not a reachable runtime state for these APIs [category: defensive] [reviewed: human:buger]
 func TestLazyBodyReader(t *testing.T) {
 	logger := logrus.NewEntry(logrus.New())
 
@@ -142,6 +208,10 @@ func TestLazyBodyReader(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-066, SYS-REQ-154, SW-REQ-141
+// SW-REQ-141:nominal:nominal
+// SW-REQ-141:boundary:nominal
+// SW-REQ-141:determinism:nominal
 func TestShouldProcessResponse(t *testing.T) {
 	t.Run("processes error responses with overrides configured", func(t *testing.T) {
 		middleware := &ResponseErrorOverrideMiddleware{
@@ -280,6 +350,10 @@ func TestShouldProcessResponse(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-066, SYS-REQ-154, SW-REQ-141
+// SW-REQ-141:nominal:nominal
+// SW-REQ-141:boundary:nominal
+// SW-REQ-141:determinism:nominal
 func TestApplyOverrideToResponse(t *testing.T) {
 	t.Run("updates status code", func(t *testing.T) {
 		middleware := &ResponseErrorOverrideMiddleware{}
@@ -375,6 +449,9 @@ func TestApplyOverrideToResponse(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-066, SYS-REQ-154, SW-REQ-141
+// SW-REQ-141:nominal:nominal
+// SW-REQ-141:boundary:nominal
 func TestHasBodyConfig(t *testing.T) {
 	middleware := &ResponseErrorOverrideMiddleware{}
 
@@ -421,6 +498,9 @@ func TestHasBodyConfig(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-066, SYS-REQ-154, SW-REQ-141
+// SW-REQ-141:nominal:nominal
+// SW-REQ-141:boundary:nominal
 func TestGenerateOverrideBody(t *testing.T) {
 	t.Run("returns plain body when no template", func(t *testing.T) {
 		middleware := &ResponseErrorOverrideMiddleware{}
@@ -455,6 +535,9 @@ func TestGenerateOverrideBody(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-066, SYS-REQ-154, SW-REQ-141
+// SW-REQ-141:nominal:nominal
+// SW-REQ-141:determinism:nominal
 func TestUpstreamErrorOverride_APILevel(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(503)
@@ -487,6 +570,10 @@ func TestUpstreamErrorOverride_APILevel(t *testing.T) {
 	}}...)
 }
 
+// Verifies: STK-REQ-066, SYS-REQ-154, SW-REQ-141
+// SW-REQ-141:nominal:nominal
+// SW-REQ-141:boundary:nominal
+// SW-REQ-141:determinism:nominal
 func TestUpstreamErrorOverride_DisableReturnsUpstreamResponse(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(503)
@@ -520,6 +607,9 @@ func TestUpstreamErrorOverride_DisableReturnsUpstreamResponse(t *testing.T) {
 	}}...)
 }
 
+// Verifies: STK-REQ-066, SYS-REQ-154, SW-REQ-141
+// SW-REQ-141:nominal:nominal
+// SW-REQ-141:determinism:nominal
 func TestUpstreamErrorOverride_APIPrecedenceOverGateway(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(503)
@@ -564,6 +654,10 @@ func TestUpstreamErrorOverride_APIPrecedenceOverGateway(t *testing.T) {
 	}}...)
 }
 
+// Verifies: STK-REQ-066, SYS-REQ-154, SW-REQ-141
+// SW-REQ-141:nominal:nominal
+// SW-REQ-141:boundary:nominal
+// SW-REQ-141:determinism:nominal
 func TestUpstreamErrorOverride_GatewayFallback(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(502)
@@ -605,6 +699,10 @@ func TestUpstreamErrorOverride_GatewayFallback(t *testing.T) {
 	}}...)
 }
 
+// Verifies: STK-REQ-066, SYS-REQ-154, SW-REQ-141
+// SW-REQ-141:nominal:nominal
+// SW-REQ-141:boundary:nominal
+// SW-REQ-141:determinism:nominal
 func TestUpstreamErrorOverride_APILevelPatternMatching(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -647,6 +745,10 @@ func TestUpstreamErrorOverride_APILevelPatternMatching(t *testing.T) {
 	}...)
 }
 
+// Verifies: STK-REQ-066, SYS-REQ-154, SW-REQ-141
+// SW-REQ-141:nominal:nominal
+// SW-REQ-141:boundary:nominal
+// SW-REQ-141:determinism:nominal
 func TestUpstreamErrorOverride_APILevelBodyFieldMatching(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
@@ -705,6 +807,10 @@ func TestUpstreamErrorOverride_APILevelBodyFieldMatching(t *testing.T) {
 	}...)
 }
 
+// Verifies: STK-REQ-066, SYS-REQ-154, SW-REQ-141
+// SW-REQ-141:nominal:nominal
+// SW-REQ-141:boundary:nominal
+// SW-REQ-141:determinism:nominal
 func TestUpstreamErrorOverride_APILevelMessagePattern(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
@@ -762,6 +868,9 @@ func TestUpstreamErrorOverride_APILevelMessagePattern(t *testing.T) {
 	}...)
 }
 
+// Verifies: STK-REQ-066, SYS-REQ-154, SW-REQ-141
+// SW-REQ-141:nominal:nominal
+// SW-REQ-141:determinism:nominal
 func TestUpstreamErrorOverride_APILevelFirstMatchWins(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(500)

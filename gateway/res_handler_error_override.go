@@ -17,29 +17,35 @@ type ResponseErrorOverrideMiddleware struct {
 	BaseTykResponseHandler
 }
 
+// SW-REQ-141
 func (r *ResponseErrorOverrideMiddleware) Base() *BaseTykResponseHandler {
 	return &r.BaseTykResponseHandler
 }
 
+// SW-REQ-141
 func (r *ResponseErrorOverrideMiddleware) Name() string {
 	return "ResponseErrorOverrideMiddleware"
 }
 
+// SW-REQ-141
 func (r *ResponseErrorOverrideMiddleware) Enabled() bool {
 	// Fast path: check config before any processing
 	return len(r.Spec.GlobalConfig.ErrorOverrides) > 0 ||
 		len(r.Spec.ErrorOverrides) > 0
 }
 
+// SW-REQ-141
 func (r *ResponseErrorOverrideMiddleware) Init(_ any, spec *APISpec) error {
 	r.Spec = spec
 	return nil
 }
 
+// SW-REQ-141
 func (r *ResponseErrorOverrideMiddleware) HandleError(_ http.ResponseWriter, _ *http.Request) {
 	//no-op: this middleware only handles upstream responses, not errors in the gateway itself
 }
 
+// SW-REQ-141
 func (r *ResponseErrorOverrideMiddleware) HandleResponse(
 	_ http.ResponseWriter,
 	res *http.Response,
@@ -78,6 +84,7 @@ func (r *ResponseErrorOverrideMiddleware) HandleResponse(
 	return nil
 }
 
+// SW-REQ-141
 // shouldProcessResponse checks if response should be processed for error overrides.
 func (r *ResponseErrorOverrideMiddleware) shouldProcessResponse(res *http.Response) bool {
 	return res.StatusCode >= 400 &&
@@ -92,10 +99,12 @@ type lazyBodyReader struct {
 	logger *logrus.Entry
 }
 
+// SW-REQ-141
 func newLazyBodyReader(body io.ReadCloser, logger *logrus.Entry) *lazyBodyReader {
 	return &lazyBodyReader{body: body, logger: logger}
 }
 
+// SW-REQ-141
 func (l *lazyBodyReader) Read() []byte {
 	if !l.read {
 		var err error
@@ -109,6 +118,7 @@ func (l *lazyBodyReader) Read() []byte {
 	return l.data
 }
 
+// SW-REQ-141
 func (l *lazyBodyReader) RestoreIfRead(res *http.Response) {
 	if l.read {
 		// Combine the data we already read with the remainder of the original body stream.
@@ -117,12 +127,14 @@ func (l *lazyBodyReader) RestoreIfRead(res *http.Response) {
 	}
 }
 
+// SW-REQ-141
 func (l *lazyBodyReader) CloseOriginal() {
 	if l.body != nil {
 		l.body.Close()
 	}
 }
 
+// SW-REQ-141
 // applyOverrideToResponse applies the override result to the HTTP response.
 // Returns true if the response body was successfully replaced, false otherwise.
 func (r *ResponseErrorOverrideMiddleware) applyOverrideToResponse(
@@ -157,6 +169,7 @@ func (r *ResponseErrorOverrideMiddleware) applyOverrideToResponse(
 	return bodyReplaced
 }
 
+// SW-REQ-141
 // hasBodyConfig returns true if the override has body configuration.
 func (r *ResponseErrorOverrideMiddleware) hasBodyConfig(result *OverrideResult) bool {
 	return result.GetBody() != "" ||
@@ -164,6 +177,7 @@ func (r *ResponseErrorOverrideMiddleware) hasBodyConfig(result *OverrideResult) 
 		result.GetMessageForTemplate() != ""
 }
 
+// SW-REQ-141
 func (r *ResponseErrorOverrideMiddleware) generateOverrideBody(
 	result *OverrideResult,
 	errCtx *ErrorResponseContext,
@@ -188,6 +202,7 @@ func (r *ResponseErrorOverrideMiddleware) generateOverrideBody(
 	return nil
 }
 
+// SW-REQ-141
 // generateDefaultTemplateBody generates response using Tyk's default error template.
 // This matches the behavior of gateway-generated errors when only message is configured.
 func (r *ResponseErrorOverrideMiddleware) generateDefaultTemplateBody(
@@ -214,6 +229,7 @@ func (r *ResponseErrorOverrideMiddleware) generateDefaultTemplateBody(
 	return r.executeTemplate(tmpl, result.GetMessageForTemplate(), statusCode, errCtx.IsXML, logger)
 }
 
+// SW-REQ-141
 // executeTemplate is a helper that executes a template with the given message and status code.
 func (r *ResponseErrorOverrideMiddleware) executeTemplate(
 	tmpl TemplateExecutor,

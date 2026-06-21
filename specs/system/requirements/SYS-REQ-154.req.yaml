@@ -1,0 +1,64 @@
+id: SYS-REQ-154
+version: 1
+status: approved
+priority: shall
+category: gateway_response_error_overrides
+req_type: guarantee
+fretish: the gateway_response_error_overrides shall always satisfy gateway_response_error_override_operation_terminal
+description: Gateway response error override middleware support shall make local upstream error-response override operations terminal and deterministic for configured response gating, lazy body reading and restoration, status/header/body/template mutation, disabled or unmatched upstream response preservation, API-before-gateway precedence, status-prefix matching, body-field matching, message-pattern matching, and first-match rule order, without claiming route generation, gateway request admission, authentication, upstream availability, persistence, analytics, full middleware ordering, or general network transport behavior.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-066
+component: gateway_response_error_overrides
+rationale: This system requirement owns terminal local response error override middleware behavior only. Route generation, request admission, authentication, upstream availability, persistence, analytics, full middleware ordering, and general network transport behavior are outside this proof slice.
+tags:
+    - gateway
+    - errors
+    - response-middleware
+variables:
+    - gateway_response_error_override_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-066
+    reviewed_at: "2026-06-21T03:07:35.176877Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:a7b526f53793e63865fe299a7c0323e8659432ba4e57d52d140bb2ba18760cfe
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T03:06:35Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway response error override middleware scope is limited to local gateway/res_handler_error_override.go response-handler behavior: handler identity and initialization, enablement and processing gates, no-op gateway-error handling, lazy response body read/cache/limit/error/restoration/close behavior, response status/header/body/content-length/content-type mutation, body-configuration classification, plain/default-template body generation, disabled or unmatched upstream response preservation, API-before-gateway precedence, status-prefix matching, body-field matching, message-pattern matching, gateway fallback matching, and first-match rule order. This approval does not claim route generation, gateway request admission, authentication, upstream availability, persistence, analytics, full middleware ordering, or general network transport behavior.'
+        fingerprint: sha256:6c69641bc8a977b79f85f77369cae127affc722ae4887cde611a0ea855c2d112
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-21T03:06:44.856859Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-154|gateway_response_error_override_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. SYS-REQ-154''s gateway_response_error_override_operation_terminal variable is decomposed by SW-REQ-141 for local gateway/res_handler_error_override.go response-handler behavior only: identity/init gates, processing gates, lazy body handling, response-object mutation, body generation, disabled or unmatched response preservation, API/global precedence, status-prefix/body-field/message-pattern matching, gateway fallback matching, and first-match rule order. Route generation, gateway request admission, authentication, upstream availability, persistence, analytics, full middleware ordering, and general network transport behavior remain outside this proof slice.'
+          reviewed_at: "2026-06-21T03:06:44.856859Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T03:06:35Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway response error override middleware system requirement.
+          changed_by: agent:codex

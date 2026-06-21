@@ -1,0 +1,56 @@
+id: SW-REQ-141
+version: 1
+status: approved
+priority: shall
+category: gateway_response_error_overrides
+req_type: guarantee
+fretish: ""
+description: The gateway response error override middleware implementation shall preserve local behavior for response handler identity and initialization, enablement and processing gates, no-op gateway-error handling, lazy response body read/cache/limit/error/restoration/close behavior, override status/header/body/content-length/content-type mutation, body-configuration classification, inline/plain/default-template body generation, template execution failure handling, disabled override preservation, API-before-gateway precedence, status-prefix matching, body-field matching, message-pattern matching, gateway fallback matching, and first-match rule order, without claiming route generation, gateway request admission, authentication, upstream availability, persistence, analytics, full middleware ordering, or general network transport behavior.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: gateway/res_handler_error_override_test.go; docs/gateway-response-error-overrides-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-154
+component: gateway_response_error_overrides
+rationale: This software requirement owns local gateway/res_handler_error_override.go response-handler mechanics and focused gateway tests only. Route generation, request admission, authentication, upstream availability, persistence, analytics, full middleware ordering, and general network transport behavior are outside this proof slice.
+tags:
+    - gateway
+    - errors
+    - response-middleware
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-154
+    reviewed_at: "2026-06-21T03:07:35.135906Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:e5a46e5d1b934e892127358f519281f690281905e936412f7a13968641e31d04
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T03:06:35Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway response error override middleware scope is limited to local gateway/res_handler_error_override.go response-handler behavior: handler identity and initialization, enablement and processing gates, no-op gateway-error handling, lazy response body read/cache/limit/error/restoration/close behavior, response status/header/body/content-length/content-type mutation, body-configuration classification, plain/default-template body generation, disabled or unmatched upstream response preservation, API-before-gateway precedence, status-prefix matching, body-field matching, message-pattern matching, gateway fallback matching, and first-match rule order. This approval does not claim route generation, gateway request admission, authentication, upstream availability, persistence, analytics, full middleware ordering, or general network transport behavior.'
+        fingerprint: sha256:d5f800ee6c5669785ff04a11f7c222b18927a64e668502a58d6f9b07bb987eb1
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T03:06:35Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added local gateway response error override middleware behavior.
+          changed_by: agent:codex

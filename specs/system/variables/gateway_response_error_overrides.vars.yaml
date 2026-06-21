@@ -1,0 +1,9 @@
+component: gateway_response_error_overrides
+no_interface:
+    declared: true
+    reason: The gateway response error override proof slice covers local response-handler middleware behavior for upstream error response override decisions and response-object mutation; route generation, gateway request admission, authentication, upstream availability, persistence, analytics, full middleware ordering, and general network transport behavior are outside this component boundary.
+variables:
+    - name: gateway_response_error_override_operation_terminal
+      type: bool
+      direction: output
+      description: Gateway response error override middleware returns a terminal local result by skipping non-matching responses, preserving or restoring upstream bodies, applying configured status/header/body/template changes, or returning explicit nil/error-free helper outcomes for the exercised upstream response override operation.
