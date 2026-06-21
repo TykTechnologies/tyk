@@ -1,0 +1,28 @@
+id: KI-TRACE-ADDTRACER-IGNORES-CONFIGURED-LOGGER
+title: Trace AddTracer ignores the configured manager logger
+description: trace.SetLogger updates the package logger variable, but trace.AddTracer passes StdLogger{} directly to the configured initializer. A caller that configures a custom trace logger before registering a service tracer does not have that logger forwarded to provider initialization.
+affected_requirements:
+    - SYS-REQ-178
+commands:
+    - go test ./trace -run TestKnownIssue_AddTracerIgnoresConfiguredLogger -count=1
+evidence_manifests:
+    - .proof/evidence/ki-trace-addtracer-ignores-configured-logger.yaml
+severity: medium
+risk: observability_logger_configuration_ignored
+cve_surface: none
+affected_api: trace.SetLogger; trace.AddTracer
+attacker_input: none
+reproducer_command: go test ./trace -run TestKnownIssue_AddTracerIgnoresConfiguredLogger -count=1
+introduced_in: unknown
+minimization_status: minimized
+mitigation: Do not rely on trace.SetLogger to affect AddTracer provider initialization logging; provider initialization currently receives StdLogger.
+remediation: Change AddTracer to pass the configured package logger to initializer, then convert the KnownIssue reproducer into an expected custom-logger forwarding regression test.
+customer_impact: Custom trace logging configured through SetLogger is ignored while adding service tracers, so provider initialization logs use the standard trace logger instead.
+owner: human:buger
+review_date: "2026-07-21"
+release_disposition: ship_with_known_issue
+status: reviewed
+history:
+    - at: "2026-06-21T00:00:00Z"
+      by: agent:codex
+      action: created

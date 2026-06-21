@@ -24,15 +24,18 @@ type NoopTracer struct {
 }
 
 // Close implements io.Closer interface by doing nothing.
+// SW-REQ-165
 func (n NoopTracer) Close() error {
 	return nil
 }
 
+// SW-REQ-165
 func (n NoopTracer) Name() string {
 	return "NoopTracer"
 }
 
 // Init returns a tracer for a given name.
+// SW-REQ-165
 func Init(name string, service string, opts map[string]interface{}, logger Logger) (Tracer, error) {
 	switch name {
 	case jaeger.Name:

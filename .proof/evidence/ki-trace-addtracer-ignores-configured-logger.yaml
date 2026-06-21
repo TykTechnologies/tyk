@@ -1,0 +1,16 @@
+schema_version: proof.evidence_profile.v1
+results:
+    - profile: known_issue_reproducer
+      requirement: SYS-REQ-178
+      command: go test ./trace -run TestKnownIssue_AddTracerIgnoresConfiguredLogger -count=1
+      status: pass
+      observed_result: known_issue_reproduced
+      executed_at: "2026-06-21T08:43:33Z"
+      input_set:
+        - KI-TRACE-ADDTRACER-IGNORES-CONFIGURED-LOGGER reproducer
+      freshness_hashes:
+        .proof/known-issues/KI-TRACE-ADDTRACER-IGNORES-CONFIGURED-LOGGER.yaml: sha256:cbb94da11950e868d1b99db42edb4c5eda43d38ded4ca840bebba3c592878721
+        proof.yaml: sha256:889281c5f8186e4c48fe5321f61736ea8f9b9a76cda365f9a15a1dce594754ca
+        trace/trace_test.go: sha256:b227f106cddcc3b26524bfd13d017d2bc387e899397a5ac33a7c87d15897442d
+      known_issues:
+        - KI-TRACE-ADDTRACER-IGNORES-CONFIGURED-LOGGER

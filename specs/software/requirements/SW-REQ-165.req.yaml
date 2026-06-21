@@ -1,0 +1,53 @@
+id: SW-REQ-165
+version: 1
+status: approved
+priority: shall
+category: observability
+req_type: guarantee
+fretish: ""
+description: The trace manager implementation shall preserve local tracing helper behavior for tested inputs by storing and reading service IDs in request contexts, enabling and disabling the global trace manager, registering configured tracer factories for services, returning no-op tracers when no service tracer is available, wrapping handlers with root-span setup, forwarding span extraction and injection to the selected tracer, forwarding helper log messages to both the supplied logger and active span, and selecting supported local tracing providers by name, without claiming trace export delivery, collector connectivity, runtime sampling correctness, full gateway trace propagation, final client responses, configured logger use during AddTracer, or close-error propagation from registered tracers.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: trace/trace_test.go; docs/trace-manager-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-178
+component: trace_manager
+rationale: This software requirement owns local trace package helpers and focused package tests only. Provider adapter internals and integrated gateway request tracing are outside this proof slice.
+tags:
+    - observability
+    - tracing
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-178
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T08:44:17Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Trace manager scope is limited to local trace package behavior for tested service ID context helpers, global enable/disable state, tracer factory registration and reuse, no-op tracer fallback, handler root-span wrapping, span extraction and injection forwarding, log helper forwarding, standard logger output, and provider selection for tested names and options. This approval does not claim trace export delivery, collector connectivity, runtime sampling correctness, full gateway trace propagation, final client responses, configured logger use during AddTracer, or close-error propagation from registered tracers. KI-TRACE-ADDTRACER-IGNORES-CONFIGURED-LOGGER and KI-TRACE-CLOSE-IGNORES-TRACER-ERROR track current product defects in those excluded behaviors.
+        fingerprint: sha256:dbfd2fd44b5ae2a460261c4c4d729125ba03ae8bbe4fe8c16f5540861d5193d2
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T08:44:17Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added local trace manager behavior.
+          changed_by: agent:codex

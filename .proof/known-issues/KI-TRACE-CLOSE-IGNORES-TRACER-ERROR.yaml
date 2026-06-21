@@ -1,0 +1,28 @@
+id: KI-TRACE-CLOSE-IGNORES-TRACER-ERROR
+title: Trace manager Close ignores registered tracer close errors
+description: trace.Close iterates registered service tracers and calls each tracer's Close method, but it discards returned errors and always returns nil. A provider close failure is therefore hidden from callers.
+affected_requirements:
+    - SYS-REQ-178
+commands:
+    - go test ./trace -run TestKnownIssue_CloseIgnoresTracerCloseErrors -count=1
+evidence_manifests:
+    - .proof/evidence/ki-trace-close-ignores-tracer-error.yaml
+severity: medium
+risk: observability_shutdown_error_hidden
+cve_surface: none
+affected_api: trace.Close
+attacker_input: none
+reproducer_command: go test ./trace -run TestKnownIssue_CloseIgnoresTracerCloseErrors -count=1
+introduced_in: unknown
+minimization_status: minimized
+mitigation: Callers cannot currently observe provider close errors through trace.Close; inspect provider-specific shutdown logs where available.
+remediation: Change trace.Close to collect and return tracer close errors, then convert the KnownIssue reproducer into an expected error propagation regression test.
+customer_impact: Trace provider shutdown failures can be hidden from gateway shutdown or test callers.
+owner: human:buger
+review_date: "2026-07-21"
+release_disposition: ship_with_known_issue
+status: reviewed
+history:
+    - at: "2026-06-21T00:00:00Z"
+      by: agent:codex
+      action: created

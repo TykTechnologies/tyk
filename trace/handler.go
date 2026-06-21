@@ -4,6 +4,7 @@ import "net/http"
 
 // Handle returns a http.Handler with root opentracting setup. This should be
 // the topmost handler.
+// SW-REQ-165
 func Handle(service string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		span, req := Root(service, r)

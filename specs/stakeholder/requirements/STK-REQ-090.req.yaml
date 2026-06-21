@@ -1,0 +1,58 @@
+id: STK-REQ-090
+version: 1
+status: approved
+priority: shall
+category: observability
+req_type: guarantee
+fretish: ""
+description: Gateway trace manager support shall preserve deterministic local tracing helper behavior for tested inputs by storing and reading service IDs in request contexts, enabling and disabling the global trace manager, registering configured tracer factories for services, returning no-op tracers when no service tracer is available, wrapping handlers with root-span setup, forwarding span extraction and injection to the selected tracer, forwarding helper log messages to both the supplied logger and active span, and selecting supported local tracing providers by name, without claiming trace export delivery, collector connectivity, runtime sampling correctness, full gateway trace propagation, final client responses, configured logger use during AddTracer, or close-error propagation from registered tracers.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: trace_manager
+rationale: Gateway request tracing consumes the root trace package. This requirement owns only local helper and manager mechanics covered by focused tests.
+tags:
+    - observability
+    - tracing
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T08:44:17Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Trace manager scope is limited to local trace package behavior for tested service ID context helpers, global enable/disable state, tracer factory registration and reuse, no-op tracer fallback, handler root-span wrapping, span extraction and injection forwarding, log helper forwarding, standard logger output, and provider selection for tested names and options. This approval does not claim trace export delivery, collector connectivity, runtime sampling correctness, full gateway trace propagation, final client responses, configured logger use during AddTracer, or close-error propagation from registered tracers. KI-TRACE-ADDTRACER-IGNORES-CONFIGURED-LOGGER and KI-TRACE-CLOSE-IGNORES-TRACER-ERROR track current product defects in those excluded behaviors.
+        fingerprint: sha256:ce301bd5d2e83e4983ce8247574ceb11aca61ff877632de136c73d65f26f70e4
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T08:44:17Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need local trace manager helpers to behave consistently before integrated gateway request tracing and provider export consume them.
+    acceptance_criteria:
+        - id: STK-REQ-090-AC-01
+          text: Given tested local trace manager helper calls, when services, handlers, spans, loggers, and supported provider names are used, then manager state, no-op fallbacks, local span setup, logger forwarding, span extraction/injection forwarding, and provider selection behave deterministically for the tested inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-178
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added trace manager requirement for focused trace package tests.
+          changed_by: agent:codex

@@ -34,12 +34,14 @@ var initializer = Init
 type serviceID = struct{}
 
 // SetServiceID returns context with service assigned to it.
+// SW-REQ-165
 func SetServiceID(ctx context.Context, service string) context.Context {
 	return context.WithValue(ctx, serviceID{}, service)
 }
 
 // GetServiceID returns service name attched to context returns an empty string
 // if the service name key is not found.
+// SW-REQ-165
 func GetServiceID(ctx context.Context) string {
 	if v := ctx.Value(serviceID{}); v != nil {
 		return v.(string)
@@ -57,17 +59,22 @@ type Logger interface {
 
 type StdLogger struct{}
 
+// SW-REQ-165
 func (StdLogger) Errorf(format string, args ...interface{}) {
 	log.Println("[ERROR] trace: ", fmt.Sprintf(format, args...))
 }
+
+// SW-REQ-165
 func (StdLogger) Infof(format string, args ...interface{}) {
 	log.Println("[INFO] trace: ", fmt.Sprintf(format, args...))
 }
 
+// SW-REQ-165
 func (StdLogger) Info(args ...interface{}) {
 	log.Println("[INFO] trace: ", fmt.Sprint(args...))
 }
 
+// SW-REQ-165
 func (StdLogger) Error(args ...interface{}) {
 	log.Println("[ERROR] trace: ", fmt.Sprint(args...))
 }
@@ -78,6 +85,7 @@ type Config struct {
 }
 
 // Get returns a tracer stored on the global trace manager.
+// SW-REQ-165
 func Get(service string) Tracer {
 	if t, ok := services.Load(service); ok {
 		return t.(Tracer)
@@ -86,6 +94,7 @@ func Get(service string) Tracer {
 }
 
 // Close calls Close on the global tace manager.
+// SW-REQ-165
 func Close() error {
 	var s []string
 	services.Range(func(k, v interface{}) bool {
@@ -101,6 +110,7 @@ func Close() error {
 }
 
 // IsEnabled returns true if the global trace manager is enabled.
+// SW-REQ-165
 func IsEnabled() bool {
 	if v := enabled.Load(); v != nil {
 		return v.(bool)
@@ -109,16 +119,19 @@ func IsEnabled() bool {
 }
 
 // Enable sets the global manager to enabled.
+// SW-REQ-165
 func Enable() {
 	enabled.Store(true)
 }
 
 // Disable disables the global trace manager.
+// SW-REQ-165
 func Disable() {
 	enabled.Store(false)
 }
 
 // AddTracer initialize a tracer for the service.
+// SW-REQ-165
 func AddTracer(tracer, service string) error {
 	if !IsEnabled() {
 		return ErrManagerDisabled
@@ -136,14 +149,17 @@ func AddTracer(tracer, service string) error {
 	return nil
 }
 
+// SW-REQ-165
 func SetLogger(log Logger) {
 	logger = log
 }
 
+// SW-REQ-165
 func SetInit(fn InitFunc) {
 	initializer = fn
 }
 
+// SW-REQ-165
 func SetupTracing(name string, opts map[string]interface{}) {
 	// We are using empty string as key since we only work with one opentracer at a
 	// time hence the default.
@@ -154,6 +170,7 @@ func SetupTracing(name string, opts map[string]interface{}) {
 	enabled.Store(true)
 }
 
+// SW-REQ-165
 func Root(service string, r *http.Request) (opentracing.Span, *http.Request) {
 	tr := Get(service)
 	mainCtx, err := Extract(tr, r.Header)
@@ -185,12 +202,14 @@ func Root(service string, r *http.Request) (opentracing.Span, *http.Request) {
 // Note that the returned context contains the returned span as active span. So
 // any spans created form the returned context will be children of the returned
 // span.
+// SW-REQ-165
 func Span(ctx context.Context, ops string, opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
 	return opentracing.StartSpanFromContextWithTracer(ctx,
 		Get(GetServiceID(ctx)),
 		ops, opts...)
 }
 
+// SW-REQ-165
 func Extract(tr Tracer, h http.Header) (opentracing.SpanContext, error) {
 	return tr.Extract(
 		opentracing.HTTPHeaders,
@@ -198,10 +217,12 @@ func Extract(tr Tracer, h http.Header) (opentracing.SpanContext, error) {
 	)
 }
 
+// SW-REQ-165
 func ExtractFromContext(ctx context.Context, h http.Header) (opentracing.SpanContext, error) {
 	return Extract(Get(GetServiceID(ctx)), h)
 }
 
+// SW-REQ-165
 func Inject(service string, span opentracing.Span, h http.Header) error {
 	tr := Get(service)
 	return tr.Inject(
@@ -211,6 +232,7 @@ func Inject(service string, span opentracing.Span, h http.Header) error {
 	)
 }
 
+// SW-REQ-165
 func InjectFromContext(ctx context.Context, span opentracing.Span, h http.Header) error {
 	return Inject(GetServiceID(ctx), span, h)
 }

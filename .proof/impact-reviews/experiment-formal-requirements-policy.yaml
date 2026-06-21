@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T08:12:44Z"
+generated_at: "2026-06-21T08:44:41Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -943,6 +943,46 @@ reviews:
       approval_fingerprint: sha256:23582517a70bf72b11a30814f57ea4ec396176a3c39cbcb3a291d605c507c501
       artifact_fingerprint: sha256:92802c00f198b5a527ad49f1e35672492d49ea47123f9f0f0db0856d856f4151
       reviewed_at: "2026-06-21T08:12:44Z"
+    - requirement: SW-REQ-165
+      artifact: trace/handler.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed trace manager implementation impact after adding ReqProof annotations and focused tests; production behavior and the approved trace manager requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:69a0fe52df8bb64add1815767ef00667384d037f3c3a9602f93cbcae76ce0b22
+      approval_fingerprint: sha256:dbfd2fd44b5ae2a460261c4c4d729125ba03ae8bbe4fe8c16f5540861d5193d2
+      artifact_fingerprint: sha256:1c14d824a4d9af6932bb408ac2bc91db4ad2d9b3cf7d45baef95f43d9dd7ac55
+      reviewed_at: "2026-06-21T08:44:41Z"
+    - requirement: SW-REQ-165
+      artifact: trace/log.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed trace manager implementation impact after adding ReqProof annotations and focused tests; production behavior and the approved trace manager requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:69a0fe52df8bb64add1815767ef00667384d037f3c3a9602f93cbcae76ce0b22
+      approval_fingerprint: sha256:dbfd2fd44b5ae2a460261c4c4d729125ba03ae8bbe4fe8c16f5540861d5193d2
+      artifact_fingerprint: sha256:89e696b5b0132cf5bee5255d71e74ab25f6181b25f50349934789a30532eb54a
+      reviewed_at: "2026-06-21T08:44:41Z"
+    - requirement: SW-REQ-165
+      artifact: trace/manager.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed trace manager implementation impact after adding ReqProof annotations and focused tests; production behavior and the approved trace manager requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:69a0fe52df8bb64add1815767ef00667384d037f3c3a9602f93cbcae76ce0b22
+      approval_fingerprint: sha256:dbfd2fd44b5ae2a460261c4c4d729125ba03ae8bbe4fe8c16f5540861d5193d2
+      artifact_fingerprint: sha256:a3ed35e562b4f1dbdb5eee5335af6465fae6c8c97f93740babf05b3c2292242f
+      reviewed_at: "2026-06-21T08:44:41Z"
+    - requirement: SW-REQ-165
+      artifact: trace/trace.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed trace manager implementation impact after adding ReqProof annotations and focused tests; production behavior and the approved trace manager requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:69a0fe52df8bb64add1815767ef00667384d037f3c3a9602f93cbcae76ce0b22
+      approval_fingerprint: sha256:dbfd2fd44b5ae2a460261c4c4d729125ba03ae8bbe4fe8c16f5540861d5193d2
+      artifact_fingerprint: sha256:1a3f8f191ca0ad1a7c27da4203436858ad99d2a2e4d4496561833c641d3a3294
+      reviewed_at: "2026-06-21T08:44:41Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change
