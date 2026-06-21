@@ -9,6 +9,7 @@ import (
 // for details about the key value pairs
 //
 // https://github.com/jaegertracing/jaeger-client-go/blob/master/config/config.go#L37
+// SW-REQ-161
 func Load(opts map[string]interface{}) (*config.Configuration, error) {
 	// The object opts is loaded from json. Instead of decoding every single value
 	// by had we marshal to then to yaml.

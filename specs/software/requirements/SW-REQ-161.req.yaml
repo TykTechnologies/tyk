@@ -1,0 +1,54 @@
+id: SW-REQ-161
+version: 1
+status: approved
+priority: shall
+category: observability
+req_type: guarantee
+fretish: ""
+description: The Jaeger trace adapter implementation shall preserve local adapter behavior for tested inputs by decoding JSON-compatible Jaeger option maps, returning the stable adapter name, forwarding logger errors, and constructing a local disabled Jaeger tracer with a service-name override, without claiming trace export delivery, collector connectivity, runtime sampling correctness, span propagation through gateway requests, unsupported option value handling, environment override handling, full gateway tracing setup, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: trace/jaeger/config_test.go; docs/jaeger-trace-adapter-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-174
+component: jaeger_trace_adapter
+rationale: This software requirement owns local trace/jaeger adapter mechanics and focused package tests only. Integrated gateway tracing setup and exporter behavior are outside this proof slice.
+tags:
+    - observability
+    - tracing
+    - jaeger
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-174
+    reviewed_at: "2026-06-21T07:19:27.719715Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:7cedd2a366ae40c12d35bd5bfeb25ce60f716bf4cae2ef9ff222e191ee7cdcfb
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Jaeger trace adapter scope is limited to local trace/jaeger behavior for tested JSON-compatible option map decoding, stable adapter naming, logger error forwarding, and successful local disabled tracer initialization with a service-name override. Focused trace/jaeger tests are validated in a clean worktree because this checkout has unrelated deleted internal/build files. This approval does not claim trace export delivery, collector connectivity, runtime sampling correctness, span propagation through gateway requests, unsupported option value handling, environment override handling, full gateway tracing setup, or final client responses. KI-JAEGER-LOAD-UNSUPPORTED-OPTION-PANIC tracks the current product defect where unsupported option values can panic during local option loading instead of returning an error.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added local Jaeger trace adapter behavior.
+          changed_by: agent:codex

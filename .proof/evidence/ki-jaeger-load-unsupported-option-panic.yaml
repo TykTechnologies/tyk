@@ -1,0 +1,16 @@
+schema_version: proof.evidence_profile.v1
+results:
+    - profile: known_issue_reproducer
+      requirement: SYS-REQ-174
+      command: go test ./trace/jaeger -run TestKnownIssue_LoadPanicsOnUnsupportedOptionValue -count=1
+      status: pass
+      observed_result: known_issue_reproduced
+      executed_at: "2026-06-21T07:17:26Z"
+      input_set:
+        - KI-JAEGER-LOAD-UNSUPPORTED-OPTION-PANIC reproducer
+      freshness_hashes:
+        .proof/known-issues/KI-JAEGER-LOAD-UNSUPPORTED-OPTION-PANIC.yaml: sha256:eae42ed66e9bf3f3b932c3129f58caf0ebb91b95e7e840de44636901dbe87196
+        proof.yaml: sha256:889281c5f8186e4c48fe5321f61736ea8f9b9a76cda365f9a15a1dce594754ca
+        trace/jaeger/config_test.go: sha256:e7a54c61a0873ed38b27768de33c0f3f44f556a05252f1bdce558a52c755a856
+      known_issues:
+        - KI-JAEGER-LOAD-UNSUPPORTED-OPTION-PANIC

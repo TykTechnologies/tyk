@@ -1,0 +1,28 @@
+id: KI-JAEGER-LOAD-UNSUPPORTED-OPTION-PANIC
+title: Jaeger option loading panics on unsupported option values
+description: trace/jaeger.Load marshals the raw option map through yaml.v3. Unsupported Go values such as functions can panic during yaml.Marshal instead of returning an error, and trace/jaeger.Init inherits that behavior because it calls Load before constructing the tracer.
+affected_requirements:
+    - SYS-REQ-174
+commands:
+    - go test ./trace/jaeger -run TestKnownIssue_LoadPanicsOnUnsupportedOptionValue -count=1
+evidence_manifests:
+    - .proof/evidence/ki-jaeger-load-unsupported-option-panic.yaml
+severity: medium
+risk: tracer_configuration_robustness
+cve_surface: none
+affected_api: trace/jaeger.Load; trace/jaeger.Init
+attacker_input: Gateway tracing configuration options supplied by operator configuration or in-process caller
+reproducer_command: go test ./trace/jaeger -run TestKnownIssue_LoadPanicsOnUnsupportedOptionValue -count=1
+introduced_in: unknown
+minimization_status: minimized
+mitigation: Use only JSON/YAML-compatible scalar, map, and list values in Jaeger tracing options until Load recovers from yaml marshal panics or validates option values before marshaling.
+remediation: Change Load to convert unsupported option values into returned errors, and ensure Init returns Load errors before dereferencing the configuration; then convert the KnownIssue reproducer into an expected error regression test.
+customer_impact: Malformed or non-JSON-compatible Jaeger tracing option values can panic local tracing setup instead of returning a configuration error.
+owner: human:buger
+review_date: "2026-07-21"
+release_disposition: ship_with_known_issue
+status: reviewed
+history:
+    - at: "2026-06-21T07:16:06Z"
+      by: agent:codex
+      action: created

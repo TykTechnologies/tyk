@@ -15,6 +15,7 @@ type Trace struct {
 	io.Closer
 }
 
+// SW-REQ-161
 func (Trace) Name() string {
 	return Name
 }
@@ -28,11 +29,13 @@ type wrapLogger struct {
 	Logger
 }
 
+// SW-REQ-161
 func (w wrapLogger) Error(msg string) {
 	w.Errorf("%s", msg)
 }
 
 // Init returns a implementation of tyk.Tracer using jaeger client.
+// SW-REQ-161
 func Init(service string, opts map[string]interface{}, log Logger) (*Trace, error) {
 	cfg, err := Load(opts)
 	if service != "" {
