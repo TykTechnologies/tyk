@@ -531,6 +531,7 @@ func (s *SessionState) KeyHashEmpty() bool {
 // hasNewExpiryBehaviour returns true when the new post-expiry fields are explicitly
 // configured, indicating that the new TTL calculation logic should be used instead
 // of the legacy behavior.
+// SW-REQ-148
 func (s *SessionState) hasNewExpiryBehaviour() bool {
 	return s.PostExpiryAction == PostExpiryActionDelete ||
 		(s.PostExpiryAction == PostExpiryActionRetain && s.PostExpiryGracePeriod != 0)
@@ -538,6 +539,7 @@ func (s *SessionState) hasNewExpiryBehaviour() bool {
 
 // calculatePostExpiryLifetime computes the Redis TTL based on PostExpiryAction
 // and PostExpiryGracePeriod fields.
+// SW-REQ-148
 func (s *SessionState) calculatePostExpiryLifetime() int64 {
 	if s.Expires <= 0 {
 		return 0
@@ -570,6 +572,7 @@ func (s *SessionState) calculatePostExpiryLifetime() int64 {
 // in the key level takes precedence. However, if key `respectKeyExpiration` is `true`, when the key expiration has longer than
 // the session lifetime, the key expiration is returned. It means even if the session lifetime finishes, it waits for the key expiration
 // for physical removal.
+// SW-REQ-148
 func (s *SessionState) Lifetime(respectKeyExpiration bool, fallback int64, forceGlobalSessionLifetime bool, globalSessionLifetime int64) int64 {
 	if forceGlobalSessionLifetime {
 		return globalSessionLifetime
@@ -592,6 +595,7 @@ func (s *SessionState) Lifetime(respectKeyExpiration bool, fallback int64, force
 
 // calculateLifetime calculates the lifetime of a session. It also sets the value to the key expiration in case of the key expiration
 // value is respected and `lifetime` < `expiration`.
+// SW-REQ-148
 func calculateLifetime(respectExpiration bool, expiration, lifetime int64) int64 {
 	if !respectExpiration || lifetime <= 0 {
 		return lifetime
@@ -715,6 +719,7 @@ type EndpointRateLimitInfo struct {
 
 // Map returns EndpointsMap of Endpoints using the key format [method:path].
 // If duplicate entries are found, it would get overwritten with latest entries Endpoints.
+// SW-REQ-148
 func (es Endpoints) Map() EndpointsMap {
 	if len(es) == 0 {
 		return nil
@@ -735,6 +740,7 @@ func (es Endpoints) Map() EndpointsMap {
 type EndpointsMap map[string]RateLimit
 
 // Endpoints coverts EndpointsMap to Endpoints.
+// SW-REQ-148
 func (em EndpointsMap) Endpoints() Endpoints {
 	if len(em) == 0 {
 		return nil

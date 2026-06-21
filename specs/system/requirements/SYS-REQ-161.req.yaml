@@ -1,0 +1,55 @@
+id: SYS-REQ-161
+version: 1
+status: approved
+priority: shall
+category: user_session_lifetime_endpoint_maps
+req_type: guarantee
+fretish: ""
+description: User session lifetime and endpoint map helper handling shall preserve deterministic local helper results for post-expiry lifetime selection, legacy lifetime fallback and key-expiration comparison, global lifetime override, endpoint collection flattening into method:path maps, and endpoint map expansion into sorted endpoint collections while skipping malformed map keys, without claiming Redis durability, policy merge behavior, gateway routing, endpoint rate-limit enforcement, distributed synchronization, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-073
+component: user_session_lifetime_endpoint_maps
+rationale: This system requirement owns local user-package lifetime and endpoint map helper decisions only. Integrated policy application, persistence, routing, runtime rate-limit execution, and transport behavior remain outside this proof slice.
+tags:
+    - user
+    - session
+    - lifetime
+    - endpoints
+    - helper
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-073
+    reviewed_at: "2026-06-21T04:46:58.578828Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:b286a571e61c344878da3a02fd25aa9faa5d8059e03d6cbedd8ed0078f457121
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. User session lifetime and endpoint map scope is limited to local user-package helpers: post-expiry lifetime selection, legacy lifetime fallback and key-expiration comparison, global lifetime override, Endpoints.Map conversion, and EndpointsMap.Endpoints conversion with malformed key skipping. This approval does not claim Redis durability, policy merge behavior, gateway routing, endpoint rate-limit enforcement, distributed synchronization, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added user session lifetime and endpoint map system requirement.
+          changed_by: agent:codex

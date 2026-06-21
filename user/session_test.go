@@ -56,6 +56,9 @@ func TestIsHashType(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-073, SYS-REQ-161, SW-REQ-148
+// SW-REQ-148:nominal:nominal
+// SW-REQ-148:boundary:boundary
 func TestSessionState_Lifetime(t *testing.T) {
 	s := SessionState{}
 
@@ -127,6 +130,9 @@ func TestSessionState_Lifetime(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-073, SYS-REQ-161, SW-REQ-148
+// SW-REQ-148:nominal:nominal
+// SW-REQ-148:boundary:boundary
 func TestSessionState_Lifetime_PostExpiry(t *testing.T) {
 	now := time.Now().Unix()
 
@@ -236,6 +242,9 @@ func TestSessionState_Lifetime_PostExpiry(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-073, SYS-REQ-161, SW-REQ-148
+// SW-REQ-148:nominal:nominal
+// SW-REQ-148:boundary:boundary
 func Test_calculateLifetime(t *testing.T) {
 	unixTime := func(t time.Duration) int64 {
 		return time.Now().Add(t * time.Second).Unix()
@@ -503,6 +512,10 @@ func TestAPILimit_Clone(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-073, SYS-REQ-161, SW-REQ-148
+// SW-REQ-148:nominal:nominal
+// SW-REQ-148:boundary:boundary
+// SW-REQ-148:determinism:nominal
 func TestEndpoints_Map(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -599,6 +612,10 @@ func TestEndpoints_Map(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-073, SYS-REQ-161, SW-REQ-148
+// SW-REQ-148:nominal:nominal
+// SW-REQ-148:boundary:boundary
+// SW-REQ-148:determinism:nominal
 func TestEndpointsMap_Endpoints(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1608,6 +1625,9 @@ func TestSessionState_PostExpiry_JSONSerialization(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-073, SYS-REQ-161, SW-REQ-148
+// SW-REQ-148:nominal:nominal
+// SW-REQ-148:boundary:boundary
 func TestCalculatePostExpiryLifetime(t *testing.T) {
 	now := time.Now().Unix()
 
@@ -1707,6 +1727,9 @@ func TestCalculatePostExpiryLifetime(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-073, SYS-REQ-161, SW-REQ-148
+// SW-REQ-148:nominal:nominal
+// SW-REQ-148:boundary:boundary
 func TestSessionState_Lifetime_PostExpiry_BypassesRespectKeyExpiration(t *testing.T) {
 	now := time.Now().Unix()
 

@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T04:34:26Z"
+generated_at: "2026-06-21T04:46:47Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -827,32 +827,42 @@ reviews:
       artifact: user/session.go
       decision: no-authored-change
       reviewer: human:buger
-      reason: Reviewed shared user/session.go impact after adding SW-REQ-147 trace annotations and focused serialization helper tests. Existing SW-REQ-145 user limit model behavior is unchanged; the current requirement and docs/user-limit-model-requirements-evidence.md remain correct, so no further authored requirement or design text change is needed.
+      reason: Reviewed shared user/session.go impact after adding SW-REQ-148 trace annotations and focused session lifetime/endpoint map tests. Existing SW-REQ-145 user limit model behavior is unchanged; the current requirement and docs/user-limit-model-requirements-evidence.md remain correct, so no further authored requirement or design text change is needed.
       base: origin/master
       requirement_fingerprint: sha256:b7373083bf33ad99f401baff12d3f46829cff2ac7acc95347d1f18e21110dd02
       approval_fingerprint: sha256:e9efebc8c71101ac1e33293bb31b4f6bb77e0d7ec10958ffaee39f41d4ec79ee
-      artifact_fingerprint: sha256:9bdaf5a703687ad8ecbbe1bcd2f5d572b6e847f08b96e9238fc1688170b039de
-      reviewed_at: "2026-06-21T04:34:02Z"
+      artifact_fingerprint: sha256:01dddd617a4becec1931bccff4a48c7e5c9b09b1bbb5eb516a0e382bc4fefee4
+      reviewed_at: "2026-06-21T04:45:08Z"
     - requirement: SW-REQ-146
       artifact: user/session.go
       decision: no-authored-change
       reviewer: human:buger
-      reason: Reviewed shared user/session.go impact after adding SW-REQ-147 trace annotations and focused serialization helper tests. Existing SW-REQ-146 user session state behavior is unchanged; the current requirement and docs/user-session-state-requirements-evidence.md remain correct, so no further authored requirement or design text change is needed.
+      reason: Reviewed shared user/session.go impact after adding SW-REQ-148 trace annotations and focused session lifetime/endpoint map tests. Existing SW-REQ-146 user session state behavior is unchanged; the current requirement and docs/user-session-state-requirements-evidence.md remain correct, so no further authored requirement or design text change is needed.
       base: origin/master
       requirement_fingerprint: sha256:2ed23ebea4602d182be53dce8c869159574df9c467b1401fcc51dc6110d0b4ad
       approval_fingerprint: sha256:766e3bf0918ae268102f2ffeab828671b7c9eab3086bff3c0c7cc7cd51958667
-      artifact_fingerprint: sha256:9bdaf5a703687ad8ecbbe1bcd2f5d572b6e847f08b96e9238fc1688170b039de
-      reviewed_at: "2026-06-21T04:34:26Z"
+      artifact_fingerprint: sha256:01dddd617a4becec1931bccff4a48c7e5c9b09b1bbb5eb516a0e382bc4fefee4
+      reviewed_at: "2026-06-21T04:45:32Z"
     - requirement: SW-REQ-147
       artifact: user/session.go
       decision: no-authored-change
       reviewer: human:buger
-      reason: Reviewed user serialization helper impact after adding trace annotations and focused tests. user/session.go behavior is unchanged; SW-REQ-147 and docs/user-serialization-helpers-requirements-evidence.md describe the local FieldLimits/BasicAuthData/JWTData/Monitor IsZero behavior plus endpoint collection Len/Less/Swap/Contains helper scope, so no further authored requirement or design text change is needed.
+      reason: Reviewed shared user/session.go impact after adding SW-REQ-148 trace annotations and focused session lifetime/endpoint map tests. Existing SW-REQ-147 user serialization helper behavior is unchanged; the current requirement and docs/user-serialization-helpers-requirements-evidence.md remain correct, so no further authored requirement or design text change is needed.
       base: origin/master
       requirement_fingerprint: sha256:8d3bf97ea83531b5a8b4d50f1d1cff091608e7f456c88f33dd1d4989c3668605
       approval_fingerprint: sha256:82619403896d5a71df4dc507c317ddf5fe657cbc7ef8f103a5be14ef26380f48
-      artifact_fingerprint: sha256:9bdaf5a703687ad8ecbbe1bcd2f5d572b6e847f08b96e9238fc1688170b039de
-      reviewed_at: "2026-06-21T04:33:39Z"
+      artifact_fingerprint: sha256:01dddd617a4becec1931bccff4a48c7e5c9b09b1bbb5eb516a0e382bc4fefee4
+      reviewed_at: "2026-06-21T04:46:22Z"
+    - requirement: SW-REQ-148
+      artifact: user/session.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed user session lifetime and endpoint map helper impact after adding trace annotations and focused tests. user/session.go behavior is unchanged; SW-REQ-148 and docs/user-session-lifetime-endpoint-map-requirements-evidence.md describe the local lifetime selection and endpoint map conversion helper scope, so no further authored requirement or design text change is needed.
+      base: origin/master
+      requirement_fingerprint: sha256:c9caa8aa6b84c0304bf1f6bc58b6d96c02fbd40e52dc5122ebf6970beaa68c13
+      approval_fingerprint: sha256:10b471e25dc9dc31f14c5e593ef896bc36411cff07e9a72570bdec8834a0bcfe
+      artifact_fingerprint: sha256:01dddd617a4becec1931bccff4a48c7e5c9b09b1bbb5eb516a0e382bc4fefee4
+      reviewed_at: "2026-06-21T04:46:47Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

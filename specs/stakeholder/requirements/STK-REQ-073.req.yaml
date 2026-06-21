@@ -1,0 +1,61 @@
+id: STK-REQ-073
+version: 1
+status: approved
+priority: shall
+category: user_session_lifetime_endpoint_maps
+req_type: guarantee
+fretish: ""
+description: User session lifetime and endpoint map helpers shall preserve deterministic local helper behavior for tested inputs by selecting legacy, fallback, global, and post-expiry session lifetimes and by converting endpoint rate-limit collections to and from method:path maps, without claiming Redis durability, policy merge behavior, gateway routing, endpoint rate-limit enforcement, distributed synchronization, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: user_session_lifetime_endpoint_maps
+rationale: These helpers provide local user-package data-model decisions consumed by higher-level gateway and policy code. This requirement owns only the local helper behavior under focused tests.
+tags:
+    - user
+    - session
+    - lifetime
+    - endpoints
+    - helper
+variables: []
+traces:
+    reviewed_at: "2026-06-21T04:46:58.486219Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:0d6cb9fcdfd34cdca9d13ca0f3bddb77965891e73a411a9debf0fa87a8528205
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. User session lifetime and endpoint map scope is limited to local user-package helpers: post-expiry lifetime selection, legacy lifetime fallback and key-expiration comparison, global lifetime override, Endpoints.Map conversion, and EndpointsMap.Endpoints conversion with malformed key skipping. This approval does not claim Redis durability, policy merge behavior, gateway routing, endpoint rate-limit enforcement, distributed synchronization, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need local session lifetime and endpoint map helpers to return predictable helper results before higher-level gateway storage, routing, and rate-limit flows consume them.
+    acceptance_criteria:
+        - id: STK-REQ-073-AC-01
+          text: Given tested user session lifetime and endpoint map inputs, when lifetime selection or endpoint map conversion helpers are exercised, then deterministic local helper outcomes are produced for those inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-161
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added user session lifetime and endpoint map helper requirement.
+          changed_by: agent:codex
