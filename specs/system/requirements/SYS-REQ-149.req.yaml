@@ -1,0 +1,66 @@
+id: SYS-REQ-149
+version: 1
+status: approved
+priority: shall
+category: gateway_api_spec_request_versioning
+req_type: guarantee
+fretish: the gateway_api_spec_request_versioning shall always satisfy !gateway_api_spec_request_versioning_operation_requested | gateway_api_spec_request_versioning_operation_terminal
+description: Gateway API spec request/version helper support shall make local helper operations terminal and deterministic for URL status mapping, CORS/whitelist/internal path decisions, request version extraction from headers/query/path, request validity status selection from already-loaded version/path state, API expiration checks, default-version selection, ambiguous default-version detection, listen-path stripping, version-path stripping, and proxy path sanitization, without claiming authentication, policy enforcement, middleware execution, upstream behavior, persistence, network transport behavior, or final client-visible responses.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-061
+component: gateway_api_spec_request_versioning
+rationale: This system requirement owns local gateway API spec request/version helper terminality only. Authentication, policy enforcement, middleware execution, upstream behavior, persistence, network transport behavior, and final request outcomes are outside this proof slice.
+tags:
+    - gateway
+    - request
+    - api-spec
+    - versioning
+variables:
+    - gateway_api_spec_request_versioning_operation_requested
+    - gateway_api_spec_request_versioning_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-061
+    reviewed_at: "2026-06-21T00:52:38.994665Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:6ae2e1569a4a76a0bb8ae0c5739a8a073597e4278a3835c525a52335b6df727d
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API spec request/versioning system scope is limited to local helper terminality when a local helper operation is requested for URL status mapping, CORS/whitelist/internal path decisions, request version extraction from headers/query/path, request validity status selection from already-loaded version/path state, API expiration checks, default-version selection, ambiguous default-version detection, listen-path stripping, version-path stripping, and proxy path sanitization. The FRETish invariant intentionally models requested local operation terminality without asserting authentication, policy enforcement, middleware execution, upstream behavior, persistence, network transport behavior, or final client-visible responses.
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-21T00:00:00Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-149|gateway_api_spec_request_versioning_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21 after requirement approval. SYS-REQ-149''s requested local operation terminality is decomposed by SW-REQ-136 for local gateway/api_definition.go request/version helper behavior: URL status mapping, CORS/whitelist/internal path decisions, request version extraction from headers/query/path, request validity status selection, API expiration checks, default-version selection, ambiguous default-version detection, listen-path stripping, version-path stripping, and proxy path sanitization. This review is limited to local helper mechanics and does not claim authentication, policy enforcement, middleware execution, upstream behavior, persistence, network transport behavior, or final client-visible responses.'
+          reviewed_at: "2026-06-21T00:00:00Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API spec request/versioning system requirement.
+          changed_by: human:buger

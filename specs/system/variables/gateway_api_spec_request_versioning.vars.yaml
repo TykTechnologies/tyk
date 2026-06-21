@@ -1,0 +1,14 @@
+component: gateway_api_spec_request_versioning
+no_interface:
+    declared: true
+    reason: The gateway API spec request/versioning proof slice covers local gateway/api_definition.go helper behavior only; authentication, policy enforcement, middleware execution, upstream behavior, persistence, network transport behavior, and final client-visible responses are outside this component boundary.
+variables:
+    - name: gateway_api_spec_request_versioning_operation_requested
+      type: bool
+      direction: input
+      description: A caller requests a local gateway API spec request/version helper operation such as URL status mapping, CORS/whitelist/internal path decision, request version extraction, request validity status selection, expiration check, default-version selection, ambiguous default-version detection, listen-path stripping, version-path stripping, or proxy path sanitization.
+
+    - name: gateway_api_spec_request_versioning_operation_terminal
+      type: bool
+      direction: output
+      description: 'A local gateway API spec request/version helper operation reaches a terminal observable result: a request status is returned, a version name or version info is selected, a valid/invalid request status is returned, an expiration result is returned, a default-version result is returned, an ambiguous-default result is returned, a stripped or unchanged path is returned, or a request path is sanitized or left unchanged.'

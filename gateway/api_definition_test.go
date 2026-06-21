@@ -2043,6 +2043,249 @@ func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-061, SYS-REQ-149, SW-REQ-136
+// STK-REQ-061:STK-REQ-061-AC-01:acceptance
+// SYS-REQ-149:nominal:nominal
+// SYS-REQ-149:boundary:nominal
+// SYS-REQ-149:error_handling:nominal
+// SYS-REQ-149:error_handling:negative
+// SYS-REQ-149:determinism:nominal
+// MCDC SYS-REQ-149: gateway_api_spec_request_versioning_operation_requested=F, gateway_api_spec_request_versioning_operation_terminal=F => TRUE
+// MCDC SYS-REQ-149: gateway_api_spec_request_versioning_operation_requested=T, gateway_api_spec_request_versioning_operation_terminal=T => TRUE
+//
+// SW-REQ-136:nominal:nominal
+// SW-REQ-136:boundary:nominal
+// SW-REQ-136:error_handling:nominal
+// SW-REQ-136:error_handling:negative
+// SW-REQ-136:determinism:nominal
+//
+//mcdc:ignore SYS-REQ-149: gateway_api_spec_request_versioning_operation_requested=T, gateway_api_spec_request_versioning_operation_terminal=F => FALSE -- violation row is the negation of the local API spec request/versioning helper guarantee; these tests assert requested helpers return request statuses, version selections, validity statuses, expiration results, default-version results, ambiguous-default results, stripped paths, sanitized paths, or explicit deny/skip outcomes [category: defensive] [reviewed: human:buger]
+func TestAPISpecRequestVersionPathHelpers(t *testing.T) {
+	mustCompile := func(pattern string) *regexp.Regexp {
+		rx, err := regexp.Compile(pattern)
+		require.NoError(t, err)
+		return rx
+	}
+
+	statusSpec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	statusCases := []struct {
+		name string
+		in   URLStatus
+		want RequestStatus
+	}{
+		{name: "ignored", in: Ignored, want: StatusOkAndIgnore},
+		{name: "blacklist", in: BlackList, want: EndPointNotAllowed},
+		{name: "whitelist", in: WhiteList, want: StatusOk},
+		{name: "cached", in: Cached, want: StatusCached},
+		{name: "internal", in: Internal, want: StatusInternal},
+		{name: "OAS validate request", in: OASValidateRequest, want: StatusOASValidateRequest},
+		{name: "OAS mock response", in: OASMockResponse, want: StatusOASMockResponse},
+		{name: "unknown status blocks", in: URLStatus(-1), want: EndPointNotAllowed},
+	}
+
+	for _, tc := range statusCases {
+		t.Run("status/"+tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, statusSpec.getURLStatus(tc.in))
+		})
+	}
+
+	pathSpec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			CORS: apidef.CORSConfig{
+				Enable:             true,
+				OptionsPassthrough: false,
+			},
+		},
+	}
+	allowedPath := URLSpec{
+		spec:   mustCompile("^/allowed$"),
+		Status: WhiteList,
+		Whitelist: apidef.EndPointMeta{
+			Path:   "/allowed",
+			Method: http.MethodGet,
+		},
+	}
+
+	t.Run("path whitelist and CORS decisions", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/allowed", nil)
+		status, meta := pathSpec.URLAllowedAndIgnored(req, []URLSpec{allowedPath}, true)
+		assert.Equal(t, StatusOk, status)
+		assert.Nil(t, meta)
+
+		req = httptest.NewRequest(http.MethodPost, "/allowed", nil)
+		status, _ = pathSpec.URLAllowedAndIgnored(req, []URLSpec{allowedPath}, true)
+		assert.Equal(t, EndPointNotAllowed, status)
+
+		req = httptest.NewRequest(http.MethodGet, "/unmatched", nil)
+		status, _ = pathSpec.URLAllowedAndIgnored(req, []URLSpec{allowedPath}, false)
+		assert.Equal(t, StatusOk, status)
+
+		req = httptest.NewRequest(http.MethodOptions, "/blocked", nil)
+		req.Header.Set("Access-Control-Request-Method", http.MethodGet)
+		status, _ = pathSpec.URLAllowedAndIgnored(req, []URLSpec{allowedPath}, true)
+		assert.Equal(t, StatusOkAndIgnore, status)
+	})
+
+	t.Run("MCP primitive direct internal access is hidden", func(t *testing.T) {
+		mcpSpec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				ApplicationProtocol: apidef.AppProtocolMCP,
+			},
+		}
+		req := httptest.NewRequest(http.MethodPost, "/mcp-tool:get_users", nil)
+		status, meta := mcpSpec.URLAllowedAndIgnored(req, []URLSpec{
+			{
+				spec:   mustCompile("^/mcp-tool:get_users$"),
+				Status: Internal,
+				Internal: apidef.InternalMeta{
+					Path:   "/mcp-tool:get_users",
+					Method: http.MethodPost,
+				},
+			},
+		}, false)
+
+		assert.Equal(t, MCPPrimitiveNotFound, status)
+		assert.Nil(t, meta)
+	})
+
+	t.Run("version extraction from header query and path", func(t *testing.T) {
+		headerSpec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				VersionDefinition: apidef.VersionDefinition{
+					Location:            apidef.HeaderLocation,
+					Key:                 apidef.DefaultAPIVersionKey,
+					StripVersioningData: true,
+					Enabled:             true,
+				},
+			},
+		}
+		req := httptest.NewRequest(http.MethodGet, "/resource", nil)
+		req.Header.Set(apidef.DefaultAPIVersionKey, "v1")
+		assert.Equal(t, "v1", headerSpec.getVersionFromRequest(req))
+		assert.Empty(t, req.Header.Get(apidef.DefaultAPIVersionKey))
+
+		querySpec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				VersionDefinition: apidef.VersionDefinition{
+					Location:            apidef.URLParamLocation,
+					Key:                 "version",
+					StripVersioningData: true,
+				},
+			},
+		}
+		req = httptest.NewRequest(http.MethodGet, "/resource?version=v2&keep=1", nil)
+		assert.Equal(t, "v2", querySpec.getVersionFromRequest(req))
+		assert.Equal(t, "keep=1", req.URL.RawQuery)
+
+		pathSpec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				Proxy: apidef.ProxyConfig{ListenPath: "/api/"},
+				VersionDefinition: apidef.VersionDefinition{
+					Location:             apidef.URLLocation,
+					StripVersioningData:  true,
+					UrlVersioningPattern: "^v[0-9]+$",
+				},
+			},
+		}
+		req = httptest.NewRequest(http.MethodGet, "/api/v3/resource", nil)
+		assert.Equal(t, "v3", pathSpec.getVersionFromRequest(req))
+		assert.Equal(t, "/api/resource", req.URL.Path)
+	})
+
+	t.Run("request validity uses loaded version path state", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				VersionData: apidef.VersionData{
+					NotVersioned: true,
+					Versions: map[string]apidef.VersionInfo{
+						"v1": {Name: "v1"},
+					},
+				},
+			},
+			RxPaths: map[string][]URLSpec{
+				"v1": {allowedPath},
+			},
+			WhiteListEnabled: map[string]bool{
+				"v1": true,
+			},
+		}
+
+		ok, status := spec.RequestValid(httptest.NewRequest(http.MethodGet, "/allowed", nil))
+		assert.True(t, ok)
+		assert.Equal(t, StatusOk, status)
+
+		ok, status = spec.RequestValid(httptest.NewRequest(http.MethodPost, "/allowed", nil))
+		assert.False(t, ok)
+		assert.Equal(t, EndPointNotAllowed, status)
+
+		spec.RxPaths = map[string][]URLSpec{}
+		ok, status = spec.RequestValid(httptest.NewRequest(http.MethodGet, "/allowed", nil))
+		assert.False(t, ok)
+		assert.Equal(t, VersionDoesNotExist, status)
+	})
+
+	t.Run("expiration and version defaults", func(t *testing.T) {
+		expirySpec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		assert.False(t, expirySpec.Expired())
+
+		expirySpec.Expiration = "configured"
+		assert.True(t, expirySpec.Expired())
+
+		expirySpec.ExpirationTs = time.Now().Add(time.Hour)
+		assert.False(t, expirySpec.Expired())
+
+		expirySpec.ExpirationTs = time.Now().Add(-time.Hour)
+		assert.True(t, expirySpec.Expired())
+
+		versionSpec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				VersionData: apidef.VersionData{
+					NotVersioned: true,
+					Versions: map[string]apidef.VersionInfo{
+						"default": {Name: "default"},
+						"v1":      {Name: "v1"},
+					},
+				},
+			},
+		}
+		version, ok := versionSpec.GetSingleOrDefaultVersion()
+		require.True(t, ok)
+		assert.Equal(t, "default", version.Name)
+		assert.False(t, versionSpec.CheckForAmbiguousDefaultVersions())
+
+		versionSpec.VersionData.Versions["Default"] = apidef.VersionInfo{Name: "Default"}
+		assert.True(t, versionSpec.CheckForAmbiguousDefaultVersions())
+
+		versionInfo, status := versionSpec.Version(httptest.NewRequest(http.MethodGet, "/", nil))
+		assert.Nil(t, versionInfo)
+		assert.Equal(t, VersionAmbiguousDefault, status)
+	})
+
+	t.Run("path stripping and sanitization", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				Proxy: apidef.ProxyConfig{
+					ListenPath:      "/listen/",
+					StripListenPath: true,
+				},
+				VersionDefinition: apidef.VersionDefinition{
+					StripPath:            true,
+					UrlVersioningPattern: "^v[0-9]+$",
+				},
+			},
+		}
+
+		assert.Equal(t, "/v1/resource", spec.StripListenPath("/listen/v1/resource"))
+		assert.Equal(t, "/resource", spec.StripVersionPath("/v1/resource"))
+
+		req := httptest.NewRequest(http.MethodGet, "/listen/v1/resource", nil)
+		req.URL.RawPath = "/listen/v1/resource"
+		spec.SanitizeProxyPaths(req)
+		assert.Equal(t, "/v1/resource", req.URL.Path)
+		assert.Equal(t, "/v1/resource", req.URL.RawPath)
+	})
+}
+
 func TestEnforcedTimeout(t *testing.T) {
 	test.Flaky(t) // TODO TT-5222
 

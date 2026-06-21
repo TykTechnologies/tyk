@@ -1,0 +1,62 @@
+id: STK-REQ-061
+version: 1
+status: approved
+priority: shall
+category: gateway_api_spec_request_versioning
+req_type: guarantee
+fretish: ""
+description: Gateway API spec request/version helper support shall locally derive deterministic request status, version selection, expiration, listen-path stripping, version-path stripping, sanitized proxy path, and whitelist decision outcomes from loaded API spec state and request metadata, without claiming authentication, policy enforcement, middleware execution, upstream behavior, persistence, network transport behavior, or final client-visible responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_api_spec_request_versioning
+rationale: Gateway operators depend on deterministic local API spec request/version helper decisions before middleware and proxy code consume them. This requirement owns only local gateway/api_definition.go helper behavior and focused gateway tests.
+tags:
+    - gateway
+    - request
+    - api-spec
+    - versioning
+variables: []
+traces:
+    reviewed_at: "2026-06-21T00:52:38.891603Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:0f7d5f69477679bf7d7d97c7f4ab96294e91a1b87d8986c1e3d9eb4e665f76b6
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API spec request/versioning scope is limited to local gateway/api_definition.go helper behavior: URL status mapping, CORS/whitelist/internal path decisions, request version extraction from headers/query/path, request validity status selection from already-loaded version/path state, API expiration checks, default-version selection, ambiguous default-version detection, listen-path stripping, version-path stripping, and proxy path sanitization. This approval does not claim authentication, policy enforcement, middleware execution, upstream behavior, persistence, network transport behavior, or final client-visible responses.
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need loaded API specs to produce deterministic local request version and path decisions before gateway middleware and proxy behavior depend on them.
+    acceptance_criteria:
+        - id: STK-REQ-061-AC-01
+          text: Given loaded API spec state and local request metadata, when request/version helper operations are exercised, then deterministic status mappings, version names, validity statuses, expiration results, stripped paths, sanitized paths, or explicit deny/skip outcomes are produced for the tested inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-149
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API spec request/version helper requirement.
+          changed_by: human:buger

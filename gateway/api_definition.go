@@ -2005,6 +2005,7 @@ func (a *APISpec) StopSessionManagerPool() {
 	a.OrgSessionManager.Stop()
 }
 
+// SW-REQ-136
 func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 	switch stat {
 	case Ignored:
@@ -2063,6 +2064,7 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 	}
 }
 
+// SW-REQ-136
 // URLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
 	// Skip Whitelist and Blocklist for CORS preflight requests when CORS is enabled and passthrough is disabled.
@@ -2205,6 +2207,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 	return StatusOk, nil
 }
 
+// SW-REQ-136
 func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 	if vName := ctxGetVersionName(r); vName != nil {
 		return *vName
@@ -2271,6 +2274,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 	return ""
 }
 
+// SW-REQ-136
 // RequestValid will check if an incoming request has valid version
 // data and return a RequestStatus that describes the status of the
 // request
@@ -2318,6 +2322,7 @@ func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus) {
 	}
 }
 
+// SW-REQ-136
 func (a *APISpec) Expired() bool {
 	// Never expires
 	if a.Expiration == "" || a.Expiration == "-1" {
@@ -2333,6 +2338,7 @@ func (a *APISpec) Expired() bool {
 	return time.Since(a.ExpirationTs) >= 0
 }
 
+// SW-REQ-136
 // Version attempts to extract the version data from a request, depending on where it is stored in the
 // request (currently only "header" is supported)
 func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) {
@@ -2386,6 +2392,7 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 	return &version, StatusOk
 }
 
+// SW-REQ-136
 // GetSingleOrDefaultVersion determines and returns a single version or the default version if only one or a default exists.
 // Returns versionInfo and a boolean indicating success or failure.
 func (a *APISpec) GetSingleOrDefaultVersion() (versionInfo apidef.VersionInfo, ok bool) {
@@ -2420,6 +2427,7 @@ func (a *APISpec) GetSingleOrDefaultVersion() (versionInfo apidef.VersionInfo, o
 	return apidef.VersionInfo{}, false
 }
 
+// SW-REQ-136
 // CheckForAmbiguousDefaultVersions checks if there are multiple ambiguous default versions in the version data.
 func (a *APISpec) CheckForAmbiguousDefaultVersions() bool {
 	foundDefaultVersions := 0
@@ -2437,11 +2445,13 @@ func (a *APISpec) CheckForAmbiguousDefaultVersions() bool {
 	return foundDefaultVersions > 1
 }
 
+// SW-REQ-136
 // StripListenPath will strip the listen path from the URL, keeping version in tact.
 func (a *APISpec) StripListenPath(reqPath string) string {
 	return httputil.StripListenPath(a.Proxy.ListenPath, reqPath)
 }
 
+// SW-REQ-136
 // StripVersionPath will strip the version from the URL. The input URL
 // should already have listen path stripped.
 func (a *APISpec) StripVersionPath(reqPath string) string {
@@ -2465,6 +2475,7 @@ func (a *APISpec) StripVersionPath(reqPath string) string {
 	return reqPath
 }
 
+// SW-REQ-136
 func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	if !a.Proxy.StripListenPath {
 		return
