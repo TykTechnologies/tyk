@@ -1,0 +1,53 @@
+id: SYS-REQ-164
+version: 1
+status: approved
+priority: shall
+category: gateway_api_loader_validation
+req_type: guarantee
+fretish: ""
+description: Gateway API loader validation shall preserve deterministic local skip decisions for tested API specs with empty or space-containing HTTP listen paths, malformed target URLs, valid target URLs, non-HTTP protocols, and config-secret target URL substitution before parsing, without claiming full API admission, route generation, middleware execution, upstream connectivity, distributed synchronization, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-076
+component: gateway_api_loader_validation
+rationale: This system requirement owns local API spec screening behavior only. Integrated loader admission, routing, middleware execution, and request handling remain outside this proof slice.
+tags:
+    - gateway
+    - api-loader
+    - validation
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-076
+    reviewed_at: "2026-06-21T05:12:15.01722Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:a52353c6d285a576a20caf78279a6f56f483fffc4f2e6d3606a88c026048fec8
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API loader validation scope is limited to local gateway/api_loader.go skipSpecBecauseInvalid behavior for tested listen-path validation, target URL parsing, and config-secret target URL substitution. This approval does not claim full API admission, route generation, middleware execution, upstream connectivity, distributed synchronization, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API loader validation system requirement.
+          changed_by: agent:codex

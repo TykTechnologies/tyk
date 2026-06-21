@@ -71,6 +71,7 @@ func (gw *Gateway) prepareStorage() generalStores {
 	return gs
 }
 
+// SW-REQ-151
 func (gw *Gateway) skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
 	switch spec.Protocol {
 	case "", "http", "https":
