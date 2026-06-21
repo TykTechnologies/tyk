@@ -1,0 +1,53 @@
+id: SYS-REQ-179
+version: 1
+status: approved
+priority: shall
+category: gateway_runtime
+req_type: guarantee
+fretish: ""
+description: TCP proxy handling shall preserve deterministic local proxy results for tested inputs by managing domain-to-target handler configuration, selecting single-target, TLS SNI, and fallback targets, applying tested request and response modifiers, flushing local connection statistics, tracking graceful shutdown context and active connection completion, formatting connection endpoints, classifying closed-socket errors, and terminating local pipe loops on shutdown, modifier errors, read errors, write errors, or empty modified payloads without claiming production listener lifecycle integration, arbitrary TLS certificate validation, upstream availability, load-balancing, analytics delivery, end-to-end gateway API admission, or final client-visible behavior beyond the focused TCP proxy tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-091
+component: tcp_proxy
+rationale: This system requirement owns local tcp package behavior only. Integrated gateway API loading and production network behavior remain outside this proof slice.
+tags:
+    - gateway-runtime
+    - tcp
+    - proxy
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-091
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T08:58:35Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. TCP proxy scope is limited to local tcp package behavior for tested domain handler management, single-target and TLS SNI target selection, fallback target selection, request and response modifier application, stat flushing and stats callbacks, shutdown context and active connection tracking, connection endpoint formatting, closed-socket classification, and pipe termination paths. This approval does not claim production listener lifecycle integration, arbitrary TLS certificate validation, upstream availability, load-balancing, analytics delivery, end-to-end gateway API admission, or final client-visible behavior beyond the focused TCP proxy tests.
+        fingerprint: sha256:850945285cf38f6b95a5061868599b21fe0ae038cf3effa130ce2d097a0b6eff
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T08:58:35Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added TCP proxy system requirement.
+          changed_by: agent:codex

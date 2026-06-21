@@ -45,6 +45,7 @@ type Stat struct {
 	BytesOut int64
 }
 
+// SW-REQ-166
 func (s *Stat) Flush() Stat {
 	v := Stat{
 		BytesIn:  atomic.LoadInt64(&s.BytesIn),
@@ -77,6 +78,7 @@ type Proxy struct {
 	shutdown    context.CancelFunc
 }
 
+// SW-REQ-166
 func (p *Proxy) AddDomainHandler(domain, target string, modifier *Modifier) {
 	p.Lock()
 	defer p.Unlock()
@@ -95,6 +97,7 @@ func (p *Proxy) AddDomainHandler(domain, target string, modifier *Modifier) {
 	}
 }
 
+// SW-REQ-166
 func (p *Proxy) Swap(new *Proxy) {
 	p.Lock()
 	defer p.Unlock()
@@ -103,6 +106,7 @@ func (p *Proxy) Swap(new *Proxy) {
 	p.TLSConfigTarget = new.TLSConfigTarget
 }
 
+// SW-REQ-166
 func (p *Proxy) RemoveDomainHandler(domain string) {
 	p.Lock()
 	defer p.Unlock()
@@ -111,6 +115,7 @@ func (p *Proxy) RemoveDomainHandler(domain string) {
 }
 
 // Shutdown initiates graceful shutdown and waits for all connections to finish
+// SW-REQ-166
 func (p *Proxy) Shutdown(ctx context.Context) error {
 	// Wait for all connections to finish or timeout
 	done := make(chan struct{})
@@ -136,6 +141,7 @@ func (p *Proxy) Shutdown(ctx context.Context) error {
 }
 
 // SetShutdownContext sets the shutdown context from the caller
+// SW-REQ-166
 func (p *Proxy) SetShutdownContext(ctx context.Context) {
 	p.Lock()
 	defer p.Unlock()
@@ -143,6 +149,7 @@ func (p *Proxy) SetShutdownContext(ctx context.Context) {
 }
 
 // initShutdownContext initializes the shutdown context if not already done
+// SW-REQ-166
 func (p *Proxy) initShutdownContext() {
 	p.Lock()
 	defer p.Unlock()
@@ -151,6 +158,7 @@ func (p *Proxy) initShutdownContext() {
 	}
 }
 
+// SW-REQ-166
 func (p *Proxy) Serve(l net.Listener) error {
 	p.initShutdownContext()
 
@@ -172,6 +180,7 @@ func (p *Proxy) Serve(l net.Listener) error {
 	}
 }
 
+// SW-REQ-166
 func (p *Proxy) getTargetConfig(conn net.Conn) (*targetConfig, error) {
 	p.RLock()
 	defer p.RUnlock()
@@ -223,6 +232,7 @@ func (p *Proxy) getTargetConfig(conn net.Conn) (*targetConfig, error) {
 	return nil, errors.New("Can't detect service configuration")
 }
 
+// SW-REQ-166
 func (p *Proxy) handleConn(conn net.Conn) error {
 	var connectionClosed atomic.Value
 	connectionClosed.Store(false)
@@ -359,20 +369,24 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 	return nil
 }
 
+// SW-REQ-166
 func upstreamConn(c net.Conn) string {
 	return formatAddress(c.LocalAddr(), c.RemoteAddr())
 }
 
+// SW-REQ-166
 func clientConn(c net.Conn) string {
 	return formatAddress(c.RemoteAddr(), c.LocalAddr())
 }
 
+// SW-REQ-166
 func formatAddress(a, b net.Addr) string {
 	return a.String() + "->" + b.String()
 }
 
 // IsSocketClosed returns true if err is a result of reading from closed network
 // connection
+// SW-REQ-166
 func IsSocketClosed(err error) bool {
 	return strings.Contains(err.Error(), "use of closed network connection")
 }
@@ -384,6 +398,7 @@ type pipeOpts struct {
 	beforeExit   func()
 }
 
+// SW-REQ-166
 func (p *Proxy) pipe(src, dst net.Conn, opts pipeOpts) {
 	defer func() {
 		src.Close()

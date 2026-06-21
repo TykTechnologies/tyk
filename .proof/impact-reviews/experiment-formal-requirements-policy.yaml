@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T08:44:41Z"
+generated_at: "2026-06-21T08:58:59Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -983,6 +983,16 @@ reviews:
       approval_fingerprint: sha256:dbfd2fd44b5ae2a460261c4c4d729125ba03ae8bbe4fe8c16f5540861d5193d2
       artifact_fingerprint: sha256:1a3f8f191ca0ad1a7c27da4203436858ad99d2a2e4d4496561833c641d3a3294
       reviewed_at: "2026-06-21T08:44:41Z"
+    - requirement: SW-REQ-166
+      artifact: tcp/tcp.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed TCP proxy implementation impact after adding ReqProof annotations and focused tests; production behavior and the approved TCP proxy requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:91fdd8ec0798cca85bec785aa7007beed48e4b81358501ec1bcf6eed3580ea6c
+      approval_fingerprint: sha256:0ed1a2f65d97b3f13d44f7663a9a80faad737e71d582e405b8195b74b4be3855
+      artifact_fingerprint: sha256:77de0454bd246ae365172a3bc05d7f7f9609a9ca3db7c6598d2e49c246f240fc
+      reviewed_at: "2026-06-21T08:58:59Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

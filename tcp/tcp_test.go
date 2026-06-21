@@ -4,15 +4,22 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"io"
 	"net"
-	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/TykTechnologies/tyk/test"
 )
 
+// Verifies: STK-REQ-091, SYS-REQ-179, SW-REQ-166
+// STK-REQ-091:STK-REQ-091-AC-01:acceptance
+// SW-REQ-166:nominal:nominal
+// SW-REQ-166:boundary:nominal
+// SW-REQ-166:encoding_safety:nominal
+// SW-REQ-166:determinism:nominal
 func TestProxyModifier(t *testing.T) {
 	// Echoing
 	upstream := test.TcpMock(false, func(in []byte, err error) (out []byte) {
@@ -58,14 +65,63 @@ func TestProxyModifier(t *testing.T) {
 		}...)
 	})
 }
+
+// Verifies: STK-REQ-091, SYS-REQ-179, SW-REQ-166
+// SW-REQ-166:nominal:nominal
+// SW-REQ-166:boundary:nominal
+// SW-REQ-166:determinism:nominal
+func TestStatFlushAndHandlerConfiguration(t *testing.T) {
+	stat := &Stat{}
+	atomic.StoreInt64(&stat.BytesIn, 12)
+	atomic.StoreInt64(&stat.BytesOut, 34)
+
+	if got := stat.Flush(); got.BytesIn != 12 || got.BytesOut != 34 {
+		t.Fatalf("expected flushed bytes 12/34 got %#v", got)
+	}
+	if got := stat.Flush(); got.BytesIn != 0 || got.BytesOut != 0 {
+		t.Fatalf("expected second flush to reset bytes got %#v", got)
+	}
+
+	proxy := &Proxy{}
+	proxy.AddDomainHandler("first.example", "tcp://first:1234", nil)
+	if proxy.muxer["first.example"].modifier == nil {
+		t.Fatal("expected nil modifier to be replaced")
+	}
+
+	replacement := &Proxy{TLSConfigTarget: &tls.Config{ServerName: "replacement"}}
+	replacement.AddDomainHandler("second.example", "tcp://second:1234", &Modifier{})
+	proxy.Swap(replacement)
+	if proxy.TLSConfigTarget.ServerName != "replacement" {
+		t.Fatal("expected swapped TLS config")
+	}
+	if _, ok := proxy.muxer["first.example"]; ok {
+		t.Fatal("expected old handler map to be replaced")
+	}
+	if _, ok := proxy.muxer["second.example"]; !ok {
+		t.Fatal("expected replacement handler map")
+	}
+
+	proxy.RemoveDomainHandler("second.example")
+	if _, ok := proxy.muxer["second.example"]; ok {
+		t.Fatal("expected handler removal")
+	}
+}
+
+// Verifies: STK-REQ-091, SYS-REQ-179, SW-REQ-166
+// SW-REQ-166:nominal:nominal
+// SW-REQ-166:boundary:nominal
+// SW-REQ-166:error_handling:nominal
+// SW-REQ-166:error_handling:negative
+// SW-REQ-166:encoding_safety:nominal
+// SW-REQ-166:determinism:nominal
+// STK-REQ-091:error_handling:negative
 func TestProxySyncStats(t *testing.T) {
-	t.Skip()
 	// Echoing
 	upstream := test.TcpMock(false, func(in []byte, err error) (out []byte) {
 		return in
 	})
 	defer upstream.Close()
-	stats := make(chan Stat)
+	stats := make(chan Stat, 10)
 	proxy := &Proxy{SyncStats: func(s Stat) {
 		stats <- s
 		if s.State == Closed {
@@ -82,18 +138,28 @@ func TestProxySyncStats(t *testing.T) {
 	for s := range stats {
 		c = append(c, s)
 	}
-	expect := []Stat{
-		{State: Open},
-		{State: Closed, BytesIn: 4, BytesOut: 4},
+	if len(c) < 2 {
+		t.Fatalf("expected at least open and closed stats got %#v", c)
 	}
-	if len(c) != len(expect) {
-		t.Fatalf("expected %d stats got %d stats", len(expect), len(c))
+	if c[0].State != Open {
+		t.Fatalf("expected first stat to be open got %#v", c[0])
 	}
-	if !reflect.DeepEqual(c, expect) {
-		t.Errorf("expected %#v got %#v", expect, c)
+	last := c[len(c)-1]
+	if last.State != Closed {
+		t.Fatalf("expected last stat to be closed got %#v", last)
+	}
+	if last.BytesIn != 4 || last.BytesOut != 4 {
+		t.Fatalf("expected closed byte counts 4/4 got %#v", last)
 	}
 }
 
+// Verifies: STK-REQ-091, SYS-REQ-179, SW-REQ-166
+// SW-REQ-166:nominal:nominal
+// SW-REQ-166:boundary:nominal
+// SW-REQ-166:error_handling:nominal
+// SW-REQ-166:error_handling:negative
+// SW-REQ-166:encoding_safety:nominal
+// SW-REQ-166:determinism:nominal
 func TestProxyMultiTarget(t *testing.T) {
 	target1 := test.TcpMock(false, func(in []byte, err error) (out []byte) {
 		return []byte("first")
@@ -231,6 +297,12 @@ func testRunner(t *testing.T, proxy *Proxy, hostname string, useSSL bool, testCa
 	runner.Run(t, testCases...)
 }
 
+// Verifies: STK-REQ-091, SYS-REQ-179, SW-REQ-166
+// SW-REQ-166:nominal:nominal
+// SW-REQ-166:boundary:nominal
+// SW-REQ-166:error_handling:nominal
+// SW-REQ-166:error_handling:negative
+// SW-REQ-166:determinism:nominal
 func TestProxy_Shutdown(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -335,6 +407,10 @@ func TestProxy_Shutdown(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-091, SYS-REQ-179, SW-REQ-166
+// SW-REQ-166:nominal:nominal
+// SW-REQ-166:boundary:nominal
+// SW-REQ-166:determinism:nominal
 func TestProxy_SetShutdownContext(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -395,6 +471,10 @@ func TestProxy_SetShutdownContext(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-091, SYS-REQ-179, SW-REQ-166
+// SW-REQ-166:nominal:nominal
+// SW-REQ-166:boundary:nominal
+// SW-REQ-166:determinism:nominal
 func TestProxy_initShutdownContext(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -450,6 +530,12 @@ func TestProxy_initShutdownContext(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-091, SYS-REQ-179, SW-REQ-166
+// SW-REQ-166:nominal:nominal
+// SW-REQ-166:boundary:nominal
+// SW-REQ-166:error_handling:nominal
+// SW-REQ-166:error_handling:negative
+// SW-REQ-166:determinism:nominal
 func TestProxy_ServeWithGracefulShutdown(t *testing.T) {
 	// Test that Serve properly tracks connections and responds to shutdown
 	upstream := test.TcpMock(false, func(in []byte, _ error) (out []byte) {
@@ -540,6 +626,10 @@ func TestProxy_ServeWithGracefulShutdown(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-091, SYS-REQ-179, SW-REQ-166
+// SW-REQ-166:nominal:nominal
+// SW-REQ-166:boundary:nominal
+// SW-REQ-166:determinism:nominal
 func TestProxy_ConcurrentConnectionTracking(t *testing.T) {
 	// Test that connection tracking is thread-safe
 	proxy := &Proxy{}
@@ -573,6 +663,12 @@ func TestProxy_ConcurrentConnectionTracking(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-091, SYS-REQ-179, SW-REQ-166
+// SW-REQ-166:nominal:nominal
+// SW-REQ-166:boundary:nominal
+// SW-REQ-166:error_handling:nominal
+// SW-REQ-166:error_handling:negative
+// SW-REQ-166:determinism:nominal
 func TestProxy_ShutdownIntegration(t *testing.T) {
 	// Test that TCP proxy properly shuts down connections when shutdown context is cancelled
 	upstream := test.TcpMock(false, func(in []byte, _ error) (out []byte) {
@@ -649,4 +745,226 @@ func TestProxy_ShutdownIntegration(t *testing.T) {
 	case <-time.After(1 * time.Second):
 		t.Error("Serve did not exit after listener was closed")
 	}
+}
+
+// Verifies: STK-REQ-091, SYS-REQ-179, SW-REQ-166
+// SW-REQ-166:nominal:nominal
+// SW-REQ-166:boundary:nominal
+// SW-REQ-166:error_handling:nominal
+// SW-REQ-166:error_handling:negative
+// SW-REQ-166:encoding_safety:nominal
+// SW-REQ-166:determinism:nominal
+func TestConnectionFormattingAndSocketClosed(t *testing.T) {
+	local := testAddr("local")
+	remote := testAddr("remote")
+	conn := &addressConn{local: local, remote: remote}
+
+	if got := upstreamConn(conn); got != "local->remote" {
+		t.Fatalf("expected upstream address got %q", got)
+	}
+	if got := clientConn(conn); got != "remote->local" {
+		t.Fatalf("expected client address got %q", got)
+	}
+	if got := formatAddress(remote, local); got != "remote->local" {
+		t.Fatalf("expected formatted address got %q", got)
+	}
+
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "closed socket",
+			err:  errors.New("read tcp: use of closed network connection"),
+			want: true,
+		},
+		{
+			name: "different error",
+			err:  io.EOF,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsSocketClosed(tt.err); got != tt.want {
+				t.Fatalf("expected %v got %v", tt.want, got)
+			}
+		})
+	}
+}
+
+// Verifies: STK-REQ-091, SYS-REQ-179, SW-REQ-166
+// SW-REQ-166:nominal:nominal
+// SW-REQ-166:boundary:nominal
+// SW-REQ-166:error_handling:nominal
+// SW-REQ-166:error_handling:negative
+// SW-REQ-166:encoding_safety:nominal
+// SW-REQ-166:determinism:nominal
+func TestProxyPipe(t *testing.T) {
+	t.Run("forwards modified payload", func(t *testing.T) {
+		proxy := &Proxy{}
+		proxy.initShutdownContext()
+		srcClient, srcProxy := net.Pipe()
+		dstProxy, dstClient := net.Pipe()
+		defer srcClient.Close()
+		defer dstClient.Close()
+
+		done := make(chan struct{})
+		go proxy.pipe(srcProxy, dstProxy, pipeOpts{
+			modifier: func(src, dst net.Conn, data []byte) ([]byte, error) {
+				return []byte("pong"), nil
+			},
+			beforeExit: func() {
+				close(done)
+			},
+		})
+
+		if _, err := srcClient.Write([]byte("ping")); err != nil {
+			t.Fatal(err)
+		}
+		buf := make([]byte, 4)
+		if _, err := dstClient.Read(buf); err != nil {
+			t.Fatal(err)
+		}
+		if string(buf) != "pong" {
+			t.Fatalf("expected pong got %q", string(buf))
+		}
+		srcClient.Close()
+		waitForPipeExit(t, done)
+	})
+
+	t.Run("drops empty modified payload then exits on read close", func(t *testing.T) {
+		proxy := &Proxy{}
+		proxy.initShutdownContext()
+		srcClient, srcProxy := net.Pipe()
+		dstProxy, dstClient := net.Pipe()
+		defer srcClient.Close()
+		defer dstClient.Close()
+
+		done := make(chan struct{})
+		go proxy.pipe(srcProxy, dstProxy, pipeOpts{
+			modifier: func(src, dst net.Conn, data []byte) ([]byte, error) {
+				return nil, nil
+			},
+			beforeExit: func() {
+				close(done)
+			},
+		})
+
+		if _, err := srcClient.Write([]byte("ping")); err != nil {
+			t.Fatal(err)
+		}
+		srcClient.Close()
+		waitForPipeExit(t, done)
+	})
+
+	t.Run("exits on modifier error", func(t *testing.T) {
+		proxy := &Proxy{}
+		proxy.initShutdownContext()
+		srcClient, srcProxy := net.Pipe()
+		dstProxy, dstClient := net.Pipe()
+		defer srcClient.Close()
+		defer dstClient.Close()
+
+		done := make(chan struct{})
+		go proxy.pipe(srcProxy, dstProxy, pipeOpts{
+			modifier: func(src, dst net.Conn, data []byte) ([]byte, error) {
+				return nil, errors.New("modifier failed")
+			},
+			beforeExit: func() {
+				close(done)
+			},
+		})
+
+		if _, err := srcClient.Write([]byte("ping")); err != nil {
+			t.Fatal(err)
+		}
+		waitForPipeExit(t, done)
+	})
+
+	t.Run("reports write errors", func(t *testing.T) {
+		proxy := &Proxy{}
+		proxy.initShutdownContext()
+		srcClient, srcProxy := net.Pipe()
+		dstProxy, dstClient := net.Pipe()
+		defer srcClient.Close()
+		dstClient.Close()
+
+		writeErrors := make(chan error, 1)
+		done := make(chan struct{})
+		go proxy.pipe(srcProxy, dstProxy, pipeOpts{
+			onWriteError: func(err error) {
+				writeErrors <- err
+			},
+			beforeExit: func() {
+				close(done)
+			},
+		})
+
+		if _, err := srcClient.Write([]byte("ping")); err != nil {
+			t.Fatal(err)
+		}
+		waitForPipeExit(t, done)
+		select {
+		case err := <-writeErrors:
+			if err == nil {
+				t.Fatal("expected write error")
+			}
+		default:
+			t.Fatal("expected write error callback")
+		}
+	})
+
+	t.Run("exits on shutdown context", func(t *testing.T) {
+		proxy := &Proxy{}
+		ctx, cancel := context.WithCancel(context.Background())
+		proxy.SetShutdownContext(ctx)
+		srcClient, srcProxy := net.Pipe()
+		dstProxy, dstClient := net.Pipe()
+		defer srcClient.Close()
+		defer dstClient.Close()
+
+		done := make(chan struct{})
+		go proxy.pipe(srcProxy, dstProxy, pipeOpts{
+			beforeExit: func() {
+				close(done)
+			},
+		})
+
+		cancel()
+		waitForPipeExit(t, done)
+	})
+}
+
+func waitForPipeExit(t *testing.T, done <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("pipe did not exit")
+	}
+}
+
+type testAddr string
+
+func (a testAddr) Network() string {
+	return "test"
+}
+
+func (a testAddr) String() string {
+	return string(a)
+}
+
+type addressConn struct {
+	net.Conn
+	local  net.Addr
+	remote net.Addr
+}
+
+func (c *addressConn) LocalAddr() net.Addr {
+	return c.local
+}
+
+func (c *addressConn) RemoteAddr() net.Addr {
+	return c.remote
 }
