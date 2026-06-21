@@ -44,6 +44,26 @@ const testBatchRequest = `{
 	"suppress_parallel_execution": true
 }`
 
+// Verifies: STK-REQ-104, SYS-REQ-192, SW-REQ-180
+// STK-REQ-104:STK-REQ-104-AC-01:acceptance
+// STK-REQ-104:nominal:nominal
+// STK-REQ-104:boundary:nominal
+// STK-REQ-104:error_handling:negative
+// STK-REQ-104:error_handling:nominal
+// STK-REQ-104:encoding_safety:nominal
+// STK-REQ-104:determinism:nominal
+// SYS-REQ-192:nominal:nominal
+// SYS-REQ-192:boundary:nominal
+// SYS-REQ-192:error_handling:negative
+// SYS-REQ-192:error_handling:nominal
+// SYS-REQ-192:encoding_safety:nominal
+// SYS-REQ-192:determinism:nominal
+// SW-REQ-180:nominal:nominal
+// SW-REQ-180:boundary:nominal
+// SW-REQ-180:error_handling:negative
+// SW-REQ-180:error_handling:nominal
+// SW-REQ-180:encoding_safety:nominal
+// SW-REQ-180:determinism:nominal
 func TestBatch(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -122,6 +142,23 @@ const virtBatchTest = `function batchTest(request, session, config) {
     return TykJsResponse(response, session.meta_data)
 }`
 
+// Verifies: STK-REQ-104, SYS-REQ-192, SW-REQ-180
+// STK-REQ-104:STK-REQ-104-AC-01:acceptance
+// STK-REQ-104:nominal:nominal
+// STK-REQ-104:boundary:nominal
+// STK-REQ-104:error_handling:negative
+// STK-REQ-104:error_handling:nominal
+// STK-REQ-104:encoding_safety:nominal
+// SYS-REQ-192:nominal:nominal
+// SYS-REQ-192:boundary:nominal
+// SYS-REQ-192:error_handling:negative
+// SYS-REQ-192:error_handling:nominal
+// SYS-REQ-192:encoding_safety:nominal
+// SW-REQ-180:nominal:nominal
+// SW-REQ-180:boundary:nominal
+// SW-REQ-180:error_handling:negative
+// SW-REQ-180:error_handling:nominal
+// SW-REQ-180:encoding_safety:nominal
 func TestVirtualEndpointBatch(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -191,6 +228,17 @@ func TestVirtualEndpointBatch(t *testing.T) {
 
 }
 
+// Verifies: STK-REQ-104, SYS-REQ-192, SW-REQ-180
+// STK-REQ-104:STK-REQ-104-AC-01:acceptance
+// STK-REQ-104:nominal:nominal
+// STK-REQ-104:boundary:nominal
+// STK-REQ-104:encoding_safety:nominal
+// SYS-REQ-192:nominal:nominal
+// SYS-REQ-192:boundary:nominal
+// SYS-REQ-192:encoding_safety:nominal
+// SW-REQ-180:nominal:nominal
+// SW-REQ-180:boundary:nominal
+// SW-REQ-180:encoding_safety:nominal
 func TestBatchIgnoreCanonicalHeaderKey(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

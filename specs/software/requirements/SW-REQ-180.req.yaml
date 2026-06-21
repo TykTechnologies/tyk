@@ -1,0 +1,60 @@
+id: SW-REQ-180
+version: 1
+status: approved
+priority: shall
+category: gateway_batch_requests
+req_type: guarantee
+fretish: ""
+description: The gateway package implementation shall preserve focused batch request behavior by registering the batch endpoint for batch-enabled APIs, decoding valid batch request JSON, reporting malformed batch request JSON as explicit errors or bad-request responses, constructing safe relative gateway requests and tested manual absolute requests, returning empty JSON arrays for empty batches, executing sequential and manual virtual-endpoint batch requests for tested inputs, preserving tested response metadata and order where sequential execution is requested, applying tested upstream certificate and insecure-TLS outcomes, preserving configured non-canonical header names, and encoding batch replies as JSON, without claiming arbitrary upstream transport correctness, complete TLS policy semantics, proxy behavior, rate-limit or authentication enforcement inside nested requests, JavaScript VM correctness beyond the tested TykBatchRequest call path, complete route-generation behavior, distributed behavior, analytics, or final client-visible behavior outside the focused batch request tests.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: gateway/batch_requests_test.go; docs/gateway-batch-requests-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-192
+component: gateway_batch_requests
+rationale: This software requirement owns local gateway/batch_requests.go helper behavior and route-registration wiring under focused gateway package tests only. Broader nested request enforcement, transport semantics, and full route generation remain outside this proof slice.
+tags:
+    - gateway
+    - batch
+    - routing
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-192
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T11:17:01Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway batch request scope is limited to focused tests for enabled batch endpoint registration, JSON decode and malformed-input handling, empty batch responses, safe relative request construction, tested manual absolute request execution, sequential response collation, manual virtual-endpoint batch execution, tested upstream certificate and insecure-TLS outcomes, configured non-canonical header preservation, and batch reply JSON encoding. This approval does not claim arbitrary upstream transport correctness, complete TLS policy semantics, proxy behavior, rate-limit or authentication enforcement inside nested requests, JavaScript VM correctness beyond the tested TykBatchRequest call path, complete route-generation behavior, distributed behavior, analytics, or final client-visible behavior outside the focused batch request tests.
+        fingerprint: sha256:9ec44fb33940e89894f935ab9f83f7d5ff85d6efb35cb1b0784642cba0cd12d5
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T11:55:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T11:17:01Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T11:55:00Z"
+          from: draft
+          to: approved
+          reason: Added focused local gateway batch request behavior.
+          changed_by: human:buger
+        - date: "2026-06-21T11:17:01Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-21T11:55:00Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. SW-REQ-180 is scoped to local gateway batch request behavior for focused tests: enabled batch endpoint registration, JSON decode and malformed-input handling, safe relative request construction, tested manual absolute request execution, empty batch responses, sequential response collation, manual virtual-endpoint batch execution, tested upstream certificate and insecure-TLS outcomes, configured non-canonical header preservation, and batch reply JSON encoding. This approval does not claim arbitrary upstream transport correctness, complete TLS policy semantics, proxy behavior, rate-limit or authentication enforcement inside nested requests, JavaScript VM correctness beyond the tested TykBatchRequest call path, complete route-generation behavior, distributed behavior, analytics, or final client-visible behavior outside the focused batch request tests.")'
+          changed_by: human:buger

@@ -1012,6 +1012,7 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	return &oauthManager
 }
 
+// SW-REQ-180
 func (gw *Gateway) addBatchEndpoint(spec *APISpec, subrouter *mux.Router) {
 	mainLog.Debug("Batch requests enabled for API")
 	batchHandler := BatchRequestHandler{API: spec, Gw: gw}

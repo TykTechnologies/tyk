@@ -39,6 +39,7 @@ type BatchRequestHandler struct {
 }
 
 // doRequest will make the same request but return a BatchReplyUnit
+// SW-REQ-180
 func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchReplyUnit {
 	tr := &http.Transport{TLSClientConfig: &tls.Config{}}
 
@@ -83,12 +84,14 @@ func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchR
 	}
 }
 
+// SW-REQ-180
 func (b *BatchRequestHandler) DecodeBatchRequest(r *http.Request) (BatchRequestStructure, error) {
 	var batchRequest BatchRequestStructure
 	err := json.NewDecoder(r.Body).Decode(&batchRequest)
 	return batchRequest, err
 }
 
+// SW-REQ-180
 func (b *BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructure, unsafe bool) ([]*http.Request, error) {
 	requestSet := []*http.Request{}
 
@@ -120,6 +123,7 @@ func (b *BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructu
 	return requestSet, nil
 }
 
+// SW-REQ-180
 func (b *BatchRequestHandler) MakeRequests(batchRequest BatchRequestStructure, requestSet []*http.Request) []BatchReplyUnit {
 	replySet := []BatchReplyUnit{}
 
@@ -150,6 +154,7 @@ func (b *BatchRequestHandler) MakeRequests(batchRequest BatchRequestStructure, r
 }
 
 // HandleBatchRequest is the actual http handler for a batch request on an API definition
+// SW-REQ-180
 func (b *BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		return
@@ -178,6 +183,7 @@ func (b *BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.
 }
 
 // HandleBatchRequest is the actual http handler for a batch request on an API definition
+// SW-REQ-180
 func (b *BatchRequestHandler) ManualBatchRequest(requestObject []byte) ([]byte, error) {
 	// Decode request
 	var batchRequest BatchRequestStructure

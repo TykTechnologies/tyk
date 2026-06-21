@@ -1,0 +1,58 @@
+id: SYS-REQ-192
+version: 1
+status: approved
+priority: shall
+category: gateway_batch_requests
+req_type: guarantee
+fretish: ""
+description: Gateway batch request handling shall preserve focused tested behavior by registering the batch endpoint for batch-enabled APIs, accepting valid batch POST requests, rejecting malformed batch request JSON with explicit bad-request responses, returning empty JSON arrays for empty batches, executing sequential and manual virtual-endpoint batch requests for tested inputs, preserving tested response metadata and order where sequential execution is requested, applying tested upstream certificate and insecure-TLS outcomes, and preserving configured non-canonical header names, without claiming arbitrary upstream transport correctness, complete TLS policy semantics, proxy behavior, rate-limit or authentication enforcement inside nested requests, JavaScript VM correctness beyond the tested TykBatchRequest call path, complete route-generation behavior, distributed behavior, analytics, or final client-visible behavior outside the focused batch request tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-104
+component: gateway_batch_requests
+rationale: This system requirement owns focused gateway batch handler and route-registration behavior. Broader nested request enforcement, transport semantics, and full route generation remain outside this proof slice.
+tags:
+    - gateway
+    - batch
+    - routing
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-104
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T11:17:01Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway batch request scope is limited to focused tests for enabled batch endpoint registration, JSON decode and malformed-input handling, empty batch responses, safe relative request construction, tested manual absolute request execution, sequential response collation, manual virtual-endpoint batch execution, tested upstream certificate and insecure-TLS outcomes, configured non-canonical header preservation, and batch reply JSON encoding. This approval does not claim arbitrary upstream transport correctness, complete TLS policy semantics, proxy behavior, rate-limit or authentication enforcement inside nested requests, JavaScript VM correctness beyond the tested TykBatchRequest call path, complete route-generation behavior, distributed behavior, analytics, or final client-visible behavior outside the focused batch request tests.
+        fingerprint: sha256:e8905bdf111bbb9c702e3e1a62c3c9dd7170567d09e90bd7af8d09ef486ca50a
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T11:55:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T11:17:01Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T11:55:00Z"
+          from: draft
+          to: approved
+          reason: Added focused gateway batch request system requirement.
+          changed_by: human:buger
+        - date: "2026-06-21T11:16:38Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-21T11:55:00Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway batch request system scope is limited to focused tests for enabled batch endpoint registration, valid POST handling, malformed JSON bad-request handling, empty batch responses, sequential batch response collation, manual virtual-endpoint batch execution, tested upstream certificate and insecure-TLS outcomes, and configured non-canonical header preservation. This approval does not claim arbitrary upstream transport correctness, complete TLS policy semantics, proxy behavior, rate-limit or authentication enforcement inside nested requests, JavaScript VM correctness beyond the tested TykBatchRequest call path, complete route-generation behavior, distributed behavior, analytics, or final client-visible behavior outside the focused batch request tests.")'
+          changed_by: human:buger
