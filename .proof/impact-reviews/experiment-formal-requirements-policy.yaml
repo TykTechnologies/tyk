@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T09:18:08Z"
+generated_at: "2026-06-21T09:24:07Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -1123,6 +1123,16 @@ reviews:
       approval_fingerprint: sha256:67c77c4afd9690ce28508a94ed00de2282a9a98a611ea197cf2bc1c8cfc2d038
       artifact_fingerprint: sha256:d71e4161eb68abe59125bd8971b12e8c0773745ebb366f7ae7ed76950a1ac918
       reviewed_at: "2026-06-21T09:18:08Z"
+    - requirement: SW-REQ-170
+      artifact: storage/connection_handler.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed storage connection-handler implementation impact after adding ReqProof annotations and focused tests; production behavior and the approved storage connection-handler requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:ff95b3114d7a8a0cc03d8bb966c8e58df0b2c35d310e88f8b853c504d7efddd3
+      approval_fingerprint: sha256:28840f0d622ed9a39bd64075fdddc7cd5fdea72171ae31fe0ac6487f95114e0d
+      artifact_fingerprint: sha256:e96f6ba99ffbb8769645bb83ff93cfe9282f2733285dbc5a5d4be9dae1c3bfbf
+      reviewed_at: "2026-06-21T09:24:07Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

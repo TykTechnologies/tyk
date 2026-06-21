@@ -15,6 +15,21 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
+// Verifies: STK-REQ-095, SYS-REQ-183, SW-REQ-170
+// STK-REQ-095:STK-REQ-095-AC-01:acceptance
+// STK-REQ-095:error_handling:negative
+// SYS-REQ-183:nominal:nominal
+// SYS-REQ-183:boundary:nominal
+// SYS-REQ-183:error_handling:nominal
+// SYS-REQ-183:error_handling:negative
+// SYS-REQ-183:encoding_safety:nominal
+// SYS-REQ-183:determinism:nominal
+// SW-REQ-170:nominal:nominal
+// SW-REQ-170:boundary:nominal
+// SW-REQ-170:error_handling:nominal
+// SW-REQ-170:error_handling:negative
+// SW-REQ-170:encoding_safety:nominal
+// SW-REQ-170:determinism:nominal
 func TestRecoverLoop(t *testing.T) {
 	t.Parallel()
 
@@ -39,6 +54,13 @@ func TestRecoverLoop(t *testing.T) {
 	assert.Equal(t, 1, onReconnectCounter)
 }
 
+// Verifies: STK-REQ-095, SYS-REQ-183, SW-REQ-170
+// SW-REQ-170:nominal:nominal
+// SW-REQ-170:boundary:nominal
+// SW-REQ-170:error_handling:nominal
+// SW-REQ-170:error_handling:negative
+// SW-REQ-170:encoding_safety:nominal
+// SW-REQ-170:determinism:nominal
 func TestNewConnectionHandler(t *testing.T) {
 	ctx := context.Background()
 	handler := NewConnectionHandler(ctx)
@@ -55,6 +77,13 @@ func RunNewConnectionHandlerTest(t *testing.T, handler *ConnectionHandler) {
 	assert.Equal(t, false, handler.Connected())
 }
 
+// Verifies: STK-REQ-095, SYS-REQ-183, SW-REQ-170
+// SW-REQ-170:nominal:nominal
+// SW-REQ-170:boundary:nominal
+// SW-REQ-170:error_handling:nominal
+// SW-REQ-170:error_handling:negative
+// SW-REQ-170:encoding_safety:nominal
+// SW-REQ-170:determinism:nominal
 func TestConnectionHandler_Connect(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -83,6 +112,14 @@ func TestConnectionHandler_Connect(t *testing.T) {
 }
 
 // TestNewConnectorDefaultConn tests the creation of a new default connection.
+
+// Verifies: STK-REQ-095, SYS-REQ-183, SW-REQ-170
+// SW-REQ-170:nominal:nominal
+// SW-REQ-170:boundary:nominal
+// SW-REQ-170:error_handling:nominal
+// SW-REQ-170:error_handling:negative
+// SW-REQ-170:encoding_safety:nominal
+// SW-REQ-170:determinism:nominal
 func TestNewConnectorDefaultConn(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
@@ -93,6 +130,14 @@ func TestNewConnectorDefaultConn(t *testing.T) {
 }
 
 // TestNewConnectorCacheConn tests the creation of a new cache connection.
+
+// Verifies: STK-REQ-095, SYS-REQ-183, SW-REQ-170
+// SW-REQ-170:nominal:nominal
+// SW-REQ-170:boundary:nominal
+// SW-REQ-170:error_handling:nominal
+// SW-REQ-170:error_handling:negative
+// SW-REQ-170:encoding_safety:nominal
+// SW-REQ-170:determinism:nominal
 func TestNewConnectorCacheConn(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
@@ -105,6 +150,14 @@ func TestNewConnectorCacheConn(t *testing.T) {
 }
 
 // TestNewConnectorAnalyticsConn tests the creation of a new analytics connection.
+
+// Verifies: STK-REQ-095, SYS-REQ-183, SW-REQ-170
+// SW-REQ-170:nominal:nominal
+// SW-REQ-170:boundary:nominal
+// SW-REQ-170:error_handling:nominal
+// SW-REQ-170:error_handling:negative
+// SW-REQ-170:encoding_safety:nominal
+// SW-REQ-170:determinism:nominal
 func TestNewConnectorAnalyticsConn(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
@@ -118,6 +171,14 @@ func TestNewConnectorAnalyticsConn(t *testing.T) {
 }
 
 // TestConnectionHandler_DisableStorage tests disabling the storage.
+
+// Verifies: STK-REQ-095, SYS-REQ-183, SW-REQ-170
+// SW-REQ-170:nominal:nominal
+// SW-REQ-170:boundary:nominal
+// SW-REQ-170:error_handling:nominal
+// SW-REQ-170:error_handling:negative
+// SW-REQ-170:encoding_safety:nominal
+// SW-REQ-170:determinism:nominal
 func TestConnectionHandler_DisableStorage(t *testing.T) {
 	ctx := context.Background()
 	rc := NewConnectionHandler(ctx)
@@ -132,6 +193,14 @@ func TestConnectionHandler_DisableStorage(t *testing.T) {
 }
 
 // TestConnectionHandler_Disconnect tests the disconnection of all connections.
+
+// Verifies: STK-REQ-095, SYS-REQ-183, SW-REQ-170
+// SW-REQ-170:nominal:nominal
+// SW-REQ-170:boundary:nominal
+// SW-REQ-170:error_handling:nominal
+// SW-REQ-170:error_handling:negative
+// SW-REQ-170:encoding_safety:nominal
+// SW-REQ-170:determinism:nominal
 func TestConnectionHandler_Disconnect(t *testing.T) {
 	ctx := context.Background()
 	rc := NewConnectionHandler(ctx)
@@ -148,6 +217,14 @@ func TestConnectionHandler_Disconnect(t *testing.T) {
 }
 
 // TestConnectionHandler_statusCheck tests the status check routine of the connection handler.
+
+// Verifies: STK-REQ-095, SYS-REQ-183, SW-REQ-170
+// SW-REQ-170:nominal:nominal
+// SW-REQ-170:boundary:nominal
+// SW-REQ-170:error_handling:nominal
+// SW-REQ-170:error_handling:negative
+// SW-REQ-170:encoding_safety:nominal
+// SW-REQ-170:determinism:nominal
 func TestConnectionHandler_statusCheck(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -182,4 +259,64 @@ func TestConnectionHandler_statusCheck(t *testing.T) {
 	// Check if storage is up
 	assert.True(t, rc.Connected(), "Expected storage to be connected after status check")
 	mockConn.AssertNumberOfCalls(t, "Ping", 3)
+}
+
+// Verifies: STK-REQ-095, SYS-REQ-183, SW-REQ-170
+// SW-REQ-170:nominal:nominal
+// SW-REQ-170:boundary:nominal
+// SW-REQ-170:error_handling:nominal
+// SW-REQ-170:error_handling:negative
+// SW-REQ-170:encoding_safety:nominal
+// SW-REQ-170:determinism:nominal
+func TestConnectionHandler_WaitConnectAndReconnectTimeout(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	rc := NewConnectionHandler(ctx)
+
+	waitCtx, waitCancel := context.WithCancel(context.Background())
+	waitCancel()
+	assert.False(t, rc.WaitConnect(waitCtx))
+
+	cancel()
+	assert.PanicsWithValue(t, "Can't reconnect to redis after disable", func() {
+		rc.DisableStorage(false)
+	})
+}
+
+// Verifies: STK-REQ-095, SYS-REQ-183, SW-REQ-170
+// SW-REQ-170:nominal:nominal
+// SW-REQ-170:boundary:nominal
+// SW-REQ-170:error_handling:nominal
+// SW-REQ-170:error_handling:negative
+// SW-REQ-170:encoding_safety:nominal
+// SW-REQ-170:determinism:nominal
+func TestConnectionHandler_getConnection(t *testing.T) {
+	rc := NewConnectionHandler(context.Background())
+
+	defaultConn := tempmocks.NewConnector(t)
+	cacheConn := tempmocks.NewConnector(t)
+	analyticsConn := tempmocks.NewConnector(t)
+
+	rc.connections[DefaultConn] = defaultConn
+	rc.connections[CacheConn] = cacheConn
+	rc.connections[AnalyticsConn] = analyticsConn
+
+	assert.Same(t, defaultConn, rc.getConnection(false, false))
+	assert.Same(t, cacheConn, rc.getConnection(true, false))
+	assert.Same(t, analyticsConn, rc.getConnection(false, true))
+	assert.Same(t, analyticsConn, rc.getConnection(true, true))
+}
+
+// Verifies: STK-REQ-095, SYS-REQ-183, SW-REQ-170
+// SW-REQ-170:nominal:nominal
+// SW-REQ-170:boundary:nominal
+// SW-REQ-170:error_handling:nominal
+// SW-REQ-170:error_handling:negative
+// SW-REQ-170:encoding_safety:nominal
+// SW-REQ-170:determinism:nominal
+func TestGetExponentialBackoff(t *testing.T) {
+	backoff := getExponentialBackoff()
+
+	assert.Equal(t, float64(2), backoff.Multiplier)
+	assert.Equal(t, 10*time.Second, backoff.MaxInterval)
+	assert.Equal(t, time.Duration(0), backoff.MaxElapsedTime)
 }

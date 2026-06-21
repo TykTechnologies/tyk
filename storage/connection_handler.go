@@ -38,6 +38,7 @@ const (
 )
 
 // NewConnectionHandler creates a new connection handler not connected
+// SW-REQ-170
 func NewConnectionHandler(ctx context.Context) *ConnectionHandler {
 	return &ConnectionHandler{
 		ctx:           ctx,
@@ -48,6 +49,7 @@ func NewConnectionHandler(ctx context.Context) *ConnectionHandler {
 }
 
 // DisableStorage allows to dynamically enable/disable talking with storage
+// SW-REQ-170
 func (rc *ConnectionHandler) DisableStorage(setStorageDown bool) {
 	if setStorageDown {
 		// we make sure x set that redis is down
@@ -69,6 +71,7 @@ func (rc *ConnectionHandler) DisableStorage(setStorageDown bool) {
 }
 
 // Connected returns true if we are connected to redis
+// SW-REQ-170
 func (rc *ConnectionHandler) Connected() bool {
 	v := rc.storageUp.Load()
 	if v != nil {
@@ -78,6 +81,7 @@ func (rc *ConnectionHandler) Connected() bool {
 }
 
 // WaitConnect waits until we are connected to the storage
+// SW-REQ-170
 func (rc *ConnectionHandler) WaitConnect(ctx context.Context) bool {
 	for {
 		select {
@@ -93,6 +97,7 @@ func (rc *ConnectionHandler) WaitConnect(ctx context.Context) bool {
 	}
 }
 
+// SW-REQ-170
 func (rc *ConnectionHandler) enabled() bool {
 	ok := true
 	if v := rc.disableStorage.Load(); v != nil {
@@ -102,6 +107,7 @@ func (rc *ConnectionHandler) enabled() bool {
 }
 
 // Disconnect closes the connection to the storage
+// SW-REQ-170
 func (rc *ConnectionHandler) Disconnect() error {
 	for _, v := range rc.connections {
 		if v != nil {
@@ -113,6 +119,7 @@ func (rc *ConnectionHandler) Disconnect() error {
 	return nil
 }
 
+// SW-REQ-170
 func (rc *ConnectionHandler) recoverLoop(ctx context.Context, onReconnect func()) {
 	for {
 		select {
@@ -128,6 +135,7 @@ func (rc *ConnectionHandler) recoverLoop(ctx context.Context, onReconnect func()
 // storage.
 //
 // onConnect will be called when we have established a successful storage reconnection
+// SW-REQ-170
 func (rc *ConnectionHandler) Connect(ctx context.Context, onConnect func(), conf *config.Config) {
 	err := rc.initConnection(*conf)
 	if err != nil {
@@ -154,6 +162,7 @@ func (rc *ConnectionHandler) Connect(ctx context.Context, onConnect func(), conf
 }
 
 // initConnection initializes the connection singletons.
+// SW-REQ-170
 func (rc *ConnectionHandler) initConnection(conf config.Config) (err error) {
 	rc.connectionsMu.Lock()
 	defer rc.connectionsMu.Unlock()
@@ -175,6 +184,7 @@ func (rc *ConnectionHandler) initConnection(conf config.Config) (err error) {
 	return nil
 }
 
+// SW-REQ-170
 func (rc *ConnectionHandler) isConnected(ctx context.Context, connType string) bool {
 	if conn, ok := rc.connections[connType]; ok && conn != nil {
 		err := conn.Ping(ctx)
@@ -185,6 +195,7 @@ func (rc *ConnectionHandler) isConnected(ctx context.Context, connType string) b
 
 // statusCheck will check the storage status each second.
 // This method will be constantly modifying the redisUp control flag.
+// SW-REQ-170
 func (rc *ConnectionHandler) statusCheck(ctx context.Context) {
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
@@ -217,6 +228,7 @@ func (rc *ConnectionHandler) statusCheck(ctx context.Context) {
 	}
 }
 
+// SW-REQ-170
 func (rc *ConnectionHandler) getConnection(isCache, isAnalytics bool) model.Connector {
 	rc.connectionsMu.RLock()
 	defer rc.connectionsMu.RUnlock()
@@ -229,6 +241,7 @@ func (rc *ConnectionHandler) getConnection(isCache, isAnalytics bool) model.Conn
 }
 
 // NewConnector creates a new storage connection.
+// SW-REQ-170
 func NewConnector(connType string, conf config.Config) (model.Connector, error) {
 	cfg := conf.Storage
 	if connType == CacheConn && conf.EnableSeperateCacheStore {
@@ -286,6 +299,8 @@ func NewConnector(connType string, conf config.Config) (model.Connector, error) 
 //   - Multiplier: 2
 //   - MaxInterval: 10 seconds
 //   - MaxElapsedTime: 0 (no limit)
+//
+// SW-REQ-170
 func getExponentialBackoff() *backoff.ExponentialBackOff {
 	exponentialBackoff := backoff.NewExponentialBackOff()
 	exponentialBackoff.Multiplier = 2
