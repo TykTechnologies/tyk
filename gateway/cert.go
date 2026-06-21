@@ -79,6 +79,7 @@ var certLog = log.WithField("prefix", "certs")
 //
 // The function automatically handles hosts with ports by using net.SplitHostPort.
 // Certificate maps are checked in order, with later maps taking precedence (allowing spec config to override global config).
+// SW-REQ-181
 func getCertificateIDForHost(host string, certMaps []map[string]string) string {
 	var certID string
 
@@ -138,6 +139,7 @@ func getCertificateIDForHost(host string, certMaps []map[string]string) string {
 	return certID
 }
 
+// SW-REQ-181
 func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
 	certMaps := []map[string]string{gw.GetConfig().Security.Certificates.Upstream}
 

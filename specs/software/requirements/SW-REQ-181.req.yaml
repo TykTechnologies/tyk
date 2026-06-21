@@ -1,0 +1,59 @@
+id: SW-REQ-181
+version: 1
+status: approved
+priority: shall
+category: gateway_upstream_certificate_selection
+req_type: guarantee
+fretish: ""
+description: The gateway package implementation shall preserve focused upstream certificate selection behavior by selecting certificate IDs from global and API certificate maps using wildcard, exact host, wildcard subdomain, host-with-port, port-specific precedence, later-map override, unmatched-host empty results, IPv4 host-with-port, and bracketed IPv6 host-with-port inputs, and by looking up configured upstream certificates for tested matching API upstream hosts, without claiming complete mTLS handshake semantics, certificate material validation, private-key storage durability, certificate pinning, common-name validation, downstream client certificate selection, TLS version or cipher policy, proxy behavior, route generation, authentication enforcement, distributed synchronization, or final client-visible gateway behavior outside the focused upstream certificate selection tests.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: gateway/cert_test.go; docs/gateway-upstream-certificate-selection-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-193
+component: gateway_upstream_certificate_selection
+rationale: This software requirement owns local gateway/cert.go upstream certificate ID selection and lookup mechanics under focused gateway package tests only. Broader TLS transport and certificate-management semantics remain outside this proof slice.
+tags:
+    - gateway
+    - certificate
+    - upstream
+    - tls
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-193
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T11:24:49Z"
+        comment: >-
+            Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway upstream certificate selection scope is limited to focused tests for certificate-ID map matching across wildcard, exact host, subdomain wildcard, host-with-port, port-specific precedence, later-map override, no-match, IPv4, and IPv6 inputs, plus tested configured upstream certificate lookup/use for matching API upstream hosts. This approval does not claim complete mTLS handshake semantics, certificate material validation, private-key storage durability, certificate pinning, common-name validation, downstream client certificate selection, TLS version or cipher policy, proxy behavior, route generation, authentication enforcement, distributed synchronization, or final client-visible gateway behavior outside the focused upstream certificate selection tests.
+        fingerprint: sha256:9943b261b566c71f025dd8d449054f4b9cc6d96f7a1842686b517dcacdd0feaf
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T12:25:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T11:24:49Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T12:25:00Z"
+          from: draft
+          to: approved
+          reason: Added focused local gateway upstream certificate selection behavior.
+          changed_by: human:buger
+        - date: "2026-06-21T11:24:49Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-21T12:25:00Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. SW-REQ-181 is scoped to local gateway/cert.go upstream certificate selection behavior for focused tests: certificate-ID map matching across wildcard, exact host, subdomain wildcard, host-with-port, port-specific precedence, later-map override, no-match, IPv4, and IPv6 inputs, plus tested configured upstream certificate lookup for matching API upstream hosts. This approval does not claim complete mTLS handshake semantics, certificate material validation, private-key storage durability, certificate pinning, common-name validation, downstream client certificate selection, TLS version or cipher policy, proxy behavior, route generation, authentication enforcement, distributed synchronization, or final client-visible gateway behavior outside the focused upstream certificate selection tests.")'
+          changed_by: human:buger

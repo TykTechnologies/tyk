@@ -1010,6 +1010,17 @@ func TestUpstreamMutualTLS(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-105, SYS-REQ-193, SW-REQ-181
+// STK-REQ-105:STK-REQ-105-AC-01:acceptance
+// STK-REQ-105:nominal:nominal
+// STK-REQ-105:boundary:nominal
+// STK-REQ-105:determinism:nominal
+// SYS-REQ-193:nominal:nominal
+// SYS-REQ-193:boundary:nominal
+// SYS-REQ-193:determinism:nominal
+// SW-REQ-181:nominal:nominal
+// SW-REQ-181:boundary:nominal
+// SW-REQ-181:determinism:nominal
 func TestUpstreamCertificateWithPort(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -1137,6 +1148,17 @@ func TestUpstreamCertificateWithPort(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-105, SYS-REQ-193, SW-REQ-181
+// STK-REQ-105:STK-REQ-105-AC-01:acceptance
+// STK-REQ-105:nominal:nominal
+// STK-REQ-105:boundary:nominal
+// STK-REQ-105:determinism:nominal
+// SYS-REQ-193:nominal:nominal
+// SYS-REQ-193:boundary:nominal
+// SYS-REQ-193:determinism:nominal
+// SW-REQ-181:nominal:nominal
+// SW-REQ-181:boundary:nominal
+// SW-REQ-181:determinism:nominal
 func TestGetCertificateIDForHost(t *testing.T) {
 	t.Run("Empty certificate maps", func(t *testing.T) {
 		certID := getCertificateIDForHost("example.com", []map[string]string{})

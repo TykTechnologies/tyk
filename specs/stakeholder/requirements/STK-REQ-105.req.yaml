@@ -1,0 +1,63 @@
+id: STK-REQ-105
+version: 1
+status: approved
+priority: shall
+category: gateway_upstream_certificate_selection
+req_type: guarantee
+fretish: ""
+description: Gateway upstream certificate selection shall preserve focused tested behavior by selecting certificate IDs from global and API certificate maps using wildcard, exact host, wildcard subdomain, host-with-port, port-specific precedence, later-map override, unmatched-host empty results, IPv4 host-with-port, and bracketed IPv6 host-with-port inputs, and by allowing tested upstream mTLS requests to use configured API upstream certificates when matching hosts are present, without claiming complete mTLS handshake semantics, certificate material validation, private-key storage durability, certificate pinning, common-name validation, downstream client certificate selection, TLS version or cipher policy, proxy behavior, route generation, authentication enforcement, distributed synchronization, or final client-visible gateway behavior outside the focused upstream certificate selection tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_upstream_certificate_selection
+rationale: Gateway operators configure upstream client certificates by host. This requirement owns only the focused tested selection and lookup behavior before broader TLS transport semantics take over.
+tags:
+    - gateway
+    - certificate
+    - upstream
+    - tls
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T11:24:49Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway upstream certificate selection scope is limited to focused tests for certificate-ID map matching across wildcard, exact host, subdomain wildcard, host-with-port, port-specific precedence, later-map override, no-match, IPv4, and IPv6 inputs, plus tested configured upstream certificate lookup/use for matching API upstream hosts. This approval does not claim complete mTLS handshake semantics, certificate material validation, private-key storage durability, certificate pinning, common-name validation, downstream client certificate selection, TLS version or cipher policy, proxy behavior, route generation, authentication enforcement, distributed synchronization, or final client-visible gateway behavior outside the focused upstream certificate selection tests.
+        fingerprint: sha256:6d22e87c4cefce0b8b1dd0dd86564af2d49eae789a805faf33f7f231626e1abc
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T12:25:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T11:24:49Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need upstream certificate host maps to select the expected certificate for tested wildcard, exact, port, IP, and override inputs before upstream TLS connections are attempted.
+    acceptance_criteria:
+        - id: STK-REQ-105-AC-01
+          text: Given configured upstream certificate maps and tested upstream mTLS API inputs, when certificate host selection is exercised with wildcard, exact, port-specific, override, unmatched, IPv4, IPv6, or matching upstream API cases, then the expected certificate ID, empty result, or successful configured certificate use is observed for those inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-193
+lifecycle:
+    change_history:
+        - date: "2026-06-21T12:25:00Z"
+          from: draft
+          to: approved
+          reason: Added focused gateway upstream certificate selection requirement.
+          changed_by: human:buger
+        - date: "2026-06-21T11:24:15Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-21T12:25:00Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway upstream certificate selection scope is limited to focused tests for certificate-ID map matching across wildcard, exact host, subdomain wildcard, host-with-port, port-specific precedence, later-map override, no-match, IPv4, and IPv6 inputs, plus tested upstream mTLS certificate use when API upstream certificate host matches are configured. This approval does not claim complete mTLS handshake semantics, certificate material validation, private-key storage durability, certificate pinning, common-name validation, downstream client certificate selection, TLS version or cipher policy, proxy behavior, route generation, authentication enforcement, distributed synchronization, or final client-visible gateway behavior outside the focused upstream certificate selection tests.")'
+          changed_by: human:buger
