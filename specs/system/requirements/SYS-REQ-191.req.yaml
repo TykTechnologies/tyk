@@ -1,0 +1,51 @@
+id: SYS-REQ-191
+version: 1
+status: approved
+priority: shall
+category: gateway_api_loader_tcp_service
+req_type: guarantee
+fretish: ""
+description: Gateway API loader TCP service handling shall preserve deterministic local setup behavior for tested TCP API specs by initializing the spec authentication, organization, and health managers with the selected local or RPC stores and registering a TCP proxy entry when the tested TCP listen port differs from the gateway listen port while skipping TCP proxy creation when the tested listen port equals the gateway listen port, without claiming TCP forwarding correctness, listener startup, TLS or proxy-protocol behavior, service-discovery dialing, storage backend correctness, authentication or session semantics, route generation, middleware execution, distributed synchronization, or final client-visible gateway behavior outside the focused TCP service loader tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-103
+component: gateway_api_loader_tcp_service
+rationale: This system requirement owns local TCP service loader setup outcomes only. Runtime TCP proxy behavior and external storage semantics remain outside this proof slice.
+tags:
+    - gateway
+    - api-loader
+    - tcp
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-103
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T10:59:50Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API loader TCP service scope is limited to focused loadTCPService tests for default and RPC store selection into spec authentication, organization, and health manager initialization plus TCP proxy registration for tested non-conflicting ports and no proxy creation for the tested gateway-port conflict. This approval does not claim TCP forwarding correctness, listener startup, TLS or proxy-protocol behavior, service-discovery dialing, storage backend correctness, authentication or session semantics, route generation, middleware execution, distributed synchronization, or final client-visible gateway behavior outside the focused TCP service loader tests.
+        fingerprint: sha256:e78660a86e0a5cb1d167e5980c19ae423f6698c4e9bee6bf57e041cbaf04664e
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T10:59:50Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added focused gateway API loader TCP service system requirement.
+          changed_by: agent:codex

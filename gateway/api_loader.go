@@ -975,6 +975,7 @@ func (gw *Gateway) generateRoutesForPrefixes(spec *APISpec, prefixes []string, e
 	}
 }
 
+// SW-REQ-178
 func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
 	// Initialise the auth and session managers (use Redis for now)
 	authStore := gs.redisStore

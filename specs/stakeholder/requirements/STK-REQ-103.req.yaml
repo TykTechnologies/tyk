@@ -1,0 +1,57 @@
+id: STK-REQ-103
+version: 1
+status: approved
+priority: shall
+category: gateway_api_loader_tcp_service
+req_type: guarantee
+fretish: ""
+description: Gateway API loader TCP service support shall preserve deterministic local setup behavior for tested TCP API specs by initializing the spec authentication, organization, and health managers with the selected local or RPC stores and registering a TCP proxy entry when the tested TCP listen port differs from the gateway listen port while skipping TCP proxy creation when the tested listen port equals the gateway listen port, without claiming TCP forwarding correctness, listener startup, TLS or proxy-protocol behavior, service-discovery dialing, storage backend correctness, authentication or session semantics, route generation, middleware execution, distributed synchronization, or final client-visible gateway behavior outside the focused TCP service loader tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_api_loader_tcp_service
+rationale: The TCP service loader performs local manager initialization and proxy-mux registration before any network listener behavior. This requirement owns only those deterministic local setup outcomes for focused tests.
+tags:
+    - gateway
+    - api-loader
+    - tcp
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T10:59:50Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API loader TCP service scope is limited to focused loadTCPService tests for default and RPC store selection into spec authentication, organization, and health manager initialization plus TCP proxy registration for tested non-conflicting ports and no proxy creation for the tested gateway-port conflict. This approval does not claim TCP forwarding correctness, listener startup, TLS or proxy-protocol behavior, service-discovery dialing, storage backend correctness, authentication or session semantics, route generation, middleware execution, distributed synchronization, or final client-visible gateway behavior outside the focused TCP service loader tests.
+        fingerprint: sha256:c5c2ddee48ddbfd39b15c6647854c6cdd2df1736018709656b42587b13826084
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T10:59:50Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need TCP API loader setup to initialize local spec managers with the intended stores and register TCP proxy entries only for tested non-conflicting ports.
+    acceptance_criteria:
+        - id: STK-REQ-103-AC-01
+          text: Given tested TCP API specs, general stores, and gateway listen-port configuration, when TCP service loading runs, then the spec authentication, organization, and health managers receive the expected stores and the proxy mux gains a TCP proxy entry only for tested non-conflicting listen ports.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-191
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: review
+          reason: Added focused gateway API loader TCP service setup requirement.
+          changed_by: agent:codex

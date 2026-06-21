@@ -18,6 +18,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 // Verifies: STK-REQ-074, SYS-REQ-162, SW-REQ-149
@@ -554,6 +555,110 @@ func TestGatewayAPILoaderReadGraphQLPlaygroundTemplate(t *testing.T) {
 				}{Endpoint: "/graphql/"})
 				assert.NoError(t, err)
 				assert.Equal(t, tt.wantIndexBody, rendered.String())
+			}
+		})
+	}
+}
+
+// Verifies: STK-REQ-103, SYS-REQ-191, SW-REQ-178
+// STK-REQ-103:STK-REQ-103-AC-01:acceptance
+// SW-REQ-178:nominal:nominal
+// SW-REQ-178:boundary:nominal
+// SW-REQ-178:determinism:nominal
+// SYS-REQ-191:determinism:nominal
+func TestGatewayAPILoaderLoadTCPService(t *testing.T) {
+	redisStore := storage.NewDummyStorage()
+	redisOrgStore := storage.NewDummyStorage()
+	healthStore := storage.NewDummyStorage()
+	rpcAuthStore := storage.NewDummyStorage()
+	rpcOrgStore := storage.NewDummyStorage()
+	stores := &generalStores{
+		redisStore:    redisStore,
+		redisOrgStore: redisOrgStore,
+		healthStore:   healthStore,
+		rpcAuthStore:  rpcAuthStore,
+		rpcOrgStore:   rpcOrgStore,
+	}
+
+	tests := []struct {
+		name           string
+		listenPort     int
+		authEngine     apidef.StorageEngineCode
+		sessionEngine  apidef.StorageEngineCode
+		wantAuthStore  storage.Handler
+		wantOrgStore   storage.Handler
+		wantProxyCount int
+	}{
+		{
+			name:           "default stores register TCP proxy on non-gateway port",
+			listenPort:     9090,
+			wantAuthStore:  redisStore,
+			wantOrgStore:   redisOrgStore,
+			wantProxyCount: 1,
+		},
+		{
+			name:           "RPC auth and session engines select RPC auth and org stores",
+			listenPort:     9091,
+			authEngine:     RPCStorageEngine,
+			sessionEngine:  RPCStorageEngine,
+			wantAuthStore:  rpcAuthStore,
+			wantOrgStore:   rpcOrgStore,
+			wantProxyCount: 1,
+		},
+		{
+			name:           "gateway listen port initializes managers without TCP proxy",
+			listenPort:     8080,
+			wantAuthStore:  redisStore,
+			wantOrgStore:   redisOrgStore,
+			wantProxyCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			authManager := &recordingSessionHandler{}
+			orgManager := &recordingSessionHandler{}
+			health := &recordingHealthChecker{}
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					APIID:      "tcp-api",
+					Name:       "TCP API",
+					Protocol:   "tcp",
+					ListenPort: tt.listenPort,
+					Proxy: apidef.ProxyConfig{
+						TargetURL: "tcp://upstream.example.com:9000",
+					},
+					AuthProvider: apidef.AuthProviderMeta{
+						StorageEngine: tt.authEngine,
+					},
+					SessionProvider: apidef.SessionProviderMeta{
+						StorageEngine: tt.sessionEngine,
+					},
+				},
+				AuthManager:       authManager,
+				OrgSessionManager: orgManager,
+				Health:            health,
+				GlobalConfig: config.Config{
+					ListenPort: 8080,
+				},
+			}
+			gw := &Gateway{}
+			gw.SetConfig(config.Config{ListenPort: 8080})
+			muxer := &proxyMux{}
+
+			gw.loadTCPService(spec, stores, muxer)
+
+			assert.Equal(t, 1, authManager.initCalls)
+			assert.Same(t, tt.wantAuthStore, authManager.initStore)
+			assert.Equal(t, 1, orgManager.initCalls)
+			assert.Same(t, tt.wantOrgStore, orgManager.initStore)
+			assert.Equal(t, 1, health.initCalls)
+			assert.Same(t, healthStore, health.initStore)
+			assert.Len(t, muxer.proxies, tt.wantProxyCount)
+			if tt.wantProxyCount > 0 {
+				assert.Equal(t, tt.listenPort, muxer.proxies[0].port)
+				assert.Equal(t, "tcp", muxer.proxies[0].protocol)
+				assert.NotNil(t, muxer.proxies[0].tcpProxy)
 			}
 		})
 	}
