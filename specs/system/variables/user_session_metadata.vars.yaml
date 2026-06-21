@@ -1,0 +1,9 @@
+component: user_session_metadata
+no_interface:
+    declared: true
+    reason: The user session metadata proof slice covers local user-package helper behavior for custom policy metadata extraction and storage plus supported metadata tag copying. Policy merge behavior, gateway session lookup, persistence backends, authorization decisions, and final client responses are outside this component boundary.
+variables:
+    - name: user_session_metadata_operation_terminal
+      type: bool
+      direction: output
+      description: User session metadata helper operations return a terminal local result by extracting custom policy metadata, reporting malformed or missing policy metadata errors, writing policy lists into metadata, copying supported metadata fields, ignoring unsupported tag element types, or returning a no-update result for unsupported inputs.

@@ -1,0 +1,61 @@
+id: STK-REQ-069
+version: 1
+status: approved
+priority: shall
+category: user_session_metadata
+req_type: guarantee
+fretish: ""
+description: User session metadata helpers shall preserve deterministic local session metadata behavior for tested inputs by reading custom policy metadata as ordered policy lists or ID-keyed maps, reporting malformed or missing custom policy metadata as errors, storing policy lists back into metadata, copying supported developer, rate-limit pattern, tag, and policy metadata into sessions, and ignoring unsupported tag element types without claiming policy merge behavior, gateway session lookup, persistence backends, authorization decisions, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: user_session_metadata
+rationale: Session metadata helpers are consumed by higher-level policy and session flows. This requirement owns the local helper behavior only and does not claim integrated gateway policy enforcement.
+tags:
+    - user
+    - session
+    - metadata
+    - helper
+variables: []
+traces:
+    reviewed_at: "2026-06-21T04:04:09.963906Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:e4ab9814c183289fe55aad107540501242dbb8d40b28f7aa7164e36f5ed1c637
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. User session metadata scope is limited to local user-package helpers: custom policy list/map extraction from session metadata, malformed or missing policy metadata errors, policy-list writes into metadata, supported metadata tag copies, and unsupported tag element filtering. This approval does not claim policy merge behavior, gateway session lookup, persistence backends, authorization decisions, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need local user session metadata helpers to preserve custom policies and supported metadata tags consistently for higher-level session and policy flows.
+    acceptance_criteria:
+        - id: STK-REQ-069-AC-01
+          text: Given tested user session metadata inputs, when custom policy helpers and tag metadata helpers are exercised, then policy metadata is read, written, or rejected deterministically and supported metadata fields are copied while unsupported tag elements are ignored.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-157
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added user session metadata helper requirement.
+          changed_by: agent:codex

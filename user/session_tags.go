@@ -1,6 +1,7 @@
 package user
 
 // TagsFromMetadata updates the session state with the tags from the metadata.
+// SW-REQ-144
 func (s *SessionState) TagsFromMetadata(data map[string]interface{}) (updateSession bool) {
 	developerID, keyFound := data["tyk_developer_id"].(string)
 	if keyFound {

@@ -1,0 +1,64 @@
+id: SYS-REQ-157
+version: 1
+status: approved
+priority: shall
+category: user_session_metadata
+req_type: guarantee
+fretish: the user_session_metadata shall always satisfy user_session_metadata_operation_terminal
+description: User session metadata helper handling shall make local metadata operations terminal and deterministic for custom policy metadata extraction as ordered lists or ID-keyed maps, malformed or missing policy metadata errors, custom policy list storage, supported developer ID, rate-limit pattern, tag, and policy metadata copying, and unsupported tag element filtering for tested paths, without claiming policy merge behavior, gateway session lookup, persistence backends, authorization decisions, or final client responses.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-069
+component: user_session_metadata
+rationale: This system requirement owns local user-package metadata helper decisions only. Integrated session lookup, policy application, persistence, authorization, and transport behavior remain outside this proof slice.
+tags:
+    - user
+    - session
+    - metadata
+    - helper
+variables:
+    - user_session_metadata_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-069
+    reviewed_at: "2026-06-21T04:03:06.95763Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:575ea9d1ba44374671611ad4759834094f8276566b98ec93fe5b0a324520e9c5
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. User session metadata scope is limited to local user-package helpers: custom policy list/map extraction from session metadata, malformed or missing policy metadata errors, policy-list writes into metadata, supported metadata tag copies, and unsupported tag element filtering. This approval does not claim policy merge behavior, gateway session lookup, persistence backends, authorization decisions, or final client responses.'
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-21T00:00:00Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-157|user_session_metadata_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. SYS-REQ-157''s user_session_metadata_operation_terminal variable is decomposed by SW-REQ-144 for local user-package metadata helper behavior only: custom policy list/map extraction, malformed or missing policy metadata errors, policy-list writes, supported metadata tag copies, and unsupported tag element filtering. Policy merge behavior, gateway session lookup, persistence backends, authorization decisions, and final client responses remain outside this proof slice.'
+          reviewed_at: "2026-06-21T00:00:00Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added user session metadata helper system requirement.
+          changed_by: agent:codex

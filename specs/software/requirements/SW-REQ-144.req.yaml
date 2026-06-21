@@ -1,0 +1,56 @@
+id: SW-REQ-144
+version: 1
+status: approved
+priority: shall
+category: user_session_metadata
+req_type: guarantee
+fretish: ""
+description: The user package implementation shall preserve local session metadata helper behavior for custom policy metadata extraction as ordered lists or ID-keyed maps, malformed or missing policy metadata errors, custom policy list storage, supported developer ID, rate-limit pattern, tag, and policy metadata copying, and unsupported tag element filtering for tested paths, without claiming policy merge behavior, gateway session lookup, persistence backends, authorization decisions, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: user/custom_policies_test.go; user/session_tags_test.go; docs/user-session-metadata-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-157
+component: user_session_metadata
+rationale: This software requirement owns local user-package metadata helper mechanics and focused user package tests only. Integrated policy application, session lookup, persistence, authorization, and transport behavior are outside this proof slice.
+tags:
+    - user
+    - session
+    - metadata
+    - helper
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-157
+    reviewed_at: "2026-06-21T04:03:06.906484Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:c4c4d0b8c0a9656a5ef9d314b0d845a0ee80d3c4fa1ae6e66a29673e449aaf8e
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. User session metadata scope is limited to local user-package helpers: custom policy list/map extraction from session metadata, malformed or missing policy metadata errors, policy-list writes into metadata, supported metadata tag copies, and unsupported tag element filtering. This approval does not claim policy merge behavior, gateway session lookup, persistence backends, authorization decisions, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added local user session metadata helper behavior.
+          changed_by: agent:codex

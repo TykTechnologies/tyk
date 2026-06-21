@@ -8,6 +8,7 @@ import (
 
 // CustomPolicies returns a map of custom policies on the session.
 // To preserve policy order, use GetCustomPolicies instead.
+// SW-REQ-144
 func (s *SessionState) CustomPolicies() (map[string]Policy, error) {
 	customPolicies, err := s.GetCustomPolicies()
 	if err != nil {
@@ -23,6 +24,7 @@ func (s *SessionState) CustomPolicies() (map[string]Policy, error) {
 }
 
 // GetCustomPolicies is like CustomPolicies but returns the list, preserving order.
+// SW-REQ-144
 func (s *SessionState) GetCustomPolicies() ([]Policy, error) {
 	var (
 		customPolicies []Policy
@@ -46,6 +48,7 @@ func (s *SessionState) GetCustomPolicies() ([]Policy, error) {
 }
 
 // SetCustomPolicies sets custom policies into session metadata.
+// SW-REQ-144
 func (s *SessionState) SetCustomPolicies(list []Policy) {
 	if s.MetaData == nil {
 		s.MetaData = make(map[string]interface{})

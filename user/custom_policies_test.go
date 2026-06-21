@@ -7,8 +7,20 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
+// Verifies: STK-REQ-069, SYS-REQ-157, SW-REQ-144
+// STK-REQ-069:STK-REQ-069-AC-01:acceptance
+// SW-REQ-144:nominal:nominal
+// SW-REQ-144:boundary:nominal
+// SW-REQ-144:error_handling:negative
+// SW-REQ-144:error_handling:nominal
+// SW-REQ-144:encoding_safety:nominal
+// SYS-REQ-157:error_handling:nominal
+// STK-REQ-069:error_handling:negative
+// MCDC SYS-REQ-157: user_session_metadata_operation_terminal=T => TRUE
+//mcdc:ignore SYS-REQ-157: user_session_metadata_operation_terminal=F => FALSE -- the onboarded user session metadata operations are synchronous local helpers that either read policy metadata, return explicit metadata errors, write policy metadata, copy supported metadata fields, ignore unsupported tag elements, or return no-update before returning; a non-terminal local result is not a reachable runtime state for these APIs [category: defensive] [reviewed: human:buger]
 func TestSessionState_CustomPolicies(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -86,6 +98,57 @@ func TestSessionState_CustomPolicies(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-069, SYS-REQ-157, SW-REQ-144
+// SW-REQ-144:nominal:nominal
+// SW-REQ-144:boundary:nominal
+// SW-REQ-144:error_handling:negative
+// SW-REQ-144:encoding_safety:nominal
+func TestSessionState_GetCustomPoliciesPreservesOrder(t *testing.T) {
+	tests := []struct {
+		name    string
+		session *SessionState
+		want    []Policy
+		wantErr bool
+	}{
+		{
+			name:    "missing policies",
+			session: &SessionState{MetaData: map[string]interface{}{}},
+			wantErr: true,
+		},
+		{
+			name: "preserves metadata order",
+			session: &SessionState{
+				MetaData: map[string]interface{}{
+					"policies": []interface{}{
+						map[string]interface{}{"id": "first", "name": "First"},
+						map[string]interface{}{"id": "second", "name": "Second"},
+					},
+				},
+			},
+			want: []Policy{
+				{ID: "first", Name: "First"},
+				{ID: "second", Name: "Second"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.session.GetCustomPolicies()
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// Verifies: STK-REQ-069, SYS-REQ-157, SW-REQ-144
+// SW-REQ-144:nominal:nominal
+// SW-REQ-144:boundary:boundary
+// SW-REQ-144:encoding_safety:nominal
 func TestSessionState_SetCustomPolicies(t *testing.T) {
 
 	policies := []Policy{{ID: "test"}}
