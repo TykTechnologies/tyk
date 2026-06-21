@@ -37,14 +37,14 @@ verification:
         comment: >-
             Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-20. Gateway policy management system scope is limited to local helper terminality for loaded-policy lookup/listing, tested policy route-dispatch wrappers, policy storage root selection, file-backed policy add/update status handling for malformed input, invalid or mismatched IDs, service policy-source rejection, missing IDs, storage-root errors, successful writes, and file-backed policy deletion status handling. The FRETish invariant intentionally models local operation terminality without asserting policy engine merge semantics, policy reload propagation, dashboard behavior, distributed synchronization, storage durability, filesystem permissions beyond returned helper errors, or final client-visible gateway authorization behavior.
         ai_generated: false
-    gaps_reviewed_at: "2026-06-20T20:43:32.949625Z"
+    gaps_reviewed_at: "2026-06-21T01:26:40.111331Z"
     gaps_reviewed_by: human:buger
     gap_reviews:
         - check: decomposition
           issue_key: decomposition|SYS-REQ-142|gateway_policy_management_operation_terminal
           reviewer: human:buger
-          reason: 'Reviewed after gateway policy-management scope extension; SW-REQ-129 decomposes gateway_policy_management_operation_terminal for the local helper and tested route-dispatch behavior now claimed.'
-          reviewed_at: "2026-06-20T20:43:32.949625Z"
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. The current decomposition findings are limited to local operation terminality variables. SW-REQ-126, SW-REQ-128, and SW-REQ-129 decompose the matching gateway control API, key-management, and policy-management local helper terminality scopes respectively; runtime authentication, persistence durability, distributed synchronization, policy merge semantics, network transport behavior, and final client-visible gateway authorization behavior remain outside these proof slices.'
+          reviewed_at: "2026-06-21T01:26:40.111331Z"
 history:
     created_by: agent:codex
     created_at: "2026-06-20T19:58:42Z"
