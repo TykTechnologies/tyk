@@ -12,14 +12,44 @@ const (
 	now          = 1546259837
 )
 
-func TestMasherySha256Sum_Hash(t *testing.T) {
-	expected := "fce2e80253cd438b666341176f34bde499116b63719e2482dae6965518ffd316"
+// Verifies: STK-REQ-087, SYS-REQ-175, SW-REQ-162
+// STK-REQ-087:STK-REQ-087-AC-01:acceptance
+// SW-REQ-162:nominal:nominal
+// SW-REQ-162:boundary:nominal
+// SW-REQ-162:encoding_safety:nominal
+// SW-REQ-162:determinism:nominal
+func TestMasheryHashers(t *testing.T) {
+	tests := []struct {
+		name       string
+		hasher     Hasher
+		wantName   string
+		wantDigest string
+	}{
+		{
+			name:       "sha256",
+			hasher:     MasherySha256Sum{},
+			wantName:   "MasherySHA256",
+			wantDigest: "fce2e80253cd438b666341176f34bde499116b63719e2482dae6965518ffd316",
+		},
+		{
+			name:       "md5",
+			hasher:     MasheryMd5sum{},
+			wantName:   "MasheryMD5",
+			wantDigest: "eb7cc742c07c2ce0d71fa2d5a6f81a91",
+		},
+	}
 
-	hasher := MasherySha256Sum{}
-	hashed := hex.EncodeToString(hasher.Hash(token, sharedSecret, now))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.hasher.Name(); got != tt.wantName {
+				t.Fatalf("expected %s name, got %s", tt.wantName, got)
+			}
 
-	if hashed != expected {
-		t.Fatalf("expected %s, got %s", expected, hashed)
+			hashed := hex.EncodeToString(tt.hasher.Hash(token, sharedSecret, now))
+			if hashed != tt.wantDigest {
+				t.Fatalf("expected %s, got %s", tt.wantDigest, hashed)
+			}
+		})
 	}
 }
 

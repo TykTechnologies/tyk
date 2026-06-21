@@ -17,6 +17,7 @@ type SignatureValidator struct {
 	h Hasher
 }
 
+// SW-REQ-162
 func (v *SignatureValidator) Init(hasherName string) error {
 	switch hasherName {
 	case "MasherySHA256":
@@ -30,6 +31,7 @@ func (v *SignatureValidator) Init(hasherName string) error {
 	return nil
 }
 
+// SW-REQ-162
 func (v SignatureValidator) Validate(signature, key, secret string, allowedClockSkew int64) error {
 	signatureBytes, _ := hex.DecodeString(signature)
 	now := time.Now().Unix()

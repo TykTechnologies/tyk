@@ -1,0 +1,55 @@
+id: SYS-REQ-175
+version: 1
+status: approved
+priority: shall
+category: authentication
+req_type: guarantee
+fretish: ""
+description: Mashery signature validator handling shall preserve deterministic local helper results for tested inputs by exposing stable Mashery SHA256 and MD5 hasher names, constructing digests from token, shared secret, and timestamp values, initializing supported hashers while rejecting unsupported hasher names, rejecting missing and incorrect signature attempts, rejecting signatures outside allowed clock skew, and accepting current or within-skew signatures, without claiming gateway request admission, token lookup, secret resolution, API configuration selection, replay protection, constant-time comparison, behavior before successful validator initialization, full Mashery protocol compatibility, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-087
+component: signature_validator
+rationale: This system requirement owns local signature_validator helper behavior only. Integrated gateway middleware behavior remains outside this proof slice.
+tags:
+    - authentication
+    - signature
+    - mashery
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-087
+    reviewed_at: "2026-06-21T07:37:58.34742Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:d98a128d9b3e7b5ed4d9185152cfa43adabd7bc915a3009f87cd487f61df53e5
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Mashery signature validator scope is limited to local signature_validator behavior for tested stable SHA256/MD5 hasher names, digest construction from token/secret/timestamp inputs, supported and unsupported hasher initialization, missing/incorrect signature rejection, outside-skew rejection, and current or within-skew signature acceptance. This approval does not claim gateway request admission, token lookup, secret resolution, API configuration selection, replay protection, constant-time comparison, behavior before successful validator initialization, full Mashery protocol compatibility, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added Mashery signature validator system requirement.
+          changed_by: agent:codex

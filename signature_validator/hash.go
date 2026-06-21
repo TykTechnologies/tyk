@@ -13,10 +13,12 @@ type Hasher interface {
 
 type MasherySha256Sum struct{}
 
+// SW-REQ-162
 func (m MasherySha256Sum) Name() string {
 	return "MasherySHA256"
 }
 
+// SW-REQ-162
 func (m MasherySha256Sum) Hash(token string, sharedSecret string, timeStamp int64) []byte {
 	signature := sha256.Sum256([]byte(token + sharedSecret + strconv.FormatInt(timeStamp, 10)))
 
@@ -25,10 +27,12 @@ func (m MasherySha256Sum) Hash(token string, sharedSecret string, timeStamp int6
 
 type MasheryMd5sum struct{}
 
+// SW-REQ-162
 func (m MasheryMd5sum) Name() string {
 	return "MasheryMD5"
 }
 
+// SW-REQ-162
 func (m MasheryMd5sum) Hash(token string, sharedSecret string, timeStamp int64) []byte {
 	signature := md5.Sum([]byte(token + sharedSecret + strconv.FormatInt(timeStamp, 10)))
 
