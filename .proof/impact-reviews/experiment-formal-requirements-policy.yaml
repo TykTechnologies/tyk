@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T08:58:59Z"
+generated_at: "2026-06-21T09:08:07Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -993,6 +993,86 @@ reviews:
       approval_fingerprint: sha256:0ed1a2f65d97b3f13d44f7663a9a80faad737e71d582e405b8195b74b4be3855
       artifact_fingerprint: sha256:77de0454bd246ae365172a3bc05d7f7f9609a9ca3db7c6598d2e49c246f240fc
       reviewed_at: "2026-06-21T08:58:59Z"
+    - requirement: SW-REQ-167
+      artifact: internal/otel/apimetrics/builder.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed API metrics implementation impact after adding ReqProof annotations and focused JSON decode test; production behavior and the approved API metrics requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:3b4ad4e9dd28feada2ae5f2d23d0365016984826d72552e69314701b795c2227
+      approval_fingerprint: sha256:05bbc32f935245551c40afd19dd1b75d6b8a553b3b57ff44d10245d90654d52f
+      artifact_fingerprint: sha256:85a8a7175e5af08b34882e5410a9b9c5126bb9d6d61a3bbfda076f8e55820823
+      reviewed_at: "2026-06-21T09:08:07Z"
+    - requirement: SW-REQ-167
+      artifact: internal/otel/apimetrics/config.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed API metrics implementation impact after adding ReqProof annotations and focused JSON decode test; production behavior and the approved API metrics requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:3b4ad4e9dd28feada2ae5f2d23d0365016984826d72552e69314701b795c2227
+      approval_fingerprint: sha256:05bbc32f935245551c40afd19dd1b75d6b8a553b3b57ff44d10245d90654d52f
+      artifact_fingerprint: sha256:334b232ad39333622f1441df9f239c9ba250a260b2a6cdd52d6c4dc5eb2a13e0
+      reviewed_at: "2026-06-21T09:08:07Z"
+    - requirement: SW-REQ-167
+      artifact: internal/otel/apimetrics/defaults.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed API metrics implementation impact after adding ReqProof annotations and focused JSON decode test; production behavior and the approved API metrics requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:3b4ad4e9dd28feada2ae5f2d23d0365016984826d72552e69314701b795c2227
+      approval_fingerprint: sha256:05bbc32f935245551c40afd19dd1b75d6b8a553b3b57ff44d10245d90654d52f
+      artifact_fingerprint: sha256:c580e467cc357297918519966aa4685035351627e366af9d327b39cdbd310280
+      reviewed_at: "2026-06-21T09:08:07Z"
+    - requirement: SW-REQ-167
+      artifact: internal/otel/apimetrics/dimension.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed API metrics implementation impact after adding ReqProof annotations and focused JSON decode test; production behavior and the approved API metrics requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:3b4ad4e9dd28feada2ae5f2d23d0365016984826d72552e69314701b795c2227
+      approval_fingerprint: sha256:05bbc32f935245551c40afd19dd1b75d6b8a553b3b57ff44d10245d90654d52f
+      artifact_fingerprint: sha256:59ebf5b70019719c23456ab725c3e981a031f53d33d649d675c79b8401f38c9e
+      reviewed_at: "2026-06-21T09:08:07Z"
+    - requirement: SW-REQ-167
+      artifact: internal/otel/apimetrics/filter.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed API metrics implementation impact after adding ReqProof annotations and focused JSON decode test; production behavior and the approved API metrics requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:3b4ad4e9dd28feada2ae5f2d23d0365016984826d72552e69314701b795c2227
+      approval_fingerprint: sha256:05bbc32f935245551c40afd19dd1b75d6b8a553b3b57ff44d10245d90654d52f
+      artifact_fingerprint: sha256:7bdc28141f5e1187264a7949f206ae3560cf579e0a9efef5044e03a96792dc23
+      reviewed_at: "2026-06-21T09:08:07Z"
+    - requirement: SW-REQ-167
+      artifact: internal/otel/apimetrics/recorder.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed API metrics implementation impact after adding ReqProof annotations and focused JSON decode test; production behavior and the approved API metrics requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:3b4ad4e9dd28feada2ae5f2d23d0365016984826d72552e69314701b795c2227
+      approval_fingerprint: sha256:05bbc32f935245551c40afd19dd1b75d6b8a553b3b57ff44d10245d90654d52f
+      artifact_fingerprint: sha256:c21e86de0848e23f4d9a70d60743b70b70d8d7b57865e637e629543ef77ed7cf
+      reviewed_at: "2026-06-21T09:08:07Z"
+    - requirement: SW-REQ-167
+      artifact: internal/otel/apimetrics/registry.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed API metrics implementation impact after adding ReqProof annotations and focused JSON decode test; production behavior and the approved API metrics requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:3b4ad4e9dd28feada2ae5f2d23d0365016984826d72552e69314701b795c2227
+      approval_fingerprint: sha256:05bbc32f935245551c40afd19dd1b75d6b8a553b3b57ff44d10245d90654d52f
+      artifact_fingerprint: sha256:e88e61023f11f0cc9b14b08c0ce14e1c76f4f816b10856c2e0bfa28eca4b8ffe
+      reviewed_at: "2026-06-21T09:08:07Z"
+    - requirement: SW-REQ-167
+      artifact: internal/otel/apimetrics/validation.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed API metrics implementation impact after adding ReqProof annotations and focused JSON decode test; production behavior and the approved API metrics requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:3b4ad4e9dd28feada2ae5f2d23d0365016984826d72552e69314701b795c2227
+      approval_fingerprint: sha256:05bbc32f935245551c40afd19dd1b75d6b8a553b3b57ff44d10245d90654d52f
+      artifact_fingerprint: sha256:b6a786f2be7ffb8a52f51bda018ece41fa57efd0330df322520a17295cb61380
+      reviewed_at: "2026-06-21T09:08:07Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

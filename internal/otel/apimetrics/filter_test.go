@@ -6,23 +6,43 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestCompiledFilter_Nil(t *testing.T) {
 	var f *CompiledFilter
 	assert.True(t, f.Match("any-api", "GET", 200), "nil filter should match everything")
 	assert.True(t, f.Match("", "", 0), "nil filter should match zero values")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestCompiledFilter_NilInput(t *testing.T) {
 	f := CompileFilter(nil)
 	assert.Nil(t, f, "CompileFilter(nil) should return nil")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestCompiledFilter_EmptyFilter(t *testing.T) {
 	f := CompileFilter(&MetricFilters{})
 	assert.NotNil(t, f, "CompileFilter with empty MetricFilters should return non-nil")
 	assert.True(t, f.Match("any-api", "GET", 200), "empty filter should match everything")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestCompiledFilter_APIIDs(t *testing.T) {
 	f := CompileFilter(&MetricFilters{
 		APIIDs: []string{"api-1", "api-2"},
@@ -34,6 +54,11 @@ func TestCompiledFilter_APIIDs(t *testing.T) {
 	assert.False(t, f.Match("", "GET", 200), "should reject empty API ID")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestCompiledFilter_Methods(t *testing.T) {
 	f := CompileFilter(&MetricFilters{
 		Methods: []string{"GET", "POST"},
@@ -45,6 +70,11 @@ func TestCompiledFilter_Methods(t *testing.T) {
 	assert.False(t, f.Match("any", "DELETE", 200), "should reject DELETE")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestCompiledFilter_MethodsNormalizedAtCompile(t *testing.T) {
 	// CompileFilter uppercases methods at compile time.
 	// Match expects callers to pass uppercase methods (as net/http provides).
@@ -58,6 +88,11 @@ func TestCompiledFilter_MethodsNormalizedAtCompile(t *testing.T) {
 	assert.False(t, f.Match("any", "Put", 200), "mixed-case caller method should not match")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestCompiledFilter_StatusCodes_Exact(t *testing.T) {
 	f := CompileFilter(&MetricFilters{
 		StatusCodes: []string{"200", "404"},
@@ -69,6 +104,11 @@ func TestCompiledFilter_StatusCodes_Exact(t *testing.T) {
 	assert.False(t, f.Match("any", "GET", 500), "should reject 500")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestCompiledFilter_StatusCodes_ClassPattern(t *testing.T) {
 	f := CompileFilter(&MetricFilters{
 		StatusCodes: []string{"2xx", "5xx"},
@@ -83,6 +123,11 @@ func TestCompiledFilter_StatusCodes_ClassPattern(t *testing.T) {
 	assert.False(t, f.Match("any", "GET", 301), "should reject 301")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestCompiledFilter_StatusCodes_Mixed(t *testing.T) {
 	f := CompileFilter(&MetricFilters{
 		StatusCodes: []string{"200", "4xx"},
@@ -95,6 +140,11 @@ func TestCompiledFilter_StatusCodes_Mixed(t *testing.T) {
 	assert.False(t, f.Match("any", "GET", 500), "should reject 500")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestCompiledFilter_Combined(t *testing.T) {
 	f := CompileFilter(&MetricFilters{
 		APIIDs:      []string{"api-1"},
@@ -115,6 +165,11 @@ func TestCompiledFilter_Combined(t *testing.T) {
 	assert.False(t, f.Match("api-1", "GET", 500), "wrong status code")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestStatusCodeMatcher_Matches(t *testing.T) {
 	tests := []struct {
 		name    string

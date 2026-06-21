@@ -1,0 +1,59 @@
+id: STK-REQ-092
+version: 1
+status: approved
+priority: shall
+category: observability
+req_type: guarantee
+fretish: ""
+description: API metrics support shall preserve deterministic local metric-definition behavior for tested inputs by decoding JSON metric configuration, providing default RED metric definitions, validating metric definitions, extracting configured dimensions with defaults, truncating API-key labels for cardinality control, compiling and matching filters, reusing dimension builders safely, creating instrument registries and source-need flags, and recording local counter and histogram values for tested request contexts without claiming collector/exporter delivery, OpenTelemetry SDK provider correctness, gateway middleware admission, full HTTP request lifecycle behavior, metric backend storage, dashboard visibility, cardinality safety for arbitrary operator-supplied labels, or final client-visible behavior beyond the focused API metrics tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: api_metrics
+rationale: Gateway API metrics depend on a local definition, extraction, filtering, registry, and recording layer. This requirement owns only the local apimetrics package behavior covered by focused tests.
+tags:
+    - observability
+    - metrics
+    - api-metrics
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T09:07:48Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. API metrics scope is limited to local internal/otel/apimetrics behavior for tested JSON decoding, default RED definitions, definition validation, dimension extraction/defaulting, token truncation, filter compilation and matching, dimension-builder reuse and concurrency, registry source flags, and local counter/histogram recording. This approval does not claim collector/exporter delivery, OpenTelemetry SDK provider correctness, gateway middleware admission, full HTTP request lifecycle behavior, metric backend storage, dashboard visibility, cardinality safety for arbitrary operator-supplied labels, or final client-visible behavior beyond the focused API metrics tests.
+        fingerprint: sha256:5c03fba65d0d3074ba42f93580a51b61831760313ade7e18860484435bcb21e8
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T09:07:48Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need API metrics definitions to be decoded, validated, filtered, and recorded consistently before exporter delivery consumes them.
+    acceptance_criteria:
+        - id: STK-REQ-092-AC-01
+          text: Given tested API metric definitions and request contexts, when the local API metrics helpers decode, validate, build dimensions, apply filters, create registries, and record counters or histograms, then they produce deterministic attributes, recording decisions, recorded values, or explicit local validation errors for the tested inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-180
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added API metrics requirement for focused internal/otel/apimetrics tests.
+          changed_by: agent:codex

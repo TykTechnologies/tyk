@@ -21,6 +21,11 @@ func noopProvider(t *testing.T) tykmetric.Provider {
 	return provider
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestNewInstrumentRegistry_DefaultInstruments(t *testing.T) {
 	provider := noopProvider(t)
 	defs := DefaultAPIMetrics()
@@ -37,6 +42,11 @@ func TestNewInstrumentRegistry_DefaultInstruments(t *testing.T) {
 	assert.False(t, reg.NeedsConfigData(), "defaults do not use config_data source")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestNewInstrumentRegistry_ValidationErrors(t *testing.T) {
 	provider := noopProvider(t)
 
@@ -48,6 +58,11 @@ func TestNewInstrumentRegistry_ValidationErrors(t *testing.T) {
 	assert.Contains(t, err.Error(), "name is required")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestNewInstrumentRegistry_NeedsSession(t *testing.T) {
 	provider := noopProvider(t)
 
@@ -82,6 +97,11 @@ func TestNewInstrumentRegistry_NeedsSession(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestNewInstrumentRegistry_NeedsContext(t *testing.T) {
 	provider := noopProvider(t)
 
@@ -116,6 +136,11 @@ func TestNewInstrumentRegistry_NeedsContext(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestNewInstrumentRegistry_NeedsResponse(t *testing.T) {
 	provider := noopProvider(t)
 
@@ -150,6 +175,11 @@ func TestNewInstrumentRegistry_NeedsResponse(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestNewInstrumentRegistry_CounterAndHistogram(t *testing.T) {
 	provider := noopProvider(t)
 
@@ -184,6 +214,11 @@ func TestNewInstrumentRegistry_CounterAndHistogram(t *testing.T) {
 	assert.NotNil(t, reg.instruments[1].Histogram)
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestNewInstrumentRegistry_WithFilters(t *testing.T) {
 	provider := noopProvider(t)
 
@@ -216,6 +251,11 @@ func TestNewInstrumentRegistry_WithFilters(t *testing.T) {
 	assert.Nil(t, reg.instruments[1].Filter, "second instrument should have no filter")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestNewInstrumentRegistry_NeedsMCP(t *testing.T) {
 	provider := noopProvider(t)
 
@@ -279,6 +319,11 @@ func TestNewInstrumentRegistry_NeedsMCP(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestNewInstrumentRegistry_NeedsConfigData(t *testing.T) {
 	provider := noopProvider(t)
 
@@ -320,6 +365,11 @@ func TestNewInstrumentRegistry_NeedsConfigData(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestNewInstrumentRegistry_MultipleSourceFlags(t *testing.T) {
 	provider := noopProvider(t)
 

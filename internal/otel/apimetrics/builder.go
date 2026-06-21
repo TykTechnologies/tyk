@@ -15,6 +15,7 @@ type DimensionBuilder struct {
 }
 
 // NewDimensionBuilder compiles a builder from dimension definitions.
+// SW-REQ-167
 func NewDimensionBuilder(dims []DimensionDefinition) (*DimensionBuilder, error) {
 	extractors := make([]*DimensionExtractor, 0, len(dims))
 	for _, dim := range dims {
@@ -43,6 +44,7 @@ func NewDimensionBuilder(dims []DimensionDefinition) (*DimensionBuilder, error) 
 
 // Build constructs an attribute KeyValue slice for one request.
 // The caller must call Release with the returned pointer when done.
+// SW-REQ-167
 func (b *DimensionBuilder) Build(rc *RequestContext) (*[]attribute.KeyValue, []attribute.KeyValue) {
 	ref := b.pool.Get().(*[]attribute.KeyValue) //nolint:errcheck // pool.New always returns *[]attribute.KeyValue
 
@@ -58,6 +60,7 @@ func (b *DimensionBuilder) Build(rc *RequestContext) (*[]attribute.KeyValue, []a
 }
 
 // Release returns a KV slice to the pool for reuse.
+// SW-REQ-167
 func (b *DimensionBuilder) Release(ref *[]attribute.KeyValue) {
 	*ref = (*ref)[:0]
 	b.pool.Put(ref)

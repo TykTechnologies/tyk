@@ -75,6 +75,12 @@ func assertMetrics(t *testing.T, tp *metrictest.TestProvider, asserts []metricAs
 // Table-driven tests: Counter scenarios
 // ---------------------------------------------------------------------------
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestRecordAPIMetrics_Counters(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -167,6 +173,12 @@ func TestRecordAPIMetrics_Counters(t *testing.T) {
 // Table-driven tests: Histogram scenarios
 // ---------------------------------------------------------------------------
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestRecordAPIMetrics_Histograms(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -267,6 +279,12 @@ func TestRecordAPIMetrics_Histograms(t *testing.T) {
 // Table-driven tests: Dimension source scenarios
 // ---------------------------------------------------------------------------
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestRecordAPIMetrics_DimensionSources(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -428,6 +446,12 @@ func TestRecordAPIMetrics_DimensionSources(t *testing.T) {
 // Table-driven tests: Filter scenarios
 // ---------------------------------------------------------------------------
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestRecordAPIMetrics_Filters(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -556,6 +580,12 @@ func TestRecordAPIMetrics_Filters(t *testing.T) {
 // Table-driven tests: Multi-instrument scenarios
 // ---------------------------------------------------------------------------
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestRecordAPIMetrics_MultiInstrument(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -641,6 +671,12 @@ func TestRecordAPIMetrics_MultiInstrument(t *testing.T) {
 // Table-driven tests: Default api_metrics config (RED instruments)
 // ---------------------------------------------------------------------------
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestRecordAPIMetrics_DefaultConfig(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -712,6 +748,12 @@ func TestRecordAPIMetrics_DefaultConfig(t *testing.T) {
 // Edge cases (not table-driven — these test nil/empty safety)
 // ---------------------------------------------------------------------------
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestRecordAPIMetrics_NilRequest(t *testing.T) {
 	reg, _ := makeRealRegistry(t, DefaultAPIMetrics())
 
@@ -727,6 +769,12 @@ func TestRecordAPIMetrics_NilRequest(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestRecordAPIMetrics_EmptyRegistry(t *testing.T) {
 	reg, _ := makeRealRegistry(t, []APIMetricDefinition{})
 

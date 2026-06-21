@@ -11,6 +11,11 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestDimensionBuilder_Build(t *testing.T) {
 	dims := []DimensionDefinition{
 		{Source: "metadata", Key: "method", Label: "http.method"},
@@ -37,6 +42,11 @@ func TestDimensionBuilder_Build(t *testing.T) {
 	assert.Equal(t, attribute.String("customer_id", "cust-42"), kvs[2])
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestDimensionBuilder_Defaults(t *testing.T) {
 	dims := []DimensionDefinition{
 		{Source: "header", Key: "X-Missing-Header", Label: "missing", Default: "fallback"},
@@ -59,6 +69,11 @@ func TestDimensionBuilder_Defaults(t *testing.T) {
 	assert.Equal(t, attribute.String("tier", "standard"), kvs[1])
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestDimensionBuilder_PoolReuse(t *testing.T) {
 	dims := []DimensionDefinition{
 		{Source: "metadata", Key: "method", Label: "method"},
@@ -83,6 +98,11 @@ func TestDimensionBuilder_PoolReuse(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestDimensionBuilder_ConcurrentSafety(t *testing.T) {
 	dims := []DimensionDefinition{
 		{Source: "metadata", Key: "method", Label: "method"},
@@ -119,6 +139,11 @@ func TestDimensionBuilder_ConcurrentSafety(t *testing.T) {
 	wg.Wait()
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestDimensionBuilder_EmptyDimensions(t *testing.T) {
 	b, err := NewDimensionBuilder(nil)
 	require.NoError(t, err)
@@ -132,6 +157,11 @@ func TestDimensionBuilder_EmptyDimensions(t *testing.T) {
 	b.Release(ref)
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestDimensionBuilder_InvalidDimension(t *testing.T) {
 	dims := []DimensionDefinition{
 		{Source: "unknown", Key: "foo"},

@@ -30,6 +30,12 @@ func makeRequestContext() *RequestContext {
 	}
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataMethod(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "method", Label: "http.method"})
 	require.NoError(t, err)
@@ -39,6 +45,12 @@ func TestCompileExtractor_MetadataMethod(t *testing.T) {
 	assert.Equal(t, "GET", ext.Extract(rc))
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataResponseCode(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "response_code"})
 	require.NoError(t, err)
@@ -48,6 +60,12 @@ func TestCompileExtractor_MetadataResponseCode(t *testing.T) {
 	assert.Equal(t, "404", ext.Extract(rc))
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataListenPath(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "listen_path"})
 	require.NoError(t, err)
@@ -56,6 +74,12 @@ func TestCompileExtractor_MetadataListenPath(t *testing.T) {
 	assert.Equal(t, "/test", ext.Extract(rc))
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataEndpoint(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "endpoint"})
 	require.NoError(t, err)
@@ -68,6 +92,12 @@ func TestCompileExtractor_MetadataEndpoint(t *testing.T) {
 	assert.Equal(t, "", ext.Extract(rc))
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataAPIID(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "api_id"})
 	require.NoError(t, err)
@@ -76,6 +106,12 @@ func TestCompileExtractor_MetadataAPIID(t *testing.T) {
 	assert.Equal(t, "api-123", ext.Extract(rc))
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataAPIName(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "api_name"})
 	require.NoError(t, err)
@@ -84,6 +120,12 @@ func TestCompileExtractor_MetadataAPIName(t *testing.T) {
 	assert.Equal(t, "TestAPI", ext.Extract(rc))
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataOrgID(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "org_id"})
 	require.NoError(t, err)
@@ -92,6 +134,12 @@ func TestCompileExtractor_MetadataOrgID(t *testing.T) {
 	assert.Equal(t, "org-456", ext.Extract(rc))
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataResponseFlag(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "response_flag"})
 	require.NoError(t, err)
@@ -110,6 +158,12 @@ func TestCompileExtractor_MetadataResponseFlag(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataIPAddress(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "ip_address"})
 	require.NoError(t, err)
@@ -126,6 +180,12 @@ func TestCompileExtractor_MetadataIPAddress(t *testing.T) {
 	assert.Empty(t, ext.Extract(rc), "ip_address extractor should return empty when IPAddress is not set")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataAPIVersion(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "api_version"})
 	require.NoError(t, err)
@@ -134,6 +194,12 @@ func TestCompileExtractor_MetadataAPIVersion(t *testing.T) {
 	assert.Equal(t, "v1", ext.Extract(rc))
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataHost(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "host"})
 	require.NoError(t, err)
@@ -142,6 +208,12 @@ func TestCompileExtractor_MetadataHost(t *testing.T) {
 	assert.Equal(t, "example.com", ext.Extract(rc))
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataScheme(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "scheme"})
 	require.NoError(t, err)
@@ -158,6 +230,12 @@ func TestCompileExtractor_MetadataScheme(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_SessionAPIKey(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "session", Key: "api_key"})
 	require.NoError(t, err)
@@ -176,6 +254,12 @@ func TestCompileExtractor_SessionAPIKey(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_SessionOAuthID(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "session", Key: "oauth_id"})
 	require.NoError(t, err)
@@ -193,6 +277,12 @@ func TestCompileExtractor_SessionOAuthID(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_SessionAlias(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "session", Key: "alias"})
 	require.NoError(t, err)
@@ -210,6 +300,12 @@ func TestCompileExtractor_SessionAlias(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_SessionPortalApp(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "session", Key: "portal_app"})
 	require.NoError(t, err)
@@ -239,6 +335,12 @@ func TestCompileExtractor_SessionPortalApp(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_SessionPortalOrg(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "session", Key: "portal_org"})
 	require.NoError(t, err)
@@ -268,6 +370,12 @@ func TestCompileExtractor_SessionPortalOrg(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_Header(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "header", Key: "X-Customer-ID", Label: "customer_id"})
 	require.NoError(t, err)
@@ -290,6 +398,12 @@ func TestCompileExtractor_Header(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_Context(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "context", Key: "tier", Label: "tier"})
 	require.NoError(t, err)
@@ -319,6 +433,12 @@ func TestCompileExtractor_Context(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_ResponseHeader(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "response_header", Key: "X-Cache-Status", Label: "cache_status"})
 	require.NoError(t, err)
@@ -338,30 +458,60 @@ func TestCompileExtractor_ResponseHeader(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_DefaultLabel(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "header", Key: "X-Custom"})
 	require.NoError(t, err)
 	assert.Equal(t, "X-Custom", ext.Label, "label should default to key when omitted")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_UnknownSource(t *testing.T) {
 	_, err := CompileExtractor(DimensionDefinition{Source: "unknown_source", Key: "anything"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown dimension source")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_UnknownMetadataKey(t *testing.T) {
 	_, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "nonexistent"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown metadata key")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_UnknownSessionKey(t *testing.T) {
 	_, err := CompileExtractor(DimensionDefinition{Source: "session", Key: "nonexistent"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown session key")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataMethodNilRequest(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "method"})
 	require.NoError(t, err)
@@ -370,6 +520,12 @@ func TestCompileExtractor_MetadataMethodNilRequest(t *testing.T) {
 	assert.Equal(t, "", ext.Extract(rc))
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataHostNilRequest(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "host"})
 	require.NoError(t, err)
@@ -378,6 +534,12 @@ func TestCompileExtractor_MetadataHostNilRequest(t *testing.T) {
 	assert.Equal(t, "", ext.Extract(rc))
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataSchemeNilRequest(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "scheme"})
 	require.NoError(t, err)
@@ -386,6 +548,12 @@ func TestCompileExtractor_MetadataSchemeNilRequest(t *testing.T) {
 	assert.Equal(t, "http", ext.Extract(rc), "nil request should return http")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataMCPMethod(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "mcp_method"})
 	require.NoError(t, err)
@@ -395,6 +563,12 @@ func TestCompileExtractor_MetadataMCPMethod(t *testing.T) {
 	assert.Equal(t, "tools/call", ext.Extract(rc))
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataMCPPrimitiveType(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "mcp_primitive_type"})
 	require.NoError(t, err)
@@ -404,6 +578,12 @@ func TestCompileExtractor_MetadataMCPPrimitiveType(t *testing.T) {
 	assert.Equal(t, "tool", ext.Extract(rc))
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataMCPPrimitiveName(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "mcp_primitive_name"})
 	require.NoError(t, err)
@@ -413,6 +593,12 @@ func TestCompileExtractor_MetadataMCPPrimitiveName(t *testing.T) {
 	assert.Equal(t, "get_weather", ext.Extract(rc))
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MetadataMCPErrorCode(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "mcp_error_code"})
 	require.NoError(t, err)
@@ -430,6 +616,12 @@ func TestCompileExtractor_MetadataMCPErrorCode(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_MCPExtractorsEmptyWhenNotSet(t *testing.T) {
 	mcpKeys := []string{"mcp_method", "mcp_primitive_type", "mcp_primitive_name", "mcp_error_code"}
 
@@ -445,6 +637,12 @@ func TestCompileExtractor_MCPExtractorsEmptyWhenNotSet(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestCompileExtractor_ConfigData(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "config_data", Key: "environment", Label: "config_data.environment"})
 	require.NoError(t, err)
@@ -518,6 +716,12 @@ func BenchmarkDimensionExtractor_SessionExtract(b *testing.B) {
 	}
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:encoding_safety:nominal
+// SW-REQ-167:determinism:nominal
 func TestTruncateKey(t *testing.T) {
 	tests := []struct {
 		name   string

@@ -15,6 +15,7 @@ type DimensionExtractor struct {
 
 // CompileExtractor creates a DimensionExtractor from a DimensionDefinition.
 // Called once at startup per dimension.
+// SW-REQ-167
 func CompileExtractor(dim DimensionDefinition) (*DimensionExtractor, error) {
 	label := dim.Label
 	if label == "" {
@@ -200,6 +201,7 @@ var sessionExtractors = map[string]func(rc *RequestContext) string{
 }
 
 // truncateKey returns the last 6 characters of the token for cardinality control.
+// SW-REQ-167
 func truncateKey(token string) string {
 	if len(token) > 6 {
 		return token[len(token)-6:]

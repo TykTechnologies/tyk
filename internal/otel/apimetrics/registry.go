@@ -32,6 +32,7 @@ type InstrumentRegistry struct {
 
 // NewInstrumentRegistry validates definitions, compiles builders and filters,
 // and creates OTel instruments from the provider.
+// SW-REQ-167
 func NewInstrumentRegistry(provider tykmetric.Provider, defs []APIMetricDefinition) (*InstrumentRegistry, error) {
 	warnings, err := ValidateDefinitions(defs)
 	for _, w := range warnings {
@@ -104,16 +105,21 @@ func NewInstrumentRegistry(provider tykmetric.Provider, defs []APIMetricDefiniti
 }
 
 // NeedsSession returns true if any instrument uses session dimensions.
+// SW-REQ-167
 func (r *InstrumentRegistry) NeedsSession() bool { return r.needsSession }
 
 // NeedsContext returns true if any instrument uses context dimensions.
+// SW-REQ-167
 func (r *InstrumentRegistry) NeedsContext() bool { return r.needsContext }
 
 // NeedsResponse returns true if any instrument uses response_header dimensions.
+// SW-REQ-167
 func (r *InstrumentRegistry) NeedsResponse() bool { return r.needsResponse }
 
 // NeedsMCP returns true if any instrument uses MCP metadata dimensions (key prefix "mcp_").
+// SW-REQ-167
 func (r *InstrumentRegistry) NeedsMCP() bool { return r.needsMCP }
 
 // NeedsConfigData returns true if any instrument uses config_data dimensions.
+// SW-REQ-167
 func (r *InstrumentRegistry) NeedsConfigData() bool { return r.needsConfigData }

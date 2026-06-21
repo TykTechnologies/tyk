@@ -10,6 +10,8 @@ type APIMetricDefinitions []APIMetricDefinition
 // a JSON-encoded string into the slice. This enables setting api_metrics via:
 //
 //	TYK_GW_OPENTELEMETRY_METRICS_APIMETRICS=[{"name":"my.counter","type":"counter",...}]
+//
+// SW-REQ-167
 func (d *APIMetricDefinitions) Decode(value string) error {
 	return json.Unmarshal([]byte(value), d)
 }

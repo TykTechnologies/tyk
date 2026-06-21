@@ -4,6 +4,7 @@ import "context"
 
 // RecordAPIMetrics iterates all instruments, applies filters, builds
 // per-instrument attribute sets, and records the value.
+// SW-REQ-167
 func (reg *InstrumentRegistry) RecordAPIMetrics(ctx context.Context, rc *RequestContext) {
 	if rc == nil || rc.Request == nil {
 		return

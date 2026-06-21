@@ -40,6 +40,7 @@ var statusCodeClassPattern = regexp.MustCompile(`^[1-5]xx$`)
 // ValidateDefinitions validates all API metric definitions at startup.
 // Returns any warnings (non-fatal) and the first error encountered.
 // Warnings include high-cardinality risks and threshold violations.
+// SW-REQ-167
 func ValidateDefinitions(defs []APIMetricDefinition) (warnings []string, err error) {
 	names := make(map[string]bool, len(defs))
 

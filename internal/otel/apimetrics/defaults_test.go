@@ -7,11 +7,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:determinism:nominal
 func TestDefaultAPIMetrics_Count(t *testing.T) {
 	defs := DefaultAPIMetrics()
 	assert.Len(t, defs, 4, "expected exactly 4 default instruments")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:determinism:nominal
 func TestDefaultAPIMetrics_NoDuplicateNames(t *testing.T) {
 	defs := DefaultAPIMetrics()
 	names := make(map[string]bool, len(defs))
@@ -21,6 +29,10 @@ func TestDefaultAPIMetrics_NoDuplicateNames(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:determinism:nominal
 func TestDefaultAPIMetrics_AllDimensionsUnder10(t *testing.T) {
 	defs := DefaultAPIMetrics()
 	for _, d := range defs {
@@ -29,6 +41,10 @@ func TestDefaultAPIMetrics_AllDimensionsUnder10(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:determinism:nominal
 func TestDefaultAPIMetrics_NoRouteOrApiNameOrOrgId(t *testing.T) {
 	excludedKeys := map[string]bool{
 		"listen_path": true,
@@ -46,6 +62,10 @@ func TestDefaultAPIMetrics_NoRouteOrApiNameOrOrgId(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:determinism:nominal
 func TestDefaultAPIMetrics_InstrumentTypes(t *testing.T) {
 	defs := DefaultAPIMetrics()
 
@@ -70,6 +90,10 @@ func TestDefaultAPIMetrics_InstrumentTypes(t *testing.T) {
 	assert.Equal(t, 1, counters, "expected 1 counter instrument")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:determinism:nominal
 func TestDefaultAPIMetrics_HistogramSources(t *testing.T) {
 	defs := DefaultAPIMetrics()
 	sources := make(map[string]bool)

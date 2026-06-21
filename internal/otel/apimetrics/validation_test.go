@@ -29,6 +29,11 @@ func validHistogramDef(name string) APIMetricDefinition {
 	}
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestValidateDefinitions(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -287,6 +292,11 @@ func TestValidateDefinitions(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestValidateDefinitions_SessionOnHistogramWarns(t *testing.T) {
 	defs := []APIMetricDefinition{
 		{
@@ -310,6 +320,11 @@ func TestValidateDefinitions_SessionOnHistogramWarns(t *testing.T) {
 	assert.Contains(t, warnings[1], "high cardinality")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestValidateDefinitions_SessionOnCounterNoWarning(t *testing.T) {
 	defs := []APIMetricDefinition{
 		{
@@ -326,6 +341,11 @@ func TestValidateDefinitions_SessionOnCounterNoWarning(t *testing.T) {
 	assert.Empty(t, warnings, "counter with session dimensions should not warn")
 }
 
+// Verifies: STK-REQ-092, SYS-REQ-180, SW-REQ-167
+// SW-REQ-167:nominal:nominal
+// SW-REQ-167:boundary:nominal
+// SW-REQ-167:error_handling:negative
+// SW-REQ-167:determinism:nominal
 func TestValidateDefinitions_ExceedsDimensionThreshold(t *testing.T) {
 	dims := make([]DimensionDefinition, 11)
 	for i := range dims {

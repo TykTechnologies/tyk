@@ -1,0 +1,53 @@
+id: SYS-REQ-180
+version: 1
+status: approved
+priority: shall
+category: observability
+req_type: guarantee
+fretish: ""
+description: API metrics handling shall preserve deterministic local metric-definition results for tested inputs by decoding JSON metric configuration, providing default RED metric definitions, validating metric definitions, extracting configured dimensions with defaults, truncating API-key labels for cardinality control, compiling and matching filters, reusing dimension builders safely, creating instrument registries and source-need flags, and recording local counter and histogram values for tested request contexts without claiming collector/exporter delivery, OpenTelemetry SDK provider correctness, gateway middleware admission, full HTTP request lifecycle behavior, metric backend storage, dashboard visibility, cardinality safety for arbitrary operator-supplied labels, or final client-visible behavior beyond the focused API metrics tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-092
+component: api_metrics
+rationale: This system requirement owns local API metrics helper behavior only. OpenTelemetry provider setup, gateway middleware integration, and exporter delivery remain outside this proof slice.
+tags:
+    - observability
+    - metrics
+    - api-metrics
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-092
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T09:07:48Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. API metrics scope is limited to local internal/otel/apimetrics behavior for tested JSON decoding, default RED definitions, definition validation, dimension extraction/defaulting, token truncation, filter compilation and matching, dimension-builder reuse and concurrency, registry source flags, and local counter/histogram recording. This approval does not claim collector/exporter delivery, OpenTelemetry SDK provider correctness, gateway middleware admission, full HTTP request lifecycle behavior, metric backend storage, dashboard visibility, cardinality safety for arbitrary operator-supplied labels, or final client-visible behavior beyond the focused API metrics tests.
+        fingerprint: sha256:f6ef109d614883cf9f31284f5a1c73e637d615104314a56c62690ebd6368c9fb
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T09:07:48Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added API metrics system requirement.
+          changed_by: agent:codex

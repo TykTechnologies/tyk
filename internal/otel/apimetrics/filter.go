@@ -12,6 +12,7 @@ type statusCodeMatcher struct {
 }
 
 // matches returns true if the status code matches this matcher.
+// SW-REQ-167
 func (m statusCodeMatcher) matches(code int) bool {
 	if m.exact != 0 {
 		return code == m.exact
@@ -34,6 +35,7 @@ type CompiledFilter struct {
 
 // CompileFilter creates a CompiledFilter from config.
 // Returns nil if the input is nil (record everything).
+// SW-REQ-167
 func CompileFilter(f *MetricFilters) *CompiledFilter {
 	if f == nil {
 		return nil
@@ -72,6 +74,7 @@ func CompileFilter(f *MetricFilters) *CompiledFilter {
 
 // Match returns true if the request should be recorded by this instrument.
 // A nil receiver matches everything.
+// SW-REQ-167
 func (f *CompiledFilter) Match(apiID, method string, statusCode int) bool {
 	if f == nil {
 		return true

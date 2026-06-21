@@ -3,6 +3,7 @@ package apimetrics
 // DefaultAPIMetrics returns the built-in RED instrument definitions used when
 // the api_metrics config field is nil (omitted). These provide lean RED metrics
 // out of the box with low-cardinality dimensions.
+// SW-REQ-167
 func DefaultAPIMetrics() []APIMetricDefinition {
 	return []APIMetricDefinition{
 		{
