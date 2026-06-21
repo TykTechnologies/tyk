@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T10:14:12Z"
+generated_at: "2026-06-21T10:32:29Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -893,6 +893,66 @@ reviews:
       approval_fingerprint: sha256:10b471e25dc9dc31f14c5e593ef896bc36411cff07e9a72570bdec8834a0bcfe
       artifact_fingerprint: sha256:01dddd617a4becec1931bccff4a48c7e5c9b09b1bbb5eb516a0e382bc4fefee4
       reviewed_at: "2026-06-21T04:46:47Z"
+    - requirement: SW-REQ-149
+      artifact: gateway/api_loader.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed gateway API loader helper impact after adding auxiliary ReqProof annotations and tests in the shared api_loader.go file; SW-REQ-149 helper behavior and documented design remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:c37921152df29f3cb7f8a331408912a2e608803595fd085c4616779a5bb91f44
+      approval_fingerprint: sha256:ce624f7c8c635821816adb1db6b63f72b6940e55287339511314fdbf9387a2f0
+      artifact_fingerprint: sha256:f8f073fea4034e964783cb59b609ffb2ef174d90e70a5dc3888b056e5f0a7f25
+      reviewed_at: "2026-06-21T10:24:31Z"
+    - requirement: SW-REQ-150
+      artifact: gateway/api_loader.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed gateway API loader storage impact after adding auxiliary ReqProof annotations and tests in the shared api_loader.go file; SW-REQ-150 storage setup behavior and documented design remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:7a891b9cfbde7f063274ff805c156ce05e9d6af1ea5cb80df0ad502d67ae46eb
+      approval_fingerprint: sha256:78f388e27dc4b353470bb47a672a47e9ce90a66a3eb9a55d14038c6a8662d7c4
+      artifact_fingerprint: sha256:f8f073fea4034e964783cb59b609ffb2ef174d90e70a5dc3888b056e5f0a7f25
+      reviewed_at: "2026-06-21T10:27:16Z"
+    - requirement: SW-REQ-151
+      artifact: gateway/api_loader.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed gateway API loader validation impact after adding auxiliary ReqProof annotations and tests in the shared api_loader.go file; SW-REQ-151 validation behavior and documented design remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:3ca332e40de9508be0c5bf19d44a2786c24d8bde9d15c556e89d6e0fe8b14bb1
+      approval_fingerprint: sha256:469aa9ebdf15e14340d2abb2db19e08cad4a0c8f6f78bd9c08ffa3ebfe449643
+      artifact_fingerprint: sha256:f8f073fea4034e964783cb59b609ffb2ef174d90e70a5dc3888b056e5f0a7f25
+      reviewed_at: "2026-06-21T10:29:05Z"
+    - requirement: SW-REQ-152
+      artifact: gateway/api_loader.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed gateway API loader loop-detection impact after adding auxiliary ReqProof annotations and tests in the shared api_loader.go file; SW-REQ-152 loop-detection behavior and documented design remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:ef7ec77e1b7e24c89e69ed7dd60903450627b58b24c21cf84cae9235b795190c
+      approval_fingerprint: sha256:e01dbdf195d4367890fe036c7a48677838c9f786631df5bce4ac16efe455731e
+      artifact_fingerprint: sha256:f8f073fea4034e964783cb59b609ffb2ef174d90e70a5dc3888b056e5f0a7f25
+      reviewed_at: "2026-06-21T10:30:15Z"
+    - requirement: SW-REQ-153
+      artifact: gateway/api_loader.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed gateway API loader internal-handler lookup impact after adding auxiliary ReqProof annotations and tests in the shared api_loader.go file; SW-REQ-153 lookup behavior and documented design remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:e8b9c5f0b23c312c4ceef1a056aebdcdcedce094dcafb98ab3581490963475a6
+      approval_fingerprint: sha256:5439a19a54bfa98222f4e08b46cf484038a81c51507f53562352cebd744bc1b2
+      artifact_fingerprint: sha256:f8f073fea4034e964783cb59b609ffb2ef174d90e70a5dc3888b056e5f0a7f25
+      reviewed_at: "2026-06-21T10:31:23Z"
+    - requirement: SW-REQ-154
+      artifact: gateway/api_loader.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed gateway API loader explicit-route subpath impact after adding auxiliary ReqProof annotations and tests in the shared api_loader.go file; SW-REQ-154 route-wrapper behavior and documented design remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:1b1a6e870b43586b9280c6e1fac35ee1ccaa65ad0322cfbbe98cde4fd52764ba
+      approval_fingerprint: sha256:8e646d53b4ba9982a765937fa6ee084ad470b5efbe142ca01926acff28d82552
+      artifact_fingerprint: sha256:f8f073fea4034e964783cb59b609ffb2ef174d90e70a5dc3888b056e5f0a7f25
+      reviewed_at: "2026-06-21T10:32:29Z"
     - requirement: SW-REQ-163
       artifact: log/json_formatter.go
       decision: no-authored-change
@@ -1193,6 +1253,16 @@ reviews:
       approval_fingerprint: sha256:c6386e04a25836fca97ac4f085ab614e119dd90463108119d9ee7ee16c97a632
       artifact_fingerprint: sha256:c792320ba3c21ff7085f1f53eadce2f37ed5ee1061eb9571689ff39ec045f8c1
       reviewed_at: "2026-06-21T10:14:12Z"
+    - requirement: SW-REQ-175
+      artifact: gateway/api_loader.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed gateway API loader auxiliary implementation impact after adding ReqProof annotations and focused evidence links; production behavior and the approved auxiliary requirement remain unchanged except for proof annotations.
+      base: origin/master
+      requirement_fingerprint: sha256:9e04889d1f072c14988c077321aa23361dd6f9aaa63e88d7c4d32fc3b47708de
+      approval_fingerprint: sha256:a990d5fc7f0e8904001e4fa243ee749a2ed85b372ba8f0a430d64862415fcae7
+      artifact_fingerprint: sha256:f8f073fea4034e964783cb59b609ffb2ef174d90e70a5dc3888b056e5f0a7f25
+      reviewed_at: "2026-06-21T10:23:14Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

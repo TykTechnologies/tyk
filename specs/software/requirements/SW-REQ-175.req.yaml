@@ -1,0 +1,58 @@
+id: SW-REQ-175
+version: 1
+status: approved
+priority: shall
+category: gateway_api_loader_auxiliary
+req_type: guarantee
+fretish: ""
+description: The gateway package implementation shall preserve local API-loader auxiliary behavior for tested GraphQL playground route registration and cloud endpoint selection, repeated HTTP service loading with New Relic middleware mounting, aggregate mTLS detection for loaded API specs, invalid-OAS panic recovery text, organization data-age enforcement when organization quotas are enabled, and quota-key option application, without claiming complete API loading, complete route generation, full middleware ordering or execution, New Relic agent correctness, upstream connectivity, GraphQL execution correctness, complete panic-recovery behavior, mTLS authentication enforcement, organization quota correctness, dashboard or RPC synchronization, distributed behavior, or final client-visible gateway behavior outside the focused API-loader auxiliary tests.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: gateway/api_loader_test.go; docs/gateway-api-loader-auxiliary-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-188
+component: gateway_api_loader_auxiliary
+rationale: This software requirement owns local gateway/api_loader.go auxiliary behavior under focused gateway package tests only. Integrated API loading and full request handling remain outside this proof slice.
+tags:
+    - gateway
+    - api-loader
+    - auxiliary
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-188
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T10:22:52Z"
+        comment: Reviewed under explicit chat delegation. Gateway API loader auxiliary scope is limited to tested GraphQL playground route registration and cloud endpoint selection, repeated HTTP service loading with New Relic middleware mounting, aggregate mTLS detection, invalid-OAS panic recovery text, organization data-age enforcement when quotas are enabled, and quota-key option application. Does not claim complete API loading, complete route generation, full middleware ordering or execution, New Relic agent correctness, upstream connectivity, GraphQL execution correctness, complete panic-recovery behavior, mTLS authentication enforcement, organization quota correctness, dashboard or RPC synchronization, distributed behavior, or final client-visible gateway behavior.
+        fingerprint: sha256:a990d5fc7f0e8904001e4fa243ee749a2ed85b372ba8f0a430d64862415fcae7
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T10:22:52Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: draft
+          reason: Added local gateway API loader auxiliary behavior.
+          changed_by: agent:codex
+        - date: "2026-06-21T10:22:52Z"
+          from: draft
+          to: review
+          reason: ""
+          changed_by: human:buger

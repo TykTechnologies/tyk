@@ -130,6 +130,7 @@ func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
 	}
 }
 
+// SW-REQ-175
 func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router) {
 	if spec.GraphQL.GraphQLPlayground.Enabled {
 		gw.loadGraphQLPlayground(spec, router)
@@ -895,6 +896,7 @@ func explicitRouteSubpaths(prefix string, handler http.Handler, enabled bool) ht
 //
 // - register gorilla/mux routing handless with proxyMux directly (wrapped),
 // - return a raw http.Handler for tyk://ID urls.
+// SW-REQ-175
 func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) (*ChainObject, error) {
 	// MakeSpec validates listenpath, but we can't be sure that it's in all the invocation paths.
 	// Since the check is relatively inexpensive, do it here to prevent issues in uncovered paths.
@@ -954,6 +956,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	return chainObj, nil
 }
 
+// SW-REQ-175
 func (gw *Gateway) generateRoutesForPrefixes(spec *APISpec, prefixes []string, enabledStrictRoutes bool, router *mux.Router, chainObj *ChainObject) {
 	for _, prefix := range prefixes {
 		subrouter := router.PathPrefix(prefix).Subrouter()
@@ -1032,6 +1035,7 @@ const (
 	playgroundHTMLTemplateName = "index.html"
 )
 
+// SW-REQ-175
 func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 	// endpoint is a graphql server url to which a playground makes the request.
 
@@ -1297,6 +1301,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	}
 }
 
+// SW-REQ-175
 func recoverFromLoadApiPanic(spec *APISpec, err any) error {
 	if spec.APIDefinition.IsOAS && spec.OAS.GetTykExtension() == nil {
 		return fmt.Errorf("trying to import invalid OAS api %s, skipping", spec.APIID)
@@ -1304,6 +1309,7 @@ func recoverFromLoadApiPanic(spec *APISpec, err any) error {
 	return fmt.Errorf("Panic while loading an API: %v, panic: %v, stacktrace: %v", spec.APIDefinition, err, string(debug.Stack()))
 }
 
+// SW-REQ-175
 func (gw *Gateway) allApisAreMTLS() bool {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
@@ -1317,6 +1323,7 @@ func (gw *Gateway) allApisAreMTLS() bool {
 }
 
 // enforceOrgDataAgeIfQuotasEnabled updates the configuration to enforce organization data age if quotas are enabled.
+// SW-REQ-175
 func (gw *Gateway) enforceOrgDataAgeIfQuotasEnabled(spec *APISpec) {
 	globalConf := gw.GetConfig()
 	if !globalConf.EnforceOrgQuotas {
@@ -1329,6 +1336,7 @@ func (gw *Gateway) enforceOrgDataAgeIfQuotasEnabled(spec *APISpec) {
 }
 
 // WithQuotaKey overrides quota key manually
+// SW-REQ-175
 func WithQuotaKey(key string) option.Option[ProcessSpecOptions] {
 	return func(p *ProcessSpecOptions) {
 		p.quotaKey = key

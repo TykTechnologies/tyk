@@ -190,6 +190,17 @@ func TestAPILoopingName(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-100, SYS-REQ-188, SW-REQ-175
+// STK-REQ-100:STK-REQ-100-AC-01:acceptance
+// STK-REQ-100:nominal:nominal
+// STK-REQ-100:boundary:nominal
+// STK-REQ-100:determinism:nominal
+// SYS-REQ-188:nominal:nominal
+// SYS-REQ-188:boundary:nominal
+// SYS-REQ-188:determinism:nominal
+// SW-REQ-175:nominal:nominal
+// SW-REQ-175:boundary:nominal
+// SW-REQ-175:determinism:nominal
 func TestGraphQLPlayground(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
@@ -323,6 +334,10 @@ func TestTykRateLimitsStatusOfAPI(t *testing.T) {
 	_, _ = g.Run(t, test.TestCase{Path: "/my-api/tyk/rate-limits/", Headers: authHeader, BodyMatch: bodyMatch, Code: http.StatusOK})
 }
 
+// Verifies: STK-REQ-100, SYS-REQ-188, SW-REQ-175
+// SW-REQ-175:nominal:nominal
+// SW-REQ-175:boundary:nominal
+// SW-REQ-175:determinism:nominal
 func TestAllApisAreMTLS(t *testing.T) {
 	// Create a new instance of the Gateway
 	gw := &Gateway{
@@ -9633,6 +9648,10 @@ func TestSortSpecsByListenPath(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-100, SYS-REQ-188, SW-REQ-175
+// STK-REQ-100:error_handling:negative
+// SYS-REQ-188:error_handling:negative
+// SW-REQ-175:error_handling:negative
 func TestRecoverFromLoadApiPanic(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -9667,6 +9686,14 @@ func TestRecoverFromLoadApiPanic(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-100, SYS-REQ-188, SW-REQ-175
+// STK-REQ-100:nominal:nominal
+// STK-REQ-100:boundary:nominal
+// SYS-REQ-188:nominal:nominal
+// SYS-REQ-188:boundary:nominal
+// SW-REQ-175:nominal:nominal
+// SW-REQ-175:boundary:nominal
+// SW-REQ-175:determinism:nominal
 func TestEnforceOrgDataAgeIfQuotasEnabled(t *testing.T) {
 	type testCase struct {
 		name                      string
@@ -9725,6 +9752,40 @@ func TestEnforceOrgDataAgeIfQuotasEnabled(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-100, SYS-REQ-188, SW-REQ-175
+// STK-REQ-100:nominal:nominal
+// STK-REQ-100:determinism:nominal
+// SYS-REQ-188:nominal:nominal
+// SYS-REQ-188:determinism:nominal
+// SW-REQ-175:nominal:nominal
+// SW-REQ-175:determinism:nominal
+func TestWithQuotaKey(t *testing.T) {
+	tests := []struct {
+		name string
+		key  string
+	}{
+		{name: "empty key", key: ""},
+		{name: "custom key", key: "trace-quota-key"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			options := ProcessSpecOptions{quotaKey: "original"}
+
+			WithQuotaKey(tt.key)(&options)
+
+			assert.Equal(t, tt.key, options.quotaKey)
+		})
+	}
+}
+
+// Verifies: STK-REQ-100, SYS-REQ-188, SW-REQ-175
+// STK-REQ-100:nominal:nominal
+// STK-REQ-100:error_handling:nominal
+// SYS-REQ-188:nominal:nominal
+// SYS-REQ-188:error_handling:nominal
+// SW-REQ-175:nominal:nominal
+// SW-REQ-175:error_handling:nominal
 func TestNewRelicMounting(t *testing.T) {
 	mwExecuted := make(chan bool, 1)
 
