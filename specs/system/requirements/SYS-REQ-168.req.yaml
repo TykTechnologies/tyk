@@ -1,0 +1,55 @@
+id: SYS-REQ-168
+version: 1
+status: approved
+priority: shall
+category: user_session_json_serialization
+req_type: guarantee
+fretish: ""
+description: User session JSON serialization handling shall preserve deterministic local JSON encoding and decoding results for tested session, policy, access-definition, limit, collection, MCP access-control, smoothing, and post-expiry fields by omitting zero values, preserving configured non-zero values, accepting legacy all-field session JSON, accepting compact session JSON with default zero values, and round-tripping post-expiry session fields, without claiming policy merge behavior, gateway authentication, persistence backends, runtime quota enforcement, session lifetime expiration behavior, endpoint limit execution, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-080
+component: user_session_json_serialization
+rationale: This system requirement owns local user-package JSON shape and compatibility decisions only. Integrated policy application, authentication, persistence, quota enforcement, lifetime expiration, endpoint execution, and transport behavior remain outside this proof slice.
+tags:
+    - user
+    - session
+    - serialization
+    - json
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-080
+    reviewed_at: "2026-06-21T06:05:41.375892Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:45889acfff977b0844009a76f021b415ebd81d8dab1d5ce3a5f714fa18bf441a
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. User session JSON serialization scope is limited to local user-package JSON shape behavior for tested session, policy, access-definition, limit, collection, MCP access-control, smoothing, and post-expiry fields. This approval does not claim policy merge behavior, gateway authentication, persistence backends, runtime quota enforcement, session lifetime expiration behavior, endpoint limit execution, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added user session JSON serialization system requirement.
+          changed_by: agent:codex

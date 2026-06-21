@@ -20,6 +20,7 @@ import (
 // SYS-REQ-157:error_handling:nominal
 // STK-REQ-069:error_handling:negative
 // MCDC SYS-REQ-157: user_session_metadata_operation_terminal=T => TRUE
+//
 //mcdc:ignore SYS-REQ-157: user_session_metadata_operation_terminal=F => FALSE -- the onboarded user session metadata operations are synchronous local helpers that either read policy metadata, return explicit metadata errors, write policy metadata, copy supported metadata fields, ignore unsupported tag elements, or return no-update before returning; a non-terminal local result is not a reachable runtime state for these APIs [category: defensive] [reviewed: human:buger]
 func TestSessionState_CustomPolicies(t *testing.T) {
 	tests := []struct {
@@ -181,6 +182,9 @@ func TestSessionState_SetCustomPolicies(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-080, SYS-REQ-168, SW-REQ-155
+// SW-REQ-155:boundary:boundary
+// SW-REQ-155:encoding_safety:nominal
 func TestPolicy_PostExpiryAction_OmittedWhenUnset(t *testing.T) {
 	p := Policy{ID: "p1", Name: "unset"}
 
@@ -190,6 +194,9 @@ func TestPolicy_PostExpiryAction_OmittedWhenUnset(t *testing.T) {
 		"expected post_expiry_action to be omitted when unset, got: %s", string(b))
 }
 
+// Verifies: STK-REQ-080, SYS-REQ-168, SW-REQ-155
+// SW-REQ-155:nominal:nominal
+// SW-REQ-155:encoding_safety:nominal
 func TestPolicy_PostExpiryAction_IncludedWhenSet(t *testing.T) {
 	p := Policy{ID: "p1", Name: "set", PostExpiryAction: PostExpiryActionRetain}
 

@@ -723,6 +723,10 @@ func TestEndpointsMap_Endpoints(t *testing.T) {
 
 // TestSessionState_EmptySessionOmitsZeroFields verifies that an empty SessionState
 // serializes to minimal JSON without zero-value fields.
+// Verifies: STK-REQ-080, SYS-REQ-168, SW-REQ-155
+// STK-REQ-080:STK-REQ-080-AC-01:acceptance
+// SW-REQ-155:boundary:boundary
+// SW-REQ-155:encoding_safety:nominal
 func TestSessionState_EmptySessionOmitsZeroFields(t *testing.T) {
 	session := &SessionState{}
 	data, err := json.Marshal(session)
@@ -769,6 +773,9 @@ func TestSessionState_EmptySessionOmitsZeroFields(t *testing.T) {
 }
 
 // TestSessionState_NonZeroFieldsPreserved verifies that non-zero fields are correctly serialized.
+// Verifies: STK-REQ-080, SYS-REQ-168, SW-REQ-155
+// SW-REQ-155:nominal:nominal
+// SW-REQ-155:encoding_safety:nominal
 func TestSessionState_NonZeroFieldsPreserved(t *testing.T) {
 	session := &SessionState{
 		Rate:  100,
@@ -813,6 +820,9 @@ func TestSessionState_NonZeroFieldsPreserved(t *testing.T) {
 }
 
 // TestSessionState_ZeroTimeOmitted verifies that zero time.Time is omitted (key omitzero advantage).
+// Verifies: STK-REQ-080, SYS-REQ-168, SW-REQ-155
+// SW-REQ-155:boundary:boundary
+// SW-REQ-155:encoding_safety:nominal
 func TestSessionState_ZeroTimeOmitted(t *testing.T) {
 	session := &SessionState{
 		DateCreated: time.Time{}, // Zero time
@@ -839,6 +849,9 @@ func TestSessionState_ZeroTimeOmitted(t *testing.T) {
 }
 
 // TestSessionState_NonZeroTimePreserved verifies that non-zero time.Time is correctly serialized.
+// Verifies: STK-REQ-080, SYS-REQ-168, SW-REQ-155
+// SW-REQ-155:nominal:nominal
+// SW-REQ-155:encoding_safety:nominal
 func TestSessionState_NonZeroTimePreserved(t *testing.T) {
 	now := time.Now()
 	session := &SessionState{
@@ -879,6 +892,9 @@ func TestSessionState_NonZeroTimePreserved(t *testing.T) {
 
 // TestSessionState_BackwardCompatibility_OldFormatWithAllFields verifies that
 // JSON with all fields (including zeros) deserializes correctly.
+// Verifies: STK-REQ-080, SYS-REQ-168, SW-REQ-155
+// SW-REQ-155:boundary:nominal
+// SW-REQ-155:encoding_safety:nominal
 func TestSessionState_BackwardCompatibility_OldFormatWithAllFields(t *testing.T) {
 	// Simulate old format with all fields present, including zeros
 	oldFormatJSON := `{
@@ -950,6 +966,9 @@ func TestSessionState_BackwardCompatibility_OldFormatWithAllFields(t *testing.T)
 
 // TestSessionState_ForwardCompatibility_NewCompactFormat verifies that
 // compact JSON (only non-zero fields) deserializes correctly with proper defaults.
+// Verifies: STK-REQ-080, SYS-REQ-168, SW-REQ-155
+// SW-REQ-155:boundary:nominal
+// SW-REQ-155:encoding_safety:nominal
 func TestSessionState_ForwardCompatibility_NewCompactFormat(t *testing.T) {
 	// New compact format with only non-zero fields
 	compactJSON := `{"rate":100,"per":60,"org_id":"org123"}`
@@ -994,6 +1013,8 @@ func TestSessionState_ForwardCompatibility_NewCompactFormat(t *testing.T) {
 // =============================================================================
 
 // TestAPILimit_IsZero_EmptyLimit verifies that IsZero returns true for empty APILimit.
+// Verifies: STK-REQ-070, SYS-REQ-158, SW-REQ-145
+// SW-REQ-145:boundary:boundary
 func TestAPILimit_IsZero_EmptyLimit(t *testing.T) {
 	limit := APILimit{}
 
@@ -1006,6 +1027,9 @@ func TestAPILimit_IsZero_EmptyLimit(t *testing.T) {
 }
 
 // TestAPILimit_IsZero_NonEmpty verifies that IsZero returns false when any field is set.
+// Verifies: STK-REQ-070, SYS-REQ-158, SW-REQ-145
+// SW-REQ-145:nominal:nominal
+// SW-REQ-145:boundary:nominal
 func TestAPILimit_IsZero_NonEmpty(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -1029,6 +1053,9 @@ func TestAPILimit_IsZero_NonEmpty(t *testing.T) {
 }
 
 // TestAccessDefinition_EmptyLimitOmitted verifies that empty Limit is omitted from JSON.
+// Verifies: STK-REQ-080, SYS-REQ-168, SW-REQ-155
+// SW-REQ-155:boundary:boundary
+// SW-REQ-155:encoding_safety:nominal
 func TestAccessDefinition_EmptyLimitOmitted(t *testing.T) {
 	session := &SessionState{
 		Rate:  100,
@@ -1074,6 +1101,9 @@ func TestAccessDefinition_EmptyLimitOmitted(t *testing.T) {
 }
 
 // TestRateLimit_IsZero verifies RateLimit.IsZero() behavior.
+// Verifies: STK-REQ-070, SYS-REQ-158, SW-REQ-145
+// SW-REQ-145:nominal:nominal
+// SW-REQ-145:boundary:boundary
 func TestRateLimit_IsZero(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1313,6 +1343,9 @@ func createComplexSession() *SessionState {
 // and non-enabled smoothing are properly omitted from JSON serialization.
 // This addresses the QA-reported issue where empty arrays like "restricted_types": []
 // and empty objects like "meta_data": {} were appearing in Redis keys.
+// Verifies: STK-REQ-080, SYS-REQ-168, SW-REQ-155
+// SW-REQ-155:boundary:boundary
+// SW-REQ-155:encoding_safety:nominal
 func TestSessionState_EmptyCollectionsOmitted(t *testing.T) {
 	// Create a session with empty (not nil) slices and maps
 	session := &SessionState{
@@ -1388,6 +1421,9 @@ func TestSessionState_EmptyCollectionsOmitted(t *testing.T) {
 
 // TestAccessDefinition_EmptyFieldsOmitted verifies that empty fields in AccessDefinition
 // are properly omitted from JSON serialization.
+// Verifies: STK-REQ-080, SYS-REQ-168, SW-REQ-155
+// SW-REQ-155:boundary:boundary
+// SW-REQ-155:encoding_safety:nominal
 func TestAccessDefinition_EmptyFieldsOmitted(t *testing.T) {
 	ad := AccessDefinition{
 		APIID:             "api123",
@@ -1432,6 +1468,9 @@ func TestAccessDefinition_EmptyFieldsOmitted(t *testing.T) {
 }
 
 // TestRateLimitSmoothing_IsZero verifies that RateLimitSmoothing.IsZero() works correctly.
+// Verifies: STK-REQ-080, SYS-REQ-168, SW-REQ-155
+// SW-REQ-155:nominal:nominal
+// SW-REQ-155:boundary:boundary
 func TestRateLimitSmoothing_IsZero(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1558,6 +1597,9 @@ func BenchmarkSessionState_RoundTrip(b *testing.B) {
 	}
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-043
+// SW-REQ-043:boundary:boundary
+// SW-REQ-043:encoding_safety:nominal
 func TestAccessDefinition_MCPFields_OmittedFromJSONWhenEmpty(t *testing.T) {
 	ad := AccessDefinition{}
 
@@ -1571,6 +1613,9 @@ func TestAccessDefinition_MCPFields_OmittedFromJSONWhenEmpty(t *testing.T) {
 	assert.NotContains(t, out, "mcp_access_rights")
 }
 
+// Verifies: STK-REQ-019, SYS-REQ-107, SW-REQ-043
+// SW-REQ-043:nominal:nominal
+// SW-REQ-043:encoding_safety:nominal
 func TestAccessDefinition_MCPFields_PresentWhenSet(t *testing.T) {
 	ad := AccessDefinition{
 		JSONRPCMethodsAccessRights: AccessControlRules{Allowed: []string{"tools/call"}},
@@ -1587,6 +1632,11 @@ func TestAccessDefinition_MCPFields_PresentWhenSet(t *testing.T) {
 	assert.Contains(t, out, "mcp_access_rights")
 }
 
+// Verifies: STK-REQ-080, SYS-REQ-168, SW-REQ-155
+// SW-REQ-155:nominal:nominal
+// SW-REQ-155:boundary:boundary
+// SW-REQ-155:encoding_safety:nominal
+// SW-REQ-155:determinism:nominal
 func TestSessionState_PostExpiry_JSONSerialization(t *testing.T) {
 	t.Run("zero values omitted", func(t *testing.T) {
 		s := SessionState{}

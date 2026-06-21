@@ -1,0 +1,61 @@
+id: STK-REQ-080
+version: 1
+status: approved
+priority: shall
+category: user_session_json_serialization
+req_type: guarantee
+fretish: ""
+description: User session JSON serialization support shall preserve deterministic local JSON encoding and decoding behavior for tested inputs by omitting zero session, policy, access-definition, limit, collection, MCP access-control, smoothing, and post-expiry fields, preserving configured non-zero fields, accepting legacy all-field session JSON, accepting compact session JSON with default zero values, and round-tripping post-expiry session fields, without claiming policy merge behavior, gateway authentication, persistence backends, runtime quota enforcement, session lifetime expiration behavior, endpoint limit execution, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: user_session_json_serialization
+rationale: Session and policy data are serialized before persistence and gateway flows consume them. This requirement owns only local user-package JSON shape and compatibility behavior under focused tests.
+tags:
+    - user
+    - session
+    - serialization
+    - json
+variables: []
+traces:
+    reviewed_at: "2026-06-21T06:06:52.955978Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:289c2f868fa616252c92e6634a32b86e24c818a803a8d0313d4c077d48b31208
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. User session JSON serialization scope is limited to local user-package JSON shape behavior for tested session, policy, access-definition, limit, collection, MCP access-control, smoothing, and post-expiry fields. This approval does not claim policy merge behavior, gateway authentication, persistence backends, runtime quota enforcement, session lifetime expiration behavior, endpoint limit execution, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - encoding_safety
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need local user session and policy JSON helpers to omit zero fields, preserve configured fields, and accept legacy and compact JSON shapes consistently before persistence or gateway flows consume them.
+    acceptance_criteria:
+        - id: STK-REQ-080-AC-01
+          text: Given tested user session, policy, access-definition, limit, collection, MCP access-control, smoothing, and post-expiry JSON inputs, when local JSON marshal or unmarshal behavior is exercised, then zero fields are omitted, configured fields are preserved, legacy all-field JSON is accepted, compact JSON defaults missing fields to zero values, and post-expiry fields round-trip for those inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-168
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added user session JSON serialization requirement for focused local JSON shape and compatibility tests.
+          changed_by: agent:codex

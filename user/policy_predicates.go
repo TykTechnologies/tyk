@@ -10,6 +10,7 @@ package user
 // quantified axiom rather than re-derived per-call.
 //
 // reqproof:lemma session_tags_len_non_negative proves LemmaSessionTagsLenNonNeg(tags) >= 0 by(SliceLengthNonNegative)
+// SW-REQ-144
 func LemmaSessionTagsLenNonNeg(tags []string) int {
 	return len(tags)
 }
@@ -18,6 +19,7 @@ func LemmaSessionTagsLenNonNeg(tags []string) int {
 // ranges over policy.Tags during the partitioned tag-merge.
 //
 // reqproof:lemma policy_tags_len_non_negative proves LemmaPolicyTagsLenNonNeg(tags) >= 0 by(SliceLengthNonNegative)
+// SW-REQ-144
 func LemmaPolicyTagsLenNonNeg(tags []string) int {
 	return len(tags)
 }
@@ -30,9 +32,11 @@ func LemmaPolicyTagsLenNonNeg(tags []string) int {
 // non-empty tag from metadata; the running count of "valid tags" is the
 // floor for any subsequent length-based decision.
 //
-// reqproof:lemma count_non_empty_tags_nonneg func(tags []string) bool {
-//   return LemmaCountNonEmptyTags(tags) >= 0
-// }
+//	reqproof:lemma count_non_empty_tags_nonneg func(tags []string) bool {
+//	  return LemmaCountNonEmptyTags(tags) >= 0
+//	}
+//
+// SW-REQ-144
 func LemmaCountNonEmptyTags(tags []string) int {
 	count := 0
 	for _, t := range tags {
@@ -55,9 +59,11 @@ func LemmaCountNonEmptyTags(tags []string) int {
 // warning; the invariant that count stays non-negative regardless of
 // where break fires is the safety floor for that diagnostic path.
 //
-// reqproof:lemma scan_tags_break_on_empty_nonneg func(tags []string) bool {
-//   return LemmaScanTagsBreakOnEmpty(tags) >= 0
-// }
+//	reqproof:lemma scan_tags_break_on_empty_nonneg func(tags []string) bool {
+//	  return LemmaScanTagsBreakOnEmpty(tags) >= 0
+//	}
+//
+// SW-REQ-144
 func LemmaScanTagsBreakOnEmpty(tags []string) int {
 	count := 0
 	for i := 0; i < len(tags); i++ {
@@ -74,6 +80,7 @@ func LemmaScanTagsBreakOnEmpty(tags []string) int {
 // Delegates the proof to the standard library lemma SliceLengthNonNegative.
 //
 // reqproof:lemma user_tags_len_nonneg_v2 proves LemmaUserTagsLenMulti(tags) >= 0 by(SliceLengthNonNegative)
+// SW-REQ-144
 func LemmaUserTagsLenMulti(tags []string) int {
 	return len(tags)
 }

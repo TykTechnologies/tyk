@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T04:46:47Z"
+generated_at: "2026-06-21T06:07:12Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -813,6 +813,36 @@ reviews:
       approval_fingerprint: sha256:e08e7b189ca8eb64a78936d516586c0362d52d98d50b51cec76fac2aeb6726c9
       artifact_fingerprint: sha256:c2c035232c5cd8744ed4a1730dede987c137755a0bb87db8dcfddc9b11dbd623
       reviewed_at: "2026-06-21T03:50:41Z"
+    - requirement: SW-REQ-144
+      artifact: user/custom_policies.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: 'Reviewed user/policy_predicates.go change: added SW-REQ-144 trace comments to existing reqproof lemma helpers only. The lemma helper bodies and local session metadata behavior did not change; SW-REQ-144 and its evidence document remain correct.'
+      base: origin/master
+      requirement_fingerprint: sha256:c4c4d0b8c0a9656a5ef9d314b0d845a0ee80d3c4fa1ae6e66a29673e449aaf8e
+      approval_fingerprint: sha256:bc58c452065a9b1714700b1c019b8c5e994c982a8d308a2d844fec427d45bee8
+      artifact_fingerprint: sha256:243df971d683593ff8a0c5f5d162d4c5bfeb5cacb557ac1f6045f04c9991db07
+      reviewed_at: "2026-06-21T06:07:12Z"
+    - requirement: SW-REQ-144
+      artifact: user/policy_predicates.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: 'Reviewed user/policy_predicates.go change: added SW-REQ-144 trace comments to existing reqproof lemma helpers only. The lemma helper bodies and local session metadata behavior did not change; SW-REQ-144 and its evidence document remain correct.'
+      base: origin/master
+      requirement_fingerprint: sha256:c4c4d0b8c0a9656a5ef9d314b0d845a0ee80d3c4fa1ae6e66a29673e449aaf8e
+      approval_fingerprint: sha256:bc58c452065a9b1714700b1c019b8c5e994c982a8d308a2d844fec427d45bee8
+      artifact_fingerprint: sha256:273b49238ab3248b419b414c2ff1cf4f337ae5aced0aa766fb8c59fbb155313a
+      reviewed_at: "2026-06-21T06:07:12Z"
+    - requirement: SW-REQ-144
+      artifact: user/session_tags.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: 'Reviewed user/policy_predicates.go change: added SW-REQ-144 trace comments to existing reqproof lemma helpers only. The lemma helper bodies and local session metadata behavior did not change; SW-REQ-144 and its evidence document remain correct.'
+      base: origin/master
+      requirement_fingerprint: sha256:c4c4d0b8c0a9656a5ef9d314b0d845a0ee80d3c4fa1ae6e66a29673e449aaf8e
+      approval_fingerprint: sha256:bc58c452065a9b1714700b1c019b8c5e994c982a8d308a2d844fec427d45bee8
+      artifact_fingerprint: sha256:235fc3a386d42e52bd0b1ededf6a852aea85c081995f82ea10773979493ee592
+      reviewed_at: "2026-06-21T06:07:12Z"
     - requirement: SW-REQ-145
       artifact: user/policy.go
       decision: no-authored-change
