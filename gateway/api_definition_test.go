@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -2385,6 +2386,203 @@ func TestAPISpecLifecycleHelpers(t *testing.T) {
 	spec.upstreamCertExpiryCancelFunc = nil
 	assert.NotPanics(t, func() {
 		spec.UnloadUpstreamCertMonitoring()
+	})
+}
+
+// Verifies: STK-REQ-063, SYS-REQ-151, SW-REQ-138
+// STK-REQ-063:STK-REQ-063-AC-01:acceptance
+// SYS-REQ-151:nominal:nominal
+// SYS-REQ-151:boundary:nominal
+// SYS-REQ-151:error_handling:nominal
+// SYS-REQ-151:error_handling:negative
+// SYS-REQ-151:determinism:nominal
+// MCDC SYS-REQ-151: gateway_api_spec_local_helpers_operation_requested=F, gateway_api_spec_local_helpers_operation_terminal=F => TRUE
+// MCDC SYS-REQ-151: gateway_api_spec_local_helpers_operation_requested=T, gateway_api_spec_local_helpers_operation_terminal=T => TRUE
+//
+// SW-REQ-138:nominal:nominal
+// SW-REQ-138:boundary:nominal
+// SW-REQ-138:error_handling:nominal
+// SW-REQ-138:error_handling:negative
+// SW-REQ-138:determinism:nominal
+//
+//mcdc:ignore SYS-REQ-151: gateway_api_spec_local_helpers_operation_requested=T, gateway_api_spec_local_helpers_operation_terminal=F => FALSE -- violation row is the negation of the local API spec helper guarantee; these tests assert requested helpers return deterministic redirect-target paths, mock and virtual-endpoint presence decisions, listen-port decisions, round-robin indexes, or explicit local errors [category: defensive] [reviewed: human:buger]
+func TestAPISpecLocalHelperBehaviors(t *testing.T) {
+	t.Run("redirect target URL", func(t *testing.T) {
+		target, err := url.Parse("https://upstream.example/base")
+		require.NoError(t, err)
+
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				Proxy: apidef.ProxyConfig{ListenPath: "/api/"},
+			},
+			target: target,
+		}
+
+		input, err := url.Parse("https://gateway.example/api/users?id=42")
+		require.NoError(t, err)
+
+		got, err := spec.getRedirectTargetUrl(input)
+		require.NoError(t, err)
+		assert.Equal(t, "/upstream.example/users", got.Path)
+		assert.Equal(t, "/upstream.example/users", got.RawPath)
+		assert.Equal(t, "id=42", got.RawQuery)
+
+		_, err = spec.getRedirectTargetUrl(nil)
+		assert.EqualError(t, err, "input url is nil")
+	})
+
+	t.Run("active mock detection", func(t *testing.T) {
+		testCases := []struct {
+			name      string
+			configure func(*APISpec)
+			want      bool
+		}{
+			{
+				name: "classic API cannot report OAS mock",
+			},
+			{
+				name: "OAS without middleware has no active mock",
+				configure: func(spec *APISpec) {
+					spec.IsOAS = true
+					spec.OAS.SetTykExtension(&oas.XTykAPIGateway{})
+				},
+			},
+			{
+				name: "disabled operation mock is ignored",
+				configure: func(spec *APISpec) {
+					spec.IsOAS = true
+					spec.OAS.SetTykExtension(&oas.XTykAPIGateway{Middleware: &oas.Middleware{
+						Operations: oas.Operations{
+							"get-user": {MockResponse: &oas.MockResponse{}},
+						},
+					}})
+				},
+			},
+			{
+				name: "enabled operation mock is active",
+				configure: func(spec *APISpec) {
+					spec.IsOAS = true
+					spec.OAS.SetTykExtension(&oas.XTykAPIGateway{Middleware: &oas.Middleware{
+						Operations: oas.Operations{
+							"get-user": {MockResponse: &oas.MockResponse{Enabled: true}},
+						},
+					}})
+				},
+				want: true,
+			},
+			{
+				name: "enabled MCP primitive mock is active",
+				configure: func(spec *APISpec) {
+					spec.IsOAS = true
+					spec.OAS.SetTykExtension(&oas.XTykAPIGateway{Middleware: &oas.Middleware{
+						McpTools: oas.MCPPrimitives{
+							"get-weather": {Operation: oas.Operation{MockResponse: &oas.MockResponse{Enabled: true}}},
+						},
+					}})
+				},
+				want: true,
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+				if tc.configure != nil {
+					tc.configure(spec)
+				}
+
+				assert.Equal(t, tc.want, spec.hasActiveMock())
+			})
+		}
+	})
+
+	t.Run("virtual endpoint detection", func(t *testing.T) {
+		testCases := []struct {
+			name     string
+			versions map[string]apidef.VersionInfo
+			want     bool
+		}{
+			{
+				name: "no versions",
+			},
+			{
+				name: "disabled virtual endpoint is ignored",
+				versions: map[string]apidef.VersionInfo{
+					"v1": {
+						ExtendedPaths: apidef.ExtendedPathsSet{
+							Virtual: []apidef.VirtualMeta{{Disabled: true, Path: "/virtual", Method: http.MethodGet}},
+						},
+					},
+				},
+			},
+			{
+				name: "enabled virtual endpoint is present",
+				versions: map[string]apidef.VersionInfo{
+					"v1": {
+						ExtendedPaths: apidef.ExtendedPathsSet{
+							Virtual: []apidef.VirtualMeta{{Path: "/virtual", Method: http.MethodGet}},
+						},
+					},
+				},
+				want: true,
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				spec := &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						VersionData: apidef.VersionData{Versions: tc.versions},
+					},
+				}
+
+				assert.Equal(t, tc.want, spec.hasVirtualEndpoint())
+			})
+		}
+	})
+
+	t.Run("listen port selection", func(t *testing.T) {
+		testCases := []struct {
+			name       string
+			listenPort int
+			configPort int
+			inputPort  int
+			want       bool
+		}{
+			{name: "unset API port falls back to gateway config", configPort: 7000, inputPort: 7000, want: true},
+			{name: "unset API port rejects different gateway config port", configPort: 7000, inputPort: 7001},
+			{name: "explicit API port matches input", listenPort: 8000, configPort: 7000, inputPort: 8000, want: true},
+			{name: "explicit API port overrides gateway config", listenPort: 8000, configPort: 7000, inputPort: 7000},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				spec := &APISpec{APIDefinition: &apidef.APIDefinition{ListenPort: tc.listenPort}}
+				cfg := &config.Config{ListenPort: tc.configPort}
+
+				assert.Equal(t, tc.want, spec.isListeningOnPort(tc.inputPort, cfg))
+			})
+		}
+	})
+
+	t.Run("round robin indexes", func(t *testing.T) {
+		testCases := []struct {
+			name string
+			len  int
+			want []int
+		}{
+			{name: "zero length returns zero", len: 0, want: []int{0, 0}},
+			{name: "positive length cycles from zero", len: 3, want: []int{0, 1, 2, 0}},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				rr := RoundRobin{}
+				for _, want := range tc.want {
+					assert.Equal(t, want, rr.WithLen(tc.len))
+				}
+			})
+		}
 	})
 }
 

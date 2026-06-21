@@ -1,0 +1,14 @@
+component: gateway_api_spec_local_helpers
+no_interface:
+    declared: true
+    reason: The gateway API spec local helper proof slice covers local gateway/api_definition.go helper behavior only; reverse-proxy execution, upstream behavior, mock delivery, virtual endpoint execution, network binding, load balancing fairness beyond local index calculation, and final client-visible responses are outside this component boundary.
+variables:
+    - name: gateway_api_spec_local_helpers_operation_requested
+      type: bool
+      direction: input
+      description: A caller requests a local gateway API spec helper operation such as redirect-target path construction, active mock detection, virtual endpoint detection, listen-port matching, or round-robin index selection.
+
+    - name: gateway_api_spec_local_helpers_operation_terminal
+      type: bool
+      direction: output
+      description: 'A local gateway API spec helper operation reaches a terminal observable result: a redirect-target URL or explicit local error is returned, mock presence is reported, virtual endpoint presence is reported, listen-port matching is reported, or a bounded round-robin index is returned.'

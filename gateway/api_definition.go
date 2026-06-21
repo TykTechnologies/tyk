@@ -2494,6 +2494,7 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	log.Debug("Upstream path is: ", r.URL.Path)
 }
 
+// SW-REQ-138
 func (a *APISpec) getRedirectTargetUrl(inputUrl *url.URL) (*url.URL, error) {
 	if inputUrl == nil {
 		return nil, errors.New("input url is nil")
@@ -2512,6 +2513,7 @@ func (a *APISpec) getRedirectTargetUrl(inputUrl *url.URL) (*url.URL, error) {
 }
 
 // hasActiveMock checks if specification has at least one active mock.
+// SW-REQ-138
 func (a *APISpec) hasActiveMock() bool {
 	if !a.IsOAS {
 		return false
@@ -2532,6 +2534,7 @@ func (a *APISpec) hasActiveMock() bool {
 	return middleware.HasMCPPrimitivesMocks()
 }
 
+// SW-REQ-138
 func (a *APISpec) hasVirtualEndpoint() bool {
 	for _, version := range a.VersionData.Versions {
 		for _, virtual := range version.ExtendedPaths.Virtual {
@@ -2545,6 +2548,7 @@ func (a *APISpec) hasVirtualEndpoint() bool {
 }
 
 // isListeningOnPort checks whether the API listens on the given port.
+// SW-REQ-138
 func (a *APISpec) isListeningOnPort(port int, gwConfig *config.Config) bool {
 	if a.ListenPort == 0 {
 		return gwConfig.ListenPort == port
@@ -2557,6 +2561,7 @@ type RoundRobin struct {
 	pos uint32
 }
 
+// SW-REQ-138
 func (r *RoundRobin) WithLen(len int) int {
 	if len < 1 {
 		return 0

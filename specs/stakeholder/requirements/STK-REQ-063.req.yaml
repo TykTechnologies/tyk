@@ -1,0 +1,61 @@
+id: STK-REQ-063
+version: 1
+status: approved
+priority: shall
+category: gateway_api_spec_local_helpers
+req_type: guarantee
+fretish: ""
+description: Gateway API spec local helper support shall deterministically construct redirect-target paths, detect active OAS and MCP mocks, detect enabled virtual endpoints, select listen-port matches, and return bounded round-robin indexes, without claiming reverse-proxy execution, upstream behavior, mock delivery, virtual endpoint execution, network binding, load balancing fairness beyond local index calculation, or final client-visible responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_api_spec_local_helpers
+rationale: Gateway operators depend on deterministic local API spec helper decisions before broader gateway request handling. This requirement owns only local gateway/api_definition.go helper behavior and focused gateway tests.
+tags:
+    - gateway
+    - api-spec
+    - local-helpers
+variables: []
+traces:
+    reviewed_at: "2026-06-21T01:13:38.406016Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:f6546a263d1aeea82dbe68ecff83f4bf36bf18321020d00cf874c9a9783ce211
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T01:11:07Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API spec local helper scope is limited to local gateway/api_definition.go helper behavior: redirect-target path construction, active OAS and MCP mock detection, enabled virtual endpoint detection, listen-port matching, and bounded round-robin index selection. This approval does not claim reverse-proxy execution, upstream behavior, mock delivery, virtual endpoint execution, network binding, load balancing fairness beyond local index calculation, or final client-visible responses.'
+        fingerprint: sha256:4326da216dcfe4850a51c0ffe79dbcee5d00bb30a4d3fb5bada3b6f2cabcc618
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T01:11:07Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need API spec local helper decisions to be deterministic before gateway request handling invokes broader proxy, mock, virtual endpoint, port, or balancing behavior.
+    acceptance_criteria:
+        - id: STK-REQ-063-AC-01
+          text: Given API spec local helper inputs, when redirect target, mock presence, virtual endpoint presence, listen-port, and round-robin helper operations are exercised, then deterministic local decisions or explicit local errors are produced for the tested inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-151
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API spec local helper requirement.
+          changed_by: human:buger
