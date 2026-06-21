@@ -1,0 +1,61 @@
+id: STK-REQ-065
+version: 1
+status: approved
+priority: shall
+category: gateway_error_overrides
+req_type: guarantee
+fretish: ""
+description: Gateway error override helper support shall locally preserve configured error override compilation, status-code indexing, API-before-gateway precedence, matcher evaluation, body/template selection, upstream response matching, and override-result construction for tested inputs, without claiming response middleware execution, final HTTP response writing, route handling, gateway request admission, analytics, persistence, or client-visible behavior.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_error_overrides
+rationale: Gateway operators depend on deterministic local error override helper decisions before broader error handlers and response middleware consume those results. This requirement owns only local gateway/error_overrides.go helper behavior and focused gateway tests.
+tags:
+    - gateway
+    - errors
+    - local-helpers
+variables: []
+traces:
+    reviewed_at: "2026-06-21T02:57:37.856165Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:7a235ba81cfe04f16849c6a92007a181791fff03bf9e5b8c25ba747eb1611763
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T02:52:10Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway error override helper scope is limited to local gateway/error_overrides.go helper behavior: rule compilation and invalid-rule skipping, exact and prefix status-code indexing, API-before-gateway precedence, flag/message/body-field matcher decisions, inline/file template lookup, direct body and default-template classification, upstream response matching, lazy body need detection, and override-result construction. This approval does not claim response middleware execution, final HTTP response writing, route handling, gateway request admission, analytics, persistence, or client-visible behavior.'
+        fingerprint: sha256:81f33b75d098eedfb41d88f837511ac3e315502a16ce74ac502a8e8cba2f5077
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T02:52:10Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need configured error override helper decisions to be deterministic before gateway handlers and response middleware use them.
+    acceptance_criteria:
+        - id: STK-REQ-065-AC-01
+          text: Given gateway error override helper inputs, when compilation, indexing, matching, precedence, template/body selection, upstream matching, and result construction are exercised, then deterministic local helper results or explicit skipped invalid rules are produced for the tested inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-153
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway error override helper requirement.
+          changed_by: agent:codex

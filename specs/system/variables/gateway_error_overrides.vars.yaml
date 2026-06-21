@@ -1,0 +1,9 @@
+component: gateway_error_overrides
+no_interface:
+    declared: true
+    reason: The gateway error override proof slice covers local helper behavior for compiling, indexing, matching, and selecting configured override rules; response middleware execution, final HTTP response writing, route handling, gateway request admission, analytics, persistence, and client-visible behavior are outside this component boundary.
+variables:
+    - name: gateway_error_override_result_determined
+      type: bool
+      direction: output
+      description: Gateway error override helper support returns a compiled rule index, skipped invalid rule, matching or non-matching rule result, selected template/body behavior, upstream-match decision, or constructed override result deterministically for the requested local helper operation.

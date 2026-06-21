@@ -1,0 +1,69 @@
+id: SYS-REQ-153
+version: 1
+status: approved
+priority: shall
+category: gateway_error_overrides
+req_type: guarantee
+fretish: the gateway_error_overrides shall always satisfy gateway_error_override_result_determined
+description: Gateway error override helper support shall make local helper operations terminal and deterministic for configured rule compilation, status-code indexing, API-before-gateway precedence, flag/message/body-field matcher evaluation, body/template selection, upstream response matching, and override-result construction, without claiming response middleware execution, final HTTP response writing, route handling, gateway request admission, analytics, persistence, or client-visible behavior.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-065
+component: gateway_error_overrides
+rationale: This system requirement owns local gateway error override helper terminality only. Middleware execution, final HTTP response writing, route handling, request admission, analytics, persistence, and client-visible behavior are outside this proof slice.
+tags:
+    - gateway
+    - errors
+    - local-helpers
+variables:
+    - gateway_error_override_result_determined
+traces:
+    satisfies:
+        - STK-REQ-065
+    reviewed_at: "2026-06-21T02:57:37.944542Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:cf567a19197586b3c21374cc8c172848c71921058f6510c1c9740aa4433210d2
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T02:57:13Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21 after replacing the requested-implies-terminal formula with the established single terminal-result helper invariant to avoid artificial activation-row witnesses. Gateway error override helper scope remains limited to local gateway/error_overrides.go helper behavior: rule compilation and invalid-rule skipping, exact and prefix status-code indexing, API-before-gateway precedence, flag/message/body-field matcher decisions, inline/file template lookup, direct body and default-template classification, upstream response matching, lazy body need detection, and override-result construction. This approval does not claim response middleware execution, final HTTP response writing, route handling, gateway request admission, analytics, persistence, or client-visible behavior.'
+        fingerprint: sha256:1528005d9a6704c4e599bceb4889554b1977684d5392af2f40d6f394c804d9e8
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-21T02:59:15.339265Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-153|gateway_error_override_result_determined
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21 after SYS-REQ-153 was narrowed to the single gateway_error_override_result_determined terminal-result invariant. SYS-REQ-153''s local gateway error override result-determination variable is decomposed by SW-REQ-140 for gateway/error_overrides.go helper behavior only: compilation/indexing, matcher decisions, precedence selection, template/body helper classification, upstream matching, lazy body need detection, and result construction. Response middleware execution, final HTTP response writing, route handling, gateway request admission, analytics, persistence, and client-visible behavior remain outside this proof slice.'
+          reviewed_at: "2026-06-21T02:59:15.339265Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T02:57:13Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway error override helper system requirement.
+          changed_by: agent:codex
+        - date: "2026-06-21T02:57:13Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-21T02:52:10Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway error override helper scope is limited to local gateway/error_overrides.go helper behavior: rule compilation and invalid-rule skipping, exact and prefix status-code indexing, API-before-gateway precedence, flag/message/body-field matcher decisions, inline/file template lookup, direct body and default-template classification, upstream response matching, lazy body need detection, and override-result construction. This approval does not claim response middleware execution, final HTTP response writing, route handling, gateway request admission, analytics, persistence, or client-visible behavior.")'
+          changed_by: human:buger

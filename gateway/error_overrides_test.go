@@ -24,6 +24,16 @@ func createGateway(overrides apidef.ErrorOverridesMap) *Gateway {
 	return gw
 }
 
+// Verifies: STK-REQ-065, SYS-REQ-153, SW-REQ-140
+// STK-REQ-065:STK-REQ-065-AC-01:acceptance
+// STK-REQ-065:error_handling:negative
+// MCDC SYS-REQ-153: gateway_error_override_result_determined=T => TRUE
+//mcdc:ignore SYS-REQ-153: gateway_error_override_result_determined=F => FALSE -- the onboarded gateway error override helpers are synchronous local helpers that either return compiled indexes, explicit skipped-rule or non-match nil results, selected template/body behavior, upstream-match decisions, or constructed override results before returning; a non-terminal result is not a reachable runtime state for these APIs [category: defensive] [reviewed: human:buger]
+// SW-REQ-140:nominal:nominal
+// SW-REQ-140:boundary:nominal
+// SW-REQ-140:error_handling:nominal
+// SW-REQ-140:error_handling:negative
+// SW-REQ-140:determinism:nominal
 // TestCompileErrorOverrides tests the compilation of error override rules
 func TestCompileErrorOverrides(t *testing.T) {
 	t.Run("nil overrides", func(t *testing.T) {
@@ -247,6 +257,10 @@ func TestCompileErrorOverrides(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-065, SYS-REQ-153, SW-REQ-140
+// SW-REQ-140:nominal:nominal
+// SW-REQ-140:error_handling:nominal
+// SW-REQ-140:error_handling:negative
 // TestCompileSingleRule tests compilation of individual rules
 func TestCompileSingleRule(t *testing.T) {
 	t.Run("valid rule with regex", func(t *testing.T) {
@@ -312,6 +326,10 @@ func TestCompileSingleRule(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-065, SYS-REQ-153, SW-REQ-140
+// SW-REQ-140:nominal:nominal
+// SW-REQ-140:error_handling:nominal
+// SW-REQ-140:error_handling:negative
 // TestErrorMatcherCompile tests regex compilation in ErrorMatcher
 func TestErrorMatcherCompile(t *testing.T) {
 	t.Run("valid regex", func(t *testing.T) {
@@ -361,6 +379,10 @@ func TestErrorMatcherCompile(t *testing.T) {
 }
 
 // TestApplyOverride tests the application of error overrides
+// Verifies: STK-REQ-065, SYS-REQ-153, SW-REQ-140
+// SW-REQ-140:nominal:nominal
+// SW-REQ-140:boundary:nominal
+// SW-REQ-140:determinism:nominal
 func TestApplyOverride(t *testing.T) {
 	// Helper to create a gateway with compiled overrides
 	createGateway := func(overrides apidef.ErrorOverridesMap) *Gateway {
@@ -712,6 +734,10 @@ func TestApplyOverride(t *testing.T) {
 }
 
 // TestMatchesAdditionalCriteria tests the matching logic for different criteria
+// Verifies: STK-REQ-065, SYS-REQ-153, SW-REQ-140
+// SW-REQ-140:nominal:nominal
+// SW-REQ-140:boundary:nominal
+// SW-REQ-140:error_handling:negative
 func TestMatchesAdditionalCriteria(t *testing.T) {
 	eo := &ErrorOverrides{}
 
@@ -806,6 +832,9 @@ func TestMatchesAdditionalCriteria(t *testing.T) {
 }
 
 // TestFlagMatching tests the flag-based matching functionality
+// Verifies: STK-REQ-065, SYS-REQ-153, SW-REQ-140
+// SW-REQ-140:nominal:nominal
+// SW-REQ-140:boundary:nominal
 func TestFlagMatching(t *testing.T) {
 	eo := &ErrorOverrides{}
 
@@ -897,6 +926,9 @@ func TestFlagMatching(t *testing.T) {
 }
 
 // TestApplyOverrideWithFlag tests ApplyOverride with flag matching
+// Verifies: STK-REQ-065, SYS-REQ-153, SW-REQ-140
+// SW-REQ-140:nominal:nominal
+// SW-REQ-140:determinism:nominal
 func TestApplyOverrideWithFlag(t *testing.T) {
 	createGateway := func(overrides apidef.ErrorOverridesMap) *Gateway {
 		gw := &Gateway{}
@@ -1019,6 +1051,10 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 }
 
 // TestOverrideResult tests the OverrideResult helper methods
+// Verifies: STK-REQ-065, SYS-REQ-153, SW-REQ-140
+// SW-REQ-140:nominal:nominal
+// SW-REQ-140:boundary:nominal
+// SW-REQ-140:determinism:nominal
 func TestOverrideResult(t *testing.T) {
 	t.Run("ShouldWriteDirectly with plain body", func(t *testing.T) {
 		result := &OverrideResult{
@@ -1108,6 +1144,10 @@ func TestOverrideResult(t *testing.T) {
 }
 
 // TestGetInlineTemplate tests inline template compilation
+// Verifies: STK-REQ-065, SYS-REQ-153, SW-REQ-140
+// SW-REQ-140:nominal:nominal
+// SW-REQ-140:boundary:nominal
+// SW-REQ-140:determinism:nominal
 func TestGetInlineTemplate(t *testing.T) {
 	t.Run("JSON content - returns HTML template", func(t *testing.T) {
 		rule := &apidef.ErrorOverride{
@@ -1167,6 +1207,9 @@ func TestGetInlineTemplate(t *testing.T) {
 // TestTemplateCompilationEdgeCases tests edge cases in template compilation
 // Note: Templates are only compiled from the Body field, not Message field.
 // Message is a semantic value passed to templates as {{.Message}}.
+// Verifies: STK-REQ-065, SYS-REQ-153, SW-REQ-140
+// SW-REQ-140:nominal:nominal
+// SW-REQ-140:error_handling:negative
 func TestTemplateCompilationEdgeCases(t *testing.T) {
 	t.Run("template with only StatusCode", func(t *testing.T) {
 		rule := &apidef.ErrorOverride{
@@ -1231,6 +1274,10 @@ func TestTemplateCompilationEdgeCases(t *testing.T) {
 
 // Tests for new methods
 
+// Verifies: STK-REQ-065, SYS-REQ-153, SW-REQ-140
+// SW-REQ-140:nominal:nominal
+// SW-REQ-140:boundary:nominal
+// SW-REQ-140:determinism:nominal
 func TestFindMatchingRuleGeneric(t *testing.T) {
 	overrides := apidef.ErrorOverridesMap{
 		"500": []apidef.ErrorOverride{
@@ -1291,6 +1338,11 @@ func TestFindMatchingRuleGeneric(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-065, SYS-REQ-153, SW-REQ-140
+// SW-REQ-140:nominal:nominal
+// SW-REQ-140:boundary:nominal
+// SW-REQ-140:error_handling:nominal
+// SW-REQ-140:determinism:nominal
 func TestApplyUpstreamOverride(t *testing.T) {
 	t.Run("returns nil when no overrides configured", func(t *testing.T) {
 		gw := createGateway(apidef.ErrorOverridesMap{})
@@ -1605,6 +1657,11 @@ func TestApplyUpstreamOverride(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-065, SYS-REQ-153, SW-REQ-140
+// SW-REQ-140:nominal:nominal
+// SW-REQ-140:boundary:nominal
+// SW-REQ-140:error_handling:nominal
+// SW-REQ-140:error_handling:negative
 func TestMatchesUpstreamCriteria(t *testing.T) {
 	gw := createGateway(apidef.ErrorOverridesMap{})
 	eo := NewErrorOverrides(&APISpec{}, gw)
@@ -1721,6 +1778,9 @@ func TestMatchesUpstreamCriteria(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-065, SYS-REQ-153, SW-REQ-140
+// SW-REQ-140:nominal:nominal
+// SW-REQ-140:boundary:nominal
 func TestNeedsBodyForMatch(t *testing.T) {
 	gw := createGateway(apidef.ErrorOverridesMap{})
 	eo := NewErrorOverrides(&APISpec{}, gw)
@@ -1769,6 +1829,10 @@ func TestNeedsBodyForMatch(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-065, SYS-REQ-153, SW-REQ-140
+// SW-REQ-140:nominal:nominal
+// SW-REQ-140:boundary:nominal
+// SW-REQ-140:determinism:nominal
 func TestCreateOverrideResult(t *testing.T) {
 	gw := createGateway(apidef.ErrorOverridesMap{})
 	eo := NewErrorOverrides(&APISpec{}, gw)

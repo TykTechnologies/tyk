@@ -56,6 +56,7 @@ type OverrideResult struct {
 	rule *apidef.ErrorOverride
 }
 
+// SW-REQ-140
 // NewErrorOverrides creates a new ErrorOverrides instance.
 func NewErrorOverrides(spec *APISpec, gw *Gateway) *ErrorOverrides {
 	return &ErrorOverrides{
@@ -64,6 +65,7 @@ func NewErrorOverrides(spec *APISpec, gw *Gateway) *ErrorOverrides {
 	}
 }
 
+// SW-REQ-140
 // CompileErrorOverrides compiles all regex patterns, pre-compiles inline message
 // templates, and builds an indexed lookup structure for O(1) status code matching.
 // Called during config load (gateway-level) or API load (API-level).
@@ -95,6 +97,7 @@ func CompileErrorOverrides(overrides apidef.ErrorOverridesMap) *CompiledErrorOve
 	return compiled
 }
 
+// SW-REQ-140
 // compileRulesForStatusCode validates and compiles all rules for a given status code.
 // Returns pointers to successfully compiled rules; failed rules are logged and skipped.
 func compileRulesForStatusCode(rules []apidef.ErrorOverride, statusCode string) []*apidef.ErrorOverride {
@@ -121,6 +124,7 @@ func compileRulesForStatusCode(rules []apidef.ErrorOverride, statusCode string) 
 	return rulePtrs
 }
 
+// SW-REQ-140
 // compileSingleRule compiles regex patterns and templates for a single override rule.
 // Returns error if compilation fails; the rule should be skipped.
 func compileSingleRule(rule *apidef.ErrorOverride) error {
@@ -141,6 +145,7 @@ func compileSingleRule(rule *apidef.ErrorOverride) error {
 	return nil
 }
 
+// SW-REQ-140
 // indexCompiledRules adds validated rules to the appropriate index (exact code or pattern).
 func indexCompiledRules(compiled *CompiledErrorOverrides, statusCode string, rules []*apidef.ErrorOverride) {
 	// Try exact match first: "500", "401"
@@ -162,6 +167,7 @@ func indexCompiledRules(compiled *CompiledErrorOverrides, statusCode string, rul
 	log.WithField("status_code", statusCode).Warn("Unrecognized status code format, skipping")
 }
 
+// SW-REQ-140
 // compileBodyTemplates pre-compiles inline Body into both template types if it contains template variables.
 // text/template is used for XML, html/template for JSON (auto-escapes).
 // Plain text bodies are skipped - they'll be written directly.
@@ -191,6 +197,7 @@ func compileBodyTemplates(rule *apidef.ErrorOverride) error {
 	return nil
 }
 
+// SW-REQ-140
 // ApplyOverride attempts to match and apply an override for the given error.
 // Uses O(1) lookup by status code, then checks additional matching criteria.
 // Returns nil if no override matches.
@@ -217,6 +224,7 @@ func (o *ErrorOverrides) ApplyOverride(r *http.Request, statusCode int, body []b
 	return nil
 }
 
+// SW-REQ-140
 // findMatchingRuleGeneric searches for a matching override rule using a custom match function.
 // Checks exact status code first, then pattern matches (4xx, 5xx).
 // Rules are evaluated in order within each status code (first match wins).
@@ -247,6 +255,7 @@ func (o *ErrorOverrides) findMatchingRuleGeneric(
 	return nil
 }
 
+// SW-REQ-140
 // findMatchingRule searches for a matching override rule.
 // Checks exact status code first, then pattern matches (4xx, 5xx).
 // Rules are evaluated in order within each status code (first match wins).
@@ -256,6 +265,7 @@ func (o *ErrorOverrides) findMatchingRule(r *http.Request, compiled *CompiledErr
 	})
 }
 
+// SW-REQ-140
 // matchesAdditionalCriteria checks if request/body matches flag and message_pattern criteria.
 // Used for gateway-generated errors where body is plain text (not JSON).
 // For upstream JSON responses, use matchesUpstreamCriteria instead.
@@ -282,6 +292,7 @@ func (o *ErrorOverrides) matchesAdditionalCriteria(r *http.Request, rule *apidef
 	return !hasMatchCriteria
 }
 
+// SW-REQ-140
 // matchFlag checks if the error classification flag matches the expected flag.
 func (o *ErrorOverrides) matchFlag(r *http.Request, expectedFlag errors.ResponseFlag) bool {
 	errClass := ctx.GetErrorClassification(r)
@@ -291,6 +302,7 @@ func (o *ErrorOverrides) matchFlag(r *http.Request, expectedFlag errors.Response
 	return errClass.Flag == expectedFlag
 }
 
+// SW-REQ-140
 // matchMessagePattern matches body against a pre-compiled regex pattern.
 func (o *ErrorOverrides) matchMessagePattern(match *apidef.ErrorMatcher, body []byte) bool {
 	if match.CompiledPattern == nil {
@@ -301,6 +313,7 @@ func (o *ErrorOverrides) matchMessagePattern(match *apidef.ErrorMatcher, body []
 	return match.CompiledPattern.Match(body)
 }
 
+// SW-REQ-140
 // matchBodyField extracts a JSON value using gjson and compares it.
 func (o *ErrorOverrides) matchBodyField(field, expectedValue string, body []byte) bool {
 	result := gjson.GetBytes(body, field)
@@ -310,6 +323,7 @@ func (o *ErrorOverrides) matchBodyField(field, expectedValue string, body []byte
 	return result.String() == expectedValue
 }
 
+// SW-REQ-140
 // GetTemplateExecutor returns the template to execute, or nil if body should be written directly.
 func (r *OverrideResult) GetTemplateExecutor(gw *Gateway, errCtx *ErrorResponseContext) TemplateExecutor {
 	// Body with template variables
@@ -330,21 +344,25 @@ func (r *OverrideResult) GetTemplateExecutor(gw *Gateway, errCtx *ErrorResponseC
 	return nil
 }
 
+// SW-REQ-140
 // GetMessageForTemplate returns the semantic message for {{.Message}} in templates.
 func (r *OverrideResult) GetMessageForTemplate() string {
 	return r.rule.Response.Message
 }
 
+// SW-REQ-140
 // GetBody returns the response body.
 func (r *OverrideResult) GetBody() string {
 	return r.rule.Response.Body
 }
 
+// SW-REQ-140
 // ShouldWriteDirectly returns true if body should be written as-is (no template variables).
 func (r *OverrideResult) ShouldWriteDirectly() bool {
 	return r.rule.Response.Body != "" && !r.rule.HasCompiledTemplate()
 }
 
+// SW-REQ-140
 // ShouldUseDefaultTemplate returns true when only Message is set (no Body, no Template).
 func (r *OverrideResult) ShouldUseDefaultTemplate() bool {
 	return r.rule.Response.Body == "" &&
@@ -352,6 +370,7 @@ func (r *OverrideResult) ShouldUseDefaultTemplate() bool {
 		r.rule.Response.Message != ""
 }
 
+// SW-REQ-140
 // getFileTemplate looks up a template file from the gateway's template cache.
 func (r *OverrideResult) getFileTemplate(gw *Gateway, errCtx *ErrorResponseContext) TemplateExecutor {
 	templateName := r.rule.Response.Template + "." + errCtx.TemplateExtension
@@ -371,6 +390,7 @@ func (r *OverrideResult) getFileTemplate(gw *Gateway, errCtx *ErrorResponseConte
 	return gw.templates.Lookup(r.rule.Response.Template)
 }
 
+// SW-REQ-140
 // getInlineTemplate returns the pre-compiled inline message template.
 func (r *OverrideResult) getInlineTemplate(errCtx *ErrorResponseContext) TemplateExecutor {
 	compiled := r.rule.GetCompiledTemplate(errCtx.IsXML)
@@ -386,6 +406,7 @@ func (r *OverrideResult) getInlineTemplate(errCtx *ErrorResponseContext) Templat
 	return nil
 }
 
+// SW-REQ-140
 // ApplyUpstreamOverride applies overrides for upstream 4xx/5xx responses.
 // Uses lazy body reading via closure.
 func (o *ErrorOverrides) ApplyUpstreamOverride(statusCode int, readBody func() []byte) *OverrideResult {
@@ -420,6 +441,7 @@ func (o *ErrorOverrides) ApplyUpstreamOverride(statusCode int, readBody func() [
 	return nil
 }
 
+// SW-REQ-140
 func (o *ErrorOverrides) createOverrideResult(rule *apidef.ErrorOverride, statusCode int) *OverrideResult {
 	result := &OverrideResult{
 		StatusCode:   rule.Response.StatusCode,
@@ -433,6 +455,7 @@ func (o *ErrorOverrides) createOverrideResult(rule *apidef.ErrorOverride, status
 	return result
 }
 
+// SW-REQ-140
 // matchesUpstreamCriteria checks if an upstream response matches the rule.
 // Handles URS flag specially for 5xx responses, supports body_field and message_pattern.
 // Skips gateway-only flags (AKI, RLT, etc.) since they require request context.
@@ -469,6 +492,7 @@ func (o *ErrorOverrides) matchesUpstreamCriteria(rule *apidef.ErrorOverride, bod
 	return !hasMatchCriteria
 }
 
+// SW-REQ-140
 // needsBodyForMatch returns true if the rule requires body inspection.
 func (o *ErrorOverrides) needsBodyForMatch(rule *apidef.ErrorOverride) bool {
 	if rule.Match == nil {
