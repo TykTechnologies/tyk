@@ -18,7 +18,10 @@ tags:
     - redis
     - cluster
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-21T10:16:09.847932Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:fb6ee3b1dba76bbb83ad5085832439c2cc384ab1e918a0dc6a936578dbcae69c
 verification:
     assurance_level: A
     formalization_status: none
