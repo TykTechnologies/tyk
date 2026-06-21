@@ -1071,6 +1071,7 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 	})
 }
 
+// SW-REQ-149
 func sortSpecsByListenPath(specs []*APISpec, enabledCustomDomain bool) {
 	// sort by listen path from longer to shorter, so that /foo
 	// doesn't break /foo-bar
@@ -1089,6 +1090,7 @@ func sortSpecsByListenPath(specs []*APISpec, enabledCustomDomain bool) {
 	})
 }
 
+// SW-REQ-149
 func listenPathLength(listenPath string) int {
 	// If the path doesn't contain '{', compute the length directly
 	if !strings.Contains(listenPath, "{") {

@@ -5,14 +5,14 @@ priority: shall
 category: gateway_api_loader_helpers
 req_type: guarantee
 fretish: ""
-description: Gateway API loader helper support shall preserve deterministic local helper behavior for tested inputs by constructing domain/listen-path keys, counting APIs by those keys, prefixing custom middleware function paths, normalizing API names for loop lookup, and matching loaded APIs by API ID, object ID, or normalized loop name, without claiming full route generation, middleware execution, storage initialization, API admission, internal proxy dispatch, dashboard or RPC synchronization, network transport behavior, or final client responses.
+description: Gateway API loader helper support shall preserve deterministic local helper behavior for tested inputs by constructing domain/listen-path keys, counting APIs by those keys, prefixing custom middleware function paths, normalizing API names for loop lookup, matching loaded APIs by API ID, object ID, or normalized loop name, and sorting API specs by listen-path specificity with tested custom-domain ordering, without claiming full route generation, middleware execution, storage initialization, API admission, internal proxy dispatch, dashboard or RPC synchronization, network transport behavior, or final client responses.
 formalization_strategy: informal
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: gateway_api_loader_helpers
-rationale: Gateway API loading depends on small local helper decisions before broader route, lookup, and middleware chains consume API definitions. This requirement owns only the local helper behavior under focused tests.
+rationale: Gateway API loading depends on small local helper decisions before broader route, lookup, and middleware chains consume API definitions. This requirement owns only the local helper behavior under focused tests, including local sort order helpers consumed by loader setup.
 tags:
     - gateway
     - api-loader
@@ -20,9 +20,9 @@ tags:
     - middleware
 variables: []
 traces:
-    reviewed_at: "2026-06-21T05:36:33.351034Z"
+    reviewed_at: "2026-06-21T05:53:03.088718Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:b371deb3edf55cab7ba05cfac521b273fcdfc82d71c8ab9074a8fa047e57eabe
+    reviewed_fingerprint: sha256:f3b11cc53e431076c91b51d7a2616e185602674c352dae7d2a1aad8d1caee825
 verification:
     assurance_level: A
     formalization_status: none
@@ -31,7 +31,7 @@ verification:
         reviewer: human:buger
         role: requirements_owner
         reviewed_at: "2026-06-21T00:00:00Z"
-        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API loader helper scope is limited to local gateway/api_loader.go helper behavior: domain/listen-path key construction, API counting by domain/listen-path key, custom middleware path prefixing, API name normalization for loop lookup, and fuzzy local API matching by API ID, object ID, or normalized loop name. This approval does not claim full route generation, middleware execution, storage initialization, API admission, internal proxy dispatch, dashboard or RPC synchronization, network transport behavior, or final client responses.'
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API loader helper scope is limited to local gateway/api_loader.go helper behavior: domain/listen-path key construction, API counting by domain/listen-path key, custom middleware path prefixing, API name normalization for loop lookup, fuzzy local API matching by API ID, object ID, or normalized loop name, and API spec listen-path sort/length helpers for tested static, parameterized, empty-domain, and custom-domain inputs. This approval does not claim full route generation, middleware execution, storage initialization, API admission, internal proxy dispatch, dashboard or RPC synchronization, network transport behavior, or final client responses.'
         ai_generated: false
 history:
     created_by: agent:codex
@@ -44,10 +44,10 @@ obligation_checklist:
     - determinism
 stakeholder:
     persona: Gateway maintainer
-    story: As a gateway maintainer, I need local API loader helpers to derive listen-path grouping keys, middleware file paths, normalized loop names, and loaded API lookup matches consistently before broader loader, route setup, or internal routing code consumes them.
+    story: As a gateway maintainer, I need local API loader helpers to derive listen-path grouping keys, middleware file paths, normalized loop names, loaded API lookup matches, and deterministic API spec ordering consistently before broader loader, route setup, or internal routing code consumes them.
     acceptance_criteria:
         - id: STK-REQ-074-AC-01
-          text: Given tested gateway API loader helper inputs, when domain/listen-path key construction, API counting, middleware path prefixing, API name normalization, or loaded API fuzzy lookup helpers are exercised, then deterministic local helper outcomes are produced for those inputs.
+          text: Given tested gateway API loader helper inputs, when domain/listen-path key construction, API counting, middleware path prefixing, API name normalization, loaded API fuzzy lookup, or API spec listen-path sort helpers are exercised, then deterministic local helper outcomes are produced for those inputs.
           verification_method: test
           derived_reqs:
             - SYS-REQ-162

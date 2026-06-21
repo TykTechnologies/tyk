@@ -9396,6 +9396,11 @@ func TestDifferentDomainsWithOneListenPathBeingASubstringOfTheOtherWithStripList
 /// enable strip slash and disable strip listenpath section (both DisableStripSlash and  StripListenPath set to false) - end
 // 4th section --end
 
+// Verifies: SYS-REQ-162, SW-REQ-149
+// SW-REQ-149:nominal:nominal
+// SW-REQ-149:boundary:nominal
+// SW-REQ-149:determinism:nominal
+// SYS-REQ-162:determinism:nominal
 func TestSortAPISpecs(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -9516,6 +9521,11 @@ func TestAPILoaderValidation(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-162, SW-REQ-149
+// SW-REQ-149:nominal:nominal
+// SW-REQ-149:boundary:boundary
+// SW-REQ-149:determinism:nominal
+// SYS-REQ-162:determinism:nominal
 func TestSortSpecsByListenPath(t *testing.T) {
 	createSpec := func(listenPath string) *APISpec {
 		return &APISpec{
