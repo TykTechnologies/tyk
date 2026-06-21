@@ -19,7 +19,10 @@ tags:
     - zipkin
     - openzipkin
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-21T08:47:19.393812Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:f6b41adfdce4ef7bc42ef4f706111730136ff79b153593d2d10d1e1dade25b26
 verification:
     assurance_level: A
     formalization_status: none
