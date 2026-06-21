@@ -18,7 +18,10 @@ tags:
     - tcp
     - proxy
 variables: []
-traces: {}
+traces:
+    reviewed_at: "2026-06-21T09:01:59.376018Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:34c394b6b4d2fde4cdc7bbcf9789b605219332a7d115e3fab3103ac6a67daf63
 verification:
     assurance_level: A
     formalization_status: none
