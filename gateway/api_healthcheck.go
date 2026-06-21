@@ -38,6 +38,7 @@ type DefaultHealthChecker struct {
 	APIID   string
 }
 
+// SW-REQ-139
 func (h *DefaultHealthChecker) Init(storeType storage.Handler) {
 	if !h.Gw.GetConfig().HealthCheck.EnableHealthChecks {
 		return
@@ -48,12 +49,14 @@ func (h *DefaultHealthChecker) Init(storeType storage.Handler) {
 	h.storage.Connect()
 }
 
+// SW-REQ-139
 func (h *DefaultHealthChecker) CreateKeyName(subKey HealthPrefix) string {
 	// Key should be API-ID.SubKey.123456789
 	return h.APIID + "." + string(subKey)
 }
 
 // reportHealthValue is a shortcut we can use throughout the app to push a health check value
+// SW-REQ-139
 func reportHealthValue(spec *APISpec, counter HealthPrefix, value string) {
 	if !spec.GlobalConfig.HealthCheck.EnableHealthChecks {
 		return
@@ -62,6 +65,7 @@ func reportHealthValue(spec *APISpec, counter HealthPrefix, value string) {
 	spec.Health.StoreCounterVal(counter, value)
 }
 
+// SW-REQ-139
 func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value string) {
 	searchStr := h.CreateKeyName(counterType)
 	log.Debug("Adding Healthcheck to: ", searchStr)
@@ -76,6 +80,7 @@ func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value s
 	go h.storage.SetRollingWindow(searchStr, h.Gw.GetConfig().HealthCheck.HealthCheckValueTimeout, value, false)
 }
 
+// SW-REQ-139
 func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
 	searchStr := h.CreateKeyName(prefix)
 	log.Debug("Searching for: ", searchStr)
@@ -94,10 +99,12 @@ func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
 	return 0.00
 }
 
+// SW-REQ-139
 func roundValue(untruncated float64) float64 {
 	return float64(int(untruncated*100)) / 100
 }
 
+// SW-REQ-139
 func (h *DefaultHealthChecker) ApiHealthValues() (HealthCheckValues, error) {
 	values := HealthCheckValues{}
 

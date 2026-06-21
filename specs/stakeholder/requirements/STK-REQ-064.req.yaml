@@ -1,0 +1,61 @@
+id: STK-REQ-064
+version: 1
+status: approved
+priority: shall
+category: gateway_api_healthcheck_helpers
+req_type: guarantee
+fretish: ""
+description: Gateway API health-check helper support shall locally gate health-check storage initialization, derive counter keys, forward enabled counter values, record rolling-window counter samples, calculate request-rate averages, truncate projected values, and aggregate health values deterministically for tested inputs, without claiming Redis durability, sample-retention correctness, asynchronous scheduling beyond observable storage invocation, health endpoint routing, distributed storage availability, or final client-visible health status.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: gateway_api_healthcheck_helpers
+rationale: Gateway operators depend on deterministic local health-check helper decisions before broader health endpoint and storage behavior. This requirement owns only local gateway/api_healthcheck.go helper behavior and focused gateway tests.
+tags:
+    - gateway
+    - healthcheck
+    - local-helpers
+variables: []
+traces:
+    reviewed_at: "2026-06-21T01:36:44.973892Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:f1aeeeedd2cd1dabdb5667a05ce4fd8592a47fdabfc0808a0ec4a6872aea57be
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T01:35:40Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API health-check helper scope is limited to local gateway/api_healthcheck.go helper behavior: health-check storage initialization gating, counter key derivation, enabled counter forwarding, rolling-window counter recording, request-rate average calculation, truncation, and aggregate health-value projection. This approval does not claim Redis durability, sample-retention correctness, asynchronous scheduling beyond observable storage invocation, health endpoint routing, distributed storage availability, or final client-visible health status.'
+        fingerprint: sha256:deeeaae39e8efd7eecdaa40730f1d05b8a53647a45f51d775d0ed78b2cd07113
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T01:35:40Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need API health-check helper calculations and storage calls to be deterministic before the health endpoint reports broader gateway status.
+    acceptance_criteria:
+        - id: STK-REQ-064-AC-01
+          text: Given API health-check helper inputs, when initialization, counter naming, counter forwarding, rolling-window recording, average calculation, truncation, and health-value aggregation are exercised, then deterministic local decisions or storage invocations are produced for the tested inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-152
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API health-check helper requirement.
+          changed_by: human:buger

@@ -1,0 +1,65 @@
+id: SYS-REQ-152
+version: 1
+status: approved
+priority: shall
+category: gateway_api_healthcheck_helpers
+req_type: guarantee
+fretish: the gateway_api_healthcheck_helpers shall always satisfy !gateway_api_healthcheck_helpers_operation_requested | gateway_api_healthcheck_helpers_operation_terminal
+description: Gateway API health-check helper support shall make local helper operations terminal and deterministic for health-check storage initialization gating, counter key derivation, enabled counter forwarding, rolling-window counter recording, request-rate average calculation, truncation, and aggregate health-value projection, without claiming Redis durability, sample-retention correctness, asynchronous scheduling beyond observable storage invocation, health endpoint routing, distributed storage availability, or final client-visible health status.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-064
+component: gateway_api_healthcheck_helpers
+rationale: This system requirement owns local gateway API health-check helper terminality only. Storage durability, sample retention, endpoint routing, distributed availability, and final health responses are outside this proof slice.
+tags:
+    - gateway
+    - healthcheck
+    - local-helpers
+variables:
+    - gateway_api_healthcheck_helpers_operation_requested
+    - gateway_api_healthcheck_helpers_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-064
+    reviewed_at: "2026-06-21T01:36:45.070579Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:478d69fac111d08baf097b541799e54e35cc1641b8e5b053ebc7378b1a2167a5
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T01:35:40Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API health-check helper scope is limited to local gateway/api_healthcheck.go helper behavior: health-check storage initialization gating, counter key derivation, enabled counter forwarding, rolling-window counter recording, request-rate average calculation, truncation, and aggregate health-value projection. This approval does not claim Redis durability, sample-retention correctness, asynchronous scheduling beyond observable storage invocation, health endpoint routing, distributed storage availability, or final client-visible health status.'
+        fingerprint: sha256:e3da8e1ba4e9fcd16584b90a126055ad5398623b255eb99d14c2de7ec3e8bd9b
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-21T01:36:16.023128Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-152|gateway_api_healthcheck_helpers_operation_terminal
+          reviewer: human:buger
+          reason: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. SYS-REQ-152's requested local health-check helper terminality is decomposed by SW-REQ-139 for local gateway/api_healthcheck.go helper behavior only; Redis durability, sample-retention correctness, asynchronous scheduling beyond observable storage invocation, health endpoint routing, distributed storage availability, and final client-visible health status remain outside this proof slice.
+          reviewed_at: "2026-06-21T01:36:16.023128Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T01:35:40Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API health-check helper system requirement.
+          changed_by: human:buger
