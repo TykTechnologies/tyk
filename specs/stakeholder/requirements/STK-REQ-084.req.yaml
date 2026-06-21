@@ -1,0 +1,61 @@
+id: STK-REQ-084
+version: 1
+status: approved
+priority: shall
+category: http_mux_path_helpers
+req_type: guarantee
+fretish: ""
+description: HTTP mux path helper support shall preserve deterministic local helper behavior for tested inputs by validating mux path patterns, compiling listen-path patterns into regular expressions, identifying mux template markers, stripping configured listen paths from request paths, matching single path patterns, and matching any path from a candidate set while returning errors for malformed regular expressions, without claiming gateway API loading, route registration, middleware authorization, upstream behavior, analytics, persistence, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: http_mux_path_helpers
+rationale: HTTP mux path helpers normalize and compare local path patterns before gateway routing and middleware flows consume them. This requirement owns only focused helper behavior under tests.
+tags:
+    - http
+    - mux
+    - path
+    - helper
+variables: []
+traces:
+    reviewed_at: "2026-06-21T06:54:38.522422Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:fca2a331a15eaebda448df0e65482b78267555e0c7a961081a50f876dee5ee0f
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. HTTP mux path helper scope is limited to local internal/httputil behavior for tested mux path validation, path-regexp preparation, mux-template detection, listen-path stripping, single-pattern matching, multi-candidate matching, and malformed regular expression errors. This approval does not claim gateway API loading, route registration, middleware authorization, upstream behavior, analytics, persistence, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need local mux path helpers to validate, prepare, strip, and match tested path patterns consistently before gateway routing and middleware flows use those decisions.
+    acceptance_criteria:
+        - id: STK-REQ-084-AC-01
+          text: Given tested mux path helper inputs, when local helper functions are exercised, then valid and invalid path patterns, prepared regular expressions, mux-template markers, stripped listen paths, direct path matches, multi-candidate matches, and malformed regular expression errors are produced as expected for those inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-172
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added HTTP mux path helper requirement for focused internal/httputil tests.
+          changed_by: agent:codex

@@ -18,13 +18,14 @@ var pathRegexpCache = maps.NewStringMap()
 // apiLandIDsRegex matches mux-style parameters like `{id}`.
 var apiLangIDsRegex = regexp.MustCompile(`{([^}]+)}`)
 
-// PreparePathRexep will replace mux-style parameters in input with a compatible regular expression.
+// PreparePathRegexp will replace mux-style parameters in input with a compatible regular expression.
 // Parameters like `{id}` would be replaced to `([^/]+)`. If the input pattern provides a starting
 // or ending delimiters (`^` or `$`), the pattern is returned.
 // If prefix is true, and pattern starts with /, the returned pattern prefixes a `^` to the regex.
 // No other prefix matches are possible so only `/` to `^/` conversion is considered.
 // If suffix is true, the returned pattern suffixes a `$` to the regex.
 // If both prefix and suffixes are achieved, an explicit match is made.
+// SW-REQ-159
 func PreparePathRegexp(pattern string, prefix bool, suffix bool) string {
 	// Construct cache key from pattern and flags
 	key := fmt.Sprintf("%s:%v:%v", pattern, prefix, suffix)
@@ -63,6 +64,7 @@ func PreparePathRegexp(pattern string, prefix bool, suffix bool) string {
 }
 
 // ValidatePath validates if the path is valid. Returns an error.
+// SW-REQ-159
 func ValidatePath(in string) error {
 	router := mux.NewRouter()
 	route := router.PathPrefix(in)
@@ -70,6 +72,7 @@ func ValidatePath(in string) error {
 }
 
 // IsMuxTemplate determines if a pattern is a mux template by counting the number of opening and closing braces.
+// SW-REQ-159
 func IsMuxTemplate(pattern string) bool {
 	openBraces := strings.Count(pattern, "{")
 	closeBraces := strings.Count(pattern, "}")
@@ -79,6 +82,7 @@ func IsMuxTemplate(pattern string) bool {
 // StripListenPath will strip the listenPath from the passed urlPath.
 // If the listenPath contains mux variables, it will trim away the
 // matching pattern with a regular expression that mux provides.
+// SW-REQ-159
 func StripListenPath(listenPath, urlPath string) (res string) {
 	defer func() {
 		if !strings.HasPrefix(res, "/") {
@@ -109,6 +113,7 @@ func StripListenPath(listenPath, urlPath string) (res string) {
 }
 
 // MatchPath matches regexp pattern with request endpoint.
+// SW-REQ-159
 func MatchPath(pattern string, endpoint string) (bool, error) {
 	if strings.Trim(pattern, "^$") == "" || endpoint == "" {
 		return false, nil
@@ -127,7 +132,8 @@ func MatchPath(pattern string, endpoint string) (bool, error) {
 
 // MatchPaths matches regexp pattern with multiple request URLs endpoint paths.
 // It will return true if any of them is correctly matched, with no error.
-// If no matches occur, any errors will be retured joined with errors.Join.
+// If no matches occur, any errors will be returned joined with errors.Join.
+// SW-REQ-159
 func MatchPaths(pattern string, endpoints []string) (bool, error) {
 	var errs []error
 
