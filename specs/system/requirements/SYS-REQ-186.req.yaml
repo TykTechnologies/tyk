@@ -1,0 +1,53 @@
+id: SYS-REQ-186
+version: 1
+status: approved
+priority: shall
+category: storage
+req_type: guarantee
+fretish: ""
+description: MDCB storage handling shall preserve deterministic local wrapper behavior for tested inputs by constructing storage wrappers, reading local keys before RPC fallback, returning the first successful multi-key read, classifying resource keys, caching RPC OAuth-client values locally, invoking certificate cache callbacks, writing only to local storage, falling back from local to RPC key listing and list range reads, combining local and RPC delete, scan-delete, connect, append, remove-list, and existence results, delegating selected set and filter operations, and preserving explicit panic behavior for unsupported MDCB storage methods without claiming real MDCB or Redis availability, distributed consistency, persistence durability, network transport behavior, RPC service correctness, certificate storage correctness beyond callback invocation, OAuth-client validity, concurrency safety, or final client-visible behavior beyond the focused local MDCB storage tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-098
+component: storage_mdcb
+rationale: This system requirement owns local MDCB storage wrapper mechanics only. Distributed MDCB behavior and real backend availability remain outside this proof slice.
+tags:
+    - storage
+    - mdcb
+    - rpc
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-098
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T10:03:31Z"
+        comment: Reviewed under explicit chat delegation. MDCB storage scope is limited to local wrapper construction, local-first reads, RPC fallback and cache processing, resource type classification, OAuth-client local caching, certificate callback invocation, local-only writes, local/RPC key and list fallback, dual-backend delete/connect/append/remove/existence behavior, selected set/filter delegation, and explicit panic behavior for unsupported methods. Does not claim real MDCB or Redis availability, distributed consistency, persistence durability, network transport behavior, RPC service correctness, certificate storage correctness beyond callback invocation, OAuth-client validity, concurrency safety, or final client-visible behavior.
+        fingerprint: sha256:4eea380b72c0b5c1486a36ee47bf36696f88b136b9072036cb79b777e9a75f74
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T10:03:32Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added MDCB storage system requirement.
+          changed_by: agent:codex

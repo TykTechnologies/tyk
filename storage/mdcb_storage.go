@@ -15,12 +15,17 @@ type MdcbStorage struct {
 }
 
 const (
+	// SW-REQ-173
 	resourceOauthClient = "OauthClient"
+	// SW-REQ-173
 	resourceCertificate = "Certificate"
-	resourceApiKey      = "ApiKey"
-	resourceKey         = "Key"
+	// SW-REQ-173
+	resourceApiKey = "ApiKey"
+	// SW-REQ-173
+	resourceKey = "Key"
 )
 
+// SW-REQ-173
 func NewMdcbStorage(local, rpc Handler, log *logrus.Entry, OnRPCCertPull func(key string, val string) error) *MdcbStorage {
 	return &MdcbStorage{
 		local:         local,
@@ -30,6 +35,7 @@ func NewMdcbStorage(local, rpc Handler, log *logrus.Entry, OnRPCCertPull func(ke
 	}
 }
 
+// SW-REQ-173
 func (m MdcbStorage) GetKey(key string) (string, error) {
 	if m.local != nil {
 		val, err := m.getFromLocal(key)
@@ -43,6 +49,7 @@ func (m MdcbStorage) GetKey(key string) (string, error) {
 }
 
 // GetMultiKey gets multiple keys from the MDCB layer
+// SW-REQ-173
 func (m MdcbStorage) GetMultiKey(keyNames []string) ([]string, error) {
 	var err error
 	var value string
@@ -57,10 +64,12 @@ func (m MdcbStorage) GetMultiKey(keyNames []string) ([]string, error) {
 	return nil, err
 }
 
+// SW-REQ-173
 func (m MdcbStorage) GetRawKey(string) (string, error) {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) SetKey(key string, content string, TTL int64) error {
 	// only set the value locally as rpc writtes is not allowed
 	errLocal := m.local.SetKey(key, content, TTL)
@@ -72,18 +81,22 @@ func (m MdcbStorage) SetKey(key string, content string, TTL int64) error {
 	return nil
 }
 
+// SW-REQ-173
 func (m MdcbStorage) SetRawKey(string, string, int64) error {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) SetExp(string, int64) error {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) GetExp(string) (int64, error) {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) GetKeys(key string) []string {
 	var val []string
 
@@ -98,6 +111,7 @@ func (m MdcbStorage) GetKeys(key string) []string {
 	return val
 }
 
+// SW-REQ-173
 func (m MdcbStorage) DeleteKey(key string) bool {
 	deleteLocal := m.local.DeleteKey(key)
 	deleteRPC := m.rpc.DeleteKey(key)
@@ -105,48 +119,60 @@ func (m MdcbStorage) DeleteKey(key string) bool {
 	return deleteLocal || deleteRPC
 }
 
+// SW-REQ-173
 func (m MdcbStorage) DeleteAllKeys() bool {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) DeleteRawKey(string) bool {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) DeleteRawKeys([]string) bool { panic("implement me") }
 
+// SW-REQ-173
 func (m MdcbStorage) Connect() bool {
 	return m.local.Connect() && m.rpc.Connect()
 }
 
+// SW-REQ-173
 func (m MdcbStorage) GetKeysAndValues() map[string]string {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) GetKeysAndValuesWithFilter(key string) map[string]string {
 	return m.local.GetKeysAndValuesWithFilter(key)
 }
 
+// SW-REQ-173
 func (m MdcbStorage) DeleteKeys([]string) bool {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) Decrement(string) {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) IncrememntWithExpire(string, int64) int64 {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{}) {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{}) {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) GetSet(key string) (map[string]string, error) {
 	val, err := m.local.GetSet(key)
 	if err != nil {
@@ -156,18 +182,22 @@ func (m MdcbStorage) GetSet(key string) (map[string]string, error) {
 	return val, err
 }
 
+// SW-REQ-173
 func (m MdcbStorage) AddToSet(key string, value string) {
 	m.local.AddToSet(key, value)
 }
 
+// SW-REQ-173
 func (m MdcbStorage) GetAndDeleteSet(string) []interface{} {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) RemoveFromSet(key string, value string) {
 	m.local.RemoveFromSet(key, value)
 }
 
+// SW-REQ-173
 func (m MdcbStorage) DeleteScanMatch(key string) bool {
 	deleteLocal := m.local.DeleteScanMatch(key)
 	deleteRPC := m.rpc.DeleteScanMatch(key)
@@ -175,22 +205,27 @@ func (m MdcbStorage) DeleteScanMatch(key string) bool {
 	return deleteLocal || deleteRPC
 }
 
+// SW-REQ-173
 func (m MdcbStorage) GetKeyPrefix() string {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) AddToSortedSet(string, string, float64) {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) GetSortedSetRange(string, string, string) ([]string, []float64, error) {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) RemoveSortedSetRange(string, string, string) error {
 	panic("implement me")
 }
 
+// SW-REQ-173
 func (m MdcbStorage) GetListRange(key string, from int64, to int64) ([]string, error) {
 	var val []string
 	var err error
@@ -207,6 +242,7 @@ func (m MdcbStorage) GetListRange(key string, from int64, to int64) ([]string, e
 	return val, err
 }
 
+// SW-REQ-173
 func (m MdcbStorage) RemoveFromList(key string, value string) error {
 	errLocal := m.local.RemoveFromList(key, value)
 	errRpc := m.rpc.RemoveFromList(key, value)
@@ -218,11 +254,13 @@ func (m MdcbStorage) RemoveFromList(key string, value string) error {
 	return nil
 }
 
+// SW-REQ-173
 func (m MdcbStorage) AppendToSet(key string, value string) {
 	m.local.AppendToSet(key, value)
 	m.rpc.AppendToSet(key, value)
 }
 
+// SW-REQ-173
 func (m MdcbStorage) Exists(key string) (bool, error) {
 	foundLocal, errLocal := m.local.Exists(key)
 	foundRpc, errRpc := m.rpc.Exists(key)
@@ -235,6 +273,7 @@ func (m MdcbStorage) Exists(key string) (bool, error) {
 }
 
 // cacheCertificate saves locally resourceCertificate after pull from rpc
+// SW-REQ-173
 func (m MdcbStorage) cacheCertificate(key, val string) error {
 	if m.OnRPCCertPull == nil {
 		return nil
@@ -243,12 +282,14 @@ func (m MdcbStorage) cacheCertificate(key, val string) error {
 }
 
 // cacheOAuthClient saved oauth data in local storage after pull from rpc
+// SW-REQ-173
 func (m MdcbStorage) cacheOAuthClient(key, val string) error {
 	return m.local.SetKey(key, val, 0)
 }
 
 // processResourceByType based on the type of key it will trigger the proper
 // caching mechanism
+// SW-REQ-173
 func (m MdcbStorage) processResourceByType(key, val string) error {
 
 	resourceType := getResourceType(key)
@@ -262,6 +303,7 @@ func (m MdcbStorage) processResourceByType(key, val string) error {
 }
 
 // getFromRPCAndCache pulls a resource from rpc and stores it in local redis for caching
+// SW-REQ-173
 func (m MdcbStorage) getFromRPCAndCache(key string) (string, error) {
 	val, err := m.rpc.GetKey(key)
 	if err != nil {
@@ -273,10 +315,12 @@ func (m MdcbStorage) getFromRPCAndCache(key string) (string, error) {
 }
 
 // getFromLocal get a key from local storage
+// SW-REQ-173
 func (m MdcbStorage) getFromLocal(key string) (string, error) {
 	return m.local.GetKey(key)
 }
 
+// SW-REQ-173
 func getResourceType(key string) string {
 	switch {
 	case strings.Contains(key, "oauth-clientid."):

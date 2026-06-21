@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T09:50:02Z"
+generated_at: "2026-06-21T10:03:58Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -1173,6 +1173,16 @@ reviews:
       approval_fingerprint: sha256:54fb7ab1eaa37bc0c5133dbff6a9247e03490284a2fb021d0d57edd36d4c47c7
       artifact_fingerprint: sha256:3bad4a8c59d457577e572a39b6da3492147d4e1769cd31b8edddc3157e84b270
       reviewed_at: "2026-06-21T09:50:02Z"
+    - requirement: SW-REQ-173
+      artifact: storage/mdcb_storage.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed storage MDCB implementation impact after adding ReqProof annotations and focused local tests; production behavior and the approved MDCB storage requirement remain unchanged except for proof annotations.
+      base: origin/master
+      requirement_fingerprint: sha256:8dd17743cde17f8160afab3d8f0fb364d40e3facfde02b8cb68950dbda6ddab0
+      approval_fingerprint: sha256:62e19024b7802edf365a8118d9ef47ce2bf08398d912063f32bbba743fca406a
+      artifact_fingerprint: sha256:0efae262fb9b8365075a9ff008ff2889bd37984c8853f18f9a701dc4662c0d6b
+      reviewed_at: "2026-06-21T10:03:58Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

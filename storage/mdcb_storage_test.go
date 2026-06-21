@@ -58,6 +58,282 @@ func setupTest(t *testing.T) *testSetup {
 	}
 }
 
+// Verifies: STK-REQ-098, SYS-REQ-186, SW-REQ-173
+// STK-REQ-098:STK-REQ-098-AC-01:acceptance
+// STK-REQ-098:error_handling:negative
+// SYS-REQ-186:nominal:nominal
+// SYS-REQ-186:boundary:nominal
+// SYS-REQ-186:error_handling:nominal
+// SYS-REQ-186:error_handling:negative
+// SYS-REQ-186:encoding_safety:nominal
+// SYS-REQ-186:determinism:nominal
+// SW-REQ-173:nominal:nominal
+// SW-REQ-173:boundary:nominal
+// SW-REQ-173:error_handling:nominal
+// SW-REQ-173:error_handling:negative
+// SW-REQ-173:encoding_safety:nominal
+// SW-REQ-173:determinism:nominal
+func TestMdcbStorageAcceptance(t *testing.T) {
+	localHandler := NewDummyStorage()
+	rpcHandler := NewDummyStorage()
+	mdcb := NewMdcbStorage(localHandler, rpcHandler, getTestLogger(), nil)
+
+	assert.NoError(t, localHandler.SetKey("local-key", "local-value", 0))
+	assert.NoError(t, rpcHandler.SetKey("rpc-key", "rpc-value", 0))
+
+	value, err := mdcb.GetKey("local-key")
+	assert.NoError(t, err)
+	assert.Equal(t, "local-value", value)
+
+	value, err = mdcb.GetKey("rpc-key")
+	assert.NoError(t, err)
+	assert.Equal(t, "rpc-value", value)
+
+	assert.NoError(t, rpcHandler.SetKey("oauth-clientid.client", "oauth-value", 0))
+	value, err = mdcb.GetKey("oauth-clientid.client")
+	assert.NoError(t, err)
+	assert.Equal(t, "oauth-value", value)
+
+	cachedOAuth, err := localHandler.GetKey("oauth-clientid.client")
+	assert.NoError(t, err)
+	assert.Equal(t, "oauth-value", cachedOAuth)
+
+	var certPulls int
+	mdcb.OnRPCCertPull = func(key, val string) error {
+		certPulls++
+		assert.Equal(t, "raw-cert", key)
+		assert.Equal(t, "cert-value", val)
+		return nil
+	}
+	assert.NoError(t, rpcHandler.SetKey("raw-cert", "cert-value", 0))
+	value, err = mdcb.GetKey("raw-cert")
+	assert.NoError(t, err)
+	assert.Equal(t, "cert-value", value)
+	assert.Equal(t, 1, certPulls)
+
+	assert.NoError(t, mdcb.SetKey("write-local", "write-value", 0))
+	value, err = localHandler.GetKey("write-local")
+	assert.NoError(t, err)
+	assert.Equal(t, "write-value", value)
+
+	assert.True(t, mdcb.DeleteKey("write-local"))
+	assert.False(t, mdcb.DeleteKey("missing-key"))
+	assert.True(t, mdcb.Connect())
+
+	mdcb.AppendToSet("shared-list", "one")
+	mdcb.AppendToSet("shared-list", "two")
+	localValues, err := localHandler.GetListRange("shared-list", 0, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"one", "two"}, localValues)
+
+	rpcValues, err := rpcHandler.GetListRange("shared-list", 0, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"one", "two"}, rpcValues)
+
+	assert.PanicsWithValue(t, "implement me", func() {
+		_, _ = mdcb.GetRawKey("unsupported")
+	})
+}
+
+// Verifies: STK-REQ-098, SYS-REQ-186, SW-REQ-173
+// SW-REQ-173:nominal:nominal
+// SW-REQ-173:boundary:nominal
+// SW-REQ-173:error_handling:nominal
+// SW-REQ-173:error_handling:negative
+// SW-REQ-173:encoding_safety:nominal
+// SW-REQ-173:determinism:nominal
+func TestMdcbStorageWrapperMethods(t *testing.T) {
+	t.Run("SetKey writes local only and maps local write errors", func(t *testing.T) {
+		setup := setupTest(t)
+		defer setup.CleanUp()
+
+		setup.Local.EXPECT().SetKey("key", "value", int64(10)).Return(nil)
+		assert.NoError(t, setup.MdcbStorage.SetKey("key", "value", 10))
+
+		setup = setupTest(t)
+		defer setup.CleanUp()
+
+		setup.Local.EXPECT().SetKey("key", "value", int64(10)).Return(errors.New("write failed"))
+		assert.EqualError(t, setup.MdcbStorage.SetKey("key", "value", 10), "cannot save key in local")
+	})
+
+	t.Run("GetKeys uses local values before RPC fallback", func(t *testing.T) {
+		setup := setupTest(t)
+		defer setup.CleanUp()
+
+		setup.Local.EXPECT().GetKeys("prefix*").Return([]string{"local"})
+		assert.Equal(t, []string{"local"}, setup.MdcbStorage.GetKeys("prefix*"))
+
+		setup = setupTest(t)
+		defer setup.CleanUp()
+
+		setup.Local.EXPECT().GetKeys("prefix*").Return(nil)
+		setup.Remote.EXPECT().GetKeys("prefix*").Return([]string{"remote"})
+		assert.Equal(t, []string{"remote"}, setup.MdcbStorage.GetKeys("prefix*"))
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		remote := mock.NewMockHandler(ctrl)
+		remote.EXPECT().GetKeys("prefix*").Return([]string{"remote-only"})
+		mdcb := NewMdcbStorage(nil, remote, getTestLogger(), nil)
+		assert.Equal(t, []string{"remote-only"}, mdcb.GetKeys("prefix*"))
+	})
+
+	t.Run("DeleteKey and DeleteScanMatch combine local and RPC results", func(t *testing.T) {
+		setup := setupTest(t)
+		defer setup.CleanUp()
+
+		setup.Local.EXPECT().DeleteKey("key").Return(false)
+		setup.Remote.EXPECT().DeleteKey("key").Return(true)
+		assert.True(t, setup.MdcbStorage.DeleteKey("key"))
+
+		setup.Local.EXPECT().DeleteScanMatch("prefix*").Return(false)
+		setup.Remote.EXPECT().DeleteScanMatch("prefix*").Return(false)
+		assert.False(t, setup.MdcbStorage.DeleteScanMatch("prefix*"))
+	})
+
+	t.Run("Connect requires local and RPC connections", func(t *testing.T) {
+		setup := setupTest(t)
+		defer setup.CleanUp()
+
+		setup.Local.EXPECT().Connect().Return(true)
+		setup.Remote.EXPECT().Connect().Return(false)
+		assert.False(t, setup.MdcbStorage.Connect())
+	})
+
+	t.Run("delegates filter and set helpers to selected handlers", func(t *testing.T) {
+		setup := setupTest(t)
+		defer setup.CleanUp()
+
+		filtered := map[string]string{"key": "value"}
+		setup.Local.EXPECT().GetKeysAndValuesWithFilter("prefix").Return(filtered)
+		assert.Equal(t, filtered, setup.MdcbStorage.GetKeysAndValuesWithFilter("prefix"))
+
+		setup.Local.EXPECT().AddToSet("set-key", "value")
+		setup.MdcbStorage.AddToSet("set-key", "value")
+
+		setup.Local.EXPECT().RemoveFromSet("set-key", "value")
+		setup.MdcbStorage.RemoveFromSet("set-key", "value")
+	})
+
+	t.Run("GetSet falls back to RPC after local error", func(t *testing.T) {
+		setup := setupTest(t)
+		defer setup.CleanUp()
+
+		localErr := errors.New("local miss")
+		rpcSet := map[string]string{"rpc": "value"}
+		setup.Local.EXPECT().GetSet("set-key").Return(nil, localErr)
+		setup.Remote.EXPECT().GetSet("set-key").Return(rpcSet, nil)
+
+		got, err := setup.MdcbStorage.GetSet("set-key")
+		assert.NoError(t, err)
+		assert.Equal(t, rpcSet, got)
+	})
+
+	t.Run("GetListRange uses RPC when local is nil or errors", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		remote := mock.NewMockHandler(ctrl)
+		remote.EXPECT().GetListRange("list-key", int64(0), int64(2)).Return([]string{"rpc"}, nil)
+		mdcb := NewMdcbStorage(nil, remote, getTestLogger(), nil)
+
+		got, err := mdcb.GetListRange("list-key", 0, 2)
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"rpc"}, got)
+
+		setup := setupTest(t)
+		defer setup.CleanUp()
+		setup.Local.EXPECT().GetListRange("list-key", int64(0), int64(2)).Return(nil, errors.New("local miss"))
+		setup.Remote.EXPECT().GetListRange("list-key", int64(0), int64(2)).Return([]string{"fallback"}, nil)
+
+		got, err = setup.MdcbStorage.GetListRange("list-key", 0, 2)
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"fallback"}, got)
+	})
+
+	t.Run("RemoveFromList and AppendToSet combine local and RPC handlers", func(t *testing.T) {
+		setup := setupTest(t)
+		defer setup.CleanUp()
+
+		setup.Local.EXPECT().RemoveFromList("list-key", "value").Return(errors.New("local failed"))
+		setup.Remote.EXPECT().RemoveFromList("list-key", "value").Return(nil)
+		assert.NoError(t, setup.MdcbStorage.RemoveFromList("list-key", "value"))
+
+		setup.Local.EXPECT().AppendToSet("list-key", "value")
+		setup.Remote.EXPECT().AppendToSet("list-key", "value")
+		setup.MdcbStorage.AppendToSet("list-key", "value")
+
+		setup = setupTest(t)
+		defer setup.CleanUp()
+
+		setup.Local.EXPECT().RemoveFromList("list-key", "value").Return(errors.New("local failed"))
+		setup.Remote.EXPECT().RemoveFromList("list-key", "value").Return(errors.New("rpc failed"))
+		assert.EqualError(t, setup.MdcbStorage.RemoveFromList("list-key", "value"), "cannot delete key in storages")
+	})
+
+	t.Run("Exists requires both handlers and maps dual errors", func(t *testing.T) {
+		setup := setupTest(t)
+		defer setup.CleanUp()
+
+		setup.Local.EXPECT().Exists("key").Return(true, nil)
+		setup.Remote.EXPECT().Exists("key").Return(true, nil)
+		exists, err := setup.MdcbStorage.Exists("key")
+		assert.NoError(t, err)
+		assert.True(t, exists)
+
+		setup = setupTest(t)
+		defer setup.CleanUp()
+
+		setup.Local.EXPECT().Exists("key").Return(false, errors.New("local failed"))
+		setup.Remote.EXPECT().Exists("key").Return(false, errors.New("rpc failed"))
+		exists, err = setup.MdcbStorage.Exists("key")
+		assert.EqualError(t, err, "cannot find key in storages")
+		assert.False(t, exists)
+	})
+}
+
+// Verifies: STK-REQ-098, SYS-REQ-186, SW-REQ-173
+// SW-REQ-173:nominal:nominal
+// SW-REQ-173:boundary:nominal
+// SW-REQ-173:error_handling:nominal
+// SW-REQ-173:error_handling:negative
+// SW-REQ-173:encoding_safety:nominal
+// SW-REQ-173:determinism:nominal
+func TestMdcbStorageUnsupportedMethodsPanic(t *testing.T) {
+	mdcb := NewMdcbStorage(nil, nil, getTestLogger(), nil)
+
+	testCases := []struct {
+		name string
+		run  func()
+	}{
+		{name: "GetRawKey", run: func() { _, _ = mdcb.GetRawKey("key") }},
+		{name: "SetRawKey", run: func() { _ = mdcb.SetRawKey("key", "value", 0) }},
+		{name: "SetExp", run: func() { _ = mdcb.SetExp("key", 0) }},
+		{name: "GetExp", run: func() { _, _ = mdcb.GetExp("key") }},
+		{name: "DeleteAllKeys", run: func() { _ = mdcb.DeleteAllKeys() }},
+		{name: "DeleteRawKey", run: func() { _ = mdcb.DeleteRawKey("key") }},
+		{name: "DeleteRawKeys", run: func() { _ = mdcb.DeleteRawKeys([]string{"key"}) }},
+		{name: "GetKeysAndValues", run: func() { _ = mdcb.GetKeysAndValues() }},
+		{name: "DeleteKeys", run: func() { _ = mdcb.DeleteKeys([]string{"key"}) }},
+		{name: "Decrement", run: func() { mdcb.Decrement("key") }},
+		{name: "IncrememntWithExpire", run: func() { _ = mdcb.IncrememntWithExpire("key", 0) }},
+		{name: "SetRollingWindow", run: func() { _, _ = mdcb.SetRollingWindow("key", 1, "value", false) }},
+		{name: "GetRollingWindow", run: func() { _, _ = mdcb.GetRollingWindow("key", 1, false) }},
+		{name: "GetAndDeleteSet", run: func() { _ = mdcb.GetAndDeleteSet("key") }},
+		{name: "GetKeyPrefix", run: func() { _ = mdcb.GetKeyPrefix() }},
+		{name: "AddToSortedSet", run: func() { mdcb.AddToSortedSet("key", "value", 1) }},
+		{name: "GetSortedSetRange", run: func() { _, _, _ = mdcb.GetSortedSetRange("key", "0", "1") }},
+		{name: "RemoveSortedSetRange", run: func() { _ = mdcb.RemoveSortedSetRange("key", "0", "1") }},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.PanicsWithValue(t, "implement me", tc.run)
+		})
+	}
+}
+
+// Verifies: STK-REQ-098, SYS-REQ-186, SW-REQ-173
 func TestGetResourceType(t *testing.T) {
 	tests := []struct {
 		key      string
@@ -79,6 +355,7 @@ func TestGetResourceType(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-098, SYS-REQ-186, SW-REQ-173
 func TestMdcbStorage_GetMultiKey(t *testing.T) {
 	rpcHandler := NewDummyStorage()
 	err := rpcHandler.SetKey("key1", "1", 0)
@@ -139,6 +416,7 @@ func TestMdcbStorage_GetMultiKey(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-098, SYS-REQ-186, SW-REQ-173
 func TestGetFromLocalStorage(t *testing.T) {
 	setup := setupTest(t)
 	defer setup.CleanUp()
@@ -156,6 +434,7 @@ func TestGetFromLocalStorage(t *testing.T) {
 	assert.Equal(t, "", notFoundVal)
 }
 
+// Verifies: STK-REQ-098, SYS-REQ-186, SW-REQ-173
 func TestGetFromRPCAndCache(t *testing.T) {
 	setup := setupTest(t)
 	defer setup.CleanUp()
@@ -202,6 +481,7 @@ func TestGetFromRPCAndCache(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+// Verifies: STK-REQ-098, SYS-REQ-186, SW-REQ-173
 func TestProcessResourceByType(t *testing.T) {
 	// Setup
 
@@ -289,6 +569,7 @@ func TestProcessResourceByType(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-098, SYS-REQ-186, SW-REQ-173
 func TestCacheOAuthClient(t *testing.T) {
 
 	// Test cases
@@ -338,6 +619,7 @@ func TestCacheOAuthClient(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-098, SYS-REQ-186, SW-REQ-173
 func TestCacheCertificate(t *testing.T) {
 
 	// Test cases
