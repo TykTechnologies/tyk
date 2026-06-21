@@ -48,6 +48,7 @@ type WebhookCredential struct {
 }
 
 // NewClient creates a new Client for interacting with the portal API
+// SW-REQ-156
 func NewClient(baseURL, secret string) *Client {
 	if !strings.HasSuffix(baseURL, "/") {
 		baseURL += "/"
@@ -61,6 +62,7 @@ func NewClient(baseURL, secret string) *Client {
 }
 
 // ListWebhookCredentials retrieves a list of apps and filters out their webhook credentials
+// SW-REQ-156
 func (client *Client) ListWebhookCredentials() ([]WebhookCredential, error) {
 	var allApps []App
 	for page := 1; ; page++ {
@@ -99,6 +101,7 @@ func (client *Client) ListWebhookCredentials() ([]WebhookCredential, error) {
 	return webhookCredentials, nil
 }
 
+// SW-REQ-156
 func (client *Client) fetchApps(page int) ([]App, error) {
 	url := fmt.Sprintf("%s/apps?page=%d&per_page=10", client.BaseURL, page)
 
@@ -134,6 +137,7 @@ func (client *Client) fetchApps(page int) ([]App, error) {
 	return apps, nil
 }
 
+// SW-REQ-156
 func (client *Client) fetchAppDetail(appID int) (*AppDetail, error) {
 	url := fmt.Sprintf("%s/apps/%d", client.BaseURL, appID)
 

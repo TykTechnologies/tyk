@@ -20,6 +20,7 @@ type portalOutputConfig struct {
 	Headers   map[string]string
 }
 
+// SW-REQ-156
 func newPortalOutputConfig() *portalOutputConfig {
 	return &portalOutputConfig{}
 }
@@ -29,11 +30,13 @@ type portalOutput struct {
 	portalClient *Client
 }
 
+// SW-REQ-156
 func newPortalOutput(conf *portalOutputConfig, _ *service.Resources) *portalOutput {
 	client := NewClient(conf.PortalURL, conf.Secret)
 	return &portalOutput{conf: conf, portalClient: client}
 }
 
+// SW-REQ-156
 func (p *portalOutput) Connect(_ context.Context) error {
 	log.Println("Connecting to Portal API")
 	// Connection logic here if necessary, e.g., test connection or fetch token.
@@ -41,6 +44,7 @@ func (p *portalOutput) Connect(_ context.Context) error {
 	return nil
 }
 
+// SW-REQ-156
 func (p *portalOutput) Write(_ context.Context, msg *service.Message) error {
 	webhooks, err := p.portalClient.ListWebhookCredentials()
 	if err != nil {
@@ -65,6 +69,7 @@ func (p *portalOutput) Write(_ context.Context, msg *service.Message) error {
 	return nil
 }
 
+// SW-REQ-156
 func (p *portalOutput) sendToWebhook(url string, data []byte) error {
 	req, err := http.NewRequestWithContext(context.Background(), "POST", url, bytes.NewBuffer(data))
 	if err != nil {
@@ -98,12 +103,14 @@ func (p *portalOutput) sendToWebhook(url string, data []byte) error {
 	return nil
 }
 
+// SW-REQ-156
 func (p *portalOutput) Close(_ context.Context) error {
 	log.Println("Closing Portal Output")
 	// Cleanup resources here if necessary
 	return nil
 }
 
+// SW-REQ-156
 func portalOutputConfigSpec() *service.ConfigSpec {
 	spec := service.NewConfigSpec().
 		Summary("Posts messages to dynamically fetched webhooks based on event type.").
@@ -116,6 +123,7 @@ func portalOutputConfigSpec() *service.ConfigSpec {
 	return spec
 }
 
+// SW-REQ-156
 func init() {
 	err := service.RegisterOutput("portal_webhook", portalOutputConfigSpec(),
 		func(conf *service.ParsedConfig, mgr *service.Resources) (service.Output, int, error) {

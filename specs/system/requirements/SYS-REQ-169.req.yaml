@@ -1,0 +1,55 @@
+id: SYS-REQ-169
+version: 1
+status: approved
+priority: shall
+category: portal_webhook_helpers
+req_type: guarantee
+fretish: ""
+description: Portal webhook helper handling shall preserve deterministic local portal client and Bento output results for tested inputs by normalizing portal API base URLs, fetching app webhook credentials while skipping apps without webhook URLs, registering and constructing the portal webhook output, sending generated messages to matching event-type webhooks, applying configured webhook headers, and returning explicit local errors for non-success webhook responses, without claiming external portal availability, webhook endpoint durability, Bento runtime completeness, gateway event triggering, persistence, analytics, network delivery outside local test servers, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-081
+component: portal_webhook_helpers
+rationale: This system requirement owns local internal/portal helper decisions only. External portal service behavior, webhook service durability, gateway event triggering, persistence, analytics, and client-visible runtime behavior remain outside this proof slice.
+tags:
+    - portal
+    - webhook
+    - bento
+    - helper
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-081
+    reviewed_at: "2026-06-21T06:15:37.302011Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:dea4fc6901f31f3ef57475bc5162c29e26768fd6e445feb734c85973c7670a0c
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Portal webhook helper scope is limited to local internal/portal behavior: portal API URL normalization, app webhook credential discovery for tested portal API responses, Bento output construction and registration, matching event-type webhook dispatch to local test servers, configured webhook headers, and non-success webhook response errors. This approval does not claim external portal availability, webhook endpoint durability, Bento runtime completeness, gateway event triggering, persistence, analytics, network delivery outside local test servers, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added portal webhook helper system requirement.
+          changed_by: agent:codex

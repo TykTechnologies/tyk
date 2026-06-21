@@ -1,0 +1,61 @@
+id: STK-REQ-081
+version: 1
+status: approved
+priority: shall
+category: portal_webhook_helpers
+req_type: guarantee
+fretish: ""
+description: Portal webhook helper support shall preserve deterministic local portal client and Bento output behavior for tested inputs by normalizing portal API base URLs, fetching app webhook credentials while skipping apps without webhook URLs, registering and constructing the portal webhook output, sending generated messages to matching event-type webhooks, applying configured webhook headers, and returning explicit local errors for non-success webhook responses, without claiming external portal availability, webhook endpoint durability, Bento runtime completeness, gateway event triggering, persistence, analytics, network delivery outside local test servers, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: portal_webhook_helpers
+rationale: Portal webhook helpers bridge local portal API credential discovery and Bento output message delivery. This requirement owns only the local helper behavior under focused tests.
+tags:
+    - portal
+    - webhook
+    - bento
+    - helper
+variables: []
+traces:
+    reviewed_at: "2026-06-21T06:19:07.780929Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:5aceb2ccabd7f35711cf42614f9eb658ae6b9725b6bf71dfad2e533752d051ca
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Portal webhook helper scope is limited to local internal/portal behavior: portal API URL normalization, app webhook credential discovery for tested portal API responses, Bento output construction and registration, matching event-type webhook dispatch to local test servers, configured webhook headers, and non-success webhook response errors. This approval does not claim external portal availability, webhook endpoint durability, Bento runtime completeness, gateway event triggering, persistence, analytics, network delivery outside local test servers, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: agent:codex
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need local portal webhook helpers to normalize portal API configuration, discover configured webhook credentials, and dispatch matching Bento output messages consistently before external portal or webhook systems are involved.
+    acceptance_criteria:
+        - id: STK-REQ-081-AC-01
+          text: Given tested portal API, Bento output, and webhook server inputs, when local portal webhook helpers are exercised, then portal base URLs are normalized, webhook credentials with URLs are returned, matching event-type webhooks receive messages, configured webhook headers are sent, and non-success webhook responses return explicit local errors.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-169
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added portal webhook helper requirement for focused local portal client and Bento output tests.
+          changed_by: agent:codex
