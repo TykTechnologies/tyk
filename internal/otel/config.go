@@ -87,6 +87,7 @@ type OpenTelemetry struct {
 //
 // Value receiver so it can be called on non-addressable values (e.g.
 // GetConfig().OpenTelemetry.TracesEnabled()).
+// SW-REQ-168
 func (c OpenTelemetry) TracesEnabled() bool {
 	if c.Traces != nil && c.Traces.Enabled {
 		return true
@@ -98,6 +99,7 @@ func (c OpenTelemetry) TracesEnabled() bool {
 // If Traces is non-nil and enabled (new format), it returns
 // &Traces.BaseOpenTelemetry; otherwise it returns the root-level
 // &c.BaseOpenTelemetry (legacy format).
+// SW-REQ-168
 func (c *OpenTelemetry) EffectiveTraceConfig() *BaseOpenTelemetry {
 	if c.Traces != nil && c.Traces.Enabled {
 		return &c.Traces.BaseOpenTelemetry
@@ -107,11 +109,13 @@ func (c *OpenTelemetry) EffectiveTraceConfig() *BaseOpenTelemetry {
 
 // effectiveTraceExporterConfig returns the ExporterConfig from the effective
 // trace source (Traces sub-object or root-level).
+// SW-REQ-168
 func (c *OpenTelemetry) effectiveTraceExporterConfig() ExporterConfig {
 	return c.EffectiveTraceConfig().ExporterConfig
 }
 
 // inheritExporterConfig copies zero-valued exporter fields in dst from src.
+// SW-REQ-168
 func inheritExporterConfig(dst *ExporterConfig, src ExporterConfig) {
 	if dst.Exporter == "" {
 		dst.Exporter = src.Exporter
@@ -137,6 +141,7 @@ func inheritExporterConfig(dst *ExporterConfig, src ExporterConfig) {
 // exporter inheritance. Trace defaults are applied first, then zero-valued
 // metrics exporter fields are filled from the effective trace config, then
 // metrics-specific defaults fill any remaining gaps.
+// SW-REQ-168
 func (c *OpenTelemetry) SetDefaults() {
 	// 1. Apply trace defaults to the effective trace config.
 	c.EffectiveTraceConfig().SetDefaults()
@@ -150,6 +155,7 @@ func (c *OpenTelemetry) SetDefaults() {
 
 // LibraryConfig returns the effective trace config for passing to
 // trace library functions that expect *otelconfig.OpenTelemetry.
+// SW-REQ-168
 func (c *OpenTelemetry) LibraryConfig() *otelconfig.OpenTelemetry {
 	return c.EffectiveTraceConfig()
 }

@@ -1,0 +1,53 @@
+id: SYS-REQ-181
+version: 1
+status: approved
+priority: shall
+category: observability
+req_type: guarantee
+fretish: ""
+description: OpenTelemetry runtime handling shall preserve deterministic local observability helper results for tested inputs by defaulting and inheriting trace and metrics configuration, selecting runtime-metrics enablement, constructing metric providers and gateway instruments, safely recording no-op and active local metric values, delegating API metric registry need flags and recording, intentionally panicking on invalid test registry definitions, initializing trace providers with local fallback behavior, generating API and gateway resource attributes, normalizing API version attributes, wrapping and extracting span contexts, extracting trace and span IDs, and adding trace IDs to response headers without claiming collector/exporter delivery, OpenTelemetry SDK provider correctness beyond local construction and fallback behavior, metric backend storage, runtime metric collection completeness, full gateway middleware admission, full HTTP request lifecycle behavior, trace propagation across services, dashboard visibility, or final client-visible behavior beyond the focused root OTEL tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-093
+component: otel_runtime
+rationale: This system requirement owns root internal/otel helper behavior only. API metric internals, gateway middleware integration, and exporter delivery remain outside this proof slice.
+tags:
+    - observability
+    - metrics
+    - tracing
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-093
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T09:13:27Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. OpenTelemetry runtime scope is limited to local root internal/otel behavior for tested trace and metrics config defaults and inheritance, runtime-metrics enablement, metric provider and instrument construction, no-op and active local metric recording, API metric registry delegation flags and recording, intentional panic behavior for invalid test registry definitions, trace provider initialization fallback, API and gateway resource attributes, API version normalization, span context wrapping and extraction, trace/span ID extraction, and trace ID response header insertion. This approval does not claim collector/exporter delivery, OpenTelemetry SDK provider correctness beyond local construction and fallback behavior, metric backend storage, runtime metric collection completeness, full gateway middleware admission, full HTTP request lifecycle behavior, trace propagation across services, dashboard visibility, or final client-visible behavior beyond the focused root OTEL tests.
+        fingerprint: sha256:4c7a2dc31a641d204009f9137ca1221f4634a83363ff4655079f9fbdb0467bf2
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T09:13:27Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added OpenTelemetry runtime system requirement.
+          changed_by: agent:codex

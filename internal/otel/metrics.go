@@ -12,6 +12,7 @@ import (
 )
 
 // NewMetricProvider creates an OTel metrics provider with the given metrics configuration.
+// SW-REQ-168
 func NewMetricProvider(ctx context.Context, logger *logrus.Logger, metricsCfg *BaseMetricsConfig,
 	id string, version string, useRPC bool, groupID string, isSegmented bool, segmentTags []string) (tykmetric.Provider, error) {
 
@@ -44,6 +45,8 @@ func NewMetricProvider(ctx context.Context, logger *logrus.Logger, metricsCfg *B
 //	nil (field omitted)  → default RED instruments created
 //	empty slice          → no API metrics (explicitly disabled)
 //	populated slice      → only configured instruments
+//
+// SW-REQ-168
 func InitOpenTelemetryMetrics(ctx context.Context, logger *logrus.Logger, gwConfig *OpenTelemetry,
 	id string, version string, useRPC bool, groupID string, isSegmented bool, segmentTags []string) *MetricInstruments {
 
@@ -88,6 +91,7 @@ func InitOpenTelemetryMetrics(ctx context.Context, logger *logrus.Logger, gwConf
 
 // isRuntimeMetricsEnabled determines if runtime metrics should be enabled.
 // Defaults to true when metrics are enabled and RuntimeMetrics is not explicitly set.
+// SW-REQ-168
 func isRuntimeMetricsEnabled(cfg *MetricsConfig) bool {
 	if cfg.Enabled == nil || !*cfg.Enabled {
 		return false

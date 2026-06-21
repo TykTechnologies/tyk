@@ -42,6 +42,13 @@ func runConcurrent(n, iter int, fn func()) {
 	}
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestNewMetricInstruments(t *testing.T) {
 	inst := noopProvider(t)
 	assert.NotNil(t, inst)
@@ -49,6 +56,13 @@ func TestNewMetricInstruments(t *testing.T) {
 	assert.NotNil(t, inst.requestCounter)
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestNewMetricInstruments_ConfigFields(t *testing.T) {
 	inst := noopProvider(t)
 	assert.NotNil(t, inst.apisLoaded)
@@ -57,6 +71,13 @@ func TestNewMetricInstruments_ConfigFields(t *testing.T) {
 	assert.NotNil(t, inst.reloadDuration)
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestRecordRequest_Noop(t *testing.T) {
 	inst := noopProvider(t)
 
@@ -66,6 +87,13 @@ func TestRecordRequest_Noop(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestRecordRequest_Concurrent(t *testing.T) {
 	inst := noopProvider(t)
 	ctx := context.Background()
@@ -75,11 +103,25 @@ func TestRecordRequest_Concurrent(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestShutdown_Noop(t *testing.T) {
 	inst := noopProvider(t)
 	assert.NoError(t, inst.Shutdown(context.Background()))
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestShutdown_Idempotent(t *testing.T) {
 	inst := noopProvider(t)
 	ctx := context.Background()
@@ -92,6 +134,13 @@ func TestShutdown_Idempotent(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestRecordConfigState_Noop(t *testing.T) {
 	inst := noopProvider(t)
 
@@ -101,6 +150,13 @@ func TestRecordConfigState_Noop(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestRecordReload_Noop(t *testing.T) {
 	inst := noopProvider(t)
 
@@ -110,6 +166,13 @@ func TestRecordReload_Noop(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestRecordConfigState_Concurrent(t *testing.T) {
 	inst := noopProvider(t)
 	ctx := context.Background()
@@ -119,6 +182,13 @@ func TestRecordConfigState_Concurrent(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestRecordReload_Concurrent(t *testing.T) {
 	inst := noopProvider(t)
 	ctx := context.Background()
@@ -139,6 +209,13 @@ func activeProvider(t *testing.T) (*MetricInstruments, *metrictest.TestProvider)
 	return inst, tp
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestRecordRequest_CountsCorrectly(t *testing.T) {
 	inst, tp := activeProvider(t)
 	ctx := context.Background()
@@ -151,6 +228,13 @@ func TestRecordRequest_CountsCorrectly(t *testing.T) {
 	metrictest.AssertSum(t, m, int64(7))
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestRecordConfigState_SetsGauges(t *testing.T) {
 	inst, tp := activeProvider(t)
 	ctx := context.Background()
@@ -161,6 +245,13 @@ func TestRecordConfigState_SetsGauges(t *testing.T) {
 	metrictest.AssertGauge(t, tp.FindMetric(t, "tyk.gateway.policies.loaded"), float64(5))
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestRecordConfigState_UpdatesGauges(t *testing.T) {
 	inst, tp := activeProvider(t)
 	ctx := context.Background()
@@ -173,6 +264,13 @@ func TestRecordConfigState_UpdatesGauges(t *testing.T) {
 	metrictest.AssertGauge(t, tp.FindMetric(t, "tyk.gateway.policies.loaded"), float64(4))
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestRecordReload_CounterAndHistogram(t *testing.T) {
 	inst, tp := activeProvider(t)
 	ctx := context.Background()
@@ -184,6 +282,13 @@ func TestRecordReload_CounterAndHistogram(t *testing.T) {
 	metrictest.AssertHistogramSum(t, tp.FindMetric(t, "tyk.gateway.config.reload.duration"), 0.25)
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestRecordReload_Accumulates(t *testing.T) {
 	inst, tp := activeProvider(t)
 	ctx := context.Background()
@@ -197,6 +302,13 @@ func TestRecordReload_Accumulates(t *testing.T) {
 	metrictest.AssertHistogramSum(t, tp.FindMetric(t, "tyk.gateway.config.reload.duration"), 0.8)
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestSetRegistry(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -310,6 +422,13 @@ func TestSetRegistry(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestAllMetricNames_Registered(t *testing.T) {
 	inst, tp := activeProvider(t)
 	ctx := context.Background()

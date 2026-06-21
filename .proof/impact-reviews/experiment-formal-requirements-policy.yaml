@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T09:08:07Z"
+generated_at: "2026-06-21T09:13:47Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -1073,6 +1073,46 @@ reviews:
       approval_fingerprint: sha256:05bbc32f935245551c40afd19dd1b75d6b8a553b3b57ff44d10245d90654d52f
       artifact_fingerprint: sha256:b6a786f2be7ffb8a52f51bda018ece41fa57efd0330df322520a17295cb61380
       reviewed_at: "2026-06-21T09:08:07Z"
+    - requirement: SW-REQ-168
+      artifact: internal/otel/config.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed OpenTelemetry runtime implementation impact after adding ReqProof annotations; production behavior and the approved root OTEL requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:8dcf05ab9cf8b92bb3df2d3dde5ed80256b2c596025e5e03b17fcfc9ffe1ffa7
+      approval_fingerprint: sha256:37dfcf25e330e919402a12b3f5127569efc7be7c1b493d320127484898f0b714
+      artifact_fingerprint: sha256:65649ef9a15c9eb71b1f7e0b8864022f3b473ba093eb06402f0efc26de7aeec5
+      reviewed_at: "2026-06-21T09:13:47Z"
+    - requirement: SW-REQ-168
+      artifact: internal/otel/metrics.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed OpenTelemetry runtime implementation impact after adding ReqProof annotations; production behavior and the approved root OTEL requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:8dcf05ab9cf8b92bb3df2d3dde5ed80256b2c596025e5e03b17fcfc9ffe1ffa7
+      approval_fingerprint: sha256:37dfcf25e330e919402a12b3f5127569efc7be7c1b493d320127484898f0b714
+      artifact_fingerprint: sha256:c0c067f1e172aec4c7a0198fde07349917a7c98bce78717d8ebb2ba0c70d256d
+      reviewed_at: "2026-06-21T09:13:47Z"
+    - requirement: SW-REQ-168
+      artifact: internal/otel/metrics_instrument.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed OpenTelemetry runtime implementation impact after adding ReqProof annotations; production behavior and the approved root OTEL requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:8dcf05ab9cf8b92bb3df2d3dde5ed80256b2c596025e5e03b17fcfc9ffe1ffa7
+      approval_fingerprint: sha256:37dfcf25e330e919402a12b3f5127569efc7be7c1b493d320127484898f0b714
+      artifact_fingerprint: sha256:de67b0c393e2d97c1a64356ac1e34c155412f84b88f358351c6703cc4a4f0419
+      reviewed_at: "2026-06-21T09:13:47Z"
+    - requirement: SW-REQ-168
+      artifact: internal/otel/otel.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed OpenTelemetry runtime implementation impact after adding ReqProof annotations; production behavior and the approved root OTEL requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:8dcf05ab9cf8b92bb3df2d3dde5ed80256b2c596025e5e03b17fcfc9ffe1ffa7
+      approval_fingerprint: sha256:37dfcf25e330e919402a12b3f5127569efc7be7c1b493d320127484898f0b714
+      artifact_fingerprint: sha256:7e70b9dd60db23cb14796a0f2e16692045a010fb361f7edf5a9d66ce2a9034f7
+      reviewed_at: "2026-06-21T09:13:47Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

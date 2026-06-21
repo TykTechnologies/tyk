@@ -20,6 +20,21 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// STK-REQ-093:STK-REQ-093-AC-01:acceptance
+// STK-REQ-093:error_handling:negative
+// SYS-REQ-181:nominal:nominal
+// SYS-REQ-181:boundary:nominal
+// SYS-REQ-181:error_handling:nominal
+// SYS-REQ-181:error_handling:negative
+// SYS-REQ-181:encoding_safety:nominal
+// SYS-REQ-181:determinism:nominal
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func Test_InitOpenTelemetry(t *testing.T) {
 	tcs := []struct {
 		testName string
@@ -115,6 +130,13 @@ func Test_InitOpenTelemetry(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func Test_ApidefSpanAttributes(t *testing.T) {
 	tcs := []struct {
 		name               string
@@ -171,6 +193,13 @@ func Test_ApidefSpanAttributes(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func Test_APIVersionAttribute(t *testing.T) {
 	tcs := []struct {
 		name                   string
@@ -197,6 +226,13 @@ func Test_APIVersionAttribute(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestGatewayResourceAttributes(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -318,6 +354,13 @@ func TestGatewayResourceAttributes(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestContextWithSpan(t *testing.T) {
 	provider := InitOpenTelemetry(context.Background(), logger.GetLogger(), &OpenTelemetry{BaseOpenTelemetry: BaseOpenTelemetry{
 		Enabled: true,
@@ -366,6 +409,13 @@ func makeProviderHTTP(t *testing.T) tyktrace.Provider {
 	return provider
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestExtractTraceID(t *testing.T) {
 	t.Run("returns empty when no span in context", func(t *testing.T) {
 		got := ExtractTraceID(context.Background())
@@ -387,6 +437,13 @@ func TestExtractTraceID(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestAddTraceID(t *testing.T) {
 	t.Run("does not set header when no span", func(t *testing.T) {
 		rr := httptest.NewRecorder()
@@ -418,6 +475,14 @@ func TestAddTraceID(t *testing.T) {
 
 // TestExtractTraceID_WithRequest verifies ExtractTraceID correctly extracts
 // trace IDs from request contexts in various scenarios.
+
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestExtractTraceID_WithRequest(t *testing.T) {
 
 	tests := []struct {
@@ -468,6 +533,13 @@ func TestExtractTraceID_WithRequest(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestOTelConfig_SpanBatchConfig(t *testing.T) {
 	t.Run("provider initialized with custom span_batch_config", func(t *testing.T) {
 		endpoint, cleanup := makeHTTPCollector(t)
@@ -562,6 +634,13 @@ func TestOTelConfig_SpanBatchConfig(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestOTelConfig_BackwardCompatibility(t *testing.T) {
 	t.Run("existing config without span_batch_config works", func(t *testing.T) {
 		endpoint, cleanup := makeHTTPCollector(t)
@@ -636,6 +715,13 @@ func TestOTelConfig_BackwardCompatibility(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestExtractTraceAndSpanID(t *testing.T) {
 	t.Run("returns empty strings when no span in context", func(t *testing.T) {
 		traceID, spanID := ExtractTraceAndSpanID(context.Background())

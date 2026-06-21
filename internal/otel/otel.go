@@ -11,6 +11,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// SW-REQ-168
 func ContextWithSpan(ctx context.Context, span tyktrace.Span) context.Context {
 	return tyktrace.ContextWithSpan(ctx, span)
 }
@@ -18,6 +19,7 @@ func ContextWithSpan(ctx context.Context, span tyktrace.Span) context.Context {
 // InitOpenTelemetry initializes OpenTelemetry - it returns a TracerProvider
 // which can be used to create a tracer. If OpenTelemetry is disabled or misconfigured,
 // a NoopProvider is returned.
+// SW-REQ-168
 func InitOpenTelemetry(ctx context.Context, logger *logrus.Logger, gwConfig *OpenTelemetry, id string, version string,
 	useRPC bool, groupID string, isSegmented bool, segmentTags []string) TracerProvider {
 
@@ -58,6 +60,7 @@ func InitOpenTelemetry(ctx context.Context, logger *logrus.Logger, gwConfig *Ope
 }
 
 // Span attributes related functions
+// SW-REQ-168
 func ApidefSpanAttributes(apidef *apidef.APIDefinition) []SpanAttribute {
 	attrs := []SpanAttribute{
 		semconv.TykAPIName(apidef.Name),
@@ -76,6 +79,7 @@ func ApidefSpanAttributes(apidef *apidef.APIDefinition) []SpanAttribute {
 	return attrs
 }
 
+// SW-REQ-168
 func GatewayResourceAttributes(gwID string, isDataplane bool, groupID string, isSegmented bool, segmentTags []string) []SpanAttribute {
 	attrs := []SpanAttribute{
 		semconv.TykGWID(gwID),
@@ -93,6 +97,7 @@ func GatewayResourceAttributes(gwID string, isDataplane bool, groupID string, is
 	return attrs
 }
 
+// SW-REQ-168
 func APIVersionAttribute(version string) SpanAttribute {
 	if version == "" {
 		version = NON_VERSIONED
@@ -110,10 +115,12 @@ const (
 	TykTraceIDHeader = "X-Tyk-Trace-Id"
 )
 
+// SW-REQ-168
 func SpanFromContext(ctx context.Context) tyktrace.Span {
 	return tyktrace.SpanFromContext(ctx)
 }
 
+// SW-REQ-168
 func ExtractTraceID(ctx context.Context) string {
 	span := SpanFromContext(ctx)
 	if span.SpanContext().HasTraceID() {
@@ -124,6 +131,7 @@ func ExtractTraceID(ctx context.Context) string {
 
 // ExtractTraceAndSpanID extracts both trace ID and span ID from the context.
 // Returns empty strings if no valid span context exists.
+// SW-REQ-168
 func ExtractTraceAndSpanID(ctx context.Context) (traceID, spanID string) {
 	span := SpanFromContext(ctx)
 	spanCtx := span.SpanContext()
@@ -136,10 +144,12 @@ func ExtractTraceAndSpanID(ctx context.Context) (traceID, spanID string) {
 	return traceID, spanID
 }
 
+// SW-REQ-168
 func addTraceIDToResponseHeader(w http.ResponseWriter, traceID string) {
 	w.Header().Set(TykTraceIDHeader, traceID)
 }
 
+// SW-REQ-168
 func AddTraceID(ctx context.Context, w http.ResponseWriter) {
 	traceID := ExtractTraceID(ctx)
 	if traceID == "" {

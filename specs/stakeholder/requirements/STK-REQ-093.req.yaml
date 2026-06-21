@@ -1,0 +1,59 @@
+id: STK-REQ-093
+version: 1
+status: approved
+priority: shall
+category: observability
+req_type: guarantee
+fretish: ""
+description: OpenTelemetry runtime support shall preserve deterministic local observability helper behavior for tested inputs by defaulting and inheriting trace and metrics configuration, selecting runtime-metrics enablement, constructing metric providers and gateway instruments, safely recording no-op and active local metric values, delegating API metric registry need flags and recording, intentionally panicking on invalid test registry definitions, initializing trace providers with local fallback behavior, generating API and gateway resource attributes, normalizing API version attributes, wrapping and extracting span contexts, extracting trace and span IDs, and adding trace IDs to response headers without claiming collector/exporter delivery, OpenTelemetry SDK provider correctness beyond local construction and fallback behavior, metric backend storage, runtime metric collection completeness, full gateway middleware admission, full HTTP request lifecycle behavior, trace propagation across services, dashboard visibility, or final client-visible behavior beyond the focused root OTEL tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: otel_runtime
+rationale: Gateway observability uses root internal/otel helpers before integrated tracing and metrics delivery consume them. This requirement owns only local root-package helper behavior covered by focused tests.
+tags:
+    - observability
+    - metrics
+    - tracing
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T09:13:27Z"
+        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. OpenTelemetry runtime scope is limited to local root internal/otel behavior for tested trace and metrics config defaults and inheritance, runtime-metrics enablement, metric provider and instrument construction, no-op and active local metric recording, API metric registry delegation flags and recording, intentional panic behavior for invalid test registry definitions, trace provider initialization fallback, API and gateway resource attributes, API version normalization, span context wrapping and extraction, trace/span ID extraction, and trace ID response header insertion. This approval does not claim collector/exporter delivery, OpenTelemetry SDK provider correctness beyond local construction and fallback behavior, metric backend storage, runtime metric collection completeness, full gateway middleware admission, full HTTP request lifecycle behavior, trace propagation across services, dashboard visibility, or final client-visible behavior beyond the focused root OTEL tests.
+        fingerprint: sha256:cdec872e56a291fc4f33785b35f61c1b69a1140143c0fcf003f3c1c26dace434
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T09:13:27Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need local OpenTelemetry helper behavior to remain predictable before trace and metric export delivery consume it.
+    acceptance_criteria:
+        - id: STK-REQ-093-AC-01
+          text: Given tested OpenTelemetry configuration, metric instrument, resource attribute, and span context inputs, when root internal/otel helpers run, then they produce deterministic local configuration, recording, attribute, trace ID, or explicit local error behavior for the tested inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-181
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added OpenTelemetry runtime requirement for focused internal/otel tests.
+          changed_by: agent:codex

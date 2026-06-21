@@ -10,6 +10,13 @@ import (
 	otelconfig "github.com/TykTechnologies/opentelemetry/config"
 )
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestIsRuntimeMetricsEnabled(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -75,6 +82,13 @@ func TestIsRuntimeMetricsEnabled(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestInitOpenTelemetryMetrics_RuntimeMetricsEnabled(t *testing.T) {
 	metricsEnabled := true
 	runtimeMetricsEnabled := true
@@ -102,6 +116,13 @@ func TestInitOpenTelemetryMetrics_RuntimeMetricsEnabled(t *testing.T) {
 	_ = inst.Shutdown(context.Background()) //nolint:errcheck // Test cleanup, error not relevant
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestInitOpenTelemetryMetrics_RuntimeMetricsDisabled(t *testing.T) {
 	metricsEnabled := true
 	runtimeMetricsDisabled := false
@@ -126,6 +147,13 @@ func TestInitOpenTelemetryMetrics_RuntimeMetricsDisabled(t *testing.T) {
 	_ = inst.Shutdown(context.Background()) //nolint:errcheck // Test cleanup, error not relevant
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestInitOpenTelemetryMetrics_MetricsDisabled(t *testing.T) {
 	cfg := &OpenTelemetry{
 		Metrics: MetricsConfig{

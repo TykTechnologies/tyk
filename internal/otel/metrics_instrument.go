@@ -33,6 +33,7 @@ type MetricInstruments struct {
 }
 
 // NewMetricInstruments creates gateway metric instruments from an existing provider.
+// SW-REQ-168
 func NewMetricInstruments(provider tykmetric.Provider, logger *logrus.Logger) *MetricInstruments {
 	requestCounter, err := provider.NewCounter(
 		"tyk.http.requests",
@@ -91,11 +92,13 @@ func NewMetricInstruments(provider tykmetric.Provider, logger *logrus.Logger) *M
 }
 
 // RecordRequest increments the request counter.
+// SW-REQ-168
 func (i *MetricInstruments) RecordRequest(ctx context.Context) {
 	i.requestCounter.Add(ctx, 1)
 }
 
 // RecordAPIMetrics records all configured API-level metrics for a request.
+// SW-REQ-168
 func (i *MetricInstruments) RecordAPIMetrics(ctx context.Context, rc *apimetrics.RequestContext) {
 	if i.registry != nil {
 		i.registry.RecordAPIMetrics(ctx, rc)
@@ -103,11 +106,13 @@ func (i *MetricInstruments) RecordAPIMetrics(ctx context.Context, rc *apimetrics
 }
 
 // NeedsSession returns true if any API metric instrument uses session dimensions.
+// SW-REQ-168
 func (i *MetricInstruments) NeedsSession() bool {
 	return i.registry != nil && i.registry.NeedsSession()
 }
 
 // NeedsContext returns true if any API metric instrument uses context dimensions.
+// SW-REQ-168
 func (i *MetricInstruments) NeedsContext() bool {
 	return i.registry != nil && i.registry.NeedsContext()
 }
@@ -115,6 +120,7 @@ func (i *MetricInstruments) NeedsContext() bool {
 // SetRegistry creates and attaches an API metric registry from the given
 // definitions. This is intended for tests that need to exercise custom
 // API metric dimensions without going through the full gateway config flow.
+// SW-REQ-168
 func (i *MetricInstruments) SetRegistry(provider tykmetric.Provider, defs []apimetrics.APIMetricDefinition) {
 	registry, err := apimetrics.NewInstrumentRegistry(provider, defs)
 	if err != nil {
@@ -124,21 +130,25 @@ func (i *MetricInstruments) SetRegistry(provider tykmetric.Provider, defs []apim
 }
 
 // NeedsResponse returns true if any API metric instrument uses response_header dimensions.
+// SW-REQ-168
 func (i *MetricInstruments) NeedsResponse() bool {
 	return i.registry != nil && i.registry.NeedsResponse()
 }
 
 // NeedsMCP returns true if any API metric instrument uses MCP metadata dimensions.
+// SW-REQ-168
 func (i *MetricInstruments) NeedsMCP() bool {
 	return i.registry != nil && i.registry.NeedsMCP()
 }
 
 // NeedsConfigData returns true if any API metric instrument uses config_data dimensions.
+// SW-REQ-168
 func (i *MetricInstruments) NeedsConfigData() bool {
 	return i.registry != nil && i.registry.NeedsConfigData()
 }
 
 // RecordConfigState records the current count of loaded APIs and policies.
+// SW-REQ-168
 func (i *MetricInstruments) RecordConfigState(ctx context.Context, apiCount, policyCount int) {
 	i.apisLoaded.Record(ctx, float64(apiCount))
 	i.policiesLoaded.Record(ctx, float64(policyCount))
@@ -146,12 +156,14 @@ func (i *MetricInstruments) RecordConfigState(ctx context.Context, apiCount, pol
 
 // RecordReload records a reload event: increments the reload counter and
 // records the reload duration in the histogram.
+// SW-REQ-168
 func (i *MetricInstruments) RecordReload(ctx context.Context, duration time.Duration) {
 	i.reloadCounter.Add(ctx, 1)
 	i.reloadDuration.Record(ctx, duration.Seconds())
 }
 
 // Shutdown flushes pending metrics and shuts down the provider.
+// SW-REQ-168
 func (i *MetricInstruments) Shutdown(ctx context.Context) error {
 	if err := i.provider.ForceFlush(ctx); err != nil {
 		return err

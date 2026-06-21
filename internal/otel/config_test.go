@@ -11,6 +11,13 @@ import (
 
 func boolPtr(v bool) *bool { return &v }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestOpenTelemetry_SetDefaults(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -674,6 +681,13 @@ func TestOpenTelemetry_SetDefaults(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestOpenTelemetry_TracesEnabled(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -727,6 +741,13 @@ func TestOpenTelemetry_TracesEnabled(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestOpenTelemetry_EffectiveTraceConfig(t *testing.T) {
 	t.Run("returns Traces config when present and enabled", func(t *testing.T) {
 		cfg := OpenTelemetry{

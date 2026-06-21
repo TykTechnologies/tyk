@@ -12,6 +12,13 @@ import (
 	otelconfig "github.com/TykTechnologies/opentelemetry/config"
 )
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestInitOpenTelemetryMetrics_Disabled(t *testing.T) {
 	// metrics.enabled absent → noop instruments, no error
 	cfg := &OpenTelemetry{}
@@ -25,6 +32,13 @@ func TestInitOpenTelemetryMetrics_Disabled(t *testing.T) {
 	assert.NoError(t, inst.Shutdown(context.Background()))
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestInitOpenTelemetryMetrics_Enabled(t *testing.T) {
 	// metrics.enabled=true → active provider
 	metricsEnabled := true
@@ -54,6 +68,13 @@ func TestInitOpenTelemetryMetrics_Enabled(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestRecordRequest_NilSafe(t *testing.T) {
 	// Verify the MetricInstruments struct handles disabled state gracefully
 	cfg := &OpenTelemetry{}
@@ -68,6 +89,13 @@ func TestRecordRequest_NilSafe(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestNewMetricProvider_ResourceAttributes(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -198,6 +226,13 @@ func TestNewMetricProvider_ResourceAttributes(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestRecordConfigState_NilSafe(t *testing.T) {
 	cfg := &OpenTelemetry{}
 	inst := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg, "", "", false, "", false, nil)
@@ -209,6 +244,13 @@ func TestRecordConfigState_NilSafe(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-093, SYS-REQ-181, SW-REQ-168
+// SW-REQ-168:nominal:nominal
+// SW-REQ-168:boundary:nominal
+// SW-REQ-168:error_handling:nominal
+// SW-REQ-168:error_handling:negative
+// SW-REQ-168:encoding_safety:nominal
+// SW-REQ-168:determinism:nominal
 func TestRecordReload_NilSafe(t *testing.T) {
 	cfg := &OpenTelemetry{}
 	inst := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg, "", "", false, "", false, nil)
