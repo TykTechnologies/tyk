@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T09:24:07Z"
+generated_at: "2026-06-21T09:35:01Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -1133,6 +1133,26 @@ reviews:
       approval_fingerprint: sha256:28840f0d622ed9a39bd64075fdddc7cd5fdea72171ae31fe0ac6487f95114e0d
       artifact_fingerprint: sha256:e96f6ba99ffbb8769645bb83ff93cfe9282f2733285dbc5a5d4be9dae1c3bfbf
       reviewed_at: "2026-06-21T09:24:07Z"
+    - requirement: SW-REQ-171
+      artifact: storage/kv/consul.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed storage KV implementation impact after adding ReqProof annotations and focused local HTTP tests; production behavior and the approved storage KV requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:354f9e8f008a14930d7dfba91a0c4565f4f5e67f6f26b610dfdbf8ed6b1916c7
+      approval_fingerprint: sha256:8e621dbe400acff5565515831e73c1a4642eb226d114951c4cd7052ff14778df
+      artifact_fingerprint: sha256:79bb9ab67bc291015e366352d241a4e215f8feb7ac860471845d123902f2e789
+      reviewed_at: "2026-06-21T09:35:01Z"
+    - requirement: SW-REQ-171
+      artifact: storage/kv/vault.go
+      decision: no-authored-change
+      reviewer: buger
+      reason: Reviewed storage KV implementation impact after adding ReqProof annotations and focused local HTTP tests; production behavior and the approved storage KV requirement remain unchanged.
+      base: origin/master
+      requirement_fingerprint: sha256:354f9e8f008a14930d7dfba91a0c4565f4f5e67f6f26b610dfdbf8ed6b1916c7
+      approval_fingerprint: sha256:8e621dbe400acff5565515831e73c1a4642eb226d114951c4cd7052ff14778df
+      artifact_fingerprint: sha256:34418f1bf349d5388658462daea7512b893019c7187ab30a60af3b64585c248d
+      reviewed_at: "2026-06-21T09:35:01Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

@@ -4,48 +4,31 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	consulapi "github.com/hashicorp/consul/api"
-
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/stretchr/testify/require"
 )
 
 var _ Store = (*Consul)(nil)
 
+// Verifies: STK-REQ-096, SYS-REQ-184, SW-REQ-171
+// SW-REQ-171:nominal:nominal
+// SW-REQ-171:boundary:nominal
+// SW-REQ-171:error_handling:nominal
+// SW-REQ-171:error_handling:negative
+// SW-REQ-171:encoding_safety:nominal
+// SW-REQ-171:determinism:nominal
 func TestConsul_Get(t *testing.T) {
-	t.Skip()
+	consulURL, values, closeServer := newTestConsulServer(t)
+	defer closeServer()
 
-	store, err := NewConsul(config.Default.KV.Consul)
-	if err != nil {
-		t.Fatal(err)
-	}
+	store, err := NewConsul(consulConfigForURL(t, consulURL))
+	require.NoError(t, err)
 
 	_, err = store.Get("key")
-
 	assert.ErrorIs(t, err, ErrKeyNotFound)
 
-	con := store.(*Consul)
-
-	_, err = con.store.Put(&consulapi.KVPair{
-		Key:   "key",
-		Value: []byte("value"),
-	}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	values["key"] = "value"
 
 	val, err := store.Get("key")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if val != "value" {
-		t.Fatalf("Got an unexpected value.. Expected %s, got %s", "value", val)
-	}
-
-	// Clean up
-	_, err = con.store.Delete("key", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "value", val)
 }

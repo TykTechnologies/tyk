@@ -1,0 +1,60 @@
+id: STK-REQ-096
+version: 1
+status: approved
+priority: shall
+category: storage
+req_type: guarantee
+fretish: ""
+description: Key-value storage adapter support shall preserve deterministic local adapter behavior for tested inputs by constructing Consul and Vault adapters from configuration, reading missing and present Consul keys, writing Consul keys, configuring Vault clients and tokens, reading and writing Vault v1 and v2 key paths and payloads, rejecting malformed Vault keys and missing Vault tokens, and surfacing Vault read errors without claiming real Consul or Vault service availability, distributed durability, authentication or ACL correctness, TLS validation, secret encryption, production network behavior, gateway configuration loading, or final client-visible behavior beyond the focused key-value adapter tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: storage_kv
+rationale: Gateway configuration can use Consul or Vault key-value adapters. This requirement owns only local adapter construction and request/response behavior covered by focused tests.
+tags:
+    - storage
+    - kv
+    - consul
+    - vault
+variables: []
+traces: {}
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T09:34:36Z"
+        comment: Reviewed under explicit chat delegation. Storage KV scope is limited to local Consul/Vault adapter construction, configured client/token behavior, local HTTP test server get/put/read paths, key-format errors, missing-token errors, missing-key behavior, and backend read errors. Does not claim real Consul/Vault availability, distributed durability, auth/ACL correctness, TLS validation, secret encryption, production network behavior, gateway config loading, or final client-visible behavior.
+        fingerprint: sha256:48a783e0977d5276b8b516086f3645361667731ee05ce20c38c760087ad9243a
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T09:34:36Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+stakeholder:
+    persona: Gateway operator
+    story: As a gateway operator, I need local Consul and Vault key-value adapters to map configured keys and values predictably before real storage services are used.
+    acceptance_criteria:
+        - id: STK-REQ-096-AC-01
+          text: Given tested Consul and Vault configuration, local HTTP storage responses, and key strings, when key-value adapters construct clients, read keys, write keys, or reject invalid input, then they produce deterministic values, payloads, paths, or explicit local errors for the tested inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-184
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added key-value storage adapter requirement for focused storage/kv tests.
+          changed_by: agent:codex

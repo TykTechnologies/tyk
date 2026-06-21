@@ -12,14 +12,17 @@ type Consul struct {
 }
 
 // NewConsul returns a configured consul KV store adapter
+// SW-REQ-171
 func NewConsul(conf config.ConsulConfig) (Store, error) {
 	return newConsul(conf)
 }
 
+// SW-REQ-171
 func (c *Consul) Store() *consulapi.KV {
 	return c.store
 }
 
+// SW-REQ-171
 func (c *Consul) Get(key string) (string, error) {
 	pair, _, err := c.store.Get(key, nil)
 	if err != nil {
@@ -33,6 +36,7 @@ func (c *Consul) Get(key string) (string, error) {
 	return string(pair.Value), nil
 }
 
+// SW-REQ-171
 func (c *Consul) Put(key string, value string) error {
 	kv := c.store
 
@@ -45,6 +49,7 @@ func (c *Consul) Put(key string, value string) error {
 	return err
 }
 
+// SW-REQ-171
 func newConsul(conf config.ConsulConfig) (Store, error) {
 	defaultCfg := consulapi.DefaultConfig()
 

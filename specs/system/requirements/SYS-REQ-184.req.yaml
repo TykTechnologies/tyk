@@ -1,0 +1,54 @@
+id: SYS-REQ-184
+version: 1
+status: approved
+priority: shall
+category: storage
+req_type: guarantee
+fretish: ""
+description: Key-value storage adapter handling shall preserve deterministic local adapter results for tested inputs by constructing Consul and Vault adapters from configuration, reading missing and present Consul keys, writing Consul keys, configuring Vault clients and tokens, reading and writing Vault v1 and v2 key paths and payloads, rejecting malformed Vault keys and missing Vault tokens, and surfacing Vault read errors without claiming real Consul or Vault service availability, distributed durability, authentication or ACL correctness, TLS validation, secret encryption, production network behavior, gateway configuration loading, or final client-visible behavior beyond the focused key-value adapter tests.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-096
+component: storage_kv
+rationale: This system requirement owns local storage/kv adapter behavior only. Real Consul/Vault availability and gateway configuration consumption remain outside this proof slice.
+tags:
+    - storage
+    - kv
+    - consul
+    - vault
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-096
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T09:34:36Z"
+        comment: Reviewed under explicit chat delegation. Storage KV scope is limited to local Consul/Vault adapter construction, configured client/token behavior, local HTTP test server get/put/read paths, key-format errors, missing-token errors, missing-key behavior, and backend read errors. Does not claim real Consul/Vault availability, distributed durability, auth/ACL correctness, TLS validation, secret encryption, production network behavior, gateway config loading, or final client-visible behavior.
+        fingerprint: sha256:750335f16638de9b93007a731bb31d1bb3b82a2763fc0ad75d845dd233e194f5
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T09:34:36Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - encoding_safety
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added key-value storage adapter system requirement.
+          changed_by: agent:codex

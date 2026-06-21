@@ -20,19 +20,23 @@ type Vault struct {
 	kvV2   bool
 }
 
+// SW-REQ-171
 func (v *Vault) Client() *vaultapi.Client {
 	return v.client
 }
 
+// SW-REQ-171
 func (v *Vault) ReadSecret(path string) (*vaultapi.Secret, error) {
 	return v.client.Logical().Read(path)
 }
 
 // NewVault returns a configured vault KV store adapter
+// SW-REQ-171
 func NewVault(conf config.VaultConfig) (Store, error) {
 	return newVault(conf)
 }
 
+// SW-REQ-171
 func (v *Vault) Get(key string) (string, error) {
 	logicalStore := v.client.Logical()
 
@@ -78,6 +82,7 @@ func (v *Vault) Get(key string) (string, error) {
 	return value.(string), nil
 }
 
+// SW-REQ-171
 func (v *Vault) Put(key string, value string) error {
 	logicalStore := v.client.Logical()
 
@@ -113,6 +118,7 @@ func (v *Vault) Put(key string, value string) error {
 	return err
 }
 
+// SW-REQ-171
 func newVault(conf config.VaultConfig) (Store, error) {
 	defaultCfg := vaultapi.DefaultConfig()
 
