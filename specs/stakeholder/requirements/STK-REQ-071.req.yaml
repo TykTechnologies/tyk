@@ -1,0 +1,62 @@
+id: STK-REQ-071
+version: 1
+status: approved
+priority: shall
+category: user_session_state
+req_type: guarantee
+fretish: ""
+description: User session state helpers shall preserve deterministic local session helper behavior for tested inputs by validating supported key hash types, constructing empty session state values, tracking modified-state flags, cloning session collections without sharing map or slice headers, computing stable session MD5 strings for unchanged sessions, requiring explicit key-hash initialization before readback, maintaining policy ID assignment and comparison helpers, selecting per-API or session quota limits, detecting basic-auth sessions, and reporting simple activity and quota-consumption predicates, without claiming policy merge behavior, gateway authentication, persistence backends, runtime quota enforcement, session lifetime expiration behavior, endpoint limit conversion, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: user_session_state
+rationale: User session state helpers provide local data-model decisions consumed by policy and gateway flows. This requirement owns only local helper behavior under focused tests and excludes higher-level policy/gateway behavior.
+tags:
+    - user
+    - session
+    - identity
+    - state
+    - helper
+variables: []
+traces:
+    reviewed_at: "2026-06-21T04:23:57.003428Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:0bf678637a5e6180efe4385f10f7d3a78b2fd1722959c306c3570634c61eca11
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. User session state scope is limited to local user-package helpers: hash type validation, empty session construction, modified-state flags, collection clone behavior, MD5/key-hash helpers, policy ID helpers, quota-limit lookup, basic-auth detection, active-at predicates, and consumed-quota predicates. This approval does not claim policy merge behavior, gateway authentication, persistence backends, runtime quota enforcement, session lifetime expiration behavior, endpoint limit conversion, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+stakeholder:
+    persona: Gateway maintainer
+    story: As a gateway maintainer, I need local user session state helpers to classify, copy, and expose session state consistently before higher-level gateway and policy flows consume it.
+    acceptance_criteria:
+        - id: STK-REQ-071-AC-01
+          text: Given tested user session state inputs, when hash type checks, modified flags, cloning, hash helpers, policy ID helpers, quota lookups, basic-auth checks, and simple active/quota predicates are exercised, then deterministic local user session state outcomes are produced for those inputs.
+          verification_method: test
+          derived_reqs:
+            - SYS-REQ-159
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added user session state helper requirement.
+          changed_by: agent:codex

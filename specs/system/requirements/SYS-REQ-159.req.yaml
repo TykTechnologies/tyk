@@ -1,0 +1,65 @@
+id: SYS-REQ-159
+version: 1
+status: approved
+priority: shall
+category: user_session_state
+req_type: guarantee
+fretish: the user_session_state shall always satisfy user_session_state_operation_terminal
+description: User session state helper handling shall make local session state operations terminal and deterministic for supported hash type validation, empty session construction, modified-state flags, collection clone behavior, stable MD5 strings for unchanged sessions, explicit key-hash initialization and missing-hash panic behavior, policy ID assignment and comparison helpers, per-API or session quota lookup, basic-auth detection, activity predicates, and consumed-quota predicates for tested paths, without claiming policy merge behavior, gateway authentication, persistence backends, runtime quota enforcement, session lifetime expiration behavior, endpoint limit conversion, or final client responses.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-071
+component: user_session_state
+rationale: This system requirement owns local user-package session state helper decisions only. Integrated policy application, gateway authentication, persistence, runtime quota enforcement, lifetime expiration, endpoint conversion, and transport behavior remain outside this proof slice.
+tags:
+    - user
+    - session
+    - identity
+    - state
+    - helper
+variables:
+    - user_session_state_operation_terminal
+traces:
+    satisfies:
+        - STK-REQ-071
+    reviewed_at: "2026-06-21T04:23:57.077789Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:03b7a44d6b829d25752824bdbee2008f155664244effd5c8b8212db544a901b8
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. User session state scope is limited to local user-package helpers: hash type validation, empty session construction, modified-state flags, collection clone behavior, MD5/key-hash helpers, policy ID helpers, quota-limit lookup, basic-auth detection, active-at predicates, and consumed-quota predicates. This approval does not claim policy merge behavior, gateway authentication, persistence backends, runtime quota enforcement, session lifetime expiration behavior, endpoint limit conversion, or final client responses.'
+        ai_generated: false
+    gaps_reviewed_at: "2026-06-21T00:00:00Z"
+    gaps_reviewed_by: human:buger
+    gap_reviews:
+        - check: decomposition
+          issue_key: decomposition|SYS-REQ-159|user_session_state_operation_terminal
+          reviewer: human:buger
+          reason: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. SYS-REQ-159''s user_session_state_operation_terminal variable is decomposed by SW-REQ-146 for local user-package session state helper behavior only: hash type validation, empty session construction, modified-state flags, collection clone behavior, MD5/key-hash helpers, policy ID helpers, quota-limit lookup, basic-auth detection, active-at predicates, and consumed-quota predicates. Policy merge behavior, gateway authentication, persistence backends, runtime quota enforcement, session lifetime expiration behavior, endpoint limit conversion, and final client responses remain outside this proof slice.'
+          reviewed_at: "2026-06-21T00:00:00Z"
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added user session state helper system requirement.
+          changed_by: agent:codex

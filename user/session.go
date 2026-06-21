@@ -36,6 +36,7 @@ const (
 	HashMurmur128          = "murmur128"
 )
 
+// SW-REQ-146
 func IsHashType(t string) bool {
 	switch HashType(t) {
 	case HashBCrypt, HashSha256, HashMurmur32, HashMurmur64, HashMurmur128:
@@ -437,6 +438,7 @@ type SessionState struct {
 	modified bool
 }
 
+// SW-REQ-146
 func NewSessionState() *SessionState {
 	return &SessionState{}
 }
@@ -460,21 +462,25 @@ func (s *SessionState) APILimit() APILimit {
 }
 
 // Touch marks the session as modified, indicating that it should be updated.
+// SW-REQ-146
 func (s *SessionState) Touch() {
 	s.modified = true
 }
 
 // Reset marks the session as not modified, skipping related updates.
+// SW-REQ-146
 func (s *SessionState) Reset() {
 	s.modified = false
 }
 
 // IsModified will return true if session has been modified to trigger an update.
+// SW-REQ-146
 func (s *SessionState) IsModified() bool {
 	return s.modified
 }
 
 // Clone  returns a fresh copy of s
+// SW-REQ-146
 func (s SessionState) Clone() SessionState {
 	// Simple vales are cloned by value
 	newSession := s
@@ -487,10 +493,12 @@ func (s SessionState) Clone() SessionState {
 	return newSession
 }
 
+// SW-REQ-146
 func (s *SessionState) MD5Hash() string {
 	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%+v", s))))
 }
 
+// SW-REQ-146
 func (s *SessionState) KeyHash() string {
 	if s.keyHash == "" {
 		panic("KeyHash cache not found. You should call `SetKeyHash` before.")
@@ -499,10 +507,12 @@ func (s *SessionState) KeyHash() string {
 	return s.keyHash
 }
 
+// SW-REQ-146
 func (s *SessionState) SetKeyHash(hash string) {
 	s.keyHash = hash
 }
 
+// SW-REQ-146
 func (s *SessionState) KeyHashEmpty() bool {
 	return s.keyHash == ""
 }
@@ -592,6 +602,7 @@ func calculateLifetime(respectExpiration bool, expiration, lifetime int64) int64
 // PolicyIDs returns the IDs of all the policies applied to this
 // session. For backwards compatibility reasons, this falls back to
 // ApplyPolicyID if ApplyPolicies is empty.
+// SW-REQ-146
 func (s *SessionState) PolicyIDs() []string {
 	if len(s.ApplyPolicies) > 0 {
 		return s.ApplyPolicies
@@ -602,12 +613,14 @@ func (s *SessionState) PolicyIDs() []string {
 	return nil
 }
 
+// SW-REQ-146
 func (s *SessionState) SetPolicies(ids ...string) {
 	s.ApplyPolicyID = ""
 	s.ApplyPolicies = ids
 }
 
 // PoliciesEqualTo compares and returns true if passed slice if IDs contains only current ApplyPolicies
+// SW-REQ-146
 func (s *SessionState) PoliciesEqualTo(ids []string) bool {
 	if len(s.ApplyPolicies) != len(ids) {
 		return false
@@ -628,6 +641,7 @@ func (s *SessionState) PoliciesEqualTo(ids []string) bool {
 }
 
 // GetQuotaLimitByAPIID return quota max, quota remaining, quota renewal rate and quota renews for the given session
+// SW-REQ-146
 func (s *SessionState) GetQuotaLimitByAPIID(apiID string) (int64, int64, int64, int64) {
 	if access, ok := s.AccessRights[apiID]; ok && !access.Limit.IsEmpty() {
 		return access.Limit.QuotaMax,
@@ -640,6 +654,7 @@ func (s *SessionState) GetQuotaLimitByAPIID(apiID string) (int64, int64, int64, 
 }
 
 // IsBasicAuth returns whether the key is basic auth or not.
+// SW-REQ-146
 func (s *SessionState) IsBasicAuth() bool {
 	return s.BasicAuthData.Password != ""
 }
@@ -654,6 +669,8 @@ func (s *SessionState) IsBasicAuth() bool {
 //	reqproof:lemma session_active_when_future_expiry func(s SessionState, now int64) bool {
 //	  return s.Expires > now && s.IsInactive == false
 //	}
+//
+// SW-REQ-146
 func (s SessionState) IsActiveAt(now int64) bool {
 	return s.Expires > now && !s.IsInactive
 }
@@ -669,6 +686,8 @@ func (s SessionState) IsActiveAt(now int64) bool {
 //	reqproof:lemma session_quota_consumed_when_remaining_below_max func(s SessionState) bool {
 //	  return s.QuotaRemaining < s.QuotaMax && s.QuotaMax > 0
 //	}
+//
+// SW-REQ-146
 func (s SessionState) HasConsumedQuota() bool {
 	return s.QuotaRemaining < s.QuotaMax && s.QuotaMax > 0
 }

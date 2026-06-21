@@ -15,6 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Verifies: STK-REQ-071, SYS-REQ-159, SW-REQ-146
+// SW-REQ-146:nominal:nominal
+// SW-REQ-146:boundary:nominal
 func TestSessionState_Touch_and_IsModified(t *testing.T) {
 	result := NewSessionState()
 
@@ -41,6 +44,9 @@ func TestSessionState_Touch_and_IsModified(t *testing.T) {
 	assert.Equal(t, "tyk", result.OrgID)
 }
 
+// Verifies: STK-REQ-071, SYS-REQ-159, SW-REQ-146
+// SW-REQ-146:nominal:nominal
+// SW-REQ-146:boundary:boundary
 func TestIsHashType(t *testing.T) {
 	assert.False(t, IsHashType(""))
 	assert.False(t, IsHashType("invalid"))

@@ -1,0 +1,9 @@
+component: user_session_state
+no_interface:
+    declared: true
+    reason: The user session state proof slice covers local user-package helper behavior for classifying hash types, constructing and mutating session helper state, cloning local session collections, key/hash helpers, policy ID helpers, quota lookup, basic-auth detection, and simple state predicates. Policy merge behavior, gateway authentication, persistence backends, runtime quota enforcement, session lifetime expiration behavior, endpoint limit conversion, and final client responses are outside this component boundary.
+variables:
+    - name: user_session_state_operation_terminal
+      type: bool
+      direction: output
+      description: User session state helper operations return a terminal local result by validating a hash type, returning an empty session pointer, mutating or reporting modified state, cloning collection fields, returning MD5 or key-hash values, panicking for missing key-hash cache, assigning or comparing policy IDs, returning quota-limit tuples, reporting basic-auth state, or reporting simple active/quota predicate state for tested paths.

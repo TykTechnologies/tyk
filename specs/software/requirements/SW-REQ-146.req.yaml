@@ -1,0 +1,57 @@
+id: SW-REQ-146
+version: 1
+status: approved
+priority: shall
+category: user_session_state
+req_type: guarantee
+fretish: ""
+description: The user package implementation shall preserve local session state helper behavior for supported hash type validation, empty session construction, modified-state flags, collection clone behavior, stable MD5 strings for unchanged sessions, explicit key-hash initialization and missing-hash panic behavior, policy ID assignment and comparison helpers, per-API or session quota lookup, basic-auth detection, activity predicates, and consumed-quota predicates for tested paths, without claiming policy merge behavior, gateway authentication, persistence backends, runtime quota enforcement, session lifetime expiration behavior, endpoint limit conversion, or final client responses.
+formalization_strategy: informal
+informal_verification:
+    method: unit_tests
+    evidence: user/session_test.go; user/session_state_reqproof_test.go; docs/user-session-state-requirements-evidence.md
+    verified: true
+parent: SYS-REQ-159
+component: user_session_state
+rationale: This software requirement owns local user-package session state helper mechanics and focused user package tests only. Integrated policy application, gateway authentication, persistence, runtime quota enforcement, lifetime expiration, endpoint conversion, and transport behavior are outside this proof slice.
+tags:
+    - user
+    - session
+    - identity
+    - state
+    - helper
+    - software-level
+variables: []
+traces:
+    satisfies:
+        - SYS-REQ-159
+    reviewed_at: "2026-06-21T04:23:57.049972Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:2ed23ebea4602d182be53dce8c869159574df9c467b1401fcc51dc6110d0b4ad
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. User session state scope is limited to local user-package helpers: hash type validation, empty session construction, modified-state flags, collection clone behavior, MD5/key-hash helpers, policy ID helpers, quota-limit lookup, basic-auth detection, active-at predicates, and consumed-quota predicates. This approval does not claim policy merge behavior, gateway authentication, persistence backends, runtime quota enforcement, session lifetime expiration behavior, endpoint limit conversion, or final client responses.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - error_handling
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added local user session state helper behavior.
+          changed_by: agent:codex
