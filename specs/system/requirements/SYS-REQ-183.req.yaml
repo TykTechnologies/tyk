@@ -5,7 +5,7 @@ priority: shall
 category: storage
 req_type: guarantee
 fretish: ""
-description: Storage connection handling shall preserve deterministic local connection-handler results for tested inputs by constructing handlers, tracking enablement and connection state, waiting for connect success or timeout, delivering reconnect callbacks, initializing default/cache/analytics connectors, checking storage status, selecting configured connector slots, propagating disconnect errors, constructing Redis connector options, and configuring exponential backoff without claiming Redis server availability, distributed storage durability, Sentinel or cluster topology correctness, TLS certificate validation beyond connector option construction, gateway request admission, analytics delivery, cache correctness, or final client-visible behavior beyond the focused storage connection-handler tests.
+description: Storage connection handling shall preserve deterministic local connection-handler and RedisController shim results for tested inputs by constructing handlers and shim controllers, tracking enablement and connection state, delegating shim connect, disable, connected, and wait-connect calls to the connection handler, waiting for connect success or timeout, delivering reconnect callbacks, initializing default/cache/analytics connectors, checking storage status, selecting configured connector slots, propagating disconnect errors, constructing Redis connector options, and configuring exponential backoff without claiming Redis server availability, distributed storage durability, Sentinel or cluster topology correctness, TLS certificate validation beyond connector option construction, gateway request admission, analytics delivery, cache correctness, Go plugin API compatibility beyond local shim delegation, or final client-visible behavior beyond the focused storage connection-handler tests.
 formalization_strategy: informal
 informal_verification:
     method: ""
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: STK-REQ-095
 component: storage_connection_handler
-rationale: This system requirement owns local storage connection-handler mechanics only. Redis topology behavior and gateway storage semantics remain outside this proof slice.
+rationale: This system requirement owns local storage connection-handler mechanics and RedisController shim delegation only. Redis topology behavior, Go plugin compatibility beyond local shim delegation, and gateway storage semantics remain outside this proof slice.
 tags:
     - storage
     - redis
@@ -32,15 +32,15 @@ verification:
         status: approved
         reviewer: human:buger
         role: requirements_owner
-        reviewed_at: "2026-06-21T09:23:49Z"
-        comment: Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Storage connection-handler scope is limited to local storage/connection_handler.go behavior for tested handler construction, enablement and connection state, wait-for-connect success and timeout, reconnect callback delivery, default/cache/analytics connector initialization, storage status checks, connector selection, disconnect propagation, Redis connector option construction, and exponential backoff settings. This approval does not claim Redis server availability, distributed storage durability, Sentinel or cluster topology correctness, TLS certificate validation beyond connector option construction, gateway request admission, analytics delivery, cache correctness, or final client-visible behavior beyond the focused storage connection-handler tests.
-        fingerprint: sha256:70cc3766fbdd9816cce2de881ef7e50939a1ec1acb7ab1cca8a0d38c660c4563
+        reviewed_at: "2026-06-21T09:41:31Z"
+        comment: Reviewed under explicit chat delegation. Storage connection scope now includes local RedisController shim delegation for construction, connect, disable, connected, and wait-connect behavior in addition to existing ConnectionHandler behavior. It does not claim Redis server availability, distributed durability, Sentinel or cluster topology correctness, TLS validation beyond connector option construction, Go plugin API compatibility beyond local shim delegation, gateway request admission, analytics delivery, cache correctness, or final client-visible behavior.
+        fingerprint: sha256:79c8c29e22806a3989f0551de45217174eaee91692656fe38751c02bfb212bbd
         ai_generated: false
 history:
     created_by: agent:codex
     created_at: "2026-06-21T00:00:00Z"
     last_modified_by: human:buger
-    last_modified_at: "2026-06-21T09:23:49Z"
+    last_modified_at: "2026-06-21T09:41:31Z"
 obligation_checklist:
     - nominal
     - boundary
@@ -54,3 +54,8 @@ lifecycle:
           to: approved
           reason: Added storage connection-handler system requirement.
           changed_by: agent:codex
+        - date: "2026-06-21T09:41:31Z"
+          from: approved
+          to: approved
+          reason: 're-approve (prior: role="requirements_owner" reviewer="human:buger" at=2026-06-21T09:23:49Z comment="Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Storage connection-handler scope is limited to local storage/connection_handler.go behavior for tested handler construction, enablement and connection state, wait-for-connect success and timeout, reconnect callback delivery, default/cache/analytics connector initialization, storage status checks, connector selection, disconnect propagation, Redis connector option construction, and exponential backoff settings. This approval does not claim Redis server availability, distributed storage durability, Sentinel or cluster topology correctness, TLS certificate validation beyond connector option construction, gateway request admission, analytics delivery, cache correctness, or final client-visible behavior beyond the focused storage connection-handler tests.")'
+          changed_by: human:buger

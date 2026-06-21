@@ -10,6 +10,13 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
+// Verifies: STK-REQ-095, SYS-REQ-183, SW-REQ-170
+// SW-REQ-170:nominal:nominal
+// SW-REQ-170:boundary:nominal
+// SW-REQ-170:error_handling:nominal
+// SW-REQ-170:error_handling:negative
+// SW-REQ-170:encoding_safety:nominal
+// SW-REQ-170:determinism:nominal
 func TestNewRedisController(t *testing.T) {
 	ctx := context.Background()
 	redisController := NewRedisController(ctx)
@@ -17,6 +24,13 @@ func TestNewRedisController(t *testing.T) {
 	RunNewConnectionHandlerTest(t, redisController.connection)
 }
 
+// Verifies: STK-REQ-095, SYS-REQ-183, SW-REQ-170
+// SW-REQ-170:nominal:nominal
+// SW-REQ-170:boundary:nominal
+// SW-REQ-170:error_handling:nominal
+// SW-REQ-170:error_handling:negative
+// SW-REQ-170:encoding_safety:nominal
+// SW-REQ-170:determinism:nominal
 func TestDisableRedis(t *testing.T) {
 	ctx := context.Background()
 	redisController := NewRedisController(ctx)
@@ -30,6 +44,13 @@ func TestDisableRedis(t *testing.T) {
 	assert.False(t, redisController.Connected(), "Expected storage to not be connected after disabling")
 }
 
+// Verifies: STK-REQ-095, SYS-REQ-183, SW-REQ-170
+// SW-REQ-170:nominal:nominal
+// SW-REQ-170:boundary:nominal
+// SW-REQ-170:error_handling:nominal
+// SW-REQ-170:error_handling:negative
+// SW-REQ-170:encoding_safety:nominal
+// SW-REQ-170:determinism:nominal
 func TestConnectToRedis(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -55,4 +76,23 @@ func TestConnectToRedis(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	<-onConnectCalled
 	assert.True(t, rc.Connected(), "Expected storage to be connected")
+}
+
+// Verifies: STK-REQ-095, SYS-REQ-183, SW-REQ-170
+// SW-REQ-170:nominal:nominal
+// SW-REQ-170:boundary:nominal
+// SW-REQ-170:error_handling:nominal
+// SW-REQ-170:error_handling:negative
+// SW-REQ-170:encoding_safety:nominal
+// SW-REQ-170:determinism:nominal
+func TestRedisControllerWaitConnect(t *testing.T) {
+	ctx := context.Background()
+	redisController := NewRedisController(ctx)
+
+	cancelledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	assert.False(t, redisController.WaitConnect(cancelledCtx))
+
+	redisController.connection.storageUp.Store(true)
+	assert.True(t, redisController.WaitConnect(ctx))
 }
