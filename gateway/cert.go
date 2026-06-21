@@ -681,6 +681,7 @@ func (gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// SW-REQ-183
 func getCipherAliases(ciphers []string) (cipherCodes []uint16) {
 	for _, v := range ciphers {
 		id, err := crypto.ResolveCipher(v)

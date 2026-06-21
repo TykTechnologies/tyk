@@ -1888,6 +1888,19 @@ func TestCertificateHandlerTLS(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-107, SYS-REQ-195, SW-REQ-183
+// STK-REQ-107:STK-REQ-107-AC-01:acceptance
+// STK-REQ-107:nominal:nominal
+// STK-REQ-107:boundary:nominal
+// STK-REQ-107:error_handling:negative
+// SYS-REQ-195:nominal:nominal
+// SYS-REQ-195:boundary:nominal
+// SYS-REQ-195:error_handling:nominal
+// SYS-REQ-195:error_handling:negative
+// SW-REQ-183:nominal:nominal
+// SW-REQ-183:boundary:nominal
+// SW-REQ-183:error_handling:nominal
+// SW-REQ-183:error_handling:negative
 func TestCipherSuites(t *testing.T) {
 
 	//configure server so we can useSSL and utilize the logic, but skip verification in the clients
