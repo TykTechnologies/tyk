@@ -338,3 +338,73 @@ func TestGatewayAPILoaderFindInternalHTTPHandler(t *testing.T) {
 		})
 	}
 }
+
+// Verifies: STK-REQ-079, SYS-REQ-167, SW-REQ-154
+// STK-REQ-079:STK-REQ-079-AC-01:acceptance
+// SW-REQ-154:nominal:nominal
+// SW-REQ-154:boundary:nominal
+// SW-REQ-154:boundary:boundary
+// SW-REQ-154:determinism:nominal
+// SYS-REQ-167:determinism:nominal
+func TestGatewayAPILoaderExplicitRouteSubpaths(t *testing.T) {
+	original := http.NewServeMux()
+	original.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("X-Handled", "true")
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	tests := []struct {
+		name     string
+		prefix   string
+		enabled  bool
+		wantSame bool
+	}{
+		{name: "disabled preserves original handler", prefix: "/api", enabled: false, wantSame: true},
+		{name: "trailing slash prefix preserves original handler", prefix: "/api/", enabled: true, wantSame: true},
+		{name: "route parameter prefix preserves original handler", prefix: "/api/{id}", enabled: true, wantSame: true},
+		{name: "simple prefix wraps handler", prefix: "/api", enabled: true, wantSame: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := explicitRouteSubpaths(tt.prefix, original, tt.enabled)
+			if tt.wantSame {
+				assert.Same(t, original, got)
+				return
+			}
+
+			wrapped, ok := got.(*explicitRouteHandler)
+			assert.True(t, ok)
+			assert.Equal(t, tt.prefix, wrapped.prefix)
+			assert.Same(t, original, wrapped.handler)
+		})
+	}
+
+	wrapped := explicitRouteSubpaths("/api", original, true)
+	requests := []struct {
+		name        string
+		path        string
+		wantStatus  int
+		wantHandled bool
+	}{
+		{name: "exact prefix delegates", path: "/api", wantStatus: http.StatusNoContent, wantHandled: true},
+		{name: "nested subpath delegates", path: "/api/users", wantStatus: http.StatusNoContent, wantHandled: true},
+		{name: "sibling path returns not found", path: "/apiary", wantStatus: http.StatusNotFound},
+		{name: "outside path returns not found", path: "/other", wantStatus: http.StatusNotFound},
+	}
+
+	for _, tt := range requests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			wrapped.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, tt.path, nil))
+
+			assert.Equal(t, tt.wantStatus, recorder.Code)
+			if tt.wantHandled {
+				assert.Equal(t, "true", recorder.Header().Get("X-Handled"))
+			} else {
+				assert.Empty(t, recorder.Header().Get("X-Handled"))
+				assert.Equal(t, http.StatusText(http.StatusNotFound), recorder.Body.String())
+			}
+		})
+	}
+}

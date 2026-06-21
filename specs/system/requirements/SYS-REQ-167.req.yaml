@@ -1,0 +1,53 @@
+id: SYS-REQ-167
+version: 1
+status: approved
+priority: shall
+category: gateway_api_loader_explicit_route_subpaths
+req_type: guarantee
+fretish: ""
+description: Gateway API loader explicit-route subpath handling shall preserve deterministic local wrapper results for tested disabled wrapping, trailing-slash prefixes, route-parameter prefixes, exact-prefix requests, nested subpath requests, sibling-path requests, and outside-path requests, without claiming full route generation, middleware execution, upstream connectivity, distributed synchronization, or final client responses beyond the local wrapper output.
+formalization_strategy: informal
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: STK-REQ-079
+component: gateway_api_loader_explicit_route_subpaths
+rationale: This system requirement owns local route-wrapper selection and ServeHTTP behavior only. Router construction, middleware execution, upstream handling, and complete gateway request admission remain outside this proof slice.
+tags:
+    - gateway
+    - api-loader
+    - route-wrapper
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-079
+    reviewed_at: "2026-06-21T05:44:09.017898Z"
+    reviewed_by: human:buger
+    reviewed_fingerprint: sha256:3a59f1f30f31cbd3843600870f79d4ffc22f35e7e66ddd06a26fc70c010ea100
+verification:
+    assurance_level: A
+    formalization_status: none
+    review:
+        status: approved
+        reviewer: human:buger
+        role: requirements_owner
+        reviewed_at: "2026-06-21T00:00:00Z"
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway API loader explicit-route subpath scope is limited to local gateway/api_loader.go explicitRouteSubpaths and explicitRouteHandler behavior for tested disabled, trailing-slash, route-parameter, exact-prefix, subpath, sibling-path, and outside-path inputs. This approval does not claim full route generation, middleware execution, upstream connectivity, distributed synchronization, or final client responses beyond the local wrapper output.'
+        ai_generated: false
+history:
+    created_by: agent:codex
+    created_at: "2026-06-21T00:00:00Z"
+    last_modified_by: human:buger
+    last_modified_at: "2026-06-21T00:00:00Z"
+obligation_checklist:
+    - nominal
+    - boundary
+    - determinism
+lifecycle:
+    change_history:
+        - date: "2026-06-21T00:00:00Z"
+          from: draft
+          to: approved
+          reason: Added gateway API loader explicit-route subpath system requirement.
+          changed_by: agent:codex

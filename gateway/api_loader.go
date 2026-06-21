@@ -858,6 +858,7 @@ type explicitRouteHandler struct {
 	handler http.Handler
 }
 
+// SW-REQ-154
 func (h *explicitRouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == h.prefix || strings.HasPrefix(r.URL.Path, h.prefix+"/") {
 		h.handler.ServeHTTP(w, r)
@@ -868,6 +869,7 @@ func (h *explicitRouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	_, _ = fmt.Fprint(w, http.StatusText(http.StatusNotFound))
 }
 
+// SW-REQ-154
 func explicitRouteSubpaths(prefix string, handler http.Handler, enabled bool) http.Handler {
 	// feature is enabled via config option
 	if !enabled {
