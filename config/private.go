@@ -15,6 +15,12 @@ type Private struct {
 	// to modify the external KV store in case of API Key Reset.
 	// This is set automatically in afterConfSetup()
 	EdgeOriginalAPIKeyPath string `json:"-"`
+	// UnresolvedConfig holds the marshaled config bytes captured by
+	// LoadAndResolve just before the KV ResolveAll pass — i.e. with kv://
+	// and $kv{} references still present. It is the pre-resolution snapshot
+	// the gateway reads original references from for hot-reload closure
+	// registration.
+	UnresolvedConfig []byte `json:"-"`
 }
 
 // GetOAuthTokensPurgeInterval returns purge interval for lapsed OAuth tokens.

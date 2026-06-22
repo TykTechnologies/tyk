@@ -15,6 +15,7 @@ import (
 
 	"github.com/TykTechnologies/storage/kv"
 	"github.com/TykTechnologies/storage/kv/registry"
+	"github.com/TykTechnologies/storage/kv/resolver"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -1637,8 +1638,49 @@ func WriteDefault(in string, conf *Config) error {
 
 // LoadAndResolve runs Load, then the KV bootstrap and full-config resolution.
 // The caller owns the returned registry, including Close on shutdown.
-func LoadAndResolve(ctx context.Context, paths []string, conf *Config) (*registry.Registry, error) {
-	return nil, nil
+func LoadAndResolve(
+	ctx context.Context,
+	paths []string,
+	conf *Config,
+	factories map[kv.ProviderType]kv.ProviderFactory,
+) (*registry.Registry, error) {
+	err := Load(paths, conf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+
+	marshaledBytes, err := json.Marshal(conf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	conf.Private.UnresolvedConfig = marshaledBytes
+
+	r, err := registry.NewFromConfig(
+		ctx,
+		marshaledBytes,
+		registry.WithDefaultStores(buildKVConfig(conf)),
+		registry.WithFactories(factories),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize KV registry: %w", err)
+	}
+
+	res := resolver.NewResolver(r)
+
+	resolvedBytes, err := res.ResolveAll(ctx, marshaledBytes)
+	if err != nil {
+		_ = r.Close(context.WithoutCancel(ctx))
+		return nil, fmt.Errorf("failed to resolve KV references in config: %w", err)
+	}
+
+	err = json.Unmarshal(resolvedBytes, conf)
+	if err != nil {
+		_ = r.Close(context.WithoutCancel(ctx))
+		return nil, fmt.Errorf("failed to unmarshal resolved config: %w", err)
+	}
+
+	return r, nil
 }
 
 // Load will load a configuration file, trying each of the paths given
