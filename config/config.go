@@ -1636,6 +1636,24 @@ func WriteDefault(in string, conf *Config) error {
 	return WriteConf(in, conf)
 }
 
+// NewLocalKVRegistry builds a registry containing ONLY the local stores
+// (env, file, secrets) promoted from conf — no network, no kv.stores parsing,
+// no resolution. It is the registry a caller uses when it has an in-memory
+// config but must not go through LoadAndResolve (the gateway's test-mode
+// construction path).
+func NewLocalKVRegistry(ctx context.Context, conf *Config) (*registry.Registry, error) {
+	all := buildKVConfig(conf)
+
+	local := make(map[string]kv.StoreConfig, len(all))
+	for name, sc := range all {
+		if sc.Type.IsLocal() {
+			local[name] = sc
+		}
+	}
+
+	return registry.NewFromConfig(ctx, nil, registry.WithDefaultStores(local))
+}
+
 // LoadAndResolve runs Load, then the KV bootstrap and full-config resolution.
 // The caller owns the returned registry, including Close on shutdown.
 func LoadAndResolve(
