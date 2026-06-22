@@ -1685,9 +1685,19 @@ func (gw *Gateway) initSystem() error {
 
 	if !gw.isRunningTests() {
 		gwConfig := config.Config{}
-		if err := config.Load(confPaths, &gwConfig); err != nil {
+
+		reg, err := config.LoadAndResolve(
+			gw.ctx,
+			confPaths,
+			&gwConfig,
+			enterpriseKVFactories(),
+		)
+		if err != nil {
 			return err
 		}
+
+		gw.kvRegistry = reg
+		gw.kvResolver = resolver.NewResolver(gw.kvRegistry)
 
 		// Compile error override regex patterns and build indexed lookup
 		// Compilation failures are logged as warnings and those rules are skipped
@@ -2692,6 +2702,8 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 
 	gw.cacheClose()
 
+	gw.closeKVRegistry(ctx)
+
 	// Check if there were any errors during shutdown
 	close(errChan)
 	var shutdownErrors []error
@@ -2754,6 +2766,16 @@ func (gw *Gateway) ensureKVRegistry(conf config.Config) error {
 	}
 
 	return nil
+}
+
+func (gw *Gateway) closeKVRegistry(ctx context.Context) {
+	if gw.kvRegistry == nil {
+		return
+	}
+
+	if err := gw.kvRegistry.Close(ctx); err != nil {
+		mainLog.WithError(err).Error("Error closing KV registry")
+	}
 }
 
 func buildJWKSCache(cfg config.Config) *cache.MemRepository {

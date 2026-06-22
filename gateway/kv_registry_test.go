@@ -1,8 +1,13 @@
 package gateway
 
 import (
+	"context"
+	"encoding/json"
+	"sync/atomic"
 	"testing"
 
+	"github.com/TykTechnologies/storage/kv"
+	"github.com/TykTechnologies/storage/kv/registry"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/stretchr/testify/require"
 )
@@ -39,4 +44,40 @@ func TestEnsureKVRegistry_DoesNotClobberExisting(t *testing.T) {
 
 	require.Same(t, existing, gw.kvRegistry,
 		"an already-installed registry must not be replaced")
+}
+
+type kvCloserStub struct{ closed *atomic.Bool }
+
+func (c kvCloserStub) Get(_ context.Context, _ string) (string, error) { return "", nil }
+func (c kvCloserStub) IsStandalone() bool                              { return true }
+func (c kvCloserStub) Close(_ context.Context) error {
+	c.closed.Store(true)
+	return nil
+}
+
+func TestCloseKVRegistry_NilIsSafe(t *testing.T) {
+	gw := &Gateway{}
+	require.Nil(t, gw.kvRegistry)
+
+	require.NotPanics(t, func() { gw.closeKVRegistry(t.Context()) })
+}
+
+func TestCloseKVRegistry_ClosesProviderConnections(t *testing.T) {
+	var closed atomic.Bool
+
+	factories := map[kv.ProviderType]kv.ProviderFactory{
+		"fake_closer": func(_ json.RawMessage) (kv.Provider, error) {
+			return kvCloserStub{closed: &closed}, nil
+		},
+	}
+
+	raw := []byte(`{"kv":{"stores":{"remote":{"type":"fake_closer","config":{}}}}}`)
+	reg, err := registry.NewFromConfig(t.Context(), raw, registry.WithFactories(factories))
+	require.NoError(t, err)
+
+	gw := &Gateway{kvRegistry: reg}
+	gw.closeKVRegistry(t.Context())
+
+	require.True(t, closed.Load(),
+		"closeKVRegistry must forward Close to the registry's providers")
 }
