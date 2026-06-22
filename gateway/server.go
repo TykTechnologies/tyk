@@ -42,6 +42,8 @@ import (
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/storage/kv/registry"
+	"github.com/TykTechnologies/storage/kv/resolver"
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk-pump/serializer"
@@ -260,6 +262,9 @@ type Gateway struct {
 	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
 	// Built from apidef.ErrorOverrides during gateway startup.
 	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
+
+	kvRegistry *registry.Registry
+	kvResolver resolver.Resolver
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -319,6 +324,10 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.jwkCache = buildJWKSCache(config)
 	gw.idpRegistry = newIdPRegistry(gw)
 	gw.BundleChecksumVerifier = defaultBundleVerifyFunction
+
+	if err := gw.ensureKVRegistry(config); err != nil {
+		log.WithError(err).Fatal("could not initialize KV registry")
+	}
 
 	return gw
 }
@@ -2727,6 +2736,23 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 		}
 	}
 	mainLog.Info("Terminating.")
+	return nil
+}
+
+func (gw *Gateway) ensureKVRegistry(conf config.Config) error {
+	if gw.kvRegistry == nil {
+		reg, err := config.NewLocalKVRegistry(gw.ctx, &conf)
+		if err != nil {
+			return err
+		}
+
+		gw.kvRegistry = reg
+	}
+
+	if gw.kvResolver == nil {
+		gw.kvResolver = resolver.NewResolver(gw.kvRegistry)
+	}
+
 	return nil
 }
 
