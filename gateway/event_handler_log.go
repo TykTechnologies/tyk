@@ -15,7 +15,7 @@ type LogEventMessage interface {
 // LogMessageEventHandler is a sample Event Handler
 type LogMessageEventHandler struct {
 	conf   apidef.LogEventHandlerConf
-	logger tyklog.Logger
+	logger *tyklog.Logger
 	Gw     *Gateway `json:"-"`
 }
 

@@ -36,7 +36,7 @@ func NewJob(name string, run func() error, interval time.Duration) *Job {
 
 // Scheduler is responsible for executing Jobs at specified intervals.
 type Scheduler struct {
-	logger tyklog.Logger
+	logger *tyklog.Logger
 
 	mustBreak bool
 	stop      chan bool
@@ -44,7 +44,7 @@ type Scheduler struct {
 }
 
 // NewScheduler creates and returns a new Scheduler with the specified logger.
-func NewScheduler(logger tyklog.Logger) *Scheduler {
+func NewScheduler(logger *tyklog.Logger) *Scheduler {
 	return &Scheduler{
 		logger: logger,
 		stop:   make(chan bool),

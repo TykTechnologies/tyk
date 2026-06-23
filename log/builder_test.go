@@ -18,9 +18,9 @@ func (m *mockHook) Fire(_ *logrus.Entry) error {
 	return nil
 }
 
-type mockSink struct {
-	Sinker
-}
+type mockSink struct{}
+
+func (m *mockSink) Sink(_ *logrus.Entry) {}
 
 func TestBuilder(t *testing.T) {
 	t.Run("Default", func(t *testing.T) {
