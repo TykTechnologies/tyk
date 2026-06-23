@@ -525,6 +525,8 @@ const (
 	prefixVault     = "vault://"
 	prefixFile      = "file://"
 	prefixKeys      = "tyk-apis"
+	prefixKV        = "kv://"
+	prefixKVInline  = "$kv{"
 	vaultSecretPath = "secret/data/"
 )
 
@@ -578,6 +580,12 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 	if strings.Contains(input, prefixFile) {
 		if err := a.replaceFileSecrets(&input); err != nil {
 			log.WithError(err).Error("Couldn't replace file secrets")
+		}
+	}
+
+	if strings.Contains(input, prefixKV) || strings.Contains(input, prefixKVInline) {
+		if err := a.replaceKVReferences(&input); err != nil {
+			log.WithError(err).Error("Couldn't replace KV references")
 		}
 	}
 
@@ -684,6 +692,17 @@ func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
 		*input = strings.ReplaceAll(*input, m[0], escaped)
 	}
 	return firstErr
+}
+
+func (a APIDefinitionLoader) replaceKVReferences(input *string) error {
+	resolved, err := a.Gw.kvResolver.ResolveAll(a.Gw.ctx, []byte(*input))
+	if err != nil {
+		return err
+	}
+
+	*input = string(resolved)
+
+	return nil
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
