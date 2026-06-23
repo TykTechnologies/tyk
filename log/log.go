@@ -1,15 +1,11 @@
 package log
 
 import (
-	"io"
 	"os"
 	"strings"
-	"sync"
-	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
 )
 
 const (
@@ -24,14 +20,9 @@ const (
 )
 
 var (
-	tmpLoggerHook          = &tmpLogsCollector{}
-	emergencyLogger        = newEmergencyLogger()
-	tmpLogger              = newTmpLogger(tmpLoggerHook, emergencyLogger)
-	log                    = &loggerWrapper{tmpLogger}
-	rawLog                 = newRawLog()
-	translations           = make(map[string]string)
-	once                   = invokeOnce{}
-	_               Logger = new(loggerWrapper)
+	log          = New()
+	rawLog       = newRawLog()
+	translations = make(map[string]string)
 )
 
 type (
@@ -55,37 +46,11 @@ type (
 		// Deprecated. Stop using direct logrus structures.
 		GetLevel() logrus.Level
 	}
-
-	Logger interface {
-		LegacyLogger
-		RawLogger
-		IsLegacyFormatter() bool
-	}
-
-	CancelFn func()
 )
 
 func newRawLog() *logrus.Logger {
 	var l = logrus.New()
 	l.SetFormatter(&RawFormatter{})
-	return l
-}
-
-func newEmergencyLogger() *logrus.Logger {
-	l := logrus.New()
-	l.SetOutput(os.Stderr)
-	l.SetFormatter(&logrus.TextFormatter{})
-	return l
-}
-
-func newTmpLogger(tmpLoggerHook *tmpLogsCollector, emergencyLogger *logrus.Logger) *logrus.Logger {
-	l := logrus.New()
-	l.SetOutput(io.Discard)
-	l.AddHook(tmpLoggerHook)
-	l.ExitFunc = func(code int) {
-		tmpLoggerHook.Proxy(emergencyLogger)
-		os.Exit(code)
-	}
 	return l
 }
 
@@ -97,61 +62,8 @@ func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	return []byte(entry.Message), nil
 }
 
-func Setup(f func(b *Builder)) {
-	once.Must(func() {
-		var builder Builder
-		f(&builder)
-		logger := builder.BuildAndPropagate()
-
-		log = &loggerWrapper{logger}
-		tmpLoggerHook.Proxy(logger)
-	})
-}
-
-func GetTestHook(t *testing.T) *logrustest.Hook {
-	t.Helper()
-
-	var hook = &logrustest.Hook{}
-	var target *logrus.Logger
-
-	once.Do(func(executed bool) {
-		if executed {
-			target = log.Logger
-		} else {
-			target = tmpLogger
-		}
-		target.AddHook(hook)
-	})
-
-	t.Cleanup(func() {
-		removeHook(target, hook)
-	})
-
-	return hook
-}
-
-func Flush() {
-	once.Do(func(executed bool) {
-		logger := log.Logger
-
-		// logger was not initialized for unknown reason
-		// flush logs to stderr logger just to inform what happened in program
-		if !executed {
-			logger = emergencyLogger
-		}
-
-		tmpLoggerHook.Proxy(logger)
-	})
-}
-
-// Reset state to default.
-// Added to pass tests.
-func Reset() CancelFn {
-	return once.reset(false)
-}
-
 // Get returns the default configured logger.
-func Get() Logger {
+func Get() *Logger {
 	return log
 }
 
@@ -172,12 +84,6 @@ func NewFormatter(format Format) logrus.Formatter {
 	default:
 		return newFormatterText()
 	}
-}
-
-// todo: remove and put into method
-func isLegacyFormatter(formatter logrus.Formatter) bool {
-	textFormatter, ok := formatter.(*logrus.TextFormatter)
-	return ok && textFormatter.TimestampFormat == LegacyTimestampFormat
 }
 
 func newFormatterText() logrus.Formatter {
@@ -209,78 +115,6 @@ func newFormatterLegacy() logrus.Formatter {
 		TimestampFormat: LegacyTimestampFormat,
 		FullTimestamp:   true,
 		DisableColors:   true,
-	}
-}
-
-type invokeOnce struct {
-	mu    sync.Mutex
-	value bool
-}
-
-func (s *invokeOnce) Must(fn func()) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.value {
-		panic("doOnce.Must has to be executed only once")
-	}
-
-	s.value = true
-
-	fn()
-}
-
-func (s *invokeOnce) Do(fn func(executed bool)) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	fn(s.value)
-}
-
-// reset's value of invoke once runner
-// create for testing purposes
-func (s *invokeOnce) reset(value bool) func() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	oldValue := s.value
-	s.value = value
-
-	return func() {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		s.value = oldValue
-	}
-}
-
-var _ logrus.Hook = new(tmpLogsCollector)
-
-type tmpLogsCollector struct {
-	mu      sync.Mutex
-	entries []*logrus.Entry
-}
-
-func (e *tmpLogsCollector) Levels() []logrus.Level {
-	return logrus.AllLevels
-}
-
-func (e *tmpLogsCollector) Fire(entry *logrus.Entry) error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	e.entries = append(e.entries, entry)
-	return nil
-}
-
-func (e *tmpLogsCollector) Proxy(logger *logrus.Logger) {
-	e.mu.Lock()
-	localEntries := e.entries
-	e.entries = nil
-	e.mu.Unlock()
-
-	for _, entry := range localEntries {
-		entry.Logger = logger // replace logger to make  copied entries write to proper place
-
-		clonedEntry := logger.WithFields(entry.Data)
-		clonedEntry.Time = entry.Time
-		clonedEntry.Log(entry.Level, entry.Message)
 	}
 }
 
@@ -354,39 +188,6 @@ func (f *Format) Valid() bool {
 		return true
 	}
 	return false
-}
-
-func Wrap(log *logrus.Logger) Logger {
-	return &loggerWrapper{Logger: log}
-}
-
-type loggerWrapper struct{ *logrus.Logger }
-
-func (d *loggerWrapper) NewEntry() *logrus.Entry {
-	return logrus.NewEntry(d.Logger)
-}
-
-func (d *loggerWrapper) AsLogrus() *logrus.Logger {
-	return d.Logger
-}
-
-func (d *loggerWrapper) IsLegacyFormatter() bool {
-	return isLegacyFormatter(d.Formatter)
-}
-
-// removeHook
-func removeHook(logger *logrus.Logger, hookToRemove logrus.Hook) {
-	newHooks := make(logrus.LevelHooks)
-
-	for level, hooks := range logger.Hooks {
-		for _, h := range hooks {
-			if h != hookToRemove {
-				newHooks[level] = append(newHooks[level], h)
-			}
-		}
-	}
-
-	logger.ReplaceHooks(newHooks)
 }
 
 func defaultFieldMap() logrus.FieldMap {

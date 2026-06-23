@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -14,7 +13,9 @@ import (
 )
 
 func TestMergeAllowedURLs(t *testing.T) {
-	svc := policy.New(nil, nil, tyklog.Wrap(logrus.New()))
+	logger, _ := tyklog.NewNullLogger()
+
+	svc := policy.New(nil, nil, logger)
 
 	session := &user.SessionState{}
 	policies := []user.Policy{

@@ -14,11 +14,10 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
-	tykLog "github.com/TykTechnologies/tyk/log"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -361,28 +360,24 @@ func TestHandle404(t *testing.T) {
 		spec.UseKeylessAccess = true
 	})
 
-	logger := logrus.New()
-	oLogger := log
-	log = tykLog.Wrap(logger)
-	t.Cleanup(func() {
-		log = oLogger
-	})
-
 	_, _ = g.Run(t, []test.TestCase{
 		{Path: "/existing", Code: http.StatusOK},
 		{Path: "/nonexisting", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
 	}...)
 
 	t.Run("check logger entry for different formatters when 404 occurs", func(t *testing.T) {
-		formatters := []tykLog.Format{tykLog.FormatLegacy, tykLog.FormatJson}
+		formatters := []tyklog.Format{tyklog.FormatLegacy, tyklog.FormatJson}
 		testReq := httptest.NewRequest(http.MethodGet, "/testLogger", nil)
 
 		for _, formatter := range formatters {
-			logger.SetFormatter(tykLog.NewFormatter(formatter))
-			entry := getLogEntryFor404(testReq)
+			lgr := tyklog.New()
+			lgr.Setup(func(b *tyklog.Builder) {
+				b.WithLogFormat(formatter)
+			})
+			entry := getLogEntryFor404(lgr, testReq)
 
 			for _, field := range []string{"request", "origin", "host"} {
-				if formatter == tykLog.FormatLegacy && field == "host" {
+				if formatter == tyklog.FormatLegacy && field == "host" {
 					_, ok := entry.Data[field]
 					assert.False(t, ok)
 				} else {

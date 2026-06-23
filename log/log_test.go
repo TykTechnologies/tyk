@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,7 +31,6 @@ func TestNewFormatter(t *testing.T) {
 	assert.Equal(t, LegacyTimestampFormat, legacyFormatter.TimestampFormat)
 	assert.True(t, legacyFormatter.FullTimestamp)
 	assert.True(t, legacyFormatter.DisableColors)
-	assert.True(t, isLegacyFormatter(legacyFormatter))
 }
 
 type testFormatter struct{}
@@ -120,76 +120,89 @@ func TestJSONFormatterErrorHandling(t *testing.T) {
 	})
 }
 
-func resetState(t *testing.T, emOut io.Writer) {
-	t.Helper()
+func Test_Logger(t *testing.T) {
+	makeDummySink := func(writer io.Writer) Sinker {
+		return NewSink(writer, &logrus.TextFormatter{}, AcceptorAllowAll)
+	}
 
-	cancel := once.reset(false)
-	t.Cleanup(cancel)
+	t.Run("Setup", func(t *testing.T) {
+		t.Run("flushes setup", func(t *testing.T) {
+			buf := &bytes.Buffer{}
 
-	tmpLoggerHook = &tmpLogsCollector{}
+			lgr := New()
+			lgr.Info("pre-setup log")
 
-	tmpLogger = logrus.New()
-	tmpLogger.SetOutput(io.Discard)
-	tmpLogger.AddHook(tmpLoggerHook)
+			assert.Len(t, lgr.tmpLogsCollector.entries, 1)
+			lgr.Setup(func(b *Builder) {
+				b.AddSink(makeDummySink(buf))
+			})
 
-	log = &loggerWrapper{Logger: tmpLogger}
+			assert.Empty(t, lgr.tmpLogsCollector.entries)
+			assert.Contains(t, buf.String(), "pre-setup log")
+		})
 
-	emergencyLogger = logrus.New()
-	emergencyLogger.SetOutput(emOut)
-	emergencyLogger.SetFormatter(&RawFormatter{})
-}
+		t.Run("panics if called twice", func(t *testing.T) {
+			lgr := New()
+			lgr.Setup(func(_ *Builder) {})
 
-func TestSetup_ExecutionAndProxy(t *testing.T) {
-	resetState(t, io.Discard)
+			assert.Panics(t, func() {
+				lgr.Setup(func(_ *Builder) {})
+			})
+		})
+	})
 
-	log.Info("pre-setup log")
-	assert.Len(t, tmpLoggerHook.entries, 1)
+	t.Run("flushes to emergency logger if setup was not called", func(t *testing.T) {
+		buf := bytes.Buffer{}
 
-	Setup(func(_ *Builder) {})
+		lgr := New()
+		lgr.emergencyLogger.SetOutput(&buf)
 
-	assert.Empty(t, tmpLoggerHook.entries)
-	assert.NotEqual(t, tmpLogger, log.Logger)
-}
+		lgr.Info("fatal startup error")
+		assert.Len(t, lgr.tmpLogsCollector.entries, 1)
 
-func TestSetup_PanicsOnMultipleCalls(t *testing.T) {
-	resetState(t, io.Discard)
+		lgr.Flush()
 
-	Setup(func(_ *Builder) {})
+		assert.Empty(t, lgr.tmpLogsCollector.entries)
+		assert.Contains(t, buf.String(), "fatal startup error")
+	})
 
-	assert.Panics(t, func() {
-		Setup(func(_ *Builder) {})
+	t.Run("Flush", func(t *testing.T) {
+		t.Run("does not add logs to output", func(t *testing.T) {
+			lgr := New()
+			emBuf := &bytes.Buffer{}
+			lgr.emergencyLogger.SetOutput(emBuf)
+
+			lgr.Setup(func(_ *Builder) {})
+
+			log.Info("post-setup log")
+			lgr.Flush()
+
+			assert.Empty(t, emBuf.String())
+		})
+	})
+
+	t.Run("RemoveHook", func(t *testing.T) {
+		t.Run("removes hook", func(t *testing.T) {
+			logger := New()
+			logger.ReplaceHooks(make(logrus.LevelHooks))
+
+			hook := &logrustest.Hook{}
+			logger.AddHook(hook)
+
+			for _, hooks := range logger.Hooks {
+				assert.True(t, len(hooks) == 1, "each logger level hes it's hook")
+			}
+
+			logger.RemoveHook(hook)
+
+			for _, hooks := range logger.Hooks {
+				assert.True(t, len(hooks) == 0, "has removed all the hooks from logger")
+			}
+		})
 	})
 }
 
-func TestFlush_WithoutSetup(t *testing.T) {
-	emBuf := &bytes.Buffer{}
-	resetState(t, emBuf)
-
-	log.Info("fatal startup error")
-	assert.Len(t, tmpLoggerHook.entries, 1)
-
-	Flush()
-
-	assert.Empty(t, tmpLoggerHook.entries)
-	assert.Contains(t, emBuf.String(), "fatal startup error")
-}
-
-func TestFlush_AfterSetup(t *testing.T) {
-	emBuf := &bytes.Buffer{}
-	resetState(t, emBuf)
-
-	Setup(func(_ *Builder) {})
-
-	log.Info("post-setup log")
-
-	Flush()
-
-	assert.Empty(t, emBuf.String())
-}
-
 func TestGetAndGetRaw(t *testing.T) {
-	resetState(t, io.Discard)
-
 	logger := Get()
 	assert.NotNil(t, logger)
 	assert.Equal(t, log, logger)
@@ -199,39 +212,23 @@ func TestGetAndGetRaw(t *testing.T) {
 	assert.Equal(t, rawLog, rawLogger)
 }
 
-func TestIsLegacyFormatter(t *testing.T) {
-	legacyFmt := newFormatterLegacy()
-	assert.True(t, isLegacyFormatter(legacyFmt))
+func Test_Logger_IsLegacyFormatter(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		format         Format
+		expectedResult bool
+	}{
+		{"text", FormatText, false},
+		{"json", FormatJson, false},
+		{"legacy", FormatLegacy, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			lgr := New()
+			lgr.Setup(func(b *Builder) {
+				b.WithLogFormat(tc.format)
+			})
 
-	textFmt := newFormatterText()
-	assert.False(t, isLegacyFormatter(textFmt))
-
-	jsonFmt := newFormatterJson()
-	assert.False(t, isLegacyFormatter(jsonFmt))
-}
-
-func TestWrap(t *testing.T) {
-	l := logrus.New()
-	wrapped := Wrap(l)
-
-	assert.NotNil(t, wrapped)
-	assert.Equal(t, l, wrapped.AsLogrus())
-}
-
-func Test_removeHook(t *testing.T) {
-	logger := logrus.New()
-	logger.SetOutput(io.Discard)
-
-	hook := &logrustest.Hook{}
-	logger.AddHook(hook)
-
-	for _, hooks := range logger.Hooks {
-		assert.True(t, len(hooks) == 1, "each logger level hes it's hook")
-	}
-
-	removeHook(logger, hook)
-
-	for _, hooks := range logger.Hooks {
-		assert.True(t, len(hooks) == 0, "has removed all the hooks from logger")
+			assert.Equal(t, tc.expectedResult, lgr.IsLegacyFormatter())
+		})
 	}
 }

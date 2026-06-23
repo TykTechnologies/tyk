@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
+	tyklog "github.com/TykTechnologies/tyk/log"
 
 	"golang.org/x/net/http2/h2c"
 
@@ -212,7 +213,7 @@ func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router, conf
 
 func (m *proxyMux) handle404(w http.ResponseWriter, r *http.Request) {
 	if m.track404Logs {
-		entry := getLogEntryFor404(r)
+		entry := getLogEntryFor404(log, r)
 		entry.Error(http.StatusText(http.StatusNotFound))
 	}
 
@@ -220,13 +221,14 @@ func (m *proxyMux) handle404(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprint(w, http.StatusText(http.StatusNotFound))
 }
 
-func getLogEntryFor404(r *http.Request) *logrus.Entry {
+func getLogEntryFor404(logger *tyklog.Logger, r *http.Request) *logrus.Entry {
 	requestMeta := fmt.Sprintf("%s %s %s", r.Method, r.URL.Path, r.Proto)
-	if !log.IsLegacyFormatter() {
-		return log.WithField("request", requestMeta).WithField("origin", r.RemoteAddr).WithField("host", r.Host)
+
+	if !logger.IsLegacyFormatter() {
+		return logger.WithField("request", requestMeta).WithField("origin", r.RemoteAddr).WithField("host", r.Host)
 	}
 
-	return log.WithField("request", requestMeta).WithField("origin", r.RemoteAddr)
+	return logger.WithField("request", requestMeta).WithField("origin", r.RemoteAddr)
 }
 
 func (m *proxyMux) addTCPService(spec *APISpec, modifier *tcp.Modifier, gw *Gateway) {

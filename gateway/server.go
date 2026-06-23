@@ -1590,7 +1590,7 @@ func (gw *Gateway) setupLogger(builder *tyklog.Builder) {
 
 	stdlog.SetOutput(io.Discard)
 
-	// precedence: TYK_LOGFORMAT > TYK_GW_LOGFORMAT > config.LogFormat > tyklog.FormatText
+	// precedence: TYK_LOGFORMAT > TYK_GW_LOGFORMAT > config.LogFormat, fallback(tyklog.FormatText)
 	logFormat := tyklog.CoalesceEnvOrDefault(tyklog.FormatText, gwConfig.LogFormat, tyklog.EnvTykLogformat, tyklog.EnvTykGwLogformat)
 	formatter := tyklog.NewFormatter(logFormat)
 
@@ -1704,8 +1704,7 @@ func (gw *Gateway) setupLogger(builder *tyklog.Builder) {
 func (gw *Gateway) initSystem() error {
 	globalMu.Lock()
 	defer globalMu.Unlock()
-
-	defer tyklog.Flush()
+	defer log.Flush()
 
 	gwConfig := gw.GetConfig()
 
@@ -1787,7 +1786,7 @@ func (gw *Gateway) initSystem() error {
 		}
 	}
 
-	tyklog.Setup(gw.setupLogger)
+	log.Setup(gw.setupLogger)
 
 	mainLog.Info("PIDFile location set to: ", gwConfig.PIDFileLocation)
 
