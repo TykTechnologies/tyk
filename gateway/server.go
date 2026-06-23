@@ -42,6 +42,7 @@ import (
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/goverify"
+	kvLib "github.com/TykTechnologies/storage/kv"
 	"github.com/TykTechnologies/storage/kv/registry"
 	"github.com/TykTechnologies/storage/kv/resolver"
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
@@ -2019,9 +2020,15 @@ func (gw *Gateway) afterConfSetup() error {
 		}
 	}
 
+	orig := conf
+	if len(conf.Private.UnresolvedConfig) > 0 {
+		orig = config.Config{}
+		_ = json.Unmarshal(conf.Private.UnresolvedConfig, &orig)
+	}
+
 	if conf.SlaveOptions.APIKey != "" {
-		conf.Private.EdgeOriginalAPIKeyPath = conf.SlaveOptions.APIKey
-		conf.SlaveOptions.APIKey, err = gw.kvStore(conf.SlaveOptions.APIKey)
+		conf.Private.EdgeOriginalAPIKeyPath = orig.SlaveOptions.APIKey
+		conf.SlaveOptions.APIKey, err = gw.kvStore(orig.SlaveOptions.APIKey)
 		if err != nil {
 			return fmt.Errorf("could not retrieve API key from KV store: %w", err)
 		}
@@ -2029,19 +2036,19 @@ func (gw *Gateway) afterConfSetup() error {
 
 	// Retrieve OAuth mTLS certificate paths from KV store
 	if conf.ExternalServices.OAuth.MTLS.Enabled {
-		conf.ExternalServices.OAuth.MTLS.CertFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.CertFile, func(c *config.Config, v string) {
+		conf.ExternalServices.OAuth.MTLS.CertFile, err = gw.resolveKV(orig.ExternalServices.OAuth.MTLS.CertFile, func(c *config.Config, v string) {
 			c.ExternalServices.OAuth.MTLS.CertFile = v
 		}, true)
 		if err != nil {
 			return fmt.Errorf("could not retrieve OAuth mTLS cert file path from KV store: %w", err)
 		}
-		conf.ExternalServices.OAuth.MTLS.KeyFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.KeyFile, func(c *config.Config, v string) {
+		conf.ExternalServices.OAuth.MTLS.KeyFile, err = gw.resolveKV(orig.ExternalServices.OAuth.MTLS.KeyFile, func(c *config.Config, v string) {
 			c.ExternalServices.OAuth.MTLS.KeyFile = v
 		}, true)
 		if err != nil {
 			return fmt.Errorf("could not retrieve OAuth mTLS key file path from KV store: %w", err)
 		}
-		conf.ExternalServices.OAuth.MTLS.CAFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.CAFile, func(c *config.Config, v string) {
+		conf.ExternalServices.OAuth.MTLS.CAFile, err = gw.resolveKV(orig.ExternalServices.OAuth.MTLS.CAFile, func(c *config.Config, v string) {
 			c.ExternalServices.OAuth.MTLS.CAFile = v
 		}, true)
 		if err != nil {
@@ -2067,7 +2074,7 @@ func (gw *Gateway) resolveKV(original string, set func(*config.Config, string), 
 	}
 	if hotReload && resolved != original {
 		gw.kvResolvers = append(gw.kvResolvers, func() error {
-			val, err := gw.kvStore(original)
+			val, err := gw.kvStoreCtx(kvLib.WithCacheBypass(gw.ctx), original)
 			if err != nil {
 				return err
 			}
@@ -2080,22 +2087,44 @@ func (gw *Gateway) resolveKV(original string, set func(*config.Config, string), 
 	return resolved, nil
 }
 
+// kvStore resolves a single KV reference using the gateway's base context.
 func (gw *Gateway) kvStore(value string) (string, error) {
+	return gw.kvStoreCtx(gw.ctx, value)
+}
+
+// kvStoreCtx is kvStore with an explicit context, so a caller can carry a
+// directive through to the store.
+func (gw *Gateway) kvStoreCtx(ctx context.Context, value string) (string, error) {
 
 	if strings.HasPrefix(value, "secrets://") {
 		key := strings.TrimPrefix(value, "secrets://")
 		log.Debugf("Retrieving %s from secret store in config", key)
-		val, ok := gw.GetConfig().Secrets[key]
-		if !ok {
-			return "", fmt.Errorf("secrets does not exist in config.. %s not found", key)
+
+		store, err := gw.kvRegistry.GetStore("secrets")
+		if err != nil {
+			return "", err
 		}
+
+		val, err := store.Get(ctx, key)
+		if err != nil {
+			return "", err
+		}
+
 		return val, nil
 	}
 
 	if strings.HasPrefix(value, "env://") {
 		key := strings.TrimPrefix(value, "env://")
 		log.Debugf("Retrieving %s from environment", key)
-		return os.Getenv(fmt.Sprintf("TYK_SECRET_%s", strings.ToUpper(key))), nil
+
+		store, err := gw.kvRegistry.GetStore("env")
+		if err != nil {
+			log.WithError(err).Error("Failed to retrieve env store")
+
+			return "", nil
+		}
+
+		return store.Get(ctx, key)
 	}
 
 	if strings.HasPrefix(value, "consul://") {
@@ -2124,12 +2153,19 @@ func (gw *Gateway) kvStore(value string) (string, error) {
 	}
 
 	if strings.HasPrefix(value, "file://") {
-		path := strings.TrimPrefix(value, "file://")
-		log.Debugf("Retrieving %s from kv file", path)
-		return ResolveFileKV(gw.GetConfig().KV.File.BasePath, path)
+		key := strings.TrimPrefix(value, "file://")
+		log.Debugf("Retrieving %s from kv file", key)
+
+		store, err := gw.kvRegistry.GetStore("file")
+		if err != nil {
+			return "", err
+
+		}
+
+		return store.Get(ctx, key)
 	}
 
-	return value, nil
+	return gw.kvResolver.Resolve(ctx, value)
 }
 
 func (gw *Gateway) setUpVault() error {
