@@ -81,7 +81,7 @@ func NewNullLogger() (*Logger, *Hook) {
 	return lgr, NewHook(hook)
 }
 
-func (l *Logger) IsLegacyFormatter() bool {
+func (l *Logger) IsLegacyFormatterEnabled() bool {
 	return l.legacyLogFormatEnabled
 }
 

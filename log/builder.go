@@ -67,8 +67,8 @@ func (b *Builder) WithRawLog(log *logrus.Logger) {
 	b.rawLog = log
 }
 
-func (b *Builder) SetLegacyLogformat(val bool) {
-	b.legacyLogFormatEnabled = val
+func (b *Builder) SetLogformat(val Format) {
+	b.legacyLogFormatEnabled = val == FormatLegacy
 }
 
 func (b *Builder) buildAndPropagate(dest *Logger) {
