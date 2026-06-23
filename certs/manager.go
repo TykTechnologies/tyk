@@ -156,7 +156,7 @@ func WithBackoffIntervals(maxElapsed, initial, max time.Duration) CertificateMan
 //	    WithRetryEnabled(true),
 //	    WithMaxRetries(10),
 //	    WithBackoffIntervals(60*time.Second, 200*time.Millisecond, 5*time.Second))
-func NewCertificateManager(storageHandler storage.Handler, secret string, logger tyklog.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
+func NewCertificateManager(storageHandler storage.Handler, secret string, logger *tyklog.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
 		logger = tyklog.Get()
 	}
@@ -189,7 +189,7 @@ func getOrgFromKeyID(key, certID string) string {
 	return orgId
 }
 
-func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger tyklog.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
+func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger *tyklog.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
 		logger = tyklog.Get()
 	}

@@ -1037,7 +1037,7 @@ type SlaveDataCenter struct {
 }
 
 func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {
-	cancel := tyklog.Reset()
+	cancel := log.Reset()
 
 	t := &Test{
 		dynamicHandlers: make(map[string]http.HandlerFunc),
