@@ -22,6 +22,7 @@ func TestAfterConfSetup_WarnsOnDisableRegexpCacheBound(t *testing.T) {
 	})
 
 	hook := log.GetTestHook(t)
+	log.SetTestLogLevel(t, logrus.WarnLevel)
 
 	gw := NewGateway(config.Config{DisableRegexpCacheBound: true}, context.Background())
 	require.NoError(t, gw.afterConfSetup())
@@ -42,6 +43,7 @@ func TestAfterConfSetup_WarnsOnNegativeMaxEntries(t *testing.T) {
 	})
 
 	hook := log.GetTestHook(t)
+	log.SetTestLogLevel(t, logrus.WarnLevel)
 
 	gw := NewGateway(config.Config{RegexpCacheMaxEntries: -1}, context.Background())
 	require.NoError(t, gw.afterConfSetup())
