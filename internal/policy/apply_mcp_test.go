@@ -18,7 +18,8 @@ const testAPIID = "test-api"
 // and returns the resulting AccessDefinition for testAPIID.
 func applyPolicies(t *testing.T, policies []user.Policy) user.AccessDefinition {
 	t.Helper()
-	svc := policy.New(nil, nil, tyklog.Get())
+	logger, _ := tyklog.NewNullLogger()
+	svc := policy.New(nil, nil, logger)
 	session := &user.SessionState{}
 	session.SetCustomPolicies(policies)
 	require.NoError(t, svc.Apply(session))

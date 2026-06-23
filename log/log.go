@@ -25,29 +25,6 @@ var (
 	translations = make(map[string]string)
 )
 
-type (
-	RawLogger interface {
-		logrus.Ext1FieldLogger
-	}
-
-	// LegacyLogger
-	// The logger with deprecated legacy methods.
-	LegacyLogger interface {
-
-		// NewEntry
-		// Deprecated. Stop using direct logrus structures.
-		NewEntry() *logrus.Entry
-
-		// AsLogrus
-		// Deprecated. Stop using direct logrus structures.
-		AsLogrus() *logrus.Logger
-
-		// GetLevel
-		// Deprecated. Stop using direct logrus structures.
-		GetLevel() logrus.Level
-	}
-)
-
 func newRawLog() *logrus.Logger {
 	var l = logrus.New()
 	l.SetFormatter(&RawFormatter{})

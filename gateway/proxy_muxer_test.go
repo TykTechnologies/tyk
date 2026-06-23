@@ -372,7 +372,7 @@ func TestHandle404(t *testing.T) {
 		for _, formatter := range formatters {
 			lgr := tyklog.New()
 			lgr.Setup(func(b *tyklog.Builder) {
-				b.SetLegacyLogformat(formatter == tyklog.FormatLegacy)
+				b.SetLogformat(formatter)
 			})
 			entry := getLogEntryFor404(lgr, testReq)
 

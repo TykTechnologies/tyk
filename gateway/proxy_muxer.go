@@ -224,7 +224,7 @@ func (m *proxyMux) handle404(w http.ResponseWriter, r *http.Request) {
 func getLogEntryFor404(logger *tyklog.Logger, r *http.Request) *logrus.Entry {
 	requestMeta := fmt.Sprintf("%s %s %s", r.Method, r.URL.Path, r.Proto)
 
-	if !logger.IsLegacyFormatter() {
+	if !logger.IsLegacyFormatterEnabled() {
 		return logger.WithField("request", requestMeta).WithField("origin", r.RemoteAddr).WithField("host", r.Host)
 	}
 
