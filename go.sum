@@ -185,8 +185,8 @@ github.com/TykTechnologies/openid2go v0.1.2 h1:WXctksOahA/epTVVvbn9iNUuMXKRr0ksr
 github.com/TykTechnologies/openid2go v0.1.2/go.mod h1:gYfkqeWa+lY3Xz/Z2xYtIzmYXynlgKZaBIbPCqdcdMA=
 github.com/TykTechnologies/opentelemetry v0.0.26-0.20260608075444-bc5cc136cf52 h1:V5PFOV71l2TupnEAPbPpyfKYXuqsrsEXVPoEzzAPTnA=
 github.com/TykTechnologies/opentelemetry v0.0.26-0.20260608075444-bc5cc136cf52/go.mod h1:FoJH6aRf8W+Rs9/Csvayfy3U2p4+vp46dj0CuGMBLSU=
-github.com/TykTechnologies/storage v1.3.1 h1:UzfrAillaXXe5AHeIGUHVf/1niLPNJChMWrqgjCiAjY=
-github.com/TykTechnologies/storage v1.3.1/go.mod h1:fw7yR9/LgVFVAlaQFLypFnfsIP/JOkF/tAsgAwMkKj0=
+github.com/TykTechnologies/storage v1.3.4 h1:avLJFoHdHSbBfGUSme0vOIuMEzVfdgroVf21szsZcys=
+github.com/TykTechnologies/storage v1.3.4/go.mod h1:H55F7A43TeOAYkvKgAqNQPQoqHa9gzAe7mkhhRsCtLc=
 github.com/TykTechnologies/structviewer v1.2.0 h1:wV3AyTmWCZ3n7/llp+6xuDjnS/EJ/Ct/HG2pPE9+VX8=
 github.com/TykTechnologies/structviewer v1.2.0/go.mod h1:XKJbqX8Q7n9FUrqTK58yVZUi5zWAkeRcULcPLDoWvvY=
 github.com/TykTechnologies/tyk-pump v1.15.0-rc1.0.20260609132845-8a614d6efd02 h1:X+J9c6AL+gDnBPGlEhx8jEPOEk7QkP5skgVCbsFu3JA=
@@ -1494,8 +1494,8 @@ go.etcd.io/etcd/client/pkg/v3 v3.6.5/go.mod h1:8Wx3eGRPiy0qOFMZT/hfvdos+DjEaPxdI
 go.etcd.io/etcd/client/v3 v3.6.5 h1:yRwZNFBx/35VKHTcLDeO7XVLbCBFbPi+XV4OC3QJf2U=
 go.etcd.io/etcd/client/v3 v3.6.5/go.mod h1:ZqwG/7TAFZ0BJ0jXRPoJjKQJtbFo/9NIY8uoFFKcCyo=
 go.mongodb.org/mongo-driver v1.11.4/go.mod h1:PTSz5yu21bkT/wXpkS7WR5f0ddqw5quethTUn9WM+2g=
-go.mongodb.org/mongo-driver v1.13.4 h1:2jXEpF+3m4QyAtm2DuzfTXg8ivGfSJUsxblmwz/8Mr0=
-go.mongodb.org/mongo-driver v1.13.4/go.mod h1:wcDf1JBCXy2mOW0bWHwO/IOYqdca1MPCwDtFu/Z9+eo=
+go.mongodb.org/mongo-driver v1.17.7 h1:a9w+U3Vt67eYzcfq3k/OAv284/uUUkL0uP75VE5rCOU=
+go.mongodb.org/mongo-driver v1.17.7/go.mod h1:Hy04i7O2kC4RS06ZrhPRqj/u4DTYkFDAAccj+rVKqgQ=
 go.nanomsg.org/mangos/v3 v3.4.2 h1:gHlopxjWvJcVCcUilQIsRQk9jdj6/HB7wrTiUN8Ki7Q=
 go.nanomsg.org/mangos/v3 v3.4.2/go.mod h1:8+hjBMQub6HvXmuGvIq6hf19uxGQIjCofmc62lbedLA=
 go.opencensus.io v0.24.0 h1:y73uSU6J157QMP2kn2r30vwW1A2W2WFwSCGnAVxeaD0=
