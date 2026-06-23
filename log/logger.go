@@ -137,8 +137,12 @@ func (l *Logger) GetTestHook(t *testing.T) *Hook {
 	var hook = NewHook(nil)
 	l.AddHook(hook)
 
+	oLevel := l.GetLevel()
+	l.innerLogger.SetLevel(logrus.TraceLevel)
+
 	t.Cleanup(func() {
 		l.RemoveHook(hook)
+		l.innerLogger.SetLevel(oLevel)
 	})
 
 	return hook
