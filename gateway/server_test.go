@@ -1761,6 +1761,7 @@ func TestPoliciesCollisionMessage(t *testing.T) {
 	t.Cleanup(ts.Close)
 
 	hook := log.GetTestHook(t)
+	log.SetTestLogLevel(t, logrus.WarnLevel)
 
 	id1 := model.NewObjectID()
 	id2 := model.NewObjectID()
