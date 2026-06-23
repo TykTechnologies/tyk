@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/config"
-	tyklog "github.com/TykTechnologies/tyk/log"
 	tykregexp "github.com/TykTechnologies/tyk/regexp"
 )
 
@@ -22,7 +21,7 @@ func TestAfterConfSetup_WarnsOnDisableRegexpCacheBound(t *testing.T) {
 		tykregexp.Configure(tykregexp.CacheOptions{Enabled: true})
 	})
 
-	hook := tyklog.GetTestHook(t)
+	hook := log.GetTestHook(t)
 
 	gw := NewGateway(config.Config{DisableRegexpCacheBound: true}, context.Background())
 	require.NoError(t, gw.afterConfSetup())
@@ -42,7 +41,7 @@ func TestAfterConfSetup_WarnsOnNegativeMaxEntries(t *testing.T) {
 		tykregexp.Configure(tykregexp.CacheOptions{Enabled: true})
 	})
 
-	hook := tyklog.GetTestHook(t)
+	hook := log.GetTestHook(t)
 
 	gw := NewGateway(config.Config{RegexpCacheMaxEntries: -1}, context.Background())
 	require.NoError(t, gw.afterConfSetup())

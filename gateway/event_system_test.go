@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"bytes"
 	"strings"
 	"testing"
 	"time"
@@ -21,11 +20,7 @@ var (
 	}
 )
 
-func (ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
-
-	if logger == nil {
-		logger = log.AsLogrus()
-	}
+func (ts *Test) prepareSpecWithEvents(logger *tyklog.Logger) (spec *APISpec) {
 	def := &apidef.APIDefinition{
 		EventHandlers: apidef.EventHandlerMetaConfig{
 			Events: map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig{
@@ -49,11 +44,11 @@ func (ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
 			eventHandlerInstance, err := ts.Gw.EventHandlerByName(handlerConf, spec)
 			logEventHandler, ok := eventHandlerInstance.(*LogMessageEventHandler)
 			if ok {
-				logEventHandler.logger = tyklog.Wrap(logger)
+				logEventHandler.logger = logger
 			}
 
 			if err != nil {
-				log.Error("Failed to init event handler: ", err)
+				logger.Error("Failed to init event handler: ", err)
 			} else {
 				spec.EventPaths[eventName] = append(spec.EventPaths[eventName], eventHandlerInstance)
 			}
@@ -104,8 +99,9 @@ func prepareEventHandlerConfig(handler apidef.TykEventHandlerName) (config apide
 func TestEventHandlerByName(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
+	logger, _ := tyklog.NewNullLogger()
 
-	spec := ts.prepareSpecWithEvents(nil)
+	spec := ts.prepareSpecWithEvents(logger)
 	for _, handlerType := range handlerTypes {
 		handlerConfig := prepareEventHandlerConfig(handlerType)
 		_, err := ts.Gw.EventHandlerByName(handlerConfig, spec)
@@ -123,11 +119,9 @@ func TestEventHandlerByName(t *testing.T) {
 func TestLogMessageEventHandler(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
+	logger, hook := tyklog.NewNullLogger()
 
-	buf := &bytes.Buffer{}
-	testLogger := logrus.New()
-	testLogger.Out = buf
-	spec := ts.prepareSpecWithEvents(testLogger)
+	spec := ts.prepareSpecWithEvents(logger)
 	handler := spec.EventPaths[EventAuthFailure][0]
 	em := config.EventMessage{
 		Type: EventAuthFailure,
@@ -141,9 +135,13 @@ func TestLogMessageEventHandler(t *testing.T) {
 	}
 	lookup := "testprefix:AuthFailure"
 	handler.HandleEvent(em)
-	if !strings.Contains(buf.String(), lookup) {
-		t.Fatal("Couldn't find log message")
-	}
+
+	assert.NotZero(
+		t,
+		hook.CountBy(func(entry *logrus.Entry) bool {
+			return strings.Contains(entry.Message, lookup)
+		}),
+	)
 }
 
 func TestInitGenericEventHandlers(t *testing.T) {

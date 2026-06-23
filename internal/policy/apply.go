@@ -20,13 +20,13 @@ var (
 // Service represents the implementation for apply policies logic.
 type Service struct {
 	storage model.PolicyProvider
-	logger  tyklog.Logger
+	logger  *tyklog.Logger
 
 	// used for validation if not empty
 	orgID *string
 }
 
-func New(orgID *string, storage model.PolicyProvider, logger tyklog.Logger) *Service {
+func New(orgID *string, storage model.PolicyProvider, logger *tyklog.Logger) *Service {
 	return &Service{
 		orgID:   orgID,
 		storage: storage,

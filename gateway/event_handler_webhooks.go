@@ -359,7 +359,7 @@ func templateFuncAsRFC3339() func(time.Time) string {
 	}
 }
 
-func templateFuncAsRFC3339FromString(log tyklog.Logger) func(string) string {
+func templateFuncAsRFC3339FromString(log *tyklog.Logger) func(string) string {
 	return func(s string) string {
 		t, err := time.Parse("2006-01-02 15:04:05.999999 -0700 MST", s)
 		if err == nil {

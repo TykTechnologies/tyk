@@ -201,7 +201,7 @@ func getOrgFromKeyID(key, certID string) string {
 	return orgId
 }
 
-func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger tyklog.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
+func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger *tyklog.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
 		logger = tyklog.Get()
 	}

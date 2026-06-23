@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	logrus "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/internal/scheduler"
@@ -14,9 +13,9 @@ import (
 )
 
 func TestScheduler_Break(t *testing.T) {
-	logger, _ := logrus.NewNullLogger()
+	logger, _ := tyklog.NewNullLogger()
 
-	s := scheduler.NewScheduler(tyklog.Wrap(logger))
+	s := scheduler.NewScheduler(logger)
 
 	assert.NotEmpty(t, s)
 
@@ -30,9 +29,9 @@ func TestScheduler_Break(t *testing.T) {
 }
 
 func TestScheduler_Close(t *testing.T) {
-	logger, _ := logrus.NewNullLogger()
+	logger, _ := tyklog.NewNullLogger()
 
-	s := scheduler.NewScheduler(tyklog.Wrap(logger))
+	s := scheduler.NewScheduler(logger)
 	defer s.Close()
 
 	job := scheduler.NewJob("test", func() error {
@@ -45,7 +44,7 @@ func TestScheduler_Close(t *testing.T) {
 }
 
 func TestScheduler_Job_Errors(t *testing.T) {
-	logger, _ := logrus.NewNullLogger()
+	logger, _ := tyklog.NewNullLogger()
 
 	testcases := []struct {
 		name string
@@ -68,7 +67,7 @@ func TestScheduler_Job_Errors(t *testing.T) {
 				return tc.err
 			}, 1)
 
-			runner := scheduler.NewScheduler(tyklog.Wrap(logger))
+			runner := scheduler.NewScheduler(logger)
 			go runner.Start(ctx, job)
 
 			time.Sleep(time.Millisecond)

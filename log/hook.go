@@ -6,10 +6,10 @@ import (
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 )
 
-type locaHookAlias = logrustest.Hook
+type innerHook = logrustest.Hook
 
 type Hook struct {
-	*locaHookAlias
+	*innerHook
 }
 
 func NewHook(base *logrustest.Hook) *Hook {
