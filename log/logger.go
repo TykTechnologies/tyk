@@ -15,11 +15,11 @@ type (
 
 	Logger struct {
 		*innerLogger
-		tmpLogsCollector *tmpLogsCollector
-		setupOnce        invokeOnce
-		emergencyLogger  *logrus.Logger
-		OsExit           func(int)
-		logFormat        Format
+		tmpLogsCollector       *tmpLogsCollector
+		setupOnce              invokeOnce
+		emergencyLogger        *logrus.Logger
+		OsExit                 func(int)
+		legacyLogFormatEnabled bool
 	}
 
 	CancelFn func()
@@ -64,6 +64,12 @@ func New() *Logger {
 	return lgr
 }
 
+func Build(factory func(b *Builder)) *Logger {
+	l := New()
+	l.Setup(factory)
+	return l
+}
+
 func NewNullLogger() (*Logger, *Hook) {
 	rawLogger, hook := logrustest.NewNullLogger()
 
@@ -76,7 +82,7 @@ func NewNullLogger() (*Logger, *Hook) {
 }
 
 func (l *Logger) IsLegacyFormatter() bool {
-	return l.logFormat == FormatLegacy
+	return l.legacyLogFormatEnabled
 }
 
 func (l *Logger) NewEntry() *logrus.Entry {
@@ -105,11 +111,10 @@ func (l *Logger) Setup(f func(b *Builder)) {
 	l.setupOnce.MustOnce(func() {
 		var builder Builder
 		f(&builder)
-		logger := builder.BuildAndPropagate()
+		builder.buildAndPropagate(l)
 
-		l.innerLogger = logger
-		l.logFormat = builder.logFormat
-		l.tmpLogsCollector.Forward(logger)
+		l.RemoveHook(l.tmpLogsCollector)
+		l.tmpLogsCollector.Forward(l.innerLogger)
 	})
 }
 
@@ -148,6 +153,11 @@ func (l *Logger) SetFormatter(_ nonImplementable) {}
 // Deprecated. Stop using direct logrus structures.
 // Shadowed.
 func (l *Logger) SetOutput(_ nonImplementable) {}
+
+// SetLevel
+// Deprecated. Stop using direct logrus structures.
+// Shadowed.
+func (l *Logger) SetLevel(_ nonImplementable) {}
 
 // Reset state to default.
 // Added to pass tests.

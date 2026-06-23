@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/internal/policy"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/user"
 )
 
