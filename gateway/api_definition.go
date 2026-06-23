@@ -694,6 +694,10 @@ func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
 	return firstErr
 }
 
+// replaceKVReferences resolves new-syntax kv:// and $kv{} references via the
+// shared resolver. Unlike the legacy bulk ops, ResolveAll re-serializes the
+// document, so resolved values are JSON-escaped automatically — no manual
+// escaping here would be correct.
 func (a APIDefinitionLoader) replaceKVReferences(input *string) error {
 	resolved, err := a.Gw.kvResolver.ResolveAll(a.Gw.ctx, []byte(*input))
 	if err != nil {
