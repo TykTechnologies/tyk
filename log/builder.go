@@ -16,6 +16,7 @@ type Builder struct {
 	withApplyHooksToRawLog bool
 	propagate              bool
 	discardOutput          bool
+	logFormat              Format
 }
 
 // WithLevel sets level.
@@ -68,10 +69,10 @@ func (b *Builder) WithRawLog(log *logrus.Logger) {
 
 func (b *Builder) BuildAndPropagate() *logrus.Logger {
 	var logger = logrus.New()
-	var stdLog = logrus.StandardLogger()
+	var logrusStdLog = logrus.StandardLogger()
 
 	if b.stdLog != nil {
-		stdLog = b.stdLog
+		logrusStdLog = b.stdLog
 	}
 	b.applyHooksToRawLog()
 
@@ -79,8 +80,8 @@ func (b *Builder) BuildAndPropagate() *logrus.Logger {
 	b.applyHooksAndSinks(logger)
 
 	if b.propagate {
-		b.discardLogger(stdLog)
-		b.applyHooksAndSinks(stdLog)
+		b.discardLogger(logrusStdLog)
+		b.applyHooksAndSinks(logrusStdLog)
 	}
 
 	return logger
@@ -124,6 +125,10 @@ func (b *Builder) applyHooksToRawLog() {
 	for _, hook := range b.hooks {
 		target.AddHook(hook)
 	}
+}
+
+func (b *Builder) WithLogFormat(logFormat Format) {
+	b.logFormat = logFormat
 }
 
 type dummyFormatter struct{}

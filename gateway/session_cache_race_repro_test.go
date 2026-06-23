@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/internal/policy"
@@ -93,7 +93,8 @@ func runSessionCacheAccessRightsRaceReproChild(t *testing.T) {
 		}()
 	}
 
-	apply := policy.New(nil, nil, logrus.New())
+	logger, _ := tyklog.NewNullLogger()
+	apply := policy.New(nil, nil, logger)
 	deadline := time.After(5 * time.Second)
 	for {
 		select {
