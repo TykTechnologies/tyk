@@ -225,7 +225,7 @@ func Test_Logger_IsLegacyFormatter(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			lgr := New()
 			lgr.Setup(func(b *Builder) {
-				b.WithLogFormat(tc.format)
+				b.SetLegacyLogformat(tc.format == FormatLegacy)
 			})
 
 			assert.Equal(t, tc.expectedResult, lgr.IsLegacyFormatter())
