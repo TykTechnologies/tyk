@@ -24,8 +24,7 @@ func (m *mockSink) Sink(_ *logrus.Entry) {}
 
 func TestBuilder(t *testing.T) {
 	t.Run("Default", func(t *testing.T) {
-		b := &Builder{}
-		logger := b.BuildAndPropagate()
+		logger := Build(func(_ *Builder) {})
 
 		assert.NotNil(t, logger)
 		assert.Equal(t, io.Discard, logger.Out)
@@ -34,27 +33,26 @@ func TestBuilder(t *testing.T) {
 	})
 
 	t.Run("WithLevel", func(t *testing.T) {
-		b := &Builder{}
-		b.WithLevel(logrus.DebugLevel)
-		logger := b.BuildAndPropagate()
+		logger := Build(func(b *Builder) {
+			b.WithLevel(logrus.DebugLevel)
+		})
 
 		assert.Equal(t, logrus.DebugLevel, logger.Level)
 	})
 
 	t.Run("WithDiscardOutput", func(t *testing.T) {
-		b := &Builder{}
-		b.AddSink(&mockSink{})
-		b.WithDiscardOutput()
+		logger := Build(func(b *Builder) {
+			b.AddSink(&mockSink{})
+			b.WithDiscardOutput()
+		})
 
-		logger := b.BuildAndPropagate()
-
-		assert.Empty(t, logger.Hooks)
+		assert.Empty(t, logger.Hooks, "skips writing to all sinks; and does not add multi sink-hook")
 	})
 
 	t.Run("AddSink", func(t *testing.T) {
-		b := &Builder{}
-		b.AddSink(&mockSink{})
-		logger := b.BuildAndPropagate()
+		logger := Build(func(b *Builder) {
+			b.AddSink(&mockSink{})
+		})
 
 		assert.NotEmpty(t, logger.Hooks)
 
@@ -64,11 +62,11 @@ func TestBuilder(t *testing.T) {
 	})
 
 	t.Run("AddHook", func(t *testing.T) {
-		b := &Builder{}
 		customHook := &mockHook{}
-		b.AddHook(customHook)
 
-		logger := b.BuildAndPropagate()
+		logger := Build(func(b *Builder) {
+			b.AddHook(customHook)
+		})
 
 		registeredHooks := logger.Hooks[logrus.InfoLevel]
 
@@ -87,13 +85,12 @@ func TestBuilder(t *testing.T) {
 		stdLogger.SetLevel(logrus.FatalLevel)
 		stdLogger.SetOutput(io.Discard)
 
-		b := &Builder{}
-		b.WithStdLog(stdLogger)
-		b.WithLevel(logrus.TraceLevel)
-		b.AddSink(&mockSink{})
-		b.WithPropagate()
-
-		logger := b.BuildAndPropagate()
+		logger := Build(func(b *Builder) {
+			b.WithStdLog(stdLogger)
+			b.WithLevel(logrus.TraceLevel)
+			b.AddSink(&mockSink{})
+			b.WithPropagate()
+		})
 
 		assert.Equal(t, logrus.TraceLevel, logger.Level)
 		assert.Equal(t, logrus.TraceLevel, stdLogger.Level)
@@ -107,28 +104,25 @@ func TestBuilder(t *testing.T) {
 
 	t.Run("WithPropagate_DiscardOutput", func(t *testing.T) {
 		stdLogger := logrus.New()
-
-		b := &Builder{}
-		b.WithStdLog(stdLogger)
-		b.WithPropagate()
-		b.AddSink(&mockSink{})
-		b.WithDiscardOutput()
-
-		b.BuildAndPropagate()
+		_ = Build(func(b *Builder) {
+			b.WithStdLog(stdLogger)
+			b.WithPropagate()
+			b.AddSink(&mockSink{})
+			b.WithDiscardOutput()
+		})
 
 		assert.Empty(t, stdLogger.Hooks)
 	})
 
 	t.Run("WithApplyHooksToRawLog_Enabled", func(t *testing.T) {
-		b := &Builder{}
 		rawLogger := logrus.New()
 		customHook := &mockHook{}
 
-		b.WithRawLog(rawLogger)
-		b.AddHook(customHook)
-		b.WithApplyHooksToRawLog()
-
-		b.BuildAndPropagate()
+		_ = Build(func(b *Builder) {
+			b.WithRawLog(rawLogger)
+			b.AddHook(customHook)
+			b.WithApplyHooksToRawLog()
+		})
 
 		assert.NotEmpty(t, rawLogger.Hooks)
 		registeredHooks := rawLogger.Hooks[logrus.InfoLevel]
@@ -137,14 +131,13 @@ func TestBuilder(t *testing.T) {
 	})
 
 	t.Run("WithApplyHooksToRawLog_Disabled", func(t *testing.T) {
-		b := &Builder{}
 		rawLogger := logrus.New()
 		customHook := &mockHook{}
 
-		b.WithRawLog(rawLogger)
-		b.AddHook(customHook)
-
-		b.BuildAndPropagate()
+		_ = Build(func(b *Builder) {
+			b.WithRawLog(rawLogger)
+			b.AddHook(customHook)
+		})
 
 		assert.Empty(t, rawLogger.Hooks)
 	})
@@ -160,13 +153,12 @@ func TestBuilder(t *testing.T) {
 
 		rawLog.Hooks = make(logrus.LevelHooks)
 
-		b := &Builder{}
 		customHook := &mockHook{}
 
-		b.AddHook(customHook)
-		b.WithApplyHooksToRawLog()
-
-		b.BuildAndPropagate()
+		_ = Build(func(b *Builder) {
+			b.AddHook(customHook)
+			b.WithApplyHooksToRawLog()
+		})
 
 		assert.NotEmpty(t, rawLog.Hooks)
 		registeredHooks := rawLog.Hooks[logrus.InfoLevel]
