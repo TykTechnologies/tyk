@@ -656,6 +656,3 @@ replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi 
 //      (still pins v2.29.0 as of v0.21.0, 2026-07), or
 //   2. a fixed github.com/hamba/avro/v2 release appears (archived, so unlikely).
 replace github.com/hamba/avro/v2 => github.com/iskorotkov/avro/v2 v2.34.0
-
-// todo: remove temporary pump replace after merging pump
-replace github.com/TykTechnologies/tyk-pump => github.com/TykTechnologies/tyk-pump v0.0.0-20260602112846-16f8bf2dcc3a
