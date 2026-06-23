@@ -144,6 +144,17 @@ func (l *Logger) GetTestHook(t *testing.T) *Hook {
 	return hook
 }
 
+func (l *Logger) SetTestLogLevel(t *testing.T, level logrus.Level) {
+	t.Helper()
+
+	oLevel := l.GetLevel()
+	l.innerLogger.SetLevel(level)
+
+	t.Cleanup(func() {
+		l.innerLogger.SetLevel(oLevel)
+	})
+}
+
 // SetFormatter
 // Deprecated. Stop using direct logrus structures.
 // Shadowed.
