@@ -24,7 +24,7 @@ func NewSink(
 	logger.SetLevel(logrus.TraceLevel)
 	logger.SetFormatter(formatter)
 	logger.SetOutput(writer)
-	logger.ExitFunc = func(_ int) {} // skip exi in sub-loggers (sinks)
+	logger.ExitFunc = func(_ int) {} // skip exit in sub-loggers (sinks)
 
 	return &Sink{
 		logger:   logger,
