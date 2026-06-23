@@ -83,8 +83,6 @@ var (
 
 	log = tyklog.Get()
 
-	// todo: fix bug mainLog is created with reference to tmp logger
-	// todo: this case is covered but it has to be tested
 	mainLog   = log.WithField("prefix", "main")
 	pubSubLog = log.WithField("prefix", "pub-sub")
 
