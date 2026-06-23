@@ -218,6 +218,11 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 // parameter for a HTTP request would. If no replacement has been made, `in`
 // is returned without modification.
 func (gw *Gateway) ReplaceTykVariables(r *http.Request, in string, escape bool) string {
+	if gw.kvResolver != nil && (strings.Contains(in, "kv://") || strings.Contains(in, "$kv{")) {
+		if resolved, err := gw.kvResolver.Resolve(r.Context(), in); err == nil {
+			in = resolved
+		}
+	}
 
 	if strings.Contains(in, secretsConfLabel) {
 		contextData := ctxGetData(r)

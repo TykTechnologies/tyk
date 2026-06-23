@@ -1461,6 +1461,50 @@ func TestReplaceTykVariables(t *testing.T) {
 	}
 }
 
+func TestReplaceTykVariables_NewSyntax(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Setenv("TYK_SECRET_HOST", "myhost")
+	t.Setenv("TYK_SECRET_USER", "alice")
+	t.Setenv("TYK_SECRET_PASS", "s3cret")
+	t.Setenv("TYK_SECRET_OTHER", "otherval")
+	t.Setenv("TYK_SECRET_RAW", "a b/c") // contains chars url.QueryEscape would change
+
+	req := httptest.NewRequest("GET", "/", nil)
+
+	t.Run("kv:// whole-value reference is fully replaced", func(t *testing.T) {
+		assert.Equal(t, "myhost", ts.Gw.ReplaceTykVariables(req, "kv://env/host", false))
+	})
+
+	t.Run("$kv{} inline token is replaced within a larger string", func(t *testing.T) {
+		fmt.Println("het")
+		assert.Equal(t, "https://myhost/v1", ts.Gw.ReplaceTykVariables(req, "https://$kv{env:host}/v1", false))
+	})
+
+	t.Run("multiple $kv{} tokens all resolve", func(t *testing.T) {
+		assert.Equal(t, "alice:s3cret", ts.Gw.ReplaceTykVariables(req, "$kv{env:user}:$kv{env:pass}", false))
+	})
+
+	t.Run("mixed $kv{} and $secret_* — both passes complete", func(t *testing.T) {
+		// Pass 1 resolves $kv{env:host}; Pass 2 resolves $secret_env.other.
+		got := ts.Gw.ReplaceTykVariables(req, "https://$kv{env:host}/$secret_env.other", false)
+		assert.Equal(t, "https://myhost/otherval", got)
+	})
+
+	t.Run("malformed kv:// reference is left unchanged, not emptied", func(t *testing.T) {
+		in := "kv://no-path-separator"
+		assert.Equal(t, in, ts.Gw.ReplaceTykVariables(req, in, false),
+			"a Pass 1 resolve error leaves the input as-is (unlike $secret_* which empties)")
+	})
+
+	t.Run("KV values are not URL-encoded even when escape=true", func(t *testing.T) {
+		got := ts.Gw.ReplaceTykVariables(req, "$kv{env:raw}", true)
+		assert.Equal(t, "a b/c", got,
+			"Pass 1 completes before the escape logic, so KV values are never URL-encoded")
+	})
+}
+
 func TestReplaceTykVariablesFileSecret(t *testing.T) {
 	dir := t.TempDir()
 	secretFile := filepath.Join(dir, "api-key")
