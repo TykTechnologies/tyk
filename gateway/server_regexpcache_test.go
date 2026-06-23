@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,13 +20,12 @@ func TestAfterConfSetup_WarnsOnDisableRegexpCacheBound(t *testing.T) {
 		tykregexp.Configure(tykregexp.CacheOptions{Enabled: true})
 	})
 
-	hook := log.GetTestHook(t)
-	log.SetTestLogLevel(t, logrus.WarnLevel)
-
-	gw := NewGateway(config.Config{DisableRegexpCacheBound: true}, context.Background())
+	gw := NewGateway(config.Config{DisableRegexpCacheBound: true}, t.Context())
 	require.NoError(t, gw.afterConfSetup())
 
-	found := lo.SomeBy(hook.AllEntries(), func(e *logrus.Entry) bool {
+	hook := log.GetTestHook(t)
+
+	found := hook.SomeBy(func(e *logrus.Entry) bool {
 		return e.Level == logrus.WarnLevel && strings.Contains(e.Message, "size eviction disabled")
 	})
 
@@ -43,12 +41,11 @@ func TestAfterConfSetup_WarnsOnNegativeMaxEntries(t *testing.T) {
 	})
 
 	hook := log.GetTestHook(t)
-	log.SetTestLogLevel(t, logrus.WarnLevel)
 
 	gw := NewGateway(config.Config{RegexpCacheMaxEntries: -1}, context.Background())
 	require.NoError(t, gw.afterConfSetup())
 
-	found := lo.SomeBy(hook.AllEntries(), func(e *logrus.Entry) bool {
+	found := hook.SomeBy(func(e *logrus.Entry) bool {
 		return e.Level == logrus.WarnLevel && strings.Contains(e.Message, "is invalid")
 	})
 
