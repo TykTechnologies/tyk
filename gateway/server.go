@@ -263,7 +263,19 @@ type Gateway struct {
 	// Built from apidef.ErrorOverrides during gateway startup.
 	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
 
+	// kvRegistry holds the initialized KV provider stores (env, inline, file,
+	// and — outside test mode — vault/consul and any enterprise providers) that
+	// back secret resolution. In a real startup it is the registry returned by
+	// config.LoadAndResolve and owned by the gateway, which closes it on
+	// shutdown. In test mode, where LoadAndResolve never runs,
+	// NewGateway installs a minimal local-only registry instead. It is
+	// guaranteed non-nil after construction.
 	kvRegistry *registry.Registry
+
+	// kvResolver resolves kv:// and $kv{} references against kvRegistry. It is
+	// the single entry point the resolution contexts use, so legacy-syntax
+	// shims and new-syntax references share one code path. Guaranteed non-nil
+	// after construction, alongside kvRegistry.
 	kvResolver resolver.Resolver
 }
 
@@ -325,6 +337,13 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.idpRegistry = newIdPRegistry(gw)
 	gw.BundleChecksumVerifier = defaultBundleVerifyFunction
 
+	// Establish the "kvRegistry and kvResolver are never nil" invariant at
+	// construction. Every resolution context (kvStore, ReplaceTykVariables,
+	// replaceSecrets) dereferences these without a nil check, so a nil here
+	// would turn the first secret lookup into a panic deep in request or
+	// startup paths rather than a clear failure. We Fatal instead of returning
+	// the error because NewGateway has no error return and a gateway that
+	// cannot even build its local stores is unusable.
 	if err := gw.ensureKVRegistry(config); err != nil {
 		log.WithError(err).Fatal("could not initialize KV registry")
 	}
