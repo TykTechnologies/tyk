@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -447,22 +447,15 @@ func Test_addBodyHash(t *testing.T) {
 // the same observability signals as regular (non-cached) requests:
 // analytics (RecordHit), access logs (RecordAccessLog), and OTel metrics (RecordMetrics).
 func TestRedisCacheMiddleware_Observability(t *testing.T) {
-	log := logrus.New()
-
 	// Install a test hook on the global logger to capture access log entries.
-	hook := &logrustest.Hook{}
-	log.AddHook(hook)
-	defer log.ReplaceHooks(make(logrus.LevelHooks))
+	hook := log.GetTestHook(t)
 
 	ts := StartTest(nil)
 	defer ts.Close()
 
 	// StartTest sets log level to Error when TYK_LOGLEVEL is unset.
 	// Access logs are emitted at Info level, so we must restore it.
-	origLevel := log.GetLevel()
-	log.SetLevel(logrus.InfoLevel)
-	defer log.SetLevel(origLevel)
-
+	log.SetTestLogLevel(t, logrus.InfoLevel)
 	// Enable access logs.
 	gwConfig := ts.Gw.GetConfig()
 	gwConfig.AccessLogs.Enabled = true
@@ -550,7 +543,7 @@ func TestRedisCacheMiddleware_Observability(t *testing.T) {
 
 // countAccessLogEntries counts log entries with prefix "access-log"
 // (set by accesslog.NewRecord in internal/httputil/accesslog/record.go:26).
-func countAccessLogEntries(hook *logrustest.Hook) int {
+func countAccessLogEntries(hook *tyklog.Hook) int {
 	count := 0
 	for _, entry := range hook.AllEntries() {
 		if entry.Data["prefix"] == "access-log" {
