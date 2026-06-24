@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -22,6 +23,31 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 )
+
+func newMCPTestGateway(t *testing.T, appPath ...string) *Gateway {
+	t.Helper()
+
+	var path string
+	if len(appPath) > 0 {
+		path = appPath[0]
+	} else {
+		path = t.TempDir()
+	}
+
+	gw := &Gateway{apisByID: map[string]*APISpec{}}
+	gw.SetConfig(config.Config{
+		AppPath:    path,
+		HostName:   "localhost",
+		ListenPort: 8080,
+	})
+	return gw
+}
+
+func newValidateMCPHandler(t *testing.T, next http.HandlerFunc) http.HandlerFunc {
+	t.Helper()
+
+	return newMCPTestGateway(t).validateMCP(next)
+}
 
 func TestExtractMCPObjFromReq(t *testing.T) {
 	t.Parallel()
@@ -158,16 +184,13 @@ func TestValidateMCP(t *testing.T) {
 	}`
 
 	t.Run("valid MCP object passes validation", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		nextCalled := false
 		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			nextCalled = true
 			w.WriteHeader(http.StatusOK)
 		})
 
-		handler := ts.Gw.validateMCP(nextHandler)
+		handler := newValidateMCPHandler(t, nextHandler)
 
 		req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(validMCPDefinition))
 		req.Header.Set("Content-Type", "application/json")
@@ -180,16 +203,13 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("PUT request with valid MCP object", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		nextCalled := false
 		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			nextCalled = true
 			w.WriteHeader(http.StatusOK)
 		})
 
-		handler := ts.Gw.validateMCP(nextHandler)
+		handler := newValidateMCPHandler(t, nextHandler)
 
 		req := httptest.NewRequest(http.MethodPut, "/test", strings.NewReader(validMCPDefinition))
 		req.Header.Set("Content-Type", "application/json")
@@ -202,15 +222,12 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("malformed request body", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		nextCalled := false
 		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			nextCalled = true
 		})
 
-		handler := ts.Gw.validateMCP(nextHandler)
+		handler := newValidateMCPHandler(t, nextHandler)
 
 		req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(`{"invalid": json}`))
 		req.Header.Set("Content-Type", "application/json")
@@ -224,15 +241,12 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("POST without Tyk extension returns error", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		nextCalled := false
 		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			nextCalled = true
 		})
 
-		handler := ts.Gw.validateMCP(nextHandler)
+		handler := newValidateMCPHandler(t, nextHandler)
 
 		mcpWithoutExtension := `{
 			"openapi": "3.0.3",
@@ -252,15 +266,12 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("PUT without Tyk extension returns error", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		nextCalled := false
 		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			nextCalled = true
 		})
 
-		handler := ts.Gw.validateMCP(nextHandler)
+		handler := newValidateMCPHandler(t, nextHandler)
 
 		mcpWithoutExtension := `{
 			"openapi": "3.0.3",
@@ -280,16 +291,13 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("GET request without Tyk extension passes", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		nextCalled := false
 		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			nextCalled = true
 			w.WriteHeader(http.StatusOK)
 		})
 
-		handler := ts.Gw.validateMCP(nextHandler)
+		handler := newValidateMCPHandler(t, nextHandler)
 
 		mcpWithoutExtension := `{
 			"openapi": "3.0.3",
@@ -309,15 +317,12 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("missing required Tyk fields returns error", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		nextCalled := false
 		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			nextCalled = true
 		})
 
-		handler := ts.Gw.validateMCP(nextHandler)
+		handler := newValidateMCPHandler(t, nextHandler)
 
 		invalidMCP := `{
 			"openapi": "3.0.3",
@@ -341,9 +346,6 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("request body is preserved for next handler", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		var capturedBody []byte
 		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var err error
@@ -352,7 +354,7 @@ func TestValidateMCP(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 		})
 
-		handler := ts.Gw.validateMCP(nextHandler)
+		handler := newValidateMCPHandler(t, nextHandler)
 
 		req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(validMCPDefinition))
 		req.Header.Set("Content-Type", "application/json")
@@ -366,9 +368,6 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("context is passed through", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		type contextKey string
 		testKey := contextKey("test-key")
 		testValue := "test-value"
@@ -381,7 +380,7 @@ func TestValidateMCP(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 		})
 
-		handler := ts.Gw.validateMCP(nextHandler)
+		handler := newValidateMCPHandler(t, nextHandler)
 
 		ctx := context.WithValue(context.Background(), testKey, testValue)
 		req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(validMCPDefinition))
@@ -396,11 +395,8 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("response headers are set correctly on error", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {})
-		handler := ts.Gw.validateMCP(nextHandler)
+		handler := newValidateMCPHandler(t, nextHandler)
 
 		req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(`invalid`))
 		req.Header.Set("Content-Type", "application/json")
@@ -415,15 +411,12 @@ func TestValidateMCP(t *testing.T) {
 
 func TestValidateMCP_EdgeCases(t *testing.T) {
 	t.Run("empty request body reader", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		nextCalled := false
 		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			nextCalled = true
 		})
 
-		handler := ts.Gw.validateMCP(nextHandler)
+		handler := newValidateMCPHandler(t, nextHandler)
 
 		req := httptest.NewRequest(http.MethodPost, "/test", &bytes.Buffer{})
 		req.Header.Set("Content-Type", "application/json")
@@ -436,9 +429,6 @@ func TestValidateMCP_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("MCP object with multiple tools", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		mcpWithMultipleTools := `{
 			"openapi": "3.0.3",
 			"info": {"title": "Multi-Tool MCP API", "version": "1.0.0"},
@@ -470,7 +460,7 @@ func TestValidateMCP_EdgeCases(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 		})
 
-		handler := ts.Gw.validateMCP(nextHandler)
+		handler := newValidateMCPHandler(t, nextHandler)
 
 		req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(mcpWithMultipleTools))
 		req.Header.Set("Content-Type", "application/json")
@@ -483,16 +473,13 @@ func TestValidateMCP_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("DELETE request behavior", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		nextCalled := false
 		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			nextCalled = true
 			w.WriteHeader(http.StatusOK)
 		})
 
-		handler := ts.Gw.validateMCP(nextHandler)
+		handler := newValidateMCPHandler(t, nextHandler)
 
 		mcpWithoutExtension := `{
 			"openapi": "3.0.3",
@@ -550,6 +537,28 @@ func restSourceSpec(apiID, orgID string, isOAS bool) *APISpec {
 			IsOAS: isOAS,
 		},
 		OAS: doc,
+	}
+}
+
+func mcpManagedTestSpec(apiID string) *APISpec {
+	apiDef := &apidef.APIDefinition{
+		APIID: apiID,
+		Name:  apiID,
+		IsOAS: true,
+		Proxy: apidef.ProxyConfig{
+			ListenPath: "/" + apiID + "/",
+			TargetURL:  "http://upstream.url",
+		},
+	}
+	apiDef.MarkAsMCP()
+
+	return &APISpec{
+		APIDefinition: apiDef,
+		OAS: oas.OAS{T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info:    &openapi3.Info{Title: apiID, Version: "1.0.0"},
+			Paths:   openapi3.NewPaths(),
+		}},
 	}
 }
 
@@ -843,6 +852,108 @@ func TestHandleAddApiOAS_ValidatesPairedMCPAdapterUpstream(t *testing.T) {
 	assert.Contains(t, msg.Message, "missing-rest")
 }
 
+func TestHandleMCP_AlignsSourceRESTGatewayTagsToPairedProxy(t *testing.T) {
+	cases := []struct {
+		name      string
+		handler   func(*Gateway, *http.Request, afero.Fs) (interface{}, int)
+		method    string
+		path      string
+		loadProxy bool
+	}{
+		{
+			name: "add",
+			handler: func(gw *Gateway, req *http.Request, fs afero.Fs) (interface{}, int) {
+				return gw.handleAddMCP(req, fs)
+			},
+			method: http.MethodPost,
+			path:   "/tyk/mcps",
+		},
+		{
+			name: "update",
+			handler: func(gw *Gateway, req *http.Request, fs afero.Fs) (interface{}, int) {
+				return gw.handleUpdateMCP("proxy-1", req, fs)
+			},
+			method:    http.MethodPut,
+			path:      "/tyk/mcps/proxy-1",
+			loadProxy: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name+" copies source tags", func(t *testing.T) {
+			gw := pairedMCPGatewayForTagAlignment(tc.loadProxy, true)
+			fs := afero.NewMemMapFs()
+			require.NoError(t, fs.MkdirAll("/apps", 0755))
+
+			body, err := json.Marshal(pairedMCPProxyOAS("proxy-1", "org-1", "rest-1"))
+			require.NoError(t, err)
+			req := httptest.NewRequest(tc.method, tc.path, bytes.NewReader(body))
+
+			obj, code := tc.handler(gw, req, fs)
+
+			require.Equal(t, http.StatusOK, code)
+			resp, ok := obj.(apiModifyKeySuccess)
+			require.True(t, ok)
+			assert.Equal(t, "proxy-1", resp.Key)
+			assertWrittenPairedMCPGatewayTags(t, gw, fs, false, []string{"edge-a", "edge-b"})
+		})
+
+		t.Run(tc.name+" rejects missing source", func(t *testing.T) {
+			gw := pairedMCPGatewayForTagAlignment(tc.loadProxy, false)
+			fs := afero.NewMemMapFs()
+			require.NoError(t, fs.MkdirAll("/apps", 0755))
+
+			body, err := json.Marshal(pairedMCPProxyOAS("proxy-1", "org-1", "rest-1"))
+			require.NoError(t, err)
+			req := httptest.NewRequest(tc.method, tc.path, bytes.NewReader(body))
+
+			obj, code := tc.handler(gw, req, fs)
+
+			require.Equal(t, http.StatusBadRequest, code)
+			msg, ok := obj.(apiStatusMessage)
+			require.True(t, ok)
+			assert.Contains(t, msg.Message, "paired REST API rest-1 is not loaded")
+		})
+	}
+}
+
+func pairedMCPGatewayForTagAlignment(loadProxy, loadSource bool) *Gateway {
+	gw := &Gateway{apisByID: map[string]*APISpec{}}
+	gw.SetConfig(config.Config{
+		AppPath:    "/apps",
+		HostName:   "localhost",
+		ListenPort: 8080,
+	})
+	if loadSource {
+		gw.apisByID["rest-1"] = restSourceSpec("rest-1", "org-1", true)
+		gw.apisByID["rest-1"].TagsDisabled = false
+		gw.apisByID["rest-1"].Tags = []string{"edge-a", "edge-b"}
+	}
+	if loadProxy {
+		gw.apisByID["proxy-1"] = pairedMCPProxySpec("proxy-1", "org-1", "rest-1", nil)
+	}
+	return gw
+}
+
+func assertWrittenPairedMCPGatewayTags(t *testing.T, gw *Gateway, fs afero.Fs, tagsDisabled bool, tags []string) {
+	t.Helper()
+
+	apiDefBody, err := afero.ReadFile(fs, gw.GetConfig().AppPath+"/proxy-1.json")
+	require.NoError(t, err)
+	var apiDef apidef.APIDefinition
+	require.NoError(t, json.Unmarshal(apiDefBody, &apiDef))
+	assert.Equal(t, tagsDisabled, apiDef.TagsDisabled)
+	assert.Equal(t, tags, apiDef.Tags)
+
+	oasBody, err := afero.ReadFile(fs, gw.GetConfig().AppPath+"/proxy-1-mcp.json")
+	require.NoError(t, err)
+	var proxyOAS oas.OAS
+	require.NoError(t, json.Unmarshal(oasBody, &proxyOAS))
+	require.NotNil(t, proxyOAS.GetTykExtension().Server.GatewayTags)
+	assert.Equal(t, !tagsDisabled, proxyOAS.GetTykExtension().Server.GatewayTags.Enabled)
+	assert.Equal(t, tags, proxyOAS.GetTykExtension().Server.GatewayTags.Tags)
+}
+
 func TestHandleGetMCPListOAS(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -923,17 +1034,9 @@ func TestMCPListHandler(t *testing.T) {
 }
 
 func TestMCPUpdateHandler(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	// Create a test MCP Proxy
-	ts.Gw.BuildAndLoadAPI(
-		func(spec *APISpec) {
-			spec.APIID = "mcp-update-test"
-			spec.Name = "MCP Update Test"
-			spec.MarkAsMCP()
-		},
-	)
+	appPath := t.TempDir()
+	gw := newMCPTestGateway(t, appPath)
+	gw.apisByID["mcp-update-test"] = mcpManagedTestSpec("mcp-update-test")
 
 	validMCPUpdate := `{
 		"openapi": "3.0.3",
@@ -974,13 +1077,14 @@ func TestMCPUpdateHandler(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPut, "/tyk/mcps/mcp-update-test", strings.NewReader(validMCPUpdate))
 		w := httptest.NewRecorder()
 
-		// Mock mux.Vars
 		req = mux.SetURLVars(req, map[string]string{"apiID": "mcp-update-test"})
 
-		ts.Gw.mcpUpdateHandler(w, req)
+		gw.mcpUpdateHandler(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Contains(t, w.Body.String(), "modified")
+		assert.FileExists(t, filepath.Join(appPath, "mcp-update-test.json"))
+		assert.FileExists(t, filepath.Join(appPath, "mcp-update-test-mcp.json"))
 	})
 
 	t.Run("returns 400 for invalid API ID", func(t *testing.T) {
@@ -989,7 +1093,7 @@ func TestMCPUpdateHandler(t *testing.T) {
 
 		req = mux.SetURLVars(req, map[string]string{"apiID": "../../../etc/passwd"})
 
-		ts.Gw.mcpUpdateHandler(w, req)
+		gw.mcpUpdateHandler(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "Invalid API ID")
@@ -997,8 +1101,13 @@ func TestMCPUpdateHandler(t *testing.T) {
 }
 
 func TestMCPDeleteHandler(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
+	appPath := t.TempDir()
+	gw := newMCPTestGateway(t, appPath)
+	gw.apisByID["test-api"] = mcpManagedTestSpec("test-api")
+
+	fs := afero.NewOsFs()
+	require.NoError(t, afero.WriteFile(fs, filepath.Join(appPath, "test-api.json"), []byte("{}"), 0644))
+	require.NoError(t, afero.WriteFile(fs, filepath.Join(appPath, "test-api-mcp.json"), []byte("{}"), 0644))
 
 	t.Run("deletes MCP Proxy successfully", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, "/tyk/mcps/test-api", nil)
@@ -1006,9 +1115,12 @@ func TestMCPDeleteHandler(t *testing.T) {
 
 		req = mux.SetURLVars(req, map[string]string{"apiID": "test-api"})
 
-		ts.Gw.mcpDeleteHandler(w, req)
+		gw.mcpDeleteHandler(w, req)
 
-		assert.NotEqual(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Body.String(), "deleted")
+		assert.NoFileExists(t, filepath.Join(appPath, "test-api.json"))
+		assert.NoFileExists(t, filepath.Join(appPath, "test-api-mcp.json"))
 	})
 
 	t.Run("rejects invalid API ID", func(t *testing.T) {
@@ -1017,7 +1129,7 @@ func TestMCPDeleteHandler(t *testing.T) {
 
 		req = mux.SetURLVars(req, map[string]string{"apiID": "../../etc/passwd"})
 
-		ts.Gw.mcpDeleteHandler(w, req)
+		gw.mcpDeleteHandler(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "Invalid API ID")
@@ -1026,15 +1138,12 @@ func TestMCPDeleteHandler(t *testing.T) {
 
 func TestValidateMCP_PRM(t *testing.T) {
 	t.Run("rejects PRM without resource", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		nextCalled := false
 		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			nextCalled = true
 		})
 
-		handler := ts.Gw.validateMCP(nextHandler)
+		handler := newValidateMCPHandler(t, nextHandler)
 
 		mcpWithBadPRM := `{
 			"openapi": "3.0.3",
@@ -1076,15 +1185,12 @@ func TestValidateMCP_PRM(t *testing.T) {
 	})
 
 	t.Run("rejects PRM without authorizationServers for MCP", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		nextCalled := false
 		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			nextCalled = true
 		})
 
-		handler := ts.Gw.validateMCP(nextHandler)
+		handler := newValidateMCPHandler(t, nextHandler)
 
 		mcpWithBadPRM := `{
 			"openapi": "3.0.3",
@@ -1126,16 +1232,13 @@ func TestValidateMCP_PRM(t *testing.T) {
 	})
 
 	t.Run("accepts valid PRM", func(t *testing.T) {
-		ts := StartTest(nil)
-		defer ts.Close()
-
 		nextCalled := false
 		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			nextCalled = true
 			w.WriteHeader(http.StatusOK)
 		})
 
-		handler := ts.Gw.validateMCP(nextHandler)
+		handler := newValidateMCPHandler(t, nextHandler)
 
 		mcpWithGoodPRM := `{
 			"openapi": "3.0.3",

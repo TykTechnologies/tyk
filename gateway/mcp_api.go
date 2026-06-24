@@ -245,6 +245,37 @@ func derivedToolSourceIdentity(tool oas.DerivedTool) string {
 	return tool.CanonicalName
 }
 
+func (gw *Gateway) alignPairedMCPProxyGatewayTags(apiDef *apidef.APIDefinition, oasObj *oas.OAS) error {
+	if apiDef == nil || oasObj == nil {
+		return nil
+	}
+
+	_, restAPIID, ok := pairedMCPAdapterTarget(apiDef.Proxy.TargetURL)
+	if !ok {
+		return nil
+	}
+
+	rest := gw.getApiSpec(restAPIID)
+	if rest == nil || rest.APIDefinition == nil {
+		return fmt.Errorf("paired REST API %s is not loaded; create it first", restAPIID)
+	}
+
+	apiDef.TagsDisabled = rest.TagsDisabled
+	apiDef.Tags = append([]string(nil), rest.Tags...)
+
+	ext := oasObj.GetTykExtension()
+	if ext == nil {
+		return nil
+	}
+	if ext.Server.GatewayTags == nil {
+		ext.Server.GatewayTags = &oas.GatewayTags{}
+	}
+	ext.Server.GatewayTags.Enabled = !apiDef.TagsDisabled
+	ext.Server.GatewayTags.Tags = append([]string(nil), apiDef.Tags...)
+
+	return nil
+}
+
 func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int) {
 	versionParams := lib.NewVersionQueryParameters(r.URL.Query())
 	err := versionParams.Validate(func() (bool, string) {
@@ -284,6 +315,10 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 	)
 
 	if err := gw.handleOASServersForNewAPI(newDef, oasObj, versioningParams); err != nil {
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
+	if err := gw.alignPairedMCPProxyGatewayTags(newDef, oasObj); err != nil {
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
@@ -335,6 +370,10 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
+	if err := gw.alignPairedMCPProxyGatewayTags(newDef, oasObj); err != nil {
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
 	newDef.IsOAS = true
 	err, errCode := gw.writeOASAndAPIDefToFile(fs, newDef, oasObj)
 	if err != nil {
@@ -345,7 +384,7 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 }
 
 func (gw *Gateway) handleGetMCPListOAS() (interface{}, int) {
-	return gw.handleGetOASList(mcpManaged, false)
+	return gw.handleGetOASList(mcpProxy, false)
 }
 
 func (gw *Gateway) mcpListHandler(w http.ResponseWriter, _ *http.Request) {

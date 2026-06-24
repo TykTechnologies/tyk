@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -77,6 +78,27 @@ func TestJSONRPCMiddleware_EnabledForSpec(t *testing.T) {
 			assert.Equal(t, tt.expected, m.EnabledForSpec())
 		})
 	}
+}
+
+func TestSyntheticJSONRPCMethod_UsesRoutingStateBeforeReadingBody(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	r.Body = &errorReadCloser{err: io.ErrUnexpectedEOF}
+	httpctx.SetJSONRPCRoutingState(r, &httpctx.JSONRPCRoutingState{Method: mcp.MethodToolsList})
+
+	assert.Equal(t, mcp.MethodToolsList, syntheticJSONRPCMethod(r))
+}
+
+func TestSyntheticJSONRPCMethod_LimitsFallbackBodyReadAndPreservesBody(t *testing.T) {
+	body := `{"jsonrpc":"2.0","method":"tools/list","params":{"padding":"` +
+		strings.Repeat("x", syntheticJSONRPCMethodReadLimit+1) +
+		`"}}`
+	r := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+
+	assert.Equal(t, "", syntheticJSONRPCMethod(r))
+
+	preserved, err := io.ReadAll(r.Body)
+	require.NoError(t, err)
+	assert.Equal(t, body, string(preserved))
 }
 
 func TestJSONRPCMiddleware_ProcessRequest_NonPostPassthrough(t *testing.T) {
