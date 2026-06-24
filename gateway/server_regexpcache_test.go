@@ -20,10 +20,10 @@ func TestAfterConfSetup_WarnsOnDisableRegexpCacheBound(t *testing.T) {
 		tykregexp.Configure(tykregexp.CacheOptions{Enabled: true})
 	})
 
+	hook := log.GetTestHook(t)
+
 	gw := NewGateway(config.Config{DisableRegexpCacheBound: true}, t.Context())
 	require.NoError(t, gw.afterConfSetup())
-
-	hook := log.GetTestHook(t)
 
 	found := hook.SomeBy(func(e *logrus.Entry) bool {
 		return e.Level == logrus.WarnLevel && strings.Contains(e.Message, "size eviction disabled")
