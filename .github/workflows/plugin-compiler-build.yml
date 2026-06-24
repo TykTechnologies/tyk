@@ -20,7 +20,8 @@ concurrency:
 
 jobs:
   dep-guard:
-    if: ${{ github.event_name == 'pull_request' }}
+    if: github.event_name == 'pull_request'
+
     uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@186b3eafdbda5d8ed71646c00e2bfd9893c88aaf
     permissions:
       contents: read
