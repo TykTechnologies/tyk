@@ -6,10 +6,12 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/mcp/pairing"
+	mockstorage "github.com/TykTechnologies/tyk/storage/mock"
 )
 
 func TestComputeMCPPairing(t *testing.T) {
@@ -135,6 +137,22 @@ func TestBuildAdapterSpec_ReusesSDKAdapterAndUpdatesTools(t *testing.T) {
 	tool, ok := reused.MCPAdapter.ToolViews["proxy-1"].ToolByName("list_orders")
 	require.True(t, ok)
 	assert.Equal(t, "updated list orders", tool.Description)
+}
+
+func TestBuildAdapterSpec_InitializesManagerFields(t *testing.T) {
+	rest := restSourceSpec("rest-1", "org-1", true)
+	proxy := pairedMCPProxySpec("proxy-1", "org-1", "rest-1", nil)
+
+	adapterSpec, err := buildMCPAdapterSpec(rest, []*APISpec{proxy}, nil)
+	require.NoError(t, err)
+
+	ctrl := gomock.NewController(t)
+	store := mockstorage.NewMockHandler(ctrl)
+	store.EXPECT().Connect().Return(true).Times(2)
+
+	require.NotPanics(t, func() {
+		adapterSpec.Init(store, store, store)
+	})
 }
 
 func TestSynthesizeMCPAdapterSpecs_AppendsHiddenInternalAdapters(t *testing.T) {

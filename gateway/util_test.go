@@ -251,6 +251,13 @@ func Test_shouldReloadSpec(t *testing.T) {
 		assert.True(t, shouldReloadSpec(existingSpec, newSpec))
 	})
 
+	t.Run("synthetic rest as mcp adapter", func(t *testing.T) {
+		t.Parallel()
+		existingSpec := &APISpec{Checksum: "1", MCPAdapter: MCPAdapterRuntime{Synthetic: true}}
+		newSpec := &APISpec{Checksum: "1", MCPAdapter: MCPAdapterRuntime{Synthetic: true}}
+		assert.True(t, shouldReloadSpec(existingSpec, newSpec))
+	})
+
 	type testCase struct {
 		name string
 		spec *APISpec

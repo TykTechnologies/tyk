@@ -11,6 +11,7 @@ package adapter
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,6 +20,7 @@ import (
 	"net/url"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -50,8 +52,8 @@ const (
 // source REST APIID (so downstream rewriters see a coherent host).
 //
 // The function is parent-context-aware: the returned request inherits
-// the parent's context, body, and trailers are not propagated (the
-// adapter does not stream).
+// parent context values without inheriting parent cancellation. The body
+// and trailers are not propagated (the adapter does not stream).
 //
 // Returned errors are user-facing — they are surfaced via the JSON-RPC
 // `error` envelope.
@@ -400,8 +402,10 @@ func scalarParameterValue(raw any) (string, bool) {
 		return fmt.Sprint(v), true
 	case uint, uint8, uint16, uint32, uint64:
 		return fmt.Sprint(v), true
-	case float32, float64:
-		return fmt.Sprint(v), true
+	case float32:
+		return strconv.FormatFloat(float64(v), 'f', -1, 32), true
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64), true
 	case json.Number:
 		return v.String(), true
 	default:
@@ -453,7 +457,7 @@ func (b *upstreamRequestBuilder) request() (*http.Request, error) {
 		body = bytes.NewReader(buf)
 	}
 
-	req, err := http.NewRequestWithContext(b.parent.Context(), b.tool.Method, b.path, body)
+	req, err := http.NewRequestWithContext(context.WithoutCancel(b.parent.Context()), b.tool.Method, b.path, body)
 	if err != nil {
 		return nil, err
 	}
