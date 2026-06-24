@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -167,6 +169,14 @@ func TestBuildAdapterSpec_ReusesSDKAdapterAndUpdatesTools(t *testing.T) {
 	assert.Equal(t, "rest-1__mcp-server", first.APIID)
 	assert.Equal(t, "rest-1", first.MCPAdapter.SourceRESTAPIID)
 	assert.Equal(t, []string{"proxy-1"}, first.MCPAdapter.AllowedCallerProxyAPIIDs)
+	assert.True(t, first.UseKeylessAccess)
+	assert.True(t, first.VersionData.NotVersioned)
+	assert.Contains(t, first.VersionData.Versions, "")
+	assert.Contains(t, first.RxPaths, "")
+	assert.Contains(t, first.WhiteListEnabled, "")
+	valid, status := first.RequestValid(httptest.NewRequest(http.MethodPost, "/rest-1__mcp-server/mcp", nil))
+	assert.True(t, valid)
+	assert.Equal(t, StatusOk, status)
 
 	rest.OAS.Paths.Set("/orders", &openapi3.PathItem{
 		Get: &openapi3.Operation{OperationID: "list_orders", Summary: "updated list orders"},

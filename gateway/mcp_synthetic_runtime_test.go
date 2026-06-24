@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
@@ -79,6 +80,35 @@ func TestSyntheticAdapterProcessRequest_UsesSDKAdapter(t *testing.T) {
 	assert.NotContains(t, tools, "listChanged")
 	assert.NotContains(t, capabilities, "resources")
 	assert.NotContains(t, capabilities, "prompts")
+}
+
+func TestSyntheticAdapterProcessRequest_RunsWithExistingJSONRPCRoutingState(t *testing.T) {
+	adapterSpec := buildSyntheticAdapterForRuntimeTest(t)
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec}}
+
+	req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader([]byte(`{
+		"jsonrpc":"2.0",
+		"id":1,
+		"method":"initialize",
+		"params":{
+			"protocolVersion":"2025-06-18",
+			"clientInfo":{"name":"test","version":"v0.0.1"},
+			"capabilities":{}
+		}
+	}`)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{
+		Method: mcp.MethodToolsCall,
+	})
+	httpctx.SetJsonRPCRouting(req, true)
+	rec := httptest.NewRecorder()
+
+	err, status := mw.ProcessRequest(rec, req, nil)
+	require.NoError(t, err)
+	assert.Equal(t, middleware.StatusRespond, status)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"result"`)
 }
 
 func TestRESTAsMCPAdapter_RejectsNonPOSTMethods(t *testing.T) {
