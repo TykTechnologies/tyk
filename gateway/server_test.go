@@ -26,12 +26,14 @@ import (
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/TykTechnologies/storage/persistent/model"
 
+	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/compression"
 	internalmodel "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/policy"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/tcp"
 	"github.com/TykTechnologies/tyk/test"
@@ -2150,102 +2152,69 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 		"policy endpoint should have been retried at least %d times", succeedOnCall)
 }
 
-func Test_setupLogger(t *testing.T) {
-	t.Skip()
+func Test_GW_setupLogger(t *testing.T) {
+	t.Run("log level from config", func(t *testing.T) {
+		cli.InitTest(t, nil)
 
-	// todo: cover with tests and adopt prev behaviour
-	//resetLogger := func(t *testing.T) {
-	//	t.Helper()
-	//
-	//	tykFormatter := log.Formatter
-	//	globalFormatter := logrus.StandardLogger().Formatter
-	//
-	//	log.Formatter = nil
-	//	logrus.StandardLogger().Formatter = nil
-	//
-	//	t.Cleanup(func() {
-	//		log.Formatter = tykFormatter
-	//		logrus.StandardLogger().Formatter = globalFormatter
-	//	})
-	//}
-	//
-	//type Formatters struct {
-	//	tyk logrus.Formatter
-	//	std logrus.Formatter
-	//}
-	//
-	//formatters := func(t *testing.T) Formatters {
-	//	t.Helper()
-	//
-	//	return Formatters{
-	//		std: logrus.StandardLogger().Formatter,
-	//		tyk: log.Formatter,
-	//	}
-	//}
-	//
-	//setFormat := func(t *testing.T, format Format) {
-	//	t.Helper()
-	//
-	//	t.Cleanup(func() {
-	//		once.reset(false)
-	//	})
-	//	once.reset(false)
-	//	Setup(func(b *Builder) {
-	//		//b.WithFormat(format)
-	//		if format != FormatLegacy {
-	//			b.WithPropagate()
-	//		}
-	//	})
-	//}
-	//
-	//t.Run("empty or unknown or text value sets default text formatter; global tyk and global logrus formatters", func(t *testing.T) {
-	//	t.Run("empty", func(t *testing.T) {
-	//		resetLogger(t)
-	//		setFormat(t, "")
-	//		f := formatters(t)
-	//		assert.Same(t, f.tyk, f.std)
-	//		assert.NotNil(t, f.std)
-	//		assert.NotNil(t, f.tyk)
-	//		assert.Equal(t, newFormatterText(), f.tyk)
-	//	})
-	//
-	//	t.Run("any other", func(t *testing.T) {
-	//		resetLogger(t)
-	//		setFormat(t, "hwdp")
-	//		f := formatters(t)
-	//		assert.Same(t, f.tyk, f.std)
-	//		assert.NotNil(t, f.std)
-	//		assert.NotNil(t, f.tyk)
-	//		assert.Equal(t, newFormatterText(), f.tyk)
-	//	})
-	//
-	//	t.Run("text", func(t *testing.T) {
-	//		resetLogger(t)
-	//		setFormat(t, FormatText)
-	//		f := formatters(t)
-	//		assert.Same(t, f.tyk, f.std)
-	//		assert.NotNil(t, f.std)
-	//		assert.NotNil(t, f.tyk)
-	//		assert.Equal(t, newFormatterText(), f.tyk)
-	//	})
-	//})
-	//
-	//t.Run("json formatter", func(t *testing.T) {
-	//	resetLogger(t)
-	//	setFormat(t, FormatJson)
-	//	f := formatters(t)
-	//	assert.Same(t, f.tyk, f.std)
-	//	assert.NotNil(t, f.std)
-	//	assert.NotNil(t, f.tyk)
-	//	assert.Equal(t, newFormatterJson(), f.tyk)
-	//})
-	//
-	//t.Run("legacy formatter does not modify std logrus formatter", func(t *testing.T) {
-	//	resetLogger(t)
-	//	setFormat(t, FormatJson)
-	//	f := formatters(t)
-	//	assert.Nil(t, f.std)    // does not set formatter for std logger
-	//	assert.NotNil(t, f.tyk) // does not set formatter for std logger
-	//	assert.Equal(t, newFormatterLegacy(), f.tyk)
-	//})
+		cancel := log.Reset()
+		t.Cleanup(cancel)
+
+		gw := NewGateway(config.Config{LogLevel: "warn"}, t.Context())
+		gw.setTestMode(false)
+
+		l := tyklog.Build(gw.setupLogger)
+		assert.Equal(t, logrus.WarnLevel, l.Level)
+	})
+
+	t.Run("log level from env overrides config", func(t *testing.T) {
+		cli.InitTest(t, nil)
+
+		cancel := log.Reset()
+		t.Cleanup(cancel)
+
+		_ = os.Setenv(tyklog.EnvTykLoglevel, "error")
+		t.Cleanup(func() {
+			_ = os.Unsetenv(tyklog.EnvTykLoglevel)
+		})
+
+		gw := NewGateway(config.Config{LogLevel: "warn"}, context.Background())
+		gw.setTestMode(false)
+
+		l := tyklog.Build(gw.setupLogger)
+		assert.Equal(t, logrus.ErrorLevel, l.Level)
+	})
+
+	t.Run("test mode discards output and sets error level", func(t *testing.T) {
+		cli.InitTest(t, nil)
+
+		gw := NewGateway(config.Config{LogLevel: "info"}, context.Background())
+		gw.setTestMode(true) // isRunningTests() returns true
+
+		l := tyklog.Build(gw.setupLogger)
+		assert.Equal(t, logrus.ErrorLevel, l.Level)
+	})
+
+	t.Run("hooks are added based on config", func(t *testing.T) {
+		cli.InitTest(t, nil)
+
+		gw := NewGateway(config.Config{
+			UseSentry:           true,
+			SentryCode:          "http://public:secret@example.com/1",
+			UseSyslog:           true,
+			SyslogNetworkAddr:   "localhost:514",
+			SyslogTransport:     "udp",
+			UseGraylog:          true,
+			GraylogNetworkAddr:  "localhost:12201",
+			UseLogstash:         true,
+			LogstashNetworkAddr: "localhost:5000",
+			LogstashTransport:   "tcp",
+			UseRedisLog:         true,
+		}, t.Context())
+		gw.setTestMode(false)
+
+		l := tyklog.Build(gw.setupLogger)
+
+		// Sentry + Syslog + GrayLog + Logstash + Redis
+		assert.Equal(t, 5, len(l.Hooks[logrus.PanicLevel]), "Expected hooks to be added")
+	})
 }
