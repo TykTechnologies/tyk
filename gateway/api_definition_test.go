@@ -22,6 +22,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
@@ -1668,6 +1669,105 @@ func TestReplaceSecrets(t *testing.T) {
 	assert.Equal(t, "Ghiur", api2.AuthConfigs[apidef.OAuthType].AuthHeaderName)
 }
 
+func TestReplaceSecretsFileScheme(t *testing.T) {
+	t.Run("file:// references rejected without base_path", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		t.Run("absolute file:// reference left unresolved", func(t *testing.T) {
+			dir := t.TempDir()
+			f := filepath.Join(dir, "jwt-secret")
+			require.NoError(t, os.WriteFile(f, []byte("my-jwt-signing-key\n"), 0600))
+
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.APIID = "file-kv-1"
+				spec.JWTSource = "file://" + f
+			})
+
+			api := ts.Gw.getApiSpec("file-kv-1")
+			require.NotNil(t, api)
+			assert.NotContains(t, api.JWTSource, "my-jwt-signing-key", "file contents must not be injected without base_path")
+			assert.Equal(t, "file://"+f, api.JWTSource, "raw file:// reference should be left unresolved")
+		})
+
+		t.Run("relative file:// reference left unresolved", func(t *testing.T) {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.APIID = "file-kv-2"
+				spec.JWTSource = "file://jwt-secret"
+			})
+
+			api := ts.Gw.getApiSpec("file-kv-2")
+			require.NotNil(t, api)
+			assert.Equal(t, "file://jwt-secret", api.JWTSource, "raw file:// reference should be left unresolved")
+		})
+	})
+
+	t.Run("relative key resolved via base_path", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "jwt-secret"), []byte("key-from-mount"), 0600))
+
+		ts := StartTest(func(conf *config.Config) {
+			conf.KV.File.BasePath = dir
+		})
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "file-kv-3"
+			spec.JWTSource = "file://jwt-secret"
+		})
+
+		api := ts.Gw.getApiSpec("file-kv-3")
+		require.NotNil(t, api)
+		assert.Equal(t, "key-from-mount", api.JWTSource)
+	})
+
+	t.Run("absolute path in API definition is rejected when base_path is set", func(t *testing.T) {
+		baseDir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(baseDir, "jwt-secret"), []byte("allowed-value"), 0600))
+
+		outsideDir := t.TempDir()
+		secret := filepath.Join(outsideDir, "passwd")
+		require.NoError(t, os.WriteFile(secret, []byte("root:x:0:0:secret"), 0600))
+
+		ts := StartTest(func(conf *config.Config) {
+			conf.KV.File.BasePath = baseDir
+		})
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "file-kv-abs-reject"
+			spec.JWTSource = "file://" + secret
+		})
+
+		api := ts.Gw.getApiSpec("file-kv-abs-reject")
+		require.NotNil(t, api)
+		assert.NotContains(t, api.JWTSource, "root:x:0:0", "absolute-path file contents must not be injected")
+		assert.Equal(t, "file://"+secret, api.JWTSource, "raw file:// reference should be left unresolved")
+	})
+
+	t.Run("multi-line PEM content is valid JSON after substitution", func(t *testing.T) {
+		dir := t.TempDir()
+		pem := "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJ\n-----END CERTIFICATE-----"
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "tls.crt"), []byte(pem+"\n"), 0600))
+
+		ts := StartTest(func(conf *config.Config) {
+			conf.KV.File.BasePath = dir
+		})
+		defer ts.Close()
+
+		// If the replacement is not JSON-escaped, the literal newlines in the PEM
+		// produce invalid JSON and BuildAndLoadAPI silently loads nothing.
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "file-kv-pem"
+			spec.JWTSource = "file://tls.crt"
+		})
+
+		api := ts.Gw.getApiSpec("file-kv-pem")
+		require.NotNil(t, api)
+		assert.Equal(t, pem, api.JWTSource)
+	})
+}
+
 func TestInternalEndpointMW_TT_11126(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -2625,6 +2725,65 @@ func TestReplaceVaultSecrets(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "some-api-key: my-secret-value", input)
 	})
+
+	t.Run("multiline value produces valid JSON", func(t *testing.T) {
+		ts := StartTest(nil, TestConfig{
+			Delay: 10 * time.Millisecond,
+		})
+		defer ts.Close()
+
+		multiline := "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIU\n-----END CERTIFICATE-----\n"
+		ts.Gw.vaultKVStore = &mockVaultSecretReader{
+			secret: &vaultapi.Secret{
+				Data: map[string]interface{}{
+					"data": map[string]interface{}{
+						"certo": multiline,
+					},
+				},
+			},
+		}
+
+		l := APIDefinitionLoader{Gw: ts.Gw}
+		input := `{"allowlist":["vault://certo"]}`
+		err := l.replaceVaultSecrets(&input)
+
+		assert.NoError(t, err)
+		var result map[string]interface{}
+		assert.NoError(t, json.Unmarshal([]byte(input), &result), "substituted JSON must be valid")
+	})
+}
+
+func TestReplaceEnvSecretsMultilineJSON(t *testing.T) {
+	multiline := "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIU\n-----END CERTIFICATE-----\n"
+	t.Setenv("CERT_VALUE", multiline)
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	l := APIDefinitionLoader{Gw: ts.Gw}
+	input := `{"allowlist":["env://CERT_VALUE"]}`
+	out := l.replaceSecrets([]byte(input))
+
+	var result map[string]interface{}
+	assert.NoError(t, json.Unmarshal(out, &result), "substituted JSON must be valid after env:// replacement")
+}
+
+func TestReplaceInlineSecretsMultilineJSON(t *testing.T) {
+	multiline := "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIU\n-----END CERTIFICATE-----\n"
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	conf := ts.Gw.GetConfig()
+	conf.Secrets = map[string]string{"certo": multiline}
+	ts.Gw.SetConfig(conf)
+
+	l := APIDefinitionLoader{Gw: ts.Gw}
+	input := `{"allowlist":["secrets://certo"]}`
+	out := l.replaceSecrets([]byte(input))
+
+	var result map[string]interface{}
+	assert.NoError(t, json.Unmarshal(out, &result), "substituted JSON must be valid after secrets:// replacement")
 }
 
 func TestPopulateMCPPrimitivesMap(t *testing.T) {

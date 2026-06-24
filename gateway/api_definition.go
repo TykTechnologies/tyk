@@ -18,30 +18,38 @@ import (
 	texttemplate "text/template"
 	"time"
 
-	"github.com/Masterminds/sprig/v3"
-	"github.com/cenk/backoff"
-	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/TykTechnologies/tyk/ee/middleware/streams"
+	"github.com/TykTechnologies/tyk/storage/kv"
+
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
+
 	"github.com/getkin/kin-openapi/routers/gorillamux"
+
+	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
+
+	"github.com/cenk/backoff"
+
+	"github.com/Masterminds/sprig/v3"
+
 	"github.com/sirupsen/logrus"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/apidef/oas"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/ee/middleware/streams"
-	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/internal/httpctx"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/mcp"
-	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/TykTechnologies/tyk/internal/oasutil"
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/pkg/schema"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/storage/kv"
 )
 
 // const used by cache middleware
@@ -508,12 +516,14 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 }
 
 var envRegex = regexp.MustCompile(`env://([^"]+)`)
+var fileRegex = regexp.MustCompile(`file://([^"]+)`)
 
 const (
 	prefixEnv       = "env://"
 	prefixSecrets   = "secrets://"
 	prefixConsul    = "consul://"
 	prefixVault     = "vault://"
+	prefixFile      = "file://"
 	prefixKeys      = "tyk-apis"
 	vaultSecretPath = "secret/data/"
 )
@@ -532,14 +542,24 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 			uniqueWords[m[0]] = true
 			val := os.Getenv(m[1])
 			if val != "" {
-				input = strings.Replace(input, m[0], val, -1)
+				escaped, err := jsonEscapeString(val)
+				if err != nil {
+					log.WithError(err).Errorf("Couldn't JSON-escape env secret for key: %s", m[1])
+					continue
+				}
+				input = strings.ReplaceAll(input, m[0], escaped)
 			}
 		}
 	}
 
 	if strings.Contains(input, prefixSecrets) {
 		for k, v := range a.Gw.GetConfig().Secrets {
-			input = strings.Replace(input, prefixSecrets+k, v, -1)
+			escaped, err := jsonEscapeString(v)
+			if err != nil {
+				log.WithError(err).Errorf("Couldn't JSON-escape config secret for key: %s", k)
+				continue
+			}
+			input = strings.ReplaceAll(input, prefixSecrets+k, escaped)
 		}
 	}
 
@@ -552,6 +572,12 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 	if strings.Contains(input, prefixVault) {
 		if err := a.replaceVaultSecrets(&input); err != nil {
 			log.WithError(err).Error("Couldn't replace vault secrets")
+		}
+	}
+
+	if strings.Contains(input, prefixFile) {
+		if err := a.replaceFileSecrets(&input); err != nil {
+			log.WithError(err).Error("Couldn't replace file secrets")
 		}
 	}
 
@@ -570,7 +596,11 @@ func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
 
 	for i := 1; i < len(pairs); i++ {
 		key := strings.TrimPrefix(pairs[i].Key, prefixKeys+"/")
-		*input = strings.Replace(*input, prefixConsul+key, string(pairs[i].Value), -1)
+		escaped, err := jsonEscapeString(string(pairs[i].Value))
+		if err != nil {
+			return err
+		}
+		*input = strings.ReplaceAll(*input, prefixConsul+key, escaped)
 	}
 
 	return nil
@@ -611,10 +641,49 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 	}
 
 	for k, v := range pairsMap {
-		*input = strings.Replace(*input, prefixVault+k, fmt.Sprintf("%v", v), -1)
+		escaped, err := jsonEscapeString(fmt.Sprintf("%v", v))
+		if err != nil {
+			return err
+		}
+		*input = strings.ReplaceAll(*input, prefixVault+k, escaped)
 	}
 
 	return nil
+}
+
+func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
+	basePath := a.Gw.GetConfig().KV.File.BasePath
+	matches := fileRegex.FindAllStringSubmatch(*input, -1)
+	seen := map[string]bool{}
+	var firstErr error
+	for _, m := range matches {
+		if seen[m[0]] {
+			continue
+		}
+		seen[m[0]] = true
+		val, err := ResolveFileKV(basePath, m[1])
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		// JSON-escape the value before injecting it into the raw JSON document.
+		// Without this, multi-line content (e.g. PEM certificates) produces
+		// literal newlines inside a JSON string, which is invalid JSON.
+		jsonBytes, err := json.Marshal(val)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		// Strip the surrounding quotes since the replacement sits
+		// inside an existing JSON string already.
+		escaped := string(jsonBytes[1 : len(jsonBytes)-1])
+		*input = strings.ReplaceAll(*input, m[0], escaped)
+	}
+	return firstErr
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
@@ -1960,12 +2029,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	return combinedPath, whiteListEnabled
 }
 
-func (a *APISpec) Init(
-	authStore storage.Handler,
-	healthStore storage.Handler,
-	orgStore storage.Handler,
-) {
-
+func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Handler) {
 	a.AuthManager.Init(authStore)
 	a.Health.Init(healthStore)
 	a.OrgSessionManager.Init(orgStore)

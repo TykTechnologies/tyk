@@ -13,6 +13,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"io/ioutil"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -58,6 +59,13 @@ const (
 	//   - 0 means unlimited (time-based only)
 	//   - Default of 5 provides reasonable retry attempts with exponential backoff
 	DefaultRPCCertFetchMaxRetries = 5
+
+	// embeddedPEMCacheKeyPrefix namespaces the in-process cache entries for
+	// inline PEM input passed to List(). The prefix contains "-" which
+	// disqualifies it from being a (hex-only) SHA256 cert ID, and is long
+	// enough that an operator-supplied org ID cannot accidentally generate a
+	// collision when prepended to a cert ID inside Add().
+	embeddedPEMCacheKeyPrefix = "embedded-pem-"
 )
 
 var (
@@ -91,7 +99,7 @@ type CertificateManagerIdGetter interface {
 
 type certificateManager struct {
 	IdGetter
-	storage                  StorageHandler
+	storage                  storage.Handler
 	logger                   *logrus.Entry
 	cache                    cache.Repository
 	secret                   string
@@ -135,18 +143,6 @@ func WithBackoffIntervals(maxElapsed, initial, max time.Duration) CertificateMan
 	}
 }
 
-type StorageHandler interface {
-	storage.GetKeyHandler
-	storage.SetKeyHandler
-	storage.GetKeysHandler
-	storage.RemoveFromListHandler
-	storage.AppendToSetHandler
-	storage.ExistsHandler
-	storage.GetListRangeHandler
-	storage.DeleteKeyHandler
-	storage.DeleteScanMatchHandler
-}
-
 // NewCertificateManager creates a certificate manager with optional retry configuration.
 // Maintains backward compatibility: calling without options uses defaults.
 //
@@ -160,7 +156,7 @@ type StorageHandler interface {
 //	    WithRetryEnabled(true),
 //	    WithMaxRetries(10),
 //	    WithBackoffIntervals(60*time.Second, 200*time.Millisecond, 5*time.Second))
-func NewCertificateManager(storageHandler StorageHandler, secret string, logger *logrus.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
+func NewCertificateManager(storageHandler storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
 		logger = tyklog.Get()
 	}
@@ -262,6 +258,23 @@ func isSHA256(value string) bool {
 	}
 
 	return true
+}
+
+// IsPEMContent reports whether the supplied string is an inline PEM block
+// rather than a SHA256 certificate ID or a filesystem path. The check is
+// intentionally permissive (substring rather than HasPrefix) so that values
+// delivered via secret-store substitution — which often arrive with leading
+// whitespace, BOM bytes, or YAML folding artefacts — are still recognised.
+// pem.Decode performs the strict structural validation downstream, so any
+// false positives here surface as clear parse errors, not silent failures.
+//
+// SHA256 IDs (hex-only) and POSIX file paths in practice never contain the
+// "-----BEGIN " sentinel, so the three cert-source modes remain unambiguous.
+//
+// Exported so that callers outside this package (e.g. certUsageTracker in the
+// gateway) can opt out of treating embedded PEM strings as cert IDs.
+func IsPEMContent(value string) bool {
+	return strings.Contains(value, "-----BEGIN ")
 }
 
 func ParsePEM(data []byte, secret string) ([]*pem.Block, error) {
@@ -592,6 +605,93 @@ func (c *certificateManager) fetchCertificateWithRetry(id string, sharedBackoff 
 	return val, err
 }
 
+// appendEmbeddedPEM resolves a single inline-PEM cert ID, caches it under a
+// content-derived key, and appends it (or nil on parse failure) to out.
+//
+// The cache prefix isolates these entries from SHA256-keyed Redis cert IDs
+// (`embedded-pem-` contains a dash, which never appears in hex). We never
+// persist embedded PEMs into the underlying storage: they are ephemeral
+// content supplied by the API definition, or, in the future, by a
+// secret-store substitution layer.
+func (c *certificateManager) appendEmbeddedPEM(id string, mode CertificateType, out *[]*tls.Certificate) {
+	rawCert := []byte(strings.TrimSpace(id))
+	cacheKey := embeddedPEMCacheKeyPrefix + tykcrypto.HexSHA256(rawCert)
+
+	if cached, found := c.cache.Get(cacheKey); found {
+		if cert, ok := cached.(*tls.Certificate); ok && isCertCanBeListed(cert, mode) {
+			*out = append(*out, cert)
+		}
+		return
+	}
+
+	parsedCert, parseErr := ParsePEMCertificate(rawCert, c.secret)
+	if parseErr != nil {
+		// Fallback: the input may be a PEM whose line breaks were collapsed
+		// into spaces by a copy-paste into a single-line field (a common
+		// Dashboard/secret-store mishap). Repair the formatting and retry
+		// once before giving up.
+		if repaired, ok := normalizeCollapsedPEM(rawCert); ok {
+			if cert, retryErr := ParsePEMCertificate(repaired, c.secret); retryErr == nil {
+				c.logger.Warn("Embedded PEM had non-canonical line formatting; normalized successfully. Please supply PEM with real line breaks (\\n).")
+				parsedCert, parseErr = cert, nil
+			}
+		}
+	}
+	if parseErr != nil {
+		// Never log the PEM body — it may contain a private key.
+		c.logger.WithError(parseErr).Error("Error parsing embedded PEM certificate")
+		*out = append(*out, nil)
+		return
+	}
+
+	c.cache.Set(cacheKey, parsedCert, cache.DefaultExpiration)
+	if isCertCanBeListed(parsedCert, mode) {
+		*out = append(*out, parsedCert)
+	}
+}
+
+// pemBlockRe matches a single PEM block whose internal line breaks may have
+// been collapsed into spaces. The body group is non-greedy so multiple blocks
+// (e.g. a certificate followed by its private key) are matched individually.
+var pemBlockRe = regexp.MustCompile(`(?s)-----BEGIN ([A-Z0-9 ]+?)-----(.*?)-----END [A-Z0-9 ]+?-----`)
+
+// normalizeCollapsedPEM rebuilds a canonical PEM document from input whose line
+// breaks were flattened into spaces (or other whitespace). For each block it
+// strips all intra-body whitespace and re-wraps the base64 payload at 64
+// columns with the BEGIN/END markers on their own lines.
+//
+// It returns ok=false when the input contains no recognisable PEM block, so the
+// caller can preserve the original parse error. This runs only as a fallback
+// after a normal parse fails, so well-formed input is never reshaped. Encrypted
+// PEM blocks (which carry `Proc-Type`/`DEK-Info` headers) are not faithfully
+// reproduced by this pass, but those parse correctly on the first attempt and
+// therefore never reach this code; a genuinely malformed block simply fails the
+// retry parse and yields the same nil as before.
+func normalizeCollapsedPEM(data []byte) ([]byte, bool) {
+	matches := pemBlockRe.FindAllSubmatch(data, -1)
+	if len(matches) == 0 {
+		return nil, false
+	}
+
+	var out bytes.Buffer
+	for _, m := range matches {
+		blockType := string(m[1])
+		body := strings.Join(strings.Fields(string(m[2])), "")
+
+		out.WriteString("-----BEGIN " + blockType + "-----\n")
+		for i := 0; i < len(body); i += 64 {
+			end := i + 64
+			if end > len(body) {
+				end = len(body)
+			}
+			out.WriteString(body[i:end])
+			out.WriteByte('\n')
+		}
+		out.WriteString("-----END " + blockType + "-----\n")
+	}
+	return out.Bytes(), true
+}
+
 func (c *certificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
 	var cert *tls.Certificate
 	var rawCert []byte
@@ -616,6 +716,17 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 	}
 
 	for _, id := range certIDs {
+		// Embedded PEM branch: when the id is a literal PEM block (rather than
+		// a SHA256 cert ID or filesystem path), parse it in-process and cache
+		// under a content-derived key. We deliberately do NOT persist embedded
+		// PEMs into the underlying storage — they are treated as ephemeral
+		// content supplied by the API definition (or, in the future, by a
+		// secret-store substitution layer).
+		if IsPEMContent(id) {
+			c.appendEmbeddedPEM(id, mode, &out)
+			continue
+		}
+
 		if cert, found := c.cache.Get(id); found {
 			if isCertCanBeListed(cert.(*tls.Certificate), mode) {
 				out = append(out, cert.(*tls.Certificate))
@@ -656,18 +767,52 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 	return out
 }
 
-// Returns list of fingerprints
+// Returns list of fingerprints.
+//
+// publicKeyCacheKey derives the in-process cache key for a pinned-key
+// reference. Inline PEM is hashed (mirroring embeddedPEMCacheKeyPrefix used by
+// List()) so the key stays bounded and matches on the trimmed content; SHA256
+// IDs and file paths are short and used verbatim.
+func publicKeyCacheKey(id string) string {
+	if IsPEMContent(id) {
+		return embeddedPEMCacheKeyPrefix + "pub-" + tykcrypto.HexSHA256([]byte(strings.TrimSpace(id)))
+	}
+	return "pub-" + id
+}
+
+// decodePublicKeyBlock decodes the first PEM block from rawKey. If the input
+// has been whitespace-collapsed (e.g. pasted into a single-line field), it is
+// normalised and retried once, matching the tolerance of appendEmbeddedPEM.
+func decodePublicKeyBlock(rawKey []byte) *pem.Block {
+	if block, _ := pem.Decode(rawKey); block != nil {
+		return block
+	}
+	if repaired, ok := normalizeCollapsedPEM(rawKey); ok {
+		if block, _ := pem.Decode(repaired); block != nil {
+			return block
+		}
+	}
+	return nil
+}
+
+// ListPublicKeys resolves pinned-public-key references to their fingerprints.
+// A reference is one of: a SHA256 ID (Redis-backed), an inline PEM public key
+// (embedded content, e.g. substituted from a secret store), or a filesystem
+// path. Inline PEM is detected by content sniffing and decoded in memory,
+// mirroring the embedded-PEM branch in List().
 func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 	var rawKey []byte
 	var err error
 
 	for _, id := range keyIDs {
-		if fingerprint, found := c.cache.Get("pub-" + id); found {
+		cacheKey := publicKeyCacheKey(id)
+		if fingerprint, found := c.cache.Get(cacheKey); found {
 			out = append(out, fingerprint.(string))
 			continue
 		}
 
-		if isSHA256(id) {
+		switch {
+		case isSHA256(id):
 			var val string
 			val, err := c.storage.GetKey("raw-" + id)
 			if err != nil {
@@ -676,7 +821,9 @@ func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 				continue
 			}
 			rawKey = []byte(val)
-		} else {
+		case IsPEMContent(id):
+			rawKey = []byte(strings.TrimSpace(id))
+		default:
 			rawKey, err = ioutil.ReadFile(id)
 			if err != nil {
 				c.logger.Error("Error while reading public key from file:", id, err)
@@ -685,7 +832,7 @@ func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 			}
 		}
 
-		block, _ := pem.Decode(rawKey)
+		block := decodePublicKeyBlock(rawKey)
 		if block == nil {
 			c.logger.Error("Can't parse public key:", id)
 			out = append(out, "")
@@ -693,7 +840,7 @@ func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 		}
 
 		fingerprint := tykcrypto.HexSHA256(block.Bytes)
-		c.cache.Set("pub-"+id, fingerprint, cache.DefaultExpiration)
+		c.cache.Set(cacheKey, fingerprint, cache.DefaultExpiration)
 		out = append(out, fingerprint)
 	}
 
@@ -705,7 +852,8 @@ func (c *certificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 	var rawKey []byte
 	var err error
 
-	if isSHA256(keyID) {
+	switch {
+	case isSHA256(keyID):
 		var val string
 		val, err := c.storage.GetKey("raw-" + keyID)
 		if err != nil {
@@ -713,7 +861,9 @@ func (c *certificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 			return nil
 		}
 		rawKey = []byte(val)
-	} else {
+	case IsPEMContent(keyID):
+		rawKey = []byte(strings.TrimSpace(keyID))
+	default:
 		rawKey, err = ioutil.ReadFile(keyID)
 		if err != nil {
 			c.logger.Error("Error while reading public key from file:", keyID, err)
@@ -721,7 +871,7 @@ func (c *certificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 		}
 	}
 
-	block, _ := pem.Decode(rawKey)
+	block := decodePublicKeyBlock(rawKey)
 	if block == nil {
 		c.logger.Error("Can't parse public key:", keyID)
 		return nil

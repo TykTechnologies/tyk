@@ -27,6 +27,7 @@ const (
 	vaultLabel       = "$secret_vault."
 	envLabel         = "$secret_env."
 	secretsConfLabel = "$secret_conf."
+	fileLabel        = "$secret_file."
 	triggerKeyPrefix = "trigger"
 	triggerKeySep    = "-"
 )
@@ -38,6 +39,7 @@ var vaultMatch = regexp.MustCompile(`\$secret_vault.([A-Za-z0-9_\/\-\.]+)`)
 var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
+var fileMatch = regexp.MustCompile(`\$secret_file\.([A-Za-z0-9_\/\-\.]+)`)
 
 func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	rawPath := r.URL.String()
@@ -241,6 +243,12 @@ func (gw *Gateway) ReplaceTykVariables(r *http.Request, in string, escape bool) 
 		in = gw.replaceVariables(in, vars, contextData, consulLabel, escape)
 	}
 
+	if strings.Contains(in, fileLabel) {
+		contextData := ctxGetData(r)
+		vars := fileMatch.FindAllString(in, -1)
+		in = gw.replaceVariables(in, vars, contextData, fileLabel, escape)
+	}
+
 	if strings.Contains(in, contextLabel) {
 		contextData := ctxGetData(r)
 		vars := contextMatch.FindAllString(in, -1)
@@ -325,6 +333,17 @@ func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]in
 			val, err := gw.consulKVStore.Get(key)
 			if err != nil {
 				in = strings.Replace(in, v, "", -1)
+				continue
+			}
+
+			in = strings.Replace(in, v, val, -1)
+
+		case fileLabel:
+
+			val, err := ResolveFileKV(gw.GetConfig().KV.File.BasePath, key)
+			if err != nil {
+				log.WithError(err).Debug("file KV: $secret_file resolution failed")
+				in = emptyStringFn(key, in, v)
 				continue
 			}
 

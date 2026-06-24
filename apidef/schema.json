@@ -642,7 +642,7 @@
                           "timeout": {
                             "type": "integer"
                           },
-                          "timeout_duration": {
+                          "duration": {
                             "type": "string",
                             "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
                           }
@@ -650,6 +650,13 @@
                       }
                     }
                   }
+                },
+                "global_enforce_timeout": {
+                  "type": "string",
+                  "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
+                },
+                "global_enforce_timeout_disabled": {
+                  "type": "boolean"
                 }
               },
               "required": [

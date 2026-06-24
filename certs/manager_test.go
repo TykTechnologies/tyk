@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -226,6 +227,54 @@ func TestStorageIndex(t *testing.T) {
 	}
 }
 
+func TestListPublicKeys_EmbeddedPEM(t *testing.T) {
+	m := newManager()
+
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	assert.NoError(t, err)
+	privDer, err := x509.MarshalPKIXPublicKey(&priv.PublicKey)
+	assert.NoError(t, err)
+	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: privDer})
+	expectedFingerprint := tykcrypto.HexSHA256(privDer)
+
+	t.Run("ListPublicKeys decodes inline PEM", func(t *testing.T) {
+		out := m.ListPublicKeys([]string{string(pubPem)})
+
+		assert.Len(t, out, 1)
+		assert.Equal(t, expectedFingerprint, out[0])
+	})
+
+	t.Run("ListPublicKeys leading/trailing whitespace tolerated", func(t *testing.T) {
+		out := m.ListPublicKeys([]string{"\n  " + string(pubPem) + "  \n"})
+
+		assert.Len(t, out, 1)
+		assert.Equal(t, expectedFingerprint, out[0])
+	})
+
+	t.Run("ListPublicKeys tolerates single-line collapsed PEM", func(t *testing.T) {
+		// A paste into a single-line field flattens line breaks into spaces,
+		// exactly as the embedded-cert path in List() already tolerates.
+		collapsed := strings.ReplaceAll(strings.TrimSpace(string(pubPem)), "\n", " ")
+		out := m.ListPublicKeys([]string{collapsed})
+
+		assert.Len(t, out, 1)
+		assert.Equal(t, expectedFingerprint, out[0])
+	})
+
+	t.Run("ListRawPublicKey parses inline PEM", func(t *testing.T) {
+		out := m.ListRawPublicKey(string(pubPem))
+
+		assert.NotNil(t, out)
+	})
+
+	t.Run("malformed inline PEM fails gracefully", func(t *testing.T) {
+		out := m.ListPublicKeys([]string{"-----BEGIN PUBLIC KEY-----\nbogus\n-----END PUBLIC KEY-----"})
+
+		assert.Len(t, out, 1)
+		assert.Equal(t, "", out[0])
+	})
+}
+
 func TestToCertificateBasics(t *testing.T) {
 	now := time.Now()
 
@@ -256,4 +305,205 @@ func TestToCertificateBasics(t *testing.T) {
 	assert.Equal(t, meta.NotBefore, basics.NotBefore)
 	assert.Equal(t, meta.NotAfter, basics.NotAfter)
 	assert.Equal(t, meta.IsCA, basics.IsCA)
+}
+
+// The following test functions all verify CertificateManager.List accepts
+// inline PEM strings in addition to certificate IDs and file paths. They are
+// split into independent top-level functions (rather than a single test with
+// many t.Run subtests) to keep individual cognitive complexity low.
+
+// requireSingleCert is a tiny helper that asserts the single-cert case shape.
+func requireSingleCert(t *testing.T, certs []*tls.Certificate) *tls.Certificate {
+	t.Helper()
+	if len(certs) != 1 {
+		t.Fatalf("expected 1 cert, got %d", len(certs))
+	}
+	if certs[0] == nil {
+		t.Fatal("expected cert, got nil")
+	}
+	return certs[0]
+}
+
+func TestList_EmbeddedPEM_SingleCert(t *testing.T) {
+	m := newManager()
+	certPem, _ := genCertificateFromCommonName("embedded", false)
+
+	certs := m.List([]string{string(certPem)}, CertificatePublic)
+
+	cert := requireSingleCert(t, certs)
+	assert.Equal(t, "embedded", leafSubjectName(cert))
+}
+
+func TestList_EmbeddedPEM_CombinedCertKey_ResolvesAsPrivate(t *testing.T) {
+	m := newManager()
+	certPem, keyPem := genCertificateFromCommonName("embedded", false)
+	combinedPem := append(append([]byte{}, certPem...), keyPem...)
+
+	certs := m.List([]string{string(combinedPem)}, CertificatePrivate)
+
+	cert := requireSingleCert(t, certs)
+	assert.Equal(t, "embedded", leafSubjectName(cert))
+	assert.False(t, isPrivateKeyEmpty(cert), "private key should be present")
+}
+
+func TestList_EmbeddedPEM_MixedBatch(t *testing.T) {
+	m := newManager()
+
+	filePem, _ := genCertificateFromCommonName("file", false)
+	dir, err := ioutil.TempDir("", "certs-embedded-mix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	filePath := filepath.Join(dir, "cert.pem")
+	if err := ioutil.WriteFile(filePath, filePem, 0666); err != nil {
+		t.Fatal(err)
+	}
+
+	storagePem, _ := genCertificateFromCommonName("storage", false)
+	storageID, err := m.Add(storagePem, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	embeddedPem, _ := genCertificateFromCommonName("embedded-mix", false)
+
+	certs := m.List([]string{filePath, storageID, string(embeddedPem)}, CertificatePublic)
+	if len(certs) != 3 {
+		t.Fatalf("expected 3 certs, got %d", len(certs))
+	}
+	assert.Equal(t, "file", leafSubjectName(certs[0]))
+	assert.Equal(t, "storage", leafSubjectName(certs[1]))
+	assert.Equal(t, "embedded-mix", leafSubjectName(certs[2]))
+}
+
+func TestList_EmbeddedPEM_LeadingTrailingWhitespace(t *testing.T) {
+	m := newManager()
+	certPem, _ := genCertificateFromCommonName("embedded", false)
+
+	padded := "\n\n  " + string(certPem) + "\n\n  "
+	certs := m.List([]string{padded}, CertificatePublic)
+
+	cert := requireSingleCert(t, certs)
+	assert.Equal(t, "embedded", leafSubjectName(cert))
+}
+
+func TestList_EmbeddedPEM_CRLFLineEndings(t *testing.T) {
+	m := newManager()
+	certPem, _ := genCertificateFromCommonName("embedded", false)
+
+	crlf := strings.ReplaceAll(string(certPem), "\n", "\r\n")
+	certs := m.List([]string{crlf}, CertificatePublic)
+
+	cert := requireSingleCert(t, certs)
+	assert.Equal(t, "embedded", leafSubjectName(cert))
+}
+
+func TestList_EmbeddedPEM_MalformedBodyReturnsNil(t *testing.T) {
+	m := newManager()
+	bad := "-----BEGIN CERTIFICATE-----\nnot-base64-data\n-----END CERTIFICATE-----"
+
+	certs := m.List([]string{bad}, CertificatePublic)
+
+	if len(certs) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(certs))
+	}
+	assert.Nil(t, certs[0], "malformed PEM must yield nil entry")
+}
+
+func TestList_EmbeddedPEM_TruncatedReturnsNil(t *testing.T) {
+	m := newManager()
+	bad := "-----BEGIN CERTIFICATE-----\nMIIB"
+
+	certs := m.List([]string{bad}, CertificatePublic)
+
+	if len(certs) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(certs))
+	}
+	assert.Nil(t, certs[0], "truncated PEM must yield nil entry")
+}
+
+func TestList_EmbeddedPEM_CacheKeyUsesContentHash(t *testing.T) {
+	m := newManager()
+	pem2, _ := genCertificateFromCommonName("cache-test", false)
+	before := m.cache.Count()
+
+	// First call: populates cache.
+	requireSingleCert(t, m.List([]string{string(pem2)}, CertificatePublic))
+	after1 := m.cache.Count()
+	assert.Equal(t, before+1, after1, "first call should add one cache entry")
+
+	// Second call: must hit cache (no new entry).
+	requireSingleCert(t, m.List([]string{string(pem2)}, CertificatePublic))
+	after2 := m.cache.Count()
+	assert.Equal(t, after1, after2, "second call with same PEM should hit cache (no new entry)")
+
+	// Cache key derived from SHA256 of trimmed content, not the raw string.
+	expectedKey := embeddedPEMCacheKeyPrefix + tykcrypto.HexSHA256([]byte(strings.TrimSpace(string(pem2))))
+	cached, found := m.cache.Get(expectedKey)
+	assert.True(t, found, "cache should hold entry under embedded-pem-<sha256> key")
+	assert.NotNil(t, cached)
+
+	_, foundRaw := m.cache.Get(string(pem2))
+	assert.False(t, foundRaw, "raw PEM string must not be used as cache key")
+}
+
+func TestList_EmbeddedPEM_MultiCertChain(t *testing.T) {
+	m := newManager()
+	leafPem, _ := genCertificateFromCommonName("leaf", false)
+	intermediatePem, _ := genCertificateFromCommonName("intermediate", false)
+	chain := append(append([]byte{}, leafPem...), intermediatePem...)
+
+	certs := m.List([]string{string(chain)}, CertificatePublic)
+
+	cert := requireSingleCert(t, certs)
+	assert.Len(t, cert.Certificate, 2, "chain should contain leaf + intermediate")
+}
+
+func TestList_EmbeddedPEM_CertPoolWithEmbeddedCA(t *testing.T) {
+	m := newManager()
+	caPem, _ := genCertificateFromCommonName("ca-embedded", false)
+
+	pool := m.CertPool([]string{string(caPem)})
+
+	if pool == nil {
+		t.Fatal("expected non-nil pool")
+	}
+	// pool.Subjects() is deprecated but acceptable here for a population check.
+	subjects := pool.Subjects()
+	assert.GreaterOrEqual(t, len(subjects), 1, "pool should contain at least the embedded CA")
+}
+
+// collapseToSingleLine simulates a copy-paste of a PEM into a single-line text
+// field: every newline becomes a space.
+func collapseToSingleLine(v []byte) string {
+	return strings.ReplaceAll(strings.TrimSpace(string(v)), "\n", " ")
+}
+
+// TestList_EmbeddedPEM_SingleLineCollapsed verifies the gateway tolerates a
+// PEM whose line breaks were collapsed into spaces (e.g. pasted into a
+// single-line Dashboard field). pem.Decode rejects this form, so List() must
+// repair it before parsing.
+func TestList_EmbeddedPEM_SingleLineCollapsed(t *testing.T) {
+	m := newManager()
+	certPem, _ := genCertificateFromCommonName("single-line", false)
+
+	certs := m.List([]string{collapseToSingleLine(certPem)}, CertificatePublic)
+
+	cert := requireSingleCert(t, certs)
+	assert.Equal(t, "single-line", leafSubjectName(cert))
+}
+
+// TestList_EmbeddedPEM_SingleLineCombinedCertKey verifies a combined cert+key
+// PEM (used by upstream_certificates) is also tolerated when collapsed.
+func TestList_EmbeddedPEM_SingleLineCombinedCertKey(t *testing.T) {
+	m := newManager()
+	certPem, keyPem := genCertificateFromCommonName("single-line-priv", false)
+	combined := append(append([]byte{}, certPem...), keyPem...)
+
+	certs := m.List([]string{collapseToSingleLine(combined)}, CertificatePrivate)
+
+	cert := requireSingleCert(t, certs)
+	assert.Equal(t, "single-line-priv", leafSubjectName(cert))
+	assert.False(t, isPrivateKeyEmpty(cert), "private key should survive normalization")
 }

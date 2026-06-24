@@ -232,10 +232,10 @@ func (gw *Gateway) processSpec(
 	}
 
 	// Initialise the auth and session managers (use Redis for now)
-	authStore, orgStore, _ := gw.configureAuthAndOrgStores(gs, spec)
+	authStore, orgStore, sessionStore := gw.configureAuthAndOrgStores(gs, spec)
 
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
-	spec.Init(authStore, gs.healthStore, orgStore)
+	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
 
 	if !spec.ErrorOverridesDisabled && len(spec.ErrorOverrides) > 0 {
 		if compiled := CompileErrorOverrides(spec.ErrorOverrides); compiled != nil {
@@ -617,7 +617,7 @@ func (gw *Gateway) processSpec(
 	} else if gw.GetConfig().OpenTelemetry.TracesEnabled() { // check if opentelemetry is enabled
 		spanAttrs := []otel.SpanAttribute{}
 		spanAttrs = append(spanAttrs, otel.ApidefSpanAttributes(spec.APIDefinition)...)
-		chainDef.ThisHandler = otel.HTTPHandler(spec.Name, chain, gw.TracerProvider, spanAttrs...)
+		chainDef.ThisHandler = otel.HTTPHandler(spec.Name, withOriginalPathSpanAttribute(chain), gw.TracerProvider, spanAttrs...)
 	} else {
 		chainDef.ThisHandler = chain
 	}
@@ -1091,8 +1091,14 @@ func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxy
 		gw.enforceOrgDataAgeIfQuotasEnabled(spec)
 	}
 
+	sessionStore := gs.redisStore
+	switch spec.SessionProvider.StorageEngine {
+	case RPCStorageEngine:
+		sessionStore = gs.rpcAuthStore
+	}
+
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
-	spec.Init(authStore, gs.healthStore, orgStore)
+	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
 
 	muxer.addTCPService(spec, nil, gw)
 }

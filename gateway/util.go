@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/url"
@@ -11,6 +12,19 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 )
+
+// jsonEscapeString encodes s as a JSON string and strips the surrounding
+// quotes, producing a value safe to splice into an existing JSON string
+// literal. This is necessary when substituting secret values (which may
+// contain newlines, quotes, or other special characters) directly into a
+// raw JSON document.
+func jsonEscapeString(s string) (string, error) {
+	b, err := json.Marshal(s)
+	if err != nil {
+		return "", err
+	}
+	return string(b[1 : len(b)-1]), nil
+}
 
 // appendIfMissing ensures dest slice is unique with new items.
 func appendIfMissing(src []string, in ...string) []string {

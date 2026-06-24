@@ -232,7 +232,7 @@ type HardTimeoutMeta struct {
 	Method   string `bson:"method" json:"method"`
 	// Deprecated: Use TimeoutDuration instead.
 	TimeOut         int                      `bson:"timeout" json:"timeout"`
-	TimeoutDuration tyktime.ReadableDuration `bson:"timeout_duration,omitempty" json:"timeout_duration,omitempty"`
+	TimeoutDuration tyktime.ReadableDuration `bson:"duration,omitempty" json:"duration,omitempty"`
 }
 
 type TrackEndpointMeta struct {
@@ -495,18 +495,20 @@ type VersionInfo struct {
 		WhiteList []string `bson:"white_list" json:"white_list"`
 		BlackList []string `bson:"black_list" json:"black_list"`
 	} `bson:"paths" json:"paths"`
-	UseExtendedPaths              bool              `bson:"use_extended_paths" json:"use_extended_paths"`
-	ExtendedPaths                 ExtendedPathsSet  `bson:"extended_paths" json:"extended_paths"`
-	GlobalHeaders                 map[string]string `bson:"global_headers" json:"global_headers"`
-	GlobalHeadersRemove           []string          `bson:"global_headers_remove" json:"global_headers_remove"`
-	GlobalHeadersDisabled         bool              `bson:"global_headers_disabled" json:"global_headers_disabled"`
-	GlobalResponseHeaders         map[string]string `bson:"global_response_headers" json:"global_response_headers"`
-	GlobalResponseHeadersRemove   []string          `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
-	GlobalResponseHeadersDisabled bool              `bson:"global_response_headers_disabled" json:"global_response_headers_disabled"`
-	IgnoreEndpointCase            bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
-	GlobalSizeLimit               int64             `bson:"global_size_limit" json:"global_size_limit"`
-	GlobalSizeLimitDisabled       bool              `bson:"global_size_limit_disabled" json:"global_size_limit_disabled"`
-	OverrideTarget                string            `bson:"override_target" json:"override_target"`
+	UseExtendedPaths              bool                     `bson:"use_extended_paths" json:"use_extended_paths"`
+	ExtendedPaths                 ExtendedPathsSet         `bson:"extended_paths" json:"extended_paths"`
+	GlobalHeaders                 map[string]string        `bson:"global_headers" json:"global_headers"`
+	GlobalHeadersRemove           []string                 `bson:"global_headers_remove" json:"global_headers_remove"`
+	GlobalHeadersDisabled         bool                     `bson:"global_headers_disabled" json:"global_headers_disabled"`
+	GlobalResponseHeaders         map[string]string        `bson:"global_response_headers" json:"global_response_headers"`
+	GlobalResponseHeadersRemove   []string                 `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
+	GlobalResponseHeadersDisabled bool                     `bson:"global_response_headers_disabled" json:"global_response_headers_disabled"`
+	IgnoreEndpointCase            bool                     `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
+	GlobalSizeLimit               int64                    `bson:"global_size_limit" json:"global_size_limit"`
+	GlobalSizeLimitDisabled       bool                     `bson:"global_size_limit_disabled" json:"global_size_limit_disabled"`
+	GlobalEnforceTimeout          tyktime.ReadableDuration `bson:"global_enforce_timeout" json:"global_enforce_timeout"`
+	GlobalEnforceTimeoutDisabled  bool                     `bson:"global_enforce_timeout_disabled" json:"global_enforce_timeout_disabled"`
+	OverrideTarget                string                   `bson:"override_target" json:"override_target"`
 }
 
 func (v *VersionInfo) GlobalHeadersEnabled() bool {

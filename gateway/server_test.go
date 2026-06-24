@@ -9,6 +9,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -40,6 +42,32 @@ import (
 )
 
 func TestGateway_afterConfSetup(t *testing.T) {
+	// file:// references require base_path, so the file-backend case below resolves
+	// relative keys under this directory. Hoisted here so expectedConfig can carry
+	// the same base_path (KV is an anonymous struct and can't be set in a literal).
+	fileKVDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(fileKVDir, "cert.pem"), []byte("/file/path/to/cert.pem"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(fileKVDir, "key.pem"), []byte("/file/path/to/key.pem"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(fileKVDir, "ca.pem"), []byte("/file/path/to/ca.pem"), 0o600))
+
+	fileBackendExpected := config.Config{
+		ExternalServices: config.ExternalServiceConfig{
+			OAuth: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  true,
+					CertFile: "/file/path/to/cert.pem",
+					KeyFile:  "/file/path/to/key.pem",
+					CAFile:   "/file/path/to/ca.pem",
+				},
+			},
+		},
+		AnalyticsConfig: config.AnalyticsConfigConfig{
+			PurgeInterval: 10,
+		},
+		HealthCheckEndpointName:    "hello",
+		ReadinessCheckEndpointName: "ready",
+	}
+	fileBackendExpected.KV.File.BasePath = fileKVDir
 
 	tests := []struct {
 		name            string
@@ -294,6 +322,22 @@ func TestGateway_afterConfSetup(t *testing.T) {
 				HealthCheckEndpointName:    "hello",
 				ReadinessCheckEndpointName: "ready",
 			},
+		},
+		{
+			name:          "oauth mtls kv store - file backend",
+			initialConfig: config.Config{},
+			setup: func(t *testing.T, gw *Gateway) {
+				t.Helper()
+
+				conf := gw.GetConfig()
+				conf.KV.File.BasePath = fileKVDir
+				conf.ExternalServices.OAuth.MTLS.Enabled = true
+				conf.ExternalServices.OAuth.MTLS.CertFile = "file://cert.pem"
+				conf.ExternalServices.OAuth.MTLS.KeyFile = "file://key.pem"
+				conf.ExternalServices.OAuth.MTLS.CAFile = "file://ca.pem"
+				gw.SetConfig(conf)
+			},
+			expectedConfig: fileBackendExpected,
 		},
 		{
 			name: "error - secret key missing from kv store",

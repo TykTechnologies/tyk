@@ -79,6 +79,9 @@ var tests = []struct {
 		`policies.policy_source: policies.policy_source must be one of the following: "", "service", "rpc"`,
 	},
 	{
+		"KVFileBasePath", `{"kv": {"file": {"base_path": "/etc/tyk/secrets"}}}`, nil,
+	},
+	{
 		"MalformedDnsCacheEntry", `{"dns_cache": { "enabled": true, "tttl": 10} }`,
 		`dns_cache: Additional property tttl is not allowed`,
 	},

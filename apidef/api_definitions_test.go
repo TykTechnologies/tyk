@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
 func TestAPIDefinition_JsonRpcVersion(t *testing.T) {
@@ -49,6 +51,42 @@ func TestAPIDefinition_JsonRpcVersion(t *testing.T) {
 		api.DecodeFromDB()
 
 		assert.Equal(t, "2.0", api.JsonRpcVersion)
+	})
+}
+
+// TestHardTimeoutMeta_DurationWireTag locks in the TT-17515 rename of the
+// granular enforced-timeout field from `timeout_duration` to `duration`.
+// The Go field name (TimeoutDuration) is unchanged; only the JSON/BSON tags moved.
+func TestHardTimeoutMeta_DurationWireTag(t *testing.T) {
+	t.Run("marshals to duration, not timeout_duration", func(t *testing.T) {
+		meta := HardTimeoutMeta{
+			Path:            "/get",
+			Method:          http.MethodGet,
+			TimeOut:         2,
+			TimeoutDuration: tyktime.ReadableDuration(1500 * time.Millisecond),
+		}
+
+		data, err := json.Marshal(meta)
+		assert.NoError(t, err)
+
+		assert.Contains(t, string(data), `"duration"`)
+		assert.NotContains(t, string(data), "timeout_duration")
+	})
+
+	t.Run("unmarshals the duration key", func(t *testing.T) {
+		var meta HardTimeoutMeta
+		err := json.Unmarshal([]byte(`{"path":"/get","method":"GET","timeout":2,"duration":"500ms"}`), &meta)
+		require.NoError(t, err)
+
+		assert.Equal(t, 2, meta.TimeOut)
+		assert.Equal(t, tyktime.ReadableDuration(500*time.Millisecond), meta.TimeoutDuration)
+	})
+
+	t.Run("empty duration omitted", func(t *testing.T) {
+		data, err := json.Marshal(HardTimeoutMeta{Path: "/get", Method: http.MethodGet, TimeOut: 3})
+		assert.NoError(t, err)
+
+		assert.NotContains(t, string(data), "duration")
 	})
 }
 
@@ -312,6 +350,44 @@ func TestSchema_SecurityRequirementScopes(t *testing.T) {
 			t.Error(e)
 		}
 	}
+}
+
+func TestSchema_GlobalEnforceTimeout(t *testing.T) {
+	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
+
+	setVersionTimeout := func(spec *APIDefinition, d tyktime.ReadableDuration, disabled bool) {
+		v := spec.VersionData.Versions["Default"]
+		v.GlobalEnforceTimeout = d
+		v.GlobalEnforceTimeoutDisabled = disabled
+		spec.VersionData.Versions["Default"] = v
+	}
+
+	t.Run("valid string duration passes schema", func(t *testing.T) {
+		spec := DummyAPI()
+		setVersionTimeout(&spec, tyktime.ReadableDuration(5*time.Second), false)
+
+		result, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewGoLoader(spec))
+		require.NoError(t, err)
+		assert.True(t, result.Valid(), result.Errors())
+	})
+
+	t.Run("valid sub-second duration passes schema", func(t *testing.T) {
+		spec := DummyAPI()
+		setVersionTimeout(&spec, tyktime.ReadableDuration(500*time.Millisecond), false)
+
+		result, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewGoLoader(spec))
+		require.NoError(t, err)
+		assert.True(t, result.Valid(), result.Errors())
+	})
+
+	t.Run("disabled flag passes schema", func(t *testing.T) {
+		spec := DummyAPI()
+		setVersionTimeout(&spec, tyktime.ReadableDuration(5*time.Second), true)
+
+		result, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewGoLoader(spec))
+		require.NoError(t, err)
+		assert.True(t, result.Valid(), result.Errors())
+	})
 }
 
 func TestStringRegexMap(t *testing.T) {
