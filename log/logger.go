@@ -209,13 +209,17 @@ func (s *invokeOnce) Do(fn func(executed bool)) {
 func (s *invokeOnce) reset(value bool) CancelFn {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	var once sync.Once
 	oldValue := s.value
 	s.value = value
 
 	return func() {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		s.value = oldValue
+		once.Do(func() {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			s.value = oldValue
+		})
 	}
 }
 
