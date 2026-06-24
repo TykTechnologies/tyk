@@ -187,6 +187,7 @@ func buildMCPAdapterSpec(rest *APISpec, proxies []*APISpec, existing *APISpec) (
 	}
 
 	allowedCallers := callerProxyIDs(proxies)
+	adapterVersion := apidef.VersionInfo{UseExtendedPaths: true}
 	adapterDef := &apidef.APIDefinition{
 		APIID:    adapterID,
 		Name:     adapterID,
@@ -194,6 +195,15 @@ func buildMCPAdapterSpec(rest *APISpec, proxies []*APISpec, existing *APISpec) (
 		Active:   true,
 		IsOAS:    true,
 		Internal: true,
+		// The hidden adapter is only reachable through paired MCP proxies.
+		// Caller-facing auth and policies are enforced on those proxies.
+		UseKeylessAccess: true,
+		VersionData: apidef.VersionData{
+			NotVersioned: true,
+			Versions: map[string]apidef.VersionInfo{
+				"": adapterVersion,
+			},
+		},
 		Proxy: apidef.ProxyConfig{
 			ListenPath: "/" + adapterID + "/",
 			TargetURL:  "http://127.0.0.1",
@@ -229,6 +239,12 @@ func buildMCPAdapterSpec(rest *APISpec, proxies []*APISpec, existing *APISpec) (
 		Health: &DefaultHealthChecker{
 			Gw:    gw,
 			APIID: adapterID,
+		},
+		RxPaths: map[string][]URLSpec{
+			adapterVersion.Name: {},
+		},
+		WhiteListEnabled: map[string]bool{
+			adapterVersion.Name: false,
 		},
 		AuthManager: &DefaultSessionManager{Gw: gw},
 		OrgSessionManager: &DefaultSessionManager{

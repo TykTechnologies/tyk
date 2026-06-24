@@ -552,8 +552,9 @@ func TestToolResultEnvelope_Truncation(t *testing.T) {
 	assert.Equal(t, true, meta["truncated"])
 	content := env["content"].([]any)[0].(map[string]any)
 	text := content["text"].(string)
-	assert.Contains(t, text, "Tyk truncated the upstream response")
+	assert.Contains(t, text, "The upstream response was truncated")
 	assert.Contains(t, text, "The content above is incomplete.")
+	assert.NotContains(t, strings.ToLower(text), "tyk")
 	assert.True(t, strings.HasPrefix(text, strings.Repeat("x", BodyTruncationBytes)))
-	assert.True(t, strings.HasSuffix(text, "Tyk truncated the upstream response after 1048576 bytes. The content above is incomplete."))
+	assert.True(t, strings.HasSuffix(text, "The upstream response was truncated after 1048576 bytes. The content above is incomplete."))
 }

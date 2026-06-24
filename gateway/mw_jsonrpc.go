@@ -168,14 +168,14 @@ func primitiveTypeForMethod(method string) string {
 //
 //nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
 func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ any) (error, int) {
+	if m.Spec.IsSyntheticMCPAdapter() {
+		return m.processSyntheticMCPAdapterRequest(w, r)
+	}
+
 	// Skip if routing already initialized (we're at a VEM path, not the listen path)
 	// This middleware should only run ONCE at the listen path to parse and route the request
 	if httpctx.GetJSONRPCRoutingState(r) != nil {
 		return nil, http.StatusOK
-	}
-
-	if m.Spec.IsSyntheticMCPAdapter() {
-		return m.processSyntheticMCPAdapterRequest(w, r)
 	}
 
 	// Validate request type
