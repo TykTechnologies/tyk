@@ -168,6 +168,7 @@ const (
 	warningOperationMarkedInternal = "operation marked internal - skipped"
 	warningOperationMarkedBlocked  = "operation marked blocked - skipped"
 	warningOperationNotSourceAllow = "operation not in source allow-list - skipped"
+	warningMCPServerStaleSource    = "x-tyk-mcp-server primitive references non-exposable source - skipped"
 )
 
 const (
@@ -191,6 +192,11 @@ type DerivedPrimitive struct {
 type DeriveWarning struct {
 	// Operation identifies the source operation that produced the warning.
 	Operation string
+	// Source identifies the configured source selector when the warning came
+	// from proxy-side MCP primitive configuration.
+	Source string
+	// ToolName is the configured caller-facing primitive name, when present.
+	ToolName string
 	// Method is the HTTP method for the source operation.
 	Method string
 	// Path is the OAS path template for the source operation.
@@ -1025,17 +1031,23 @@ func DeriveMCPToolView(srcOAS *OAS, config *TykMCPServer) (MCPToolView, []Derive
 	}
 	tools = append(tools, configuredPathTools...)
 
-	view, err := BuildMCPToolView(tools, config)
+	view, viewWarnings, err := buildMCPToolView(tools, config)
+	warnings = append(warnings, viewWarnings...)
 	return view, warnings, err
 }
 
 // BuildMCPToolView applies a proxy-side x-tyk-mcp-server extension to a
 // canonical source tool catalogue.
 func BuildMCPToolView(canonical []DerivedTool, config *TykMCPServer) (MCPToolView, error) {
+	view, _, err := buildMCPToolView(canonical, config)
+	return view, err
+}
+
+func buildMCPToolView(canonical []DerivedTool, config *TykMCPServer) (MCPToolView, []DeriveWarning, error) {
 	catalogue := newMCPToolViewCatalogue(canonical)
-	selection, err := buildMCPToolViewSelection(config, catalogue)
+	selection, warnings, err := buildMCPToolViewSelection(config, catalogue)
 	if err != nil {
-		return MCPToolView{}, err
+		return MCPToolView{}, warnings, err
 	}
 
 	view := MCPToolView{Tools: make([]DerivedTool, 0, len(selection.sourceKeys))}
@@ -1044,22 +1056,22 @@ func BuildMCPToolView(canonical []DerivedTool, config *TykMCPServer) (MCPToolVie
 		tool := cloneDerivedTool(catalogue.bySourceKey[sourceKey])
 		if override, ok := selection.overrides[sourceKey]; ok {
 			if err := applyMCPToolViewOverride(&tool, override); err != nil {
-				return MCPToolView{}, err
+				return MCPToolView{}, warnings, err
 			}
 		}
 		if err := validateDerivedToolName(tool); err != nil {
-			return MCPToolView{}, err
+			return MCPToolView{}, warnings, err
 		}
 
 		if existing, duplicate := seenNames[tool.Name]; duplicate {
-			return MCPToolView{}, fmt.Errorf("duplicate exposed tool name %q for sources %q and %q", tool.Name, existing, sourceKey)
+			return MCPToolView{}, warnings, fmt.Errorf("duplicate exposed tool name %q for sources %q and %q", tool.Name, existing, sourceKey)
 		}
 		seenNames[tool.Name] = sourceKey
 		view.Tools = append(view.Tools, tool)
 	}
 
 	sort.Slice(view.Tools, func(i, j int) bool { return view.Tools[i].Name < view.Tools[j].Name })
-	return view, nil
+	return view, warnings, nil
 }
 
 const (
@@ -1115,10 +1127,11 @@ func normaliseCanonicalTool(tool DerivedTool) DerivedTool {
 	return tool
 }
 
-func buildMCPToolViewSelection(config *TykMCPServer, catalogue mcpToolViewCatalogue) (mcpToolViewSelection, error) {
+func buildMCPToolViewSelection(config *TykMCPServer, catalogue mcpToolViewCatalogue) (mcpToolViewSelection, []DeriveWarning, error) {
 	selection := mcpToolViewSelection{
 		overrides: map[string]TykMCPServerPrimitive{},
 	}
+	var warnings []DeriveWarning
 	explicitAllow := false
 
 	if config != nil {
@@ -1126,38 +1139,51 @@ func buildMCPToolViewSelection(config *TykMCPServer, catalogue mcpToolViewCatalo
 		for _, primitive := range config.Primitives {
 			sourceKey, _, err := mcpPrimitiveSourceKey(primitive.Source)
 			if err != nil {
-				return selection, err
+				return selection, warnings, err
+			}
+			primitiveAllowed := primitive.Allow != nil && *primitive.Allow
+			if primitiveAllowed {
+				explicitAllow = true
 			}
 			tool, ok := catalogue.bySourceKey[sourceKey]
 			if !ok {
-				return selection, fmt.Errorf("%s primitive references non-exposable source %q", ExtensionTykMCPServer, sourceKey)
+				warnings = append(warnings, staleMCPServerPrimitiveWarning(sourceKey, primitive))
+				continue
 			}
 			if _, duplicate := seenSourceKeys[sourceKey]; duplicate {
-				return selection, fmt.Errorf("%s has duplicate primitive source %q", ExtensionTykMCPServer, sourceKey)
+				return selection, warnings, fmt.Errorf("%s has duplicate primitive source %q", ExtensionTykMCPServer, sourceKey)
 			}
 			seenSourceKeys[sourceKey] = struct{}{}
 
 			if err := validateMCPToolViewParameterOverrides(tool, primitive); err != nil {
-				return selection, err
+				return selection, warnings, err
 			}
 			selection.overrides[sourceKey] = primitive
 
-			if primitive.Allow != nil && *primitive.Allow {
-				explicitAllow = true
+			if primitiveAllowed {
 				selection.sourceKeys = append(selection.sourceKeys, sourceKey)
 			}
 		}
 	}
 
 	if explicitAllow {
-		return selection, nil
+		return selection, warnings, nil
 	}
 
 	selection.sourceKeys = make([]string, 0, len(catalogue.tools))
 	for _, tool := range catalogue.tools {
 		selection.sourceKeys = append(selection.sourceKeys, tool.SourceKey)
 	}
-	return selection, nil
+	return selection, warnings, nil
+}
+
+func staleMCPServerPrimitiveWarning(sourceKey string, primitive TykMCPServerPrimitive) DeriveWarning {
+	return DeriveWarning{
+		Operation: sourceKey,
+		Source:    sourceKey,
+		ToolName:  strings.TrimSpace(primitive.Name),
+		Reason:    warningMCPServerStaleSource,
+	}
 }
 
 func deriveConfiguredPathMethodTools(srcOAS *OAS, config *TykMCPServer, canonical []DerivedTool) ([]DerivedTool, error) {
@@ -1181,6 +1207,11 @@ func deriveConfiguredPathMethodTools(srcOAS *OAS, config *TykMCPServer, canonica
 		}
 		seen[sourceKey] = struct{}{}
 		if _, exists := catalogue.bySourceKey[sourceKey]; exists {
+			continue
+		}
+		path := strings.TrimSpace(primitive.Source.Path)
+		method := strings.ToUpper(strings.TrimSpace(primitive.Source.Method))
+		if _, _, ok := sourceOperationByPathMethod(srcOAS, path, method); !ok {
 			continue
 		}
 

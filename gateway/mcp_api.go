@@ -217,6 +217,8 @@ func logMCPDeriveWarnings(proxyAPIID, restAPIID string, warnings []oas.DeriveWar
 			"api_id":      proxyAPIID,
 			"rest_api_id": restAPIID,
 			"operation":   warning.Operation,
+			"source":      warning.Source,
+			"tool_name":   warning.ToolName,
 			"method":      warning.Method,
 			"path":        warning.Path,
 			"reason":      warning.Reason,
