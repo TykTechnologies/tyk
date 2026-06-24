@@ -1723,3 +1723,51 @@ func TestSessionState_Lifetime_PostExpiry_BypassesRespectKeyExpiration(t *testin
 		})
 	}
 }
+
+func BenchmarkSessionStateClone(b *testing.B) {
+	session := SessionState{
+		Allowance:      100,
+		Rate:           100,
+		Per:            60,
+		Expires:        100000,
+		QuotaMax:       1000,
+		QuotaRenews:    100000,
+		QuotaRemaining: 500,
+		OrgID:          "org-1",
+		OauthClientID:  "client-1",
+		OauthKeys: map[string]string{
+			"key1": "val1",
+			"key2": "val2",
+		},
+		AccessRights: map[string]AccessDefinition{
+			"api-1": {
+				APIName: "API 1",
+				APIID:   "api-1",
+				Versions: []string{"Default"},
+				AllowedURLs: []AccessSpec{
+					{URL: "/path1", Methods: []string{"GET", "POST"}},
+					{URL: "/path2", Methods: []string{"PUT", "DELETE"}},
+				},
+			},
+			"api-2": {
+				APIName: "API 2",
+				APIID:   "api-2",
+				Versions: []string{"v1", "v2"},
+			},
+		},
+		MetaData: map[string]interface{}{
+			"meta1": "value1",
+			"meta2": 123,
+			"meta3": true,
+		},
+		Tags: []string{"tag1", "tag2", "tag3"},
+		Alias: "test-alias",
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		_ = session.Clone()
+	}
+}
