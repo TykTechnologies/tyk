@@ -620,9 +620,13 @@ func (gw *Gateway) processSpec(
 	}
 
 	if spec.APIDefinition.AnalyticsPlugin.Enabled {
+		pluginPath := spec.AnalyticsPlugin.PluginPath
+		if prefix != "" {
+			pluginPath = filepath.Join(prefix, pluginPath)
+		}
 
 		ap := &GoAnalyticsPlugin{
-			Path:     spec.AnalyticsPlugin.PluginPath,
+			Path:     pluginPath,
 			FuncName: spec.AnalyticsPlugin.FuncName,
 		}
 
