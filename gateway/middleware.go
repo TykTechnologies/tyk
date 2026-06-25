@@ -608,15 +608,26 @@ func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
 	return copied
 }
 
+// defaultMinTokenLength is the floor applied to key length when min_token_length
+// is unset. It is enforced at both create time (handleAddOrUpdate) and auth time
+// so the two cannot drift (see TT-17585).
+// See https://github.com/TykTechnologies/tyk/issues/1681.
+const defaultMinTokenLength = 3
+
+// effectiveMinTokenLength returns the configured min_token_length, or the
+// default floor when it is unset (0).
+func effectiveMinTokenLength(configured int) int {
+	if configured == 0 {
+		return defaultMinTokenLength
+	}
+	return configured
+}
+
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
 func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r *http.Request) (user.SessionState, bool) {
 	key := originalKey
-	minLength := t.Spec.GlobalConfig.MinTokenLength
-	if minLength == 0 {
-		// See https://github.com/TykTechnologies/tyk/issues/1681
-		minLength = 3
-	}
+	minLength := effectiveMinTokenLength(t.Spec.GlobalConfig.MinTokenLength)
 
 	if len(key) < minLength {
 		return user.SessionState{IsInactive: true}, false
