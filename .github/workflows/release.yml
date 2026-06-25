@@ -119,6 +119,40 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+      - name: Validate Go version
+        run: |
+          GO_VERSION_STR=$(docker run --rm tykio/golang-cross:${{ matrix.golang_cross }} go version 2>&1 || true)
+          if [[ ! "$GO_VERSION_STR" =~ go[0-9]+ ]]; then
+            echo "::warning::Could not determine Go version from container: $GO_VERSION_STR"
+            exit 1
+          fi
+          GO_VERSION=$(echo "$GO_VERSION_STR" | awk '{print $3}' | sed 's/^go//')
+          echo "Go version in container: $GO_VERSION"
+          MINOR_VERSION=$(echo "$GO_VERSION" | cut -d. -f1,2)
+          echo "Minor version: $MINOR_VERSION"
+
+          # Fetch latest patches
+          LATEST_PATCH_STR=$(curl -s 'https://go.dev/dl/?mode=json&include=all' || true)
+          if [ -z "$LATEST_PATCH_STR" ]; then
+            echo "::warning::Could not fetch Go releases from API. Skipping validation."
+            exit 0
+          fi
+          LATEST_PATCH=$(echo "$LATEST_PATCH_STR" | jq -r --arg minor "go${MINOR_VERSION}" '.[] | select(.stable == true and (.version | startswith($minor + ".") or . == $minor)) | .version' | head -n 1 | sed 's/^go//')
+
+          if [ -n "$LATEST_PATCH" ]; then
+            echo "Latest patch version for Go $MINOR_VERSION is $LATEST_PATCH"
+            if [ "$GO_VERSION" != "$LATEST_PATCH" ]; then
+              echo "::error::Go version validation failed!"
+              echo "Used version: $GO_VERSION (in tykio/golang-cross:${{ matrix.golang_cross }})"
+              echo "Latest patch: $LATEST_PATCH"
+              echo "Please update the buildenv Go version to the latest patch version."
+              exit 1
+            else
+              echo "Go version is up to date: $GO_VERSION"
+            fi
+          else
+            echo "::warning::Could not determine latest patch version for Go $MINOR_VERSION from API. Skipping validation."
+          fi
       - name: Build
         env:
           NFPM_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
@@ -129,7 +163,7 @@ jobs:
           ci/bin/unlock-agent.sh
           git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
-          goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign,docker' || '--skip=docker' }}' | tee /tmp/build.sh
+          goreleaser release --timeout 120m --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign,docker' || '--skip=docker' }}' | tee /tmp/build.sh
           chmod +x /tmp/build.sh
           docker run --rm --privileged -e GITHUB_TOKEN=${{ github.token }} \
           -e GOPRIVATE=github.com/TykTechnologies                                \
@@ -171,7 +205,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
-          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64,linux/s390x' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
           outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
@@ -181,8 +215,6 @@ jobs:
           labels: ${{ steps.ci_metadata_ee.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
-            BASE_IMAGE=tykio/dhi-busybox:1.37-fips
-            NONROOT_CHOWN=true
       - name: Verify compression format for ee CI image
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
         run: |
@@ -250,7 +282,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64,linux/s390x
           file: ci/Dockerfile.distroless
           provenance: mode=max
           cache-from: type=gha
@@ -259,8 +291,6 @@ jobs:
           labels: ${{ steps.tag_metadata_ee.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
-            BASE_IMAGE=tykio/dhi-busybox:1.37-fips
-            NONROOT_CHOWN=true
       - name: Verify compression format for ee prod image
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
@@ -304,21 +334,6 @@ jobs:
             verify_manifest manifest.json
           fi
           echo "Success: All layers are uniformly compressed using gzip."
-      - name: Attach base image VEX to ee
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
-        run: |
-          # Install Docker Scout CLI
-          curl -fsSL https://raw.githubusercontent.com/docker/scout-cli/v1.20.4/install.sh -o /tmp/scout-install.sh && sh /tmp/scout-install.sh 2>/dev/null
-          # Extract VEX from the DHI base image
-          docker scout vex get --org tykio -o /tmp/ee-vex.json tykio/dhi-busybox:1.37-fips || true
-          if [ -f /tmp/ee-vex.json ]; then
-            cosign attest --yes --type openvex \
-              --predicate /tmp/ee-vex.json \
-              docker.tyk.io/tyk-gateway/tyk-gateway-ee:${{ github.ref_name }} || true
-            cosign attest --yes --type openvex \
-              --predicate /tmp/ee-vex.json \
-              tykio/tyk-gateway-ee:${{ github.ref_name }} || true
-          fi
       - name: Docker metadata for fips CI
         id: ci_metadata_fips
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
@@ -476,7 +491,12 @@ jobs:
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
           # Install Docker Scout CLI
-          curl -fsSL https://raw.githubusercontent.com/docker/scout-cli/v1.20.4/install.sh -o /tmp/scout-install.sh && sh /tmp/scout-install.sh 2>/dev/null
+          mkdir -p ~/.docker/cli-plugins
+          curl --proto '=https' --tlsv1.2 -fsSL https://github.com/docker/scout-cli/releases/download/v1.22.0/docker-scout_1.22.0_linux_amd64.tar.gz -o /tmp/scout.tar.gz
+          echo "49a6b18768f0ba9cb90e6aafd76c887fddad34c0124ca7ee81e2b422cd860b07  /tmp/scout.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/scout.tar.gz -C ~/.docker/cli-plugins/ docker-scout
+          chmod +x ~/.docker/cli-plugins/docker-scout
+
           # Extract VEX from the DHI base image
           docker scout vex get --org tykio -o /tmp/fips-vex.json tykio/dhi-busybox:1.37-fips || true
           if [ -f /tmp/fips-vex.json ]; then
@@ -986,7 +1006,7 @@ jobs:
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk-analytics
 
           # Build packages for current platform (GOOS and GOARCH are set via docker -e)
-          goreleaser release --clean -f ci/goreleaser/goreleaser.yml --snapshot --skip=sign,docker
+          goreleaser release --timeout 120m --clean -f ci/goreleaser/goreleaser.yml --snapshot --skip=sign,docker
           EOF
 
           chmod +x /tmp/build-dashboard.sh
@@ -1202,18 +1222,9 @@ jobs:
       deb: ${{ steps.params.outputs.deb }}
       rpm: ${{ steps.params.outputs.rpm }}
     steps:
-      - name: set params
+      - name: Set distro matrix
+        uses: TykTechnologies/github-actions/.github/actions/tests/distro-matrix@production
         id: params
-        shell: bash
-        env:
-          # startsWith covers pull_request_target too
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
-        run: |
-          set -eo pipefail
-          curl -s --retry 5 --retry-delay 10 --fail-with-body "http://tui.internal.dev.tyk.technology/v2/$VARIATION/tyk/$BASE_REF/${{ github.event_name}}/api/Distros.gho" | tee -a "$GITHUB_OUTPUT"
-          if ! [[ $VARIATION =~ prod ]];then
-            echo "::warning file=.github/workflows/release.yml,line=24,col=1,endColumn=8::Using test variation"
-          fi
   upgrade-deb:
     services:
       httpbin.org:
