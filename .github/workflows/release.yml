@@ -986,7 +986,7 @@ jobs:
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk-analytics
 
           # Build packages for current platform (GOOS and GOARCH are set via docker -e)
-          goreleaser release --clean -f ci/goreleaser/goreleaser.yml --snapshot --skip=sign,docker
+          goreleaser release --timeout 120m --clean -f ci/goreleaser/goreleaser.yml --snapshot --skip=sign,docker
           EOF
 
           chmod +x /tmp/build-dashboard.sh
