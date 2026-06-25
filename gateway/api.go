@@ -523,8 +523,8 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		// shorter than that length would succeed here but every subsequent
 		// auth attempt with the raw ID would silently 403 (AKI). Empty keyName
 		// is fine — generateToken below will produce a safe-length UUID envelope.
-		minLen := gw.GetConfig().MinTokenLength
-		if keyName != "" && minLen > 0 && len(keyName) < minLen {
+		minLen := effectiveMinTokenLength(gw.GetConfig().MinTokenLength)
+		if keyName != "" && len(keyName) < minLen {
 			return apiError(fmt.Sprintf(
 				"custom key ID length %d is less than min_token_length (%d); "+
 					"the key would be unreachable at auth time. Use an ID of at least min_token_length characters, "+
