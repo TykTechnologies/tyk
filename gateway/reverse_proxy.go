@@ -461,13 +461,13 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 // upstream's, which is what `res.Request` carries after the proxy
 // director rewrites the URL.
 //
-// No-op for non-MCP APIs, non-401 responses, or APIs without PRM
+// No-op for non-MCP-managed APIs, non-401 responses, or APIs without PRM
 // configured.
 func augmentMCPWWWAuthenticate(res *http.Response, inboundReq *http.Request, spec *APISpec) {
 	if res == nil || res.StatusCode != http.StatusUnauthorized {
 		return
 	}
-	if spec == nil || !spec.IsMCP() {
+	if spec == nil || !spec.IsMCPManaged() {
 		return
 	}
 	prm := spec.GetPRMConfig()
@@ -913,7 +913,7 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 			r.Header.Del(apidef.TykInternalApiHeader)
 		}
 
-		handler, _, found := rt.Gw.findInternalHttpHandlerByNameOrID(r.Host)
+		handler, _, found := rt.Gw.findInternalHTTPHandlerForLoop(r.Host, nil, r)
 		if !found {
 			rt.logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
 			return nil, errors.New("handler could")
