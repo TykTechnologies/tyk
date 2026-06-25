@@ -1149,6 +1149,62 @@ func TestKeyHandler_RejectCustomKeyBelowMinTokenLength(t *testing.T) {
 	})
 }
 
+// TestKeyHandler_DefaultMinTokenLengthFloorOnCreate locks the create path to the
+// same effective floor the auth-time gate enforces when min_token_length is
+// unset. CheckSessionAndIdentityForValidKey falls back to a minimum of 3 (see
+// middleware.go / issue #1681), so without an explicitly configured
+// min_token_length a custom ID of length 1-2 must still be rejected at create —
+// otherwise it is accepted here yet 403s (AKI) at auth, the exact silent-accept
+// trap TT-17065 set out to close, just at the default-config boundary that the
+// original create guard left open (reported in TT-17585).
+func TestKeyHandler_DefaultMinTokenLengthFloorOnCreate(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.MinTokenLength = 0 // unset -> effective floor of 3
+	})
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.APIID = "test"
+		spec.Auth.AuthHeaderName = "authorization"
+	})
+
+	session := CreateStandardSession()
+	session.AccessRights = map[string]user.AccessDefinition{"test": {
+		APIID: "test", Versions: []string{"Default"},
+	}}
+	body := test.MarshalJSON(t)(session)
+
+	cases := []struct {
+		name     string
+		keyID    string
+		wantCode int
+	}{
+		{
+			name:     "below_default_floor_rejected",
+			keyID:    "ab", // 2 chars, strictly below the default floor of 3
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "equal_to_default_floor_accepted",
+			keyID:    "abc", // 3 chars, == default floor
+			wantCode: http.StatusOK,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _ = ts.Run(t, test.TestCase{
+				Method:    http.MethodPost,
+				Path:      "/tyk/keys/" + tc.keyID,
+				Data:      body,
+				AdminAuth: true,
+				Code:      tc.wantCode,
+			})
+		})
+	}
+}
+
 func TestHashKeyHandler(t *testing.T) {
 	t.Skip() // DeleteAllKeys interferes with other tests.
 
