@@ -1670,11 +1670,11 @@ func TestReplaceSecrets(t *testing.T) {
 }
 
 func TestReplaceSecretsFileScheme(t *testing.T) {
-	t.Run("absolute path without base_path", func(t *testing.T) {
+	t.Run("file:// references rejected without base_path", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		t.Run("replaces file:// reference with file contents", func(t *testing.T) {
+		t.Run("absolute file:// reference left unresolved", func(t *testing.T) {
 			dir := t.TempDir()
 			f := filepath.Join(dir, "jwt-secret")
 			require.NoError(t, os.WriteFile(f, []byte("my-jwt-signing-key\n"), 0600))
@@ -1686,26 +1686,19 @@ func TestReplaceSecretsFileScheme(t *testing.T) {
 
 			api := ts.Gw.getApiSpec("file-kv-1")
 			require.NotNil(t, api)
-			assert.Equal(t, "my-jwt-signing-key", api.JWTSource)
+			assert.NotContains(t, api.JWTSource, "my-jwt-signing-key", "file contents must not be injected without base_path")
+			assert.Equal(t, "file://"+f, api.JWTSource, "raw file:// reference should be left unresolved")
 		})
 
-		t.Run("multiple file:// references in one definition are all replaced", func(t *testing.T) {
-			dir := t.TempDir()
-			f1 := filepath.Join(dir, "source")
-			f2 := filepath.Join(dir, "method")
-			require.NoError(t, os.WriteFile(f1, []byte("source-value"), 0600))
-			require.NoError(t, os.WriteFile(f2, []byte("method-value"), 0600))
-
+		t.Run("relative file:// reference left unresolved", func(t *testing.T) {
 			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.APIID = "file-kv-2"
-				spec.JWTSource = "file://" + f1
-				spec.JWTSigningMethod = "file://" + f2
+				spec.JWTSource = "file://jwt-secret"
 			})
 
 			api := ts.Gw.getApiSpec("file-kv-2")
 			require.NotNil(t, api)
-			assert.Equal(t, "source-value", api.JWTSource)
-			assert.Equal(t, "method-value", api.JWTSigningMethod)
+			assert.Equal(t, "file://jwt-secret", api.JWTSource, "raw file:// reference should be left unresolved")
 		})
 	})
 
@@ -1726,6 +1719,30 @@ func TestReplaceSecretsFileScheme(t *testing.T) {
 		api := ts.Gw.getApiSpec("file-kv-3")
 		require.NotNil(t, api)
 		assert.Equal(t, "key-from-mount", api.JWTSource)
+	})
+
+	t.Run("absolute path in API definition is rejected when base_path is set", func(t *testing.T) {
+		baseDir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(baseDir, "jwt-secret"), []byte("allowed-value"), 0600))
+
+		outsideDir := t.TempDir()
+		secret := filepath.Join(outsideDir, "passwd")
+		require.NoError(t, os.WriteFile(secret, []byte("root:x:0:0:secret"), 0600))
+
+		ts := StartTest(func(conf *config.Config) {
+			conf.KV.File.BasePath = baseDir
+		})
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "file-kv-abs-reject"
+			spec.JWTSource = "file://" + secret
+		})
+
+		api := ts.Gw.getApiSpec("file-kv-abs-reject")
+		require.NotNil(t, api)
+		assert.NotContains(t, api.JWTSource, "root:x:0:0", "absolute-path file contents must not be injected")
+		assert.Equal(t, "file://"+secret, api.JWTSource, "raw file:// reference should be left unresolved")
 	})
 
 	t.Run("multi-line PEM content is valid JSON after substitution", func(t *testing.T) {

@@ -1323,7 +1323,7 @@ type EnforceTimeout struct {
 
 	// Duration is the configured timeout duration. Supports sub-second values (e.g. "500ms", "5s").
 	//
-	// Tyk classic API definition: `version_data.versions.extended_paths.hard_timeouts[].timeout_duration`.
+	// Tyk classic API definition: `version_data.versions.extended_paths.hard_timeouts[].duration`.
 	Duration tyktime.ReadableDuration `bson:"duration,omitempty" json:"duration,omitempty"`
 }
 

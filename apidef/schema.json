@@ -642,7 +642,7 @@
                           "timeout": {
                             "type": "integer"
                           },
-                          "timeout_duration": {
+                          "duration": {
                             "type": "string",
                             "pattern": "^(\\d+(?:\\.\\d+)?m)?(\\d+(?:\\.\\d+)?s)?(\\d+(?:\\.\\d+)?ms)?$"
                           }
