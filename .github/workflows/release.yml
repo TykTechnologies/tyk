@@ -129,7 +129,7 @@ jobs:
           ci/bin/unlock-agent.sh
           git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
-          goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign,docker' || '--skip=docker' }}' | tee /tmp/build.sh
+          goreleaser release --timeout 120m --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign,docker' || '--skip=docker' }}' | tee /tmp/build.sh
           chmod +x /tmp/build.sh
           docker run --rm --privileged -e GITHUB_TOKEN=${{ github.token }} \
           -e GOPRIVATE=github.com/TykTechnologies                                \
@@ -986,7 +986,7 @@ jobs:
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk-analytics
 
           # Build packages for current platform (GOOS and GOARCH are set via docker -e)
-          goreleaser release --clean -f ci/goreleaser/goreleaser.yml --snapshot --skip=sign,docker
+          goreleaser release --timeout 120m --clean -f ci/goreleaser/goreleaser.yml --snapshot --skip=sign,docker
           EOF
 
           chmod +x /tmp/build-dashboard.sh
