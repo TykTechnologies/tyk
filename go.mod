@@ -132,6 +132,7 @@ require (
 	go.uber.org/mock v0.5.0
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 	golang.org/x/oauth2 v0.36.0
+	google.golang.org/api v0.259.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -595,7 +596,6 @@ require (
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.44.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
-	google.golang.org/api v0.259.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260401024825-9d38bb4040a9 // indirect
@@ -630,3 +630,5 @@ require (
 replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
 
 replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.92.1-0.20260211103127-0004a8367058
+
+replace github.com/TykTechnologies/storage => ../storage
