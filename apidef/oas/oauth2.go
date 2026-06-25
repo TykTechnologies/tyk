@@ -342,6 +342,7 @@ const (
 	OAuth2ClaimIss = "iss"
 	OAuth2ClaimSub = "sub"
 	OAuth2ClaimExp = "exp"
+	OAuth2ClaimAzp = "azp"
 
 	// OAuth2 response / WWW-Authenticate field names.
 	OAuth2FieldError            = "error"

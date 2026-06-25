@@ -52,6 +52,14 @@ const (
 	// OAuth2ScopeCheckFailed fires when an OAS-native scope check
 	// rejects a request (insufficient_scope per RFC 6750 §3.1).
 	OAuth2ScopeCheckFailed Event = "OAuth2ScopeCheckFailed"
+
+	// OAuth2ExchangeSucceeded fires when an RFC 8693 token exchange
+	// returns a token for the subject (cache miss or cache hit).
+	OAuth2ExchangeSucceeded Event = "OAuth2ExchangeSucceeded"
+	// OAuth2ExchangeFailed fires when an exchange is rejected. The
+	// oauth2_exchange_outcome meta field distinguishes an IdP error from a
+	// no-matching-provider rejection.
+	OAuth2ExchangeFailed Event = "OAuth2ExchangeFailed"
 )
 
 // Rate limiter events
