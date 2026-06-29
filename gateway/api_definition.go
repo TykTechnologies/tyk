@@ -793,7 +793,28 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 }
 
 func dashboardAPIsPayloadHash(message json.RawMessage) [32]byte {
-	return sha256.Sum256(message)
+	return controlPlanePayloadHash(message)
+}
+
+func controlPlanePayloadHash(payload []byte) [32]byte {
+	return sha256.Sum256(payload)
+}
+
+func (gw *Gateway) saveRPCDefinitionsBackupIfNeeded(apiCollection string, payloadHash [32]byte) {
+	if rpc.LoadCount() <= 0 {
+		return
+	}
+
+	if cachedHash, ok := gw.rpcAPIsBackupPayloadHash.get(); ok && cachedHash == payloadHash {
+		return
+	}
+
+	if err := gw.saveRPCDefinitionsBackup(apiCollection); err != nil {
+		log.Error(err)
+		return
+	}
+
+	gw.rpcAPIsBackupPayloadHash.setValue(payloadHash)
 }
 
 var envRegex = regexp.MustCompile(`env://([^"]+)`)
@@ -925,16 +946,31 @@ func (a APIDefinitionLoader) FromRPC(store RPCDataLoader, orgId string, gw *Gate
 
 	apiCollection := store.GetApiDefinitions(orgId, tags)
 	apiCollection = string(a.replaceSecrets([]byte(apiCollection)))
+	payloadHash := controlPlanePayloadHash([]byte(apiCollection))
 
 	//store.Disconnect()
 
-	if rpc.LoadCount() > 0 {
-		if err := gw.saveRPCDefinitionsBackup(apiCollection); err != nil {
-			log.Error(err)
+	if cachedHash, ok := gw.rpcAPIsPayloadHash.get(); ok && cachedHash == payloadHash {
+		specs := gw.getCurrentAPISpecsSnapshot()
+		if len(specs) > 0 {
+			gw.saveRPCDefinitionsBackupIfNeeded(apiCollection, payloadHash)
+			log.WithFields(logrus.Fields{
+				"api_count":     len(specs),
+				"payload_bytes": len(apiCollection),
+			}).Debug("Using cached API specs for unchanged RPC API payload")
+			return specs, nil
 		}
 	}
 
-	return a.processRPCDefinitions(apiCollection, gw)
+	specs, err := a.processRPCDefinitions(apiCollection, gw)
+	if err != nil {
+		return nil, err
+	}
+
+	gw.saveRPCDefinitionsBackupIfNeeded(apiCollection, payloadHash)
+	gw.rpcAPIsPayloadHash.setValue(payloadHash)
+
+	return specs, nil
 }
 
 func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gateway) ([]*APISpec, error) {

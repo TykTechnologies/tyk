@@ -1586,6 +1586,55 @@ func TestLoadPoliciesFromRPC(t *testing.T) {
 	})
 }
 
+func TestLoadPoliciesFromRPCUnchangedPayloadFastPath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	forceRPCNormalModeForTest(t)
+
+	orgId := "org123"
+	existing := user.Policy{
+		ID:    "existing-policy-id",
+		OrgID: orgId,
+	}
+	ts.Gw.policies.Reload(existing)
+
+	payload := "not-json"
+	ts.Gw.rpcPoliciesPayloadHash.setValue(controlPlanePayloadHash([]byte(payload)))
+
+	store := policy.NewMockRPCDataLoader(gomock.NewController(t))
+	store.EXPECT().Connect().Return(true)
+	store.EXPECT().GetPolicies(orgId).Return(payload)
+
+	policies, err := ts.Gw.LoadPoliciesFromRPC(store, orgId)
+
+	assert.NoError(t, err, "Gateway.LoadPoliciesFromRPC(unchanged payload) should skip parsing unchanged RPC payload")
+	if assert.Len(t, policies, 1, "Gateway.LoadPoliciesFromRPC(unchanged payload) should return current policy snapshot") {
+		assert.Equal(t, existing.ID, policies[0].ID, "Gateway.LoadPoliciesFromRPC(unchanged payload) should return existing policy")
+	}
+}
+
+func TestLoadPoliciesFromRPCConfigChangeInvalidatesUnchangedPayloadFastPath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	forceRPCNormalModeForTest(t)
+
+	orgId := "org123"
+	payload := "not-json"
+	ts.Gw.rpcPoliciesPayloadHash.setValue(controlPlanePayloadHash([]byte(payload)))
+
+	updatedConf := ts.Gw.GetConfig()
+	updatedConf.IgnoreEndpointCase = !updatedConf.IgnoreEndpointCase
+	ts.Gw.SetConfig(updatedConf)
+
+	store := policy.NewMockRPCDataLoader(gomock.NewController(t))
+	store.EXPECT().Connect().Return(true)
+	store.EXPECT().GetPolicies(orgId).Return(payload)
+
+	_, err := ts.Gw.LoadPoliciesFromRPC(store, orgId)
+
+	assert.Error(t, err, "Gateway.LoadPoliciesFromRPC(config changed) should parse unchanged RPC payload after hash invalidation")
+}
+
 func TestSetupGlobals_MaxDecompressedSize(t *testing.T) {
 	origSize := compression.GetMaxDecompressedSize()
 	defer compression.SetMaxDecompressedSize(origSize)

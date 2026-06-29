@@ -114,6 +114,32 @@ const (
 	externalOAuthJWKCacheCleanupInterval = 30
 )
 
+type gatewayPayloadHash struct {
+	mu  sync.RWMutex
+	val [32]byte
+	set bool
+}
+
+func (h *gatewayPayloadHash) get() ([32]byte, bool) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.val, h.set
+}
+
+func (h *gatewayPayloadHash) setValue(hash [32]byte) {
+	h.mu.Lock()
+	h.val = hash
+	h.set = true
+	h.mu.Unlock()
+}
+
+func (h *gatewayPayloadHash) clear() {
+	h.mu.Lock()
+	h.val = [32]byte{}
+	h.set = false
+	h.mu.Unlock()
+}
+
 type Gateway struct {
 	DefaultProxyMux   *proxyMux
 	config            atomic.Value
@@ -187,6 +213,13 @@ type Gateway struct {
 	dashboardAPIsPayloadHashMu  sync.RWMutex
 	dashboardAPIsPayloadHash    [32]byte
 	dashboardAPIsPayloadHashSet bool
+
+	// RPC payload hashes avoid rebuilding unchanged MDCB payloads on repeated
+	// reload checks while keeping API/policy backup writes independently tracked.
+	rpcAPIsPayloadHash           gatewayPayloadHash
+	rpcAPIsBackupPayloadHash     gatewayPayloadHash
+	rpcPoliciesPayloadHash       gatewayPayloadHash
+	rpcPoliciesBackupPayloadHash gatewayPayloadHash
 
 	apisMu          sync.RWMutex
 	apiSpecs        []*APISpec
@@ -389,12 +422,15 @@ func (gw *Gateway) getCurrentAPISpecsSnapshot() []*APISpec {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
 
-	if len(gw.apiSpecs) == 0 {
-		return nil
-	}
-
 	out := make([]*APISpec, len(gw.apiSpecs))
 	copy(out, gw.apiSpecs)
+	return out
+}
+
+func (gw *Gateway) getCurrentPoliciesSnapshot() []user.Policy {
+	policies := gw.policies.AsSlice()
+	out := make([]user.Policy, len(policies))
+	copy(out, policies)
 	return out
 }
 
@@ -416,6 +452,13 @@ func (gw *Gateway) clearDashboardAPIsPayloadHash() {
 	gw.dashboardAPIsPayloadHash = [32]byte{}
 	gw.dashboardAPIsPayloadHashSet = false
 	gw.dashboardAPIsPayloadHashMu.Unlock()
+}
+
+func (gw *Gateway) clearRPCPayloadHashes() {
+	gw.rpcAPIsPayloadHash.clear()
+	gw.rpcAPIsBackupPayloadHash.clear()
+	gw.rpcPoliciesPayloadHash.clear()
+	gw.rpcPoliciesBackupPayloadHash.clear()
 }
 
 func (gw *Gateway) deleteApi(spec *APISpec) {
@@ -2824,6 +2867,7 @@ func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Unlock()
 
 	gw.clearDashboardAPIsPayloadHash()
+	gw.clearRPCPayloadHashes()
 
 	// Invalidate cached config viewer so the next request rebuilds it
 	// with the updated configuration.

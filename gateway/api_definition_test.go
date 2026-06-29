@@ -1984,6 +1984,86 @@ func Test_LoadAPIsFromRPC(t *testing.T) {
 	})
 }
 
+type rawRPCDataLoader struct {
+	shouldConnect bool
+	apis          string
+	policies      string
+}
+
+func (s rawRPCDataLoader) Connect() bool {
+	return s.shouldConnect
+}
+
+func (s rawRPCDataLoader) GetApiDefinitions(_ string, _ []string) string {
+	return s.apis
+}
+
+func (s rawRPCDataLoader) GetPolicies(_ string) string {
+	return s.policies
+}
+
+func forceRPCNormalModeForTest(t *testing.T) {
+	t.Helper()
+
+	prevEmergencyMode := rpc.IsEmergencyMode()
+	prevLoadCount := rpc.LoadCount()
+
+	rpc.SetEmergencyMode(t, false)
+	rpc.SetLoadCounts(t, 0)
+
+	t.Cleanup(func() {
+		rpc.SetEmergencyMode(t, prevEmergencyMode)
+		rpc.SetLoadCounts(t, prevLoadCount)
+	})
+}
+
+func TestFromRPCUnchangedPayloadFastPath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	forceRPCNormalModeForTest(t)
+
+	existing := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "existing-api-id",
+			Name:  "existing-api",
+			OrgID: "org1",
+		},
+	}
+	ts.Gw.apisMu.Lock()
+	ts.Gw.apiSpecs = []*APISpec{existing}
+	ts.Gw.apisByID = map[string]*APISpec{existing.APIID: existing}
+	ts.Gw.apisMu.Unlock()
+
+	payload := "not-json"
+	ts.Gw.rpcAPIsPayloadHash.setValue(controlPlanePayloadHash([]byte(payload)))
+
+	loader := APIDefinitionLoader{Gw: ts.Gw}
+	specs, err := loader.FromRPC(rawRPCDataLoader{shouldConnect: true, apis: payload}, "org1", ts.Gw)
+
+	assert.NoError(t, err, "APIDefinitionLoader.FromRPC(unchanged payload) should skip parsing unchanged RPC payload")
+	if assert.Len(t, specs, 1, "APIDefinitionLoader.FromRPC(unchanged payload) should return current API snapshot") {
+		assert.Same(t, existing, specs[0], "APIDefinitionLoader.FromRPC(unchanged payload) should return existing API spec")
+	}
+}
+
+func TestFromRPCConfigChangeInvalidatesUnchangedPayloadFastPath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	forceRPCNormalModeForTest(t)
+
+	payload := "not-json"
+	ts.Gw.rpcAPIsPayloadHash.setValue(controlPlanePayloadHash([]byte(payload)))
+
+	updatedConf := ts.Gw.GetConfig()
+	updatedConf.IgnoreEndpointCase = !updatedConf.IgnoreEndpointCase
+	ts.Gw.SetConfig(updatedConf)
+
+	loader := APIDefinitionLoader{Gw: ts.Gw}
+	_, err := loader.FromRPC(rawRPCDataLoader{shouldConnect: true, apis: payload}, "org1", ts.Gw)
+
+	assert.Error(t, err, "APIDefinitionLoader.FromRPC(config changed) should parse unchanged RPC payload after hash invalidation")
+}
+
 func TestAPISpec_hasMock(t *testing.T) {
 	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
 	assert.False(t, s.hasActiveMock())

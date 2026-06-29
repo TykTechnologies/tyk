@@ -298,6 +298,19 @@ func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string) ([]use
 	if rpcPolicies == "" {
 		return nil, errors.New("failed to fetch policies from RPC store; connection may be down")
 	}
+	payloadHash := controlPlanePayloadHash([]byte(rpcPolicies))
+
+	if cachedHash, ok := gw.rpcPoliciesPayloadHash.get(); ok && cachedHash == payloadHash {
+		policies := gw.getCurrentPoliciesSnapshot()
+		if len(policies) > 0 {
+			gw.saveRPCPoliciesBackupIfNeeded(rpcPolicies, payloadHash)
+			log.WithFields(logrus.Fields{
+				"policy_count":  len(policies),
+				"payload_bytes": len(rpcPolicies),
+			}).Debug("Using cached policies for unchanged RPC policy payload")
+			return policies, nil
+		}
+	}
 
 	policies, err := parsePoliciesFromRPC(rpcPolicies)
 
@@ -308,9 +321,21 @@ func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string) ([]use
 		return nil, err
 	}
 
-	if err := gw.saveRPCPoliciesBackup(rpcPolicies); err != nil {
-		log.Error(err)
-	}
+	gw.saveRPCPoliciesBackupIfNeeded(rpcPolicies, payloadHash)
+	gw.rpcPoliciesPayloadHash.setValue(payloadHash)
 
 	return policies, nil
+}
+
+func (gw *Gateway) saveRPCPoliciesBackupIfNeeded(rpcPolicies string, payloadHash [32]byte) {
+	if cachedHash, ok := gw.rpcPoliciesBackupPayloadHash.get(); ok && cachedHash == payloadHash {
+		return
+	}
+
+	if err := gw.saveRPCPoliciesBackup(rpcPolicies); err != nil {
+		log.Error(err)
+		return
+	}
+
+	gw.rpcPoliciesBackupPayloadHash.setValue(payloadHash)
 }
