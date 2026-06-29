@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	stdlog "log"
 	"log/syslog"
+	"math/rand"
 	"net"
 	"net/http"
 	pprofhttp "net/http/pprof"
@@ -17,6 +18,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"runtime/pprof"
 	"strconv"
 	"strings"
@@ -85,7 +87,8 @@ var (
 	pubSubLog = log.WithField("prefix", "pub-sub")
 	rawLog    = logger.GetRaw()
 
-	memProfFile *os.File
+	memProfFile            *os.File
+	releaseGatewayHeapToOS = debug.FreeOSMemory
 
 	// confPaths is the series of paths to try to use as config files. The
 	// first one to exist will be used. If none exists, a default config
@@ -127,6 +130,17 @@ type Gateway struct {
 	drlOnce    sync.Once
 	DRLManager *drl.DRL
 	reloadMu   sync.Mutex
+	// controlPlaneMu coordinates cooldown state for expensive dashboard/redis
+	// control-plane operations. Startup retries do not use this cooldown.
+	controlPlaneMu             sync.Mutex
+	controlPlaneFailureCount   int
+	controlPlaneNextAttempt    time.Time
+	controlPlaneRetryScheduled int32
+	controlPlaneLastReloadAt   time.Time
+	// Debounce redis reconnect-triggered reloads to avoid reconnect/reload storms
+	// when redis flaps under pressure.
+	storageReconnectReloadMu       sync.Mutex
+	storageReconnectLastReloadTime time.Time
 
 	Analytics            RedisAnalyticsHandler
 	GlobalEventsJSVM     JSVM
@@ -225,7 +239,8 @@ type Gateway struct {
 
 	// This is a list of callbacks to execute on the next reload. It is protected by
 	// requeueLock for concurrent use.
-	requeue []func()
+	requeue      []func()
+	reloadQueued bool
 
 	// ReloadTestCase use this when in any test for gateway reloads
 	ReloadTestCase *ReloadMachinery
@@ -1328,27 +1343,65 @@ func (gw *Gateway) DoReloadWithError() error {
 		return err
 	}
 
+	apiCount := 0
+
 	// load the specs
 	if count, err := syncResourcesWithReload("apis", gw.GetConfig(), gw.syncAPISpecs); err != nil {
 		mainLog.Error("Error during syncing apis")
 		return err
 	} else {
+		apiCount = count
 		// skip re-loading only if dashboard service reported 0 APIs
 		// and current registry had 0 APIs
 		if count == 0 && gw.apisByIDLen() == 0 {
 			mainLog.Warning("No API Definitions found, not reloading")
+			gw.clearControlPlaneFailure()
 			gw.markControlPlaneReady()
 			return nil
 		}
 	}
 
 	gw.loadGlobalApps()
+	gw.releaseHeapAfterLargeAPIReload(apiCount)
 
 	gw.MetricInstruments.RecordReload(gw.ctx, time.Since(start))
 
+	gw.clearControlPlaneFailure()
 	gw.markControlPlaneReady()
 	mainLog.Info("API reload complete")
 	return nil
+}
+
+func (gw *Gateway) releaseHeapAfterLargeAPIReload(apiCount int) bool {
+	minAPIs := gw.GetConfig().APIReload.EffectiveHeapReleaseMinAPIs()
+	if minAPIs < 0 || apiCount < minAPIs {
+		return false
+	}
+
+	var before runtime.MemStats
+	runtime.ReadMemStats(&before)
+
+	releaseGatewayHeapToOS()
+
+	var after runtime.MemStats
+	runtime.ReadMemStats(&after)
+
+	mainLog.WithFields(logrus.Fields{
+		"api_count":         apiCount,
+		"min_api_count":     minAPIs,
+		"heap_alloc_before": before.HeapAlloc,
+		"heap_alloc_after":  after.HeapAlloc,
+		"heap_inuse_before": before.HeapInuse,
+		"heap_inuse_after":  after.HeapInuse,
+		"heap_idle_before":  before.HeapIdle,
+		"heap_idle_after":   after.HeapIdle,
+		"heap_sys_before":   before.HeapSys,
+		"heap_sys_after":    after.HeapSys,
+		"num_gc_before":     before.NumGC,
+		"num_gc_after":      after.NumGC,
+	}).Info("Released transient heap after large API reload")
+
+	return true
 }
 
 func (gw *Gateway) markControlPlaneReady() {
@@ -1362,8 +1415,21 @@ func (gw *Gateway) markControlPlaneReady() {
 // in RPCStorageHandler and the emergencyModeLoadedFunc func() parameter in
 // rpc.Connect without a much wider refactor.
 func (gw *Gateway) DoReload() {
+	if gw.GetConfig().UseDBAppConfigs {
+		if wait := gw.controlPlaneRetryAfter(); wait > 0 {
+			mainLog.WithField("retry_in", wait.String()).
+				Warn("Skipping control-plane reload during cooldown window")
+			gw.scheduleControlPlaneReload(wait)
+			return
+		}
+	}
+
 	if err := gw.DoReloadWithError(); err != nil {
 		mainLog.Errorf("Reload failed: %v", err)
+		if gw.GetConfig().UseDBAppConfigs {
+			delay := gw.markControlPlaneFailure("reload", err)
+			gw.scheduleControlPlaneReload(delay)
+		}
 	}
 }
 
@@ -1372,6 +1438,11 @@ const (
 	reloadRetryInitialInterval = 5 * time.Second
 	reloadRetryMaxInterval     = 60 * time.Second
 	reloadRetryMultiplier      = 2.0
+
+	controlPlaneReloadMinGap            = 3 * time.Second
+	controlPlaneFailureRetryMaxInterval = 45 * time.Second
+	controlPlaneFailureRetryJitterMax   = 500 * time.Millisecond
+	storageReconnectReloadMinGap        = 20 * time.Second
 )
 
 // DoReloadWithRetry calls DoReloadWithError in an exponential-backoff retry
@@ -1407,6 +1478,138 @@ func (gw *Gateway) DoReloadWithRetry(ctx context.Context) {
 	if err != nil && ctx.Err() != nil {
 		mainLog.Warning("Reload retry abandoned: gateway shutting down")
 	}
+}
+
+func (gw *Gateway) controlPlaneRetryAfter() time.Duration {
+	gw.controlPlaneMu.Lock()
+	defer gw.controlPlaneMu.Unlock()
+
+	if gw.controlPlaneNextAttempt.IsZero() {
+		return 0
+	}
+
+	now := time.Now()
+	if now.After(gw.controlPlaneNextAttempt) {
+		return 0
+	}
+
+	return gw.controlPlaneNextAttempt.Sub(now)
+}
+
+func (gw *Gateway) canStartControlPlaneReload(now time.Time) (bool, time.Duration) {
+	if !gw.GetConfig().UseDBAppConfigs {
+		return true, 0
+	}
+
+	gw.controlPlaneMu.Lock()
+	defer gw.controlPlaneMu.Unlock()
+
+	if !gw.controlPlaneLastReloadAt.IsZero() {
+		elapsed := now.Sub(gw.controlPlaneLastReloadAt)
+		if elapsed < controlPlaneReloadMinGap {
+			return false, controlPlaneReloadMinGap - elapsed
+		}
+	}
+
+	gw.controlPlaneLastReloadAt = now
+	return true, 0
+}
+
+func (gw *Gateway) markControlPlaneFailure(scope string, err error) time.Duration {
+	gw.controlPlaneMu.Lock()
+	defer gw.controlPlaneMu.Unlock()
+
+	gw.controlPlaneFailureCount++
+	attempt := gw.controlPlaneFailureCount
+	if attempt < 1 {
+		attempt = 1
+	}
+
+	exp := attempt - 1
+	if exp > 6 {
+		exp = 6
+	}
+
+	delay := time.Duration(1<<exp) * time.Second
+	if delay > controlPlaneFailureRetryMaxInterval {
+		delay = controlPlaneFailureRetryMaxInterval
+	}
+	delay += gatewayReloadJitter(controlPlaneFailureRetryJitterMax)
+	gw.controlPlaneNextAttempt = time.Now().Add(delay)
+
+	mainLog.WithError(err).WithFields(logrus.Fields{
+		"scope":              scope,
+		"failure_count":      gw.controlPlaneFailureCount,
+		"next_retry_in":      delay.String(),
+		"cooldown_until_utc": gw.controlPlaneNextAttempt.UTC().Format(time.RFC3339),
+	}).Warn("Control-plane operation failed; opening cooldown window")
+
+	return delay
+}
+
+func (gw *Gateway) clearControlPlaneFailure() {
+	gw.controlPlaneMu.Lock()
+	gw.controlPlaneFailureCount = 0
+	gw.controlPlaneNextAttempt = time.Time{}
+	gw.controlPlaneMu.Unlock()
+}
+
+func (gw *Gateway) scheduleControlPlaneReload(delay time.Duration) {
+	if delay <= 0 {
+		delay = 500 * time.Millisecond
+	}
+
+	if !atomic.CompareAndSwapInt32(&gw.controlPlaneRetryScheduled, 0, 1) {
+		return
+	}
+
+	go func() {
+		defer atomic.StoreInt32(&gw.controlPlaneRetryScheduled, 0)
+		ctx := gw.ctx
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		if err := sleepWithContext(ctx, delay); err != nil {
+			return
+		}
+		gw.reloadURLStructure(nil)
+	}()
+}
+
+func (gw *Gateway) handleStorageReconnect() {
+	if !gw.GetConfig().UseDBAppConfigs {
+		gw.reloadURLStructure(func() {})
+		return
+	}
+
+	gw.ServiceNonceMutex.RLock()
+	hasNonce := gw.ServiceNonce != ""
+	gw.ServiceNonceMutex.RUnlock()
+	hasNodeID := gw.GetNodeID() != ""
+	if !hasNonce || !hasNodeID {
+		mainLog.WithFields(logrus.Fields{
+			"has_nonce":   hasNonce,
+			"has_node_id": hasNodeID,
+		}).Warn("Skipping reconnect-triggered reload before dashboard registration is complete")
+		return
+	}
+
+	gw.storageReconnectReloadMu.Lock()
+	defer gw.storageReconnectReloadMu.Unlock()
+
+	now := time.Now()
+	if !gw.storageReconnectLastReloadTime.IsZero() {
+		if since := now.Sub(gw.storageReconnectLastReloadTime); since < storageReconnectReloadMinGap {
+			mainLog.WithField("since_last_reload", since.String()).
+				WithField("min_gap", storageReconnectReloadMinGap.String()).
+				Warn("Skipping reconnect-triggered reload within debounce window")
+			return
+		}
+	}
+
+	gw.storageReconnectLastReloadTime = now
+	mainLog.Info("Storage reconnected; scheduling debounced control-plane reload")
+	gw.reloadURLStructure(nil)
 }
 
 func createCORSWrapper(spec *APISpec) func(handler http.HandlerFunc) http.HandlerFunc {
@@ -1471,10 +1674,42 @@ func syncResourcesWithReload(resource string, conf config.Config, syncFunc func(
 			break
 		}
 
-		time.Sleep(time.Duration(conf.ResourceSync.Interval) * time.Second)
+		time.Sleep(resourceSyncRetryDelay(conf.ResourceSync.Interval, i))
 	}
 
 	return 0, fmt.Errorf("syncing %s failed %w", resource, err)
+}
+
+func resourceSyncRetryDelay(baseIntervalSeconds, attempt int) time.Duration {
+	if attempt < 1 {
+		attempt = 1
+	}
+
+	base := time.Second
+	if baseIntervalSeconds > 0 {
+		base = time.Duration(baseIntervalSeconds) * time.Second
+	}
+
+	delay := base * time.Duration(1<<(attempt-1))
+	if delay > 30*time.Second {
+		delay = 30 * time.Second
+	}
+
+	jitterMax := delay / 5
+	if jitterMax < 200*time.Millisecond {
+		jitterMax = 200 * time.Millisecond
+	}
+
+	return delay + gatewayReloadJitter(jitterMax)
+}
+
+func gatewayReloadJitter(max time.Duration) time.Duration {
+	if max <= 0 {
+		return 0
+	}
+
+	r := rand.New(rand.NewSource(time.Now().UnixNano() ^ int64(os.Getpid())))
+	return time.Duration(r.Int63n(int64(max)))
 }
 
 // shouldReload returns true if we should perform any reload. Reloads happens if
@@ -1482,11 +1717,12 @@ func syncResourcesWithReload(resource string, conf config.Config, syncFunc func(
 func (gw *Gateway) shouldReload() ([]func(), bool) {
 	gw.requeueLock.Lock()
 	defer gw.requeueLock.Unlock()
-	if len(gw.requeue) == 0 {
+	if !gw.reloadQueued && len(gw.requeue) == 0 {
 		return nil, false
 	}
 	n := gw.requeue
 	gw.requeue = []func(){}
+	gw.reloadQueued = false
 	return n, true
 }
 
@@ -1501,6 +1737,15 @@ func (gw *Gateway) reloadLoop(tick <-chan time.Time, complete ...func()) {
 		case <-tick:
 			cb, ok := gw.shouldReload()
 			if !ok {
+				continue
+			}
+			if allowed, wait := gw.canStartControlPlaneReload(time.Now()); !allowed {
+				mainLog.WithField("retry_in", wait.String()).
+					Warn("Deferring control-plane reload inside debounce window")
+				gw.requeueLock.Lock()
+				gw.requeue = append(gw.requeue, cb...)
+				gw.reloadQueued = true
+				gw.requeueLock.Unlock()
 				continue
 			}
 			start := time.Now()
@@ -1533,7 +1778,10 @@ func (gw *Gateway) reloadQueueLoop(cb ...func()) {
 			return
 		case fn := <-gw.reloadQueue:
 			gw.requeueLock.Lock()
-			gw.requeue = append(gw.requeue, fn)
+			if fn != nil {
+				gw.requeue = append(gw.requeue, fn)
+			}
+			gw.reloadQueued = true
 			gw.requeueLock.Unlock()
 			mainLog.Info("Reload queued")
 			if len(cb) != 0 {
@@ -1553,7 +1801,29 @@ func (gw *Gateway) reloadQueueLoop(cb ...func()) {
 // reload is already queued, another won't be queued, but done will
 // still be called when said queued reload is finished.
 func (gw *Gateway) reloadURLStructure(done func()) {
-	gw.reloadQueue <- done
+	gw.requeueLock.Lock()
+	if done != nil {
+		gw.requeue = append(gw.requeue, done)
+	}
+	if gw.reloadQueued {
+		gw.requeueLock.Unlock()
+		return
+	}
+	gw.reloadQueued = true
+	gw.requeueLock.Unlock()
+
+	var doneCh <-chan struct{}
+	if gw.ctx != nil {
+		doneCh = gw.ctx.Done()
+	}
+
+	select {
+	case gw.reloadQueue <- nil:
+	case <-doneCh:
+		gw.requeueLock.Lock()
+		gw.reloadQueued = false
+		gw.requeueLock.Unlock()
+	}
 }
 
 func (gw *Gateway) setupLogger() {
@@ -1723,7 +1993,7 @@ func (gw *Gateway) initSystem() error {
 	}
 
 	go gw.StorageConnectionHandler.Connect(gw.ctx, func() {
-		gw.reloadURLStructure(func() {})
+		gw.handleStorageReconnect()
 	}, &gwConfig)
 
 	timeout, cancel := context.WithTimeout(context.Background(), time.Second)

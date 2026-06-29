@@ -22,6 +22,10 @@ type IPsHandleStrategy string
 
 const GracefulShutdownDefaultDuration = 30
 
+// DefaultAPIReloadHeapReleaseMinAPIs is the default API count threshold for
+// returning transient reload heap to the OS after a successful API reload.
+const DefaultAPIReloadHeapReleaseMinAPIs = 100
+
 var (
 	log = logger.Get()
 
@@ -66,6 +70,9 @@ var (
 				CheckCooldownSeconds: DefaultCheckCooldownSeconds,
 				EventCooldownSeconds: DefaultEventCooldownSeconds,
 			},
+		},
+		APIReload: APIReloadConfig{
+			HeapReleaseMinAPIs: DefaultAPIReloadHeapReleaseMinAPIs,
 		},
 	}
 )
@@ -1391,6 +1398,9 @@ type Config struct {
 	// ResourceSync configures mitigation strategy in case sync fails.
 	ResourceSync ResourceSyncConfig `json:"resource_sync"`
 
+	// APIReload configures memory controls applied after API reload.
+	APIReload APIReloadConfig `json:"api_reload"`
+
 	// Private contains configuration fields for internal app usage.
 	Private Private `json:"-"`
 
@@ -1445,6 +1455,25 @@ type ResourceSyncConfig struct {
 
 	// Interval configures the interval in seconds between each retry on a resource sync error.
 	Interval int `json:"interval"`
+}
+
+// APIReloadConfig controls memory behavior after API reloads.
+type APIReloadConfig struct {
+	// HeapReleaseMinAPIs defines the minimum loaded API count that triggers
+	// returning transient reload heap to the OS after a successful API reload.
+	// Set to a negative value to disable this behavior.
+	HeapReleaseMinAPIs int `json:"heap_release_min_apis"`
+}
+
+// EffectiveHeapReleaseMinAPIs returns the active heap-release threshold.
+func (c APIReloadConfig) EffectiveHeapReleaseMinAPIs() int {
+	if c.HeapReleaseMinAPIs < 0 {
+		return c.HeapReleaseMinAPIs
+	}
+	if c.HeapReleaseMinAPIs == 0 {
+		return DefaultAPIReloadHeapReleaseMinAPIs
+	}
+	return c.HeapReleaseMinAPIs
 }
 
 type TykError struct {

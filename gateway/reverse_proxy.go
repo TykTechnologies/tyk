@@ -1383,7 +1383,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			alias = session.Alias
 		}
 
-		p.logger.WithFields(logrus.Fields{
+		fields := logrus.Fields{
 			"prefix":      "proxy",
 			"user_ip":     addrs,
 			"server_name": outreq.Host,
@@ -1391,7 +1391,15 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			"user_name":   alias,
 			"org_id":      p.TykAPISpec.OrgID,
 			"api_id":      p.TykAPISpec.APIID,
-		}).Error("http: proxy error: ", err)
+		}
+
+		if isClientCanceledProxyError(err) {
+			p.logger.WithFields(fields).Debug("http: proxy client canceled request: ", err)
+			p.ErrorHandler.HandleError(rw, logreq, "Client closed request", 499, true)
+			return ProxyResponse{UpstreamLatency: upstreamLatency}
+		}
+
+		p.logger.WithFields(fields).Error("http: proxy error: ", err)
 
 		if strings.HasPrefix(err.Error(), "mock:") {
 			p.ErrorHandler.HandleError(rw, logreq, err.Error(), res.StatusCode, true)
@@ -1405,11 +1413,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 				p.logger.Debug("[PROXY] [SERVICE DISCOVERY] Upstream host failed, refreshing host list")
 				p.Gw.ServiceCache.Delete(p.TykAPISpec.APIID)
 			}
-			return ProxyResponse{UpstreamLatency: upstreamLatency}
-		}
-
-		if strings.Contains(err.Error(), "context canceled") {
-			p.ErrorHandler.HandleError(rw, logreq, "Client closed request", 499, true)
 			return ProxyResponse{UpstreamLatency: upstreamLatency}
 		}
 
@@ -1514,6 +1517,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	p.HandleResponse(rw, res, ses)
 	return ProxyResponse{UpstreamLatency: upstreamLatency, Response: inres}
+}
+
+func isClientCanceledProxyError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return errors.Is(err, context.Canceled) || strings.Contains(err.Error(), "context canceled")
 }
 
 func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) error {

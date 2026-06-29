@@ -1800,6 +1800,200 @@ func TestDoReload_RecordsConfigStateOnSyncFailure(t *testing.T) {
 	metrictest.AssertGauge(t, policiesMetric, float64(0))
 }
 
+func TestGateway_CanStartControlPlaneReloadDebouncesDBConfig(t *testing.T) {
+	var gw Gateway
+	gw.SetConfig(config.Config{UseDBAppConfigs: true})
+
+	now := time.Unix(100, 0)
+	allowed, wait := gw.canStartControlPlaneReload(now)
+	if !allowed || wait != 0 {
+		t.Fatalf("canStartControlPlaneReload(first) = %t, %v, want true, 0", allowed, wait)
+	}
+
+	allowed, wait = gw.canStartControlPlaneReload(now.Add(time.Second))
+	if allowed {
+		t.Fatalf("canStartControlPlaneReload(second) allowed = true, want false")
+	}
+	if wait <= 0 || wait > controlPlaneReloadMinGap {
+		t.Fatalf("canStartControlPlaneReload(second) wait = %v, want within (0, %v]", wait, controlPlaneReloadMinGap)
+	}
+
+	allowed, wait = gw.canStartControlPlaneReload(now.Add(controlPlaneReloadMinGap))
+	if !allowed || wait != 0 {
+		t.Fatalf("canStartControlPlaneReload(after gap) = %t, %v, want true, 0", allowed, wait)
+	}
+}
+
+func TestGateway_ControlPlaneFailureCooldownClears(t *testing.T) {
+	var gw Gateway
+	err := errors.New("dashboard unavailable")
+
+	first := gw.markControlPlaneFailure("reload", err)
+	if first < time.Second || first > time.Second+controlPlaneFailureRetryJitterMax {
+		t.Fatalf("markControlPlaneFailure(first) = %v, want within [1s, %v]", first, time.Second+controlPlaneFailureRetryJitterMax)
+	}
+	if wait := gw.controlPlaneRetryAfter(); wait <= 0 || wait > first {
+		t.Fatalf("controlPlaneRetryAfter() after first failure = %v, want within (0, %v]", wait, first)
+	}
+
+	second := gw.markControlPlaneFailure("reload", err)
+	if second < 2*time.Second || second > 2*time.Second+controlPlaneFailureRetryJitterMax {
+		t.Fatalf("markControlPlaneFailure(second) = %v, want within [2s, %v]", second, 2*time.Second+controlPlaneFailureRetryJitterMax)
+	}
+
+	gw.clearControlPlaneFailure()
+	if wait := gw.controlPlaneRetryAfter(); wait != 0 {
+		t.Fatalf("controlPlaneRetryAfter() after clear = %v, want 0", wait)
+	}
+}
+
+func TestGateway_ScheduleControlPlaneReloadSingleflight(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	gw := &Gateway{
+		ctx:         ctx,
+		reloadQueue: make(chan func(), 2),
+	}
+
+	gw.scheduleControlPlaneReload(time.Millisecond)
+	gw.scheduleControlPlaneReload(time.Millisecond)
+
+	select {
+	case <-gw.reloadQueue:
+	case <-time.After(time.Second):
+		t.Fatal("scheduleControlPlaneReload() did not queue reload")
+	}
+
+	select {
+	case <-gw.reloadQueue:
+		t.Fatal("scheduleControlPlaneReload() queued duplicate reload")
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func TestGateway_HandleStorageReconnectSkipsUntilDashboardRegistration(t *testing.T) {
+	gw := &Gateway{
+		ctx:         context.Background(),
+		reloadQueue: make(chan func(), 1),
+	}
+	gw.SetConfig(config.Config{UseDBAppConfigs: true})
+
+	gw.handleStorageReconnect()
+	select {
+	case <-gw.reloadQueue:
+		t.Fatal("handleStorageReconnect() queued reload before dashboard registration")
+	default:
+	}
+
+	gw.SetNodeID("node-1")
+	gw.ServiceNonceMutex.Lock()
+	gw.ServiceNonce = "nonce-1"
+	gw.ServiceNonceMutex.Unlock()
+
+	gw.handleStorageReconnect()
+	select {
+	case <-gw.reloadQueue:
+	case <-time.After(time.Second):
+		t.Fatal("handleStorageReconnect() did not queue reload after dashboard registration")
+	}
+
+	gw.handleStorageReconnect()
+	select {
+	case <-gw.reloadQueue:
+		t.Fatal("handleStorageReconnect() queued duplicate reload inside debounce window")
+	default:
+	}
+}
+
+func TestResourceSyncRetryDelayBacksOffWithJitter(t *testing.T) {
+	first := resourceSyncRetryDelay(0, 1)
+	if first < time.Second || first > 1200*time.Millisecond {
+		t.Fatalf("resourceSyncRetryDelay(0, 1) = %v, want within [1s, 1.2s]", first)
+	}
+
+	second := resourceSyncRetryDelay(0, 2)
+	if second < 2*time.Second || second > 2400*time.Millisecond {
+		t.Fatalf("resourceSyncRetryDelay(0, 2) = %v, want within [2s, 2.4s]", second)
+	}
+
+	capped := resourceSyncRetryDelay(10, 10)
+	if capped < 30*time.Second || capped > 36*time.Second {
+		t.Fatalf("resourceSyncRetryDelay(10, 10) = %v, want within [30s, 36s]", capped)
+	}
+}
+
+func TestGatewayReleaseHeapAfterLargeAPIReloadHonoursConfig(t *testing.T) {
+	original := releaseGatewayHeapToOS
+	var calls int
+	releaseGatewayHeapToOS = func() {
+		calls++
+	}
+	t.Cleanup(func() {
+		releaseGatewayHeapToOS = original
+	})
+
+	tests := []struct {
+		name     string
+		conf     config.APIReloadConfig
+		apiCount int
+		want     bool
+	}{
+		{
+			name:     "zero config uses default threshold and skips below it",
+			conf:     config.APIReloadConfig{},
+			apiCount: config.DefaultAPIReloadHeapReleaseMinAPIs - 1,
+			want:     false,
+		},
+		{
+			name:     "zero config uses default threshold and releases at it",
+			conf:     config.APIReloadConfig{},
+			apiCount: config.DefaultAPIReloadHeapReleaseMinAPIs,
+			want:     true,
+		},
+		{
+			name:     "configured positive threshold is honoured",
+			conf:     config.APIReloadConfig{HeapReleaseMinAPIs: 3},
+			apiCount: 3,
+			want:     true,
+		},
+		{
+			name:     "configured positive threshold skips below it",
+			conf:     config.APIReloadConfig{HeapReleaseMinAPIs: 3},
+			apiCount: 2,
+			want:     false,
+		},
+		{
+			name:     "negative threshold disables heap release",
+			conf:     config.APIReloadConfig{HeapReleaseMinAPIs: -1},
+			apiCount: config.DefaultAPIReloadHeapReleaseMinAPIs,
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls = 0
+
+			var gw Gateway
+			gw.SetConfig(config.Config{APIReload: tt.conf})
+
+			got := gw.releaseHeapAfterLargeAPIReload(tt.apiCount)
+			if got != tt.want {
+				t.Fatalf("releaseHeapAfterLargeAPIReload(%d) = %t, want %t", tt.apiCount, got, tt.want)
+			}
+
+			wantCalls := 0
+			if tt.want {
+				wantCalls = 1
+			}
+			if calls != wantCalls {
+				t.Fatalf("releaseHeapAfterLargeAPIReload(%d) release calls = %d, want %d", tt.apiCount, calls, wantCalls)
+			}
+		})
+	}
+}
+
 // TestDoReloadWithRetry_RetriesUntilSuccess verifies that DoReloadWithRetry keeps
 // retrying when DoReloadWithError returns an error, and stops as soon as it succeeds.
 // It also confirms that performedSuccessfulReload is true after recovery.

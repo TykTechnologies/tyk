@@ -79,6 +79,51 @@ func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {
 	}
 }
 
+func TestIsClientCanceledProxyError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "nil",
+			err:  nil,
+			want: false,
+		},
+		{
+			name: "context canceled",
+			err:  context.Canceled,
+			want: true,
+		},
+		{
+			name: "wrapped context canceled",
+			err:  fmt.Errorf("proxy request failed: %w", context.Canceled),
+			want: true,
+		},
+		{
+			name: "string context canceled",
+			err:  errors.New("net/http: request canceled: context canceled"),
+			want: true,
+		},
+		{
+			name: "deadline exceeded is not client cancel",
+			err:  context.DeadlineExceeded,
+			want: false,
+		},
+		{
+			name: "upstream error is not client cancel",
+			err:  errors.New("dial tcp: no such host"),
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, isClientCanceledProxyError(tt.err))
+		})
+	}
+}
+
 func TestReverseProxyRetainHost(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

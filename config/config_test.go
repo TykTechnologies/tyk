@@ -69,6 +69,11 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 			func(c *Config) interface{} { return c.Security.CertificateExpiryMonitor.EventCooldownSeconds },
 			86400, 43200,
 		},
+		{
+			"APIReloadHeapReleaseMinAPIs", "TYK_GW_APIRELOAD_HEAPRELEASEMINAPIS",
+			func(c *Config) interface{} { return c.APIReload.HeapReleaseMinAPIs },
+			DefaultAPIReloadHeapReleaseMinAPIs, 250,
+		},
 	}
 
 	for _, tc := range cases {
@@ -92,6 +97,39 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 			}
 			if !reflect.DeepEqual(tc.FieldGetter(conf), tc.expectedValue) {
 				t.Fatalf("Expected %s to be set to %v, but got %v", tc.FieldName, tc.expectedValue, tc.FieldGetter(conf))
+			}
+		})
+	}
+}
+
+func TestAPIReloadConfigEffectiveHeapReleaseMinAPIs(t *testing.T) {
+	tests := []struct {
+		name string
+		conf APIReloadConfig
+		want int
+	}{
+		{
+			name: "zero falls back to resilient default",
+			conf: APIReloadConfig{},
+			want: DefaultAPIReloadHeapReleaseMinAPIs,
+		},
+		{
+			name: "positive value is honoured",
+			conf: APIReloadConfig{HeapReleaseMinAPIs: 250},
+			want: 250,
+		},
+		{
+			name: "negative value disables heap release",
+			conf: APIReloadConfig{HeapReleaseMinAPIs: -1},
+			want: -1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.conf.EffectiveHeapReleaseMinAPIs()
+			if got != tt.want {
+				t.Errorf("EffectiveHeapReleaseMinAPIs(%+v) = %d, want %d", tt.conf, got, tt.want)
 			}
 		})
 	}
