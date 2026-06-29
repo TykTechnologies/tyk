@@ -264,11 +264,18 @@ func (r *RedisCluster) up() error {
 	return nil
 }
 
+func logRedisClusterError(err error) {
+	if errors.Is(err, ErrRedisIsDown) {
+		return
+	}
+	log.Error(err)
+}
+
 // GetKey will retrieve a key from the database
 func (r *RedisCluster) GetKey(keyName string) (string, error) {
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return "", err
 	}
 
@@ -287,7 +294,7 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return nil, err
 	}
 
@@ -323,7 +330,7 @@ func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 func (r *RedisCluster) GetKeyTTL(keyName string) (ttl int64, err error) {
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return 0, err
 	}
 
@@ -333,7 +340,7 @@ func (r *RedisCluster) GetKeyTTL(keyName string) (ttl int64, err error) {
 func (r *RedisCluster) GetRawKey(keyName string) (string, error) {
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return "", err
 	}
 
@@ -355,7 +362,7 @@ func (r *RedisCluster) GetExp(keyName string) (int64, error) {
 func (r *RedisCluster) SetExp(keyName string, timeout int64) error {
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return err
 	}
 
@@ -370,7 +377,7 @@ func (r *RedisCluster) SetKey(keyName, session string, timeout int64) error {
 func (r *RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return err
 	}
 
@@ -381,7 +388,7 @@ func (r *RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
 func (r *RedisCluster) Lock(key string, timeout time.Duration) (bool, error) {
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return false, err
 	}
 
@@ -399,7 +406,7 @@ func (r *RedisCluster) Decrement(keyName string) {
 	// log.Debug("Decrementing key: ", keyName)
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return
 	}
 
@@ -413,7 +420,7 @@ func (r *RedisCluster) Decrement(keyName string) {
 func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 {
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return 0
 	}
 
@@ -465,7 +472,7 @@ func (r *RedisCluster) GetKeys(filter string) []string {
 func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]string {
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return nil
 	}
 
@@ -496,7 +503,7 @@ func (r *RedisCluster) GetKeysAndValues() map[string]string {
 func (r *RedisCluster) DeleteKey(keyName string) bool {
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return false
 	}
 
@@ -518,7 +525,7 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 func (r *RedisCluster) DeleteAllKeys() bool {
 	storage, err := r.flusher()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return false
 	}
 
@@ -535,7 +542,7 @@ func (r *RedisCluster) DeleteAllKeys() bool {
 func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return false
 	}
 
@@ -551,7 +558,7 @@ func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return false
 	}
 	log.Debug("Deleting: ", pattern)
@@ -567,7 +574,7 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 func (r *RedisCluster) DeleteRawKeys(keys []string) bool {
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return false
 	}
 
@@ -583,7 +590,7 @@ func (r *RedisCluster) DeleteRawKeys(keys []string) bool {
 func (r *RedisCluster) DeleteKeys(keys []string) bool {
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return false
 	}
 
@@ -604,7 +611,7 @@ func (r *RedisCluster) DeleteKeys(keys []string) bool {
 func (r *RedisCluster) StartPubSubHandler(ctx context.Context, channel string, callback func(interface{})) error {
 	storage, err := r.queue()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return err
 	}
 
@@ -652,7 +659,7 @@ func (r *RedisCluster) handleMessage(msg interface{}, err error, callback func(i
 func (r *RedisCluster) Publish(channel, message string) error {
 	storage, err := r.queue()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return err
 	}
 
@@ -667,7 +674,7 @@ func (r *RedisCluster) Publish(channel, message string) error {
 func (r *RedisCluster) GetAndDeleteSet(keyName string) []interface{} {
 	storage, err := r.list()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return nil
 	}
 
@@ -700,7 +707,7 @@ func (r *RedisCluster) AppendToSet(keyName, value string) {
 	log.WithField("fixedKey", fixedKey).Debug("Appending to fixed key list")
 	storage, err := r.list()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return
 	}
 
@@ -717,7 +724,7 @@ func (r *RedisCluster) Exists(keyName string) (bool, error) {
 
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return false, err
 	}
 
@@ -740,7 +747,7 @@ func (r *RedisCluster) RemoveFromList(keyName, value string) error {
 	log.WithFields(logEntry).Debug("Removing value from list")
 	storage, err := r.list()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return err
 	}
 
@@ -766,7 +773,7 @@ func (r *RedisCluster) GetListRange(keyName string, from, to int64) ([]string, e
 
 	storage, err := r.list()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return []string{}, err
 	}
 
@@ -787,7 +794,7 @@ func (r *RedisCluster) AppendToSetPipelined(key string, values [][]byte) {
 	fixedKey := r.fixKey(key)
 	storage, err := r.list()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return
 	}
 
@@ -802,7 +809,7 @@ func (r *RedisCluster) GetSet(keyName string) (map[string]string, error) {
 	log.Debug("Getting from fixed key set: ", r.fixKey(keyName))
 	storage, err := r.set()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return nil, err
 	}
 
@@ -825,7 +832,7 @@ func (r *RedisCluster) AddToSet(keyName, value string) {
 	log.Debug("Pushing to fixed key set: ", r.fixKey(keyName))
 	storage, err := r.set()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return
 	}
 
@@ -840,7 +847,7 @@ func (r *RedisCluster) RemoveFromSet(keyName, value string) {
 	log.Debug("Removing from fixed key set: ", r.fixKey(keyName))
 	storage, err := r.set()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return
 	}
 
@@ -853,7 +860,7 @@ func (r *RedisCluster) RemoveFromSet(keyName, value string) {
 func (r *RedisCluster) IsMemberOfSet(keyName, value string) bool {
 	storage, err := r.set()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return false
 	}
 
@@ -879,7 +886,7 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 
 	singleton, err := r.Client()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return 0, nil
 	}
 
@@ -942,7 +949,7 @@ func (r *RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool
 
 	singleton, err := r.Client()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return 0, nil
 	}
 	ctx := context.Background()
@@ -1000,7 +1007,7 @@ func (r *RedisCluster) AddToSortedSet(keyName, value string, score float64) {
 
 	storage, err := r.sortedSet()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return
 	}
 
@@ -1023,7 +1030,7 @@ func (r *RedisCluster) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]
 
 	storage, err := r.sortedSet()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return nil, nil, err
 	}
 
@@ -1059,7 +1066,7 @@ func (r *RedisCluster) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) 
 
 	storage, err := r.sortedSet()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return err
 	}
 
@@ -1080,7 +1087,7 @@ func (r *RedisCluster) ControllerInitiated() bool {
 func (r *RedisCluster) ScanKeys(pattern string) ([]string, error) {
 	storage, err := r.kv()
 	if err != nil {
-		log.Error(err)
+		logRedisClusterError(err)
 		return nil, err
 	}
 

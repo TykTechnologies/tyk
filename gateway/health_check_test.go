@@ -350,6 +350,23 @@ func TestGateway_readinessHandler_Integration(t *testing.T) {
 	})
 }
 
+func TestGatewayGatherHealthChecksUsesRedisConnectionState(t *testing.T) {
+	gw := NewGateway(config.Config{}, nil)
+
+	gw.gatherHealthChecks()
+
+	redisCheck, ok := gw.getHealthCheckInfo()["redis"]
+	if !ok {
+		t.Fatal("Gateway.gatherHealthChecks() did not produce redis check")
+	}
+	if redisCheck.Status != Fail {
+		t.Errorf("Gateway.gatherHealthChecks() redis status = %s, want %s", redisCheck.Status, Fail)
+	}
+	if redisCheck.Output != storage.ErrRedisIsDown.Error() {
+		t.Errorf("Gateway.gatherHealthChecks() redis output = %q, want %q", redisCheck.Output, storage.ErrRedisIsDown.Error())
+	}
+}
+
 func TestGateway_isCriticalFailure(t *testing.T) {
 	tests := []struct {
 		name           string

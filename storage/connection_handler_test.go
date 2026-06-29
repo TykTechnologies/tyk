@@ -55,12 +55,9 @@ func RunNewConnectionHandlerTest(t *testing.T, handler *ConnectionHandler) {
 	assert.Equal(t, false, handler.Connected())
 }
 
-func TestConnectionHandler_Connect(t *testing.T) {
+func TestConnectionHandler_statusCheckTriggersRecoverLoop(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	conf, err := config.New()
-	assert.NoError(t, err)
 
 	onConnectCalled := make(chan bool, 1)
 	onConnect := func() {
@@ -69,17 +66,25 @@ func TestConnectionHandler_Connect(t *testing.T) {
 
 	rc := NewConnectionHandler(ctx)
 	rc.storageUp.Store(false)
-	go rc.Connect(ctx, onConnect, conf)
+	rc.disableStorage.Store(false)
 
-	// let's wait one statusCheck cycle
-	time.Sleep(1100 * time.Millisecond)
-	// Simulate a connection event
-	rc.storageUp.Store(false)
+	mockConn := tempmocks.NewConnector(t)
+	mockConn.On("Ping", ctx).Return(nil)
+	rc.connections[DefaultConn] = mockConn
+	rc.connections[CacheConn] = mockConn
+	rc.connections[AnalyticsConn] = mockConn
 
-	// Allow some time for the goroutine to run
-	time.Sleep(100 * time.Millisecond)
-	<-onConnectCalled
-	assert.True(t, rc.Connected(), "Expected storage to be connected")
+	go rc.recoverLoop(ctx, onConnect)
+	go rc.statusCheckWithInterval(ctx, 10*time.Millisecond)
+
+	select {
+	case <-onConnectCalled:
+	case <-time.After(time.Second):
+		t.Fatal("ConnectionHandler.statusCheckWithInterval() did not trigger recoverLoop before timeout")
+	}
+	if !rc.Connected() {
+		t.Error("ConnectionHandler.statusCheckWithInterval() Connected() = false, want true")
+	}
 }
 
 // TestNewConnectorDefaultConn tests the creation of a new default connection.
@@ -173,8 +178,9 @@ func TestConnectionHandler_statusCheck(t *testing.T) {
 	rc.connections[CacheConn] = mockConn
 	rc.connections[AnalyticsConn] = mockConn
 
-	// Run statusCheck in a goroutine
-	go rc.statusCheck(ctx)
+	// Run statusCheck in a goroutine with a short interval to keep the unit
+	// test fast while production uses the default dampened interval.
+	go rc.statusCheckWithInterval(ctx, 10*time.Millisecond)
 
 	// Allow some time for the goroutine to run
 	wg.Wait()
@@ -182,4 +188,16 @@ func TestConnectionHandler_statusCheck(t *testing.T) {
 	// Check if storage is up
 	assert.True(t, rc.Connected(), "Expected storage to be connected after status check")
 	mockConn.AssertNumberOfCalls(t, "Ping", 3)
+}
+
+func TestStatusCheckInitialDelay(t *testing.T) {
+	if got := statusCheckInitialDelay(time.Millisecond); got != 0 {
+		t.Fatalf("statusCheckInitialDelay(time.Millisecond) = %s, want 0", got)
+	}
+
+	interval := 50 * time.Millisecond
+	got := statusCheckInitialDelay(interval)
+	if got < 0 || got >= interval {
+		t.Fatalf("statusCheckInitialDelay(%s) = %s, want [0,%s)", interval, got, interval)
+	}
 }

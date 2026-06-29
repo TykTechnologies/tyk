@@ -214,6 +214,7 @@ type Gateway struct {
 	reloadQueue chan func()
 	// performedSuccessfulReload is used to know whether a successful reload happened
 	performedSuccessfulReload bool
+	controlPlaneReady         atomic.Bool
 
 	// reloadRetryBackoff optionally returns a custom backoff strategy for
 	// DoReloadWithRetry. Production code leaves this nil (default exponential
@@ -627,7 +628,11 @@ func (gw *Gateway) setupGlobals() {
 	mainNotifierStore := &storage.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
 	mainNotifierStore.Connect()
 
-	gw.MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel, gw}
+	gw.MainNotifier = RedisNotifier{
+		store:   mainNotifierStore,
+		channel: RedisPubSubChannel,
+		Gateway: gw,
+	}
 
 	if gwConfig.Monitor.EnableTriggerMonitors {
 		h := &WebHookHandler{Gw: gw}
@@ -1332,7 +1337,7 @@ func (gw *Gateway) DoReloadWithError() error {
 		// and current registry had 0 APIs
 		if count == 0 && gw.apisByIDLen() == 0 {
 			mainLog.Warning("No API Definitions found, not reloading")
-			gw.performedSuccessfulReload = true
+			gw.markControlPlaneReady()
 			return nil
 		}
 	}
@@ -1341,9 +1346,14 @@ func (gw *Gateway) DoReloadWithError() error {
 
 	gw.MetricInstruments.RecordReload(gw.ctx, time.Since(start))
 
-	gw.performedSuccessfulReload = true
+	gw.markControlPlaneReady()
 	mainLog.Info("API reload complete")
 	return nil
+}
+
+func (gw *Gateway) markControlPlaneReady() {
+	gw.performedSuccessfulReload = true
+	gw.controlPlaneReady.Store(true)
 }
 
 // DoReload preserves the func() signature required by RPCStorageHandler,

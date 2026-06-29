@@ -1,13 +1,18 @@
 package gateway
 
 import (
+	"errors"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"github.com/TykTechnologies/tyk/storage"
+	mockstorage "github.com/TykTechnologies/tyk/storage/mock"
 	"github.com/TykTechnologies/tyk/test"
+	"go.uber.org/mock/gomock"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -35,10 +40,8 @@ func TestHostCheckerManagerInit(t *testing.T) {
 }
 
 func TestAmIPolling(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	hc := HostCheckerManager{Gw: ts.Gw}
+	gw := testHostCheckerGateway(t)
+	hc := HostCheckerManager{Gw: gw}
 
 	polling := hc.AmIPolling()
 	if polling {
@@ -46,57 +49,140 @@ func TestAmIPolling(t *testing.T) {
 	}
 
 	//Testing if we had 2 active host checker managers, only 1 takes control of the uptimechecks
-	globalConf := ts.Gw.GetConfig()
+	globalConf := gw.GetConfig()
 	groupID := "TEST"
 	globalConf.UptimeTests.PollerGroup = groupID
-	ts.Gw.SetConfig(globalConf)
+	gw.SetConfig(globalConf)
 
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	redisStorage.Connect()
+	ctrl := gomock.NewController(t)
+	store := mockstorage.NewMockHandler(ctrl)
+	hc = HostCheckerManager{Gw: gw, Id: "host-checker-id-1", store: store}
+	hc2 := HostCheckerManager{Gw: gw, Id: "host-checker-id-2", store: store}
 
-	hc.Init(redisStorage)
-	hc2 := HostCheckerManager{Gw: ts.Gw}
-	hc2.Init(redisStorage)
+	testKey := PollerCacheKey + "." + groupID
+	gomock.InOrder(
+		store.EXPECT().GetKey(testKey).Return("", storage.ErrKeyNotFound),
+		store.EXPECT().SetKey(testKey, hc.Id, int64(15)).Return(nil),
+		store.EXPECT().GetKey(testKey).Return(hc.Id, nil),
+	)
 
 	polling = hc.AmIPolling()
 	pollingHc2 := hc2.AmIPolling()
-
-	if !polling && pollingHc2 {
-		t.Error("HostCheckerManager storage configured, it shouldn't have failed.")
+	if !polling || pollingHc2 {
+		t.Errorf("HostCheckerManager.AmIPolling(two managers, grouped key) = %v/%v, want true/false", polling, pollingHc2)
 	}
 
 	//Testing if the PollerCacheKey contains the poller_group
-	testKey := PollerCacheKey + "." + groupID
-	activeInstance, err := hc.store.GetKey(testKey)
-	if err != nil {
-		t.Errorf("%q  should exist in redis.%v", testKey, activeInstance)
-	}
-	if activeInstance != hc.Id {
-		t.Errorf("%q value : expected %v got %v", testKey, hc.Id, activeInstance)
-	}
-
-	globalConf = ts.Gw.GetConfig()
+	globalConf = gw.GetConfig()
 	groupID = ""
 	globalConf.UptimeTests.PollerGroup = groupID
-	ts.Gw.SetConfig(globalConf)
+	gw.SetConfig(globalConf)
 
 	//Testing if the PollerCacheKey doesn't contains the poller_group by default
-	hc = HostCheckerManager{Gw: ts.Gw}
+	ctrl = gomock.NewController(t)
+	store = mockstorage.NewMockHandler(ctrl)
+	hc = HostCheckerManager{Gw: gw, Id: "host-checker-id-default", store: store}
+	store.EXPECT().GetKey(PollerCacheKey).Return("", storage.ErrKeyNotFound)
+	store.EXPECT().SetKey(PollerCacheKey, hc.Id, int64(15)).Return(nil)
 
-	redisStorage = &storage.RedisCluster{KeyPrefix: "host-checker-test:", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	redisStorage.Connect()
-
-	hc.Init(redisStorage)
-	hc.AmIPolling()
-
-	activeInstance, err = hc.store.GetKey(PollerCacheKey)
-	if err != nil {
-		t.Errorf("%q should exist in redis.%v", PollerCacheKey, activeInstance)
+	if polling = hc.AmIPolling(); !polling {
+		t.Error("HostCheckerManager.AmIPolling(default key, missing primary) = false, want true")
 	}
-	if activeInstance != hc.Id {
-		t.Errorf("%q : value expected %v got %v", PollerCacheKey, hc.Id, activeInstance)
+}
+
+func TestAmIPollingDoesNotAssumeControlOnRedisGetFailure(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := mockstorage.NewMockHandler(ctrl)
+	getErr := errors.New("redis transport unavailable")
+	hc := HostCheckerManager{
+		Gw:    testHostCheckerGateway(t),
+		Id:    "host-checker-id",
+		store: store,
 	}
 
+	store.EXPECT().GetKey(PollerCacheKey).Return("", getErr)
+
+	if polling := hc.AmIPolling(); polling {
+		t.Error("HostCheckerManager.AmIPolling(redis GetKey failure) = true, want false")
+	}
+	if !hc.pollerRetryAfter.After(time.Now()) {
+		t.Errorf("HostCheckerManager.AmIPolling(redis GetKey failure) pollerRetryAfter = %v, want future backoff", hc.pollerRetryAfter)
+	}
+
+	if polling := hc.AmIPolling(); polling {
+		t.Error("HostCheckerManager.AmIPolling(during Redis failure backoff) = true, want false")
+	}
+}
+
+func TestAmIPollingAssumesControlOnlyWhenPrimaryKeyMissing(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := mockstorage.NewMockHandler(ctrl)
+	hc := HostCheckerManager{
+		Gw:    testHostCheckerGateway(t),
+		Id:    "host-checker-id",
+		store: store,
+	}
+	hc.pollerRetryAfter = time.Now().Add(-time.Second)
+
+	store.EXPECT().GetKey(PollerCacheKey).Return("", storage.ErrKeyNotFound)
+	store.EXPECT().SetKey(PollerCacheKey, hc.Id, int64(15)).Return(nil)
+
+	if polling := hc.AmIPolling(); !polling {
+		t.Error("HostCheckerManager.AmIPolling(storage.ErrKeyNotFound) = false, want true")
+	}
+	if !hc.pollerRetryAfter.IsZero() {
+		t.Errorf("HostCheckerManager.AmIPolling(storage.ErrKeyNotFound) pollerRetryAfter = %v, want cleared", hc.pollerRetryAfter)
+	}
+}
+
+func TestAmIPollingBacksOffWhenPrimaryKeySetFails(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := mockstorage.NewMockHandler(ctrl)
+	setErr := errors.New("redis set unavailable")
+	hc := HostCheckerManager{
+		Gw:    testHostCheckerGateway(t),
+		Id:    "host-checker-id",
+		store: store,
+	}
+
+	store.EXPECT().GetKey(PollerCacheKey).Return("", storage.ErrKeyNotFound)
+	store.EXPECT().SetKey(PollerCacheKey, hc.Id, int64(15)).Return(setErr)
+
+	if polling := hc.AmIPolling(); polling {
+		t.Error("HostCheckerManager.AmIPolling(redis SetKey failure) = true, want false")
+	}
+	if !hc.pollerRetryAfter.After(time.Now()) {
+		t.Errorf("HostCheckerManager.AmIPolling(redis SetKey failure) pollerRetryAfter = %v, want future backoff", hc.pollerRetryAfter)
+	}
+}
+
+func TestAmIPollingBacksOffWhenPrimaryTTLRefreshFails(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	store := mockstorage.NewMockHandler(ctrl)
+	setErr := errors.New("redis ttl refresh unavailable")
+	hc := HostCheckerManager{
+		Gw:    testHostCheckerGateway(t),
+		Id:    "host-checker-id",
+		store: store,
+	}
+
+	store.EXPECT().GetKey(PollerCacheKey).Return(hc.Id, nil)
+	store.EXPECT().SetKey(PollerCacheKey, hc.Id, int64(15)).Return(setErr)
+
+	if polling := hc.AmIPolling(); polling {
+		t.Error("HostCheckerManager.AmIPolling(redis TTL refresh failure) = true, want false")
+	}
+	if !hc.pollerRetryAfter.After(time.Now()) {
+		t.Errorf("HostCheckerManager.AmIPolling(redis TTL refresh failure) pollerRetryAfter = %v, want future backoff", hc.pollerRetryAfter)
+	}
+}
+
+func testHostCheckerGateway(t *testing.T) *Gateway {
+	t.Helper()
+
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{})
+	return gw
 }
 
 func TestGenerateCheckerId(t *testing.T) {

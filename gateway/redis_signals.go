@@ -6,10 +6,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"math/rand"
 
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
@@ -65,9 +67,16 @@ func (gw *Gateway) startPubSubLoop() {
 	cacheStore := storage.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
 	cacheStore.Connect()
 
-	message := "Connection to Redis failed, reconnect in 10s"
+	message := "Connection to Redis failed, reconnecting with backoff"
+	consecutiveFailures := 0
 
 	for {
+		if gw.StorageConnectionHandler != nil && !gw.StorageConnectionHandler.Connected() {
+			if !gw.StorageConnectionHandler.WaitConnect(gw.ctx) {
+				return
+			}
+		}
+
 		err := cacheStore.StartPubSubHandler(gw.ctx, RedisPubSubChannel, func(v interface{}) {
 			gw.handleRedisEvent(v, nil, nil)
 		})
@@ -79,9 +88,41 @@ func (gw *Gateway) startPubSubLoop() {
 		default:
 		}
 
-		gw.logPubSubError(err, message)
-		gw.addPubSubDelay(10 * time.Second)
+		if err == nil {
+			consecutiveFailures = 0
+			continue
+		}
+
+		consecutiveFailures++
+		delay := pubSubRetryDelay(consecutiveFailures)
+		gw.logPubSubErrorWithBackoff(err, message, consecutiveFailures, delay)
+		if err := sleepWithContext(gw.ctx, delay); err != nil {
+			return
+		}
 	}
+}
+
+func pubSubRetryDelay(attempt int) time.Duration {
+	if attempt < 1 {
+		attempt = 1
+	}
+
+	exp := attempt - 1
+	if exp > 3 {
+		exp = 3
+	}
+
+	delay := 10 * time.Second * time.Duration(1<<exp)
+	if delay > 60*time.Second {
+		delay = 60 * time.Second
+	}
+	jitter := time.Duration(rand.Int63n(int64(2 * time.Second)))
+	delay += jitter
+	if delay > 60*time.Second {
+		delay = 60 * time.Second
+	}
+
+	return delay
 }
 
 // addPubSubDelay sleeps for duration
@@ -96,6 +137,13 @@ func (gw *Gateway) logPubSubError(err error, message string) bool {
 		return true
 	}
 	return false
+}
+
+func (gw *Gateway) logPubSubErrorWithBackoff(err error, message string, attempt int, delay time.Duration) {
+	pubSubLog.WithError(err).WithFields(map[string]interface{}{
+		"reconnect_attempt": attempt,
+		"reconnect_delay":   delay.String(),
+	}).Error(message)
 }
 
 func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {
@@ -233,10 +281,13 @@ func isPayloadSignatureValid(notification Notification) bool {
 
 // RedisNotifier will use redis pub/sub channels to send notifications
 type RedisNotifier struct {
-	store   *storage.RedisCluster
-	channel string
+	store               *storage.RedisCluster
+	channel             string
+	publishBackoffUntil atomic.Int64
 	*Gateway
 }
+
+const redisNotificationPublishBackoff = 5 * time.Second
 
 // Notify will send a notification to a channel
 func (r *RedisNotifier) Notify(notif interface{}) bool {
@@ -255,10 +306,15 @@ func (r *RedisNotifier) Notify(notif interface{}) bool {
 
 	// pubSubLog.Debug("Sending notification", notif)
 
+	if time.Now().UnixNano() < r.publishBackoffUntil.Load() {
+		return false
+	}
+
 	if err := r.store.Publish(r.channel, string(toSend)); err != nil {
 		if !errors.Is(err, storage.ErrRedisIsDown) {
 			pubSubLog.Error("Could not send notification: ", err)
 		}
+		r.publishBackoffUntil.Store(time.Now().Add(redisNotificationPublishBackoff).UnixNano())
 		return false
 	}
 

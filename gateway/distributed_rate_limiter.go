@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"math/rand"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -9,30 +10,53 @@ import (
 	"github.com/TykTechnologies/drl"
 )
 
+const (
+	defaultDRLNotificationFrequency = 2 * time.Second
+	idleDRLNotificationFrequency    = 30 * time.Second
+)
+
 func (gw *Gateway) startRateLimitNotifications() {
-	notificationFreq := gw.GetConfig().DRLNotificationFrequency
-	if notificationFreq == 0 {
-		notificationFreq = 2
+	notificationInterval := time.Duration(gw.GetConfig().DRLNotificationFrequency) * time.Second
+	if notificationInterval == 0 {
+		notificationInterval = defaultDRLNotificationFrequency
 	}
 
 	go func() {
 		log.Info("Starting gateway rate limiter notifications...")
+		lastIdleNotification := time.Now()
+		if err := sleepWithContext(gw.ctx, drlNotificationInitialJitter(notificationInterval)); err != nil {
+			return
+		}
+
 		for {
 			select {
 			case <-gw.ctx.Done():
 				return
 			default:
 				if gw.GetNodeID() != "" {
-					gw.NotifyCurrentServerStatus()
+					published, idle := gw.notifyCurrentServerStatusIfReady(lastIdleNotification)
+					if published && idle {
+						lastIdleNotification = time.Now()
+					}
 				} else {
 					log.Warning("Node not registered yet, skipping DRL Notification")
 				}
 
-				time.Sleep(time.Duration(notificationFreq) * time.Second)
+				if err := sleepWithContext(gw.ctx, notificationInterval); err != nil {
+					return
+				}
 			}
 
 		}
 	}()
+}
+
+func drlNotificationInitialJitter(notificationInterval time.Duration) time.Duration {
+	if notificationInterval <= 0 {
+		return 0
+	}
+
+	return time.Duration(rand.Int63n(int64(notificationInterval)))
 }
 
 func (gw *Gateway) getTagHash() string {
@@ -43,12 +67,37 @@ func (gw *Gateway) getTagHash() string {
 	return th
 }
 
-func (gw *Gateway) NotifyCurrentServerStatus() {
-	if !gw.DRLManager.Ready() {
-		return
+func (gw *Gateway) notifyCurrentServerStatusIfReady(lastIdleNotification time.Time) (bool, bool) {
+	if !gw.controlPlaneReady.Load() {
+		return false, false
 	}
 
 	rate := GlobalRate.Rate()
+	idle := rate == 0
+	if idle {
+		if time.Since(lastIdleNotification) < idleDRLNotificationFrequency {
+			return false, true
+		}
+		rate = 1
+	}
+
+	return gw.notifyCurrentServerStatusWithRate(rate), idle
+}
+
+func (gw *Gateway) NotifyCurrentServerStatus() bool {
+	rate := GlobalRate.Rate()
+	if rate == 0 {
+		rate = 1
+	}
+
+	return gw.notifyCurrentServerStatusWithRate(rate)
+}
+
+func (gw *Gateway) notifyCurrentServerStatusWithRate(rate int64) bool {
+	if gw.DRLManager == nil || !gw.DRLManager.Ready() {
+		return false
+	}
+
 	if rate == 0 {
 		rate = 1
 	}
@@ -63,7 +112,7 @@ func (gw *Gateway) NotifyCurrentServerStatus() {
 	asJson, err := json.Marshal(server)
 	if err != nil {
 		log.Error("Failed to encode payload: ", err)
-		return
+		return false
 	}
 
 	n := Notification{
@@ -72,7 +121,7 @@ func (gw *Gateway) NotifyCurrentServerStatus() {
 		Gw:      gw,
 	}
 
-	gw.MainNotifier.Notify(n)
+	return gw.MainNotifier.Notify(n)
 }
 
 func (gw *Gateway) onServerStatusReceivedHandler(payload string) {

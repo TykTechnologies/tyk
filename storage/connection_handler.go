@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -35,6 +36,8 @@ const (
 	CacheConn = "cache"
 	// AnalyticsConn is the analytics connection type
 	AnalyticsConn = "analytics"
+
+	statusCheckInterval = 5 * time.Second
 )
 
 // NewConnectionHandler creates a new connection handler not connected
@@ -183,10 +186,18 @@ func (rc *ConnectionHandler) isConnected(ctx context.Context, connType string) b
 	return false
 }
 
-// statusCheck will check the storage status each second.
+// statusCheck will check the storage status periodically.
 // This method will be constantly modifying the redisUp control flag.
 func (rc *ConnectionHandler) statusCheck(ctx context.Context) {
-	tick := time.NewTicker(time.Second)
+	rc.statusCheckWithInterval(ctx, statusCheckInterval)
+}
+
+func (rc *ConnectionHandler) statusCheckWithInterval(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		interval = statusCheckInterval
+	}
+
+	tick := time.NewTimer(statusCheckInitialDelay(interval))
 	defer tick.Stop()
 
 	for {
@@ -196,6 +207,7 @@ func (rc *ConnectionHandler) statusCheck(ctx context.Context) {
 		case <-tick.C:
 			// if we disabled storage - we don't want to check anything
 			if !rc.enabled() {
+				tick.Reset(interval)
 				continue
 			}
 
@@ -213,8 +225,17 @@ func (rc *ConnectionHandler) statusCheck(ctx context.Context) {
 				rc.reconnect <- struct{}{}
 			}
 
+			tick.Reset(interval)
 		}
 	}
+}
+
+func statusCheckInitialDelay(interval time.Duration) time.Duration {
+	if interval <= time.Millisecond {
+		return 0
+	}
+
+	return time.Duration(rand.New(rand.NewSource(time.Now().UnixNano())).Int63n(int64(interval)))
 }
 
 func (rc *ConnectionHandler) getConnection(isCache, isAnalytics bool) model.Connector {

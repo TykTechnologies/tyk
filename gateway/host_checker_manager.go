@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"net/http"
 	"net/url"
 	"sync"
@@ -15,6 +14,7 @@ import (
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
@@ -31,6 +31,9 @@ type HostCheckerManager struct {
 	unhealthyHostList *sync.Map
 	currentHostList   map[string]HostData
 	resetsInitiated   map[string]bool
+	pollerStateMu     sync.Mutex
+	pollerRetryAfter  time.Time
+	lastPollerErrLog  time.Time
 }
 
 type UptimeReportData struct {
@@ -71,6 +74,10 @@ const (
 	PoolerHostSentinelKeyPrefix    = "PollerCheckerInstance:"
 
 	UptimeAnalytics_KEYNAME = "tyk-uptime-analytics"
+
+	// Back off host-checker leader election after Redis transport failures
+	// to avoid retry storms across the gateway fleet.
+	pollerElectionFailureBackoff = 30 * time.Second
 )
 
 func (hc *HostCheckerManager) Init(store storage.Handler) {
@@ -149,15 +156,27 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		pollerCacheKey = pollerCacheKey + "." + hc.Gw.GetConfig().UptimeTests.PollerGroup
 	}
 
+	now := time.Now()
+	if hc.shouldSkipPollerElection(now) {
+		return false
+	}
+
 	activeInstance, err := hc.store.GetKey(pollerCacheKey)
 	if err != nil {
+		if !errors.Is(err, storage.ErrKeyNotFound) {
+			hc.markPollerElectionFailure(now, err)
+			return false
+		}
+
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Debug("No Primary instance found, assuming control")
 		err := hc.store.SetKey(pollerCacheKey, hc.Id, 15)
 		if err != nil {
-			log.WithError(err).Error("cannot set key in pollerCacheKey")
+			hc.markPollerElectionFailure(now, err)
+			return false
 		}
+		hc.clearPollerElectionFailure()
 		return true
 	}
 
@@ -167,10 +186,13 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		}).Debug("Primary instance set, I am master")
 		err := hc.store.SetKey(pollerCacheKey, hc.Id, 15) // Reset TTL
 		if err != nil {
-			log.WithError(err).Error("could not reset TTL in polled cacheKey")
+			hc.markPollerElectionFailure(now, err)
+			return false
 		}
+		hc.clearPollerElectionFailure()
 		return true
 	}
+	hc.clearPollerElectionFailure()
 
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
@@ -179,6 +201,32 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		"prefix": "host-check-mgr",
 	}).Debug("--- I am: ", hc.Id)
 	return false
+}
+
+func (hc *HostCheckerManager) shouldSkipPollerElection(now time.Time) bool {
+	hc.pollerStateMu.Lock()
+	defer hc.pollerStateMu.Unlock()
+	return !hc.pollerRetryAfter.IsZero() && now.Before(hc.pollerRetryAfter)
+}
+
+func (hc *HostCheckerManager) markPollerElectionFailure(now time.Time, err error) {
+	hc.pollerStateMu.Lock()
+	defer hc.pollerStateMu.Unlock()
+
+	hc.pollerRetryAfter = now.Add(pollerElectionFailureBackoff)
+	if hc.lastPollerErrLog.IsZero() || now.Sub(hc.lastPollerErrLog) >= pollerElectionFailureBackoff {
+		hc.lastPollerErrLog = now
+		log.WithError(err).WithFields(logrus.Fields{
+			"prefix":           "host-check-mgr",
+			"retry_after_secs": int(pollerElectionFailureBackoff / time.Second),
+		}).Warn("Host-checker leader election Redis failure; backing off")
+	}
+}
+
+func (hc *HostCheckerManager) clearPollerElectionFailure() {
+	hc.pollerStateMu.Lock()
+	hc.pollerRetryAfter = time.Time{}
+	hc.pollerStateMu.Unlock()
 }
 
 func (hc *HostCheckerManager) StartPoller(ctx context.Context) {

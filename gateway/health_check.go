@@ -79,11 +79,6 @@ type SafeHealthCheck struct {
 func (gw *Gateway) gatherHealthChecks() {
 	allInfos := SafeHealthCheck{info: make(map[string]HealthCheckItem, 3)}
 
-	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-", ConnectionHandler: gw.StorageConnectionHandler}
-	redisStore.Connect()
-
-	key := "tyk-liveness-probe"
-
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -96,8 +91,8 @@ func (gw *Gateway) gatherHealthChecks() {
 			Time:          time.Now().Format(time.RFC3339),
 		}
 
-		err := redisStore.SetRawKey(key, key, 10)
-		if err != nil {
+		if gw.StorageConnectionHandler == nil || !gw.StorageConnectionHandler.Connected() {
+			err := storage.ErrRedisIsDown
 			mainLog.WithField("liveness-check", true).WithError(err).Error("Redis health check failed")
 			checkItem.Output = err.Error()
 			checkItem.Status = Fail

@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/TykTechnologies/tyk/storage"
@@ -21,19 +22,52 @@ type RedisPurger struct {
 }
 
 func (r RedisPurger) PurgeLoop(ctx context.Context) {
-	tick := time.NewTicker(time.Second)
+	interval := r.purgeInterval()
+	tick := time.NewTimer(r.initialPurgeDelay(interval))
 	defer tick.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
 			r.PurgeCache()
+			tick.Reset(interval)
 		}
 	}
 }
 
+func (r RedisPurger) purgeInterval() time.Duration {
+	if r.Gw == nil {
+		return 10 * time.Second
+	}
+
+	interval := r.Gw.GetConfig().AnalyticsConfig.PurgeInterval
+	if interval <= 0 {
+		return 10 * time.Second
+	}
+
+	d := time.Duration(float64(interval) * float64(time.Second))
+	if d < time.Second {
+		return time.Second
+	}
+
+	return d
+}
+
+func (r RedisPurger) initialPurgeDelay(interval time.Duration) time.Duration {
+	if interval <= time.Second {
+		return interval
+	}
+
+	return time.Duration(rand.New(rand.NewSource(time.Now().UnixNano())).Int63n(int64(interval)))
+}
+
 func (r *RedisPurger) PurgeCache() {
+	if r.Gw != nil && r.Gw.StorageConnectionHandler != nil && !r.Gw.StorageConnectionHandler.Connected() {
+		return
+	}
+
 	expireAfter := r.Gw.GetConfig().AnalyticsConfig.StorageExpirationTime
 	if expireAfter == -1 {
 		return
