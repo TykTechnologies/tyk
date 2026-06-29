@@ -1,0 +1,291 @@
+---
+name: Plugin-compiler NG build
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  push:
+    branches:
+      - master
+      - release-**
+    tags:
+      - "v*"
+
+env:
+  GOLANG_CROSS: 1.25-bullseye
+  NG_BASE_IMAGE: tykio/tyk-plugin-compiler-ng-base:latest
+  NG_BASE_SOURCE: dhi.io/busybox:1-debian-dev
+  NG_GLIBC_TARGET: "2.17"
+  NG_CROSS: "1"
+  NG_SLIM: "1"
+  NG_WITH_CXX: "1"
+  NG_WITH_GIT: "1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  dep-guard:
+    if: github.event_name == 'pull_request'
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@d3fa20888fa2878e877e22bb7702141217290e7c  # main
+    permissions:
+      contents: read
+
+  docker-build:
+    needs: [dep-guard]
+    if: |
+      !cancelled() &&
+      (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') &&
+      !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - name: "Reclaim some runner space"
+        run: sudo rm -rf /usr/local/bin/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS Credentials
+        id: configure-aws
+        uses: aws-actions/configure-aws-credentials@5fd3084fc36e372ff1fff382a39b10d03659f355  # v2
+        with:
+          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
+          role-session-name: ci-plugin-compiler-ng-push
+          aws-region: eu-central-1
+
+      - name: Login to AWS ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@5a88a04c91d5c6f97aae0d9be790e64d9b1d47b7  # v1
+
+      - name: Login to Dockerhub
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc  # v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Login to DHI
+        if: ${{ startsWith(env.NG_BASE_SOURCE, 'dhi.io/') }}
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc  # v2
+        with:
+          registry: dhi.io
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Resolve source base digest
+        id: source-base
+        run: |
+          digest="$(docker buildx imagetools inspect "$NG_BASE_SOURCE" | awk '/^Digest:/ {print $2; exit}')"
+          test -n "$digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Build NG base for this workflow
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: ci/images/plugin-compiler-ng
+          file: ci/images/plugin-compiler-ng/Dockerfile.base
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler-ng-base:${{ github.sha }}
+          build-args: |
+            BASE_IMAGE=${{ env.NG_BASE_SOURCE }}
+            GLIBC_TARGET=${{ env.NG_GLIBC_TARGET }}
+            CROSS=${{ env.NG_CROSS }}
+            SLIM=${{ env.NG_SLIM }}
+            WITH_CXX=${{ env.NG_WITH_CXX }}
+            WITH_GIT=${{ env.NG_WITH_GIT }}
+            DHI_DIGEST=${{ steps.source-base.outputs.digest }}
+
+      - name: Use workflow-local NG base
+        run: echo "NG_BASE_IMAGE=${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler-ng-base:${{ github.sha }}" >> "$GITHUB_ENV"
+
+      - name: Set docker metadata
+        id: set-metadata-ng
+        uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175  # v4
+        with:
+          images: |
+            tykio/tyk-plugin-compiler,enable=${{ startsWith(github.ref, 'refs/tags') }}
+            ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler
+          labels: |
+            org.opencontainers.image.title=tyk-plugin-compiler-ng
+            org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway (next generation)
+          tags: |
+            type=ref,event=pr,suffix=-ng
+            type=semver,pattern=v{{version}},suffix=-ng
+            type=semver,pattern=v{{major}}.{{minor}},suffix=-ng
+            type=semver,pattern={{raw}},suffix=-ng
+            type=sha,format=long,suffix=-ng
+
+      - name: Build local NG gate image
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler-ng/Dockerfile.release
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: tyk-plugin-compiler-ng-gate:std
+          build-args: |
+            BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
+            GOLANG_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ github.ref_name }}
+            DEFAULT_EDITION=ce
+
+      - name: Gate NG plugin load
+        run: ci/images/plugin-compiler-ng/scripts/loadtest-gate.sh tyk-plugin-compiler-ng-gate:std ce
+
+      - name: Validate NG cross-build arm64
+        run: VALIDATE_ONLY=1 ci/images/plugin-compiler-ng/scripts/loadtest-gate.sh tyk-plugin-compiler-ng-gate:std ce arm64
+
+      - name: Validate NG cross-build s390x
+        run: VALIDATE_ONLY=1 ci/images/plugin-compiler-ng/scripts/loadtest-gate.sh tyk-plugin-compiler-ng-gate:std ce s390x
+
+
+      - name: Build and push NG to dockerhub/ECR
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler-ng/Dockerfile.release
+          platforms: linux/amd64
+          push: true
+          labels: ${{ steps.set-metadata-ng.outputs.labels }}
+          tags: ${{ steps.set-metadata-ng.outputs.tags }}
+          build-args: |
+            BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
+            GOLANG_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ github.ref_name }}
+            DEFAULT_EDITION=ce
+
+      - name: Set docker metadata EE
+        id: set-metadata-ee-ng
+        uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175  # v4
+        with:
+          images: |
+            tykio/tyk-plugin-compiler-ee,enable=${{ startsWith(github.ref, 'refs/tags') }}
+            ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler-ee
+          labels: |
+            org.opencontainers.image.title=tyk-plugin-compiler-ee-ng
+            org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway Enterprise Edition (next generation)
+          tags: |
+            type=ref,event=pr,suffix=-ng
+            type=semver,pattern=v{{version}},suffix=-ng
+            type=semver,pattern=v{{major}}.{{minor}},suffix=-ng
+            type=semver,pattern={{raw}},suffix=-ng
+            type=sha,format=long,suffix=-ng
+
+      - name: Build local NG gate image EE
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler-ng/Dockerfile.release
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: tyk-plugin-compiler-ng-gate:ee
+          build-args: |
+            BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
+            GOLANG_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ github.ref_name }}
+            DEFAULT_EDITION=ee
+            EE_AVAILABLE=true
+            EE_BUILD_TAG=ee
+            SELFTEST_BUILD_TAG=ee
+
+      - name: Gate NG plugin load EE
+        run: ci/images/plugin-compiler-ng/scripts/loadtest-gate.sh tyk-plugin-compiler-ng-gate:ee ee
+
+      - name: Validate NG cross-build arm64 EE
+        run: VALIDATE_ONLY=1 ci/images/plugin-compiler-ng/scripts/loadtest-gate.sh tyk-plugin-compiler-ng-gate:ee ee arm64
+
+
+      - name: Build and push NG to dockerhub/ECR EE
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler-ng/Dockerfile.release
+          platforms: linux/amd64
+          push: true
+          labels: ${{ steps.set-metadata-ee-ng.outputs.labels }}
+          tags: ${{ steps.set-metadata-ee-ng.outputs.tags }}
+          build-args: |
+            BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
+            GOLANG_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ github.ref_name }}
+            DEFAULT_EDITION=ee
+            EE_AVAILABLE=true
+            EE_BUILD_TAG=ee
+            SELFTEST_BUILD_TAG=ee
+
+      - name: Set docker metadata FIPS
+        id: set-metadata-fips-ng
+        uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175  # v4
+        with:
+          images: |
+            tykio/tyk-plugin-compiler-fips,enable=${{ startsWith(github.ref, 'refs/tags') }}
+            ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler-fips
+          labels: |
+            org.opencontainers.image.title=tyk-plugin-compiler-fips-ng
+            org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway FIPS Edition (next generation)
+          tags: |
+            type=ref,event=pr,suffix=-ng
+            type=semver,pattern=v{{version}},suffix=-ng
+            type=semver,pattern=v{{major}}.{{minor}},suffix=-ng
+            type=semver,pattern={{raw}},suffix=-ng
+            type=sha,format=long,suffix=-ng
+
+      - name: Build local NG gate image FIPS
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler-ng/Dockerfile.release
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: tyk-plugin-compiler-ng-gate:fips
+          build-args: |
+            BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
+            GOLANG_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ github.ref_name }}
+            DEFAULT_EDITION=ee-fips
+            FIPS_AVAILABLE=true
+            FIPS_BUILD_TAG=ee,fips
+            FIPS_GOFIPS140=v1.0.0
+            SELFTEST_BUILD_TAG=ee,fips
+            SELFTEST_GOFIPS140=v1.0.0
+
+      - name: Gate NG plugin load FIPS
+        run: ci/images/plugin-compiler-ng/scripts/loadtest-gate.sh tyk-plugin-compiler-ng-gate:fips ee-fips
+
+      - name: Validate NG cross-build arm64 FIPS
+        run: VALIDATE_ONLY=1 ci/images/plugin-compiler-ng/scripts/loadtest-gate.sh tyk-plugin-compiler-ng-gate:fips ee-fips arm64
+
+
+      - name: Build and push NG to dockerhub/ECR FIPS
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler-ng/Dockerfile.release
+          platforms: linux/amd64
+          push: true
+          labels: ${{ steps.set-metadata-fips-ng.outputs.labels }}
+          tags: ${{ steps.set-metadata-fips-ng.outputs.tags }}
+          build-args: |
+            BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
+            GOLANG_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ github.ref_name }}
+            DEFAULT_EDITION=ee-fips
+            FIPS_AVAILABLE=true
+            FIPS_BUILD_TAG=ee,fips
+            FIPS_GOFIPS140=v1.0.0
+            SELFTEST_BUILD_TAG=ee,fips
+            SELFTEST_GOFIPS140=v1.0.0
