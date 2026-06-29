@@ -153,7 +153,7 @@ type TransformJQSpec struct {
 	JQFilter *JQ
 }
 
-func (a *APIDefinitionLoader) compileTransformJQPathSpec(paths []apidef.TransformJQMeta, stat URLStatus, conf config.Config) []URLSpec {
+func (a *APIDefinitionLoader) compileTransformJQPathSpec(paths []apidef.TransformJQMeta, stat URLStatus, conf *config.Config) []URLSpec {
 	urlSpec := make([]URLSpec, 0, len(paths))
 
 	log.Debug("Checking for JQ tranform paths ...")

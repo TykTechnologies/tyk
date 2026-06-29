@@ -60,6 +60,10 @@ func (k *ValidateRequest) EnabledForSpec() bool {
 		return false
 	}
 
+	if k.Spec.hasCompiledActiveOASValidateRequest() {
+		return true
+	}
+
 	extension := k.Spec.OAS.GetTykExtension()
 	if extension == nil {
 		return false
@@ -136,7 +140,11 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	// validated against the /anything operation.
 	// We pass both the stripped path (for path param extraction) and full path (for regexp listen paths).
 	strippedPath := k.Spec.StripListenPath(r.URL.Path)
-	route, pathParams, err := k.Spec.findRouteForOASPath(validateMeta.Path, validateMeta.Method, strippedPath, r.URL.Path)
+	route, pathParams, ok := k.Spec.routeForOASRuntimeRoute(validateMeta.Route, strippedPath)
+	var err error
+	if !ok {
+		route, pathParams, err = k.Spec.findRouteForOASPath(validateMeta.Path, validateMeta.Method, strippedPath, r.URL.Path)
+	}
 	if err != nil || route == nil {
 		log.WithFields(logrus.Fields{
 			"method":   r.Method,
@@ -205,6 +213,10 @@ func (k *ValidateRequest) processRequestWithCandidates(r *http.Request, candidat
 // resolveCandidate uses matchCandidatePath to check if the candidate's path param
 // schemas match the request, then builds a routers.Route for full validation.
 func (k *ValidateRequest) resolveCandidate(candidate ValidateRequestCandidate, strippedPath string) (*routers.Route, map[string]string, bool) {
+	if route, pathParams, ok := k.Spec.matchOASRuntimeRoute(candidate.Route, strippedPath); ok {
+		return route, pathParams, true
+	}
+
 	pathItem, operation, pathParams, ok := k.Spec.matchCandidatePath(candidate.OASPath, candidate.OASMethod, strippedPath)
 	if !ok {
 		return nil, nil, false

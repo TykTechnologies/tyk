@@ -148,7 +148,14 @@ func gzipPayload(payload []byte) ([]byte, bool) {
 		log.WithError(err).Warn("Failed to finalize compressed API definition payload")
 		return nil, false
 	}
-	return buf.Bytes(), true
+	// Retained management payloads should not pin spare bytes.Buffer capacity.
+	return exactCapacityBytes(buf.Bytes()), true
+}
+
+func exactCapacityBytes(data []byte) []byte {
+	out := make([]byte, len(data))
+	copy(out, data)
+	return out
 }
 
 func gunzipPayload(payload []byte) ([]byte, bool) {
@@ -265,11 +272,16 @@ func (a *APISpec) releaseOASDocumentRuntimeState() {
 	streamingExt := a.OAS.GetTykStreamingExtension()
 	info := a.OAS.Info
 	openAPI := a.OAS.OpenAPI
+	components := a.OAS.Components
+	preserveComponents := a.hasOASRouteStateRuntimeConsumer()
 	releaseOASRuntimeExtensionState(tykExt)
 
 	a.OAS.T = openapi3.T{
 		OpenAPI: openAPI,
 		Info:    info,
+	}
+	if preserveComponents {
+		a.OAS.Components = components
 	}
 	if tykExt != nil {
 		a.OAS.SetTykExtension(tykExt)
@@ -304,7 +316,7 @@ func (a *APISpec) canReleaseOASDocumentRuntimeState() bool {
 	if a.hasOASVersioningState() {
 		return false
 	}
-	if a.IsMCP() || a.oasRouter != nil || a.hasOASRuntimeDocumentConsumer() || a.hasCustomRequestContextConsumer() {
+	if a.IsMCP() || a.oasRouter != nil || a.hasUnreleasableOASRuntimeDocumentConsumer() || a.hasCustomRequestContextConsumer() {
 		return false
 	}
 	if a.OAS.GetTykStreamingExtension() != nil || a.hasOASAuthenticationDocumentState() {
@@ -319,28 +331,106 @@ func (a *APISpec) hasOASVersioningState() bool {
 		len(a.VersionDefinition.Versions) > 0
 }
 
-func (a *APISpec) hasOASRuntimeDocumentConsumer() bool {
+func (a *APISpec) hasUnreleasableOASRuntimeDocumentConsumer() bool {
 	for _, paths := range a.RxPaths {
 		for i := range paths {
 			switch paths[i].Status {
 			case OASValidateRequest:
-				return true
+				meta, ok := paths[i].oasValidateRequestRuntimeMeta()
+				if !ok || meta == nil {
+					return true
+				}
+				if oasValidateRequestNeedsRouteState(meta) && !oasValidateRequestRouteStateComplete(meta) {
+					return true
+				}
 			case OASMockResponse:
 				meta, ok := paths[i].oasMockResponseRuntimeMeta()
 				if !ok || meta == nil {
 					continue
 				}
-				if len(meta.Candidates) > 0 {
-					return true
-				}
-				mock := meta.MockResponse
-				if mock != nil && mock.FromOASExamples != nil && mock.FromOASExamples.Enabled {
+				if !oasMockResponseRouteStateComplete(meta) {
 					return true
 				}
 			}
 		}
 	}
 	return false
+}
+
+func (a *APISpec) hasOASRouteStateRuntimeConsumer() bool {
+	for _, paths := range a.RxPaths {
+		for i := range paths {
+			switch paths[i].Status {
+			case OASValidateRequest:
+				meta, ok := paths[i].oasValidateRequestRuntimeMeta()
+				if ok && meta != nil && oasValidateRequestNeedsRouteState(meta) && oasValidateRequestRouteStateComplete(meta) {
+					return true
+				}
+			case OASMockResponse:
+				meta, ok := paths[i].oasMockResponseRuntimeMeta()
+				if ok && meta != nil && oasMockResponseNeedsRouteState(meta) && oasMockResponseRouteStateComplete(meta) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func oasValidateRequestRouteStateComplete(meta *oasValidateRequestRuntimeMeta) bool {
+	if meta == nil {
+		return false
+	}
+	if len(meta.Candidates) == 0 {
+		return meta.Route.canBuildRoute()
+	}
+	for _, candidate := range meta.Candidates {
+		if candidate.OASValidateRequestMeta != nil && candidate.OASValidateRequestMeta.Enabled && !candidate.Route.canBuildRoute() {
+			return false
+		}
+	}
+	return true
+}
+
+func oasValidateRequestNeedsRouteState(meta *oasValidateRequestRuntimeMeta) bool {
+	if meta == nil {
+		return false
+	}
+	if len(meta.Candidates) > 0 {
+		for _, candidate := range meta.Candidates {
+			if candidate.OASValidateRequestMeta != nil && candidate.OASValidateRequestMeta.Enabled {
+				return true
+			}
+		}
+		return false
+	}
+	return meta.ValidateRequest != nil && meta.ValidateRequest.Enabled
+}
+
+func oasMockResponseRouteStateComplete(meta *oasMockResponseRuntimeMeta) bool {
+	if meta == nil || !oasMockResponseNeedsRouteState(meta) {
+		return true
+	}
+	if len(meta.Candidates) == 0 {
+		return meta.Route.canBuildRoute()
+	}
+	for _, candidate := range meta.Candidates {
+		if candidate.OASMockResponseMeta != nil && candidate.OASMockResponseMeta.Enabled && !candidate.Route.canBuildRoute() {
+			return false
+		}
+	}
+	return true
+}
+
+func oasMockResponseNeedsRouteState(meta *oasMockResponseRuntimeMeta) bool {
+	if meta == nil {
+		return false
+	}
+	if len(meta.Candidates) > 0 {
+		return true
+	}
+	mock := meta.MockResponse
+	return mock != nil && mock.FromOASExamples != nil && mock.FromOASExamples.Enabled
 }
 
 func (a *APISpec) hasCustomRequestContextConsumer() bool {
@@ -614,6 +704,20 @@ func (a *APISpec) routeForOASPath(oasPath, method string) (*routers.Route, error
 	}, nil
 }
 
+func (a *APISpec) routeForOASRuntimeRoute(runtimeRoute *oasRuntimeRoute, actualPath string) (*routers.Route, map[string]string, bool) {
+	if !runtimeRoute.canBuildRoute() {
+		return nil, nil, false
+	}
+
+	return &routers.Route{
+		Spec:      &a.OAS.T,
+		Path:      runtimeRoute.Path,
+		PathItem:  runtimeRoute.PathItem,
+		Method:    runtimeRoute.Method,
+		Operation: runtimeRoute.Operation,
+	}, extractPathParams(runtimeRoute.Path, actualPath), true
+}
+
 // findRouteForOASPath finds the OAS route using the OAS path pattern (e.g., "/users/{id}")
 // and method, rather than the actual request path. This is used when gateway path matching
 // (prefix/suffix) matches a broader pattern than the exact OAS path.
@@ -659,6 +763,17 @@ func (a *APISpec) findRouteForOASPath(oasPath, method, actualPath, fullRequestPa
 	pathParams := extractPathParams(oasPath, actualPath)
 
 	return route, pathParams, nil
+}
+
+func (a *APISpec) matchOASRuntimeRoute(runtimeRoute *oasRuntimeRoute, strippedPath string) (*routers.Route, map[string]string, bool) {
+	route, pathParams, ok := a.routeForOASRuntimeRoute(runtimeRoute, strippedPath)
+	if !ok {
+		return nil, nil, false
+	}
+	if !pathParamsMatchOperation(pathParams, runtimeRoute.Operation) {
+		return nil, nil, false
+	}
+	return route, pathParams, true
 }
 
 // matchCandidatePath looks up the path item and operation from the OAS spec for a

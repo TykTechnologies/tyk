@@ -47,9 +47,17 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 }
 
 func (gw *Gateway) urlRewriteRuntime(meta urlRewriteRuntimeMetadata, r *http.Request) (string, error) {
+	return gw.urlRewriteRuntimeForSpec(meta, nil, r)
+}
+
+func (gw *Gateway) urlRewriteRuntimeForSpec(meta urlRewriteRuntimeMetadata, matchedSpec *URLSpec, r *http.Request) (string, error) {
 	if directMeta, ok := meta.(*directURLRewriteRuntimeMeta); ok {
-		ctxSetUrlRewritePath(r, directMeta.urlRewriteContextPath())
-		return gw.ReplaceTykVariables(r, directMeta.RewriteTo, true), nil
+		contextPath := r.URL.Path
+		if matchedSpec != nil && matchedSpec.literalPath != "" {
+			contextPath = matchedSpec.literalPath
+		}
+		ctxSetUrlRewritePath(r, contextPath)
+		return gw.ReplaceTykVariables(r, directMeta.rewriteTo, true), nil
 	}
 
 	fullMeta, ok := meta.(*urlRewriteRuntimeMeta)
@@ -534,7 +542,7 @@ func LoopingUrl(host string) string {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	vInfo, _ := m.Spec.Version(r)
-	found, meta := m.Spec.CheckSpecMatchesStatus(r, m.Spec.RxPaths[vInfo.Name], URLRewrite)
+	matchedSpec, found := m.Spec.FindSpecMatchesStatus(r, m.Spec.RxPaths[vInfo.Name], URLRewrite)
 
 	if !found {
 		return nil, http.StatusOK
@@ -548,12 +556,12 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	log.Debug(r.URL)
 	oldPath := r.URL.String()
 
-	runtimeMeta, ok := meta.(urlRewriteRuntimeMetadata)
+	runtimeMeta, ok := urlRewriteRuntimeMetaFromSpec(matchedSpec)
 	if !ok {
 		return nil, http.StatusOK
 	}
 
-	p, err := m.Gw.urlRewriteRuntime(runtimeMeta, r)
+	p, err := m.Gw.urlRewriteRuntimeForSpec(runtimeMeta, matchedSpec, r)
 	if err != nil {
 		log.Error(err)
 		return err, http.StatusInternalServerError

@@ -139,6 +139,142 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 	})
 }
 
+func TestOAS_extractPathsAndOperationsUsesPathOperationIDLookup(t *testing.T) {
+	t.Parallel()
+
+	spec := minimumValidOAS()
+	paths := openapi3.NewPaths()
+	paths.Set("/ignored", &openapi3.PathItem{
+		Get: &openapi3.Operation{OperationID: "ignoredGET"},
+	})
+	paths.Set("/rewrite", &openapi3.PathItem{
+		Get: &openapi3.Operation{OperationID: "rewriteGET"},
+	})
+	paths.Set("/transform", &openapi3.PathItem{
+		Get: &openapi3.Operation{OperationID: "transformGET"},
+	})
+	paths.Set("/headers", &openapi3.PathItem{
+		Get: &openapi3.Operation{OperationID: "headersGET"},
+	})
+	spec.Paths = paths
+	spec.SetTykExtension(&XTykAPIGateway{Middleware: &Middleware{Operations: Operations{
+		"ignoredGET": {
+			IgnoreAuthentication: &Allowance{Enabled: true},
+		},
+		"rewriteGET": {
+			URLRewrite: &URLRewrite{
+				Enabled:   true,
+				Pattern:   "/rewrite",
+				RewriteTo: "/hello",
+			},
+		},
+		"transformGET": {
+			TransformRequestBody: &TransformBody{
+				Enabled: true,
+				Format:  apidef.RequestJSON,
+				Body:    "e30=",
+			},
+		},
+		"headersGET": {
+			TransformRequestHeaders: &TransformHeaders{
+				Enabled: true,
+				Add:     Headers{{Name: "x-test", Value: "ok"}},
+			},
+		},
+		"staleOperationNotInPaths": {
+			IgnoreAuthentication: &Allowance{Enabled: true},
+		},
+	}}})
+
+	var ep apidef.ExtendedPathsSet
+	spec.extractPathsAndOperations(&ep)
+
+	if got, want := len(ep.Ignored), 1; got != want {
+		t.Fatalf("OAS.extractPathsAndOperations() ignored paths = %d, want %d", got, want)
+	}
+	if got, want := ep.Ignored[0].Path, "/ignored"; got != want {
+		t.Fatalf("OAS.extractPathsAndOperations() ignored path = %q, want %q", got, want)
+	}
+	if got, want := len(ep.URLRewrite), 1; got != want {
+		t.Fatalf("OAS.extractPathsAndOperations() URL rewrites = %d, want %d", got, want)
+	}
+	if got, want := ep.URLRewrite[0].Path, "/rewrite"; got != want {
+		t.Fatalf("OAS.extractPathsAndOperations() URL rewrite path = %q, want %q", got, want)
+	}
+	if got, want := len(ep.Transform), 1; got != want {
+		t.Fatalf("OAS.extractPathsAndOperations() transforms = %d, want %d", got, want)
+	}
+	if got, want := ep.Transform[0].Path, "/transform"; got != want {
+		t.Fatalf("OAS.extractPathsAndOperations() transform path = %q, want %q", got, want)
+	}
+	if got, want := len(ep.TransformHeader), 1; got != want {
+		t.Fatalf("OAS.extractPathsAndOperations() transform headers = %d, want %d", got, want)
+	}
+	if got, want := ep.TransformHeader[0].Path, "/headers"; got != want {
+		t.Fatalf("OAS.extractPathsAndOperations() transform header path = %q, want %q", got, want)
+	}
+}
+
+func BenchmarkOASExtractPathsAndOperationsMixedProfile(b *testing.B) {
+	spec := oasExtractPathsAndOperationsMixedProfileBenchmarkSpec(75, 75, 24)
+	var ep apidef.ExtendedPathsSet
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		spec.extractPathsAndOperations(&ep)
+	}
+}
+
+func oasExtractPathsAndOperationsMixedProfileBenchmarkSpec(ignored, rewrites, transforms int) OAS {
+	spec := minimumValidOAS()
+	paths := openapi3.NewPaths()
+	operations := make(Operations, ignored+rewrites+transforms)
+
+	for i := 0; i < ignored; i++ {
+		id := "ignored_" + strconv.Itoa(i)
+		path := "/ignored-" + strconv.Itoa(i)
+		paths.Set(path, &openapi3.PathItem{
+			Get: &openapi3.Operation{OperationID: id},
+		})
+		operations[id] = &Operation{
+			IgnoreAuthentication: &Allowance{Enabled: true},
+		}
+	}
+	for i := 0; i < rewrites; i++ {
+		id := "rewrite_" + strconv.Itoa(i)
+		path := "/rewrite-" + strconv.Itoa(i)
+		paths.Set(path, &openapi3.PathItem{
+			Get: &openapi3.Operation{OperationID: id},
+		})
+		operations[id] = &Operation{
+			URLRewrite: &URLRewrite{
+				Enabled:   true,
+				Pattern:   path,
+				RewriteTo: "/hello",
+			},
+		}
+	}
+	for i := 0; i < transforms; i++ {
+		id := "transform_" + strconv.Itoa(i)
+		path := "/transform-" + strconv.Itoa(i)
+		paths.Set(path, &openapi3.PathItem{
+			Get: &openapi3.Operation{OperationID: id},
+		})
+		operations[id] = &Operation{
+			TransformRequestBody: &TransformBody{
+				Enabled: true,
+				Format:  apidef.RequestJSON,
+				Body:    "e30=",
+			},
+		}
+	}
+
+	spec.Paths = paths
+	spec.SetTykExtension(&XTykAPIGateway{Middleware: &Middleware{Operations: operations}})
+	return spec
+}
+
 func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 	t.Parallel()
 

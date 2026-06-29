@@ -1057,6 +1057,12 @@ func (gw *Gateway) mcpPRMSuffixHandler(spec *APISpec) http.HandlerFunc {
 
 func (gw *Gateway) generateRoutesForPrefixes(spec *APISpec, prefixes []string, enabledStrictRoutes bool, router *mux.Router, chainObj *ChainObject) {
 	for _, prefix := range prefixes {
+		httpHandler := explicitRouteSubpaths(prefix, chainObj.ThisHandler, enabledStrictRoutes)
+		if canUseDirectPrefixRoute(spec, chainObj) {
+			router.MatcherFunc(literalPathPrefixMatcher(prefix)).Handler(httpHandler)
+			continue
+		}
+
 		subrouter := router.PathPrefix(prefix).Subrouter()
 
 		gw.generateSubRoutes(spec, subrouter)
@@ -1065,10 +1071,28 @@ func (gw *Gateway) generateRoutesForPrefixes(spec *APISpec, prefixes []string, e
 			subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
 		}
 
-		httpHandler := explicitRouteSubpaths(prefix, chainObj.ThisHandler, enabledStrictRoutes)
-
 		// Attach handlers
 		subrouter.NewRoute().Handler(httpHandler)
+	}
+}
+
+func canUseDirectPrefixRoute(spec *APISpec, chainObj *ChainObject) bool {
+	if spec == nil || chainObj == nil || !chainObj.Open {
+		return false
+	}
+	// Only APIs without generated child routes can skip mux PathPrefix subrouters.
+	if spec.GraphQL.GraphQLPlayground.Enabled {
+		return false
+	}
+	if spec.EnableBatchRequestSupport && !spec.IsMCP() {
+		return false
+	}
+	return !spec.UseOauth2
+}
+
+func literalPathPrefixMatcher(prefix string) mux.MatcherFunc {
+	return func(r *http.Request, _ *mux.RouteMatch) bool {
+		return strings.HasPrefix(r.URL.Path, prefix)
 	}
 }
 

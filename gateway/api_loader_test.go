@@ -67,6 +67,108 @@ func TestOpenTracing(t *testing.T) {
 	})
 }
 
+func TestGenerateRoutesForPrefixesUsesDirectMatcherForOpenAPI(t *testing.T) {
+	router := mux.NewRouter()
+	gw := &Gateway{}
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{UseKeylessAccess: true}}
+	chainObj := &ChainObject{
+		Open: true,
+		ThisHandler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		}),
+	}
+
+	gw.generateRoutesForPrefixes(spec, []string{"/open/"}, false, router, chainObj)
+
+	if got := routePathRegexps(t, router); len(got) != 0 {
+		t.Fatalf("generateRoutesForPrefixes(open API) registered path regexps = %v, want none", got)
+	}
+	if got, want := serveRouteStatus(router, "/open/resource"), http.StatusNoContent; got != want {
+		t.Errorf("serveRouteStatus(/open/resource) = %d, want %d", got, want)
+	}
+	if got, want := serveRouteStatus(router, "/other"), http.StatusNotFound; got != want {
+		t.Errorf("serveRouteStatus(/other) = %d, want %d", got, want)
+	}
+}
+
+func TestGenerateRoutesForPrefixesDirectMatcherKeepsStrictRouteSemantics(t *testing.T) {
+	router := mux.NewRouter()
+	gw := &Gateway{}
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{UseKeylessAccess: true}}
+	chainObj := &ChainObject{
+		Open: true,
+		ThisHandler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		}),
+	}
+
+	gw.generateRoutesForPrefixes(spec, []string{"/open"}, true, router, chainObj)
+
+	if got := routePathRegexps(t, router); len(got) != 0 {
+		t.Fatalf("generateRoutesForPrefixes(strict open API) registered path regexps = %v, want none", got)
+	}
+	for _, path := range []string{"/open", "/open/resource"} {
+		if got, want := serveRouteStatus(router, path), http.StatusNoContent; got != want {
+			t.Errorf("serveRouteStatus(%q) = %d, want %d", path, got, want)
+		}
+	}
+	if got, want := serveRouteStatus(router, "/openish"), http.StatusNotFound; got != want {
+		t.Errorf("serveRouteStatus(/openish) = %d, want %d", got, want)
+	}
+}
+
+func TestGenerateRoutesForPrefixesKeepsSubrouterWhenRateLimitSubrouteNeeded(t *testing.T) {
+	router := mux.NewRouter()
+	gw := &Gateway{}
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{UseKeylessAccess: false}}
+	chainObj := &ChainObject{
+		Open: false,
+		ThisHandler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusAccepted)
+		}),
+		RateLimitChain: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusPartialContent)
+		}),
+	}
+
+	gw.generateRoutesForPrefixes(spec, []string{"/secure/"}, false, router, chainObj)
+
+	if got := routePathRegexps(t, router); len(got) == 0 {
+		t.Fatal("generateRoutesForPrefixes(authenticated API) registered path regexps = none, want mux path-prefix subrouter")
+	}
+	if got, want := serveRouteStatus(router, "/secure/resource"), http.StatusAccepted; got != want {
+		t.Errorf("serveRouteStatus(/secure/resource) = %d, want %d", got, want)
+	}
+	if got, want := serveRouteStatus(router, "/secure/tyk/rate-limits/"), http.StatusPartialContent; got != want {
+		t.Errorf("serveRouteStatus(/secure/tyk/rate-limits/) = %d, want %d", got, want)
+	}
+}
+
+func serveRouteStatus(handler http.Handler, path string) int {
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	return rec.Code
+}
+
+func routePathRegexps(t *testing.T, router *mux.Router) []string {
+	t.Helper()
+
+	var regexps []string
+	err := router.Walk(func(route *mux.Route, _ *mux.Router, _ []*mux.Route) error {
+		pathRegexp, err := route.GetPathRegexp()
+		if err == nil {
+			regexps = append(regexps, pathRegexp)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("router.Walk() error = %v, want nil", err)
+	}
+
+	return regexps
+}
+
 func TestInternalAPIUsage(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()

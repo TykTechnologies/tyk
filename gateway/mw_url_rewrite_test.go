@@ -137,7 +137,9 @@ func TestURLRewriteRuntimeMetaContextPathFallsBackToMatchPattern(t *testing.T) {
 		RewriteTo:    "/next",
 	})
 
-	assert.Equal(t, "/same", meta.urlRewriteContextPath())
+	fullMeta, ok := meta.(*urlRewriteRuntimeMeta)
+	assert.True(t, ok)
+	assert.Equal(t, "/same", fullMeta.urlRewriteContextPath())
 }
 
 func TestURLRewriteRuntimeUsesCompactMeta(t *testing.T) {
@@ -163,21 +165,48 @@ func TestURLRewriteSimpleLiteralAvoidsSecondRegex(t *testing.T) {
 		Method:       http.MethodGet,
 		MatchPattern: "/test/foo/rewrite",
 		RewriteTo:    "/rewritten",
-	}}, URLRewrite, config.Config{})
+	}}, URLRewrite, &config.Config{})
 
 	assert.Len(t, paths, 1)
 	meta, ok := typedURLSpecMeta[*directURLRewriteRuntimeMeta](&paths[0])
 	assert.True(t, ok)
-	assert.Equal(t, http.MethodGet, meta.Method)
-	assert.Equal(t, "/test/foo/rewrite", meta.ContextPath)
-	assert.Equal(t, "/rewritten", meta.RewriteTo)
+	assert.Equal(t, http.MethodGet, meta.method)
+	assert.Equal(t, "/rewritten", meta.rewriteTo)
+	assert.Equal(t, "/test/foo/rewrite", paths[0].literalPath)
 
 	gw := &Gateway{}
-	req := httptest.NewRequest(http.MethodGet, "/test/foo/rewrite", nil)
-	got, err := gw.urlRewriteRuntime(meta, req)
+	req := httptest.NewRequest(http.MethodGet, "/listen/test/foo/rewrite", nil)
+	got, err := gw.urlRewriteRuntimeForSpec(meta, &paths[0], req)
 	assert.NoError(t, err)
 	assert.Equal(t, "/rewritten", got)
 	assert.Equal(t, "/test/foo/rewrite", ctxGetUrlRewritePath(req))
+}
+
+func TestURLRewriteSimpleLiteralReusesDirectRuntimeMeta(t *testing.T) {
+	loader := APIDefinitionLoader{}
+	paths := loader.compileURLRewritesPathSpec([]apidef.URLRewriteMeta{
+		{
+			Path:         "/test/foo/rewrite",
+			Method:       http.MethodGet,
+			MatchPattern: "/test/foo/rewrite",
+			RewriteTo:    "/rewritten",
+		},
+		{
+			Path:         "/test/bar/rewrite",
+			Method:       http.MethodGet,
+			MatchPattern: "/test/bar/rewrite",
+			RewriteTo:    "/rewritten",
+		},
+	}, URLRewrite, &config.Config{})
+
+	assert.Len(t, paths, 2)
+	first, ok := typedURLSpecMeta[*directURLRewriteRuntimeMeta](&paths[0])
+	assert.True(t, ok)
+	second, ok := typedURLSpecMeta[*directURLRewriteRuntimeMeta](&paths[1])
+	assert.True(t, ok)
+	assert.Same(t, first, second)
+	assert.Equal(t, "/test/foo/rewrite", paths[0].literalPath)
+	assert.Equal(t, "/test/bar/rewrite", paths[1].literalPath)
 }
 
 func TestURLRewriteInitTriggerRxEnablesDirectRuntimeMeta(t *testing.T) {
@@ -186,9 +215,8 @@ func TestURLRewriteInitTriggerRxEnablesDirectRuntimeMeta(t *testing.T) {
 			"": {{
 				Status: URLRewrite,
 				metadata: &directURLRewriteRuntimeMeta{
-					Method:      http.MethodGet,
-					ContextPath: "/test/foo/rewrite",
-					RewriteTo:   "/rewritten",
+					method:    http.MethodGet,
+					rewriteTo: "/rewritten",
 				},
 			}},
 		},
@@ -205,7 +233,7 @@ func TestURLRewriteRegexPathStillCompilesOnDemand(t *testing.T) {
 		Method:       http.MethodGet,
 		MatchPattern: "/test/(.*)/rewrite",
 		RewriteTo:    "/rewritten/$1",
-	}}, URLRewrite, config.Config{})
+	}}, URLRewrite, &config.Config{})
 
 	assert.Len(t, paths, 1)
 	meta, ok := typedURLSpecMeta[*urlRewriteRuntimeMeta](&paths[0])

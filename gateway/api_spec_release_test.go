@@ -1,17 +1,43 @@
 package gateway
 
 import (
+	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/header"
+	internalmiddleware "github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/model"
 )
+
+func TestGzipPayloadReturnsExactCapacityPayload(t *testing.T) {
+	payload := bytes.Repeat([]byte(`{"paths":{"/users/{id}":{"get":{"operationId":"getUser"}}},"x-tyk-api-gateway":{"middleware":{}}}`), 4096)
+
+	compressed, ok := gzipPayload(payload)
+	if !ok {
+		t.Fatal("gzipPayload(test payload) ok = false, want true")
+	}
+	if got, want := cap(compressed), len(compressed); got != want {
+		t.Fatalf("gzipPayload(test payload) cap = %d, want len %d", got, want)
+	}
+
+	decompressed, ok := gunzipPayload(compressed)
+	if !ok {
+		t.Fatal("gunzipPayload(gzipPayload(test payload)) ok = false, want true")
+	}
+	if !bytes.Equal(decompressed, payload) {
+		t.Fatalf("gunzipPayload(gzipPayload(test payload)) bytes.Equal = false, want true; got len %d, want len %d", len(decompressed), len(payload))
+	}
+}
 
 func TestAPISpecReleaseCompiledPathConfigPreservesClassicManagementPayload(t *testing.T) {
 	gw := gatewayForAPISpecReleaseTest()
@@ -207,6 +233,21 @@ func TestAPISpecReleaseCompiledPathConfigReleasesEligibleOASRuntimeDocumentState
 	}
 }
 
+func TestAPISpecValidateUsesRawOASDefinitionAfterRuntimeDocumentRelease(t *testing.T) {
+	_, spec := oasSpecForReleaseTest(t, nil)
+	spec.releaseCompiledPathConfig()
+
+	if !spec.oasRuntimeDocumentReleased {
+		t.Fatal("APISpec.releaseCompiledPathConfig(OAS validation release test) released = false, want true")
+	}
+	if err := spec.OAS.Validate(context.Background()); err == nil {
+		t.Fatal("OAS.Validate(released runtime document) error = nil, want error from stripped paths")
+	}
+	if err := spec.Validate(config.OASConfig{}); err != nil {
+		t.Fatalf("APISpec.Validate(released OAS runtime document) error = %v, want nil", err)
+	}
+}
+
 func TestAPISpecReleaseCompiledPathConfigReleasesEligibleOASOperationMiddleware(t *testing.T) {
 	gw, spec := oasSpecForReleaseTest(t, oas.Operations{
 		"getUser": {
@@ -387,7 +428,7 @@ func TestAPISpecReleaseCompiledPathConfigPreservesOASManagementPayload(t *testin
 	assertFullOASReleaseTestDocument(t, "Gateway.handleGetOASList", &oasList[0])
 }
 
-func TestAPISpecReleaseCompiledPathConfigKeepsOASWhenRuntimeDocumentConsumerExists(t *testing.T) {
+func TestAPISpecReleaseCompiledPathConfigReleasesRouteStateBackedRuntimeDocumentConsumers(t *testing.T) {
 	tests := []struct {
 		name      string
 		operation *oas.Operation
@@ -412,20 +453,203 @@ func TestAPISpecReleaseCompiledPathConfigKeepsOASWhenRuntimeDocumentConsumerExis
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, spec := oasSpecForReleaseTest(t, oas.Operations{"getUser": tt.operation})
-			if spec.canReleaseOASDocumentRuntimeState() {
-				t.Fatalf("APISpec.canReleaseOASDocumentRuntimeState(%s) = true, want false", tt.name)
+			if !spec.canReleaseOASDocumentRuntimeState() {
+				t.Fatalf("APISpec.canReleaseOASDocumentRuntimeState(%s) = false, want true", tt.name)
 			}
 
 			spec.releaseCompiledPathConfig()
 
-			if spec.OAS.Paths == nil || spec.OAS.Paths.Value("/users/{id}") == nil {
-				t.Fatalf("APISpec.releaseCompiledPathConfig(%s) paths = %#v, want retained /users/{id}", tt.name, spec.OAS.Paths)
+			if spec.OAS.Paths != nil {
+				t.Fatalf("APISpec.releaseCompiledPathConfig(%s) paths = %#v, want nil", tt.name, spec.OAS.Paths)
 			}
-			if spec.oasRuntimeDocumentReleased {
-				t.Fatalf("APISpec.releaseCompiledPathConfig(%s) released = true, want false", tt.name)
+			if !spec.oasRuntimeDocumentReleased {
+				t.Fatalf("APISpec.releaseCompiledPathConfig(%s) released = false, want true", tt.name)
 			}
 		})
 	}
+}
+
+func TestAPISpecReleaseCompiledPathConfigReleasesOASForValidateRequestRuntime(t *testing.T) {
+	gw, spec := oasValidateRequestSpecForReleaseRuntimeTest(t)
+	spec.OAS.Components = &openapi3.Components{
+		Schemas: openapi3.Schemas{
+			"RetainedRuntimeSchema": openapi3.NewSchemaRef("", openapi3.NewStringSchema()),
+		},
+	}
+	if !spec.canReleaseOASDocumentRuntimeState() {
+		t.Fatal("APISpec.canReleaseOASDocumentRuntimeState(validate-request runtime) = false, want true")
+	}
+
+	spec.releaseCompiledPathConfig()
+
+	if !spec.oasRuntimeDocumentReleased {
+		t.Fatal("APISpec.releaseCompiledPathConfig(validate-request runtime) released = false, want true")
+	}
+	if spec.OAS.Paths != nil {
+		t.Fatalf("APISpec.releaseCompiledPathConfig(validate-request runtime) paths = %#v, want nil", spec.OAS.Paths)
+	}
+	if spec.OAS.Components == nil || spec.OAS.Components.Schemas["RetainedRuntimeSchema"] == nil {
+		t.Fatalf("APISpec.releaseCompiledPathConfig(validate-request runtime) components = %#v, want retained RetainedRuntimeSchema", spec.OAS.Components)
+	}
+
+	middleware := &ValidateRequest{BaseMiddleware: NewBaseMiddleware(gw, spec, nil, nil)}
+	if !middleware.EnabledForSpec() {
+		t.Fatal("ValidateRequest.EnabledForSpec(validate-request runtime) = false, want true after APISpec.releaseCompiledPathConfig")
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/oas-release/users/123", nil)
+	err, code := middleware.ProcessRequest(httptest.NewRecorder(), req, nil)
+	if err == nil || code != http.StatusTeapot {
+		t.Fatalf("ValidateRequest.ProcessRequest(GET /oas-release/users/123 without required query) = (%v, %d), want error and %d", err, code, http.StatusTeapot)
+	}
+}
+
+func TestAPISpecReleaseCompiledPathConfigReleasesOASForMockFromExamplesRuntime(t *testing.T) {
+	gw, spec := oasMockFromExamplesSpecForReleaseRuntimeTest(t)
+	if !spec.canReleaseOASDocumentRuntimeState() {
+		t.Fatal("APISpec.canReleaseOASDocumentRuntimeState(mock-from-OAS-examples runtime) = false, want true")
+	}
+
+	spec.releaseCompiledPathConfig()
+
+	if !spec.oasRuntimeDocumentReleased {
+		t.Fatal("APISpec.releaseCompiledPathConfig(mock-from-OAS-examples runtime) released = false, want true")
+	}
+	if spec.OAS.Paths != nil {
+		t.Fatalf("APISpec.releaseCompiledPathConfig(mock-from-OAS-examples runtime) paths = %#v, want nil", spec.OAS.Paths)
+	}
+
+	middleware := newMockResponseMiddleware(NewBaseMiddleware(gw, spec, nil, nil))
+	tests := []struct {
+		name            string
+		headers         http.Header
+		wantStatus      int
+		wantContentType string
+		wantBody        string
+	}{
+		{
+			name:            "first named JSON example",
+			wantStatus:      http.StatusOK,
+			wantContentType: "application/json",
+			wantBody:        `{"example":"alpha"}`,
+		},
+		{
+			name: "header selected JSON example",
+			headers: http.Header{
+				header.XTykAcceptExampleName: {"beta"},
+			},
+			wantStatus:      http.StatusOK,
+			wantContentType: "application/json",
+			wantBody:        `{"example":"beta"}`,
+		},
+		{
+			name: "accept header selected media type",
+			headers: http.Header{
+				header.Accept: {"application/xml"},
+			},
+			wantStatus:      http.StatusOK,
+			wantContentType: "application/xml",
+			wantBody:        `{"example":"xml"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/oas-release/users/123", nil)
+			for name, values := range tt.headers {
+				for _, value := range values {
+					req.Header.Add(name, value)
+				}
+			}
+			rw := httptest.NewRecorder()
+
+			err, code := middleware.ProcessRequest(rw, req, nil)
+			if err != nil || code != internalmiddleware.StatusRespond {
+				t.Fatalf("mockResponseMiddleware.ProcessRequest(%s) = (%v, %d), want nil and %d", tt.name, err, code, internalmiddleware.StatusRespond)
+			}
+			if got := rw.Code; got != tt.wantStatus {
+				t.Fatalf("mockResponseMiddleware.ProcessRequest(%s) status = %d, want %d", tt.name, got, tt.wantStatus)
+			}
+			if got := rw.Header().Get(header.ContentType); got != tt.wantContentType {
+				t.Fatalf("mockResponseMiddleware.ProcessRequest(%s) content-type = %q, want %q", tt.name, got, tt.wantContentType)
+			}
+			assertJSONBodyEqual(t, "mockResponseMiddleware.ProcessRequest("+tt.name+")", rw.Body.Bytes(), []byte(tt.wantBody))
+		})
+	}
+}
+
+func TestAPISpecReleaseCompiledPathConfigKeepsOASWhenRuntimeRouteStateMissing(t *testing.T) {
+	tests := []struct {
+		name string
+		spec func(t *testing.T) *APISpec
+	}{
+		{
+			name: "validate request",
+			spec: func(t *testing.T) *APISpec {
+				_, spec := oasValidateRequestSpecForReleaseRuntimeTest(t)
+				clearOASValidateRequestRuntimeRoutes(spec)
+				return spec
+			},
+		},
+		{
+			name: "mock from OAS examples",
+			spec: func(t *testing.T) *APISpec {
+				_, spec := oasMockFromExamplesSpecForReleaseRuntimeTest(t)
+				clearOASMockResponseRuntimeRoutes(spec)
+				return spec
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := tt.spec(t)
+			if spec.canReleaseOASDocumentRuntimeState() {
+				t.Fatalf("APISpec.canReleaseOASDocumentRuntimeState(%s missing route state) = true, want false", tt.name)
+			}
+
+			spec.releaseCompiledPathConfig()
+
+			if spec.oasRuntimeDocumentReleased {
+				t.Fatalf("APISpec.releaseCompiledPathConfig(%s missing route state) released = true, want false", tt.name)
+			}
+			if spec.OAS.Paths == nil || spec.OAS.Paths.Value("/users/{id}") == nil {
+				t.Fatalf("APISpec.releaseCompiledPathConfig(%s missing route state) paths = %#v, want retained /users/{id}", tt.name, spec.OAS.Paths)
+			}
+		})
+	}
+}
+
+func TestOASRuntimeRouteStateKeepsValidateRequestWorkingWithoutPaths(t *testing.T) {
+	gw, spec := oasValidateRequestSpecForReleaseRuntimeTest(t)
+	spec.OAS.Paths = nil
+
+	middleware := &ValidateRequest{BaseMiddleware: NewBaseMiddleware(gw, spec, nil, nil)}
+	req := httptest.NewRequest(http.MethodGet, "/oas-release/users/123", nil)
+
+	err, code := middleware.ProcessRequest(httptest.NewRecorder(), req, nil)
+	if err == nil || code != http.StatusTeapot {
+		t.Fatalf("ValidateRequest.ProcessRequest(GET /oas-release/users/123 without OAS paths) = (%v, %d), want error and %d", err, code, http.StatusTeapot)
+	}
+}
+
+func TestOASRuntimeRouteStateKeepsMockFromExamplesWorkingWithoutPaths(t *testing.T) {
+	gw, spec := oasMockFromExamplesSpecForReleaseRuntimeTest(t)
+	spec.OAS.Paths = nil
+
+	middleware := newMockResponseMiddleware(NewBaseMiddleware(gw, spec, nil, nil))
+	req := httptest.NewRequest(http.MethodGet, "/oas-release/users/123", nil)
+	req.Header.Set(header.XTykAcceptExampleName, "beta")
+	rw := httptest.NewRecorder()
+
+	err, code := middleware.ProcessRequest(rw, req, nil)
+	if err != nil || code != internalmiddleware.StatusRespond {
+		t.Fatalf("mockResponseMiddleware.ProcessRequest(GET /oas-release/users/123 without OAS paths) = (%v, %d), want nil and %d", err, code, internalmiddleware.StatusRespond)
+	}
+	if got := rw.Code; got != http.StatusOK {
+		t.Fatalf("mockResponseMiddleware.ProcessRequest(GET /oas-release/users/123 without OAS paths) status = %d, want %d", got, http.StatusOK)
+	}
+	assertJSONBodyEqual(t, "mockResponseMiddleware.ProcessRequest(without OAS paths)", rw.Body.Bytes(), []byte(`{"example":"beta"}`))
 }
 
 func TestAPISpecReleaseCompiledPathConfigKeepsOASWhenRequestContextConsumerConfigured(t *testing.T) {
@@ -591,6 +815,112 @@ func oasSpecWithGlobalMiddlewareForReleaseTest(t *testing.T) (*Gateway, *APISpec
 	return gw, spec
 }
 
+func oasValidateRequestSpecForReleaseRuntimeTest(t *testing.T) (*Gateway, *APISpec) {
+	t.Helper()
+
+	merged := newOASRouterLazyMergedAPI(t, "/oas-release/", oas.Operations{
+		"getUser": {
+			ValidateRequest: &oas.ValidateRequest{
+				Enabled:           true,
+				ErrorResponseCode: http.StatusTeapot,
+			},
+		},
+	})
+	operation := merged.OAS.Paths.Value("/users/{id}").Get
+	operation.Parameters = append(operation.Parameters, &openapi3.ParameterRef{
+		Value: &openapi3.Parameter{
+			Name:     "required",
+			In:       "query",
+			Required: true,
+			Schema: &openapi3.SchemaRef{
+				Value: &openapi3.Schema{Type: &openapi3.Types{"string"}},
+			},
+		},
+	})
+
+	return makeOASReleaseRuntimeSpec(t, "validate-request runtime", merged)
+}
+
+func oasMockFromExamplesSpecForReleaseRuntimeTest(t *testing.T) (*Gateway, *APISpec) {
+	t.Helper()
+
+	merged := newOASRouterLazyMergedAPI(t, "/oas-release/", oas.Operations{
+		"getUser": {
+			MockResponse: &oas.MockResponse{
+				Enabled: true,
+				Code:    http.StatusOK,
+				FromOASExamples: &oas.FromOASExamples{
+					Enabled: true,
+					Code:    http.StatusOK,
+				},
+			},
+		},
+	})
+
+	desc := "mock response examples"
+	operation := merged.OAS.Paths.Value("/users/{id}").Get
+	operation.Responses = openapi3.NewResponses()
+	operation.Responses.Set("200", &openapi3.ResponseRef{
+		Value: &openapi3.Response{
+			Description: &desc,
+			Content: openapi3.Content{
+				"application/json": &openapi3.MediaType{
+					Examples: openapi3.Examples{
+						"alpha": &openapi3.ExampleRef{Value: &openapi3.Example{Value: map[string]string{"example": "alpha"}}},
+						"beta":  &openapi3.ExampleRef{Value: &openapi3.Example{Value: map[string]string{"example": "beta"}}},
+					},
+				},
+				"application/xml": &openapi3.MediaType{
+					Example: map[string]string{"example": "xml"},
+				},
+			},
+		},
+	})
+
+	return makeOASReleaseRuntimeSpec(t, "mock-from-OAS-examples runtime", merged)
+}
+
+func makeOASReleaseRuntimeSpec(t *testing.T, name string, merged *model.MergedAPI) (*Gateway, *APISpec) {
+	t.Helper()
+
+	gw := newGatewayForOASRouterLazyTest()
+	spec, err := (APIDefinitionLoader{Gw: gw}).MakeSpec(merged, nil)
+	if err != nil {
+		t.Fatalf("APIDefinitionLoader.MakeSpec(%s) error = %v, want nil", name, err)
+	}
+	return gw, spec
+}
+
+func clearOASValidateRequestRuntimeRoutes(spec *APISpec) {
+	for _, paths := range spec.RxPaths {
+		for i := range paths {
+			meta, ok := paths[i].oasValidateRequestRuntimeMeta()
+			if !ok || meta == nil {
+				continue
+			}
+			meta.Route = nil
+			for ci := range meta.Candidates {
+				meta.Candidates[ci].Route = nil
+			}
+		}
+	}
+}
+
+func clearOASMockResponseRuntimeRoutes(spec *APISpec) {
+	for _, paths := range spec.RxPaths {
+		for i := range paths {
+			meta, ok := paths[i].oasMockResponseRuntimeMeta()
+			if !ok || meta == nil {
+				continue
+			}
+			meta.Route = nil
+			for ci := range meta.Candidates {
+				meta.Candidates[ci].Route = nil
+			}
+		}
+	}
+}
+
 func (a *APISpec) hasOASGlobalHeaderRuntimeFields() bool {
 	if a == nil || a.APIDefinition == nil {
 		return false
@@ -675,4 +1005,26 @@ func decodeRawAPIDefinition(t *testing.T, payload json.RawMessage) apidef.APIDef
 		t.Fatalf("json.Unmarshal(APIDefinition) error = %v, want nil", err)
 	}
 	return def
+}
+
+func assertJSONBodyEqual(t *testing.T, caller string, got, want []byte) {
+	t.Helper()
+
+	var gotJSON any
+	if err := json.Unmarshal(got, &gotJSON); err != nil {
+		t.Fatalf("%s body json.Unmarshal(got) error = %v, got body %q", caller, err, string(got))
+	}
+	var wantJSON any
+	if err := json.Unmarshal(want, &wantJSON); err != nil {
+		t.Fatalf("%s body json.Unmarshal(want) error = %v, want body %q", caller, err, string(want))
+	}
+	if !jsonValuesEqual(gotJSON, wantJSON) {
+		t.Fatalf("%s body = %s, want %s", caller, got, want)
+	}
+}
+
+func jsonValuesEqual(a, b any) bool {
+	aBytes, aErr := json.Marshal(a)
+	bBytes, bErr := json.Marshal(b)
+	return aErr == nil && bErr == nil && bytes.Equal(aBytes, bBytes)
 }

@@ -3,6 +3,8 @@ package gateway
 import (
 	"strings"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -39,6 +41,7 @@ type ValidateRequestCandidate struct {
 	OASValidateRequestMeta *oas.ValidateRequest
 	OASMethod              string
 	OASPath                string
+	Route                  *oasRuntimeRoute
 }
 
 // MockResponseCandidate represents one OAS endpoint that maps to the same
@@ -47,6 +50,7 @@ type MockResponseCandidate struct {
 	OASMockResponseMeta *oas.MockResponse
 	OASMethod           string
 	OASPath             string
+	Route               *oasRuntimeRoute
 }
 
 type oasValidateRequestRuntimeMeta struct {
@@ -54,6 +58,7 @@ type oasValidateRequestRuntimeMeta struct {
 	Method          string
 	Path            string
 	Candidates      []ValidateRequestCandidate
+	Route           *oasRuntimeRoute
 }
 
 type oasMockResponseRuntimeMeta struct {
@@ -61,6 +66,27 @@ type oasMockResponseRuntimeMeta struct {
 	Method       string
 	Path         string
 	Candidates   []MockResponseCandidate
+	Route        *oasRuntimeRoute
+}
+
+type oasRuntimeRoute struct {
+	Path      string
+	Method    string
+	PathItem  *openapi3.PathItem
+	Operation *openapi3.Operation
+}
+
+func newOASRuntimeRoute(path, method string, pathItem *openapi3.PathItem, operation *openapi3.Operation) *oasRuntimeRoute {
+	return &oasRuntimeRoute{
+		Path:      path,
+		Method:    method,
+		PathItem:  pathItem,
+		Operation: operation,
+	}
+}
+
+func (r *oasRuntimeRoute) canBuildRoute() bool {
+	return r != nil && r.Path != "" && r.Method != "" && r.PathItem != nil && r.Operation != nil
 }
 
 func newOASValidateRequestURLSpec(validateRequest *oas.ValidateRequest, method, path string) URLSpec {

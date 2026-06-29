@@ -7,7 +7,9 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -74,6 +76,134 @@ func TestSortURLSpecsByPathPriority(t *testing.T) {
 			assert.Equal(t, tc.expected, got)
 		})
 	}
+}
+
+func TestIndexOASOperationRoutes(t *testing.T) {
+	paths := openapi3.NewPaths()
+	paths.Set("/pets", &openapi3.PathItem{
+		Get:  &openapi3.Operation{OperationID: "listPets"},
+		Post: &openapi3.Operation{OperationID: "createPet"},
+	})
+	paths.Set("/owners/{id}", &openapi3.PathItem{
+		Delete: &openapi3.Operation{OperationID: "deleteOwner"},
+	})
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{},
+		OAS:           oas.OAS{T: openapi3.T{Paths: paths}},
+	}
+
+	routes := indexOASOperationRoutes(spec)
+	assertOASOperationRoute(t, routes["listPets"], "/pets", http.MethodGet, "listPets")
+	assertOASOperationRoute(t, routes["createPet"], "/pets", http.MethodPost, "createPet")
+	assertOASOperationRoute(t, routes["deleteOwner"], "/owners/{id}", http.MethodDelete, "deleteOwner")
+}
+
+func TestOASMiddlewareCompilersUseOperationRouteIndex(t *testing.T) {
+	paths := openapi3.NewPaths()
+	paths.Set("/pets/{id}", &openapi3.PathItem{
+		Get: &openapi3.Operation{OperationID: "getPet"},
+	})
+	paths.Set("/pets/{kind}/{name}", &openapi3.PathItem{
+		Post: &openapi3.Operation{OperationID: "createPetByKind"},
+	})
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{},
+		OAS:           oas.OAS{T: openapi3.T{Paths: paths}},
+	}
+	spec.IsOAS = true
+	spec.OAS.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				"getPet": {
+					ValidateRequest: &oas.ValidateRequest{Enabled: true},
+				},
+				"createPetByKind": {
+					MockResponse: &oas.MockResponse{Enabled: true, Code: http.StatusCreated, Body: "created"},
+				},
+				"missingOperation": {
+					ValidateRequest: &oas.ValidateRequest{Enabled: true},
+					MockResponse:    &oas.MockResponse{Enabled: true, Code: http.StatusAccepted},
+				},
+			},
+		},
+	})
+
+	loader := APIDefinitionLoader{}
+	routes := indexOASOperationRoutes(spec)
+	validateSpecs := loader.compileOASValidateRequestPathSpec(spec, &config.Config{}, routes)
+	mockSpecs := loader.compileOASMockResponsePathSpec(spec, &config.Config{}, routes)
+
+	assert.Len(t, validateSpecs, 1)
+	validateMeta, ok := validateSpecs[0].oasValidateRequestRuntimeMeta()
+	assert.True(t, ok)
+	assert.Equal(t, "/pets/{id}", validateMeta.Path)
+	assert.Equal(t, http.MethodGet, validateMeta.Method)
+	assertOASRuntimeRoute(t, validateMeta.Route, "/pets/{id}", http.MethodGet, "getPet")
+
+	assert.Len(t, mockSpecs, 1)
+	mockMeta, ok := mockSpecs[0].oasMockResponseRuntimeMeta()
+	assert.True(t, ok)
+	assert.Equal(t, "/pets/{kind}/{name}", mockMeta.Path)
+	assert.Equal(t, http.MethodPost, mockMeta.Method)
+	assert.NotNil(t, mockMeta.Route)
+	assertOASRuntimeRoute(t, mockMeta.Route, "/pets/{kind}/{name}", http.MethodPost, "createPetByKind")
+}
+
+func assertOASOperationRoute(t *testing.T, got oasOperationRoute, wantPath, wantMethod, wantOperationID string) {
+	t.Helper()
+
+	assert.Equal(t, wantPath, got.path)
+	assert.Equal(t, wantMethod, got.method)
+	if assert.NotNil(t, got.pathItem) && assert.NotNil(t, got.operation) {
+		assert.Equal(t, wantOperationID, got.operation.OperationID)
+	}
+}
+
+func assertOASRuntimeRoute(t *testing.T, got *oasRuntimeRoute, wantPath, wantMethod, wantOperationID string) {
+	t.Helper()
+
+	if !assert.NotNil(t, got) {
+		return
+	}
+	assert.Equal(t, wantPath, got.Path)
+	assert.Equal(t, wantMethod, got.Method)
+	if assert.NotNil(t, got.PathItem) && assert.NotNil(t, got.Operation) {
+		assert.Equal(t, wantOperationID, got.Operation.OperationID)
+	}
+}
+
+func TestOASMiddlewareNeedsOperationRoutesOnlyForValidateOrMock(t *testing.T) {
+	assert.False(t, oasMiddlewareNeedsOperationRoutes(nil))
+	assert.False(t, oasMiddlewareNeedsOperationRoutes(&oas.Middleware{}))
+	assert.False(t, oasMiddlewareNeedsOperationRoutes(&oas.Middleware{
+		Operations: oas.Operations{
+			"ignored": {
+				IgnoreAuthentication: &oas.Allowance{Enabled: true},
+			},
+			"rewrite": {
+				URLRewrite: &oas.URLRewrite{Enabled: true},
+			},
+			"transform": {
+				TransformRequestBody: &oas.TransformBody{Enabled: true},
+			},
+		},
+	}))
+	assert.True(t, oasMiddlewareNeedsOperationRoutes(&oas.Middleware{
+		Operations: oas.Operations{
+			"validate": {
+				ValidateRequest: &oas.ValidateRequest{Enabled: true},
+			},
+		},
+	}))
+	assert.True(t, oasMiddlewareNeedsOperationRoutes(&oas.Middleware{
+		Operations: oas.Operations{
+			"mock": {
+				MockResponse: &oas.MockResponse{Enabled: true},
+			},
+		},
+	}))
 }
 
 func TestStaticPathTakesPrecedenceOverParameterised(t *testing.T) {

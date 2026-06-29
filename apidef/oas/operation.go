@@ -280,36 +280,39 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 	}
 
 	for _, pathItem := range oasutil.SortByPathLength(*s.Paths) {
-		for id, tykOp := range tykOperations {
-			path := pathItem.Path
-			for method, operation := range pathItem.Operations() {
-				if id == operation.OperationID {
-					tykOp.extractAllowanceTo(ep, path, method, allow)
-					tykOp.extractAllowanceTo(ep, path, method, block)
-					tykOp.extractAllowanceTo(ep, path, method, ignoreAuthentication)
-					tykOp.extractInternalTo(ep, path, method)
-					tykOp.extractTransformRequestMethodTo(ep, path, method)
-					tykOp.extractTransformRequestBodyTo(ep, path, method)
-					tykOp.extractTransformResponseBodyTo(ep, path, method)
-					tykOp.extractTransformRequestHeadersTo(ep, path, method)
-					tykOp.extractTransformResponseHeadersTo(ep, path, method)
-					tykOp.extractURLRewriteTo(ep, path, method)
-					tykOp.extractCacheTo(ep, path, method)
-					tykOp.extractEnforceTimeoutTo(ep, path, method)
-					tykOp.extractVirtualEndpointTo(ep, path, method)
-					tykOp.extractEndpointPostPluginTo(ep, path, method)
-					tykOp.extractCircuitBreakerTo(ep, path, method)
-					tykOp.extractTrackEndpointTo(ep, path, method)
-					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
-					tykOp.extractRequestSizeLimitTo(ep, path, method)
-					tykOp.extractRateLimitEndpointTo(ep, path, method)
-					break
-				}
+		path := pathItem.Path
+		for method, operation := range pathItem.Operations() {
+			tykOp, ok := tykOperations[operation.OperationID]
+			if !ok {
+				continue
 			}
+			tykOp.extractGatewayExtendedPaths(ep, path, method)
 		}
 	}
 
 	sortMockResponseAllowList(ep)
+}
+
+func (o *Operation) extractGatewayExtendedPaths(ep *apidef.ExtendedPathsSet, path, method string) {
+	o.extractAllowanceTo(ep, path, method, allow)
+	o.extractAllowanceTo(ep, path, method, block)
+	o.extractAllowanceTo(ep, path, method, ignoreAuthentication)
+	o.extractInternalTo(ep, path, method)
+	o.extractTransformRequestMethodTo(ep, path, method)
+	o.extractTransformRequestBodyTo(ep, path, method)
+	o.extractTransformResponseBodyTo(ep, path, method)
+	o.extractTransformRequestHeadersTo(ep, path, method)
+	o.extractTransformResponseHeadersTo(ep, path, method)
+	o.extractURLRewriteTo(ep, path, method)
+	o.extractCacheTo(ep, path, method)
+	o.extractEnforceTimeoutTo(ep, path, method)
+	o.extractVirtualEndpointTo(ep, path, method)
+	o.extractEndpointPostPluginTo(ep, path, method)
+	o.extractCircuitBreakerTo(ep, path, method)
+	o.extractTrackEndpointTo(ep, path, method)
+	o.extractDoNotTrackEndpointTo(ep, path, method)
+	o.extractRequestSizeLimitTo(ep, path, method)
+	o.extractRateLimitEndpointTo(ep, path, method)
 }
 
 func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {

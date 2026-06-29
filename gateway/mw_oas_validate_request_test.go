@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -164,29 +165,36 @@ func TestValidateRequest(t *testing.T) {
 	err = oasAPI.Validate(context.Background())
 	assert.NoError(t, err)
 
-	apis := ts.Gw.BuildAndLoadAPI(
-		func(spec *APISpec) {
-			spec.VersionData = def.VersionData
-			spec.Name = "without regexp"
-			spec.OAS = oasAPI
-			spec.IsOAS = true
-			spec.Proxy.ListenPath = "/product"
-		},
-		func(spec *APISpec) {
-			spec.VersionData = def.VersionData
-			spec.OAS = oasAPI
-			spec.IsOAS = true
-			spec.Proxy.ListenPath = "/product-regexp1/{name:.*}"
-			spec.UseKeylessAccess = true
-		},
-		func(spec *APISpec) {
-			spec.VersionData = def.VersionData
-			spec.OAS = oasAPI
-			spec.IsOAS = true
-			spec.Proxy.ListenPath = "/product-regexp2/{name:.*}/suffix"
-			spec.UseKeylessAccess = true
-		},
-	)
+	buildValidateRequestAPIs := func(stripListenPath bool) []*APISpec {
+		return BuildAPI(
+			func(spec *APISpec) {
+				spec.VersionData = def.VersionData
+				spec.Name = "without regexp"
+				spec.OAS = oasAPI
+				spec.IsOAS = true
+				spec.Proxy.ListenPath = "/product"
+				spec.Proxy.StripListenPath = stripListenPath
+			},
+			func(spec *APISpec) {
+				spec.VersionData = def.VersionData
+				spec.OAS = oasAPI
+				spec.IsOAS = true
+				spec.Proxy.ListenPath = "/product-regexp1/{name:.*}"
+				spec.Proxy.StripListenPath = stripListenPath
+				spec.UseKeylessAccess = true
+			},
+			func(spec *APISpec) {
+				spec.VersionData = def.VersionData
+				spec.OAS = oasAPI
+				spec.IsOAS = true
+				spec.Proxy.ListenPath = "/product-regexp2/{name:.*}/suffix"
+				spec.Proxy.StripListenPath = stripListenPath
+				spec.UseKeylessAccess = true
+			},
+		)
+	}
+
+	ts.Gw.LoadAPI(buildValidateRequestAPIs(false)...)
 
 	headers := map[string]string{}
 
@@ -221,10 +229,7 @@ func TestValidateRequest(t *testing.T) {
 		})
 
 		t.Run("stripListenPath=true", func(t *testing.T) {
-			apis[0].Proxy.StripListenPath = true
-			apis[1].Proxy.StripListenPath = true
-			apis[2].Proxy.StripListenPath = true
-			ts.Gw.LoadAPI(apis...)
+			ts.Gw.LoadAPI(buildValidateRequestAPIs(true)...)
 			check(t)
 		})
 
@@ -279,7 +284,7 @@ func TestValidateRequest_AfterMigration(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	input := BuildAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/listen/"
 		spec.Proxy.StripListenPath = true
 		spec.ConfigDataDisabled = true
@@ -296,6 +301,7 @@ func TestValidateRequest_AfterMigration(t *testing.T) {
 			}
 		})
 	})[0]
+	ts.Gw.LoadAPI(input)
 
 	_, _ = ts.Run(t, []test.TestCase{
 		{Method: http.MethodPost, Path: "/listen/without_validation", Data: "{not_valid}", Code: http.StatusOK},
@@ -303,7 +309,8 @@ func TestValidateRequest_AfterMigration(t *testing.T) {
 		{Method: http.MethodPost, Path: "/listen/post", Data: `{"name":"Furkan"}`, Code: http.StatusOK},
 	}...)
 
-	migratedAPI, _, err := oas.MigrateAndFillOAS(api.APIDefinition)
+	migratedInput := cloneValidateRequestAPIDefinition(t, input.APIDefinition)
+	migratedAPI, _, err := oas.MigrateAndFillOAS(migratedInput)
 	assert.NoError(t, err)
 
 	ts.Gw.LoadAPI(&APISpec{APIDefinition: migratedAPI.Classic, OAS: *migratedAPI.OAS})
@@ -313,6 +320,18 @@ func TestValidateRequest_AfterMigration(t *testing.T) {
 		{Method: http.MethodPost, Path: "/listen/post", Data: `{"age":27}`, Code: http.StatusTeapot},
 		{Method: http.MethodPost, Path: "/listen/post", Data: `{"name":"Furkan"}`, Code: http.StatusOK},
 	}...)
+}
+
+func cloneValidateRequestAPIDefinition(t *testing.T, api *apidef.APIDefinition) *apidef.APIDefinition {
+	t.Helper()
+
+	payload, err := json.Marshal(api)
+	require.NoError(t, err)
+
+	var clone apidef.APIDefinition
+	require.NoError(t, json.Unmarshal(payload, &clone))
+
+	return &clone
 }
 
 // TestValidateRequest_PrefixMatching verifies that OAS validateRequest middleware

@@ -220,27 +220,55 @@ type ExtendedCircuitBreakerMeta struct {
 
 type urlRewriteRuntimeMetadata interface {
 	urlRewriteMethod() string
-	urlRewriteContextPath() string
 }
 
 type directURLRewriteRuntimeMeta struct {
-	Method      string
-	ContextPath string
-	RewriteTo   string
+	method    string
+	rewriteTo string
 }
 
 func (m *directURLRewriteRuntimeMeta) urlRewriteMethod() string {
 	if m == nil {
 		return ""
 	}
-	return m.Method
+	return m.method
 }
 
-func (m *directURLRewriteRuntimeMeta) urlRewriteContextPath() string {
-	if m == nil {
-		return ""
+type directURLRewriteRuntimeMetaKey struct {
+	method    string
+	rewriteTo string
+}
+
+// Keep the package-level cache bounded so reloads with many unique rewrite
+// targets do not retain old API definition metadata indefinitely.
+const directURLRewriteRuntimeMetaCacheMaxItems = 1024
+
+var directURLRewriteRuntimeMetaCache = struct {
+	sync.Mutex
+	items map[directURLRewriteRuntimeMetaKey]*directURLRewriteRuntimeMeta
+}{
+	items: make(map[directURLRewriteRuntimeMetaKey]*directURLRewriteRuntimeMeta),
+}
+
+func directURLRewriteRuntimeMetaFor(method, rewriteTo string) *directURLRewriteRuntimeMeta {
+	key := directURLRewriteRuntimeMetaKey{method: method, rewriteTo: rewriteTo}
+
+	directURLRewriteRuntimeMetaCache.Lock()
+	defer directURLRewriteRuntimeMetaCache.Unlock()
+
+	if meta, ok := directURLRewriteRuntimeMetaCache.items[key]; ok {
+		return meta
 	}
-	return m.ContextPath
+	if len(directURLRewriteRuntimeMetaCache.items) >= directURLRewriteRuntimeMetaCacheMaxItems {
+		clear(directURLRewriteRuntimeMetaCache.items)
+	}
+
+	meta := &directURLRewriteRuntimeMeta{
+		method:    method,
+		rewriteTo: rewriteTo,
+	}
+	directURLRewriteRuntimeMetaCache.items[key] = meta
+	return meta
 }
 
 type urlRewriteRuntimeMeta struct {
@@ -277,11 +305,7 @@ func compileURLRewriteRuntimeMetaWithError(meta apidef.URLRewriteMeta, directMat
 		contextPath = meta.MatchPattern
 	}
 	if directMatch {
-		return &directURLRewriteRuntimeMeta{
-			Method:      meta.Method,
-			ContextPath: contextPath,
-			RewriteTo:   meta.RewriteTo,
-		}, nil
+		return directURLRewriteRuntimeMetaFor(meta.Method, meta.RewriteTo), nil
 	}
 	runtimeMeta := &urlRewriteRuntimeMeta{
 		Method:       meta.Method,
@@ -364,13 +388,21 @@ func (s *APISpec) Unload() {
 func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 	if s.IsOAS {
 		var err error
+		oasDoc := &s.OAS
+		if s.oasRuntimeDocumentReleased {
+			raw, ok := s.rawOASDefinition()
+			if !ok {
+				return errors.New("released OAS runtime document has no raw management payload")
+			}
+			oasDoc = raw
+		}
 		if s.IsMCP() {
 			// MCP-aware path: empty-mode + no-resource PRM config
 			// resolves to mirror, so users can enable mirror by just
 			// marking the API as MCP without any static fields.
-			err = s.OAS.ValidateForMCP(context.Background(), oas.GetValidationOptionsFromConfig(oasConfig)...)
+			err = oasDoc.ValidateForMCP(context.Background(), oas.GetValidationOptionsFromConfig(oasConfig)...)
 		} else {
-			err = s.OAS.Validate(context.Background(), oas.GetValidationOptionsFromConfig(oasConfig)...)
+			err = oasDoc.Validate(context.Background(), oas.GetValidationOptionsFromConfig(oasConfig)...)
 		}
 		if err != nil {
 			return err
@@ -485,14 +517,15 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		Gw:    a.Gw,
 	}
 
-	spec.GlobalConfig = a.Gw.GetConfig()
+	gwConfig := a.Gw.GetConfig()
+	spec.GlobalConfig = gwConfig
 
 	if err = a.Gw.loadBundle(spec); err != nil {
 		logger.WithError(err).Error("Couldn't load bundle")
 		return nil, err
 	}
 
-	if a.Gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || spec.CustomMiddleware.Driver == apidef.OttoDriver) {
+	if gwConfig.EnableJSVM && (spec.hasVirtualEndpoint() || spec.CustomMiddleware.Driver == apidef.OttoDriver) {
 		logger.Debug("Initializing JSVM")
 		spec.JSVM.Init(spec, logger, a.Gw)
 	}
@@ -544,7 +577,7 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 	for _, v := range def.VersionData.Versions {
 		var pathSpecs []URLSpec
 		var whiteListSpecs bool
-		cacheKey, cacheable := versionPathSpecCacheKey(v, a.Gw.GetConfig())
+		cacheKey, cacheable := versionPathSpecCacheKey(v, &gwConfig)
 		if spec.IsOAS {
 			cacheable = false
 		}
@@ -558,10 +591,10 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 
 		// If we have transitioned to extended path specifications, we should use these now
 		if v.UseExtendedPaths {
-			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, spec, a.Gw.GetConfig())
+			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, spec, &gwConfig)
 		} else {
 			logger.Warning("Legacy path detected! Upgrade to extended.")
-			pathSpecs, whiteListSpecs = a.getPathSpecs(v, a.Gw.GetConfig())
+			pathSpecs, whiteListSpecs = a.getPathSpecs(v, &gwConfig)
 		}
 		spec.RxPaths[v.Name] = pathSpecs
 		spec.WhiteListEnabled[v.Name] = whiteListSpecs
@@ -1043,7 +1076,7 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 	return a.MakeSpec(&nestDef, nil)
 }
 
-func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo, conf config.Config) ([]URLSpec, bool) {
+func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo, conf *config.Config) ([]URLSpec, bool) {
 	ignoredPaths := a.compilePathSpec(apiVersionDef.Paths.Ignored, Ignored, conf)
 	blackListPaths := a.compilePathSpec(apiVersionDef.Paths.BlackList, BlackList, conf)
 	whiteListPaths := a.compilePathSpec(apiVersionDef.Paths.WhiteList, WhiteList, conf)
@@ -1061,7 +1094,7 @@ type compiledVersionPathSpecs struct {
 	whiteListEnabled bool
 }
 
-func versionPathSpecCacheKey(version apidef.VersionInfo, conf config.Config) (string, bool) {
+func versionPathSpecCacheKey(version apidef.VersionInfo, conf *config.Config) (string, bool) {
 	if version.UseExtendedPaths && !versionExtendedPathSpecsShareable(version.ExtendedPaths, conf) {
 		return "", false
 	}
@@ -1089,7 +1122,7 @@ func versionPathSpecCacheKey(version apidef.VersionInfo, conf config.Config) (st
 	return base64.URLEncoding.EncodeToString(sum[:]), true
 }
 
-func versionExtendedPathSpecsShareable(paths apidef.ExtendedPathsSet, conf config.Config) bool {
+func versionExtendedPathSpecsShareable(paths apidef.ExtendedPathsSet, conf *config.Config) bool {
 	if hasEnabledCircuitBreaker(paths.CircuitBreaker) ||
 		len(paths.Virtual) > 0 ||
 		len(paths.TransformJQ) > 0 ||
@@ -1122,7 +1155,7 @@ func hasEnabledGoPlugin(paths []apidef.GoPluginMeta) bool {
 	return false
 }
 
-func urlRewriteSpecsShareable(paths []apidef.URLRewriteMeta, conf config.Config) bool {
+func urlRewriteSpecsShareable(paths []apidef.URLRewriteMeta, conf *config.Config) bool {
 	for _, path := range paths {
 		if path.Disabled {
 			continue
@@ -1142,7 +1175,7 @@ func urlRewriteSpecsShareable(paths []apidef.URLRewriteMeta, conf config.Config)
 	return true
 }
 
-func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus, conf config.Config) {
+func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus, conf *config.Config) {
 	var (
 		pattern string
 		err     error
@@ -1211,7 +1244,7 @@ func literalPathMatcher(pattern string, prefix, suffix, ignoreCase bool) (string
 	}
 }
 
-func (a APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus, conf *config.Config) []URLSpec {
 	// transform a configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := make([]URLSpec, 0, len(paths))
@@ -1225,7 +1258,7 @@ func (a APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus,
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileExtendedPathSpec(ignoreEndpointCase bool, paths []apidef.EndPointMeta, specType URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileExtendedPathSpec(ignoreEndpointCase bool, paths []apidef.EndPointMeta, specType URLStatus, conf *config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := make([]URLSpec, 0, len(paths))
@@ -1246,7 +1279,7 @@ func (a APIDefinitionLoader) compileExtendedPathSpec(ignoreEndpointCase bool, pa
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileMockResponsePathSpec(ignoreEndpointCase bool, paths []apidef.MockResponseMeta, specType URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileMockResponsePathSpec(ignoreEndpointCase bool, paths []apidef.MockResponseMeta, specType URLStatus, conf *config.Config) []URLSpec {
 	urlSpec := make([]URLSpec, 0, len(paths))
 
 	for _, stringSpec := range paths {
@@ -1265,7 +1298,7 @@ func (a APIDefinitionLoader) compileMockResponsePathSpec(ignoreEndpointCase bool
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths []apidef.CacheMeta, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths []apidef.CacheMeta, conf *config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := make([]URLSpec, 0, len(oldpaths)+len(newpaths))
@@ -1361,7 +1394,7 @@ func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*texttemplate.Templa
 	return parsed, nil
 }
 
-func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMeta, stat URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMeta, stat URLStatus, conf *config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := make([]URLSpec, 0, len(paths))
@@ -1413,7 +1446,7 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileInjectedHeaderSpec(paths []apidef.HeaderInjectionMeta, stat URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileInjectedHeaderSpec(paths []apidef.HeaderInjectionMeta, stat URLStatus, conf *config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := make([]URLSpec, 0, len(paths))
@@ -1435,7 +1468,7 @@ func (a APIDefinitionLoader) compileInjectedHeaderSpec(paths []apidef.HeaderInje
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileMethodTransformSpec(paths []apidef.MethodTransformMeta, stat URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileMethodTransformSpec(paths []apidef.MethodTransformMeta, stat URLStatus, conf *config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := make([]URLSpec, 0, len(paths))
@@ -1456,29 +1489,7 @@ func (a APIDefinitionLoader) compileMethodTransformSpec(paths []apidef.MethodTra
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileTimeoutPathSpec(paths []apidef.HardTimeoutMeta, stat URLStatus, conf config.Config) []URLSpec {
-	// transform an extended configuration URL into an array of URLSpecs
-	// This way we can iterate the whole array once, on match we break with status
-	urlSpec := make([]URLSpec, 0, len(paths))
-
-	for _, stringSpec := range paths {
-		if stringSpec.Disabled {
-			continue
-		}
-
-		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
-		// Extend with method actions
-		meta := stringSpec
-		newSpec.metadata = &meta
-
-		urlSpec = append(urlSpec, newSpec)
-	}
-
-	return urlSpec
-}
-
-func (a APIDefinitionLoader) compileRequestSizePathSpec(paths []apidef.RequestSizeMeta, stat URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileTimeoutPathSpec(paths []apidef.HardTimeoutMeta, stat URLStatus, conf *config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := make([]URLSpec, 0, len(paths))
@@ -1500,7 +1511,29 @@ func (a APIDefinitionLoader) compileRequestSizePathSpec(paths []apidef.RequestSi
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.CircuitBreakerMeta, stat URLStatus, apiSpec *APISpec, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileRequestSizePathSpec(paths []apidef.RequestSizeMeta, stat URLStatus, conf *config.Config) []URLSpec {
+	// transform an extended configuration URL into an array of URLSpecs
+	// This way we can iterate the whole array once, on match we break with status
+	urlSpec := make([]URLSpec, 0, len(paths))
+
+	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
+		// Extend with method actions
+		meta := stringSpec
+		newSpec.metadata = &meta
+
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
+func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.CircuitBreakerMeta, stat URLStatus, apiSpec *APISpec, conf *config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := make([]URLSpec, 0, len(paths))
@@ -1585,7 +1618,7 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewriteMeta, stat URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewriteMeta, stat URLStatus, conf *config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := make([]URLSpec, 0, len(paths))
@@ -1615,7 +1648,7 @@ func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewrit
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileVirtualPathsSpec(paths []apidef.VirtualMeta, stat URLStatus, apiSpec *APISpec, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileVirtualPathsSpec(paths []apidef.VirtualMeta, stat URLStatus, apiSpec *APISpec, conf *config.Config) []URLSpec {
 	if !conf.EnableJSVM {
 		return nil
 	}
@@ -1642,7 +1675,7 @@ func (a APIDefinitionLoader) compileVirtualPathsSpec(paths []apidef.VirtualMeta,
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileGopluginPathsSpec(paths []apidef.GoPluginMeta, stat URLStatus, _ *APISpec, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileGopluginPathsSpec(paths []apidef.GoPluginMeta, stat URLStatus, _ *APISpec, conf *config.Config) []URLSpec {
 
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
@@ -1672,7 +1705,7 @@ func (a APIDefinitionLoader) compileGopluginPathsSpec(paths []apidef.GoPluginMet
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compilePersistGraphQLPathSpec(paths []apidef.PersistGraphQLMeta, stat URLStatus, apiSpec *APISpec, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compilePersistGraphQLPathSpec(paths []apidef.PersistGraphQLMeta, stat URLStatus, apiSpec *APISpec, conf *config.Config) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := make([]URLSpec, 0, len(paths))
@@ -1694,7 +1727,7 @@ func (a APIDefinitionLoader) compilePersistGraphQLPathSpec(paths []apidef.Persis
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileTrackedEndpointPathsSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileTrackedEndpointPathsSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf *config.Config) []URLSpec {
 
 	urlSpec := make([]URLSpec, 0, len(paths))
 
@@ -1721,7 +1754,7 @@ func (a APIDefinitionLoader) compileTrackedEndpointPathsSpec(paths []apidef.Trac
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileValidateJSONPathsSpec(paths []apidef.ValidatePathMeta, stat URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileValidateJSONPathsSpec(paths []apidef.ValidatePathMeta, stat URLStatus, conf *config.Config) []URLSpec {
 	urlSpec := make([]URLSpec, 0, len(paths))
 
 	for _, stringSpec := range paths {
@@ -1742,7 +1775,7 @@ func (a APIDefinitionLoader) compileValidateJSONPathsSpec(paths []apidef.Validat
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileUnTrackedEndpointPathsSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileUnTrackedEndpointPathsSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf *config.Config) []URLSpec {
 	urlSpec := make([]URLSpec, 0, len(paths))
 
 	for _, stringSpec := range paths {
@@ -1761,7 +1794,7 @@ func (a APIDefinitionLoader) compileUnTrackedEndpointPathsSpec(paths []apidef.Tr
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileInternalPathsSpec(paths []apidef.InternalMeta, stat URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileInternalPathsSpec(paths []apidef.InternalMeta, stat URLStatus, conf *config.Config) []URLSpec {
 	urlSpec := make([]URLSpec, 0, len(paths))
 
 	for _, stringSpec := range paths {
@@ -1780,7 +1813,7 @@ func (a APIDefinitionLoader) compileInternalPathsSpec(paths []apidef.InternalMet
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileRateLimitPathsSpec(paths []apidef.RateLimitMeta, stat URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileRateLimitPathsSpec(paths []apidef.RateLimitMeta, stat URLStatus, conf *config.Config) []URLSpec {
 	urlSpec := make([]URLSpec, 0, len(paths))
 
 	for _, stringSpec := range paths {
@@ -1803,7 +1836,7 @@ func (a APIDefinitionLoader) compileRateLimitPathsSpec(paths []apidef.RateLimitM
 // and converts them to URLSpec entries that use the standard regex-based path matching algorithm.
 // This ensures OAS validateRequest middleware respects gateway configurations like
 // EnablePathPrefixMatching, EnablePathSuffixMatching, and IgnoreEndpointCase.
-func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec, conf *config.Config, operationRoutes map[string]oasOperationRoute) []URLSpec {
 	if !apiSpec.IsOAS {
 		return nil
 	}
@@ -1813,7 +1846,7 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 		return nil
 	}
 
-	urlSpec := []URLSpec{}
+	urlSpec := make([]URLSpec, 0, len(middleware.Operations))
 
 	// Iterate through all OAS operations and find those with ValidateRequest enabled
 	for operationID, operation := range middleware.Operations {
@@ -1821,14 +1854,20 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 			continue
 		}
 
-		path, method := a.findPathAndMethodForOperation(apiSpec, operationID)
-		if path == "" || method == "" {
+		if operationRoutes == nil {
+			operationRoutes = indexOASOperationRoutes(apiSpec)
+		}
+		route, ok := operationRoutes[operationID]
+		if !ok || route.path == "" || route.method == "" {
 			continue
 		}
 
-		newSpec := newOASValidateRequestURLSpec(operation.ValidateRequest, strings.ToUpper(method), path)
+		newSpec := newOASValidateRequestURLSpec(operation.ValidateRequest, strings.ToUpper(route.method), route.path)
+		if meta, ok := newSpec.oasValidateRequestRuntimeMeta(); ok && meta != nil {
+			meta.Route = route.runtimeRoute()
+		}
 
-		a.generateRegex(path, &newSpec, OASValidateRequest, conf)
+		a.generateRegex(route.path, &newSpec, OASValidateRequest, conf)
 		urlSpec = append(urlSpec, newSpec)
 	}
 
@@ -1874,8 +1913,8 @@ func groupCollapsedSpecs(
 		method string
 	}
 
-	groups := make(map[key][]int)
-	var order []key
+	groups := make(map[key][]int, len(specs))
+	order := make([]key, 0, len(specs))
 	for i, s := range specs {
 		if s.Status != status || s.spec == nil {
 			continue
@@ -1915,6 +1954,7 @@ func mergeMockGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]
 			OASMockResponseMeta: meta.MockResponse,
 			OASMethod:           meta.Method,
 			OASPath:             meta.Path,
+			Route:               meta.Route,
 		}
 		if idx != primary {
 			toRemove[idx] = true
@@ -1925,6 +1965,7 @@ func mergeMockGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]
 	meta.MockResponse = candidates[0].OASMockResponseMeta
 	meta.Method = candidates[0].OASMethod
 	meta.Path = candidates[0].OASPath
+	meta.Route = candidates[0].Route
 	meta.Candidates = candidates
 }
 
@@ -1961,6 +2002,7 @@ func mergeGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]bool
 			OASValidateRequestMeta: meta.ValidateRequest,
 			OASMethod:              meta.Method,
 			OASPath:                meta.Path,
+			Route:                  meta.Route,
 		}
 		if idx != primary {
 			toRemove[idx] = true
@@ -1971,6 +2013,7 @@ func mergeGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]bool
 	meta.ValidateRequest = candidates[0].OASValidateRequestMeta
 	meta.Method = candidates[0].OASMethod
 	meta.Path = candidates[0].OASPath
+	meta.Route = candidates[0].Route
 	meta.Candidates = candidates
 }
 
@@ -2091,7 +2134,7 @@ func pathParamPatternLength(oasPath, method string, oasPaths *openapi3.Paths) in
 // and converts them to URLSpec entries that use the standard regex-based path matching algorithm.
 // This ensures OAS mockResponse middleware respects gateway configurations like
 // EnablePathPrefixMatching, EnablePathSuffixMatching, and IgnoreEndpointCase.
-func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, conf *config.Config, operationRoutes map[string]oasOperationRoute) []URLSpec {
 	if !apiSpec.IsOAS {
 		return nil
 	}
@@ -2101,7 +2144,7 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 		return nil
 	}
 
-	urlSpec := []URLSpec{}
+	urlSpec := make([]URLSpec, 0, len(middleware.Operations))
 
 	// Iterate through all OAS operations and find those with MockResponse enabled
 	for operationID, operation := range middleware.Operations {
@@ -2109,14 +2152,20 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 			continue
 		}
 
-		path, method := a.findPathAndMethodForOperation(apiSpec, operationID)
-		if path == "" || method == "" {
+		if operationRoutes == nil {
+			operationRoutes = indexOASOperationRoutes(apiSpec)
+		}
+		route, ok := operationRoutes[operationID]
+		if !ok || route.path == "" || route.method == "" {
 			continue
 		}
 
-		newSpec := newOASMockResponseURLSpec(operation.MockResponse, strings.ToUpper(method), path)
+		newSpec := newOASMockResponseURLSpec(operation.MockResponse, strings.ToUpper(route.method), route.path)
+		if meta, ok := newSpec.oasMockResponseRuntimeMeta(); ok && meta != nil {
+			meta.Route = route.runtimeRoute()
+		}
 
-		a.generateRegex(path, &newSpec, OASMockResponse, conf)
+		a.generateRegex(route.path, &newSpec, OASMockResponse, conf)
 		urlSpec = append(urlSpec, newSpec)
 	}
 
@@ -2141,7 +2190,7 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 // since without parameterised paths there is no cross-matching risk.
 func (a APIDefinitionLoader) addStaticPathShields(
 	apiSpec *APISpec,
-	conf config.Config,
+	conf *config.Config,
 	urlSpec []URLSpec,
 	status URLStatus,
 	newDisabledSpec func(path, method string) URLSpec,
@@ -2190,22 +2239,58 @@ func indexURLSpecs(specs []URLSpec) (existing map[string]struct{}, hasParameteri
 	return
 }
 
-// findPathAndMethodForOperation finds the path and method for a given operation ID
-// by searching through the OAS paths.
-func (a APIDefinitionLoader) findPathAndMethodForOperation(apiSpec *APISpec, operationID string) (string, string) {
+type oasOperationRoute struct {
+	path      string
+	method    string
+	pathItem  *openapi3.PathItem
+	operation *openapi3.Operation
+}
+
+func (r oasOperationRoute) runtimeRoute() *oasRuntimeRoute {
+	return newOASRuntimeRoute(r.path, strings.ToUpper(r.method), r.pathItem, r.operation)
+}
+
+func indexOASOperationRoutes(apiSpec *APISpec) map[string]oasOperationRoute {
 	if apiSpec.OAS.Paths == nil {
-		return "", ""
+		return nil
 	}
 
-	for path, pathItem := range apiSpec.OAS.Paths.Map() {
+	paths := apiSpec.OAS.Paths.Map()
+	routes := make(map[string]oasOperationRoute, len(paths))
+	for path, pathItem := range paths {
 		for method, operation := range pathItem.Operations() {
-			if operation.OperationID == operationID {
-				return path, method
+			if operation.OperationID == "" {
+				continue
 			}
+			routes[operation.OperationID] = oasOperationRoute{path: path, method: method, pathItem: pathItem, operation: operation}
 		}
 	}
 
-	return "", ""
+	return routes
+}
+
+func oasMiddlewareNeedsOperationRoutes(middleware *oas.Middleware) bool {
+	if middleware == nil || len(middleware.Operations) == 0 {
+		return false
+	}
+	for _, operation := range middleware.Operations {
+		if operation.ValidateRequest != nil && operation.ValidateRequest.Enabled {
+			return true
+		}
+		if operation.MockResponse != nil && operation.MockResponse.Enabled {
+			return true
+		}
+	}
+	return false
+}
+
+// findPathAndMethodForOperation finds the path and method for a given operation ID.
+func (a APIDefinitionLoader) findPathAndMethodForOperation(apiSpec *APISpec, operationID string) (string, string) {
+	route, ok := indexOASOperationRoutes(apiSpec)[operationID]
+	if !ok {
+		return "", ""
+	}
+	return route.path, route.method
 }
 
 // sortURLSpecsByPathPriority sorts URLSpec entries using the same path priority
@@ -2274,7 +2359,7 @@ func (a APIDefinitionLoader) initMCPConfiguration(spec *APISpec) {
 	}
 }
 
-func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec, conf config.Config) ([]URLSpec, bool) {
+func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec, conf *config.Config) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
 	mockResponsePaths := a.compileMockResponsePathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.MockResponse, MockResponse, conf)
@@ -2304,8 +2389,12 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 
 	// OAS-specific middleware paths - compiled alongside Classic middleware
 	// The compile functions handle nil/empty OAS gracefully by returning empty slices
-	oasValidateRequestPaths := a.compileOASValidateRequestPathSpec(apiSpec, conf)
-	oasMockResponsePaths := a.compileOASMockResponsePathSpec(apiSpec, conf)
+	var oasOperationRoutes map[string]oasOperationRoute
+	if oasMiddlewareNeedsOperationRoutes(apiSpec.OAS.GetTykMiddleware()) {
+		oasOperationRoutes = indexOASOperationRoutes(apiSpec)
+	}
+	oasValidateRequestPaths := a.compileOASValidateRequestPathSpec(apiSpec, conf, oasOperationRoutes)
+	oasMockResponsePaths := a.compileOASMockResponsePathSpec(apiSpec, conf, oasOperationRoutes)
 
 	combinedPath := make([]URLSpec, 0,
 		len(mockResponsePaths)+len(ignoredPaths)+len(blackListPaths)+len(whiteListPaths)+
@@ -2926,6 +3015,30 @@ func (a *APISpec) hasCompiledActiveOASMockResponse() bool {
 			}
 			for _, candidate := range meta.Candidates {
 				if candidate.OASMockResponseMeta != nil && candidate.OASMockResponseMeta.Enabled {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (a *APISpec) hasCompiledActiveOASValidateRequest() bool {
+	for _, paths := range a.RxPaths {
+		for i := range paths {
+			if paths[i].Status != OASValidateRequest {
+				continue
+			}
+
+			meta, ok := paths[i].oasValidateRequestRuntimeMeta()
+			if !ok || meta == nil {
+				continue
+			}
+			if meta.ValidateRequest != nil && meta.ValidateRequest.Enabled {
+				return true
+			}
+			for _, candidate := range meta.Candidates {
+				if candidate.OASValidateRequestMeta != nil && candidate.OASValidateRequestMeta.Enabled {
 					return true
 				}
 			}

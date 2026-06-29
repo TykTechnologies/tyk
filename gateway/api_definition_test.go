@@ -240,7 +240,7 @@ func TestGenerateRegexKeepsOASRegexBacked(t *testing.T) {
 			var spec URLSpec
 			loader := APIDefinitionLoader{}
 
-			loader.generateRegex("/users", &spec, status, config.Config{})
+			loader.generateRegex("/users", &spec, status, &config.Config{})
 
 			assert.NotNil(t, spec.spec)
 			assert.Empty(t, spec.literalPath)
@@ -263,7 +263,7 @@ func TestCompileTransformPathSpecUsesCompactRuntimeMeta(t *testing.T) {
 			EnableSession:  false,
 			TemplateSource: encodedTemplate,
 		},
-	}}, Transformed, config.Config{})
+	}}, Transformed, &config.Config{})
 
 	assert.Len(t, specs, 1)
 	transform, ok := typedURLSpecMeta[*TransformSpec](&specs[0])
@@ -1775,7 +1775,7 @@ func TestVersionPathSpecCacheKeyRejectsStatefulVersionPathSpecs(t *testing.T) {
 	version := apidef.VersionInfo{UseExtendedPaths: true}
 	version.ExtendedPaths.CircuitBreaker = []apidef.CircuitBreakerMeta{{Path: "/breaker"}}
 
-	if _, ok := versionPathSpecCacheKey(version, config.Config{}); ok {
+	if _, ok := versionPathSpecCacheKey(version, &config.Config{}); ok {
 		t.Fatal("versionPathSpecCacheKey(circuit-breaker version) cacheable = true, want false")
 	}
 
@@ -1787,12 +1787,12 @@ func TestVersionPathSpecCacheKeyRejectsStatefulVersionPathSpecs(t *testing.T) {
 		RewriteTo:    "/hello",
 	}}
 
-	if _, ok := versionPathSpecCacheKey(version, config.Config{}); !ok {
+	if _, ok := versionPathSpecCacheKey(version, &config.Config{}); !ok {
 		t.Fatal("versionPathSpecCacheKey(simple url-rewrite version) cacheable = false, want true")
 	}
 
 	version.ExtendedPaths.URLRewrite[0].Triggers = []apidef.RoutingTrigger{{}}
-	if _, ok := versionPathSpecCacheKey(version, config.Config{}); ok {
+	if _, ok := versionPathSpecCacheKey(version, &config.Config{}); ok {
 		t.Fatal("versionPathSpecCacheKey(triggered url-rewrite version) cacheable = true, want false")
 	}
 }
