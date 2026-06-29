@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	_ "github.com/TykTechnologies/tyk/internal/portal"
+	_ "github.com/aws/aws-sdk-go-v2/service/s3"
 	_ "github.com/warpstreamlabs/bento/public/components/all"
 	"github.com/warpstreamlabs/bento/public/service"
 )
