@@ -2,12 +2,45 @@ package gateway
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
+
+	"github.com/sirupsen/logrus"
 )
+
+const (
+	dashboardSyncReadErrorMaxAttempts     = 2
+	dashboardControlPlaneRetryMaxAttempts = 8
+)
+
+const (
+	dashboardControlPlaneRetryCodeBusy    = "control_plane_busy"
+	dashboardControlPlaneRetryCodeWarming = "control_plane_warming"
+)
+
+var dashboardSyncSleep = func(ctx context.Context, delay time.Duration) bool {
+	if delay <= 0 {
+		return true
+	}
+
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
 
 // DashboardAuthError represents a non-nonce authentication failure
 type DashboardAuthError struct {
@@ -17,6 +50,20 @@ type DashboardAuthError struct {
 
 func (e *DashboardAuthError) Error() string {
 	return fmt.Sprintf("dashboard authentication failed (status %d): %s", e.StatusCode, e.Body)
+}
+
+type dashboardControlPlaneError struct {
+	Status            string                    `json:"Status"`
+	Message           string                    `json:"Message"`
+	Code              string                    `json:"code"`
+	RetryAfterSeconds int                       `json:"retry_after_seconds"`
+	Meta              dashboardControlPlaneMeta `json:"Meta"`
+}
+
+type dashboardControlPlaneMeta struct {
+	Code              string `json:"code"`
+	RetryAfterSeconds int    `json:"retry_after_seconds"`
+	Generation        uint64 `json:"generation"`
 }
 
 // executeDashboardRequestWithRecovery performs a dashboard request with automatic recovery for network and nonce errors.
@@ -102,6 +149,147 @@ func (gw *Gateway) HandleDashboardResponseReadError(err error, errorContext stri
 	}
 
 	return false
+}
+
+func dashboardSyncRetryDelay(attempt int) time.Duration {
+	if attempt < 1 {
+		attempt = 1
+	}
+
+	delay := time.Second * time.Duration(1<<(attempt-1))
+	if delay > 8*time.Second {
+		delay = 8 * time.Second
+	}
+
+	jitter := time.Duration(rand.New(rand.NewSource(time.Now().UnixNano())).Int63n(int64(500 * time.Millisecond)))
+	return delay + jitter
+}
+
+// HandleDashboardRetryableControlPlaneResponse retries typed dashboard control-plane backpressure responses.
+func (gw *Gateway) HandleDashboardRetryableControlPlaneResponse(resp *http.Response, body []byte, attempt, maxAttempts int, errorContext string) (bool, error) {
+	retry, ok := parseDashboardRetryableControlPlaneResponse(resp, body)
+	if !ok {
+		return false, nil
+	}
+	if attempt >= maxAttempts {
+		log.WithFields(logrus.Fields{
+			"context": errorContext,
+			"code":    retry.Meta.Code,
+			"attempt": attempt,
+			"max":     maxAttempts,
+		}).Warn("Dashboard control-plane retry exhausted")
+		return false, nil
+	}
+
+	delay := dashboardControlPlaneRetryDelay(resp, retry, attempt)
+	log.WithFields(logrus.Fields{
+		"context":       errorContext,
+		"code":          retry.Meta.Code,
+		"generation":    retry.Meta.Generation,
+		"attempt":       attempt,
+		"max":           maxAttempts,
+		"retry_wait_ms": delay.Milliseconds(),
+	}).Warn("Dashboard control-plane response is retryable; retrying sync without re-register")
+
+	if !gw.sleepDashboardSyncRetry(delay) {
+		return true, gw.dashboardSyncContextErr()
+	}
+	return true, nil
+}
+
+func parseDashboardRetryableControlPlaneResponse(resp *http.Response, body []byte) (dashboardControlPlaneError, bool) {
+	if resp == nil || resp.StatusCode != http.StatusServiceUnavailable || len(body) == 0 {
+		return dashboardControlPlaneError{}, false
+	}
+
+	var errResp dashboardControlPlaneError
+	if err := json.Unmarshal(body, &errResp); err != nil {
+		return dashboardControlPlaneError{}, false
+	}
+
+	if errResp.Meta.Code == "" {
+		errResp.Meta.Code = errResp.Code
+	}
+	if errResp.Meta.RetryAfterSeconds == 0 {
+		errResp.Meta.RetryAfterSeconds = errResp.RetryAfterSeconds
+	}
+
+	switch errResp.Meta.Code {
+	case dashboardControlPlaneRetryCodeBusy, dashboardControlPlaneRetryCodeWarming:
+		return errResp, true
+	default:
+		return dashboardControlPlaneError{}, false
+	}
+}
+
+func dashboardControlPlaneRetryDelay(resp *http.Response, errResp dashboardControlPlaneError, attempt int) time.Duration {
+	delay := retryAfterHeaderDelay(resp.Header.Get("Retry-After"))
+	if delay <= 0 && errResp.Meta.RetryAfterSeconds > 0 {
+		delay = time.Duration(errResp.Meta.RetryAfterSeconds) * time.Second
+	}
+	if delay <= 0 {
+		delay = dashboardSyncRetryDelay(attempt)
+	}
+
+	const maxControlPlaneRetryDelay = 10 * time.Second
+	if delay > maxControlPlaneRetryDelay {
+		delay = maxControlPlaneRetryDelay
+	}
+
+	jitter := time.Duration(rand.New(rand.NewSource(time.Now().UnixNano())).Int63n(int64(500 * time.Millisecond)))
+	return delay + jitter
+}
+
+func retryAfterHeaderDelay(value string) time.Duration {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0
+	}
+
+	seconds, err := strconv.Atoi(value)
+	if err == nil {
+		if seconds <= 0 {
+			return 0
+		}
+		return time.Duration(seconds) * time.Second
+	}
+
+	retryAt, err := http.ParseTime(value)
+	if err != nil {
+		return 0
+	}
+	delay := time.Until(retryAt)
+	if delay <= 0 {
+		return 0
+	}
+	return delay
+}
+
+func (gw *Gateway) sleepDashboardSyncRetry(delay time.Duration) bool {
+	ctx := context.Background()
+	if gw != nil && gw.ctx != nil {
+		ctx = gw.ctx
+	}
+	return dashboardSyncSleep(ctx, delay)
+}
+
+func (gw *Gateway) dashboardSyncContextErr() error {
+	if gw != nil && gw.ctx != nil && gw.ctx.Err() != nil {
+		return gw.ctx.Err()
+	}
+	return context.Canceled
+}
+
+func (gw *Gateway) setServiceNonceIfPresent(source, nonce string) bool {
+	if nonce == "" {
+		log.WithField("source", source).Warn("Dashboard response missing nonce; keeping existing nonce")
+		return false
+	}
+
+	gw.ServiceNonceMutex.Lock()
+	gw.ServiceNonce = nonce
+	gw.ServiceNonceMutex.Unlock()
+	return true
 }
 
 // attemptDashboardRecovery attempts to re-register the node with the dashboard.

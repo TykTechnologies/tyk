@@ -2043,15 +2043,14 @@ func TestDoReload_RuntimeReloadLoopUnaffected(t *testing.T) {
 		"DoReload should make exactly 1 request with RetryAttempts=0, got %d", callCount)
 }
 
-// TestRegister_DoReloadWithRetry_OnStartup verifies that when Register() is called
-// and the initial DoReloadWithRetry fails (dashboard returns 500 for APIs/policies),
-// the gateway keeps retrying until the upstream recovers, then marks the reload
-// as successful — without re-registering the node.
-func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
-	const succeedOnCall = 3
+// TestRegister_DoesNotReloadOnSuccess verifies that successful registration does
+// not trigger an API/policy reload. Reload is owned by startup and explicit
+// reload paths; coupling it to registration amplifies dashboard recovery storms.
+func TestRegister_DoesNotReloadOnSuccess(t *testing.T) {
 	var (
 		registerCount int
 		policyCount   int
+		apiCount      int
 	)
 
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2068,17 +2067,12 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 
 		case strings.Contains(r.URL.Path, "/system/policies"):
 			policyCount++
-			if policyCount < succeedOnCall {
-				w.WriteHeader(http.StatusInternalServerError)
-				_, err := w.Write([]byte(`{"Status":"Error","Message":"db unavailable","Meta":null}`))
-				require.NoError(t, err)
-				return
-			}
 			w.Header().Set("Content-Type", "application/json")
 			_, err := w.Write([]byte(`{"Message":[],"Nonce":"ok"}`))
 			require.NoError(t, err)
 
 		case strings.Contains(r.URL.Path, "/system/apis"):
+			apiCount++
 			w.Header().Set("Content-Type", "application/json")
 			_, err := w.Write([]byte(`{"Status":"OK","Nonce":"ok","Message":[]}`))
 			require.NoError(t, err)
@@ -2096,11 +2090,6 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 		conf.NodeSecret = "test-secret"
 	})
 	defer ts.Close()
-
-	// Use a fast retry interval so retries happen in milliseconds during the test.
-	ts.Gw.reloadRetryBackoff = func() backoff.BackOff {
-		return backoff.NewConstantBackOff(50 * time.Millisecond)
-	}
 
 	// Enable dashboard mode and wire up the mock dashboard.
 	conf := ts.Gw.GetConfig()
@@ -2123,10 +2112,12 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 	err := ts.Gw.DashService.Register(ctx)
 
 	assert.NoError(t, err, "Register should not return an error")
-	assert.True(t, ts.Gw.performedSuccessfulReload,
-		"performedSuccessfulReload should be true after recovery")
+	assert.False(t, ts.Gw.performedSuccessfulReload,
+		"performedSuccessfulReload should stay false after Register")
 	assert.Equal(t, 1, registerCount,
-		"/register/node must be called exactly once — DoReloadWithRetry must not re-register")
-	assert.GreaterOrEqual(t, policyCount, succeedOnCall,
-		"policy endpoint should have been retried at least %d times", succeedOnCall)
+		"/register/node must be called exactly once")
+	assert.Equal(t, 0, policyCount,
+		"/system/policies must not be called by Register")
+	assert.Equal(t, 0, apiCount,
+		"/system/apis must not be called by Register")
 }

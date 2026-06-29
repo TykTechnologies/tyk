@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
@@ -57,7 +58,7 @@ func (k *RateLimitForAPI) getSession(r *http.Request) *user.SessionState {
 
 	spec, ok := k.Spec.FindSpecMatchesStatus(r, versionPaths, RateLimit)
 	if ok {
-		if limits := spec.RateLimit; limits.Valid() {
+		if limits, ok := typedURLSpecMeta[*apidef.RateLimitMeta](spec); ok && limits.Valid() {
 			// track per-endpoint with a hash of the path
 			keyname := k.keyName + "-" + storage.HashStr(fmt.Sprintf("%s:%s", limits.Method, limits.Path))
 

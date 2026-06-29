@@ -222,42 +222,57 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string) ([]user.Po
 		"prefix": "policy",
 	}).Info("Calling dashboard service for policy list")
 
-	// Execute request with automatic recovery
-	resp, err := gw.executeDashboardRequestWithRecovery(buildReq, "policy fetch")
-	if err != nil {
-		log.Error("Policy request failed: ", err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
-		log.Error("Policy request login failure, Response was: ", string(body))
-		return nil, ErrPoliciesFetchFailed
-	}
-
-	// Extract Policies
-	var list struct {
-		Message []DBPolicy
-		Nonce   string
-	}
-	if err = json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		log.Error("Failed to decode policy body: ", err)
-		// Check if we should retry after a network error during read
-		if gw.HandleDashboardResponseReadError(err, "policy fetch") {
-			// Retry the entire operation
-			return gw.LoadPoliciesFromDashboard(endpoint, secret)
+	// Keep typed control-plane retries bounded and iterative to avoid recursive recovery loops.
+	const maxControlPlaneAttempts = dashboardControlPlaneRetryMaxAttempts
+	for attempt := 1; attempt <= maxControlPlaneAttempts; attempt++ {
+		// Execute request with automatic recovery
+		resp, err := gw.executeDashboardRequestWithRecovery(buildReq, "policy fetch")
+		if err != nil {
+			log.Error("Policy request failed: ", err)
+			return nil, err
 		}
-		return nil, err
+
+		// Check response status
+		if resp.StatusCode != http.StatusOK {
+			body, _ := ioutil.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			retry, retryErr := gw.HandleDashboardRetryableControlPlaneResponse(resp, body, attempt, maxControlPlaneAttempts, "policy fetch")
+			if retryErr != nil {
+				return nil, retryErr
+			}
+			if retry {
+				continue
+			}
+			log.Error("Policy request login failure, Response was: ", string(body))
+			return nil, ErrPoliciesFetchFailed
+		}
+
+		// Extract Policies
+		var list struct {
+			Message []DBPolicy
+			Nonce   string
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+			_ = resp.Body.Close()
+			log.Error("Failed to decode policy body: ", err)
+			if attempt < dashboardSyncReadErrorMaxAttempts && gw.HandleDashboardResponseReadError(err, "policy fetch") {
+				if !gw.sleepDashboardSyncRetry(dashboardSyncRetryDelay(attempt)) {
+					return nil, gw.dashboardSyncContextErr()
+				}
+				continue
+			}
+			return nil, err
+		}
+		_ = resp.Body.Close()
+
+		// Keep last known nonce unless dashboard provides a fresh one.
+		gw.setServiceNonceIfPresent("policies", list.Nonce)
+		log.Debug("Loading Policies Finished: Nonce Set: ", list.Nonce)
+
+		return lo.Map(list.Message, func(item DBPolicy, _ int) user.Policy { return item.ToRegularPolicy() }), nil
 	}
 
-	gw.ServiceNonceMutex.Lock()
-	gw.ServiceNonce = list.Nonce
-	gw.ServiceNonceMutex.Unlock()
-	log.Debug("Loading Policies Finished: Nonce Set: ", list.Nonce)
-
-	return lo.Map(list.Message, func(item DBPolicy, _ int) user.Policy { return item.ToRegularPolicy() }), nil
+	return nil, errors.New("policy fetch retry attempts exhausted")
 }
 
 func parsePoliciesFromRPC(list string) ([]user.Policy, error) {

@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -865,6 +866,62 @@ func TestLoadPoliciesFromDashboardServerError(t *testing.T) {
 	assert.Equal(t, ErrPoliciesFetchFailed, err)
 	assert.Empty(t, policyMap)
 	assert.Equal(t, 1, requestCount, "Should make only one request, no retry for server errors")
+}
+
+func TestLoadPoliciesFromDashboardRetryableControlPlaneResponse(t *testing.T) {
+	oldSleep := dashboardSyncSleep
+	dashboardSyncSleep = func(context.Context, time.Duration) bool { return true }
+	defer func() { dashboardSyncSleep = oldSleep }()
+
+	var requestCount int
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requestCount++
+		w.Header().Set("Content-Type", "application/json")
+		if requestCount < 3 {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"Status":"Error","Message":"Control plane busy while serving policies","Meta":{"code":"control_plane_busy","retry_after_seconds":1}}`))
+			return
+		}
+
+		_, _ = w.Write([]byte(`{"Status":"OK","Message":[],"Nonce":"fresh-policy-nonce"}`))
+	}))
+	defer ts.Close()
+
+	gwConf := config.Config{
+		UseDBAppConfigs:          false,
+		DisableDashboardZeroConf: true,
+	}
+	gw := NewGateway(gwConf, context.Background())
+	gw.ServiceNonce = "old-policy-nonce"
+
+	policies, err := gw.LoadPoliciesFromDashboard(ts.URL, "")
+
+	assert.NoError(t, err)
+	assert.Empty(t, policies)
+	assert.Equal(t, 3, requestCount, "Should retry typed control-plane 503s without re-registering")
+	assert.Equal(t, "fresh-policy-nonce", gw.ServiceNonce)
+}
+
+func TestLoadPoliciesFromDashboardKeepsNonceWhenResponseNonceEmpty(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"Status":"OK","Message":[],"Nonce":""}`))
+	}))
+	defer ts.Close()
+
+	gwConf := config.Config{
+		UseDBAppConfigs:          false,
+		DisableDashboardZeroConf: true,
+	}
+	gw := NewGateway(gwConf, context.Background())
+	gw.ServiceNonce = "keep-policy-nonce"
+
+	policies, err := gw.LoadPoliciesFromDashboard(ts.URL, "")
+
+	assert.NoError(t, err)
+	assert.Empty(t, policies)
+	assert.Equal(t, "keep-policy-nonce", gw.ServiceNonce)
 }
 
 // TestLoadPoliciesFromDashboardTimeoutSimulation tests timeout scenario (Case 1.1 simulation)

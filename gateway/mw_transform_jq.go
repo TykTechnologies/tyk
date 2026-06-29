@@ -160,7 +160,7 @@ type TransformJQSpec struct {
 }
 
 func (a *APIDefinitionLoader) compileTransformJQPathSpec(paths []apidef.TransformJQMeta, stat URLStatus, conf config.Config) []URLSpec {
-	urlSpec := []URLSpec{}
+	urlSpec := make([]URLSpec, 0, len(paths))
 
 	log.Debug("Checking for JQ tranform paths ...")
 	for _, stringSpec := range paths {
@@ -171,13 +171,8 @@ func (a *APIDefinitionLoader) compileTransformJQPathSpec(paths []apidef.Transfor
 		var err error
 		newTransformSpec.JQFilter, err = NewJQ(stringSpec.Filter)
 
-		if stat == TransformedJQ {
-			newSpec.TransformJQAction = newTransformSpec
-		} else {
-			newSpec.TransformJQResponseAction = newTransformSpec
-		}
-
 		if err == nil {
+			newSpec.metadata = &newTransformSpec
 			urlSpec = append(urlSpec, newSpec)
 		} else {
 			log.Error("JQ Filter load failure! Skipping transformation: ", err)

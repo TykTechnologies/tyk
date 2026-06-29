@@ -17,6 +17,14 @@ func boolPtr(v bool) *bool {
 	return &v
 }
 
+func trackEndpointURLSpec(pathRegex string, status URLStatus, meta apidef.TrackEndpointMeta) URLSpec {
+	return URLSpec{
+		spec:     tykregexp.MustCompile(pathRegex),
+		Status:   status,
+		metadata: &meta,
+	}
+}
+
 func TestTrackEndpointMiddleware_EnabledForSpec(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -284,14 +292,14 @@ func TestTrackEndpointMiddleware_ProcessRequest(t *testing.T) {
 				},
 				RxPaths: map[string][]URLSpec{
 					"Default": {
-						{
-							spec:   tykregexp.MustCompile("/tracked"),
-							Status: RequestTracked,
-							TrackEndpoint: apidef.TrackEndpointMeta{
+						trackEndpointURLSpec(
+							"/tracked",
+							RequestTracked,
+							apidef.TrackEndpointMeta{
 								Path:   "/tracked",
 								Method: "GET",
 							},
-						},
+						),
 					},
 				},
 			},
@@ -319,14 +327,14 @@ func TestTrackEndpointMiddleware_ProcessRequest(t *testing.T) {
 				},
 				RxPaths: map[string][]URLSpec{
 					"Default": {
-						{
-							spec:   tykregexp.MustCompile("/health"),
-							Status: RequestNotTracked,
-							DoNotTrackEndpoint: apidef.TrackEndpointMeta{
+						trackEndpointURLSpec(
+							"/health",
+							RequestNotTracked,
+							apidef.TrackEndpointMeta{
 								Path:   "/health",
 								Method: "GET",
 							},
-						},
+						),
 					},
 				},
 			},
@@ -354,14 +362,14 @@ func TestTrackEndpointMiddleware_ProcessRequest(t *testing.T) {
 				},
 				RxPaths: map[string][]URLSpec{
 					"Default": {
-						{
-							spec:   tykregexp.MustCompile("/tracked"),
-							Status: RequestTracked,
-							TrackEndpoint: apidef.TrackEndpointMeta{
+						trackEndpointURLSpec(
+							"/tracked",
+							RequestTracked,
+							apidef.TrackEndpointMeta{
 								Path:   "/tracked",
 								Method: "GET",
 							},
-						},
+						),
 					},
 				},
 			},
@@ -389,14 +397,14 @@ func TestTrackEndpointMiddleware_ProcessRequest(t *testing.T) {
 				},
 				RxPaths: map[string][]URLSpec{
 					"Default": {
-						{
-							spec:   tykregexp.MustCompile("/tracked"),
-							Status: RequestTracked,
-							TrackEndpoint: apidef.TrackEndpointMeta{
+						trackEndpointURLSpec(
+							"/tracked",
+							RequestTracked,
+							apidef.TrackEndpointMeta{
 								Path:   "/tracked",
 								Method: "POST",
 							},
-						},
+						),
 					},
 				},
 			},
@@ -424,14 +432,14 @@ func TestTrackEndpointMiddleware_ProcessRequest(t *testing.T) {
 				},
 				RxPaths: map[string][]URLSpec{
 					"Default": {
-						{
-							spec:   tykregexp.MustCompile("/status/([^/]+)"),
-							Status: RequestTracked,
-							TrackEndpoint: apidef.TrackEndpointMeta{
+						trackEndpointURLSpec(
+							"/status/([^/]+)",
+							RequestTracked,
+							apidef.TrackEndpointMeta{
 								Path:   "/status/{status_id}",
 								Method: "GET",
 							},
-						},
+						),
 					},
 				},
 			},
@@ -459,14 +467,14 @@ func TestTrackEndpointMiddleware_ProcessRequest(t *testing.T) {
 				},
 				RxPaths: map[string][]URLSpec{
 					"Default": {
-						{
-							spec:   tykregexp.MustCompile("/status/([^/]+)"),
-							Status: RequestTracked,
-							TrackEndpoint: apidef.TrackEndpointMeta{
+						trackEndpointURLSpec(
+							"/status/([^/]+)",
+							RequestTracked,
+							apidef.TrackEndpointMeta{
 								Path:   "/status/{status_id}",
 								Method: "GET",
 							},
-						},
+						),
 					},
 				},
 			},
@@ -494,14 +502,14 @@ func TestTrackEndpointMiddleware_ProcessRequest(t *testing.T) {
 				},
 				RxPaths: map[string][]URLSpec{
 					"Default": {
-						{
-							spec:   tykregexp.MustCompile("/internal/.*"),
-							Status: RequestNotTracked,
-							DoNotTrackEndpoint: apidef.TrackEndpointMeta{
+						trackEndpointURLSpec(
+							"/internal/.*",
+							RequestNotTracked,
+							apidef.TrackEndpointMeta{
 								Path:   "/internal/*",
 								Method: "GET",
 							},
-						},
+						),
 					},
 				},
 			},
@@ -529,14 +537,14 @@ func TestTrackEndpointMiddleware_ProcessRequest(t *testing.T) {
 				},
 				RxPaths: map[string][]URLSpec{
 					"Default": {
-						{
-							spec:   tykregexp.MustCompile("/users/([^/]+)/orders"),
-							Status: RequestTracked,
-							TrackEndpoint: apidef.TrackEndpointMeta{
+						trackEndpointURLSpec(
+							"/users/([^/]+)/orders",
+							RequestTracked,
+							apidef.TrackEndpointMeta{
 								Path:   "/users/{user_id}/orders",
 								Method: "GET",
 							},
-						},
+						),
 					},
 				},
 			},
@@ -564,14 +572,14 @@ func TestTrackEndpointMiddleware_ProcessRequest(t *testing.T) {
 				},
 				RxPaths: map[string][]URLSpec{
 					"Default": {
-						{
-							spec:   tykregexp.MustCompile("/users/([^/]+)/orders/([^/]+)"),
-							Status: RequestTracked,
-							TrackEndpoint: apidef.TrackEndpointMeta{
+						trackEndpointURLSpec(
+							"/users/([^/]+)/orders/([^/]+)",
+							RequestTracked,
+							apidef.TrackEndpointMeta{
 								Path:   "/users/{id}/orders/{order_id}",
 								Method: "POST",
 							},
-						},
+						),
 					},
 				},
 			},
@@ -599,22 +607,22 @@ func TestTrackEndpointMiddleware_ProcessRequest(t *testing.T) {
 				},
 				RxPaths: map[string][]URLSpec{
 					"Default": {
-						{
-							spec:   tykregexp.MustCompile("/both"),
-							Status: RequestTracked,
-							TrackEndpoint: apidef.TrackEndpointMeta{
+						trackEndpointURLSpec(
+							"/both",
+							RequestTracked,
+							apidef.TrackEndpointMeta{
 								Path:   "/both",
 								Method: "GET",
 							},
-						},
-						{
-							spec:   tykregexp.MustCompile("/both"),
-							Status: RequestNotTracked,
-							DoNotTrackEndpoint: apidef.TrackEndpointMeta{
+						),
+						trackEndpointURLSpec(
+							"/both",
+							RequestNotTracked,
+							apidef.TrackEndpointMeta{
 								Path:   "/both",
 								Method: "GET",
 							},
-						},
+						),
 					},
 				},
 			},

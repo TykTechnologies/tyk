@@ -40,11 +40,23 @@ var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
 
 func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
+	if meta == nil {
+		return r.URL.String(), nil
+	}
+	return gw.urlRewriteRuntime(compileURLRewriteRuntimeMeta(*meta), r)
+}
+
+func (gw *Gateway) urlRewriteRuntime(meta *urlRewriteRuntimeMeta, r *http.Request) (string, error) {
 	rawPath := r.URL.String()
 	path := rawPath
 
 	log.Debug("Inbound path: ", path)
 	newpath := path
+
+	if meta.directMatch {
+		ctxSetUrlRewritePath(r, meta.contextPath())
+		return gw.ReplaceTykVariables(r, meta.RewriteTo, true), nil
+	}
 
 	if meta.MatchRegexp == nil {
 		var err error
@@ -203,7 +215,7 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 		log.Debug("URL Re-written to: ", newpath)
 
 		// put url_rewrite path to context to be used in ResponseTransformMiddleware
-		ctxSetUrlRewritePath(r, r.URL.Path)
+		ctxSetUrlRewritePath(r, meta.contextPath())
 	}
 
 	newpath = gw.ReplaceTykVariables(r, newpath, true)
@@ -397,55 +409,60 @@ func (m *URLRewriteMiddleware) Name() string {
 	return "URLRewriteMiddleware"
 }
 
-// InitTriggerRx will go over all defined URLRewrite triggers and initialize them. It
-// will skip disabled triggers, returning true if at least one trigger is enabled.
-func (m *URLRewriteMiddleware) InitTriggerRx() (enabled bool) {
-	// Generate regexp for each special match parameter
-	for verKey := range m.Spec.VersionData.Versions {
-		for pathKey := range m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite {
-			rewrite := m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey]
-
-			if rewrite.Disabled {
-				continue
-			}
-
-			enabled = true
-
-			for trKey := range rewrite.Triggers {
-				tr := rewrite.Triggers[trKey]
-
-				for key, h := range tr.Options.HeaderMatches {
-					h.Init()
-					tr.Options.HeaderMatches[key] = h
-				}
-				for key, q := range tr.Options.QueryValMatches {
-					q.Init()
-					tr.Options.QueryValMatches[key] = q
-				}
-				for key, h := range tr.Options.SessionMetaMatches {
-					h.Init()
-					tr.Options.SessionMetaMatches[key] = h
-				}
-				for key, h := range tr.Options.RequestContextMatches {
-					h.Init()
-					tr.Options.RequestContextMatches[key] = h
-				}
-				for key, h := range tr.Options.PathPartMatches {
-					h.Init()
-					tr.Options.PathPartMatches[key] = h
-				}
-				if tr.Options.PayloadMatches.MatchPattern != "" {
-					tr.Options.PayloadMatches.Init()
-				}
-
-				rewrite.Triggers[trKey] = tr
-			}
-
-			m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey] = rewrite
-		}
+func initURLRewriteTriggerRegex(rewrite *urlRewriteRuntimeMeta) (enabled bool) {
+	if rewrite == nil {
+		return false
 	}
 
-	return
+	enabled = true
+	for trKey := range rewrite.Triggers {
+		tr := rewrite.Triggers[trKey]
+
+		for key, h := range tr.Options.HeaderMatches {
+			h.Init()
+			tr.Options.HeaderMatches[key] = h
+		}
+		for key, q := range tr.Options.QueryValMatches {
+			q.Init()
+			tr.Options.QueryValMatches[key] = q
+		}
+		for key, h := range tr.Options.SessionMetaMatches {
+			h.Init()
+			tr.Options.SessionMetaMatches[key] = h
+		}
+		for key, h := range tr.Options.RequestContextMatches {
+			h.Init()
+			tr.Options.RequestContextMatches[key] = h
+		}
+		for key, h := range tr.Options.PathPartMatches {
+			h.Init()
+			tr.Options.PathPartMatches[key] = h
+		}
+		if tr.Options.PayloadMatches.MatchPattern != "" {
+			tr.Options.PayloadMatches.Init()
+		}
+
+		rewrite.Triggers[trKey] = tr
+	}
+
+	return true
+}
+
+// InitTriggerRx initializes trigger regexes on the compiled URL specs. Keeping
+// this off VersionData lets high-cardinality API loads release the raw path
+// config after middleware construction.
+func (m *URLRewriteMiddleware) InitTriggerRx() (enabled bool) {
+	for versionName, paths := range m.Spec.RxPaths {
+		for i := range paths {
+			urlRewrite, _ := typedURLSpecMeta[*urlRewriteRuntimeMeta](&paths[i])
+			if initURLRewriteTriggerRegex(urlRewrite) {
+				enabled = true
+			}
+		}
+		m.Spec.RxPaths[versionName] = paths
+	}
+
+	return enabled
 }
 
 func (m *URLRewriteMiddleware) EnabledForSpec() bool {
@@ -518,11 +535,11 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	ctxSetOrigRequestURL(r, r.URL)
 
 	log.Debug("Rewriter active")
-	umeta := meta.(*apidef.URLRewriteMeta)
+	umeta := meta.(*urlRewriteRuntimeMeta)
 	log.Debug(r.URL)
 	oldPath := r.URL.String()
 
-	p, err := m.Gw.urlRewrite(umeta, r)
+	p, err := m.Gw.urlRewriteRuntime(umeta, r)
 	if err != nil {
 		log.Error(err)
 		return err, http.StatusInternalServerError

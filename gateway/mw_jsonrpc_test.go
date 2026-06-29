@@ -1157,13 +1157,19 @@ func TestJSONRPCMiddleware_AllowListEnforcedOnVEM(t *testing.T) {
 		for i, spec := range rxPaths {
 			t.Logf("  [%d] Status=%d, Path regex=%v", i, spec.Status, spec.spec)
 			if spec.Status == WhiteList {
-				t.Logf("       WhiteList: Path=%s, Method=%s", spec.Whitelist.Path, spec.Whitelist.Method)
+				if meta, ok := typedURLSpecMeta[*endpointRuntimeMeta](&spec); ok {
+					t.Logf("       WhiteList: Method=%s, MethodActions=%v", meta.method, meta.methodActionsByName)
+				}
 			}
 			if spec.Status == BlackList {
-				t.Logf("       BlackList: Path=%s, Method=%s", spec.Blacklist.Path, spec.Blacklist.Method)
+				if meta, ok := typedURLSpecMeta[*endpointRuntimeMeta](&spec); ok {
+					t.Logf("       BlackList: Method=%s, MethodActions=%v", meta.method, meta.methodActionsByName)
+				}
 			}
 			if spec.Status == Internal {
-				t.Logf("       Internal: Path=%s, Method=%s", spec.Internal.Path, spec.Internal.Method)
+				if meta, ok := typedURLSpecMeta[*apidef.InternalMeta](&spec); ok {
+					t.Logf("       Internal: Path=%s, Method=%s", meta.Path, meta.Method)
+				}
 			}
 		}
 	}
@@ -1386,11 +1392,15 @@ func TestJSONRPCMiddleware_OperationHeaderInjection(t *testing.T) {
 		for i, rxPath := range rxPaths {
 			t.Logf("  [%d] Status=%d", i, rxPath.Status)
 			if rxPath.Status == HeaderInjected {
-				t.Logf("      HeaderInjected: Path=%s, Method=%s, Add=%v",
-					rxPath.InjectHeaders.Path, rxPath.InjectHeaders.Method, rxPath.InjectHeaders.AddHeaders)
+				if meta, ok := typedURLSpecMeta[*apidef.HeaderInjectionMeta](&rxPath); ok {
+					t.Logf("      HeaderInjected: Path=%s, Method=%s, Add=%v",
+						meta.Path, meta.Method, meta.AddHeaders)
+				}
 			}
 			if rxPath.Status == Internal {
-				t.Logf("      Internal: Path=%s", rxPath.Internal.Path)
+				if meta, ok := typedURLSpecMeta[*apidef.InternalMeta](&rxPath); ok {
+					t.Logf("      Internal: Path=%s", meta.Path)
+				}
 			}
 		}
 	}

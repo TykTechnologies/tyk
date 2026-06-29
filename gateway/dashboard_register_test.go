@@ -3,8 +3,12 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -183,6 +187,153 @@ func TestRegister_Retries(t *testing.T) {
 	}
 }
 
+func TestRegister_SingleflightSharesInFlightRegistration(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var startOnce sync.Once
+	var callCount int32
+
+	h := newClientBackedDashboardHandler(t, roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		atomic.AddInt32(&callCount, 1)
+		startOnce.Do(func() { close(started) })
+		<-release
+
+		return dashboardHTTPResponse(http.StatusOK, `{"Status":"OK","Message":{"NodeID":"node-singleflight"},"Nonce":"nonce-singleflight"}`), nil
+	}))
+
+	errs := make(chan error, 2)
+	go func() { errs <- h.Register(context.Background()) }()
+
+	waitForSignal(t, started, "first Register() request to reach dashboard")
+
+	go func() { errs <- h.Register(context.Background()) }()
+	time.Sleep(50 * time.Millisecond)
+	close(release)
+
+	for i := 0; i < 2; i++ {
+		require.NoError(t, <-errs)
+	}
+
+	assert.Equal(t, int32(1), atomic.LoadInt32(&callCount))
+	assert.Equal(t, "node-singleflight", h.Gw.GetNodeID())
+}
+
+func TestRegister_SingleflightContinuesAfterCallerCancellation(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var startOnce sync.Once
+	var callCount int32
+
+	h := newClientBackedDashboardHandler(t, roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		atomic.AddInt32(&callCount, 1)
+		startOnce.Do(func() { close(started) })
+		<-release
+
+		return dashboardHTTPResponse(http.StatusOK, `{"Status":"OK","Message":{"NodeID":"node-after-cancelled-waiter"},"Nonce":"nonce-after-cancelled-waiter"}`), nil
+	}))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	firstErr := make(chan error, 1)
+	go func() { firstErr <- h.Register(ctx) }()
+
+	waitForSignal(t, started, "first Register() request to reach dashboard")
+	cancel()
+
+	require.ErrorIs(t, <-firstErr, context.Canceled)
+
+	secondErr := make(chan error, 1)
+	go func() { secondErr <- h.Register(context.Background()) }()
+	time.Sleep(50 * time.Millisecond)
+	close(release)
+
+	require.NoError(t, <-secondErr)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&callCount))
+	assert.Equal(t, "node-after-cancelled-waiter", h.Gw.GetNodeID())
+}
+
+func TestRegister_StopsWhenGatewayLifecycleContextIsCancelled(t *testing.T) {
+	lifecycleCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	gw := NewGateway(config.Config{
+		NodeSecret: "test-secret",
+		DBAppConfOptions: config.DBAppConfOptionsConfig{
+			ConnectionTimeout: 1,
+		},
+	}, lifecycleCtx)
+	gw.SessionID = "shutdown-session"
+
+	h := &HTTPDashboardHandler{
+		Gw:                   gw,
+		Secret:               "test-secret",
+		RegistrationEndpoint: "http://127.0.0.1:1/register/node",
+	}
+
+	err := h.Register(context.Background())
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestAttemptRegistration_EmptyNonceKeepsExistingState(t *testing.T) {
+	h := newClientBackedDashboardHandler(t, roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		return dashboardHTTPResponse(http.StatusOK, `{"Status":"OK","Message":{"NodeID":"node-from-empty-nonce-response"},"Nonce":""}`), nil
+	}))
+
+	h.Gw.SetNodeID("existing-node")
+	h.Gw.ServiceNonceMutex.Lock()
+	h.Gw.ServiceNonce = "existing-nonce"
+	h.Gw.ServiceNonceMutex.Unlock()
+
+	registered, err := h.attemptRegistration(context.Background())
+	require.NoError(t, err)
+	assert.False(t, registered)
+	assert.Equal(t, "existing-node", h.Gw.GetNodeID())
+
+	h.Gw.ServiceNonceMutex.RLock()
+	gotNonce := h.Gw.ServiceNonce
+	h.Gw.ServiceNonceMutex.RUnlock()
+	assert.Equal(t, "existing-nonce", gotNonce)
+}
+
+func TestSendHeartBeat_EmptyNonceKeepsExistingNonce(t *testing.T) {
+	h := newClientBackedDashboardHandler(t, roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		return dashboardHTTPResponse(http.StatusOK, `{"Status":"OK","Nonce":""}`), nil
+	}))
+
+	h.Gw.ServiceNonceMutex.Lock()
+	h.Gw.ServiceNonce = "existing-heartbeat-nonce"
+	h.Gw.ServiceNonceMutex.Unlock()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	req := h.newRequest(http.MethodGet, "http://dashboard.local/register/ping")
+	err := h.sendHeartBeat(req, h.Gw.initialiseClient(), ctx)
+	require.ErrorIs(t, err, context.Canceled)
+
+	h.Gw.ServiceNonceMutex.RLock()
+	gotNonce := h.Gw.ServiceNonce
+	h.Gw.ServiceNonceMutex.RUnlock()
+	assert.Equal(t, "existing-heartbeat-nonce", gotNonce)
+}
+
+func TestDeRegister_EmptyNonceKeepsExistingNonce(t *testing.T) {
+	h := newClientBackedDashboardHandler(t, roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		return dashboardHTTPResponse(http.StatusOK, `{"Status":"OK","Nonce":""}`), nil
+	}))
+
+	h.Gw.SetNodeID("node-for-deregister")
+	h.Gw.ServiceNonceMutex.Lock()
+	h.Gw.ServiceNonce = "existing-deregister-nonce"
+	h.Gw.ServiceNonceMutex.Unlock()
+
+	require.NoError(t, h.DeRegister())
+
+	h.Gw.ServiceNonceMutex.RLock()
+	gotNonce := h.Gw.ServiceNonce
+	h.Gw.ServiceNonceMutex.RUnlock()
+	assert.Equal(t, "existing-deregister-nonce", gotNonce)
+}
+
 func Test_parseRegistrationResponse(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -298,4 +449,151 @@ func Test_DashboardLifecycle(t *testing.T) {
 
 	handler.StopBeating()
 	assert.True(t, handler.isHeartBeatStopped())
+}
+
+func TestNextRegisterRetryDelay(t *testing.T) {
+	testCases := []struct {
+		name    string
+		attempt int
+		min     time.Duration
+		max     time.Duration
+	}{
+		{name: "attempt 1", attempt: 1, min: 5 * time.Second, max: 6500 * time.Millisecond},
+		{name: "attempt 2", attempt: 2, min: 10 * time.Second, max: 11500 * time.Millisecond},
+		{name: "attempt 5 capped", attempt: 5, min: 60 * time.Second, max: 60 * time.Second},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := &HTTPDashboardHandler{retryRng: rand.New(rand.NewSource(1))}
+			delay := h.nextRegisterRetryDelay(tc.attempt)
+			assert.GreaterOrEqual(t, delay, tc.min)
+			assert.LessOrEqual(t, delay, tc.max)
+		})
+	}
+}
+
+func TestForbiddenRecoveryPlan_ResetAndMetric(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	h := &HTTPDashboardHandler{
+		Gw:       &Gateway{},
+		now:      func() time.Time { return now },
+		retryRng: rand.New(rand.NewSource(42)),
+	}
+	h.Gw.SetNodeID("node-1")
+
+	originalMetricRecorder := recordReRegisterCircuitOpenMetric
+	t.Cleanup(func() {
+		recordReRegisterCircuitOpenMetric = originalMetricRecorder
+	})
+
+	var metricCalls int
+	var metricNodeID string
+	var metricConsecutive int
+	var metricDelay time.Duration
+	recordReRegisterCircuitOpenMetric = func(nodeID string, consecutive int, delay time.Duration) {
+		metricCalls++
+		metricNodeID = nodeID
+		metricConsecutive = consecutive
+		metricDelay = delay
+	}
+
+	firstDelay, firstConsecutive := h.nextForbiddenRecoveryPlan()
+	require.Equal(t, 1, firstConsecutive)
+	assert.GreaterOrEqual(t, firstDelay, time.Second)
+	assert.LessOrEqual(t, firstDelay, 5*time.Second)
+
+	h.recordReRegisterCircuitOpen(firstConsecutive, firstDelay)
+	assert.Equal(t, 0, metricCalls)
+
+	now = now.Add(10 * time.Second)
+	secondDelay, secondConsecutive := h.nextForbiddenRecoveryPlan()
+	require.Equal(t, 2, secondConsecutive)
+	assert.GreaterOrEqual(t, secondDelay, 2*time.Second)
+	assert.LessOrEqual(t, secondDelay, 60*time.Second)
+
+	h.recordReRegisterCircuitOpen(secondConsecutive, secondDelay)
+	require.Equal(t, 1, metricCalls)
+	assert.Equal(t, "node-1", metricNodeID)
+	assert.Equal(t, 2, metricConsecutive)
+	assert.Equal(t, secondDelay, metricDelay)
+
+	h.resetForbiddenRecoveryState()
+	now = now.Add(time.Second)
+	_, consecutiveAfterReset := h.nextForbiddenRecoveryPlan()
+	assert.Equal(t, 1, consecutiveAfterReset)
+}
+
+func TestSleepWithContext(t *testing.T) {
+	t.Run("cancelled context", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		err := sleepWithContext(ctx, 5*time.Second)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+
+	t.Run("non-positive delay", func(t *testing.T) {
+		err := sleepWithContext(context.Background(), 0)
+		require.NoError(t, err)
+
+		err = sleepWithContext(context.Background(), -1*time.Second)
+		require.NoError(t, err)
+	})
+}
+
+func waitForSignal(t *testing.T, ch <-chan struct{}, description string) {
+	t.Helper()
+
+	select {
+	case <-ch:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for %s", description)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func newClientBackedDashboardHandler(t *testing.T, rt http.RoundTripper) *HTTPDashboardHandler {
+	t.Helper()
+
+	gw := NewGateway(config.Config{
+		NodeSecret:               "test-secret",
+		DisableDashboardZeroConf: true,
+		DBAppConfOptions: config.DBAppConfOptionsConfig{
+			ConnectionTimeout: 1,
+		},
+	}, context.Background())
+	gw.SessionID = "unit-test-session"
+	gw.resetDashboardClient()
+
+	dashClient = &http.Client{
+		Transport: rt,
+		Timeout:   time.Second,
+	}
+	t.Cleanup(func() {
+		gw.resetDashboardClient()
+	})
+
+	handler := &HTTPDashboardHandler{
+		Gw:                     gw,
+		Secret:                 "test-secret",
+		RegistrationEndpoint:   "http://dashboard.local/register/node",
+		DeRegistrationEndpoint: "http://dashboard.local/register/node",
+	}
+	gw.DashService = handler
+
+	return handler
+}
+
+func dashboardHTTPResponse(status int, body string) *http.Response {
+	return &http.Response{
+		StatusCode: status,
+		Header:     make(http.Header),
+		Body:       io.NopCloser(strings.NewReader(body)),
+	}
 }

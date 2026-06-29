@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"strings"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -12,34 +14,13 @@ import (
 type URLSpec struct {
 	spec *regexp.Regexp
 
-	Status                    URLStatus
-	MethodActions             map[string]apidef.EndpointMethodMeta
-	Whitelist                 apidef.EndPointMeta
-	Blacklist                 apidef.EndPointMeta
-	Ignored                   apidef.EndPointMeta
-	MockResponse              apidef.MockResponseMeta
-	CacheConfig               EndPointCacheMeta
-	TransformAction           TransformSpec
-	TransformResponseAction   TransformSpec
-	TransformJQAction         TransformJQSpec
-	TransformJQResponseAction TransformJQSpec
-	InjectHeaders             apidef.HeaderInjectionMeta
-	InjectHeadersResponse     apidef.HeaderInjectionMeta
-	HardTimeout               apidef.HardTimeoutMeta
-	CircuitBreaker            ExtendedCircuitBreakerMeta
-	URLRewrite                *apidef.URLRewriteMeta
-	VirtualPathSpec           apidef.VirtualMeta
-	RequestSize               apidef.RequestSizeMeta
-	MethodTransform           apidef.MethodTransformMeta
-	TrackEndpoint             apidef.TrackEndpointMeta
-	DoNotTrackEndpoint        apidef.TrackEndpointMeta
-	ValidatePathMeta          apidef.ValidatePathMeta
-	Internal                  apidef.InternalMeta
-	GoPluginMeta              GoPluginMiddleware
-	PersistGraphQL            apidef.PersistGraphQLMeta
-	RateLimit                 apidef.RateLimitMeta
-	OASValidateRequestMeta    *oas.ValidateRequest
-	OASMockResponseMeta       *oas.MockResponse
+	metadata    any
+	literalPath string
+	Status      URLStatus
+	matchMode   urlPathMatchMode
+
+	OASValidateRequestMeta *oas.ValidateRequest
+	OASMockResponseMeta    *oas.MockResponse
 
 	// OASValidateRequestCandidates holds multiple OAS endpoints that compile to the
 	// same regex pattern. When non-empty, the validate request middleware must
@@ -59,6 +40,16 @@ type URLSpec struct {
 	// This is used for matching against the OAS router when needed
 	OASPath string
 }
+
+type urlPathMatchMode uint8
+
+const (
+	urlPathMatchRegex urlPathMatchMode = iota
+	urlPathMatchContains
+	urlPathMatchPrefix
+	urlPathMatchSuffix
+	urlPathMatchExact
+)
 
 // ValidateRequestCandidate represents one OAS endpoint that maps to the same
 // compiled regex pattern. Used for disambiguation when multiple parameterized
@@ -84,43 +75,49 @@ func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 	case Ignored, BlackList, WhiteList:
 		return nil, true
 	case Cached:
-		return &u.CacheConfig, true
+		return typedURLSpecMeta[*EndPointCacheMeta](u)
 	case Transformed:
-		return &u.TransformAction, true
+		return typedURLSpecMeta[*TransformSpec](u)
 	case TransformedJQ:
-		return &u.TransformJQAction, true
+		return typedURLSpecMeta[*TransformJQSpec](u)
 	case HeaderInjected:
-		return &u.InjectHeaders, true
+		return typedURLSpecMeta[*apidef.HeaderInjectionMeta](u)
 	case HeaderInjectedResponse:
-		return &u.InjectHeadersResponse, true
+		return typedURLSpecMeta[*apidef.HeaderInjectionMeta](u)
 	case TransformedResponse:
-		return &u.TransformResponseAction, true
+		return typedURLSpecMeta[*TransformSpec](u)
 	case TransformedJQResponse:
-		return &u.TransformJQResponseAction, true
+		return typedURLSpecMeta[*TransformJQSpec](u)
 	case HardTimeout:
-		return &u.HardTimeout.TimeOut, true
+		meta, ok := typedURLSpecMeta[*apidef.HardTimeoutMeta](u)
+		if !ok {
+			return nil, false
+		}
+		return &meta.TimeOut, true
 	case CircuitBreaker:
-		return &u.CircuitBreaker, true
+		return typedURLSpecMeta[*ExtendedCircuitBreakerMeta](u)
 	case URLRewrite:
-		return u.URLRewrite, true
+		return typedURLSpecMeta[*urlRewriteRuntimeMeta](u)
 	case VirtualPath:
-		return &u.VirtualPathSpec, true
+		return typedURLSpecMeta[*apidef.VirtualMeta](u)
 	case RequestSizeLimit:
-		return &u.RequestSize, true
+		return typedURLSpecMeta[*apidef.RequestSizeMeta](u)
 	case MethodTransformed:
-		return &u.MethodTransform, true
+		return typedURLSpecMeta[*apidef.MethodTransformMeta](u)
 	case RequestTracked:
-		return &u.TrackEndpoint, true
+		return typedURLSpecMeta[*apidef.TrackEndpointMeta](u)
 	case RequestNotTracked:
-		return &u.DoNotTrackEndpoint, true
+		return typedURLSpecMeta[*apidef.TrackEndpointMeta](u)
 	case ValidateJSONRequest:
-		return &u.ValidatePathMeta, true
+		return typedURLSpecMeta[*apidef.ValidatePathMeta](u)
 	case Internal:
-		return &u.Internal, true
+		return typedURLSpecMeta[*apidef.InternalMeta](u)
 	case GoPlugin:
-		return &u.GoPluginMeta, true
+		return typedURLSpecMeta[*GoPluginMiddleware](u)
 	case PersistGraphQL:
-		return &u.PersistGraphQL, true
+		return typedURLSpecMeta[*apidef.PersistGraphQLMeta](u)
+	case RateLimit:
+		return typedURLSpecMeta[*apidef.RateLimitMeta](u)
 	case OASValidateRequest:
 		return u.OASValidateRequestMeta, true
 	case OASMockResponse:
@@ -130,51 +127,87 @@ func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 	}
 }
 
+func typedURLSpecMeta[T any](u *URLSpec) (T, bool) {
+	meta, ok := u.metadata.(T)
+	return meta, ok
+}
+
 // matchesMethod checks if the given method matches the method required by the URLSpec for the current status.
 func (u *URLSpec) matchesMethod(method string) bool {
 	switch u.Status {
 	case Ignored, BlackList, WhiteList:
+		meta, ok := typedURLSpecMeta[*endpointRuntimeMeta](u)
+		if !ok {
+			return true
+		}
+		if meta.method != "" {
+			return method == meta.method
+		}
+		if meta.methodActionsByName != nil {
+			_, ok := meta.methodActionsByName[method]
+			return ok
+		}
 		return true
 	case Cached:
-		return method == u.CacheConfig.Method || (u.CacheConfig.Method == SAFE_METHODS && isSafeMethod(method))
+		meta, ok := typedURLSpecMeta[*EndPointCacheMeta](u)
+		return ok && (method == meta.Method || (meta.Method == SAFE_METHODS && isSafeMethod(method)))
 	case Transformed:
-		return method == u.TransformAction.Method
+		meta, ok := typedURLSpecMeta[*TransformSpec](u)
+		return ok && method == meta.Method
 	case TransformedJQ:
-		return method == u.TransformJQAction.Method
+		meta, ok := typedURLSpecMeta[*TransformJQSpec](u)
+		return ok && method == meta.Method
 	case HeaderInjected:
-		return method == u.InjectHeaders.Method
+		meta, ok := typedURLSpecMeta[*apidef.HeaderInjectionMeta](u)
+		return ok && method == meta.Method
 	case HeaderInjectedResponse:
-		return method == u.InjectHeadersResponse.Method
+		meta, ok := typedURLSpecMeta[*apidef.HeaderInjectionMeta](u)
+		return ok && method == meta.Method
 	case TransformedResponse:
-		return method == u.TransformResponseAction.Method
+		meta, ok := typedURLSpecMeta[*TransformSpec](u)
+		return ok && method == meta.Method
 	case TransformedJQResponse:
-		return method == u.TransformJQResponseAction.Method
+		meta, ok := typedURLSpecMeta[*TransformJQSpec](u)
+		return ok && method == meta.Method
 	case HardTimeout:
-		return method == u.HardTimeout.Method
+		meta, ok := typedURLSpecMeta[*apidef.HardTimeoutMeta](u)
+		return ok && method == meta.Method
 	case CircuitBreaker:
-		return method == u.CircuitBreaker.Method
+		meta, ok := typedURLSpecMeta[*ExtendedCircuitBreakerMeta](u)
+		return ok && method == meta.Method
 	case URLRewrite:
-		return method == u.URLRewrite.Method
+		meta, ok := typedURLSpecMeta[*urlRewriteRuntimeMeta](u)
+		return ok && method == meta.Method
 	case VirtualPath:
-		return method == u.VirtualPathSpec.Method
+		meta, ok := typedURLSpecMeta[*apidef.VirtualMeta](u)
+		return ok && method == meta.Method
 	case RequestSizeLimit:
-		return method == u.RequestSize.Method
+		meta, ok := typedURLSpecMeta[*apidef.RequestSizeMeta](u)
+		return ok && method == meta.Method
 	case MethodTransformed:
-		return method == u.MethodTransform.Method
+		meta, ok := typedURLSpecMeta[*apidef.MethodTransformMeta](u)
+		return ok && method == meta.Method
 	case RequestTracked:
-		return method == u.TrackEndpoint.Method
+		meta, ok := typedURLSpecMeta[*apidef.TrackEndpointMeta](u)
+		return ok && method == meta.Method
 	case RequestNotTracked:
-		return method == u.DoNotTrackEndpoint.Method
+		meta, ok := typedURLSpecMeta[*apidef.TrackEndpointMeta](u)
+		return ok && method == meta.Method
 	case ValidateJSONRequest:
-		return method == u.ValidatePathMeta.Method
+		meta, ok := typedURLSpecMeta[*apidef.ValidatePathMeta](u)
+		return ok && method == meta.Method
 	case Internal:
-		return method == u.Internal.Method
+		meta, ok := typedURLSpecMeta[*apidef.InternalMeta](u)
+		return ok && method == meta.Method
 	case GoPlugin:
-		return method == u.GoPluginMeta.Meta.Method
+		meta, ok := typedURLSpecMeta[*GoPluginMiddleware](u)
+		return ok && method == meta.Meta.Method
 	case PersistGraphQL:
-		return method == u.PersistGraphQL.Method
+		meta, ok := typedURLSpecMeta[*apidef.PersistGraphQLMeta](u)
+		return ok && method == meta.Method
 	case RateLimit:
-		return method == u.RateLimit.Method
+		meta, ok := typedURLSpecMeta[*apidef.RateLimitMeta](u)
+		return ok && method == meta.Method
 	case OASValidateRequest, OASMockResponse:
 		// OAS middleware is method-specific, check against stored method
 		return method == u.OASMethod
@@ -191,16 +224,31 @@ func (a *URLSpec) matchesPath(reqPath string, api *APISpec) bool {
 	clean := api.StripListenPath(reqPath)
 	noVersion := api.StripVersionPath(clean)
 	// match /users
-	if noVersion != clean && a.spec.MatchString(noVersion) {
+	if noVersion != clean && a.matchesPreparedPath(noVersion) {
 		return true
 	}
 	// match /v3/users
-	if a.spec.MatchString(clean) {
+	if a.matchesPreparedPath(clean) {
 		return true
 	}
 	// match /listenpath/v3/users
-	if a.spec.MatchString(reqPath) {
+	if a.matchesPreparedPath(reqPath) {
 		return true
 	}
 	return false
+}
+
+func (a *URLSpec) matchesPreparedPath(path string) bool {
+	switch a.matchMode {
+	case urlPathMatchContains:
+		return strings.Contains(path, a.literalPath)
+	case urlPathMatchPrefix:
+		return strings.HasPrefix(path, a.literalPath)
+	case urlPathMatchSuffix:
+		return strings.HasSuffix(path, a.literalPath)
+	case urlPathMatchExact:
+		return path == a.literalPath
+	default:
+		return a.spec != nil && a.spec.MatchString(path)
+	}
 }

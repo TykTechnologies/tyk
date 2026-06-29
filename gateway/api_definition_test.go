@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -36,6 +37,133 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
+
+func TestLiteralPathMatcher(t *testing.T) {
+	tests := []struct {
+		name      string
+		pattern   string
+		prefix    bool
+		suffix    bool
+		ignore    bool
+		wantPath  string
+		wantMode  urlPathMatchMode
+		wantMatch bool
+	}{
+		{name: "contains", pattern: "/users", wantPath: "/users", wantMode: urlPathMatchContains, wantMatch: true},
+		{name: "prefix", pattern: "/users", prefix: true, wantPath: "/users", wantMode: urlPathMatchPrefix, wantMatch: true},
+		{name: "prefix without leading slash keeps contains semantics", pattern: "users", prefix: true, wantPath: "users", wantMode: urlPathMatchContains, wantMatch: true},
+		{name: "suffix", pattern: "/users", suffix: true, wantPath: "/users", wantMode: urlPathMatchSuffix, wantMatch: true},
+		{name: "suffix without leading slash", pattern: "users", suffix: true, wantPath: "users", wantMode: urlPathMatchSuffix, wantMatch: true},
+		{name: "exact", pattern: "/users", prefix: true, suffix: true, wantPath: "/users", wantMode: urlPathMatchExact, wantMatch: true},
+		{name: "prefix suffix without leading slash keeps suffix semantics", pattern: "users", prefix: true, suffix: true, wantPath: "users", wantMode: urlPathMatchSuffix, wantMatch: true},
+		{name: "ignore case stays regex", pattern: "/users", ignore: true},
+		{name: "mux template stays regex", pattern: "/users/{id}"},
+		{name: "wildcard stays regex", pattern: "/users/*"},
+		{name: "regex meta stays regex", pattern: "/users/[0-9]+"},
+		{name: "anchored stays regex", pattern: "^/users$"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path, mode, ok := literalPathMatcher(tt.pattern, tt.prefix, tt.suffix, tt.ignore)
+			assert.Equal(t, tt.wantMatch, ok)
+			if !tt.wantMatch {
+				return
+			}
+			assert.Equal(t, tt.wantPath, path)
+			assert.Equal(t, tt.wantMode, mode)
+		})
+	}
+}
+
+func TestGenerateRegexKeepsOASRegexBacked(t *testing.T) {
+	for _, status := range []URLStatus{OASValidateRequest, OASMockResponse} {
+		t.Run(fmt.Sprintf("status-%d", status), func(t *testing.T) {
+			var spec URLSpec
+			loader := APIDefinitionLoader{}
+
+			loader.generateRegex("/users", &spec, status, config.Config{})
+
+			assert.NotNil(t, spec.spec)
+			assert.Empty(t, spec.literalPath)
+			assert.Equal(t, urlPathMatchRegex, spec.matchMode)
+			assert.True(t, spec.spec.MatchString("/users"))
+		})
+	}
+}
+
+func TestCompileTransformPathSpecUsesCompactRuntimeMeta(t *testing.T) {
+	loader := APIDefinitionLoader{}
+	encodedTemplate := base64.StdEncoding.EncodeToString([]byte(`{{.name}}-ok`))
+
+	specs := loader.compileTransformPathSpec([]apidef.TemplateMeta{{
+		Path:   "/transform",
+		Method: http.MethodPost,
+		TemplateData: apidef.TemplateData{
+			Input:          apidef.RequestJSON,
+			Mode:           apidef.UseBlob,
+			EnableSession:  false,
+			TemplateSource: encodedTemplate,
+		},
+	}}, Transformed, config.Config{})
+
+	assert.Len(t, specs, 1)
+	transform, ok := typedURLSpecMeta[*TransformSpec](&specs[0])
+	assert.True(t, ok)
+	assert.Equal(t, http.MethodPost, transform.Method)
+	assert.Equal(t, apidef.RequestJSON, transform.TemplateData.Input)
+	assert.False(t, transform.TemplateData.EnableSession)
+	assert.NotNil(t, transform.Template)
+
+	req := TestReq(t, http.MethodPost, "/transform", `{"name":"compact"}`)
+	mw := &TransformMiddleware{BaseMiddleware: &BaseMiddleware{
+		Spec: &APISpec{
+			APIDefinition: &apidef.APIDefinition{},
+		},
+		Gw: &Gateway{},
+	}}
+	assert.NoError(t, transformBody(req, transform, mw))
+	got, err := ioutil.ReadAll(req.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, "compact-ok", string(got))
+}
+
+func TestEndpointRuntimeMetaKeepsCommonNoActionCompact(t *testing.T) {
+	meta := compileEndpointRuntimeMeta(apidef.EndPointMeta{
+		MethodActions: map[string]apidef.EndpointMethodMeta{
+			http.MethodGet: {Action: apidef.NoAction},
+		},
+	})
+
+	assert.Equal(t, http.MethodGet, meta.method)
+	assert.Nil(t, meta.methodActionsByName)
+}
+
+func TestURLAllowedAndIgnoredUsesCompactEndpointMeta(t *testing.T) {
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			Proxy: apidef.ProxyConfig{ListenPath: "/"},
+		},
+	}
+	rxPaths := []URLSpec{
+		{
+			metadata:    compileEndpointRuntimeMeta(apidef.EndPointMeta{Method: http.MethodGet}),
+			literalPath: "/allowed",
+			Status:      Ignored,
+			matchMode:   urlPathMatchExact,
+		},
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/allowed", nil)
+	status, meta := spec.URLAllowedAndIgnored(getReq, rxPaths, false)
+	assert.Equal(t, StatusOkAndIgnore, status)
+	assert.Nil(t, meta)
+
+	postReq := httptest.NewRequest(http.MethodPost, "/allowed", nil)
+	status, meta = spec.URLAllowedAndIgnored(postReq, rxPaths, false)
+	assert.Equal(t, StatusOk, status)
+	assert.Nil(t, meta)
+}
 
 func TestURLRewrites(t *testing.T) {
 	ts := StartTest(nil)
@@ -1317,6 +1445,200 @@ func TestAPIDefinitionLoader(t *testing.T) {
 	})
 }
 
+func TestAPIDefinitionLoaderLoadBlobTemplateCache(t *testing.T) {
+	transformBlobTemplateCache.Lock()
+	clear(transformBlobTemplateCache.items)
+	transformBlobTemplateCache.Unlock()
+	t.Cleanup(func() {
+		transformBlobTemplateCache.Lock()
+		clear(transformBlobTemplateCache.items)
+		transformBlobTemplateCache.Unlock()
+	})
+
+	loader := APIDefinitionLoader{}
+	templateBase64 := base64.StdEncoding.EncodeToString([]byte(`{"value":"{{.value1}}"}`))
+
+	first, err := loader.loadBlobTemplate(templateBase64)
+	if err != nil {
+		t.Fatalf("APIDefinitionLoader.loadBlobTemplate(%q) error = %v, want nil", templateBase64, err)
+	}
+
+	second, err := loader.loadBlobTemplate(templateBase64)
+	if err != nil {
+		t.Fatalf("APIDefinitionLoader.loadBlobTemplate(%q) second call error = %v, want nil", templateBase64, err)
+	}
+
+	if first != second {
+		t.Errorf("APIDefinitionLoader.loadBlobTemplate(%q) returned different template pointers for identical input", templateBase64)
+	}
+
+	otherBase64 := base64.StdEncoding.EncodeToString([]byte(`{"other":"{{.value2}}"}`))
+	other, err := loader.loadBlobTemplate(otherBase64)
+	if err != nil {
+		t.Fatalf("APIDefinitionLoader.loadBlobTemplate(%q) error = %v, want nil", otherBase64, err)
+	}
+
+	if first == other {
+		t.Errorf("APIDefinitionLoader.loadBlobTemplate(%q) reused template pointer from distinct input %q", otherBase64, templateBase64)
+	}
+}
+
+func TestMakeSpecSharesIdenticalSafeVersionPathSpecs(t *testing.T) {
+	gwConf := config.Config{
+		UseDBAppConfigs:          false,
+		DisableDashboardZeroConf: true,
+		NodeSecret:               "test-secret",
+	}
+	gw := NewGateway(gwConf, context.Background())
+	encodedTemplate := base64.StdEncoding.EncodeToString([]byte(`{"ok":true}`))
+
+	input := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "shared-version-paths"
+		spec.Name = "shared version paths"
+		spec.UseKeylessAccess = true
+
+		v1 := apidef.VersionInfo{
+			Name:             "v1",
+			UseExtendedPaths: true,
+		}
+		v1.ExtendedPaths.Ignored = []apidef.EndPointMeta{{
+			Path: "/ignored",
+			MethodActions: map[string]apidef.EndpointMethodMeta{
+				http.MethodGet: {Action: apidef.NoAction},
+			},
+		}}
+		v1.ExtendedPaths.Transform = []apidef.TemplateMeta{{
+			Path:   "/transform",
+			Method: http.MethodGet,
+			TemplateData: apidef.TemplateData{
+				Input:          apidef.RequestJSON,
+				Mode:           apidef.UseBlob,
+				TemplateSource: encodedTemplate,
+			},
+		}}
+
+		v2 := v1
+		v2.Name = "v2"
+		spec.VersionData.NotVersioned = false
+		spec.VersionData.DefaultVersion = "v1"
+		spec.VersionData.Versions = map[string]apidef.VersionInfo{
+			"v1": v1,
+			"v2": v2,
+		}
+	})[0]
+
+	loader := APIDefinitionLoader{Gw: gw}
+	spec, err := loader.MakeSpec(&model.MergedAPI{APIDefinition: input.APIDefinition}, nil)
+	if err != nil {
+		t.Fatalf("APIDefinitionLoader.MakeSpec(shared-version-paths) error = %v, want nil", err)
+	}
+
+	v1Paths := spec.RxPaths["v1"]
+	v2Paths := spec.RxPaths["v2"]
+	if len(v1Paths) == 0 || len(v2Paths) == 0 {
+		t.Fatalf("APIDefinitionLoader.MakeSpec(shared-version-paths) path counts = %d/%d, want both non-zero", len(v1Paths), len(v2Paths))
+	}
+	if len(v1Paths) != len(v2Paths) {
+		t.Fatalf("APIDefinitionLoader.MakeSpec(shared-version-paths) path counts = %d/%d, want equal", len(v1Paths), len(v2Paths))
+	}
+	if &v1Paths[0] != &v2Paths[0] {
+		t.Fatalf("APIDefinitionLoader.MakeSpec(shared-version-paths) did not share backing storage for identical safe version path specs")
+	}
+}
+
+func TestMakeSpecDoesNotShareOASVersionPathSpecs(t *testing.T) {
+	gwConf := config.Config{
+		UseDBAppConfigs:          false,
+		DisableDashboardZeroConf: true,
+		NodeSecret:               "test-secret",
+	}
+	gw := NewGateway(gwConf, context.Background())
+
+	input := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "oas-version-paths"
+		spec.Name = "oas version paths"
+		spec.IsOAS = true
+		spec.UseKeylessAccess = true
+
+		v1 := apidef.VersionInfo{
+			Name:             "v1",
+			UseExtendedPaths: true,
+		}
+		v1.ExtendedPaths.Ignored = []apidef.EndPointMeta{{
+			Path: "/ignored",
+			MethodActions: map[string]apidef.EndpointMethodMeta{
+				http.MethodGet: {Action: apidef.NoAction},
+			},
+		}}
+
+		v2 := v1
+		v2.Name = "v2"
+		spec.VersionData.NotVersioned = false
+		spec.VersionData.DefaultVersion = "v1"
+		spec.VersionData.Versions = map[string]apidef.VersionInfo{
+			"v1": v1,
+			"v2": v2,
+		}
+	})[0]
+	merged := &model.MergedAPI{
+		APIDefinition: input.APIDefinition,
+		OAS: &oas.OAS{
+			T: openapi3.T{
+				OpenAPI: "3.0.0",
+				Info: &openapi3.Info{
+					Title:   "oas version paths",
+					Version: "1.0.0",
+				},
+				Paths: openapi3.NewPaths(),
+			},
+		},
+	}
+
+	loader := APIDefinitionLoader{Gw: gw}
+	spec, err := loader.MakeSpec(merged, nil)
+	if err != nil {
+		t.Fatalf("APIDefinitionLoader.MakeSpec(oas-version-paths) error = %v, want nil", err)
+	}
+
+	v1Paths := spec.RxPaths["v1"]
+	v2Paths := spec.RxPaths["v2"]
+	if len(v1Paths) == 0 || len(v2Paths) == 0 {
+		t.Fatalf("APIDefinitionLoader.MakeSpec(oas-version-paths) path counts = %d/%d, want both non-zero", len(v1Paths), len(v2Paths))
+	}
+	if len(v1Paths) != len(v2Paths) {
+		t.Fatalf("APIDefinitionLoader.MakeSpec(oas-version-paths) path counts = %d/%d, want equal", len(v1Paths), len(v2Paths))
+	}
+	if &v1Paths[0] == &v2Paths[0] {
+		t.Fatalf("APIDefinitionLoader.MakeSpec(oas-version-paths) shared backing storage, want isolated OAS path specs")
+	}
+}
+
+func TestVersionPathSpecCacheKeyRejectsStatefulVersionPathSpecs(t *testing.T) {
+	version := apidef.VersionInfo{UseExtendedPaths: true}
+	version.ExtendedPaths.CircuitBreaker = []apidef.CircuitBreakerMeta{{Path: "/breaker"}}
+
+	if _, ok := versionPathSpecCacheKey(version, config.Config{}); ok {
+		t.Fatal("versionPathSpecCacheKey(circuit-breaker version) cacheable = true, want false")
+	}
+
+	version.ExtendedPaths.CircuitBreaker = nil
+	version.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
+		Path:         "/rewrite",
+		Method:       http.MethodGet,
+		MatchPattern: "/rewrite",
+		RewriteTo:    "/hello",
+	}}
+
+	if _, ok := versionPathSpecCacheKey(version, config.Config{}); !ok {
+		t.Fatal("versionPathSpecCacheKey(simple url-rewrite version) cacheable = false, want true")
+	}
+
+	version.ExtendedPaths.URLRewrite[0].Triggers = []apidef.RoutingTrigger{{}}
+	if _, ok := versionPathSpecCacheKey(version, config.Config{}); ok {
+		t.Fatal("versionPathSpecCacheKey(triggered url-rewrite version) cacheable = true, want false")
+	}
+}
+
 func TestAPIExpiration(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -1845,6 +2167,68 @@ func TestFromDashboardServiceServerError(t *testing.T) {
 	assert.Contains(t, err.Error(), "dashboard API error")
 	assert.Nil(t, specs)
 	assert.Equal(t, 1, requestCount, "Should make only one request, no retry for server errors")
+}
+
+func TestFromDashboardServiceRetryableControlPlaneResponse(t *testing.T) {
+	oldSleep := dashboardSyncSleep
+	dashboardSyncSleep = func(context.Context, time.Duration) bool { return true }
+	defer func() { dashboardSyncSleep = oldSleep }()
+
+	var requestCount int
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requestCount++
+		w.Header().Set("Content-Type", "application/json")
+		if requestCount < 3 {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"Status":"Error","Message":"Control plane busy while serving APIs","Meta":{"code":"control_plane_busy","retry_after_seconds":1,"generation":42}}`))
+			return
+		}
+
+		_, _ = w.Write([]byte(`{"Status":"OK","Message":[],"Nonce":"fresh-nonce"}`))
+	}))
+	defer ts.Close()
+
+	gwConf := config.Config{
+		UseDBAppConfigs:          false,
+		DisableDashboardZeroConf: true,
+		NodeSecret:               "test-secret",
+	}
+	gwConf.DBAppConfOptions.ConnectionTimeout = 2
+	gw := NewGateway(gwConf, context.Background())
+	gw.ServiceNonce = "old-nonce"
+
+	loader := APIDefinitionLoader{Gw: gw}
+	specs, err := loader.FromDashboardService(ts.URL)
+
+	assert.NoError(t, err)
+	assert.Empty(t, specs)
+	assert.Equal(t, 3, requestCount, "Should retry typed control-plane 503s without re-registering")
+	assert.Equal(t, "fresh-nonce", gw.ServiceNonce)
+}
+
+func TestFromDashboardServiceKeepsNonceWhenResponseNonceEmpty(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"Status":"OK","Message":[],"Nonce":""}`))
+	}))
+	defer ts.Close()
+
+	gwConf := config.Config{
+		UseDBAppConfigs:          false,
+		DisableDashboardZeroConf: true,
+		NodeSecret:               "test-secret",
+	}
+	gwConf.DBAppConfOptions.ConnectionTimeout = 2
+	gw := NewGateway(gwConf, context.Background())
+	gw.ServiceNonce = "keep-me"
+
+	loader := APIDefinitionLoader{Gw: gw}
+	specs, err := loader.FromDashboardService(ts.URL)
+
+	assert.NoError(t, err)
+	assert.Empty(t, specs)
+	assert.Equal(t, "keep-me", gw.ServiceNonce)
 }
 
 // TestFromDashboardServiceNoDashServiceFallback tests graceful fallback for API definitions
@@ -2896,13 +3280,9 @@ func TestURLAllowedAndIgnored_CORSPreflight(t *testing.T) {
 
 	paths := []URLSpec{
 		{
-			spec:   compile,
-			Status: WhiteList,
-			Whitelist: apidef.EndPointMeta{
-				Disabled: false,
-				Path:     testPath,
-				Method:   http.MethodGet,
-			},
+			spec:     compile,
+			Status:   WhiteList,
+			metadata: endpointRuntimeMetaForMethod(http.MethodGet),
 		},
 	}
 

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -127,6 +128,80 @@ func TestRewriter(t *testing.T) {
 		})
 	}
 }
+
+func TestURLRewriteRuntimeMetaContextPathFallsBackToMatchPattern(t *testing.T) {
+	meta := compileURLRewriteRuntimeMeta(apidef.URLRewriteMeta{
+		Path:         "/same",
+		MatchPattern: "/same",
+		Method:       http.MethodGet,
+		RewriteTo:    "/next",
+	})
+
+	assert.Empty(t, meta.Path)
+	assert.Equal(t, "/same", meta.contextPath())
+}
+
+func TestURLRewriteRuntimeUsesCompactMeta(t *testing.T) {
+	gw := &Gateway{}
+	req := httptest.NewRequest(http.MethodGet, "/test/foo/rewrite", nil)
+	meta := compileURLRewriteRuntimeMeta(apidef.URLRewriteMeta{
+		Path:         "/test/foo/rewrite",
+		MatchPattern: "/test/foo/rewrite",
+		RewriteTo:    "/rewritten",
+	})
+
+	got, err := gw.urlRewriteRuntime(meta, req)
+	assert.NoError(t, err)
+	assert.Equal(t, "/rewritten", got)
+	assert.Equal(t, "/test/foo/rewrite", ctxGetUrlRewritePath(req))
+}
+
+func TestURLRewriteSimpleLiteralAvoidsSecondRegex(t *testing.T) {
+	loader := APIDefinitionLoader{}
+	paths := loader.compileURLRewritesPathSpec([]apidef.URLRewriteMeta{{
+		Path:         "/test/foo/rewrite",
+		Method:       http.MethodGet,
+		MatchPattern: "/test/foo/rewrite",
+		RewriteTo:    "/rewritten",
+	}}, URLRewrite, config.Config{})
+
+	assert.Len(t, paths, 1)
+	meta, ok := typedURLSpecMeta[*urlRewriteRuntimeMeta](&paths[0])
+	assert.True(t, ok)
+	assert.True(t, meta.directMatch)
+	assert.Nil(t, meta.MatchRegexp)
+
+	gw := &Gateway{}
+	req := httptest.NewRequest(http.MethodGet, "/test/foo/rewrite", nil)
+	got, err := gw.urlRewriteRuntime(meta, req)
+	assert.NoError(t, err)
+	assert.Equal(t, "/rewritten", got)
+	assert.Equal(t, "/test/foo/rewrite", ctxGetUrlRewritePath(req))
+}
+
+func TestURLRewriteRegexPathStillCompilesOnDemand(t *testing.T) {
+	loader := APIDefinitionLoader{}
+	paths := loader.compileURLRewritesPathSpec([]apidef.URLRewriteMeta{{
+		Path:         "/test/(.*)/rewrite",
+		Method:       http.MethodGet,
+		MatchPattern: "/test/(.*)/rewrite",
+		RewriteTo:    "/rewritten/$1",
+	}}, URLRewrite, config.Config{})
+
+	assert.Len(t, paths, 1)
+	meta, ok := typedURLSpecMeta[*urlRewriteRuntimeMeta](&paths[0])
+	assert.True(t, ok)
+	assert.False(t, meta.directMatch)
+	assert.Nil(t, meta.MatchRegexp)
+
+	gw := &Gateway{}
+	req := httptest.NewRequest(http.MethodGet, "/test/foo/rewrite", nil)
+	got, err := gw.urlRewriteRuntime(meta, req)
+	assert.NoError(t, err)
+	assert.Equal(t, "/rewritten/foo", got)
+	assert.NotNil(t, meta.MatchRegexp)
+}
+
 func BenchmarkRewriter(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
