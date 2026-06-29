@@ -840,6 +840,25 @@ type PinnedPublicKey struct {
 // pemPrefix is the start of a PEM-encoded block header.
 const pemPrefix = "-----BEGIN"
 
+// splitPublicKeys splits a comma-separated list of public key identifiers.
+// PEM blocks have surrounding whitespace trimmed; fingerprints have all spaces
+// removed (normalising values like "abc123, def456" into ["abc123", "def456"]).
+func splitPublicKeys(value string) []string {
+	parts := strings.Split(value, ",")
+	keys := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if strings.Contains(part, pemPrefix) {
+			part = strings.TrimSpace(part)
+		} else {
+			part = strings.ReplaceAll(part, " ", "")
+		}
+		if part != "" {
+			keys = append(keys, part)
+		}
+	}
+	return keys
+}
+
 // PinnedPublicKeys is a list of domains and pinned public keys for them.
 type PinnedPublicKeys []PinnedPublicKey
 
@@ -859,11 +878,7 @@ func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
 
 	i = 0
 	for _, domain := range domains {
-		val := strings.TrimSpace(publicKeys[domain])
-		if !strings.Contains(val, pemPrefix) {
-			val = strings.ReplaceAll(val, " ", "")
-		}
-		ppk[i] = PinnedPublicKey{Domain: domain, PublicKeys: strings.Split(val, ",")}
+		ppk[i] = PinnedPublicKey{Domain: domain, PublicKeys: splitPublicKeys(publicKeys[domain])}
 		i++
 	}
 }
