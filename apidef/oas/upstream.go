@@ -859,7 +859,7 @@ func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
 
 	i = 0
 	for _, domain := range domains {
-		val := publicKeys[domain]
+		val := strings.TrimSpace(publicKeys[domain])
 		if !strings.Contains(val, pemPrefix) {
 			val = strings.ReplaceAll(val, " ", "")
 		}
