@@ -1,0 +1,105 @@
+---
+name: Plugin-compiler NG base build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - release-**
+    paths:
+      - ".github/workflows/plugin-compiler-ng-base.yml"
+      - "ci/images/plugin-compiler-ng/**"
+
+env:
+  NG_BASE_IMAGE: tyk-plugin-compiler-ng-base
+  NG_BASE_TAG: latest
+  NG_BASE_SOURCE: dhi.io/busybox:1-debian-dev
+  NG_GLIBC_TARGET: "2.17"
+  NG_CROSS: "1"
+  NG_SLIM: "1"
+  NG_WITH_CXX: "1"
+  NG_WITH_GIT: "1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - name: "Reclaim some runner space"
+        run: sudo rm -rf /usr/local/bin/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS Credentials
+        id: configure-aws
+        uses: aws-actions/configure-aws-credentials@5fd3084fc36e372ff1fff382a39b10d03659f355  # v2
+        with:
+          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
+          role-session-name: ci-plugin-compiler-ng-base-push
+          aws-region: eu-central-1
+
+      - name: Login to AWS ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@5a88a04c91d5c6f97aae0d9be790e64d9b1d47b7  # v1
+
+      - name: Login to Dockerhub
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc  # v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Login to DHI
+        if: ${{ startsWith(env.NG_BASE_SOURCE, 'dhi.io/') }}
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc  # v2
+        with:
+          registry: dhi.io
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Resolve source base digest
+        id: source-base
+        run: |
+          digest="$(docker buildx imagetools inspect "$NG_BASE_SOURCE" | awk '/^Digest:/ {print $2; exit}')"
+          test -n "$digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Set docker metadata
+        id: set-metadata
+        uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175  # v4
+        with:
+          images: |
+            tykio/${{ env.NG_BASE_IMAGE }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.NG_BASE_IMAGE }}
+          labels: |
+            org.opencontainers.image.title=${{ env.NG_BASE_IMAGE }}
+            org.opencontainers.image.description=Stable BusyBox/glibc toolchain and sysroot base for the next-generation Tyk plugin compiler
+          tags: |
+            type=raw,value=${{ env.NG_BASE_TAG }}
+            type=sha,format=long
+
+      - name: Build and push base to dockerhub/ECR
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: ci/images/plugin-compiler-ng
+          file: ci/images/plugin-compiler-ng/Dockerfile.base
+          platforms: linux/amd64
+          push: true
+          labels: ${{ steps.set-metadata.outputs.labels }}
+          tags: ${{ steps.set-metadata.outputs.tags }}
+          build-args: |
+            BASE_IMAGE=${{ env.NG_BASE_SOURCE }}
+            GLIBC_TARGET=${{ env.NG_GLIBC_TARGET }}
+            CROSS=${{ env.NG_CROSS }}
+            SLIM=${{ env.NG_SLIM }}
+            WITH_CXX=${{ env.NG_WITH_CXX }}
+            WITH_GIT=${{ env.NG_WITH_GIT }}
+            DHI_DIGEST=${{ steps.source-base.outputs.digest }}
