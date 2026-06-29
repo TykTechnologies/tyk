@@ -129,6 +129,7 @@ func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
 
 func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router) {
 	if spec.GraphQL.GraphQLPlayground.Enabled {
+		gw.readGraphqlPlaygroundTemplate()
 		gw.loadGraphQLPlayground(spec, router)
 	}
 
@@ -1103,28 +1104,65 @@ type generalStores struct {
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
 }
 
-var playgroundTemplate *texttemplate.Template
+var (
+	playgroundTemplateMu   sync.RWMutex
+	playgroundTemplate     *texttemplate.Template
+	playgroundTemplatePath string
+)
 
 func (gw *Gateway) readGraphqlPlaygroundTemplate() {
 	playgroundPath := filepath.Join(gw.GetConfig().TemplatePath, "playground")
+
+	playgroundTemplateMu.RLock()
+	loaded := playgroundTemplate != nil && playgroundTemplatePath == playgroundPath
+	playgroundTemplateMu.RUnlock()
+	if loaded {
+		return
+	}
+
 	files, err := ioutil.ReadDir(playgroundPath)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "playground",
-		}).Error("Could not load the default playground templates: ", err)
+		}).WithError(err).Error("Could not load the default playground templates")
+		clearGraphqlPlaygroundTemplate(playgroundPath)
+		return
 	}
 
-	var paths []string
+	paths := make([]string, 0, len(files))
 	for _, file := range files {
 		paths = append(paths, filepath.Join(playgroundPath, file.Name()))
 	}
 
-	playgroundTemplate, err = texttemplate.ParseFiles(paths...)
+	template, err := texttemplate.ParseFiles(paths...)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "playground",
-		}).Error("Could not parse the default playground templates: ", err)
+		}).WithError(err).Error("Could not parse the default playground templates")
+		clearGraphqlPlaygroundTemplate(playgroundPath)
+		return
 	}
+
+	playgroundTemplateMu.Lock()
+	defer playgroundTemplateMu.Unlock()
+	if playgroundTemplate != nil && playgroundTemplatePath == playgroundPath {
+		return
+	}
+	playgroundTemplate = template
+	playgroundTemplatePath = playgroundPath
+}
+
+func clearGraphqlPlaygroundTemplate(playgroundPath string) {
+	playgroundTemplateMu.Lock()
+	defer playgroundTemplateMu.Unlock()
+	playgroundTemplate = nil
+	playgroundTemplatePath = playgroundPath
+}
+
+func currentGraphqlPlaygroundTemplate() *texttemplate.Template {
+	playgroundTemplateMu.RLock()
+	defer playgroundTemplateMu.RUnlock()
+	return playgroundTemplate
 }
 
 const (
@@ -1145,23 +1183,25 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 	}
 
 	subrouter.Methods(http.MethodGet).Path(path.Join(playgroundPath, playgroundJSTemplateName)).HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		if playgroundTemplate == nil {
+		template := currentGraphqlPlaygroundTemplate()
+		if template == nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		if err := playgroundTemplate.ExecuteTemplate(rw, playgroundJSTemplateName, nil); err != nil {
+		if err := template.ExecuteTemplate(rw, playgroundJSTemplateName, nil); err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 		}
 	})
 
 	subrouter.Methods(http.MethodGet).Path(playgroundPath).HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		if playgroundTemplate == nil {
+		template := currentGraphqlPlaygroundTemplate()
+		if template == nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		err := playgroundTemplate.ExecuteTemplate(rw, playgroundHTMLTemplateName, struct {
+		err := template.ExecuteTemplate(rw, playgroundHTMLTemplateName, struct {
 			Url, PathPrefix string
 		}{endpoint, path.Join(endpoint, playgroundPath)})
 

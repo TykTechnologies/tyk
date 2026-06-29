@@ -107,15 +107,19 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		// No validation configured for this path
 		return nil, http.StatusOK
 	}
+	validateMeta, ok := urlSpec.oasValidateRequestRuntimeMeta()
+	if !ok || validateMeta == nil {
+		return nil, http.StatusOK
+	}
 
 	// If this URLSpec has multiple candidates (collapsed parameterized paths),
 	// disambiguate using path parameter schema validation.
-	if len(urlSpec.OASValidateRequestCandidates) > 0 {
-		code, err := k.processRequestWithCandidates(r, urlSpec)
+	if len(validateMeta.Candidates) > 0 {
+		code, err := k.processRequestWithCandidates(r, validateMeta.Candidates)
 		return err, code
 	}
 
-	validateRequest := urlSpec.OASValidateRequestMeta
+	validateRequest := validateMeta.ValidateRequest
 	if validateRequest == nil || !validateRequest.Enabled {
 		return nil, http.StatusOK
 	}
@@ -132,12 +136,12 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	// validated against the /anything operation.
 	// We pass both the stripped path (for path param extraction) and full path (for regexp listen paths).
 	strippedPath := k.Spec.StripListenPath(r.URL.Path)
-	route, pathParams, err := k.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
+	route, pathParams, err := k.Spec.findRouteForOASPath(validateMeta.Path, validateMeta.Method, strippedPath, r.URL.Path)
 	if err != nil || route == nil {
 		log.WithFields(logrus.Fields{
 			"method":   r.Method,
 			"path":     r.URL.Path,
-			"oas_path": urlSpec.OASPath,
+			"oas_path": validateMeta.Path,
 			"error":    err,
 		}).Error("OAS ValidateRequest: could not find route for matched OAS path")
 		return fmt.Errorf("request validation error: no matching operation was found for request: %s %s", r.Method, r.URL.Path), errResponseCode
@@ -176,11 +180,11 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 //
 // This prevents a catch-all type:string candidate from stealing requests that belong to
 // a more restrictive type:number candidate.
-func (k *ValidateRequest) processRequestWithCandidates(r *http.Request, urlSpec *URLSpec) (int, error) {
+func (k *ValidateRequest) processRequestWithCandidates(r *http.Request, candidates []ValidateRequestCandidate) (int, error) {
 	normalizeHeaders(r.Header)
 	strippedPath := k.Spec.StripListenPath(r.URL.Path)
 
-	for _, candidate := range urlSpec.OASValidateRequestCandidates {
+	for _, candidate := range candidates {
 		if candidate.OASValidateRequestMeta == nil || !candidate.OASValidateRequestMeta.Enabled {
 			continue
 		}
@@ -194,7 +198,7 @@ func (k *ValidateRequest) processRequestWithCandidates(r *http.Request, urlSpec 
 		return k.validateRoute(r, route, pathParams, candidate.OASValidateRequestMeta)
 	}
 
-	return candidatesErrorResponseCode(urlSpec.OASValidateRequestCandidates),
+	return candidatesErrorResponseCode(candidates),
 		fmt.Errorf("request validation error: path parameter doesn't match any endpoint")
 }
 

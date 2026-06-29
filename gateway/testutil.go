@@ -1896,7 +1896,17 @@ func (gw *Gateway) writeAPIDefinitionFile(spec *APISpec, index int, appPath stri
 // writeOASFile marshals and writes the OAS spec to a file.
 // Uses -mcp.json suffix for MCP APIs, -oas.json for regular OAS APIs.
 func (gw *Gateway) writeOASFile(spec *APISpec, index int, appPath string) {
-	oasSpecBytes, err := json.Marshal(&spec.OAS)
+	oasDoc := &spec.OAS
+	if spec.IsOAS {
+		var err error
+		oasDoc, err = spec.oasDefinitionForManagement()
+		if err != nil {
+			log.WithError(err).Errorf("OAS management payload preparation failed: %+v", spec)
+			panic(err)
+		}
+	}
+
+	oasSpecBytes, err := json.Marshal(oasDoc)
 	if err != nil {
 		log.WithError(err).Errorf("OAS Marshal failed: %+v", spec)
 		panic(err)

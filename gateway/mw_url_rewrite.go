@@ -46,29 +46,34 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 	return gw.urlRewriteRuntime(compileURLRewriteRuntimeMeta(*meta), r)
 }
 
-func (gw *Gateway) urlRewriteRuntime(meta *urlRewriteRuntimeMeta, r *http.Request) (string, error) {
+func (gw *Gateway) urlRewriteRuntime(meta urlRewriteRuntimeMetadata, r *http.Request) (string, error) {
+	if directMeta, ok := meta.(*directURLRewriteRuntimeMeta); ok {
+		ctxSetUrlRewritePath(r, directMeta.urlRewriteContextPath())
+		return gw.ReplaceTykVariables(r, directMeta.RewriteTo, true), nil
+	}
+
+	fullMeta, ok := meta.(*urlRewriteRuntimeMeta)
+	if !ok || fullMeta == nil {
+		return r.URL.String(), nil
+	}
+
 	rawPath := r.URL.String()
 	path := rawPath
 
 	log.Debug("Inbound path: ", path)
 	newpath := path
 
-	if meta.directMatch {
-		ctxSetUrlRewritePath(r, meta.contextPath())
-		return gw.ReplaceTykVariables(r, meta.RewriteTo, true), nil
-	}
-
-	if meta.MatchRegexp == nil {
+	if fullMeta.MatchRegexp == nil {
 		var err error
-		meta.MatchRegexp, err = regexp.Compile(meta.MatchPattern)
+		fullMeta.MatchRegexp, err = regexp.Compile(fullMeta.MatchPattern)
 		if err != nil {
-			return path, fmt.Errorf("URLRewrite regexp error %s", meta.MatchPattern)
+			return path, fmt.Errorf("URLRewrite regexp error %s", fullMeta.MatchPattern)
 		}
 	}
 
 	// Check triggers
-	rewriteToPath := meta.RewriteTo
-	if len(meta.Triggers) > 0 {
+	rewriteToPath := fullMeta.RewriteTo
+	if len(fullMeta.Triggers) > 0 {
 
 		// This feature uses context, we must force it if it doesn't exist
 		contextData := ctxGetData(r)
@@ -77,7 +82,7 @@ func (gw *Gateway) urlRewriteRuntime(meta *urlRewriteRuntimeMeta, r *http.Reques
 			ctxSetData(r, contextDataObject)
 		}
 
-		for tn, triggerOpts := range meta.Triggers {
+		for tn, triggerOpts := range fullMeta.Triggers {
 			checkAny := false
 			setCount := 0
 			if triggerOpts.On == apidef.Any {
@@ -181,14 +186,14 @@ func (gw *Gateway) urlRewriteRuntime(meta *urlRewriteRuntimeMeta, r *http.Reques
 		}
 	}
 
-	matchGroups := meta.MatchRegexp.FindAllStringSubmatch(path, -1)
+	matchGroups := fullMeta.MatchRegexp.FindAllStringSubmatch(path, -1)
 	if len(matchGroups) == 0 && containsEscapedChars(rawPath) {
 		unescapedPath, err := url.PathUnescape(rawPath)
 		if err != nil {
 			return unescapedPath, fmt.Errorf("failed to decode URL path: %s", rawPath)
 		}
 
-		matchGroups = meta.MatchRegexp.FindAllStringSubmatch(unescapedPath, -1)
+		matchGroups = fullMeta.MatchRegexp.FindAllStringSubmatch(unescapedPath, -1)
 	}
 
 	// Make sure it matches the string
@@ -215,7 +220,7 @@ func (gw *Gateway) urlRewriteRuntime(meta *urlRewriteRuntimeMeta, r *http.Reques
 		log.Debug("URL Re-written to: ", newpath)
 
 		// put url_rewrite path to context to be used in ResponseTransformMiddleware
-		ctxSetUrlRewritePath(r, meta.contextPath())
+		ctxSetUrlRewritePath(r, fullMeta.urlRewriteContextPath())
 	}
 
 	newpath = gw.ReplaceTykVariables(r, newpath, true)
@@ -409,14 +414,19 @@ func (m *URLRewriteMiddleware) Name() string {
 	return "URLRewriteMiddleware"
 }
 
-func initURLRewriteTriggerRegex(rewrite *urlRewriteRuntimeMeta) (enabled bool) {
+func initURLRewriteTriggerRegex(rewrite urlRewriteRuntimeMetadata) (enabled bool) {
 	if rewrite == nil {
 		return false
 	}
 
+	fullRewrite, ok := rewrite.(*urlRewriteRuntimeMeta)
+	if !ok {
+		return true
+	}
+
 	enabled = true
-	for trKey := range rewrite.Triggers {
-		tr := rewrite.Triggers[trKey]
+	for trKey := range fullRewrite.Triggers {
+		tr := fullRewrite.Triggers[trKey]
 
 		for key, h := range tr.Options.HeaderMatches {
 			h.Init()
@@ -442,7 +452,7 @@ func initURLRewriteTriggerRegex(rewrite *urlRewriteRuntimeMeta) (enabled bool) {
 			tr.Options.PayloadMatches.Init()
 		}
 
-		rewrite.Triggers[trKey] = tr
+		fullRewrite.Triggers[trKey] = tr
 	}
 
 	return true
@@ -454,7 +464,7 @@ func initURLRewriteTriggerRegex(rewrite *urlRewriteRuntimeMeta) (enabled bool) {
 func (m *URLRewriteMiddleware) InitTriggerRx() (enabled bool) {
 	for versionName, paths := range m.Spec.RxPaths {
 		for i := range paths {
-			urlRewrite, _ := typedURLSpecMeta[*urlRewriteRuntimeMeta](&paths[i])
+			urlRewrite, _ := urlRewriteRuntimeMetaFromSpec(&paths[i])
 			if initURLRewriteTriggerRegex(urlRewrite) {
 				enabled = true
 			}
@@ -535,11 +545,15 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	ctxSetOrigRequestURL(r, r.URL)
 
 	log.Debug("Rewriter active")
-	umeta := meta.(*urlRewriteRuntimeMeta)
 	log.Debug(r.URL)
 	oldPath := r.URL.String()
 
-	p, err := m.Gw.urlRewriteRuntime(umeta, r)
+	runtimeMeta, ok := meta.(urlRewriteRuntimeMetadata)
+	if !ok {
+		return nil, http.StatusOK
+	}
+
+	p, err := m.Gw.urlRewriteRuntime(runtimeMeta, r)
 	if err != nil {
 		log.Error(err)
 		return err, http.StatusInternalServerError

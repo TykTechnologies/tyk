@@ -277,6 +277,45 @@ func TestGraphQLPlayground(t *testing.T) {
 	}
 }
 
+func TestGraphQLPlaygroundTemplateLoadedLazily(t *testing.T) {
+	resetGraphQLPlaygroundTemplateForTest(t)
+
+	g := StartTest(nil)
+	defer g.Close()
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "lazy-template-api"
+		spec.Proxy.ListenPath = "/lazy-template-api/"
+	})[0]
+
+	g.Gw.LoadAPI(api)
+	assert.Nil(t, currentGraphqlPlaygroundTemplate())
+
+	api.GraphQL.Enabled = true
+	api.GraphQL.GraphQLPlayground.Enabled = true
+	api.GraphQL.GraphQLPlayground.Path = "/playground"
+	g.Gw.LoadAPI(api)
+	require.NotNil(t, currentGraphqlPlaygroundTemplate())
+}
+
+func resetGraphQLPlaygroundTemplateForTest(t *testing.T) {
+	t.Helper()
+
+	playgroundTemplateMu.Lock()
+	previousTemplate := playgroundTemplate
+	previousPath := playgroundTemplatePath
+	playgroundTemplate = nil
+	playgroundTemplatePath = ""
+	playgroundTemplateMu.Unlock()
+
+	t.Cleanup(func() {
+		playgroundTemplateMu.Lock()
+		playgroundTemplate = previousTemplate
+		playgroundTemplatePath = previousPath
+		playgroundTemplateMu.Unlock()
+	})
+}
+
 func TestTykRateLimitsStatusOfAPI(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()

@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	goerrors "errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -118,58 +119,134 @@ type APISpec struct {
 	// compressed form so runtime can release duplicate raw path metadata after
 	// compiling RxPaths. This is only used for classic API responses.
 	rawAPIDefinitionGZIP []byte
+
+	// TT-16904 OAS API stress: retain the original OAS document in compressed
+	// form so eligible APIs can release the heavy parsed OpenAPI tree after
+	// route/middleware compilation without changing management API responses.
+	rawOASDefinitionGZIP []byte
+
+	oasRuntimeDocumentReleased bool
 }
 
-func (a *APISpec) storeRawAPIDefinitionPayload(payload []byte) {
+func gzipPayload(payload []byte) ([]byte, bool) {
 	if len(payload) == 0 {
-		return
+		return nil, false
 	}
 
 	var buf bytes.Buffer
 	gz, err := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
 	if err != nil {
 		log.WithError(err).Warn("Failed to create compressed API definition payload")
-		return
+		return nil, false
 	}
 	if _, err := gz.Write(payload); err != nil {
 		log.WithError(err).Warn("Failed to compress API definition payload")
 		_ = gz.Close()
-		return
+		return nil, false
 	}
 	if err := gz.Close(); err != nil {
 		log.WithError(err).Warn("Failed to finalize compressed API definition payload")
-		return
+		return nil, false
 	}
-	a.rawAPIDefinitionGZIP = buf.Bytes()
+	return buf.Bytes(), true
 }
 
-func (a *APISpec) rawAPIDefinitionPayload() (json.RawMessage, bool) {
-	if len(a.rawAPIDefinitionGZIP) == 0 {
+func gunzipPayload(payload []byte) ([]byte, bool) {
+	if len(payload) == 0 {
 		return nil, false
 	}
 
-	gz, err := gzip.NewReader(bytes.NewReader(a.rawAPIDefinitionGZIP))
+	gz, err := gzip.NewReader(bytes.NewReader(payload))
 	if err != nil {
 		log.WithError(err).Warn("Failed to open compressed API definition payload")
 		return nil, false
 	}
 	defer gz.Close()
 
-	payload, err := io.ReadAll(gz)
+	out, err := io.ReadAll(gz)
 	if err != nil {
 		log.WithError(err).Warn("Failed to read compressed API definition payload")
+		return nil, false
+	}
+	return out, true
+}
+
+func (a *APISpec) storeRawAPIDefinitionPayload(payload []byte) {
+	if compressed, ok := gzipPayload(payload); ok {
+		a.rawAPIDefinitionGZIP = compressed
+	}
+}
+
+func (a *APISpec) rawAPIDefinitionPayload() (json.RawMessage, bool) {
+	payload, ok := gunzipPayload(a.rawAPIDefinitionGZIP)
+	if !ok {
 		return nil, false
 	}
 	return json.RawMessage(payload), true
 }
 
+func (a *APISpec) storeRawOASDefinitionPayload(payload []byte) {
+	if compressed, ok := gzipPayload(payload); ok {
+		a.rawOASDefinitionGZIP = compressed
+	}
+}
+
+func (a *APISpec) rawOASDefinition() (*oas.OAS, bool) {
+	payload, ok := gunzipPayload(a.rawOASDefinitionGZIP)
+	if !ok {
+		return nil, false
+	}
+
+	var doc oas.OAS
+	if err := json.Unmarshal(payload, &doc); err != nil {
+		log.WithError(err).Warn("Failed to unmarshal compressed OAS definition payload")
+		return nil, false
+	}
+	return &doc, true
+}
+
+func (a *APISpec) oasDefinitionForManagement() (*oas.OAS, error) {
+	if a == nil || a.APIDefinition == nil {
+		return nil, goerrors.New("OAS API definition is not initialized")
+	}
+
+	var doc *oas.OAS
+	if a.oasRuntimeDocumentReleased {
+		raw, ok := a.rawOASDefinition()
+		if !ok {
+			return nil, goerrors.New("released OAS runtime document has no raw management payload")
+		}
+		doc = raw
+	} else {
+		clone, err := a.OAS.Clone()
+		if err != nil {
+			return nil, err
+		}
+		doc = clone
+	}
+
+	doc.Fill(*a.APIDefinition)
+	return doc, nil
+}
+
 func (a *APISpec) releaseCompiledPathConfig() {
-	if a == nil || a.APIDefinition == nil || a.IsOAS {
+	if a == nil || a.APIDefinition == nil {
+		return
+	}
+
+	if a.IsOAS {
+		a.releaseOASDocumentRuntimeState()
+		if a.oasRuntimeDocumentReleased {
+			a.releaseDecodedVersionPathConfig()
+		}
 		return
 	}
 
 	a.ResponseProcessors = nil
+	a.releaseDecodedVersionPathConfig()
+}
 
+func (a *APISpec) releaseDecodedVersionPathConfig() {
 	for name, version := range a.VersionData.Versions {
 		version.Paths.Ignored = nil
 		version.Paths.WhiteList = nil
@@ -177,6 +254,120 @@ func (a *APISpec) releaseCompiledPathConfig() {
 		version.ExtendedPaths = apidef.ExtendedPathsSet{}
 		a.VersionData.Versions[name] = version
 	}
+}
+
+func (a *APISpec) releaseOASDocumentRuntimeState() {
+	if !a.canReleaseOASDocumentRuntimeState() {
+		return
+	}
+
+	tykExt := a.OAS.GetTykExtension()
+	streamingExt := a.OAS.GetTykStreamingExtension()
+	info := a.OAS.Info
+	openAPI := a.OAS.OpenAPI
+	releaseOASRuntimeExtensionState(tykExt)
+
+	a.OAS.T = openapi3.T{
+		OpenAPI: openAPI,
+		Info:    info,
+	}
+	if tykExt != nil {
+		a.OAS.SetTykExtension(tykExt)
+	}
+	if streamingExt != nil {
+		a.OAS.SetTykStreamingExtension(streamingExt)
+	}
+	a.oasRuntimeDocumentReleased = true
+}
+
+func releaseOASRuntimeExtensionState(tykExt *oas.XTykAPIGateway) {
+	if tykExt == nil || tykExt.Middleware == nil {
+		return
+	}
+
+	// TT-16904 OAS runtime memory: releasable specs have already copied global
+	// middleware into the classic runtime APIDefinition fields.
+	tykExt.Middleware.Global = nil
+	tykExt.Middleware.Operations = nil
+}
+
+func (a *APISpec) canReleaseOASDocumentRuntimeState() bool {
+	if a == nil || a.APIDefinition == nil || !a.IsOAS {
+		return false
+	}
+	if len(a.rawOASDefinitionGZIP) == 0 {
+		return false
+	}
+	if a.OAS.Paths == nil {
+		return false
+	}
+	if a.hasOASVersioningState() {
+		return false
+	}
+	if a.IsMCP() || a.oasRouter != nil || a.hasOASRuntimeDocumentConsumer() || a.hasCustomRequestContextConsumer() {
+		return false
+	}
+	if a.OAS.GetTykStreamingExtension() != nil || a.hasOASAuthenticationDocumentState() {
+		return false
+	}
+	return true
+}
+
+func (a *APISpec) hasOASVersioningState() bool {
+	return a.VersionDefinition.Enabled ||
+		a.VersionDefinition.BaseID != "" ||
+		len(a.VersionDefinition.Versions) > 0
+}
+
+func (a *APISpec) hasOASRuntimeDocumentConsumer() bool {
+	for _, paths := range a.RxPaths {
+		for i := range paths {
+			switch paths[i].Status {
+			case OASValidateRequest:
+				return true
+			case OASMockResponse:
+				meta, ok := paths[i].oasMockResponseRuntimeMeta()
+				if !ok || meta == nil {
+					continue
+				}
+				if len(meta.Candidates) > 0 {
+					return true
+				}
+				mock := meta.MockResponse
+				if mock != nil && mock.FromOASExamples != nil && mock.FromOASExamples.Enabled {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (a *APISpec) hasCustomRequestContextConsumer() bool {
+	if a.CustomMiddlewareBundle != "" && !a.CustomMiddlewareBundleDisabled {
+		return true
+	}
+	if a.CustomMiddleware.Driver != "" ||
+		len(a.CustomMiddleware.Pre) > 0 ||
+		len(a.CustomMiddleware.Post) > 0 ||
+		len(a.CustomMiddleware.PostKeyAuth) > 0 ||
+		len(a.CustomMiddleware.Response) > 0 ||
+		a.CustomMiddleware.AuthCheck.Name != "" ||
+		a.AnalyticsPlugin.Enabled {
+		return true
+	}
+	return a.hasCompiledURLStatus(GoPlugin, VirtualPath)
+}
+
+func (a *APISpec) hasOASAuthenticationDocumentState() bool {
+	if a.OAS.GetTykExtension() != nil &&
+		a.OAS.GetTykExtension().Server.Authentication != nil {
+		return true
+	}
+	if len(a.OAS.Security) > 0 {
+		return true
+	}
+	return a.OAS.Components != nil && len(a.OAS.Components.SecuritySchemes) > 0
 }
 
 func (a *APISpec) hasCompiledURLStatus(statuses ...URLStatus) bool {
@@ -373,30 +564,81 @@ func (a *APISpec) findOperation(r *http.Request) *Operation {
 	}
 }
 
+func (a *APISpec) requiresCompiledOASRouter() bool {
+	if !a.IsOAS || !httputil.IsMuxTemplate(a.Proxy.ListenPath) {
+		return false
+	}
+
+	middleware := a.OAS.GetTykMiddleware()
+	if middleware == nil {
+		return false
+	}
+
+	for _, operation := range middleware.Operations {
+		if operation == nil {
+			continue
+		}
+		if operation.ValidateRequest != nil && operation.ValidateRequest.Enabled {
+			return true
+		}
+		if operation.MockResponse != nil && operation.MockResponse.Enabled &&
+			operation.MockResponse.FromOASExamples != nil && operation.MockResponse.FromOASExamples.Enabled {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (a *APISpec) routeForOASPath(oasPath, method string) (*routers.Route, error) {
+	if a.OAS.Paths == nil {
+		return nil, errors.New("OAS paths not initialized")
+	}
+
+	pathItem := a.OAS.Paths.Value(oasPath)
+	if pathItem == nil {
+		return nil, errors.New("OAS path not found")
+	}
+
+	operation := pathItem.GetOperation(method)
+	if operation == nil {
+		return nil, errors.New("OAS operation not found")
+	}
+
+	return &routers.Route{
+		Spec:      &a.OAS.T,
+		Path:      oasPath,
+		PathItem:  pathItem,
+		Method:    method,
+		Operation: operation,
+	}, nil
+}
+
 // findRouteForOASPath finds the OAS route using the OAS path pattern (e.g., "/users/{id}")
 // and method, rather than the actual request path. This is used when gateway path matching
 // (prefix/suffix) matches a broader pattern than the exact OAS path.
 // The actualPath parameter is the request path stripped of the listen path.
 // The fullRequestPath is the original request path (used for regexp listen paths).
 func (a *APISpec) findRouteForOASPath(oasPath, method, actualPath, fullRequestPath string) (*routers.Route, map[string]string, error) {
+	// For listen paths with mux-style variables (regexp), we need to use the actual
+	// request path because the OAS router's server URL contains the variable pattern.
+	// For regular listen paths, we build a synthetic path.
+	if !httputil.IsMuxTemplate(a.Proxy.ListenPath) {
+		route, err := a.routeForOASPath(oasPath, method)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return route, extractPathParams(oasPath, actualPath), nil
+	}
+
 	if a.oasRouter == nil {
 		return nil, nil, errors.New("OAS router not initialized")
 	}
 
-	// For listen paths with mux-style variables (regexp), we need to use the actual
-	// request path because the OAS router's server URL contains the variable pattern.
-	// For regular listen paths, we build a synthetic path.
-	var routePath string
-	if httputil.IsMuxTemplate(a.Proxy.ListenPath) {
-		// For regexp listen paths like /product-regexp1/{name:.*}
-		// Use the full request path as the OAS router expects actual values
-		routePath = fullRequestPath
-	} else {
-		// For regular listen paths, combine listen path + OAS path
-		routePath = strings.TrimSuffix(a.Proxy.ListenPath, "/") + oasPath
-	}
-
-	syntheticURL, err := url.Parse(routePath)
+	// For regexp listen paths like /product-regexp1/{name:.*}, use the full
+	// request path as the OAS router expects actual values.
+	syntheticURL, err := url.Parse(fullRequestPath)
 	if err != nil {
 		return nil, nil, err
 	}

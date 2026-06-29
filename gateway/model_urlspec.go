@@ -19,26 +19,7 @@ type URLSpec struct {
 	Status      URLStatus
 	matchMode   urlPathMatchMode
 
-	OASValidateRequestMeta *oas.ValidateRequest
-	OASMockResponseMeta    *oas.MockResponse
-
-	// OASValidateRequestCandidates holds multiple OAS endpoints that compile to the
-	// same regex pattern. When non-empty, the validate request middleware must
-	// disambiguate by checking path parameter schemas against each candidate.
-	OASValidateRequestCandidates []ValidateRequestCandidate
-
-	// OASMockResponseCandidates holds multiple OAS endpoints that compile to the
-	// same regex pattern. When non-empty, the mock response middleware must
-	// disambiguate by checking path parameter schemas against each candidate.
-	OASMockResponseCandidates []MockResponseCandidate
-
 	IgnoreCase bool
-	// OASMethod stores the HTTP method for OAS-specific middleware
-	// This is needed because OAS operations are method-specific
-	OASMethod string
-	// OASPath stores the original OAS path pattern (e.g., "/users/{id}")
-	// This is used for matching against the OAS router when needed
-	OASPath string
 }
 
 type urlPathMatchMode uint8
@@ -66,6 +47,69 @@ type MockResponseCandidate struct {
 	OASMockResponseMeta *oas.MockResponse
 	OASMethod           string
 	OASPath             string
+}
+
+type oasValidateRequestRuntimeMeta struct {
+	ValidateRequest *oas.ValidateRequest
+	Method          string
+	Path            string
+	Candidates      []ValidateRequestCandidate
+}
+
+type oasMockResponseRuntimeMeta struct {
+	MockResponse *oas.MockResponse
+	Method       string
+	Path         string
+	Candidates   []MockResponseCandidate
+}
+
+func newOASValidateRequestURLSpec(validateRequest *oas.ValidateRequest, method, path string) URLSpec {
+	return URLSpec{
+		Status: OASValidateRequest,
+		metadata: &oasValidateRequestRuntimeMeta{
+			ValidateRequest: validateRequest,
+			Method:          method,
+			Path:            path,
+		},
+	}
+}
+
+func newOASMockResponseURLSpec(mockResponse *oas.MockResponse, method, path string) URLSpec {
+	return URLSpec{
+		Status: OASMockResponse,
+		metadata: &oasMockResponseRuntimeMeta{
+			MockResponse: mockResponse,
+			Method:       method,
+			Path:         path,
+		},
+	}
+}
+
+func (u *URLSpec) oasValidateRequestRuntimeMeta() (*oasValidateRequestRuntimeMeta, bool) {
+	return typedURLSpecMeta[*oasValidateRequestRuntimeMeta](u)
+}
+
+func (u *URLSpec) oasMockResponseRuntimeMeta() (*oasMockResponseRuntimeMeta, bool) {
+	return typedURLSpecMeta[*oasMockResponseRuntimeMeta](u)
+}
+
+func (u *URLSpec) oasPathAndMethod() (path, method string, ok bool) {
+	switch u.Status {
+	case OASValidateRequest:
+		meta, ok := u.oasValidateRequestRuntimeMeta()
+		if !ok || meta == nil {
+			return "", "", false
+		}
+		return meta.Path, meta.Method, true
+	case OASMockResponse:
+		meta, ok := u.oasMockResponseRuntimeMeta()
+		if !ok || meta == nil {
+			return "", "", false
+		}
+		return meta.Path, meta.Method, true
+	default:
+		return "", "", false
+	}
 }
 
 // modeSpecificSpec returns the respective field of URLSpec if it matches the given mode.
@@ -97,7 +141,7 @@ func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 	case CircuitBreaker:
 		return typedURLSpecMeta[*ExtendedCircuitBreakerMeta](u)
 	case URLRewrite:
-		return typedURLSpecMeta[*urlRewriteRuntimeMeta](u)
+		return urlRewriteRuntimeMetaFromSpec(u)
 	case VirtualPath:
 		return typedURLSpecMeta[*apidef.VirtualMeta](u)
 	case RequestSizeLimit:
@@ -119,12 +163,30 @@ func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 	case RateLimit:
 		return typedURLSpecMeta[*apidef.RateLimitMeta](u)
 	case OASValidateRequest:
-		return u.OASValidateRequestMeta, true
+		meta, ok := u.oasValidateRequestRuntimeMeta()
+		if !ok || meta == nil {
+			return nil, false
+		}
+		return meta.ValidateRequest, true
 	case OASMockResponse:
-		return u.OASMockResponseMeta, true
+		meta, ok := u.oasMockResponseRuntimeMeta()
+		if !ok || meta == nil {
+			return nil, false
+		}
+		return meta.MockResponse, true
 	default:
 		return nil, false
 	}
+}
+
+func urlRewriteRuntimeMetaFromSpec(u *URLSpec) (urlRewriteRuntimeMetadata, bool) {
+	if meta, ok := typedURLSpecMeta[*directURLRewriteRuntimeMeta](u); ok {
+		return meta, true
+	}
+	if meta, ok := typedURLSpecMeta[*urlRewriteRuntimeMeta](u); ok {
+		return meta, true
+	}
+	return nil, false
 }
 
 func typedURLSpecMeta[T any](u *URLSpec) (T, bool) {
@@ -176,8 +238,8 @@ func (u *URLSpec) matchesMethod(method string) bool {
 		meta, ok := typedURLSpecMeta[*ExtendedCircuitBreakerMeta](u)
 		return ok && method == meta.Method
 	case URLRewrite:
-		meta, ok := typedURLSpecMeta[*urlRewriteRuntimeMeta](u)
-		return ok && method == meta.Method
+		meta, ok := urlRewriteRuntimeMetaFromSpec(u)
+		return ok && method == meta.urlRewriteMethod()
 	case VirtualPath:
 		meta, ok := typedURLSpecMeta[*apidef.VirtualMeta](u)
 		return ok && method == meta.Method
@@ -209,8 +271,9 @@ func (u *URLSpec) matchesMethod(method string) bool {
 		meta, ok := typedURLSpecMeta[*apidef.RateLimitMeta](u)
 		return ok && method == meta.Method
 	case OASValidateRequest, OASMockResponse:
-		// OAS middleware is method-specific, check against stored method
-		return method == u.OASMethod
+		// OAS middleware is method-specific, check against stored method.
+		_, oasMethod, ok := u.oasPathAndMethod()
+		return ok && method == oasMethod
 	default:
 		return false
 	}

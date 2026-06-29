@@ -82,14 +82,17 @@ func TestOASPathCompilation(t *testing.T) {
 	// Check if any of them are OAS mock response paths
 	foundOASMock := false
 	for i, urlSpec := range urlSpecs {
+		oasPath, oasMethod, _ := urlSpec.oasPathAndMethod()
 		t.Logf("Path %d: Status=%v, OASMethod=%s, OASPath=%s",
-			i, urlSpec.Status, urlSpec.OASMethod, urlSpec.OASPath)
+			i, urlSpec.Status, oasMethod, oasPath)
 
 		if urlSpec.Status == OASMockResponse {
 			foundOASMock = true
-			t.Logf("Found OAS mock response path: %s %s", urlSpec.OASMethod, urlSpec.OASPath)
-			assert.NotNil(t, urlSpec.OASMockResponseMeta, "OAS mock response meta should not be nil")
-			assert.True(t, urlSpec.OASMockResponseMeta.Enabled, "Mock response should be enabled")
+			mockMeta, ok := urlSpec.oasMockResponseRuntimeMeta()
+			assert.True(t, ok)
+			t.Logf("Found OAS mock response path: %s %s", mockMeta.Method, mockMeta.Path)
+			assert.NotNil(t, mockMeta.MockResponse, "OAS mock response meta should not be nil")
+			assert.True(t, mockMeta.MockResponse.Enabled, "Mock response should be enabled")
 		}
 	}
 

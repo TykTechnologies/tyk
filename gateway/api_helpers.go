@@ -111,15 +111,19 @@ func (gw *Gateway) handleGetOASList(filter apiFilterFunc, modePublic bool) (inte
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
 
-	apisList := []oas.OAS{}
+	apisList := make([]oas.OAS, 0, len(gw.apisByID))
 
 	for _, apiSpec := range gw.apisByID {
 		if filter(apiSpec) {
-			apiSpec.OAS.Fill(*apiSpec.APIDefinition)
-			if modePublic {
-				apiSpec.OAS.RemoveTykExtension()
+			oasDoc, err := apiSpec.oasDefinitionForManagement()
+			if err != nil {
+				log.WithError(err).WithField("api_id", apiSpec.APIID).Error("Failed to prepare OAS API definition")
+				return apiError("Failed to prepare OAS API definition"), http.StatusInternalServerError
 			}
-			apisList = append(apisList, apiSpec.OAS)
+			if modePublic {
+				oasDoc.RemoveTykExtension()
+			}
+			apisList = append(apisList, *oasDoc)
 		}
 	}
 
@@ -141,8 +145,12 @@ func (gw *Gateway) handleGetOASByID(apiID string, typeCheck apiTypeCheck) (inter
 		return apiError(err.Error()), http.StatusNotFound
 	}
 
-	api.OAS.Fill(*api.APIDefinition)
-	return &api.OAS, http.StatusOK
+	oasDoc, err := api.oasDefinitionForManagement()
+	if err != nil {
+		log.WithError(err).WithField("api_id", api.APIID).Error("Failed to prepare OAS API definition")
+		return apiError("Failed to prepare OAS API definition"), http.StatusInternalServerError
+	}
+	return oasDoc, http.StatusOK
 }
 
 func deepCopyViaJSON[T any](src *T) (*T, error) {
@@ -177,7 +185,7 @@ func copyBaseAPIForPersistence(baseAPI *APISpec) (*apidef.APIDefinition, *oas.OA
 
 	var oasCopy *oas.OAS
 	if baseAPI.IsOAS {
-		oasCopy, err = copyOASForPersistence(&baseAPI.OAS)
+		oasCopy, err = baseAPI.oasDefinitionForManagement()
 		if err != nil {
 			return nil, nil, err
 		}

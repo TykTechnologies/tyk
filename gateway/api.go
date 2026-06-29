@@ -1263,8 +1263,12 @@ func (gw *Gateway) handleGetAPIListOAS(modePublic bool) (interface{}, int) {
 func (gw *Gateway) handleGetAPI(apiID string, oasEndpoint bool) (interface{}, int) {
 	if spec := gw.getApiSpec(apiID); spec != nil {
 		if oasEndpoint && spec.IsOAS {
-			spec.OAS.Fill(*spec.APIDefinition)
-			return &spec.OAS, http.StatusOK
+			oasDoc, err := spec.oasDefinitionForManagement()
+			if err != nil {
+				log.WithError(err).Error("Failed to prepare OAS API definition")
+				return apiError("Failed to prepare OAS API definition"), http.StatusInternalServerError
+			}
+			return oasDoc, http.StatusOK
 		} else if oasEndpoint && !spec.IsOAS {
 			return apiError(apidef.ErrOASGetForOldAPI.Error()), http.StatusBadRequest
 		}
@@ -1733,9 +1737,12 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var oasObjToPatch oas.OAS
-	existingAPISpec.OAS.Fill(*existingAPISpec.APIDefinition)
-	oasObjToPatch = existingAPISpec.OAS
+	oasObjToPatch, err := existingAPISpec.oasDefinitionForManagement()
+	if err != nil {
+		log.WithError(err).WithField("api_id", apiID).Error("Failed to prepare OAS API definition for patch")
+		doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to prepare OAS API definition"))
+		return
+	}
 
 	var tykExtToPatch *oas.XTykAPIGateway
 

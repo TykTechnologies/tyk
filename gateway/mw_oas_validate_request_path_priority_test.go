@@ -59,14 +59,16 @@ func TestSortURLSpecsByPathPriority(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			specs := make([]URLSpec, len(tc.paths))
 			for i, p := range tc.paths {
-				specs[i] = URLSpec{OASPath: p}
+				specs[i] = newOASValidateRequestURLSpec(nil, "", p)
 			}
 
 			sortURLSpecsByPathPriority(specs)
 
 			got := make([]string, len(specs))
 			for i, s := range specs {
-				got[i] = s.OASPath
+				path, _, ok := s.oasPathAndMethod()
+				assert.True(t, ok)
+				got[i] = path
 			}
 
 			assert.Equal(t, tc.expected, got)
@@ -643,13 +645,10 @@ func TestSameBasePathStringCatchAll(t *testing.T) {
 
 func TestGroupCollapsedValidateRequestSpecs(t *testing.T) {
 	makeSpec := func(path, method, regex string) URLSpec {
-		return URLSpec{
-			Status:                 OASValidateRequest,
-			OASValidateRequestMeta: &oas.ValidateRequest{Enabled: true},
-			OASMethod:              method,
-			OASPath:                path,
-			spec:                   regexp.MustCompile(regex),
-		}
+		spec := newOASValidateRequestURLSpec(&oas.ValidateRequest{Enabled: true}, method, path)
+		spec.Status = OASValidateRequest
+		spec.spec = regexp.MustCompile(regex)
+		return spec
 	}
 
 	t.Run("no collision leaves specs unchanged", func(t *testing.T) {
@@ -659,8 +658,12 @@ func TestGroupCollapsedValidateRequestSpecs(t *testing.T) {
 		}
 		result := groupCollapsedValidateRequestSpecs(specs, nil)
 		assert.Len(t, result, 2)
-		assert.Nil(t, result[0].OASValidateRequestCandidates)
-		assert.Nil(t, result[1].OASValidateRequestCandidates)
+		meta0, ok := result[0].oasValidateRequestRuntimeMeta()
+		assert.True(t, ok)
+		meta1, ok := result[1].oasValidateRequestRuntimeMeta()
+		assert.True(t, ok)
+		assert.Nil(t, meta0.Candidates)
+		assert.Nil(t, meta1.Candidates)
 	})
 
 	t.Run("same regex same method groups into candidates", func(t *testing.T) {
@@ -670,10 +673,12 @@ func TestGroupCollapsedValidateRequestSpecs(t *testing.T) {
 		}
 		result := groupCollapsedValidateRequestSpecs(specs, nil)
 		assert.Len(t, result, 1)
-		assert.Len(t, result[0].OASValidateRequestCandidates, 2)
+		meta, ok := result[0].oasValidateRequestRuntimeMeta()
+		assert.True(t, ok)
+		assert.Len(t, meta.Candidates, 2)
 		// Candidates are sorted by OASPath
-		assert.Equal(t, "/employees/{prct}", result[0].OASValidateRequestCandidates[0].OASPath)
-		assert.Equal(t, "/employees/{zd}", result[0].OASValidateRequestCandidates[1].OASPath)
+		assert.Equal(t, "/employees/{prct}", meta.Candidates[0].OASPath)
+		assert.Equal(t, "/employees/{zd}", meta.Candidates[1].OASPath)
 	})
 
 	t.Run("same regex different methods are not grouped", func(t *testing.T) {
@@ -683,8 +688,12 @@ func TestGroupCollapsedValidateRequestSpecs(t *testing.T) {
 		}
 		result := groupCollapsedValidateRequestSpecs(specs, nil)
 		assert.Len(t, result, 2)
-		assert.Nil(t, result[0].OASValidateRequestCandidates)
-		assert.Nil(t, result[1].OASValidateRequestCandidates)
+		meta0, ok := result[0].oasValidateRequestRuntimeMeta()
+		assert.True(t, ok)
+		meta1, ok := result[1].oasValidateRequestRuntimeMeta()
+		assert.True(t, ok)
+		assert.Nil(t, meta0.Candidates)
+		assert.Nil(t, meta1.Candidates)
 	})
 
 	t.Run("three specs with same regex and method all grouped", func(t *testing.T) {
@@ -695,10 +704,12 @@ func TestGroupCollapsedValidateRequestSpecs(t *testing.T) {
 		}
 		result := groupCollapsedValidateRequestSpecs(specs, nil)
 		assert.Len(t, result, 1)
-		assert.Len(t, result[0].OASValidateRequestCandidates, 3)
-		assert.Equal(t, "/employees/{a}", result[0].OASValidateRequestCandidates[0].OASPath)
-		assert.Equal(t, "/employees/{b}", result[0].OASValidateRequestCandidates[1].OASPath)
-		assert.Equal(t, "/employees/{c}", result[0].OASValidateRequestCandidates[2].OASPath)
+		meta, ok := result[0].oasValidateRequestRuntimeMeta()
+		assert.True(t, ok)
+		assert.Len(t, meta.Candidates, 3)
+		assert.Equal(t, "/employees/{a}", meta.Candidates[0].OASPath)
+		assert.Equal(t, "/employees/{b}", meta.Candidates[1].OASPath)
+		assert.Equal(t, "/employees/{c}", meta.Candidates[2].OASPath)
 	})
 }
 

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/test"
@@ -38,7 +39,9 @@ func TestOASMockResponseUnifiedPathMatching(t *testing.T) {
 			t.Logf("Version '%s' has %d URLSpecs", vName, len(urlSpecs))
 			for i, spec := range urlSpecs {
 				if spec.Status == OASMockResponse {
-					t.Logf("  [%d] OASMockResponse: %s %s", i, spec.OASMethod, spec.OASPath)
+					path, method, ok := spec.oasPathAndMethod()
+					assert.True(t, ok)
+					t.Logf("  [%d] OASMockResponse: %s %s", i, method, path)
 				}
 			}
 		}

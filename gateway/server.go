@@ -727,7 +727,6 @@ func (gw *Gateway) setupGlobals() {
 		gw.NewRelicApplication = gw.SetupNewRelic()
 	}
 
-	gw.readGraphqlPlaygroundTemplate()
 }
 
 func (gw *Gateway) buildDashboardConnStr(resource string) string {

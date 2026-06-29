@@ -20,9 +20,9 @@ func BenchmarkSortURLSpecsByPathPriority(b *testing.B) {
 			template := make([]URLSpec, n)
 			for i := 0; i < n; i++ {
 				if i%3 == 0 {
-					template[i] = URLSpec{OASPath: fmt.Sprintf("/api/v1/resource%d/{id}", i)}
+					template[i] = newOASValidateRequestURLSpec(nil, "", fmt.Sprintf("/api/v1/resource%d/{id}", i))
 				} else {
-					template[i] = URLSpec{OASPath: fmt.Sprintf("/api/v1/resource%d/static", i)}
+					template[i] = newOASValidateRequestURLSpec(nil, "", fmt.Sprintf("/api/v1/resource%d/static", i))
 				}
 			}
 

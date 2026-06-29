@@ -218,44 +218,80 @@ type ExtendedCircuitBreakerMeta struct {
 	CB *circuit.Breaker `json:"-"`
 }
 
+type urlRewriteRuntimeMetadata interface {
+	urlRewriteMethod() string
+	urlRewriteContextPath() string
+}
+
+type directURLRewriteRuntimeMeta struct {
+	Method      string
+	ContextPath string
+	RewriteTo   string
+}
+
+func (m *directURLRewriteRuntimeMeta) urlRewriteMethod() string {
+	if m == nil {
+		return ""
+	}
+	return m.Method
+}
+
+func (m *directURLRewriteRuntimeMeta) urlRewriteContextPath() string {
+	if m == nil {
+		return ""
+	}
+	return m.ContextPath
+}
+
 type urlRewriteRuntimeMeta struct {
 	Method       string
-	Path         string
+	ContextPath  string
 	MatchPattern string
 	RewriteTo    string
 	Triggers     []apidef.RoutingTrigger
 	MatchRegexp  *regexp.Regexp
-	directMatch  bool
 }
 
-func compileURLRewriteRuntimeMeta(meta apidef.URLRewriteMeta) *urlRewriteRuntimeMeta {
+func (m *urlRewriteRuntimeMeta) urlRewriteMethod() string {
+	if m == nil {
+		return ""
+	}
+	return m.Method
+}
+
+func (m *urlRewriteRuntimeMeta) urlRewriteContextPath() string {
+	if m == nil {
+		return ""
+	}
+	return m.ContextPath
+}
+
+func compileURLRewriteRuntimeMeta(meta apidef.URLRewriteMeta) urlRewriteRuntimeMetadata {
 	runtimeMeta, _ := compileURLRewriteRuntimeMetaWithError(meta, false)
 	return runtimeMeta
 }
 
-func compileURLRewriteRuntimeMetaWithError(meta apidef.URLRewriteMeta, directMatch bool) (*urlRewriteRuntimeMeta, error) {
+func compileURLRewriteRuntimeMetaWithError(meta apidef.URLRewriteMeta, directMatch bool) (urlRewriteRuntimeMetadata, error) {
+	contextPath := meta.Path
+	if contextPath == "" {
+		contextPath = meta.MatchPattern
+	}
+	if directMatch {
+		return &directURLRewriteRuntimeMeta{
+			Method:      meta.Method,
+			ContextPath: contextPath,
+			RewriteTo:   meta.RewriteTo,
+		}, nil
+	}
 	runtimeMeta := &urlRewriteRuntimeMeta{
 		Method:       meta.Method,
+		ContextPath:  contextPath,
 		MatchPattern: meta.MatchPattern,
 		RewriteTo:    meta.RewriteTo,
 		Triggers:     meta.Triggers,
 		MatchRegexp:  meta.MatchRegexp,
-		directMatch:  directMatch,
-	}
-	if meta.Path != meta.MatchPattern {
-		runtimeMeta.Path = meta.Path
 	}
 	return runtimeMeta, nil
-}
-
-func (m *urlRewriteRuntimeMeta) contextPath() string {
-	if m == nil {
-		return ""
-	}
-	if m.Path != "" {
-		return m.Path
-	}
-	return m.MatchPattern
 }
 
 type OAuthManagerInterface interface {
@@ -542,14 +578,25 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		return nil, err
 	}
 
-	oasSpec := spec.OAS.T
-	oasSpec.Servers = openapi3.Servers{
+	if !spec.IsOAS {
+		return spec, nil
+	}
+
+	spec.OAS.T.Servers = openapi3.Servers{
 		{URL: spec.Proxy.ListenPath},
 	}
 
-	spec.oasRouter, err = gorillamux.NewRouter(&oasSpec)
-	if err != nil {
-		logger.WithError(err).Error("Could not create OAS router")
+	if spec.requiresCompiledOASRouter() {
+		spec.oasRouter, err = gorillamux.NewRouter(&spec.OAS.T)
+		if err != nil {
+			logger.WithError(err).Error("Could not create OAS router")
+		}
+	}
+
+	if oasPayload, err := json.Marshal(&spec.OAS); err != nil {
+		logger.WithError(err).Warn("Failed to preserve raw OAS definition payload")
+	} else {
+		spec.storeRawOASDefinitionPayload(oasPayload)
 	}
 
 	return spec, nil
@@ -1779,11 +1826,7 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 			continue
 		}
 
-		newSpec := URLSpec{
-			OASValidateRequestMeta: operation.ValidateRequest,
-			OASMethod:              strings.ToUpper(method),
-			OASPath:                path,
-		}
+		newSpec := newOASValidateRequestURLSpec(operation.ValidateRequest, strings.ToUpper(method), path)
 
 		a.generateRegex(path, &newSpec, OASValidateRequest, conf)
 		urlSpec = append(urlSpec, newSpec)
@@ -1792,11 +1835,7 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 	urlSpec = groupCollapsedValidateRequestSpecs(urlSpec, apiSpec.OAS.Paths)
 
 	urlSpec = a.addStaticPathShields(apiSpec, conf, urlSpec, OASValidateRequest, func(path, method string) URLSpec {
-		return URLSpec{
-			OASValidateRequestMeta: &oas.ValidateRequest{Enabled: false},
-			OASMethod:              method,
-			OASPath:                path,
-		}
+		return newOASValidateRequestURLSpec(&oas.ValidateRequest{Enabled: false}, method, path)
 	})
 
 	sortURLSpecsByPathPriority(urlSpec)
@@ -1841,7 +1880,11 @@ func groupCollapsedSpecs(
 		if s.Status != status || s.spec == nil {
 			continue
 		}
-		k := key{regex: s.spec.String(), method: s.OASMethod}
+		_, method, ok := s.oasPathAndMethod()
+		if !ok {
+			continue
+		}
+		k := key{regex: s.spec.String(), method: method}
 		if _, exists := groups[k]; !exists {
 			order = append(order, k)
 		}
@@ -1867,20 +1910,22 @@ func mergeMockGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]
 	primary := indices[0]
 	candidates := make([]MockResponseCandidate, len(indices))
 	for ci, idx := range indices {
+		meta, _ := specs[idx].oasMockResponseRuntimeMeta()
 		candidates[ci] = MockResponseCandidate{
-			OASMockResponseMeta: specs[idx].OASMockResponseMeta,
-			OASMethod:           specs[idx].OASMethod,
-			OASPath:             specs[idx].OASPath,
+			OASMockResponseMeta: meta.MockResponse,
+			OASMethod:           meta.Method,
+			OASPath:             meta.Path,
 		}
 		if idx != primary {
 			toRemove[idx] = true
 		}
 	}
 
-	specs[primary].OASMockResponseMeta = candidates[0].OASMockResponseMeta
-	specs[primary].OASMethod = candidates[0].OASMethod
-	specs[primary].OASPath = candidates[0].OASPath
-	specs[primary].OASMockResponseCandidates = candidates
+	meta, _ := specs[primary].oasMockResponseRuntimeMeta()
+	meta.MockResponse = candidates[0].OASMockResponseMeta
+	meta.Method = candidates[0].OASMethod
+	meta.Path = candidates[0].OASPath
+	meta.Candidates = candidates
 }
 
 // sortByRestrictiveness sorts spec indices so that more restrictive path parameter
@@ -1888,17 +1933,19 @@ func mergeMockGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]
 // (longer patterns are more specific, e.g., ^\d+$ before .*), then alphabetically.
 func sortByRestrictiveness(indices []int, specs []URLSpec, oasPaths *openapi3.Paths) {
 	sort.Slice(indices, func(a, b int) bool {
-		scoreA := pathParamRestrictiveness(specs[indices[a]].OASPath, specs[indices[a]].OASMethod, oasPaths)
-		scoreB := pathParamRestrictiveness(specs[indices[b]].OASPath, specs[indices[b]].OASMethod, oasPaths)
+		pathA, methodA, _ := specs[indices[a]].oasPathAndMethod()
+		pathB, methodB, _ := specs[indices[b]].oasPathAndMethod()
+		scoreA := pathParamRestrictiveness(pathA, methodA, oasPaths)
+		scoreB := pathParamRestrictiveness(pathB, methodB, oasPaths)
 		if scoreA != scoreB {
 			return scoreA > scoreB
 		}
-		lenA := pathParamPatternLength(specs[indices[a]].OASPath, specs[indices[a]].OASMethod, oasPaths)
-		lenB := pathParamPatternLength(specs[indices[b]].OASPath, specs[indices[b]].OASMethod, oasPaths)
+		lenA := pathParamPatternLength(pathA, methodA, oasPaths)
+		lenB := pathParamPatternLength(pathB, methodB, oasPaths)
 		if lenA != lenB {
 			return lenA > lenB
 		}
-		return specs[indices[a]].OASPath < specs[indices[b]].OASPath
+		return pathA < pathB
 	})
 }
 
@@ -1909,20 +1956,22 @@ func mergeGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]bool
 	primary := indices[0]
 	candidates := make([]ValidateRequestCandidate, len(indices))
 	for ci, idx := range indices {
+		meta, _ := specs[idx].oasValidateRequestRuntimeMeta()
 		candidates[ci] = ValidateRequestCandidate{
-			OASValidateRequestMeta: specs[idx].OASValidateRequestMeta,
-			OASMethod:              specs[idx].OASMethod,
-			OASPath:                specs[idx].OASPath,
+			OASValidateRequestMeta: meta.ValidateRequest,
+			OASMethod:              meta.Method,
+			OASPath:                meta.Path,
 		}
 		if idx != primary {
 			toRemove[idx] = true
 		}
 	}
 
-	specs[primary].OASValidateRequestMeta = candidates[0].OASValidateRequestMeta
-	specs[primary].OASMethod = candidates[0].OASMethod
-	specs[primary].OASPath = candidates[0].OASPath
-	specs[primary].OASValidateRequestCandidates = candidates
+	meta, _ := specs[primary].oasValidateRequestRuntimeMeta()
+	meta.ValidateRequest = candidates[0].OASValidateRequestMeta
+	meta.Method = candidates[0].OASMethod
+	meta.Path = candidates[0].OASPath
+	meta.Candidates = candidates
 }
 
 // removeIndices returns a new slice with entries at the given indices removed.
@@ -2065,11 +2114,7 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 			continue
 		}
 
-		newSpec := URLSpec{
-			OASMockResponseMeta: operation.MockResponse,
-			OASMethod:           strings.ToUpper(method),
-			OASPath:             path,
-		}
+		newSpec := newOASMockResponseURLSpec(operation.MockResponse, strings.ToUpper(method), path)
 
 		a.generateRegex(path, &newSpec, OASMockResponse, conf)
 		urlSpec = append(urlSpec, newSpec)
@@ -2078,11 +2123,7 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 	urlSpec = groupCollapsedMockResponseSpecs(urlSpec, apiSpec.OAS.Paths)
 
 	urlSpec = a.addStaticPathShields(apiSpec, conf, urlSpec, OASMockResponse, func(path, method string) URLSpec {
-		return URLSpec{
-			OASMockResponseMeta: &oas.MockResponse{Enabled: false},
-			OASMethod:           method,
-			OASPath:             path,
-		}
+		return newOASMockResponseURLSpec(&oas.MockResponse{Enabled: false}, method, path)
 	})
 
 	sortURLSpecsByPathPriority(urlSpec)
@@ -2137,8 +2178,12 @@ func (a APIDefinitionLoader) addStaticPathShields(
 func indexURLSpecs(specs []URLSpec) (existing map[string]struct{}, hasParameterised bool) {
 	existing = make(map[string]struct{}, len(specs))
 	for _, spec := range specs {
-		existing[spec.OASPath+":"+spec.OASMethod] = struct{}{}
-		if httputil.IsMuxTemplate(spec.OASPath) {
+		path, method, ok := spec.oasPathAndMethod()
+		if !ok {
+			continue
+		}
+		existing[path+":"+method] = struct{}{}
+		if httputil.IsMuxTemplate(path) {
 			hasParameterised = true
 		}
 	}
@@ -2167,7 +2212,9 @@ func (a APIDefinitionLoader) findPathAndMethodForOperation(apiSpec *APISpec, ope
 // rules as oasutil.SortByPathLength, ensuring consistent ordering across the gateway.
 func sortURLSpecsByPathPriority(specs []URLSpec) {
 	sort.Slice(specs, func(i, j int) bool {
-		return oasutil.PathLess(specs[i].OASPath, specs[j].OASPath)
+		pathI, _, _ := specs[i].oasPathAndMethod()
+		pathJ, _, _ := specs[j].oasPathAndMethod()
+		return oasutil.PathLess(pathI, pathJ)
 	})
 }
 
@@ -2844,6 +2891,10 @@ func (a *APISpec) hasActiveMock() bool {
 		return false
 	}
 
+	if a.hasCompiledActiveOASMockResponse() {
+		return true
+	}
+
 	middleware := a.OAS.GetTykMiddleware()
 	if middleware == nil {
 		return false
@@ -2857,6 +2908,30 @@ func (a *APISpec) hasActiveMock() bool {
 
 	// Check MCP primitives (tools, resources, prompts)
 	return middleware.HasMCPPrimitivesMocks()
+}
+
+func (a *APISpec) hasCompiledActiveOASMockResponse() bool {
+	for _, paths := range a.RxPaths {
+		for i := range paths {
+			if paths[i].Status != OASMockResponse {
+				continue
+			}
+
+			meta, ok := paths[i].oasMockResponseRuntimeMeta()
+			if !ok || meta == nil {
+				continue
+			}
+			if meta.MockResponse != nil && meta.MockResponse.Enabled {
+				return true
+			}
+			for _, candidate := range meta.Candidates {
+				if candidate.OASMockResponseMeta != nil && candidate.OASMockResponseMeta.Enabled {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func (a *APISpec) hasVirtualEndpoint() bool {

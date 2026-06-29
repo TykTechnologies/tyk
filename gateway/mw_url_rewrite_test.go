@@ -137,18 +137,18 @@ func TestURLRewriteRuntimeMetaContextPathFallsBackToMatchPattern(t *testing.T) {
 		RewriteTo:    "/next",
 	})
 
-	assert.Empty(t, meta.Path)
-	assert.Equal(t, "/same", meta.contextPath())
+	assert.Equal(t, "/same", meta.urlRewriteContextPath())
 }
 
 func TestURLRewriteRuntimeUsesCompactMeta(t *testing.T) {
 	gw := &Gateway{}
 	req := httptest.NewRequest(http.MethodGet, "/test/foo/rewrite", nil)
-	meta := compileURLRewriteRuntimeMeta(apidef.URLRewriteMeta{
+	meta, err := compileURLRewriteRuntimeMetaWithError(apidef.URLRewriteMeta{
 		Path:         "/test/foo/rewrite",
 		MatchPattern: "/test/foo/rewrite",
 		RewriteTo:    "/rewritten",
-	})
+	}, true)
+	assert.NoError(t, err)
 
 	got, err := gw.urlRewriteRuntime(meta, req)
 	assert.NoError(t, err)
@@ -166,10 +166,11 @@ func TestURLRewriteSimpleLiteralAvoidsSecondRegex(t *testing.T) {
 	}}, URLRewrite, config.Config{})
 
 	assert.Len(t, paths, 1)
-	meta, ok := typedURLSpecMeta[*urlRewriteRuntimeMeta](&paths[0])
+	meta, ok := typedURLSpecMeta[*directURLRewriteRuntimeMeta](&paths[0])
 	assert.True(t, ok)
-	assert.True(t, meta.directMatch)
-	assert.Nil(t, meta.MatchRegexp)
+	assert.Equal(t, http.MethodGet, meta.Method)
+	assert.Equal(t, "/test/foo/rewrite", meta.ContextPath)
+	assert.Equal(t, "/rewritten", meta.RewriteTo)
 
 	gw := &Gateway{}
 	req := httptest.NewRequest(http.MethodGet, "/test/foo/rewrite", nil)
@@ -177,6 +178,24 @@ func TestURLRewriteSimpleLiteralAvoidsSecondRegex(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "/rewritten", got)
 	assert.Equal(t, "/test/foo/rewrite", ctxGetUrlRewritePath(req))
+}
+
+func TestURLRewriteInitTriggerRxEnablesDirectRuntimeMeta(t *testing.T) {
+	spec := &APISpec{
+		RxPaths: map[string][]URLSpec{
+			"": {{
+				Status: URLRewrite,
+				metadata: &directURLRewriteRuntimeMeta{
+					Method:      http.MethodGet,
+					ContextPath: "/test/foo/rewrite",
+					RewriteTo:   "/rewritten",
+				},
+			}},
+		},
+	}
+	middleware := &URLRewriteMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec}}
+
+	assert.True(t, middleware.InitTriggerRx())
 }
 
 func TestURLRewriteRegexPathStillCompilesOnDemand(t *testing.T) {
@@ -191,7 +210,6 @@ func TestURLRewriteRegexPathStillCompilesOnDemand(t *testing.T) {
 	assert.Len(t, paths, 1)
 	meta, ok := typedURLSpecMeta[*urlRewriteRuntimeMeta](&paths[0])
 	assert.True(t, ok)
-	assert.False(t, meta.directMatch)
 	assert.Nil(t, meta.MatchRegexp)
 
 	gw := &Gateway{}
