@@ -15,6 +15,9 @@ import (
 	_ "github.com/warpstreamlabs/bento/public/components/nats"
 	"github.com/warpstreamlabs/bento/public/service"
 
+	// Blank import to force aws-sdk-go-v2/service/s3 version for downstream consumers (tyk-analytics) to fix CVE GHSA-xmrv-pmrh-hhx2
+	_ "github.com/aws/aws-sdk-go-v2/service/s3"
+
 	_ "github.com/TykTechnologies/tyk/internal/portal"
 )
 
