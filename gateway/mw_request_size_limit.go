@@ -40,12 +40,11 @@ func (t *RequestSizeLimitMiddleware) Name() string {
 
 func (t *RequestSizeLimitMiddleware) EnabledForSpec() bool {
 	for _, version := range t.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.SizeLimit) > 0 ||
-			(!version.GlobalSizeLimitDisabled && version.GlobalSizeLimit > 0) {
+		if !version.GlobalSizeLimitDisabled && version.GlobalSizeLimit > 0 {
 			return true
 		}
 	}
-	return false
+	return t.Spec.hasCompiledURLStatus(RequestSizeLimit)
 }
 
 func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimit int64) (error, int) {
@@ -97,10 +96,6 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 	}
 
 	// if there's no paths at all path check
-	if len(vInfo.ExtendedPaths.SizeLimit) == 0 {
-		return nil, http.StatusOK
-	}
-
 	versionPaths := t.Spec.RxPaths[vInfo.Name]
 
 	// If there's a potential match, try to match

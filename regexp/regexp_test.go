@@ -32,6 +32,32 @@ func TestCompile(t *testing.T) {
 	}
 }
 
+func TestCompileReturnsCachedRegexpInstance(t *testing.T) {
+	ResetCache(defaultCacheItemTTL, true)
+
+	rx, err := Compile("^abc.*$")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rx2, err := Compile("^abc.*$")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !rx2.FromCache {
+		t.Errorf("Compile(%q).FromCache = false, want true", "^abc.*$")
+	}
+	if rx.Regexp == nil || rx2.Regexp == nil {
+		t.Fatalf("Compile(%q) returned nil regexp: first=%v second=%v", "^abc.*$", rx.Regexp, rx2.Regexp)
+	}
+	if rx.Regexp != rx2.Regexp {
+		t.Errorf("Compile(%q) cached regexp pointer = %p, want %p", "^abc.*$", rx2.Regexp, rx.Regexp)
+	}
+	if !rx2.MatchString("abcxyz") {
+		t.Errorf("Compile(%q).MatchString(%q) = false, want true", "^abc.*$", "abcxyz")
+	}
+}
+
 func BenchmarkRegExpCompile(b *testing.B) {
 	ResetCache(defaultCacheItemTTL, true)
 
@@ -341,6 +367,9 @@ func TestCopy(t *testing.T) {
 	}
 	if rx.String() != rxCopy.String() {
 		t.Error("Copy's Regexp is not equal")
+	}
+	if rx.Regexp == rxCopy.Regexp {
+		t.Errorf("Regexp.Copy() returned original regexp pointer %p, want distinct copy", rx.Regexp)
 	}
 }
 

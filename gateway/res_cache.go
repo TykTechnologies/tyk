@@ -43,6 +43,10 @@ func (m *ResponseCacheMiddleware) EnabledForSpec() bool {
 	return m.Spec.CacheOptions.EnableCache
 }
 
+func (m *ResponseCacheMiddleware) Enabled() bool {
+	return m.EnabledForSpec()
+}
+
 func (m *ResponseCacheMiddleware) getTimeTTL(cacheTTL int64) int64 {
 	timeNow := time.Now().Unix()
 	return timeNow + cacheTTL

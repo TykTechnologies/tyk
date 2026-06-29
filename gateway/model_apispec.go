@@ -1,7 +1,11 @@
 package gateway
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -109,6 +113,89 @@ type APISpec struct {
 	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
 	// Built from apidef.ErrorOverrides during gateway startup.
 	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
+
+	// TT-16904 API stress: retain the management-API representation in a
+	// compressed form so runtime can release duplicate raw path metadata after
+	// compiling RxPaths. This is only used for classic API responses.
+	rawAPIDefinitionGZIP []byte
+}
+
+func (a *APISpec) storeRawAPIDefinitionPayload(payload []byte) {
+	if len(payload) == 0 {
+		return
+	}
+
+	var buf bytes.Buffer
+	gz, err := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
+	if err != nil {
+		log.WithError(err).Warn("Failed to create compressed API definition payload")
+		return
+	}
+	if _, err := gz.Write(payload); err != nil {
+		log.WithError(err).Warn("Failed to compress API definition payload")
+		_ = gz.Close()
+		return
+	}
+	if err := gz.Close(); err != nil {
+		log.WithError(err).Warn("Failed to finalize compressed API definition payload")
+		return
+	}
+	a.rawAPIDefinitionGZIP = buf.Bytes()
+}
+
+func (a *APISpec) rawAPIDefinitionPayload() (json.RawMessage, bool) {
+	if len(a.rawAPIDefinitionGZIP) == 0 {
+		return nil, false
+	}
+
+	gz, err := gzip.NewReader(bytes.NewReader(a.rawAPIDefinitionGZIP))
+	if err != nil {
+		log.WithError(err).Warn("Failed to open compressed API definition payload")
+		return nil, false
+	}
+	defer gz.Close()
+
+	payload, err := io.ReadAll(gz)
+	if err != nil {
+		log.WithError(err).Warn("Failed to read compressed API definition payload")
+		return nil, false
+	}
+	return json.RawMessage(payload), true
+}
+
+func (a *APISpec) releaseCompiledPathConfig() {
+	if a == nil || a.APIDefinition == nil || a.IsOAS {
+		return
+	}
+
+	a.ResponseProcessors = nil
+
+	for name, version := range a.VersionData.Versions {
+		version.Paths.Ignored = nil
+		version.Paths.WhiteList = nil
+		version.Paths.BlackList = nil
+		version.ExtendedPaths = apidef.ExtendedPathsSet{}
+		a.VersionData.Versions[name] = version
+	}
+}
+
+func (a *APISpec) hasCompiledURLStatus(statuses ...URLStatus) bool {
+	if len(a.RxPaths) == 0 {
+		return false
+	}
+	for _, paths := range a.RxPaths {
+		for i := range paths {
+			for _, status := range statuses {
+				if paths[i].Status != status {
+					continue
+				}
+				if _, ok := paths[i].modeSpecificSpec(status); ok {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.

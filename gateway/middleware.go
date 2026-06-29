@@ -306,14 +306,8 @@ func NewBaseMiddleware(gw *Gateway, spec *APISpec, proxy ReturningHttpHandler, l
 		Gw:     gw,
 	}
 
-	for _, v := range baseMid.Spec.VersionData.Versions {
-		if len(v.ExtendedPaths.CircuitBreaker) > 0 {
-			baseMid.Spec.CircuitBreakerEnabled = true
-		}
-		if len(v.ExtendedPaths.HardTimeouts) > 0 {
-			baseMid.Spec.EnforcedTimeoutEnabled = true
-		}
-	}
+	baseMid.Spec.CircuitBreakerEnabled = baseMid.Spec.hasCompiledURLStatus(CircuitBreaker)
+	baseMid.Spec.EnforcedTimeoutEnabled = baseMid.Spec.hasCompiledURLStatus(HardTimeout)
 
 	return baseMid
 }

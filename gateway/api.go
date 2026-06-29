@@ -1222,11 +1222,21 @@ func (gw *Gateway) handleGetAPIList(r *http.Request) (interface{}, int) {
 
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
-	apiIDList := make([]*apidef.APIDefinition, 0, len(gw.apisByID))
+	apiIDList := make([]json.RawMessage, 0, len(gw.apisByID))
 
 	for _, apiSpec := range gw.apisByID {
 		if shouldIncludeAPI(apiSpec, includeTypes) {
-			apiIDList = append(apiIDList, apiSpec.APIDefinition)
+			if payload, ok := apiSpec.rawAPIDefinitionPayload(); ok {
+				apiIDList = append(apiIDList, payload)
+				continue
+			}
+
+			payload, err := json.Marshal(apiSpec.APIDefinition)
+			if err != nil {
+				log.WithError(err).Error("Failed to marshal API definition")
+				return apiError("Failed to marshal API definition"), http.StatusInternalServerError
+			}
+			apiIDList = append(apiIDList, payload)
 		}
 	}
 	return apiIDList, http.StatusOK
@@ -1259,6 +1269,9 @@ func (gw *Gateway) handleGetAPI(apiID string, oasEndpoint bool) (interface{}, in
 			return apiError(apidef.ErrOASGetForOldAPI.Error()), http.StatusBadRequest
 		}
 
+		if payload, ok := spec.rawAPIDefinitionPayload(); ok {
+			return payload, http.StatusOK
+		}
 		return spec.APIDefinition, http.StatusOK
 	}
 
@@ -1596,6 +1609,9 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 		if apiID != "" {
 			log.Debugf("Requesting API definition for %q", apiID)
 			obj, code = gw.handleGetAPI(apiID, false)
+			if spec := gw.getApiSpec(apiID); spec != nil && spec.VersionDefinition.BaseID != "" {
+				w.Header().Set(apidef.HeaderBaseAPIID, spec.VersionDefinition.BaseID)
+			}
 		} else {
 			log.Debug("Requesting API list")
 			obj, code = gw.handleGetAPIList(r)

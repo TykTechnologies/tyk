@@ -22,13 +22,7 @@ func (k *ValidateJSON) Name() string {
 }
 
 func (k *ValidateJSON) EnabledForSpec() bool {
-	for _, v := range k.Spec.VersionData.Versions {
-		if len(v.ExtendedPaths.ValidateJSON) > 0 {
-			return true
-		}
-	}
-
-	return false
+	return k.Spec.hasCompiledURLStatus(ValidateJSONRequest)
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail

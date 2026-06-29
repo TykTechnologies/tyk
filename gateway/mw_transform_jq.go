@@ -34,13 +34,7 @@ func (t *TransformJQMiddleware) Name() string {
 }
 
 func (t *TransformJQMiddleware) EnabledForSpec() bool {
-
-	for _, version := range t.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.TransformJQ) > 0 {
-			return true
-		}
-	}
-	return false
+	return t.Spec.hasCompiledURLStatus(TransformedJQ)
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail

@@ -124,15 +124,7 @@ func (m *GoPluginMiddleware) EnabledForSpec() bool {
 	}
 
 	// per path go plugins
-	for _, version := range m.Spec.VersionData.Versions {
-		for _, p := range version.ExtendedPaths.GoPlugin {
-			if !p.Disabled {
-				return true
-			}
-		}
-	}
-
-	return false
+	return m.Spec.hasCompiledURLStatus(GoPlugin)
 }
 
 // loadPlugin loads the plugin file from m.Path, it will try

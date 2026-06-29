@@ -168,6 +168,12 @@ type Gateway struct {
 	ServiceNonce      string
 	ServiceNonceMutex sync.RWMutex
 
+	// dashboardAPIsPayloadHash tracks the last successfully prepared /system/apis
+	// message payload hash, after secret replacement but before full API decode.
+	dashboardAPIsPayloadHashMu  sync.RWMutex
+	dashboardAPIsPayloadHash    [32]byte
+	dashboardAPIsPayloadHashSet bool
+
 	apisMu          sync.RWMutex
 	apiSpecs        []*APISpec
 	apisByID        map[string]*APISpec
@@ -361,6 +367,39 @@ func (gw *Gateway) saveApi(spec *APISpec) {
 
 	gw.apisByID[spec.APIID] = spec
 	gw.apiSpecs = append(gw.apiSpecs, spec)
+}
+
+func (gw *Gateway) getCurrentAPISpecsSnapshot() []*APISpec {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+
+	if len(gw.apiSpecs) == 0 {
+		return nil
+	}
+
+	out := make([]*APISpec, len(gw.apiSpecs))
+	copy(out, gw.apiSpecs)
+	return out
+}
+
+func (gw *Gateway) getDashboardAPIsPayloadHash() ([32]byte, bool) {
+	gw.dashboardAPIsPayloadHashMu.RLock()
+	defer gw.dashboardAPIsPayloadHashMu.RUnlock()
+	return gw.dashboardAPIsPayloadHash, gw.dashboardAPIsPayloadHashSet
+}
+
+func (gw *Gateway) setDashboardAPIsPayloadHash(hash [32]byte) {
+	gw.dashboardAPIsPayloadHashMu.Lock()
+	gw.dashboardAPIsPayloadHash = hash
+	gw.dashboardAPIsPayloadHashSet = true
+	gw.dashboardAPIsPayloadHashMu.Unlock()
+}
+
+func (gw *Gateway) clearDashboardAPIsPayloadHash() {
+	gw.dashboardAPIsPayloadHashMu.Lock()
+	gw.dashboardAPIsPayloadHash = [32]byte{}
+	gw.dashboardAPIsPayloadHashSet = false
+	gw.dashboardAPIsPayloadHashMu.Unlock()
 }
 
 func (gw *Gateway) deleteApi(spec *APISpec) {
@@ -1216,17 +1255,22 @@ func (gw *Gateway) createResponseMiddlewareChain(
 	gw.responseMWAppendEnabled(&responseMWChain,
 		decorate(&ResponseErrorOverrideMiddleware{BaseTykResponseHandler: baseHandler}))
 
-	keyPrefix := "cache-" + spec.APIID
-	cacheStore := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
-	cacheStore.Connect()
-
 	// Add cache writer as the final step of the response middleware chain
-	processor := decorate(&ResponseCacheMiddleware{BaseTykResponseHandler: baseHandler, store: cacheStore})
+	cacheProcessor := &ResponseCacheMiddleware{BaseTykResponseHandler: baseHandler}
+	processor := decorate(cacheProcessor)
 	if err := processor.Init(nil, spec); err != nil {
 		log.WithError(err).Debug("Failed to init processor")
 	}
 
-	return append(responseMWChain, processor)
+	if cacheProcessor.Enabled() {
+		keyPrefix := "cache-" + spec.APIID
+		cacheStore := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
+		cacheStore.Connect()
+		cacheProcessor.store = cacheStore
+		responseMWChain = append(responseMWChain, processor)
+	}
+
+	return responseMWChain
 }
 
 func (gw *Gateway) isRPCMode() bool {
@@ -2499,6 +2543,8 @@ func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Lock()
 	gw.config.Store(conf)
 	gw.configMu.Unlock()
+
+	gw.clearDashboardAPIsPayloadHash()
 
 	// Invalidate cached config viewer so the next request rebuilds it
 	// with the updated configuration.

@@ -32,13 +32,9 @@ func (h *HeaderInjector) Enabled() bool {
 		if version.GlobalResponseHeadersEnabled() {
 			return true
 		}
-
-		if version.HasEndpointResHeader() {
-			return true
-		}
 	}
 
-	return false
+	return h.Spec.hasCompiledURLStatus(HeaderInjectedResponse)
 }
 
 func (h *HeaderInjector) Init(c interface{}, spec *APISpec) error {

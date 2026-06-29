@@ -629,6 +629,8 @@ func (gw *Gateway) processSpec(
 		}
 	}
 
+	spec.releaseCompiledPathConfig()
+
 	logger.WithFields(logrus.Fields{
 		"prefix":      "gateway",
 		"user_ip":     "--",

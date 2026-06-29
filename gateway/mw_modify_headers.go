@@ -20,12 +20,8 @@ func (t *TransformHeaders) EnabledForSpec() bool {
 		if version.GlobalHeadersEnabled() {
 			return true
 		}
-
-		if version.HasEndpointReqHeader() {
-			return true
-		}
 	}
-	return false
+	return t.Spec.hasCompiledURLStatus(HeaderInjected)
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail

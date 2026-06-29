@@ -40,7 +40,11 @@ func (c *cache) add(key string, value interface{}) {
 
 func (c *cache) getRegexp(key string) (*regexp.Regexp, bool) {
 	if val, found := c.Get(key); found {
-		return val.(*regexp.Regexp).Copy(), true
+		// regexp.Regexp is safe for concurrent use. Returning the cached
+		// instance avoids retaining a duplicate compiled regexp for every API
+		// route that shares the same path pattern during large control-plane
+		// syncs.
+		return val.(*regexp.Regexp), true
 	}
 
 	return nil, false

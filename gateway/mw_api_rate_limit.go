@@ -36,12 +36,8 @@ func (k *RateLimitForAPI) shouldEnable() bool {
 	}
 
 	// per endpoint rate limits
-	for _, version := range k.Spec.VersionData.Versions {
-		for _, v := range version.ExtendedPaths.RateLimit {
-			if !v.Disabled {
-				return true
-			}
-		}
+	if k.Spec.hasCompiledURLStatus(RateLimit) {
+		return true
 	}
 
 	// global api rate limit

@@ -38,6 +38,164 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+func TestFromDashboardServiceUnchangedPayloadFastPath(t *testing.T) {
+	gwConf := config.Config{
+		UseDBAppConfigs:          false,
+		DisableDashboardZeroConf: true,
+		NodeSecret:               "test-secret",
+	}
+	gwConf.DBAppConfOptions.ConnectionTimeout = 2
+
+	gw := NewGateway(gwConf, context.Background())
+
+	existing := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "existing-api-id",
+			Name:  "existing",
+		},
+	}
+	gw.apisMu.Lock()
+	gw.apiSpecs = []*APISpec{existing}
+	gw.apisByID = map[string]*APISpec{existing.APIID: existing}
+	gw.apisMu.Unlock()
+
+	rawMessage := json.RawMessage(`"not-an-array"`)
+	gw.setDashboardAPIsPayloadHash(dashboardAPIsPayloadHash(rawMessage))
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"Status":"OK","Message":"not-an-array","Nonce":"nonce-fast-path"}`))
+	}))
+	defer ts.Close()
+
+	loader := APIDefinitionLoader{Gw: gw}
+	specs, err := loader.FromDashboardService(ts.URL)
+	if err != nil {
+		t.Fatalf("APIDefinitionLoader.FromDashboardService(unchanged payload) error = %v, want nil", err)
+	}
+	if len(specs) != 1 {
+		t.Fatalf("APIDefinitionLoader.FromDashboardService(unchanged payload) returned %d specs, want 1", len(specs))
+	}
+	if specs[0] != existing {
+		t.Fatalf("APIDefinitionLoader.FromDashboardService(unchanged payload) returned spec %p, want existing spec %p", specs[0], existing)
+	}
+
+	gw.ServiceNonceMutex.RLock()
+	nonce := gw.ServiceNonce
+	gw.ServiceNonceMutex.RUnlock()
+	if nonce != "nonce-fast-path" {
+		t.Fatalf("APIDefinitionLoader.FromDashboardService(unchanged payload) nonce = %q, want %q", nonce, "nonce-fast-path")
+	}
+}
+
+func TestFromDashboardServiceUnchangedPayloadFastPathKeepsNonceWhenResponseNonceEmpty(t *testing.T) {
+	gwConf := config.Config{
+		UseDBAppConfigs:          false,
+		DisableDashboardZeroConf: true,
+		NodeSecret:               "test-secret",
+	}
+	gwConf.DBAppConfOptions.ConnectionTimeout = 2
+
+	gw := NewGateway(gwConf, context.Background())
+	gw.ServiceNonce = "existing-nonce"
+
+	existing := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "existing-api-id",
+			Name:  "existing",
+		},
+	}
+	gw.apisMu.Lock()
+	gw.apiSpecs = []*APISpec{existing}
+	gw.apisByID = map[string]*APISpec{existing.APIID: existing}
+	gw.apisMu.Unlock()
+
+	rawMessage := json.RawMessage(`"not-an-array"`)
+	gw.setDashboardAPIsPayloadHash(dashboardAPIsPayloadHash(rawMessage))
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"Status":"OK","Message":"not-an-array","Nonce":""}`))
+	}))
+	defer ts.Close()
+
+	loader := APIDefinitionLoader{Gw: gw}
+	specs, err := loader.FromDashboardService(ts.URL)
+	if err != nil {
+		t.Fatalf("APIDefinitionLoader.FromDashboardService(unchanged payload empty nonce) error = %v, want nil", err)
+	}
+	if len(specs) != 1 {
+		t.Fatalf("APIDefinitionLoader.FromDashboardService(unchanged payload empty nonce) returned %d specs, want 1", len(specs))
+	}
+
+	gw.ServiceNonceMutex.RLock()
+	nonce := gw.ServiceNonce
+	gw.ServiceNonceMutex.RUnlock()
+	if nonce != "existing-nonce" {
+		t.Fatalf("APIDefinitionLoader.FromDashboardService(unchanged payload empty nonce) nonce = %q, want %q", nonce, "existing-nonce")
+	}
+}
+
+func TestFromDashboardServiceConfigChangeInvalidatesUnchangedPayloadFastPath(t *testing.T) {
+	gwConf := config.Config{
+		UseDBAppConfigs:          false,
+		DisableDashboardZeroConf: true,
+		NodeSecret:               "test-secret",
+	}
+	gwConf.DBAppConfOptions.ConnectionTimeout = 2
+
+	gw := NewGateway(gwConf, context.Background())
+	rawMessage := json.RawMessage(`"not-an-array"`)
+	gw.setDashboardAPIsPayloadHash(dashboardAPIsPayloadHash(rawMessage))
+
+	updatedConf := gw.GetConfig()
+	updatedConf.IgnoreEndpointCase = !updatedConf.IgnoreEndpointCase
+	gw.SetConfig(updatedConf)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"Status":"OK","Message":"not-an-array","Nonce":"nonce-after-config-change"}`))
+	}))
+	defer ts.Close()
+
+	loader := APIDefinitionLoader{Gw: gw}
+	if _, err := loader.FromDashboardService(ts.URL); err == nil {
+		t.Fatal("APIDefinitionLoader.FromDashboardService(config-changed unchanged payload) error = nil, want message decode error")
+	}
+}
+
+func TestFromDashboardServiceMissingMessageKeepsEmptyListSemantics(t *testing.T) {
+	gwConf := config.Config{
+		UseDBAppConfigs:          false,
+		DisableDashboardZeroConf: true,
+		NodeSecret:               "test-secret",
+	}
+	gwConf.DBAppConfOptions.ConnectionTimeout = 2
+
+	gw := NewGateway(gwConf, context.Background())
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"Status":"OK","Nonce":"nonce-missing-message"}`))
+	}))
+	defer ts.Close()
+
+	loader := APIDefinitionLoader{Gw: gw}
+	specs, err := loader.FromDashboardService(ts.URL)
+	if err != nil {
+		t.Fatalf("APIDefinitionLoader.FromDashboardService(missing Message) error = %v, want nil", err)
+	}
+	if len(specs) != 0 {
+		t.Fatalf("APIDefinitionLoader.FromDashboardService(missing Message) returned %d specs, want 0", len(specs))
+	}
+
+	gw.ServiceNonceMutex.RLock()
+	nonce := gw.ServiceNonce
+	gw.ServiceNonceMutex.RUnlock()
+	if nonce != "nonce-missing-message" {
+		t.Fatalf("APIDefinitionLoader.FromDashboardService(missing Message) nonce = %q, want %q", nonce, "nonce-missing-message")
+	}
+}
+
 func TestLiteralPathMatcher(t *testing.T) {
 	tests := []struct {
 		name      string

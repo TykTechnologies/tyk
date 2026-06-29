@@ -400,6 +400,13 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 	spec.Checksum = base64.URLEncoding.EncodeToString(sha256hash[:])
 
 	spec.APIDefinition = def.APIDefinition
+	if !spec.IsOAS {
+		if apiDefPayload, err := json.Marshal(def.APIDefinition); err != nil {
+			logger.WithError(err).Warn("Failed to preserve raw API definition payload")
+		} else {
+			spec.storeRawAPIDefinitionPayload(apiDefPayload)
+		}
+	}
 
 	if currSpec := a.Gw.getApiSpec(def.APIID); !shouldReloadSpec(currSpec, spec) {
 		return currSpec, nil
@@ -550,6 +557,7 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
 func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, error) {
+	started := time.Now()
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
 
@@ -610,8 +618,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 			return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 		}
 
-		// Extract tagged APIs#
-		list := model.NewMergedAPIList()
+		readStart := time.Now()
 		inBytes, err := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if err != nil {
@@ -624,31 +631,89 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 			}
 			return nil, err
 		}
+		readDuration := time.Since(readStart)
 
+		secretStart := time.Now()
 		inBytes = a.replaceSecrets(inBytes)
+		secretDuration := time.Since(secretStart)
 
-		err = json.Unmarshal(inBytes, &list)
+		envelopeStart := time.Now()
+		var envelope struct {
+			Message json.RawMessage `json:"Message"`
+			Nonce   string          `json:"Nonce"`
+		}
+		err = json.Unmarshal(inBytes, &envelope)
 		if err != nil {
 			log.Error("Couldn't unmarshal api definition list")
 			// JSON unmarshal errors are not network errors, so don't retry
 			return nil, err
 		}
+		if len(envelope.Message) == 0 {
+			envelope.Message = []byte("null")
+		}
+		envelopeDuration := time.Since(envelopeStart)
+
+		payloadHash := dashboardAPIsPayloadHash(envelope.Message)
+		if cachedHash, ok := a.Gw.getDashboardAPIsPayloadHash(); ok && cachedHash == payloadHash {
+			a.Gw.setServiceNonceIfPresent("api_definitions", envelope.Nonce)
+			specs := a.Gw.getCurrentAPISpecsSnapshot()
+			log.WithFields(logrus.Fields{
+				"api_count":          len(specs),
+				"response_bytes":     len(inBytes),
+				"message_bytes":      len(envelope.Message),
+				"read_ms":            readDuration.Milliseconds(),
+				"secret_replace_ms":  secretDuration.Milliseconds(),
+				"envelope_decode_ms": envelopeDuration.Milliseconds(),
+				"total_ms":           time.Since(started).Milliseconds(),
+			}).Debug("Using cached API specs for unchanged /system/apis payload")
+			return specs, nil
+		}
+
+		messageStart := time.Now()
+		var message []model.MergedAPI
+		if err := json.Unmarshal(envelope.Message, &message); err != nil {
+			log.Error("Couldn't unmarshal api definition message payload")
+			return nil, err
+		}
+		messageDuration := time.Since(messageStart)
+		list := model.NewMergedAPIList(message...)
+		list.Nonce = envelope.Nonce
 
 		// Extract tagged entries only
 		gwConfig := a.Gw.GetConfig()
+		filterStart := time.Now()
 		apiDefs := list.Filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
+		filterDuration := time.Since(filterStart)
 
 		// Process
+		prepareStart := time.Now()
 		specs := a.prepareSpecs(apiDefs, gwConfig, false)
+		prepareDuration := time.Since(prepareStart)
+		a.Gw.setDashboardAPIsPayloadHash(payloadHash)
 
 		// Keep last known nonce unless dashboard provides a fresh one.
 		a.Gw.setServiceNonceIfPresent("api_definitions", list.Nonce)
-		log.Debug("Loading APIS Finished: Nonce Set: ", list.Nonce)
+		log.WithFields(logrus.Fields{
+			"api_count":          len(specs),
+			"response_bytes":     len(inBytes),
+			"message_bytes":      len(envelope.Message),
+			"read_ms":            readDuration.Milliseconds(),
+			"secret_replace_ms":  secretDuration.Milliseconds(),
+			"envelope_decode_ms": envelopeDuration.Milliseconds(),
+			"message_decode_ms":  messageDuration.Milliseconds(),
+			"filter_ms":          filterDuration.Milliseconds(),
+			"prepare_specs_ms":   prepareDuration.Milliseconds(),
+			"total_ms":           time.Since(started).Milliseconds(),
+		}).Debug("Dashboard API definitions fetch complete")
 
 		return specs, nil
 	}
 
 	return nil, errors.New("API definitions fetch retry attempts exhausted")
+}
+
+func dashboardAPIsPayloadHash(message json.RawMessage) [32]byte {
+	return sha256.Sum256(message)
 }
 
 var envRegex = regexp.MustCompile(`env://([^"]+)`)
@@ -2795,6 +2860,10 @@ func (a *APISpec) hasActiveMock() bool {
 }
 
 func (a *APISpec) hasVirtualEndpoint() bool {
+	if a.hasCompiledURLStatus(VirtualPath) {
+		return true
+	}
+
 	for _, version := range a.VersionData.Versions {
 		for _, virtual := range version.ExtendedPaths.Virtual {
 			if !virtual.Disabled {

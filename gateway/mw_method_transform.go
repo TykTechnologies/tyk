@@ -18,12 +18,7 @@ func (t *TransformMethod) Name() string {
 }
 
 func (t *TransformMethod) EnabledForSpec() bool {
-	for _, version := range t.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.MethodTransforms) > 0 {
-			return true
-		}
-	}
-	return false
+	return t.Spec.hasCompiledURLStatus(MethodTransformed)
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail

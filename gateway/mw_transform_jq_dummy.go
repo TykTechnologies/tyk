@@ -18,11 +18,8 @@ func (t *TransformJQMiddleware) Name() string {
 }
 
 func (t *TransformJQMiddleware) EnabledForSpec() bool {
-	for _, version := range t.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.TransformJQ) > 0 {
-			log.Warning("JQ transform not supported.")
-			return false
-		}
+	if t.Spec.hasCompiledURLStatus(TransformedJQ) {
+		log.Warning("JQ transform not supported.")
 	}
 
 	return false
