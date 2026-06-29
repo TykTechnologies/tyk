@@ -837,6 +837,9 @@ type PinnedPublicKey struct {
 	PublicKeys []string `bson:"publicKeys" json:"publicKeys"`
 }
 
+// pemPrefix is the start of a PEM-encoded block header.
+const pemPrefix = "-----BEGIN"
+
 // PinnedPublicKeys is a list of domains and pinned public keys for them.
 type PinnedPublicKeys []PinnedPublicKey
 
@@ -856,7 +859,11 @@ func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
 
 	i = 0
 	for _, domain := range domains {
-		ppk[i] = PinnedPublicKey{Domain: domain, PublicKeys: strings.Split(strings.ReplaceAll(publicKeys[domain], " ", ""), ",")}
+		val := publicKeys[domain]
+		if !strings.Contains(val, pemPrefix) {
+			val = strings.ReplaceAll(val, " ", "")
+		}
+		ppk[i] = PinnedPublicKey{Domain: domain, PublicKeys: strings.Split(val, ",")}
 		i++
 	}
 }
