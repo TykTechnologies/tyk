@@ -837,21 +837,14 @@ type PinnedPublicKey struct {
 	PublicKeys []string `bson:"publicKeys" json:"publicKeys"`
 }
 
-// pemPrefix is the start of a PEM-encoded block header.
-const pemPrefix = "-----BEGIN"
-
 // splitPublicKeys splits a comma-separated list of public key identifiers.
-// PEM blocks have surrounding whitespace trimmed; fingerprints have all spaces
-// removed (normalising values like "abc123, def456" into ["abc123", "def456"]).
+// Each entry is trimmed of surrounding whitespace; PEM blocks are preserved
+// intact.
 func splitPublicKeys(value string) []string {
 	parts := strings.Split(value, ",")
 	keys := make([]string, 0, len(parts))
 	for _, part := range parts {
-		if strings.Contains(part, pemPrefix) {
-			part = strings.TrimSpace(part)
-		} else {
-			part = strings.ReplaceAll(part, " ", "")
-		}
+		part = strings.TrimSpace(part)
 		if part != "" {
 			keys = append(keys, part)
 		}
