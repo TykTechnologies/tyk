@@ -61,8 +61,8 @@ github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6 h1:wwt23wdyi
 github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6/go.mod h1:v6v7Mlj08+EmEcXOfpuTxGt2qYU9yhqqtv4QF9Wf50E=
 github.com/TykTechnologies/goverify v0.0.0-20260203113354-7a104729566e h1:wbd35YYCywZbgc4Fk/G2pQHnvwYzjedrw8pNzUsVowg=
 github.com/TykTechnologies/goverify v0.0.0-20260203113354-7a104729566e/go.mod h1:WtiSLIlItUVsHyHQB1NG+de/L4/PTtmZWc9CnzTRBLs=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20260624141309-dae0d8d8d038 h1:akyeFvwB5ZnVq9jbGPx1pP33ETxp0ziDlt5r40HRCDY=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20260624141309-dae0d8d8d038/go.mod h1:bvVafmGebtdjIFG2bXkLd+O1jOjjU/3To+mQHcLr4KI=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20260610093432-c7048b604e16 h1:gqmN+bl7hZoRrrckPicIu+m+Y6k3o8oPYpA9jWy1YiM=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20260610093432-c7048b604e16/go.mod h1:bvVafmGebtdjIFG2bXkLd+O1jOjjU/3To+mQHcLr4KI=
 github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d h1:ntmDECMD7475TK/cxshJ1b8KJvUM1wppohd0qZjqUqI=
 github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d/go.mod h1:eOt2cxB9sZ80mz4q1UKzzk9CE4QZaS6jP20X2LwPwy8=
 github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36 h1:7nNsyocI/RKBqo73RR9G/SiFMZ8w2sN+HMsQXYp9wPI=
@@ -127,6 +127,10 @@ github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.21 h1:c31//R3x
 github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.21/go.mod h1:r6+pf23ouCB718FUxaqzZdbpYFyDtehyZcmP5KL9FkA=
 github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.21 h1:ZlvrNcHSFFWURB8avufQq9gFsheUgjVD9536obIknfM=
 github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.21/go.mod h1:cv3TNhVrssKR0O/xxLJVRfd2oazSnZnkUeTf6ctUwfQ=
+github.com/aws/aws-sdk-go-v2/service/kinesis v1.43.5 h1:LxgRVyuY+5DEPSX7kmin/V7toE8MWZ9U8n2dqRtX+RE=
+github.com/aws/aws-sdk-go-v2/service/kinesis v1.43.5/go.mod h1:eUebEBEqVfOwEyDDDbGauH4PNqDCuepRvTaNbJeWr5w=
+github.com/aws/aws-sdk-go-v2/service/lambda v1.88.5 h1:HWN7xwaV7Zwrn3Jlauio4u4aTMFgRzG2fblHWQeir/k=
+github.com/aws/aws-sdk-go-v2/service/lambda v1.88.5/go.mod h1:6HBXRyFFqOw+ALkJ6YGHfrr20/YXYv6X9pcZErXRvCA=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.97.3 h1:HwxWTbTrIHm5qY+CAEur0s/figc3qwvLWsNkF4RPToo=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.97.3/go.mod h1:uoA43SdFwacedBfSgfFSjjCvYe8aYBS7EnU5GZ/YKMM=
 github.com/aws/smithy-go v1.24.2 h1:FzA3bu/nt/vDvmnkg+R8Xl46gmzEDam6mZ1hzmwXFng=
