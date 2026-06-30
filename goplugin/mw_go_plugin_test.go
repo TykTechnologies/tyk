@@ -12,8 +12,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/user"
-
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func goPluginFilename() string {
@@ -895,7 +894,7 @@ func TestGoPlugin_DontWriteBodyInCaseIfPluginRespondsWith4xxOrHigher(t *testing.
 }
 
 func TestAnalyticsPluginBundle(t *testing.T) {
-	pluginName := "plugin.so"
+	pluginName := "goplugins.so"
 	ts := gateway.StartTest(func(c *config.Config) {
 		c.PublicKeyPath = ""
 		c.AnalyticsConfig.EnableDetailedRecording = true
@@ -910,15 +909,13 @@ func TestAnalyticsPluginBundle(t *testing.T) {
 
 		specs := ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.CustomMiddlewareBundle = analyticsPlugin
-			spec.AnalyticsPlugin.Enabled = true
-			spec.AnalyticsPlugin.PluginPath = pluginName
-			spec.AnalyticsPlugin.FuncName = "MyAnalyticsPluginAddTag"
 
 			spec.EnableDetailedRecording = true
 			spec.Proxy.ListenPath = "/test"
 		})
 		spec := specs[0]
 
+		require.NotNil(t, spec, "API should be created successfully")
 		require.NotNil(t, spec.AnalyticsPluginConfig, "Analytics plugin should have loaded successfully")
 
 		_, err = ts.Run(t, test.TestCase{
@@ -956,7 +953,22 @@ func analyticsBundle(pluginName string) (map[string]string, error) {
 	}
 
 	checksum := fmt.Sprintf("%x", md5.Sum(pluginData))
-	manifest := fmt.Sprintf(`{"file_list": ["%s"], "custom_middleware": {"driver": "goplugin"}, "checksum": "%s"}`, pluginName, checksum)
+	manifest := fmt.Sprintf(
+		`
+{
+	"file_list": ["%s"],
+	"custom_middleware": {
+		"analytics": {
+			"disabled": false,
+			"name": "MyAnalyticsPluginAddTag",
+			"path": "%s"
+		},
+		"driver": "goplugin"
+	},
+	"checksum": "%s"
+}
+`,
+		pluginName, pluginName, checksum)
 
 	return map[string]string{
 		"manifest.json": manifest,

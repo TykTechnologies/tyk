@@ -1560,6 +1560,7 @@ func resetSecuritySchemes(api *apidef.APIDefinition) {
 	// Custom
 	api.CustomPluginAuthEnabled = false
 	api.CustomMiddleware.AuthCheck = apidef.MiddlewareDefinition{Disabled: true}
+	api.CustomMiddleware.Analytics = apidef.MiddlewareDefinition{Disabled: true}
 	api.CustomMiddleware.IdExtractor = apidef.MiddlewareIdExtractor{Disabled: true}
 }
 
