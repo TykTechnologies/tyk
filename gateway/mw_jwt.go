@@ -10,7 +10,9 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -834,23 +836,27 @@ func getScopeFromClaim(claims jwt.MapClaims, scopeClaimName string) []string {
 }
 
 func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
-	polIDs := []string{}
-
 	// add all policies matched from scope-policy mapping
-	policiesToApply := map[string]bool{}
+	policiesToApplySet := make(map[string]struct{}, len(mapping))
+	unmatchedScopes := make(map[string]struct{}, len(mapping))
+
 	for _, scopeItem := range scope {
 		if policyID, ok := mapping[scopeItem]; ok {
-			policiesToApply[policyID] = true
+			policiesToApplySet[policyID] = struct{}{}
 			log.Debugf("Found a matching policy for scope item: %s", scopeItem)
 		} else {
-			log.Errorf("Couldn't find a matching policy for scope item: %s", scopeItem)
+			unmatchedScopes[scopeItem] = struct{}{}
 		}
 	}
-	for id := range policiesToApply {
-		polIDs = append(polIDs, id)
+
+	// https://tyktech.atlassian.net/browse/TT-5893
+	if len(policiesToApplySet) > 0 {
+		for scopeItem := range unmatchedScopes {
+			log.Debugf("Couldn't find a matching policy for scope item: %s", scopeItem)
+		}
 	}
 
-	return polIDs
+	return slices.Collect(maps.Keys(policiesToApplySet))
 }
 
 func (k *JWTMiddleware) getOAuthClientIDFromClaim(claims jwt.MapClaims) string {
