@@ -214,7 +214,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
-          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64,linux/s390x' }}
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
           outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
@@ -224,6 +224,8 @@ jobs:
           labels: ${{ steps.ci_metadata_ee.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
+            BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
       - name: Verify compression format for ee CI image
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
         run: |
@@ -291,7 +293,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
-          platforms: linux/amd64,linux/arm64,linux/s390x
+          platforms: linux/amd64,linux/arm64
           file: ci/Dockerfile.distroless
           provenance: mode=max
           cache-from: type=gha
@@ -300,6 +302,8 @@ jobs:
           labels: ${{ steps.tag_metadata_ee.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
+            BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
       - name: Verify compression format for ee prod image
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
@@ -343,6 +347,18 @@ jobs:
             verify_manifest manifest.json
           fi
           echo "Success: All layers are uniformly compressed using gzip."
+      - name: Attach base image VEX to ee
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          docker scout vex get --org tykio -o /tmp/ee-vex.json tykio/dhi-busybox:1.37-fips || true
+          if [ -f /tmp/ee-vex.json ]; then
+            cosign attest --yes --type openvex \
+              --predicate /tmp/ee-vex.json \
+              docker.tyk.io/tyk-gateway/tyk-gateway-ee:${{ github.ref_name }} || true
+            cosign attest --yes --type openvex \
+              --predicate /tmp/ee-vex.json \
+              tykio/tyk-gateway-ee:${{ github.ref_name }} || true
+          fi
       - name: Docker metadata for fips CI
         id: ci_metadata_fips
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
