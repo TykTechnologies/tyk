@@ -119,6 +119,40 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+      - name: Validate Go version
+        run: |
+          GO_VERSION_STR=$(docker run --rm tykio/golang-cross:${{ matrix.golang_cross }} go version 2>&1 || true)
+          if [[ ! "$GO_VERSION_STR" =~ go[0-9]+ ]]; then
+            echo "::warning::Could not determine Go version from container: $GO_VERSION_STR"
+            exit 1
+          fi
+          GO_VERSION=$(echo "$GO_VERSION_STR" | awk '{print $3}' | sed 's/^go//')
+          echo "Go version in container: $GO_VERSION"
+          MINOR_VERSION=$(echo "$GO_VERSION" | cut -d. -f1,2)
+          echo "Minor version: $MINOR_VERSION"
+
+          # Fetch latest patches
+          LATEST_PATCH_STR=$(curl -s 'https://go.dev/dl/?mode=json&include=all' || true)
+          if [ -z "$LATEST_PATCH_STR" ]; then
+            echo "::warning::Could not fetch Go releases from API. Skipping validation."
+            exit 0
+          fi
+          LATEST_PATCH=$(echo "$LATEST_PATCH_STR" | jq -r --arg minor "go${MINOR_VERSION}" '.[] | select(.stable == true and (.version | startswith($minor + ".") or . == $minor)) | .version' | head -n 1 | sed 's/^go//')
+
+          if [ -n "$LATEST_PATCH" ]; then
+            echo "Latest patch version for Go $MINOR_VERSION is $LATEST_PATCH"
+            if [ "$GO_VERSION" != "$LATEST_PATCH" ]; then
+              echo "::error::Go version validation failed!"
+              echo "Used version: $GO_VERSION (in tykio/golang-cross:${{ matrix.golang_cross }})"
+              echo "Latest patch: $LATEST_PATCH"
+              echo "Please update the buildenv Go version to the latest patch version."
+              exit 1
+            else
+              echo "Go version is up to date: $GO_VERSION"
+            fi
+          else
+            echo "::warning::Could not determine latest patch version for Go $MINOR_VERSION from API. Skipping validation."
+          fi
       - name: Build
         env:
           NFPM_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
@@ -129,7 +163,7 @@ jobs:
           ci/bin/unlock-agent.sh
           git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
-          goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign,docker' || '--skip=docker' }}' | tee /tmp/build.sh
+          goreleaser release --timeout 120m --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign,docker' || '--skip=docker' }}' | tee /tmp/build.sh
           chmod +x /tmp/build.sh
           docker run --rm --privileged -e GITHUB_TOKEN=${{ github.token }} \
           -e GOPRIVATE=github.com/TykTechnologies                                \
@@ -150,6 +184,15 @@ jobs:
           -v /tmp/build.sh:/tmp/build.sh                                         \
           -w /go/src/github.com/TykTechnologies/tyk                      \
           tykio/golang-cross:${{ matrix.golang_cross }} /tmp/build.sh
+      - name: Install Docker Scout CLI
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          mkdir -p ~/.docker/cli-plugins
+          curl --proto '=https' --tlsv1.2 -fsSL https://github.com/docker/scout-cli/releases/download/v1.22.0/docker-scout_1.22.0_linux_amd64.tar.gz -o /tmp/scout.tar.gz
+          curl --proto '=https' --tlsv1.2 -fsSL https://github.com/docker/scout-cli/releases/download/v1.22.0/docker-scout_1.22.0_checksums.txt -o /tmp/scout_checksums.txt
+          grep "docker-scout_1.22.0_linux_amd64.tar.gz" /tmp/scout_checksums.txt | awk '{print $1 "  /tmp/scout.tar.gz"}' | sha256sum -c -
+          tar -xzf /tmp/scout.tar.gz -C ~/.docker/cli-plugins/ docker-scout
+          chmod +x ~/.docker/cli-plugins/docker-scout
       - name: Docker metadata for ee CI
         id: ci_metadata_ee
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
@@ -307,9 +350,6 @@ jobs:
       - name: Attach base image VEX to ee
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
-          # Install Docker Scout CLI
-          curl -fsSL https://raw.githubusercontent.com/docker/scout-cli/v1.20.4/install.sh -o /tmp/scout-install.sh && sh /tmp/scout-install.sh 2>/dev/null
-          # Extract VEX from the DHI base image
           docker scout vex get --org tykio -o /tmp/ee-vex.json tykio/dhi-busybox:1.37-fips || true
           if [ -f /tmp/ee-vex.json ]; then
             cosign attest --yes --type openvex \
@@ -475,9 +515,6 @@ jobs:
       - name: Attach base image VEX to fips
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
-          # Install Docker Scout CLI
-          curl -fsSL https://raw.githubusercontent.com/docker/scout-cli/v1.20.4/install.sh -o /tmp/scout-install.sh && sh /tmp/scout-install.sh 2>/dev/null
-          # Extract VEX from the DHI base image
           docker scout vex get --org tykio -o /tmp/fips-vex.json tykio/dhi-busybox:1.37-fips || true
           if [ -f /tmp/fips-vex.json ]; then
             cosign attest --yes --type openvex \
@@ -986,7 +1023,7 @@ jobs:
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk-analytics
 
           # Build packages for current platform (GOOS and GOARCH are set via docker -e)
-          goreleaser release --clean -f ci/goreleaser/goreleaser.yml --snapshot --skip=sign,docker
+          goreleaser release --timeout 120m --clean -f ci/goreleaser/goreleaser.yml --snapshot --skip=sign,docker
           EOF
 
           chmod +x /tmp/build-dashboard.sh
