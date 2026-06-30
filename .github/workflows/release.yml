@@ -184,6 +184,15 @@ jobs:
           -v /tmp/build.sh:/tmp/build.sh                                         \
           -w /go/src/github.com/TykTechnologies/tyk                      \
           tykio/golang-cross:${{ matrix.golang_cross }} /tmp/build.sh
+      - name: Install Docker Scout CLI
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          mkdir -p ~/.docker/cli-plugins
+          curl --proto '=https' --tlsv1.2 -fsSL https://github.com/docker/scout-cli/releases/download/v1.22.0/docker-scout_1.22.0_linux_amd64.tar.gz -o /tmp/scout.tar.gz
+          curl --proto '=https' --tlsv1.2 -fsSL https://github.com/docker/scout-cli/releases/download/v1.22.0/docker-scout_1.22.0_checksums.txt -o /tmp/scout_checksums.txt
+          grep "docker-scout_1.22.0_linux_amd64.tar.gz" /tmp/scout_checksums.txt | awk '{print $1 "  /tmp/scout.tar.gz"}' | sha256sum -c -
+          tar -xzf /tmp/scout.tar.gz -C ~/.docker/cli-plugins/ docker-scout
+          chmod +x ~/.docker/cli-plugins/docker-scout
       - name: Docker metadata for ee CI
         id: ci_metadata_ee
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
@@ -205,7 +214,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
-          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64,linux/s390x' }}
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
           outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
@@ -215,6 +224,8 @@ jobs:
           labels: ${{ steps.ci_metadata_ee.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
+            BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
       - name: Verify compression format for ee CI image
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
         run: |
@@ -282,7 +293,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
-          platforms: linux/amd64,linux/arm64,linux/s390x
+          platforms: linux/amd64,linux/arm64
           file: ci/Dockerfile.distroless
           provenance: mode=max
           cache-from: type=gha
@@ -291,6 +302,8 @@ jobs:
           labels: ${{ steps.tag_metadata_ee.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
+            BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
       - name: Verify compression format for ee prod image
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
@@ -334,6 +347,18 @@ jobs:
             verify_manifest manifest.json
           fi
           echo "Success: All layers are uniformly compressed using gzip."
+      - name: Attach base image VEX to ee
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        run: |
+          docker scout vex get --org tykio -o /tmp/ee-vex.json tykio/dhi-busybox:1.37-fips || true
+          if [ -f /tmp/ee-vex.json ]; then
+            cosign attest --yes --type openvex \
+              --predicate /tmp/ee-vex.json \
+              docker.tyk.io/tyk-gateway/tyk-gateway-ee:${{ github.ref_name }} || true
+            cosign attest --yes --type openvex \
+              --predicate /tmp/ee-vex.json \
+              tykio/tyk-gateway-ee:${{ github.ref_name }} || true
+          fi
       - name: Docker metadata for fips CI
         id: ci_metadata_fips
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
@@ -490,14 +515,6 @@ jobs:
       - name: Attach base image VEX to fips
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
-          # Install Docker Scout CLI
-          mkdir -p ~/.docker/cli-plugins
-          curl --proto '=https' --tlsv1.2 -fsSL https://github.com/docker/scout-cli/releases/download/v1.22.0/docker-scout_1.22.0_linux_amd64.tar.gz -o /tmp/scout.tar.gz
-          echo "49a6b18768f0ba9cb90e6aafd76c887fddad34c0124ca7ee81e2b422cd860b07  /tmp/scout.tar.gz" | sha256sum -c -
-          tar -xzf /tmp/scout.tar.gz -C ~/.docker/cli-plugins/ docker-scout
-          chmod +x ~/.docker/cli-plugins/docker-scout
-
-          # Extract VEX from the DHI base image
           docker scout vex get --org tykio -o /tmp/fips-vex.json tykio/dhi-busybox:1.37-fips || true
           if [ -f /tmp/fips-vex.json ]; then
             cosign attest --yes --type openvex \
