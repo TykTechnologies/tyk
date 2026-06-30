@@ -98,6 +98,8 @@ require (
 	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d
 	github.com/TykTechnologies/opentelemetry v0.0.22
 	github.com/alecthomas/kingpin/v2 v2.4.0
+	github.com/aws/aws-sdk-go-v2/service/kinesis v1.43.5
+	github.com/aws/aws-sdk-go-v2/service/lambda v1.88.5
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.3
 	github.com/getkin/kin-openapi v0.133.0
 	github.com/go-redis/redismock/v9 v9.2.0
