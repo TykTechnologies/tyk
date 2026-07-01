@@ -171,6 +171,10 @@ func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
 		return true
 	}
 
+	if newSpec.IsSyntheticMCPAdapter() {
+		return true
+	}
+
 	if existingSpec.Checksum != newSpec.Checksum {
 		return true
 	}

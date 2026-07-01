@@ -16,6 +16,7 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/model"
@@ -1527,21 +1528,16 @@ func TestHasMCPFields(t *testing.T) {
 }
 
 func TestValidateMCPFieldsInAccessRights(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	specs := ts.Gw.BuildAndLoadAPI(
-		func(spec *APISpec) {
-			spec.APIID = "mcp-api-id"
-			spec.MarkAsMCP()
-		},
-		func(spec *APISpec) {
-			spec.APIID = "non-mcp-api-id"
-			spec.Name = "non-mcp-api"
-		},
-	)
-	mcpAPIID := specs[0].APIID
-	nonMCPAPIID := specs[1].APIID
+	mcpAPIID := "mcp-api-id"
+	nonMCPAPIID := "non-mcp-api-id"
+	pairedMCPAPIID := "paired-mcp-api-id"
+	mcpDef := &apidef.APIDefinition{APIID: mcpAPIID, OrgID: "org-1"}
+	mcpDef.MarkAsMCP()
+	gw := &Gateway{apisByID: map[string]*APISpec{
+		mcpAPIID:       {APIDefinition: mcpDef},
+		nonMCPAPIID:    {APIDefinition: &apidef.APIDefinition{APIID: nonMCPAPIID, Name: "non-mcp-api"}},
+		pairedMCPAPIID: pairedMCPProxySpec(pairedMCPAPIID, "org-1", "rest-1", nil),
+	}}
 
 	mcpAR := user.AccessDefinition{
 		JSONRPCMethods: []user.JSONRPCMethodLimit{{Name: "tools/call"}},
@@ -1555,6 +1551,10 @@ func TestValidateMCPFieldsInAccessRights(t *testing.T) {
 		{
 			name:         "MCP fields on MCP Proxy are accepted",
 			accessRights: map[string]user.AccessDefinition{mcpAPIID: mcpAR},
+		},
+		{
+			name:         "MCP fields on REST-as-MCP paired proxy are accepted",
+			accessRights: map[string]user.AccessDefinition{pairedMCPAPIID: mcpAR},
 		},
 		{
 			name:         "MCP fields on non-MCP API are rejected",
@@ -1592,9 +1592,9 @@ func TestValidateMCPFieldsInAccessRights(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := ts.Gw.validateMCPFieldsInAccessRights(tc.accessRights)
+			err := gw.validateMCPFieldsInAccessRights(tc.accessRights)
 			if tc.expectErr != "" {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.expectErr)
 			} else {
 				assert.NoError(t, err)
@@ -1654,21 +1654,16 @@ func TestHasNonMCPFields(t *testing.T) {
 }
 
 func TestValidateNonMCPFieldsOnMCPProxy(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	specs := ts.Gw.BuildAndLoadAPI(
-		func(spec *APISpec) {
-			spec.APIID = "mcp-api-id"
-			spec.MarkAsMCP()
-		},
-		func(spec *APISpec) {
-			spec.APIID = "non-mcp-api-id"
-			spec.Name = "non-mcp-api"
-		},
-	)
-	mcpAPIID := specs[0].APIID
-	nonMCPAPIID := specs[1].APIID
+	mcpAPIID := "mcp-api-id"
+	nonMCPAPIID := "non-mcp-api-id"
+	pairedMCPAPIID := "paired-mcp-api-id"
+	mcpDef := &apidef.APIDefinition{APIID: mcpAPIID, OrgID: "org-1"}
+	mcpDef.MarkAsMCP()
+	gw := &Gateway{apisByID: map[string]*APISpec{
+		mcpAPIID:       {APIDefinition: mcpDef},
+		nonMCPAPIID:    {APIDefinition: &apidef.APIDefinition{APIID: nonMCPAPIID, Name: "non-mcp-api"}},
+		pairedMCPAPIID: pairedMCPProxySpec(pairedMCPAPIID, "org-1", "rest-1", nil),
+	}}
 
 	cases := []struct {
 		name         string
@@ -1679,6 +1674,13 @@ func TestValidateNonMCPFieldsOnMCPProxy(t *testing.T) {
 			name: "AllowedURLs on MCP Proxy is rejected",
 			accessRights: map[string]user.AccessDefinition{
 				mcpAPIID: {AllowedURLs: []user.AccessSpec{{URL: "/foo", Methods: []string{"GET"}}}},
+			},
+			expectErr: "HTTP/REST and GraphQL fields cannot be configured on MCP Proxies",
+		},
+		{
+			name: "AllowedURLs on REST-as-MCP paired proxy is rejected",
+			accessRights: map[string]user.AccessDefinition{
+				pairedMCPAPIID: {AllowedURLs: []user.AccessSpec{{URL: "/foo", Methods: []string{"GET"}}}},
 			},
 			expectErr: "HTTP/REST and GraphQL fields cannot be configured on MCP Proxies",
 		},
@@ -1737,9 +1739,9 @@ func TestValidateNonMCPFieldsOnMCPProxy(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := ts.Gw.validateNonMCPFieldsOnMCPProxy(tc.accessRights)
+			err := gw.validateNonMCPFieldsOnMCPProxy(tc.accessRights)
 			if tc.expectErr != "" {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.expectErr)
 			} else {
 				assert.NoError(t, err)

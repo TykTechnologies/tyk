@@ -271,6 +271,48 @@ func TestAPIDefinition_MarkAsMCP(t *testing.T) {
 	})
 }
 
+func TestAPIDefinition_IsPairedMCPAdapterProxy(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		target string
+		want   bool
+	}{
+		{
+			name:   "canonical mcp path target",
+			target: "tyk://rest-1/mcp",
+			want:   true,
+		},
+		{
+			name:   "id-prefixed mcp path target",
+			target: "tyk://id:rest-1/mcp/",
+			want:   true,
+		},
+		{
+			name:   "fallback suffix target",
+			target: "tyk://rest-1__mcp-server",
+			want:   true,
+		},
+		{
+			name:   "non mcp path target",
+			target: "tyk://rest-1/not-mcp",
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			api := &APIDefinition{Proxy: ProxyConfig{TargetURL: tt.target}}
+
+			assert.Equal(t, tt.want, api.IsPairedMCPAdapterProxy())
+		})
+	}
+}
+
 func TestSchema(t *testing.T) {
 	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
 
