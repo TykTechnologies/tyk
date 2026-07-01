@@ -27,33 +27,30 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/stretchr/testify/assert"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
-	"github.com/TykTechnologies/tyk/rpc"
-
 	"github.com/golang-jwt/jwt/v4"
-
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/TykTechnologies/tyk/internal/reflect"
-	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/reflect"
+	"github.com/TykTechnologies/tyk/internal/uuid"
+	tyklog "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
-	_ "github.com/TykTechnologies/tyk/templates" // Don't delete
 	"github.com/TykTechnologies/tyk/test"
-	_ "github.com/TykTechnologies/tyk/testdata" // Don't delete
 	"github.com/TykTechnologies/tyk/user"
+
+	_ "github.com/TykTechnologies/tyk/templates" // Don't delete
+	_ "github.com/TykTechnologies/tyk/testdata"  // Don't delete
 )
 
 const jsonContentType = "application/json"
@@ -1027,8 +1024,9 @@ type Test struct {
 	TestServerRouter *mux.Router
 	MockHandle       *test.DnsMockHandle
 
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx       context.Context
+	cancel    context.CancelFunc
+	cancelLog tyklog.CancelFn
 
 	dynamicHandlers map[string]http.HandlerFunc
 }
@@ -1039,6 +1037,8 @@ type SlaveDataCenter struct {
 }
 
 func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {
+	cancel := log.Reset()
+
 	t := &Test{
 		dynamicHandlers: make(map[string]http.HandlerFunc),
 	}
@@ -1050,6 +1050,7 @@ func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig
 	}
 
 	t.Gw = t.start(genConf)
+	t.cancelLog = cancel
 
 	return t
 }
@@ -1309,6 +1310,7 @@ func (s *Test) ReloadGatewayProxy() {
 
 func (s *Test) Close() {
 	defer s.cancel()
+	defer s.cancelLog()
 
 	for _, p := range s.Gw.DefaultProxyMux.proxies {
 		if p.listener != nil {

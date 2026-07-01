@@ -4,11 +4,11 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/internal/policy"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -18,7 +18,8 @@ const testAPIID = "test-api"
 // and returns the resulting AccessDefinition for testAPIID.
 func applyPolicies(t *testing.T, policies []user.Policy) user.AccessDefinition {
 	t.Helper()
-	svc := policy.New(nil, nil, logrus.New())
+	logger, _ := tyklog.NewNullLogger()
+	svc := policy.New(nil, nil, logger)
 	session := &user.SessionState{}
 	session.SetCustomPolicies(policies)
 	require.NoError(t, svc.Apply(session))
@@ -255,7 +256,8 @@ const testAPIID2 = "test-api-2"
 
 func applySession(t *testing.T, policies []user.Policy) *user.SessionState {
 	t.Helper()
-	svc := policy.New(nil, nil, logrus.New())
+	logger, _ := tyklog.NewNullLogger()
+	svc := policy.New(nil, nil, logger)
 	session := &user.SessionState{}
 	session.SetCustomPolicies(policies)
 	require.NoError(t, svc.Apply(session))

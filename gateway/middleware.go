@@ -296,7 +296,7 @@ type BaseMiddleware struct {
 // The logger duplication is used so that basemiddleware copies can be created for different middleware.
 func NewBaseMiddleware(gw *Gateway, spec *APISpec, proxy ReturningHttpHandler, logger *logrus.Entry) *BaseMiddleware {
 	if logger == nil {
-		logger = logrus.NewEntry(log)
+		logger = log.NewEntry()
 	}
 	baseMid := &BaseMiddleware{
 		Spec:   spec,
@@ -346,18 +346,18 @@ func (t *BaseMiddleware) SetName(name string) {
 	defer t.loggerMu.Unlock()
 
 	if t.logger == nil {
-		t.logger = logrus.NewEntry(log)
+		t.logger = log.NewEntry()
 	}
 	t.logger = t.logger.WithField("mw", name)
 }
 
 // Logger is used by middleware process functions.
-func (t *BaseMiddleware) Logger() (logger *logrus.Entry) {
+func (t *BaseMiddleware) Logger() *logrus.Entry {
 	t.loggerMu.Lock()
 	defer t.loggerMu.Unlock()
 
 	if t.logger == nil {
-		t.logger = logrus.NewEntry(log)
+		t.logger = log.NewEntry()
 	}
 	return t.logger
 }
@@ -367,7 +367,7 @@ func (t *BaseMiddleware) SetRequestLogger(r *http.Request) *logrus.Entry {
 	defer t.loggerMu.Unlock()
 
 	if t.logger == nil {
-		t.logger = logrus.NewEntry(log)
+		t.logger = log.NewEntry()
 	}
 	t.logger = t.Gw.getLogEntryForRequest(t.logger, r, ctxGetAuthToken(r), nil)
 	return t.logger
@@ -1005,7 +1005,7 @@ func (b *BaseTykResponseHandler) setLogger(logger *logrus.Entry) {
 
 func (b *BaseTykResponseHandler) logger() *logrus.Entry {
 	if b.log == nil {
-		return logrus.NewEntry(log)
+		return log.NewEntry()
 	}
 	return b.log
 }
