@@ -1,7 +1,7 @@
 # yamllint disable rule:line-length
 ---
 name: CI tests
-
+# test line
 on:
   pull_request:
     branches:
