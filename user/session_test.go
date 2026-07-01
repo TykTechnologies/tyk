@@ -41,6 +41,28 @@ func TestSessionState_Touch_and_IsModified(t *testing.T) {
 	assert.Equal(t, "tyk", result.OrgID)
 }
 
+func TestSessionState_MarkAsRestored_and_Clone(t *testing.T) {
+	// A freshly created session is NOT restored, so UpdateSession writes it
+	// unconditionally (create). Only sessions loaded from storage are restored,
+	// so their updates use the conditional set-if-exists write (TT-16259).
+	assert.False(t, NewSessionState().IsRestored())
+	assert.False(t, (&SessionState{}).IsRestored())
+
+	sess := NewSessionState()
+	sess.MarkAsRestored()
+	assert.True(t, sess.IsRestored())
+
+	// Clone MUST carry isRestored: SessionDetail marks the loaded session restored
+	// and returns a Clone, and that clone is what the request path later writes back.
+	// If Clone dropped the flag, restored updates would fall back to an unconditional
+	// write and the resurrection race would return.
+	restoredClone := sess.Clone()
+	assert.True(t, restoredClone.IsRestored(), "Clone must preserve a restored session")
+
+	freshClone := NewSessionState().Clone()
+	assert.False(t, freshClone.IsRestored(), "Clone must preserve a non-restored session")
+}
+
 func TestIsHashType(t *testing.T) {
 	assert.False(t, IsHashType(""))
 	assert.False(t, IsHashType("invalid"))

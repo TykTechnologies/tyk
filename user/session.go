@@ -349,9 +349,11 @@ type SessionState struct {
 	// use Touch() to set it, and IsModified() to get it.
 	modified bool
 
-	// isRestored
-	// The flag holds information if session was restored or not.
-	// Use MarkAsRestored() to mark session as restored, and IsRestored() to get it.
+	// isRestored is true when this session was loaded (restored) from storage,
+	// as opposed to being freshly constructed for a create. UpdateSession uses it to
+	// choose between an unconditional write (create) and a conditional set-if-exists
+	// write (update), so a quota update that races a delete cannot recreate the key.
+	// Set via MarkAsRestored(), read via IsRestored().
 	isRestored bool
 }
 
@@ -386,12 +388,15 @@ func (s *SessionState) Reset() {
 	s.modified = false
 }
 
-// MarkAsRestored marks the session as new.
+// MarkAsRestored marks the session as having been loaded from storage (an existing
+// session), as opposed to one freshly created. Called by SessionDetail after a read.
 func (s *SessionState) MarkAsRestored() {
 	s.isRestored = true
 }
 
-// IsRestored informs if session is a new one.
+// IsRestored reports whether the session was loaded from storage (true) rather than
+// freshly created (false). Used by UpdateSession to pick a conditional set-if-exists
+// write for restored sessions so a racing update cannot resurrect a deleted key.
 func (s *SessionState) IsRestored() bool {
 	return s.isRestored
 }

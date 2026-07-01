@@ -647,3 +647,51 @@ func (c *countingStorageHandler) SetKeyEx(string, string, int64) error {
 func (c *countingStorageHandler) SetRawKeyEx(string, string, int64) error {
 	return nil
 }
+
+// BenchmarkUpdateSession backs the "no performance degradation" criterion for the
+// TT-16259 fix at the full UpdateSession path (marshal + dispatch + cache clear).
+// "create" is a fresh session (unconditional SetKey); "update" is a restored session
+// (conditional SetKeyEx -> SET ... XX). The two should be on par.
+//
+// Run: go test -run '^$' -bench BenchmarkUpdateSession -benchmem ./gateway/
+func BenchmarkUpdateSession(b *testing.B) {
+	ts := StartTest(func(_ *config.Config) {})
+	defer ts.Close()
+
+	sm := ts.Gw.GlobalSessionManager
+
+	newSession := func() *user.SessionState {
+		s := &user.SessionState{}
+		s.QuotaMax = 100000000
+		s.QuotaRemaining = 99999999
+		s.OrgID = "bench-org"
+		return s
+	}
+
+	b.Run("create_unconditional", func(b *testing.B) {
+		s := newSession() // not restored -> unconditional SetKey
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			if err := sm.UpdateSession("bench-create", s, 0, false); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("update_conditional", func(b *testing.B) {
+		// seed so the conditional write hits an existing key
+		if err := sm.UpdateSession("bench-update", newSession(), 0, false); err != nil {
+			b.Fatal(err)
+		}
+		s := newSession()
+		s.MarkAsRestored() // restored -> conditional SetKeyEx (SET ... XX)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			if err := sm.UpdateSession("bench-update", s, 0, false); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}

@@ -287,6 +287,70 @@ func TestLock(t *testing.T) {
 	})
 }
 
+// TestSetKeyEx verifies the conditional set-if-exists write used by the session
+// UPDATE path (gateway UpdateSession for restored sessions). It is the storage-level,
+// load-independent regression for the TT-16259 delete-vs-update resurrection race:
+// a write that lands after a delete must NOT recreate the key.
+func TestSetKeyEx(t *testing.T) {
+	store := &RedisCluster{KeyPrefix: "test-setkeyex-", ConnectionHandler: rc}
+	assert.True(t, store.ConnectionHandler.isConnected(context.Background(), DefaultConn))
+	store.DeleteAllKeys()
+	t.Cleanup(func() { store.DeleteAllKeys() })
+
+	t.Run("SetKeyEx updates an existing key", func(t *testing.T) {
+		const key = "existing"
+		assert.NoError(t, store.SetKey(key, "v1", 0))
+		assert.NoError(t, store.SetKeyEx(key, "v2", 0))
+
+		got, err := store.GetKey(key)
+		assert.NoError(t, err)
+		assert.Equal(t, "v2", got)
+	})
+
+	t.Run("SetKeyEx does not recreate a deleted key", func(t *testing.T) {
+		const key = "deleted-then-updated"
+		assert.NoError(t, store.SetKey(key, "v1", 0))
+		assert.True(t, store.DeleteKey(key))
+
+		// Simulates a racing quota update landing after the delete. The unconditional
+		// SetKey would resurrect the key here; the conditional SetKeyEx must no-op.
+		assert.NoError(t, store.SetKeyEx(key, "v2", 0))
+
+		exists, err := store.Exists(key)
+		assert.NoError(t, err)
+		assert.False(t, exists, "SetKeyEx must not recreate a deleted key")
+
+		_, err = store.GetKey(key)
+		assert.ErrorIs(t, err, ErrKeyNotFound)
+	})
+
+	t.Run("SetKeyEx on a never-existing key is a no-op", func(t *testing.T) {
+		const key = "never-existed"
+		assert.NoError(t, store.SetKeyEx(key, "v1", 0))
+
+		exists, err := store.Exists(key)
+		assert.NoError(t, err)
+		assert.False(t, exists)
+	})
+
+	t.Run("SetRawKeyEx mirrors the conditional semantics (hashed path)", func(t *testing.T) {
+		raw := "test-setkeyex-raw"
+
+		// updates when present
+		assert.NoError(t, store.SetRawKey(raw, "v1", 0))
+		assert.NoError(t, store.SetRawKeyEx(raw, "v2", 0))
+		got, err := store.GetRawKey(raw)
+		assert.NoError(t, err)
+		assert.Equal(t, "v2", got)
+
+		// no resurrection after delete
+		assert.True(t, store.DeleteRawKey(raw))
+		assert.NoError(t, store.SetRawKeyEx(raw, "v3", 0))
+		_, err = store.GetRawKey(raw)
+		assert.ErrorIs(t, err, ErrKeyNotFound)
+	})
+}
+
 func TestInternalStorages(t *testing.T) {
 	tcs := []struct {
 		name         string
