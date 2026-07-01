@@ -244,3 +244,28 @@ func RejectWithoutBody(
 
 	rw.WriteHeader(403)
 }
+
+func MyAnalyticsPluginAddTag(record *analytics.AnalyticsRecord) {
+	str, err := base64.StdEncoding.DecodeString(record.RawResponse)
+	record.Tags = append(record.Tags, "TEST")
+
+	if err != nil {
+		return
+	}
+
+	var b = &bytes.Buffer{}
+	b.Write(str)
+
+	r := bufio.NewReader(b)
+	var resp *http.Response
+	resp, err = http.ReadResponse(r, nil)
+	if err != nil {
+		return
+	}
+	resp.Header.Del("Server")
+	resp.Header.Add("Test", "test")
+
+	var bNew bytes.Buffer
+	_ = resp.Write(&bNew)
+	record.RawResponse = base64.StdEncoding.EncodeToString(bNew.Bytes())
+}

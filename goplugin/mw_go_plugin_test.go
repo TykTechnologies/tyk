@@ -5,19 +5,26 @@ package goplugin_test
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/base64"
+	"fmt"
 	"net/http"
+	"os"
 	"testing"
-
-	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"gopkg.in/vmihailenco/msgpack.v2"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func goPluginFilename() string {
@@ -884,4 +891,87 @@ func TestGoPlugin_DontWriteBodyInCaseIfPluginRespondsWith4xxOrHigher(t *testing.
 			}...)
 		})
 	})
+}
+
+func TestAnalyticsPluginBundle(t *testing.T) {
+	pluginName := "goplugins.so"
+	ts := gateway.StartTest(func(c *config.Config) {
+		c.PublicKeyPath = ""
+		c.AnalyticsConfig.EnableDetailedRecording = true
+	})
+	defer ts.Close()
+
+	t.Run("successfully loads and executes bundled analytics plugin", func(t *testing.T) {
+		bundle, err := analyticsBundle(pluginName)
+		require.NoError(t, err)
+
+		analyticsPlugin := ts.RegisterBundle("goAnalyticsBundle", bundle)
+
+		specs := ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.CustomMiddlewareBundle = analyticsPlugin
+
+			spec.EnableDetailedRecording = true
+			spec.Proxy.ListenPath = "/test"
+		})
+		spec := specs[0]
+
+		require.NotNil(t, spec, "API should be created successfully")
+		require.NotNil(t, spec.AnalyticsPluginConfig, "Analytics plugin should have loaded successfully")
+
+		_, err = ts.Run(t, test.TestCase{
+			Path: "/test",
+			Code: 200,
+		})
+		require.NoError(t, err)
+
+		ts.Gw.Analytics.Flush()
+
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet("tyk-system-analytics")
+		require.Len(t, results, 1, "Should have generated 1 analytics record")
+
+		var record analytics.AnalyticsRecord
+		err = msgpack.Unmarshal([]byte(results[0].(string)), &record)
+		require.NoError(t, err)
+
+		// Plugin adds a custom tag named TEST
+		assert.Contains(t, record.Tags, "TEST", "Tag should have been added")
+
+		rawResp, err := base64.StdEncoding.DecodeString(record.RawResponse)
+		require.NoError(t, err)
+
+		respStr := string(rawResp)
+		// Plugin removes 'Server' header and adds a new header 'Test' with value 'test'
+		assert.NotContains(t, respStr, "Server:", "Server header should be deleted")
+		assert.Contains(t, respStr, "Test: test", "Test header should be added")
+	})
+}
+
+func analyticsBundle(pluginName string) (map[string]string, error) {
+	pluginData, err := os.ReadFile(goPluginFilename())
+	if err != nil {
+		return nil, fmt.Errorf("%s must be built before running this test", pluginName)
+	}
+
+	checksum := fmt.Sprintf("%x", md5.Sum(pluginData))
+	manifest := fmt.Sprintf(
+		`
+{
+	"file_list": ["%s"],
+	"custom_middleware": {
+		"analytics": {
+			"disabled": false,
+			"name": "MyAnalyticsPluginAddTag",
+			"path": "%s"
+		},
+		"driver": "goplugin"
+	},
+	"checksum": "%s"
+}
+`,
+		pluginName, pluginName, checksum)
+
+	return map[string]string{
+		"manifest.json": manifest,
+		pluginName:      string(pluginData),
+	}, nil
 }
