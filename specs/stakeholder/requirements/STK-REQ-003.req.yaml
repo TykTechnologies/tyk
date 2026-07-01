@@ -1,0 +1,92 @@
+id: STK-REQ-003
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The policy engine shall enforce rate limits using highest-rate-wins semantics when merging rate limits from multiple policies or API-level limits. Empty rate limits must never be applied, and equal rate limits must preserve the existing value.
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: Rate limiting protects backend APIs from overload. The highest-rate-wins rule ensures that the most permissive policy governs when multiple policies apply, which is the correct business semantic for Tyk's multi-policy model. Applying empty (zero) rate limits would effectively disable API access.
+tags:
+    - rate-limiting
+    - traffic-control
+variables: []
+traces:
+    implemented_by_extra:
+        - internal/policy/apply.go
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-05-19T17:10:21.373089Z"
+    reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:184277cd9d7748e4a83dfbe764b5de02f2574bee24b6931f63ca5bf5c8b14fa9
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: true
+    impact_reviews:
+        - requirement: STK-REQ-003
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:184277cd9d7748e4a83dfbe764b5de02f2574bee24b6931f63ca5bf5c8b14fa9
+          approval_fingerprint: sha256:eb4db3d224e55fa46b72b522f2c5bb6ebdabd55261db5afe635e57b5edf3d0df
+          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
+          reviewed_at: "2026-05-19T17:01:30Z"
+history:
+    created_by: ai:claude
+    created_at: "2026-04-14T10:00:00Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:33Z"
+obligation_checklist:
+    - nominal
+    - rate_limit_boundary
+    - error_handling
+    - policy_merge
+    - determinism
+    - commutativity
+    - monotonicity
+    - overflow_safety
+    - nil_safety
+stakeholder:
+    persona: API platform administrator
+    story: As an API platform administrator, I need rate limits to be enforced using highest-rate-wins semantics so that the most permissive policy governs when multiple policies apply.
+    acceptance_criteria:
+        - id: STK-REQ-003-AC-01
+          text: Given a policy with a higher rate than the current session, when rate limits are applied, then the policy rate replaces the session rate
+          testable: true
+          derived_reqs:
+            - SYS-REQ-021
+        - id: STK-REQ-003-AC-02
+          text: Given a policy with an empty rate (Rate=0 or Per=0), when rate limits are applied, then the empty rate is never applied
+          testable: true
+          derived_reqs:
+            - SYS-REQ-022
+        - id: STK-REQ-003-AC-03
+          text: Given a policy with an equal rate to the current session, when rate limits are applied, then the existing rate is preserved
+          testable: true
+          derived_reqs:
+            - SYS-REQ-041
+        - id: STK-REQ-003-AC-04
+          text: Given multiple policies with different rates, when they are merged, then the highest rate wins
+          testable: true
+          derived_reqs:
+            - SYS-REQ-021
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:33Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

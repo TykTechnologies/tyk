@@ -10,6 +10,16 @@ type GraphAccessDefinition struct {
 
 // Policy represents a user policy
 // swagger:model
+//
+// reqproof:model
+// field QuotaMax int64
+// field QuotaRenewalRate int64
+// field Rate float64
+// field Per float64
+// field ThrottleInterval float64
+// field ThrottleRetryLimit int
+// field Active bool
+// field IsInactive bool
 type Policy struct {
 	MID                           model.ObjectID                   `bson:"_id,omitempty" json:"_id" gorm:"primaryKey;column:_id"`
 	ID                            string                           `bson:"id,omitempty" json:"id"`
@@ -66,4 +76,55 @@ type PolicyPartitions struct {
 // Enabled reports if partitioning is enabled.
 func (p PolicyPartitions) Enabled() bool {
 	return p.Quota || p.RateLimit || p.Acl || p.Complexity
+}
+
+// IsActiveQuotaConfigured reports whether the policy is active (Active &&
+// !IsInactive) and has a positive QuotaMax — i.e. it can serve quota-gated
+// requests at all. The policy engine's per-request quota check uses this
+// natural correctness condition.
+//
+// reqproof:requires p.QuotaMax > 0
+// reqproof:requires p.Active == true
+// reqproof:requires p.IsInactive == false
+// reqproof:lemma policy_meets_quota_when_active_and_quota_positive func(p Policy) bool {
+//   return p.QuotaMax > 0 && p.Active && !p.IsInactive
+// }
+func (p Policy) IsActiveQuotaConfigured() bool {
+	return p.QuotaMax > 0 && p.Active && !p.IsInactive
+}
+
+// HasNonNegativeQuota reports whether the policy's QuotaMax is
+// non-negative — the storage-level invariant the Apply path relies on.
+// Admin API validation guarantees QuotaMax >= 0.
+//
+// reqproof:requires p.QuotaMax >= 0
+// reqproof:lemma policy_quota_max_valid_iff_nonneg func(p Policy) bool {
+//   return p.QuotaMax >= 0
+// }
+func (p Policy) HasNonNegativeQuota() bool {
+	return p.QuotaMax >= 0
+}
+
+// HasConfiguredRate reports whether the policy's Rate and Per are both
+// strictly positive — the rate-limit subsystem treats "either zero" as
+// disabled (see user.RateLimit.Duration()).
+//
+// reqproof:requires p.Rate > 0.0
+// reqproof:requires p.Per > 0.0
+// reqproof:lemma policy_rate_pair_consistency func(p Policy) bool {
+//   return p.Rate > 0.0 && p.Per > 0.0
+// }
+func (p Policy) HasConfiguredRate() bool {
+	return p.Rate > 0.0 && p.Per > 0.0
+}
+
+// HasConfiguredThrottle reports whether the policy's ThrottleRetryLimit
+// is positive — i.e. retries are enabled with a finite budget.
+//
+// reqproof:requires p.ThrottleRetryLimit > 0
+// reqproof:lemma policy_throttle_configured_when_positive func(p Policy) bool {
+//   return p.ThrottleRetryLimit > 0
+// }
+func (p Policy) HasConfiguredThrottle() bool {
+	return p.ThrottleRetryLimit > 0
 }

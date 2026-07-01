@@ -1,0 +1,51 @@
+id: SYS-REQ-075
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !apply_requested | !clear_requested | !store_available | panic_free
+description: All policy engine entry points must handle edge-case inputs without panicking. Specifically, nil sessions, zero-value sessions, sessions with nil AccessRights maps, sessions with empty or malformed policy IDs, and concurrent read/write on shared state must never cause a panic. The component must return an error for invalid inputs rather than crashing the gateway process.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: A panic in the policy engine crashes the entire gateway process, affecting all APIs and consumers. The engine must be resilient to all edge-case inputs, including nil sessions, sessions constructed by middleware with partial initialization, and concurrent access patterns. This is especially important for ClearSession which is called during hot-reload scenarios.
+tags:
+    - panic-free
+    - safety
+    - resilience
+    - input-validation
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-005
+        - STK-REQ-006
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-05-19T17:10:22.431633Z"
+    reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:a48f4e65ab4cce8b747268a6962dac10f485316a9349c90e93d525bf5272fb61
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T12:00:00Z"
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-05-08T00:00:00Z"
+    last_modified_by: ai:claude
+    last_modified_at: "2026-05-08T00:00:00Z"
+obligation_class: panic_free_input_handling
+lifecycle:
+    change_history:
+        - date: "2026-05-08T00:00:00Z"
+          from: ""
+          to: review
+          reason: New obligation class panic_free_input_handling covering STK-REQ-005, STK-REQ-006
+          changed_by: ai:claude

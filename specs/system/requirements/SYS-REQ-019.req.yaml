@@ -1,0 +1,70 @@
+id: SYS-REQ-019
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !clear_requested | !policy_found | error_reported | session_cleared
+description: ClearSession must reset quota/rate/complexity values when the referenced policy is found. Without clearing, stale session values would prevent policy updates from taking effect.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+component: policy
+rationale: ClearSession must reset quota/rate/complexity values when the referenced policy is found. Without clearing, stale session values would prevent policy updates from taking effect.
+tags: []
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-002
+    verified_by_extra:
+        - FLIP:policy/tc-027
+        - FLIP:policy/tc-028
+        - FLIP:policy/tc-029
+    documented_by_extra:
+        - README.md
+    reviewed_at: "2026-05-19T17:10:22.133308Z"
+    reviewed_by: human:leonidbugaev
+    reviewed_fingerprint: sha256:5a89f80edc474171e85f0e41579251bb1963c8012cddd084a6bb747762491ea8
+verification:
+    assurance_level: A
+    formalization_status: valid
+    review:
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
+        ai_generated: false
+    gaps_reviewed_at: "2026-05-18T16:37:44.006591Z"
+    gaps_reviewed_by: leonidbugaev
+    impact_reviews:
+        - requirement: SYS-REQ-019
+          artifact: internal/policy/apply.go
+          decision: no-authored-change
+          reviewer: leonidbugaev
+          reason: 'Policy deep-dive: system requirements consistent with implementation'
+          base: origin/master
+          requirement_fingerprint: sha256:5a89f80edc474171e85f0e41579251bb1963c8012cddd084a6bb747762491ea8
+          approval_fingerprint: sha256:be60cd1440ee7732a2e8be09ca236862108a2bc547a8877d2fa2e8e619463b28
+          artifact_fingerprint: sha256:df8f95cf7284c1ad46443a7b7bc8deaa48887d4e5c3c530e6231217f9b26e423
+          reviewed_at: "2026-05-19T17:01:30Z"
+history:
+    created_by: human:cli
+    created_at: "2026-03-28T13:28:53Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:34Z"
+obligation_class: nominal
+obligation_checklist:
+    - nominal
+    - error_handling
+    - determinism
+    - idempotency
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:34Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli
+audit_ignore:
+    - lint-formalization-quality
