@@ -3,7 +3,27 @@ no_interface:
     declared: true
     reason: The storage dummy proof slice covers focused local helper behavior under tested inputs only; cross-component runtime integration, external service availability, persistence durability, distributed behavior, and final client-visible behavior are outside this component boundary.
 variables:
-    - name: storage_dummy_operation_terminal
+    - name: storage_dummy_construction_determined
       type: bool
       direction: output
-      description: The storage dummy operation reaches a terminal local result for the focused tested inputs, such as returning the expected value, selecting the expected local branch, surfacing an explicit local error, or preserving the documented local fallback behavior.
+      description: DummyStorage construction initializes deterministic local data and index maps for the focused tested inputs.
+    - name: storage_dummy_key_values_determined
+      type: bool
+      direction: output
+      description: DummyStorage key-value set, get, raw get, multi-get, missing-key, and delete behavior produces deterministic local implementation results.
+    - name: storage_dummy_wildcard_keys_determined
+      type: bool
+      direction: output
+      description: DummyStorage wildcard key listing and deletion behavior produces deterministic local implementation results.
+    - name: storage_dummy_list_membership_determined
+      type: bool
+      direction: output
+      description: DummyStorage list append, range, remove, and existence behavior across data and index maps produces deterministic local implementation results.
+    - name: storage_dummy_connect_determined
+      type: bool
+      direction: output
+      description: DummyStorage connect behavior reports deterministic local success for the focused tested input.
+    - name: storage_dummy_unsupported_panics_determined
+      type: bool
+      direction: output
+      description: DummyStorage methods that are intentionally unsupported preserve deterministic explicit panic behavior for the focused tested inputs.

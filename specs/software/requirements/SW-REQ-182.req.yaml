@@ -4,8 +4,8 @@ status: approved
 priority: shall
 category: gateway_upstream_tls_validation
 req_type: guarantee
-fretish: the gateway_upstream_tls_validation shall always satisfy gateway_upstream_tls_validation_operation_terminal
-description: The gateway package implementation shall preserve focused upstream TLS validation behavior by enabling public-key pin validation only when API or global pins are configured, selecting pinned public-key fingerprints from global and API maps, accepting upstream public keys that match configured pins, rejecting mismatched pins, falling back to normal verification when API certificate pinning is disabled, applying configured global pins, validating pins through the tested proxy path, and applying forced CommonName validation for tested direct and proxied upstream inputs, without claiming complete TLS handshake semantics, certificate chain policy correctness, arbitrary proxy behavior, downstream client certificate selection, TLS version or cipher policy, certificate material storage durability, route generation, authentication enforcement, distributed synchronization, or final client-visible gateway behavior outside the focused upstream TLS validation tests.
+fretish: the gateway_upstream_tls_validation shall always satisfy (gateway_upstream_tls_pinning_enablement_determined & gateway_upstream_tls_fingerprint_selection_determined & gateway_upstream_tls_pin_match_determined & gateway_upstream_tls_pin_mismatch_determined & gateway_upstream_tls_disabled_and_global_pins_determined & gateway_upstream_tls_proxy_pinning_determined & gateway_upstream_tls_common_name_determined)
+description: "The gateway package implementation shall preserve seven focused upstream TLS validation mechanisms: public-key pin enablement, pinned fingerprint selection from API and global maps, API pin match acceptance, pin mismatch rejection, API pinning-disabled fallback and global pin behavior, tested proxy pinning behavior, and forced CommonName validation for tested direct and proxied upstream inputs. This requirement does not claim complete TLS handshake semantics, certificate chain policy correctness, arbitrary proxy behavior, downstream client certificate selection, TLS version or cipher policy, certificate material storage durability, route generation, authentication enforcement, distributed synchronization, or final client-visible gateway behavior outside the focused upstream TLS validation tests."
 formalization_strategy: fretish
 informal_verification:
     method: unit_tests
@@ -13,7 +13,7 @@ informal_verification:
     verified: true
 parent: SYS-REQ-194
 component: gateway_upstream_tls_validation
-rationale: This software requirement owns local gateway/cert.go public-key pinning and CommonName validation helper mechanics under focused gateway package tests only. Broader TLS transport and certificate-management semantics remain outside this proof slice.
+rationale: This software requirement owns local gateway/cert.go public-key pinning and CommonName validation helper mechanics under focused gateway package tests only. Its formal model is decomposed into pin enablement, fingerprint selection, match, mismatch, disabled/global behavior, proxy pinning, and CommonName outputs so each behavior can be reviewed and witnessed independently. Broader TLS transport and certificate-management semantics remain outside this proof slice.
 tags:
     - gateway
     - certificate
@@ -25,9 +25,9 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-194
-    reviewed_at: "2026-06-21T11:59:05.460892Z"
+    reviewed_at: "2026-06-21T18:30:53.386817Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:eb2f15887c62c305388e43954d9af1610b6ac14e5c4fb64788bd03fadf258f33
+    reviewed_fingerprint: sha256:55d52f0fa29630fbedd8573a1b82d0cd3fd16c75071d3e09457366d9cef096b3
 verification:
     assurance_level: A
     formalization_status: valid

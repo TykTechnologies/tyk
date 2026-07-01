@@ -4,8 +4,8 @@ status: approved
 priority: shall
 category: gateway_api_loader_auxiliary
 req_type: guarantee
-fretish: the gateway_api_loader_auxiliary shall always satisfy gateway_api_loader_auxiliary_operation_terminal
-description: Gateway API loader auxiliary handling shall preserve deterministic local results for tested GraphQL playground route registration and cloud endpoint selection, repeated HTTP service loading with New Relic middleware mounting, aggregate mTLS detection for loaded API specs, invalid-OAS panic recovery text, organization data-age enforcement when organization quotas are enabled, and quota-key option application, without claiming complete API loading, complete route generation, full middleware ordering or execution, New Relic agent correctness, upstream connectivity, GraphQL execution correctness, complete panic-recovery behavior, mTLS authentication enforcement, organization quota correctness, dashboard or RPC synchronization, distributed behavior, or final client-visible gateway behavior outside the focused API-loader auxiliary tests.
+fretish: the gateway_api_loader_auxiliary shall always satisfy (gateway_api_loader_playground_routes_determined & gateway_api_loader_newrelic_mount_determined & gateway_api_loader_mtls_detection_determined & gateway_api_loader_panic_recovery_determined & gateway_api_loader_org_data_age_determined & gateway_api_loader_quota_key_determined)
+description: "Gateway API loader auxiliary handling shall preserve deterministic local results for six focused behaviors: GraphQL playground route registration and cloud endpoint selection, repeated HTTP service loading with New Relic middleware mounting, aggregate mTLS detection for loaded API specs, invalid-OAS panic recovery text, organization data-age enforcement when organization quotas are enabled, and quota-key option application. This requirement does not claim complete API loading, complete route generation, full middleware ordering or execution, New Relic agent correctness, upstream connectivity, GraphQL execution correctness, complete panic-recovery behavior, mTLS authentication enforcement, organization quota correctness, dashboard or RPC synchronization, distributed behavior, or final client-visible gateway behavior outside the focused API-loader auxiliary tests."
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: STK-REQ-100
 component: gateway_api_loader_auxiliary
-rationale: This system requirement owns tested local auxiliary API-loader decisions only. Complete route generation, request handling, and distributed gateway behavior remain outside this proof slice.
+rationale: This system requirement owns tested local auxiliary API-loader decisions only. Its formal model is decomposed into playground route, New Relic mount, mTLS detection, panic-recovery, organization data-age, and quota-key outputs so each behavior can be reviewed and witnessed independently. Complete route generation, request handling, and distributed gateway behavior remain outside this proof slice.
 tags:
     - gateway
     - api-loader
@@ -22,9 +22,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-100
-    reviewed_at: "2026-06-21T11:59:05.844835Z"
+    reviewed_at: "2026-06-21T18:30:14.869395Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:a6d8e0d18ae153cbfb31ccd66521de3a44e023b0d7922d50fd5236dbb6120cc4
+    reviewed_fingerprint: sha256:708d5cf5fd51def174ba6558a6a6b11c3e75494e5fd5e0163ba7102479547b7b
 verification:
     assurance_level: A
     formalization_status: valid

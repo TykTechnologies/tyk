@@ -41,6 +41,7 @@ var (
 	EncodeRequestToEvent = event.EncodeRequestToEvent
 )
 
+// SW-REQ-112
 func ctxGetOrCreateData(r *http.Request) CtxData {
 	data := ctxGetData(r)
 

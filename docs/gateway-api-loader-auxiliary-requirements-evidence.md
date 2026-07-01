@@ -3,8 +3,8 @@
 `STK-REQ-100`, `SYS-REQ-188`, and `SW-REQ-175` cover focused gateway API
 loader auxiliary behavior in `gateway/api_loader.go`.
 
-The executable evidence is `gateway/api_loader_test.go`. It covers GraphQL
-playground route registration for tested playground paths and cloud endpoint
+The executable evidence is `gateway/api_loader_test.go`. The formal model is
+decomposed into GraphQL playground route registration and cloud endpoint
 selection, New Relic middleware mounting through repeated `loadHTTPService`
 calls on a tested router, aggregate mTLS detection for loaded API specs,
 invalid-OAS panic recovery text, organization data-age enforcement when

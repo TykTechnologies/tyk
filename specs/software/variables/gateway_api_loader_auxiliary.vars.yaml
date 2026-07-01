@@ -1,6 +1,26 @@
 component: gateway_api_loader_auxiliary
 variables:
-    - name: gateway_api_loader_auxiliary_operation_terminal
+    - name: gateway_api_loader_playground_routes_determined
       type: bool
       direction: output
-      description: The gateway api loader auxiliary implementation operation reaches a terminal local result for the focused tested inputs, such as returning the expected value, selecting the expected local branch, surfacing an explicit local error, or preserving the documented local fallback behavior.
+      description: GraphQL playground route registration and cloud endpoint selection produce deterministic local implementation results for the focused tested inputs.
+    - name: gateway_api_loader_newrelic_mount_determined
+      type: bool
+      direction: output
+      description: Repeated HTTP service loading mounts New Relic middleware on the tested router exactly enough for the local middleware presence assertion.
+    - name: gateway_api_loader_mtls_detection_determined
+      type: bool
+      direction: output
+      description: Aggregate mTLS detection over loaded API specs produces deterministic local implementation results for the focused tested inputs.
+    - name: gateway_api_loader_panic_recovery_determined
+      type: bool
+      direction: output
+      description: Invalid-OAS panic recovery returns the expected local error text for the focused tested input.
+    - name: gateway_api_loader_org_data_age_determined
+      type: bool
+      direction: output
+      description: Organization data-age enforcement updates gateway and spec configuration when organization quotas are enabled for the focused tested input.
+    - name: gateway_api_loader_quota_key_determined
+      type: bool
+      direction: output
+      description: Quota-key option application stores the provided quota key in local process-spec options for the focused tested inputs.

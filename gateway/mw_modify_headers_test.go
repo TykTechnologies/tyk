@@ -39,6 +39,7 @@ func TestTransformHeaders_EnabledForSpec(t *testing.T) {
 	assert.True(t, th.EnabledForSpec())
 }
 
+// Verifies: SW-REQ-080
 func TestVersionInfo_GlobalHeadersEnabled(t *testing.T) {
 	v := apidef.VersionInfo{
 		GlobalHeaders:       map[string]string{},
@@ -65,6 +66,7 @@ func TestVersionInfo_GlobalHeadersEnabled(t *testing.T) {
 	assert.False(t, v.GlobalHeadersEnabled())
 }
 
+// Verifies: SW-REQ-080
 func TestVersionInfo_HasEndpointReqHeader(t *testing.T) {
 	v := apidef.VersionInfo{}
 
@@ -84,6 +86,7 @@ func TestVersionInfo_HasEndpointReqHeader(t *testing.T) {
 	assert.True(t, v.HasEndpointReqHeader())
 }
 
+// Verifies: SW-REQ-080
 func TestHeaderInjectionMeta_Enabled(t *testing.T) {
 	h := apidef.HeaderInjectionMeta{Disabled: true}
 	assert.False(t, h.Enabled())

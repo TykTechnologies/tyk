@@ -136,6 +136,187 @@ func TestMdcbStorageAcceptance(t *testing.T) {
 }
 
 // Verifies: STK-REQ-098, SYS-REQ-186, SW-REQ-173
+// STK-REQ-098:STK-REQ-098-AC-01:acceptance
+// SYS-REQ-186:nominal:nominal
+// SYS-REQ-186:boundary:nominal
+// SYS-REQ-186:error_handling:nominal
+// SYS-REQ-186:encoding_safety:nominal
+// SYS-REQ-186:determinism:nominal
+// SW-REQ-173:nominal:nominal
+// SW-REQ-173:boundary:nominal
+// SW-REQ-173:error_handling:nominal
+// SW-REQ-173:encoding_safety:nominal
+// SW-REQ-173:determinism:nominal
+// MCDC SYS-REQ-186: storage_mdcb_construction_determined=T, storage_mdcb_local_rpc_reads_determined=T, storage_mdcb_resource_cache_determined=T, storage_mdcb_local_write_determined=T, storage_mdcb_key_collection_delegation_determined=T, storage_mdcb_list_membership_determined=T, storage_mdcb_connect_determined=T, storage_mdcb_unsupported_panics_determined=T => TRUE
+// MCDC SW-REQ-173: storage_mdcb_construction_determined=T, storage_mdcb_local_rpc_reads_determined=T, storage_mdcb_resource_cache_determined=T, storage_mdcb_local_write_determined=T, storage_mdcb_key_collection_delegation_determined=T, storage_mdcb_list_membership_determined=T, storage_mdcb_connect_determined=T, storage_mdcb_unsupported_panics_determined=T => TRUE
+func TestMdcbStorageReqProof(t *testing.T) {
+	localHandler := NewDummyStorage()
+	rpcHandler := NewDummyStorage()
+	logger := getTestLogger()
+	var certPulls int
+	mdcb := NewMdcbStorage(localHandler, rpcHandler, logger, func(key, val string) error {
+		certPulls++
+		assert.Equal(t, "raw-cert", key)
+		assert.Equal(t, "cert-value", val)
+		return nil
+	})
+
+	assert.Equal(t, localHandler, mdcb.local)
+	assert.Equal(t, rpcHandler, mdcb.rpc)
+	assert.Equal(t, logger, mdcb.logger)
+	assert.NotNil(t, mdcb.OnRPCCertPull)
+	assert.True(t, mdcb.Connect())
+
+	assert.NoError(t, localHandler.SetKey("local-key", "local-value", 0))
+	assert.NoError(t, rpcHandler.SetKey("rpc-key", "rpc-value", 0))
+	assert.NoError(t, rpcHandler.SetKey("oauth-clientid.client", "oauth-value", 0))
+	assert.NoError(t, rpcHandler.SetKey("raw-cert", "cert-value", 0))
+
+	value, err := mdcb.GetKey("local-key")
+	assert.NoError(t, err)
+	assert.Equal(t, "local-value", value)
+
+	value, err = mdcb.GetKey("rpc-key")
+	assert.NoError(t, err)
+	assert.Equal(t, "rpc-value", value)
+
+	values, err := mdcb.GetMultiKey([]string{"missing", "rpc-key"})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"rpc-value"}, values)
+
+	_, err = mdcb.GetMultiKey([]string{"missing-a", "missing-b"})
+	assert.Error(t, err)
+
+	assert.Equal(t, resourceOauthClient, getResourceType("oauth-clientid.client"))
+	assert.Equal(t, resourceCertificate, getResourceType("raw-cert"))
+	assert.Equal(t, resourceApiKey, getResourceType("apikey.value"))
+	assert.Equal(t, resourceKey, getResourceType("ordinary-key"))
+
+	value, err = mdcb.GetKey("oauth-clientid.client")
+	assert.NoError(t, err)
+	assert.Equal(t, "oauth-value", value)
+	cachedOAuth, err := localHandler.GetKey("oauth-clientid.client")
+	assert.NoError(t, err)
+	assert.Equal(t, "oauth-value", cachedOAuth)
+
+	value, err = mdcb.GetKey("raw-cert")
+	assert.NoError(t, err)
+	assert.Equal(t, "cert-value", value)
+	assert.Equal(t, 1, certPulls)
+
+	assert.NoError(t, mdcb.SetKey("write-local", "write-value", 0))
+	value, err = localHandler.GetKey("write-local")
+	assert.NoError(t, err)
+	assert.Equal(t, "write-value", value)
+	_, err = rpcHandler.GetKey("write-local")
+	assert.EqualError(t, err, "Not found")
+
+	assert.True(t, mdcb.DeleteKey("write-local"))
+	assert.False(t, mdcb.DeleteKey("missing-key"))
+
+	assert.NoError(t, localHandler.SetKey("local-list-key", "value", 0))
+	assert.Equal(t, []string{"local-key", "local-list-key", "oauth-clientid.client"}, sortedDummyKeys(mdcb.GetKeys("*")))
+	assert.True(t, localHandler.DeleteScanMatch("*"))
+	assert.Equal(t, []string{"oauth-clientid.client", "raw-cert", "rpc-key"}, sortedDummyKeys(mdcb.GetKeys("*")))
+	assert.True(t, mdcb.DeleteScanMatch("*"))
+	assert.Nil(t, mdcb.GetKeys("prefix*"))
+
+	mdcb.AppendToSet("shared-list", "one")
+	mdcb.AppendToSet("shared-list", "two")
+	listValues, err := mdcb.GetListRange("shared-list", 0, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"one", "two"}, listValues)
+
+	exists, err := mdcb.Exists("shared-list")
+	assert.NoError(t, err)
+	assert.True(t, exists)
+
+	assert.NoError(t, mdcb.RemoveFromList("shared-list", "one"))
+	listValues, err = mdcb.GetListRange("shared-list", 0, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"two"}, listValues)
+
+	t.Run("delegated key and set operations", func(t *testing.T) {
+		setup := setupTest(t)
+		defer setup.CleanUp()
+
+		filtered := map[string]string{"key": "value"}
+		setup.Local.EXPECT().GetKeysAndValuesWithFilter("prefix").Return(filtered)
+		assert.Equal(t, filtered, setup.MdcbStorage.GetKeysAndValuesWithFilter("prefix"))
+
+		setup.Local.EXPECT().AddToSet("set-key", "value")
+		setup.MdcbStorage.AddToSet("set-key", "value")
+
+		setup.Local.EXPECT().RemoveFromSet("set-key", "value")
+		setup.MdcbStorage.RemoveFromSet("set-key", "value")
+
+		setup.Local.EXPECT().GetSet("set-key").Return(nil, errors.New("local miss"))
+		setup.Remote.EXPECT().GetSet("set-key").Return(map[string]string{"rpc": "value"}, nil)
+		got, err := setup.MdcbStorage.GetSet("set-key")
+		assert.NoError(t, err)
+		assert.Equal(t, map[string]string{"rpc": "value"}, got)
+
+		setup.Local.EXPECT().SetKey("key", "value", int64(10)).Return(errors.New("write failed"))
+		assert.EqualError(t, setup.MdcbStorage.SetKey("key", "value", 10), "cannot save key in local")
+	})
+
+	t.Run("delegated list and connection operations", func(t *testing.T) {
+		setup := setupTest(t)
+		defer setup.CleanUp()
+
+		setup.Local.EXPECT().GetListRange("list-key", int64(0), int64(2)).Return(nil, errors.New("local miss"))
+		setup.Remote.EXPECT().GetListRange("list-key", int64(0), int64(2)).Return([]string{"fallback"}, nil)
+		got, err := setup.MdcbStorage.GetListRange("list-key", 0, 2)
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"fallback"}, got)
+
+		setup.Local.EXPECT().RemoveFromList("list-key", "value").Return(errors.New("local failed"))
+		setup.Remote.EXPECT().RemoveFromList("list-key", "value").Return(nil)
+		assert.NoError(t, setup.MdcbStorage.RemoveFromList("list-key", "value"))
+
+		setup.Local.EXPECT().Exists("key").Return(false, errors.New("local failed"))
+		setup.Remote.EXPECT().Exists("key").Return(false, errors.New("rpc failed"))
+		exists, err := setup.MdcbStorage.Exists("key")
+		assert.EqualError(t, err, "cannot find key in storages")
+		assert.False(t, exists)
+
+		setup.Local.EXPECT().Connect().Return(true)
+		setup.Remote.EXPECT().Connect().Return(false)
+		assert.False(t, setup.MdcbStorage.Connect())
+	})
+
+	unsupportedCases := []struct {
+		name string
+		run  func()
+	}{
+		{name: "GetRawKey", run: func() { _, _ = mdcb.GetRawKey("key") }},
+		{name: "SetRawKey", run: func() { _ = mdcb.SetRawKey("key", "value", 0) }},
+		{name: "SetExp", run: func() { _ = mdcb.SetExp("key", 0) }},
+		{name: "GetExp", run: func() { _, _ = mdcb.GetExp("key") }},
+		{name: "DeleteAllKeys", run: func() { _ = mdcb.DeleteAllKeys() }},
+		{name: "DeleteRawKey", run: func() { _ = mdcb.DeleteRawKey("key") }},
+		{name: "DeleteRawKeys", run: func() { _ = mdcb.DeleteRawKeys([]string{"key"}) }},
+		{name: "GetKeysAndValues", run: func() { _ = mdcb.GetKeysAndValues() }},
+		{name: "DeleteKeys", run: func() { _ = mdcb.DeleteKeys([]string{"key"}) }},
+		{name: "Decrement", run: func() { mdcb.Decrement("key") }},
+		{name: "IncrememntWithExpire", run: func() { _ = mdcb.IncrememntWithExpire("key", 0) }},
+		{name: "SetRollingWindow", run: func() { _, _ = mdcb.SetRollingWindow("key", 1, "value", false) }},
+		{name: "GetRollingWindow", run: func() { _, _ = mdcb.GetRollingWindow("key", 1, false) }},
+		{name: "GetAndDeleteSet", run: func() { _ = mdcb.GetAndDeleteSet("key") }},
+		{name: "GetKeyPrefix", run: func() { _ = mdcb.GetKeyPrefix() }},
+		{name: "AddToSortedSet", run: func() { mdcb.AddToSortedSet("key", "value", 1) }},
+		{name: "GetSortedSetRange", run: func() { _, _, _ = mdcb.GetSortedSetRange("key", "0", "1") }},
+		{name: "RemoveSortedSetRange", run: func() { _ = mdcb.RemoveSortedSetRange("key", "0", "1") }},
+	}
+
+	for _, tc := range unsupportedCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.PanicsWithValue(t, "implement me", tc.run)
+		})
+	}
+}
+
+// Verifies: STK-REQ-098, SYS-REQ-186, SW-REQ-173
 // SW-REQ-173:nominal:nominal
 // SW-REQ-173:boundary:nominal
 // SW-REQ-173:error_handling:nominal

@@ -4,7 +4,7 @@ status: approved
 priority: shall
 category: gateway_runtime
 req_type: guarantee
-fretish: the external_http_client shall always satisfy external_http_client_operation_terminal
+fretish: the external_http_client shall always satisfy (external_http_client_service_config_determined & external_http_client_service_client_determined & external_http_client_proxy_selection_determined & external_http_client_mtls_loading_determined & external_http_client_mtls_error_classification_determined & external_http_client_jwk_fetch_determined)
 description: External-service HTTP client handling shall preserve deterministic local client factory results for tested inputs by detecting and merging service configuration, constructing service-specific clients, applying service timeouts and transports, selecting and bypassing proxies, loading mTLS certificates and CA pools from files or the certificate store, classifying mTLS errors, and fetching JWK data through a supplied client and parser without claiming network reachability, external service availability, proxy server behavior, certificate authority trust correctness beyond the focused tests, production certificate-store persistence, JWK cryptographic validation, OAuth/JWT protocol correctness, or final client-visible gateway behavior beyond the focused HTTP client factory tests.
 formalization_strategy: fretish
 informal_verification:
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: STK-REQ-094
 component: external_http_client
-rationale: This system requirement owns local external HTTP client factory behavior only. Real external integrations and protocol-level behavior remain outside this proof slice.
+rationale: This system requirement owns local external HTTP client factory behavior only. Its formal model is decomposed into service configuration, service client construction, proxy selection, mTLS loading, mTLS error classification, and JWK fetch outputs so each behavior can be reviewed and witnessed independently. Real external integrations and protocol-level behavior remain outside this proof slice.
 tags:
     - gateway-runtime
     - http-client
@@ -22,9 +22,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-094
-    reviewed_at: "2026-06-21T11:59:05.766852Z"
+    reviewed_at: "2026-06-21T18:23:44.94705Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:990cc88b6712b83b9cba4bb69a341c75110ac3742c1dccdf5f433a1d999573e3
+    reviewed_fingerprint: sha256:8fcea44d99adcfbb281767ddda44ba3be2d46bbd3d17f494d7b6d1a895603d37
 verification:
     assurance_level: A
     formalization_status: valid

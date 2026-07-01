@@ -8,6 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Verifies: STK-REQ-037, SYS-REQ-125, SW-REQ-112
+// SW-REQ-112:nominal:nominal
+// SW-REQ-112:boundary:nominal
 func Test_ctxGetOrCreateData(t *testing.T) {
 	t.Run("returns data if already exists", func(t *testing.T) {
 		req, err := http.NewRequestWithContext(t.Context(), "GET", "/", nil)

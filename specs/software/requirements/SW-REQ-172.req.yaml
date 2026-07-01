@@ -4,7 +4,7 @@ status: approved
 priority: shall
 category: storage
 req_type: guarantee
-fretish: the storage_dummy shall always satisfy storage_dummy_operation_terminal
+fretish: the storage_dummy shall always satisfy (storage_dummy_construction_determined & storage_dummy_key_values_determined & storage_dummy_wildcard_keys_determined & storage_dummy_list_membership_determined & storage_dummy_connect_determined & storage_dummy_unsupported_panics_determined)
 description: The dummy storage implementation shall preserve local in-memory behavior for tested inputs by constructing empty data and index maps, reading present and missing keys, setting and deleting keys, deleting or listing wildcard-matched keys, appending, ranging, and removing list values, checking key existence across data and index maps, reporting connect success, and preserving explicit panic behavior for unsupported dummy storage methods without claiming production Redis behavior, persistence, TTL handling, sorted-set semantics, rolling-window semantics, raw-key mutation, bulk deletion semantics, concurrency safety, or final client-visible behavior beyond the focused dummy storage tests.
 formalization_strategy: fretish
 informal_verification:
@@ -13,7 +13,7 @@ informal_verification:
     verified: true
 parent: SYS-REQ-185
 component: storage_dummy
-rationale: This software requirement owns local storage/dummy.go mechanics and focused package tests only. Production storage semantics and unsupported-method implementation are outside this proof slice.
+rationale: This software requirement owns local storage/dummy.go mechanics and focused package tests only. Its formal model is decomposed into construction, key-value map behavior, wildcard key behavior, list/index-list behavior, connect behavior, and explicit unsupported-method panic outputs so each behavior can be reviewed and witnessed independently. Production storage semantics and unsupported-method implementation are outside this proof slice.
 tags:
     - storage
     - dummy
@@ -23,9 +23,9 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-185
-    reviewed_at: "2026-06-21T11:59:04.954156Z"
+    reviewed_at: "2026-06-21T18:18:16.307496Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:30678f3a0b0bbff3aa4958d29d1e9f0b581ba460de2c1d96baaabff0a5b618dd
+    reviewed_fingerprint: sha256:5e4c5e9e9513a1726662402d91832f99e0f19a8e19c5c333d1050bb2acfae276
 verification:
     assurance_level: A
     formalization_status: valid

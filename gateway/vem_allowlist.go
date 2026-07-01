@@ -13,6 +13,7 @@ type PrimitiveCategory struct {
 // hasOperationAllowEnabled checks if any operation has allow middleware enabled.
 // Operations are path-level configurations in OAS (e.g., operationId-based middleware).
 // This is generic JSON-RPC logic, not specific to MCP.
+// Implements: SW-REQ-135
 func hasOperationAllowEnabled(operations oas.Operations) bool {
 	for _, op := range operations {
 		if op != nil && op.Allow != nil && op.Allow.Enabled {
@@ -25,6 +26,7 @@ func hasOperationAllowEnabled(operations oas.Operations) bool {
 // hasPrimitiveAllowEnabled checks if any primitive has allow middleware enabled.
 // Primitives are protocol-specific resources (MCP tools/resources/prompts, A2A actions, etc.).
 // This is generic for any protocol that uses MCPPrimitives structure.
+// Implements: SW-REQ-135
 func hasPrimitiveAllowEnabled(primitives oas.MCPPrimitives) bool {
 	for _, primitive := range primitives {
 		if primitive != nil && primitive.Allow != nil && primitive.Allow.Enabled {
@@ -41,6 +43,7 @@ func hasPrimitiveAllowEnabled(primitives oas.MCPPrimitives) bool {
 // When this returns true, whitelist mode is active:
 // - Only explicitly allowed endpoints (with Allow.Enabled) are accessible
 // - All other endpoints are blocked by catch-all BlackList VEMs
+// Implements: SW-REQ-135
 func hasAllowListEnabled(operations oas.Operations, categories []PrimitiveCategory) bool {
 	// Check operation-level allows (path/operationId-based)
 	if hasOperationAllowEnabled(operations) {

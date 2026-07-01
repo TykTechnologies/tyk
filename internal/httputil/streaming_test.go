@@ -206,3 +206,130 @@ func TestIsStreamingResponse(t *testing.T) {
 		})
 	}
 }
+
+// Verifies: STK-REQ-082, SYS-REQ-170, SW-REQ-157
+// MCDC SYS-REQ-170: http_streaming_helpers_operation_terminal=T => TRUE
+// MCDC SW-REQ-157: http_streaming_helpers_operation_terminal=T => TRUE
+// STK-REQ-082:STK-REQ-082-AC-01:acceptance
+// SW-REQ-157:nominal:nominal
+// SW-REQ-157:boundary:nominal
+// SW-REQ-157:error_handling:negative
+// SW-REQ-157:determinism:nominal
+func TestHTTPStreamingHelpersReqProof(t *testing.T) {
+	t.Run("grpc request classification", func(t *testing.T) {
+		tests := []struct {
+			name          string
+			contentLength int64
+			contentType   string
+			want          bool
+		}{
+			{name: "streaming grpc", contentLength: -1, contentType: "application/grpc", want: true},
+			{name: "fixed length grpc", contentLength: 0, contentType: "application/grpc"},
+			{name: "streaming non-grpc", contentLength: -1, contentType: "text/plain"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				req := newRequestWithHeaders(t, tt.contentLength, map[string]string{headerContentType: tt.contentType})
+				assert.Equal(t, tt.want, IsGrpcStreaming(req))
+			})
+		}
+	})
+
+	t.Run("sse content type parsing", func(t *testing.T) {
+		tests := []struct {
+			name string
+			ct   string
+			want bool
+		}{
+			{name: "exact event stream", ct: "text/event-stream", want: true},
+			{name: "event stream with charset", ct: "text/event-stream; charset=utf-8", want: true},
+			{name: "json fallback", ct: "application/json"},
+			{name: "malformed parameter fallback", ct: `text/event-stream; charset="`},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				assert.Equal(t, tt.want, IsSSEContentType(tt.ct))
+			})
+		}
+	})
+
+	t.Run("sse response classification", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			contentType string
+			want        bool
+		}{
+			{name: "sse response", contentType: "text/event-stream; charset=utf-8", want: true},
+			{name: "json response", contentType: "application/json"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				resp := newResponseWithHeaders(t, map[string]string{headerContentType: tt.contentType})
+				assert.Equal(t, tt.want, IsSSEStreamingResponse(resp))
+				assert.Equal(t, tt.want, IsStreamingResponse(resp))
+			})
+		}
+	})
+
+	t.Run("upgrade request classification", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			connection  string
+			upgrade     string
+			wantUpgrade string
+			wantOK      bool
+		}{
+			{name: "websocket upgrade", connection: " Upgrade ", upgrade: "WebSocket", wantUpgrade: "websocket", wantOK: true},
+			{name: "non-upgrade connection", connection: "keep-alive", upgrade: "websocket"},
+			{name: "missing upgrade header", connection: "Upgrade"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				headers := map[string]string{headerConnection: tt.connection}
+				if tt.upgrade != "" {
+					headers[headerUpgrade] = tt.upgrade
+				}
+
+				upgradeType, ok := IsUpgrade(newRequestWithHeaders(t, 0, headers))
+				assert.Equal(t, tt.wantOK, ok)
+				assert.Equal(t, tt.wantUpgrade, upgradeType)
+			})
+		}
+	})
+
+	t.Run("aggregate request classification", func(t *testing.T) {
+		tests := []struct {
+			name          string
+			contentLength int64
+			headers       map[string]string
+			want          bool
+		}{
+			{
+				name:          "grpc streaming request",
+				contentLength: -1,
+				headers:       map[string]string{headerContentType: "application/grpc"},
+				want:          true,
+			},
+			{
+				name:    "websocket streaming request",
+				headers: map[string]string{headerConnection: "Upgrade", headerUpgrade: "websocket"},
+				want:    true,
+			},
+			{
+				name:    "non-streaming request",
+				headers: map[string]string{headerConnection: "keep-alive", headerContentType: "application/json"},
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				req := newRequestWithHeaders(t, tt.contentLength, tt.headers)
+				assert.Equal(t, tt.want, IsStreamingRequest(req))
+			})
+		}
+	})
+}

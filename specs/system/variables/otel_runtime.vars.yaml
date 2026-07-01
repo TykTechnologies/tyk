@@ -3,7 +3,35 @@ no_interface:
     declared: true
     reason: The otel runtime proof slice covers focused local helper behavior under tested inputs only; cross-component runtime integration, external service availability, persistence durability, distributed behavior, and final client-visible behavior are outside this component boundary.
 variables:
-    - name: otel_runtime_operation_terminal
+    - name: otel_trace_config_defaults_determined
       type: bool
       direction: output
-      description: The otel runtime operation reaches a terminal local result for the focused tested inputs, such as returning the expected value, selecting the expected local branch, surfacing an explicit local error, or preserving the documented local fallback behavior.
+      description: OpenTelemetry trace and metrics configuration defaulting, inheritance, and effective trace selection produce deterministic local implementation results for the focused tested inputs.
+    - name: otel_runtime_metrics_enablement_determined
+      type: bool
+      direction: output
+      description: Runtime metrics enablement selection produces deterministic local implementation results for the focused tested inputs.
+    - name: otel_metric_provider_instruments_determined
+      type: bool
+      direction: output
+      description: Metric provider and gateway instrument construction produce deterministic local implementation results for the focused tested inputs.
+    - name: otel_metric_recording_determined
+      type: bool
+      direction: output
+      description: No-op and active local metric recording, configuration-state recording, reload recording, and shutdown behavior produce deterministic local implementation results for the focused tested inputs.
+    - name: otel_api_metric_delegation_determined
+      type: bool
+      direction: output
+      description: API metric registry delegation, source-need flags, local recording, and invalid test registry panic behavior produce deterministic local implementation results for the focused tested inputs.
+    - name: otel_trace_provider_fallback_determined
+      type: bool
+      direction: output
+      description: Trace provider initialization and local fallback selection produce deterministic local implementation results for the focused tested inputs.
+    - name: otel_resource_attributes_determined
+      type: bool
+      direction: output
+      description: API, gateway, and API-version resource and span attribute helpers produce deterministic local implementation results for the focused tested inputs.
+    - name: otel_span_context_helpers_determined
+      type: bool
+      direction: output
+      description: Span context wrapping, trace and span ID extraction, and trace ID response header insertion produce deterministic local implementation results for the focused tested inputs.

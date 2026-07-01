@@ -95,6 +95,12 @@ ci/tests/specs/policies
 
 # ReqProof generated artifacts
 .proof/
+!.proof/
+.proof/*
+!.proof/impact-reviews/
+.proof/impact-reviews/*
+!.proof/impact-reviews/by-branch/
+!.proof/impact-reviews/by-branch/*.yaml
 tests/policy/properties/
 tests/policy/tc-*.json
 tests/policy/z3-*.json

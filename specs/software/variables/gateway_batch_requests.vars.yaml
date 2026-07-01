@@ -1,6 +1,26 @@
 component: gateway_batch_requests
 variables:
-    - name: gateway_batch_requests_operation_terminal
+    - name: gateway_batch_endpoint_handling_determined
       type: bool
       direction: output
-      description: The gateway batch requests implementation operation reaches a terminal local result for the focused tested inputs, such as returning the expected value, selecting the expected local branch, surfacing an explicit local error, or preserving the documented local fallback behavior.
+      description: Batch-enabled APIs register and handle the tested batch endpoint cases, including accepted POSTs, malformed JSON rejection, and empty batch responses.
+    - name: gateway_batch_request_construction_determined
+      type: bool
+      direction: output
+      description: Safe relative request construction, tested manual absolute request construction, and configured non-canonical header preservation produce deterministic local implementation results for the focused tested inputs.
+    - name: gateway_batch_execution_collation_determined
+      type: bool
+      direction: output
+      description: Tested batch execution collates response metadata and preserves response order where sequential execution is requested.
+    - name: gateway_batch_manual_virtual_endpoint_determined
+      type: bool
+      direction: output
+      description: Manual virtual-endpoint batch execution through the tested TykBatchRequest path produces the expected local implementation results.
+    - name: gateway_batch_tls_outcomes_determined
+      type: bool
+      direction: output
+      description: Tested upstream certificate and insecure-TLS configuration outcomes produce deterministic local implementation results for the focused virtual-endpoint inputs.
+    - name: gateway_batch_reply_encoding_determined
+      type: bool
+      direction: output
+      description: Batch replies are encoded as JSON for the focused handler and manual batch request inputs.

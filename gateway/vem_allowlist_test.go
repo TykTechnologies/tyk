@@ -9,8 +9,14 @@ import (
 	"github.com/TykTechnologies/tyk/internal/mcp"
 )
 
-// TestHasOperationAllowEnabled tests detection of allow middleware in operations.
-// Operations are JSON-RPC method-level configurations (tools/call, resources/read, etc.)
+// Verifies: STK-REQ-060, SYS-REQ-148, SW-REQ-135
+// STK-REQ-060:STK-REQ-060-AC-01:acceptance
+// SYS-REQ-148:nominal:nominal
+// SYS-REQ-148:boundary:nominal
+// SYS-REQ-148:determinism:nominal
+// SW-REQ-135:nominal:nominal
+// SW-REQ-135:boundary:nominal
+// SW-REQ-135:determinism:nominal
 func TestHasOperationAllowEnabled(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -75,8 +81,14 @@ func TestHasOperationAllowEnabled(t *testing.T) {
 	}
 }
 
-// TestHasPrimitiveAllowEnabled tests detection of allow middleware in primitives.
-// Primitives are MCP-specific resources (tools, resources, prompts).
+// Verifies: STK-REQ-060, SYS-REQ-148, SW-REQ-135
+// STK-REQ-060:STK-REQ-060-AC-01:acceptance
+// SYS-REQ-148:nominal:nominal
+// SYS-REQ-148:boundary:nominal
+// SYS-REQ-148:determinism:nominal
+// SW-REQ-135:nominal:nominal
+// SW-REQ-135:boundary:nominal
+// SW-REQ-135:determinism:nominal
 func TestHasPrimitiveAllowEnabled(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -147,8 +159,14 @@ func TestHasPrimitiveAllowEnabled(t *testing.T) {
 	}
 }
 
-// TestHasAllowListEnabled tests combined detection of allow middleware at both levels.
-// This validates the unified allowlist logic that works for JSON-RPC operations and MCP primitives.
+// Verifies: STK-REQ-060, SYS-REQ-148, SW-REQ-135
+// STK-REQ-060:STK-REQ-060-AC-01:acceptance
+// SYS-REQ-148:nominal:nominal
+// SYS-REQ-148:boundary:nominal
+// SYS-REQ-148:determinism:nominal
+// SW-REQ-135:nominal:nominal
+// SW-REQ-135:boundary:nominal
+// SW-REQ-135:determinism:nominal
 func TestHasAllowListEnabled(t *testing.T) {
 	tests := []struct {
 		name       string

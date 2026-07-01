@@ -1,6 +1,10 @@
 component: user_session_lifetime_endpoint_maps
 variables:
-    - name: user_session_lifetime_endpoint_maps_operation_terminal
+    - name: user_session_lifetime_selection_matches_expected
       type: bool
       direction: output
-      description: The user session lifetime endpoint maps implementation operation reaches a terminal local result for the focused tested inputs, such as returning the expected value, selecting the expected local branch, surfacing an explicit local error, or preserving the documented local fallback behavior.
+      description: Session lifetime helper selection matches expected TTL or retention results for tested legacy, fallback, global override, key-expiration, and post-expiry inputs.
+    - name: user_endpoint_map_conversion_matches_expected
+      type: bool
+      direction: output
+      description: Endpoint collection flattening and endpoint map expansion match expected method:path maps, sorted endpoint collections, duplicate handling, and malformed-key skipping for tested inputs.

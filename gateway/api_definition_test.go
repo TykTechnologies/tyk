@@ -899,6 +899,12 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-063, SYS-REQ-151, SW-REQ-138
+// STK-REQ-063:boundary:nominal
+// SYS-REQ-151:nominal:nominal
+// SYS-REQ-151:boundary:nominal
+// SW-REQ-138:nominal:nominal
+// SW-REQ-138:boundary:nominal
 func TestRoundRobin(t *testing.T) {
 	rr := RoundRobin{}
 	for _, want := range []int{0, 1, 2, 0} {
@@ -2021,6 +2027,7 @@ func TestAPIExpiration(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-061, SYS-REQ-149, SW-REQ-136
 func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
 	a := APISpec{APIDefinition: &apidef.APIDefinition{}}
 	a.Proxy.ListenPath = "/listen/"
@@ -2774,6 +2781,7 @@ func TestAPISpecValidateProtocolDispatch(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-063, SYS-REQ-151, SW-REQ-138
 func TestAPISpec_isListeningOnPort(t *testing.T) {
 	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
 	cfg := &config.Config{}
@@ -2841,6 +2849,7 @@ func Test_LoadAPIsFromRPC(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-063, SYS-REQ-151, SW-REQ-138
 func TestAPISpec_hasMock(t *testing.T) {
 	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
 	assert.False(t, s.hasActiveMock())
@@ -2966,6 +2975,7 @@ func TestAPISpec_isStreamingAPI(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-056, SYS-REQ-144, SW-REQ-131
 func TestReplaceSecrets(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.Secrets = map[string]string{
@@ -3483,6 +3493,7 @@ func TestFromDashboardServiceNetworkErrorRecovery(t *testing.T) {
 	assert.GreaterOrEqual(t, registrationCount, 1, "Should have re-registered after network error")
 }
 
+// Verifies: STK-REQ-061, SYS-REQ-149, SW-REQ-136
 func TestAPISpec_GetSingleOrDefaultVersion(t *testing.T) {
 	type testCase struct {
 		name            string
@@ -3627,6 +3638,7 @@ func TestAPISpec_GetSingleOrDefaultVersion(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-061, SYS-REQ-149, SW-REQ-136
 func TestAPISpec_CheckForAmbiguousDefaultVersions(t *testing.T) {
 	type testCase struct {
 		name              string
@@ -3726,6 +3738,7 @@ func TestAPISpec_CheckForAmbiguousDefaultVersions(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-061, SYS-REQ-149, SW-REQ-136
 func TestAPISpec_Version(t *testing.T) {
 	t.Run("for not_versioned set to true", func(t *testing.T) {
 		type testCase struct {
@@ -3924,6 +3937,7 @@ func TestReplaceVaultSecrets(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-060, SYS-REQ-148, SW-REQ-135
 func TestPopulateMCPPrimitivesMap(t *testing.T) {
 	loader := APIDefinitionLoader{}
 
@@ -4005,6 +4019,7 @@ func TestPopulateMCPPrimitivesMap(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-060, SYS-REQ-148, SW-REQ-135
 func TestCalculateMCPAllowlistFlags(t *testing.T) {
 	loader := APIDefinitionLoader{}
 
@@ -4320,6 +4335,7 @@ func TestAPIDefinitionLoaderExtendedPathSpecAggregation(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-060, SYS-REQ-148, SW-REQ-135
 // TestAddInternalMWtoMCPOperations tests adding internal middleware for MCP operations.
 func TestAddInternalMWtoMCPOperations(t *testing.T) {
 	ts := StartTest(nil)
@@ -4406,6 +4422,7 @@ func TestAddInternalMWtoMCPOperations(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-061, SYS-REQ-149, SW-REQ-136
 func TestURLAllowedAndIgnored_CORSPreflight(t *testing.T) {
 	spec := APISpec{
 		APIDefinition: &apidef.APIDefinition{

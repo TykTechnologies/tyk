@@ -4,7 +4,7 @@ status: approved
 priority: shall
 category: observability
 req_type: guarantee
-fretish: the otel_runtime shall always satisfy otel_runtime_operation_terminal
+fretish: the otel_runtime shall always satisfy (otel_trace_config_defaults_determined & otel_runtime_metrics_enablement_determined & otel_metric_provider_instruments_determined & otel_metric_recording_determined & otel_api_metric_delegation_determined & otel_trace_provider_fallback_determined & otel_resource_attributes_determined & otel_span_context_helpers_determined)
 description: OpenTelemetry runtime handling shall preserve deterministic local observability helper results for tested inputs by defaulting and inheriting trace and metrics configuration, selecting runtime-metrics enablement, constructing metric providers and gateway instruments, safely recording no-op and active local metric values, delegating API metric registry need flags and recording, intentionally panicking on invalid test registry definitions, initializing trace providers with local fallback behavior, generating API and gateway resource attributes, normalizing API version attributes, wrapping and extracting span contexts, extracting trace and span IDs, and adding trace IDs to response headers without claiming collector/exporter delivery, OpenTelemetry SDK provider correctness beyond local construction and fallback behavior, metric backend storage, runtime metric collection completeness, full gateway middleware admission, full HTTP request lifecycle behavior, trace propagation across services, dashboard visibility, or final client-visible behavior beyond the focused root OTEL tests.
 formalization_strategy: fretish
 informal_verification:
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: STK-REQ-093
 component: otel_runtime
-rationale: This system requirement owns root internal/otel helper behavior only. API metric internals, gateway middleware integration, and exporter delivery remain outside this proof slice.
+rationale: This system requirement owns root internal/otel helper behavior only. Its formal model is decomposed into trace configuration/defaulting, runtime metric enablement, metric provider and instrument construction, local metric recording, API metric delegation, trace provider fallback, resource attributes, and span context helper outputs so each behavior can be reviewed and witnessed independently. API metric internals, gateway middleware integration, and exporter delivery remain outside this proof slice.
 tags:
     - observability
     - metrics
@@ -22,9 +22,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-093
-    reviewed_at: "2026-06-21T11:59:05.75287Z"
+    reviewed_at: "2026-06-21T18:19:53.616048Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:883d978dcb8a4911419d093e6d74b359af2ef4bcab36598d30845d3dc91fc26a
+    reviewed_fingerprint: sha256:a595c9dd5ef3ea53904f5f645defe1072fc11b235f50c2656a7154ccf7121a73
 verification:
     assurance_level: A
     formalization_status: valid

@@ -5,23 +5,23 @@ priority: shall
 category: gateway_error_handler
 req_type: guarantee
 fretish: ""
-description: Gateway error handling shall locally produce deterministic error-handler outcomes for tested error paths by preserving configured Tyk error-message overrides, selecting JSON/XML/SOAP template responses, selecting JSON-RPC error formatting when MCP JSON-RPC routing state is present, applying configured request-side error overrides and fallbacks, and recording local analytics, access-log, metrics, latency, and health signals for exercised paths, without claiming route generation, request matching/admission, authentication correctness beyond tested error triggers, upstream availability, analytics persistence, log transport, complete middleware ordering, full JSON-RPC routing/parser/method authorization, or general network transport behavior.
+description: Gateway error handling shall locally produce deterministic error-response helper outcomes for tested error paths by preserving configured Tyk error-message overrides, selecting JSON/XML/SOAP template responses, selecting JSON-RPC error formatting when MCP JSON-RPC routing state is present, writing JSON-RPC access-denied helper responses with or without routing state, applying configured request-side error overrides and fallbacks, and recording local analytics, access-log, metrics, latency, and health signals for exercised paths, without claiming route generation, request matching/admission, authentication correctness beyond tested error triggers, upstream availability, analytics persistence, log transport, complete middleware ordering, full JSON-RPC routing/parser/method authorization, or general network transport behavior.
 formalization_strategy: informal
 informal_verification:
     method: ""
     evidence: ""
     verified: false
 component: gateway_error_handler
-rationale: Gateway operators need the local error handler to make deterministic response and observability decisions before broader gateway behavior is reasoned about. This requirement owns local gateway/handler_error.go behavior and focused gateway tests only.
+rationale: Gateway operators need local gateway error-response helpers to make deterministic response and observability decisions before broader gateway behavior is reasoned about. This requirement owns local gateway error response helper behavior and focused gateway tests only.
 tags:
     - gateway
     - errors
     - observability
 variables: []
 traces:
-    reviewed_at: "2026-06-21T03:46:04.190842Z"
+    reviewed_at: "2026-06-21T17:51:25.467832Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:f1d9eba0d080af7b07b06b745411a1cf4a9cc71df6b115ac46f278a293a1dab6
+    reviewed_fingerprint: sha256:b3fac138129312446558150ab3ca1891eb832dda8f77d4a0213b1e34d527288c
 verification:
     assurance_level: A
     formalization_status: none
@@ -30,7 +30,7 @@ verification:
         reviewer: human:buger
         role: requirements_owner
         reviewed_at: "2026-06-21T00:00:00Z"
-        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway error-handler scope is limited to local gateway/handler_error.go behavior: Tyk error map lookup/default/override behavior, JSON/XML/SOAP template response selection and headers, JSON-RPC error response selection when MCP JSON-RPC routing state exists, request-side error override response writing and fallback, and local analytics/access-log/status/latency/metrics/health recording for tested paths. This approval does not claim route generation, request matching/admission, authentication correctness beyond tested error triggers, upstream availability, analytics persistence, log transport, complete middleware ordering, full JSON-RPC routing/parser/method authorization, or general network transport behavior.'
+        comment: 'Reviewed under explicit chat delegation from human:buger to agent:codex on 2026-06-21. Gateway error-handler scope is limited to local gateway error-response helper behavior: Tyk error map lookup/default/override behavior, JSON/XML/SOAP template response selection and headers, JSON-RPC error response selection when MCP JSON-RPC routing state exists, JSON-RPC access-denied helper response writing with or without routing state, request-side error override response writing and fallback, and local analytics/access-log/status/latency/metrics/health recording for tested paths. This approval does not claim route generation, request matching/admission, authentication correctness beyond tested error triggers, upstream availability, analytics persistence, log transport, complete middleware ordering, full JSON-RPC routing/parser/method authorization, or general network transport behavior.'
         ai_generated: false
 history:
     created_by: agent:codex
@@ -47,7 +47,7 @@ stakeholder:
     story: As a gateway operator, I need gateway error responses and local observability records to follow deterministic handler decisions for configured and standard error paths.
     acceptance_criteria:
         - id: STK-REQ-067-AC-01
-          text: Given tested gateway error-handler inputs, when Tyk error message lookup/override, template formatting, JSON-RPC formatting, request-side error override writing/fallback, and local observability recording are exercised, then deterministic local error-handler outcomes are produced for those inputs.
+          text: Given tested gateway error-handler inputs, when Tyk error message lookup/override, template formatting, JSON-RPC formatting, JSON-RPC access-denied helper writing, request-side error override writing/fallback, and local observability recording are exercised, then deterministic local error-handler outcomes are produced for those inputs.
           verification_method: test
           derived_reqs:
             - SYS-REQ-155

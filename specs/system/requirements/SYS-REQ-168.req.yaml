@@ -4,8 +4,8 @@ status: approved
 priority: shall
 category: user_session_json_serialization
 req_type: guarantee
-fretish: the user_session_json_serialization shall always satisfy user_session_json_serialization_operation_terminal
-description: User session JSON serialization handling shall preserve deterministic local JSON encoding and decoding results for tested session, policy, access-definition, limit, collection, MCP access-control, smoothing, and post-expiry fields by omitting zero values, preserving configured non-zero values, accepting legacy all-field session JSON, accepting compact session JSON with default zero values, and round-tripping post-expiry session fields, without claiming policy merge behavior, gateway authentication, persistence backends, runtime quota enforcement, session lifetime expiration behavior, endpoint limit execution, or final client responses.
+fretish: the user_session_json_serialization shall always satisfy (user_session_json_zero_values_omitted & user_session_json_nonzero_values_preserved & user_session_json_legacy_format_accepted & user_session_json_compact_defaults_accepted & user_session_json_access_structures_determined & user_session_json_smoothing_determined & user_session_json_post_expiry_determined)
+description: "User session JSON serialization handling shall preserve seven focused mechanisms: zero-value omission, configured non-zero value preservation, legacy all-field session JSON decoding, compact session JSON decoding with default zero values, access-definition/API-limit/collection/MCP access-control JSON shape behavior, rate-limit smoothing JSON behavior, and policy/session post-expiry JSON omission, inclusion, and round-trip preservation. This requirement does not claim policy merge behavior, gateway authentication, persistence backends, runtime quota enforcement, session lifetime expiration behavior, endpoint limit execution, or final client responses."
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: STK-REQ-080
 component: user_session_json_serialization
-rationale: This system requirement owns local user-package JSON shape and compatibility decisions only. Integrated policy application, authentication, persistence, quota enforcement, lifetime expiration, endpoint execution, and transport behavior remain outside this proof slice.
+rationale: This system requirement owns local user-package JSON shape and compatibility decisions only. Its formal model is decomposed into zero omission, non-zero preservation, legacy decode, compact decode, access structures, smoothing, and post-expiry outputs so each behavior can be reviewed and witnessed independently. Integrated policy application, authentication, persistence, quota enforcement, lifetime expiration, endpoint execution, and transport behavior remain outside this proof slice.
 tags:
     - user
     - session
@@ -23,9 +23,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-080
-    reviewed_at: "2026-06-21T11:59:05.578Z"
+    reviewed_at: "2026-06-21T18:28:51.269925Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:0b7cc8962a11fa51e344bd7b34d62985864043c23ee30fc29be5126003df2813
+    reviewed_fingerprint: sha256:d1e2ad3fef0bb5beb6ffb217487bfd240c7d1cff0e0da481d24d55f806867fb2
 verification:
     assurance_level: A
     formalization_status: valid

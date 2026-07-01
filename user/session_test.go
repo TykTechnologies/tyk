@@ -721,14 +721,189 @@ func TestEndpointsMap_Endpoints(t *testing.T) {
 // omitzero Serialization Tests
 // =============================================================================
 
+// Verifies: STK-REQ-080, SYS-REQ-168, SW-REQ-155
+// MCDC SYS-REQ-168: user_session_json_zero_values_omitted=T, user_session_json_nonzero_values_preserved=T, user_session_json_legacy_format_accepted=T, user_session_json_compact_defaults_accepted=T, user_session_json_access_structures_determined=T, user_session_json_smoothing_determined=T, user_session_json_post_expiry_determined=T => TRUE
+// MCDC SW-REQ-155: user_session_json_zero_values_omitted=T, user_session_json_nonzero_values_preserved=T, user_session_json_legacy_format_accepted=T, user_session_json_compact_defaults_accepted=T, user_session_json_access_structures_determined=T, user_session_json_smoothing_determined=T, user_session_json_post_expiry_determined=T => TRUE
+func TestSessionStateJSONSerializationReqProof(t *testing.T) {
+	t.Run("zero values omitted and non-zero values preserved", func(t *testing.T) {
+		emptyData, err := json.Marshal(&SessionState{})
+		assert.NoError(t, err)
+		emptyJSON := string(emptyData)
+		assert.NotContains(t, emptyJSON, "last_check")
+		assert.NotContains(t, emptyJSON, "quota_max")
+		assert.NotContains(t, emptyJSON, "post_expiry_action")
+		assert.LessOrEqual(t, len(emptyData), 10)
+
+		created := time.Date(2026, 6, 21, 10, 0, 0, 0, time.UTC)
+		session := &SessionState{
+			Rate:        100,
+			Per:         60,
+			OrgID:       "org123",
+			DateCreated: created,
+		}
+		data, err := json.Marshal(session)
+		assert.NoError(t, err)
+		jsonStr := string(data)
+		assert.Contains(t, jsonStr, `"rate":100`)
+		assert.Contains(t, jsonStr, `"per":60`)
+		assert.Contains(t, jsonStr, `"org_id":"org123"`)
+		assert.Contains(t, jsonStr, `"date_created"`)
+		assert.NotContains(t, jsonStr, "0001-01-01")
+
+		var decoded SessionState
+		assert.NoError(t, json.Unmarshal(data, &decoded))
+		assert.Equal(t, session.Rate, decoded.Rate)
+		assert.Equal(t, session.Per, decoded.Per)
+		assert.Equal(t, session.OrgID, decoded.OrgID)
+		assert.False(t, decoded.DateCreated.IsZero())
+	})
+
+	t.Run("legacy and compact session JSON decode", func(t *testing.T) {
+		oldFormatJSON := `{
+			"last_check": 0,
+			"rate": 100,
+			"per": 60,
+			"date_created": "0001-01-01T00:00:00Z",
+			"quota_max": 1000,
+			"quota_remaining": 500,
+			"org_id": "test-org",
+			"hmac_enabled": false
+		}`
+
+		var legacy SessionState
+		assert.NoError(t, json.Unmarshal([]byte(oldFormatJSON), &legacy))
+		assert.Equal(t, float64(100), legacy.Rate)
+		assert.Equal(t, float64(60), legacy.Per)
+		assert.Equal(t, int64(1000), legacy.QuotaMax)
+		assert.Equal(t, int64(500), legacy.QuotaRemaining)
+		assert.Equal(t, "test-org", legacy.OrgID)
+		assert.False(t, legacy.HMACEnabled)
+
+		var compact SessionState
+		assert.NoError(t, json.Unmarshal([]byte(`{"rate":100,"per":60,"org_id":"org123"}`), &compact))
+		assert.Equal(t, float64(100), compact.Rate)
+		assert.Equal(t, float64(60), compact.Per)
+		assert.Equal(t, "org123", compact.OrgID)
+		assert.Zero(t, compact.LastCheck)
+		assert.Zero(t, compact.QuotaMax)
+		assert.True(t, compact.DateCreated.IsZero())
+		assert.Nil(t, compact.AccessRights)
+	})
+
+	t.Run("access structures and MCP fields use compact JSON shape", func(t *testing.T) {
+		session := &SessionState{
+			Rate:          100,
+			Per:           60,
+			OrgID:         "test-org",
+			Tags:          []string{},
+			MetaData:      map[string]interface{}{},
+			ApplyPolicies: []string{},
+			OauthKeys:     map[string]string{},
+			AccessRights: map[string]AccessDefinition{
+				"api1": {
+					APIID:             "api1",
+					APIName:           "Test API",
+					Limit:             APILimit{},
+					Versions:          []string{},
+					RestrictedTypes:   nil,
+					AllowedTypes:      []graphql.Type{},
+					FieldAccessRights: []FieldAccessDefinition{},
+					AllowedURLs:       []AccessSpec{},
+				},
+			},
+		}
+
+		data, err := json.Marshal(session)
+		assert.NoError(t, err)
+		jsonStr := string(data)
+		for _, field := range []string{
+			`"tags"`,
+			`"meta_data"`,
+			`"apply_policies"`,
+			`"oauth_keys"`,
+			`"limit"`,
+			`"versions"`,
+			`"restricted_types"`,
+			`"allowed_types"`,
+			`"field_access_rights"`,
+			`"allowed_urls"`,
+		} {
+			assert.NotContains(t, jsonStr, field)
+		}
+		assert.Contains(t, jsonStr, `"access_rights"`)
+		assert.Contains(t, jsonStr, `"api_id":"api1"`)
+
+		emptyMCPData, err := json.Marshal(AccessDefinition{})
+		assert.NoError(t, err)
+		var emptyMCP map[string]json.RawMessage
+		assert.NoError(t, json.Unmarshal(emptyMCPData, &emptyMCP))
+		assert.NotContains(t, emptyMCP, "json_rpc_methods_access_rights")
+		assert.NotContains(t, emptyMCP, "mcp_access_rights")
+
+		configuredMCP := AccessDefinition{
+			JSONRPCMethodsAccessRights: AccessControlRules{Allowed: []string{"tools/call"}},
+			MCPAccessRights:            MCPAccessRights{Tools: AccessControlRules{Allowed: []string{"weather"}}},
+		}
+		configuredMCPData, err := json.Marshal(configuredMCP)
+		assert.NoError(t, err)
+		var configuredMCPJSON map[string]json.RawMessage
+		assert.NoError(t, json.Unmarshal(configuredMCPData, &configuredMCPJSON))
+		assert.Contains(t, configuredMCPJSON, "json_rpc_methods_access_rights")
+		assert.Contains(t, configuredMCPJSON, "mcp_access_rights")
+	})
+
+	t.Run("smoothing and post-expiry fields serialize deterministically", func(t *testing.T) {
+		assert.True(t, (*apidef.RateLimitSmoothing)(nil).IsZero())
+		assert.True(t, (&apidef.RateLimitSmoothing{
+			Enabled:   false,
+			Threshold: 500,
+			Trigger:   0.8,
+			Step:      100,
+			Delay:     30,
+		}).IsZero())
+		assert.False(t, (&apidef.RateLimitSmoothing{
+			Enabled:   true,
+			Threshold: 500,
+			Trigger:   0.8,
+			Step:      100,
+			Delay:     30,
+		}).IsZero())
+
+		unsetPolicy, err := json.Marshal(Policy{ID: "p1", Name: "unset"})
+		assert.NoError(t, err)
+		assert.NotContains(t, string(unsetPolicy), "post_expiry_action")
+
+		setPolicy, err := json.Marshal(Policy{ID: "p1", Name: "set", PostExpiryAction: PostExpiryActionRetain})
+		assert.NoError(t, err)
+		assert.Contains(t, string(setPolicy), `"post_expiry_action":"retain"`)
+
+		zeroSession, err := json.Marshal(SessionState{})
+		assert.NoError(t, err)
+		assert.NotContains(t, string(zeroSession), "post_expiry_action")
+		assert.NotContains(t, string(zeroSession), "post_expiry_grace_period")
+
+		original := SessionState{
+			PostExpiryAction:      PostExpiryActionRetain,
+			PostExpiryGracePeriod: 7200,
+		}
+		data, err := json.Marshal(original)
+		assert.NoError(t, err)
+		assert.Contains(t, string(data), `"post_expiry_action"`)
+		assert.Contains(t, string(data), `"post_expiry_grace_period"`)
+
+		var restored SessionState
+		assert.NoError(t, json.Unmarshal(data, &restored))
+		assert.Equal(t, original.PostExpiryAction, restored.PostExpiryAction)
+		assert.Equal(t, original.PostExpiryGracePeriod, restored.PostExpiryGracePeriod)
+	})
+}
+
 // TestSessionState_EmptySessionOmitsZeroFields verifies that an empty SessionState
 // serializes to minimal JSON without zero-value fields.
 // Verifies: STK-REQ-080, SYS-REQ-168, SW-REQ-155
 // STK-REQ-080:STK-REQ-080-AC-01:acceptance
 // SW-REQ-155:boundary:boundary
 // SW-REQ-155:encoding_safety:nominal
-// MCDC SW-REQ-155: user_session_json_serialization_operation_terminal=T => TRUE
-//mcdc:ignore:defensive SW-REQ-155: user_session_json_serialization_operation_terminal=F => FALSE -- false is the invariant-violation row for this local serialization terminal predicate; the positive row is witnessed by this test [reviewed: human:buger]
 func TestSessionState_EmptySessionOmitsZeroFields(t *testing.T) {
 	session := &SessionState{}
 	data, err := json.Marshal(session)

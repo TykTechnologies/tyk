@@ -4,8 +4,8 @@ status: approved
 priority: shall
 category: http_server_header_helpers
 req_type: guarantee
-fretish: the http_server_header_helpers shall always satisfy http_server_header_helpers_operation_terminal
-description: HTTP server and header helper handling shall preserve deterministic local helper results for tested inputs by constructing connection watchers with zero count, applying explicit and connection-state count deltas, leaving non-counting connection states unchanged, reporting the current count, and constructing Basic Authorization header values from username and password pairs, without claiming nonnegative connection-count enforcement, full server lifecycle management, upstream authentication, credential validation, transport security, analytics, persistence, or final client responses.
+fretish: the http_server_header_helpers shall always satisfy (http_connection_watcher_determined & http_basic_auth_header_determined)
+description: "HTTP server and header helper handling shall preserve deterministic local helper results for two focused behaviors: constructing connection watchers with zero count, applying explicit and connection-state count deltas, leaving non-counting connection states unchanged, and reporting the current count; and constructing Basic Authorization header values from username and password pairs. This requirement does not claim nonnegative connection-count enforcement, full server lifecycle management, upstream authentication, credential validation, transport security, analytics, persistence, or final client responses."
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: STK-REQ-085
 component: http_server_header_helpers
-rationale: This system requirement owns local internal/httputil connection watcher and Basic auth header helper decisions only. Integrated gateway server lifecycle and upstream authentication behavior remain outside this proof slice.
+rationale: This system requirement owns local internal/httputil connection watcher and Basic auth header helper decisions only. Its formal model is decomposed into connection watcher and Basic auth header outputs so each helper surface can be reviewed and witnessed independently. Integrated gateway server lifecycle and upstream authentication behavior remain outside this proof slice.
 tags:
     - http
     - server
@@ -23,9 +23,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-085
-    reviewed_at: "2026-06-21T11:59:05.64483Z"
+    reviewed_at: "2026-06-21T18:05:12.448781Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:60aec942d43d2a5aadfc16c8ab5d7bc554da6b7ad84c58160a685cb3c9390aaa
+    reviewed_fingerprint: sha256:49b4c707780d9b425bdafcbdfac43c5b8dbda2a0e3dc7757eb811b3b304e8d2f
 verification:
     assurance_level: A
     formalization_status: valid

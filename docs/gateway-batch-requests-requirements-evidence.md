@@ -5,14 +5,13 @@
 request behavior in `gateway/batch_requests.go` and route registration in
 `gateway/server.go`.
 
-The proof slice is limited to tested gateway batch request behavior: registering
-the `/tyk/batch/` endpoint when batch support is enabled, accepting batch POST
-requests, rejecting malformed batch request JSON with an explicit bad-request
-response, returning an empty JSON array for an empty batch, constructing safe
-relative gateway requests, executing sequential batches with stable response
-order, executing manual virtual-endpoint batches, applying tested upstream
-certificate and insecure-TLS configuration outcomes, preserving configured
-non-canonical header names, and encoding batch replies as JSON.
+The proof slice is decomposed into tested gateway batch request mechanisms:
+registering and handling the `/tyk/batch/` endpoint for batch-enabled APIs,
+constructing safe relative gateway requests and tested manual absolute
+requests, preserving configured non-canonical header names, executing and
+collating tested batch responses, executing manual virtual-endpoint batches,
+applying tested upstream certificate and insecure-TLS configuration outcomes,
+and encoding batch replies as JSON.
 
 This evidence does not claim arbitrary upstream transport correctness, complete
 TLS policy semantics, proxy behavior, rate-limit or authentication enforcement

@@ -9,7 +9,14 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
 
-// TestOASPathCompilation verifies that OAS paths are correctly compiled into RxPaths
+// Verifies: STK-REQ-059, SYS-REQ-147, SW-REQ-134
+// STK-REQ-059:STK-REQ-059-AC-01:acceptance
+// SYS-REQ-147:nominal:nominal
+// SYS-REQ-147:boundary:nominal
+// SYS-REQ-147:determinism:nominal
+// SW-REQ-134:nominal:nominal
+// SW-REQ-134:boundary:nominal
+// SW-REQ-134:determinism:nominal
 func TestOASPathCompilation(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

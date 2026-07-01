@@ -4,8 +4,8 @@ status: approved
 priority: shall
 category: storage
 req_type: guarantee
-fretish: the storage_redis_cluster shall always satisfy storage_redis_cluster_operation_terminal
-description: The RedisCluster storage implementation shall preserve adapter behavior for tested inputs by selecting the configured connection handler, deriving Redis addresses, gating operations on connection state, lazily constructing temporal storage adapters, applying key prefixes and hash selection, reading and writing keys, handling TTL and expiration calls, returning multi-key results, preserving raw-key operations, forwarding lock, increment, decrement, scan, filtering, delete, flush, pub/sub, publish, list, set, rolling-window, sorted-set, controller-initialization, and error-handling behavior for mocked or configured storage backends without claiming Redis server availability, Redis clustering correctness, third-party temporal storage library correctness, distributed lock safety beyond the wrapper SetIfNotExist call, timing precision for rolling windows or TTL expiry, pub/sub delivery guarantees beyond exercised handler paths, persistence durability, network partition behavior, concurrency safety beyond exercised lazy-storage mutex paths, or final client-visible gateway behavior outside these RedisCluster storage adapter tests.
+fretish: the storage_redis_cluster shall always satisfy (storage_redis_cluster_connection_config_determined & storage_redis_cluster_temporal_adapters_determined & storage_redis_cluster_key_value_determined & storage_redis_cluster_scan_delete_determined & storage_redis_cluster_pubsub_determined & storage_redis_cluster_list_determined & storage_redis_cluster_set_sorted_set_determined & storage_redis_cluster_controller_prefix_determined)
+description: The RedisCluster storage implementation shall preserve adapter behavior for tested inputs by selecting the configured connection handler, deriving Redis addresses, gating operations on connection state, lazily constructing temporal storage adapters, applying key prefixes and hash selection, reading and writing keys, handling TTL and expiration calls, returning multi-key results, preserving raw-key operations, forwarding lock, increment, decrement, scan, filtering, delete, flush, pub/sub, publish, list, set, sorted-set, controller-initialization, and error-handling behavior for mocked or configured storage backends without claiming Redis server availability, Redis clustering correctness, third-party temporal storage library correctness, distributed lock safety beyond the wrapper SetIfNotExist call, rolling-window behavior or timing precision, TTL expiry timing precision, pub/sub delivery guarantees beyond exercised handler paths, persistence durability, network partition behavior, concurrency safety beyond exercised lazy-storage mutex paths, or final client-visible gateway behavior outside these RedisCluster storage adapter tests.
 formalization_strategy: fretish
 informal_verification:
     method: unit_tests
@@ -13,7 +13,7 @@ informal_verification:
     verified: true
 parent: SYS-REQ-187
 component: storage_redis_cluster
-rationale: This software requirement owns local storage/redis_cluster.go wrapper mechanics and focused package tests only. Redis and distributed-system guarantees are outside this proof slice.
+rationale: This software requirement owns local storage/redis_cluster.go wrapper mechanics and focused package tests only. Its formal model is decomposed into connection/configuration, lazy temporal adapter construction, key-value operations, scan/delete operations, pub/sub operations, list operations, set/sorted-set operations, and controller/prefix outputs so each behavior group can be reviewed and witnessed independently. Redis rolling-window timing precision and distributed-system guarantees are outside this proof slice.
 tags:
     - storage
     - redis
@@ -23,9 +23,9 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-187
-    reviewed_at: "2026-06-21T11:59:05.113264Z"
+    reviewed_at: "2026-06-21T18:16:18.986944Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:33e12afd1fb94af1f6d8447be41e6579f17a79b4ec323cdf45abf09d9a1da2c4
+    reviewed_fingerprint: sha256:2f5331eaf91e58586b9eb8c97970526afeace6c9b5e6f8596de9e1a2400aaa7f
 verification:
     assurance_level: A
     formalization_status: valid

@@ -3,7 +3,27 @@ no_interface:
     declared: true
     reason: The storage kv proof slice covers focused local helper behavior under tested inputs only; cross-component runtime integration, external service availability, persistence durability, distributed behavior, and final client-visible behavior are outside this component boundary.
 variables:
-    - name: storage_kv_operation_terminal
+    - name: storage_kv_consul_config_determined
       type: bool
       direction: output
-      description: The storage kv operation reaches a terminal local result for the focused tested inputs, such as returning the expected value, selecting the expected local branch, surfacing an explicit local error, or preserving the documented local fallback behavior.
+      description: Consul adapter construction from focused tested configuration produces deterministic local implementation results.
+    - name: storage_kv_consul_read_write_determined
+      type: bool
+      direction: output
+      description: Consul missing-key, get, and put behavior through the local HTTP test server produces deterministic local implementation results.
+    - name: storage_kv_vault_config_determined
+      type: bool
+      direction: output
+      description: Vault adapter construction, token configuration, and missing-token rejection produce deterministic local implementation results for the focused tested inputs.
+    - name: storage_kv_vault_get_determined
+      type: bool
+      direction: output
+      description: Vault v1 and v2 get path, payload, missing-key, and malformed-key behavior produce deterministic local implementation results for the focused tested inputs.
+    - name: storage_kv_vault_put_determined
+      type: bool
+      direction: output
+      description: Vault v1 and v2 put path, payload, and malformed-key behavior produce deterministic local implementation results for the focused tested inputs.
+    - name: storage_kv_vault_read_secret_determined
+      type: bool
+      direction: output
+      description: Vault ReadSecret success, missing-secret, and backend-error behavior produce deterministic local implementation results for the focused tested inputs.

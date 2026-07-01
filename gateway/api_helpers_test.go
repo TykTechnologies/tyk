@@ -22,6 +22,15 @@ import (
 	lib "github.com/TykTechnologies/tyk/lib/apidef"
 )
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:nominal:nominal
+// STK-REQ-051:boundary:nominal
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:determinism:nominal
 // TestHandleGetOASList tests the generic OAS list handler with different filters
 func TestHandleGetOASList(t *testing.T) {
 	ts := StartTest(nil)
@@ -135,6 +144,15 @@ func TestHandleGetOASList(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:nominal:nominal
+// STK-REQ-051:error_handling:nominal
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:error_handling:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:error_handling:nominal
+// SW-REQ-126:determinism:nominal
 // TestHandleGetOASByID tests the type-checked OAS retrieval helper
 func TestHandleGetOASByID(t *testing.T) {
 	ts := StartTest(nil)
@@ -720,6 +738,15 @@ func TestSetBaseAPIIDHeader(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:nominal:nominal
+// STK-REQ-051:error_handling:negative
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:error_handling:negative
+// SYS-REQ-139:encoding_safety:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:error_handling:negative
+// SW-REQ-126:encoding_safety:nominal
 func TestEnsureAndValidateAPIID(t *testing.T) {
 	t.Run("generates API ID if empty", func(t *testing.T) {
 		apiDef := &apidef.APIDefinition{
@@ -768,6 +795,15 @@ func TestEnsureAndValidateAPIID(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:nominal:nominal
+// STK-REQ-051:error_handling:negative
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:error_handling:negative
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:error_handling:negative
+// SW-REQ-126:determinism:nominal
 func TestDeleteAPIFiles(t *testing.T) {
 	t.Run("deletes both main and OAS files successfully", func(t *testing.T) {
 		fs := afero.NewMemMapFs()
@@ -868,6 +904,13 @@ func TestDeleteAPIFiles(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:nominal:nominal
+// STK-REQ-051:error_handling:nominal
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:error_handling:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:error_handling:nominal
 func TestValidateSpecExists(t *testing.T) {
 	t.Run("returns nil when spec exists", func(t *testing.T) {
 		spec := &APISpec{
@@ -894,6 +937,13 @@ func TestValidateSpecExists(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:nominal:nominal
+// STK-REQ-051:error_handling:nominal
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:error_handling:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:error_handling:nominal
 func TestValidateAPIIDMatch(t *testing.T) {
 	t.Run("returns nil when IDs match", func(t *testing.T) {
 		resp, code := validateAPIIDMatch("api-123", "api-123")
@@ -934,6 +984,12 @@ func (f *failingFs) Remove(name string) error {
 	return f.Fs.Remove(name)
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:nominal:nominal
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:determinism:nominal
 func TestBuildSuccessResponse(t *testing.T) {
 	t.Run("builds added response", func(t *testing.T) {
 		resp, code := buildSuccessResponse("api-123", "added")
@@ -969,6 +1025,15 @@ func TestBuildSuccessResponse(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:nominal:nominal
+// STK-REQ-051:boundary:nominal
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:determinism:nominal
 func TestHandleBaseVersionCleanup(t *testing.T) {
 	t.Run("does nothing when baseID is empty", func(_ *testing.T) {
 		gw := &Gateway{}
@@ -1014,6 +1079,15 @@ func TestHandleBaseVersionCleanup(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:nominal:nominal
+// STK-REQ-051:error_handling:nominal
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:error_handling:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:error_handling:nominal
+// SW-REQ-126:determinism:nominal
 func TestHandleBaseVersionUpdate(t *testing.T) {
 	t.Run("returns nil when baseAPIID is empty", func(t *testing.T) {
 		gw := &Gateway{}

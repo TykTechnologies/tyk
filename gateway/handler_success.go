@@ -70,6 +70,7 @@ func tagHeaders(r *http.Request, th []string, tags []string) []string {
 	return tags
 }
 
+// Implements: SW-REQ-125
 func addVersionHeader(w http.ResponseWriter, r *http.Request, globalConf config.Config) {
 	if ctxGetDefaultVersion(r) {
 		if vinfo := ctxGetVersionInfo(r); vinfo != nil {
@@ -80,6 +81,7 @@ func addVersionHeader(w http.ResponseWriter, r *http.Request, globalConf config.
 	}
 }
 
+// Implements: SW-REQ-125
 func estimateTagsCapacity(session *user.SessionState, apiSpec *APISpec) int {
 	size := 5 // that number of tags expected to be added at least before we record hit
 	if session != nil {
@@ -103,6 +105,7 @@ func estimateTagsCapacity(session *user.SessionState, apiSpec *APISpec) int {
 	return size
 }
 
+// Implements: SW-REQ-125
 func getSessionTags(session *user.SessionState) []string {
 	tags := make([]string, 0, len(session.Tags)+len(session.ApplyPolicies)+1)
 
@@ -122,6 +125,7 @@ func getSessionTags(session *user.SessionState) []string {
 	return tags
 }
 
+// Implements: SW-REQ-125
 func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *http.Response, spec *APISpec) {
 	if !spec.GraphQL.Enabled || spec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph {
 		return
@@ -168,6 +172,7 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 	rec.GraphQLStats = stats
 }
 
+// Implements: SW-REQ-125
 func recordMCPDetails(rec *analytics.AnalyticsRecord, r *http.Request) {
 	rec.MCPStats = analytics.MCPStats{
 		IsMCP:         true,
@@ -179,6 +184,7 @@ func recordMCPDetails(rec *analytics.AnalyticsRecord, r *http.Request) {
 
 const traceTagPrefix = "trace-id-"
 
+// Implements: SW-REQ-125
 func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []string {
 	if !s.Gw.GetConfig().OpenTelemetry.TracesEnabled() {
 		return tags
@@ -189,6 +195,7 @@ func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []
 	return tags
 }
 
+// Implements: SW-REQ-125
 func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response, cached bool) {
 
 	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
@@ -360,6 +367,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 	reportHealthValue(s.Spec, RequestLog, strconv.FormatInt(timing.Total, 10))
 }
 
+// Implements: SW-REQ-125
 func recordDetail(r *http.Request, spec *APISpec) bool {
 	// when streaming in grpc, we do not record the request
 	if httputil.IsStreamingRequest(r) {
@@ -369,6 +377,7 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 	return recordDetailUnsafe(r, spec)
 }
 
+// Implements: SW-REQ-125
 func recordDetailUnsafe(r *http.Request, spec *APISpec) bool {
 	if spec.EnableDetailedRecording {
 		return true
@@ -396,6 +405,7 @@ func recordDetailUnsafe(r *http.Request, spec *APISpec) bool {
 // Currently handles 5XX status codes; can be extended for other error classifications.
 // If a classification was already set earlier in the request lifecycle (e.g. NHU from
 // the load balancer director), it is preserved.
+// Implements: SW-REQ-125
 func (s *SuccessHandler) classifyUpstreamError(r *http.Request, statusCode int) {
 	if statusCode >= 500 && statusCode <= 599 {
 		// Don't overwrite a more specific classification set earlier (e.g. NHU).
@@ -414,6 +424,7 @@ func (s *SuccessHandler) classifyUpstreamError(r *http.Request, statusCode int) 
 // ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored
+// Implements: SW-REQ-125
 func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
 	log.Debug("Started proxy")
 	defer s.Base().UpdateRequestSession(r)
@@ -467,6 +478,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 // ServeHTTPWithCache will store the request details in the analytics store if necessary and proxy the request to it's
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored Itwill also return a response object for the cache
+// Implements: SW-REQ-125
 func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Request) ProxyResponse {
 
 	// Make sure we get the correct target URL

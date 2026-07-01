@@ -176,6 +176,7 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 //
 // This prevents a catch-all type:string candidate from stealing requests that belong to
 // a more restrictive type:number candidate.
+// Implements: SW-REQ-134
 func (k *ValidateRequest) processRequestWithCandidates(r *http.Request, urlSpec *URLSpec) (int, error) {
 	normalizeHeaders(r.Header)
 	strippedPath := k.Spec.StripListenPath(r.URL.Path)
@@ -200,6 +201,7 @@ func (k *ValidateRequest) processRequestWithCandidates(r *http.Request, urlSpec 
 
 // resolveCandidate uses matchCandidatePath to check if the candidate's path param
 // schemas match the request, then builds a routers.Route for full validation.
+// Implements: SW-REQ-134
 func (k *ValidateRequest) resolveCandidate(candidate ValidateRequestCandidate, strippedPath string) (*routers.Route, map[string]string, bool) {
 	pathItem, operation, pathParams, ok := k.Spec.matchCandidatePath(candidate.OASPath, candidate.OASMethod, strippedPath)
 	if !ok {
@@ -218,6 +220,7 @@ func (k *ValidateRequest) resolveCandidate(candidate ValidateRequestCandidate, s
 
 // validateRoute runs openapi3filter.ValidateRequest against a resolved route and returns
 // the appropriate error/status pair.
+// Implements: SW-REQ-134
 func (k *ValidateRequest) validateRoute(r *http.Request, route *routers.Route, pathParams map[string]string, meta *oas.ValidateRequest) (int, error) {
 	errResponseCode := http.StatusUnprocessableEntity
 	if meta != nil && meta.ErrorResponseCode != 0 {
@@ -364,6 +367,7 @@ func valueMatchesFormat(value, format string) bool {
 // processRequestWithFindOperation is the original implementation that uses findOperation
 // to locate the OAS route. This is used for APIs with mux-template listen paths where
 // the standard regex-based path matching doesn't work reliably.
+// Implements: SW-REQ-134
 func (k *ValidateRequest) processRequestWithFindOperation(r *http.Request) (error, int) {
 	operation := k.Spec.findOperation(r)
 

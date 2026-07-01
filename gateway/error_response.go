@@ -27,6 +27,7 @@ type ErrorResponseContext struct {
 
 // DetectErrorResponseContext extracts content type info from the request.
 // Follows the same pattern as writeTemplateErrorResponse for consistency.
+// Implements: SW-REQ-141, SW-REQ-142
 func DetectErrorResponseContext(r *http.Request) *ErrorResponseContext {
 	contentType := r.Header.Get(header.ContentType)
 	contentType = strings.Split(contentType, ";")[0]
@@ -55,6 +56,7 @@ func DetectErrorResponseContext(r *http.Request) *ErrorResponseContext {
 
 // SetErrorResponseHeaders sets common error response headers on both the
 // ResponseWriter and returns a copy for analytics recording.
+// Implements: SW-REQ-142
 func (e *ErrorHandler) SetErrorResponseHeaders(w http.ResponseWriter, contentType string) http.Header {
 	respHeader := http.Header{}
 
@@ -77,6 +79,7 @@ func (e *ErrorHandler) SetErrorResponseHeaders(w http.ResponseWriter, contentTyp
 // escapeTemplateString prepares s for safe rendering by the appropriate template engine.
 // For JSON (html/template): JS-escapes and marks safe to prevent HTML entity encoding.
 // For XML (text/template): HTML-escapes explicitly since text/template does not auto-escape.
+// Implements: SW-REQ-141, SW-REQ-142
 func escapeTemplateString(s string, isXML bool) htmltemplate.HTML {
 	if isXML {
 		return htmltemplate.HTML(html.EscapeString(s))
@@ -86,6 +89,7 @@ func escapeTemplateString(s string, isXML bool) htmltemplate.HTML {
 
 // ExecuteErrorTemplate executes a template and captures output for analytics.
 // Uses io.MultiWriter to write to both the response and a buffer for recording.
+// Implements: SW-REQ-142
 func (e *ErrorHandler) ExecuteErrorTemplate(w http.ResponseWriter, tmpl TemplateExecutor, data any, errCode int) *http.Response {
 	w.WriteHeader(errCode)
 

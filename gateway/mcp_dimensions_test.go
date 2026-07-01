@@ -75,50 +75,77 @@ func mcpMetricDefs() []apimetrics.APIMetricDefinition {
 
 // -- ctxSet/ctxGet roundtrips --
 
+// Verifies: STK-REQ-037, SYS-REQ-125, SW-REQ-112
+// STK-REQ-037:STK-REQ-037-AC-01:acceptance
+// SW-REQ-112:nominal:nominal
 func TestCtxSetMCPMethod_Roundtrip(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
 	ctxSetMCPMethod(r, "tools/call")
 	assert.Equal(t, "tools/call", ctxGetMCPMethod(r))
 }
 
+// Verifies: STK-REQ-037, SYS-REQ-125, SW-REQ-112
+// STK-REQ-037:STK-REQ-037-AC-01:acceptance
+// SW-REQ-112:nominal:nominal
 func TestCtxSetMCPPrimitiveType_Roundtrip(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
 	ctxSetMCPPrimitiveType(r, "tool")
 	assert.Equal(t, "tool", ctxGetMCPPrimitiveType(r))
 }
 
+// Verifies: STK-REQ-037, SYS-REQ-125, SW-REQ-112
+// STK-REQ-037:STK-REQ-037-AC-01:acceptance
+// SW-REQ-112:nominal:nominal
 func TestCtxSetMCPPrimitiveName_Roundtrip(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
 	ctxSetMCPPrimitiveName(r, "get_weather")
 	assert.Equal(t, "get_weather", ctxGetMCPPrimitiveName(r))
 }
 
+// Verifies: STK-REQ-037, SYS-REQ-125, SW-REQ-112
+// STK-REQ-037:STK-REQ-037-AC-01:acceptance
+// SW-REQ-112:nominal:nominal
 func TestCtxSetJSONRPCErrorCode_Roundtrip(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
 	ctxSetJSONRPCErrorCode(r, -32601)
 	assert.Equal(t, -32601, ctxGetJSONRPCErrorCode(r))
 }
 
+// Verifies: STK-REQ-037, SYS-REQ-125, SW-REQ-112
+// STK-REQ-037:STK-REQ-037-AC-01:acceptance
+// SW-REQ-112:boundary:nominal
 func TestCtxGetMCPMethod_EmptyWhenNotSet(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
 	assert.Equal(t, "", ctxGetMCPMethod(r))
 }
 
+// Verifies: STK-REQ-037, SYS-REQ-125, SW-REQ-112
+// STK-REQ-037:STK-REQ-037-AC-01:acceptance
+// SW-REQ-112:boundary:nominal
 func TestCtxGetMCPPrimitiveType_EmptyWhenNotSet(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
 	assert.Equal(t, "", ctxGetMCPPrimitiveType(r))
 }
 
+// Verifies: STK-REQ-037, SYS-REQ-125, SW-REQ-112
+// STK-REQ-037:STK-REQ-037-AC-01:acceptance
+// SW-REQ-112:boundary:nominal
 func TestCtxGetMCPPrimitiveName_EmptyWhenNotSet(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
 	assert.Equal(t, "", ctxGetMCPPrimitiveName(r))
 }
 
+// Verifies: STK-REQ-037, SYS-REQ-125, SW-REQ-112
+// STK-REQ-037:STK-REQ-037-AC-01:acceptance
+// SW-REQ-112:boundary:nominal
 func TestCtxGetJSONRPCErrorCode_ZeroWhenNotSet(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
 	assert.Equal(t, 0, ctxGetJSONRPCErrorCode(r))
 }
 
+// Verifies: STK-REQ-037, SYS-REQ-125, SW-REQ-112
+// STK-REQ-037:STK-REQ-037-AC-01:acceptance
+// SW-REQ-112:boundary:nominal
 func TestCtxSetMCPMethod_OverwritesPreviousValue(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
 	ctxSetMCPMethod(r, "resources/read")

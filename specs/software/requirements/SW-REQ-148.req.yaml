@@ -4,8 +4,8 @@ status: approved
 priority: shall
 category: user_session_lifetime_endpoint_maps
 req_type: guarantee
-fretish: the user_session_lifetime_endpoint_maps shall always satisfy user_session_lifetime_endpoint_maps_operation_terminal
-description: The user package implementation shall preserve local session lifetime and endpoint map helper behavior for post-expiry lifetime selection, legacy lifetime fallback and key-expiration comparison, global lifetime override, endpoint collection flattening into method:path maps, and endpoint map expansion into sorted endpoint collections while skipping malformed map keys, without claiming Redis durability, policy merge behavior, gateway routing, endpoint rate-limit enforcement, distributed synchronization, or final client responses.
+fretish: the user_session_lifetime_endpoint_maps shall always satisfy (user_session_lifetime_selection_matches_expected & user_endpoint_map_conversion_matches_expected)
+description: "The user package implementation shall preserve local session lifetime and endpoint map helper behavior for two focused behaviors: post-expiry lifetime selection, legacy lifetime fallback and key-expiration comparison, and global lifetime override; and endpoint collection flattening into method:path maps plus endpoint map expansion into sorted endpoint collections while skipping malformed map keys. This requirement does not claim Redis durability, policy merge behavior, gateway routing, endpoint rate-limit enforcement, distributed synchronization, or final client responses."
 formalization_strategy: fretish
 informal_verification:
     method: unit_tests
@@ -13,7 +13,7 @@ informal_verification:
     verified: true
 parent: SYS-REQ-161
 component: user_session_lifetime_endpoint_maps
-rationale: This software requirement owns local user-package session lifetime and endpoint map conversion mechanics and focused user package tests only. Integrated policy behavior, persistence, routing, endpoint rate-limit execution, and transport behavior are outside this proof slice.
+rationale: This software requirement owns local user-package session lifetime and endpoint map conversion mechanics and focused user package tests only. Its formal model uses concrete app-logic outcome predicates for lifetime selection and endpoint map conversion because those are the helper results asserted by the tests. Integrated policy behavior, persistence, routing, endpoint rate-limit execution, and transport behavior are outside this proof slice.
 tags:
     - user
     - session
@@ -25,9 +25,9 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-161
-    reviewed_at: "2026-06-21T11:59:02.220068Z"
+    reviewed_at: "2026-06-21T18:58:07.699823Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:5cd9bc1108daf77f39573f648387cb172c95644ddac1f2af7ddaf1c647b6dd70
+    reviewed_fingerprint: sha256:a7b06f506dd35f9056b4a7cd4061ca70404476ba6e094829959fc77edd783cf4
 verification:
     assurance_level: A
     formalization_status: valid

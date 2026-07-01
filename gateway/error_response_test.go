@@ -16,6 +16,9 @@ import (
 )
 
 // TestDetectErrorResponseContext tests content-type detection
+// Verifies: STK-REQ-066, STK-REQ-067, SYS-REQ-154, SYS-REQ-155, SW-REQ-141, SW-REQ-142
+// SW-REQ-141:boundary:nominal
+// SW-REQ-142:boundary:nominal
 func TestDetectErrorResponseContext(t *testing.T) {
 	t.Run("JSON content type - application/json", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", nil)
@@ -88,6 +91,10 @@ func TestDetectErrorResponseContext(t *testing.T) {
 }
 
 // TestSetErrorResponseHeaders tests header setting
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
+// SW-REQ-142:determinism:nominal
 func TestSetErrorResponseHeaders(t *testing.T) {
 	createTestErrorHandler := func(cfg config.Config) *ErrorHandler {
 		spec := &APISpec{
@@ -173,6 +180,9 @@ func TestSetErrorResponseHeaders(t *testing.T) {
 }
 
 // TestExecuteErrorTemplate tests template execution
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:boundary:nominal
 func TestExecuteErrorTemplate(t *testing.T) {
 	createTestErrorHandler := func() *ErrorHandler {
 		spec := &APISpec{
@@ -312,6 +322,9 @@ func TestExecuteErrorTemplate(t *testing.T) {
 }
 
 // TestAPIErrorWithContext tests the error context structure
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:determinism:nominal
 func TestAPIErrorWithContext(t *testing.T) {
 	t.Run("has Message and StatusCode fields", func(t *testing.T) {
 		errCtx := &APIErrorWithContext{
@@ -366,6 +379,9 @@ func TestAPIErrorWithContext(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-066, STK-REQ-067, SYS-REQ-154, SYS-REQ-155, SW-REQ-141, SW-REQ-142
+// SW-REQ-141:boundary:nominal
+// SW-REQ-142:boundary:nominal
 func TestEscapeTemplateString(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -435,6 +451,9 @@ func TestEscapeTemplateString(t *testing.T) {
 }
 
 // TestHeaderPropagation tests that headers are correctly set on both writer and response
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:nominal:nominal
+// SW-REQ-142:determinism:nominal
 func TestHeaderPropagation(t *testing.T) {
 	t.Run("headers set on both writer and return value", func(t *testing.T) {
 		w := httptest.NewRecorder()
@@ -475,6 +494,9 @@ func TestHeaderPropagation(t *testing.T) {
 }
 
 // TestContentTypeParsing tests edge cases in content-type parsing
+// Verifies: STK-REQ-066, STK-REQ-067, SYS-REQ-154, SYS-REQ-155, SW-REQ-141, SW-REQ-142
+// SW-REQ-141:boundary:nominal
+// SW-REQ-142:boundary:nominal
 func TestContentTypeParsing(t *testing.T) {
 	testCases := []struct {
 		name              string
@@ -572,6 +594,8 @@ func TestContentTypeParsing(t *testing.T) {
 }
 
 // TestExecuteErrorTemplateStatusCodes tests various status codes
+// Verifies: STK-REQ-067, SYS-REQ-155, SW-REQ-142
+// SW-REQ-142:boundary:nominal
 func TestExecuteErrorTemplateStatusCodes(t *testing.T) {
 	testCases := []struct {
 		name       string

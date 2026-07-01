@@ -1,6 +1,30 @@
 component: gateway_upstream_tls_validation
 variables:
-    - name: gateway_upstream_tls_validation_operation_terminal
+    - name: gateway_upstream_tls_pinning_enablement_determined
       type: bool
       direction: output
-      description: The gateway upstream tls validation implementation operation reaches a terminal local result for the focused tested inputs, such as returning the expected value, selecting the expected local branch, surfacing an explicit local error, or preserving the documented local fallback behavior.
+      description: Public-key pin validation is enabled only when API or global pins are configured for the focused tested inputs.
+    - name: gateway_upstream_tls_fingerprint_selection_determined
+      type: bool
+      direction: output
+      description: Pinned public-key fingerprints are selected from API and global pin maps for the focused tested inputs.
+    - name: gateway_upstream_tls_pin_match_determined
+      type: bool
+      direction: output
+      description: Upstream public keys matching configured API pins are accepted for the focused tested inputs.
+    - name: gateway_upstream_tls_pin_mismatch_determined
+      type: bool
+      direction: output
+      description: Upstream public keys that do not match configured pins are rejected for the focused tested inputs.
+    - name: gateway_upstream_tls_disabled_and_global_pins_determined
+      type: bool
+      direction: output
+      description: API pinning-disabled fallback and configured global pin behavior produce deterministic local implementation results for the focused tested inputs.
+    - name: gateway_upstream_tls_proxy_pinning_determined
+      type: bool
+      direction: output
+      description: The tested proxy path applies upstream public-key pinning outcomes for the focused tested inputs.
+    - name: gateway_upstream_tls_common_name_determined
+      type: bool
+      direction: output
+      description: Forced CommonName validation is applied for the focused direct and proxied upstream inputs.

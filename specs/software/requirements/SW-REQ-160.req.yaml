@@ -4,8 +4,8 @@ status: approved
 priority: shall
 category: http_server_header_helpers
 req_type: guarantee
-fretish: the http_server_header_helpers shall always satisfy http_server_header_helpers_operation_terminal
-description: The internal HTTP utility package implementation shall preserve local server and header helper behavior for tested inputs by constructing connection watchers with zero count, applying explicit and connection-state count deltas, leaving non-counting connection states unchanged, reporting the current count, and constructing Basic Authorization header values from username and password pairs, without claiming nonnegative connection-count enforcement, full server lifecycle management, upstream authentication, credential validation, transport security, analytics, persistence, or final client responses.
+fretish: the http_server_header_helpers shall always satisfy (http_connection_watcher_determined & http_basic_auth_header_determined)
+description: "The internal HTTP utility package implementation shall preserve local server and header helper behavior for two focused behaviors: constructing connection watchers with zero count, applying explicit and connection-state count deltas, leaving non-counting connection states unchanged, and reporting the current count; and constructing Basic Authorization header values from username and password pairs. This requirement does not claim nonnegative connection-count enforcement, full server lifecycle management, upstream authentication, credential validation, transport security, analytics, persistence, or final client responses."
 formalization_strategy: fretish
 informal_verification:
     method: unit_tests
@@ -13,7 +13,7 @@ informal_verification:
     verified: true
 parent: SYS-REQ-173
 component: http_server_header_helpers
-rationale: This software requirement owns local internal/httputil connection watcher and Basic auth header helper mechanics and focused package tests only. Integrated gateway server lifecycle and upstream authentication behavior are outside this proof slice.
+rationale: This software requirement owns local internal/httputil connection watcher and Basic auth header helper mechanics and focused package tests only. Its formal model is decomposed into connection watcher and Basic auth header outputs so each helper surface can be reviewed and witnessed independently. Integrated gateway server lifecycle and upstream authentication behavior are outside this proof slice.
 tags:
     - http
     - server
@@ -24,9 +24,9 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-173
-    reviewed_at: "2026-06-21T11:59:03.122372Z"
+    reviewed_at: "2026-06-21T18:05:11.144981Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:445393f734a9d3749f85c5359249bb6e63f6552a060fa8d879dda85ad0be6680
+    reviewed_fingerprint: sha256:2433b4d9a304de2a9e8af9fb580fa773949885bf6d2c1aa7ae0f37373681ae21
 verification:
     assurance_level: A
     formalization_status: valid

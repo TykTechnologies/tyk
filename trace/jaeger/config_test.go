@@ -127,6 +127,69 @@ func TestInit(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-086, SYS-REQ-174, SW-REQ-161
+// MCDC SYS-REQ-174: jaeger_trace_adapter_operation_terminal=T => TRUE
+// MCDC SW-REQ-161: jaeger_trace_adapter_operation_terminal=T => TRUE
+// STK-REQ-086:STK-REQ-086-AC-01:acceptance
+// SW-REQ-161:nominal:nominal
+// SW-REQ-161:boundary:nominal
+// SW-REQ-161:determinism:nominal
+func TestJaegerTraceAdapterReqProof(t *testing.T) {
+	loadedConfig, err := Load(map[string]interface{}{
+		"serviceName": "tyk-gateway",
+		"sampler": map[string]interface{}{
+			"type":  jaeger.SamplerTypeConst,
+			"param": 1,
+		},
+		"reporter": map[string]interface{}{
+			"logSpans": true,
+			"http_headers": map[string]interface{}{
+				"test": "1",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loadedConfig.ServiceName != "tyk-gateway" {
+		t.Fatalf("ServiceName = %q, want tyk-gateway", loadedConfig.ServiceName)
+	}
+	if loadedConfig.Sampler == nil || loadedConfig.Sampler.Type != jaeger.SamplerTypeConst || loadedConfig.Sampler.Param != 1 {
+		t.Fatalf("Sampler = %#v, want const sampler with param 1", loadedConfig.Sampler)
+	}
+	if loadedConfig.Reporter == nil || loadedConfig.Reporter.HTTPHeaders["test"] != "1" {
+		t.Fatalf("Reporter = %#v, want HTTP header test=1", loadedConfig.Reporter)
+	}
+
+	logger := &recordingLogger{}
+	wrapLogger{Logger: logger}.Error("jaeger error")
+	if len(logger.errors) != 1 || logger.errors[0] != "jaeger error" {
+		t.Fatalf("logger errors = %#v, want jaeger error", logger.errors)
+	}
+
+	trace, err := Init("override-service", map[string]interface{}{
+		"disabled": true,
+		"sampler": map[string]interface{}{
+			"type":  jaeger.SamplerTypeConst,
+			"param": 1,
+		},
+	}, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer trace.Close()
+
+	if trace.Tracer == nil {
+		t.Fatal("expected tracer")
+	}
+	if trace.Closer == nil {
+		t.Fatal("expected closer")
+	}
+	if got := trace.Name(); got != Name {
+		t.Fatalf("Name = %q, want %q", got, Name)
+	}
+}
+
 // Reproduces: KI-JAEGER-LOAD-UNSUPPORTED-OPTION-PANIC
 // Verifies: SYS-REQ-174
 func TestKnownIssue_LoadPanicsOnUnsupportedOptionValue(t *testing.T) {

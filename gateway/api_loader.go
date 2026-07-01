@@ -147,6 +147,7 @@ func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router) {
 
 }
 
+// Implements: SW-REQ-150, SW-REQ-151, SW-REQ-175
 func (gw *Gateway) processSpec(
 	spec *APISpec,
 	apisByListen map[string]int,
@@ -810,6 +811,7 @@ func (gw *Gateway) findInternalHttpHandlerByNameOrID(apiNameOrID string) (handle
 	return h.(*ChainObject).ThisHandler, targetAPI, true
 }
 
+// Implements: SW-REQ-150, SW-REQ-175, SW-REQ-178
 func (gw *Gateway) loadGlobalApps() {
 	// we need to make a full copy of the slice, as loadApps will
 	// use in-place to sort the apis.
@@ -1118,7 +1120,8 @@ func listenPathLength(listenPath string) int {
 	return length
 }
 
-// Create the individual API (app) specs based on live configurations and assign middleware
+// Create the individual API (app) specs based on live configurations and assign middleware.
+// Implements: SW-REQ-150, SW-REQ-175, SW-REQ-178
 func (gw *Gateway) loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
 

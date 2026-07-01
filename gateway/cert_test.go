@@ -1901,6 +1901,8 @@ func TestCertificateHandlerTLS(t *testing.T) {
 // SW-REQ-183:boundary:nominal
 // SW-REQ-183:error_handling:nominal
 // SW-REQ-183:error_handling:negative
+// MCDC SYS-REQ-195: gateway_cipher_suite_selection_operation_terminal=T => TRUE
+// MCDC SW-REQ-183: gateway_cipher_suite_selection_operation_terminal=T => TRUE
 func TestCipherSuites(t *testing.T) {
 
 	//configure server so we can useSSL and utilize the logic, but skip verification in the clients

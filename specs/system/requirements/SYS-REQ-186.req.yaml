@@ -4,7 +4,7 @@ status: approved
 priority: shall
 category: storage
 req_type: guarantee
-fretish: the storage_mdcb shall always satisfy storage_mdcb_operation_terminal
+fretish: the storage_mdcb shall always satisfy (storage_mdcb_construction_determined & storage_mdcb_local_rpc_reads_determined & storage_mdcb_resource_cache_determined & storage_mdcb_local_write_determined & storage_mdcb_key_collection_delegation_determined & storage_mdcb_list_membership_determined & storage_mdcb_connect_determined & storage_mdcb_unsupported_panics_determined)
 description: MDCB storage handling shall preserve deterministic local wrapper behavior for tested inputs by constructing storage wrappers, reading local keys before RPC fallback, returning the first successful multi-key read, classifying resource keys, caching RPC OAuth-client values locally, invoking certificate cache callbacks, writing only to local storage, falling back from local to RPC key listing and list range reads, combining local and RPC delete, scan-delete, connect, append, remove-list, and existence results, delegating selected set and filter operations, and preserving explicit panic behavior for unsupported MDCB storage methods without claiming real MDCB or Redis availability, distributed consistency, persistence durability, network transport behavior, RPC service correctness, certificate storage correctness beyond callback invocation, OAuth-client validity, concurrency safety, or final client-visible behavior beyond the focused local MDCB storage tests.
 formalization_strategy: fretish
 informal_verification:
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: STK-REQ-098
 component: storage_mdcb
-rationale: This system requirement owns local MDCB storage wrapper mechanics only. Distributed MDCB behavior and real backend availability remain outside this proof slice.
+rationale: This system requirement owns local MDCB storage wrapper mechanics only. Its formal model is decomposed into wrapper construction, local/RPC reads, resource classification and caching, local-only writes, key/set delegation, list/existence behavior, connect behavior, and explicit unsupported-method panic outputs so each behavior can be reviewed and witnessed independently. Distributed MDCB behavior and real backend availability remain outside this proof slice.
 tags:
     - storage
     - mdcb
@@ -22,9 +22,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-098
-    reviewed_at: "2026-06-21T11:59:05.820839Z"
+    reviewed_at: "2026-06-21T18:17:11.822998Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:6ebdb0ec26650db434b81f549a5416f35d457556d7c13102e4fa452a61090c1d
+    reviewed_fingerprint: sha256:cf208c4ffafae4a4a2995144c7fc9998c3f677a7069a01d07a8485828dd8f58b
 verification:
     assurance_level: A
     formalization_status: valid

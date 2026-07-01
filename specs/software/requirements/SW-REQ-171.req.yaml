@@ -4,7 +4,7 @@ status: approved
 priority: shall
 category: storage
 req_type: guarantee
-fretish: the storage_kv shall always satisfy storage_kv_operation_terminal
+fretish: the storage_kv shall always satisfy (storage_kv_consul_config_determined & storage_kv_consul_read_write_determined & storage_kv_vault_config_determined & storage_kv_vault_get_determined & storage_kv_vault_put_determined & storage_kv_vault_read_secret_determined)
 description: The key-value storage adapter implementation shall preserve local adapter behavior for tested inputs by constructing Consul and Vault adapters from configuration, reading missing and present Consul keys, writing Consul keys, configuring Vault clients and tokens, reading and writing Vault v1 and v2 key paths and payloads, rejecting malformed Vault keys and missing Vault tokens, and surfacing Vault read errors without claiming real Consul or Vault service availability, distributed durability, authentication or ACL correctness, TLS validation, secret encryption, production network behavior, gateway configuration loading, or final client-visible behavior beyond the focused key-value adapter tests.
 formalization_strategy: fretish
 informal_verification:
@@ -13,7 +13,7 @@ informal_verification:
     verified: true
 parent: SYS-REQ-184
 component: storage_kv
-rationale: This software requirement owns local storage/kv Consul and Vault adapter mechanics and focused package tests only. Real backends and gateway consumers are outside this proof slice.
+rationale: This software requirement owns local storage/kv Consul and Vault adapter mechanics and focused package tests only. Its formal model is decomposed into Consul configuration, Consul read/write, Vault configuration/token, Vault get, Vault put, and Vault ReadSecret outputs so each behavior can be reviewed and witnessed independently. Real backends and gateway consumers are outside this proof slice.
 tags:
     - storage
     - kv
@@ -24,9 +24,9 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-184
-    reviewed_at: "2026-06-21T11:59:04.828841Z"
+    reviewed_at: "2026-06-21T18:27:41.592109Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:59f00dcd28278466bcaf45fe6624374d8ee97379c88f2973871563925c5a9b20
+    reviewed_fingerprint: sha256:33be7849231e8e0c5e98cfacfceb46f2be7cb5abc8337ae1e55cc8b7dc60e026
 verification:
     assurance_level: A
     formalization_status: valid

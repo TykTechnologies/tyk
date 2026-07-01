@@ -3,6 +3,14 @@
 `STK-REQ-074`, `SYS-REQ-162`, and `SW-REQ-149` cover local gateway API loader
 helper behavior in `gateway/api_loader.go`.
 
+The formal model is decomposed into four behavior-specific outputs instead of
+one broad terminal helper variable: domain/listen-path keying, middleware path
+prefixing, loop lookup, and sort ordering. The aggregate TRUE MC/DC row is
+witnessed by `TestGatewayAPILoaderLocalHelpers`, which drives all four local
+helper groups. The behavior-specific FALSE rows remain invariant-violation debt
+until they are resolved by real reachability evidence, product KnownIssues, or
+a reviewed ReqProof modeling policy for invariant rows.
+
 The executable evidence is `gateway/api_loader_reqproof_test.go` and
 `gateway/api_loader_test.go`. It covers domain/listen-path key construction,
 API count aggregation by domain and listen path including disabled-domain APIs,

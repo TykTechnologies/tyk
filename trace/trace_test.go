@@ -378,6 +378,215 @@ func TestInit(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-090, SYS-REQ-178, SW-REQ-165
+// MCDC SYS-REQ-178: trace_manager_operation_terminal=T => TRUE
+// MCDC SW-REQ-165: trace_manager_operation_terminal=T => TRUE
+// STK-REQ-090:STK-REQ-090-AC-01:acceptance
+// STK-REQ-090:error_handling:negative
+// SW-REQ-165:nominal:nominal
+// SW-REQ-165:boundary:nominal
+// SW-REQ-165:encoding_safety:nominal
+// SW-REQ-165:error_handling:nominal
+// SW-REQ-165:error_handling:negative
+// SW-REQ-165:determinism:nominal
+func TestTraceManagerReqProof(t *testing.T) {
+	resetTraceGlobals(t)
+
+	t.Run("service id context helpers", func(t *testing.T) {
+		if got := GetServiceID(context.Background()); got != "" {
+			t.Fatalf("unset service id = %q, want empty", got)
+		}
+		ctx := SetServiceID(context.Background(), "svc")
+		if got := GetServiceID(ctx); got != "svc" {
+			t.Fatalf("service id = %q, want svc", got)
+		}
+	})
+
+	t.Run("manager state registration and no-op fallback", func(t *testing.T) {
+		if IsEnabled() {
+			t.Fatal("expected tracing disabled before setup")
+		}
+		if _, ok := Get("missing").(NoopTracer); !ok {
+			t.Fatal("expected no-op tracer for missing service")
+		}
+		if err := AddTracer("", "svc"); !errors.Is(err, ErrManagerDisabled) {
+			t.Fatalf("AddTracer disabled error = %v, want ErrManagerDisabled", err)
+		}
+
+		tracer := &recordingTracer{name: "configured"}
+		var calls int
+		SetInit(func(name string, service string, opts map[string]interface{}, logger Logger) (Tracer, error) {
+			calls++
+			if name != "configured" || service != "svc" || opts["sample"] != "value" {
+				t.Fatalf("initializer args = name:%q service:%q opts:%#v", name, service, opts)
+			}
+			if _, ok := logger.(StdLogger); !ok {
+				t.Fatalf("initializer logger = %T, want StdLogger", logger)
+			}
+			return tracer, nil
+		})
+		SetupTracing("configured", map[string]interface{}{"sample": "value"})
+		if !IsEnabled() {
+			t.Fatal("expected tracing enabled after setup")
+		}
+		if err := AddTracer("", "svc"); err != nil {
+			t.Fatal(err)
+		}
+		if err := AddTracer("", "svc"); err != nil {
+			t.Fatal(err)
+		}
+		if calls != 1 {
+			t.Fatalf("initializer calls = %d, want 1", calls)
+		}
+		if got := Get("svc"); got != tracer {
+			t.Fatal("expected registered tracer")
+		}
+	})
+
+	tracer := &recordingTracer{name: "svc"}
+	services.Store("svc", tracer)
+	ctx := SetServiceID(context.Background(), "svc")
+	header := http.Header{"B3": {"trace-span"}}
+
+	t.Run("span extraction and injection helpers", func(t *testing.T) {
+		span, spanCtx := Span(ctx, "child")
+		if span == nil {
+			t.Fatal("expected span")
+		}
+		if got := GetServiceID(spanCtx); got != "svc" {
+			t.Fatalf("span context service id = %q, want svc", got)
+		}
+		if got := tracer.started[len(tracer.started)-1]; got != "child" {
+			t.Fatalf("last started span = %q, want child", got)
+		}
+
+		extracted, err := Extract(tracer, header)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if extracted != tracer.context {
+			t.Fatal("expected extracted tracer context")
+		}
+		if _, err := ExtractFromContext(ctx, header); err != nil {
+			t.Fatal(err)
+		}
+		if err := Inject("svc", span, header); err != nil {
+			t.Fatal(err)
+		}
+		if err := InjectFromContext(ctx, span, header); err != nil {
+			t.Fatal(err)
+		}
+		if tracer.extractCount != 2 || tracer.injectCount != 2 {
+			t.Fatalf("extract/inject counts = %d/%d, want 2/2", tracer.extractCount, tracer.injectCount)
+		}
+
+		tracer.extractErr = errors.New("extract failed")
+		if _, err := Extract(tracer, header); err == nil {
+			t.Fatal("expected extract error")
+		}
+		tracer.extractErr = nil
+		tracer.injectErr = errors.New("inject failed")
+		if err := Inject("svc", span, header); err == nil {
+			t.Fatal("expected inject error")
+		}
+		tracer.injectErr = nil
+	})
+
+	t.Run("handler root span setup", func(t *testing.T) {
+		tracer.extractErr = errors.New("no inbound span")
+		req := httptest.NewRequest(http.MethodPost, "/widgets?id=1", strings.NewReader("body"))
+		req.ContentLength = 4
+		span, rootedReq := Root("svc", req)
+		if span == nil {
+			t.Fatal("expected root span")
+		}
+		if got := GetServiceID(rootedReq.Context()); got != "svc" {
+			t.Fatalf("rooted service id = %q, want svc", got)
+		}
+
+		called := false
+		handler := Handle("svc", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			called = true
+			if got := GetServiceID(r.Context()); got != "svc" {
+				t.Fatalf("handled service id = %q, want svc", got)
+			}
+			w.WriteHeader(http.StatusAccepted)
+		}))
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if !called {
+			t.Fatal("expected wrapped handler call")
+		}
+		if rec.Code != http.StatusAccepted {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusAccepted)
+		}
+		tracer.extractErr = nil
+	})
+
+	t.Run("log helpers forward to logger and active span", func(t *testing.T) {
+		span := &recordingSpan{tags: map[string]interface{}{}}
+		logCtx := opentracing.ContextWithSpan(context.Background(), span)
+		logger := &recordingLogrus{}
+
+		Debug(logCtx, logger, "debug", 1)
+		Error(logCtx, logger, "error", 2)
+		Warning(logCtx, logger, "warn", 3)
+		Info(logCtx, logger, "info", 4)
+		Log(context.Background(), opentracinglog.String("ignored", "without span"))
+
+		wantLogs := []string{"debug:debug1", "error:error2", "warning:warn3", "info:info4"}
+		if !reflect.DeepEqual(wantLogs, logger.entries) {
+			t.Fatalf("logger entries = %#v, want %#v", logger.entries, wantLogs)
+		}
+		if len(span.fields) != 4 {
+			t.Fatalf("span log entries = %d, want 4", len(span.fields))
+		}
+	})
+
+	t.Run("supported provider selection", func(t *testing.T) {
+		tests := []struct {
+			name       string
+			tracerName string
+			opts       map[string]interface{}
+			wantName   string
+			wantErr    string
+		}{
+			{name: "unknown provider returns noop", tracerName: "noop", wantName: "NoopTracer"},
+			{name: "zipkin provider returns local init errors", tracerName: openzipkin.Name, wantErr: "missing url"},
+			{name: "jaeger provider initializes disabled tracer", tracerName: jaeger.Name, opts: map[string]interface{}{"disabled": true}, wantName: jaeger.Name},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				got, err := Init(tt.tracerName, "svc", tt.opts, &recordingManagerLogger{})
+				if tt.wantErr != "" {
+					if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+						t.Fatalf("expected error containing %q, got %v", tt.wantErr, err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer got.Close()
+				if got.Name() != tt.wantName {
+					t.Fatalf("provider name = %q, want %q", got.Name(), tt.wantName)
+				}
+			})
+		}
+	})
+
+	if err := Close(); err != nil {
+		t.Fatal(err)
+	}
+	if IsEnabled() {
+		t.Fatal("expected close to disable tracing")
+	}
+	if _, ok := Get("svc").(NoopTracer); !ok {
+		t.Fatal("expected close to remove registered tracer")
+	}
+}
+
 func resetTraceGlobals(t *testing.T) {
 	t.Helper()
 

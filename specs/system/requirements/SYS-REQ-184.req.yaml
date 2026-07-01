@@ -4,7 +4,7 @@ status: approved
 priority: shall
 category: storage
 req_type: guarantee
-fretish: the storage_kv shall always satisfy storage_kv_operation_terminal
+fretish: the storage_kv shall always satisfy (storage_kv_consul_config_determined & storage_kv_consul_read_write_determined & storage_kv_vault_config_determined & storage_kv_vault_get_determined & storage_kv_vault_put_determined & storage_kv_vault_read_secret_determined)
 description: Key-value storage adapter handling shall preserve deterministic local adapter results for tested inputs by constructing Consul and Vault adapters from configuration, reading missing and present Consul keys, writing Consul keys, configuring Vault clients and tokens, reading and writing Vault v1 and v2 key paths and payloads, rejecting malformed Vault keys and missing Vault tokens, and surfacing Vault read errors without claiming real Consul or Vault service availability, distributed durability, authentication or ACL correctness, TLS validation, secret encryption, production network behavior, gateway configuration loading, or final client-visible behavior beyond the focused key-value adapter tests.
 formalization_strategy: fretish
 informal_verification:
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: STK-REQ-096
 component: storage_kv
-rationale: This system requirement owns local storage/kv adapter behavior only. Real Consul/Vault availability and gateway configuration consumption remain outside this proof slice.
+rationale: This system requirement owns local storage/kv adapter behavior only. Its formal model is decomposed into Consul configuration, Consul read/write, Vault configuration/token, Vault get, Vault put, and Vault ReadSecret outputs so each behavior can be reviewed and witnessed independently. Real Consul/Vault availability and gateway configuration consumption remain outside this proof slice.
 tags:
     - storage
     - kv
@@ -23,9 +23,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-096
-    reviewed_at: "2026-06-21T11:59:05.794953Z"
+    reviewed_at: "2026-06-21T18:27:41.875833Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:ed20ae6d76681498f4d1258d27bccab6aeb1910f8a6e1ca02d1c869c3a52beee
+    reviewed_fingerprint: sha256:3db332cdff2388cdd5cd30457fd910560a31cc9de823016a40d96bbcb5ab1068
 verification:
     assurance_level: A
     formalization_status: valid

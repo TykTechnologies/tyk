@@ -936,6 +936,324 @@ func TestProxyPipe(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-091, SYS-REQ-179, SW-REQ-166
+// MCDC SYS-REQ-179: tcp_proxy_operation_terminal=T => TRUE
+// MCDC SW-REQ-166: tcp_proxy_operation_terminal=T => TRUE
+// STK-REQ-091:STK-REQ-091-AC-01:acceptance
+// STK-REQ-091:error_handling:negative
+// SW-REQ-166:nominal:nominal
+// SW-REQ-166:boundary:nominal
+// SW-REQ-166:error_handling:nominal
+// SW-REQ-166:error_handling:negative
+// SW-REQ-166:encoding_safety:nominal
+// SW-REQ-166:determinism:nominal
+func TestTCPProxyReqProof(t *testing.T) {
+	t.Run("domain handler configuration and stat flushing", func(t *testing.T) {
+		stat := &Stat{}
+		atomic.StoreInt64(&stat.BytesIn, 12)
+		atomic.StoreInt64(&stat.BytesOut, 34)
+		if got := stat.Flush(); got.BytesIn != 12 || got.BytesOut != 34 {
+			t.Fatalf("flushed stat = %#v, want 12/34 bytes", got)
+		}
+		if got := stat.Flush(); got.BytesIn != 0 || got.BytesOut != 0 {
+			t.Fatalf("second flushed stat = %#v, want reset bytes", got)
+		}
+
+		proxy := &Proxy{}
+		proxy.AddDomainHandler("first.example", "tcp://first:1234", nil)
+		if proxy.muxer["first.example"].modifier == nil {
+			t.Fatal("expected nil modifier to be replaced")
+		}
+
+		replacement := &Proxy{TLSConfigTarget: &tls.Config{ServerName: "replacement"}}
+		replacement.AddDomainHandler("second.example", "tcp://second:1234", &Modifier{})
+		proxy.Swap(replacement)
+		if proxy.TLSConfigTarget.ServerName != "replacement" {
+			t.Fatal("expected swapped TLS config")
+		}
+		if _, ok := proxy.muxer["first.example"]; ok {
+			t.Fatal("expected old handler map to be replaced")
+		}
+		if _, ok := proxy.muxer["second.example"]; !ok {
+			t.Fatal("expected replacement handler map")
+		}
+		proxy.RemoveDomainHandler("second.example")
+		if _, ok := proxy.muxer["second.example"]; ok {
+			t.Fatal("expected handler removal")
+		}
+	})
+
+	target1 := test.TcpMock(false, func(in []byte, _ error) []byte {
+		return []byte("first")
+	})
+	defer target1.Close()
+	target2 := test.TcpMock(false, func(in []byte, _ error) []byte {
+		return []byte("second")
+	})
+	defer target2.Close()
+
+	t.Run("single tls sni and fallback target selection", func(t *testing.T) {
+		single := &Proxy{}
+		single.AddDomainHandler("", target1.Addr().String(), nil)
+		testRunner(t, single, "", false, test.TCPTestCase{Action: "write", Payload: "ping"}, test.TCPTestCase{Action: "read", Payload: "first"})
+
+		byDomain := &Proxy{}
+		byDomain.AddDomainHandler("localhost", target1.Addr().String(), nil)
+		byDomain.AddDomainHandler("example.com", target2.Addr().String(), nil)
+		testRunner(t, byDomain, "example.com", true, test.TCPTestCase{Action: "write", Payload: "ping"}, test.TCPTestCase{Action: "read", Payload: "second"})
+
+		withFallback := &Proxy{}
+		withFallback.AddDomainHandler("", target1.Addr().String(), nil)
+		withFallback.AddDomainHandler("example.com", target2.Addr().String(), nil)
+		testRunner(t, withFallback, "wrong", true, test.TCPTestCase{Action: "write", Payload: "ping"}, test.TCPTestCase{Action: "read", Payload: "first"})
+	})
+
+	t.Run("request and response modifiers plus sync stats", func(t *testing.T) {
+		upstream := test.TcpMock(false, func(in []byte, _ error) []byte {
+			return in
+		})
+		defer upstream.Close()
+
+		stats := make(chan Stat, 10)
+		proxy := &Proxy{
+			SyncStats: func(s Stat) {
+				stats <- s
+				if s.State == Closed {
+					close(stats)
+				}
+			},
+			StatsSyncInterval: 10 * time.Millisecond,
+		}
+		proxy.AddDomainHandler("", upstream.Addr().String(), &Modifier{
+			ModifyRequest: func(src, dst net.Conn, data []byte) ([]byte, error) {
+				return []byte("modified-request"), nil
+			},
+			ModifyResponse: func(src, dst net.Conn, data []byte) ([]byte, error) {
+				if string(data) != "modified-request" {
+					t.Fatalf("upstream response = %q, want modified request echo", string(data))
+				}
+				return []byte("modified-response"), nil
+			},
+		})
+		testRunner(t, proxy, "", false, test.TCPTestCase{Action: "write", Payload: "ping"}, test.TCPTestCase{Action: "read", Payload: "modified-response"})
+
+		var observed []Stat
+		for s := range stats {
+			observed = append(observed, s)
+		}
+		if len(observed) < 2 {
+			t.Fatalf("expected open and closed stats, got %#v", observed)
+		}
+		if observed[0].State != Open || observed[len(observed)-1].State != Closed {
+			t.Fatalf("stats states = %#v, want open then closed", observed)
+		}
+	})
+
+	t.Run("shutdown context and active connection completion", func(t *testing.T) {
+		proxy := &Proxy{}
+		proxy.initShutdownContext()
+		if proxy.shutdownCtx == nil || proxy.shutdown == nil {
+			t.Fatal("expected initialized shutdown context")
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		proxy.SetShutdownContext(ctx)
+		if proxy.shutdownCtx == nil || proxy.shutdown == nil {
+			t.Fatal("expected caller shutdown context")
+		}
+		cancel()
+
+		proxy.activeConns.Add(1)
+		go proxy.activeConns.Done()
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), time.Second)
+		defer shutdownCancel()
+		if err := proxy.Shutdown(shutdownCtx); err != nil {
+			t.Fatalf("Shutdown returned error: %v", err)
+		}
+	})
+
+	t.Run("connection formatting and closed socket classification", func(t *testing.T) {
+		conn := &addressConn{local: testAddr("local"), remote: testAddr("remote")}
+		if got := upstreamConn(conn); got != "local->remote" {
+			t.Fatalf("upstream conn = %q, want local->remote", got)
+		}
+		if got := clientConn(conn); got != "remote->local" {
+			t.Fatalf("client conn = %q, want remote->local", got)
+		}
+		if got := formatAddress(testAddr("remote"), testAddr("local")); got != "remote->local" {
+			t.Fatalf("formatted address = %q, want remote->local", got)
+		}
+		if !IsSocketClosed(errors.New("read tcp: use of closed network connection")) {
+			t.Fatal("expected closed socket classification")
+		}
+		if IsSocketClosed(io.EOF) {
+			t.Fatal("expected EOF not to classify as closed socket")
+		}
+	})
+
+	t.Run("pipe termination paths", func(t *testing.T) {
+		t.Run("forwards modified payload", func(t *testing.T) {
+			proxy := &Proxy{}
+			proxy.initShutdownContext()
+			srcClient, srcProxy := net.Pipe()
+			dstProxy, dstClient := net.Pipe()
+			defer srcClient.Close()
+			defer dstClient.Close()
+
+			done := make(chan struct{})
+			go proxy.pipe(srcProxy, dstProxy, pipeOpts{
+				modifier: func(src, dst net.Conn, data []byte) ([]byte, error) {
+					return []byte("pong"), nil
+				},
+				beforeExit: func() {
+					close(done)
+				},
+			})
+
+			if _, err := srcClient.Write([]byte("ping")); err != nil {
+				t.Fatal(err)
+			}
+			buf := make([]byte, 4)
+			if _, err := dstClient.Read(buf); err != nil {
+				t.Fatal(err)
+			}
+			if string(buf) != "pong" {
+				t.Fatalf("pipe output = %q, want pong", string(buf))
+			}
+			srcClient.Close()
+			waitForPipeExit(t, done)
+		})
+
+		t.Run("empty modified payload exits after read close", func(t *testing.T) {
+			proxy := &Proxy{}
+			proxy.initShutdownContext()
+			srcClient, srcProxy := net.Pipe()
+			dstProxy, dstClient := net.Pipe()
+			defer srcClient.Close()
+			defer dstClient.Close()
+
+			done := make(chan struct{})
+			go proxy.pipe(srcProxy, dstProxy, pipeOpts{
+				modifier: func(src, dst net.Conn, data []byte) ([]byte, error) {
+					return nil, nil
+				},
+				beforeExit: func() {
+					close(done)
+				},
+			})
+
+			if _, err := srcClient.Write([]byte("ping")); err != nil {
+				t.Fatal(err)
+			}
+			srcClient.Close()
+			waitForPipeExit(t, done)
+		})
+
+		t.Run("exits on modifier error", func(t *testing.T) {
+			proxy := &Proxy{}
+			proxy.initShutdownContext()
+			srcClient, srcProxy := net.Pipe()
+			dstProxy, dstClient := net.Pipe()
+			defer srcClient.Close()
+			defer dstClient.Close()
+
+			done := make(chan struct{})
+			go proxy.pipe(srcProxy, dstProxy, pipeOpts{
+				modifier: func(src, dst net.Conn, data []byte) ([]byte, error) {
+					return nil, errors.New("modifier failed")
+				},
+				beforeExit: func() {
+					close(done)
+				},
+			})
+
+			if _, err := srcClient.Write([]byte("ping")); err != nil {
+				t.Fatal(err)
+			}
+			waitForPipeExit(t, done)
+		})
+
+		t.Run("reports read and write errors", func(t *testing.T) {
+			proxy := &Proxy{}
+			proxy.initShutdownContext()
+			srcClient, srcProxy := net.Pipe()
+			dstProxy, dstClient := net.Pipe()
+			defer srcClient.Close()
+			dstClient.Close()
+
+			writeErrors := make(chan error, 1)
+			done := make(chan struct{})
+			go proxy.pipe(srcProxy, dstProxy, pipeOpts{
+				onWriteError: func(err error) {
+					writeErrors <- err
+				},
+				beforeExit: func() {
+					close(done)
+				},
+			})
+
+			if _, err := srcClient.Write([]byte("ping")); err != nil {
+				t.Fatal(err)
+			}
+			waitForPipeExit(t, done)
+			select {
+			case err := <-writeErrors:
+				if err == nil {
+					t.Fatal("expected write error")
+				}
+			default:
+				t.Fatal("expected write error callback")
+			}
+
+			readProxy := &Proxy{}
+			readProxy.initShutdownContext()
+			readClient, readSrc := net.Pipe()
+			readDst, readSink := net.Pipe()
+			defer readClient.Close()
+			defer readSink.Close()
+			readErrors := make(chan error, 1)
+			readDone := make(chan struct{})
+			go readProxy.pipe(readSrc, readDst, pipeOpts{
+				onReadError: func(err error) {
+					readErrors <- err
+				},
+				beforeExit: func() {
+					close(readDone)
+				},
+			})
+			readClient.Close()
+			waitForPipeExit(t, readDone)
+			select {
+			case err := <-readErrors:
+				if err == nil {
+					t.Fatal("expected read error")
+				}
+			default:
+				t.Fatal("expected read error callback")
+			}
+		})
+
+		t.Run("exits on shutdown context", func(t *testing.T) {
+			proxy := &Proxy{}
+			ctx, cancel := context.WithCancel(context.Background())
+			proxy.SetShutdownContext(ctx)
+			srcClient, srcProxy := net.Pipe()
+			dstProxy, dstClient := net.Pipe()
+			defer srcClient.Close()
+			defer dstClient.Close()
+
+			done := make(chan struct{})
+			go proxy.pipe(srcProxy, dstProxy, pipeOpts{
+				beforeExit: func() {
+					close(done)
+				},
+			})
+			cancel()
+			waitForPipeExit(t, done)
+		})
+	})
+}
+
 func waitForPipeExit(t *testing.T, done <-chan struct{}) {
 	t.Helper()
 	select {

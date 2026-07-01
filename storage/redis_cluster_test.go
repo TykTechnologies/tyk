@@ -164,6 +164,276 @@ func TestRedisClusterGetMultiKey(t *testing.T) {
 }
 
 // Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
+// STK-REQ-099:STK-REQ-099-AC-01:acceptance
+// SYS-REQ-187:nominal:nominal
+// SYS-REQ-187:boundary:nominal
+// SYS-REQ-187:error_handling:nominal
+// SYS-REQ-187:encoding_safety:nominal
+// SYS-REQ-187:determinism:nominal
+// SW-REQ-174:nominal:nominal
+// SW-REQ-174:boundary:nominal
+// SW-REQ-174:error_handling:nominal
+// SW-REQ-174:encoding_safety:nominal
+// SW-REQ-174:determinism:nominal
+// MCDC SYS-REQ-187: storage_redis_cluster_connection_config_determined=T, storage_redis_cluster_temporal_adapters_determined=T, storage_redis_cluster_key_value_determined=T, storage_redis_cluster_scan_delete_determined=T, storage_redis_cluster_pubsub_determined=T, storage_redis_cluster_list_determined=T, storage_redis_cluster_set_sorted_set_determined=T, storage_redis_cluster_controller_prefix_determined=T => TRUE
+// MCDC SW-REQ-174: storage_redis_cluster_connection_config_determined=T, storage_redis_cluster_temporal_adapters_determined=T, storage_redis_cluster_key_value_determined=T, storage_redis_cluster_scan_delete_determined=T, storage_redis_cluster_pubsub_determined=T, storage_redis_cluster_list_determined=T, storage_redis_cluster_set_sorted_set_determined=T, storage_redis_cluster_controller_prefix_determined=T => TRUE
+func TestRedisClusterReqProof(t *testing.T) {
+	controllerHandler := NewConnectionHandler(context.Background())
+	controlled := &RedisCluster{RedisController: &RedisController{connection: controllerHandler}}
+	assert.Equal(t, controllerHandler, controlled.getConnectionHandler())
+
+	cluster := newConnectedReqProofRedisCluster("prefix:")
+	assert.Equal(t, cluster.ConnectionHandler, cluster.getConnectionHandler())
+	assert.True(t, cluster.Connect())
+	assert.True(t, cluster.ControllerInitiated())
+	assert.Equal(t, []string{"override:30000"}, getRedisAddrs(config.StorageOptionsConf{
+		Host:  "host",
+		Port:  30000,
+		Addrs: []string{"override:30000"},
+	}))
+	assert.Equal(t, "prefix:key", cluster.fixKey("key"))
+	assert.Equal(t, "key", cluster.cleanKey("prefix:key"))
+	assert.Equal(t, "key", cluster.hashKey("key"))
+	hashed := (&RedisCluster{HashKeys: true}).hashKey("key")
+	assert.NotEmpty(t, hashed)
+	assert.NotEqual(t, "key", hashed)
+
+	actualAdapters := &RedisCluster{ConnectionHandler: rc}
+	adapterCases := []struct {
+		name string
+		get  func() (interface{}, error)
+	}{
+		{name: "client", get: func() (interface{}, error) { return actualAdapters.Client() }},
+		{name: "key-value", get: func() (interface{}, error) { return actualAdapters.kv() }},
+		{name: "flusher", get: func() (interface{}, error) { return actualAdapters.flusher() }},
+		{name: "queue", get: func() (interface{}, error) { return actualAdapters.queue() }},
+		{name: "list", get: func() (interface{}, error) { return actualAdapters.list() }},
+		{name: "set", get: func() (interface{}, error) { return actualAdapters.set() }},
+		{name: "sorted-set", get: func() (interface{}, error) { return actualAdapters.sortedSet() }},
+	}
+	for _, tc := range adapterCases {
+		t.Run("adapter "+tc.name, func(t *testing.T) {
+			got, err := tc.get()
+			assert.NoError(t, err)
+			assert.NotNil(t, got)
+		})
+	}
+
+	disconnectedAdapters := newConnectedReqProofRedisCluster("")
+	disconnectedAdapters.ConnectionHandler.storageUp.Store(false)
+	gotKV, err := disconnectedAdapters.kv()
+	assert.ErrorIs(t, err, ErrRedisIsDown)
+	assert.Nil(t, gotKV)
+
+	exerciseRedisClusterKeyValueReqProof(t)
+	exerciseRedisClusterScanDeleteReqProof(t)
+	exerciseRedisClusterPubSubReqProof(t)
+	exerciseRedisClusterListReqProof(t)
+	exerciseRedisClusterSetSortedSetReqProof(t)
+	exerciseRedisClusterControllerPrefixReqProof(t)
+}
+
+func newConnectedReqProofRedisCluster(prefix string) *RedisCluster {
+	handler := NewConnectionHandler(context.Background())
+	handler.storageUp.Store(true)
+	return &RedisCluster{KeyPrefix: prefix, ConnectionHandler: handler}
+}
+
+func exerciseRedisClusterKeyValueReqProof(t *testing.T) {
+	t.Helper()
+
+	storage := newConnectedReqProofRedisCluster("prefix:")
+	mockKV := tempmocks.NewKeyValue(t)
+	storage.kvStorage = mockKV
+
+	mockKV.On("Set", mock.Anything, "prefix:key", "value", 10*time.Second).Return(nil)
+	assert.NoError(t, storage.SetKey("key", "value", 10))
+
+	mockKV.On("Get", mock.Anything, "prefix:key").Return("value", nil)
+	value, err := storage.GetKey("key")
+	assert.NoError(t, err)
+	assert.Equal(t, "value", value)
+
+	mockKV.On("GetMulti", mock.Anything, []string{"prefix:key", "prefix:missing"}).Return([]interface{}{"value", "<nil>"}, nil)
+	values, err := storage.GetMultiKey([]string{"key", "missing"})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"value", ""}, values)
+
+	mockKV.On("TTL", mock.Anything, "prefix:key").Return(int64(10), nil)
+	ttl, err := storage.GetKeyTTL("key")
+	assert.NoError(t, err)
+	assert.Equal(t, int64(10), ttl)
+	ttl, err = storage.GetExp("key")
+	assert.NoError(t, err)
+	assert.Equal(t, int64(10), ttl)
+
+	mockKV.On("Expire", mock.Anything, "prefix:key", 10*time.Second).Return(nil)
+	assert.NoError(t, storage.SetExp("key", 10))
+
+	mockKV.On("Set", mock.Anything, "raw-key", "raw-value", time.Duration(0)).Return(nil)
+	assert.NoError(t, storage.SetRawKey("raw-key", "raw-value", 0))
+
+	mockKV.On("Get", mock.Anything, "raw-key").Return("raw-value", nil)
+	rawValue, err := storage.GetRawKey("raw-key")
+	assert.NoError(t, err)
+	assert.Equal(t, "raw-value", rawValue)
+
+	mockKV.On("SetIfNotExist", mock.Anything, "lock-key", "1", time.Second).Return(true, nil)
+	locked, err := storage.Lock("lock-key", time.Second)
+	assert.NoError(t, err)
+	assert.True(t, locked)
+
+	mockKV.On("Decrement", mock.Anything, "prefix:counter").Return(int64(1), nil)
+	storage.Decrement("counter")
+
+	mockKV.On("Increment", mock.Anything, "raw-counter").Return(int64(1), nil)
+	mockKV.On("Expire", mock.Anything, "raw-counter", 10*time.Second).Return(nil)
+	assert.Equal(t, int64(1), storage.IncrememntWithExpire("raw-counter", 10))
+}
+
+func exerciseRedisClusterScanDeleteReqProof(t *testing.T) {
+	t.Helper()
+
+	storage := newConnectedReqProofRedisCluster("prefix:")
+	mockKV := tempmocks.NewKeyValue(t)
+	mockFlusher := tempmocks.NewFlusher(t)
+	storage.kvStorage = mockKV
+	storage.flusherStorage = mockFlusher
+
+	mockKV.On("Keys", mock.Anything, "prefix:key*").Return([]string{"prefix:key1"}, nil)
+	assert.Equal(t, []string{"key1"}, storage.GetKeys("key"))
+
+	mockKV.On("GetKeysAndValuesWithFilter", mock.Anything, "prefix:key").Return(map[string]interface{}{"prefix:key1": "value1"}, nil)
+	assert.Equal(t, map[string]string{"key1": "value1"}, storage.GetKeysAndValuesWithFilter("key"))
+
+	mockKV.On("GetKeysAndValuesWithFilter", mock.Anything, "").Return(map[string]interface{}{"prefix:key1": "value1"}, nil)
+	assert.Equal(t, map[string]string{"key1": "value1"}, storage.GetKeysAndValues())
+
+	mockKV.On("Exists", mock.Anything, "prefix:key1").Return(true, nil)
+	mockKV.On("Delete", mock.Anything, "prefix:key1").Return(nil)
+	assert.True(t, storage.DeleteKey("key1"))
+
+	mockKV.On("Delete", mock.Anything, "raw-key").Return(nil)
+	assert.True(t, storage.DeleteRawKey("raw-key"))
+
+	mockKV.On("DeleteKeys", mock.Anything, []string{"raw-1", "raw-2"}).Return(int64(2), nil)
+	assert.True(t, storage.DeleteRawKeys([]string{"raw-1", "raw-2"}))
+
+	mockKV.On("DeleteKeys", mock.Anything, []string{"prefix:key2", "prefix:key3"}).Return(int64(2), nil)
+	assert.True(t, storage.DeleteKeys([]string{"key2", "key3"}))
+
+	mockKV.On("DeleteScanMatch", mock.Anything, "prefix:*").Return(int64(2), nil)
+	assert.True(t, storage.DeleteScanMatch("prefix:*"))
+
+	mockFlusher.On("FlushAll", mock.Anything).Return(nil)
+	assert.True(t, storage.DeleteAllKeys())
+}
+
+func exerciseRedisClusterPubSubReqProof(t *testing.T) {
+	t.Helper()
+
+	storage := newConnectedReqProofRedisCluster("")
+	mockQueue := tempmocks.NewQueue(t)
+	storage.queueStorage = mockQueue
+
+	mockMessage := tempmocks.NewMessage(t)
+	var received interface{}
+	err := storage.handleReceive(context.Background(), func(context.Context) (model.Message, error) {
+		return mockMessage, nil
+	}, func(value interface{}) {
+		received = value
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, mockMessage, received)
+
+	err = storage.handleMessage(nil, errors.New("read: use of closed network connection"), nil)
+	assert.ErrorIs(t, err, redis.ErrClosed)
+
+	mockQueue.On("Publish", mock.Anything, "channel", "message").Return(int64(1), nil)
+	assert.NoError(t, storage.Publish("channel", "message"))
+}
+
+func exerciseRedisClusterListReqProof(t *testing.T) {
+	t.Helper()
+
+	storage := newConnectedReqProofRedisCluster("prefix:")
+	mockKV := tempmocks.NewKeyValue(t)
+	mockList := tempmocks.NewList(t)
+	storage.kvStorage = mockKV
+	storage.listStorage = mockList
+
+	fixedKey := "prefix:list-key"
+	mockList.On("Pop", mock.Anything, fixedKey, int64(-1)).Return([]string{"one", "two"}, nil)
+	assert.Equal(t, []interface{}{"one", "two"}, storage.GetAndDeleteSet("list-key"))
+
+	mockList.On("Append", mock.Anything, false, fixedKey, []byte("three")).Return(nil)
+	storage.AppendToSet("list-key", "three")
+
+	mockKV.On("Exists", mock.Anything, fixedKey).Return(true, nil)
+	exists, err := storage.Exists("list-key")
+	assert.NoError(t, err)
+	assert.True(t, exists)
+
+	mockList.On("Remove", mock.Anything, fixedKey, int64(0), "one").Return(int64(1), nil)
+	assert.NoError(t, storage.RemoveFromList("list-key", "one"))
+
+	mockList.On("Range", mock.Anything, fixedKey, int64(0), int64(10)).Return([]string{"two", "three"}, nil)
+	listValues, err := storage.GetListRange("list-key", 0, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"two", "three"}, listValues)
+
+	pipelineValues := [][]byte{[]byte("four"), []byte("five")}
+	mockList.On("Append", mock.Anything, true, fixedKey, pipelineValues[0], pipelineValues[1]).Return(nil)
+	storage.AppendToSetPipelined("list-key", pipelineValues)
+}
+
+func exerciseRedisClusterSetSortedSetReqProof(t *testing.T) {
+	t.Helper()
+
+	storage := newConnectedReqProofRedisCluster("prefix:")
+	mockSet := tempmocks.NewSet(t)
+	mockSortedSet := tempmocks.NewSortedSet(t)
+	storage.setStorage = mockSet
+	storage.sortedSetStorage = mockSortedSet
+
+	setKey := "prefix:set-key"
+	mockSet.On("Members", mock.Anything, setKey).Return([]string{"a", "b"}, nil)
+	setValues, err := storage.GetSet("set-key")
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]string{"0": "a", "1": "b"}, setValues)
+
+	mockSet.On("AddMember", mock.Anything, setKey, "c").Return(nil)
+	storage.AddToSet("set-key", "c")
+
+	mockSet.On("RemoveMember", mock.Anything, setKey, "a").Return(nil)
+	storage.RemoveFromSet("set-key", "a")
+
+	mockSet.On("IsMember", mock.Anything, setKey, "b").Return(true, nil)
+	assert.True(t, storage.IsMemberOfSet("set-key", "b"))
+
+	sortedKey := "prefix:sorted-key"
+	mockSortedSet.On("AddScoredMember", mock.Anything, sortedKey, "member", 1.5).Return(int64(1), nil)
+	storage.AddToSortedSet("sorted-key", "member", 1.5)
+
+	mockSortedSet.On("GetMembersByScoreRange", mock.Anything, sortedKey, "0", "2").Return([]interface{}{"member"}, []float64{1.5}, nil)
+	members, scores, err := storage.GetSortedSetRange("sorted-key", "0", "2")
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"member"}, members)
+	assert.Equal(t, []float64{1.5}, scores)
+
+	mockSortedSet.On("RemoveMembersByScoreRange", mock.Anything, sortedKey, "0", "2").Return(int64(1), nil)
+	assert.NoError(t, storage.RemoveSortedSetRange("sorted-key", "0", "2"))
+}
+
+func exerciseRedisClusterControllerPrefixReqProof(t *testing.T) {
+	t.Helper()
+
+	storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "reqproof:"}
+	assert.True(t, storage.ControllerInitiated())
+	assert.Equal(t, "reqproof:", storage.GetKeyPrefix())
+}
+
+// Verifies: STK-REQ-099, SYS-REQ-187, SW-REQ-174
 // STK-REQ-099:boundary:nominal
 // STK-REQ-099:encoding_safety:nominal
 // SYS-REQ-187:boundary:nominal

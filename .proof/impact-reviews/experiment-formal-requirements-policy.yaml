@@ -1,6 +1,6 @@
 schema_version: 1
 branch: experiment-formal-requirements-policy
-generated_at: "2026-06-21T12:13:22Z"
+generated_at: "2026-06-21T19:19:23Z"
 reviews:
     - requirement: STK-REQ-001
       artifact: internal/policy/apply.go
@@ -533,6 +533,26 @@ reviews:
       approval_fingerprint: sha256:08a6eed4ff228ca7306fe5027b7fddad0464445b64cdac581bbf62442bb7d900
       artifact_fingerprint: sha256:fc3d1828d82c0eb9ab612ea3f94c127ef26ed4eae02f35548ac8d616a8e1f585
       reviewed_at: "2026-06-20T09:43:43Z"
+    - requirement: SW-REQ-103
+      artifact: gateway/api_config.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
+      base: origin/master
+      requirement_fingerprint: sha256:8f44d8fd3b7b09cce0172a65da448a9ec738a38f08d87f188cc773603f1f8db5
+      approval_fingerprint: sha256:4f8500f8d737875e6556cbf7698e59b02522e9aaa335e5fb0dde5a18b13208f8
+      artifact_fingerprint: sha256:5ce908a365efeb0b1d511a214db07c5cf3f09961f2a45f04231f0837174444c2
+      reviewed_at: "2026-06-21T19:10:28Z"
+    - requirement: SW-REQ-103
+      artifact: gateway/server.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
+      base: origin/master
+      requirement_fingerprint: sha256:8f44d8fd3b7b09cce0172a65da448a9ec738a38f08d87f188cc773603f1f8db5
+      approval_fingerprint: sha256:4f8500f8d737875e6556cbf7698e59b02522e9aaa335e5fb0dde5a18b13208f8
+      artifact_fingerprint: sha256:bcac830341b3a628a7f2d5d42f201daf0bf588819cb4471f326fb7138078a902
+      reviewed_at: "2026-06-21T19:10:28Z"
     - requirement: SW-REQ-104
       artifact: config/external_service.go
       decision: no-authored-change
@@ -613,6 +633,56 @@ reviews:
       approval_fingerprint: sha256:0522db80a99550b0fa56c0407b5d576274d3a60794e3475ad81ec483180ca500
       artifact_fingerprint: sha256:604d11b257f038b375cc9e8226dcd5de3878444d863130f2ae07c7b9200635d5
       reviewed_at: "2026-06-20T18:08:33Z"
+    - requirement: SW-REQ-126
+      artifact: gateway/api.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
+      base: origin/master
+      requirement_fingerprint: sha256:43f5d074fa9c7542113a5c125aa7e09e77b41162c2f53184966b402dae09be6b
+      approval_fingerprint: sha256:6b3f6ffc4b21983d109bae79481fd5d6e34eb87b051356de30c73d558e0d5fd0
+      artifact_fingerprint: sha256:695af5dfba335b52eb6c79a6a4629148f3856b27e11662bc79beb56ddb45feb3
+      reviewed_at: "2026-06-21T19:11:02Z"
+    - requirement: SW-REQ-126
+      artifact: gateway/api_helpers.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
+      base: origin/master
+      requirement_fingerprint: sha256:43f5d074fa9c7542113a5c125aa7e09e77b41162c2f53184966b402dae09be6b
+      approval_fingerprint: sha256:6b3f6ffc4b21983d109bae79481fd5d6e34eb87b051356de30c73d558e0d5fd0
+      artifact_fingerprint: sha256:03034e7257bc756d880873eb119b7ea641fe77fba4e04f2b83e2945cc3aa178c
+      reviewed_at: "2026-06-21T19:11:02Z"
+    - requirement: SW-REQ-126
+      artifact: gateway/delete_api_cache.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
+      base: origin/master
+      requirement_fingerprint: sha256:43f5d074fa9c7542113a5c125aa7e09e77b41162c2f53184966b402dae09be6b
+      approval_fingerprint: sha256:6b3f6ffc4b21983d109bae79481fd5d6e34eb87b051356de30c73d558e0d5fd0
+      artifact_fingerprint: sha256:db3a29e8aab4030489ca47e2e7a615f98b95cc0ca0fab17ed566ccd7dc6f30d0
+      reviewed_at: "2026-06-21T19:11:02Z"
+    - requirement: SW-REQ-126
+      artifact: gateway/server.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
+      base: origin/master
+      requirement_fingerprint: sha256:43f5d074fa9c7542113a5c125aa7e09e77b41162c2f53184966b402dae09be6b
+      approval_fingerprint: sha256:6b3f6ffc4b21983d109bae79481fd5d6e34eb87b051356de30c73d558e0d5fd0
+      artifact_fingerprint: sha256:bcac830341b3a628a7f2d5d42f201daf0bf588819cb4471f326fb7138078a902
+      reviewed_at: "2026-06-21T19:11:02Z"
+    - requirement: SW-REQ-126
+      artifact: gateway/versions_handler.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
+      base: origin/master
+      requirement_fingerprint: sha256:43f5d074fa9c7542113a5c125aa7e09e77b41162c2f53184966b402dae09be6b
+      approval_fingerprint: sha256:6b3f6ffc4b21983d109bae79481fd5d6e34eb87b051356de30c73d558e0d5fd0
+      artifact_fingerprint: sha256:2915d42233884d1a6dad609b221fc83092dfaa329c0747f394269da63552f9c0
+      reviewed_at: "2026-06-21T19:11:02Z"
     - requirement: SW-REQ-130
       artifact: gateway/api_definition.go
       decision: no-authored-change
@@ -667,12 +737,22 @@ reviews:
       artifact: gateway/model_apispec.go
       decision: no-authored-change
       reviewer: human:buger
-      reason: Reviewed implementation impact for gateway/model_apispec.go after ReqProof annotation-only changes. Executable behavior did not change; SW-REQ-134 and linked evidence remain correct.
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
       base: origin/master
       requirement_fingerprint: sha256:5f2e5513659261f2865b54ec666a8d46cf165fef8bf8501af8500967f764b030
       approval_fingerprint: sha256:533c07ddf04847aa1081b05890ebb5d57683680403ecc0d30b870db732d7d713
-      artifact_fingerprint: sha256:a1eb52491db4a05fa7d0a0b68d5bb51de0e58a0613493adfa24df4667b37c32b
-      reviewed_at: "2026-06-21T02:32:32Z"
+      artifact_fingerprint: sha256:5adb3cbf6b1f532d322ac6b9809ef191c731c697d5271ce9cdf08c772041d4de
+      reviewed_at: "2026-06-21T19:11:23Z"
+    - requirement: SW-REQ-134
+      artifact: gateway/mw_oas_validate_request.go
+      decision: no-authored-change
+      reviewer: agent:codex
+      reason: Reviewed current production diffs for pending authored-delta findings; these changes add ReqProof trace annotations/comments only and do not alter executable behavior, requirement intent, or documented design contracts.
+      base: origin/master
+      requirement_fingerprint: sha256:5f2e5513659261f2865b54ec666a8d46cf165fef8bf8501af8500967f764b030
+      approval_fingerprint: sha256:533c07ddf04847aa1081b05890ebb5d57683680403ecc0d30b870db732d7d713
+      artifact_fingerprint: sha256:0bcff1cef5f042f9c8b79dea0de8824129bfe4efaa8af9ebd5777333a35ce0f6
+      reviewed_at: "2026-06-21T16:54:21Z"
     - requirement: SW-REQ-135
       artifact: gateway/api_definition.go
       decision: no-authored-change
@@ -693,6 +773,16 @@ reviews:
       approval_fingerprint: sha256:14c0e7f3f99cb2681a5ce3fa50928c5eb5da37e2c8d333efbaa012016ebe84cf
       artifact_fingerprint: sha256:b50ee6175c0f1aa6d686e7353c06f16794767510b5df6fb3238fbc4a7b195e87
       reviewed_at: "2026-06-21T02:32:48Z"
+    - requirement: SW-REQ-136
+      artifact: gateway/model_urlspec.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only trace edits in gateway/model_urlspec.go; no executable behavior changed and SW-REQ-136 remains scoped to local request/version helper behavior.
+      base: origin/master
+      requirement_fingerprint: sha256:400c4d01715dc341a20d3b021d56a494170267c8904affd54f0e5f728fb5eddc
+      approval_fingerprint: sha256:14c0e7f3f99cb2681a5ce3fa50928c5eb5da37e2c8d333efbaa012016ebe84cf
+      artifact_fingerprint: sha256:e248d13cdf3f3e12f880578318c0d1634766af45ad59ff6ea24eb8918893a476
+      reviewed_at: "2026-06-21T19:19:23Z"
     - requirement: SW-REQ-137
       artifact: gateway/api_definition.go
       decision: no-authored-change
@@ -713,6 +803,46 @@ reviews:
       approval_fingerprint: sha256:091a315134fb533062d880d75c25cd17abafbd40d19f3a8da8dbbdcd14cc410d
       artifact_fingerprint: sha256:b50ee6175c0f1aa6d686e7353c06f16794767510b5df6fb3238fbc4a7b195e87
       reviewed_at: "2026-06-21T02:32:48Z"
+    - requirement: SW-REQ-141
+      artifact: gateway/error_response.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
+      base: origin/master
+      requirement_fingerprint: sha256:e5a46e5d1b934e892127358f519281f690281905e936412f7a13968641e31d04
+      approval_fingerprint: sha256:d5f800ee6c5669785ff04a11f7c222b18927a64e668502a58d6f9b07bb987eb1
+      artifact_fingerprint: sha256:3f18d6bc135fde910985eada634f697ccd35fe02860e847e3d11a2ad571bb062
+      reviewed_at: "2026-06-21T19:11:44Z"
+    - requirement: SW-REQ-141
+      artifact: gateway/model_apispec.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
+      base: origin/master
+      requirement_fingerprint: sha256:e5a46e5d1b934e892127358f519281f690281905e936412f7a13968641e31d04
+      approval_fingerprint: sha256:d5f800ee6c5669785ff04a11f7c222b18927a64e668502a58d6f9b07bb987eb1
+      artifact_fingerprint: sha256:5adb3cbf6b1f532d322ac6b9809ef191c731c697d5271ce9cdf08c772041d4de
+      reviewed_at: "2026-06-21T19:11:44Z"
+    - requirement: SW-REQ-141
+      artifact: gateway/res_handler_error_override.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
+      base: origin/master
+      requirement_fingerprint: sha256:e5a46e5d1b934e892127358f519281f690281905e936412f7a13968641e31d04
+      approval_fingerprint: sha256:d5f800ee6c5669785ff04a11f7c222b18927a64e668502a58d6f9b07bb987eb1
+      artifact_fingerprint: sha256:5f35affe0014097925646be36f2cbf98fda567f68258af8592c548b8bf52db0c
+      reviewed_at: "2026-06-21T19:11:44Z"
+    - requirement: SW-REQ-141
+      artifact: gateway/server.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
+      base: origin/master
+      requirement_fingerprint: sha256:e5a46e5d1b934e892127358f519281f690281905e936412f7a13968641e31d04
+      approval_fingerprint: sha256:d5f800ee6c5669785ff04a11f7c222b18927a64e668502a58d6f9b07bb987eb1
+      artifact_fingerprint: sha256:bcac830341b3a628a7f2d5d42f201daf0bf588819cb4471f326fb7138078a902
+      reviewed_at: "2026-06-21T19:11:44Z"
     - requirement: SW-REQ-143
       artifact: regexp/cache.go
       decision: no-authored-change
@@ -897,72 +1027,72 @@ reviews:
       artifact: user/session.go
       decision: no-authored-change
       reviewer: human:buger
-      reason: Reviewed trace-only requirement-reference annotations on user session JSON serialization symbols; production behavior, requirement text, and documented design remain unchanged.
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
       base: origin/master
-      requirement_fingerprint: sha256:5cd9bc1108daf77f39573f648387cb172c95644ddac1f2af7ddaf1c647b6dd70
-      approval_fingerprint: sha256:9f044fe8a37a1921e246e93ac18242186b9f30faf1440a988136d7bfb1cf6daa
+      requirement_fingerprint: sha256:a7b06f506dd35f9056b4a7cd4061ca70404476ba6e094829959fc77edd783cf4
+      approval_fingerprint: sha256:e0bc5fe359272354ef77f303dd16b5824c726b7a6cc30df5b707232af5c3f3ef
       artifact_fingerprint: sha256:7fe07a288336dd796a7243611f6233bf2a279f26c93744dbda1160423c11deef
-      reviewed_at: "2026-06-21T12:13:22Z"
+      reviewed_at: "2026-06-21T19:12:04Z"
     - requirement: SW-REQ-149
       artifact: gateway/api_loader.go
       decision: no-authored-change
-      reviewer: buger
-      reason: Reviewed gateway API loader helper impact after adding auxiliary ReqProof annotations and tests in the shared api_loader.go file; SW-REQ-149 helper behavior and documented design remain unchanged.
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
       base: origin/master
-      requirement_fingerprint: sha256:c37921152df29f3cb7f8a331408912a2e608803595fd085c4616779a5bb91f44
-      approval_fingerprint: sha256:ce624f7c8c635821816adb1db6b63f72b6940e55287339511314fdbf9387a2f0
-      artifact_fingerprint: sha256:f8f073fea4034e964783cb59b609ffb2ef174d90e70a5dc3888b056e5f0a7f25
-      reviewed_at: "2026-06-21T10:24:31Z"
+      requirement_fingerprint: sha256:96df0cbfec901a328ff851cb1305459321fded7f5b8d682f74d4327dafc2d650
+      approval_fingerprint: sha256:046c2e65a167a0bb087258e4e5774328f1492114ffe37045b738fa8c2e713137
+      artifact_fingerprint: sha256:2cd971d7a016e30dc3e9a894ece0d6fe3fe913d98c2d2cb55566e3582b31fb20
+      reviewed_at: "2026-06-21T19:12:25Z"
     - requirement: SW-REQ-150
       artifact: gateway/api_loader.go
       decision: no-authored-change
-      reviewer: buger
-      reason: Reviewed gateway API loader storage impact after adding auxiliary ReqProof annotations and tests in the shared api_loader.go file; SW-REQ-150 storage setup behavior and documented design remain unchanged.
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
       base: origin/master
-      requirement_fingerprint: sha256:7a891b9cfbde7f063274ff805c156ce05e9d6af1ea5cb80df0ad502d67ae46eb
-      approval_fingerprint: sha256:78f388e27dc4b353470bb47a672a47e9ce90a66a3eb9a55d14038c6a8662d7c4
-      artifact_fingerprint: sha256:f8f073fea4034e964783cb59b609ffb2ef174d90e70a5dc3888b056e5f0a7f25
-      reviewed_at: "2026-06-21T10:27:16Z"
+      requirement_fingerprint: sha256:1230a08e64a8f19540d61e01f6032cdafcda5ef0b7f9dae579268639c8245c65
+      approval_fingerprint: sha256:a1e430502ef55a39fc7e611b443c36672ac500f871adf1787afae16ccb80e9d2
+      artifact_fingerprint: sha256:2cd971d7a016e30dc3e9a894ece0d6fe3fe913d98c2d2cb55566e3582b31fb20
+      reviewed_at: "2026-06-21T19:12:45Z"
     - requirement: SW-REQ-151
       artifact: gateway/api_loader.go
       decision: no-authored-change
-      reviewer: buger
-      reason: Reviewed gateway API loader validation impact after adding auxiliary ReqProof annotations and tests in the shared api_loader.go file; SW-REQ-151 validation behavior and documented design remain unchanged.
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
       base: origin/master
-      requirement_fingerprint: sha256:3ca332e40de9508be0c5bf19d44a2786c24d8bde9d15c556e89d6e0fe8b14bb1
-      approval_fingerprint: sha256:469aa9ebdf15e14340d2abb2db19e08cad4a0c8f6f78bd9c08ffa3ebfe449643
-      artifact_fingerprint: sha256:f8f073fea4034e964783cb59b609ffb2ef174d90e70a5dc3888b056e5f0a7f25
-      reviewed_at: "2026-06-21T10:29:05Z"
+      requirement_fingerprint: sha256:1f89c1c2153e5a429bc01aa8210740524ad76f5c69690feaac0d2bb780b3c2c8
+      approval_fingerprint: sha256:0fc1b58d837563231d551e11229a71877a589cf35ce53e13a6292460e2c6d61a
+      artifact_fingerprint: sha256:2cd971d7a016e30dc3e9a894ece0d6fe3fe913d98c2d2cb55566e3582b31fb20
+      reviewed_at: "2026-06-21T19:14:46Z"
     - requirement: SW-REQ-152
       artifact: gateway/api_loader.go
       decision: no-authored-change
-      reviewer: buger
-      reason: Reviewed gateway API loader loop-detection impact after adding auxiliary ReqProof annotations and tests in the shared api_loader.go file; SW-REQ-152 loop-detection behavior and documented design remain unchanged.
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
       base: origin/master
-      requirement_fingerprint: sha256:ef7ec77e1b7e24c89e69ed7dd60903450627b58b24c21cf84cae9235b795190c
-      approval_fingerprint: sha256:e01dbdf195d4367890fe036c7a48677838c9f786631df5bce4ac16efe455731e
-      artifact_fingerprint: sha256:f8f073fea4034e964783cb59b609ffb2ef174d90e70a5dc3888b056e5f0a7f25
-      reviewed_at: "2026-06-21T10:30:15Z"
+      requirement_fingerprint: sha256:3ddb32db72361b1e78cc8d20dc72189fe18bcb4bb01afac7190886a61a0d22e8
+      approval_fingerprint: sha256:b80a54f75fa41f78a3bafe2640bf83c344f1cd8e2c1be5b063f81ec29726289b
+      artifact_fingerprint: sha256:2cd971d7a016e30dc3e9a894ece0d6fe3fe913d98c2d2cb55566e3582b31fb20
+      reviewed_at: "2026-06-21T19:15:07Z"
     - requirement: SW-REQ-153
       artifact: gateway/api_loader.go
       decision: no-authored-change
-      reviewer: buger
-      reason: Reviewed gateway API loader internal-handler lookup impact after adding auxiliary ReqProof annotations and tests in the shared api_loader.go file; SW-REQ-153 lookup behavior and documented design remain unchanged.
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
       base: origin/master
-      requirement_fingerprint: sha256:e8b9c5f0b23c312c4ceef1a056aebdcdcedce094dcafb98ab3581490963475a6
-      approval_fingerprint: sha256:5439a19a54bfa98222f4e08b46cf484038a81c51507f53562352cebd744bc1b2
-      artifact_fingerprint: sha256:f8f073fea4034e964783cb59b609ffb2ef174d90e70a5dc3888b056e5f0a7f25
-      reviewed_at: "2026-06-21T10:31:23Z"
+      requirement_fingerprint: sha256:ab27ce45b9a38d395a4d636ca8fc9c2e6776d5bf58f41792fb2af1593dd5f55a
+      approval_fingerprint: sha256:548b5effe2fcc615c17d7a8952010b6c82a707a1015455dff678409eabe6b8dc
+      artifact_fingerprint: sha256:2cd971d7a016e30dc3e9a894ece0d6fe3fe913d98c2d2cb55566e3582b31fb20
+      reviewed_at: "2026-06-21T19:15:28Z"
     - requirement: SW-REQ-154
       artifact: gateway/api_loader.go
       decision: no-authored-change
-      reviewer: buger
-      reason: Reviewed gateway API loader explicit-route subpath impact after adding auxiliary ReqProof annotations and tests in the shared api_loader.go file; SW-REQ-154 route-wrapper behavior and documented design remain unchanged.
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
       base: origin/master
-      requirement_fingerprint: sha256:1b1a6e870b43586b9280c6e1fac35ee1ccaa65ad0322cfbbe98cde4fd52764ba
-      approval_fingerprint: sha256:8e646d53b4ba9982a765937fa6ee084ad470b5efbe142ca01926acff28d82552
-      artifact_fingerprint: sha256:f8f073fea4034e964783cb59b609ffb2ef174d90e70a5dc3888b056e5f0a7f25
-      reviewed_at: "2026-06-21T10:32:29Z"
+      requirement_fingerprint: sha256:c12c11ba3cd674282637b90cc64d8b1a5a58536dea348f3aaf9c15d0b92f0099
+      approval_fingerprint: sha256:4efaa56384ccfba5ec0f113069576247b76a6ea256f8edfc5447aa524ebfa061
+      artifact_fingerprint: sha256:2cd971d7a016e30dc3e9a894ece0d6fe3fe913d98c2d2cb55566e3582b31fb20
+      reviewed_at: "2026-06-21T19:13:06Z"
     - requirement: SW-REQ-155
       artifact: user/mcp_access.go
       decision: no-authored-change
@@ -976,13 +1106,13 @@ reviews:
     - requirement: SW-REQ-155
       artifact: user/session.go
       decision: no-authored-change
-      reviewer: human:buger
-      reason: Reviewed trace-only requirement-reference annotations on user session JSON serialization symbols; production behavior, requirement text, and documented design remain unchanged.
+      reviewer: agent:codex
+      reason: Reviewed implementation impact for the flagged requirement-owned production files; no authored requirement or documented design change is needed.
       base: origin/master
-      requirement_fingerprint: sha256:4503bf43dff215fc8acd5a8e770508c4a2063963518213565c21f63335d09a86
-      approval_fingerprint: sha256:b60f1269e8f3e2edfcdfbf6a21d2cf033282df729658cb2666da241da5a4d0d2
+      requirement_fingerprint: sha256:33993acd71b23ff1415d6d17cf725dbe8e3a122f71bb610bc00273201503d58f
+      approval_fingerprint: sha256:95491b25d1fcbcc326c3f3ca2ee12420c6be1556d6c2d1ae77d9ba749e55716d
       artifact_fingerprint: sha256:7fe07a288336dd796a7243611f6233bf2a279f26c93744dbda1160423c11deef
-      reviewed_at: "2026-06-21T12:13:22Z"
+      reviewed_at: "2026-06-21T16:25:22Z"
     - requirement: SW-REQ-163
       artifact: log/json_formatter.go
       decision: no-authored-change
@@ -1286,33 +1416,63 @@ reviews:
     - requirement: SW-REQ-175
       artifact: gateway/api_loader.go
       decision: no-authored-change
-      reviewer: buger
-      reason: Reviewed gateway API loader auxiliary implementation impact after adding ReqProof annotations and focused evidence links; production behavior and the approved auxiliary requirement remain unchanged except for proof annotations.
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
       base: origin/master
-      requirement_fingerprint: sha256:9e04889d1f072c14988c077321aa23361dd6f9aaa63e88d7c4d32fc3b47708de
-      approval_fingerprint: sha256:a990d5fc7f0e8904001e4fa243ee749a2ed85b372ba8f0a430d64862415fcae7
-      artifact_fingerprint: sha256:f8f073fea4034e964783cb59b609ffb2ef174d90e70a5dc3888b056e5f0a7f25
-      reviewed_at: "2026-06-21T10:23:14Z"
+      requirement_fingerprint: sha256:1a564b5957a9ad59e06ddd7f584481519700c63ab0e8860e519df9cf2a80902d
+      approval_fingerprint: sha256:c85516a52207bde1f797f185a53e81d601bd93690069288f0167bc47ffad05b8
+      artifact_fingerprint: sha256:2cd971d7a016e30dc3e9a894ece0d6fe3fe913d98c2d2cb55566e3582b31fb20
+      reviewed_at: "2026-06-21T19:13:27Z"
+    - requirement: SW-REQ-176
+      artifact: gateway/api_loader.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
+      base: origin/master
+      requirement_fingerprint: sha256:e8c7cfd9c7d5e39cfdfeabcffe8fac245f47eded682bc4b559a374cb35bae70d
+      approval_fingerprint: sha256:9f323466dcab0bd00789543adf33de69706db6500bf1b4bd83e2f7748ac31358
+      artifact_fingerprint: sha256:2cd971d7a016e30dc3e9a894ece0d6fe3fe913d98c2d2cb55566e3582b31fb20
+      reviewed_at: "2026-06-21T19:15:49Z"
+    - requirement: SW-REQ-177
+      artifact: gateway/api_loader.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
+      base: origin/master
+      requirement_fingerprint: sha256:f32096c0bcb4eec58bcfcd5de4e89ea751f8ed073f2173493edf3c5432945f17
+      approval_fingerprint: sha256:02ed2e3beec07eb85088b15572cfbdcf03b58bf7bbf2af4d895ddf8765606e43
+      artifact_fingerprint: sha256:2cd971d7a016e30dc3e9a894ece0d6fe3fe913d98c2d2cb55566e3582b31fb20
+      reviewed_at: "2026-06-21T19:16:13Z"
+    - requirement: SW-REQ-178
+      artifact: gateway/api_loader.go
+      decision: no-authored-change
+      reviewer: human:buger
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
+      base: origin/master
+      requirement_fingerprint: sha256:50035730307caa4c528f14d7382738370d2d74e7f128b6405d4fc6c7c07350b6
+      approval_fingerprint: sha256:30f020adfa6724caf44b4b7a4c5b157e25912d17fac32e8eec992139c550a2fe
+      artifact_fingerprint: sha256:2cd971d7a016e30dc3e9a894ece0d6fe3fe913d98c2d2cb55566e3582b31fb20
+      reviewed_at: "2026-06-21T19:13:47Z"
     - requirement: SW-REQ-180
       artifact: gateway/batch_requests.go
       decision: no-authored-change
       reviewer: human:buger
-      reason: Reviewed gateway/server.go batch endpoint trace addition for SW-REQ-180; implementation behavior and authored batch request requirement/design scope remain unchanged.
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
       base: origin/master
-      requirement_fingerprint: sha256:8ec45569dd29a769c63b772b11bd3985db3a2ce8b81d1e545b93617f0c8e807c
-      approval_fingerprint: sha256:9ec44fb33940e89894f935ab9f83f7d5ff85d6efb35cb1b0784642cba0cd12d5
+      requirement_fingerprint: sha256:5a15e4b4713fffe3ba44e152f6750d7a20afde7840ab6bac3efc583680dfaff6
+      approval_fingerprint: sha256:52cb948a5337406f84771f63a0e1e29cd9e2775a44d62df858f22255c3f7697b
       artifact_fingerprint: sha256:0e6c7dbfb2e361cf97795b61b8650c99d390090f3542e6468c1f61e60fb3b9fe
-      reviewed_at: "2026-06-21T11:19:05Z"
+      reviewed_at: "2026-06-21T19:14:08Z"
     - requirement: SW-REQ-180
       artifact: gateway/server.go
       decision: no-authored-change
       reviewer: human:buger
-      reason: Reviewed formalization-only requirement fingerprint updates; linked production implementation behavior and documented design intent remain unchanged.
+      reason: Reviewed current branch impact for annotation-only production trace edits and current requirement scope; no executable behavior changed. This impact review does not disposition remaining MC/DC witness gaps or product KnownIssues.
       base: origin/master
-      requirement_fingerprint: sha256:dbf83f044d8a121784f391474c4d55d4ebbd781579c5d425dfa1128ab542c7f4
-      approval_fingerprint: sha256:444d0b04f97b19f22fb1c9ca49082439faf2c9c7db48b180725d1498cbc04e30
-      artifact_fingerprint: sha256:0a2a5356e0958cc7bddf12fa60a033d72ab1a8ffe8aba9019c5aefeebb1c1dfa
-      reviewed_at: "2026-06-21T12:05:55Z"
+      requirement_fingerprint: sha256:5a15e4b4713fffe3ba44e152f6750d7a20afde7840ab6bac3efc583680dfaff6
+      approval_fingerprint: sha256:52cb948a5337406f84771f63a0e1e29cd9e2775a44d62df858f22255c3f7697b
+      artifact_fingerprint: sha256:bcac830341b3a628a7f2d5d42f201daf0bf588819cb4471f326fb7138078a902
+      reviewed_at: "2026-06-21T19:14:08Z"
     - requirement: SYS-REQ-008
       artifact: internal/policy/apply.go
       decision: no-authored-change

@@ -404,6 +404,14 @@ func TestOASCollapsedCandidateHelperChecks(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-059, SYS-REQ-147, SW-REQ-134
+// STK-REQ-059:STK-REQ-059-AC-01:acceptance
+// SYS-REQ-147:nominal:nominal
+// SYS-REQ-147:boundary:nominal
+// SYS-REQ-147:determinism:nominal
+// SW-REQ-134:nominal:nominal
+// SW-REQ-134:boundary:nominal
+// SW-REQ-134:determinism:nominal
 func TestSortURLSpecsByPathPriority(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1033,6 +1041,14 @@ func TestSameBasePathStringCatchAll(t *testing.T) {
 	}...)
 }
 
+// Verifies: STK-REQ-059, SYS-REQ-147, SW-REQ-134
+// STK-REQ-059:STK-REQ-059-AC-01:acceptance
+// SYS-REQ-147:nominal:nominal
+// SYS-REQ-147:boundary:nominal
+// SYS-REQ-147:determinism:nominal
+// SW-REQ-134:nominal:nominal
+// SW-REQ-134:boundary:nominal
+// SW-REQ-134:determinism:nominal
 func TestGroupCollapsedValidateRequestSpecs(t *testing.T) {
 	makeSpec := func(path, method, regex string) URLSpec {
 		return URLSpec{

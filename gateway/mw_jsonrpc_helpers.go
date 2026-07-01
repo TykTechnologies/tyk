@@ -10,6 +10,7 @@ import (
 // writeJSONRPCAccessDenied writes a JSON-RPC 2.0 error response for access-denied cases.
 // Delegates to jsonrpcerrors.WriteJSONRPCError for consistent response shape and HTTP→JSON-RPC
 // error code mapping across all error paths in the gateway.
+// Implements: SW-REQ-142
 func writeJSONRPCAccessDenied(w http.ResponseWriter, r *http.Request, detail string) {
 	var requestID interface{}
 	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {

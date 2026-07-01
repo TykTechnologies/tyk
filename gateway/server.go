@@ -785,6 +785,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 
 // stripSlashes removes any trailing slashes from the request's URL
 // path.
+// Implements: SW-REQ-126
 func stripSlashes(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
@@ -814,6 +815,7 @@ func (gw *Gateway) controlAPICheckClientCertificate(certLevel string, next http.
 
 // loadConfigInspectionEndpoints registers the /config and /env endpoints for troubleshooting.
 // These endpoints are only enabled when EnableConfigInspection is true and Secret is set.
+// Implements: SW-REQ-103
 func (gw *Gateway) loadConfigInspectionEndpoints(muxer *mux.Router) {
 	if !gw.GetConfig().EnableConfigInspection {
 		return
@@ -828,6 +830,7 @@ func (gw *Gateway) loadConfigInspectionEndpoints(muxer *mux.Router) {
 }
 
 // loadControlAPIEndpoints loads the endpoints used for controlling the Gateway.
+// Implements: SW-REQ-126
 func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	hostname := gw.GetConfig().HostName
 	if gw.GetConfig().ControlAPIHostname != "" {
@@ -941,6 +944,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 // correct security credentials - this is a shared secret between the
 // client and the owner and is set in the tyk.conf file. This should
 // never be made public!
+// Implements: SW-REQ-126
 func (gw *Gateway) checkIsAPIOwner(next http.Handler) http.Handler {
 	secret := gw.GetConfig().Secret
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2472,11 +2476,13 @@ func (gw *Gateway) GetCertificateManager() certs.CertificateManager {
 }
 
 // GetCompiledErrorOverrides returns the compiled error overrides for O(1) lookup.
+// Implements: SW-REQ-141
 func (gw *Gateway) GetCompiledErrorOverrides() *CompiledErrorOverrides {
 	return gw.compiledErrorOverrides.Load()
 }
 
 // SetCompiledErrorOverrides stores the compiled error overrides.
+// Implements: SW-REQ-141
 func (gw *Gateway) SetCompiledErrorOverrides(compiled *CompiledErrorOverrides) {
 	gw.compiledErrorOverrides.Store(compiled)
 }

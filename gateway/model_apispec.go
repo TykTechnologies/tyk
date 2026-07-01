@@ -113,6 +113,7 @@ type APISpec struct {
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
 // Deprecated: The function doesn't follow go return conventions (T, ok); use FindSpecMatchesStatus;
+// Implements: SW-REQ-134
 func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
 	matchPath, method := a.getMatchPathAndMethod(r, mode)
 
@@ -146,11 +147,13 @@ func (a *APISpec) GetTykExtension() *oas.XTykAPIGateway {
 }
 
 // GetCompiledErrorOverrides returns the compiled error overrides for O(1) lookup.
+// Implements: SW-REQ-141
 func (a *APISpec) GetCompiledErrorOverrides() *CompiledErrorOverrides {
 	return a.compiledErrorOverrides.Load()
 }
 
 // SetCompiledErrorOverrides stores the compiled error overrides.
+// Implements: SW-REQ-141
 func (a *APISpec) SetCompiledErrorOverrides(compiled *CompiledErrorOverrides) {
 	a.compiledErrorOverrides.Store(compiled)
 }
@@ -171,6 +174,7 @@ func (a *APISpec) GetPRMConfig() *oas.ProtectedResourceMetadata {
 }
 
 // FindSpecMatchesStatus checks if a URL spec has a specific status and returns the URLSpec for it.
+// Implements: SW-REQ-134
 func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (*URLSpec, bool) {
 	matchPath, method := a.getMatchPathAndMethod(r, mode)
 
@@ -193,11 +197,13 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 // isJSONRPCVEMPath returns true if the request is a JSON-RPC routed request
 // targeting a protocol VEM path. In this case, the listen path should not be
 // stripped as the VEM path is already in its final form.
+// Implements: SW-REQ-134
 func isJSONRPCVEMPath(r *http.Request, path string) bool {
 	return httpctx.IsJsonRPCRouting(r) && agentprotocol.IsProtocolVEMPath(path)
 }
 
 // getMatchPathAndMethod retrieves the match path and method from the request based on the mode.
+// Implements: SW-REQ-134
 func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string, string) {
 	var (
 		matchPath = r.URL.Path
@@ -231,6 +237,7 @@ func (a *APISpec) injectIntoReqContext(req *http.Request) {
 	}
 }
 
+// Implements: SW-REQ-134
 func (a *APISpec) findOperation(r *http.Request) *Operation {
 	middleware := a.OAS.GetTykMiddleware()
 	if middleware == nil {
@@ -275,6 +282,7 @@ func (a *APISpec) findOperation(r *http.Request) *Operation {
 // (prefix/suffix) matches a broader pattern than the exact OAS path.
 // The actualPath parameter is the request path stripped of the listen path.
 // The fullRequestPath is the original request path (used for regexp listen paths).
+// Implements: SW-REQ-134
 func (a *APISpec) findRouteForOASPath(oasPath, method, actualPath, fullRequestPath string) (*routers.Route, map[string]string, error) {
 	if a.oasRouter == nil {
 		return nil, nil, errors.New("OAS router not initialized")

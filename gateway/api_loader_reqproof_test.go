@@ -28,6 +28,8 @@ import (
 // SW-REQ-149:boundary:boundary
 // SW-REQ-149:determinism:nominal
 // SYS-REQ-162:determinism:nominal
+// MCDC SYS-REQ-162: gateway_api_loader_domain_path_counts_match_expected=T, gateway_api_loader_listen_path_sort_order_matches_expected=T, gateway_api_loader_loop_lookup_matches_expected=T, gateway_api_loader_middleware_paths_prefixed=T => TRUE
+// MCDC SW-REQ-149: gateway_api_loader_domain_path_counts_match_expected=T, gateway_api_loader_listen_path_sort_order_matches_expected=T, gateway_api_loader_loop_lookup_matches_expected=T, gateway_api_loader_middleware_paths_prefixed=T => TRUE
 func TestGatewayAPILoaderLocalHelpers(t *testing.T) {
 	t.Run("domain path key", func(t *testing.T) {
 		tests := []struct {
@@ -79,6 +81,39 @@ func TestGatewayAPILoaderLocalHelpers(t *testing.T) {
 			{Name: "empty", Path: "/opt/tyk"},
 		}, functions)
 	})
+
+	t.Run("loop lookup helpers", func(t *testing.T) {
+		ts := StartTest(nil)
+		t.Cleanup(ts.Close)
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "Loop Target #internal"
+			spec.APIID = "loop-target-id"
+		})
+
+		assert.Equal(t, "Loop-Target", APILoopingName("Loop Target #internal"))
+		assert.Equal(t, "loop-target-id", ts.Gw.fuzzyFindAPI("loop-target-id").APIID)
+		assert.Equal(t, "loop-target-id", ts.Gw.fuzzyFindAPI("loop-target").APIID)
+		assert.Nil(t, ts.Gw.fuzzyFindAPI(""))
+	})
+
+	t.Run("listen path sort order", func(t *testing.T) {
+		specs := []*APISpec{
+			apiLoaderHelperSpec("short", "", false, "/a/"),
+			apiLoaderHelperSpec("empty-domain-long", "", false, "/longer/"),
+			apiLoaderHelperSpec("domain-long", "api.example.com", false, "/longer/"),
+			apiLoaderHelperSpec("domain-param", "api.example.com", false, "/users/{id}/detail/"),
+		}
+
+		sortSpecsByListenPath(specs, true)
+
+		assert.Equal(t, []string{
+			"domain-param",
+			"domain-long",
+			"empty-domain-long",
+			"short",
+		}, []string{specs[0].Name, specs[1].Name, specs[2].Name, specs[3].Name})
+	})
 }
 
 func apiLoaderHelperSpec(name, domain string, domainDisabled bool, listenPath string) *APISpec {
@@ -101,6 +136,8 @@ func apiLoaderHelperSpec(name, domain string, domainDisabled bool, listenPath st
 // SW-REQ-151:boundary:boundary
 // SW-REQ-151:determinism:nominal
 // SYS-REQ-164:determinism:nominal
+// MCDC SYS-REQ-164: gateway_api_loader_validation_operation_terminal=T => TRUE
+// MCDC SW-REQ-151: gateway_api_loader_validation_operation_terminal=T => TRUE
 func TestGatewayAPILoaderSkipInvalidSpecs(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -179,6 +216,8 @@ func TestGatewayAPILoaderSkipInvalidSpecs(t *testing.T) {
 // SW-REQ-152:boundary:boundary
 // SW-REQ-152:determinism:nominal
 // SYS-REQ-165:determinism:nominal
+// MCDC SYS-REQ-165: gateway_api_loader_loop_detection_operation_terminal=T => TRUE
+// MCDC SW-REQ-152: gateway_api_loader_loop_detection_operation_terminal=T => TRUE
 func TestGatewayAPILoaderLoopDetection(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -257,6 +296,8 @@ func TestGatewayAPILoaderLoopDetection(t *testing.T) {
 // SW-REQ-153:boundary:boundary
 // SW-REQ-153:determinism:nominal
 // SYS-REQ-166:determinism:nominal
+// MCDC SYS-REQ-166: gateway_api_loader_internal_handler_lookup_operation_terminal=T => TRUE
+// MCDC SW-REQ-153: gateway_api_loader_internal_handler_lookup_operation_terminal=T => TRUE
 func TestGatewayAPILoaderFindInternalHTTPHandler(t *testing.T) {
 	apiByID := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
@@ -357,6 +398,8 @@ func TestGatewayAPILoaderFindInternalHTTPHandler(t *testing.T) {
 // SYS-REQ-189:determinism:nominal
 // SYS-REQ-189:error_handling:nominal
 // SYS-REQ-189:error_handling:negative
+// MCDC SYS-REQ-189: gateway_api_loader_loop_dispatch_operation_terminal=T => TRUE
+// MCDC SW-REQ-176: gateway_api_loader_loop_dispatch_operation_terminal=T => TRUE
 func TestGatewayAPILoaderDummyProxyLoopDispatch(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -489,6 +532,8 @@ func TestGatewayAPILoaderDummyProxyLoopDispatch(t *testing.T) {
 // SYS-REQ-190:determinism:nominal
 // SYS-REQ-190:error_handling:nominal
 // SYS-REQ-190:error_handling:negative
+// MCDC SYS-REQ-190: gateway_api_loader_playground_templates_operation_terminal=T => TRUE
+// MCDC SW-REQ-177: gateway_api_loader_playground_templates_operation_terminal=T => TRUE
 func TestGatewayAPILoaderReadGraphQLPlaygroundTemplate(t *testing.T) {
 	previousTemplate := playgroundTemplate
 	t.Cleanup(func() {
@@ -566,6 +611,8 @@ func TestGatewayAPILoaderReadGraphQLPlaygroundTemplate(t *testing.T) {
 // SW-REQ-178:boundary:nominal
 // SW-REQ-178:determinism:nominal
 // SYS-REQ-191:determinism:nominal
+// MCDC SYS-REQ-191: gateway_api_loader_tcp_service_operation_terminal=T => TRUE
+// MCDC SW-REQ-178: gateway_api_loader_tcp_service_operation_terminal=T => TRUE
 func TestGatewayAPILoaderLoadTCPService(t *testing.T) {
 	redisStore := storage.NewDummyStorage()
 	redisOrgStore := storage.NewDummyStorage()
@@ -671,6 +718,8 @@ func TestGatewayAPILoaderLoadTCPService(t *testing.T) {
 // SW-REQ-154:boundary:boundary
 // SW-REQ-154:determinism:nominal
 // SYS-REQ-167:determinism:nominal
+// MCDC SYS-REQ-167: gateway_api_loader_explicit_route_subpaths_operation_terminal=T => TRUE
+// MCDC SW-REQ-154: gateway_api_loader_explicit_route_subpaths_operation_terminal=T => TRUE
 func TestGatewayAPILoaderExplicitRouteSubpaths(t *testing.T) {
 	original := http.NewServeMux()
 	original.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {

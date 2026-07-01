@@ -4,7 +4,7 @@ status: approved
 priority: shall
 category: storage
 req_type: guarantee
-fretish: the storage_connection_handler shall always satisfy storage_connection_handler_operation_terminal
+fretish: the storage_connection_handler shall always satisfy (storage_connection_handler_state_determined & storage_connection_handler_wait_reconnect_determined & storage_connection_handler_connector_slots_determined & storage_connection_handler_status_disconnect_determined & storage_connection_handler_redis_options_determined & storage_connection_handler_backoff_determined & storage_connection_handler_shim_delegation_determined)
 description: Storage connection handling shall preserve deterministic local connection-handler and RedisController shim results for tested inputs by constructing handlers and shim controllers, tracking enablement and connection state, delegating shim connect, disable, connected, and wait-connect calls to the connection handler, waiting for connect success or timeout, delivering reconnect callbacks, initializing default/cache/analytics connectors, checking storage status, selecting configured connector slots, propagating disconnect errors, constructing Redis connector options, and configuring exponential backoff without claiming Redis server availability, distributed storage durability, Sentinel or cluster topology correctness, TLS certificate validation beyond connector option construction, gateway request admission, analytics delivery, cache correctness, Go plugin API compatibility beyond local shim delegation, or final client-visible behavior beyond the focused storage connection-handler tests.
 formalization_strategy: fretish
 informal_verification:
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: STK-REQ-095
 component: storage_connection_handler
-rationale: This system requirement owns local storage connection-handler mechanics and RedisController shim delegation only. Redis topology behavior, Go plugin compatibility beyond local shim delegation, and gateway storage semantics remain outside this proof slice.
+rationale: This system requirement owns local storage connection-handler mechanics and RedisController shim delegation only. Its formal model is decomposed into handler state, wait/reconnect behavior, connector slot setup, status/disconnect behavior, Redis option construction, backoff configuration, and shim delegation outputs so each behavior can be reviewed and witnessed independently. Redis topology behavior, Go plugin compatibility beyond local shim delegation, and gateway storage semantics remain outside this proof slice.
 tags:
     - storage
     - redis
@@ -22,9 +22,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-095
-    reviewed_at: "2026-06-21T11:59:05.780868Z"
+    reviewed_at: "2026-06-21T18:24:36.334234Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:b2f2553dec81fc7930ebddcec81c794a2fe1945fc63d2950c5390a0b720a2068
+    reviewed_fingerprint: sha256:ede17d16470be7a84430ed2f885ec7f708fff437169f08fdb836e9296f961e4c
 verification:
     assurance_level: A
     formalization_status: valid

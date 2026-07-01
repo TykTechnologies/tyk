@@ -106,6 +106,8 @@ func setGODEBUG(t *testing.T) {
 // SW-REQ-182:boundary:nominal
 // SW-REQ-182:error_handling:negative
 // SW-REQ-182:error_handling:nominal
+// MCDC SYS-REQ-194: gateway_upstream_tls_pinning_enablement_determined=T, gateway_upstream_tls_fingerprint_selection_determined=T, gateway_upstream_tls_pin_match_determined=T, gateway_upstream_tls_pin_mismatch_determined=T, gateway_upstream_tls_disabled_and_global_pins_determined=T, gateway_upstream_tls_proxy_pinning_determined=T, gateway_upstream_tls_common_name_determined=T => TRUE
+// MCDC SW-REQ-182: gateway_upstream_tls_pinning_enablement_determined=T, gateway_upstream_tls_fingerprint_selection_determined=T, gateway_upstream_tls_pin_match_determined=T, gateway_upstream_tls_pin_mismatch_determined=T, gateway_upstream_tls_disabled_and_global_pins_determined=T, gateway_upstream_tls_proxy_pinning_determined=T, gateway_upstream_tls_common_name_determined=T => TRUE
 func TestPublicKeyPinning(t *testing.T) {
 	test.Flaky(t) // TODO: TT-5260
 

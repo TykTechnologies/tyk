@@ -4,8 +4,8 @@ status: approved
 priority: shall
 category: gateway_api_loader_helpers
 req_type: guarantee
-fretish: the gateway_api_loader_helpers shall always satisfy gateway_api_loader_helpers_operation_terminal
-description: Gateway API loader helper handling shall preserve deterministic local helper results for domain/listen-path key construction, API count aggregation by host/listen path including disabled-domain APIs, custom middleware function path prefixing, API name normalization for loop lookup, fuzzy local API matching by API ID, object ID, or normalized loop name, and API spec ordering by listen-path specificity with tested custom-domain ordering for tested inputs, without claiming full route generation, middleware execution, storage initialization, API admission, internal proxy dispatch, dashboard or RPC synchronization, network transport behavior, or final client responses.
+fretish: the gateway_api_loader_helpers shall always satisfy (gateway_api_loader_domain_path_counts_match_expected & gateway_api_loader_middleware_paths_prefixed & gateway_api_loader_loop_lookup_matches_expected & gateway_api_loader_listen_path_sort_order_matches_expected)
+description: "Gateway API loader helper handling shall preserve deterministic local helper results for four focused behaviors: domain/listen-path key construction and API count aggregation by host/listen path including disabled-domain APIs; custom middleware function path prefixing; API name normalization for loop lookup and fuzzy local API matching by API ID, object ID, or normalized loop name; and API spec ordering by listen-path specificity with tested custom-domain ordering. This requirement does not claim full route generation, middleware execution, storage initialization, API admission, internal proxy dispatch, dashboard or RPC synchronization, network transport behavior, or final client responses."
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: STK-REQ-074
 component: gateway_api_loader_helpers
-rationale: This system requirement owns local gateway/api_loader.go helper decisions only, including local sort order helpers consumed by loader setup. Route construction, middleware execution, storage setup, distributed synchronization, internal proxy dispatch, and request handling remain outside this proof slice.
+rationale: This system requirement owns local gateway/api_loader.go helper decisions only. Its formal model uses concrete app-logic outcome predicates for domain/listen-path key counts, middleware path prefixing, loop lookup, and listen-path sort order because those are the helper results asserted by the tests. Route construction, middleware execution, storage setup, distributed synchronization, internal proxy dispatch, and request handling remain outside this proof slice.
 tags:
     - gateway
     - api-loader
@@ -23,9 +23,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-074
-    reviewed_at: "2026-06-21T11:59:05.500979Z"
+    reviewed_at: "2026-06-21T18:58:07.761454Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:937b493a41b7413013aac4a6b617f4cdbcb2c590ecbc4e52d04fe954f1523486
+    reviewed_fingerprint: sha256:b4db4f301137c6458d4037c77e242d35ee212ffdcec83cef20cb8e82ef0cc8d7
 verification:
     assurance_level: A
     formalization_status: valid

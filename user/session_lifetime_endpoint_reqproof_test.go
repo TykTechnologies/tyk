@@ -14,6 +14,8 @@ import (
 // SW-REQ-148:boundary:boundary
 // SW-REQ-148:determinism:nominal
 // SYS-REQ-161:determinism:nominal
+// MCDC SYS-REQ-161: user_endpoint_map_conversion_matches_expected=T, user_session_lifetime_selection_matches_expected=T => TRUE
+// MCDC SW-REQ-148: user_endpoint_map_conversion_matches_expected=T, user_session_lifetime_selection_matches_expected=T => TRUE
 func TestUserSessionLifetimeAndEndpointMapHelpers(t *testing.T) {
 	t.Run("lifetime helpers", func(t *testing.T) {
 		now := time.Now().Unix()

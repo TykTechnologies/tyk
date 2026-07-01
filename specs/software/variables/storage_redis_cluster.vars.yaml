@@ -1,6 +1,34 @@
 component: storage_redis_cluster
 variables:
-    - name: storage_redis_cluster_operation_terminal
+    - name: storage_redis_cluster_connection_config_determined
       type: bool
       direction: output
-      description: The storage redis cluster implementation operation reaches a terminal local result for the focused tested inputs, such as returning the expected value, selecting the expected local branch, surfacing an explicit local error, or preserving the documented local fallback behavior.
+      description: RedisCluster connection-handler selection, configured address derivation, connection gating, key prefixing, hash selection, and controller initialization reporting produce deterministic local implementation results.
+    - name: storage_redis_cluster_temporal_adapters_determined
+      type: bool
+      direction: output
+      description: RedisCluster lazy temporal key-value, flusher, queue, list, set, sorted-set, and client adapter construction and connection-error behavior produce deterministic local implementation results.
+    - name: storage_redis_cluster_key_value_determined
+      type: bool
+      direction: output
+      description: RedisCluster key, multi-key, TTL, expiration, raw-key, lock, increment, and decrement behavior produces deterministic local implementation results for mocked or configured storage backends.
+    - name: storage_redis_cluster_scan_delete_determined
+      type: bool
+      direction: output
+      description: RedisCluster scan, filter, key/value listing, delete, raw-delete, bulk-delete, scan-delete, and flush behavior produces deterministic local implementation results.
+    - name: storage_redis_cluster_pubsub_determined
+      type: bool
+      direction: output
+      description: RedisCluster pub/sub receive handling, closed-connection error coalescing, and publish behavior produce deterministic local implementation results.
+    - name: storage_redis_cluster_list_determined
+      type: bool
+      direction: output
+      description: RedisCluster list get-and-delete, append, pipelined append, existence, remove, and range behavior produces deterministic local implementation results.
+    - name: storage_redis_cluster_set_sorted_set_determined
+      type: bool
+      direction: output
+      description: RedisCluster set membership, set mutation, sorted-set add, sorted-set range, and sorted-set removal behavior produce deterministic local implementation results.
+    - name: storage_redis_cluster_controller_prefix_determined
+      type: bool
+      direction: output
+      description: RedisCluster controller initialization reporting and key-prefix reporting produce deterministic local implementation results for the focused tested inputs.

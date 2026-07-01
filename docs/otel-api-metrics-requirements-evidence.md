@@ -3,12 +3,12 @@
 `STK-REQ-092`, `SYS-REQ-180`, and `SW-REQ-167` cover local API metrics
 behavior in `internal/otel/apimetrics`.
 
-The executable evidence is `internal/otel/apimetrics/*_test.go`. It covers JSON
-configuration decoding, default metric definitions, metric definition
-validation, dimension extraction and defaulting, bounded token truncation,
-filter compilation and matching, dimension-builder reuse and concurrency,
-instrument registry creation and source-need flags, and local counter and
-histogram recording for tested request contexts.
+The executable evidence is `internal/otel/apimetrics/*_test.go`. It covers the
+decomposed local outputs for JSON configuration decoding, default metric
+definitions, metric definition validation, dimension extraction and defaulting,
+bounded token truncation, filter compilation and matching, dimension-builder
+reuse and concurrency, instrument registry creation and source-need flags, and
+local counter and histogram recording for tested request contexts.
 
 This evidence does not claim collector/exporter delivery, OpenTelemetry SDK
 provider correctness, gateway middleware admission, full HTTP request lifecycle

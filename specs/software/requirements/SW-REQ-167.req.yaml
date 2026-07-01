@@ -4,7 +4,7 @@ status: approved
 priority: shall
 category: observability
 req_type: guarantee
-fretish: the api_metrics shall always satisfy api_metrics_operation_terminal
+fretish: the api_metrics shall always satisfy (api_metrics_config_decode_determined & api_metrics_default_definitions_determined & api_metrics_definition_validation_determined & api_metrics_dimension_extraction_determined & api_metrics_dimension_builder_reuse_determined & api_metrics_filter_matching_determined & api_metrics_registry_flags_determined & api_metrics_local_recording_determined)
 description: The API metrics implementation shall preserve local metric-definition behavior for tested inputs by decoding JSON metric configuration, providing default RED metric definitions, validating metric definitions, extracting configured dimensions with defaults, truncating API-key labels for cardinality control, compiling and matching filters, reusing dimension builders safely, creating instrument registries and source-need flags, and recording local counter and histogram values for tested request contexts without claiming collector/exporter delivery, OpenTelemetry SDK provider correctness, gateway middleware admission, full HTTP request lifecycle behavior, metric backend storage, dashboard visibility, cardinality safety for arbitrary operator-supplied labels, or final client-visible behavior beyond the focused API metrics tests.
 formalization_strategy: fretish
 informal_verification:
@@ -13,7 +13,7 @@ informal_verification:
     verified: true
 parent: SYS-REQ-180
 component: api_metrics
-rationale: This software requirement owns local internal/otel/apimetrics mechanics and focused package tests only. Root OpenTelemetry setup and gateway request lifecycle integration are outside this proof slice.
+rationale: This software requirement owns local internal/otel/apimetrics mechanics and focused package tests only. Its formal model is decomposed into configuration decoding, default definitions, definition validation, dimension extraction, dimension builder reuse, filter matching, registry flags, and local recording outputs so each behavior can be reviewed and witnessed independently. Root OpenTelemetry setup and gateway request lifecycle integration are outside this proof slice.
 tags:
     - observability
     - metrics
@@ -23,9 +23,9 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-180
-    reviewed_at: "2026-06-21T11:59:03.943188Z"
+    reviewed_at: "2026-06-21T18:25:29.669009Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:803a16499e5110aae62f6acbbcc297bb81ea1e6241b7af4d74aa428a31ca4904
+    reviewed_fingerprint: sha256:3f2be2d91321f207fefbc9f83a7beb9e7f8e0b07c82ee7574e2681c90ab26ce0
 verification:
     assurance_level: A
     formalization_status: valid

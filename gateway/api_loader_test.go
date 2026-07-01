@@ -495,6 +495,8 @@ func httpCollectorMock(t *testing.T, fn http.HandlerFunc, address string) *httpt
 // SW-REQ-150:boundary:nominal
 // SW-REQ-150:determinism:nominal
 // SYS-REQ-163:determinism:nominal
+// MCDC SYS-REQ-163: gateway_api_loader_storage_operation_terminal=T => TRUE
+// MCDC SW-REQ-150: gateway_api_loader_storage_operation_terminal=T => TRUE
 func TestConfigureAuthAndOrgStores(t *testing.T) {
 
 	testCases := []struct {
@@ -9860,6 +9862,178 @@ func TestNewRelicMounting(t *testing.T) {
 			assert.True(t, success, "FAILURE: New Relic middleware was not present")
 		case <-time.After(1 * time.Second):
 			t.Fatal("FAILURE: Timeout - Middleware did not execute")
+		}
+	})
+}
+
+// Verifies: STK-REQ-100, SYS-REQ-188, SW-REQ-175
+// MCDC SYS-REQ-188: gateway_api_loader_playground_routes_determined=T, gateway_api_loader_newrelic_mount_determined=T, gateway_api_loader_mtls_detection_determined=T, gateway_api_loader_panic_recovery_determined=T, gateway_api_loader_org_data_age_determined=T, gateway_api_loader_quota_key_determined=T => TRUE
+// MCDC SW-REQ-175: gateway_api_loader_playground_routes_determined=T, gateway_api_loader_newrelic_mount_determined=T, gateway_api_loader_mtls_detection_determined=T, gateway_api_loader_panic_recovery_determined=T, gateway_api_loader_org_data_age_determined=T, gateway_api_loader_quota_key_determined=T => TRUE
+func TestAPILoaderAuxiliaryReqProof(t *testing.T) {
+	t.Run("GraphQL playground route uses cloud endpoint", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.Cloud = true
+		})
+		t.Cleanup(ts.Close)
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "auxiliary-graphql-api"
+			spec.Slug = "auxiliary-graphql-slug"
+			spec.Proxy.ListenPath = "/auxiliary-graphql-api/"
+			spec.GraphQL.Enabled = true
+			spec.GraphQL.GraphQLPlayground.Enabled = true
+			spec.GraphQL.GraphQLPlayground.Path = "/playground"
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/auxiliary-graphql-api/playground",
+			BodyMatch: `const url = window.location.origin + "/auxiliary-graphql-slug/";`,
+			Code:      http.StatusOK,
+		})
+	})
+
+	t.Run("New Relic middleware is mounted once for repeated loads", func(t *testing.T) {
+		mwExecuted := make(chan bool, 1)
+		dummyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mwExecuted <- nr.FromContext(r.Context()) != nil
+			w.WriteHeader(http.StatusOK)
+		})
+
+		muxer := &proxyMux{}
+		conf := &config.Config{
+			ListenPort: 8080,
+			HttpServerOptions: config.HttpServerOptionsConfig{
+				EnableStrictRoutes: false,
+			},
+		}
+		router := mux.NewRouter()
+		muxer.setRouter(8080, "http", router, *conf)
+
+		gw := &Gateway{
+			apisByID:        make(map[string]*APISpec),
+			apisHandlesByID: new(sync.Map),
+			DefaultProxyMux: muxer,
+		}
+		gw.config.Store(*conf)
+
+		app, err := nr.NewApplication(
+			nr.ConfigAppName("ReqProofApp"),
+			nr.ConfigLicense("1234567890123456789012345678901234567890"),
+			nr.ConfigDistributedTracerEnabled(true),
+			nr.ConfigEnabled(false),
+		)
+		require.NoError(t, err)
+		gw.NewRelicApplication = app
+
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				APIID:            "auxiliary-newrelic-api",
+				Name:             "Auxiliary NewRelic API",
+				Protocol:         "http",
+				Active:           true,
+				UseKeylessAccess: true,
+				Proxy: apidef.ProxyConfig{
+					ListenPath: "/auxiliary-newrelic/",
+					TargetURL:  "http://mock",
+				},
+			},
+		}
+		gw.apisByID[spec.APIID] = spec
+		gw.apisHandlesByID.Store(spec.APIID, &ChainObject{
+			ThisHandler: dummyHandler,
+		})
+
+		_, err = gw.loadHTTPService(spec, map[string]int{}, nil, muxer)
+		require.NoError(t, err)
+		_, err = gw.loadHTTPService(spec, map[string]int{}, nil, muxer)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodGet, "/auxiliary-newrelic/", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		select {
+		case success := <-mwExecuted:
+			assert.True(t, success)
+		case <-time.After(time.Second):
+			t.Fatal("middleware did not execute")
+		}
+	})
+
+	t.Run("mTLS aggregate detection returns true for active mTLS APIs", func(t *testing.T) {
+		gw := &Gateway{
+			apisByID: map[string]*APISpec{
+				"api-1": {
+					APIDefinition: &apidef.APIDefinition{
+						APIID:            "api-1",
+						Active:           true,
+						UseMutualTLSAuth: true,
+					},
+				},
+				"api-2": {
+					APIDefinition: &apidef.APIDefinition{
+						APIID:            "api-2",
+						Active:           true,
+						UseMutualTLSAuth: true,
+					},
+				},
+			},
+		}
+
+		assert.True(t, gw.allApisAreMTLS())
+	})
+
+	t.Run("invalid OAS panic recovery names the skipped API", func(t *testing.T) {
+		err := recoverFromLoadApiPanic(&APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				APIID: "auxiliary-oas-api",
+				IsOAS: true,
+			},
+			OAS: oas.OAS{},
+		}, "panic")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "trying to import invalid OAS api auxiliary-oas-api, skipping")
+	})
+
+	t.Run("organization data age is enforced when quotas are enabled", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.EnforceOrgQuotas = true
+			globalConf.EnforceOrgDataAge = false
+		})
+		t.Cleanup(ts.Close)
+
+		spec := &APISpec{
+			GlobalConfig: config.Config{
+				EnforceOrgDataAge: false,
+			},
+		}
+
+		ts.Gw.enforceOrgDataAgeIfQuotasEnabled(spec)
+
+		assert.True(t, ts.Gw.GetConfig().EnforceOrgDataAge)
+		assert.True(t, spec.GlobalConfig.EnforceOrgDataAge)
+	})
+
+	t.Run("quota key option stores supplied keys", func(t *testing.T) {
+		tests := []struct {
+			name string
+			key  string
+		}{
+			{name: "empty key", key: ""},
+			{name: "custom key", key: "auxiliary-quota-key"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				options := ProcessSpecOptions{quotaKey: "original"}
+
+				WithQuotaKey(tt.key)(&options)
+
+				assert.Equal(t, tt.key, options.quotaKey)
+			})
 		}
 	})
 }

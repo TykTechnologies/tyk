@@ -486,6 +486,175 @@ func TestLogEncoderEmitsSupportedFieldTypes(t *testing.T) {
 	(&logEncoder{}).EmitString("ignored", "value")
 }
 
+// Verifies: STK-REQ-089, SYS-REQ-177, SW-REQ-164
+// MCDC SYS-REQ-177: openzipkin_trace_adapter_operation_terminal=T => TRUE
+// MCDC SW-REQ-164: openzipkin_trace_adapter_operation_terminal=T => TRUE
+// STK-REQ-089:STK-REQ-089-AC-01:acceptance
+// STK-REQ-089:error_handling:negative
+// SW-REQ-164:nominal:nominal
+// SW-REQ-164:boundary:nominal
+// SW-REQ-164:encoding_safety:nominal
+// SW-REQ-164:error_handling:nominal
+// SW-REQ-164:error_handling:negative
+// SW-REQ-164:determinism:nominal
+func TestOpenZipkinTraceAdapterReqProof(t *testing.T) {
+	t.Run("decodes json compatible zipkin options", func(t *testing.T) {
+		var c config.Config
+		if err := config.Load([]string{"testdata/zipkin.json"}, &c); err != nil {
+			t.Fatal(err)
+		}
+
+		got, err := Load(c.Tracer.Options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Reporter.URL != "http:localhost:9411/api/v2/spans" {
+			t.Fatalf("Reporter.URL = %q, want configured URL", got.Reporter.URL)
+		}
+	})
+
+	t.Run("selects supported samplers and rejects unsupported names", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			sampler   config.Sampler
+			decisions map[uint64]bool
+			wantErr   string
+		}{
+			{name: "default sampler", decisions: map[uint64]bool{1: true, 2: true}},
+			{name: "boundary sampler", sampler: config.Sampler{Name: "boundary", Rate: 1, Salt: 23}, decisions: map[uint64]bool{1: true, 2: true}},
+			{name: "count sampler", sampler: config.Sampler{Name: "count", Rate: 1}, decisions: map[uint64]bool{1: true, 2: true}},
+			{name: "mod sampler", sampler: config.Sampler{Name: "mod", Mod: 2}, decisions: map[uint64]bool{2: true, 3: false}},
+			{name: "unknown sampler", sampler: config.Sampler{Name: "unknown"}, wantErr: "unknown sampler"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				sampler, err := getSampler(tt.sampler)
+				if tt.wantErr != "" {
+					if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+						t.Fatalf("expected error containing %q, got %v", tt.wantErr, err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				for id, want := range tt.decisions {
+					if got := sampler(id); got != want {
+						t.Fatalf("id %d: sampler = %v, want %v", id, got, want)
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("initializes local tracer and returns local initialization errors", func(t *testing.T) {
+		tracer, err := Init("tyk-gateway", map[string]interface{}{
+			"reporter": map[string]interface{}{
+				"url": "http://127.0.0.1:9411/api/v2/spans",
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tracer.Close()
+
+		if tracer.Tracer == nil {
+			t.Fatal("expected tracer")
+		}
+		if tracer.Reporter == nil {
+			t.Fatal("expected reporter")
+		}
+		if got := tracer.Name(); got != Name {
+			t.Fatalf("Name = %q, want %q", got, Name)
+		}
+
+		if _, err := Init("tyk-gateway", map[string]interface{}{}); err == nil || !strings.Contains(err.Error(), "missing url") {
+			t.Fatalf("expected missing url error, got %v", err)
+		}
+		if _, err := Init("tyk-gateway", map[string]interface{}{
+			"reporter": map[string]interface{}{
+				"url": "http://127.0.0.1:9411/api/v2/spans",
+			},
+			"sampler": map[string]interface{}{
+				"name": "unknown",
+			},
+		}); err == nil || !strings.Contains(err.Error(), "unknown sampler") {
+			t.Fatalf("expected unknown sampler error, got %v", err)
+		}
+	})
+
+	t.Run("converts supported b3 http header carriers", func(t *testing.T) {
+		zipTracer, err := zipkin.NewTracer(reporter.NewNoopReporter())
+		if err != nil {
+			t.Fatal(err)
+		}
+		tracer := NewTracer(zipTracer)
+
+		parent, err := tracer.Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(http.Header{
+			"B3": {"0000000000000011-0000000000000022-1"},
+		}))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		header := opentracing.HTTPHeadersCarrier(http.Header{})
+		if err := tracer.Inject(parent, opentracing.HTTPHeaders, header); err != nil {
+			t.Fatal(err)
+		}
+		if got := http.Header(header).Get("b3"); got == "" {
+			t.Fatal("expected injected b3 header")
+		}
+		if _, err := tracer.Extract(opentracing.TextMap, opentracing.HTTPHeadersCarrier(http.Header{})); !errors.Is(err, opentracing.ErrUnsupportedFormat) {
+			t.Fatalf("expected unsupported extract format, got %v", err)
+		}
+		if err := tracer.Inject(foreignSpanContext{}, opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(http.Header{})); !errors.Is(err, opentracing.ErrInvalidSpanContext) {
+			t.Fatalf("expected invalid span context, got %v", err)
+		}
+		if err := tracer.Inject(parent, opentracing.TextMap, opentracing.HTTPHeadersCarrier(http.Header{})); !errors.Is(err, opentracing.ErrUnsupportedFormat) {
+			t.Fatalf("expected unsupported inject format, got %v", err)
+		}
+	})
+
+	t.Run("forwards local span facade operations", func(t *testing.T) {
+		sampled := true
+		fake := &recordingZipkinSpan{
+			ctx: model.SpanContext{
+				TraceID: model.TraceID{Low: 1},
+				ID:      model.ID(2),
+				Sampled: &sampled,
+			},
+			tags: map[string]string{},
+		}
+		tracer := &zipkinTracer{}
+		span := Span{span: fake, tr: tracer}
+
+		if got := span.Context().(spanContext).ID.String(); got != "0000000000000002" {
+			t.Fatalf("span context id = %q, want 0000000000000002", got)
+		}
+		if span.Tracer() != tracer {
+			t.Fatal("expected owning tracer")
+		}
+		span.SetOperationName("updated")
+		if fake.name != "updated" {
+			t.Fatalf("span name = %q, want updated", fake.name)
+		}
+		span.SetTag("code", 200)
+		if got := fake.tags["code"]; got != "200" {
+			t.Fatalf("tag code = %q, want 200", got)
+		}
+		span.LogFields(opentracinglog.String("event", "selected"), opentracinglog.Int("count", 2))
+		if len(fake.annotations) != 2 {
+			t.Fatalf("annotations length = %d, want 2", len(fake.annotations))
+		}
+		span.Finish()
+		span.FinishWithOptions(opentracing.FinishOptions{})
+		if fake.finishCount != 2 {
+			t.Fatalf("finish count = %d, want 2", fake.finishCount)
+		}
+	})
+}
+
 type foreignSpanContext struct{}
 
 func (foreignSpanContext) ForeachBaggageItem(func(k, v string) bool) {}

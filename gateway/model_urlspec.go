@@ -79,6 +79,7 @@ type MockResponseCandidate struct {
 
 // modeSpecificSpec returns the respective field of URLSpec if it matches the given mode.
 // Deprecated: Usage should not increase.
+// Implements: SW-REQ-136
 func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 	switch mode {
 	case Ignored, BlackList, WhiteList:
@@ -131,6 +132,7 @@ func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 }
 
 // matchesMethod checks if the given method matches the method required by the URLSpec for the current status.
+// Implements: SW-REQ-136
 func (u *URLSpec) matchesMethod(method string) bool {
 	switch u.Status {
 	case Ignored, BlackList, WhiteList:
@@ -187,6 +189,7 @@ func (u *URLSpec) matchesMethod(method string) bool {
 // it will match the regex against the clean URL with stripped listen path first,
 // then it will match against the full URL including the listen path as provided.
 // APISpec to provide URL sanitization of the input is passed along.
+// Implements: SW-REQ-136
 func (a *URLSpec) matchesPath(reqPath string, api *APISpec) bool {
 	clean := api.StripListenPath(reqPath)
 	noVersion := api.StripVersionPath(clean)

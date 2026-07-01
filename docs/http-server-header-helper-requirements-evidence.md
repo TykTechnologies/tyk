@@ -1,7 +1,8 @@
 <!-- documents STK-REQ-085 SYS-REQ-173 SW-REQ-160 -->
 
 `STK-REQ-085`, `SYS-REQ-173`, and `SW-REQ-160` cover local HTTP server and
-header helper behavior in `internal/httputil`.
+header helper behavior in `internal/httputil`. The formal model is decomposed
+into connection watcher behavior and Basic Authorization header construction.
 
 The executable evidence is `internal/httputil/connection_watcher_test.go` and
 `internal/httputil/headers_test.go`. It covers zero initial connection watcher

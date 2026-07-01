@@ -1,6 +1,30 @@
 component: storage_connection_handler
 variables:
-    - name: storage_connection_handler_operation_terminal
+    - name: storage_connection_handler_state_determined
       type: bool
       direction: output
-      description: The storage connection handler implementation operation reaches a terminal local result for the focused tested inputs, such as returning the expected value, selecting the expected local branch, surfacing an explicit local error, or preserving the documented local fallback behavior.
+      description: Storage connection-handler construction, enablement, disablement, and connected-state tracking produce deterministic local implementation results for the focused tested inputs.
+    - name: storage_connection_handler_wait_reconnect_determined
+      type: bool
+      direction: output
+      description: Wait-connect success or timeout and reconnect callback delivery produce deterministic local implementation results for the focused tested inputs.
+    - name: storage_connection_handler_connector_slots_determined
+      type: bool
+      direction: output
+      description: Default, cache, and analytics connector initialization and selection produce deterministic local implementation results for the focused tested inputs.
+    - name: storage_connection_handler_status_disconnect_determined
+      type: bool
+      direction: output
+      description: Storage status checking and disconnect error propagation produce deterministic local implementation results for the focused tested inputs.
+    - name: storage_connection_handler_redis_options_determined
+      type: bool
+      direction: output
+      description: Redis connector option construction for the focused tested configurations produces deterministic local implementation results.
+    - name: storage_connection_handler_backoff_determined
+      type: bool
+      direction: output
+      description: Exponential backoff configuration produces deterministic local implementation results for the focused tested inputs.
+    - name: storage_connection_handler_shim_delegation_determined
+      type: bool
+      direction: output
+      description: RedisController shim construction, disable, connected, and wait-connect delegation produce deterministic local implementation results for the focused tested inputs.

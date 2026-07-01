@@ -13,6 +13,14 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SYS-REQ-139:determinism:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
+// SW-REQ-126:determinism:nominal
 func TestHandleListAPIVersions(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

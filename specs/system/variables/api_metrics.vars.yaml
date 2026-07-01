@@ -3,7 +3,35 @@ no_interface:
     declared: true
     reason: The api metrics proof slice covers focused local helper behavior under tested inputs only; cross-component runtime integration, external service availability, persistence durability, distributed behavior, and final client-visible behavior are outside this component boundary.
 variables:
-    - name: api_metrics_operation_terminal
+    - name: api_metrics_config_decode_determined
       type: bool
       direction: output
-      description: The api metrics operation reaches a terminal local result for the focused tested inputs, such as returning the expected value, selecting the expected local branch, surfacing an explicit local error, or preserving the documented local fallback behavior.
+      description: API metric JSON configuration decoding produces deterministic local implementation results for the focused tested inputs.
+    - name: api_metrics_default_definitions_determined
+      type: bool
+      direction: output
+      description: Built-in RED metric definition selection produces deterministic local implementation results for the focused tested inputs.
+    - name: api_metrics_definition_validation_determined
+      type: bool
+      direction: output
+      description: Metric definition validation and warning generation produce deterministic local implementation results for the focused tested inputs.
+    - name: api_metrics_dimension_extraction_determined
+      type: bool
+      direction: output
+      description: Dimension extraction, defaulting, and API-key label truncation produce deterministic local implementation results for the focused tested inputs.
+    - name: api_metrics_dimension_builder_reuse_determined
+      type: bool
+      direction: output
+      description: Dimension builder build and release reuse produces deterministic local implementation results for the focused tested inputs.
+    - name: api_metrics_filter_matching_determined
+      type: bool
+      direction: output
+      description: Metric filter compilation and matching produce deterministic local implementation results for the focused tested inputs.
+    - name: api_metrics_registry_flags_determined
+      type: bool
+      direction: output
+      description: Instrument registry creation and source-need flag computation produce deterministic local implementation results for the focused tested inputs.
+    - name: api_metrics_local_recording_determined
+      type: bool
+      direction: output
+      description: Local counter and histogram recording produce deterministic local implementation results for the focused tested request contexts.

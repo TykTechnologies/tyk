@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 )
 
+// SW-REQ-125
 func GetAnalyticsHandler(path string, symbol string) (func(record *analytics.AnalyticsRecord), error) {
 	// try to load plugin
 	loadedPlugin, err := plugin.Open(path)

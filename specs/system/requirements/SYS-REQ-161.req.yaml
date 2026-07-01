@@ -4,8 +4,8 @@ status: approved
 priority: shall
 category: user_session_lifetime_endpoint_maps
 req_type: guarantee
-fretish: the user_session_lifetime_endpoint_maps shall always satisfy user_session_lifetime_endpoint_maps_operation_terminal
-description: User session lifetime and endpoint map helper handling shall preserve deterministic local helper results for post-expiry lifetime selection, legacy lifetime fallback and key-expiration comparison, global lifetime override, endpoint collection flattening into method:path maps, and endpoint map expansion into sorted endpoint collections while skipping malformed map keys, without claiming Redis durability, policy merge behavior, gateway routing, endpoint rate-limit enforcement, distributed synchronization, or final client responses.
+fretish: the user_session_lifetime_endpoint_maps shall always satisfy (user_session_lifetime_selection_matches_expected & user_endpoint_map_conversion_matches_expected)
+description: "User session lifetime and endpoint map helper handling shall preserve deterministic local helper results for two focused behaviors: post-expiry lifetime selection, legacy lifetime fallback and key-expiration comparison, and global lifetime override; and endpoint collection flattening into method:path maps plus endpoint map expansion into sorted endpoint collections while skipping malformed map keys. This requirement does not claim Redis durability, policy merge behavior, gateway routing, endpoint rate-limit enforcement, distributed synchronization, or final client responses."
 formalization_strategy: fretish
 informal_verification:
     method: ""
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: STK-REQ-073
 component: user_session_lifetime_endpoint_maps
-rationale: This system requirement owns local user-package lifetime and endpoint map helper decisions only. Integrated policy application, persistence, routing, runtime rate-limit execution, and transport behavior remain outside this proof slice.
+rationale: This system requirement owns local user-package lifetime and endpoint map helper decisions only. Its formal model uses concrete app-logic outcome predicates for lifetime selection and endpoint map conversion because those are the helper results asserted by the tests. Integrated policy application, persistence, routing, runtime rate-limit execution, and transport behavior remain outside this proof slice.
 tags:
     - user
     - session
@@ -24,9 +24,9 @@ variables: []
 traces:
     satisfies:
         - STK-REQ-073
-    reviewed_at: "2026-06-21T11:59:05.487882Z"
+    reviewed_at: "2026-06-21T18:58:07.748537Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:b75a683167f2bb741b766eb810c64e0d1dfe4e09e722ecb708baa2de61ba4034
+    reviewed_fingerprint: sha256:291b0d7332606301a3da76cff1bc6b1a8bbe15efa8b3f44fd2e9b99a484d86d0
 verification:
     assurance_level: A
     formalization_status: valid

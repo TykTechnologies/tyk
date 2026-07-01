@@ -72,6 +72,134 @@ func TestDummyStorageAcceptance(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-097, SYS-REQ-185, SW-REQ-172
+// STK-REQ-097:STK-REQ-097-AC-01:acceptance
+// SYS-REQ-185:nominal:nominal
+// SYS-REQ-185:boundary:nominal
+// SYS-REQ-185:error_handling:nominal
+// SYS-REQ-185:encoding_safety:nominal
+// SYS-REQ-185:determinism:nominal
+// SW-REQ-172:nominal:nominal
+// SW-REQ-172:boundary:nominal
+// SW-REQ-172:error_handling:nominal
+// SW-REQ-172:encoding_safety:nominal
+// SW-REQ-172:determinism:nominal
+// MCDC SYS-REQ-185: storage_dummy_construction_determined=T, storage_dummy_key_values_determined=T, storage_dummy_wildcard_keys_determined=T, storage_dummy_list_membership_determined=T, storage_dummy_connect_determined=T, storage_dummy_unsupported_panics_determined=T => TRUE
+// MCDC SW-REQ-172: storage_dummy_construction_determined=T, storage_dummy_key_values_determined=T, storage_dummy_wildcard_keys_determined=T, storage_dummy_list_membership_determined=T, storage_dummy_connect_determined=T, storage_dummy_unsupported_panics_determined=T => TRUE
+func TestDummyStorageReqProof(t *testing.T) {
+	ds := NewDummyStorage()
+	assert.NotNil(t, ds.Data)
+	assert.NotNil(t, ds.IndexList)
+	assert.Empty(t, ds.Data)
+	assert.Empty(t, ds.IndexList)
+	assert.True(t, ds.Connect())
+
+	keyValueCases := []struct {
+		key   string
+		value string
+	}{
+		{key: "data-key", value: "data-value"},
+		{key: "second-key", value: "second-value"},
+	}
+	for _, tc := range keyValueCases {
+		assert.NoError(t, ds.SetKey(tc.key, tc.value, 0))
+	}
+
+	value, err := ds.GetKey("data-key")
+	assert.NoError(t, err)
+	assert.Equal(t, "data-value", value)
+
+	rawValue, err := ds.GetRawKey("data-key")
+	assert.NoError(t, err)
+	assert.Equal(t, "data-value", rawValue)
+
+	values, err := ds.GetMultiKey([]string{"data-key", "second-key"})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"data-value", "second-value"}, values)
+
+	_, err = ds.GetKey("missing")
+	assert.EqualError(t, err, "Not found")
+
+	_, err = ds.GetRawKey("missing")
+	assert.EqualError(t, err, "key not found: missing")
+
+	_, err = ds.GetMultiKey([]string{"missing"})
+	assert.EqualError(t, err, "key not found: missing")
+
+	assert.True(t, ds.DeleteKey("second-key"))
+	assert.False(t, ds.DeleteKey("second-key"))
+
+	ds.AppendToSet("list-key", "one")
+	ds.AppendToSet("list-key", "two")
+	ds.AppendToSet("new-list-key", "only")
+
+	exists, err := ds.Exists("data-key")
+	assert.NoError(t, err)
+	assert.True(t, exists)
+
+	exists, err = ds.Exists("list-key")
+	assert.NoError(t, err)
+	assert.True(t, exists)
+
+	exists, err = ds.Exists("missing")
+	assert.NoError(t, err)
+	assert.False(t, exists)
+
+	listValues, err := ds.GetListRange("list-key", 0, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"one", "two"}, listValues)
+
+	assert.NoError(t, ds.RemoveFromList("list-key", "one"))
+	listValues, err = ds.GetListRange("list-key", 0, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"two"}, listValues)
+
+	listValues, err = ds.GetListRange("missing", 0, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{}, listValues)
+
+	assert.NoError(t, ds.SetKey("wildcard-a", "a", 0))
+	assert.NoError(t, ds.SetKey("wildcard-b", "b", 0))
+	assert.Equal(t, []string{"data-key", "wildcard-a", "wildcard-b"}, sortedDummyKeys(ds.GetKeys("*")))
+	assert.Nil(t, ds.GetKeys("wildcard-*"))
+	assert.True(t, ds.DeleteScanMatch("*"))
+	assert.Empty(t, ds.Data)
+	assert.False(t, ds.DeleteScanMatch("wildcard-*"))
+
+	unsupportedCases := []struct {
+		name string
+		call func()
+	}{
+		{name: "SetRawKey", call: func() { _ = ds.SetRawKey("key", "value", 0) }},
+		{name: "SetExp", call: func() { _ = ds.SetExp("key", 1) }},
+		{name: "GetExp", call: func() { _, _ = ds.GetExp("key") }},
+		{name: "DeleteAllKeys", call: func() { _ = ds.DeleteAllKeys() }},
+		{name: "DeleteRawKey", call: func() { _ = ds.DeleteRawKey("key") }},
+		{name: "DeleteRawKeys", call: func() { _ = ds.DeleteRawKeys([]string{"key"}) }},
+		{name: "GetKeysAndValues", call: func() { _ = ds.GetKeysAndValues() }},
+		{name: "GetKeysAndValuesWithFilter", call: func() { _ = ds.GetKeysAndValuesWithFilter("*") }},
+		{name: "DeleteKeys", call: func() { _ = ds.DeleteKeys([]string{"key"}) }},
+		{name: "Decrement", call: func() { ds.Decrement("key") }},
+		{name: "IncrememntWithExpire", call: func() { _ = ds.IncrememntWithExpire("key", 1) }},
+		{name: "SetRollingWindow", call: func() { _, _ = ds.SetRollingWindow("key", 1, "value", false) }},
+		{name: "GetRollingWindow", call: func() { _, _ = ds.GetRollingWindow("key", 1, false) }},
+		{name: "GetSet", call: func() { _, _ = ds.GetSet("set") }},
+		{name: "AddToSet", call: func() { ds.AddToSet("set", "value") }},
+		{name: "GetAndDeleteSet", call: func() { _ = ds.GetAndDeleteSet("set") }},
+		{name: "RemoveFromSet", call: func() { ds.RemoveFromSet("set", "value") }},
+		{name: "GetKeyPrefix", call: func() { _ = ds.GetKeyPrefix() }},
+		{name: "AddToSortedSet", call: func() { ds.AddToSortedSet("set", "value", 1) }},
+		{name: "GetSortedSetRange", call: func() { _, _, _ = ds.GetSortedSetRange("set", "from", "to") }},
+		{name: "RemoveSortedSetRange", call: func() { _ = ds.RemoveSortedSetRange("set", "from", "to") }},
+	}
+
+	for _, tc := range unsupportedCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.PanicsWithValue(t, "implement me", tc.call)
+		})
+	}
+}
+
 func mustExists(t *testing.T, ds *DummyStorage, key string) bool {
 	t.Helper()
 

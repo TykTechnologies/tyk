@@ -4,7 +4,7 @@ status: approved
 priority: shall
 category: storage
 req_type: guarantee
-fretish: the storage_connection_handler shall always satisfy storage_connection_handler_operation_terminal
+fretish: the storage_connection_handler shall always satisfy (storage_connection_handler_state_determined & storage_connection_handler_wait_reconnect_determined & storage_connection_handler_connector_slots_determined & storage_connection_handler_status_disconnect_determined & storage_connection_handler_redis_options_determined & storage_connection_handler_backoff_determined & storage_connection_handler_shim_delegation_determined)
 description: The storage connection-handler implementation shall preserve local connection-handler and RedisController shim behavior for tested inputs by constructing handlers and shim controllers, tracking enablement and connection state, delegating shim connect, disable, connected, and wait-connect calls to the connection handler, waiting for connect success or timeout, delivering reconnect callbacks, initializing default/cache/analytics connectors, checking storage status, selecting configured connector slots, propagating disconnect errors, constructing Redis connector options, and configuring exponential backoff without claiming Redis server availability, distributed storage durability, Sentinel or cluster topology correctness, TLS certificate validation beyond connector option construction, gateway request admission, analytics delivery, cache correctness, Go plugin API compatibility beyond local shim delegation, or final client-visible behavior beyond the focused storage connection-handler tests.
 formalization_strategy: fretish
 informal_verification:
@@ -13,7 +13,7 @@ informal_verification:
     verified: true
 parent: SYS-REQ-183
 component: storage_connection_handler
-rationale: This software requirement owns local storage/connection_handler.go mechanics, storage/redis_shim.go delegation, and focused package tests only. Concrete Redis availability, Go plugin compatibility beyond local shim delegation, and gateway storage operation semantics are outside this proof slice.
+rationale: This software requirement owns local storage/connection_handler.go mechanics, storage/redis_shim.go delegation, and focused package tests only. Its formal model is decomposed into handler state, wait/reconnect behavior, connector slot setup, status/disconnect behavior, Redis option construction, backoff configuration, and shim delegation outputs so each behavior can be reviewed and witnessed independently. Concrete Redis availability, Go plugin compatibility beyond local shim delegation, and gateway storage operation semantics are outside this proof slice.
 tags:
     - storage
     - redis
@@ -23,9 +23,9 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-183
-    reviewed_at: "2026-06-21T11:59:04.701915Z"
+    reviewed_at: "2026-06-21T18:24:36.021165Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:edc46194ea23f51374fffb73cca3b3e87589d26f7cafd336904b032d83d21072
+    reviewed_fingerprint: sha256:8047096b567f8fb151e7094b943fea2ba812dc85818c4c3feefb5e4a67dffb27
 verification:
     assurance_level: A
     formalization_status: valid

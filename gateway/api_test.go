@@ -1135,6 +1135,14 @@ func TestHashKeyHandler(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SYS-REQ-141:error_handling:nominal
+// SW-REQ-128:nominal:nominal
+// SW-REQ-128:boundary:nominal
+// SW-REQ-128:error_handling:nominal
 func TestDisableKeyActionsByUserName(t *testing.T) {
 	conf := func(globalConf *config.Config) {
 		globalConf.HashKeys = true
@@ -1211,6 +1219,13 @@ func TestDisableKeyActionsByUserName(t *testing.T) {
 		},
 	}...)
 }
+
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SW-REQ-128:nominal:nominal
+// SW-REQ-128:boundary:nominal
 func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 	test.Racy(t) // TODO: TT-5233
 	ts := StartTest(nil)
@@ -1437,6 +1452,14 @@ func (ts *Test) testHashFuncAndBAHelper(t *testing.T) {
 	}...)
 }
 
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SYS-REQ-141:error_handling:nominal
+// SW-REQ-128:nominal:nominal
+// SW-REQ-128:boundary:nominal
+// SW-REQ-128:error_handling:nominal
 func TestHashKeyListingDisabled(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -1556,6 +1579,14 @@ func TestHashKeyListingDisabled(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SYS-REQ-141:error_handling:nominal
+// SW-REQ-128:nominal:nominal
+// SW-REQ-128:boundary:nominal
+// SW-REQ-128:error_handling:nominal
 func TestKeyHandler_HashingDisabled(t *testing.T) {
 	test.Racy(t) // TODO: TT-5524
 
@@ -1640,6 +1671,12 @@ func TestKeyHandler_HashingDisabled(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-052, SYS-REQ-140, SW-REQ-127
+// STK-REQ-052:STK-REQ-052-AC-01:acceptance
+// SYS-REQ-140:nominal:nominal
+// SYS-REQ-140:boundary:nominal
+// SW-REQ-127:nominal:nominal
+// SW-REQ-127:boundary:nominal
 func TestSessionLifetimeRespectsKeyExpiration(t *testing.T) {
 	const respectingAPI = "respectingAPI"
 	const overridingAPI = "overridingAPI"
@@ -1688,6 +1725,12 @@ func TestSessionLifetimeRespectsKeyExpiration(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
 func TestInvalidateCache(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -1700,6 +1743,12 @@ func TestInvalidateCache(t *testing.T) {
 	}...)
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
 func TestGetOAuthClients(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -1724,6 +1773,12 @@ func TestGetOAuthClients(t *testing.T) {
 	}...)
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:error_handling:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:error_handling:nominal
 func TestCreateOAuthClient(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -1835,6 +1890,12 @@ func TestCreateOAuthClient(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
 func TestUpdateOauthClientHandler(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -2075,6 +2136,10 @@ func TestGroupResetHandler(t *testing.T) {
 	assert.Equal(t, tryReloadCount, reloadCount, "Unexpected number of reloads registered from pubsub")
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SW-REQ-126:nominal:nominal
 func TestHotReloadSingle(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -2403,6 +2468,10 @@ func TestGatewayRequestContextHelpers(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SW-REQ-126:nominal:nominal
 func TestRotateClientSecretHandler(t *testing.T) {
 
 	ts := StartTest(nil)
@@ -2510,6 +2579,12 @@ func TestRotateClientSecretHandler(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:error_handling:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:error_handling:nominal
 func TestHandleAddApi(t *testing.T) {
 	testFs := afero.NewMemMapFs()
 
@@ -2660,6 +2735,12 @@ func TestHandleAddApi(t *testing.T) {
 
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
 func TestHandleAddApi_AddVersionAtomically(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -2714,6 +2795,12 @@ func TestHandleAddApi_AddVersionAtomically(t *testing.T) {
 	_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Path: "/tyk/apis/" + v2APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
 func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -2795,6 +2882,12 @@ func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
 	_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Path: "/tyk/apis/oas/" + v2APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
 func TestHandleDeleteAPI_RemoveVersionAtomically(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -2856,6 +2949,12 @@ func TestHandleDeleteAPI_RemoveVersionAtomically(t *testing.T) {
 	}...)
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
 func TestHandleDeleteOASAPI_RemoveVersionAtomically(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -2959,6 +3058,12 @@ func baseAPIHeader(id string) map[string]string {
 	}
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:error_handling:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:error_handling:nominal
 func TestHandleUpdateApi(t *testing.T) {
 	testFs := afero.NewMemMapFs()
 
@@ -3058,6 +3163,10 @@ func TestHandleUpdateApi(t *testing.T) {
 
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:error_handling:nominal
+// SW-REQ-126:error_handling:nominal
 func TestDeleteAPI(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -4178,6 +4287,12 @@ func testImportOAS(t *testing.T, ts *Test, testCase test.TestCase) string {
 	return importResp.Key
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
 func TestGetAPI_WithVersionBaseID(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -4242,6 +4357,12 @@ func TestGetAPI_WithVersionBaseID(t *testing.T) {
 	}...)
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
 func TestGetOASAPI_WithVersionBaseID(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -4554,6 +4675,12 @@ func TestApplyLifetime_PostExpiry_FromPolicy(t *testing.T) {
 	assert.InDelta(t, 300, got, 10)
 }
 
+// Verifies: STK-REQ-052, SYS-REQ-140, SW-REQ-127
+// STK-REQ-052:STK-REQ-052-AC-01:acceptance
+// SYS-REQ-140:nominal:nominal
+// SYS-REQ-140:boundary:nominal
+// SW-REQ-127:nominal:nominal
+// SW-REQ-127:boundary:nominal
 func TestPostExpiryFields_APIRoundTrip(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -4651,6 +4778,12 @@ func TestPostExpiryFields_APIRoundTrip(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-052, SYS-REQ-140, SW-REQ-127
+// STK-REQ-052:STK-REQ-052-AC-01:acceptance
+// SYS-REQ-140:nominal:nominal
+// SYS-REQ-140:determinism:nominal
+// SW-REQ-127:nominal:nominal
+// SW-REQ-127:determinism:nominal
 func TestOrgKeyHandler_LastUpdated(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -4754,6 +4887,12 @@ func TestDeletionOfPoliciesThatFromAKeyDoesNotMakeTheAPIKeyless(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:error_handling:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:error_handling:nominal
 func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
 	conf := func(globalConf *config.Config) {
 		// set tokens to be expired after 1 second
@@ -4823,6 +4962,12 @@ func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// SYS-REQ-141:nominal:nominal
+// SYS-REQ-141:boundary:nominal
+// SW-REQ-128:nominal:nominal
+// SW-REQ-128:boundary:nominal
 func TestKeyHandler_BatchFiltering_Integration(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.HashKeys = true
@@ -4900,6 +5045,10 @@ func TestKeyHandler_BatchFiltering_Integration(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-053, SYS-REQ-141, SW-REQ-128
+// STK-REQ-053:STK-REQ-053-AC-01:acceptance
+// SYS-REQ-141:error_handling:nominal
+// SW-REQ-128:error_handling:nominal
 func TestKeyHandler_ContextCancellation(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.HashKeys = true
@@ -6514,6 +6663,12 @@ func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-051, SYS-REQ-139, SW-REQ-126
+// STK-REQ-051:STK-REQ-051-AC-01:acceptance
+// SYS-REQ-139:nominal:nominal
+// SYS-REQ-139:boundary:nominal
+// SW-REQ-126:nominal:nominal
+// SW-REQ-126:boundary:nominal
 func TestAPIListFilter_IncludeTypes(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

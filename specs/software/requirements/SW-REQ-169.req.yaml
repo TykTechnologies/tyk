@@ -4,7 +4,7 @@ status: approved
 priority: shall
 category: gateway_runtime
 req_type: guarantee
-fretish: the external_http_client shall always satisfy external_http_client_operation_terminal
+fretish: the external_http_client shall always satisfy (external_http_client_service_config_determined & external_http_client_service_client_determined & external_http_client_proxy_selection_determined & external_http_client_mtls_loading_determined & external_http_client_mtls_error_classification_determined & external_http_client_jwk_fetch_determined)
 description: The external-service HTTP client implementation shall preserve local client factory behavior for tested inputs by detecting and merging service configuration, constructing service-specific clients, applying service timeouts and transports, selecting and bypassing proxies, loading mTLS certificates and CA pools from files or the certificate store, classifying mTLS errors, and fetching JWK data through a supplied client and parser without claiming network reachability, external service availability, proxy server behavior, certificate authority trust correctness beyond the focused tests, production certificate-store persistence, JWK cryptographic validation, OAuth/JWT protocol correctness, or final client-visible gateway behavior beyond the focused HTTP client factory tests.
 formalization_strategy: fretish
 informal_verification:
@@ -13,7 +13,7 @@ informal_verification:
     verified: true
 parent: SYS-REQ-182
 component: external_http_client
-rationale: This software requirement owns local internal/httpclient factory mechanics and focused package tests only. Actual outbound service protocol behavior and network delivery are outside this proof slice.
+rationale: This software requirement owns local internal/httpclient factory mechanics and focused package tests only. Its formal model is decomposed into service configuration, service client construction, proxy selection, mTLS loading, mTLS error classification, and JWK fetch outputs so each behavior can be reviewed and witnessed independently. Actual outbound service protocol behavior and network delivery are outside this proof slice.
 tags:
     - gateway-runtime
     - http-client
@@ -23,9 +23,9 @@ variables: []
 traces:
     satisfies:
         - SYS-REQ-182
-    reviewed_at: "2026-06-21T11:59:04.600654Z"
+    reviewed_at: "2026-06-21T18:23:44.737258Z"
     reviewed_by: human:buger
-    reviewed_fingerprint: sha256:b0c5e21cf467e9e4718d3f5d1ced1f61665c446a584e6b9ccf3f088f66ad7ca9
+    reviewed_fingerprint: sha256:44447628842045f4239332e5cb6068d2bf512f2623136360e522660cec721193
 verification:
     assurance_level: A
     formalization_status: valid

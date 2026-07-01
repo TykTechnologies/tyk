@@ -1,6 +1,26 @@
 component: external_http_client
 variables:
-    - name: external_http_client_operation_terminal
+    - name: external_http_client_service_config_determined
       type: bool
       direction: output
-      description: The external http client implementation operation reaches a terminal local result for the focused tested inputs, such as returning the expected value, selecting the expected local branch, surfacing an explicit local error, or preserving the documented local fallback behavior.
+      description: External HTTP client service configuration detection and merging produce deterministic local implementation results for the focused tested inputs.
+    - name: external_http_client_service_client_determined
+      type: bool
+      direction: output
+      description: Service-specific client constructors, timeouts, and transport settings produce deterministic local implementation results for the focused tested inputs.
+    - name: external_http_client_proxy_selection_determined
+      type: bool
+      direction: output
+      description: Proxy selection, environment proxy use, and proxy bypass behavior produce deterministic local implementation results for the focused tested inputs.
+    - name: external_http_client_mtls_loading_determined
+      type: bool
+      direction: output
+      description: mTLS file, certificate-store, and CA-pool loading paths produce deterministic local implementation results or explicit local errors for the focused tested inputs.
+    - name: external_http_client_mtls_error_classification_determined
+      type: bool
+      direction: output
+      description: mTLS error classification produces deterministic local implementation results for the focused tested inputs.
+    - name: external_http_client_jwk_fetch_determined
+      type: bool
+      direction: output
+      description: JWK fetching through a supplied HTTP client and parser produces deterministic local implementation results for the focused tested inputs.

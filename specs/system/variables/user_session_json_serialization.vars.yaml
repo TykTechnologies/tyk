@@ -3,7 +3,31 @@ no_interface:
     declared: true
     reason: The user session json serialization proof slice covers focused local helper behavior under tested inputs only; cross-component runtime integration, external service availability, persistence durability, distributed behavior, and final client-visible behavior are outside this component boundary.
 variables:
-    - name: user_session_json_serialization_operation_terminal
+    - name: user_session_json_zero_values_omitted
       type: bool
       direction: output
-      description: The user session json serialization operation reaches a terminal local result for the focused tested inputs, such as returning the expected value, selecting the expected local branch, surfacing an explicit local error, or preserving the documented local fallback behavior.
+      description: Zero session, policy, access-definition, limit, collection, smoothing, MCP access-control, and post-expiry values are omitted from JSON for the focused tested inputs.
+    - name: user_session_json_nonzero_values_preserved
+      type: bool
+      direction: output
+      description: Configured non-zero session, policy, access-definition, time, MCP access-control, smoothing, and post-expiry values are preserved in JSON for the focused tested inputs.
+    - name: user_session_json_legacy_format_accepted
+      type: bool
+      direction: output
+      description: Legacy all-field session JSON is accepted and decoded into the expected local values for the focused tested input.
+    - name: user_session_json_compact_defaults_accepted
+      type: bool
+      direction: output
+      description: Compact session JSON with omitted fields is accepted and missing fields decode to default zero values for the focused tested input.
+    - name: user_session_json_access_structures_determined
+      type: bool
+      direction: output
+      description: Access-definition, API limit, collection, and MCP access-control JSON shape behavior produces deterministic local results for the focused tested inputs.
+    - name: user_session_json_smoothing_determined
+      type: bool
+      direction: output
+      description: Rate-limit smoothing JSON omission and inclusion behavior produces deterministic local results for the focused tested inputs.
+    - name: user_session_json_post_expiry_determined
+      type: bool
+      direction: output
+      description: Policy and session post-expiry JSON omission, inclusion, and round-trip preservation produce deterministic local results for the focused tested inputs.

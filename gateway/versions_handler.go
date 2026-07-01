@@ -14,10 +14,12 @@ type VersionsHandler struct {
 	getApiDef func(string) (*apidef.APIDefinition, error)
 }
 
+// Implements: SW-REQ-126
 func NewVersionHandler(getApiDef func(string) (*apidef.APIDefinition, error)) *VersionsHandler {
 	return &VersionsHandler{getApiDef: getApiDef}
 }
 
+// Implements: SW-REQ-126
 func (h *VersionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 	searchText := strings.ToLower(r.URL.Query().Get("searchText"))
