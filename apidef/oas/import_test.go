@@ -12,7 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
 
-//go:embed testdata/urlRewrite.json testdata/petstore-no-responses.json
+//go:embed testdata/urlRewrite.json testdata/petstore-no-responses.json testdata/oas_31_webhooks_no_paths.json
 var oasTestAPIs embed.FS
 
 // TestLoad_URLRewrite(t *testing.T)
@@ -133,4 +133,25 @@ func TestImportValidateRequest(t *testing.T) {
 
 		assert.Equal(t, want, got)
 	})
+}
+
+func TestImport_OAS31_Webhooks_NoPaths(t *testing.T) {
+	oasContents, err := oasTestAPIs.ReadFile("testdata/oas_31_webhooks_no_paths.json")
+	assert.NoError(t, err)
+	assert.NotNil(t, oasContents)
+
+	var webhookOAS oas.OAS
+	err = json.Unmarshal(oasContents, &webhookOAS)
+	assert.NoError(t, err, "Should successfully unmarshal OAS 3.1 with webhooks and no paths")
+
+	trueVal, falseVal := true, false
+	isImport := true
+	params := oas.TykExtensionConfigParams{
+		ListenPath:      "/listen-api",
+		UpstreamURL:     "https://example.org/api",
+		ValidateRequest: &trueVal,
+		MockResponse:    &falseVal,
+	}
+	err = webhookOAS.BuildDefaultTykExtension(params, isImport)
+	assert.NoError(t, err, "Should successfully build Tyk extension")
 }
