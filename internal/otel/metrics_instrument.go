@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/attribute"
 
 	tykmetric "github.com/TykTechnologies/opentelemetry/metric"
 
@@ -15,6 +16,19 @@ import (
 // configuration reload durations. Reloads typically range from sub-second to
 // tens of seconds under heavy load.
 var reloadDurationBuckets = []float64{0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0}
+
+// exchangeDurationBuckets defines histogram bucket boundaries (in seconds) for
+// IdP round-trip latency on a token exchange.
+var exchangeDurationBuckets = []float64{0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0}
+
+// Metric attribute keys for the token-exchange instruments. Both are bounded —
+// `outcome` is a small enum and `provider` is operator-defined and few — so
+// both are safe as labels. Unbounded fields (idp error code, any token-derived
+// value) stay out of labels and live only on logs/audit.
+const (
+	exchangeAttrOutcome  = "outcome"
+	exchangeAttrProvider = "provider"
+)
 
 // MetricInstruments encapsulates the OTel metrics provider and all gateway instruments.
 // All methods are safe to call even when the provider is disabled (noop).
@@ -30,6 +44,13 @@ type MetricInstruments struct {
 	// Reload event metrics.
 	reloadCounter  *tykmetric.Counter
 	reloadDuration *tykmetric.Histogram
+
+	// Token-exchange (RFC 8693) metrics. The duration histogram records every
+	// attempt; cache hits are additionally counted on the separate cache_hit
+	// counter, never as a requests outcome.
+	exchangeRequests *tykmetric.Counter
+	exchangeDuration *tykmetric.Histogram
+	exchangeCacheHit *tykmetric.Counter
 }
 
 // NewMetricInstruments creates gateway metric instruments from an existing provider.
@@ -80,14 +101,65 @@ func NewMetricInstruments(provider tykmetric.Provider, logger *logrus.Logger) *M
 		logger.Errorf("Creating reload duration histogram: %s", err)
 	}
 
-	return &MetricInstruments{
-		provider:       provider,
-		requestCounter: requestCounter,
-		apisLoaded:     apisLoaded,
-		policiesLoaded: policiesLoaded,
-		reloadCounter:  reloadCounter,
-		reloadDuration: reloadDuration,
+	exchangeRequests, err := provider.NewCounter(
+		"tyk.oauth2.exchange.requests",
+		"Total RFC 8693 token exchange decisions, by outcome and provider",
+		"1",
+	)
+	if err != nil {
+		logger.Errorf("Creating exchange requests counter: %s", err)
 	}
+
+	exchangeDuration, err := provider.NewHistogram(
+		"tyk.oauth2.exchange.duration",
+		"IdP round-trip latency for token exchange (IdP-touching calls only)",
+		"s",
+		exchangeDurationBuckets,
+	)
+	if err != nil {
+		logger.Errorf("Creating exchange duration histogram: %s", err)
+	}
+
+	exchangeCacheHit, err := provider.NewCounter(
+		"tyk.oauth2.exchange.cache_hit",
+		"Total token-exchange requests served from the cache, by provider",
+		"1",
+	)
+	if err != nil {
+		logger.Errorf("Creating exchange cache_hit counter: %s", err)
+	}
+
+	return &MetricInstruments{
+		provider:         provider,
+		requestCounter:   requestCounter,
+		apisLoaded:       apisLoaded,
+		policiesLoaded:   policiesLoaded,
+		reloadCounter:    reloadCounter,
+		reloadDuration:   reloadDuration,
+		exchangeRequests: exchangeRequests,
+		exchangeDuration: exchangeDuration,
+		exchangeCacheHit: exchangeCacheHit,
+	}
+}
+
+// RecordExchange records one token-exchange decision: it increments the
+// requests counter and records the duration histogram (both labelled by
+// outcome + provider) on every attempt. Cache hits land sub-millisecond and
+// live IdP round-trips dominate the upper buckets, so the histogram reads as
+// IdP latency in practice while still making the cache speedup visible.
+func (i *MetricInstruments) RecordExchange(ctx context.Context, outcome, provider string, duration time.Duration) {
+	attrs := []attribute.KeyValue{
+		attribute.String(exchangeAttrOutcome, outcome),
+		attribute.String(exchangeAttrProvider, provider),
+	}
+	i.exchangeRequests.Add(ctx, 1, attrs...)
+	i.exchangeDuration.Record(ctx, duration.Seconds(), attrs...)
+}
+
+// RecordCacheHit increments the dedicated cache_hit counter (labelled by
+// provider only). Cache hits are a separate signal, never a requests outcome.
+func (i *MetricInstruments) RecordCacheHit(ctx context.Context, provider string) {
+	i.exchangeCacheHit.Add(ctx, 1, attribute.String(exchangeAttrProvider, provider))
 }
 
 // RecordRequest increments the request counter.
