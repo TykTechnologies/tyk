@@ -129,6 +129,10 @@ func (rc *ConnectionHandler) recoverLoop(ctx context.Context, onReconnect func()
 //
 // onConnect will be called when we have established a successful storage reconnection
 func (rc *ConnectionHandler) Connect(ctx context.Context, onConnect func(), conf *config.Config) {
+	if onConnect == nil {
+		onConnect = func() {}
+	}
+
 	err := rc.initConnection(*conf)
 	if err != nil {
 		log.WithError(err).Error("Could not initialize connection to Redis cluster")
