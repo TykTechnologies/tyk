@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -517,4 +519,30 @@ func TestResponseTransformMiddleware(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestSkipLegacyResponseBodyTransform(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	logger, hook := logrustest.NewNullLogger()
+	entry := logrus.NewEntry(logger)
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			ResponseProcessors: []apidef.ResponseProcessor{
+				{Name: "response_body_transform"},
+			},
+		},
+	}
+
+	chain := ts.Gw.createResponseMiddlewareChain(spec, nil, entry)
+	assert.NotNil(t, chain)
+
+	// Verify that no error log was printed for "response_body_transform"
+	for _, entry := range hook.Entries {
+		if entry.Level == logrus.ErrorLevel {
+			assert.NotContains(t, entry.Message, "No such processor: response_body_transform")
+		}
+	}
 }
