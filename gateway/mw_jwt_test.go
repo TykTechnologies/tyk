@@ -5398,7 +5398,7 @@ func Test_mapScopeToPolicies_TT5893(t *testing.T) {
 			assert.True(t, lo.EveryBy(hook.AllEntries(), func(item *logrus.Entry) bool {
 				return item.Level == logrus.DebugLevel && strings.HasPrefix(item.Message, "Found a matching policy for scope item")
 			}))
-			assert.Equal(t, []string{"policy1", "policy2"}, res)
+			assert.ElementsMatch(t, []string{"policy1", "policy2"}, res)
 		})
 
 		t.Run("does not log if no one scope matches", func(t *testing.T) {
@@ -5433,7 +5433,7 @@ func Test_mapScopeToPolicies_TT5893(t *testing.T) {
 			assert.True(t, strings.HasPrefix(nonMatch.Message, "Couldn't find a matching policy for scope item"))
 			assert.Equal(t, logrus.DebugLevel, nonMatch.Level)
 
-			assert.Equal(t, []string{"policy1"}, res)
+			assert.ElementsMatch(t, []string{"policy1"}, res)
 		})
 	})
 }

@@ -837,14 +837,22 @@ func getScopeFromClaim(claims jwt.MapClaims, scopeClaimName string) []string {
 
 func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 	// add all policies matched from scope-policy mapping
-	policiesToApplySet := make(map[string]struct{}, len(mapping))
-	unmatchedScopes := make(map[string]struct{}, len(mapping))
+	var policiesToApplySet map[string]struct{}
+	var unmatchedScopes map[string]struct{}
 
 	for _, scopeItem := range scope {
 		if policyID, ok := mapping[scopeItem]; ok {
+			if policiesToApplySet == nil {
+				policiesToApplySet = make(map[string]struct{}, len(scope))
+			}
+
 			policiesToApplySet[policyID] = struct{}{}
 			log.Debugf("Found a matching policy for scope item: %s", scopeItem)
 		} else {
+			if unmatchedScopes == nil {
+				unmatchedScopes = make(map[string]struct{}, len(scope))
+			}
+
 			unmatchedScopes[scopeItem] = struct{}{}
 		}
 	}
@@ -852,7 +860,10 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 	// https://tyktech.atlassian.net/browse/TT-5893
 	if len(policiesToApplySet) > 0 {
 		for scopeItem := range unmatchedScopes {
-			log.Debugf("Couldn't find a matching policy for scope item: %s", scopeItem)
+			log.Debugf(
+				"Couldn't find a matching policy for scope item: %q",
+				scopeItem,
+			)
 		}
 	}
 
