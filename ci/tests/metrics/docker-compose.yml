@@ -41,7 +41,7 @@ services:
 
   httpbin:
     platform: linux/amd64
-    image: kennethreitz/httpbin:latest
+    image: mccutchen/go-httpbin
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.100.0
