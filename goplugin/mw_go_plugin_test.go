@@ -5,11 +5,8 @@ package goplugin_test
 
 import (
 	"context"
-	"crypto/md5"
 	"encoding/base64"
-	"fmt"
 	"net/http"
-	"os"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -893,22 +890,18 @@ func TestGoPlugin_DontWriteBodyInCaseIfPluginRespondsWith4xxOrHigher(t *testing.
 	})
 }
 
-func TestAnalyticsPluginBundle(t *testing.T) {
-	pluginName := "goplugins.so"
+func TestAnalyticsPlugin(t *testing.T) {
 	ts := gateway.StartTest(func(c *config.Config) {
 		c.PublicKeyPath = ""
 		c.AnalyticsConfig.EnableDetailedRecording = true
 	})
 	defer ts.Close()
 
-	t.Run("successfully loads and executes bundled analytics plugin", func(t *testing.T) {
-		bundle, err := analyticsBundle(pluginName)
-		require.NoError(t, err)
-
-		analyticsPlugin := ts.RegisterBundle("goAnalyticsBundle", bundle)
-
+	t.Run("successfully loads and executes analytics plugin", func(t *testing.T) {
 		specs := ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
-			spec.CustomMiddlewareBundle = analyticsPlugin
+			spec.AnalyticsPlugin.Enabled = true
+			spec.AnalyticsPlugin.PluginPath = goPluginFilename()
+			spec.AnalyticsPlugin.FuncName = "MyAnalyticsPluginAddTag"
 
 			spec.EnableDetailedRecording = true
 			spec.Proxy.ListenPath = "/test"
@@ -918,7 +911,7 @@ func TestAnalyticsPluginBundle(t *testing.T) {
 		require.NotNil(t, spec, "API should be created successfully")
 		require.NotNil(t, spec.AnalyticsPluginConfig, "Analytics plugin should have loaded successfully")
 
-		_, err = ts.Run(t, test.TestCase{
+		_, err := ts.Run(t, test.TestCase{
 			Path: "/test",
 			Code: 200,
 		})
@@ -944,34 +937,4 @@ func TestAnalyticsPluginBundle(t *testing.T) {
 		assert.NotContains(t, respStr, "Server:", "Server header should be deleted")
 		assert.Contains(t, respStr, "Test: test", "Test header should be added")
 	})
-}
-
-func analyticsBundle(pluginName string) (map[string]string, error) {
-	pluginData, err := os.ReadFile(goPluginFilename())
-	if err != nil {
-		return nil, fmt.Errorf("%s must be built before running this test", pluginName)
-	}
-
-	checksum := fmt.Sprintf("%x", md5.Sum(pluginData))
-	manifest := fmt.Sprintf(
-		`
-{
-	"file_list": ["%s"],
-	"custom_middleware": {
-		"analytics": {
-			"disabled": false,
-			"name": "MyAnalyticsPluginAddTag",
-			"path": "%s"
-		},
-		"driver": "goplugin"
-	},
-	"checksum": "%s"
-}
-`,
-		pluginName, pluginName, checksum)
-
-	return map[string]string{
-		"manifest.json": manifest,
-		pluginName:      string(pluginData),
-	}, nil
 }
