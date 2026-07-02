@@ -911,6 +911,11 @@ func TestAnalyticsPlugin(t *testing.T) {
 		require.NotNil(t, spec, "API should be created successfully")
 		require.NotNil(t, spec.AnalyticsPluginConfig, "Analytics plugin should have loaded successfully")
 
+		analyticsKey := "tyk-system-analytics"
+		// Delete old records and ensure clean state
+		ts.Gw.Analytics.Flush()
+		ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKey)
+
 		_, err := ts.Run(t, test.TestCase{
 			Path: "/test",
 			Code: 200,
@@ -918,8 +923,7 @@ func TestAnalyticsPlugin(t *testing.T) {
 		require.NoError(t, err)
 
 		ts.Gw.Analytics.Flush()
-
-		results := ts.Gw.Analytics.Store.GetAndDeleteSet("tyk-system-analytics")
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKey)
 		require.Len(t, results, 1, "Should have generated 1 analytics record")
 
 		var record analytics.AnalyticsRecord
