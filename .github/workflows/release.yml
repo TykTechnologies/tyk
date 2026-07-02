@@ -1245,7 +1245,7 @@ jobs:
   upgrade-deb:
     services:
       httpbin.org:
-        image: kennethreitz/httpbin
+        image: mccutchen/go-httpbin
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     needs:
       - test-controller-distros
@@ -1304,7 +1304,7 @@ jobs:
   upgrade-rpm:
     services:
       httpbin.org:
-        image: kennethreitz/httpbin
+        image: mccutchen/go-httpbin
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     needs:
       - test-controller-distros

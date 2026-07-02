@@ -121,7 +121,7 @@ services:
 
   httpbin:
     platform: linux/amd64
-    image: kennethreitz/httpbin:latest
+    image: mccutchen/go-httpbin
 
   grpcapi:
     platform: linux/amd64
