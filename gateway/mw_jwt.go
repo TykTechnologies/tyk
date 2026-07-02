@@ -1263,7 +1263,12 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 		ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeAuthFieldMissing, k.Name()))
 		k.reportLoginFailure(tykId, r)
-		return k.prmError(w, r, errors.New("Authorization field missing"), http.StatusBadRequest)
+		// A missing credential is unauthorized (401), not a bad request (400).
+		// RFC 9728 / MCP clients only begin the PRM-discovery + OAuth flow on a
+		// 401 challenge, so returning 400 here (even with the WWW-Authenticate
+		// resource_metadata header) leaves spec-compliant clients (e.g. VS Code)
+		// unable to authenticate.
+		return k.prmError(w, r, errors.New("Authorization field missing"), http.StatusUnauthorized)
 	}
 
 	// enable bearer token format
