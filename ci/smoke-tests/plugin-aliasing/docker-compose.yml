@@ -19,4 +19,4 @@ services:
       - TYK_DB_REDISHOST=redis
 
   httpbin.org:
-    image: kennethreitz/httpbin
+    image: mccutchen/go-httpbin

@@ -43,4 +43,4 @@ services:
       timeout: 10s
 
   httpbin.org:
-    image: kennethreitz/httpbin
+    image: mccutchen/go-httpbin
