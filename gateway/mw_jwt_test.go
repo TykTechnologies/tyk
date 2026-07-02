@@ -5401,7 +5401,7 @@ func Test_mapScopeToPolicies_TT5893(t *testing.T) {
 			assert.ElementsMatch(t, []string{"policy1", "policy2"}, res)
 		})
 
-		t.Run("does not log if no one scope matches", func(t *testing.T) {
+		t.Run("logs error if no one scope matches", func(t *testing.T) {
 			_, hook := injectLogger(t)
 
 			res := mapScopeToPolicies(map[string]string{
@@ -5409,8 +5409,13 @@ func Test_mapScopeToPolicies_TT5893(t *testing.T) {
 				"scope2": "policy2",
 			}, []string{"scope3"})
 
-			assert.Len(t, hook.AllEntries(), 0)
-			assert.Equal(t, []string(nil), res)
+			entries := hook.AllEntries()
+			assert.Len(t, entries, 1)
+			entry := entries[0]
+			assert.Equal(t, "Couldn't find a matching policy for scope item: \"scope3\"", entry.Message)
+			assert.Equal(t, logrus.ErrorLevel, entry.Level)
+
+			assert.Len(t, res, 0)
 		})
 
 		t.Run("logs if at least one scope matches", func(t *testing.T) {

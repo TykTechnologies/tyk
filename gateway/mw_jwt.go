@@ -840,19 +840,18 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 	// add all policies matched from scope-policy mapping
 	var policiesToApplySet map[string]struct{}
 	var unmatchedScopes map[string]struct{}
-	var capacity = min(len(scope), len(mapping))
 
 	for _, scopeItem := range scope {
 		if policyID, ok := mapping[scopeItem]; ok {
 			if policiesToApplySet == nil {
-				policiesToApplySet = make(map[string]struct{}, capacity)
+				policiesToApplySet = make(map[string]struct{}, min(len(scope), len(mapping)))
 			}
 
 			policiesToApplySet[policyID] = struct{}{}
 			log.Debugf("Found a matching policy for scope item: %s", scopeItem)
 		} else {
 			if unmatchedScopes == nil {
-				unmatchedScopes = make(map[string]struct{}, capacity)
+				unmatchedScopes = make(map[string]struct{}, len(scope))
 			}
 
 			unmatchedScopes[scopeItem] = struct{}{}
@@ -873,7 +872,10 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 		)
 	}
 
-	return slices.Collect(maps.Keys(policiesToApplySet))
+	return slices.AppendSeq(
+		make([]string, 0, len(policiesToApplySet)),
+		maps.Keys(policiesToApplySet),
+	)
 }
 
 func (k *JWTMiddleware) getOAuthClientIDFromClaim(claims jwt.MapClaims) string {
