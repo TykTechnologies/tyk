@@ -22,6 +22,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
 	"github.com/ohler55/ojg/jp"
+	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 	"golang.org/x/sync/singleflight"
 
@@ -839,18 +840,19 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 	// add all policies matched from scope-policy mapping
 	var policiesToApplySet map[string]struct{}
 	var unmatchedScopes map[string]struct{}
+	var capacity = min(len(scope), len(mapping))
 
 	for _, scopeItem := range scope {
 		if policyID, ok := mapping[scopeItem]; ok {
 			if policiesToApplySet == nil {
-				policiesToApplySet = make(map[string]struct{}, len(scope))
+				policiesToApplySet = make(map[string]struct{}, capacity)
 			}
 
 			policiesToApplySet[policyID] = struct{}{}
 			log.Debugf("Found a matching policy for scope item: %s", scopeItem)
 		} else {
 			if unmatchedScopes == nil {
-				unmatchedScopes = make(map[string]struct{}, len(scope))
+				unmatchedScopes = make(map[string]struct{}, capacity)
 			}
 
 			unmatchedScopes[scopeItem] = struct{}{}
@@ -858,13 +860,17 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 	}
 
 	// https://tyktech.atlassian.net/browse/TT-5893
-	if len(policiesToApplySet) > 0 {
-		for scopeItem := range unmatchedScopes {
-			log.Debugf(
-				"Couldn't find a matching policy for scope item: %q",
-				scopeItem,
-			)
-		}
+	level := logrus.DebugLevel
+	if len(policiesToApplySet) == 0 {
+		level = logrus.ErrorLevel
+	}
+
+	for scopeItem := range unmatchedScopes {
+		log.Logf(
+			level,
+			"Couldn't find a matching policy for scope item: %q",
+			scopeItem,
+		)
 	}
 
 	return slices.Collect(maps.Keys(policiesToApplySet))
