@@ -14,8 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate Jira ticket
-        uses: TykTechnologies/github-actions/jira-linter@main
+        uses: TykTechnologies/github-actions/jira-linter@feat/TT-17507/refactor-jira-linter-auth
         with:
-          jira-base-url: 'https://tyktech.atlassian.net'
-          jira-user-email: ${{ secrets.JIRA_USER_EMAIL }}
-          jira-api-token: ${{ secrets.JIRA_TOKEN }}
+          jira-base-url: ${{ secrets.JIRA_BASE_URL }}
+          jira-read-auth: ${{ secrets.JIRA_READ_AUTH }}
