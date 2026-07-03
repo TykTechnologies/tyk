@@ -807,8 +807,8 @@ func TestResponseHeaderDimension_ContentType(t *testing.T) {
 	// /ip returns application/json content type.
 	sendTraffic(t, "GET", gatewayURL+"/resp-headers/ip", 10)
 
-	// Content-Type from httpbin is "application/json".
-	assertMetricExists(t, `tyk_requests_by_content_type_total{tyk_api_id="5",content_type="application/json"}`)
+	// Content-Type from httpbin is "application/json; charset=utf-8".
+	assertMetricExists(t, `tyk_requests_by_content_type_total{tyk_api_id="5",content_type="application/json; charset=utf-8"}`)
 }
 
 // TestResponseHeaderDimension_MultipleValues validates that different response
