@@ -248,8 +248,9 @@ func TestSDKToolResult_TruncationNoticeIsVisible(t *testing.T) {
 	assert.Equal(t, true, result.Meta["truncated"])
 	require.Len(t, result.Content, 1)
 	text := result.Content[0].(*mcpsdk.TextContent).Text
-	assert.Contains(t, text, "Tyk truncated the upstream response")
+	assert.Contains(t, text, "The upstream response was truncated")
 	assert.Contains(t, text, "The content above is incomplete.")
+	assert.NotContains(t, strings.ToLower(text), "tyk")
 }
 
 func TestSDKAdapter_UpdateToolsDoesNotAdvertiseOrEmitListChanged(t *testing.T) {

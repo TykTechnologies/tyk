@@ -37,8 +37,8 @@ const (
 	headerContentType          = "Content-Type"
 	contentTypeApplicationJSON = "application/json"
 	contentTypeFormURLEncoded  = "application/x-www-form-urlencoded"
-	defaultTruncationNotice    = "Tyk truncated the upstream response after 1048576 bytes. The content above is incomplete."
-	truncationNoticeTemplate   = "Tyk truncated the upstream response after %d bytes. The content above is incomplete."
+	defaultTruncationNotice    = "The upstream response was truncated after 1048576 bytes. The content above is incomplete."
+	truncationNoticeTemplate   = "The upstream response was truncated after %d bytes. The content above is incomplete."
 )
 
 const (

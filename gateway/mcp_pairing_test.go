@@ -1,9 +1,13 @@
 package gateway
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -115,6 +119,45 @@ func TestDeriveMCPAdapterCatalogue_BuildsProxySpecificToolViewsAndUnion(t *testi
 	assert.Equal(t, "orders visible to proxy two", catalogue.toolViews["proxy-2"].Tools[0].Description)
 }
 
+func TestDeriveMCPAdapterCatalogue_SkipsStaleOverrideAndLogsWarning(t *testing.T) {
+	logger, hook := logrustest.NewNullLogger()
+	logger.SetLevel(logrus.WarnLevel)
+	originalLog := log
+	log = logger
+	t.Cleanup(func() {
+		log = originalLog
+	})
+
+	rest := restSourceSpec("rest-1", "org-1", true)
+	proxy := pairedMCPProxySpec("proxy-1", "org-1", "rest-1", &oas.TykMCPServer{
+		Primitives: []oas.TykMCPServerPrimitive{
+			{Source: oas.TykMCPServerSource{OperationID: "list_orders"}, Name: "orders", Allow: boolPtr(true)},
+			{Source: oas.TykMCPServerSource{OperationID: "deleted_order"}, Name: "stale_orders", Allow: boolPtr(true)},
+		},
+	})
+
+	catalogue, err := deriveMCPAdapterCatalogue(rest, []*APISpec{proxy})
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"orders"}, derivedToolNames(catalogue.unionTools))
+	assert.Equal(t, []string{"orders"}, catalogue.toolViews["proxy-1"].ToolNames())
+
+	var warningEntry *logrus.Entry
+	for _, entry := range hook.AllEntries() {
+		if entry.Level == logrus.WarnLevel && entry.Message == "REST-as-MCP derivation warning" {
+			warningEntry = entry
+			break
+		}
+	}
+	require.NotNil(t, warningEntry)
+	assert.Equal(t, "proxy-1", warningEntry.Data["api_id"])
+	assert.Equal(t, "rest-1", warningEntry.Data["rest_api_id"])
+	assert.Equal(t, "operationId:deleted_order", warningEntry.Data["operation"])
+	assert.Equal(t, "operationId:deleted_order", warningEntry.Data["source"])
+	assert.Equal(t, "stale_orders", warningEntry.Data["tool_name"])
+	assert.Equal(t, "x-tyk-mcp-server primitive references non-exposable source - skipped", warningEntry.Data["reason"])
+}
+
 func TestBuildAdapterSpec_ReusesSDKAdapterAndUpdatesTools(t *testing.T) {
 	rest := restSourceSpec("rest-1", "org-1", true)
 	proxy := pairedMCPProxySpec("proxy-1", "org-1", "rest-1", nil)
@@ -126,6 +169,14 @@ func TestBuildAdapterSpec_ReusesSDKAdapterAndUpdatesTools(t *testing.T) {
 	assert.Equal(t, "rest-1__mcp-server", first.APIID)
 	assert.Equal(t, "rest-1", first.MCPAdapter.SourceRESTAPIID)
 	assert.Equal(t, []string{"proxy-1"}, first.MCPAdapter.AllowedCallerProxyAPIIDs)
+	assert.True(t, first.UseKeylessAccess)
+	assert.True(t, first.VersionData.NotVersioned)
+	assert.Contains(t, first.VersionData.Versions, "")
+	assert.Contains(t, first.RxPaths, "")
+	assert.Contains(t, first.WhiteListEnabled, "")
+	valid, status := first.RequestValid(httptest.NewRequest(http.MethodPost, "/rest-1__mcp-server/mcp", nil))
+	assert.True(t, valid)
+	assert.Equal(t, StatusOk, status)
 
 	rest.OAS.Paths.Set("/orders", &openapi3.PathItem{
 		Get: &openapi3.Operation{OperationID: "list_orders", Summary: "updated list orders"},
@@ -151,7 +202,7 @@ func TestBuildAdapterSpec_InitializesManagerFields(t *testing.T) {
 	store.EXPECT().Connect().Return(true).Times(2)
 
 	require.NotPanics(t, func() {
-		adapterSpec.Init(store, store, store)
+		adapterSpec.Init(store, store, store, store)
 	})
 }
 

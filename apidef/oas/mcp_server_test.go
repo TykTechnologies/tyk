@@ -487,6 +487,32 @@ func TestCloneDerivedToolCopiesAnnotationsAndOutputSchema(t *testing.T) {
 	assert.Equal(t, "string", original.OutputSchema["properties"].(map[string]any)["id"].(map[string]any)["type"])
 }
 
+func TestDeriveMCPToolView_StalePrimitiveSourceWarnsAndSkips(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get:  &openapi3.Operation{OperationID: "list_orders"},
+			Post: &openapi3.Operation{OperationID: "create_order"},
+		}),
+	))
+
+	view, warnings, err := DeriveMCPToolView(src, &TykMCPServer{
+		Primitives: []TykMCPServerPrimitive{
+			{Source: TykMCPServerSource{OperationID: "list_orders"}, Name: "orders", Allow: boolPtr(true)},
+			{Source: TykMCPServerSource{OperationID: "deleted_order"}, Name: "stale_orders", Allow: boolPtr(true)},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"orders"}, view.ToolNames())
+	require.Len(t, warnings, 1)
+	assert.Equal(t, "operationId:deleted_order", warnings[0].Operation)
+	assert.Equal(t, "operationId:deleted_order", warnings[0].Source)
+	assert.Equal(t, "stale_orders", warnings[0].ToolName)
+	assert.Equal(t, warningMCPServerStaleSource, warnings[0].Reason)
+}
+
 func TestDeriveMCPToolView_ValidationFailures(t *testing.T) {
 	t.Parallel()
 
@@ -511,11 +537,6 @@ func TestDeriveMCPToolView_ValidationFailures(t *testing.T) {
 		cfg  *TykMCPServer
 		want string
 	}{
-		{
-			name: "unknown operationId source",
-			cfg:  &TykMCPServer{Primitives: []TykMCPServerPrimitive{{Source: TykMCPServerSource{OperationID: "missing_order"}, Name: "missing", Allow: boolPtr(true)}}},
-			want: "missing_order",
-		},
 		{
 			name: "duplicate exposed names",
 			cfg: &TykMCPServer{Primitives: []TykMCPServerPrimitive{
