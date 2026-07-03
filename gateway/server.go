@@ -77,6 +77,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+
 var (
 	globalMu sync.Mutex
 
