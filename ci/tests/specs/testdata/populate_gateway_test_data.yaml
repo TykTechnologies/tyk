@@ -53,7 +53,7 @@ testcases:
             "proxy": {
               "listen_path": "/tyk-api-test/",
               "strip_listen_path": true,
-              "target_url": "https://httpbin.org"
+              "target_url": "http://httpbin:3123"
             },
             "use_oauth2": true,
             "version_data": {
@@ -89,7 +89,7 @@ testcases:
             "proxy": {
               "listen_path": "/tyk-keyless-api/",
               "strip_listen_path": true,
-              "target_url": "https://httpbin.org"
+              "target_url": "http://httpbin:3123"
             },
             "use_oauth2": false,
             "version_data": {

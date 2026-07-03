@@ -27,7 +27,7 @@
     "proxy": {
 	"preserve_host_header": false,
 	"listen_path": "/goplugin/",
-	"target_url": "http://httpbin.org/",
+	"target_url": "https://httpbin.org:8080/",
 	"strip_listen_path": true,
 	"enable_load_balancing": false,
 	"target_list": [],

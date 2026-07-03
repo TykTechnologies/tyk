@@ -33,5 +33,5 @@ spec:
     selector: span[tracetest.span.type="http" name="HTTP GET" http.request.method="GET"]
     assertions:
     - attr:http.response.status_code = 500
-    - attr:url.full = "http://httpbin:80/status/500"
+    - attr:url.full = "https://httpbin:8080/status/500"
     - attr:tracetest.span.parent_id != ""

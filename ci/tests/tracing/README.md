@@ -23,4 +23,4 @@ It needs the following services to work:
 
 
 The `tests` folder contains all the `*.yml` declarations of tests that are going to be executed. Please take into consideration:
-- the target URL for gateway APIs is `http://httpbin:80/` for HTTP APIs
+- the target URL for gateway APIs is `https://httpbin:8080/` for HTTP APIs

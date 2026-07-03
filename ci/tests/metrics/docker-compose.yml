@@ -21,10 +21,16 @@ services:
       - 9000:8080
     env_file:
       - ./profiles/${GW_PROFILE:-default}/tyk.env
+    environment:
+      - SSL_CERT_FILE=/opt/tyk-gateway/certs/ca.crt
     volumes:
+      - ./certs:/opt/tyk-gateway/certs:ro
       - ./apps:/opt/tyk-gateway/apps
     depends_on:
-      - redis
+      cert-generator:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
 
   tyk-checker:
     platform: linux/amd64
@@ -42,8 +48,12 @@ services:
   httpbin:
     platform: linux/amd64
     image: mccutchen/go-httpbin@sha256:90ac1702685468aa592938e65b2ba1b4757e0c006934a962ef7271a8717aaa3b
-    user: "root"
-    command: ["-port", "80"]
+    command: ["-https-cert-file", "/certs/httpbin.crt", "-https-key-file", "/certs/httpbin.key"]
+    volumes:
+      - ./certs:/certs:ro
+    depends_on:
+      cert-generator:
+        condition: service_completed_successfully
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.100.0
@@ -80,3 +90,24 @@ services:
       timeout: 3s
       interval: 5s
       retries: 10
+
+  cert-generator:
+    image: alpine:3.19
+    volumes:
+      - ./certs:/certs
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        apk add --no-cache openssl
+        mkdir -p /certs
+        openssl genrsa -out /certs/ca.key 2048
+        openssl req -x509 -new -nodes -key /certs/ca.key -sha256 -days 365 -out /certs/ca.crt -subj "/CN=Test CA"
+        openssl genrsa -out /certs/httpbin.key 2048
+        openssl req -new -key /certs/httpbin.key -out /certs/httpbin.csr -subj "/CN=httpbin"
+        echo "subjectAltName=DNS:httpbin,DNS:httpbin.org" > /certs/httpbin_ext.cnf
+        openssl x509 -req -in /certs/httpbin.csr -CA /certs/ca.crt -CAkey /certs/ca.key -CAcreateserial -out /certs/httpbin.crt -days 365 -sha256 -extfile /certs/httpbin_ext.cnf
+        echo "Certificates generated successfully"
+        chmod -R 777 /certs
+        ls -la /certs/
+        sleep 5
