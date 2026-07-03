@@ -819,6 +819,51 @@ func TestBundle_Verify(t *testing.T) {
 	}
 }
 
+func TestAddToSpec_AnalyticsPlugin(t *testing.T) {
+	pluginPath := "analyticsPlugin"
+	pluginFuncName := "addTag"
+	getBundle := func() *Bundle {
+		return &Bundle{
+			Name: "analyticsBundle",
+			Spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					CustomMiddlewareBundle: "test-bundle",
+				},
+			},
+			Manifest: apidef.BundleManifest{
+				FileList: []string{},
+				CustomMiddleware: apidef.MiddlewareSection{
+					Analytics: apidef.MiddlewareDefinition{
+						Disabled: false,
+						Name:     pluginFuncName,
+						Path:     pluginPath,
+					},
+				},
+			},
+			Gw: &Gateway{},
+		}
+	}
+
+	t.Run("should add enabled plugin to spec", func(t *testing.T) {
+		bundle := getBundle()
+		bundle.AddToSpec()
+
+		assert.True(t, bundle.Spec.AnalyticsPlugin.Enabled)
+		assert.Equal(t, pluginPath, bundle.Spec.AnalyticsPlugin.PluginPath)
+		assert.Equal(t, pluginFuncName, bundle.Spec.AnalyticsPlugin.FuncName)
+	})
+
+	t.Run("should omit disabled plugin", func(t *testing.T) {
+		bundle := getBundle()
+		bundle.Manifest.CustomMiddleware.Analytics.Disabled = true
+		bundle.AddToSpec()
+
+		assert.False(t, bundle.Spec.AnalyticsPlugin.Enabled)
+		assert.Empty(t, bundle.Spec.AnalyticsPlugin.PluginPath)
+		assert.Empty(t, bundle.Spec.AnalyticsPlugin.FuncName)
+	})
+}
+
 func createPEMFile(t *testing.T) *os.File {
 	t.Helper()
 

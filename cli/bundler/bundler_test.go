@@ -13,6 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 
 	kingpin "github.com/alecthomas/kingpin/v2"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -213,5 +214,24 @@ func TestBuild(t *testing.T) {
 		if manifest.CustomMiddleware.Driver != apidef.PythonDriver {
 			t.Fatalf("Bundle driver doesn't match, got %s, expected %s", manifest.CustomMiddleware.Driver, apidef.PythonDriver)
 		}
+	})
+}
+
+func TestValidateBundle(t *testing.T) {
+	b := Bundler{}
+	manifest := &apidef.BundleManifest{
+		FileList: []string{},
+		CustomMiddleware: apidef.MiddlewareSection{
+			Analytics: apidef.MiddlewareDefinition{
+				Name: "analyticsBundle",
+			},
+			Driver: apidef.GoPluginDriver,
+		},
+	}
+
+	t.Run("manifest validation should pass with only analytics section as custom middleware", func(t *testing.T) {
+		err := b.validateManifest(manifest)
+
+		assert.NoError(t, err)
 	})
 }
