@@ -16,7 +16,6 @@ import (
 
 	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
-	lo "github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -5395,9 +5394,13 @@ func Test_mapScopeToPolicies_TT5893(t *testing.T) {
 				"scope2": "policy2",
 			}, []string{"scope1", "scope2"})
 
-			assert.True(t, lo.EveryBy(hook.AllEntries(), func(item *logrus.Entry) bool {
-				return item.Level == logrus.DebugLevel && strings.HasPrefix(item.Message, "Found a matching policy for scope item")
-			}))
+			entries := hook.AllEntries()
+
+			assert.Len(t, entries, 1)
+			entry := entries[0]
+			assert.Equal(t, logrus.DebugLevel, entry.Level)
+			assert.Contains(t, entry.Message, "Found a matching policy for scope item: ")
+
 			assert.ElementsMatch(t, []string{"policy1", "policy2"}, res)
 		})
 
@@ -5412,7 +5415,7 @@ func Test_mapScopeToPolicies_TT5893(t *testing.T) {
 			entries := hook.AllEntries()
 			assert.Len(t, entries, 1)
 			entry := entries[0]
-			assert.Equal(t, "Couldn't find a matching policy for scope item: \"scope3\"", entry.Message)
+			assert.Equal(t, "Couldn't find a matching policy for scope item: [\"scope3\"]", entry.Message)
 			assert.Equal(t, logrus.ErrorLevel, entry.Level)
 
 			assert.Len(t, res, 0)
@@ -5432,10 +5435,10 @@ func Test_mapScopeToPolicies_TT5893(t *testing.T) {
 			match := entries[0]
 			nonMatch := entries[1]
 
-			assert.True(t, strings.HasPrefix(match.Message, "Found a matching policy for scope item"))
+			assert.Equal(t, match.Message, "Found a matching policy for scope item: [\"policy1\"]")
 			assert.Equal(t, logrus.DebugLevel, match.Level)
 
-			assert.True(t, strings.HasPrefix(nonMatch.Message, "Couldn't find a matching policy for scope item"))
+			assert.Equal(t, nonMatch.Message, "Couldn't find a matching policy for scope item: [\"scope3\"]")
 			assert.Equal(t, logrus.DebugLevel, nonMatch.Level)
 
 			assert.ElementsMatch(t, []string{"policy1"}, res)

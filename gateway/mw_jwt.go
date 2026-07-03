@@ -10,9 +10,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"maps"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 
@@ -24,6 +22,7 @@ import (
 	"github.com/ohler55/ojg/jp"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
+	expmaps "golang.org/x/exp/maps"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -848,7 +847,6 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 			}
 
 			policiesToApplySet[policyID] = struct{}{}
-			log.Debugf("Found a matching policy for scope item: %s", scopeItem)
 		} else {
 			if unmatchedScopes == nil {
 				unmatchedScopes = make(map[string]struct{}, len(scope))
@@ -858,24 +856,27 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 		}
 	}
 
-	// https://tyktech.atlassian.net/browse/TT-5893
-	level := logrus.DebugLevel
-	if len(policiesToApplySet) == 0 {
-		level = logrus.ErrorLevel
+	res := expmaps.Keys(policiesToApplySet)
+
+	if len(res) > 0 {
+		log.Debugf("Found a matching policy for scope item: %q", res)
 	}
 
-	for scopeItem := range unmatchedScopes {
+	// https://tyktech.atlassian.net/browse/TT-5893
+	if len(unmatchedScopes) > 0 {
+		level := logrus.DebugLevel
+		if len(policiesToApplySet) == 0 {
+			level = logrus.ErrorLevel
+		}
+
 		log.Logf(
 			level,
 			"Couldn't find a matching policy for scope item: %q",
-			scopeItem,
+			expmaps.Keys(unmatchedScopes),
 		)
 	}
 
-	return slices.AppendSeq(
-		make([]string, 0, len(policiesToApplySet)),
-		maps.Keys(policiesToApplySet),
-	)
+	return res
 }
 
 func (k *JWTMiddleware) getOAuthClientIDFromClaim(claims jwt.MapClaims) string {
