@@ -1215,6 +1215,9 @@ jobs:
             echo "::warning file=.github/workflows/release.yml,line=24,col=1,endColumn=8::Using test variation"
           fi
   upgrade-deb:
+    services:
+      httpbin.org:
+        image: kennethreitz/httpbin
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     needs:
       - test-controller-distros
@@ -1265,12 +1268,15 @@ jobs:
           load: true
       - name: Test the built container image with api functionality test.
         run: |
-          docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
+          docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.services['httpbin.org'].network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
           sleep 2
           ./ci/tests/api-functionality/api_test.sh
           sleep 2
           docker stop test || true
   upgrade-rpm:
+    services:
+      httpbin.org:
+        image: kennethreitz/httpbin
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     needs:
       - test-controller-distros
@@ -1323,7 +1329,7 @@ jobs:
           tags: test-${{ matrix.distro }}-${{ matrix.arch }}
           load: true
       - name: Test the built container image with api functionality test.
-        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
+        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.services['httpbin.org'].network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
   release-tests:
     needs:
       - goreleaser
