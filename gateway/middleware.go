@@ -724,6 +724,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 
 	// session not found
 	session.KeyID = key
+
 	return session, false
 }
 

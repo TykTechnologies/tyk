@@ -348,6 +348,11 @@ type SessionState struct {
 	// modified holds the hint if a session has been modified for update.
 	// use Touch() to set it, and IsModified() to get it.
 	modified bool
+
+	// isRestored
+	// The flag holds information if session was restored or not.
+	// Use MarkAsRestored() to mark session as restored, and IsRestored() to get it.
+	isRestored bool
 }
 
 func NewSessionState() *SessionState {
@@ -379,6 +384,16 @@ func (s *SessionState) Touch() {
 // Reset marks the session as not modified, skipping related updates.
 func (s *SessionState) Reset() {
 	s.modified = false
+}
+
+// MarkAsRestored marks the session as new.
+func (s *SessionState) MarkAsRestored() {
+	s.isRestored = true
+}
+
+// IsRestored informs if session is a new one.
+func (s *SessionState) IsRestored() bool {
+	return s.isRestored
 }
 
 // IsModified will return true if session has been modified to trigger an update.
