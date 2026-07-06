@@ -119,9 +119,6 @@ services:
     image: redis:6
     command: redis-server --appendonly yes
 
-  httpbin:
-    platform: linux/amd64
-    image: kennethreitz/httpbin:latest
 
   grpcapi:
     platform: linux/amd64
