@@ -1,18 +1,21 @@
 package streams
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"strings"
 	"sync"
 	"sync/atomic"
 
+	"github.com/IBM/sarama"
+	"github.com/TykTechnologies/tyk/ee/middleware/streams/kafka"
 	"github.com/gorilla/mux"
 )
-
 // Manager is responsible for creating a single stream.
 type Manager struct {
 	streams          sync.Map
+	kafkaClients     sync.Map // Map of streamFullID to sarama.Client
 	routeLock        sync.Mutex
 	muxer            *mux.Router
 	mw               *Middleware
@@ -58,11 +61,77 @@ func (sm *Manager) setUpOrDryRunStream(streamConfig any, streamID string) {
 			}
 		}
 		sm.listenPaths = append(sm.listenPaths, httpPaths...)
+
+		if kConfig := GetKafkaConfig(streamMap); kConfig != nil {
+			commitPath := fmt.Sprintf("/%s/kafka/offset/commit", streamID)
+			resetPath := fmt.Sprintf("/%s/kafka/offset/reset", streamID)
+			config := sarama.NewConfig()
+			config.Version = sarama.V2_0_0_0
+
+			if kConfig.TLS != nil {
+				if enabled, ok := kConfig.TLS["enabled"].(bool); ok && enabled {
+					config.Net.TLS.Enable = true
+					tlsConfig := &tls.Config{}
+					if skipVerify, ok := kConfig.TLS["skip_cert_verify"].(bool); ok {
+						tlsConfig.InsecureSkipVerify = skipVerify
+					}
+					config.Net.TLS.Config = tlsConfig
+				}
+			}
+
+			if len(kConfig.SASL) > 0 {
+				if saslMap, ok := kConfig.SASL[0].(map[string]interface{}); ok {
+					mechanism, _ := saslMap["mechanism"].(string)
+					if mechanism != "" && mechanism != "none" {
+						config.Net.SASL.Enable = true
+						config.Net.SASL.Mechanism = sarama.SASLMechanism(mechanism)
+						if user, ok := saslMap["user"].(string); ok {
+							config.Net.SASL.User = user
+						}
+						if password, ok := saslMap["password"].(string); ok {
+							config.Net.SASL.Password = password
+						}
+						if mechanism == sarama.SASLTypeSCRAMSHA256 {
+							config.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient {
+								return &kafka.XDGSCRAMClient{HashGeneratorFcn: kafka.SHA256}
+							}
+						} else if mechanism == sarama.SASLTypeSCRAMSHA512 {
+							config.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient {
+								return &kafka.XDGSCRAMClient{HashGeneratorFcn: kafka.SHA512}
+							}
+						}
+					}
+				}
+			}
+
+			client, err := sarama.NewClient(kConfig.Brokers, config)
+			if err != nil {
+				sm.mw.Logger().WithError(err).Errorf("Error creating Kafka client for stream %s", streamID)
+				return
+			}
+
+			streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
+			sm.kafkaClients.Store(streamFullID, client)
+
+			handler := kafka.NewKafkaOffsetResetHandler(client, kConfig.ConsumerGroup, kConfig.Topic)
+
+			sm.muxer.HandleFunc(commitPath, handler).Methods("POST")
+			sm.muxer.HandleFunc(resetPath, handler).Methods("POST")
+
+			sm.listenPaths = append(sm.listenPaths, commitPath, resetPath)
+		}
 	}
 }
 
 // removeStream removes a stream
 func (sm *Manager) removeStream(streamID string) error {
+	if clientValue, exists := sm.kafkaClients.Load(streamID); exists {
+		if client, ok := clientValue.(sarama.Client); ok {
+			client.Close()
+		}
+		sm.kafkaClients.Delete(streamID)
+	}
+
 	if streamValue, exists := sm.streams.Load(streamID); exists {
 		stream, ok := streamValue.(*Stream)
 		if !ok {
