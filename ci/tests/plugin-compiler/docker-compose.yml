@@ -33,3 +33,5 @@ services:
       start_period: 4s
       timeout: 10s
 
+  httpbin.org:
+    image: kennethreitz/httpbin
