@@ -34,6 +34,4 @@ services:
       timeout: 10s
 
   httpbin.org:
-    image: mccutchen/go-httpbin@sha256:90ac1702685468aa592938e65b2ba1b4757e0c006934a962ef7271a8717aaa3b
-    user: "root"
-    command: ["-port", "80"]
+    image: kennethreitz/httpbin

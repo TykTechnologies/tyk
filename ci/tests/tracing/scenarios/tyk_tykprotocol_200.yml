@@ -27,8 +27,8 @@ spec:
     selector: span[tracetest.span.type="general" name="RateCheckMW"]
     assertions:
     - attr:tracetest.selected_spans.count = 2
-  - name: We should have only 1 proxy to httpbin
+  - name: We should have only 1 proxy to httpbin.org
     selector: span[tracetest.span.type="http" name="HTTP GET" http.request.method="GET"]
     assertions:
-    - attr:server.address = "httpbin"
+    - attr:server.address = "httpbin.org"
     - attr:tracetest.selected_spans.count = 1
