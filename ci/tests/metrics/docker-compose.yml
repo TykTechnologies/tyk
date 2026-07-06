@@ -39,9 +39,6 @@ services:
       start_period: 4s
       timeout: 10s
 
-  httpbin:
-    platform: linux/amd64
-    image: kennethreitz/httpbin:latest
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.100.0

@@ -1243,9 +1243,6 @@ jobs:
         uses: TykTechnologies/github-actions/.github/actions/tests/distro-matrix@production
         id: params
   upgrade-deb:
-    services:
-      httpbin.org:
-        image: kennethreitz/httpbin
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     needs:
       - test-controller-distros
@@ -1302,9 +1299,6 @@ jobs:
           sleep 2
           docker stop test || true
   upgrade-rpm:
-    services:
-      httpbin.org:
-        image: kennethreitz/httpbin
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     needs:
       - test-controller-distros
