@@ -8,7 +8,6 @@ This docker-compose file defines a multi-service application including the follo
 
 - `tyk`: This service runs an internal Tyk gateway. So if you are running this from a cold start, make sure to execute `make docker` at the root of Tyk's repo. The environment variables for the tyk service are loaded from a local file, `./configs/tyk.env`. It uses `/apps` folder to mount the preloaded APIs.
     - `redis`: This service runs another Redis server (version 4.0, based on Alpine Linux). The Redis server is configured to use an append-only file for data persistence.
-    - `httpbin`: This service runs an HTTP Request & Response Service, which is a simple HTTP server for testing and debugging.
 
 
 
