@@ -27,6 +27,19 @@ func TestEventToString(t *testing.T) {
 	})
 }
 
+// TestOAuth2ExchangeEventTypes pins the exact wire strings of the
+// token-exchange audit events. These are a cross-repo contract: the dashboard
+// audit-event consumer keys off these literal type names, so they must not
+// drift. The exchange surface carries exactly two types — a no-matching-provider
+// outcome rides OAuth2ExchangeFailed via the oauth2_exchange_outcome meta field, not a
+// distinct event type.
+func TestOAuth2ExchangeEventTypes(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, Event("OAuth2ExchangeSucceeded"), OAuth2ExchangeSucceeded)
+	assert.Equal(t, Event("OAuth2ExchangeFailed"), OAuth2ExchangeFailed)
+}
+
 func TestAddEventToRequest(t *testing.T) {
 	t.Parallel()
 
