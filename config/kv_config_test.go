@@ -188,7 +188,7 @@ func TestBuildKVConfig_Vault(t *testing.T) {
 			"a zero time.Duration must still marshal as the \"0s\" string the provider parses")
 	})
 
-	t.Run("agent_address is omitted from the marshaled vault config", func(t *testing.T) {
+	t.Run("agent_address is included to the marshaled vault config", func(t *testing.T) {
 		t.Parallel()
 
 		conf := &Config{}
@@ -198,8 +198,7 @@ func TestBuildKVConfig_Vault(t *testing.T) {
 		stores := buildKVConfig(conf)
 
 		cfg := decodeConfig(t, stores["vault"].Config)
-		require.NotContains(t, cfg, "agent_address",
-			"agent mode is not yet supported by the vault provider, so the field is dropped")
+		require.Equal(t, conf.KV.Vault.AgentAddress, cfg["agent_address"])
 	})
 
 	t.Run("not emitted when neither address nor token is set", func(t *testing.T) {

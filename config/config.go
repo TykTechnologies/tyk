@@ -1845,17 +1845,19 @@ func buildKVConfig(cfg *Config) map[string]kv.StoreConfig {
 // which marshals as int64 ns) to the "5s" string the vault provider expects.
 func marshalVaultConfig(v VaultConfig) json.RawMessage {
 	cfg := struct {
-		Address    string `json:"address"`
-		Token      string `json:"token"`
-		MaxRetries int    `json:"max_retries"`
-		Timeout    string `json:"timeout"`
-		KVVersion  int    `json:"kv_version"`
+		Address      string `json:"address"`
+		AgentAddress string `json:"agent_address"`
+		Token        string `json:"token"`
+		MaxRetries   int    `json:"max_retries"`
+		Timeout      string `json:"timeout"`
+		KVVersion    int    `json:"kv_version"`
 	}{
-		Address:    v.Address,
-		Token:      v.Token,
-		MaxRetries: v.MaxRetries,
-		Timeout:    v.Timeout.String(),
-		KVVersion:  v.KVVersion,
+		Address:      v.Address,
+		AgentAddress: v.AgentAddress,
+		Token:        v.Token,
+		MaxRetries:   v.MaxRetries,
+		Timeout:      v.Timeout.String(),
+		KVVersion:    v.KVVersion,
 	}
 	b, _ := json.Marshal(cfg)
 
