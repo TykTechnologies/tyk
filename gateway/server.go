@@ -2130,26 +2130,28 @@ func (gw *Gateway) kvStoreCtx(ctx context.Context, value string) (string, error)
 	if strings.HasPrefix(value, "consul://") {
 		key := strings.TrimPrefix(value, "consul://")
 		log.Debugf("Retrieving %s from consul", key)
-		if err := gw.setUpConsul(); err != nil {
-			log.Error("Failed to setup consul: ", err)
+		store, err := gw.kvRegistry.GetStore("consul")
+		if err != nil {
+			log.Error(`Failed to get "consul" store: `, err)
 
-			// Return value as is. If consul cannot be set up
 			return value, nil
 		}
 
-		return gw.consulKVStore.Get(key)
+		return store.Get(ctx, key)
 	}
 
 	if strings.HasPrefix(value, "vault://") {
 		key := strings.TrimPrefix(value, "vault://")
 		log.Debugf("Retrieving %s from vault", key)
-		if err := gw.setUpVault(); err != nil {
-			log.Error("Failed to setup vault: ", err)
-			// Return value as is If vault cannot be set up
+
+		resolved, err := gw.kvResolver.Resolve(ctx, "kv://vault/"+vaultDotToFragment(key))
+		if errors.Is(err, kvLib.ErrStoreNotFound) {
+			log.Error(`Failed to get "vault" store: `, err)
+
 			return value, nil
 		}
 
-		return gw.vaultKVStore.Get(key)
+		return resolved, err
 	}
 
 	if strings.HasPrefix(value, "file://") {

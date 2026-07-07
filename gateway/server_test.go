@@ -270,21 +270,23 @@ func TestGateway_afterConfSetup(t *testing.T) {
 					OAuth: config.ServiceConfig{
 						MTLS: config.MTLSConfig{
 							Enabled:  true,
-							CertFile: "vault://secret/oauth/cert_file",
-							KeyFile:  "vault://secret/oauth/key_file",
-							CAFile:   "vault://secret/oauth/ca_file",
+							CertFile: "vault://secret/oauth.cert_file",
+							KeyFile:  "vault://secret/oauth.key_file",
+							CAFile:   "vault://secret/oauth.ca_file",
 						},
 					},
 				},
 			},
-			setup: func(_ *testing.T, gw *Gateway) {
-				gw.vaultKVStore = &mockKVStore{
-					store: map[string]string{
-						"secret/oauth/cert_file": "/vault/path/to/cert.pem",
-						"secret/oauth/key_file":  "/vault/path/to/key.pem",
-						"secret/oauth/ca_file":   "/vault/path/to/ca.pem",
+			setup: func(t *testing.T, gw *Gateway) {
+				installFakeKVStores(t, gw, map[string]map[string]string{
+					"vault": {
+						"secret/oauth": `{
+							"cert_file": "/vault/path/to/cert.pem",
+							"key_file":  "/vault/path/to/key.pem",
+							"ca_file":   "/vault/path/to/ca.pem"
+						}`,
 					},
-				}
+				})
 			},
 			expectedConfig: config.Config{
 				ExternalServices: config.ExternalServiceConfig{
@@ -318,14 +320,14 @@ func TestGateway_afterConfSetup(t *testing.T) {
 					},
 				},
 			},
-			setup: func(_ *testing.T, gw *Gateway) {
-				gw.consulKVStore = &mockKVStore{
-					store: map[string]string{
+			setup: func(t *testing.T, gw *Gateway) {
+				installFakeKVStores(t, gw, map[string]map[string]string{
+					"consul": {
 						"oauth/cert_file": "/consul/path/to/cert.pem",
 						"oauth/key_file":  "/consul/path/to/key.pem",
 						"oauth/ca_file":   "/consul/path/to/ca.pem",
 					},
-				}
+				})
 			},
 			expectedConfig: config.Config{
 				ExternalServices: config.ExternalServiceConfig{
@@ -698,6 +700,53 @@ func TestKVResolvers_HotReloadBypassesCache(t *testing.T) {
 		"the hot-reload closure must re-resolve with a cache-bypass context")
 }
 
+// fakeKVProvider is a registry-backed stand-in for a remote provider: a fixed
+// key→value map with the same not-found contract as the real vault/consul
+// providers. Standalone, so the registry skips the cache wrapper and tests
+// observe every Get.
+type fakeKVProvider struct {
+	data map[string]string
+}
+
+func (f fakeKVProvider) Get(_ context.Context, key string) (string, error) {
+	val, ok := f.data[key]
+	if !ok {
+		return "", &kv.KeyNotFoundError{KeyPath: key}
+	}
+
+	return val, nil
+}
+
+func (f fakeKVProvider) IsStandalone() bool { return true }
+
+func installFakeKVStores(t *testing.T, gw *Gateway, stores map[string]map[string]string) {
+	t.Helper()
+
+	factories := make(map[kv.ProviderType]kv.ProviderFactory, len(stores))
+	storeCfgs := make(map[string]kv.StoreConfig, len(stores))
+
+	for name, data := range stores {
+		typ := kv.ProviderType("fake_" + name)
+		provider := fakeKVProvider{data: data}
+		factories[typ] = func(_ json.RawMessage) (kv.Provider, error) {
+			return provider, nil
+		}
+		storeCfgs[name] = kv.StoreConfig{Type: typ}
+	}
+
+	reg, err := registry.NewFromConfig(
+		t.Context(),
+		nil,
+		registry.WithDefaultStores(storeCfgs),
+		registry.WithFactories(factories),
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = reg.Close(context.WithoutCancel(t.Context())) })
+
+	gw.kvRegistry = reg
+	gw.kvResolver = resolver.NewResolver(reg)
+}
+
 func TestKVStore_Secrets(t *testing.T) {
 	gw := NewGateway(config.Config{
 		Secrets: map[string]string{"db_password": "hunter2", "blank": ""},
@@ -803,6 +852,79 @@ func TestKVStore_NewSyntax(t *testing.T) {
 		_, err := gw.kvStore("kv://no-path-separator")
 		require.Error(t, err)
 	})
+}
+
+func TestKVStore_Consul(t *testing.T) {
+	gw := NewGateway(config.Config{}, t.Context())
+	installFakeKVStores(t, gw, map[string]map[string]string{
+		"consul": {"services/redis/host": "10.0.0.5"},
+	})
+
+	t.Run("existing key resolves via the registry consul store", func(t *testing.T) {
+		got, err := gw.kvStore("consul://services/redis/host")
+		require.NoError(t, err)
+		require.Equal(t, "10.0.0.5", got)
+	})
+
+	t.Run("missing key propagates the not-found error", func(t *testing.T) {
+		_, err := gw.kvStore("consul://services/missing")
+		require.Error(t, err)
+
+		var notFound *kv.KeyNotFoundError
+		require.ErrorAs(t, err, &notFound)
+	})
+}
+
+func TestKVStore_Consul_StoreUnavailable(t *testing.T) {
+	gw := NewGateway(config.Config{}, t.Context())
+
+	got, err := gw.kvStore("consul://services/redis/host")
+	require.NoError(t, err, "warn-and-continue: unavailable store must not error")
+	require.Equal(t, "consul://services/redis/host", got,
+		"the original reference is returned when the consul store is unavailable")
+}
+
+func TestKVStore_Vault(t *testing.T) {
+	gw := NewGateway(config.Config{}, t.Context())
+	// The fake returns the whole secret as JSON — the real vault provider's
+	// contract — so the dot→fragment conversion drives field extraction.
+	installFakeKVStores(t, gw, map[string]map[string]string{
+		"vault": {"secret/db": `{"password":"hunter2","username":"admin"}`},
+	})
+
+	t.Run("dot notation extracts the field from the secret", func(t *testing.T) {
+		got, err := gw.kvStore("vault://secret/db.password")
+		require.NoError(t, err)
+		require.Equal(t, "hunter2", got, "legacy path.field must resolve the field's value")
+	})
+
+	t.Run("missing field within an existing secret is an error", func(t *testing.T) {
+		_, err := gw.kvStore("vault://secret/db.missing_field")
+		require.Error(t, err)
+	})
+
+	t.Run("missing secret is an error", func(t *testing.T) {
+		_, err := gw.kvStore("vault://secret/missing.password")
+		require.Error(t, err)
+
+		var notFound *kv.KeyNotFoundError
+		require.ErrorAs(t, err, &notFound)
+	})
+
+	t.Run("key without a dot returns the whole secret JSON", func(t *testing.T) {
+		got, err := gw.kvStore("vault://secret/db")
+		require.NoError(t, err)
+		require.JSONEq(t, `{"password":"hunter2","username":"admin"}`, got)
+	})
+}
+
+func TestKVStore_Vault_StoreUnavailable(t *testing.T) {
+	gw := NewGateway(config.Config{}, t.Context())
+
+	got, err := gw.kvStore("vault://secret/db.password")
+	require.NoError(t, err, "warn-and-continue: unavailable store must not error")
+	require.Equal(t, "vault://secret/db.password", got,
+		"the original reference is returned when the vault store is unavailable")
 }
 
 func TestGateway_apisByIDLen(t *testing.T) {
