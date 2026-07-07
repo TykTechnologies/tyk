@@ -152,5 +152,5 @@ jobs:
             BASE_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
-            BUILD_TAG=ee,fips,boringcrypto
-            GOEXPERIMENT=boringcrypto
+            BUILD_TAG=ee,fips
+            GOFIPS140=v1.0.0
