@@ -859,7 +859,7 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 	res := expmaps.Keys(policiesToApplySet)
 
 	if len(res) > 0 {
-		log.Debugf("Found a matching policy for scope item: %q", res)
+		log.Debugf("Found a matching policy for scope item: %s", res)
 	}
 
 	// https://tyktech.atlassian.net/browse/TT-5893
@@ -871,7 +871,7 @@ func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
 
 		log.Logf(
 			level,
-			"Couldn't find a matching policy for scope item: %q",
+			"Couldn't find a matching policy for scope item: %s",
 			expmaps.Keys(unmatchedScopes),
 		)
 	}

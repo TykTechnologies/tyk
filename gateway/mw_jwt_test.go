@@ -5415,7 +5415,7 @@ func Test_mapScopeToPolicies_TT5893(t *testing.T) {
 			entries := hook.AllEntries()
 			assert.Len(t, entries, 1)
 			entry := entries[0]
-			assert.Equal(t, "Couldn't find a matching policy for scope item: [\"scope3\"]", entry.Message)
+			assert.Equal(t, "Couldn't find a matching policy for scope item: [scope3]", entry.Message)
 			assert.Equal(t, logrus.ErrorLevel, entry.Level)
 
 			assert.Len(t, res, 0)
@@ -5435,10 +5435,10 @@ func Test_mapScopeToPolicies_TT5893(t *testing.T) {
 			match := entries[0]
 			nonMatch := entries[1]
 
-			assert.Equal(t, match.Message, "Found a matching policy for scope item: [\"policy1\"]")
+			assert.Equal(t, match.Message, "Found a matching policy for scope item: [policy1]")
 			assert.Equal(t, logrus.DebugLevel, match.Level)
 
-			assert.Equal(t, nonMatch.Message, "Couldn't find a matching policy for scope item: [\"scope3\"]")
+			assert.Equal(t, nonMatch.Message, "Couldn't find a matching policy for scope item: [scope3]")
 			assert.Equal(t, logrus.DebugLevel, nonMatch.Level)
 
 			assert.ElementsMatch(t, []string{"policy1"}, res)
