@@ -3,7 +3,9 @@ package oas
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -191,6 +193,13 @@ type OAuth2TokenExchangeProvider struct {
 	// Name is an operator-chosen identifier used in audit logs. Unique within Providers.
 	Name string `bson:"name" json:"name"`
 
+	// GrantType selects the grant_type this provider's exchange request uses.
+	// Empty or "token-exchange" (default) sends the RFC 8693 token-exchange
+	// grant; "jwt-bearer" sends the RFC 7523 jwt-bearer grant with the inbound
+	// token as `assertion` and the target rendered into `scope`. The default
+	// keeps existing providers unchanged.
+	GrantType string `bson:"grantType,omitempty" json:"grantType,omitempty"`
+
 	// Issuers is the set of inbound token `iss` values routed to this provider.
 	// Must not overlap with issuers on other providers — dispatch would be non-deterministic.
 	Issuers []string `bson:"issuers,omitempty" json:"issuers,omitempty"`
@@ -221,6 +230,12 @@ type OAuth2TokenExchangeProvider struct {
 	Cache *OAuth2ExchangeCache `bson:"cache,omitempty" json:"cache,omitempty"`
 }
 
+// IsJWTBearer reports whether this provider uses the RFC 7523 jwt-bearer
+// grant. An empty GrantType defaults to RFC 8693 token-exchange.
+func (p *OAuth2TokenExchangeProvider) IsJWTBearer() bool {
+	return p != nil && p.GrantType == OAuth2ProviderGrantJWTBearer
+}
+
 // OAuth2ExchangeCache controls caching of exchanged tokens per provider.
 type OAuth2ExchangeCache struct {
 	// Enabled turns on Redis-backed caching of exchanged tokens for this provider.
@@ -245,12 +260,19 @@ type OAuth2ClientAuth struct {
 	//     HTTP Authorization header.
 	//   - "client_secret_post" (RFC 6749 §2.3.1) — credentials in the
 	//     form body.
+	//   - "private_key_jwt" (OIDC Core §9) — a signed client-assertion JWT
+	//     authenticated by a certificate referenced via CertID; no shared
+	//     secret.
 	// Empty string defaults to client_secret_basic.
 	Method string `bson:"method,omitempty" json:"method,omitempty"`
 	// ClientID is the OAuth2 client identifier Tyk presents to the IdP token endpoint.
 	ClientID string `bson:"clientId,omitempty" json:"clientId,omitempty"`
 	// ClientSecret accepts env://, secrets://, vault://, consul:// prefixes.
 	ClientSecret string `bson:"clientSecret,omitempty" json:"clientSecret,omitempty"`
+	// CertID references a certificate (with private key) in the gateway
+	// certificate store used to sign the private_key_jwt client assertion.
+	// Required when Method is private_key_jwt; ignored otherwise.
+	CertID string `bson:"certId,omitempty" json:"certId,omitempty"`
 }
 
 // OAuth2DefaultTarget is the fallback audience and scopes when no per-op override is set.
@@ -308,6 +330,13 @@ const (
 	OAuth2ErrNoMatchingProvider = "no_matching_provider"
 	OAuth2ErrMisconfigured      = "misconfigured"
 
+	// jwt-bearer step-up relay: the IdP's back-channel error code and the
+	// front-channel challenge the gateway re-emits it as.
+	OAuth2ErrInteractionRequired = "interaction_required"
+	OAuth2ErrInsufficientClaims  = "insufficient_claims"
+	OAuth2FieldClaims            = "claims"
+	OAuth2FieldAuthorizationURI  = "authorization_uri"
+
 	OAuth2AuthSchemeBearer = "Bearer" // RFC 6750 §2.1
 
 	// RFC 8693 form keys.
@@ -325,14 +354,32 @@ const (
 	OAuth2FormClientAssertion     = "client_assertion"
 	OAuth2FormClientAssertionType = "client_assertion_type"
 
-	// RFC 8693 URNs.
+	// RFC 7523 jwt-bearer form key: the inbound token travels as `assertion`.
+	OAuth2FormAssertion = "assertion"
+
+	// RFC 8693 / RFC 7523 grant URNs.
 	OAuth2GrantTypeTokenExchange = "urn:ietf:params:oauth:grant-type:token-exchange"
+	OAuth2GrantTypeJWTBearer     = "urn:ietf:params:oauth:grant-type:jwt-bearer"
 	OAuth2TokenTypeAccessToken   = "urn:ietf:params:oauth:token-type:access_token"
 	OAuth2TokenTypeJWT           = "urn:ietf:params:oauth:token-type:jwt"
 
+	// OAuth2TokenExchangeProvider.GrantType values — the last segment of the
+	// grant URN each one selects.
+	OAuth2ProviderGrantTokenExchange = "token-exchange"
+	OAuth2ProviderGrantJWTBearer     = "jwt-bearer"
+
+	// OAuth2IssuerRegexPrefix marks an issuers entry as a regular expression
+	// matched against the inbound token's iss; entries without it keep
+	// exact-match semantics.
+	OAuth2IssuerRegexPrefix = "regex:"
+
 	// OAuth2ClientAuth.Method values.
-	OAuth2ClientAuthBasic = "client_secret_basic"
-	OAuth2ClientAuthPost  = "client_secret_post"
+	OAuth2ClientAuthBasic         = "client_secret_basic"
+	OAuth2ClientAuthPost          = "client_secret_post"
+	OAuth2ClientAuthPrivateKeyJWT = "private_key_jwt"
+
+	// client_assertion_type value for the private_key_jwt method (RFC 7523 §2.2).
+	OAuth2ClientAssertionTypeJWTBearer = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 
 	// OAuth2ExchangeCache.Mode values.
 	OAuth2CacheModeDerived = "derived"
@@ -354,8 +401,9 @@ const (
 	OAuth2FieldIdpErrorDescription = "idp_error_description"
 )
 
-// oauth2ReservedExchangeFormKeys are RFC 8693 / OAuth2 form parameters Tyk
-// sets itself. CustomParams may not shadow them — it would corrupt the wire shape.
+// oauth2ReservedExchangeFormKeys are the form parameters Tyk sets itself under
+// the RFC 8693 token-exchange grant. CustomParams may not shadow them — it
+// would corrupt the wire shape.
 var oauth2ReservedExchangeFormKeys = map[string]struct{}{
 	OAuth2FormGrantType:           {},
 	OAuth2FormSubjectToken:        {},
@@ -366,6 +414,19 @@ var oauth2ReservedExchangeFormKeys = map[string]struct{}{
 	OAuth2FormScope:               {},
 	OAuth2FormActorToken:          {},
 	OAuth2FormActorTokenType:      {},
+	OAuth2FormClientID:            {},
+	OAuth2FormClientSecret:        {},
+	OAuth2FormClientAssertion:     {},
+	OAuth2FormClientAssertionType: {},
+}
+
+// oauth2ReservedJWTBearerFormKeys are the form parameters Tyk sets itself under
+// the RFC 7523 jwt-bearer grant. Reservation is per grant: keys this grant does
+// not emit (audience, resource, subject_token, …) are legal custom params here.
+var oauth2ReservedJWTBearerFormKeys = map[string]struct{}{
+	OAuth2FormGrantType:           {},
+	OAuth2FormAssertion:           {},
+	OAuth2FormScope:               {},
 	OAuth2FormClientID:            {},
 	OAuth2FormClientSecret:        {},
 	OAuth2FormClientAssertion:     {},
@@ -439,11 +500,17 @@ func validateOAuth2ExchangeProvider(schemeName string, i int, p *OAuth2TokenExch
 		return fmt.Errorf("oauth2 scheme %q: duplicate tokenExchange.provider name %q", schemeName, p.Name)
 	}
 	seenNames[p.Name] = struct{}{}
+	if err := validateExchangeGrantType(schemeName, p); err != nil {
+		return err
+	}
 	if err := validateExchangeTokenEndpoint(schemeName, p); err != nil {
 		return err
 	}
 	if p.ClientAuth == nil || p.ClientAuth.ClientID == "" {
 		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q has empty clientAuth.clientId", schemeName, p.Name)
+	}
+	if err := validateExchangeClientAuth(schemeName, p); err != nil {
+		return err
 	}
 	if err := validateExchangeIssuers(schemeName, p, issuerOwner); err != nil {
 		return err
@@ -454,26 +521,83 @@ func validateOAuth2ExchangeProvider(schemeName string, i int, p *OAuth2TokenExch
 	return validateExchangeCacheMode(schemeName, p)
 }
 
+// oauth2ClaimPlaceholderRE matches a {claim.<name>} placeholder in a
+// provider tokenEndpoint.
+var oauth2ClaimPlaceholderRE = regexp.MustCompile(`\{claim\.[A-Za-z0-9_-]+\}`)
+
 // validateExchangeTokenEndpoint requires a non-empty, absolute http(s)
 // tokenEndpoint. It rejects non-HTTP SSRF vectors (file://, gopher://, …) but
 // deliberately does not apply host-level egress (private-IP) restrictions: the
 // API definition is admin-controlled and internal IdPs legitimately live on
-// private networks — mirrors the gateway's JWKS-fetch SSRF posture.
+// private networks — mirrors the gateway's JWKS-fetch SSRF posture. A
+// {claim.<name>} placeholder is valid only in the URL path — a placeholder in
+// host position would let a token claim steer which host the gateway calls.
 func validateExchangeTokenEndpoint(schemeName string, p *OAuth2TokenExchangeProvider) error {
 	if p.TokenEndpoint == "" {
 		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q has empty tokenEndpoint", schemeName, p.Name)
 	}
-	if u, err := url.Parse(p.TokenEndpoint); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+	// Substitute placeholders with a sentinel path segment so the URL check
+	// sees the request-time shape.
+	endpoint := oauth2ClaimPlaceholderRE.ReplaceAllString(p.TokenEndpoint, "claim-value")
+	u, err := url.Parse(endpoint)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q tokenEndpoint must be an absolute http(s) URL", schemeName, p.Name)
+	}
+	if placeholderOutsideURLPath(p.TokenEndpoint) {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q tokenEndpoint claim placeholder is valid only in the URL path", schemeName, p.Name)
 	}
 	return nil
 }
 
+// placeholderOutsideURLPath reports whether a {claim.<name>} placeholder sits
+// before the URL path begins — i.e. in scheme, host, or port position.
+func placeholderOutsideURLPath(endpoint string) bool {
+	placeholder := oauth2ClaimPlaceholderRE.FindStringIndex(endpoint)
+	if placeholder == nil {
+		return false
+	}
+	authorityStart := strings.Index(endpoint, "://") + len("://")
+	pathStart := strings.Index(endpoint[authorityStart:], "/")
+	if pathStart < 0 {
+		// No path at all, so the placeholder can only be in the authority.
+		return true
+	}
+	return placeholder[0] < authorityStart+pathStart
+}
+
+// validateExchangeClientAuth validates the client-authentication method.
+// Secret methods (basic/post, and the empty default) are accepted as-is;
+// private_key_jwt additionally requires a certId to sign the client assertion;
+// any other method is rejected at config load rather than at the first call.
+func validateExchangeClientAuth(schemeName string, p *OAuth2TokenExchangeProvider) error {
+	switch p.ClientAuth.Method {
+	case "", OAuth2ClientAuthBasic, OAuth2ClientAuthPost:
+		return nil
+	case OAuth2ClientAuthPrivateKeyJWT:
+		if p.ClientAuth.CertID == "" {
+			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q clientAuth.method %q requires a certId to sign the client assertion",
+				schemeName, p.Name, OAuth2ClientAuthPrivateKeyJWT)
+		}
+		return nil
+	default:
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q clientAuth.method %q is unsupported; valid values are %q, %q and %q",
+			schemeName, p.Name, p.ClientAuth.Method, OAuth2ClientAuthBasic, OAuth2ClientAuthPost, OAuth2ClientAuthPrivateKeyJWT)
+	}
+}
+
 // validateExchangeIssuers rejects an issuer claimed by more than one provider
-// and records each non-empty issuer's owning provider into issuerOwner.
+// and records each non-empty issuer's owning provider into issuerOwner. An
+// entry with the regex: prefix must compile and be ^…$-anchored; regex entries
+// are excluded from the cross-provider overlap check (dispatch order decides).
 func validateExchangeIssuers(schemeName string, p *OAuth2TokenExchangeProvider, issuerOwner map[string]string) error {
 	for _, iss := range p.Issuers {
 		if iss == "" {
+			continue
+		}
+		if pattern, isRegex := strings.CutPrefix(iss, OAuth2IssuerRegexPrefix); isRegex {
+			if err := validateIssuerRegex(schemeName, p.Name, pattern); err != nil {
+				return err
+			}
 			continue
 		}
 		if owner, dup := issuerOwner[iss]; dup {
@@ -484,12 +608,41 @@ func validateExchangeIssuers(schemeName string, p *OAuth2TokenExchangeProvider, 
 	return nil
 }
 
-// validateExchangeCustomParams rejects customParams that would override a
-// reserved RFC 8693 wire key.
+// validateIssuerRegex requires a regex: issuer pattern to compile and to be
+// explicitly anchored so a tenant pattern cannot accidentally match inside a
+// longer, attacker-chosen issuer value.
+func validateIssuerRegex(schemeName, providerName, pattern string) error {
+	if _, err := regexp.Compile(pattern); err != nil {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q issuers regex %q does not compile: %v", schemeName, providerName, pattern, err)
+	}
+	if !strings.HasPrefix(pattern, "^") || !strings.HasSuffix(pattern, "$") {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q issuers regex %q must be anchored (^…$)", schemeName, providerName, pattern)
+	}
+	return nil
+}
+
+// validateExchangeGrantType rejects an unknown provider grantType. Empty is
+// valid and resolves to token-exchange.
+func validateExchangeGrantType(schemeName string, p *OAuth2TokenExchangeProvider) error {
+	switch p.GrantType {
+	case "", OAuth2ProviderGrantTokenExchange, OAuth2ProviderGrantJWTBearer:
+		return nil
+	default:
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q grantType %q is invalid; valid values are %q and %q",
+			schemeName, p.Name, p.GrantType, OAuth2ProviderGrantTokenExchange, OAuth2ProviderGrantJWTBearer)
+	}
+}
+
+// validateExchangeCustomParams rejects customParams that would override a wire
+// key the gateway sets under the provider's grant.
 func validateExchangeCustomParams(schemeName string, p *OAuth2TokenExchangeProvider) error {
+	reservedKeys, grantLabel := oauth2ReservedExchangeFormKeys, "RFC 8693"
+	if p.IsJWTBearer() {
+		reservedKeys, grantLabel = oauth2ReservedJWTBearerFormKeys, "RFC 7523 jwt-bearer"
+	}
 	for key := range p.CustomParams {
-		if _, reserved := oauth2ReservedExchangeFormKeys[key]; reserved {
-			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q customParams cannot override reserved RFC 8693 wire key %q", schemeName, p.Name, key)
+		if _, reserved := reservedKeys[key]; reserved {
+			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q customParams cannot override reserved %s wire key %q", schemeName, p.Name, grantLabel, key)
 		}
 	}
 	return nil

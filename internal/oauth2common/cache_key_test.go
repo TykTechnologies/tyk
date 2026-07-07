@@ -62,3 +62,23 @@ func TestCacheKey_DifferentIssuers(t *testing.T) {
 	k2 := CacheKeyInput{Issuer: "https://idp-b", SubjectID: "alice", APIID: "api1", Audience: "aud", Scopes: []string{"r"}, ProviderName: "p"}
 	assert.NotEqual(t, k1.Build(), k2.Build())
 }
+
+func TestCacheKey_TenantEndpoint(t *testing.T) {
+	base := CacheKeyInput{
+		Issuer: "https://one-issuer", SubjectID: "user-1", APIID: "api",
+		Audience: "api://orders", Scopes: []string{"read"}, ProviderName: "p",
+	}
+
+	t.Run("different tenant endpoints yield different keys", func(t *testing.T) {
+		a, b := base, base
+		a.TenantEndpoint = "https://idp/tenant-a/token"
+		b.TenantEndpoint = "https://idp/tenant-b/token"
+		assert.NotEqual(t, a.Build(), b.Build())
+	})
+
+	t.Run("empty tenant endpoint leaves the key unchanged", func(t *testing.T) {
+		withField := base
+		withField.TenantEndpoint = ""
+		assert.Equal(t, base.Build(), withField.Build())
+	})
+}

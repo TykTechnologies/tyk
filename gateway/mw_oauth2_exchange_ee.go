@@ -4,8 +4,11 @@ package gateway
 
 import (
 	"context"
+	"crypto/tls"
+	"fmt"
 	"time"
 
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/ee/middleware/oauth2tokenexchange"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/oauth2common"
@@ -28,6 +31,20 @@ func (t *BaseMiddleware) RecordExchangeCacheHit(ctx context.Context, provider st
 		return
 	}
 	t.Gw.MetricInstruments.RecordCacheHit(ctx, provider)
+}
+
+// GetClientCertificate returns the certificate (with private key) registered
+// under certID in the gateway certificate store, used to sign a private_key_jwt
+// client assertion. Mirrors the upstream-certificate lookup (gateway/cert.go).
+func (t *BaseMiddleware) GetClientCertificate(certID string) (*tls.Certificate, error) {
+	if t.Gw == nil || t.Gw.CertificateManager == nil {
+		return nil, fmt.Errorf("certificate manager unavailable")
+	}
+	list := t.Gw.CertificateManager.List([]string{certID}, certs.CertificatePrivate)
+	if len(list) == 0 || list[0] == nil {
+		return nil, fmt.Errorf("certificate %q not found or has no private key", certID)
+	}
+	return list[0], nil
 }
 
 func getOAuth2ExchangeMw(base *BaseMiddleware) TykMiddleware {

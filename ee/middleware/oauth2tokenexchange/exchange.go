@@ -5,6 +5,7 @@ package oauth2tokenexchange
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -101,6 +102,21 @@ func inboundRemaining(st *oauth2common.State) time.Duration {
 // and enabled. It also reports whether the token was served from cache. The
 // caller times the call for the duration metric.
 func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State, provider *oas.OAuth2TokenExchangeProvider, target *oauth2common.Target) (string, bool, error) {
+	endpoint, err := oauth2common.ResolveTokenEndpoint(provider.TokenEndpoint, st.Claims)
+	if err != nil {
+		return "", false, &oauth2common.MisconfigError{Reason: err.Error()}
+	}
+	tenantEndpoint := ""
+	if endpoint != provider.TokenEndpoint {
+		// Per-tenant endpoint: exchange against a copy so the shared provider
+		// config is never mutated, and key the cache by the resolved endpoint
+		// so a token cached for one tenant is never served for another.
+		tenantEndpoint = endpoint
+		resolved := *provider
+		resolved.TokenEndpoint = endpoint
+		provider = &resolved
+	}
+
 	if m.Cache == nil || provider.Cache == nil || !provider.Cache.Enabled {
 		token, _, err := m.exchangeAtIdP(r.Context(), provider, st.RawToken, target)
 		return token, false, err
@@ -108,12 +124,13 @@ func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State
 
 	subjectID := subjectIDFromState(st)
 	cacheKey := oauth2common.CacheKeyInput{
-		Issuer:       oauth2common.StringClaim(st.Claims, oas.OAuth2ClaimIss),
-		SubjectID:    subjectID,
-		APIID:        st.APIID,
-		Audience:     target.Audience,
-		Scopes:       target.Scopes,
-		ProviderName: provider.Name,
+		Issuer:         oauth2common.StringClaim(st.Claims, oas.OAuth2ClaimIss),
+		SubjectID:      subjectID,
+		APIID:          st.APIID,
+		Audience:       target.Audience,
+		Scopes:         target.Scopes,
+		ProviderName:   provider.Name,
+		TenantEndpoint: tenantEndpoint,
 	}.Build()
 
 	log := m.Logger()
@@ -249,6 +266,12 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 
 	form := buildExchangeForm(provider, subjectToken, target, method)
 
+	if method == oas.OAuth2ClientAuthPrivateKeyJWT {
+		if err := m.addClientAssertion(form, provider); err != nil {
+			return "", 0, err
+		}
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.TokenEndpoint, strings.NewReader(form.Encode()))
 	if err != nil {
 		return "", 0, fmt.Errorf("building exchange request: %w", err)
@@ -268,6 +291,17 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		idpErr, idpDesc := oauth2common.DecodeIdPError(body)
+		// interaction_required means the user must sign in again — a message
+		// for the caller, relayed as a 401 step-up challenge instead of being
+		// collapsed to idp_error. Scoped to the jwt-bearer grant; the RFC 8693
+		// error path is shipped behaviour and stays unchanged.
+		if provider.IsJWTBearer() && idpErr == oas.OAuth2ErrInteractionRequired {
+			claims, authURI := oauth2common.DecodeClaimsChallenge(body)
+			return "", 0, &oauth2common.StepUpRequiredError{
+				Claims:           claims,
+				AuthorizationURI: authURI,
+			}
+		}
 		return "", 0, &oauth2common.ExchangeFailedError{
 			Status:      resp.StatusCode,
 			IdpError:    idpErr,
@@ -278,10 +312,17 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 	return parseExchangeResponse(body)
 }
 
-// buildExchangeForm builds the RFC 8693 token-exchange request form. When the
+// buildExchangeForm builds the exchange request form for the provider's grant.
+// RFC 8693 (the default) sends the inbound token as subject_token with the
+// target as separate audience/resource/scope parameters; jwt-bearer (RFC 7523)
+// sends it as `assertion` with the target rendered into `scope`. When the
 // client-auth method is client_secret_post, credentials are injected into the
 // form here (basic-auth credentials are set on the request header instead).
 func buildExchangeForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken string, target *oauth2common.Target, method string) url.Values {
+	if provider.IsJWTBearer() {
+		return buildJWTBearerForm(provider, subjectToken, target, method)
+	}
+
 	form := url.Values{}
 	form.Set(oas.OAuth2FormGrantType, oas.OAuth2GrantTypeTokenExchange)
 	form.Set(oas.OAuth2FormSubjectToken, subjectToken)
@@ -293,18 +334,47 @@ func buildExchangeForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken s
 	if len(target.Scopes) > 0 {
 		form.Set(oas.OAuth2FormScope, strings.Join(target.Scopes, " "))
 	}
+	addCustomParams(form, provider)
+	addPostClientCredentials(form, provider, method)
+	return form
+}
+
+// buildJWTBearerForm builds the RFC 7523 jwt-bearer request: the inbound token
+// as `assertion` and the target rendered into `scope` by the prefix rule (see
+// oauth2common.RenderJWTBearerScope). The grant emits no audience or resource
+// wire parameter — the audience is consumed by the scope rendering — and no
+// IdP-specific flag of its own; those travel via customParams.
+func buildJWTBearerForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken string, target *oauth2common.Target, method string) url.Values {
+	form := url.Values{}
+	form.Set(oas.OAuth2FormGrantType, oas.OAuth2GrantTypeJWTBearer)
+	form.Set(oas.OAuth2FormAssertion, subjectToken)
+	if scope := oauth2common.RenderJWTBearerScope(target.Audience, target.Scopes); scope != "" {
+		form.Set(oas.OAuth2FormScope, scope)
+	}
+	addCustomParams(form, provider)
+	addPostClientCredentials(form, provider, method)
+	return form
+}
+
+// addCustomParams appends the provider's operator-supplied form parameters.
+func addCustomParams(form url.Values, provider *oas.OAuth2TokenExchangeProvider) {
 	for k, v := range provider.CustomParams {
 		form.Set(k, v)
 	}
-	if method == oas.OAuth2ClientAuthPost && provider.ClientAuth != nil {
-		if provider.ClientAuth.ClientID != "" {
-			form.Set(oas.OAuth2FormClientID, provider.ClientAuth.ClientID)
-		}
-		if provider.ClientAuth.ClientSecret != "" {
-			form.Set(oas.OAuth2FormClientSecret, provider.ClientAuth.ClientSecret)
-		}
+}
+
+// addPostClientCredentials injects client_id/client_secret into the form for
+// the client_secret_post method; a no-op for basic (set on the request header).
+func addPostClientCredentials(form url.Values, provider *oas.OAuth2TokenExchangeProvider, method string) {
+	if method != oas.OAuth2ClientAuthPost || provider.ClientAuth == nil {
+		return
 	}
-	return form
+	if provider.ClientAuth.ClientID != "" {
+		form.Set(oas.OAuth2FormClientID, provider.ClientAuth.ClientID)
+	}
+	if provider.ClientAuth.ClientSecret != "" {
+		form.Set(oas.OAuth2FormClientSecret, provider.ClientAuth.ClientSecret)
+	}
 }
 
 // applyClientAuth sets the request-level client authentication for the exchange
@@ -312,8 +382,9 @@ func buildExchangeForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken s
 // no-op for that method; basic (the default) sets the Authorization header.
 func applyClientAuth(req *http.Request, provider *oas.OAuth2TokenExchangeProvider, method string) error {
 	switch method {
-	case oas.OAuth2ClientAuthPost:
-		// credentials already injected into form
+	case oas.OAuth2ClientAuthPost, oas.OAuth2ClientAuthPrivateKeyJWT:
+		// credentials already injected into the form (client_secret_post or the
+		// signed private_key_jwt client_assertion).
 	case "", oas.OAuth2ClientAuthBasic:
 		if provider.ClientAuth != nil && provider.ClientAuth.ClientID != "" {
 			req.SetBasicAuth(provider.ClientAuth.ClientID, provider.ClientAuth.ClientSecret)
@@ -382,6 +453,26 @@ func (m *Middleware) writeNoMatchingProviderResponse(w http.ResponseWriter, r *h
 		oas.OAuth2FieldErrorDescription: oe.Error(),
 		oas.OAuth2ClaimIss:              oe.Iss,
 	})
+}
+
+// writeStepUpRequiredResponse renders a 401 with a Bearer insufficient_claims
+// challenge relaying the IdP's claims challenge. The claims are base64-encoded
+// with padding (the de-facto claims-challenge convention) on the
+// WWW-Authenticate header; absent fields are omitted rather than sent empty.
+// The upstream is never called and nothing is cached.
+func (m *Middleware) writeStepUpRequiredResponse(w http.ResponseWriter, r *http.Request, e *oauth2common.StepUpRequiredError) {
+	params := [][2]string{{oas.OAuth2FieldError, oas.OAuth2ErrInsufficientClaims}}
+	body := map[string]string{oas.OAuth2FieldError: oas.OAuth2ErrInsufficientClaims}
+	if e.Claims != "" {
+		encoded := base64.StdEncoding.EncodeToString([]byte(e.Claims))
+		params = append(params, [2]string{oas.OAuth2FieldClaims, encoded})
+		body[oas.OAuth2FieldClaims] = encoded
+	}
+	if e.AuthorizationURI != "" {
+		params = append(params, [2]string{oas.OAuth2FieldAuthorizationURI, e.AuthorizationURI})
+		body[oas.OAuth2FieldAuthorizationURI] = e.AuthorizationURI
+	}
+	m.writeJSONError(w, r, http.StatusUnauthorized, params, body)
 }
 
 // writeMisconfigResponse renders a 500 for an incomplete exchange configuration.
