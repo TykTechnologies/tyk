@@ -1651,7 +1651,12 @@ func NewLocalKVRegistry(ctx context.Context, conf *Config) (*registry.Registry, 
 		}
 	}
 
-	return registry.NewFromConfig(ctx, nil, registry.WithDefaultStores(local))
+	return registry.NewFromConfig(
+		ctx,
+		nil,
+		registry.WithDefaultStores(local),
+		registry.WithInitLogger(kvLogger{l: log}),
+	)
 }
 
 // LoadAndResolve runs Load, then the KV bootstrap and full-config resolution.
@@ -1679,6 +1684,7 @@ func LoadAndResolve(
 		marshaledBytes,
 		registry.WithDefaultStores(buildKVConfig(conf)),
 		registry.WithFactories(factories),
+		registry.WithInitLogger(kvLogger{l: log}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize KV registry: %w", err)
