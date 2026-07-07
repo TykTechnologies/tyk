@@ -34,8 +34,8 @@ ENV GITHUB_TAG=${GITHUB_TAG}
 ARG BUILD_TAG
 ENV BUILD_TAG=${BUILD_TAG}
 
-ARG GOEXPERIMENT
-ENV GOEXPERIMENT=${GOEXPERIMENT}
+ARG GOFIPS140
+ENV GOFIPS140=${GOFIPS140}
 
 # Provide a gateway test binary for testing plugin loading.
 RUN --mount=type=cache,mode=0755,target=/go/pkg/mod \
