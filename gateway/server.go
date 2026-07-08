@@ -2023,8 +2023,13 @@ func (gw *Gateway) afterConfSetup() error {
 
 	orig := conf
 	if len(conf.Private.UnresolvedConfig) > 0 {
-		orig = config.Config{}
-		_ = json.Unmarshal(conf.Private.UnresolvedConfig, &orig)
+		var snap config.Config
+
+		if err := json.Unmarshal(conf.Private.UnresolvedConfig, &snap); err != nil {
+			log.WithError(err).Error("Failed to decode pre-resolution config snapshot; hot-reload closures will use current values")
+		} else {
+			orig = snap
+		}
 	}
 
 	if conf.SlaveOptions.APIKey != "" {

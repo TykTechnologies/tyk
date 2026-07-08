@@ -658,6 +658,29 @@ func TestAfterConfSetup_SlaveAPIKeyOriginalFromSnapshot(t *testing.T) {
 		"the live APIKey must still be the resolved value")
 }
 
+func TestAfterConfSetup_CorruptSnapshotFallsBackToCurrentValues(t *testing.T) {
+	live := config.Config{
+		Secrets: map[string]string{"edge_api_key": "/resolved/api-key"},
+	}
+	live.SlaveOptions.APIKey = "/resolved/api-key"
+	live.ExternalServices.OAuth.MTLS.Enabled = true
+	live.ExternalServices.OAuth.MTLS.CertFile = "/resolved/cert.pem"
+	live.Private.UnresolvedConfig = []byte(`{this is not valid json`)
+
+	gw := NewGateway(live, t.Context())
+	require.NoError(t, gw.afterConfSetup(),
+		"a corrupt snapshot must not fail startup — it degrades to current-values-as-originals")
+
+	got := gw.GetConfig()
+	require.Equal(t, "/resolved/cert.pem", got.ExternalServices.OAuth.MTLS.CertFile,
+		"resolved fields must keep their values, not be blanked by a zero-value orig")
+	require.Equal(t, "/resolved/api-key", got.SlaveOptions.APIKey)
+	require.Equal(t, "/resolved/api-key", got.Private.EdgeOriginalAPIKeyPath,
+		"with the fallback, the current value doubles as the original (legacy behavior)")
+	require.Empty(t, gw.kvResolvers,
+		"plain values must not register hot-reload closures")
+}
+
 type bypassRecorder struct{ seen *[]bool }
 
 func (b bypassRecorder) Get(ctx context.Context, _ string) (string, error) {
