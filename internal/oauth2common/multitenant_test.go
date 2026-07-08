@@ -3,7 +3,6 @@ package oauth2common
 import (
 	"testing"
 
-	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -56,39 +55,5 @@ func TestSelectExchangeProvider_RegexIssuers(t *testing.T) {
 			{Name: "corp", Issuers: []string{pattern}},
 		}
 		assert.Nil(t, SelectExchangeProvider(providers, pattern))
-	})
-}
-
-func TestResolveTokenEndpoint(t *testing.T) {
-	claims := jwt.MapClaims{"tid": "aaa-111"}
-
-	t.Run("no placeholder passes through untouched", func(t *testing.T) {
-		got, err := ResolveTokenEndpoint("https://idp.example.com/token", claims)
-		require.NoError(t, err)
-		assert.Equal(t, "https://idp.example.com/token", got)
-	})
-
-	t.Run("claim value lands in the endpoint path", func(t *testing.T) {
-		got, err := ResolveTokenEndpoint("https://login.example.com/{claim.tid}/oauth2/v2.0/token", claims)
-		require.NoError(t, err)
-		assert.Equal(t, "https://login.example.com/aaa-111/oauth2/v2.0/token", got)
-	})
-
-	t.Run("token lacking the claim is rejected", func(t *testing.T) {
-		_, err := ResolveTokenEndpoint("https://login.example.com/{claim.tid}/token", jwt.MapClaims{})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "tid")
-	})
-
-	t.Run("claim value failing the charset guard is rejected", func(t *testing.T) {
-		for _, bad := range []string{"../evil", "a b", "x/y", "a?b=c", ".", ".."} {
-			_, err := ResolveTokenEndpoint("https://login.example.com/{claim.tid}/token", jwt.MapClaims{"tid": bad})
-			require.Error(t, err, "value %q must fail the charset guard", bad)
-		}
-	})
-
-	t.Run("non-string claim value is rejected", func(t *testing.T) {
-		_, err := ResolveTokenEndpoint("https://login.example.com/{claim.tid}/token", jwt.MapClaims{"tid": 42})
-		require.Error(t, err)
 	})
 }

@@ -14,6 +14,10 @@ type State struct {
 	// Claims is the JWT-parsed claim set on the inbound token.
 	Claims jwt.MapClaims
 
+	// ReplaceVariables applies the gateway's standard request-context
+	// variable replacement to a config string; nil means pass-through.
+	ReplaceVariables func(in string) string
+
 	// RawToken is the inbound Bearer (after stripping the prefix).
 	RawToken string
 

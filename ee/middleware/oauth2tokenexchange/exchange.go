@@ -102,9 +102,10 @@ func inboundRemaining(st *oauth2common.State) time.Duration {
 // and enabled. It also reports whether the token was served from cache. The
 // caller times the call for the duration metric.
 func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State, provider *oas.OAuth2TokenExchangeProvider, target *oauth2common.Target) (string, bool, error) {
-	endpoint, err := oauth2common.ResolveTokenEndpoint(provider.TokenEndpoint, st.Claims)
-	if err != nil {
-		return "", false, &oauth2common.MisconfigError{Reason: err.Error()}
+	// Standard gateway variable replacement, e.g. $tyk_context.jwt_claims_tid.
+	endpoint := provider.TokenEndpoint
+	if st.ReplaceVariables != nil {
+		endpoint = st.ReplaceVariables(endpoint)
 	}
 	tenantEndpoint := ""
 	if endpoint != provider.TokenEndpoint {

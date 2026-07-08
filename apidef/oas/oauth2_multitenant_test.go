@@ -72,16 +72,21 @@ func TestValidateOAuth2Schemes_RegexIssuers(t *testing.T) {
 	})
 }
 
-func TestValidateOAuth2Schemes_TokenEndpointPlaceholder(t *testing.T) {
-	t.Run("placeholder in the path loads", func(t *testing.T) {
-		s := multiTenantScheme([]string{"https://idp"}, "https://login.example.com/{claim.tid}/oauth2/v2.0/token")
-		assert.NoError(t, s.ValidateOAuth2Schemes())
-	})
+func TestValidateOAuth2Schemes_TokenEndpointVariable(t *testing.T) {
+	// Variables load anywhere in the URL string; resolution is request-time.
+	for name, endpoint := range map[string]string{
+		"jwt_claims variable in the path": "https://login.example.com/$tyk_context.jwt_claims_tid/oauth2/v2.0/token",
+		"variable in host position":       "https://$tyk_context.jwt_claims_tid.example.com/token",
+		"non-jwt_claims context variable": "https://login.example.com/$tyk_context.headers_X-Tenant/token",
+	} {
+		t.Run(name+" loads", func(t *testing.T) {
+			s := multiTenantScheme([]string{"https://idp"}, endpoint)
+			assert.NoError(t, s.ValidateOAuth2Schemes())
+		})
+	}
 
-	t.Run("placeholder in host position is a load error", func(t *testing.T) {
-		s := multiTenantScheme([]string{"https://idp"}, "https://{claim.tid}.evil.example/token")
-		err := s.ValidateOAuth2Schemes()
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "placeholder")
+	t.Run("a non-URL tokenEndpoint is still a load error", func(t *testing.T) {
+		s := multiTenantScheme([]string{"https://idp"}, "not-a-url")
+		require.Error(t, s.ValidateOAuth2Schemes())
 	})
 }

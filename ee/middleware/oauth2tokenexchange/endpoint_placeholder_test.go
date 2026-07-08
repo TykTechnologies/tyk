@@ -5,6 +5,7 @@ package oauth2tokenexchange
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -16,10 +17,16 @@ import (
 	"github.com/TykTechnologies/tyk/internal/oauth2common"
 )
 
-// TestFetchExchangedToken_EndpointPlaceholder pins per-request tokenEndpoint
-// resolution from the inbound token's claims: the claim value lands in the
-// endpoint path, and a token lacking the claim is rejected before any IdP call.
-func TestFetchExchangedToken_EndpointPlaceholder(t *testing.T) {
+// replaceVarsWith stands in for the gateway's ReplaceTykVariables hook.
+func replaceVarsWith(tid string) func(string) string {
+	return func(in string) string {
+		return strings.ReplaceAll(in, "$tyk_context.jwt_claims_tid", tid)
+	}
+}
+
+// TestFetchExchangedToken_EndpointVariables pins per-request tokenEndpoint
+// resolution through the State's variable-replacement hook.
+func TestFetchExchangedToken_EndpointVariables(t *testing.T) {
 	target := &oauth2common.Target{Audience: "api://orders", Scopes: []string{"Orders.Read"}}
 
 	newIdP := func(t *testing.T) (*httptest.Server, *[]string) {
@@ -43,12 +50,12 @@ func TestFetchExchangedToken_EndpointPlaceholder(t *testing.T) {
 		}
 	}
 
-	t.Run("claim value selects the per-tenant endpoint", func(t *testing.T) {
+	t.Run("replaced variable selects the per-tenant endpoint", func(t *testing.T) {
 		idp, paths := newIdP(t)
-		provider := newProvider(idp.URL + "/{claim.tid}/token")
+		provider := newProvider(idp.URL + "/$tyk_context.jwt_claims_tid/token")
 
 		for _, tid := range []string{"aaa-111", "bbb-222"} {
-			st := &oauth2common.State{Claims: jwt.MapClaims{"tid": tid}, RawToken: "inbound"}
+			st := &oauth2common.State{ReplaceVariables: replaceVarsWith(tid), RawToken: "inbound"}
 			r := httptest.NewRequest(http.MethodGet, "/", nil)
 			_, _, err := mwWithoutTykOps().fetchExchangedToken(r, st, provider, target)
 			require.NoError(t, err)
@@ -56,33 +63,22 @@ func TestFetchExchangedToken_EndpointPlaceholder(t *testing.T) {
 		assert.Equal(t, []string{"/aaa-111/token", "/bbb-222/token"}, *paths)
 	})
 
-	t.Run("token lacking the claim is rejected before any IdP call", func(t *testing.T) {
+	t.Run("no replacement hook sends the configured endpoint verbatim", func(t *testing.T) {
 		idp, paths := newIdP(t)
-		provider := newProvider(idp.URL + "/{claim.tid}/token")
+		provider := newProvider(idp.URL + "/$tyk_context.jwt_claims_tid/token")
 
-		st := &oauth2common.State{Claims: jwt.MapClaims{}, RawToken: "inbound"}
+		st := &oauth2common.State{RawToken: "inbound"}
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 		_, _, err := mwWithoutTykOps().fetchExchangedToken(r, st, provider, target)
-		require.Error(t, err)
-		assert.Empty(t, *paths, "the IdP must record zero calls")
-	})
-
-	t.Run("claim value failing the charset guard is rejected before any IdP call", func(t *testing.T) {
-		idp, paths := newIdP(t)
-		provider := newProvider(idp.URL + "/{claim.tid}/token")
-
-		st := &oauth2common.State{Claims: jwt.MapClaims{"tid": "../evil"}, RawToken: "inbound"}
-		r := httptest.NewRequest(http.MethodGet, "/", nil)
-		_, _, err := mwWithoutTykOps().fetchExchangedToken(r, st, provider, target)
-		require.Error(t, err)
-		assert.Empty(t, *paths, "the IdP must record zero calls")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"/$tyk_context.jwt_claims_tid/token"}, *paths,
+			"without a hook the variable text goes out literally — resolution is the gateway's job")
 	})
 }
 
-// TestFetchExchangedToken_EndpointPlaceholder_CacheIsPerTenant pins that a
-// cached exchanged token is never served across tenants: two tokens identical
-// but for the endpoint-selecting claim must each hit their own tenant endpoint.
-func TestFetchExchangedToken_EndpointPlaceholder_CacheIsPerTenant(t *testing.T) {
+// TestFetchExchangedToken_EndpointVariables_CacheIsPerTenant pins that a
+// cached exchanged token is never served across tenants.
+func TestFetchExchangedToken_EndpointVariables_CacheIsPerTenant(t *testing.T) {
 	target := &oauth2common.Target{Audience: "api://orders", Scopes: []string{"Orders.Read"}}
 
 	var paths []string
@@ -96,7 +92,7 @@ func TestFetchExchangedToken_EndpointPlaceholder_CacheIsPerTenant(t *testing.T) 
 	provider := &oas.OAuth2TokenExchangeProvider{
 		Name:          "corp-idp",
 		GrantType:     oas.OAuth2ProviderGrantJWTBearer,
-		TokenEndpoint: idp.URL + "/{claim.tid}/token",
+		TokenEndpoint: idp.URL + "/$tyk_context.jwt_claims_tid/token",
 		ClientAuth:    &oas.OAuth2ClientAuth{Method: oas.OAuth2ClientAuthPost, ClientID: "cid", ClientSecret: "s"},
 		Cache:         &oas.OAuth2ExchangeCache{Enabled: true},
 	}
@@ -104,11 +100,12 @@ func TestFetchExchangedToken_EndpointPlaceholder_CacheIsPerTenant(t *testing.T) 
 	m := &Middleware{Base: newFakeBase(), Spec: model.MergedAPI{OAS: &oas.OAS{}}}
 	m.Cache = newSingleFlightCache(&fakeCache{items: map[string]string{}})
 
-	// Same issuer and subject — only the endpoint-selecting claim differs.
+	// Same issuer and subject — only the endpoint-selecting variable differs.
 	for _, tid := range []string{"tenant-a", "tenant-b"} {
 		st := &oauth2common.State{
-			Claims:   jwt.MapClaims{"iss": "https://one-issuer", "sub": "user-1", "tid": tid},
-			RawToken: "inbound",
+			Claims:           jwt.MapClaims{"iss": "https://one-issuer", "sub": "user-1"},
+			ReplaceVariables: replaceVarsWith(tid),
+			RawToken:         "inbound",
 		}
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 		_, _, err := m.fetchExchangedToken(r, st, provider, target)

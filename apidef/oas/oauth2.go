@@ -521,48 +521,22 @@ func validateOAuth2ExchangeProvider(schemeName string, i int, p *OAuth2TokenExch
 	return validateExchangeCacheMode(schemeName, p)
 }
 
-// oauth2ClaimPlaceholderRE matches a {claim.<name>} placeholder in a
-// provider tokenEndpoint.
-var oauth2ClaimPlaceholderRE = regexp.MustCompile(`\{claim\.[A-Za-z0-9_-]+\}`)
-
 // validateExchangeTokenEndpoint requires a non-empty, absolute http(s)
 // tokenEndpoint. It rejects non-HTTP SSRF vectors (file://, gopher://, …) but
 // deliberately does not apply host-level egress (private-IP) restrictions: the
 // API definition is admin-controlled and internal IdPs legitimately live on
-// private networks — mirrors the gateway's JWKS-fetch SSRF posture. A
-// {claim.<name>} placeholder is valid only in the URL path — a placeholder in
-// host position would let a token claim steer which host the gateway calls.
+// private networks — mirrors the gateway's JWKS-fetch SSRF posture.
+// $tyk_context.* variables may appear anywhere in the string; they resolve at
+// request time and are not validated here.
 func validateExchangeTokenEndpoint(schemeName string, p *OAuth2TokenExchangeProvider) error {
 	if p.TokenEndpoint == "" {
 		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q has empty tokenEndpoint", schemeName, p.Name)
 	}
-	// Substitute placeholders with a sentinel path segment so the URL check
-	// sees the request-time shape.
-	endpoint := oauth2ClaimPlaceholderRE.ReplaceAllString(p.TokenEndpoint, "claim-value")
-	u, err := url.Parse(endpoint)
+	u, err := url.Parse(p.TokenEndpoint)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q tokenEndpoint must be an absolute http(s) URL", schemeName, p.Name)
 	}
-	if placeholderOutsideURLPath(p.TokenEndpoint) {
-		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q tokenEndpoint claim placeholder is valid only in the URL path", schemeName, p.Name)
-	}
 	return nil
-}
-
-// placeholderOutsideURLPath reports whether a {claim.<name>} placeholder sits
-// before the URL path begins — i.e. in scheme, host, or port position.
-func placeholderOutsideURLPath(endpoint string) bool {
-	placeholder := oauth2ClaimPlaceholderRE.FindStringIndex(endpoint)
-	if placeholder == nil {
-		return false
-	}
-	authorityStart := strings.Index(endpoint, "://") + len("://")
-	pathStart := strings.Index(endpoint[authorityStart:], "/")
-	if pathStart < 0 {
-		// No path at all, so the placeholder can only be in the authority.
-		return true
-	}
-	return placeholder[0] < authorityStart+pathStart
 }
 
 // validateExchangeClientAuth validates the client-authentication method.
