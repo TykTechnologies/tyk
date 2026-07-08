@@ -16,6 +16,7 @@ import (
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/opentelemetry/metric/metrictest"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/storage"
+	storagemock "github.com/TykTechnologies/tyk/storage/mock"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -1423,4 +1425,79 @@ func TestBaseMiddleware_CopyNilLogger_Concurrent(t *testing.T) {
 		require.NotNil(t, got, "goroutine %d", i)
 		assert.Nil(t, got.logger, "Copy of nil logger should leave logger nil (goroutine %d)", i)
 	}
+}
+
+func TestCheckSessionAndIdentityForValidKey_AuthStorePath_MarksSessionAsNew(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HashKeys = false
+		globalConf.LocalSessionCache.DisableCacheSessionState = false
+	})
+	defer ts.Close()
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = uuid.New()
+		spec.UseKeylessAccess = false
+		spec.UseOauth2 = true
+		spec.Auth.AuthHeaderName = "authorization"
+	})[0]
+
+	// rpc/mdcb storage
+	apiStorageHandler := storagemock.NewMockHandler(ctrl)
+	api.AuthManager = &DefaultSessionManager{
+		store: apiStorageHandler,
+		orgID: api.OrgID,
+		Gw:    ts.Gw,
+	}
+
+	// local storage
+	globalStorageHandler := storagemock.NewMockHandler(ctrl)
+	ts.Gw.GlobalSessionManager = &DefaultSessionManager{
+		store: globalStorageHandler,
+		orgID: api.OrgID,
+		Gw:    ts.Gw,
+	}
+
+	key := "auth-store-new-" + uuid.New()
+	session := CreateStandardSession()
+	session.AccessRights = map[string]user.AccessDefinition{
+		api.APIID: {
+			APIID:    api.APIID,
+			Versions: []string{"Default"},
+		},
+	}
+
+	sessionJSON, err := json.Marshal(session)
+	require.NoError(t, err)
+
+	apiStorageHandler.EXPECT().GetKey(gomock.Any()).Return(string(sessionJSON), nil).AnyTimes()
+	apiStorageHandler.EXPECT().GetMultiKey(gomock.Any()).Return([]string{string(sessionJSON)}, nil).AnyTimes()
+	apiStorageHandler.EXPECT().GetRawKey(gomock.Any()).Return(string(sessionJSON), nil).AnyTimes()
+	apiStorageHandler.EXPECT().GetKeyPrefix().Return("").AnyTimes()
+
+	globalStorageHandler.EXPECT().GetKey(gomock.Any()).Return("", storage.ErrKeyNotFound).AnyTimes()
+	globalStorageHandler.EXPECT().GetMultiKey(gomock.Any()).Return(nil, storage.ErrKeyNotFound).AnyTimes()
+	globalStorageHandler.EXPECT().GetRawKey(gomock.Any()).Return("", storage.ErrKeyNotFound).AnyTimes()
+	globalStorageHandler.EXPECT().GetKeyPrefix().Return("").AnyTimes()
+
+	// ensure that session was copied from remote repo into the local one
+	globalStorageHandler.EXPECT().SetKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
+
+	baseMid := NewBaseMiddleware(ts.Gw, api, nil, nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+
+	// global handle simulates absence of session
+	got, ok := baseMid.CheckSessionAndIdentityForValidKey(key, req)
+
+	assert.True(t, ok, "session should be found in auth store")
+	assert.False(t, got.IsRestored(), "session retrieved from AuthManager should be marked as new (IsRestored == false)")
+
+	// simulate session write to context
+	ctxSetSession(req, &got, false, false)
+
+	// Check update session behavior
+	updated := baseMid.UpdateRequestSession(req)
+	assert.True(t, updated, "UpdateRequestSession should successfully update the session")
 }
