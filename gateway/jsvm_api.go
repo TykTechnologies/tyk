@@ -1,16 +1,23 @@
 package gateway
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/internal/redis"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -22,7 +29,19 @@ type JSVMAPIHelper struct {
 	Gw     *Gateway
 	Log    *logrus.Entry
 	RawLog *logrus.Logger
+	Store  *storage.RedisCluster
 }
+
+// JSVM storage binding limits. All keys live under jsvmStoreKeyPrefix so
+// plugins cannot read or write gateway-internal keys (sessions, quotas, ...).
+const (
+	jsvmStoreKeyPrefix   = "jsvm-store:"
+	jsvmStoreMaxKeyLen   = 256
+	jsvmStoreMaxValueLen = 64 * 1024
+	jsvmStoreOpTimeout   = 2 * time.Second
+)
+
+var errJSVMStoreUnavailable = errors.New("JSVM storage is not available")
 
 func (h *JSVMAPIHelper) LogMessage(msg string) {
 	h.Log.WithFields(logrus.Fields{
@@ -186,6 +205,151 @@ func (h *JSVMAPIHelper) SetKeyData(apiKey, encodedSession, suppressReset string)
 		return err
 	}
 	return nil
+}
+
+// storeClient returns the raw redis client for the JSVM store, and validates
+// and prefixes the key. The raw client is used (rather than RedisCluster's
+// methods) so every op gets a hard timeout via context and the prefix cannot
+// be bypassed by key hashing (fixKey hashes before prefixing when HashKeys
+// is on, which would break namespacing guarantees).
+func (h *JSVMAPIHelper) storeClient(key string) (redis.UniversalClient, string, error) {
+	if h.Store == nil {
+		return nil, "", errJSVMStoreUnavailable
+	}
+	if key == "" || len(key) > jsvmStoreMaxKeyLen {
+		return nil, "", fmt.Errorf("storage key must be 1-%d bytes", jsvmStoreMaxKeyLen)
+	}
+	client, err := h.Store.Client()
+	if err != nil {
+		h.Log.WithError(err).Error("JSVM storage: failed to get redis client")
+		return nil, "", err
+	}
+	return client, jsvmStoreKeyPrefix + key, nil
+}
+
+// StorageGet retrieves a key from the JSVM store. A missing key returns
+// found=false with no error; err is only non-nil on storage failure so
+// callers can distinguish "absent" from "Redis down".
+func (h *JSVMAPIHelper) StorageGet(key string) (value string, found bool, err error) {
+	client, fixedKey, err := h.storeClient(key)
+	if err != nil {
+		return "", false, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), jsvmStoreOpTimeout)
+	defer cancel()
+
+	value, err = client.Get(ctx, fixedKey).Result()
+	if errors.Is(err, redis.Nil) {
+		return "", false, nil
+	}
+	if err != nil {
+		h.Log.WithError(err).Error("JSVM storage: failed to get key")
+		return "", false, err
+	}
+	return value, true, nil
+}
+
+// StorageSet stores a value in the JSVM store. ttlSeconds 0 means no expiry.
+func (h *JSVMAPIHelper) StorageSet(key, value string, ttlSeconds int64) error {
+	client, fixedKey, err := h.storeClient(key)
+	if err != nil {
+		return err
+	}
+	if len(value) > jsvmStoreMaxValueLen {
+		return fmt.Errorf("storage value exceeds %d bytes", jsvmStoreMaxValueLen)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), jsvmStoreOpTimeout)
+	defer cancel()
+
+	if err := client.Set(ctx, fixedKey, value, time.Duration(ttlSeconds)*time.Second).Err(); err != nil {
+		h.Log.WithError(err).Error("JSVM storage: failed to set key")
+		return err
+	}
+	return nil
+}
+
+// StorageSetNX stores a value only if the key does not exist (SET NX EX).
+// Returns true if this call claimed the key.
+func (h *JSVMAPIHelper) StorageSetNX(key, value string, ttlSeconds int64) (bool, error) {
+	client, fixedKey, err := h.storeClient(key)
+	if err != nil {
+		return false, err
+	}
+	if len(value) > jsvmStoreMaxValueLen {
+		return false, fmt.Errorf("storage value exceeds %d bytes", jsvmStoreMaxValueLen)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), jsvmStoreOpTimeout)
+	defer cancel()
+
+	set, err := client.SetNX(ctx, fixedKey, value, time.Duration(ttlSeconds)*time.Second).Result()
+	if err != nil {
+		h.Log.WithError(err).Error("JSVM storage: failed to setnx key")
+		return false, err
+	}
+	return set, nil
+}
+
+// StorageDel removes a key from the JSVM store.
+func (h *JSVMAPIHelper) StorageDel(key string) error {
+	client, fixedKey, err := h.storeClient(key)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), jsvmStoreOpTimeout)
+	defer cancel()
+
+	if err := client.Del(ctx, fixedKey).Err(); err != nil {
+		h.Log.WithError(err).Error("JSVM storage: failed to delete key")
+		return err
+	}
+	return nil
+}
+
+// StorageTTL returns the remaining TTL of a key in seconds, following redis
+// semantics: -1 means no expiry, -2 means the key does not exist.
+func (h *JSVMAPIHelper) StorageTTL(key string) (int64, error) {
+	client, fixedKey, err := h.storeClient(key)
+	if err != nil {
+		return 0, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), jsvmStoreOpTimeout)
+	defer cancel()
+
+	ttl, err := client.TTL(ctx, fixedKey).Result()
+	if err != nil {
+		h.Log.WithError(err).Error("JSVM storage: failed to get key TTL")
+		return 0, err
+	}
+	// go-redis passes the -1/-2 sentinels through as raw durations.
+	if ttl < 0 {
+		return int64(ttl), nil
+	}
+	return int64(ttl / time.Second), nil
+}
+
+// StorageIncr atomically increments a key and returns the new value as a
+// string (JS numbers lose precision past 2^53). ttlSeconds is applied only
+// when the increment created the key, matching IncrememntWithExpire semantics.
+func (h *JSVMAPIHelper) StorageIncr(key string, ttlSeconds int64) (string, error) {
+	client, fixedKey, err := h.storeClient(key)
+	if err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), jsvmStoreOpTimeout)
+	defer cancel()
+
+	val, err := client.Incr(ctx, fixedKey).Result()
+	if err != nil {
+		h.Log.WithError(err).Error("JSVM storage: failed to increment key")
+		return "", err
+	}
+	if val == 1 && ttlSeconds > 0 {
+		if err := client.Expire(ctx, fixedKey, time.Duration(ttlSeconds)*time.Second).Err(); err != nil {
+			h.Log.WithError(err).Error("JSVM storage: failed to set expire on incremented key")
+			return "", err
+		}
+	}
+	return strconv.FormatInt(val, 10), nil
 }
 
 func (h *JSVMAPIHelper) BatchRequest(requestSet string) (string, error) {

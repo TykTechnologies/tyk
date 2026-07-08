@@ -11,6 +11,8 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 // GojaJSVM is a goja-based JavaScript VM that uses a fresh runtime per
@@ -33,6 +35,7 @@ type GojaJSVM struct {
 	Gw      *Gateway       `json:"-"`
 
 	programs    []gojaProgram // compiled JS programs replayed on each new runtime
+	store       *storage.RedisCluster
 	initialized bool
 }
 
@@ -240,6 +243,11 @@ func (j *GojaJSVM) Init(spec *APISpec, logger *logrus.Entry, gw *Gateway) {
 		j.programs = append(j.programs, gojaProgram{p: tykJsResp})
 	}
 
+	// HashKeys stays false so keys land verbatim under the enforced prefix;
+	// the helper additionally prefixes on the raw client so plugin keys can
+	// never escape the jsvm-store namespace.
+	j.store = &storage.RedisCluster{KeyPrefix: jsvmStoreKeyPrefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+
 	j.Spec = spec
 	j.initialized = true
 
@@ -283,6 +291,7 @@ func (j *GojaJSVM) DeInit() {
 	j.Log = nil
 	j.RawLog = nil
 	j.Gw = nil
+	j.store = nil
 	j.initialized = false
 	j.programs = nil
 }
@@ -343,7 +352,7 @@ func sanitizeJSIdent(s string) string {
 }
 
 func (j *GojaJSVM) registerAPI(vm *goja.Runtime) {
-	h := &JSVMAPIHelper{Spec: j.Spec, Gw: j.Gw, Log: j.Log, RawLog: j.RawLog}
+	h := &JSVMAPIHelper{Spec: j.Spec, Gw: j.Gw, Log: j.Log, RawLog: j.RawLog, Store: j.store}
 
 	set := func(name string, fn any) {
 		if err := vm.Set(name, fn); err != nil && j.Log != nil {
@@ -394,6 +403,52 @@ func (j *GojaJSVM) registerAPI(vm *goja.Runtime) {
 			h.Log.WithError(err).Error("Failed to set key data from JS")
 		}
 		return goja.Undefined()
+	})
+	// Storage bindings throw a JS exception on failure (Redis outage,
+	// timeout, cap violation) instead of returning undefined — a plugin must
+	// never be able to mistake an outage for key-absent.
+	set("TykStorageGet", func(call goja.FunctionCall) goja.Value {
+		val, found, err := h.StorageGet(call.Argument(0).String())
+		if err != nil {
+			panic(vm.NewGoError(err))
+		}
+		if !found {
+			return goja.Null()
+		}
+		return vm.ToValue(val)
+	})
+	set("TykStorageSet", func(call goja.FunctionCall) goja.Value {
+		if err := h.StorageSet(call.Argument(0).String(), call.Argument(1).String(), call.Argument(2).ToInteger()); err != nil {
+			panic(vm.NewGoError(err))
+		}
+		return goja.Undefined()
+	})
+	set("TykStorageSetNX", func(call goja.FunctionCall) goja.Value {
+		set, err := h.StorageSetNX(call.Argument(0).String(), call.Argument(1).String(), call.Argument(2).ToInteger())
+		if err != nil {
+			panic(vm.NewGoError(err))
+		}
+		return vm.ToValue(set)
+	})
+	set("TykStorageDel", func(call goja.FunctionCall) goja.Value {
+		if err := h.StorageDel(call.Argument(0).String()); err != nil {
+			panic(vm.NewGoError(err))
+		}
+		return goja.Undefined()
+	})
+	set("TykStorageTTL", func(call goja.FunctionCall) goja.Value {
+		ttl, err := h.StorageTTL(call.Argument(0).String())
+		if err != nil {
+			panic(vm.NewGoError(err))
+		}
+		return vm.ToValue(ttl)
+	})
+	set("TykStorageIncr", func(call goja.FunctionCall) goja.Value {
+		val, err := h.StorageIncr(call.Argument(0).String(), call.Argument(1).ToInteger())
+		if err != nil {
+			panic(vm.NewGoError(err))
+		}
+		return vm.ToValue(val)
 	})
 	set("TykBatchRequest", func(call goja.FunctionCall) goja.Value {
 		result, err := h.BatchRequest(call.Argument(0).String())

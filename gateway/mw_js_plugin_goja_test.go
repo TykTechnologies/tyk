@@ -6,7 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,6 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -731,4 +735,147 @@ func TestGoja_LoadJSPaths(t *testing.T) {
 	}
 	vm.LoadJSPaths([]string{"good.js"}, dir)
 	assert.Equal(t, initialCount+1, len(vm.programs), "should load valid .js file")
+}
+
+// ---------------------------------------------------------------------------
+// 13. TykStorage* bindings — bounded atomic storage for JS plugins
+// ---------------------------------------------------------------------------
+
+func TestGoja_StorageBindings(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	vm := GojaJSVM{}
+	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+
+	// Unique key base so reruns against a shared Redis don't collide.
+	base := fmt.Sprintf("goja-store-%d", time.Now().UnixNano())
+	run := func(t *testing.T, js string) string {
+		t.Helper()
+		result, err := vm.Run(js)
+		require.NoError(t, err)
+		return result
+	}
+
+	t.Run("set get roundtrip", func(t *testing.T) {
+		assert.Equal(t, "hello", run(t, fmt.Sprintf(`TykStorageSet(%[1]q, "hello", 0); TykStorageGet(%[1]q)`, base+"-rt")))
+	})
+
+	t.Run("missing key returns null", func(t *testing.T) {
+		assert.Equal(t, "null", run(t, fmt.Sprintf(`String(TykStorageGet(%q))`, base+"-missing")))
+	})
+
+	t.Run("ttl", func(t *testing.T) {
+		js := fmt.Sprintf(`TykStorageSet(%[1]q, "v", 30); TykStorageTTL(%[1]q)`, base+"-ttl")
+		ttl, err := strconv.ParseInt(run(t, js), 10, 64)
+		require.NoError(t, err)
+		assert.True(t, ttl > 0 && ttl <= 30, "expected 0 < ttl <= 30, got %d", ttl)
+		// No expiry → -1; missing key → -2 (redis semantics).
+		assert.Equal(t, "-1", run(t, fmt.Sprintf(`TykStorageSet(%[1]q, "v", 0); TykStorageTTL(%[1]q)`, base+"-nottl")))
+		assert.Equal(t, "-2", run(t, fmt.Sprintf(`TykStorageTTL(%q)`, base+"-ttl-missing")))
+	})
+
+	t.Run("del", func(t *testing.T) {
+		js := fmt.Sprintf(`TykStorageSet(%[1]q, "v", 0); TykStorageDel(%[1]q); String(TykStorageGet(%[1]q))`, base+"-del")
+		assert.Equal(t, "null", run(t, js))
+	})
+
+	t.Run("setnx claims once", func(t *testing.T) {
+		key := base + "-nx"
+		assert.Equal(t, "true", run(t, fmt.Sprintf(`String(TykStorageSetNX(%q, "first", 30))`, key)))
+		assert.Equal(t, "false", run(t, fmt.Sprintf(`String(TykStorageSetNX(%q, "second", 30))`, key)))
+		assert.Equal(t, "first", run(t, fmt.Sprintf(`TykStorageGet(%q)`, key)))
+	})
+
+	t.Run("incr returns string and applies ttl on first increment only", func(t *testing.T) {
+		key := base + "-incr"
+		assert.Equal(t, "string", run(t, fmt.Sprintf(`typeof TykStorageIncr(%q, 30)`, key)))
+		assert.Equal(t, "2", run(t, fmt.Sprintf(`TykStorageIncr(%q, 30)`, key)))
+		ttl, err := strconv.ParseInt(run(t, fmt.Sprintf(`TykStorageTTL(%q)`, key)), 10, 64)
+		require.NoError(t, err)
+		assert.True(t, ttl > 0 && ttl <= 30, "expected TTL from first increment, got %d", ttl)
+	})
+
+	t.Run("caps are enforced and catchable", func(t *testing.T) {
+		// Oversized key → thrown error surfaces via vm.Run.
+		_, err := vm.Run(`TykStorageSet(Array(300).join("k"), "v", 0)`)
+		assert.Error(t, err)
+		// Oversized value → catchable in JS with try/catch.
+		js := `try { TykStorageSet("cap-key", Array(70000).join("v"), 0); "no-throw" } catch (e) { "threw" }`
+		assert.Equal(t, "threw", run(t, js))
+	})
+
+	t.Run("keys are namespaced under jsvm-store prefix", func(t *testing.T) {
+		// A plugin key named like a session key must not escape the prefix.
+		run(t, `TykStorageSet("apikey-foo", "trapped", 0); "ok"`)
+		rc := storage.RedisCluster{ConnectionHandler: ts.Gw.StorageConnectionHandler}
+		val, err := rc.GetRawKey("jsvm-store:apikey-foo")
+		require.NoError(t, err)
+		assert.Equal(t, "trapped", val)
+		_, err = rc.GetRawKey("apikey-foo")
+		assert.ErrorIs(t, err, storage.ErrKeyNotFound)
+	})
+
+	t.Run("nil store throws instead of failing silently", func(t *testing.T) {
+		vm.DeInit()
+		defer vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+		h := &JSVMAPIHelper{Log: logrus.NewEntry(log)}
+		_, _, err := h.StorageGet("any")
+		assert.ErrorIs(t, err, errJSVMStoreUnavailable)
+	})
+}
+
+// TestGoja_StorageBindings_Contention verifies the atomicity contract under
+// concurrency: exactly one SetNX winner, and Incr never loses an update.
+func TestGoja_StorageBindings_Contention(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	vm := GojaJSVM{}
+	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+
+	const n = 50
+
+	t.Run("setnx has exactly one winner", func(t *testing.T) {
+		key := fmt.Sprintf("goja-store-race-nx-%d", time.Now().UnixNano())
+		var wg sync.WaitGroup
+		var claimed, failed int64
+		for i := 0; i < n; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				result, err := vm.Run(fmt.Sprintf(`String(TykStorageSetNX(%q, "owner", 60))`, key))
+				if err != nil {
+					atomic.AddInt64(&failed, 1)
+					return
+				}
+				if result == "true" {
+					atomic.AddInt64(&claimed, 1)
+				}
+			}()
+		}
+		wg.Wait()
+		assert.Equal(t, int64(0), failed, "no SetNX call should error")
+		assert.Equal(t, int64(1), claimed, "exactly one goroutine should claim the key")
+	})
+
+	t.Run("incr counts every update", func(t *testing.T) {
+		key := fmt.Sprintf("goja-store-race-incr-%d", time.Now().UnixNano())
+		var wg sync.WaitGroup
+		var failed int64
+		for i := 0; i < n; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if _, err := vm.Run(fmt.Sprintf(`TykStorageIncr(%q, 60)`, key)); err != nil {
+					atomic.AddInt64(&failed, 1)
+				}
+			}()
+		}
+		wg.Wait()
+		assert.Equal(t, int64(0), failed, "no Incr call should error")
+		final, err := vm.Run(fmt.Sprintf(`TykStorageGet(%q)`, key))
+		require.NoError(t, err)
+		assert.Equal(t, strconv.Itoa(n), final)
+	})
 }
