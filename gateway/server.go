@@ -2809,8 +2809,16 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 }
 
 func (gw *Gateway) ensureKVRegistry(conf config.Config) error {
+	// Constructing a gateway with a nil context is a long-supported test
+	// convenience; the registry bootstrap derives contexts internally and
+	// panics on a nil parent, so normalize here.
+	ctx := gw.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	if gw.kvRegistry == nil {
-		reg, err := config.NewLocalKVRegistry(gw.ctx, &conf)
+		reg, err := config.NewLocalKVRegistry(ctx, &conf)
 		if err != nil {
 			return err
 		}

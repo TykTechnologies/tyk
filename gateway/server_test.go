@@ -700,53 +700,6 @@ func TestKVResolvers_HotReloadBypassesCache(t *testing.T) {
 		"the hot-reload closure must re-resolve with a cache-bypass context")
 }
 
-// fakeKVProvider is a registry-backed stand-in for a remote provider: a fixed
-// key→value map with the same not-found contract as the real vault/consul
-// providers. Standalone, so the registry skips the cache wrapper and tests
-// observe every Get.
-type fakeKVProvider struct {
-	data map[string]string
-}
-
-func (f fakeKVProvider) Get(_ context.Context, key string) (string, error) {
-	val, ok := f.data[key]
-	if !ok {
-		return "", &kv.KeyNotFoundError{KeyPath: key}
-	}
-
-	return val, nil
-}
-
-func (f fakeKVProvider) IsStandalone() bool { return true }
-
-func installFakeKVStores(t *testing.T, gw *Gateway, stores map[string]map[string]string) {
-	t.Helper()
-
-	factories := make(map[kv.ProviderType]kv.ProviderFactory, len(stores))
-	storeCfgs := make(map[string]kv.StoreConfig, len(stores))
-
-	for name, data := range stores {
-		typ := kv.ProviderType("fake_" + name)
-		provider := fakeKVProvider{data: data}
-		factories[typ] = func(_ json.RawMessage) (kv.Provider, error) {
-			return provider, nil
-		}
-		storeCfgs[name] = kv.StoreConfig{Type: typ}
-	}
-
-	reg, err := registry.NewFromConfig(
-		t.Context(),
-		nil,
-		registry.WithDefaultStores(storeCfgs),
-		registry.WithFactories(factories),
-	)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = reg.Close(context.WithoutCancel(t.Context())) })
-
-	gw.kvRegistry = reg
-	gw.kvResolver = resolver.NewResolver(reg)
-}
-
 func TestKVStore_Secrets(t *testing.T) {
 	gw := NewGateway(config.Config{
 		Secrets: map[string]string{"db_password": "hunter2", "blank": ""},

@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -1345,43 +1344,24 @@ func TestLoopingUrl(t *testing.T) {
 	}
 }
 
-type mockKVStore struct {
-	store map[string]string
-}
-
-func (m *mockKVStore) Get(key string) (string, error) {
-	if val, ok := m.store[key]; ok {
-		return val, nil
-	}
-	return "", fmt.Errorf("secret not found: %s", key)
-}
-
-func (m *mockKVStore) Put(key, value string) error {
-	m.store[key] = value
-	return nil
-}
-
 func TestReplaceTykVariables(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	// Mock Vault KV store
-	ts.Gw.vaultKVStore = &mockKVStore{
-		store: map[string]string{
-			"kv-v2/layer1/layer2/dev.API_KEY": "vault_api_key_value",
-			"simplekey":                       "simple_vault_value",
+	installFakeKVStores(t, ts.Gw, map[string]map[string]string{
+		"vault": {
+			"kv-v2/layer1/layer2/dev": `{"API_KEY": "vault_api_key_value"}`,
+			"simplekey":               "simple_vault_value",
 		},
-	}
-
-	// Mock Consul KV store
-	ts.Gw.consulKVStore = &mockKVStore{
-		store: map[string]string{
+		"consul": {
 			"path/to/db_password": "consul_db_password_value",
 			"anotherkey":          "another_consul_value",
 		},
-	}
+		"secrets": {
+			"conf_key": "conf_secret_value",
+		},
+	})
 
-	// Set up environment variable for testing
 	t.Setenv("TYK_SECRET_ENV_VAR", "env_var_value")
 	t.Setenv("TYK_SECRET_ENV_VAR_WITH_UNDERSCORE", "env_var_underscore_value")
 
@@ -1450,6 +1430,16 @@ func TestReplaceTykVariables(t *testing.T) {
 			input:    "$secret_env.non_existent_env_var",
 			expected: "",
 		},
+		{
+			name:     "Config secret",
+			input:    "$secret_conf.conf_key",
+			expected: "conf_secret_value",
+		},
+		{
+			name:     "Non-existent config secret",
+			input:    "$secret_conf.non_existent_conf_key",
+			expected: "",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1459,6 +1449,35 @@ func TestReplaceTykVariables(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestReplaceTykVariables_SecretConf(t *testing.T) {
+	ts := StartTest(func(conf *config.Config) {
+		conf.Secrets = map[string]string{
+			"api_token": "conf-token-value",
+			"blank":     "",
+		}
+	})
+	defer ts.Close()
+
+	req := httptest.NewRequest("GET", "/", nil)
+
+	t.Run("present key resolves from the promoted secrets store", func(t *testing.T) {
+		got := ts.Gw.ReplaceTykVariables(req, "token=$secret_conf.api_token", false)
+		assert.Equal(t, "token=conf-token-value", got)
+	})
+
+	t.Run("missing key resolves to empty string", func(t *testing.T) {
+		got := ts.Gw.ReplaceTykVariables(req, "token=$secret_conf.missing", false)
+		assert.Equal(t, "token=", got)
+	})
+
+	t.Run("present key with empty value resolves to empty string", func(t *testing.T) {
+		// Legacy treated ok-but-empty the same as missing (token → "");
+		// resolving "" through the inline store produces the same output.
+		got := ts.Gw.ReplaceTykVariables(req, "token=$secret_conf.blank", false)
+		assert.Equal(t, "token=", got)
+	})
 }
 
 func TestReplaceTykVariables_NewSyntax(t *testing.T) {
@@ -1478,7 +1497,6 @@ func TestReplaceTykVariables_NewSyntax(t *testing.T) {
 	})
 
 	t.Run("$kv{} inline token is replaced within a larger string", func(t *testing.T) {
-		fmt.Println("het")
 		assert.Equal(t, "https://myhost/v1", ts.Gw.ReplaceTykVariables(req, "https://$kv{env:host}/v1", false))
 	})
 

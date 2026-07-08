@@ -15,3 +15,24 @@ func vaultDotToFragment(key string) string {
 
 	return key[:idx] + "#" + key[idx+1:]
 }
+
+// dollarSecretToKVRef converts a matched $secret_* token's key into the $kv{}
+// reference the resolver understands, routing each legacy label to its
+// registry store. The token regexes admit no '#', '{', '}' or ':' characters,
+// so the key cannot alter the reference's structure.
+func dollarSecretToKVRef(label, key string) string {
+	switch label {
+	case vaultLabel:
+		return "$kv{vault:" + vaultDotToFragment(key) + "}"
+	case consulLabel:
+		return "$kv{consul:" + key + "}"
+	case envLabel:
+		return "$kv{env:" + key + "}"
+	case secretsConfLabel:
+		return "$kv{secrets:" + key + "}"
+	case fileLabel:
+		return "$kv{file:" + key + "}"
+	default:
+		return ""
+	}
+}
