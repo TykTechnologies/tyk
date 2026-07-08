@@ -1784,7 +1784,7 @@ func TestReplaceSecretsFileScheme(t *testing.T) {
 		assert.Equal(t, "key-from-mount", api.JWTSource)
 	})
 
-	t.Run("absolute path in API definition is rejected when base_path is set", func(t *testing.T) {
+	t.Run("absolute path in API definition is rejected", func(t *testing.T) {
 		baseDir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(baseDir, "jwt-secret"), []byte("allowed-value"), 0600))
 
