@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,8 +13,6 @@ import (
 	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/storage/kv"
-	"github.com/TykTechnologies/storage/kv/registry"
-	"github.com/TykTechnologies/storage/kv/resolver"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -1636,77 +1633,6 @@ func WriteDefault(in string, conf *Config) error {
 	return WriteConf(in, conf)
 }
 
-// NewLocalKVRegistry builds a registry containing ONLY the local stores
-// (env, file, secrets) promoted from conf — no network, no kv.stores parsing,
-// no resolution. It is the registry a caller uses when it has an in-memory
-// config but must not go through LoadAndResolve (the gateway's test-mode
-// construction path).
-func NewLocalKVRegistry(ctx context.Context, conf *Config) (*registry.Registry, error) {
-	all := buildKVConfig(conf)
-
-	local := make(map[string]kv.StoreConfig, len(all))
-	for name, sc := range all {
-		if sc.Type.IsLocal() {
-			local[name] = sc
-		}
-	}
-
-	return registry.NewFromConfig(
-		ctx,
-		nil,
-		registry.WithDefaultStores(local),
-		registry.WithInitLogger(kvLogger{l: log}),
-	)
-}
-
-// LoadAndResolve runs Load, then the KV bootstrap and full-config resolution.
-// The caller owns the returned registry, including Close on shutdown.
-func LoadAndResolve(
-	ctx context.Context,
-	paths []string,
-	conf *Config,
-	factories map[kv.ProviderType]kv.ProviderFactory,
-) (*registry.Registry, error) {
-	err := Load(paths, conf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %w", err)
-	}
-
-	marshaledBytes, err := json.Marshal(conf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal config: %w", err)
-	}
-
-	conf.Private.UnresolvedConfig = marshaledBytes
-
-	r, err := registry.NewFromConfig(
-		ctx,
-		marshaledBytes,
-		registry.WithDefaultStores(buildKVConfig(conf)),
-		registry.WithFactories(factories),
-		registry.WithInitLogger(kvLogger{l: log}),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize KV registry: %w", err)
-	}
-
-	res := resolver.NewResolver(r)
-
-	resolvedBytes, err := res.ResolveAll(ctx, marshaledBytes)
-	if err != nil {
-		_ = r.Close(context.WithoutCancel(ctx))
-		return nil, fmt.Errorf("failed to resolve KV references in config: %w", err)
-	}
-
-	err = json.Unmarshal(resolvedBytes, conf)
-	if err != nil {
-		_ = r.Close(context.WithoutCancel(ctx))
-		return nil, fmt.Errorf("failed to unmarshal resolved config: %w", err)
-	}
-
-	return r, nil
-}
-
 // Load will load a configuration file, trying each of the paths given
 // and using the first one that is a regular file and can be opened.
 //
@@ -1797,91 +1723,4 @@ func processCustom(prefix string, c *Config, custom ...func(prefix string, c *Co
 		}
 	}
 	return nil
-}
-
-// buildKVConfig translates the legacy tyk.conf KV blocks (vault, consul, file,
-// secrets) into the store map the storage/kv library understands.
-func buildKVConfig(cfg *Config) map[string]kv.StoreConfig {
-	stores := make(map[string]kv.StoreConfig)
-
-	// prefix+uppercase reproduces the legacy os.Getenv("TYK_SECRET_" + ToUpper(key)).
-	// Every json.Marshal here takes static scalars and cannot fail — err is discarded.
-	envCfg, _ := json.Marshal(map[string]any{
-		"prefix":    "TYK_SECRET_",
-		"uppercase": true,
-	})
-	stores["env"] = kv.StoreConfig{
-		Type:   kv.Env,
-		Config: envCfg,
-	}
-
-	fileCfg, _ := json.Marshal(cfg.KV.File)
-	stores["file"] = kv.StoreConfig{
-		Type:   kv.File,
-		Config: fileCfg,
-	}
-
-	// Names "secrets" so legacy secrets:// references route here; values are literal.
-	if len(cfg.Secrets) > 0 {
-		data, _ := json.Marshal(map[string]any{
-			"data": cfg.Secrets,
-		})
-
-		stores["secrets"] = kv.StoreConfig{
-			Type:   kv.Inline,
-			Config: data,
-		}
-	}
-
-	// vault and consul stay Required:false — legacy warn-and-continue: an unreachable
-	// backend at startup logs a warning, it must not abort the gateway.
-	if cfg.KV.Vault.Address != "" || cfg.KV.Vault.Token != "" {
-		stores["vault"] = kv.StoreConfig{Type: kv.Vault, Config: marshalVaultConfig(cfg.KV.Vault)}
-	}
-
-	if cfg.KV.Consul.Address != "" {
-		stores["consul"] = kv.StoreConfig{Type: kv.Consul, Config: marshalConsulConfig(cfg.KV.Consul)}
-	}
-
-	return stores
-
-}
-
-// marshalVaultConfig serializes VaultConfig, converting Timeout (a time.Duration,
-// which marshals as int64 ns) to the "5s" string the vault provider expects.
-func marshalVaultConfig(v VaultConfig) json.RawMessage {
-	cfg := struct {
-		Address      string `json:"address"`
-		AgentAddress string `json:"agent_address"`
-		Token        string `json:"token"`
-		MaxRetries   int    `json:"max_retries"`
-		Timeout      string `json:"timeout"`
-		KVVersion    int    `json:"kv_version"`
-	}{
-		Address:      v.Address,
-		AgentAddress: v.AgentAddress,
-		Token:        v.Token,
-		MaxRetries:   v.MaxRetries,
-		Timeout:      v.Timeout.String(),
-		KVVersion:    v.KVVersion,
-	}
-	b, _ := json.Marshal(cfg)
-
-	return b
-}
-
-// marshalConsulConfig serializes ConsulConfig, converting WaitTime (a time.Duration,
-// which marshals as int64 ns) to the "5s" string the consul provider expects.
-func marshalConsulConfig(c ConsulConfig) json.RawMessage {
-	type alias ConsulConfig
-
-	b, _ := json.Marshal(struct {
-		alias
-		WaitTime string `json:"wait_time"`
-	}{
-		alias:    alias(c),
-		WaitTime: c.WaitTime.String(),
-	})
-
-	return b
 }
