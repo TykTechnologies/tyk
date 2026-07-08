@@ -1716,6 +1716,7 @@ func (gw *Gateway) initSystem() error {
 			return err
 		}
 
+		gw.closeKVRegistry(gw.ctx)
 		gw.kvRegistry = reg
 		gw.kvResolver = resolver.NewResolver(gw.kvRegistry)
 
