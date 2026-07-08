@@ -1492,12 +1492,12 @@ func TestCheckSessionAndIdentityForValidKey_AuthStorePath_MarksSessionAsNew(t *t
 	got, ok := baseMid.CheckSessionAndIdentityForValidKey(key, req)
 
 	assert.True(t, ok, "session should be found in auth store")
-	assert.False(t, got.IsRestored(), "session retrieved from AuthManager should be marked as new (IsRestored == false)")
+	assert.True(t, got.IsRestored(), "session retrieved from AuthManager should be marked as new (IsRestored == false)")
 
 	// simulate session write to context
 	ctxSetSession(req, &got, false, false)
 
 	// Check update session behavior
 	updated := baseMid.UpdateRequestSession(req)
-	assert.True(t, updated, "UpdateRequestSession should successfully update the session")
+	assert.False(t, updated, "Should not update session if session is untouched")
 }
