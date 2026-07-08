@@ -731,8 +731,6 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
 
-		session.Touch()
-
 		return session, found
 	}
 
