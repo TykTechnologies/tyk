@@ -697,9 +697,9 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
 		key = session.KeyID
-
 		session := session.Clone()
 		session.SetKeyHash(keyHash)
+		session.MarkAsNew()
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		t.Logger().Info("Recreating session for key: ", t.Gw.obfuscateKey(key))
 

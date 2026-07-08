@@ -386,9 +386,14 @@ func (s *SessionState) Reset() {
 	s.modified = false
 }
 
-// MarkAsRestored marks the session as new.
+// MarkAsRestored marks the session as restored.
 func (s *SessionState) MarkAsRestored() {
 	s.isRestored = true
+}
+
+// MarkAsNew marks the session as new.
+func (s *SessionState) MarkAsNew() {
+	s.isRestored = false
 }
 
 // IsRestored informs if session is a new one.
