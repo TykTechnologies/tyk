@@ -468,6 +468,8 @@ func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 
 	// Reset session state, useful for benchmarks when request object stays the same.
 	session.Reset()
+	// Mark session as restored for
+	session.MarkAsRestored()
 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		t.Gw.SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
@@ -699,7 +701,6 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		key = session.KeyID
 		session := session.Clone()
 		session.SetKeyHash(keyHash)
-		session.MarkAsNew() // mark remote MDCB session as new to make possible save it into the local storage (local redis)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		t.Logger().Info("Recreating session for key: ", t.Gw.obfuscateKey(key))
 
@@ -718,6 +719,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
 
 		session.Touch()
+		session.MarkAsNew() // mark remote MDCB session as new to make possible save it into the local storage (local redis)
 
 		return session, found
 	}
