@@ -14,11 +14,10 @@ import (
 	"log"
 	"time"
 
+	"github.com/TykTechnologies/storage/iamauth"
 	"github.com/TykTechnologies/storage/temporal/connector"
 	keyvalue "github.com/TykTechnologies/storage/temporal/keyvalue"
 	"github.com/TykTechnologies/storage/temporal/model"
-
-	"github.com/TykTechnologies/tyk/storage/iamauth/gcp"
 )
 
 func main() {
@@ -35,7 +34,10 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	provider, err := gcp.NewCredentialsProvider(ctx, gcp.Config{ServiceAccount: *serviceAccount})
+	provider, err := iamauth.NewProvider(ctx, iamauth.Config{
+		Provider:       iamauth.ProviderGCP,
+		ServiceAccount: *serviceAccount,
+	})
 	if err != nil {
 		log.Fatalf("FAIL: building GCP credentials provider: %v", err)
 	}
