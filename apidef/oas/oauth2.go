@@ -433,6 +433,13 @@ var oauth2ReservedJWTBearerFormKeys = map[string]struct{}{
 	OAuth2FormClientAssertionType: {},
 }
 
+// Grant labels naming the spec whose reserved wire keys a provider protects,
+// used in customParams validation errors.
+const (
+	grantLabelTokenExchange = "RFC 8693"
+	grantLabelJWTBearer     = "RFC 7523 jwt-bearer"
+)
+
 // ValidateOAuth2Schemes enforces token-exchange invariants across all configured
 // oauth2 schemes: non-empty providers when enabled, unique names, no overlapping
 // issuers within a scheme, non-empty tokenEndpoint and clientId, no reserved customParams keys.
@@ -521,6 +528,10 @@ func validateOAuth2ExchangeProvider(schemeName string, i int, p *OAuth2TokenExch
 	return validateExchangeCacheMode(schemeName, p)
 }
 
+// tokenEndpointContextVarPrefix marks a $tyk_context.* request-time variable in
+// a tokenEndpoint; its presence defers structural URL validation to request time.
+const tokenEndpointContextVarPrefix = "$tyk_context."
+
 // validateExchangeTokenEndpoint requires a non-empty, absolute http(s)
 // tokenEndpoint. It rejects non-HTTP SSRF vectors (file://, gopher://, …) but
 // deliberately does not apply host-level egress (private-IP) restrictions: the
@@ -532,11 +543,26 @@ func validateExchangeTokenEndpoint(schemeName string, p *OAuth2TokenExchangeProv
 	if p.TokenEndpoint == "" {
 		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q has empty tokenEndpoint", schemeName, p.Name)
 	}
-	u, err := url.Parse(p.TokenEndpoint)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+	// A $tyk_context.* variable can sit anywhere in the endpoint — including the
+	// scheme or host — and only resolves at request time, so a templated value
+	// cannot be structurally validated at load. The resolved value is re-checked
+	// with IsAbsoluteHTTPURL at request time.
+	if strings.Contains(p.TokenEndpoint, tokenEndpointContextVarPrefix) {
+		return nil
+	}
+	if !IsAbsoluteHTTPURL(p.TokenEndpoint) {
 		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q tokenEndpoint must be an absolute http(s) URL", schemeName, p.Name)
 	}
 	return nil
+}
+
+// IsAbsoluteHTTPURL reports whether s is an absolute http(s) URL with a host. It
+// rejects non-HTTP SSRF vectors (file://, gopher://, …) but applies no host-level
+// egress restriction. Used to validate a tokenEndpoint both at load and, once a
+// $tyk_context.* template has resolved, at request time.
+func IsAbsoluteHTTPURL(s string) bool {
+	u, err := url.Parse(s)
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }
 
 // validateExchangeClientAuth validates the client-authentication method.
@@ -582,15 +608,21 @@ func validateExchangeIssuers(schemeName string, p *OAuth2TokenExchangeProvider, 
 	return nil
 }
 
-// validateIssuerRegex requires a regex: issuer pattern to compile and to be
-// explicitly anchored so a tenant pattern cannot accidentally match inside a
-// longer, attacker-chosen issuer value.
+// Regex anchors required on a regex: issuer pattern.
+const (
+	regexAnchorStart = "^"
+	regexAnchorEnd   = "$"
+)
+
+// validateIssuerRegex requires a regex: issuer pattern to be explicitly anchored
+// so a tenant pattern cannot accidentally match inside a longer, attacker-chosen
+// issuer value, and to compile.
 func validateIssuerRegex(schemeName, providerName, pattern string) error {
+	if !strings.HasPrefix(pattern, regexAnchorStart) || !strings.HasSuffix(pattern, regexAnchorEnd) {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q issuers regex %q must be anchored (^…$)", schemeName, providerName, pattern)
+	}
 	if _, err := regexp.Compile(pattern); err != nil {
 		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q issuers regex %q does not compile: %v", schemeName, providerName, pattern, err)
-	}
-	if !strings.HasPrefix(pattern, "^") || !strings.HasSuffix(pattern, "$") {
-		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q issuers regex %q must be anchored (^…$)", schemeName, providerName, pattern)
 	}
 	return nil
 }
@@ -610,9 +642,9 @@ func validateExchangeGrantType(schemeName string, p *OAuth2TokenExchangeProvider
 // validateExchangeCustomParams rejects customParams that would override a wire
 // key the gateway sets under the provider's grant.
 func validateExchangeCustomParams(schemeName string, p *OAuth2TokenExchangeProvider) error {
-	reservedKeys, grantLabel := oauth2ReservedExchangeFormKeys, "RFC 8693"
+	reservedKeys, grantLabel := oauth2ReservedExchangeFormKeys, grantLabelTokenExchange
 	if p.IsJWTBearer() {
-		reservedKeys, grantLabel = oauth2ReservedJWTBearerFormKeys, "RFC 7523 jwt-bearer"
+		reservedKeys, grantLabel = oauth2ReservedJWTBearerFormKeys, grantLabelJWTBearer
 	}
 	for key := range p.CustomParams {
 		if _, reserved := reservedKeys[key]; reserved {

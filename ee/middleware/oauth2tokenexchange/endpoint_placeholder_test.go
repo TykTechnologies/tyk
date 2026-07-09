@@ -76,6 +76,36 @@ func TestFetchExchangedToken_EndpointVariables(t *testing.T) {
 	})
 }
 
+// TestFetchExchangedToken_ResolvedEndpointValidated pins that a $tyk_context.*
+// substitution resolving to a non-http(s) target is rejected before any request
+// reaches the wire — the structural check skipped at load runs on the resolved value.
+func TestFetchExchangedToken_ResolvedEndpointValidated(t *testing.T) {
+	target := &oauth2common.Target{Audience: "api://orders", Scopes: []string{"Orders.Read"}}
+
+	for name, resolved := range map[string]string{
+		"non-http scheme": "file:///etc/passwd",
+		"scheme-less":     "not-a-url",
+		"empty":           "",
+	} {
+		t.Run(name+" is rejected without calling the IdP", func(t *testing.T) {
+			provider := &oas.OAuth2TokenExchangeProvider{
+				Name:          "corp-idp",
+				GrantType:     oas.OAuth2ProviderGrantJWTBearer,
+				TokenEndpoint: "$tyk_context.jwt_claims_endpoint",
+				ClientAuth:    &oas.OAuth2ClientAuth{Method: oas.OAuth2ClientAuthPost, ClientID: "cid", ClientSecret: "s"},
+			}
+			st := &oauth2common.State{
+				ReplaceVariables: func(string) string { return resolved },
+				RawToken:         "inbound",
+			}
+			r := httptest.NewRequest(http.MethodGet, "/", nil)
+			_, _, err := mwWithoutTykOps().fetchExchangedToken(r, st, provider, target)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "not an absolute http(s) URL")
+		})
+	}
+}
+
 // TestFetchExchangedToken_EndpointVariables_CacheIsPerTenant pins that a
 // cached exchanged token is never served across tenants.
 func TestFetchExchangedToken_EndpointVariables_CacheIsPerTenant(t *testing.T) {

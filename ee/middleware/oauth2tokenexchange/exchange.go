@@ -107,6 +107,12 @@ func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State
 	if st.ReplaceVariables != nil {
 		endpoint = st.ReplaceVariables(endpoint)
 	}
+	// A templated tokenEndpoint skips structural validation at load; validate the
+	// resolved value here so a bad $tyk_context.* substitution never reaches the
+	// wire as a non-http(s) target.
+	if !oas.IsAbsoluteHTTPURL(endpoint) {
+		return "", false, fmt.Errorf("resolved tokenEndpoint %q is not an absolute http(s) URL", endpoint)
+	}
 	tenantEndpoint := ""
 	if endpoint != provider.TokenEndpoint {
 		// Per-tenant endpoint: exchange against a copy so the shared provider

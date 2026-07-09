@@ -20,6 +20,8 @@ func compiledIssuerRegex(pattern string) (*regexp.Regexp, error) {
 	if err != nil {
 		return nil, err
 	}
-	issuerRegexCache.Store(pattern, re)
-	return re, nil
+	// LoadOrStore atomically resolves a concurrent first-miss: every caller
+	// returns the one cached regexp instead of racing Load/Store as a pair.
+	actual, _ := issuerRegexCache.LoadOrStore(pattern, re)
+	return actual.(*regexp.Regexp), nil
 }

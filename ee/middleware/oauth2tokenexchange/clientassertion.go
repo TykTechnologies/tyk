@@ -22,6 +22,10 @@ import (
 // Short by design — the assertion is single-use against one token request.
 const clientAssertionTTL = 5 * time.Minute
 
+// joseHeaderX5TS256 is the JOSE header parameter (RFC 7515 §4.1.8) carrying the
+// base64url-encoded SHA-256 certificate thumbprint the IdP uses to select the key.
+const joseHeaderX5TS256 = "x5t#S256"
+
 // buildClientAssertion mints a private_key_jwt client-authentication assertion
 // (RFC 7523 §2.2) signed with the certificate's RSA private key. The JOSE header
 // carries the SHA-256 certificate thumbprint (`x5t#S256`) so the IdP can select
@@ -49,7 +53,7 @@ func buildClientAssertion(cert *tls.Certificate, clientID, tokenEndpoint, jti st
 		"nbf": now.Unix(),
 		"exp": now.Add(clientAssertionTTL).Unix(),
 	})
-	token.Header["x5t#S256"] = thumbprint
+	token.Header[joseHeaderX5TS256] = thumbprint
 
 	signed, err := token.SignedString(key)
 	if err != nil {
