@@ -104,6 +104,8 @@ func (m *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 		switch e := err.(type) {
 		case *oauth2common.NoMatchingProviderError:
 			m.writeNoMatchingProviderResponse(w, r, e)
+		case *oauth2common.StepUpRequiredError:
+			m.writeStepUpRequiredResponse(w, r, e)
 		case *oauth2common.MisconfigError:
 			m.writeMisconfigResponse(w, r, e)
 		default:

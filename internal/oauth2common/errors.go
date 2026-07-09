@@ -24,6 +24,33 @@ func (e *NoMatchingProviderError) Error() string {
 	return fmt.Sprintf("no token-exchange provider configured for issuer %s", e.Iss)
 }
 
+// StepUpRequiredError is raised when a jwt-bearer exchange returns
+// error=interaction_required instead of a token: the user must sign in again,
+// which only the caller can act on. It is an expected control-flow event, not
+// a failure: the gateway relays it to the caller as an HTTP 401 with a
+// WWW-Authenticate insufficient_claims challenge, and it is never cached.
+// Claims is the raw challenge from the IdP (a JSON string); AuthorizationURI
+// is the authorize endpoint the caller completes the step-up against, when known.
+type StepUpRequiredError struct {
+	Claims           string
+	AuthorizationURI string
+}
+
+func (e *StepUpRequiredError) Error() string {
+	return "step_up_required: the IdP returned a claims challenge (interaction_required)"
+}
+
+// DecodeClaimsChallenge extracts the `claims` challenge and optional
+// authorization_uri from an interaction_required error body.
+func DecodeClaimsChallenge(body []byte) (claims, authorizationURI string) {
+	var p struct {
+		Claims           string `json:"claims"`
+		AuthorizationURI string `json:"authorization_uri"`
+	}
+	_ = json.Unmarshal(body, &p)
+	return p.Claims, p.AuthorizationURI
+}
+
 // ExchangeFailedError represents a non-2xx IdP token-endpoint response.
 type ExchangeFailedError struct {
 	Status      int

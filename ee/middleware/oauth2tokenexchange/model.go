@@ -4,6 +4,7 @@ package oauth2tokenexchange
 
 import (
 	"context"
+	"crypto/tls"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -32,6 +33,11 @@ type BaseMiddleware interface {
 
 	// RecordExchangeCacheHit increments the dedicated cache_hit counter.
 	RecordExchangeCacheHit(ctx context.Context, provider string)
+
+	// GetClientCertificate returns the certificate (with private key) stored
+	// under certID, used to sign a private_key_jwt client assertion. Errors
+	// when the store is unavailable or the certificate is not found.
+	GetClientCertificate(certID string) (*tls.Certificate, error)
 }
 
 // EffectiveIdPTimeout returns d, falling back to DefaultIdPTimeout when d is zero.

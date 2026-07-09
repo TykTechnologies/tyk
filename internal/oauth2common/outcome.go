@@ -23,6 +23,10 @@ const (
 	// OutcomeNoMatchingProvider: the inbound token's issuer matched no
 	// configured provider.
 	OutcomeNoMatchingProvider OutcomeKind = "no_matching_provider"
+	// OutcomeStepUpRequired: a jwt-bearer exchange returned a claims challenge
+	// (interaction_required). An expected control-flow event relayed to the
+	// caller as a 401 insufficient_claims challenge — not an idp_error.
+	OutcomeStepUpRequired OutcomeKind = "step_up_required"
 )
 
 // ClassifyExchangeOutcome maps an exchange result to its bounded OutcomeKind.
@@ -40,6 +44,10 @@ func ClassifyExchangeOutcome(err error) OutcomeKind {
 	var misconfig *MisconfigError
 	if errors.As(err, &misconfig) {
 		return OutcomeMisconfig
+	}
+	var stepUp *StepUpRequiredError
+	if errors.As(err, &stepUp) {
+		return OutcomeStepUpRequired
 	}
 	return OutcomeIdPError
 }
