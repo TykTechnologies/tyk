@@ -19,7 +19,7 @@ godebug (
 require (
 	github.com/Jeffail/tunny v0.1.4
 	github.com/Masterminds/sprig/v3 v3.3.0
-	github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed
+	github.com/TykTechnologies/again v0.0.0-20260702122454-93dd864dd1d9
 	github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible
 	github.com/TykTechnologies/drl v0.0.0-20231218155806-88e4363884a2
 	github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481
