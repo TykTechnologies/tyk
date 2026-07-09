@@ -124,15 +124,33 @@ func TestLoadAndResolve_InjectedFactoryResolvesCustomStore(t *testing.T) {
 }
 
 func TestLoadAndResolve_MalformedReferenceFailsStartup(t *testing.T) {
-	path := writeTempConf(t, `{"secret": "kv://no-path-separator"}`)
+	tests := []struct {
+		name string
+		raw  string
+	}{
+		{
+			name: "kv:// without a path separator",
+			raw:  `{"secret": "kv://no-path-separator"}`,
+		},
+		{
+			name: "unclosed $kv{ token",
+			raw:  `{"secret": "$kv{unclosed"}`,
+		},
+	}
 
-	var conf Config
-	reg, err := LoadAndResolve(t.Context(), []string{path}, &conf, nil)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writeTempConf(t, tc.raw)
 
-	require.Error(t, err, "a malformed kv:// reference must fail startup")
-	require.ErrorIs(t, err, resolver.ErrMalformedReference,
-		"the underlying resolver error must be surfaced")
-	require.Nil(t, reg, "no registry is returned on a resolution failure")
+			var conf Config
+			reg, err := LoadAndResolve(t.Context(), []string{path}, &conf, nil)
+
+			require.Error(t, err, "a malformed reference must fail startup")
+			require.ErrorIs(t, err, resolver.ErrMalformedReference,
+				"the underlying resolver error must be surfaced")
+			require.Nil(t, reg, "no registry is returned on a resolution failure")
+		})
+	}
 }
 
 func TestLoadAndResolve_NoKVReferencesLeavesConfigUnchanged(t *testing.T) {

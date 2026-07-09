@@ -83,7 +83,7 @@ func (gw *Gateway) kvStoreCtx(ctx context.Context, value string) (string, error)
 		log.Debugf("Retrieving %s from consul", key)
 		store, err := gw.kvRegistry.GetStore("consul")
 		if err != nil {
-			log.Error(`Failed to get "consul" store: `, err)
+			log.Error(`Failed to get store: `, err)
 
 			return value, nil
 		}
@@ -97,7 +97,7 @@ func (gw *Gateway) kvStoreCtx(ctx context.Context, value string) (string, error)
 
 		resolved, err := gw.kvResolver.Resolve(ctx, "kv://vault/"+vaultDotToFragment(key))
 		if errors.Is(err, kvLib.ErrStoreNotFound) {
-			log.Error(`Failed to get "vault" store: `, err)
+			log.Error(`Failed to get store: `, err)
 
 			return value, nil
 		}
