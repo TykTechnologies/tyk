@@ -218,6 +218,12 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 // parameter for a HTTP request would. If no replacement has been made, `in`
 // is returned without modification.
 func (gw *Gateway) ReplaceTykVariables(r *http.Request, in string, escape bool) string {
+	// kv:// and $kv{} tokens in API definitions are resolved once at API load
+	// (replaceSecrets), so they rarely reach this point. When that load-time
+	// pass fails, the spec keeps its literal tokens — this pass then resolves
+	// them per request for the strings routed through here (the spec itself
+	// is only fixed by a successful reload). It also covers strings that
+	// never went through the API-definition loader.
 	if gw.kvResolver != nil && (strings.Contains(in, "kv://") || strings.Contains(in, "$kv{")) {
 		if resolved, err := gw.kvResolver.Resolve(r.Context(), in); err == nil {
 			in = resolved
