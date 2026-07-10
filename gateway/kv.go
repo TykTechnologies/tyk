@@ -181,8 +181,6 @@ func (gw *Gateway) closeKVRegistry(ctx context.Context) {
 		return
 	}
 
-	mainLog.Info("Closing KV registry provider connections")
-
 	if err := gw.kvRegistry.Close(ctx); err != nil {
 		mainLog.WithError(err).Error("Error closing KV registry")
 	}

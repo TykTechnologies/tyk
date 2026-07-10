@@ -1715,7 +1715,9 @@ func (gw *Gateway) initSystem() error {
 			return err
 		}
 
+		mainLog.Debug("Replacing bootstrap KV registry")
 		gw.closeKVRegistry(gw.ctx)
+
 		gw.kvRegistry = reg
 		gw.kvResolver = resolver.NewResolver(gw.kvRegistry)
 
@@ -2631,6 +2633,7 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 
 	gw.cacheClose()
 
+	mainLog.Info("Closing KV registry provider connections")
 	gw.closeKVRegistry(ctx)
 
 	// Check if there were any errors during shutdown
