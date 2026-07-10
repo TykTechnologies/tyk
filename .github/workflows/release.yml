@@ -1110,7 +1110,6 @@ jobs:
           variation: ${{ env.VARIATION }}
           base_ref: ${{ env.BASE_REF }}
           test_type: api
-          fallback_ref: release-5.13
   api-tests:
     needs:
       - test-controller-api
