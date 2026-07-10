@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -605,4 +606,37 @@ func keysOf(m map[string]kv.StoreConfig) []string {
 	}
 
 	return keys
+}
+
+// BenchmarkLoadAndResolve measures the gateway's real startup resolution path
+// (Load + FillEnv + registry bootstrap + strict ResolveAll + unmarshal) as a
+// function of KV reference count.
+func BenchmarkLoadAndResolve(b *testing.B) {
+	b.Setenv("TYK_SECRET_BENCH_VAL", "bench-value")
+
+	for _, n := range []int{0, 20, 50, 100} {
+		secrets := make(map[string]string, n)
+		for i := 0; i < n; i++ {
+			secrets[fmt.Sprintf("key_%d", i)] = "kv://env/bench_val"
+		}
+
+		doc, err := json.Marshal(map[string]any{"secrets": secrets})
+		require.NoError(b, err)
+
+		path := filepath.Join(b.TempDir(), "tyk.conf")
+		require.NoError(b, os.WriteFile(path, doc, 0o644))
+
+		b.Run(fmt.Sprintf("refs=%d", n), func(b *testing.B) {
+			for b.Loop() {
+				var conf Config
+
+				reg, err := LoadAndResolve(context.Background(), []string{path}, &conf, nil)
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				_ = reg.Close(context.Background())
+			}
+		})
+	}
 }
