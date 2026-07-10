@@ -473,6 +473,58 @@ func TestPinnedPublicKeys(t *testing.T) {
 	assert.Equal(t, pinnedPublicKeys, resultPinnedPublicKeys)
 }
 
+func TestSplitPublicKeys(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		title    string
+		input    string
+		expected []string
+	}{
+		{
+			"single fingerprint",
+			"abc123",
+			[]string{"abc123"},
+		},
+		{
+			"comma-separated fingerprints",
+			"abc123,def456",
+			[]string{"abc123", "def456"},
+		},
+		{
+			"fingerprints with spaces around separator",
+			"abc123, def456",
+			[]string{"abc123", "def456"},
+		},
+		{
+			"fingerprint with leading and trailing spaces",
+			"  abc123  ",
+			[]string{"abc123"},
+		},
+		{
+			"raw PEM block preserved as single entry",
+			"-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----",
+			[]string{"-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"},
+		},
+		{
+			"raw PEM block with surrounding whitespace trimmed",
+			"  -----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----  ",
+			[]string{"-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"},
+		},
+		{
+			"empty string produces no keys",
+			"",
+			[]string{},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.title, func(t *testing.T) {
+			assert.Equal(t, tc.expected, splitPublicKeys(tc.input))
+		})
+	}
+}
+
 func TestCertificatePinning(t *testing.T) {
 	t.Run("extractTo api definition", func(t *testing.T) {
 		testcases := []struct {
