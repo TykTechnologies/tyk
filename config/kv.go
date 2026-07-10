@@ -53,12 +53,12 @@ func LoadAndResolve(
 ) (*registry.Registry, error) {
 	err := Load(paths, conf)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %w", err)
+		return nil, fmt.Errorf("load config: %w", err)
 	}
 
 	marshaledBytes, err := json.Marshal(conf)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal config: %w", err)
+		return nil, fmt.Errorf("encode config: %w", err)
 	}
 
 	conf.Private.UnresolvedConfig = marshaledBytes
@@ -71,7 +71,7 @@ func LoadAndResolve(
 		registry.WithInitLogger(kvLogger{l: log}),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize KV registry: %w", err)
+		return nil, fmt.Errorf("initialize KV registry: %w", err)
 	}
 
 	res := resolver.NewResolver(r)
@@ -79,13 +79,13 @@ func LoadAndResolve(
 	resolvedBytes, err := res.ResolveAll(ctx, marshaledBytes)
 	if err != nil {
 		_ = r.Close(context.WithoutCancel(ctx))
-		return nil, fmt.Errorf("failed to resolve KV references in config: %w", err)
+		return nil, fmt.Errorf("resolve KV references in config: %w", err)
 	}
 
 	err = json.Unmarshal(resolvedBytes, conf)
 	if err != nil {
 		_ = r.Close(context.WithoutCancel(ctx))
-		return nil, fmt.Errorf("failed to unmarshal resolved config: %w", err)
+		return nil, fmt.Errorf("decode resolved config: %w", err)
 	}
 
 	return r, nil
