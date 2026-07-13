@@ -1180,21 +1180,13 @@ type Config struct {
 	// The default is 60 seconds. This must be a positive value. If you set to 0 this uses the default value.
 	RegexpCacheExpire int32 `json:"regexp_cache_expire"`
 
-	// RegexpCacheMaxEntries caps the per-cache LRU size for the regex
-	// compile caches. Defaults to 5000 when unset (0).
-	// To opt into the legacy unbounded cache, set `disable_regexp_cache_bound` to true instead.
+	// Caps the maximum size of the gateway's internal regular expression compile cache. The default is 5000.
 	RegexpCacheMaxEntries int `json:"regexp_cache_max_entries"`
 
-	// DisableRegexpCacheBound opts into the legacy unbounded regex compile
-	// cache (no size eviction). Only safe when the distinct-pattern keyspace
-	// is naturally bounded by API/session shape. The default (`false`) keeps the LRU bound active.
+	// If set to `true`, reverts Tyk to its legacy, unbounded regex cache behavior. The default is `false`.
 	DisableRegexpCacheBound bool `json:"disable_regexp_cache_bound"`
 
-	// DisableAutoMaxProcs opts out of `automaxprocs` GOMAXPROCS adjustment.
-	// By default Tyk aligns GOMAXPROCS with the container's cgroup CPU quota
-	// Set to `true` only if you are pinning GOMAXPROCS yourself or
-	// running outside a CPU-quota-aware environment. No-op outside cgroup
-	// CPU-quota environments either way.
+	// Disables the automatic alignment of the Go runtime's GOMAXPROCS with the container's CPU quota at startup. The default is `false`.
 	DisableAutoMaxProcs bool `json:"disable_auto_max_procs"`
 
 	// Tyk can cache some data locally, this can speed up lookup times on a single node and lower the number of connections and operations being done on Redis. It will however introduce a slight delay when updating or modifying keys as the cache must expire.
