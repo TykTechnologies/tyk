@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -132,7 +133,7 @@ func (gw *Gateway) validatePairedMCPAdapterUpstream(_ *http.Request, mcpObj *oas
 		return "Paired REST API " + restAPIID + " is a Classic API; REST-as-MCP sources must be Tyk OAS APIs", http.StatusBadRequest
 	}
 
-	view, warnings, err := oas.DeriveMCPToolView(&rest.OAS, mcpObj.GetTykMCPServerExtension())
+	view, warnings, err := oas.DeriveMCPToolViewStrict(&rest.OAS, mcpObj.GetTykMCPServerExtension())
 	logMCPDeriveWarnings(incoming.APIID, restAPIID, warnings)
 	if err != nil {
 		return err.Error(), http.StatusBadRequest
@@ -279,8 +280,17 @@ func (gw *Gateway) alignPairedMCPProxyGatewayTags(apiDef *apidef.APIDefinition, 
 }
 
 func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int) {
+	dryRun, err := boolQueryParam(r, "dryRun")
+	if err != nil {
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+	expand, err := boolQueryParam(r, "expand")
+	if err != nil {
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
 	versionParams := lib.NewVersionQueryParameters(r.URL.Query())
-	err := versionParams.Validate(func() (bool, string) {
+	err = versionParams.Validate(func() (bool, string) {
 		baseApiID := versionParams.Get(lib.BaseAPIID)
 		baseApi := gw.getApiSpec(baseApiID)
 		if baseApi != nil {
@@ -326,6 +336,18 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 
 	newDef.IsOAS = true
 	oasObj.GetTykExtension().Info.ID = newDef.APIID
+	if dryRun {
+		if expand {
+			expanded, err := gw.expandMCPProxyDefinition(oasObj)
+			if err != nil {
+				return apiError(err.Error()), http.StatusBadRequest
+			}
+			return expanded, http.StatusOK
+		}
+		return oasObj, http.StatusOK
+	}
+
+	oasObj.CompactTykMCPServerExtension()
 	err, errCode := gw.writeOASAndAPIDefToFile(fs, newDef, oasObj)
 	if err != nil {
 		return apiError(err.Error()), errCode
@@ -377,6 +399,7 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 	}
 
 	newDef.IsOAS = true
+	oasObj.CompactTykMCPServerExtension()
 	err, errCode := gw.writeOASAndAPIDefToFile(fs, newDef, oasObj)
 	if err != nil {
 		return apiError(err.Error()), errCode
@@ -399,11 +422,35 @@ func (gw *Gateway) handleGetMCP(apiID string) (interface{}, int) {
 	return gw.handleGetOASByID(apiID, mcpTypeCheck)
 }
 
+func (gw *Gateway) handleGetMCPWithExpand(apiID string, expand bool) (interface{}, int) {
+	obj, code := gw.handleGetMCP(apiID)
+	if code != http.StatusOK || !expand {
+		return obj, code
+	}
+
+	oasObj, ok := obj.(*oas.OAS)
+	if !ok {
+		return obj, code
+	}
+
+	expanded, err := gw.expandMCPProxyDefinition(oasObj)
+	if err != nil {
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+	return expanded, http.StatusOK
+}
+
 func (gw *Gateway) mcpGetHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 	log.Debugf("Requesting MCP definition for %q", apiID)
 
-	obj, code := gw.handleGetMCP(apiID)
+	expand, err := boolQueryParam(r, "expand")
+	if err != nil {
+		doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+		return
+	}
+
+	obj, code := gw.handleGetMCPWithExpand(apiID, expand)
 
 	if code == http.StatusOK {
 		if oasAPI, ok := obj.(*oas.OAS); ok {
@@ -412,6 +459,67 @@ func (gw *Gateway) mcpGetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doJSONWrite(w, code, obj)
+}
+
+func boolQueryParam(r *http.Request, name string) (bool, error) {
+	raw := r.URL.Query().Get(name)
+	if raw == "" {
+		return false, nil
+	}
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, fmt.Errorf("invalid %s query parameter", name)
+	}
+	return value, nil
+}
+
+func (gw *Gateway) expandMCPProxyDefinition(proxyOAS *oas.OAS) (*oas.OAS, error) {
+	if proxyOAS == nil {
+		return nil, fmt.Errorf("MCP Proxy OAS is nil")
+	}
+
+	var proxyDef apidef.APIDefinition
+	proxyOAS.ExtractTo(&proxyDef)
+
+	_, restAPIID, ok := pairedMCPAdapterTarget(proxyDef.Proxy.TargetURL)
+	if !ok {
+		return proxyOAS.Clone()
+	}
+
+	rest, err := gw.validateAndGetMCPExpansionSource(restAPIID, proxyDef.OrgID)
+	if err != nil {
+		return nil, err
+	}
+
+	expanded, err := proxyOAS.Clone()
+	if err != nil {
+		return nil, err
+	}
+
+	mcpServer, warnings, err := oas.ExpandMCPServerConfig(&rest.OAS, expanded.GetTykMCPServerExtension())
+	logMCPDeriveWarnings(proxyDef.APIID, restAPIID, warnings)
+	if err != nil {
+		return nil, err
+	}
+	expanded.SetTykMCPServerExtension(mcpServer)
+	return expanded, nil
+}
+
+func (gw *Gateway) validateAndGetMCPExpansionSource(restAPIID, orgID string) (*APISpec, error) {
+	gw.apisMu.RLock()
+	rest := gw.apisByID[restAPIID]
+	gw.apisMu.RUnlock()
+
+	if rest == nil || rest.APIDefinition == nil {
+		return nil, fmt.Errorf("paired REST API %s is not loaded; create it first", restAPIID)
+	}
+	if rest.OrgID != orgID {
+		return nil, fmt.Errorf("paired REST API belongs to a different OrgID")
+	}
+	if !rest.IsOAS {
+		return nil, fmt.Errorf("paired REST API %s is a Classic API; REST-as-MCP sources must be Tyk OAS APIs", restAPIID)
+	}
+	return rest, nil
 }
 
 func (gw *Gateway) mcpCreateHandler(w http.ResponseWriter, r *http.Request) {

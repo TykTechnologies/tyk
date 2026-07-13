@@ -71,6 +71,59 @@
           },
           "allow": {
             "type": "boolean"
+          },
+          "inputSchema": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "outputSchema": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "parameterLocations": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "parameterSourceNames": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "parameterSerializations": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "sourceName": {
+                  "type": "string"
+                },
+                "location": {
+                  "type": "string"
+                },
+                "style": {
+                  "type": "string"
+                },
+                "explode": {
+                  "type": "boolean"
+                },
+                "schemaType": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "parameterOrder": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requestBodyContentType": {
+            "type": "string"
           }
         },
         "additionalProperties": false
