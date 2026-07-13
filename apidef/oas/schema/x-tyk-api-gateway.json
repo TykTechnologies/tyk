@@ -1413,6 +1413,9 @@
         "batchProcessing": {
           "$ref": "#/definitions/X-Tyk-BatchProcessing"
         },
+        "requestBodyPassthrough": {
+          "$ref": "#/definitions/X-Tyk-RequestBodyPassthrough"
+        },
         "port": {
           "type": "integer",
           "minimum": 1,
@@ -2848,6 +2851,16 @@
       }
     },
     "X-Tyk-BatchProcessing": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-RequestBodyPassthrough": {
       "properties": {
         "enabled": {
           "type": "boolean"

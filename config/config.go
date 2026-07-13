@@ -655,6 +655,11 @@ type HttpServerOptionsConfig struct {
 	// https://tyk.io/docs/api-management/traffic-transformation/#request-size-limits
 	MaxRequestBodySize int64 `json:"max_request_body_size"`
 
+	// EnableRequestBodyPassthrough, when true, allows opted-in APIs (see the
+	// per-API requestBodyPassthrough option) to skip the Gateway's request-body
+	// buffering and stream the body straight to the upstream instead.
+	EnableRequestBodyPassthrough bool `json:"enable_request_body_passthrough"`
+
 	// XFFDepth controls which position in the X-Forwarded-For chain to use for determining client IP address.
 	// A value of 0 means using the first IP (default). this is way the Gateway has calculated the client IP historically,
 	// the most common case, and will be used when this config is not set.

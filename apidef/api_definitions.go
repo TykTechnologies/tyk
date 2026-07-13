@@ -777,8 +777,13 @@ type APIDefinition struct {
 	GlobalRateLimit                      GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
 	StripAuthData                        bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
 	EnableDetailedRecording              bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
-	GraphQL                              GraphQLConfig          `bson:"graphql" json:"graphql"`
-	AnalyticsPlugin                      AnalyticsPluginConfig  `bson:"analytics_plugin" json:"analytics_plugin,omitempty"`
+	// EnableRequestBodyPassthrough, when true, allows the reverse proxy to skip
+	// its redundant deep copy of the request body for this API, provided the
+	// Gateway-wide http_server_options.enable_request_body_passthrough gate is
+	// also enabled.
+	EnableRequestBodyPassthrough bool                  `bson:"enable_request_body_passthrough" json:"enable_request_body_passthrough"`
+	GraphQL                      GraphQLConfig         `bson:"graphql" json:"graphql"`
+	AnalyticsPlugin              AnalyticsPluginConfig `bson:"analytics_plugin" json:"analytics_plugin,omitempty"`
 
 	// Gateway segment tags
 	TagsDisabled bool     `bson:"tags_disabled" json:"tags_disabled,omitempty"`
