@@ -95,6 +95,25 @@ func TestBuildUpstreamRequest_PathQueryHeader(t *testing.T) {
 	assert.Equal(t, "http", req.URL.Scheme)
 }
 
+func TestBuildUpstreamRequest_DoesNotForwardParentAuthOrMCPTransportHeaders(t *testing.T) {
+	t.Parallel()
+
+	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
+	parent.Header.Set("Authorization", "Bearer consumer-token")
+	parent.Header.Set("Mcp-Session-Id", "consumer-session")
+	parent.Header.Set("MCP-Protocol-Version", "2025-06-18")
+	tool := sampleTool(t, "getOrder")
+
+	req, err := BuildUpstreamRequest(parent, tool, "rest-1", map[string]any{
+		"id": "42",
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, req.Header.Get("Authorization"))
+	assert.Empty(t, req.Header.Get("Mcp-Session-Id"))
+	assert.Empty(t, req.Header.Get("MCP-Protocol-Version"))
+}
+
 func TestBuildUpstreamRequest_DetachesFromParentCancellation(t *testing.T) {
 	t.Parallel()
 	type contextKey string
