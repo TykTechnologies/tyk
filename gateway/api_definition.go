@@ -1991,12 +1991,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	return combinedPath, whiteListEnabled
 }
 
-func (a *APISpec) Init(
-	authStore storage.Handler,
-	healthStore storage.Handler,
-	orgStore storage.Handler,
-) {
-
+func (a *APISpec) Init(authStore, healthStore, orgStore storage.Handler) {
 	a.AuthManager.Init(authStore)
 	a.Health.Init(healthStore)
 	a.OrgSessionManager.Init(orgStore)

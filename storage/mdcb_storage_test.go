@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage/mock"
 )
 
@@ -416,12 +415,11 @@ func Test_MdcbStorage(t *testing.T) {
 		local  *mock.MockHandler
 		rpc    *mock.MockHandler
 		logger *logrus.Logger
-		hook   *logger.Hook
 	}
 
 	newTestMdcbStorage := func(t *testing.T) testMdcbStorage {
 		t.Helper()
-		nullLogger, hook := logrustest.NewNullLogger()
+		nullLogger, _ := logrustest.NewNullLogger()
 
 		ctrl := gomock.NewController(t)
 		local := mock.NewMockHandler(ctrl)
@@ -438,7 +436,6 @@ func Test_MdcbStorage(t *testing.T) {
 			local:       local,
 			rpc:         rpc,
 			logger:      nullLogger,
-			hook:        logger.NewHook(hook),
 		}
 	}
 
