@@ -1485,6 +1485,9 @@ func TestCheckSessionAndIdentityForValidKey_AuthStorePath_MarksSessionAsNew(t *t
 	// ensure that session was copied from remote repo into the local one
 	globalStorageHandler.EXPECT().SetKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
 
+	// ensure that session was updated at the end of UpdateRequestSession
+	globalStorageHandler.EXPECT().SetKeyEx(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
+
 	baseMid := NewBaseMiddleware(ts.Gw, api, nil, nil)
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 
@@ -1499,5 +1502,5 @@ func TestCheckSessionAndIdentityForValidKey_AuthStorePath_MarksSessionAsNew(t *t
 
 	// Check update session behavior
 	updated := baseMid.UpdateRequestSession(req)
-	assert.False(t, updated, "Should not update session if session is untouched")
+	assert.True(t, updated, "Should update session if session is touched")
 }
