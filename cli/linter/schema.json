@@ -886,6 +886,9 @@
         "enable_websockets": {
           "type": "boolean"
         },
+        "enable_request_body_passthrough": {
+          "type": "boolean"
+        },
         "enable_strict_routes": {
           "type": "boolean"
         },
