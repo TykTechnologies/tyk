@@ -112,6 +112,14 @@ func TestRecordDetail(t *testing.T) {
 			}),
 			expect: true,
 		},
+		{
+			title: "request body passthrough enabled, overrides detailed recording",
+			spec: testAPISpec(func(spec *APISpec) {
+				spec.EnableDetailedRecording = true
+				spec.EnableRequestBodyPassthrough = true
+			}),
+			expect: false,
+		},
 	}
 
 	for _, tc := range testcases {

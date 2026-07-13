@@ -129,6 +129,11 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 	if r.Body == nil {
 		return
 	}
+	// the request body passes straight through to the upstream and is not
+	// available to re-read for graph analytics
+	if spec.EnableRequestBodyPassthrough {
+		return
+	}
 	body, err := io.ReadAll(r.Body)
 	defer func() {
 		_ = r.Body.Close()
@@ -364,6 +369,12 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 func recordDetail(r *http.Request, spec *APISpec) bool {
 	// when streaming in grpc, we do not record the request
 	if httputil.IsStreamingRequest(r) {
+		return false
+	}
+
+	// the request body passes straight through to the upstream and is not
+	// available to re-read for detailed recording
+	if spec.EnableRequestBodyPassthrough {
 		return false
 	}
 
