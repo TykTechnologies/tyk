@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -20,7 +19,6 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -1831,6 +1829,48 @@ func TestReplaceSecretsFileScheme(t *testing.T) {
 	})
 }
 
+func TestReplaceSecrets_LegacyVaultConsul(t *testing.T) {
+	gw := NewGateway(config.Config{}, t.Context())
+
+	installFakeKVStores(t, gw, map[string]map[string]string{
+		"consul": {
+			"tyk-apis/c2_value": "consul-c2-resolved",
+		},
+		"vault": {
+			"secret/tyk-apis": `{"auth_header_name":"vault-field-resolved"}`,
+		},
+	})
+
+	l := APIDefinitionLoader{Gw: gw}
+
+	t.Run("consul whole value", func(t *testing.T) {
+		out := l.replaceSecrets([]byte(`{"target_url":"consul://c2_value"}`))
+		require.JSONEq(t, `{"target_url":"consul-c2-resolved"}`, string(out))
+	})
+
+	t.Run("consul inline within a larger string", func(t *testing.T) {
+		out := l.replaceSecrets([]byte(`{"h":"prefix-consul://c2_value-suffix"}`))
+		require.JSONEq(t, `{"h":"prefix-consul-c2-resolved-suffix"}`, string(out))
+	})
+
+	t.Run("vault whole value resolves a field of secret/tyk-apis", func(t *testing.T) {
+		out := l.replaceSecrets([]byte(`{"auth_header_name":"vault://auth_header_name"}`))
+		require.JSONEq(t, `{"auth_header_name":"vault-field-resolved"}`, string(out))
+	})
+
+	t.Run("vault inline within a larger string", func(t *testing.T) {
+		out := l.replaceSecrets([]byte(`{"h":"prefix-vault://auth_header_name-suffix"}`))
+		require.JSONEq(t, `{"h":"prefix-vault-field-resolved-suffix"}`, string(out))
+	})
+
+	t.Run("legacy and new syntax for the same target resolve together", func(t *testing.T) {
+		out := l.replaceSecrets([]byte(
+			`{"legacy":"consul://c2_value","new":"kv://consul/tyk-apis/c2_value"}`))
+		require.JSONEq(t,
+			`{"legacy":"consul-c2-resolved","new":"consul-c2-resolved"}`, string(out))
+	})
+}
+
 func TestInternalEndpointMW_TT_11126(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -2626,193 +2666,68 @@ func TestAPISpec_Version(t *testing.T) {
 
 }
 
-// mockVaultSecretReader implements vaultSecretReader and kv.Store for testing.
-type mockVaultSecretReader struct {
-	secret *vaultapi.Secret
-	err    error
-}
-
-func (m *mockVaultSecretReader) ReadSecret(_ string) (*vaultapi.Secret, error) {
-	return m.secret, m.err
-}
-
-func (m *mockVaultSecretReader) Get(_ string) (string, error) { return "", nil }
-func (m *mockVaultSecretReader) Put(_, _ string) error        { return nil }
-
-// mockKVStoreWithoutSecretReader implements kv.Store but NOT kv.SecretReader.
-type mockKVStoreWithoutSecretReader struct{}
-
-func (m *mockKVStoreWithoutSecretReader) Get(_ string) (string, error) { return "", nil }
-func (m *mockKVStoreWithoutSecretReader) Put(_, _ string) error        { return nil }
-
 // TT-14791: A non-existent Vault path caused a panic due to nil secret.
 func TestReplaceVaultSecrets(t *testing.T) {
-	t.Run("vault store does not implement SecretReader", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
+	// newLoader builds a redis-free gateway with the given fake KV stores.
+	// A nil map installs a registry with no vault store.
+	newLoader := func(t *testing.T, stores map[string]map[string]string) APIDefinitionLoader {
+		t.Helper()
 
-		ts.Gw.vaultKVStore = &mockKVStoreWithoutSecretReader{}
+		gw := NewGateway(config.Config{}, t.Context())
+		installFakeKVStores(t, gw, stores)
 
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
+		return APIDefinitionLoader{Gw: gw}
+	}
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "could not read secrets")
+	// withVaultSecret puts the given JSON at the fixed secret's logical path.
+	withVaultSecret := func(secretJSON string) map[string]map[string]string {
+		return map[string]map[string]string{"vault": {vaultSecretPath: secretJSON}}
+	}
+
+	t.Run("resolves fields whole-value and inline", func(t *testing.T) {
+		l := newLoader(t, withVaultSecret(`{"auth_header_name":"X-From-Vault","db":"hunter2"}`))
+
+		input := `{"a":"vault://auth_header_name","b":"prefix-vault://db-suffix"}`
+		require.NoError(t, l.replaceVaultSecrets(&input))
+		require.JSONEq(t, `{"a":"X-From-Vault","b":"prefix-hunter2-suffix"}`, input)
 	})
 
-	t.Run("vault path does not exist - nil secret", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
-
-		// nil secret simulates non-existent path
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{secret: nil, err: nil}
-
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "vault path does not exist")
-	})
-
-	t.Run("vault path contains no data", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
-
-		// non-nil secret but nil Data simulates empty/deleted secret
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{
-			secret: &vaultapi.Secret{Data: nil},
-			err:    nil,
-		}
-
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "vault path contains no data")
-	})
-
-	t.Run("vault ReadSecret returns error", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
-
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{
-			secret: nil,
-			err:    errors.New("vault server unavailable"),
-		}
-
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "vault server unavailable")
-	})
-
-	t.Run("vault secret missing data key", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
-
-		// secret.Data exists but doesn't have "data" key
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{
-			secret: &vaultapi.Secret{
-				Data: map[string]interface{}{
-					"other-key": "some-value",
-				},
-			},
-		}
-
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "no data returned")
-	})
-
-	t.Run("vault secret data is wrong type", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
-
-		// secret.Data["data"] exists but is not a map
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{
-			secret: &vaultapi.Secret{
-				Data: map[string]interface{}{
-					"data": "not-a-map",
-				},
-			},
-		}
-
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "data is not in the map format")
-	})
-
-	t.Run("vault secrets replaced successfully", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
-
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{
-			secret: &vaultapi.Secret{
-				Data: map[string]interface{}{
-					"data": map[string]interface{}{
-						"secret-key": "my-secret-value",
-					},
-				},
-			},
-		}
-
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
-
-		assert.NoError(t, err)
-		assert.Equal(t, "some-api-key: my-secret-value", input)
-	})
-
-	t.Run("multiline value produces valid JSON", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
-
+	t.Run("multiline value keeps the document valid JSON", func(t *testing.T) {
 		multiline := "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIU\n-----END CERTIFICATE-----\n"
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{
-			secret: &vaultapi.Secret{
-				Data: map[string]interface{}{
-					"data": map[string]interface{}{
-						"certo": multiline,
-					},
-				},
-			},
-		}
+		secretJSON, err := json.Marshal(map[string]string{"certo": multiline})
+		require.NoError(t, err)
 
-		l := APIDefinitionLoader{Gw: ts.Gw}
+		l := newLoader(t, withVaultSecret(string(secretJSON)))
+
 		input := `{"allowlist":["vault://certo"]}`
-		err := l.replaceVaultSecrets(&input)
+		require.NoError(t, l.replaceVaultSecrets(&input))
 
-		assert.NoError(t, err)
-		var result map[string]interface{}
-		assert.NoError(t, json.Unmarshal([]byte(input), &result), "substituted JSON must be valid")
+		var result map[string]any
+		require.NoError(t, json.Unmarshal([]byte(input), &result), "substituted JSON must be valid")
+	})
+
+	t.Run("store not registered", func(t *testing.T) {
+		l := newLoader(t, nil) // registry has no vault store
+
+		input := `{"a":"vault://x"}`
+		require.Error(t, l.replaceVaultSecrets(&input))
+		require.Contains(t, input, "vault://x", "reference must be left literal")
+	})
+
+	t.Run("fixed secret missing", func(t *testing.T) {
+		l := newLoader(t, map[string]map[string]string{"vault": {"some/other/path": "{}"}})
+
+		input := `{"a":"vault://x"}`
+		require.Error(t, l.replaceVaultSecrets(&input))
+		require.Contains(t, input, "vault://x", "reference must be left literal")
+	})
+
+	t.Run("secret value is not JSON", func(t *testing.T) {
+		l := newLoader(t, withVaultSecret("not-json"))
+
+		input := `{"a":"vault://x"}`
+		require.Error(t, l.replaceVaultSecrets(&input))
+		require.Contains(t, input, "vault://x", "reference must be left literal")
 	})
 }
 
