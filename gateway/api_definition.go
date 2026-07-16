@@ -18,6 +18,7 @@ import (
 	texttemplate "text/template"
 	"time"
 
+	"github.com/TykTechnologies/storage/kv"
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 
 	"github.com/TykTechnologies/tyk/internal/httpctx"
@@ -49,8 +50,6 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
-
-	kvLib "github.com/TykTechnologies/storage/kv"
 )
 
 // const used by cache middleware
@@ -604,7 +603,7 @@ func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
 		return fmt.Errorf("retrieve %q store: %w", "consul", err)
 	}
 
-	l, ok := kvLib.AsLister(store)
+	l, ok := kv.AsLister(store)
 	if !ok {
 		return errors.New("assign store to lister interface")
 	}
@@ -637,8 +636,8 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 	pairsJson, err := store.Get(a.Gw.ctx, vaultSecretPath)
 	if err != nil {
 		var (
-			unavailableErr *kvLib.StoreUnavailableError
-			notFoundErr    *kvLib.KeyNotFoundError
+			unavailableErr *kv.StoreUnavailableError
+			notFoundErr    *kv.KeyNotFoundError
 		)
 
 		switch {

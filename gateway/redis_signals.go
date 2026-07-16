@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	kvLib "github.com/TykTechnologies/storage/kv"
+	"github.com/TykTechnologies/storage/kv"
 	"github.com/TykTechnologies/storage/kv/resolver"
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
 
@@ -360,7 +360,7 @@ func (gw *Gateway) updateKeyInStore(keyPath, newKey string) {
 		return
 	}
 
-	setter, ok := kvLib.AsSetter(store)
+	setter, ok := kv.AsSetter(store)
 	if !ok {
 		log.Warnf("Cannot persist rotated API key: KV store %q is not writable", ref.Store)
 		return

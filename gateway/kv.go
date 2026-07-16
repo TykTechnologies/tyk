@@ -1,8 +1,6 @@
 // This file is the gateway's KV resolution surface: registry lifecycle
 // (ensureKVRegistry/closeKVRegistry), the legacy-scheme resolution shim
-// (kvStore/kvStoreCtx) with its hot-reload closure registration (resolveKV),
-// and the legacy vault/consul store setup that bulk operations at API Definition
-// still depend on (setUpVault/setUpConsul).
+// (kvStore/kvStoreCtx) with its hot-reload closure registration (resolveKV).
 
 package gateway
 
@@ -11,11 +9,10 @@ import (
 	"errors"
 	"strings"
 
-	kvLib "github.com/TykTechnologies/storage/kv"
+	"github.com/TykTechnologies/storage/kv"
 	"github.com/TykTechnologies/storage/kv/resolver"
 
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage/kv"
 )
 
 func (gw *Gateway) resolveKV(original string, set func(*config.Config, string), hotReload bool) (string, error) {
@@ -25,7 +22,7 @@ func (gw *Gateway) resolveKV(original string, set func(*config.Config, string), 
 	}
 	if hotReload && resolved != original {
 		gw.kvResolvers = append(gw.kvResolvers, func() error {
-			val, err := gw.kvStoreCtx(kvLib.WithCacheBypass(gw.ctx), original)
+			val, err := gw.kvStoreCtx(kv.WithCacheBypass(gw.ctx), original)
 			if err != nil {
 				return err
 			}
@@ -96,7 +93,7 @@ func (gw *Gateway) kvStoreCtx(ctx context.Context, value string) (string, error)
 		log.Debugf("Retrieving %s from vault", key)
 
 		resolved, err := gw.kvResolver.Resolve(ctx, "kv://vault/"+vaultDotToFragment(key))
-		if errors.Is(err, kvLib.ErrStoreNotFound) {
+		if errors.Is(err, kv.ErrStoreNotFound) {
 			log.Error(`Failed to get store: `, err)
 
 			return value, nil
@@ -119,36 +116,6 @@ func (gw *Gateway) kvStoreCtx(ctx context.Context, value string) (string, error)
 	}
 
 	return gw.kvResolver.Resolve(ctx, value)
-}
-
-func (gw *Gateway) setUpVault() error {
-	if gw.vaultKVStore != nil {
-		return nil
-	}
-
-	var err error
-
-	gw.vaultKVStore, err = kv.NewVault(gw.GetConfig().KV.Vault)
-	if err != nil {
-		log.Debugf("an error occurred while setting up vault... %v", err)
-	}
-
-	return err
-}
-
-func (gw *Gateway) setUpConsul() error {
-	if gw.consulKVStore != nil {
-		return nil
-	}
-
-	var err error
-
-	gw.consulKVStore, err = kv.NewConsul(gw.GetConfig().KV.Consul)
-	if err != nil {
-		log.Debugf("an error occurred while setting up consul.. %v", err)
-	}
-
-	return err
 }
 
 func (gw *Gateway) ensureKVRegistry(conf config.Config) error {

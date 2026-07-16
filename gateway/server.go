@@ -72,7 +72,6 @@ import (
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/storage/kv"
 	"github.com/TykTechnologies/tyk/tcp"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/trace"
@@ -186,9 +185,6 @@ type Gateway struct {
 	pendingCerts     sync.Map          // certID -> struct{}, certs skipped due to tracker miss
 
 	dnsCacheManager dnscache.IDnsCacheManager
-
-	consulKVStore kv.Store
-	vaultKVStore  kv.Store
 
 	// signatureVerifier is used to verify signatures with config.PublicKeyPath.
 	signatureVerifier atomic.Pointer[goverify.Verifier]
