@@ -273,7 +273,7 @@ func (gw *Gateway) processSpec(
 		fixFuncPath(prefix, mwPostAuthCheckFuncs)
 		fixFuncPath(prefix, mwResponseFuncs)
 
-		if spec.AnalyticsPlugin.Enabled && spec.AnalyticsPlugin.PluginPath != "" {
+		if spec.AnalyticsPlugin.Enabled && spec.AnalyticsPlugin.PluginPath != "" && !filepath.IsAbs(spec.AnalyticsPlugin.PluginPath) {
 			spec.AnalyticsPlugin.PluginPath = filepath.Join(prefix, spec.AnalyticsPlugin.PluginPath)
 		}
 	}
