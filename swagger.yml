@@ -2737,7 +2737,8 @@ paths:
       - Keys
   /tyk/keys/create:
     post:
-      description: Create a key.
+      description: Create a key. Functionally equivalent to `POST /tyk/keys`, provided
+        as an alternative, explicitly-named endpoint.
       operationId: createKey
       requestBody:
         content:
@@ -2826,7 +2827,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Malformed body.
-      summary: Create a key.
+      summary: Create a key (alternative endpoint).
       tags:
       - Keys
   /tyk/keys/policy/{keyID}:
