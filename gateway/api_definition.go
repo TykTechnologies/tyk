@@ -2490,7 +2490,7 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	}
 
 	// skip sanitizing if was rewritten
-	if ctxGetURLRewriteTarget(r) != nil {
+	if ctxGetUrlRewritten(r) {
 		return
 	}
 
