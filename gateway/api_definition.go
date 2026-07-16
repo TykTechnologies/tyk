@@ -599,8 +599,7 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
 	store, err := a.Gw.kvRegistry.GetStore("consul")
 	if err != nil {
-		// TODO: Check how it looks on terminal
-		return fmt.Errorf("retrieve %q store: %w", "consul", err)
+		return fmt.Errorf("retrieve store: %w", err)
 	}
 
 	l, ok := kv.AsLister(store)
@@ -629,8 +628,7 @@ func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
 func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 	store, err := a.Gw.kvRegistry.GetStore("vault")
 	if err != nil {
-		// TODO: Check how it looks on terminal
-		return fmt.Errorf("retrieve %q store: %w", "vault", err)
+		return fmt.Errorf("retrieve store: %w", err)
 	}
 
 	pairsJson, err := store.Get(a.Gw.ctx, vaultSecretPath)
