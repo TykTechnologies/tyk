@@ -175,7 +175,7 @@ func (b *Bundler) validateManifest(manifest *apidef.BundleManifest) (err error) 
 		definedHooks++
 	}
 
-	if manifest.CustomMiddleware.Analytics.Name != "" {
+	if manifest.CustomMiddleware.TrafficLogs.Name != "" {
 		definedHooks++
 	}
 

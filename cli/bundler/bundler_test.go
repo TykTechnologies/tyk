@@ -222,7 +222,7 @@ func TestValidateBundle(t *testing.T) {
 	manifest := &apidef.BundleManifest{
 		FileList: []string{},
 		CustomMiddleware: apidef.MiddlewareSection{
-			Analytics: apidef.MiddlewareDefinition{
+			TrafficLogs: apidef.MiddlewareDefinition{
 				Name: "analyticsBundle",
 			},
 			Driver: apidef.GoPluginDriver,

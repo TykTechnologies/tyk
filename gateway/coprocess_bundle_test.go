@@ -833,7 +833,7 @@ func TestAddToSpec_AnalyticsPlugin(t *testing.T) {
 			Manifest: apidef.BundleManifest{
 				FileList: []string{},
 				CustomMiddleware: apidef.MiddlewareSection{
-					Analytics: apidef.MiddlewareDefinition{
+					TrafficLogs: apidef.MiddlewareDefinition{
 						Disabled: false,
 						Name:     pluginFuncName,
 						Path:     pluginPath,
@@ -855,7 +855,7 @@ func TestAddToSpec_AnalyticsPlugin(t *testing.T) {
 
 	t.Run("should omit disabled plugin", func(t *testing.T) {
 		bundle := getBundle()
-		bundle.Manifest.CustomMiddleware.Analytics.Disabled = true
+		bundle.Manifest.CustomMiddleware.TrafficLogs.Disabled = true
 		bundle.AddToSpec()
 
 		assert.False(t, bundle.Spec.AnalyticsPlugin.Enabled)

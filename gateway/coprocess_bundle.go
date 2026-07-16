@@ -161,10 +161,10 @@ func (b *Bundle) AddToSpec() {
 	b.Spec.CustomMiddleware = b.Manifest.CustomMiddleware
 
 	// Map analytics plugin from manifest to APISpec
-	if !b.Manifest.CustomMiddleware.Analytics.Disabled && b.Manifest.CustomMiddleware.Analytics.Name != "" {
+	if !b.Manifest.CustomMiddleware.TrafficLogs.Disabled && b.Manifest.CustomMiddleware.TrafficLogs.Name != "" {
 		b.Spec.AnalyticsPlugin.Enabled = true
-		b.Spec.AnalyticsPlugin.FuncName = b.Manifest.CustomMiddleware.Analytics.Name
-		b.Spec.AnalyticsPlugin.PluginPath = b.Manifest.CustomMiddleware.Analytics.Path
+		b.Spec.AnalyticsPlugin.FuncName = b.Manifest.CustomMiddleware.TrafficLogs.Name
+		b.Spec.AnalyticsPlugin.PluginPath = b.Manifest.CustomMiddleware.TrafficLogs.Path
 	}
 
 	// Load Python interpreter if the
