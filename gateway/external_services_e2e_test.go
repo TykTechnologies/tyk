@@ -5,9 +5,11 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -608,4 +610,124 @@ func TestE2E_VaultHotReload(t *testing.T) {
 	assert.Equal(t, "/updated/cert.pem", conf.ExternalServices.OAuth.MTLS.CertFile)
 	assert.Equal(t, "/updated/key.pem", conf.ExternalServices.OAuth.MTLS.KeyFile)
 	assert.Equal(t, "/updated/ca.pem", conf.ExternalServices.OAuth.MTLS.CAFile)
+}
+
+// TestE2E_EdgeKeyRotationWriteBack drives the MDCB slave-key rotation write-back
+// end to end.
+func TestE2E_EdgeKeyRotationWriteBackVault(t *testing.T) {
+	const (
+		oldKey = "old-edge-key"
+		newKey = "new-edge-key"
+	)
+
+	var (
+		mu        sync.Mutex
+		gotMethod string
+		gotPath   string
+		gotBody   string
+	)
+
+	mockVault := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+
+		mu.Lock()
+		gotMethod, gotPath, gotBody = r.Method, r.URL.Path, string(body)
+		mu.Unlock()
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"version":1}}`))
+	}))
+	defer mockVault.Close()
+
+	ts := StartTest(func(gc *config.Config) {
+		gc.SlaveOptions.APIKey = oldKey
+		gc.KV.Vault = config.VaultConfig{Address: mockVault.URL, Token: "test-token", KVVersion: 2}
+	})
+	defer ts.Close()
+
+	conf := ts.Gw.GetConfig()
+	conf.Private.EdgeOriginalAPIKeyPath = "vault://secret/tyk-apis.api_key"
+	ts.Gw.SetConfig(conf)
+
+	// Point the registry at the real vault provider against the mock backend.
+	vaultCfg, err := json.Marshal(map[string]any{
+		"address": mockVault.URL, "token": "test-token", "kv_version": 2,
+	})
+	require.NoError(t, err)
+	installKVRegistry(t, ts.Gw, map[string]kv.StoreConfig{
+		"vault": {Type: kv.Vault, Config: vaultCfg},
+	}, nil)
+
+	// Trigger the rotation exactly as MDCB does.
+	ts.Gw.handleUserKeyReset(fmt.Sprintf("%s.%s:%s", oldKey, newKey, NoticeUserKeyReset))
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	assert.Equal(t, http.MethodPut, gotMethod)
+	assert.Equal(t, "/v1/secret/data/tyk-apis", gotPath,
+		"rotated key must land at the same physical path the legacy Put used (KV v2 /data injection)")
+	assert.JSONEq(t, `{"data":{"api_key":"new-edge-key"}}`, gotBody,
+		"write body must match the legacy single-field data map, byte-for-byte")
+	assert.Equal(t, newKey, ts.Gw.GetConfig().SlaveOptions.APIKey,
+		"in-memory slave key must also be rotated")
+}
+
+// TestE2E_EdgeKeyRotationWriteBackConsul is the consul mirror of the vault
+// write-back E2E: the same trigger and chain, but consul writes the value
+// verbatim at the verbatim key (PUT /v1/kv/<key>), with no field map or /data
+// injection — byte-for-byte the legacy Consul.Put.
+func TestE2E_EdgeKeyRotationWriteBackConsul(t *testing.T) {
+	const (
+		oldKey = "old-edge-key"
+		newKey = "new-edge-key"
+	)
+
+	var (
+		mu        sync.Mutex
+		gotMethod string
+		gotPath   string
+		gotBody   string
+	)
+
+	mockConsul := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+
+		mu.Lock()
+		gotMethod, gotPath, gotBody = r.Method, r.URL.Path, string(body)
+		mu.Unlock()
+
+		// Consul answers a successful KV PUT with 200 and the literal "true".
+		_, _ = w.Write([]byte("true"))
+	}))
+	defer mockConsul.Close()
+
+	ts := StartTest(func(gc *config.Config) {
+		gc.SlaveOptions.APIKey = oldKey
+	})
+	defer ts.Close()
+
+	conf := ts.Gw.GetConfig()
+	conf.Private.EdgeOriginalAPIKeyPath = "consul://tyk-apis/edge_key"
+	ts.Gw.SetConfig(conf)
+
+	consulCfg, err := json.Marshal(map[string]any{
+		"address": strings.TrimPrefix(mockConsul.URL, "http://"),
+	})
+	require.NoError(t, err)
+	installKVRegistry(t, ts.Gw, map[string]kv.StoreConfig{
+		"consul": {Type: kv.Consul, Config: consulCfg},
+	}, nil)
+
+	ts.Gw.handleUserKeyReset(fmt.Sprintf("%s.%s:%s", oldKey, newKey, NoticeUserKeyReset))
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	assert.Equal(t, http.MethodPut, gotMethod)
+	assert.Equal(t, "/v1/kv/tyk-apis/edge_key", gotPath,
+		"rotated key must be written at the verbatim consul key, no transform")
+	assert.Equal(t, newKey, gotBody,
+		"consul write body is the raw value, byte-for-byte the legacy Put")
+	assert.Equal(t, newKey, ts.Gw.GetConfig().SlaveOptions.APIKey)
 }
