@@ -2,9 +2,11 @@ package upstreamoauth_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -232,6 +234,284 @@ func TestProvider_PasswordAuthorizeType(t *testing.T) {
 			},
 		},
 	}...)
+}
+
+// bodyOnlyTokenServer imitates an IdP that rejects header (Basic) client
+// authentication and only accepts client credentials in the request body.
+// Every token request increments *requestCount; expectedForm keys are asserted
+// against the successful (body-credentials) request.
+func bodyOnlyTokenServer(t *testing.T, requestCount *int, expectedForm url.Values) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		*requestCount++
+
+		if r.Header.Get("Authorization") != "" {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"invalid_client"}`))
+			return
+		}
+
+		body, err := io.ReadAll(r.Body)
+		assert.NoError(t, err)
+		parsed, err := url.ParseQuery(string(body))
+		assert.NoError(t, err)
+		for key, want := range expectedForm {
+			assert.Equal(t, want, parsed[key], "form key %q", key)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"body-only-token","token_type":"bearer","expires_in":3600}`))
+	}))
+}
+
+// headerOnlyTokenServer imitates an IdP that only accepts client credentials
+// via HTTP Basic authentication and rejects credentials in the request body.
+func headerOnlyTokenServer(t *testing.T, requestCount *int, wantBasicAuth string) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		*requestCount++
+
+		body, err := io.ReadAll(r.Body)
+		assert.NoError(t, err)
+		parsed, err := url.ParseQuery(string(body))
+		assert.NoError(t, err)
+
+		if r.Header.Get("Authorization") != wantBasicAuth || parsed.Get("client_secret") != "" {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"invalid_client"}`))
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"header-only-token","token_type":"bearer","expires_in":3600}`))
+	}))
+}
+
+// buildUpstreamOAuthAPI loads a keyless API proxying with the given upstream
+// OAuth configuration on the given listen path.
+func buildUpstreamOAuthAPI(tst *gateway.Test, listenPath string, oauth apidef.UpstreamOAuth) {
+	tst.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.Proxy.ListenPath = listenPath
+			spec.UseKeylessAccess = true
+			spec.UpstreamAuth = apidef.UpstreamAuth{
+				Enabled: true,
+				OAuth:   oauth,
+			}
+			spec.Proxy.StripListenPath = true
+		},
+	)
+}
+
+func TestProvider_ClientCredentials_MethodPost(t *testing.T) {
+	tst := StartTest(nil)
+	t.Cleanup(tst.Close)
+
+	var requestCount int
+	ts := bodyOnlyTokenServer(t, &requestCount, url.Values{
+		"grant_type":    {"client_credentials"},
+		"client_id":     {"CC_POST_CLIENT"},
+		"client_secret": {"CC_POST_SECRET"},
+	})
+	t.Cleanup(ts.Close)
+
+	buildUpstreamOAuthAPI(tst, "/upstream-oauth-cc-post/", apidef.UpstreamOAuth{
+		Enabled:               true,
+		AllowedAuthorizeTypes: []string{apidef.OAuthAuthorizationTypeClientCredentials},
+		ClientCredentials: apidef.ClientCredentials{
+			ClientAuthData: apidef.ClientAuthData{
+				ClientID:     "CC_POST_CLIENT",
+				ClientSecret: "CC_POST_SECRET",
+				Method:       apidef.OAuth2ClientAuthPost,
+			},
+			TokenURL: ts.URL + "/token",
+			Header:   apidef.AuthSource{Enabled: true, Name: "Authorization"},
+		},
+	})
+
+	_, _ = tst.Run(t, test.TestCase{
+		Path: "/upstream-oauth-cc-post/",
+		Code: http.StatusOK,
+		BodyMatchFunc: func(body []byte) bool {
+			resp := struct {
+				Headers map[string]string `json:"headers"`
+			}{}
+			assert.NoError(t, json.Unmarshal(body, &resp))
+			assert.Equal(t, "Bearer body-only-token", resp.Headers[header.Authorization])
+			return true
+		},
+	})
+
+	assert.Equal(t, 1, requestCount, "expected a single token request with body credentials, no Basic Auth probe")
+}
+
+func TestProvider_Password_MethodPost(t *testing.T) {
+	tst := StartTest(nil)
+	t.Cleanup(tst.Close)
+
+	// The password-grant token cache key is derived from client ID, secret and
+	// scopes only (not the token URL), so use per-run credentials to avoid
+	// serving a token cached in Redis by a previous run.
+	clientID := fmt.Sprintf("PW_POST_CLIENT_%d", time.Now().UnixNano())
+
+	var requestCount int
+	ts := bodyOnlyTokenServer(t, &requestCount, url.Values{
+		"grant_type":    {"password"},
+		"client_id":     {clientID},
+		"client_secret": {"PW_POST_SECRET"},
+		"username":      {"user1"},
+		"password":      {"password1"},
+	})
+	t.Cleanup(ts.Close)
+
+	buildUpstreamOAuthAPI(tst, "/upstream-oauth-pw-post/", apidef.UpstreamOAuth{
+		Enabled:               true,
+		AllowedAuthorizeTypes: []string{apidef.OAuthAuthorizationTypePassword},
+		PasswordAuthentication: apidef.PasswordAuthentication{
+			ClientAuthData: apidef.ClientAuthData{
+				ClientID:     clientID,
+				ClientSecret: "PW_POST_SECRET",
+				Method:       apidef.OAuth2ClientAuthPost,
+			},
+			Username: "user1",
+			Password: "password1",
+			TokenURL: ts.URL + "/token",
+			Header:   apidef.AuthSource{Enabled: true, Name: "Authorization"},
+		},
+	})
+
+	_, _ = tst.Run(t, test.TestCase{
+		Path: "/upstream-oauth-pw-post/",
+		Code: http.StatusOK,
+		BodyMatchFunc: func(body []byte) bool {
+			resp := struct {
+				Headers map[string]string `json:"headers"`
+			}{}
+			assert.NoError(t, json.Unmarshal(body, &resp))
+			assert.Equal(t, "Bearer body-only-token", resp.Headers[header.Authorization])
+			return true
+		},
+	})
+
+	assert.Equal(t, 1, requestCount, "expected a single token request with body credentials, no Basic Auth probe")
+}
+
+func TestProvider_ClientCredentials_MethodBasic(t *testing.T) {
+	tst := StartTest(nil)
+	t.Cleanup(tst.Close)
+
+	var requestCount int
+	ts := headerOnlyTokenServer(t, &requestCount, "Basic Q0xJRU5UX0lEOkNMSUVOVF9TRUNSRVQ=")
+	t.Cleanup(ts.Close)
+
+	buildUpstreamOAuthAPI(tst, "/upstream-oauth-cc-basic/", apidef.UpstreamOAuth{
+		Enabled:               true,
+		AllowedAuthorizeTypes: []string{apidef.OAuthAuthorizationTypeClientCredentials},
+		ClientCredentials: apidef.ClientCredentials{
+			ClientAuthData: apidef.ClientAuthData{
+				ClientID:     "CLIENT_ID",
+				ClientSecret: "CLIENT_SECRET",
+				Method:       apidef.OAuth2ClientAuthBasic,
+			},
+			TokenURL: ts.URL + "/token",
+			Header:   apidef.AuthSource{Enabled: true, Name: "Authorization"},
+		},
+	})
+
+	_, _ = tst.Run(t, test.TestCase{
+		Path: "/upstream-oauth-cc-basic/",
+		Code: http.StatusOK,
+		BodyMatchFunc: func(body []byte) bool {
+			resp := struct {
+				Headers map[string]string `json:"headers"`
+			}{}
+			assert.NoError(t, json.Unmarshal(body, &resp))
+			assert.Equal(t, "Bearer header-only-token", resp.Headers[header.Authorization])
+			return true
+		},
+	})
+
+	assert.Equal(t, 1, requestCount, "expected a single token request with header credentials")
+}
+
+// TestProvider_ClientCredentials_MethodEmpty_AutoDetectFallback pins the
+// backwards-compatible default: with method unset, Tyk keeps the RFC
+// auto-detect behaviour — the first attempt uses Basic Auth (rejected by a
+// body-only IdP), the second retries with body credentials and succeeds.
+func TestProvider_ClientCredentials_MethodEmpty_AutoDetectFallback(t *testing.T) {
+	tst := StartTest(nil)
+	t.Cleanup(tst.Close)
+
+	var requestCount int
+	ts := bodyOnlyTokenServer(t, &requestCount, url.Values{
+		"grant_type":    {"client_credentials"},
+		"client_id":     {"CC_AUTO_CLIENT"},
+		"client_secret": {"CC_AUTO_SECRET"},
+	})
+	t.Cleanup(ts.Close)
+
+	buildUpstreamOAuthAPI(tst, "/upstream-oauth-cc-auto/", apidef.UpstreamOAuth{
+		Enabled:               true,
+		AllowedAuthorizeTypes: []string{apidef.OAuthAuthorizationTypeClientCredentials},
+		ClientCredentials: apidef.ClientCredentials{
+			ClientAuthData: apidef.ClientAuthData{
+				ClientID:     "CC_AUTO_CLIENT",
+				ClientSecret: "CC_AUTO_SECRET",
+			},
+			TokenURL: ts.URL + "/token",
+			Header:   apidef.AuthSource{Enabled: true, Name: "Authorization"},
+		},
+	})
+
+	_, _ = tst.Run(t, test.TestCase{
+		Path: "/upstream-oauth-cc-auto/",
+		Code: http.StatusOK,
+		BodyMatchFunc: func(body []byte) bool {
+			resp := struct {
+				Headers map[string]string `json:"headers"`
+			}{}
+			assert.NoError(t, json.Unmarshal(body, &resp))
+			assert.Equal(t, "Bearer body-only-token", resp.Headers[header.Authorization])
+			return true
+		},
+	})
+
+	assert.Equal(t, 2, requestCount, "expected the auto-detect probe: failed Basic Auth attempt followed by a body-credentials retry")
+}
+
+// TestProvider_ClientCredentials_MethodPost_NoFallbackOnMismatch verifies an
+// explicit method is honoured: body-only credentials against a header-only
+// IdP fail without a silent fallback to Basic Auth.
+func TestProvider_ClientCredentials_MethodPost_NoFallbackOnMismatch(t *testing.T) {
+	tst := StartTest(nil)
+	t.Cleanup(tst.Close)
+
+	var requestCount int
+	ts := headerOnlyTokenServer(t, &requestCount, "Basic Q0xJRU5UX0lEOkNMSUVOVF9TRUNSRVQ=")
+	t.Cleanup(ts.Close)
+
+	buildUpstreamOAuthAPI(tst, "/upstream-oauth-cc-mismatch/", apidef.UpstreamOAuth{
+		Enabled:               true,
+		AllowedAuthorizeTypes: []string{apidef.OAuthAuthorizationTypeClientCredentials},
+		ClientCredentials: apidef.ClientCredentials{
+			ClientAuthData: apidef.ClientAuthData{
+				ClientID:     "CLIENT_ID",
+				ClientSecret: "CLIENT_SECRET",
+				Method:       apidef.OAuth2ClientAuthPost,
+			},
+			TokenURL: ts.URL + "/token",
+			Header:   apidef.AuthSource{Enabled: true, Name: "Authorization"},
+		},
+	})
+
+	_, _ = tst.Run(t, test.TestCase{
+		Path: "/upstream-oauth-cc-mismatch/",
+		Code: http.StatusInternalServerError,
+	})
+
+	assert.Equal(t, 1, requestCount, "expected a single rejected token request and no fallback to header credentials")
 }
 
 func TestSetExtraMetadata(t *testing.T) {

@@ -565,6 +565,60 @@ func TestRuleUpstreamAuth_Validate(t *testing.T) {
 				Errors:  []error{ErrInvalidUpstreamOAuthAuthorizationType},
 			},
 		},
+		{
+			name: "invalid client authentication method",
+			upstreamAuth: UpstreamAuth{
+				Enabled: true,
+				OAuth: UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypeClientCredentials},
+					ClientCredentials: ClientCredentials{
+						ClientAuthData: ClientAuthData{Method: "client_secret_jwt"},
+					},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrInvalidUpstreamOAuthClientAuthMethod},
+			},
+		},
+		{
+			name: "invalid client authentication method on password grant",
+			upstreamAuth: UpstreamAuth{
+				Enabled: true,
+				OAuth: UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypePassword},
+					PasswordAuthentication: PasswordAuthentication{
+						ClientAuthData: ClientAuthData{Method: "bogus"},
+					},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrInvalidUpstreamOAuthClientAuthMethod},
+			},
+		},
+		{
+			name: "valid client authentication methods",
+			upstreamAuth: UpstreamAuth{
+				Enabled: true,
+				OAuth: UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypeClientCredentials},
+					ClientCredentials: ClientCredentials{
+						ClientAuthData: ClientAuthData{Method: OAuth2ClientAuthPost},
+					},
+					PasswordAuthentication: PasswordAuthentication{
+						ClientAuthData: ClientAuthData{Method: OAuth2ClientAuthBasic},
+					},
+				},
+			},
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
 	}
 
 	for _, tc := range testCases {

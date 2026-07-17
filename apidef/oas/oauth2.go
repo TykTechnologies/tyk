@@ -9,6 +9,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
@@ -373,9 +374,10 @@ const (
 	// exact-match semantics.
 	OAuth2IssuerRegexPrefix = "regex:"
 
-	// OAuth2ClientAuth.Method values.
-	OAuth2ClientAuthBasic         = "client_secret_basic"
-	OAuth2ClientAuthPost          = "client_secret_post"
+	// OAuth2ClientAuth.Method values, aliased from package apidef so the classic
+	// and OAS formats share one set of constants (apidef cannot import apidef/oas).
+	OAuth2ClientAuthBasic = apidef.OAuth2ClientAuthBasic
+	OAuth2ClientAuthPost  = apidef.OAuth2ClientAuthPost
 	OAuth2ClientAuthPrivateKeyJWT = "private_key_jwt"
 
 	// client_assertion_type value for the private_key_jwt method (RFC 7523 §2.2).
