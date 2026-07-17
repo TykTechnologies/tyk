@@ -3437,8 +3437,8 @@ func ctxGetOrigRequestURL(r *http.Request) *url.URL {
 	return nil
 }
 
-func ctxSetUrlRewritten(r *http.Request) {
-	setCtxValue(r, ctx.UrlRewritten, true)
+func ctxSetUrlRewritten(r *http.Request, val bool) {
+	setCtxValue(r, ctx.UrlRewritten, val)
 }
 
 func ctxGetUrlRewritten(r *http.Request) bool {
