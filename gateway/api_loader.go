@@ -696,7 +696,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if newURL := ctxGetURLRewriteTarget(r); newURL != nil {
 		r.URL = newURL
 		ctxSetURLRewriteTarget(r, nil)
-		ctxSetUrlRewritten(r, false)
+		ctxSetUrlRewritten(r, true)
 	}
 	if newMethod := ctxGetTransformRequestMethod(r); newMethod != "" {
 		r.Method = newMethod
