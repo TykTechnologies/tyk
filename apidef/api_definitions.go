@@ -135,6 +135,13 @@ const (
 	// OAuthAuthorizationTypePassword is the authorization type for password flow.
 	OAuthAuthorizationTypePassword = "password"
 
+	// OAuth2ClientAuthBasic and OAuth2ClientAuthPost are the client authentication
+	// methods defined by RFC 6749 Section 2.3.1 (the `token_endpoint_auth_method`
+	// values IdPs publish). Shared by upstream OAuth (ClientAuthData.Method) and
+	// the OAS OAuth2 token-exchange feature (oas.OAuth2ClientAuth.Method).
+	OAuth2ClientAuthBasic = "client_secret_basic"
+	OAuth2ClientAuthPost  = "client_secret_post"
+
 	// JSON-RPC protocol versions
 	JsonRPC20 = "2.0"
 
@@ -907,6 +914,16 @@ type ClientAuthData struct {
 	ClientID string `bson:"client_id" json:"client_id"`
 	// ClientSecret is the application's secret.
 	ClientSecret string `bson:"client_secret,omitempty" json:"client_secret,omitempty"` // client secret is optional for password flow
+	// Method controls how the client credentials are sent to the upstream token
+	// endpoint (RFC 6749 Section 2.3.1). Valid values are `client_secret_basic`
+	// (credentials in the Authorization header only, no fallback) and
+	// `client_secret_post` (credentials in the request body only, no fallback).
+	// When empty, Tyk keeps the historical auto-detect behaviour: it tries the
+	// header first and falls back to the body on failure. Unlike the OAuth2
+	// token-exchange clientAuth.method, empty deliberately does NOT default to
+	// client_secret_basic — existing APIs pointed at body-only IdPs rely on the
+	// fallback.
+	Method string `bson:"method,omitempty" json:"method,omitempty"`
 }
 
 // ClientCredentials holds the client credentials for upstream OAuth2 authentication.

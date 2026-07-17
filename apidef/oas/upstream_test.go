@@ -205,6 +205,47 @@ func TestUpstream(t *testing.T) {
 		})
 	})
 
+	t.Run("upstream oauth client auth method", func(t *testing.T) {
+		upstream := Upstream{
+			Authentication: &UpstreamAuth{
+				Enabled: true,
+				OAuth: &UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{apidef.OAuthAuthorizationTypeClientCredentials},
+					ClientCredentials: &ClientCredentials{
+						ClientAuthData: ClientAuthData{
+							ClientID:     "client-id",
+							ClientSecret: "client-secret",
+							Method:       apidef.OAuth2ClientAuthPost,
+						},
+						TokenURL: "https://idp.example.com/token",
+					},
+					PasswordAuthentication: &PasswordAuthentication{
+						ClientAuthData: ClientAuthData{
+							ClientID: "client-id",
+							Method:   apidef.OAuth2ClientAuthBasic,
+						},
+						Username: "user",
+						Password: "pass",
+						TokenURL: "https://idp.example.com/token",
+					},
+				},
+			},
+		}
+
+		var api apidef.APIDefinition
+		api.SetDisabledFlags()
+		upstream.ExtractTo(&api)
+
+		assert.Equal(t, apidef.OAuth2ClientAuthPost, api.UpstreamAuth.OAuth.ClientCredentials.Method)
+		assert.Equal(t, apidef.OAuth2ClientAuthBasic, api.UpstreamAuth.OAuth.PasswordAuthentication.Method)
+
+		var result Upstream
+		result.Fill(api)
+
+		assert.Equal(t, upstream, result)
+	})
+
 	t.Run("rate limit", func(t *testing.T) {
 		t.Run("valid duration", func(t *testing.T) {
 			rateLimitUpstream := Upstream{
