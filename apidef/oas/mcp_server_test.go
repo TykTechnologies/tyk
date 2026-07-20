@@ -385,21 +385,19 @@ func TestDeriveMCPToolView_PathMethodSourceForOperationWithoutOperationID(t *tes
 					Path:   "/orders",
 					Method: "GET",
 				},
-				Name:        "list_orders",
 				Allow:       boolPtr(true),
 				Description: "List orders without operationId",
 			},
 		},
 	})
 	require.NoError(t, err)
-	require.Len(t, warnings, 1)
-	assert.Equal(t, warningMissingOperationID, warnings[0].Reason)
+	assert.Empty(t, warnings)
 	require.Len(t, view.Tools, 1)
 
 	tool := view.Tools[0]
 	assert.Empty(t, tool.OperationID)
 	assert.Equal(t, "http:GET /orders", tool.SourceKey)
-	assert.Equal(t, "list_orders", tool.Name)
+	assert.Equal(t, "get_orders", tool.Name)
 	assert.Equal(t, "List orders without operationId", tool.Description)
 	assert.Equal(t, http.MethodGet, tool.Method)
 	assert.Equal(t, "/orders", tool.PathTemplate)
@@ -455,6 +453,208 @@ func TestDeriveMCPToolView_DefaultsToAllCanonicalTools(t *testing.T) {
 	assert.Empty(t, warnings)
 	require.Len(t, view.Tools, 2)
 	assert.Equal(t, []string{"create_order", "list_orders"}, view.ToolNames())
+}
+
+func TestExpandMCPServerConfig_AllSelectedWhenConfigOmitted(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: "list_orders",
+				Summary:     "list orders",
+				Parameters: openapi3.Parameters{
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{
+						Name:        "status",
+						In:          openapi3.ParameterInQuery,
+						Description: "Order status",
+						Schema:      &openapi3.SchemaRef{Value: openapi3.NewStringSchema()},
+					}},
+				},
+				Responses: deriveTestResponses(map[string]openapi3.Content{
+					"200": {"application/json": deriveTestMedia(openapi3.NewObjectSchema().WithProperty("id", openapi3.NewStringSchema()))},
+				}),
+			},
+			Post: &openapi3.Operation{
+				OperationID: "create_order",
+				Summary:     "create order",
+			},
+		}),
+	))
+
+	expanded, warnings, err := ExpandMCPServerConfig(src, nil)
+
+	require.NoError(t, err)
+	assert.Empty(t, warnings)
+	require.NotNil(t, expanded)
+	require.Len(t, expanded.Primitives, 2)
+	assert.Equal(t, []string{"create_order", "list_orders"}, primitiveNames(expanded.Primitives))
+	for _, primitive := range expanded.Primitives {
+		require.NotNil(t, primitive.Allow)
+		assert.True(t, *primitive.Allow)
+		assert.NotEmpty(t, primitive.Name)
+		assert.NotNil(t, primitive.Annotations)
+		assert.NotNil(t, primitive.InputSchema)
+	}
+
+	listOrders := primitiveByName(expanded.Primitives, "list_orders")
+	require.NotNil(t, listOrders)
+	assert.Equal(t, "list_orders", listOrders.Source.OperationID)
+	assert.Equal(t, map[string]string{"status": DerivedParamLocationQuery}, listOrders.ParameterLocations)
+	assert.Equal(t, map[string]string{"status": "status"}, listOrders.ParameterSourceNames)
+	assert.Equal(t, []string{"status"}, listOrders.ParameterOrder)
+	assert.NotNil(t, listOrders.OutputSchema)
+}
+
+func TestExpandMCPServerConfig_PartialSelectionIncludesUnselectedPrimitives(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: "list_orders",
+				Summary:     "list orders",
+			},
+			Post: &openapi3.Operation{
+				OperationID: "create_order_source",
+				Summary:     "create order",
+				Parameters: openapi3.Parameters{
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{
+						Name:        "customer_id",
+						In:          openapi3.ParameterInQuery,
+						Description: "source customer id",
+						Schema:      &openapi3.SchemaRef{Value: openapi3.NewStringSchema()},
+					}},
+				},
+			},
+		}),
+		openapi3.WithPath("/orders/{order_id}", &openapi3.PathItem{
+			Delete: &openapi3.Operation{
+				OperationID: "delete_order",
+				Summary:     "delete order",
+			},
+		}),
+	))
+
+	expanded, warnings, err := ExpandMCPServerConfig(src, &TykMCPServer{
+		Primitives: []TykMCPServerPrimitive{
+			{
+				Source:      TykMCPServerSource{OperationID: "create_order_source"},
+				Name:        "create_order",
+				Description: "Create a new customer order.",
+				Allow:       boolPtr(true),
+				Parameters: []TykMCPServerParameter{
+					{Param: "customer_id", Name: "customer", Description: "Customer identifier."},
+				},
+			},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, warnings)
+	require.Len(t, expanded.Primitives, 3)
+	assert.Equal(t, []string{"create_order", "delete_order", "list_orders"}, primitiveNames(expanded.Primitives))
+
+	createOrder := primitiveByName(expanded.Primitives, "create_order")
+	require.NotNil(t, createOrder)
+	assert.True(t, *createOrder.Allow)
+	assert.Equal(t, "create_order_source", createOrder.Source.OperationID)
+	assert.Equal(t, "Create a new customer order.", createOrder.Description)
+	assert.Equal(t, []TykMCPServerParameter{{Param: "customer_id", Name: "customer", Description: "Customer identifier."}}, createOrder.Parameters)
+	assert.Equal(t, map[string]string{"customer": DerivedParamLocationQuery}, createOrder.ParameterLocations)
+	assert.Equal(t, map[string]string{"customer": "customer_id"}, createOrder.ParameterSourceNames)
+
+	listOrders := primitiveByName(expanded.Primitives, "list_orders")
+	require.NotNil(t, listOrders)
+	assert.False(t, *listOrders.Allow)
+
+	deleteOrder := primitiveByName(expanded.Primitives, "delete_order")
+	require.NotNil(t, deleteOrder)
+	assert.False(t, *deleteOrder.Allow)
+}
+
+func TestExpandMCPServerConfig_MethodPathOperationWithoutOperationID(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders/{order_id}/large", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				Summary:     "large order",
+				Description: "Fetch a large order response",
+				Parameters: openapi3.Parameters{
+					&openapi3.ParameterRef{Value: &openapi3.Parameter{
+						Name:   "order_id",
+						In:     openapi3.ParameterInPath,
+						Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()},
+					}},
+				},
+			},
+		}),
+	))
+
+	expanded, warnings, err := ExpandMCPServerConfig(src, &TykMCPServer{
+		Primitives: []TykMCPServerPrimitive{
+			{
+				Source: TykMCPServerSource{
+					Method: http.MethodGet,
+					Path:   "/orders/{order_id}/large",
+				},
+				Allow: boolPtr(true),
+			},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, warnings)
+	require.Len(t, expanded.Primitives, 1)
+
+	primitive := expanded.Primitives[0]
+	assert.Equal(t, http.MethodGet, primitive.Source.Method)
+	assert.Equal(t, "/orders/{order_id}/large", primitive.Source.Path)
+	assert.Empty(t, primitive.Source.OperationID)
+	assert.Equal(t, "get_orders_order_id_large", primitive.Name)
+	assert.True(t, *primitive.Allow)
+	assert.Equal(t, "large order", primitive.Description)
+	assert.Equal(t, map[string]string{"order_id": DerivedParamLocationPath}, primitive.ParameterLocations)
+
+	view, _, err := DeriveMCPToolView(src, &TykMCPServer{Primitives: []TykMCPServerPrimitive{
+		{Source: primitive.Source, Allow: boolPtr(true)},
+	}})
+	require.NoError(t, err)
+	require.Len(t, view.Tools, 1)
+	assert.Equal(t, primitive.Name, view.Tools[0].Name)
+}
+
+func TestCompactTykMCPServerExtension_DropsExpandedOnlyUnselectedPrimitives(t *testing.T) {
+	t.Parallel()
+
+	doc := newDeriveTestOAS(openapi3.NewPaths())
+	doc.SetTykMCPServerExtension(&TykMCPServer{
+		Primitives: []TykMCPServerPrimitive{
+			{
+				Source:      TykMCPServerSource{OperationID: "create_order"},
+				Name:        "create_order",
+				Allow:       boolPtr(true),
+				InputSchema: map[string]any{"type": "object"},
+			},
+			{
+				Source:      TykMCPServerSource{OperationID: "list_orders"},
+				Name:        "list_orders",
+				Allow:       boolPtr(false),
+				InputSchema: map[string]any{"type": "object"},
+			},
+		},
+	})
+
+	doc.CompactTykMCPServerExtension()
+
+	compact := doc.GetTykMCPServerExtension()
+	require.NotNil(t, compact)
+	require.Len(t, compact.Primitives, 1)
+	assert.Equal(t, "create_order", compact.Primitives[0].Name)
+	assert.Nil(t, compact.Primitives[0].InputSchema)
+	require.NotNil(t, compact.Primitives[0].Allow)
+	assert.True(t, *compact.Primitives[0].Allow)
 }
 
 func TestCloneDerivedToolCopiesAnnotationsAndOutputSchema(t *testing.T) {
@@ -660,4 +860,21 @@ func TestDeriveMCPToolView_RejectsInvalidParameterOverrideNames(t *testing.T) {
 			assert.Contains(t, err.Error(), tc.want)
 		})
 	}
+}
+
+func primitiveNames(primitives []TykMCPServerPrimitive) []string {
+	names := make([]string, 0, len(primitives))
+	for _, primitive := range primitives {
+		names = append(names, primitive.Name)
+	}
+	return names
+}
+
+func primitiveByName(primitives []TykMCPServerPrimitive, name string) *TykMCPServerPrimitive {
+	for i := range primitives {
+		if primitives[i].Name == name {
+			return &primitives[i]
+		}
+	}
+	return nil
 }

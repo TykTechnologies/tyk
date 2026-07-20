@@ -28,6 +28,21 @@ type TykMCPServerPrimitive struct {
 	Parameters []TykMCPServerParameter `bson:"parameters,omitempty" json:"parameters,omitempty"`
 	// Allow exposes this primitive when any primitive uses explicit allow mode.
 	Allow *bool `bson:"allow,omitempty" json:"allow,omitempty"`
+
+	// InputSchema is populated in expanded responses with the final MCP tool input schema.
+	InputSchema map[string]any `bson:"-" json:"inputSchema,omitempty"`
+	// OutputSchema is populated in expanded responses with the final MCP tool output schema.
+	OutputSchema map[string]any `bson:"-" json:"outputSchema,omitempty"`
+	// ParameterLocations maps final MCP parameter names to their source REST location in expanded responses.
+	ParameterLocations map[string]string `bson:"-" json:"parameterLocations,omitempty"`
+	// ParameterSourceNames maps final MCP parameter names to their original REST names in expanded responses.
+	ParameterSourceNames map[string]string `bson:"-" json:"parameterSourceNames,omitempty"`
+	// ParameterSerializations describes final path/query/header serialization in expanded responses.
+	ParameterSerializations map[string]DerivedParamSerialization `bson:"-" json:"parameterSerializations,omitempty"`
+	// ParameterOrder preserves final parameter order in expanded responses.
+	ParameterOrder []string `bson:"-" json:"parameterOrder,omitempty"`
+	// RequestBodyContentType is populated in expanded responses when the source request body has a selected media type.
+	RequestBodyContentType string `bson:"-" json:"requestBodyContentType,omitempty"`
 }
 
 // TykMCPServerSource identifies the source REST operation behind an MCP
@@ -111,6 +126,67 @@ func (s *OAS) RemoveTykMCPServerExtension() {
 	}
 
 	delete(s.Extensions, ExtensionTykMCPServer)
+}
+
+// CompactTykMCPServerExtension removes response-only expansion fields before persistence.
+func (s *OAS) CompactTykMCPServerExtension() {
+	ext := s.GetTykMCPServerExtension()
+	if ext == nil {
+		return
+	}
+
+	compact := CompactTykMCPServer(ext)
+	if compact == nil || len(compact.Primitives) == 0 {
+		s.RemoveTykMCPServerExtension()
+		return
+	}
+
+	s.SetTykMCPServerExtension(compact)
+}
+
+// CompactTykMCPServer returns a storage-safe copy of an MCP server extension.
+func CompactTykMCPServer(ext *TykMCPServer) *TykMCPServer {
+	if ext == nil {
+		return nil
+	}
+
+	compact := &TykMCPServer{
+		Primitives: make([]TykMCPServerPrimitive, 0, len(ext.Primitives)),
+	}
+	for _, primitive := range ext.Primitives {
+		if primitive.Allow != nil && !*primitive.Allow && primitive.hasExpandedResponseFields() {
+			continue
+		}
+
+		compact.Primitives = append(compact.Primitives, TykMCPServerPrimitive{
+			Source:      primitive.Source,
+			Name:        primitive.Name,
+			Description: primitive.Description,
+			Annotations: cloneDerivedToolAnnotations(primitive.Annotations),
+			Parameters:  append([]TykMCPServerParameter(nil), primitive.Parameters...),
+			Allow:       cloneBoolPtr(primitive.Allow),
+		})
+	}
+
+	return compact
+}
+
+func (p TykMCPServerPrimitive) hasExpandedResponseFields() bool {
+	return p.InputSchema != nil ||
+		p.OutputSchema != nil ||
+		p.ParameterLocations != nil ||
+		p.ParameterSourceNames != nil ||
+		p.ParameterSerializations != nil ||
+		p.ParameterOrder != nil ||
+		p.RequestBodyContentType != ""
+}
+
+func cloneBoolPtr(src *bool) *bool {
+	if src == nil {
+		return nil
+	}
+	dst := *src
+	return &dst
 }
 
 func (s *OAS) validateMCPServerExtensionPlacement(isMCP bool) error {

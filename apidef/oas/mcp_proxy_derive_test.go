@@ -2,6 +2,7 @@ package oas
 
 import (
 	"encoding/json"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -54,7 +55,7 @@ func TestDefaultDerivedParamSerialization(t *testing.T) {
 	assert.False(t, DefaultDerivedParamExplode("pipeDelimited"))
 }
 
-func TestDeriveSourcePrimitives_SkipsMissingOperationIDAndEmitsToolPrimitive(t *testing.T) {
+func TestDeriveSourcePrimitives_EmitsPathMethodPrimitiveForMissingOperationID(t *testing.T) {
 	t.Parallel()
 
 	src := newDeriveTestOAS(openapi3.NewPaths(
@@ -66,15 +67,14 @@ func TestDeriveSourcePrimitives_SkipsMissingOperationIDAndEmitsToolPrimitive(t *
 
 	primitives, warnings, err := DeriveSourcePrimitives(src)
 	require.NoError(t, err)
-	require.Len(t, primitives, 1)
+	require.Len(t, primitives, 2)
 	assert.Equal(t, MCPPrimitiveTypeTool, primitives[0].Type)
 	assert.Equal(t, "create_order", primitives[0].Tool.Name)
-
-	require.Len(t, warnings, 1)
-	assert.Equal(t, "GET /orders", warnings[0].Operation)
-	assert.Equal(t, "GET", warnings[0].Method)
-	assert.Equal(t, "/orders", warnings[0].Path)
-	assert.Equal(t, "missing operationId", warnings[0].Reason)
+	assert.Equal(t, MCPPrimitiveTypeTool, primitives[1].Type)
+	assert.Empty(t, primitives[1].Tool.OperationID)
+	assert.Equal(t, "http:GET /orders", primitives[1].Tool.SourceKey)
+	assert.Equal(t, "get_orders", primitives[1].Tool.Name)
+	assert.Empty(t, warnings)
 }
 
 func TestDeriveSourceTools_RespectsEndpointVisibility(t *testing.T) {
@@ -111,20 +111,42 @@ func TestDeriveSourceTools_RespectsEndpointVisibility(t *testing.T) {
 	assert.Equal(t, "operation not in source allow-list - skipped", reasons["not_allowed_op"])
 }
 
-func TestDeriveSourceTools_DoesNotSynthesizeFallbackNames(t *testing.T) {
+func TestDeriveSourceTools_SynthesizesDeterministicFallbackNames(t *testing.T) {
 	t.Parallel()
 
 	src := newDeriveTestOAS(openapi3.NewPaths(
-		openapi3.WithPath("/orders/{id}", &openapi3.PathItem{
+		openapi3.WithPath("/orders/{id}/large-item", &openapi3.PathItem{
 			Get: &openapi3.Operation{},
 		}),
 	))
 
 	tools, warnings, err := DeriveSourceTools(src, nil)
 	require.NoError(t, err)
-	assert.Empty(t, tools)
-	require.Len(t, warnings, 1)
-	assert.Equal(t, "missing operationId", warnings[0].Reason)
+	require.Len(t, tools, 1)
+	assert.Empty(t, tools[0].OperationID)
+	assert.Equal(t, "http:GET /orders/{id}/large-item", tools[0].SourceKey)
+	assert.Equal(t, "get_orders_id_large_item", tools[0].Name)
+	assert.Empty(t, warnings)
+}
+
+func TestDeriveSourceTools_DisambiguatesFallbackNameCollisions(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/foo", &openapi3.PathItem{
+			Get: &openapi3.Operation{OperationID: "get_orders"},
+		}),
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get: &openapi3.Operation{},
+		}),
+	))
+
+	tools, warnings, err := DeriveSourceTools(src, nil)
+	require.NoError(t, err)
+	require.Len(t, tools, 2)
+	assert.Equal(t, "get_orders", tools[0].Name)
+	assert.Equal(t, deterministicPathMethodToolName(http.MethodGet, "/orders", true), tools[1].Name)
+	assert.Empty(t, warnings)
 }
 
 func TestDeriveSourceTools_PrefersExactJSONRequestBodyMediaType(t *testing.T) {
