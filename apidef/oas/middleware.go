@@ -1368,6 +1368,12 @@ type CustomPlugin struct {
 	// Tyk classic API definition: `custom_middleware.pre[].path`, `custom_middleware.post_key_auth[].path`,
 	// `custom_middleware.post[].path`, `custom_middleware.response[].path`.
 	Path string `bson:"path" json:"path"`
+	// Code is the base64-encoded JS source code for inline plugin execution (goja driver).
+	// When non-empty, Code takes precedence over Path.
+	//
+	// Tyk classic API definition: `custom_middleware.pre[].code`, `custom_middleware.post_key_auth[].code`,
+	// `custom_middleware.post[].code`, `custom_middleware.response[].code`.
+	Code string `bson:"code,omitempty" json:"code,omitempty"`
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	//
 	// Tyk classic API definition: `custom_middleware.pre[].raw_body_only`, `custom_middleware.post_key_auth[].raw_body_only`,
@@ -1395,6 +1401,7 @@ func (c *CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
 		customPlugins[i] = CustomPlugin{
 			Enabled:        !mwDef.Disabled,
 			Path:           mwDef.Path,
+			Code:           mwDef.Code,
 			FunctionName:   mwDef.Name,
 			RawBodyOnly:    mwDef.RawBodyOnly,
 			RequireSession: mwDef.RequireSession,
@@ -1415,6 +1422,7 @@ func (c *CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
 			Disabled:       !plugin.Enabled,
 			Name:           plugin.FunctionName,
 			Path:           plugin.Path,
+			Code:           plugin.Code,
 			RawBodyOnly:    plugin.RawBodyOnly,
 			RequireSession: plugin.RequireSession,
 		}

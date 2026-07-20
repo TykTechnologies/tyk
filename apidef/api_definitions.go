@@ -64,11 +64,12 @@ const (
 	RequestXML  RequestInputType = "xml"
 	RequestJSON RequestInputType = "json"
 
-	OttoDriver     MiddlewareDriver = "otto"
-	PythonDriver   MiddlewareDriver = "python"
-	LuaDriver      MiddlewareDriver = "lua"
-	GrpcDriver     MiddlewareDriver = "grpc"
-	GoPluginDriver MiddlewareDriver = "goplugin"
+	OttoDriver       MiddlewareDriver = "otto"
+	JavaScriptDriver MiddlewareDriver = "javascript"
+	PythonDriver     MiddlewareDriver = "python"
+	LuaDriver        MiddlewareDriver = "lua"
+	GrpcDriver       MiddlewareDriver = "grpc"
+	GoPluginDriver   MiddlewareDriver = "goplugin"
 
 	BodySource        IdExtractorSource = "body"
 	HeaderSource      IdExtractorSource = "header"
@@ -571,8 +572,15 @@ type MiddlewareDefinition struct {
 	Disabled       bool   `bson:"disabled" json:"disabled"`
 	Name           string `bson:"name" json:"name"`
 	Path           string `bson:"path" json:"path"`
+	Code           string `bson:"code,omitempty" json:"code,omitempty"`
 	RequireSession bool   `bson:"require_session" json:"require_session"`
 	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
+
+	// RuntimeHandlerName is set by the gateway at API-load time when the JS
+	// driver rebrands handler globals to per-(file, name) unique aliases.
+	// Dispatch reads this when non-empty and falls back to Name otherwise.
+	// Transient — never serialized.
+	RuntimeHandlerName string `bson:"-" json:"-"`
 }
 
 // IDExtractorConfig specifies the configuration for ID extractor
@@ -746,6 +754,14 @@ type APIDefinition struct {
 	DisableRateLimit                     bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
 	DisableQuota                         bool                   `bson:"disable_quota" json:"disable_quota"`
 	CustomMiddleware                     MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
+	// CustomMiddlewareBundle is the bundle filename (or comma-separated list of
+	// bundle filenames) resolved against the gateway's bundle_base_url. A single
+	// name takes the legacy single-bundle load path unchanged. Two or more
+	// comma-separated names enable multi-bundle composition: each bundle is
+	// fetched into its own subdirectory under the API's bundle root, and the
+	// manifests are merged into the effective custom_middleware section in
+	// declaration order — array hooks (pre/post/post_key_auth/response)
+	// concatenate; auth_check may be set by at most one bundle.
 	CustomMiddlewareBundle               string                 `bson:"custom_middleware_bundle" json:"custom_middleware_bundle"`
 	CustomMiddlewareBundleDisabled       bool                   `bson:"custom_middleware_bundle_disabled" json:"custom_middleware_bundle_disabled"`
 	CacheOptions                         CacheOptions           `bson:"cache_options" json:"cache_options"`
