@@ -2827,7 +2827,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Malformed body.
-      summary: Create a key (alternative endpoint).
+      summary: Create a key (auto-generates Key ID and HMAC secret)
       tags:
       - Keys
   /tyk/keys/policy/{keyID}:
