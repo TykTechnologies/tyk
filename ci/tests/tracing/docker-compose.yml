@@ -119,7 +119,7 @@ services:
     image: redis:6
     command: redis-server --appendonly yes
 
-  httpbin:
+  httpbin.org:
     platform: linux/amd64
     image: kennethreitz/httpbin:latest
 
