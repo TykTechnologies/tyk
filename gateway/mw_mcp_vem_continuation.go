@@ -6,6 +6,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/ctx"
 )
 
 // MCPVEMContinuationMiddleware handles sequential VEM routing for MCP JSON-RPC requests.
@@ -52,6 +53,10 @@ func (m *MCPVEMContinuationMiddleware) ProcessRequest(_ http.ResponseWriter, r *
 		// VEM paths are virtual internal routes and should not be sent to upstream
 		r.URL.Path = state.OriginalPath
 		r.URL.RawQuery = "" // Clear internal routing query params
+		
+		if rc := ctx.GetRequestContext(r); rc != nil {
+			rc.Reset()
+		}
 		// No more routing needed, allow upstream
 		return nil, http.StatusOK
 	}

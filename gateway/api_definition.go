@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"github.com/TykTechnologies/tyk/ctx"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -2474,6 +2475,10 @@ func (a *APISpec) StripVersionPath(reqPath string) string {
 
 func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	if !a.Proxy.StripListenPath {
+		return
+	}
+
+	if rc := ctx.GetRequestContext(r); rc != nil && rc.IsRewritten() {
 		return
 	}
 

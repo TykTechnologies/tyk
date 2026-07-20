@@ -11,6 +11,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"github.com/TykTechnologies/tyk/ctx"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1378,6 +1380,26 @@ func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
 		a.SanitizeProxyPaths(r)
 
 		assert.Equal(t, "/get", r.URL.Path)
+		assert.Equal(t, "", r.URL.RawPath)
+	})
+
+	t.Run("strip=true but skipped because UrlRewritten is true", func(t *testing.T) {
+		a.Proxy.StripListenPath = true
+		r, _ := http.NewRequest(http.MethodGet, "https://proxy.com/listen/get", nil)
+		
+		rc := &ctx.RequestContext{}
+		ctxSetRequestContext(r, rc)
+		
+		newURL, _ := url.Parse("https://proxy.com/listen/get")
+		rc.RewriteUrl(r.URL, newURL) // Same URL, won't set rewritten
+		
+		newURL2, _ := url.Parse("https://proxy.com/listen/get2")
+		rc.RewriteUrl(r.URL, newURL2) // Different URL, will set rewritten
+		
+		a.SanitizeProxyPaths(r)
+
+		// Expect listen_path NOT to be stripped because UrlRewritten == true
+		assert.Equal(t, "/listen/get", r.URL.Path)
 		assert.Equal(t, "", r.URL.RawPath)
 	})
 }
