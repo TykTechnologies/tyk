@@ -39,6 +39,9 @@ type DefaultHealthChecker struct {
 }
 
 func (h *DefaultHealthChecker) Init(storeType storage.Handler) {
+	if h.Gw == nil {
+		return
+	}
 	if !h.Gw.GetConfig().HealthCheck.EnableHealthChecks {
 		return
 	}
