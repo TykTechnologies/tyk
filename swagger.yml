@@ -2737,7 +2737,7 @@ paths:
       - Keys
   /tyk/keys/create:
     post:
-      description: Create a key. Functionally equivalent to `POST /tyk/keys`, provided
+      description: Creates a new API key. Automatically generates a key ID (unless overridden by the 'certificate' field) and an 'hmac_secret' (if 'hmac_enabled' is true). For Basic Auth hashing, MCP validation, or update parameters (suppress_reset, hashed), use POST /tyk/keys instead.
         as an alternative, explicitly-named endpoint.
       operationId: createKey
       requestBody:
