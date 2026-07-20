@@ -248,7 +248,8 @@ func bodyOnlyTokenServer(t *testing.T, requestCount *int, expectedForm url.Value
 
 		if r.Header.Get("Authorization") != "" {
 			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte(`{"error":"invalid_client"}`))
+			_, err := w.Write([]byte(`{"error":"invalid_client"}`))
+			assert.NoError(t, err)
 			return
 		}
 
@@ -261,7 +262,8 @@ func bodyOnlyTokenServer(t *testing.T, requestCount *int, expectedForm url.Value
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"access_token":"body-only-token","token_type":"bearer","expires_in":3600}`))
+		_, err = w.Write([]byte(`{"access_token":"body-only-token","token_type":"bearer","expires_in":3600}`))
+		assert.NoError(t, err)
 	}))
 }
 
@@ -280,12 +282,14 @@ func headerOnlyTokenServer(t *testing.T, requestCount *int, wantBasicAuth string
 
 		if r.Header.Get("Authorization") != wantBasicAuth || parsed.Get("client_secret") != "" {
 			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte(`{"error":"invalid_client"}`))
+			_, err := w.Write([]byte(`{"error":"invalid_client"}`))
+			assert.NoError(t, err)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"access_token":"header-only-token","token_type":"bearer","expires_in":3600}`))
+		_, err = w.Write([]byte(`{"access_token":"header-only-token","token_type":"bearer","expires_in":3600}`))
+		assert.NoError(t, err)
 	}))
 }
 
