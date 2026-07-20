@@ -2478,7 +2478,7 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 		return
 	}
 
-	if rc := ctx.GetRequestContext(r); rc != nil && rc.IsRewritten() {
+	if rc := ctx.GetRequestContext(r); rc.IsRewritten() {
 		return
 	}
 

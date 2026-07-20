@@ -54,9 +54,8 @@ func (m *MCPVEMContinuationMiddleware) ProcessRequest(_ http.ResponseWriter, r *
 		r.URL.Path = state.OriginalPath
 		r.URL.RawQuery = "" // Clear internal routing query params
 		
-		if rc := ctx.GetRequestContext(r); rc != nil {
-			rc.Reset()
-		}
+		rc := ctx.GetRequestContext(r)
+		rc.Reset()
 		// No more routing needed, allow upstream
 		return nil, http.StatusOK
 	}

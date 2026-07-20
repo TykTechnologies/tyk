@@ -695,9 +695,8 @@ type DummyProxyHandler struct {
 
 func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if newURL := ctxGetURLRewriteTarget(r); newURL != nil {
-		if rc := ctx.GetRequestContext(r); rc != nil {
-			rc.RewriteUrl(r.URL, newURL)
-		}
+		rc := ctx.GetRequestContext(r)
+		rc.RewriteUrl(r.URL, newURL)
 		r.URL = newURL
 		ctxSetURLRewriteTarget(r, nil)
 	}

@@ -1,6 +1,7 @@
 package ctx
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"sync"
@@ -44,5 +45,10 @@ func GetRequestContext(r *http.Request) *RequestContext {
 			return rc
 		}
 	}
-	return nil
+	
+	rc := &RequestContext{}
+	ctx := context.WithValue(r.Context(), RequestContextKey, rc)
+	h := r.WithContext(ctx)
+	*r = *h
+	return rc
 }
