@@ -10,8 +10,30 @@ import (
 	"github.com/TykTechnologies/storage/temporal/model"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/iamtest"
 	"github.com/TykTechnologies/tyk/internal/redis"
 )
+
+// With IAM auth enabled, buildUniversalOptions must build the provider, wire it
+// onto the options, and clear any static credentials. Using UseSSL=false also
+// exercises the no-TLS warning branch.
+func TestBuildUniversalOptions_IAMEnabled_WiresProviderAndClearsStaticCreds(t *testing.T) {
+	iamtest.FakeADC(t)
+
+	cfg := &config.StorageOptionsConf{
+		Username: "static-user",
+		Password: "static-pass",
+		UseSSL:   false,
+		IAMAuth:  config.IAMAuthConfig{Enabled: true, Provider: "gcp"},
+	}
+
+	opts, err := buildUniversalOptions(cfg, nil)
+
+	require.NoError(t, err)
+	require.NotNil(t, opts.CredentialsProviderContext, "IAM provider must be wired onto the options")
+	assert.Empty(t, opts.Username, "static username must be cleared under IAM auth")
+	assert.Empty(t, opts.Password, "static password must be cleared under IAM auth")
+}
 
 // applyIAMAuth must attach the credentials provider and clear any static
 // username/password, so short-lived IAM tokens become the only credential
