@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -108,30 +107,11 @@ func applyIAMAuth(opts *redis.UniversalOptions, provider model.CredentialsProvid
 // runs at construction time; the returned func mints a fresh token per new
 // connection.
 func buildIAMProvider(cfg config.IAMAuthConfig) (model.CredentialsProviderFunc, error) {
-	refresh, err := parseRefreshBeforeExpiry(cfg.TokenRefreshBeforeExpiry)
-	if err != nil {
-		return nil, err
-	}
-
 	return iamauth.NewProvider(context.Background(), iamauth.Config{
 		Provider:            strings.ToLower(strings.TrimSpace(cfg.Provider)),
 		ServiceAccount:      cfg.ServiceAccount,
-		RefreshBeforeExpiry: refresh,
+		RefreshBeforeExpiry: cfg.TokenRefreshBeforeExpiry,
 	})
-}
-
-// parseRefreshBeforeExpiry parses the optional refresh duration. An empty value
-// yields a zero duration, letting the provider apply its own default.
-func parseRefreshBeforeExpiry(raw string) (time.Duration, error) {
-	if strings.TrimSpace(raw) == "" {
-		return 0, nil
-	}
-
-	d, err := time.ParseDuration(raw)
-	if err != nil {
-		return 0, fmt.Errorf("invalid token_refresh_before_expiry %q: %w", raw, err)
-	}
-	return d, nil
 }
 
 // createTLSConfig creates a TLS configuration with proper mTLS support

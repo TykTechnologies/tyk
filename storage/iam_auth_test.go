@@ -40,5 +40,7 @@ func TestBuildIAMAuthOption_InvalidRefreshDuration(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Nil(t, opt)
-	assert.Contains(t, err.Error(), "token_refresh_before_expiry")
+	// The refresh duration is now parsed inside the storage iamauth package;
+	// the error names the offending value.
+	assert.Contains(t, err.Error(), "not-a-duration")
 }

@@ -2,9 +2,7 @@ package storage
 
 import (
 	"context"
-	"fmt"
 	"strings"
-	"time"
 
 	"github.com/TykTechnologies/storage/iamauth"
 	"github.com/TykTechnologies/storage/temporal/model"
@@ -23,33 +21,14 @@ func buildIAMAuthOption(ctx context.Context, cfg config.IAMAuthConfig) (model.Op
 		return nil, nil
 	}
 
-	refresh, err := parseRefreshBeforeExpiry(cfg.TokenRefreshBeforeExpiry)
-	if err != nil {
-		return nil, err
-	}
-
 	provider, err := iamauth.NewProvider(ctx, iamauth.Config{
 		Provider:            strings.ToLower(strings.TrimSpace(cfg.Provider)),
 		ServiceAccount:      cfg.ServiceAccount,
-		RefreshBeforeExpiry: refresh,
+		RefreshBeforeExpiry: cfg.TokenRefreshBeforeExpiry,
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	return model.WithCredentialsProvider(provider), nil
-}
-
-// parseRefreshBeforeExpiry parses the optional refresh duration. An empty value
-// yields a zero duration, letting the provider apply its own default.
-func parseRefreshBeforeExpiry(raw string) (time.Duration, error) {
-	if strings.TrimSpace(raw) == "" {
-		return 0, nil
-	}
-
-	d, err := time.ParseDuration(raw)
-	if err != nil {
-		return 0, fmt.Errorf("invalid token_refresh_before_expiry %q: %w", raw, err)
-	}
-	return d, nil
 }

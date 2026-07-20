@@ -64,7 +64,9 @@ func TestBuildIAMProvider_InvalidRefresh_Errors(t *testing.T) {
 		TokenRefreshBeforeExpiry: "notaduration",
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "token_refresh_before_expiry")
+	// Parsing now happens inside the storage iamauth package; the error names
+	// the offending value.
+	assert.Contains(t, err.Error(), "notaduration")
 }
 
 // NewStorage must surface an error (and return no client) when the IAM provider
