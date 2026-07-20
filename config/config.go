@@ -278,6 +278,10 @@ type AnalyticsConfigConfig struct {
 	// This setting can be overridden with an organization flag, enabed at an API level, or on individual Key level.
 	EnableDetailedRecording bool `json:"enable_detailed_recording"`
 
+	// AllowUnsafeDetailedLogs controls whether sensitive headers (Authorization) are obfuscated when detailed recording is enabled.
+	// Setting this to true restores the legacy behavior where raw requests are captured as-is, which may expose sensitive tokens in plain text.
+	AllowUnsafeDetailedLogs bool `json:"allow_unsafe_detailed_logs"`
+
 	// Tyk can store GeoIP information based on MaxMind DB’s to enable GeoIP tracking on inbound request analytics. Set this value to `true` and assign a DB using the `geo_ip_db_path` setting.
 	EnableGeoIP bool `json:"enable_geo_ip"`
 
