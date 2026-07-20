@@ -468,6 +468,8 @@ func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 
 	// Reset session state, useful for benchmarks when request object stays the same.
 	session.Reset()
+	// Mark session as restored; (makes invoke `SET key val XX` in further calls)
+	session.MarkAsRestored()
 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		t.Gw.SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
@@ -651,6 +653,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		if found {
 			t.Logger().Debug("--> Key found in local cache")
 			session := cachedVal.(user.SessionState).Clone()
+			session.MarkAsRestored()
 			if err := t.ApplyPolicies(&session); err != nil {
 				t.Logger().Error(err)
 				return session, false
@@ -697,11 +700,22 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
 		key = session.KeyID
-
 		session := session.Clone()
 		session.SetKeyHash(keyHash)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		t.Logger().Info("Recreating session for key: ", t.Gw.obfuscateKey(key))
+
+		// insert new session
+		if t.Gw.GlobalSessionManager.Store() != t.Spec.AuthManager.Store() {
+			clonedSession := session.Clone()
+			clonedSession.MarkAsNew()
+
+			lifetime := clonedSession.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
+			if err := t.Gw.GlobalSessionManager.UpdateSession(key, &clonedSession, lifetime, false); err != nil {
+				t.Logger().WithError(err).Error("Cant copy session from AuthManager into GlobalSessionManager")
+				return user.SessionState{}, false
+			}
+		}
 
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
@@ -724,6 +738,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 
 	// session not found
 	session.KeyID = key
+
 	return session, false
 }
 

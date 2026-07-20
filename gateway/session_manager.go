@@ -496,6 +496,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(
 
 	increment := func() bool {
 		var res *redis.IntCmd
+		// todo: change to lua script, it does not works like author suppose
 		_, err := conn.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 			res = pipe.Incr(ctx, rawKey)
 			if res.Val() == 1 && quotaRenewalRate > 0 {
