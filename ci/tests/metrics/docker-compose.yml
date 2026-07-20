@@ -39,7 +39,7 @@ services:
       start_period: 4s
       timeout: 10s
 
-  httpbin:
+  httpbin.org:
     platform: linux/amd64
     image: kennethreitz/httpbin:latest
 

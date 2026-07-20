@@ -24,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -1397,4 +1398,16 @@ func TestLoadApps_PendingCertsDrain_Extended(t *testing.T) {
 		ts.Gw.loadApps([]*APISpec{spec})
 		// no assertion needed beyond mock expectation: GetRaw must not be called
 	})
+}
+
+func TestRPCStorageHandler_SetKeyEx(t *testing.T) {
+	rpcListener := RPCStorageHandler{}
+	err := rpcListener.SetKeyEx("test_key", "test_session", 100)
+	assert.ErrorIs(t, err, errpack.ErrNotImplemented, "rpc storage handler should not be called")
+}
+
+func TestRPCStorageHandler_SetRawKeyEx(t *testing.T) {
+	rpcListener := RPCStorageHandler{}
+	err := rpcListener.SetRawKeyEx("test_key", "test_session", 100)
+	assert.ErrorIs(t, err, errpack.ErrNotImplemented, "rpc storage handler should not be called")
 }

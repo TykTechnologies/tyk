@@ -8,7 +8,6 @@ import (
 	"net/textproto"
 	"net/url"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -341,17 +340,9 @@ func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]in
 
 		case fileLabel:
 
-			bp := gw.GetConfig().KV.File.BasePath
-			// When base_path is configured it acts as a security boundary:
-			// reject absolute paths so API designers cannot bypass the boundary
-			// to read files outside the configured mount directory.
-			if bp != "" && filepath.IsAbs(key) {
-				log.Warnf("file KV: absolute path rejected for $secret_file key %q - base_path is configured", key)
-				in = emptyStringFn(key, in, v)
-				continue
-			}
-			val, err := ResolveFileKV(bp, key)
+			val, err := ResolveFileKV(gw.GetConfig().KV.File.BasePath, key)
 			if err != nil {
+				log.WithError(err).Debug("file KV: $secret_file resolution failed")
 				in = emptyStringFn(key, in, v)
 				continue
 			}

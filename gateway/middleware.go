@@ -468,6 +468,8 @@ func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 
 	// Reset session state, useful for benchmarks when request object stays the same.
 	session.Reset()
+	// Mark session as restored; (makes invoke `SET key val XX` in further calls)
+	session.MarkAsRestored()
 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		t.Gw.SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
@@ -612,15 +614,26 @@ func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
 	return copied
 }
 
+// defaultMinTokenLength is the floor applied to key length when min_token_length
+// is unset. It is enforced at both create time (handleAddOrUpdate) and auth time
+// so the two cannot drift (see TT-17585).
+// See https://github.com/TykTechnologies/tyk/issues/1681.
+const defaultMinTokenLength = 3
+
+// effectiveMinTokenLength returns the configured min_token_length, or the
+// default floor when it is unset (0).
+func effectiveMinTokenLength(configured int) int {
+	if configured == 0 {
+		return defaultMinTokenLength
+	}
+	return configured
+}
+
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
 func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r *http.Request) (user.SessionState, bool) {
 	key := originalKey
-	minLength := t.Spec.GlobalConfig.MinTokenLength
-	if minLength == 0 {
-		// See https://github.com/TykTechnologies/tyk/issues/1681
-		minLength = 3
-	}
+	minLength := effectiveMinTokenLength(t.Spec.GlobalConfig.MinTokenLength)
 
 	if len(key) < minLength {
 		return user.SessionState{IsInactive: true}, false
@@ -640,6 +653,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		if found {
 			t.Logger().Debug("--> Key found in local cache")
 			session := cachedVal.(user.SessionState).Clone()
+			session.MarkAsRestored()
 			if err := t.ApplyPolicies(&session); err != nil {
 				t.Logger().Error(err)
 				return session, false
@@ -662,7 +676,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		// If exists, assume it has been authorized and pass on
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			t.Gw.SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			t.Gw.SessionCache.Set(cacheKey, session.Clone(), cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
@@ -686,15 +700,26 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
 		key = session.KeyID
-
 		session := session.Clone()
 		session.SetKeyHash(keyHash)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		t.Logger().Info("Recreating session for key: ", t.Gw.obfuscateKey(key))
 
+		// insert new session
+		if t.Gw.GlobalSessionManager.Store() != t.Spec.AuthManager.Store() {
+			clonedSession := session.Clone()
+			clonedSession.MarkAsNew()
+
+			lifetime := clonedSession.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
+			if err := t.Gw.GlobalSessionManager.UpdateSession(key, &clonedSession, lifetime, false); err != nil {
+				t.Logger().WithError(err).Error("Cant copy session from AuthManager into GlobalSessionManager")
+				return user.SessionState{}, false
+			}
+		}
+
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go t.Gw.SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			go t.Gw.SessionCache.Set(cacheKey, session.Clone(), cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
@@ -713,6 +738,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 
 	// session not found
 	session.KeyID = key
+
 	return session, false
 }
 
