@@ -57,9 +57,9 @@ type MetricsConfig struct {
 type TracesConfig struct {
 	BaseOpenTelemetry `json:",inline"`
 
-	// MCPTraceContext configures where Tyk reads an MCP request's W3C trace
-	// context from (ordered, first-match-wins). Omitted ⇒ the canonical
-	// [{header}, {body, path: params._meta}] default.
+	// Configure from where Tyk should read an MCP request's W3C trace
+	// context (ordered, first-match-wins). If not set, the canonical
+	// default [{header}, {body, path: params._meta}] will be used.
 	MCPTraceContext MCPTraceContextConfig `json:"mcp"`
 }
 
