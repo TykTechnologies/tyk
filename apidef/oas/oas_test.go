@@ -346,6 +346,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.CustomMiddleware.TrafficLogs.Disabled",
 		"APIDefinition.CustomMiddleware.TrafficLogs.Name",
 		"APIDefinition.CustomMiddleware.TrafficLogs.Path",
+		"APIDefinition.CustomMiddleware.TrafficLogs.Code",
 		"APIDefinition.CustomMiddleware.TrafficLogs.RequireSession",
 		"APIDefinition.CustomMiddleware.TrafficLogs.RawBodyOnly",
 		"APIDefinition.AuthProvider.Name",
