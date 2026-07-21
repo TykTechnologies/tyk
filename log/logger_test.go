@@ -12,7 +12,7 @@ import (
 )
 
 func Test_Logger(t *testing.T) {
-	makeDummySink := func(writer io.Writer) Sinker {
+	makeDummySink := func(writer io.Writer) SinkerExtended {
 		return NewSink(writer, &logrus.TextFormatter{}, AcceptorAllowAll)
 	}
 
@@ -25,7 +25,7 @@ func Test_Logger(t *testing.T) {
 
 			assert.Len(t, lgr.tmpLogsCollector.entries, 1)
 			lgr.Setup(func(b *Builder) {
-				b.AddSink(makeDummySink(buf))
+				b.AddSinker(makeDummySink(buf))
 			})
 
 			assert.Empty(t, lgr.tmpLogsCollector.entries)
@@ -101,7 +101,7 @@ func Test_Logger(t *testing.T) {
 			sinkBuf := &bytes.Buffer{}
 
 			lgr.Setup(func(b *Builder) {
-				b.AddSink(NewSink(sinkBuf, &logrus.TextFormatter{}, AcceptorAllowAll))
+				b.AddSinker(NewSink(sinkBuf, &logrus.TextFormatter{}, AcceptorAllowAll))
 			})
 
 			child.Info("post setup")

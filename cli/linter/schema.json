@@ -484,6 +484,36 @@
           "required": ["response"]
         }
       }
+    },
+    "SinkConfig": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "string",
+          "description": "Specifies the minimum severity level (e.g., debug, info, warn) an event must have to be processed by this sink."
+        },
+        "high_level": {
+          "type": "string",
+          "description": "Specifies the maximum severity level (e.g., debug, info, warn). Default value: panic"
+        },
+        "format": {
+          "type": "string",
+          "description": "Defines the identifier of the used formatter (e.g., \"json\", \"text\")."
+        },
+        "format_options": {
+          "type": "object",
+          "description": "Raw JSON payload with parameters specific to the chosen Format."
+        },
+        "output": {
+          "type": "string",
+          "description": "Defines the identifier of the target destination (e.g., \"file\", \"http\", \"stdout\")."
+        },
+        "output_options": {
+          "type": "object",
+          "description": "Raw JSON payload with parameters specific to the chosen Output."
+        }
+      },
+      "additionalProperties": false
     }
   },
   "properties": {
@@ -987,8 +1017,21 @@
       "enum": ["", "debug", "info", "warn", "error"]
     },
     "log_format": {
-      "type": "string",
-      "enum": ["", "text", "json", "legacy"]
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": ["", "text", "json", "legacy"]
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SinkConfig"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "access_logs": {
       "type": ["object", "null"],

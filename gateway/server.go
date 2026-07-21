@@ -1545,29 +1545,84 @@ func (gw *Gateway) reloadURLStructure(done func()) {
 	gw.reloadQueue <- done
 }
 
+func (gw *Gateway) extractLogLevel(cfg *config.Config) logrus.Level {
+	var level logrus.Level
+	var ok bool
+
+	if logLevel := tyklog.CoalesceEnvOr(cfg.LogLevel, tyklog.EnvTykLoglevel, tyklog.EnvTykGwLoglevel); logLevel != "" {
+		if level, ok = logLevel.LogrusLevel(); !ok {
+			mainLog.Fatalf("Invalid log level %q specified in config, must be error, warn, debug or info. ", logLevel)
+		}
+	} else {
+		level = logrus.InfoLevel
+	}
+
+	return level
+}
+
+func (gw *Gateway) buildSinkWithDest(
+	dest string,
+	format tyklog.Format,
+	cfg *config.Config,
+) ([]tyklog.SinkerExtended, error) {
+
+	level := gw.extractLogLevel(cfg)
+	sink := tyklog.NewSink(
+		os.Stdout,
+		tyklog.NewFormatter(format),
+		tyklog.NewAcceptorRange(level, logrus.FatalLevel),
+	)
+	log.Debugf("Building looger %q format=%q level=%q output=stdout", dest, format, level)
+	return []tyklog.SinkerExtended{sink}, nil
+}
+
+func (gw *Gateway) buildSinks(cfg *config.Config) ([]tyklog.SinkerExtended, error) {
+	// precedence: TYK_LOGFORMAT > TYK_GW_LOGFORMAT > config.LogFormat > fallback(tyklog.FormatText)
+
+	if envFormat, ok := tyklog.CoalesceValidEnv[tyklog.Format](tyklog.EnvTykLogformat, tyklog.EnvTykGwLogformat); ok {
+		return gw.buildSinkWithDest("env", envFormat, cfg)
+	}
+
+	if sinkConfigs, ok := cfg.LogFormat.Sinks(); ok {
+		log.Debugf("Building logger from sinks config=%q", sinkConfigs)
+		sinkers := make([]tyklog.SinkerExtended, 0, len(sinkConfigs))
+		var errs []error
+
+		for _, sinkConfig := range sinkConfigs {
+			if sink, err := tyklog.NewSinkFromConfig(sinkConfig); err != nil {
+				errs = append(errs, err)
+			} else {
+				sinkers = append(sinkers, sink)
+			}
+		}
+
+		if len(errs) > 0 {
+			return nil, errors.Join(errs...)
+		}
+
+		return sinkers, nil
+	}
+
+	if cfgFormatAsString, ok := cfg.LogFormat.Format(); ok {
+		return gw.buildSinkWithDest("config", cfgFormatAsString, cfg)
+	}
+
+	return gw.buildSinkWithDest("fallback", tyklog.FormatText, cfg)
+}
+
 func (gw *Gateway) setupLogger(builder *tyklog.Builder) {
 	gwConfig := gw.GetConfig()
 	builder.WithApplyHooksToRawLog()
 
 	stdlog.SetOutput(io.Discard)
 
-	// precedence: TYK_LOGFORMAT > TYK_GW_LOGFORMAT > config.LogFormat, fallback(tyklog.FormatText)
-	logFormat := tyklog.CoalesceEnvOrDefault(tyklog.FormatText, gwConfig.LogFormat, tyklog.EnvTykLogformat, tyklog.EnvTykGwLogformat)
-	formatter := tyklog.NewFormatter(logFormat)
-
-	// split one stream into two separate streams
-	builder.AddSinkSplitByLevel(logrus.ErrorLevel, formatter)
-
-	// precedence: TYK_LOGLEVEL > TYK_GW_LOGLEVEL > config.LogLevel
-	// if provided value is not valid -> Fatal
-	if logLevel := tyklog.CoalesceEnv(gwConfig.LogLevel, tyklog.EnvTykLoglevel, tyklog.EnvTykGwLoglevel); logLevel != "" {
-		if level, ok := logLevel.LogrusLevel(); !ok {
-			mainLog.Fatalf("Invalid log level %q specified in config, must be error, warn, debug or info. ", level)
-		} else {
-			builder.WithLevel(level)
-		}
-		mainLog.Debugf("Set log level to %q", log.GetLevel())
+	sinks, err := gw.buildSinks(&gwConfig)
+	if err != nil {
+		log.Fatalf("Failed to build sinks: %v", err)
+		return
 	}
+
+	builder.AddSinker(sinks...)
 
 	if gw.isRunningTests() && os.Getenv(tyklog.EnvTykLoglevel) == "" {
 		// `go test` without TYK_LOGLEVEL set defaults to no log
@@ -1575,7 +1630,6 @@ func (gw *Gateway) setupLogger(builder *tyklog.Builder) {
 		builder.WithLevel(logrus.ErrorLevel)
 		builder.WithDiscardOutput()
 		gorpc.SetErrorLogger(func(string, ...interface{}) {})
-		stdlog.SetOutput(io.Discard)
 	} else if *cli.DebugMode {
 		builder.WithLevel(logrus.DebugLevel)
 		mainLog.Debug("Enabling debug-level output")

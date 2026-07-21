@@ -2,13 +2,12 @@ package log
 
 import (
 	"io"
-	"os"
 
 	"github.com/sirupsen/logrus"
 )
 
 type Builder struct {
-	sinks                  []Sinker
+	sinkers                []SinkerExtended
 	hooks                  []logrus.Hook
 	level                  *logrus.Level
 	stdLog                 *logrus.Logger
@@ -34,17 +33,9 @@ func (b *Builder) AddHook(hook logrus.Hook) {
 	b.hooks = append(b.hooks, hook)
 }
 
-// AddSink adds sink.
-func (b *Builder) AddSink(sink Sinker) {
-	b.sinks = append(b.sinks, sink)
-}
-
-// AddSinkSplitByLevel adds default split by level.
-// AddSink or AddDefaultSplit can be used.
-// These methods are mutually excluded.
-func (b *Builder) AddSinkSplitByLevel(level logrus.Level, formatter logrus.Formatter) {
-	b.AddSink(NewSink(os.Stderr, formatter, NewAcceptorGte(level)))
-	b.AddSink(NewSink(os.Stdout, formatter, NewAcceptorLt(level)))
+// AddSinker adds sinker.
+func (b *Builder) AddSinker(sink ...SinkerExtended) {
+	b.sinkers = append(b.sinkers, sink...)
 }
 
 // WithPropagate propagates logger.
@@ -79,6 +70,12 @@ func (b *Builder) buildAndPropagate(dest *Logger) {
 	}
 	b.applyHooksToRawLog()
 
+	if b.level != nil {
+		for _, sinker := range b.sinkers {
+			sinker.SetAcceptor(NewAcceptorRange(*b.level, logrus.FatalLevel))
+		}
+	}
+
 	dest.legacyLogFormatEnabled = b.legacyLogFormatEnabled
 	b.discardLogger(dest.innerLogger)
 	b.applyHooksAndSinks(dest.innerLogger)
@@ -91,14 +88,20 @@ func (b *Builder) buildAndPropagate(dest *Logger) {
 
 func (b *Builder) discardLogger(target *logrus.Logger) {
 	var level = target.Level
-
-	if b.level != nil {
-		level = *b.level
-	}
-
 	target.SetFormatter(&dummyFormatter{})
 	target.SetOutput(io.Discard)
 	target.SetLevel(level)
+}
+
+func (b *Builder) convertSinkers() []Sinker {
+	if b.sinkers == nil {
+		return nil
+	}
+	sinks := make([]Sinker, 0, len(b.sinkers))
+	for _, sink := range b.sinkers {
+		sinks = append(sinks, sink)
+	}
+	return sinks
 }
 
 func (b *Builder) applyHooksAndSinks(target *logrus.Logger) {
@@ -106,9 +109,9 @@ func (b *Builder) applyHooksAndSinks(target *logrus.Logger) {
 		target.AddHook(hook)
 	}
 
-	if !b.discardOutput && len(b.sinks) > 0 {
+	if !b.discardOutput && len(b.sinkers) > 0 {
 		target.AddHook(&multiSinkHook{
-			sinks: b.sinks,
+			sinks: b.convertSinkers(),
 		})
 	}
 }

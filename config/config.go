@@ -1261,12 +1261,15 @@ type Config struct {
 
 	// You can now set a logging level (log_level). The following levels can be set: debug, info, warn, error.
 	// If not set or left empty, it will default to `info`.
+	// Is ignored when LogFormat is an array of sinks.
 	LogLevel logger.Level `json:"log_level"`
 
-	// Configures the output format used for application logs.
-	// Allowed values are `text`, `json`, or `legacy`.
+	// LogFormat configures the output format used for application logs.
+	// Allowed values are null, `text`, `json`, `legacy` or array of sinks.
 	// If not set or left empty, it defaults to `text`.
-	LogFormat logger.Format `json:"log_format"`
+	// Empty string is also treated as null value.
+	// Sinks configures the output, format and level for each sink.
+	LogFormat LogFormat `json:"log_format"`
 
 	// AccessLogs configures the output for access logs.
 	// If not configured, the access log is disabled.
