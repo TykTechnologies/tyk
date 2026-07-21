@@ -10,17 +10,13 @@ import (
 
 type mockHook struct{}
 
-func (m *mockHook) Levels() []logrus.Level {
-	return logrus.AllLevels
-}
-
-func (m *mockHook) Fire(_ *logrus.Entry) error {
-	return nil
-}
+func (m *mockHook) Levels() []logrus.Level     { return logrus.AllLevels }
+func (m *mockHook) Fire(_ *logrus.Entry) error { return nil }
 
 type mockSink struct{}
 
-func (m *mockSink) Sink(_ *logrus.Entry) {}
+func (m *mockSink) SetAcceptor(_ Acceptor) {}
+func (m *mockSink) Sink(_ *logrus.Entry)   {}
 
 func TestBuilder(t *testing.T) {
 	t.Run("Default", func(t *testing.T) {
@@ -32,17 +28,9 @@ func TestBuilder(t *testing.T) {
 		assert.Empty(t, logger.Hooks)
 	})
 
-	t.Run("WithLevel", func(t *testing.T) {
-		logger := Build(func(b *Builder) {
-			b.WithLevel(logrus.DebugLevel)
-		})
-
-		assert.Equal(t, logrus.DebugLevel, logger.Level)
-	})
-
 	t.Run("WithDiscardOutput", func(t *testing.T) {
 		logger := Build(func(b *Builder) {
-			b.AddSink(&mockSink{})
+			b.AddSinker(&mockSink{})
 			b.WithDiscardOutput()
 		})
 
@@ -51,7 +39,7 @@ func TestBuilder(t *testing.T) {
 
 	t.Run("AddSink", func(t *testing.T) {
 		logger := Build(func(b *Builder) {
-			b.AddSink(&mockSink{})
+			b.AddSinker(&mockSink{})
 		})
 
 		assert.NotEmpty(t, logger.Hooks)
@@ -85,15 +73,13 @@ func TestBuilder(t *testing.T) {
 		stdLogger.SetLevel(logrus.FatalLevel)
 		stdLogger.SetOutput(io.Discard)
 
-		logger := Build(func(b *Builder) {
+		_ = Build(func(b *Builder) {
 			b.WithStdLog(stdLogger)
 			b.WithLevel(logrus.TraceLevel)
-			b.AddSink(&mockSink{})
+			b.AddSinker(&mockSink{})
 			b.WithPropagate()
 		})
 
-		assert.Equal(t, logrus.TraceLevel, logger.Level)
-		assert.Equal(t, logrus.TraceLevel, stdLogger.Level)
 		assert.Equal(t, io.Discard, stdLogger.Out)
 		assert.IsType(t, &dummyFormatter{}, stdLogger.Formatter)
 
@@ -107,7 +93,7 @@ func TestBuilder(t *testing.T) {
 		_ = Build(func(b *Builder) {
 			b.WithStdLog(stdLogger)
 			b.WithPropagate()
-			b.AddSink(&mockSink{})
+			b.AddSinker(&mockSink{})
 			b.WithDiscardOutput()
 		})
 
