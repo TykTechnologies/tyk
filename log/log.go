@@ -1,6 +1,8 @@
 package log
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -20,10 +22,23 @@ const (
 )
 
 var (
-	log          = New()
-	rawLog       = newRawLog()
-	translations = make(map[string]string)
+	log               = New()
+	rawLog            = newRawLog()
+	translations      = make(map[string]string)
+	formatterRegistry = map[Format]formatterFactory{
+		FormatText: func(_ json.RawMessage) (logrus.Formatter, error) {
+			return newFormatterText(), nil
+		},
+		FormatJson: func(_ json.RawMessage) (logrus.Formatter, error) {
+			return newFormatterJson(), nil
+		},
+		FormatLegacy: func(_ json.RawMessage) (logrus.Formatter, error) {
+			return newFormatterLegacy(), nil
+		},
+	}
 )
+
+type formatterFactory func(options json.RawMessage) (logrus.Formatter, error)
 
 func newRawLog() *logrus.Logger {
 	var l = logrus.New()
@@ -63,6 +78,14 @@ func NewFormatter(format Format) logrus.Formatter {
 	}
 }
 
+func MakeFormatter(format Format, opts json.RawMessage) (logrus.Formatter, error) {
+	if formatter, ok := formatterRegistry[format]; ok {
+		return formatter(opts)
+	}
+
+	return nil, fmt.Errorf("unknown formatter %q", format)
+}
+
 func newFormatterText() logrus.Formatter {
 	return &logrus.TextFormatter{
 		FieldMap:        defaultFieldMap(),
@@ -95,7 +118,7 @@ func newFormatterLegacy() logrus.Formatter {
 	}
 }
 
-func CoalesceEnv[T any, P interface {
+func CoalesceEnvOr[T any, P interface {
 	*T
 	Parse(string) bool
 }](fallback T, envNames ...string) T {
@@ -115,11 +138,11 @@ func CoalesceEnv[T any, P interface {
 	return fallback
 }
 
-func CoalesceEnvOrDefault[T any, P interface {
+func CoalesceValidEnv[T any, P interface {
 	*T
 	Parse(string) bool
 	Valid() bool
-}](default_ T, fallback T, envNames ...string) T {
+}](envNames ...string) (T, bool) {
 
 	for _, envName := range envNames {
 		raw := os.Getenv(envName)
@@ -129,15 +152,12 @@ func CoalesceEnvOrDefault[T any, P interface {
 
 		var value T
 		if P(&value).Parse(raw) {
-			return value
+			return value, true
 		}
 	}
 
-	if P(&fallback).Valid() {
-		return fallback
-	}
-
-	return default_
+	var zero T
+	return zero, false
 }
 
 type Format string
@@ -172,9 +192,3 @@ func defaultFieldMap() logrus.FieldMap {
 		logrus.FieldKeyMsg: "message",
 	}
 }
-
-type InjectTestHookOptions struct {
-	Logger *logrus.Logger
-}
-
-type InjectTestHookOpt func(*InjectTestHookOptions)
