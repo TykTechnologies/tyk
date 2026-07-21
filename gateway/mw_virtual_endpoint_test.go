@@ -6,7 +6,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -310,7 +309,7 @@ func TestPreLoadVirtualMetaCodeGoja_UseFile(t *testing.T) {
 	defer ts.Close()
 
 	vm := &GojaJSVM{}
-	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	vm.Init(nil, log.NewEntry(), ts.Gw)
 	before := len(vm.programs)
 
 	meta := &apidef.VirtualMeta{
@@ -328,7 +327,7 @@ func TestPreLoadVirtualMetaCodeGoja_UseFile_Missing(t *testing.T) {
 	defer ts.Close()
 
 	vm := &GojaJSVM{}
-	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	vm.Init(nil, log.NewEntry(), ts.Gw)
 	before := len(vm.programs)
 
 	meta := &apidef.VirtualMeta{
@@ -348,7 +347,7 @@ func TestPreLoadVirtualMetaCodeGoja_BlobDisabled(t *testing.T) {
 	defer ts.Close()
 
 	vm := &GojaJSVM{}
-	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	vm.Init(nil, log.NewEntry(), ts.Gw)
 	before := len(vm.programs)
 
 	meta := &apidef.VirtualMeta{
@@ -366,7 +365,7 @@ func TestPreLoadVirtualMetaCodeGoja_UseBlob_InvalidBase64(t *testing.T) {
 	defer ts.Close()
 
 	vm := &GojaJSVM{}
-	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	vm.Init(nil, log.NewEntry(), ts.Gw)
 	before := len(vm.programs)
 
 	meta := &apidef.VirtualMeta{
@@ -384,7 +383,7 @@ func TestPreLoadVirtualMetaCodeGoja_UnknownType(t *testing.T) {
 	defer ts.Close()
 
 	vm := &GojaJSVM{}
-	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	vm.Init(nil, log.NewEntry(), ts.Gw)
 	before := len(vm.programs)
 
 	meta := &apidef.VirtualMeta{
