@@ -117,6 +117,40 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+      - name: Validate Go version
+        run: |
+          GO_VERSION_STR=$(docker run --rm tykio/golang-cross:${{ matrix.golang_cross }} go version 2>&1 || true)
+          if [[ ! "$GO_VERSION_STR" =~ go[0-9]+ ]]; then
+            echo "::warning::Could not determine Go version from container: $GO_VERSION_STR"
+            exit 1
+          fi
+          GO_VERSION=$(echo "$GO_VERSION_STR" | awk '{print $3}' | sed 's/^go//')
+          echo "Go version in container: $GO_VERSION"
+          MINOR_VERSION=$(echo "$GO_VERSION" | cut -d. -f1,2)
+          echo "Minor version: $MINOR_VERSION"
+
+          # Fetch latest patches
+          LATEST_PATCH_STR=$(curl -s 'https://go.dev/dl/?mode=json&include=all' || true)
+          if [ -z "$LATEST_PATCH_STR" ]; then
+            echo "::warning::Could not fetch Go releases from API. Skipping validation."
+            exit 0
+          fi
+          LATEST_PATCH=$(echo "$LATEST_PATCH_STR" | jq -r --arg minor "go${MINOR_VERSION}" '.[] | select(.stable == true and (.version | startswith($minor + ".") or . == $minor)) | .version' | head -n 1 | sed 's/^go//')
+
+          if [ -n "$LATEST_PATCH" ]; then
+            echo "Latest patch version for Go $MINOR_VERSION is $LATEST_PATCH"
+            if [ "$GO_VERSION" != "$LATEST_PATCH" ]; then
+              echo "::error::Go version validation failed!"
+              echo "Used version: $GO_VERSION (in tykio/golang-cross:${{ matrix.golang_cross }})"
+              echo "Latest patch: $LATEST_PATCH"
+              echo "Please update the buildenv Go version to the latest patch version."
+              exit 1
+            else
+              echo "Go version is up to date: $GO_VERSION"
+            fi
+          else
+            echo "::warning::Could not determine latest patch version for Go $MINOR_VERSION from API. Skipping validation."
+          fi
       - name: Build
         env:
           NFPM_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
@@ -127,7 +161,7 @@ jobs:
           ci/bin/unlock-agent.sh
           git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
-          goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign,docker' || '--skip=docker' }}' | tee /tmp/build.sh
+          goreleaser release --timeout 120m --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign,docker' || '--skip=docker' }}' | tee /tmp/build.sh
           chmod +x /tmp/build.sh
           docker run --rm --privileged -e GITHUB_TOKEN=${{ github.token }} \
           -e GOPRIVATE=github.com/TykTechnologies                                \
@@ -187,10 +221,39 @@ jobs:
           echo "Inspecting layer compression for tag: $TAG"
 
           docker buildx imagetools inspect --raw -- "$TAG" > manifest.json
-          if grep -q "tar+zstd" manifest.json; then
-            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
-            cat manifest.json | grep mediaType
-            exit 1
+
+          # Extract child digests (excluding attestation manifests) if it's a multi-arch manifest list / index
+          DIGESTS=$(jq -r '.manifests[] | select((.platform.architecture // "") != "unknown" and (.annotations["vnd.docker.reference.type"] // "") != "attestation-manifest") | .digest' manifest.json 2>/dev/null || true)
+
+          verify_manifest() {
+            local file=$1
+            # Check if any layer does NOT end in gzip/tar+gzip/tar.gzip
+            local invalid_layers
+            invalid_layers=$(jq -r '.layers[].mediaType' "$file" | grep -v 'tar+gzip' | grep -v 'tar.gzip' || true)
+            if [ -n "$invalid_layers" ]; then
+              echo "::error::Found layers that are not gzip-compressed:"
+              echo "$invalid_layers"
+              exit 1
+            fi
+            # Also verify we found at least one layer
+            local layer_count
+            layer_count=$(jq '.layers | length' "$file" 2>/dev/null || echo 0)
+            if [ "$layer_count" -eq 0 ]; then
+              echo "::error::No layers found in manifest!"
+              exit 1
+            fi
+          }
+
+          if [ -n "$DIGESTS" ]; then
+            echo "Multi-arch image list detected. Checking each platform manifest..."
+            for digest in $DIGESTS; do
+              echo "Inspecting child platform manifest: $digest"
+              docker buildx imagetools inspect --raw -- "$TAG@$digest" > child_manifest.json
+              verify_manifest child_manifest.json
+            done
+          else
+            echo "Single-arch manifest detected. Checking manifest..."
+            verify_manifest manifest.json
           fi
           echo "Success: All layers are uniformly compressed using gzip."
       - name: Docker metadata for std tag push
@@ -234,10 +297,39 @@ jobs:
           echo "Inspecting layer compression for tag: $TAG"
 
           docker buildx imagetools inspect --raw -- "$TAG" > manifest.json
-          if grep -q "tar+zstd" manifest.json; then
-            echo "::error::Image contains zstd-compressed layers! This is incompatible with legacy registries."
-            cat manifest.json | grep mediaType
-            exit 1
+
+          # Extract child digests (excluding attestation manifests) if it's a multi-arch manifest list / index
+          DIGESTS=$(jq -r '.manifests[] | select((.platform.architecture // "") != "unknown" and (.annotations["vnd.docker.reference.type"] // "") != "attestation-manifest") | .digest' manifest.json 2>/dev/null || true)
+
+          verify_manifest() {
+            local file=$1
+            # Check if any layer does NOT end in gzip/tar+gzip/tar.gzip
+            local invalid_layers
+            invalid_layers=$(jq -r '.layers[].mediaType' "$file" | grep -v 'tar+gzip' | grep -v 'tar.gzip' || true)
+            if [ -n "$invalid_layers" ]; then
+              echo "::error::Found layers that are not gzip-compressed:"
+              echo "$invalid_layers"
+              exit 1
+            fi
+            # Also verify we found at least one layer
+            local layer_count
+            layer_count=$(jq '.layers | length' "$file" 2>/dev/null || echo 0)
+            if [ "$layer_count" -eq 0 ]; then
+              echo "::error::No layers found in manifest!"
+              exit 1
+            fi
+          }
+
+          if [ -n "$DIGESTS" ]; then
+            echo "Multi-arch image list detected. Checking each platform manifest..."
+            for digest in $DIGESTS; do
+              echo "Inspecting child platform manifest: $digest"
+              docker buildx imagetools inspect --raw -- "$TAG@$digest" > child_manifest.json
+              verify_manifest child_manifest.json
+            done
+          else
+            echo "Single-arch manifest detected. Checking manifest..."
+            verify_manifest manifest.json
           fi
           echo "Success: All layers are uniformly compressed using gzip."
       - name: save deb
@@ -401,135 +493,23 @@ jobs:
     outputs:
       deb: ${{ steps.params.outputs.deb }}
       rpm: ${{ steps.params.outputs.rpm }}
+      rpm_amd64: ${{ steps.params.outputs.rpm_amd64 }}
     steps:
-      - name: set params
+      - name: Set distro matrix
+        uses: TykTechnologies/github-actions/.github/actions/tests/distro-matrix@production
         id: params
-        shell: bash
-        env:
-          # startsWith covers pull_request_target too
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
-        run: |
-          set -eo pipefail
-          curl -s --retry 5 --retry-delay 10 --fail-with-body "http://tui.internal.dev.tyk.technology/v2/$VARIATION/tyk/$BASE_REF/${{ github.event_name}}/api/Distros.gho" | tee -a "$GITHUB_OUTPUT"
-          if ! [[ $VARIATION =~ prod ]];then
-            echo "::warning file=.github/workflows/release.yml,line=24,col=1,endColumn=8::Using test variation"
-          fi
-  upgrade-deb:
-    services:
-      httpbin.org:
-        image: kennethreitz/httpbin
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+  upgrade-tests:
     needs:
       - test-controller-distros
-    strategy:
-      fail-fast: true
-      matrix:
-        arch:
-          - amd64
-          - arm64
-        distro: ${{ fromJson(needs.test-controller-distros.outputs.deb) }}
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 1
-          sparse-checkout: ci
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: deb
-      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      - name: generate dockerfile
-        run: |
-          echo 'FROM ${{ matrix.distro }}
-          ARG TARGETARCH
-          COPY tyk-gateway*_${TARGETARCH}.deb /tyk-gateway.deb
-          RUN apt-get update && apt-get install -y curl
-          # TODO(security): curl|bash - consider fetching script and verifying checksum before execution
-          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash || echo "Repository setup failed, but continuing" # SECURITY: accepted risk, see TODO above
-          RUN apt-get install -y tyk-gateway=3.0.8 || echo "Previous version not found, testing fresh install"
-          RUN dpkg -i /tyk-gateway.deb
-
-          RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
-          COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
-          CMD ["/opt/tyk-gateway/tyk", "--conf", "/opt/tyk-gateway/tyk.conf"]
-          ' | tee Dockerfile
-      - name: install on ${{ matrix.distro }}
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
-        with:
-          context: "."
-          platforms: linux/${{ matrix.arch }}
-          build-args: |
-            RHELARCH=${{ startsWith(matrix.arch, 'arm64') && 'aarch64' || 'x86_64' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          file: Dockerfile
-          push: false
-          tags: test-${{ matrix.distro }}-${{ matrix.arch }}
-          load: true
-      - name: Test the built container image with api functionality test.
-        run: |
-          docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
-          sleep 2
-          ./ci/tests/api-functionality/api_test.sh
-          sleep 2
-          docker stop test || true
-  upgrade-rpm:
-    services:
-      httpbin.org:
-        image: kennethreitz/httpbin
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
-    needs:
-      - test-controller-distros
-    strategy:
-      fail-fast: true
-      matrix:
-        arch:
-          - amd64
-          - arm64
-        distro: ${{ fromJson(needs.test-controller-distros.outputs.rpm) }}
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 1
-          sparse-checkout: ci
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: rpm
-      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      - name: generate dockerfile
-        run: |
-          echo 'FROM ${{ matrix.distro }}
-          ARG RHELARCH
-          COPY tyk-gateway*.${RHELARCH}.rpm /tyk-gateway.rpm
-          RUN command -v curl || yum install -y curl
-          RUN command -v useradd || yum install -y shadow-utils
-          # TODO(security): curl|bash - consider fetching script and verifying checksum before execution
-          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.rpm.sh | bash || echo "Repository setup failed, but continuing" # SECURITY: accepted risk, see TODO above
-          RUN yum install -y tyk-gateway-3.0.8-1 || echo "Previous version not found, testing fresh install"
-          RUN curl https://keyserver.tyk.io/tyk.io.rpm.signing.key.2020 -o tyk-gateway.key && rpm --import tyk-gateway.key
-          RUN rpm --checksig /tyk-gateway.rpm
-          RUN rpm -Uvh --force /tyk-gateway.rpm
-
-          RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
-          COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
-          CMD ["/opt/tyk-gateway/tyk", "--conf", "/opt/tyk-gateway/tyk.conf"]
-          ' | tee Dockerfile
-      - name: install on ${{ matrix.distro }}
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
-        with:
-          context: "."
-          platforms: linux/${{ matrix.arch }}
-          build-args: |
-            RHELARCH=${{ startsWith(matrix.arch, 'arm64') && 'aarch64' || 'x86_64' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          file: Dockerfile
-          push: false
-          tags: test-${{ matrix.distro }}-${{ matrix.arch }}
-          load: true
-      - name: Test the built container image with api functionality test.
-        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
+    uses: TykTechnologies/github-actions/.github/workflows/upgrade-tests.yml@production
+    with:
+      deb: ${{ needs.test-controller-distros.outputs.deb }}
+      rpm: ${{ needs.test-controller-distros.outputs.rpm }}
+      rpm_amd64: ${{ needs.test-controller-distros.outputs.rpm_amd64 }}
+      package_name: tyk-gateway
+      upgrade_repo: tyk-gateway
+      runs_on: ${{ vars.DEFAULT_RUNNER }}
+      run_gateway_tests: true
   release-tests:
     needs:
       - goreleaser
