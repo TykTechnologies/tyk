@@ -1267,7 +1267,7 @@ type Config struct {
 	// If not set or left empty, it will default to `info`.
 	LogLevel string `json:"log_level"`
 
-	// LogFormat configures the output format of the logs.
+	// Configures the output format used for application logs.
 	// Allowed values are `text`, `json`, or `legacy`.
 	// If not set or left empty, it defaults to `text`.
 	LogFormat logger.Format `json:"log_format"`

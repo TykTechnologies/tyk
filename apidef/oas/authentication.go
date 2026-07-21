@@ -370,7 +370,7 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	a.CustomKeyLifetime.ExtractTo(api)
 }
 
-// SecuritySchemes holds security scheme values, filled with Import().
+// SecuritySchemes holds security scheme values keyed by the scheme name declared in `components.securitySchemes`. Each value can be an `oauth2` scheme — see [OAuth2](#oauth2) for the full configuration contract.
 type SecuritySchemes map[string]interface{}
 
 // SecurityScheme defines an Importer interface for security schemes.
