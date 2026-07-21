@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
@@ -148,7 +147,7 @@ func (gw *Gateway) pluginTestHandler(w http.ResponseWriter, r *http.Request) {
 	// This loads coreJS, TykJSPath, TykJsResponse, and sets timeout from config.
 	spec := minimalTestRunnerAPISpec(&req)
 	jsvm := &GojaJSVM{}
-	jsvm.Init(spec, logrus.NewEntry(log), gw)
+	jsvm.Init(spec, log.NewEntry(), gw)
 	if !jsvm.Initialized() {
 		writeJSON(http.StatusInternalServerError, map[string]string{"error": "failed to initialize JavaScript VM"})
 		return
