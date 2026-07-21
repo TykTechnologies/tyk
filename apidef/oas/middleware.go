@@ -1312,18 +1312,18 @@ func (a *CachePlugin) ExtractTo(cm *apidef.CacheMeta) {
 type EnforceTimeout struct {
 	// Enabled is a boolean flag. If set to `true`, requests will enforce a configured timeout.
 	//
-	// Tyk classic API definition: `version_data.versions.extended_paths.hard_timeouts[].disabled` (negated).
+	// Tyk classic API definition: `version_data.versions.{version-name}.extended_paths.hard_timeouts[].disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"`
 
 	// Value is the configured timeout in seconds.
 	//
-	// Tyk classic API definition: `version_data.versions.extended_paths.hard_timeouts[].timeout`.
+	// Tyk classic API definition: `version_data.versions.{version-name}.extended_paths.hard_timeouts[].timeout`.
 	// Deprecated: Use Duration instead.
 	Value int `bson:"value" json:"value"`
 
 	// Duration is the configured timeout duration. Supports sub-second values (e.g. "500ms", "5s").
 	//
-	// Tyk classic API definition: `version_data.versions.extended_paths.hard_timeouts[].duration`.
+	// Tyk classic API definition: `version_data.versions.{version-name}.extended_paths.hard_timeouts[].duration`.
 	Duration tyktime.ReadableDuration `bson:"duration,omitempty" json:"duration,omitempty"`
 }
 
