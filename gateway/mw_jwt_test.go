@@ -27,6 +27,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/cache"
 	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -5369,11 +5370,9 @@ func TestJWTPostExpiry(t *testing.T) {
 func Test_mapScopeToPolicies_TT5893(t *testing.T) {
 	// https://tyktech.atlassian.net/browse/TT-5893
 
-	injectLogger := func(t *testing.T) (tmpLogger *logrus.Logger, hook *logrustest.Hook) {
+	injectLogger := func(t *testing.T) (tmpLogger *tyklog.Logger, hook *tyklog.Hook) {
 		t.Helper()
-
-		tmpLogger, hook = logrustest.NewNullLogger()
-		tmpLogger.SetLevel(logrus.TraceLevel)
+		tmpLogger, hook = tyklog.NewNullLogger()
 
 		realLogger := log
 
