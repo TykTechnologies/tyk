@@ -27,7 +27,6 @@ import (
 const (
 	keyDataDeveloperID    = "tyk_developer_id"
 	keyDataDeveloperEmail = "tyk_developer_email"
-	obfuscationToken      = "***"
 )
 
 type ProxyResponse struct {

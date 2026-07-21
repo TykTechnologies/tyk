@@ -12,20 +12,21 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+const obfuscationToken = "***"
+
 func getRawRequest(r *http.Request, spec *APISpec) string {
 	var wireFormatReq bytes.Buffer
 
 	var originalHeaders http.Header
 	if !spec.GlobalConfig.AnalyticsConfig.AllowUnsafeDetailedLogs {
 		originalHeaders = obfuscateAuthorizationHeaders(r, spec)
+		defer func() {
+			r.Header = originalHeaders
+		}()
 	}
 
 	r.Write(&wireFormatReq)
 	rawRequest := base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
-
-	if originalHeaders != nil {
-		r.Header = originalHeaders
-	}
 
 	return rawRequest
 }
