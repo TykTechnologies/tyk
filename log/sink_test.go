@@ -28,27 +28,43 @@ func (m *mockWriter) Write(_ []byte) (n int, err error) {
 	return 0, m.err
 }
 
-func TestNewAcceptorGte(t *testing.T) {
-	acceptor := NewAcceptorGte(logrus.InfoLevel)
+func TestNewAcceptorRange(t *testing.T) {
+	type testCase struct {
+		name     string
+		acceptor Acceptor
+		accepts  []logrus.Level
+		rejects  []logrus.Level
+	}
 
-	assert.False(t, acceptor.Accept(&logrus.Entry{Level: logrus.DebugLevel}))
-	assert.True(t, acceptor.Accept(&logrus.Entry{Level: logrus.InfoLevel}))
-	assert.True(t, acceptor.Accept(&logrus.Entry{Level: logrus.ErrorLevel}))
-}
+	for _, tc := range []testCase{
+		{
+			name:     "strict",
+			acceptor: NewAcceptorRange(logrus.InfoLevel, logrus.WarnLevel),
+			accepts:  []logrus.Level{logrus.InfoLevel, logrus.WarnLevel},
+			rejects:  []logrus.Level{logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel, logrus.DebugLevel, logrus.TraceLevel},
+		},
+		{
+			name:     "reverted",
+			acceptor: NewAcceptorRange(logrus.WarnLevel, logrus.InfoLevel),
+			rejects:  []logrus.Level{logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel, logrus.DebugLevel, logrus.TraceLevel},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, level := range tc.accepts {
+				assert.True(t, tc.acceptor.Accept(&logrus.Entry{Level: level}))
+			}
 
-func TestNewAcceptorLt(t *testing.T) {
-	acceptor := NewAcceptorLt(logrus.InfoLevel)
-
-	assert.True(t, acceptor.Accept(&logrus.Entry{Level: logrus.DebugLevel}))
-	assert.False(t, acceptor.Accept(&logrus.Entry{Level: logrus.InfoLevel}))
-	assert.False(t, acceptor.Accept(&logrus.Entry{Level: logrus.ErrorLevel}))
-	assert.False(t, acceptor.Accept(&logrus.Entry{Level: logrus.FatalLevel}))
+			for _, level := range tc.rejects {
+				assert.False(t, tc.acceptor.Accept(&logrus.Entry{Level: level}))
+			}
+		})
+	}
 }
 
 func TestNewSink(t *testing.T) {
 	writer := &bytes.Buffer{}
 	formatter := &mockFormatter{}
-	acceptor := NewAcceptorGte(logrus.InfoLevel)
+	acceptor := NewAcceptorRange(logrus.InfoLevel, logrus.DebugLevel)
 
 	sink := NewSink(writer, formatter, acceptor)
 
@@ -65,8 +81,8 @@ func TestMultiSinkHook_Fire_Success(t *testing.T) {
 	buf1 := &bytes.Buffer{}
 	buf2 := &bytes.Buffer{}
 
-	sink1 := NewSink(buf1, &mockFormatter{}, NewAcceptorLt(logrus.WarnLevel))
-	sink2 := NewSink(buf2, &mockFormatter{}, NewAcceptorGte(logrus.WarnLevel))
+	sink1 := NewSink(buf1, &mockFormatter{}, NewAcceptorRange(logrus.DebugLevel, logrus.InfoLevel))
+	sink2 := NewSink(buf2, &mockFormatter{}, NewAcceptorRange(logrus.WarnLevel, logrus.ErrorLevel))
 
 	hook := &multiSinkHook{
 		sinks: []Sinker{sink1, sink2},
