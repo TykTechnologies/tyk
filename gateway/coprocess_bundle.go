@@ -305,8 +305,16 @@ func (z *ZipBundleSaver) extractFile(f *zip.File, bundlePath string) error {
 	return nil
 }
 
-// FetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
+// FetchBundle fetches the API spec's CustomMiddlewareBundle. Preserved for
+// backward compatibility; multi-bundle callers should use FetchBundleByName.
 func (gw *Gateway) FetchBundle(bundleFs afero.Fs, spec *APISpec) (Bundle, error) {
+	return gw.FetchBundleByName(bundleFs, spec, spec.CustomMiddlewareBundle)
+}
+
+// FetchBundleByName fetches a bundle by name (resolved against the gateway's
+// BundleBaseURL). The returned Bundle.Name is set to bundleName so subsequent
+// save/verify steps stay scoped to this specific bundle.
+func (gw *Gateway) FetchBundleByName(bundleFs afero.Fs, spec *APISpec, bundleName string) (Bundle, error) {
 	bundle := Bundle{Gw: gw}
 	var err error
 
@@ -323,7 +331,7 @@ func (gw *Gateway) FetchBundle(bundleFs afero.Fs, spec *APISpec) (Bundle, error)
 		return bundle, err
 	}
 
-	u.Path = path.Join(u.Path, spec.CustomMiddlewareBundle)
+	u.Path = path.Join(u.Path, bundleName)
 
 	bundleURL := u.String()
 
@@ -355,7 +363,7 @@ func (gw *Gateway) FetchBundle(bundleFs afero.Fs, spec *APISpec) (Bundle, error)
 
 	bundleData, err := pullBundle(getter, bundleBackoffMultiplier)
 
-	bundle.Name = spec.CustomMiddlewareBundle
+	bundle.Name = bundleName
 	bundle.Data = bundleData
 	bundle.Spec = spec
 	return bundle, err
@@ -448,6 +456,22 @@ func (gw *Gateway) getHashedBundleName(bundleName string) (string, error) {
 	return fmt.Sprintf("%x", bundleNameHash.Sum(nil)), nil
 }
 
+// parseBundleNames splits spec.CustomMiddlewareBundle on commas, trims
+// whitespace, and drops empty entries. A bare filename (no comma) yields a
+// one-element slice equal to the input; an empty input yields nil.
+func parseBundleNames(s string) []string {
+	if s == "" {
+		return nil
+	}
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // loadBundle configures the gateway to load a custom middleware bundle based on the provided API specification.
 // It verifies the existence, integrity, and configuration of the bundle, applying it to the spec if validation succeeds.
 // Returns an error if the bundle cannot be loaded, validated, or is disabled in the spec.
@@ -455,30 +479,82 @@ func (gw *Gateway) loadBundle(spec *APISpec) error {
 	return gw.loadBundleWithFs(spec, afero.NewOsFs())
 }
 
-// loadBundleWithFs loads and validates a middleware bundle for the given API specification using the provided filesystem.
-// It operates only if required settings like CustomMiddlewareBundle and BundleBaseURL are configured in the API spec.
-// The method handles bundle fetching, saving, and manifest validation.
-// Returns an error if the bundle cannot be fetched, saved, or its manifest cannot be verified successfully.
+// loadBundleWithFs loads and validates one or more middleware bundles for the
+// given API specification using the provided filesystem.
+//
+// spec.CustomMiddlewareBundle accepts either a single bundle filename or a
+// comma-separated list of filenames, each resolved against the gateway's
+// bundle_base_url. Selection rule (backward compatible):
+//   - A single bare filename (no comma) takes the legacy single-bundle path
+//     unchanged — same on-disk layout, same AddToSpec replacement semantics.
+//     Existing deployments continue to behave identically.
+//   - Two or more comma-separated names take the multi-bundle merge path:
+//     each entry is fetched, unpacked into its own subdirectory under the
+//     API's bundle root, and its manifest merged into spec.CustomMiddleware.
+//
+// Returns an error if any bundle cannot be fetched, saved, or verified.
 func (gw *Gateway) loadBundleWithFs(spec *APISpec, bundleFs afero.Fs) error {
 	if gw.GetConfig().ManagementNode {
 		return nil
 	}
-
-	// Skip if no custom middleware bundle name is set.
-	if spec.CustomMiddlewareBundleDisabled || spec.CustomMiddlewareBundle == "" {
+	if spec.CustomMiddlewareBundleDisabled {
 		return nil
 	}
 
-	// Skip if no bundle base URL is set.
+	bundleNames := parseBundleNames(spec.CustomMiddlewareBundle)
+	if len(bundleNames) == 0 {
+		return nil
+	}
+	// Single bare filename → preserve the legacy path exactly so existing
+	// deployments keep their on-disk layout and hashing.
+	if len(bundleNames) == 1 && bundleNames[0] == spec.CustomMiddlewareBundle {
+		return gw.loadSingleBundle(spec, bundleFs)
+	}
+
 	if gw.GetConfig().BundleBaseURL == "" {
 		return bundleError(spec, nil, "No bundle base URL set, skipping bundle")
 	}
 
-	// get bundle destination on disk
+	rootPath := gw.getBundleDestPath(spec)
+	if err := bundleFs.MkdirAll(rootPath, 0700); err != nil {
+		return bundleError(spec, err, "Couldn't create bundle root directory")
+	}
+
+	// Reset the spec's middleware section before merging — multi-bundle mode
+	// is the source of truth for hooks, not whatever was previously attached.
+	spec.CustomMiddleware = apidef.MiddlewareSection{}
+
+	for _, name := range bundleNames {
+		if name == "" {
+			continue
+		}
+		if err := gw.loadOneBundleForMerge(spec, bundleFs, rootPath, name); err != nil {
+			return err
+		}
+	}
+
+	// Initialise non-goja drivers once after all bundles are merged. The legacy
+	// single-bundle path does this inside Bundle.AddToSpec; for multi-bundle we
+	// do it explicitly with the merged Driver.
+	if dispatcher := loadedDrivers[spec.CustomMiddleware.Driver]; dispatcher != nil {
+		dispatcher.HandleMiddlewareCache(&apidef.BundleManifest{
+			CustomMiddleware: spec.CustomMiddleware,
+		}, rootPath)
+	}
+
+	return nil
+}
+
+// loadSingleBundle is the original single-bundle path, factored out so the
+// new multi-bundle entry point can fall back to it without behavioural
+// drift. Existing single-bundle deployments take this path unchanged.
+func (gw *Gateway) loadSingleBundle(spec *APISpec, bundleFs afero.Fs) error {
+	if gw.GetConfig().BundleBaseURL == "" {
+		return bundleError(spec, nil, "No bundle base URL set, skipping bundle")
+	}
+
 	destPath := gw.getBundleDestPath(spec)
 
-	// Skip if the bundle destination path already exists.
-	// The bundle exists, load and return:
 	if _, err := bundleFs.Stat(destPath); err == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -529,7 +605,6 @@ func (gw *Gateway) loadBundleWithFs(spec *APISpec, bundleFs afero.Fs) error {
 		"prefix": "main",
 	}).Debug("----> Saving Bundle: ", spec.CustomMiddlewareBundle)
 
-	// Set the destination path:
 	bundle.Path = destPath
 
 	if err := loadBundleManifest(bundleFs, &bundle, spec, false, false); err != nil {
@@ -548,6 +623,179 @@ func (gw *Gateway) loadBundleWithFs(spec *APISpec, bundleFs afero.Fs) error {
 	bundle.AddToSpec()
 
 	return nil
+}
+
+// loadOneBundleForMerge fetches/loads a single bundle into a per-bundle
+// subdirectory under rootPath, then merges its manifest into spec.CustomMiddleware
+// with file paths rewritten so api_loader's prefix-join still resolves
+// correctly.
+func (gw *Gateway) loadOneBundleForMerge(spec *APISpec, bundleFs afero.Fs, rootPath, bundleName string) error {
+	subdir := bundleSubdirName(bundleName)
+	destPath := filepath.Join(rootPath, subdir)
+
+	bundle := Bundle{
+		Name: bundleName,
+		Path: destPath,
+		Spec: spec,
+		Gw:   gw,
+	}
+
+	if _, err := bundleFs.Stat(destPath); err == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Loading existing bundle: ", bundleName)
+
+		if err := loadBundleManifestNamed(bundleFs, &bundle, bundleName, true, gw.GetConfig().SkipVerifyExistingPluginBundle); err != nil {
+			return bundleError(spec, err, fmt.Sprintf("Couldn't load bundle %q", bundleName))
+		}
+	} else {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("----> Fetching Bundle: ", bundleName)
+
+		fetched, err := gw.FetchBundleByName(bundleFs, spec, bundleName)
+		if err != nil {
+			return bundleError(spec, err, fmt.Sprintf("Couldn't fetch bundle %q", bundleName))
+		}
+
+		if err := bundleFs.MkdirAll(destPath, 0700); err != nil {
+			return bundleError(spec, err, fmt.Sprintf("Couldn't create bundle directory for %q", bundleName))
+		}
+
+		fetched.Path = destPath
+		if err := saveBundle(bundleFs, &fetched, destPath, spec); err != nil {
+			return bundleError(spec, err, fmt.Sprintf("Couldn't save bundle %q", bundleName))
+		}
+
+		bundle = fetched
+		bundle.Path = destPath
+
+		if err := loadBundleManifestNamed(bundleFs, &bundle, bundleName, false, false); err != nil {
+			if removeErr := bundleFs.RemoveAll(bundle.Path); removeErr != nil {
+				bundleError(spec, removeErr, "Couldn't remove bundle")
+			}
+			return bundleError(spec, err, fmt.Sprintf("Couldn't load bundle %q", bundleName))
+		}
+	}
+
+	if err := mergeBundleManifest(spec, &bundle.Manifest, subdir, bundleName); err != nil {
+		return bundleError(spec, err, fmt.Sprintf("Couldn't merge bundle %q", bundleName))
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("----> Merged bundle into spec: ", bundleName)
+
+	return nil
+}
+
+// loadBundleManifestNamed mirrors loadBundleManifest but uses the supplied
+// bundleName for log messages so multi-bundle merges have meaningful logs.
+// The verification logic is identical.
+func loadBundleManifestNamed(bundleFs afero.Fs, bundle *Bundle, bundleName string, partial bool, skipVerification bool) error {
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("----> Loading bundle: ", bundleName)
+
+	manifestPath := filepath.Join(bundle.Path, "manifest.json")
+	f, err := bundleFs.Open(manifestPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if err := json.NewDecoder(f).Decode(&bundle.Manifest); err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("----> Couldn't unmarshal the manifest file for bundle: ", bundleName)
+		return err
+	}
+
+	if partial {
+		err = bundle.PartialVerify(bundleFs, skipVerification)
+	} else {
+		err = bundle.DeepVerify(bundleFs)
+	}
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("----> Bundle verification failed: ", bundleName)
+		return err
+	}
+
+	return nil
+}
+
+// mergeBundleManifest merges a bundle's manifest into the spec's
+// CustomMiddleware section. Each entry's Path is prepended with the bundle's
+// subdir so the api_loader's prefix-join (prefix = api bundle root) resolves
+// to the correct file under the per-bundle subdirectory.
+//
+// Hook arity rules:
+//   - pre/post/post_key_auth/response: append in declaration order
+//   - auth_check: at most one bundle may set this; merging a second is an error
+//   - driver: must be uniform; mismatch is an error
+func mergeBundleManifest(spec *APISpec, manifest *apidef.BundleManifest, subdir, bundleName string) error {
+	src := manifest.CustomMiddleware
+
+	// Driver consistency
+	if src.Driver != "" {
+		if spec.CustomMiddleware.Driver == "" {
+			spec.CustomMiddleware.Driver = src.Driver
+		} else if spec.CustomMiddleware.Driver != src.Driver {
+			return fmt.Errorf("bundle %q declares driver %q but earlier bundles set %q", bundleName, src.Driver, spec.CustomMiddleware.Driver)
+		}
+	}
+
+	rewritePath := func(md apidef.MiddlewareDefinition) apidef.MiddlewareDefinition {
+		if md.Path != "" {
+			md.Path = filepath.Join(subdir, md.Path)
+		}
+		return md
+	}
+
+	// auth_check is single-valued across the whole API
+	if src.AuthCheck.Name != "" {
+		if spec.CustomMiddleware.AuthCheck.Name != "" {
+			return fmt.Errorf("bundle %q declares an auth_check hook but another bundle has already set one (%q)", bundleName, spec.CustomMiddleware.AuthCheck.Name)
+		}
+		spec.CustomMiddleware.AuthCheck = rewritePath(src.AuthCheck)
+	}
+
+	for _, md := range src.Pre {
+		spec.CustomMiddleware.Pre = append(spec.CustomMiddleware.Pre, rewritePath(md))
+	}
+	for _, md := range src.Post {
+		spec.CustomMiddleware.Post = append(spec.CustomMiddleware.Post, rewritePath(md))
+	}
+	for _, md := range src.PostKeyAuth {
+		spec.CustomMiddleware.PostKeyAuth = append(spec.CustomMiddleware.PostKeyAuth, rewritePath(md))
+	}
+	for _, md := range src.Response {
+		spec.CustomMiddleware.Response = append(spec.CustomMiddleware.Response, rewritePath(md))
+	}
+
+	// IdExtractor: take the first bundle that sets one
+	if !spec.CustomMiddleware.IdExtractor.Disabled && spec.CustomMiddleware.IdExtractor.ExtractWith == "" && src.IdExtractor.ExtractWith != "" {
+		spec.CustomMiddleware.IdExtractor = src.IdExtractor
+	}
+
+	return nil
+}
+
+// bundleSubdirName derives a filesystem-friendly subdirectory name from a
+// bundle filename. The output is stable across runs and gateways so that an
+// already-unpacked bundle can be reused without redownload.
+func bundleSubdirName(bundleName string) string {
+	clean := strings.TrimSuffix(bundleName, filepath.Ext(bundleName))
+	clean = strings.ReplaceAll(clean, "/", "__")
+	clean = strings.ReplaceAll(clean, "\\", "__")
+	if clean == "" {
+		// Fallback: hash the original name so we always produce *something*.
+		sum := sha256.Sum256([]byte(bundleName))
+		return fmt.Sprintf("bundle_%x", sum[:6])
+	}
+	return clean
 }
 
 // bundleError is a log helper.
