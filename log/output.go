@@ -8,6 +8,9 @@ import (
 )
 
 var (
+	// if you are planning to extend outputRegistry, see Benchmark_Logger_Slow_Sink.
+	// Sink has to be wrapped with AsyncSink, which holds an internal queue
+	// and has a defined strategy on how to deal with delayed logs (drop, wait...)
 	outputRegistry = map[Output]outputFactory{
 		OutputStdout: func(_ json.RawMessage) (io.Writer, error) {
 			return os.Stdout, nil
