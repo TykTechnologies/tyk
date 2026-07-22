@@ -451,6 +451,59 @@ func TestUpstreamEnforceTimeoutSchema(t *testing.T) {
 	})
 }
 
+func TestRequestBodyPassthroughSchema(t *testing.T) {
+	t.Parallel()
+
+	base := func(requestBodyPassthrough string) []byte {
+		server := `"listenPath": {"value": "/t"}`
+		if requestBodyPassthrough != "" {
+			server += `,` + requestBodyPassthrough
+		}
+		return []byte(`{
+			"openapi": "3.0.3",
+			"info": {"title": "t", "version": "1"},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {"name": "t", "state": {"active": true}},
+				"server": {` + server + `},
+				"upstream": {"url": "http://upstream"}
+			}
+		}`)
+	}
+
+	t.Run("valid: enabled true", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(base(`"requestBodyPassthrough": {"enabled": true}`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("valid: enabled false", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(base(`"requestBodyPassthrough": {"enabled": false}`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("valid: no requestBodyPassthrough field", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(base(""), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("invalid: requestBodyPassthrough missing required enabled field", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(base(`"requestBodyPassthrough": {}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "enabled")
+	})
+
+	t.Run("invalid: enabled is not a boolean", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(base(`"requestBodyPassthrough": {"enabled": "yes"}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "enabled")
+	})
+}
+
 func TestGetOASSchema(t *testing.T) {
 	err := loadOASSchema()
 	assert.NoError(t, err)

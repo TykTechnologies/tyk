@@ -1179,7 +1179,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	*outreq = *req // includes shallow copies of maps, but okay
 	*logreq = *req
 
-	deepCopyErr := deepCopyBody(req, outreq)
+	var deepCopyErr error
+	// With per-API passthrough enabled, skip the deep copy: outreq.Body
+	// stays the same live, unbuffered reader as req.Body (already shared by
+	// the *outreq = *req shallow copy above) instead of a buffered clone.
+	if !p.TykAPISpec.EnableRequestBodyPassthrough {
+		deepCopyErr = deepCopyBody(req, outreq)
+	}
 	if deepCopyErr != nil {
 		p.logger.Debug("Unable to create deep copy of request, err: ", deepCopyErr)
 		p.ErrorHandler.HandleError(rw, logreq, "There was a problem with reading Body of the Request.",
