@@ -2,9 +2,11 @@ package log
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
@@ -117,4 +119,43 @@ func Test_Logger(t *testing.T) {
 			assert.NotContains(t, string(lines[2]), "prefix=child")
 		})
 	})
+}
+
+type DelayerWriter struct {
+	Dur time.Duration
+}
+
+func (d *DelayerWriter) Write(data []byte) (n int, err error) {
+	time.Sleep(d.Dur)
+	n = len(data)
+	return
+}
+
+func Benchmark_Logger_Slow_Sink(b *testing.B) {
+	makeBenchmark := func(logger *Logger) func(b *testing.B) {
+		return func(b *testing.B) {
+			b.Helper()
+
+			err := errors.New("dummy error")
+
+			b.ResetTimer()
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				logger.WithError(err).Error("something bad happened")
+			}
+		}
+	}
+
+	loggerWithOneSlowSink := Build(func(b *Builder) {
+		b.AddSinker(NewSink(&DelayerWriter{time.Millisecond * 10}, &logrus.TextFormatter{}, AcceptorAllowAll)) // slow sink
+		b.AddSinker(NewSink(io.Discard, &logrus.TextFormatter{}, AcceptorAllowAll))                            // fast sink
+	})
+
+	loggerWithFastSink := Build(func(b *Builder) {
+		b.AddSinker(NewSink(io.Discard, &logrus.TextFormatter{}, AcceptorAllowAll)) // fast sink
+	})
+
+	b.Run("slow sink", makeBenchmark(loggerWithOneSlowSink))
+	b.Run("fast sink", makeBenchmark(loggerWithFastSink))
 }
