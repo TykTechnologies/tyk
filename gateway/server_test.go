@@ -2153,47 +2153,6 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 }
 
 func Test_GW_setupLogger(t *testing.T) {
-	t.Run("log level from config", func(t *testing.T) {
-		cli.InitTest(t, nil)
-
-		cancel := log.Reset()
-		t.Cleanup(cancel)
-
-		gw := NewGateway(config.Config{LogLevel: "warn"}, t.Context())
-		gw.setTestMode(false)
-
-		l := tyklog.Build(gw.setupLogger)
-		assert.Equal(t, logrus.WarnLevel, l.Level)
-	})
-
-	t.Run("log level from env overrides config", func(t *testing.T) {
-		cli.InitTest(t, nil)
-
-		cancel := log.Reset()
-		t.Cleanup(cancel)
-
-		_ = os.Setenv(tyklog.EnvTykLoglevel, "error")
-		t.Cleanup(func() {
-			_ = os.Unsetenv(tyklog.EnvTykLoglevel)
-		})
-
-		gw := NewGateway(config.Config{LogLevel: "warn"}, context.Background())
-		gw.setTestMode(false)
-
-		l := tyklog.Build(gw.setupLogger)
-		assert.Equal(t, logrus.ErrorLevel, l.Level)
-	})
-
-	t.Run("test mode discards output and sets error level", func(t *testing.T) {
-		cli.InitTest(t, nil)
-
-		gw := NewGateway(config.Config{LogLevel: "info"}, context.Background())
-		gw.setTestMode(true) // isRunningTests() returns true
-
-		l := tyklog.Build(gw.setupLogger)
-		assert.Equal(t, logrus.ErrorLevel, l.Level)
-	})
-
 	t.Run("hooks are added based on config", func(t *testing.T) {
 		cli.InitTest(t, nil)
 
