@@ -1205,6 +1205,10 @@ type Config struct {
 	// ```
 	EnableBundleDownloader bool `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
 
+	// EnableLabsMultiBundle enables loading multiple plugin bundles from a
+	// comma-separated custom_middleware_bundle value. The default is false.
+	EnableLabsMultiBundle bool `bson:"enable_labs_multi_bundle" json:"enable_labs_multi_bundle"`
+
 	// Is a base URL that will be used to download the bundle. In this example we have `bundle-latest.zip` specified in the API settings, Tyk will fetch the following URL: http://my-bundle-server.com/bundles/bundle-latest.zip (see the next section for details).
 	BundleBaseURL string `bson:"bundle_base_url" json:"bundle_base_url"`
 

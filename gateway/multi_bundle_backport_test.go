@@ -13,6 +13,10 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
+func enableLabsMultiBundle(c *config.Config) {
+	c.EnableLabsMultiBundle = true
+}
+
 // TestParseBundleNames covers the comma-splitting/trimming contract that the
 // multi-bundle dispatcher relies on: a bare filename yields a single element
 // equal to the input, whitespace is trimmed, empty entries are dropped, and an
@@ -204,7 +208,7 @@ func TestBundleSubdirNameStripsExtAndCollapsesSlashes(t *testing.T) {
 //
 // Uses StartTest, so requires a running Redis.
 func TestLoadBundleWithFs_EarlyReturns(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest(enableLabsMultiBundle)
 	defer ts.Close()
 
 	t.Run("management node skips bundle loading", func(t *testing.T) {
@@ -267,7 +271,7 @@ func mergeBundleManifestJSON(driver, middlewareBody string) map[string]string {
 func testMultiBundleMerge(t *testing.T, driver string) {
 	t.Helper()
 
-	ts := StartTest(nil)
+	ts := StartTest(enableLabsMultiBundle)
 	defer ts.Close()
 
 	bundleA := ts.RegisterBundle("multi_merge_a", mergeBundleManifestJSON(driver,
@@ -347,6 +351,7 @@ func stagePreUnpackedBundle(t *testing.T, fs afero.Fs, rootPath, bundleName, man
 // Requires a running Redis.
 func TestLoadBundleWithFs_OnDiskReuseMergesBothBundles(t *testing.T) {
 	ts := StartTest(func(c *config.Config) {
+		enableLabsMultiBundle(c)
 		c.BundleBaseURL = "http://bundles.local/"
 		c.SkipVerifyExistingPluginBundle = true
 	})
@@ -411,6 +416,7 @@ func TestLoadBundleWithFs_OnDiskReuseMergesBothBundles(t *testing.T) {
 // only the merged hooks remain. Requires a running Redis.
 func TestLoadBundleWithFs_ResetsStaleCustomMiddleware(t *testing.T) {
 	ts := StartTest(func(c *config.Config) {
+		enableLabsMultiBundle(c)
 		c.BundleBaseURL = "http://bundles.local/"
 		c.SkipVerifyExistingPluginBundle = true
 	})
@@ -456,6 +462,7 @@ func TestLoadBundleWithFs_ResetsStaleCustomMiddleware(t *testing.T) {
 // running Redis.
 func TestLoadBundleWithFs_EmptyBaseURLMultiBundle(t *testing.T) {
 	ts := StartTest(func(c *config.Config) {
+		enableLabsMultiBundle(c)
 		c.BundleBaseURL = ""
 	})
 	defer ts.Close()
@@ -479,7 +486,7 @@ func TestLoadBundleWithFs_EmptyBaseURLMultiBundle(t *testing.T) {
 // must error and the error must name the failing bundle. Requires a running
 // Redis.
 func TestLoadBundleWithFs_PartialFailureFailsClosed(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest(enableLabsMultiBundle)
 	defer ts.Close()
 
 	// Shrink retries so the 404 fails fast instead of backing off.
@@ -512,7 +519,7 @@ func TestLoadBundleWithFs_PartialFailureFailsClosed(t *testing.T) {
 // Requires a running Redis.
 func TestLoadBundleWithFs_FetchedBadManifestFailsAndCleansUp(t *testing.T) {
 	t.Run("invalid manifest json", func(t *testing.T) {
-		ts := StartTest(nil)
+		ts := StartTest(enableLabsMultiBundle)
 		defer ts.Close()
 
 		bundleA := ts.RegisterBundle("badmanifest_ok_a", mergeBundleManifestJSON("grpc",
@@ -534,7 +541,7 @@ func TestLoadBundleWithFs_FetchedBadManifestFailsAndCleansUp(t *testing.T) {
 	})
 
 	t.Run("missing manifest file", func(t *testing.T) {
-		ts := StartTest(nil)
+		ts := StartTest(enableLabsMultiBundle)
 		defer ts.Close()
 
 		bundleA := ts.RegisterBundle("nomanifest_ok_a", mergeBundleManifestJSON("grpc",
@@ -565,6 +572,7 @@ func TestLoadBundleWithFs_FetchedBadManifestFailsAndCleansUp(t *testing.T) {
 func TestFetchBundleByName_BadScheme(t *testing.T) {
 	t.Run("unknown scheme", func(t *testing.T) {
 		ts := StartTest(func(c *config.Config) {
+			enableLabsMultiBundle(c)
 			c.BundleBaseURL = "ftp://bundles.local/"
 		})
 		defer ts.Close()
@@ -580,6 +588,7 @@ func TestFetchBundleByName_BadScheme(t *testing.T) {
 
 	t.Run("malformed base url", func(t *testing.T) {
 		ts := StartTest(func(c *config.Config) {
+			enableLabsMultiBundle(c)
 			c.BundleBaseURL = "://missing-scheme"
 		})
 		defer ts.Close()
@@ -597,6 +606,7 @@ func TestFetchBundleByName_BadScheme(t *testing.T) {
 		// downloader turned off, a fetch-requiring multi-bundle load fails
 		// closed with "Bundle downloader is disabled".
 		ts := StartTest(func(c *config.Config) {
+			enableLabsMultiBundle(c)
 			c.BundleBaseURL = "http://bundles.local/"
 			c.EnableBundleDownloader = false
 		})
@@ -664,6 +674,7 @@ func TestMergeBundleManifestIdExtractorFirstWins(t *testing.T) {
 // Requires a running Redis.
 func TestLoadOneBundleForMerge_OnDiskVerificationFails(t *testing.T) {
 	ts := StartTest(func(c *config.Config) {
+		enableLabsMultiBundle(c)
 		c.BundleBaseURL = "http://bundles.local/"
 		c.SkipVerifyExistingPluginBundle = false
 	})
@@ -696,6 +707,7 @@ func TestLoadOneBundleForMerge_OnDiskVerificationFails(t *testing.T) {
 // wrapped with the offending bundle name. Requires a running Redis.
 func TestLoadOneBundleForMerge_DriverMismatchOnDisk(t *testing.T) {
 	ts := StartTest(func(c *config.Config) {
+		enableLabsMultiBundle(c)
 		c.BundleBaseURL = "http://bundles.local/"
 		c.SkipVerifyExistingPluginBundle = true
 	})
@@ -726,12 +738,10 @@ func TestLoadOneBundleForMerge_DriverMismatchOnDisk(t *testing.T) {
 	assert.Contains(t, err.Error(), "driver")
 }
 
-// TestLoadSingleBundle_OnDiskReuse exercises loadSingleBundle's existing-bundle
-// branch (Stat ok → loadBundleManifest partial=true → AddToSpec) which the
-// single bare-filename fast path takes. Pre-stage the hashed bundle dir on the
-// FS with SkipVerifyExistingPluginBundle so no HTTP fetch happens. Requires a
-// running Redis.
-func TestLoadSingleBundle_OnDiskReuse(t *testing.T) {
+// TestLoadBundleWithFs_MultiBundleDisabledUsesSingleBundlePath verifies that a
+// comma-containing value uses the legacy single-bundle path when the labs flag
+// is unset. Requires a running Redis.
+func TestLoadBundleWithFs_MultiBundleDisabledUsesSingleBundlePath(t *testing.T) {
 	ts := StartTest(func(c *config.Config) {
 		c.BundleBaseURL = "http://bundles.local/"
 		c.SkipVerifyExistingPluginBundle = true
@@ -740,8 +750,8 @@ func TestLoadSingleBundle_OnDiskReuse(t *testing.T) {
 
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
-			APIID:                  "single-bundle-ondisk",
-			CustomMiddlewareBundle: "single.zip",
+			APIID:                  "multi-bundle-disabled",
+			CustomMiddlewareBundle: "bundle-a.zip,bundle-b.zip",
 		},
 	}
 

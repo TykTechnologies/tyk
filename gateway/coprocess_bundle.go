@@ -475,9 +475,10 @@ func (gw *Gateway) loadBundle(spec *APISpec) error {
 // loadBundleWithFs loads and validates one or more middleware bundles for the
 // given API specification using the provided filesystem.
 //
-// spec.CustomMiddlewareBundle accepts either a single bundle filename or a
-// comma-separated list of filenames, each resolved against the gateway's
-// bundle_base_url. Selection rule (backward compatible):
+// When enable_labs_multi_bundle is true, spec.CustomMiddlewareBundle accepts
+// either a single bundle filename or a comma-separated list of filenames,
+// each resolved against the gateway's bundle_base_url. When it is false, the
+// complete value takes the legacy single-bundle path. Selection rule:
 //   - A single bare filename (no comma) takes the legacy single-bundle path
 //     unchanged — same on-disk layout, same AddToSpec replacement semantics.
 //     Existing deployments continue to behave identically.
@@ -490,8 +491,11 @@ func (gw *Gateway) loadBundleWithFs(spec *APISpec, bundleFs afero.Fs) error {
 	if gw.GetConfig().ManagementNode {
 		return nil
 	}
-	if spec.CustomMiddlewareBundleDisabled {
+	if spec.CustomMiddlewareBundleDisabled || spec.CustomMiddlewareBundle == "" {
 		return nil
+	}
+	if !gw.GetConfig().EnableLabsMultiBundle {
+		return gw.loadSingleBundle(spec, bundleFs)
 	}
 
 	bundleNames := parseBundleNames(spec.CustomMiddlewareBundle)

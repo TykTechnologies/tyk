@@ -38,6 +38,11 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 			false, true,
 		},
 		{
+			"EnableLabsMultiBundle", "TYK_GW_ENABLELABSMULTIBUNDLE",
+			func(c *Config) interface{} { return c.EnableLabsMultiBundle },
+			false, true,
+		},
+		{
 			"DnsCacheTTL", "TYK_GW_DNSCACHE_TTL",
 			func(c *Config) interface{} { return c.DnsCache.TTL },
 			int64(3600), int64(300),
