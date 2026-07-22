@@ -7,6 +7,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
@@ -330,9 +331,10 @@ const (
 	OAuth2TokenTypeAccessToken   = "urn:ietf:params:oauth:token-type:access_token"
 	OAuth2TokenTypeJWT           = "urn:ietf:params:oauth:token-type:jwt"
 
-	// OAuth2ClientAuth.Method values.
-	OAuth2ClientAuthBasic = "client_secret_basic"
-	OAuth2ClientAuthPost  = "client_secret_post"
+	// OAuth2ClientAuth.Method values, aliased from package apidef so the classic
+	// and OAS formats share one set of constants (apidef cannot import apidef/oas).
+	OAuth2ClientAuthBasic = apidef.OAuth2ClientAuthBasic
+	OAuth2ClientAuthPost  = apidef.OAuth2ClientAuthPost
 
 	// OAuth2ExchangeCache.Mode values.
 	OAuth2CacheModeDerived = "derived"
