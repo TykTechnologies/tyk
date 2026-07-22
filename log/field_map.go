@@ -1,6 +1,10 @@
 package log
 
-import "github.com/sirupsen/logrus"
+import (
+	"encoding/json"
+
+	"github.com/sirupsen/logrus"
+)
 
 type FieldMap struct {
 	fields map[string]string
@@ -26,4 +30,25 @@ func (f FieldMap) Resolve(field string) string {
 	}
 
 	return field
+}
+
+func (f *FieldMap) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+
+	var m map[string]string
+	if err := json.Unmarshal(data, &m); err != nil {
+		return err
+	}
+
+	f.fields = m
+	return nil
+}
+
+func (f FieldMap) MarshalJSON() ([]byte, error) {
+	if f.fields == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(f.fields)
 }

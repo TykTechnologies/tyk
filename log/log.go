@@ -3,7 +3,6 @@ package log
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -25,20 +24,12 @@ var (
 	log               = New()
 	rawLog            = newRawLog()
 	translations      = make(map[string]string)
-	formatterRegistry = map[Format]formatterFactory{
-		FormatText: func(_ json.RawMessage) (logrus.Formatter, error) {
-			return newFormatterText(), nil
-		},
-		FormatJson: func(_ json.RawMessage) (logrus.Formatter, error) {
-			return newFormatterJson(), nil
-		},
-		FormatLegacy: func(_ json.RawMessage) (logrus.Formatter, error) {
-			return newFormatterLegacy(), nil
-		},
+	formatterRegistry = map[Format]func() logrus.Formatter{
+		FormatText:   newFormatterText,
+		FormatJson:   newFormatterJson,
+		FormatLegacy: newFormatterLegacy,
 	}
 )
-
-type formatterFactory func(options json.RawMessage) (logrus.Formatter, error)
 
 func newRawLog() *logrus.Logger {
 	var l = logrus.New()
@@ -79,11 +70,44 @@ func NewFormatter(format Format) logrus.Formatter {
 }
 
 func MakeFormatter(format Format, opts json.RawMessage) (logrus.Formatter, error) {
-	if formatter, ok := formatterRegistry[format]; ok {
-		return formatter(opts)
+	formatterFactory, ok := formatterRegistry[format]
+	if !ok {
+		return nil, fmt.Errorf("unknown formatter %q", format)
 	}
 
-	return nil, fmt.Errorf("unknown formatter %q", format)
+	formatter := formatterFactory()
+
+	if err := applySnakeCaseOptions(opts, formatter); err != nil {
+		return nil, fmt.Errorf("failed to apply options to %s formatter: %w", format, err)
+	}
+
+	return formatter, nil
+}
+
+// applySnakeCaseOptions strips underscores from JSON keys so that snake_case
+// transparently maps to CamelCase struct fields via Go's case-insensitive unmarshaler.
+func applySnakeCaseOptions(data json.RawMessage, target interface{}) error {
+	if len(data) == 0 || string(data) == "null" {
+		return nil
+	}
+
+	var rawMap map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawMap); err != nil {
+		return err
+	}
+
+	normalizedMap := make(map[string]json.RawMessage, len(rawMap))
+	for key, val := range rawMap {
+		normalizedKey := strings.ReplaceAll(key, "_", "")
+		normalizedMap[normalizedKey] = val
+	}
+
+	transformedData, err := json.Marshal(normalizedMap)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(transformedData, target)
 }
 
 func newFormatterText() logrus.Formatter {
@@ -116,48 +140,6 @@ func newFormatterLegacy() logrus.Formatter {
 		FullTimestamp:   true,
 		DisableColors:   true,
 	}
-}
-
-func CoalesceEnvOr[T any, P interface {
-	*T
-	Parse(string) bool
-}](fallback T, envNames ...string) T {
-
-	for _, envName := range envNames {
-		raw := os.Getenv(envName)
-		if raw == "" {
-			continue
-		}
-
-		var value T
-		if P(&value).Parse(raw) {
-			return value
-		}
-	}
-
-	return fallback
-}
-
-func CoalesceValidEnv[T any, P interface {
-	*T
-	Parse(string) bool
-	Valid() bool
-}](envNames ...string) (T, bool) {
-
-	for _, envName := range envNames {
-		raw := os.Getenv(envName)
-		if raw == "" {
-			continue
-		}
-
-		var value T
-		if P(&value).Parse(raw) {
-			return value, true
-		}
-	}
-
-	var zero T
-	return zero, false
 }
 
 type Format string
