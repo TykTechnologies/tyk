@@ -1,6 +1,7 @@
 package log
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"testing"
@@ -147,4 +148,21 @@ func Test_Logger_IsLegacyFormatter(t *testing.T) {
 			assert.Equal(t, tc.expectedResult, lgr.IsLegacyFormatterEnabled())
 		})
 	}
+}
+
+func Test_MakeFormatter(t *testing.T) {
+	t.Run("does not fail with raw message", func(t *testing.T) {
+		_, err := MakeFormatter(FormatText, json.RawMessage(""))
+		assert.NoError(t, err)
+	})
+
+	t.Run("maps snake_case json into camel case properties", func(t *testing.T) {
+		formatter, err := MakeFormatter(FormatText, json.RawMessage(`{"field_map":{"msg":"my_message"}, "force_colors": true}`))
+		assert.NoError(t, err)
+		textFormatter, ok := formatter.(*logrus.TextFormatter)
+		assert.True(t, ok)
+		assert.Equal(t, logrus.FieldMap{"msg": "my_message"}, textFormatter.FieldMap)
+		assert.True(t, textFormatter.ForceColors, "force colors modified by options")
+		assert.False(t, textFormatter.DisableSorting, "disable colors has default value")
+	})
 }
