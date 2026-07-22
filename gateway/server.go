@@ -1190,6 +1190,12 @@ func (gw *Gateway) createResponseMiddlewareChain(
 			continue
 		}
 
+		// Skip legacy response_body_transform processor as it is no longer registered
+		// and is handled by ResponseTransformMiddleware automatically if enabled.
+		if processorDetail.Name == "response_body_transform" {
+			continue
+		}
+
 		processor := gw.responseProcessorByName(processorDetail.Name, baseHandler)
 		if processor == nil {
 			log.Error("No such processor: ", processorDetail.Name)
