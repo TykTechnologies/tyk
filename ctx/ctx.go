@@ -44,6 +44,7 @@ const (
 	Trace
 	CheckLoopLimits
 	UrlRewriteTarget
+	UrlRewritten
 	TransformedRequestMethod
 	Definition
 	RequestStatus

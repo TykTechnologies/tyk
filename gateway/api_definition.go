@@ -2489,6 +2489,11 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 		return
 	}
 
+	// skip sanitizing if was rewritten
+	if ctxGetUrlRewritten(r) {
+		return
+	}
+
 	log.Debug("Stripping proxy listen path: ", a.Proxy.ListenPath)
 
 	r.URL.Path = a.StripListenPath(r.URL.Path)
