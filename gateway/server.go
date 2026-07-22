@@ -1610,7 +1610,7 @@ func (gw *Gateway) buildSinkWithDest(
 
 	level := gw.extractLogLevel(cfg)
 	sink := tyklog.NewSink(
-		os.Stdout,
+		os.Stderr,
 		tyklog.NewFormatter(format),
 		tyklog.NewAcceptorRange(level, logrus.FatalLevel),
 	)

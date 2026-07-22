@@ -501,8 +501,11 @@
           "description": "Defines the identifier of the used formatter (e.g., \"json\", \"text\")."
         },
         "format_options": {
-          "type": "object",
-          "description": "Raw JSON payload with parameters specific to the chosen Format."
+          "description": "Raw JSON payload with parameters specific to the chosen Format.",
+          "anyOf": [
+            { "$ref": "#/definitions/TextFormatterOptions" },
+            { "$ref": "#/definitions/JsonFormatterOptions" }
+          ]
         },
         "output": {
           "type": "string",
@@ -511,6 +514,43 @@
         "output_options": {
           "type": "object",
           "description": "Raw JSON payload with parameters specific to the chosen Output."
+        }
+      },
+      "additionalProperties": false
+    },
+    "TextFormatterOptions": {
+      "type": "object",
+      "description": "Configuration options mapped directly to logrus.TextFormatter. For exact field semantics, see: https://pkg.go.dev/github.com/sirupsen/logrus#TextFormatter",
+      "properties": {
+        "force_colors": { "type": "boolean" },
+        "disable_colors": { "type": "boolean" },
+        "force_quote": { "type": "boolean" },
+        "disable_quote": { "type": "boolean" },
+        "environment_override_colors": { "type": "boolean" },
+        "disable_timestamp": { "type": "boolean" },
+        "full_timestamp": { "type": "boolean" },
+        "timestamp_format": { "type": "string" },
+        "disable_sorting": { "type": "boolean" },
+        "disable_level_truncation": { "type": "boolean" },
+        "pad_level_text": { "type": "boolean" },
+        "quote_empty_fields": { "type": "boolean" },
+        "field_map": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "JsonFormatterOptions": {
+      "type": "object",
+      "description": "Configuration options mapped directly to log.JsonFormatter from tyk repository.",
+      "properties": {
+        "timestamp_format": { "type": "string" },
+        "disable_timestamp": { "type": "boolean" },
+        "data_key": { "type": "string" },
+        "field_map": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
         }
       },
       "additionalProperties": false
