@@ -45,9 +45,15 @@ func NewSink(
 
 func NewSinkFromConfig(cfg SinkConfig) (*Sink, error) {
 	lowLevel, ok := cfg.Level.LogrusLevel()
+
 	if !ok {
-		return nil, fmt.Errorf("invalid log level in config: %q", cfg.Level)
+		if cfg.Level == "" {
+			lowLevel = logrus.InfoLevel
+		} else {
+			return nil, fmt.Errorf("invalid log level in config: %q", cfg.Level)
+		}
 	}
+
 	highLevel, ok := cfg.HighLevel.LogrusLevel()
 	if !ok {
 		highLevel = logrus.PanicLevel

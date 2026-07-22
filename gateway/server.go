@@ -1561,7 +1561,7 @@ func (gw *Gateway) extractLogLevel(cfg *config.Config) logrus.Level {
 }
 
 func (gw *Gateway) buildSinkWithDest(
-	dest string,
+	case_ string,
 	format tyklog.Format,
 	cfg *config.Config,
 ) ([]tyklog.SinkerExtended, error) {
@@ -1572,7 +1572,7 @@ func (gw *Gateway) buildSinkWithDest(
 		tyklog.NewFormatter(format),
 		tyklog.NewAcceptorRange(level, logrus.FatalLevel),
 	)
-	log.Debugf("Building looger %q format=%q level=%q output=stdout", dest, format, level)
+	log.Debugf("Building logger format=%q level=%q case=%s", format, level, case_)
 	return []tyklog.SinkerExtended{sink}, nil
 }
 
@@ -1580,11 +1580,15 @@ func (gw *Gateway) buildSinks(cfg *config.Config) ([]tyklog.SinkerExtended, erro
 	// precedence: TYK_LOGFORMAT > TYK_GW_LOGFORMAT > config.LogFormat > fallback(tyklog.FormatText)
 
 	if envFormat, ok := tyklog.CoalesceValidEnv[tyklog.Format](tyklog.EnvTykLogformat, tyklog.EnvTykGwLogformat); ok {
-		return gw.buildSinkWithDest("env", envFormat, cfg)
+		if cfg.LogFormat.Defined() {
+			log.Warn("TYK_LOGFORMAT environment variable is set. Ignoring 'log_format' configuration in tyk.conf.")
+		}
+
+		return gw.buildSinkWithDest("ENV_VARIABLES", envFormat, cfg)
 	}
 
 	if sinkConfigs, ok := cfg.LogFormat.Sinks(); ok {
-		log.Debugf("Building logger from sinks config=%q", sinkConfigs)
+		log.Debugf("Building logger from provided sinks=%#v", sinkConfigs)
 		sinkers := make([]tyklog.SinkerExtended, 0, len(sinkConfigs))
 		var errs []error
 
@@ -1604,10 +1608,10 @@ func (gw *Gateway) buildSinks(cfg *config.Config) ([]tyklog.SinkerExtended, erro
 	}
 
 	if cfgFormatAsString, ok := cfg.LogFormat.Format(); ok {
-		return gw.buildSinkWithDest("config", cfgFormatAsString, cfg)
+		return gw.buildSinkWithDest("CONFIG_AS_STRING", cfgFormatAsString, cfg)
 	}
 
-	return gw.buildSinkWithDest("fallback", tyklog.FormatText, cfg)
+	return gw.buildSinkWithDest("FALLBACK", tyklog.FormatText, cfg)
 }
 
 func (gw *Gateway) setupLogger(builder *tyklog.Builder) {
