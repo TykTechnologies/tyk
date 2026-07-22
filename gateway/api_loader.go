@@ -33,6 +33,7 @@ import (
 	"github.com/TykTechnologies/tyk/trace"
 
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
@@ -784,6 +785,8 @@ type DummyProxyHandler struct {
 
 func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if newURL := ctxGetURLRewriteTarget(r); newURL != nil {
+		rc := ctx.GetRequestContext(r)
+		rc.RewriteUrl(r.URL, newURL)
 		r.URL = newURL
 		ctxSetURLRewriteTarget(r, nil)
 	}

@@ -3437,6 +3437,10 @@ func ctxGetOrigRequestURL(r *http.Request) *url.URL {
 	return nil
 }
 
+func ctxSetRequestContext(r *http.Request, rc *ctx.RequestContext) {
+	setCtxValue(r, ctx.RequestContextKey, rc)
+}
+
 func ctxSetURLRewriteTarget(r *http.Request, url *url.URL) {
 	setCtxValue(r, ctx.UrlRewriteTarget, url)
 }
