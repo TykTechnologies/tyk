@@ -610,6 +610,7 @@ type MiddlewareSection struct {
 	Post        []MiddlewareDefinition `bson:"post" json:"post"`
 	PostKeyAuth []MiddlewareDefinition `bson:"post_key_auth" json:"post_key_auth"`
 	AuthCheck   MiddlewareDefinition   `bson:"auth_check" json:"auth_check"`
+	TrafficLogs MiddlewareDefinition   `bson:"traffic_logs" json:"traffic_logs"`
 	Response    []MiddlewareDefinition `bson:"response" json:"response"`
 	Driver      MiddlewareDriver       `bson:"driver" json:"driver"`
 	IdExtractor MiddlewareIdExtractor  `bson:"id_extractor" json:"id_extractor"`
@@ -1687,6 +1688,7 @@ func DummyAPI() APIDefinition {
 			Pre:         []MiddlewareDefinition{},
 			PostKeyAuth: []MiddlewareDefinition{},
 			AuthCheck:   MiddlewareDefinition{},
+			TrafficLogs: MiddlewareDefinition{},
 			IdExtractor: MiddlewareIdExtractor{
 				ExtractorConfig: map[string]interface{}{},
 			},

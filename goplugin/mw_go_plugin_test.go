@@ -5,19 +5,23 @@ package goplugin_test
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
 	"testing"
-
-	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"gopkg.in/vmihailenco/msgpack.v2"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func goPluginFilename() string {
@@ -883,5 +887,58 @@ func TestGoPlugin_DontWriteBodyInCaseIfPluginRespondsWith4xxOrHigher(t *testing.
 				},
 			}...)
 		})
+	})
+}
+
+func TestAnalyticsPlugin(t *testing.T) {
+	ts := gateway.StartTest(func(c *config.Config) {
+		c.PublicKeyPath = ""
+		c.AnalyticsConfig.EnableDetailedRecording = true
+	})
+	defer ts.Close()
+
+	t.Run("successfully loads and executes analytics plugin", func(t *testing.T) {
+		specs := ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.AnalyticsPlugin.Enabled = true
+			spec.AnalyticsPlugin.PluginPath = goPluginFilename()
+			spec.AnalyticsPlugin.FuncName = "MyAnalyticsPluginAddTag"
+
+			spec.EnableDetailedRecording = true
+			spec.Proxy.ListenPath = "/test"
+		})
+		spec := specs[0]
+
+		require.NotNil(t, spec, "API should be created successfully")
+		require.NotNil(t, spec.AnalyticsPluginConfig, "Analytics plugin should have loaded successfully")
+
+		analyticsKey := "tyk-system-analytics"
+		// Delete old records and ensure clean state
+		ts.Gw.Analytics.Flush()
+		ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKey)
+
+		_, err := ts.Run(t, test.TestCase{
+			Path: "/test",
+			Code: 200,
+		})
+		require.NoError(t, err)
+
+		ts.Gw.Analytics.Flush()
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKey)
+		require.Len(t, results, 1, "Should have generated 1 analytics record")
+
+		var record analytics.AnalyticsRecord
+		err = msgpack.Unmarshal([]byte(results[0].(string)), &record)
+		require.NoError(t, err)
+
+		// Plugin adds a custom tag named TEST
+		assert.Contains(t, record.Tags, "TEST", "Tag should have been added")
+
+		rawResp, err := base64.StdEncoding.DecodeString(record.RawResponse)
+		require.NoError(t, err)
+
+		respStr := string(rawResp)
+		// Plugin removes 'Server' header and adds a new header 'Test' with value 'test'
+		assert.NotContains(t, respStr, "Server:", "Server header should be deleted")
+		assert.Contains(t, respStr, "Test: test", "Test header should be added")
 	})
 }
