@@ -1,12 +1,15 @@
 package ctx_test
 
 import (
+	"encoding/json"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -49,6 +52,65 @@ func TestGetOASDefinition(t *testing.T) {
 	assert.Equal(t, oasDef, cloned)
 }
 
+// Test for GetOASDefinitionRaw
+func TestGetOASDefinitionRaw(t *testing.T) {
+	t.Run("nil when nothing is stored", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "http://example.com", nil)
+		assert.Nil(t, ctx.GetOASDefinitionRaw(req))
+	})
+
+	t.Run("returns the exact pointer stored by SetOASDefinition", func(t *testing.T) {
+		oasDef := &oas.OAS{}
+		oasDef.Info = &openapi3.Info{
+			Title:   uuid.New(),
+			Version: "1",
+		}
+
+		req := httptest.NewRequest("GET", "http://example.com", nil)
+		ctx.SetOASDefinition(req, oasDef)
+
+		raw := ctx.GetOASDefinitionRaw(req)
+
+		assert.Same(t, oasDef, raw)
+	})
+
+	t.Run("repeated calls allocate ~nothing", func(t *testing.T) {
+		oasDef := &oas.OAS{}
+		oasDef.Info = &openapi3.Info{
+			Title:   uuid.New(),
+			Version: "1",
+		}
+
+		req := httptest.NewRequest("GET", "http://example.com", nil)
+		ctx.SetOASDefinition(req, oasDef)
+
+		allocs := testing.AllocsPerRun(100, func() {
+			_ = ctx.GetOASDefinitionRaw(req)
+		})
+
+		assert.Zero(t, allocs, "GetOASDefinitionRaw must not allocate: it's a context value lookup plus a type assertion, no reflect.Clone")
+	})
+
+	t.Run("mutating the raw pointer does not affect a clone obtained from GetOASDefinition", func(t *testing.T) {
+		oasDef := &oas.OAS{}
+		oasDef.Info = &openapi3.Info{
+			Title:   uuid.New(),
+			Version: "1",
+		}
+
+		req := httptest.NewRequest("GET", "http://example.com", nil)
+		ctx.SetOASDefinition(req, oasDef)
+
+		raw := ctx.GetOASDefinitionRaw(req)
+		cloned := ctx.GetOASDefinition(req)
+
+		raw.Info.Title = "mutated"
+
+		assert.Equal(t, "mutated", raw.Info.Title)
+		assert.NotEqual(t, "mutated", cloned.Info.Title)
+	})
+}
+
 // Benchmark for GetDefinition
 func BenchmarkGetDefinition(b *testing.B) {
 	apiDef := &apidef.APIDefinition{
@@ -68,11 +130,7 @@ func BenchmarkGetDefinition(b *testing.B) {
 
 // Benchmark for GetOASDefinition
 func BenchmarkGetOASDefinition(b *testing.B) {
-	oasDef := &oas.OAS{}
-	oasDef.Info = &openapi3.Info{
-		Title:   uuid.New(),
-		Version: "1",
-	}
+	oasDef := loadPetstoreOAS(b)
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
 
@@ -80,9 +138,40 @@ func BenchmarkGetOASDefinition(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		cloned := ctx.GetOASDefinition(req)
-		assert.Equal(b, oasDef, cloned)
+		oasDefinitionSink = ctx.GetOASDefinition(req)
 	}
+}
+
+// Benchmark for GetOASDefinitionRaw
+func BenchmarkGetOASDefinitionRaw(b *testing.B) {
+	oasDef := loadPetstoreOAS(b)
+
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+
+	ctx.SetOASDefinition(req, oasDef)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		oasDefinitionSink = ctx.GetOASDefinitionRaw(req)
+	}
+}
+
+// oasDefinitionSink prevents the compiler from eliding the benchmarked calls.
+var oasDefinitionSink *oas.OAS
+
+// loadPetstoreOAS loads a realistically-sized OAS fixture (petstore, several
+// paths and operations) so the GetOASDefinition/GetOASDefinitionRaw benchmarks
+// measure the clone cost against a representative payload, not a near-empty one.
+func loadPetstoreOAS(tb testing.TB) *oas.OAS {
+	tb.Helper()
+
+	contents, err := os.ReadFile("../apidef/oas/testdata/petstore-no-responses.json")
+	require.NoError(tb, err)
+
+	var petstore oas.OAS
+	require.NoError(tb, json.Unmarshal(contents, &petstore))
+
+	return &petstore
 }
 
 // TestContextKeyUniqueness verifies all context keys have unique values
