@@ -224,6 +224,28 @@ type StorageOptionsConf struct {
 	// This limit prevents memory exhaustion during decompression.
 	// Defaults to 104857600 (100MB).
 	MaxDecompressedSize int64 `json:"max_decompressed_size"`
+
+	// IAMAuth enables IAM-based authentication to cloud-managed Redis/Valkey
+	// (e.g. GCP Memorystore) using short-lived access tokens instead of a static
+	// password. When enabled, `username` and `password` are ignored for this store.
+	IAMAuth IAMAuthConfig `json:"iam_auth"`
+}
+
+// IAMAuthConfig configures IAM-based authentication for cloud-managed Redis/Valkey.
+type IAMAuthConfig struct {
+	// Enabled turns on IAM-based authentication for this storage connection.
+	Enabled bool `json:"enabled"`
+	// Provider selects the cloud IAM provider. Currently supported: "gcp"
+	// (GCP Memorystore for Valkey and Redis Cluster).
+	Provider string `json:"provider"`
+	// ServiceAccount, for GCP, optionally impersonates this service account to
+	// mint tokens instead of using the ambient Application Default Credentials
+	// identity. Leave empty to use the workload's own identity (Workload Identity
+	// on GKE, or GOOGLE_APPLICATION_CREDENTIALS).
+	ServiceAccount string `json:"service_account"`
+	// TokenRefreshBeforeExpiry is how far ahead of token expiry to refresh, as a
+	// Go duration string (e.g. "5m"). Defaults to "5m" when empty.
+	TokenRefreshBeforeExpiry string `json:"token_refresh_before_expiry"`
 }
 
 type NormalisedURLConfig struct {

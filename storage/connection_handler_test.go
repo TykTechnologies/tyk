@@ -13,7 +13,45 @@ import (
 	tempmocks "github.com/TykTechnologies/storage/temporal/tempmocks"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/iamtest"
 )
+
+func TestNewConnector_IAMEnabled_Success(t *testing.T) {
+	// Hermetic ADC lets the IAM option build and mint its token offline. The
+	// connector is lazy (no dial on construction), so this exercises the full
+	// IAM success branch: the no-TLS warning and the option append.
+	iamtest.FakeADC(t)
+
+	conf := config.Config{}
+	conf.Storage.Type = "redis"
+	conf.Storage.Addrs = []string{"localhost:6379"}
+	conf.Storage.IAMAuth = config.IAMAuthConfig{Enabled: true, Provider: "gcp"}
+
+	conn, err := NewConnector(DefaultConn, conf)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, conn)
+
+	if conn != nil {
+		if derr := conn.Disconnect(context.Background()); derr != nil {
+			t.Logf("disconnect: %v", derr)
+		}
+	}
+}
+
+func TestNewConnector_IAMUnsupportedProvider_Errors(t *testing.T) {
+	// With IAM auth enabled but an unsupported provider, connector construction
+	// must fail up front (before any Redis dial), naming the offending provider.
+	conf := config.Config{}
+	conf.Storage.Type = "redis"
+	conf.Storage.IAMAuth = config.IAMAuthConfig{Enabled: true, Provider: "foo"}
+
+	conn, err := NewConnector(DefaultConn, conf)
+
+	assert.Error(t, err, "unsupported IAM provider must fail connector construction")
+	assert.Nil(t, conn)
+	assert.Contains(t, err.Error(), "foo")
+}
 
 func TestRecoverLoop(t *testing.T) {
 	t.Parallel()
