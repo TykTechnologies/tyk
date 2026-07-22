@@ -14,19 +14,23 @@ type LogFormat struct {
 	formatType LogFormatType
 }
 
-func (o *LogFormat) Type() LogFormatType {
-	return o.formatType
+func (lf *LogFormat) Type() LogFormatType {
+	return lf.formatType
 }
 
-func (o *LogFormat) Format() (tyklog.Format, bool) {
-	return o.format, o.formatType == LogFormatString
+func (lf *LogFormat) Format() (tyklog.Format, bool) {
+	return lf.format, lf.formatType == LogFormatString
 }
 
-func (o *LogFormat) Sinks() ([]tyklog.SinkConfig, bool) {
-	return o.sinks, o.formatType == LogFormatSinks
+func (lf *LogFormat) Sinks() ([]tyklog.SinkConfig, bool) {
+	return lf.sinks, lf.formatType == LogFormatSinks
 }
 
-func (o *LogFormat) UnmarshalJSON(data []byte) error {
+func (lf *LogFormat) Defined() bool {
+	return lf.formatType != LogFormatUndefined
+}
+
+func (lf *LogFormat) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" || string(data) == `""` {
 		return nil
 	}
@@ -39,8 +43,8 @@ func (o *LogFormat) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("invalid format %q", string(legacyStr))
 		}
 
-		o.formatType = LogFormatString
-		o.format = legacyStr
+		lf.formatType = LogFormatString
+		lf.format = legacyStr
 		return nil
 	} else {
 		errs = append(errs, err)
@@ -48,8 +52,8 @@ func (o *LogFormat) UnmarshalJSON(data []byte) error {
 
 	var sinks []tyklog.SinkConfig
 	if err := json.Unmarshal(data, &sinks); err == nil {
-		o.formatType = LogFormatSinks
-		o.sinks = sinks
+		lf.formatType = LogFormatSinks
+		lf.sinks = sinks
 		return nil
 	} else {
 		errs = append(errs, err)
@@ -58,12 +62,12 @@ func (o *LogFormat) UnmarshalJSON(data []byte) error {
 	return fmt.Errorf("invalid log_format: must be a string, null, or an array of tyklog.SinkConfig: %w", errors.Join(errs...))
 }
 
-func (o LogFormat) MarshalJSON() ([]byte, error) {
-	switch o.formatType {
+func (lf LogFormat) MarshalJSON() ([]byte, error) {
+	switch lf.formatType {
 	case LogFormatString:
-		return json.Marshal(o.format)
+		return json.Marshal(lf.format)
 	case LogFormatSinks:
-		return json.Marshal(o.sinks)
+		return json.Marshal(lf.sinks)
 	case LogFormatUndefined:
 		fallthrough
 	default:
