@@ -335,8 +335,10 @@ type SessionState struct {
 	LastUpdated             string                 `json:"last_updated,omitzero" msg:"last_updated"`
 	IdExtractorDeadline     int64                  `json:"id_extractor_deadline,omitzero" msg:"id_extractor_deadline"`
 	SessionLifetime         int64                  `json:"session_lifetime,omitzero" bson:"session_lifetime"`
-	PostExpiryAction        PostExpiryAction       `json:"post_expiry_action,omitzero" msg:"post_expiry_action"`
-	PostExpiryGracePeriod   int64                  `json:"post_expiry_grace_period,omitzero" msg:"post_expiry_grace_period"`
+	// PostExpiryAction determines what happens to the data in Redis after the expires timestamp is reached (e.g., "delete" or "retain").
+	PostExpiryAction PostExpiryAction `json:"post_expiry_action,omitzero" msg:"post_expiry_action"`
+	// PostExpiryGracePeriod defines how long (in seconds) the Session is kept in Redis after expiration if the post_expiry_action is "retain".
+	PostExpiryGracePeriod int64 `json:"post_expiry_grace_period,omitzero" msg:"post_expiry_grace_period"`
 
 	// Used to store token hash
 	keyHash string
