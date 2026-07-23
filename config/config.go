@@ -15,6 +15,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/pkg/escaper"
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
@@ -1438,6 +1439,12 @@ type Config struct {
 	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
 	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
 	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
+
+	// ErrorMessageEscaper
+	// Allows override legacy message escaper.
+	// Standard legacy escaper escapes every error message (invoking html/template.JSEscapeString) unless headers is "application/xml", "text/xml" or "application/soap+xml".
+	// Allowed values "", "legacy" and "skip"
+	ErrorMessageEscaper escaper.Type `json:"error_message_escaper,omitempty"`
 }
 
 // LabsConfig include config for streaming

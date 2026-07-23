@@ -368,9 +368,10 @@ func TestAPIErrorWithContext(t *testing.T) {
 
 func TestEscapeTemplateString(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		isXML    bool
+		name  string
+		input string
+		isXML bool
+		git
 		expected htmltemplate.HTML
 	}{
 		// JSON path: html/template would HTML-encode plain strings (e.g. ' → &#39;).
