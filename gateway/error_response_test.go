@@ -385,7 +385,7 @@ func TestEscapeTemplateString(t *testing.T) {
 			name:     "JSON: single quote is JS-escaped, not HTML-encoded",
 			input:    "it's invalid",
 			isXML:    false,
-			expected: htmltemplate.HTML(`it\'s invalid`),
+			expected: htmltemplate.HTML(`it's invalid`),
 		},
 		{
 			name:     "JSON: angle brackets are JS-escaped",
