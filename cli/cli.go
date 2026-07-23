@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sync"
+	"testing"
 
 	kingpin "github.com/alecthomas/kingpin/v2"
 
@@ -16,7 +17,6 @@ import (
 	"github.com/TykTechnologies/tyk/cli/plugin"
 	"github.com/TykTechnologies/tyk/cli/version"
 	"github.com/TykTechnologies/tyk/internal/build"
-	logger "github.com/TykTechnologies/tyk/log"
 )
 
 const (
@@ -48,8 +48,6 @@ var (
 	DefaultMode bool
 
 	app *kingpin.Application
-
-	log = logger.Get()
 )
 
 var initOnce sync.Once
@@ -60,6 +58,56 @@ var initOnce sync.Once
 func Init(confPaths []string) {
 	initOnce.Do(func() {
 		setup(confPaths)
+	})
+}
+
+// InitTest changes/sets global state.
+// Mocks global state :/
+func InitTest(t *testing.T, confPaths []string) {
+	t.Helper()
+
+	type globalState struct {
+		Conf               *string
+		Port               *string
+		MemProfile         *bool
+		CPUProfile         *bool
+		BlockProfile       *bool
+		MutexProfile       *bool
+		HTTPProfile        *bool
+		DebugMode          *bool
+		LogInstrumentation *bool
+		DefaultMode        bool
+		app                *kingpin.Application
+	}
+
+	snapshot := globalState{
+		Conf:               Conf,
+		Port:               Port,
+		MemProfile:         MemProfile,
+		CPUProfile:         CPUProfile,
+		BlockProfile:       BlockProfile,
+		MutexProfile:       MutexProfile,
+		HTTPProfile:        HTTPProfile,
+		DebugMode:          DebugMode,
+		LogInstrumentation: LogInstrumentation,
+		DefaultMode:        DefaultMode,
+		app:                app,
+	}
+
+	setup(confPaths)
+
+	t.Cleanup(func() {
+		Conf = snapshot.Conf
+		Port = snapshot.Port
+		MemProfile = snapshot.MemProfile
+		CPUProfile = snapshot.CPUProfile
+		BlockProfile = snapshot.BlockProfile
+		MutexProfile = snapshot.MutexProfile
+		HTTPProfile = snapshot.HTTPProfile
+		DebugMode = snapshot.DebugMode
+		LogInstrumentation = snapshot.LogInstrumentation
+		DefaultMode = snapshot.DefaultMode
+		app = snapshot.app
 	})
 }
 

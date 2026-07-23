@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -21,26 +20,15 @@ func TestAfterConfSetup_WarnsOnDisableRegexpCacheBound(t *testing.T) {
 		tykregexp.Configure(tykregexp.CacheOptions{Enabled: true})
 	})
 
-	// Other tests that go through StartTest drop the level to Error,
-	// which silences the Warn entries this test is checking for.
-	origLevel := log.GetLevel()
-	log.SetLevel(logrus.WarnLevel)
-	defer log.SetLevel(origLevel)
+	hook := log.GetTestHook(t)
 
-	hook := &logrustest.Hook{}
-	log.AddHook(hook)
-	defer log.ReplaceHooks(make(logrus.LevelHooks))
-
-	gw := NewGateway(config.Config{DisableRegexpCacheBound: true}, context.Background())
+	gw := NewGateway(config.Config{DisableRegexpCacheBound: true}, t.Context())
 	require.NoError(t, gw.afterConfSetup())
 
-	var found bool
-	for _, e := range hook.AllEntries() {
-		if e.Level == logrus.WarnLevel && strings.Contains(e.Message, "size eviction disabled") {
-			found = true
-			break
-		}
-	}
+	found := hook.SomeBy(func(e *logrus.Entry) bool {
+		return e.Level == logrus.WarnLevel && strings.Contains(e.Message, "size eviction disabled")
+	})
+
 	assert.True(t, found, "expected warning log about disabled size eviction")
 }
 
@@ -52,23 +40,14 @@ func TestAfterConfSetup_WarnsOnNegativeMaxEntries(t *testing.T) {
 		tykregexp.Configure(tykregexp.CacheOptions{Enabled: true})
 	})
 
-	origLevel := log.GetLevel()
-	log.SetLevel(logrus.WarnLevel)
-	defer log.SetLevel(origLevel)
-
-	hook := &logrustest.Hook{}
-	log.AddHook(hook)
-	defer log.ReplaceHooks(make(logrus.LevelHooks))
+	hook := log.GetTestHook(t)
 
 	gw := NewGateway(config.Config{RegexpCacheMaxEntries: -1}, context.Background())
 	require.NoError(t, gw.afterConfSetup())
 
-	var found bool
-	for _, e := range hook.AllEntries() {
-		if e.Level == logrus.WarnLevel && strings.Contains(e.Message, "is invalid") {
-			found = true
-			break
-		}
-	}
+	found := hook.SomeBy(func(e *logrus.Entry) bool {
+		return e.Level == logrus.WarnLevel && strings.Contains(e.Message, "is invalid")
+	})
+
 	assert.True(t, found, "expected warning log pointing at DisableRegexpCacheBound")
 }

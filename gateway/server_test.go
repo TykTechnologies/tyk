@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,14 +10,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,12 +26,14 @@ import (
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/TykTechnologies/storage/persistent/model"
 
+	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/compression"
 	internalmodel "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/policy"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/tcp"
 	"github.com/TykTechnologies/tyk/test"
@@ -1673,24 +1672,7 @@ func TestPoliciesCollisionMessage(t *testing.T) {
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
 
-	type logMessage struct {
-		Level string    `json:"level"`
-		Msg   string    `json:"msg"`
-		Time  time.Time `json:"time"`
-	}
-
-	var buf bytes.Buffer
-
-	mock := logrus.New()
-	mock.SetOutput(&buf)
-	mock.SetFormatter(&logrus.JSONFormatter{})
-	mock.SetLevel(logrus.WarnLevel)
-
-	originGlobalLogger := log
-	log = mock
-	t.Cleanup(func() {
-		log = originGlobalLogger
-	})
+	hook := log.GetTestHook(t)
 
 	id1 := model.NewObjectID()
 	id2 := model.NewObjectID()
@@ -1702,20 +1684,15 @@ func TestPoliciesCollisionMessage(t *testing.T) {
 		user.Policy{MID: id3, ID: "duplicate_id", OrgID: "B"},
 	)
 
-	msgs := lo.Map(slices.Collect(strings.Lines(buf.String())), func(line string, _ int) logMessage {
-		var res logMessage
-		err := json.Unmarshal([]byte(line), &res)
-		assert.NoError(t, err)
-		return res
-	})
+	entries := hook.AllEntries()
 
-	require.Len(t, msgs, 1)
-	msg := msgs[0]
+	require.Len(t, entries, 1)
+	entry := entries[0]
 
-	assert.Contains(t, msg.Msg, "Policies should not share the same ID")
-	assert.Contains(t, msg.Msg, "duplicate_id")
-	assert.Contains(t, msg.Msg, id1.Hex())
-	assert.Contains(t, msg.Msg, id2.Hex())
+	assert.Contains(t, entry.Message, "Policies should not share the same ID")
+	assert.Contains(t, entry.Message, "duplicate_id")
+	assert.Contains(t, entry.Message, id1.Hex())
+	assert.Contains(t, entry.Message, id2.Hex())
 }
 
 // newMinimalGateway creates a Gateway with only the fields needed for
@@ -2173,4 +2150,30 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 		"/register/node must be called exactly once — DoReloadWithRetry must not re-register")
 	assert.GreaterOrEqual(t, policyCount, succeedOnCall,
 		"policy endpoint should have been retried at least %d times", succeedOnCall)
+}
+
+func Test_GW_setupLogger(t *testing.T) {
+	t.Run("hooks are added based on config", func(t *testing.T) {
+		cli.InitTest(t, nil)
+
+		gw := NewGateway(config.Config{
+			UseSentry:           true,
+			SentryCode:          "http://public:secret@example.com/1",
+			UseSyslog:           true,
+			SyslogNetworkAddr:   "localhost:514",
+			SyslogTransport:     "udp",
+			UseGraylog:          true,
+			GraylogNetworkAddr:  "localhost:12201",
+			UseLogstash:         true,
+			LogstashNetworkAddr: "localhost:5000",
+			LogstashTransport:   "tcp",
+			UseRedisLog:         true,
+		}, t.Context())
+		gw.setTestMode(false)
+
+		l := tyklog.Build(gw.setupLogger)
+
+		// Sentry + Syslog + GrayLog + Logstash + Redis
+		assert.Equal(t, 5, len(l.Hooks[logrus.PanicLevel]), "Expected hooks to be added")
+	})
 }
