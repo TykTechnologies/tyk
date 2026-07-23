@@ -350,7 +350,7 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 		var tmplExecutor TemplateExecutor
 		tmplExecutor = tmpl
 
-		apiError := APIError{htmltemplate.HTML(htmltemplate.JSEscapeString(errMsg))}
+		apiError := APIError{htmltemplate.HTML(EscapeJSONString(errMsg))}
 
 		if contentType == header.ApplicationXML || contentType == header.TextXML || contentType == header.ApplicationSoapXML {
 			apiError.Message = htmltemplate.HTML(errMsg)
