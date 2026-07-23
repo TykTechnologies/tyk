@@ -382,22 +382,22 @@ func TestEscapeTemplateString(t *testing.T) {
 			expected: htmltemplate.HTML("validation failed"),
 		},
 		{
-			name:     "JSON: single quote is JS-escaped, not HTML-encoded",
+			name:     "JSON: single quote is NOT escaped (RFC 8259)",
 			input:    "it's invalid",
 			isXML:    false,
-			expected: htmltemplate.HTML(`it\'s invalid`),
+			expected: htmltemplate.HTML(`it's invalid`),
 		},
 		{
-			name:     "JSON: angle brackets are JS-escaped",
+			name:     "JSON: angle brackets are NOT escaped",
 			input:    "<script>",
 			isXML:    false,
-			expected: htmltemplate.HTML(`\u003Cscript\u003E`),
+			expected: htmltemplate.HTML(`<script>`),
 		},
 		{
-			name:     "JSON: ampersand is JS-escaped",
+			name:     "JSON: ampersand is NOT escaped",
 			input:    "a & b",
 			isXML:    false,
-			expected: htmltemplate.HTML(`a \u0026 b`),
+			expected: htmltemplate.HTML(`a & b`),
 		},
 		// XML path: text/template does not auto-escape, so HTML-escaping must be applied explicitly.
 		{
