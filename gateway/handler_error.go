@@ -19,6 +19,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
+	"github.com/TykTechnologies/tyk/pkg/escaper"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -350,7 +351,7 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 		var tmplExecutor TemplateExecutor
 		tmplExecutor = tmpl
 
-		apiError := APIError{htmltemplate.HTML(htmltemplate.JSEscapeString(errMsg))}
+		var apiError APIError
 
 		if contentType == header.ApplicationXML || contentType == header.TextXML || contentType == header.ApplicationSoapXML {
 			apiError.Message = htmltemplate.HTML(errMsg)
@@ -358,6 +359,8 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 			//we look up in the last defined templateName to obtain the template.
 			rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
 			tmplExecutor = rawTmpl
+		} else {
+			apiError.Message = htmltemplate.HTML(escaper.JsonEscapeString(errMsg))
 		}
 
 		var log bytes.Buffer
