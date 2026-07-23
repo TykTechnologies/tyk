@@ -1,6 +1,6 @@
 // This file is the storage/kv integration seam: legacy config-block promotion
-// (buildKVConfig), the resolving load path (LoadAndResolve), and the local-only
-// registry for callers that bypass it (NewLocalKVRegistry).
+// (buildKVConfig), the load + registry bootstrap path (LoadAndInitKVRegistry),
+// and the local-only registry for callers that bypass it (NewLocalKVRegistry).
 
 package config
 
@@ -11,7 +11,6 @@ import (
 
 	"github.com/TykTechnologies/storage/kv"
 	"github.com/TykTechnologies/storage/kv/registry"
-	"github.com/TykTechnologies/storage/kv/resolver"
 	"github.com/sirupsen/logrus"
 )
 
@@ -23,7 +22,7 @@ func (a kvLogger) Warnf(format string, args ...any)       { a.l.Warnf(format, ar
 // NewLocalKVRegistry builds a registry containing ONLY the local stores
 // (env, file, secrets) promoted from conf — no network, no kv.stores parsing,
 // no resolution. It is the registry a caller uses when it has an in-memory
-// config but must not go through LoadAndResolve (the gateway's test-mode
+// config but must not go through LoadAndInitKVRegistry (the gateway's test-mode
 // construction path).
 func NewLocalKVRegistry(ctx context.Context, conf *Config) (*registry.Registry, error) {
 	all := buildKVConfig(conf)
@@ -43,9 +42,11 @@ func NewLocalKVRegistry(ctx context.Context, conf *Config) (*registry.Registry, 
 	)
 }
 
-// LoadAndResolve runs Load, then the KV bootstrap and full-config resolution.
-// The caller owns the returned registry, including Close on shutdown.
-func LoadAndResolve(
+// LoadAndInitKVRegistry runs Load, then builds the KV registry from the config's
+// store blocks. It does NOT resolve references in the config — individual fields
+// (secrets, certificates) are resolved later at their point of consumption
+// (afterConfSetup / per-API). The caller owns the returned registry and its Close.
+func LoadAndInitKVRegistry(
 	ctx context.Context,
 	paths []string,
 	conf *Config,
@@ -61,8 +62,6 @@ func LoadAndResolve(
 		return nil, fmt.Errorf("encode config: %w", err)
 	}
 
-	conf.Private.UnresolvedConfig = marshaledBytes
-
 	r, err := registry.NewFromConfig(
 		ctx,
 		marshaledBytes,
@@ -72,20 +71,6 @@ func LoadAndResolve(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initialize KV registry: %w", err)
-	}
-
-	res := resolver.NewResolver(r)
-
-	resolvedBytes, err := res.ResolveAll(ctx, marshaledBytes)
-	if err != nil {
-		_ = r.Close(context.WithoutCancel(ctx))
-		return nil, fmt.Errorf("resolve KV references in config: %w", err)
-	}
-
-	err = json.Unmarshal(resolvedBytes, conf)
-	if err != nil {
-		_ = r.Close(context.WithoutCancel(ctx))
-		return nil, fmt.Errorf("decode resolved config: %w", err)
 	}
 
 	return r, nil

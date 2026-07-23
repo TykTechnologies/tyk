@@ -616,66 +616,80 @@ func TestAfterConfSetup_NewSyntaxFieldRegistersClosure(t *testing.T) {
 		Secrets: map[string]string{"oauth_cert": "/resolved/cert.pem"},
 	}
 	live.ExternalServices.OAuth.MTLS.Enabled = true
-	// The live field already holds the resolved value, as it would after Load.
-	live.ExternalServices.OAuth.MTLS.CertFile = "/resolved/cert.pem"
-
-	// The snapshot keeps the original kv:// reference for that same field.
-	snap := live
-	snap.ExternalServices.OAuth.MTLS.CertFile = "kv://secrets/oauth_cert"
-	snapBytes, err := json.Marshal(snap)
-	require.NoError(t, err)
-	live.Private.UnresolvedConfig = snapBytes
+	// The field holds a kv:// reference, as it does after Load — the config is
+	// no longer resolved up front, so afterConfSetup resolves it in place.
+	live.ExternalServices.OAuth.MTLS.CertFile = "kv://secrets/oauth_cert"
 
 	gw := NewGateway(live, t.Context())
 	require.NoError(t, gw.afterConfSetup())
 
 	require.Len(t, gw.kvResolvers, 1,
-		"a field that was a kv:// reference in the snapshot must register a hot-reload closure")
+		"a field holding a kv:// reference must register a hot-reload closure")
+
+	got := gw.GetConfig()
+	require.Equal(t, "/resolved/cert.pem", got.ExternalServices.OAuth.MTLS.CertFile,
+		"the reference must be resolved into the live config")
 }
 
-func TestAfterConfSetup_SlaveAPIKeyOriginalFromSnapshot(t *testing.T) {
+func TestAfterConfSetup_SlaveAPIKeyOriginalIsCaptured(t *testing.T) {
 	live := config.Config{
 		Secrets: map[string]string{"edge_api_key": "/resolved/api-key"},
 	}
-	live.SlaveOptions.APIKey = "/resolved/api-key" // resolved value, as after Load
-
-	snap := live
-	snap.SlaveOptions.APIKey = "kv://secrets/edge_api_key"
-	snapBytes, err := json.Marshal(snap)
-	require.NoError(t, err)
-	live.Private.UnresolvedConfig = snapBytes
+	// The field holds the original kv:// reference, as it does after Load.
+	live.SlaveOptions.APIKey = "kv://secrets/edge_api_key"
 
 	gw := NewGateway(live, t.Context())
 	require.NoError(t, gw.afterConfSetup())
 
 	got := gw.GetConfig()
 	require.Equal(t, "kv://secrets/edge_api_key", got.Private.EdgeOriginalAPIKeyPath,
-		"EdgeOriginalAPIKeyPath must hold the ORIGINAL reference from the snapshot, not the resolved secret")
+		"EdgeOriginalAPIKeyPath must hold the ORIGINAL reference, captured before the field is resolved")
 	require.Equal(t, "/resolved/api-key", got.SlaveOptions.APIKey,
-		"the live APIKey must still be the resolved value")
+		"the live APIKey must be the resolved value")
 }
 
-func TestAfterConfSetup_CorruptSnapshotFallsBackToCurrentValues(t *testing.T) {
-	live := config.Config{
-		Secrets: map[string]string{"edge_api_key": "/resolved/api-key"},
-	}
-	live.SlaveOptions.APIKey = "/resolved/api-key"
+func TestAfterConfSetup_MTLS_MissingStoreDoesNotFailStartup(t *testing.T) {
+	live := config.Config{}
 	live.ExternalServices.OAuth.MTLS.Enabled = true
-	live.ExternalServices.OAuth.MTLS.CertFile = "/resolved/cert.pem"
-	live.Private.UnresolvedConfig = []byte(`{this is not valid json`)
+	// vault is NOT configured
+	live.ExternalServices.OAuth.MTLS.CertFile = "kv://vault/secret/cert#value"
 
 	gw := NewGateway(live, t.Context())
 	require.NoError(t, gw.afterConfSetup(),
-		"a corrupt snapshot must not fail startup — it degrades to current-values-as-originals")
+		"an enabled mTLS reference to an unconfigured store must not fail startup")
 
 	got := gw.GetConfig()
-	require.Equal(t, "/resolved/cert.pem", got.ExternalServices.OAuth.MTLS.CertFile,
-		"resolved fields must keep their values, not be blanked by a zero-value orig")
-	require.Equal(t, "/resolved/api-key", got.SlaveOptions.APIKey)
-	require.Equal(t, "/resolved/api-key", got.Private.EdgeOriginalAPIKeyPath,
-		"with the fallback, the current value doubles as the original (legacy behavior)")
+	require.Equal(t, "kv://vault/secret/cert#value", got.ExternalServices.OAuth.MTLS.CertFile,
+		"the unresolved reference must be left in place, not blanked")
 	require.Empty(t, gw.kvResolvers,
-		"plain values must not register hot-reload closures")
+		"an unresolved reference registers no hot-reload closure (resolved == original)")
+}
+
+func TestAfterConfSetup_MTLS_ConfiguredStoreMissingKeyFailsStartup(t *testing.T) {
+	live := config.Config{
+		Secrets: map[string]string{"present": "x"},
+	}
+	live.ExternalServices.OAuth.MTLS.Enabled = true
+	live.ExternalServices.OAuth.MTLS.CertFile = "kv://secrets/absent_key"
+
+	gw := NewGateway(live, t.Context())
+	require.Error(t, gw.afterConfSetup(),
+		"a reference to a configured store with a missing key must stay a hard startup error")
+}
+
+func TestAfterConfSetup_MTLS_DisabledSectionNeverResolvesKV(t *testing.T) {
+	live := config.Config{}
+	live.ExternalServices.OAuth.MTLS.Enabled = false
+	live.ExternalServices.OAuth.MTLS.CertFile = "kv://vault/secret/cert#value"
+
+	gw := NewGateway(live, t.Context())
+	require.NoError(t, gw.afterConfSetup(),
+		"a disabled mTLS section must never fail startup on its KV reference")
+
+	got := gw.GetConfig()
+	require.Equal(t, "kv://vault/secret/cert#value", got.ExternalServices.OAuth.MTLS.CertFile,
+		"a disabled section's reference must be left untouched")
+	require.Empty(t, gw.kvResolvers)
 }
 
 func TestGateway_apisByIDLen(t *testing.T) {
