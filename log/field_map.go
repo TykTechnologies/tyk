@@ -20,7 +20,7 @@ func NewFieldMap(fMap logrus.FieldMap) FieldMap {
 	return FieldMap{fields: m}
 }
 
-func (f FieldMap) Resolve(field string) string {
+func (f *FieldMap) Resolve(field string) string {
 	if len(f.fields) == 0 {
 		return field
 	}
@@ -47,7 +47,7 @@ func (f *FieldMap) UnmarshalJSON(data []byte) error {
 }
 
 func (f FieldMap) MarshalJSON() ([]byte, error) {
-	if f.fields == nil {
+	if len(f.fields) == 0 {
 		return []byte("null"), nil
 	}
 	return json.Marshal(f.fields)
