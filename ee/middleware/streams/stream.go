@@ -1,3 +1,5 @@
+//go:build ee || dev
+
 package streams
 
 import (
