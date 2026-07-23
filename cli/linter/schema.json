@@ -1630,6 +1630,45 @@
               "type": "string"
             }
           }
+        },
+        "stores": {
+          "type": ["object", "null"],
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "config": {
+                "type": ["object", "null"]
+              }
+            }
+          }
+        },
+        "cache": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "ttl": {
+              "type": "string"
+            },
+            "refresh_before_expiry": {
+              "type": "string"
+            },
+            "negative_ttl_not_found": {
+              "type": "string"
+            },
+            "negative_ttl_transient": {
+              "type": "string"
+            }
+          }
         }
       }
     },

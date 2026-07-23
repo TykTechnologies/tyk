@@ -1669,6 +1669,69 @@ func TestReplaceSecrets(t *testing.T) {
 	assert.Equal(t, "Ghiur", api2.AuthConfigs[apidef.OAuthType].AuthHeaderName)
 }
 
+func TestReplaceSecrets_NewSyntax(t *testing.T) {
+	t.Setenv("TYK_SECRET_TOKEN", "tok-new")
+	t.Setenv("RAW_TOKEN", "tok-raw")
+
+	gw := NewGateway(config.Config{
+		Secrets: map[string]string{
+			"db_url": "resolved-db-url",
+			// A value that MUST be JSON-escaped to keep the document valid.
+			"cert": "-----BEGIN-----\nline\twith \"quotes\"\n-----END-----\n",
+		},
+	}, t.Context())
+
+	l := APIDefinitionLoader{Gw: gw}
+
+	t.Run("kv:// whole-value reference is resolved", func(t *testing.T) {
+		out := l.replaceSecrets([]byte(`{"target_url":"kv://secrets/db_url"}`))
+		require.JSONEq(t, `{"target_url":"resolved-db-url"}`, string(out))
+	})
+
+	t.Run("$kv{} inline token is resolved within a string", func(t *testing.T) {
+		out := l.replaceSecrets([]byte(`{"target_url":"https://$kv{secrets:db_url}/v1"}`))
+		require.JSONEq(t, `{"target_url":"https://resolved-db-url/v1"}`, string(out))
+	})
+
+	t.Run("env semantics differ: env:// is raw, $kv{env:} is TYK_SECRET_ prefixed", func(t *testing.T) {
+		legacy := l.replaceSecrets([]byte(`{"a":"env://RAW_TOKEN"}`))
+		require.JSONEq(t, `{"a":"tok-raw"}`, string(legacy),
+			"legacy env:// reads the variable name directly")
+
+		newSyntax := l.replaceSecrets([]byte(`{"a":"$kv{env:token}"}`))
+		require.JSONEq(t, `{"a":"tok-new"}`, string(newSyntax),
+			"$kv{env:token} reads TYK_SECRET_TOKEN")
+	})
+
+	t.Run("malformed kv:// reference leaves the document unchanged", func(t *testing.T) {
+		in := []byte(`{"a":"kv://no-path-separator"}`)
+		out := l.replaceSecrets(in)
+		require.JSONEq(t, string(in), string(out),
+			"on a ResolveAll error the document is returned as-is, not corrupted")
+	})
+
+	t.Run("mixed legacy and new syntax both resolve", func(t *testing.T) {
+		out := l.replaceSecrets([]byte(`{"legacy":"secrets://db_url","new":"kv://secrets/db_url"}`))
+		s := string(out)
+		require.NotContains(t, s, "secrets://db_url", "legacy reference must be resolved")
+		require.NotContains(t, s, "kv://secrets/db_url", "new reference must be resolved")
+		require.JSONEq(t, `{"legacy":"resolved-db-url","new":"resolved-db-url"}`, s)
+	})
+
+	t.Run("resolved value needing JSON escaping keeps the document valid", func(t *testing.T) {
+		// ResolveAll parses the document, resolves string values, and
+		// re-serializes — so values with quotes/newlines are JSON-escaped
+		// automatically.
+		out := l.replaceSecrets([]byte(`{"cert":"kv://secrets/cert"}`))
+
+		var result map[string]string
+		require.NoError(t, json.Unmarshal(out, &result),
+			"output must be valid JSON after resolving a value with quotes/newlines")
+		require.Equal(t, "-----BEGIN-----\nline\twith \"quotes\"\n-----END-----\n", result["cert"],
+			"the resolved value round-trips exactly — escaped once, not double-escaped")
+	})
+}
+
 func TestReplaceSecretsFileScheme(t *testing.T) {
 	t.Run("file:// references rejected without base_path", func(t *testing.T) {
 		ts := StartTest(nil)
@@ -1721,7 +1784,7 @@ func TestReplaceSecretsFileScheme(t *testing.T) {
 		assert.Equal(t, "key-from-mount", api.JWTSource)
 	})
 
-	t.Run("absolute path in API definition is rejected when base_path is set", func(t *testing.T) {
+	t.Run("absolute path in API definition is rejected", func(t *testing.T) {
 		baseDir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(baseDir, "jwt-secret"), []byte("allowed-value"), 0600))
 

@@ -82,6 +82,31 @@ var tests = []struct {
 		"KVFileBasePath", `{"kv": {"file": {"base_path": "/etc/tyk/secrets"}}}`, nil,
 	},
 	{
+		"KVStores",
+		`{"kv": {"stores": {"vault": {"type": "hashicorp_vault", "required": false, "config": {"address": "https://vault.internal:8200", "token": "kv://env/VAULT_TOKEN", "kv_version": 2}}}}}`,
+		nil,
+	},
+	{
+		"KVCache",
+		`{"kv": {"cache": {"enabled": true, "ttl": "60s", "refresh_before_expiry": "10s", "negative_ttl_not_found": "300s", "negative_ttl_transient": "5s"}}}`,
+		nil,
+	},
+	{
+		"KVStoresAndCache",
+		`{"kv": {"vault": {"address": "https://vault:8200"}, "cache": {"enabled": true, "ttl": "60s"}, "stores": {"aws-prod": {"type": "aws_secrets_manager", "required": true, "config": {"region": "us-east-1"}}}}}`,
+		nil,
+	},
+	{
+		"KVCacheFieldTypo",
+		`{"kv": {"cache": {"enabledd": true}}}`,
+		`kv.cache: Additional property enabledd is not allowed`,
+	},
+	{
+		"KVStoreFieldTypo",
+		`{"kv": {"stores": {"x": {"typ": "env"}}}}`,
+		`Additional property typ is not allowed`,
+	},
+	{
 		"MalformedDnsCacheEntry", `{"dns_cache": { "enabled": true, "tttl": 10} }`,
 		`dns_cache: Additional property tttl is not allowed`,
 	},

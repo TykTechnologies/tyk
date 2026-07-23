@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/storage/kv"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
@@ -579,6 +580,16 @@ func TestE2E_VaultHotReload(t *testing.T) {
 		}
 	})
 	defer ts.Close()
+
+	vaultCfg, err := json.Marshal(map[string]any{
+		"address":    mockVault.URL,
+		"token":      "test-token",
+		"kv_version": 2,
+	})
+	require.NoError(t, err)
+	installKVRegistry(t, ts.Gw, map[string]kv.StoreConfig{
+		"vault": {Type: kv.Vault, Config: vaultCfg},
+	}, nil)
 
 	require.NoError(t, ts.Gw.afterConfSetup())
 

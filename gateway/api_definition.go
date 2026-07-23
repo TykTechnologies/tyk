@@ -525,6 +525,8 @@ const (
 	prefixVault     = "vault://"
 	prefixFile      = "file://"
 	prefixKeys      = "tyk-apis"
+	prefixKV        = "kv://"
+	prefixKVInline  = "$kv{"
 	vaultSecretPath = "secret/data/"
 )
 
@@ -578,6 +580,12 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 	if strings.Contains(input, prefixFile) {
 		if err := a.replaceFileSecrets(&input); err != nil {
 			log.WithError(err).Error("Couldn't replace file secrets")
+		}
+	}
+
+	if strings.Contains(input, prefixKV) || strings.Contains(input, prefixKVInline) {
+		if err := a.replaceKVReferences(&input); err != nil {
+			log.WithError(err).Error("Couldn't replace KV references")
 		}
 	}
 
@@ -652,22 +660,31 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 }
 
 func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
-	basePath := a.Gw.GetConfig().KV.File.BasePath
+	store, err := a.Gw.kvRegistry.GetStore("file")
+	if err != nil {
+		return err
+	}
+
 	matches := fileRegex.FindAllStringSubmatch(*input, -1)
 	seen := map[string]bool{}
+
 	var firstErr error
+
 	for _, m := range matches {
 		if seen[m[0]] {
 			continue
 		}
+
 		seen[m[0]] = true
-		val, err := ResolveFileKV(basePath, m[1])
+
+		val, err := store.Get(a.Gw.ctx, m[1])
 		if err != nil {
 			if firstErr == nil {
 				firstErr = err
 			}
 			continue
 		}
+
 		// JSON-escape the value before injecting it into the raw JSON document.
 		// Without this, multi-line content (e.g. PEM certificates) produces
 		// literal newlines inside a JSON string, which is invalid JSON.
@@ -676,14 +693,32 @@ func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
 			if firstErr == nil {
 				firstErr = err
 			}
+
 			continue
 		}
+
 		// Strip the surrounding quotes since the replacement sits
 		// inside an existing JSON string already.
 		escaped := string(jsonBytes[1 : len(jsonBytes)-1])
 		*input = strings.ReplaceAll(*input, m[0], escaped)
 	}
+
 	return firstErr
+}
+
+// replaceKVReferences resolves new-syntax kv:// and $kv{} references via the
+// shared resolver. Unlike the legacy bulk ops, ResolveAll re-serializes the
+// document, so resolved values are JSON-escaped automatically — no manual
+// escaping here would be correct.
+func (a APIDefinitionLoader) replaceKVReferences(input *string) error {
+	resolved, err := a.Gw.kvResolver.ResolveAll(a.Gw.ctx, []byte(*input))
+	if err != nil {
+		return err
+	}
+
+	*input = string(resolved)
+
+	return nil
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.

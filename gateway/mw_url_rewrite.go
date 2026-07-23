@@ -2,12 +2,12 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/textproto"
 	"net/url"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -218,57 +218,75 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 // parameter for a HTTP request would. If no replacement has been made, `in`
 // is returned without modification.
 func (gw *Gateway) ReplaceTykVariables(r *http.Request, in string, escape bool) string {
+	// kv:// and $kv{} tokens in API definitions are resolved once at API load
+	// (replaceSecrets), so they rarely reach this point. When that load-time
+	// pass fails, the spec keeps its literal tokens — this pass then resolves
+	// them per request for the strings routed through here (the spec itself
+	// is only fixed by a successful reload). It also covers strings that
+	// never went through the API-definition loader.
+	if gw.kvResolver != nil && (strings.Contains(in, "kv://") || strings.Contains(in, "$kv{")) {
+		if resolved, err := gw.kvResolver.Resolve(r.Context(), in); err == nil {
+			in = resolved
+		}
+	}
 
 	if strings.Contains(in, secretsConfLabel) {
 		contextData := ctxGetData(r)
 		vars := secretsConfMatch.FindAllString(in, -1)
-		in = gw.replaceVariables(in, vars, contextData, secretsConfLabel, escape)
+		in = gw.replaceVariables(r.Context(), in, vars, contextData, secretsConfLabel, escape)
 	}
 
 	if strings.Contains(in, envLabel) {
 		contextData := ctxGetData(r)
 		vars := envValueMatch.FindAllString(in, -1)
-		in = gw.replaceVariables(in, vars, contextData, envLabel, escape)
+		in = gw.replaceVariables(r.Context(), in, vars, contextData, envLabel, escape)
 	}
 
 	if strings.Contains(in, vaultLabel) {
 		contextData := ctxGetData(r)
 		vars := vaultMatch.FindAllString(in, -1)
-		in = gw.replaceVariables(in, vars, contextData, vaultLabel, escape)
+		in = gw.replaceVariables(r.Context(), in, vars, contextData, vaultLabel, escape)
 	}
 
 	if strings.Contains(in, consulLabel) {
 		contextData := ctxGetData(r)
 		vars := consulMatch.FindAllString(in, -1)
-		in = gw.replaceVariables(in, vars, contextData, consulLabel, escape)
+		in = gw.replaceVariables(r.Context(), in, vars, contextData, consulLabel, escape)
 	}
 
 	if strings.Contains(in, fileLabel) {
 		contextData := ctxGetData(r)
 		vars := fileMatch.FindAllString(in, -1)
-		in = gw.replaceVariables(in, vars, contextData, fileLabel, escape)
+		in = gw.replaceVariables(r.Context(), in, vars, contextData, fileLabel, escape)
 	}
 
 	if strings.Contains(in, contextLabel) {
 		contextData := ctxGetData(r)
 		vars := contextMatch.FindAllString(in, -1)
-		in = gw.replaceVariables(in, vars, contextData, contextLabel, escape)
+		in = gw.replaceVariables(r.Context(), in, vars, contextData, contextLabel, escape)
 	}
 
 	if strings.Contains(in, metaLabel) {
 		vars := metaMatch.FindAllString(in, -1)
 		session := ctxGetSession(r)
 		if session == nil {
-			in = gw.replaceVariables(in, vars, nil, metaLabel, escape)
+			in = gw.replaceVariables(r.Context(), in, vars, nil, metaLabel, escape)
 		} else {
-			in = gw.replaceVariables(in, vars, session.MetaData, metaLabel, escape)
+			in = gw.replaceVariables(r.Context(), in, vars, session.MetaData, metaLabel, escape)
 		}
 	}
 	//todo add config_data
 	return in
 }
 
-func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]interface{}, label string, escape bool) string {
+func (gw *Gateway) replaceVariables(
+	ctx context.Context,
+	in string,
+	vars []string,
+	vals map[string]interface{},
+	label string,
+	escape bool,
+) string {
 
 	emptyStringFn := func(key, in, val string) string {
 		in = strings.Replace(in, val, "", -1)
@@ -286,68 +304,15 @@ func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]in
 
 		switch label {
 
-		case secretsConfLabel:
+		case secretsConfLabel, envLabel, vaultLabel, consulLabel, fileLabel:
 
-			secrets := gw.GetConfig().Secrets
-
-			val, ok := secrets[key]
-			if !ok || val == "" {
-				in = emptyStringFn(key, in, v)
-				continue
-			}
-
-			in = strings.Replace(in, v, val, -1)
-
-		case envLabel:
-
-			val := os.Getenv(fmt.Sprintf("TYK_SECRET_%s", strings.ToUpper(key)))
-			if val == "" {
-				in = emptyStringFn(key, in, v)
-				continue
-			}
-
-			in = strings.Replace(in, v, val, -1)
-
-		case vaultLabel:
-
-			if err := gw.setUpVault(); err != nil {
-				in = emptyStringFn(key, in, v)
-				continue
-			}
-
-			val, err := gw.vaultKVStore.Get(key)
+			val, err := gw.kvResolver.Resolve(ctx, dollarSecretToKVRef(label, key))
 			if err != nil {
 				in = emptyStringFn(key, in, v)
 				continue
 			}
 
-			in = strings.Replace(in, v, val, -1)
-
-		case consulLabel:
-
-			if err := gw.setUpConsul(); err != nil {
-				in = emptyStringFn(key, in, v)
-				continue
-			}
-
-			val, err := gw.consulKVStore.Get(key)
-			if err != nil {
-				in = strings.Replace(in, v, "", -1)
-				continue
-			}
-
-			in = strings.Replace(in, v, val, -1)
-
-		case fileLabel:
-
-			val, err := ResolveFileKV(gw.GetConfig().KV.File.BasePath, key)
-			if err != nil {
-				log.WithError(err).Debug("file KV: $secret_file resolution failed")
-				in = emptyStringFn(key, in, v)
-				continue
-			}
-
-			in = strings.Replace(in, v, val, -1)
+			in = strings.ReplaceAll(in, v, val)
 
 		default:
 
@@ -358,7 +323,7 @@ func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]in
 				if escape && !strings.HasPrefix(valStr, "http") {
 					valStr = url.QueryEscape(valStr)
 				}
-				in = strings.Replace(in, v, valStr, -1)
+				in = strings.ReplaceAll(in, v, valStr)
 				continue
 			}
 

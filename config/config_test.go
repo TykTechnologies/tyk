@@ -97,6 +97,30 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 	}
 }
 
+// TestKVStoresIgnoredFromEnv pins the ignored:"true" tag on Config.KV.Stores.
+// envconfig parses maps from a flat "key:value" string and cannot express a
+// map of StoreConfig with a nested json.RawMessage Config, so TYK_GW_KV_STORES
+// must have no effect — store definitions come from the config file only.
+// Cache, by contrast, is a flat struct and is intentionally env-settable; the
+// second case guards that asymmetry so neither tag drifts.
+func TestKVStoresIgnoredFromEnv(t *testing.T) {
+	t.Run("stores is not populated from env", func(t *testing.T) {
+		t.Setenv("TYK_GW_KV_STORES", "vault:hashicorp_vault")
+
+		conf := &Config{}
+		require.NoError(t, FillEnv(conf))
+		require.Empty(t, conf.KV.Stores, "TYK_GW_KV_STORES must be ignored")
+	})
+
+	t.Run("cache is still settable from env", func(t *testing.T) {
+		t.Setenv("TYK_GW_KV_CACHE_ENABLED", "true")
+
+		conf := &Config{}
+		require.NoError(t, FillEnv(conf))
+		require.True(t, conf.KV.Cache.Enabled, "TYK_GW_KV_CACHE_ENABLED must apply")
+	})
+}
+
 func TestConfigFiles(t *testing.T) {
 	dir, err := ioutil.TempDir("", "tyk")
 	if err != nil {
