@@ -18,7 +18,9 @@ type Level string
 func (l *Level) Parse(str string) bool {
 	str = strings.ToLower(str)
 	_, ok := logLevels[str]
-	*l = Level(str)
+	if ok {
+		*l = Level(str)
+	}
 	return ok
 }
 
