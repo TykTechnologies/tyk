@@ -2252,6 +2252,19 @@ func (f fakeKVProvider) Get(_ context.Context, key string) (string, error) {
 
 func (f fakeKVProvider) IsStandalone() bool { return true }
 
+// List returns every entry whose key has the given prefix, mirroring the
+// consul provider's Lister.
+func (f fakeKVProvider) List(_ context.Context, prefix string) (map[string]string, error) {
+	out := make(map[string]string)
+	for k, v := range f.data {
+		if strings.HasPrefix(k, prefix) {
+			out[k] = v
+		}
+	}
+
+	return out, nil
+}
+
 // installKVRegistry replaces the gateway's registry and resolver with ones
 // built from the given store configs and factories (WithFactories merges on
 // top of the OSS defaults, so real provider types work with nil factories).
