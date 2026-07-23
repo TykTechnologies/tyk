@@ -262,8 +262,8 @@ type Gateway struct {
 	// kvRegistry holds the initialized KV provider stores (env, inline, file,
 	// and — outside test mode — vault/consul and any enterprise providers) that
 	// back secret resolution. In a real startup it is the registry returned by
-	// config.LoadAndResolve and owned by the gateway, which closes it on
-	// shutdown. In test mode, where LoadAndResolve never runs,
+	// config.LoadAndInitKVRegistry and owned by the gateway, which closes it on
+	// shutdown. In test mode, where LoadAndInitKVRegistry never runs,
 	// NewGateway installs a minimal local-only registry instead. It is
 	// guaranteed non-nil after construction.
 	kvRegistry *registry.Registry
@@ -1701,7 +1701,7 @@ func (gw *Gateway) initSystem() error {
 	if !gw.isRunningTests() {
 		gwConfig := config.Config{}
 
-		reg, err := config.LoadAndResolve(
+		reg, err := config.LoadAndInitKVRegistry(
 			gw.ctx,
 			confPaths,
 			&gwConfig,
@@ -2018,20 +2018,9 @@ func (gw *Gateway) afterConfSetup() error {
 		}
 	}
 
-	orig := conf
-	if len(conf.Private.UnresolvedConfig) > 0 {
-		var snap config.Config
-
-		if err := json.Unmarshal(conf.Private.UnresolvedConfig, &snap); err != nil {
-			log.WithError(err).Error("Failed to decode pre-resolution config snapshot; hot-reload closures will use current values")
-		} else {
-			orig = snap
-		}
-	}
-
 	if conf.SlaveOptions.APIKey != "" {
-		conf.Private.EdgeOriginalAPIKeyPath = orig.SlaveOptions.APIKey
-		conf.SlaveOptions.APIKey, err = gw.kvStore(orig.SlaveOptions.APIKey)
+		conf.Private.EdgeOriginalAPIKeyPath = conf.SlaveOptions.APIKey
+		conf.SlaveOptions.APIKey, err = gw.kvStore(conf.SlaveOptions.APIKey)
 		if err != nil {
 			return fmt.Errorf("could not retrieve API key from KV store: %w", err)
 		}
@@ -2039,19 +2028,19 @@ func (gw *Gateway) afterConfSetup() error {
 
 	// Retrieve OAuth mTLS certificate paths from KV store
 	if conf.ExternalServices.OAuth.MTLS.Enabled {
-		conf.ExternalServices.OAuth.MTLS.CertFile, err = gw.resolveKV(orig.ExternalServices.OAuth.MTLS.CertFile, func(c *config.Config, v string) {
+		conf.ExternalServices.OAuth.MTLS.CertFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.CertFile, func(c *config.Config, v string) {
 			c.ExternalServices.OAuth.MTLS.CertFile = v
 		}, true)
 		if err != nil {
 			return fmt.Errorf("could not retrieve OAuth mTLS cert file path from KV store: %w", err)
 		}
-		conf.ExternalServices.OAuth.MTLS.KeyFile, err = gw.resolveKV(orig.ExternalServices.OAuth.MTLS.KeyFile, func(c *config.Config, v string) {
+		conf.ExternalServices.OAuth.MTLS.KeyFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.KeyFile, func(c *config.Config, v string) {
 			c.ExternalServices.OAuth.MTLS.KeyFile = v
 		}, true)
 		if err != nil {
 			return fmt.Errorf("could not retrieve OAuth mTLS key file path from KV store: %w", err)
 		}
-		conf.ExternalServices.OAuth.MTLS.CAFile, err = gw.resolveKV(orig.ExternalServices.OAuth.MTLS.CAFile, func(c *config.Config, v string) {
+		conf.ExternalServices.OAuth.MTLS.CAFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.CAFile, func(c *config.Config, v string) {
 			c.ExternalServices.OAuth.MTLS.CAFile = v
 		}, true)
 		if err != nil {

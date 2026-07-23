@@ -115,7 +115,14 @@ func (gw *Gateway) kvStoreCtx(ctx context.Context, value string) (string, error)
 		return store.Get(ctx, key)
 	}
 
-	return gw.kvResolver.Resolve(ctx, value)
+	resolved, err := gw.kvResolver.Resolve(ctx, value)
+	if errors.Is(err, kvLib.ErrStoreNotFound) {
+		log.Error(`Failed to get store: `, err)
+
+		return value, nil
+	}
+
+	return resolved, err
 }
 
 func (gw *Gateway) ensureKVRegistry(conf config.Config) error {

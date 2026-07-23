@@ -11,74 +11,63 @@ import (
 
 	"github.com/TykTechnologies/storage/kv"
 	"github.com/TykTechnologies/storage/kv/registry"
-	"github.com/TykTechnologies/storage/kv/resolver"
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadAndResolve_ResolvesKVReferenceFromSecretsStore(t *testing.T) {
+func TestLoadAndInitKVRegistry_LeavesConfigReferencesUnresolved(t *testing.T) {
 	path := writeTempConf(t, `{
 		"secret": "kv://secrets/db_password",
 		"secrets": {"db_password": "hunter2"}
 	}`)
 
 	var conf Config
-	reg, err := LoadAndResolve(t.Context(), []string{path}, &conf, nil)
+	reg, err := LoadAndInitKVRegistry(t.Context(), []string{path}, &conf, nil)
 	require.NoError(t, err)
 	require.NotNil(t, reg, "a usable registry must be returned")
 	closeRegistry(t, reg)
 
-	require.Equal(t, "hunter2", conf.Secret,
-		"the kv:// reference must be replaced by the resolved secret value")
+	require.Equal(t, "kv://secrets/db_password", conf.Secret,
+		"LoadAndInitKVRegistry must NOT resolve config fields; the reference is resolved later at its point of consumption")
 }
 
-func TestLoadAndResolve_SnapshotRetainsUnresolvedReferences(t *testing.T) {
+func TestLoadAndInitKVRegistry_SecretsStoreResolvableViaRegistry(t *testing.T) {
 	path := writeTempConf(t, `{
 		"secret": "kv://secrets/db_password",
 		"secrets": {"db_password": "hunter2"}
 	}`)
 
 	var conf Config
-	reg, err := LoadAndResolve(t.Context(), []string{path}, &conf, nil)
+	reg, err := LoadAndInitKVRegistry(t.Context(), []string{path}, &conf, nil)
 	require.NoError(t, err)
 	closeRegistry(t, reg)
 
-	require.Equal(t, "hunter2", conf.Secret, "the live config holds the resolved value")
-	require.NotEmpty(t, conf.Private.UnresolvedConfig, "the pre-resolution snapshot must be captured")
+	store, err := reg.GetStore("secrets")
+	require.NoError(t, err, "conf.secrets must be promoted into a resolvable store")
 
-	var snapshot Config
-	require.NoError(t, json.Unmarshal(conf.Private.UnresolvedConfig, &snapshot))
-	require.Equal(t, "kv://secrets/db_password", snapshot.Secret,
-		"the snapshot must retain the original, unresolved reference")
+	val, err := store.Get(t.Context(), "db_password")
+	require.NoError(t, err)
+	require.Equal(t, "hunter2", val)
 }
 
-func TestLoadAndResolve_EnvReferenceUsesTykSecretPrefix(t *testing.T) {
+func TestLoadAndInitKVRegistry_EnvStoreUsesTykSecretPrefix(t *testing.T) {
 	t.Setenv("TYK_SECRET_DBPASS", "s3cret")
 
 	path := writeTempConf(t, `{"secret": "kv://env/dbpass"}`)
 
 	var conf Config
-	reg, err := LoadAndResolve(t.Context(), []string{path}, &conf, nil)
+	reg, err := LoadAndInitKVRegistry(t.Context(), []string{path}, &conf, nil)
 	require.NoError(t, err)
 	closeRegistry(t, reg)
 
-	require.Equal(t, "s3cret", conf.Secret,
-		"kv://env/dbpass must read TYK_SECRET_DBPASS")
+	store, err := reg.GetStore("env")
+	require.NoError(t, err)
+
+	val, err := store.Get(t.Context(), "dbpass")
+	require.NoError(t, err)
+	require.Equal(t, "s3cret", val, "the env store applies the TYK_SECRET_ prefix and uppercases the key")
 }
 
-func TestLoadAndResolve_MissingEnvVarResolvesToEmptyWithoutError(t *testing.T) {
-	os.Unsetenv("TYK_SECRET_DEFINITELY_MISSING")
-
-	path := writeTempConf(t, `{"secret": "kv://env/definitely_missing"}`)
-
-	var conf Config
-	reg, err := LoadAndResolve(t.Context(), []string{path}, &conf, nil)
-	require.NoError(t, err, "a missing env secret must not fail startup")
-	closeRegistry(t, reg)
-
-	require.Equal(t, "", conf.Secret, "a missing env var resolves to the empty string")
-}
-
-func TestLoadAndResolve_UserDefinedStoreFromConfigFileResolves(t *testing.T) {
+func TestLoadAndInitKVRegistry_UserDefinedStoreFromConfigFile(t *testing.T) {
 	path := writeTempConf(t, `{
 		"secret": "kv://myvals/token",
 		"kv": {
@@ -89,15 +78,19 @@ func TestLoadAndResolve_UserDefinedStoreFromConfigFileResolves(t *testing.T) {
 	}`)
 
 	var conf Config
-	reg, err := LoadAndResolve(t.Context(), []string{path}, &conf, nil)
+	reg, err := LoadAndInitKVRegistry(t.Context(), []string{path}, &conf, nil)
 	require.NoError(t, err)
 	closeRegistry(t, reg)
 
-	require.Equal(t, "xyz", conf.Secret,
-		"a store defined under kv.stores must survive the round-trip and resolve")
+	store, err := reg.GetStore("myvals")
+	require.NoError(t, err, "a store defined under kv.stores must be built into the registry")
+
+	val, err := store.Get(t.Context(), "token")
+	require.NoError(t, err)
+	require.Equal(t, "xyz", val)
 }
 
-func TestLoadAndResolve_InjectedFactoryResolvesCustomStore(t *testing.T) {
+func TestLoadAndInitKVRegistry_InjectedFactoryBuildsCustomStore(t *testing.T) {
 	const customType kv.ProviderType = "fake_secrets_manager"
 
 	factories := map[kv.ProviderType]kv.ProviderFactory{
@@ -116,27 +109,25 @@ func TestLoadAndResolve_InjectedFactoryResolvesCustomStore(t *testing.T) {
 	}`)
 
 	var conf Config
-	reg, err := LoadAndResolve(t.Context(), []string{path}, &conf, factories)
+	reg, err := LoadAndInitKVRegistry(t.Context(), []string{path}, &conf, factories)
 	require.NoError(t, err)
 	closeRegistry(t, reg)
 
-	require.Equal(t, "from-ee-provider", conf.Secret,
-		"an injected factory must be available to resolve its store type")
+	store, err := reg.GetStore("myfake")
+	require.NoError(t, err, "an injected factory must build its store type into the registry")
+
+	val, err := store.Get(t.Context(), "whatever")
+	require.NoError(t, err)
+	require.Equal(t, "from-ee-provider", val)
 }
 
-func TestLoadAndResolve_MalformedReferenceFailsStartup(t *testing.T) {
+func TestLoadAndInitKVRegistry_MalformedReferenceInFieldDoesNotFailStartup(t *testing.T) {
 	tests := []struct {
 		name string
 		raw  string
 	}{
-		{
-			name: "kv:// without a path separator",
-			raw:  `{"secret": "kv://no-path-separator"}`,
-		},
-		{
-			name: "unclosed $kv{ token",
-			raw:  `{"secret": "$kv{unclosed"}`,
-		},
+		{name: "kv:// without a path separator", raw: `{"secret": "kv://no-path-separator"}`},
+		{name: "unclosed $kv{ token", raw: `{"secret": "$kv{unclosed"}`},
 	}
 
 	for _, tc := range tests {
@@ -144,21 +135,19 @@ func TestLoadAndResolve_MalformedReferenceFailsStartup(t *testing.T) {
 			path := writeTempConf(t, tc.raw)
 
 			var conf Config
-			reg, err := LoadAndResolve(t.Context(), []string{path}, &conf, nil)
-
-			require.Error(t, err, "a malformed reference must fail startup")
-			require.ErrorIs(t, err, resolver.ErrMalformedReference,
-				"the underlying resolver error must be surfaced")
-			require.Nil(t, reg, "no registry is returned on a resolution failure")
+			reg, err := LoadAndInitKVRegistry(t.Context(), []string{path}, &conf, nil)
+			require.NoError(t, err, "a malformed reference in a config field must not fail registry init")
+			require.NotNil(t, reg)
+			closeRegistry(t, reg)
 		})
 	}
 }
 
-func TestLoadAndResolve_NoKVReferencesLeavesConfigUnchanged(t *testing.T) {
+func TestLoadAndInitKVRegistry_NoKVReferencesLeavesConfigUnchanged(t *testing.T) {
 	path := writeTempConf(t, `{"secret": "plain-value"}`)
 
 	var conf Config
-	reg, err := LoadAndResolve(t.Context(), []string{path}, &conf, nil)
+	reg, err := LoadAndInitKVRegistry(t.Context(), []string{path}, &conf, nil)
 	require.NoError(t, err)
 	require.NotNil(t, reg)
 	closeRegistry(t, reg)
@@ -171,29 +160,26 @@ func TestLoadAndResolve_NoKVReferencesLeavesConfigUnchanged(t *testing.T) {
 	require.NoError(t, err, "the file store is always initialized")
 }
 
-func TestLoadAndResolve_PropagatesLoadError(t *testing.T) {
+func TestLoadAndInitKVRegistry_PropagatesLoadError(t *testing.T) {
 	path := writeTempConf(t, `{ this is not valid json`)
 
 	var conf Config
-	reg, err := LoadAndResolve(t.Context(), []string{path}, &conf, nil)
+	reg, err := LoadAndInitKVRegistry(t.Context(), []string{path}, &conf, nil)
 
 	require.Error(t, err, "an unparseable config file must surface the Load error")
 	require.Nil(t, reg, "no registry is returned when Load fails")
 }
 
-func TestLoadAndResolve_PreservesJSONDashFields(t *testing.T) {
-	path := writeTempConf(t, `{
-		"secret": "kv://secrets/db_password",
-		"secrets": {"db_password": "hunter2"}
-	}`)
+func TestLoadAndInitKVRegistry_PreservesJSONDashFields(t *testing.T) {
+	path := writeTempConf(t, `{"secret": "plain-value"}`)
 
 	var conf Config
-	reg, err := LoadAndResolve(t.Context(), []string{path}, &conf, nil)
+	reg, err := LoadAndInitKVRegistry(t.Context(), []string{path}, &conf, nil)
 	require.NoError(t, err)
 	closeRegistry(t, reg)
 
 	require.Equal(t, path, conf.Private.OriginalPath,
-		"a json:\"-\" field set during Load must survive the resolution round-trip")
+		"a json:\"-\" field set during Load must be populated")
 }
 
 func TestNewLocalKVRegistry_EmptyConfigHasOnlyLocalStores(t *testing.T) {
@@ -608,10 +594,9 @@ func keysOf(m map[string]kv.StoreConfig) []string {
 	return keys
 }
 
-// BenchmarkLoadAndResolve measures the gateway's real startup resolution path
-// (Load + FillEnv + registry bootstrap + strict ResolveAll + unmarshal) as a
-// function of KV reference count.
-func BenchmarkLoadAndResolve(b *testing.B) {
+// BenchmarkLoadAndInitKVRegistry measures the gateway's real startup path
+// (Load + FillEnv + registry bootstrap) as a function of KV reference count.
+func BenchmarkLoadAndInitKVRegistry(b *testing.B) {
 	b.Setenv("TYK_SECRET_BENCH_VAL", "bench-value")
 
 	for _, n := range []int{0, 20, 50, 100} {
@@ -630,7 +615,7 @@ func BenchmarkLoadAndResolve(b *testing.B) {
 			for b.Loop() {
 				var conf Config
 
-				reg, err := LoadAndResolve(context.Background(), []string{path}, &conf, nil)
+				reg, err := LoadAndInitKVRegistry(context.Background(), []string{path}, &conf, nil)
 				if err != nil {
 					b.Fatal(err)
 				}
