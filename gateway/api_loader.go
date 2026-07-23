@@ -1232,6 +1232,7 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 			return
 		}
 
+		rw.Header().Set("Content-Type", "application/javascript")
 		if err := playgroundTemplate.ExecuteTemplate(rw, playgroundJSTemplateName, nil); err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 		}

@@ -10,6 +10,7 @@ import (
 	"path"
 	_ "path"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -210,8 +211,18 @@ func TestGraphQLPlayground(t *testing.T) {
 			}...)
 		})
 		t.Run("playground.js is loaded", func(t *testing.T) {
+			// BodyMatch is a regex: assert only on string literals that survive
+			// minification, escaped with regexp.QuoteMeta. BodyNotMatch is literal
+			// byte matching and must not be escaped.
+			jsPath := path.Join(playgroundPath, "playground.js")
 			_, _ = g.Run(t, []test.TestCase{
-				{Path: path.Join(playgroundPath, "playground.js"), BodyMatch: "TykGraphiQL", Code: http.StatusOK},
+				{Path: jsPath, BodyMatch: "TykGraphiQL", Code: http.StatusOK},
+				{Path: jsPath, BodyMatch: regexp.QuoteMeta("query { __typename }"), Code: http.StatusOK},
+				{Path: jsPath, BodyMatch: regexp.QuoteMeta("Select Api"), Code: http.StatusOK},
+				{Path: jsPath, BodyMatch: "GraphiqlInit", Code: http.StatusOK},
+				{Path: jsPath, HeadersMatch: map[string]string{"Content-Type": "application/javascript"}, Code: http.StatusOK},
+				// Template delimiters in the bundle would break ParseFiles at startup.
+				{Path: jsPath, BodyNotMatch: "{{", Code: http.StatusOK},
 			}...)
 		})
 		t.Run("should get error on post request to playground path", func(t *testing.T) {
