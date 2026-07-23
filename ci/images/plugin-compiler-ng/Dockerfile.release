@@ -1,0 +1,76 @@
+# syntax=docker/dockerfile:1.7
+ARG GOLANG_IMAGE=tykio/golang-cross:1.25-bullseye
+ARG BASE_IMAGE=tykio/tyk-plugin-compiler-ng-base:latest
+
+FROM ${GOLANG_IMAGE} AS go-toolchain
+
+FROM ${BASE_IMAGE}
+
+COPY --from=go-toolchain /usr/local/go /usr/local/go
+
+ENV GOTOOLCHAIN=local
+
+ADD go.mod go.sum $TYK_GW_PATH/
+WORKDIR $TYK_GW_PATH
+
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod \
+    --mount=type=cache,mode=0755,target=/root/.cache/go-build \
+    go mod download
+
+ADD . $TYK_GW_PATH
+
+ARG GITHUB_SHA
+ARG GITHUB_TAG
+ARG BUILD_TAG
+ARG GOEXPERIMENT
+ARG GOFIPS140
+ARG SELFTEST_BUILD_TAG
+ARG SELFTEST_GOEXPERIMENT
+ARG SELFTEST_GOFIPS140
+ARG GATEWAY_TRIMPATH=true
+ARG GATEWAY_SRC_ROOT=
+ARG DEFAULT_EDITION=ce
+ARG EE_AVAILABLE=false
+ARG EE_BUILD_TAG=
+ARG FIPS_AVAILABLE=false
+ARG FIPS_GOFIPS140=
+ARG FIPS_GOEXPERIMENT=
+ARG FIPS_BUILD_TAG=
+ARG CE_ARCHS=amd64,arm64,s390x
+ARG EE_ARCHS=amd64,arm64
+ARG FIPS_ARCHS=amd64,arm64
+
+ENV GITHUB_SHA=${GITHUB_SHA} \
+    GITHUB_TAG=${GITHUB_TAG} \
+    TYK_GATEWAY_TRIMPATH=${GATEWAY_TRIMPATH} \
+    TYK_GATEWAY_SRC_ROOT=${GATEWAY_SRC_ROOT} \
+    EDITION=${DEFAULT_EDITION} \
+    TYK_EE_AVAILABLE=${EE_AVAILABLE} \
+    TYK_EE_BUILD_TAG=${EE_BUILD_TAG} \
+    TYK_FIPS_AVAILABLE=${FIPS_AVAILABLE} \
+    TYK_FIPS_GOFIPS140=${FIPS_GOFIPS140} \
+    TYK_FIPS_GOEXPERIMENT=${FIPS_GOEXPERIMENT} \
+    TYK_FIPS_BUILD_TAG=${FIPS_BUILD_TAG} \
+    TYK_CE_ARCHS=${CE_ARCHS} \
+    TYK_EE_ARCHS=${EE_ARCHS} \
+    TYK_FIPS_ARCHS=${FIPS_ARCHS}
+
+ARG WITH_GATEWAY_SELFTEST=1
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod \
+    --mount=type=cache,mode=0755,target=/root/.cache/go-build \
+    if [ "$WITH_GATEWAY_SELFTEST" = "1" ]; then \
+      GOEXPERIMENT=${SELFTEST_GOEXPERIMENT} GOFIPS140=${SELFTEST_GOFIPS140} \
+        GOBIN=/usr/local/bin go install -tags=goplugin${SELFTEST_BUILD_TAG:+,$SELFTEST_BUILD_TAG} -trimpath .; \
+    else \
+      echo "skipping gateway self-test binary (WITH_GATEWAY_SELFTEST=0)"; \
+    fi
+
+LABEL description="Next-generation image for Tyk plugin development" \
+      org.opencontainers.image.title="tyk-plugin-compiler-ng" \
+      org.opencontainers.image.description="Next-generation plugin compiler for the Tyk API Gateway" \
+      org.opencontainers.image.source="https://github.com/TykTechnologies/tyk" \
+      org.opencontainers.image.licenses="MPL-2.0" \
+      org.opencontainers.image.revision="${GITHUB_SHA}" \
+      org.opencontainers.image.version="${GITHUB_TAG}"
+
+WORKDIR $TYK_GW_PATH
