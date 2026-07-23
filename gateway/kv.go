@@ -116,7 +116,7 @@ func (gw *Gateway) kvStoreCtx(ctx context.Context, value string) (string, error)
 	}
 
 	resolved, err := gw.kvResolver.Resolve(ctx, value)
-	if errors.Is(err, kvLib.ErrStoreNotFound) {
+	if errors.Is(err, kv.ErrStoreNotFound) {
 		log.Error(`Failed to get store: `, err)
 
 		return value, nil
