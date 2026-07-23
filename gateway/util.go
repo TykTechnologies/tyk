@@ -11,7 +11,25 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/middleware"
+	"strings"
 )
+
+// JSONTemplateEscaper is used to escape strings for JSON templates.
+// It explicitly omits escaping single quotes (') because while valid in JS,
+// it is invalid in JSON (RFC 8259).
+// It is configurable so users can define what to escape if needed.
+var JSONTemplateEscaper = strings.NewReplacer(
+	"\\", "\\\\",
+	"\"", "\\\"",
+	"\n", "\\n",
+	"\r", "\\r",
+	"\t", "\\t",
+)
+
+// EscapeJSONString escapes a string to be safely embedded in a JSON template.
+func EscapeJSONString(s string) string {
+	return JSONTemplateEscaper.Replace(s)
+}
 
 // jsonEscapeString encodes s as a JSON string and strips the surrounding
 // quotes, producing a value safe to splice into an existing JSON string

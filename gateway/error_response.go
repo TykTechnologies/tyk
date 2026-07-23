@@ -74,58 +74,15 @@ func (e *ErrorHandler) SetErrorResponseHeaders(w http.ResponseWriter, contentTyp
 	return respHeader
 }
 
-const jsonHexChars = "0123456789abcdef"
-
-// JSONEscapeString escapes characters for JSON without adding outer quotes.
-// It does not escape single quotes ('), fixing OAS validation issues.
-// It uses strings.Builder to minimize allocations (exactly 1 allocation).
-func JSONEscapeString(s string) string {
-	var b strings.Builder
-	b.Grow(len(s) + 8) // Heuristic: preallocate with a small buffer for escapes
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		switch c {
-		case '"':
-			b.WriteString(`\"`)
-		case '\\':
-			b.WriteString(`\\`)
-		case '\b':
-			b.WriteString(`\b`)
-		case '\f':
-			b.WriteString(`\f`)
-		case '\n':
-			b.WriteString(`\n`)
-		case '\r':
-			b.WriteString(`\r`)
-		case '\t':
-			b.WriteString(`\t`)
-		case '<':
-			b.WriteString(`\u003c`) // XSS protection (like encoding/json)
-		case '>':
-			b.WriteString(`\u003e`)
-		case '&':
-			b.WriteString(`\u0026`)
-		default:
-			if c < 0x20 {
-				b.WriteString(`\u00`)
-				b.WriteByte(jsonHexChars[c>>4])
-				b.WriteByte(jsonHexChars[c&0xF])
-			} else {
-				b.WriteByte(c)
-			}
-		}
-	}
-	return b.String()
-}
 
 // escapeTemplateString prepares s for safe rendering by the appropriate template engine.
-// For JSON (html/template): JS-escapes and marks safe to prevent HTML entity encoding.
+// For JSON (html/template): JSON-escapes and marks safe to prevent HTML entity encoding.
 // For XML (text/template): HTML-escapes explicitly since text/template does not auto-escape.
 func escapeTemplateString(s string, isXML bool) htmltemplate.HTML {
 	if isXML {
 		return htmltemplate.HTML(html.EscapeString(s))
 	}
-	return htmltemplate.HTML(JSONEscapeString(s))
+	return htmltemplate.HTML(EscapeJSONString(s))
 }
 
 // ExecuteErrorTemplate executes a template and captures output for analytics.
