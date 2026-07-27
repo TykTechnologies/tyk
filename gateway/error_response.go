@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/pkg/escaper"
 )
 
 // ErrorResponseContext holds content-type detection results for error responses.
@@ -82,8 +81,10 @@ func escapeTemplateString(s string, isXML bool) htmltemplate.HTML {
 	if isXML {
 		return htmltemplate.HTML(html.EscapeString(s))
 	}
-	return htmltemplate.HTML(escaper.JsonEscapeString(s))
+	escaped, _ := jsonEscapeString(s)
+	return htmltemplate.HTML(escaped)
 }
+
 
 // ExecuteErrorTemplate executes a template and captures output for analytics.
 // Uses io.MultiWriter to write to both the response and a buffer for recording.

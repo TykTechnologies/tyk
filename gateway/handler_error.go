@@ -19,7 +19,6 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
-	"github.com/TykTechnologies/tyk/pkg/escaper"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -360,7 +359,8 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 			rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
 			tmplExecutor = rawTmpl
 		} else {
-			apiError.Message = htmltemplate.HTML(escaper.JsonEscapeString(errMsg))
+			escaped, _ := jsonEscapeString(errMsg)
+			apiError.Message = htmltemplate.HTML(escaped)
 		}
 
 		var log bytes.Buffer

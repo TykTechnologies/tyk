@@ -391,7 +391,7 @@ func TestEscapeTemplateString(t *testing.T) {
 			name:     "JSON: angle brackets are JS-escaped",
 			input:    "<script>",
 			isXML:    false,
-			expected: htmltemplate.HTML(`\u003Cscript\u003E`),
+			expected: htmltemplate.HTML(`\u003cscript\u003e`),
 		},
 		{
 			name:     "JSON: ampersand is JS-escaped",
