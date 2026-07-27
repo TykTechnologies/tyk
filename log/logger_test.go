@@ -42,13 +42,51 @@ func Test_Logger(t *testing.T) {
 				lgr.Setup(func(_ *Builder) {})
 			})
 		})
+
+		t.Run("calls OsExit .Fatal() is invoked", func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			var exitCode *int
+
+			lgr := New()
+			lgr.OsExit = func(code int) {
+				exitCode = &code
+			}
+			lgr.Setup(func(b *Builder) {
+				b.AddSinker(makeDummySink(buf))
+			})
+
+			const msg = "you must die with 1 exit code"
+			lgr.Fatal(msg)
+
+			assert.NotNil(t, exitCode, "calls OsExit if .Fatal() is invoked")
+			assert.Equal(t, 1, *exitCode)
+			assert.Contains(t, buf.String(), msg)
+		})
+
+		t.Run("does not deadlock if pannic occurs during Setup", func(t *testing.T) {
+			emergencyLogger, emergencyHook := test.NewNullLogger()
+
+			buf := &bytes.Buffer{}
+			const msg = "you must die"
+
+			lgr := New()
+			lgr.OsExit = func(int) {}
+			lgr.EmergencyLogger = emergencyLogger
+			lgr.Setup(func(b *Builder) {
+				b.AddSinker(makeDummySink(buf))
+				lgr.Fatal(msg)
+			})
+
+			assert.Empty(t, buf.String())
+			assert.Equal(t, msg, emergencyHook.AllEntries()[0].Message)
+		})
 	})
 
 	t.Run("flushes to emergency logger if setup was not called", func(t *testing.T) {
 		buf := bytes.Buffer{}
 
 		lgr := New()
-		lgr.emergencyLogger.SetOutput(&buf)
+		lgr.EmergencyLogger.SetOutput(&buf)
 
 		lgr.Info("fatal startup error")
 		assert.Len(t, lgr.tmpLogsCollector.entries, 1)
@@ -63,7 +101,7 @@ func Test_Logger(t *testing.T) {
 		t.Run("does not add logs to output", func(t *testing.T) {
 			lgr := New()
 			emBuf := &bytes.Buffer{}
-			lgr.emergencyLogger.SetOutput(emBuf)
+			lgr.EmergencyLogger.SetOutput(emBuf)
 
 			lgr.Setup(func(_ *Builder) {})
 
