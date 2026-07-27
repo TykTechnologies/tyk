@@ -11,9 +11,9 @@
 #     mismatch (set VALIDATE=0 to skip).
 set -e
 
-# Parse vMAJOR.MINOR.PATCH from the tag. Done in pure bash (was perl upstream) so
-# the image needs no perl interpreter - perl was the source of all CRITICAL CVEs
-# (CVE-2026-42496 / CVE-2026-8376, no fix available) and is otherwise unused.
+# Parse vMAJOR.MINOR.PATCH from the tag. This no longer invokes Perl directly.
+# Git's Debian package still brings its declared Perl dependency, which remains
+# installed and visible to package scanners.
 GATEWAY_VERSION=""
 if [[ "$GITHUB_TAG" =~ v([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
     GATEWAY_VERSION="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
@@ -28,14 +28,10 @@ fi
 # Output name: {plugin_name%.*}_{GATEWAY_VERSION}_{GOOS}_{GOARCH}.so
 # Example: ./build.sh plugin.so  ->  plugin_v5.13.0_linux_amd64.so
 
-plugin_name=$1
-plugin_id=$2
+plugin_name=${1:-}
+plugin_id=${2:-}
 GOOS=${3:-$(go env GOOS)}
 GOARCH=${4:-$(go env GOARCH)}
-
-WORKSPACE_ROOT=$(dirname "$TYK_GW_PATH")
-PLUGIN_SOURCE_PATH=${PLUGIN_SOURCE_PATH:-"/plugin-source"}
-PLUGIN_BUILD_PATH=${PLUGIN_BUILD_PATH:-"${WORKSPACE_ROOT}/plugin_${plugin_name%.*}$plugin_id"}
 
 # Compatibility target + sysroot location (set by the image; sane defaults).
 TYK_GLIBC_TARGET=${TYK_GLIBC_TARGET:-2.31}
@@ -54,6 +50,30 @@ if [ -z "$plugin_name" ] ; then
     usage
     exit 1
 fi
+case "$plugin_name" in
+    .|..|*/*)
+        echo "ERROR: plugin_name must be a file basename, not a path (got '$plugin_name')." >&2
+        exit 1
+        ;;
+esac
+case "$plugin_id" in
+    */*)
+        echo "ERROR: plugin_id must not contain a path separator (got '$plugin_id')." >&2
+        exit 1
+        ;;
+esac
+if [[ ! "$GOOS" =~ ^[a-z0-9]+$ ]]; then
+    echo "ERROR: GOOS must contain only lowercase ASCII letters and digits (got '$GOOS')." >&2
+    exit 1
+fi
+if [[ ! "$GOARCH" =~ ^[a-z0-9]+$ ]]; then
+    echo "ERROR: GOARCH must contain only lowercase ASCII letters and digits (got '$GOARCH')." >&2
+    exit 1
+fi
+
+WORKSPACE_ROOT=$(dirname "$TYK_GW_PATH")
+PLUGIN_SOURCE_PATH=${PLUGIN_SOURCE_PATH:-"/plugin-source"}
+PLUGIN_BUILD_PATH=${PLUGIN_BUILD_PATH:-"${WORKSPACE_ROOT}/plugin_${plugin_name%.*}$plugin_id"}
 
 # --- CC + sysroot selection -------------------------------------------------
 # Pick the C compiler and the matching glibc sysroot for the TARGET arch.
@@ -133,7 +153,16 @@ fi
 
 # Copy plugin source into plugin build folder.
 mkdir -p "$PLUGIN_BUILD_PATH"
-yes | cp -r "$PLUGIN_SOURCE_PATH"/* "$PLUGIN_BUILD_PATH" || true
+for source_entry in \
+    "$PLUGIN_SOURCE_PATH"/* \
+    "$PLUGIN_SOURCE_PATH"/.[!.]* \
+    "$PLUGIN_SOURCE_PATH"/..?*
+do
+    if { [ -e "$source_entry" ] || [ -L "$source_entry" ]; } \
+        && [ "$(basename "$source_entry")" != ".git" ]; then
+        cp -a "$source_entry" "$PLUGIN_BUILD_PATH"/
+    fi
+done
 
 echo "PLUGIN_BUILD_PATH: ${PLUGIN_BUILD_PATH}"
 echo "PLUGIN_SOURCE_PATH: ${PLUGIN_SOURCE_PATH}"
@@ -151,6 +180,107 @@ if [[ "$DEBUG" == "1" ]] ; then
 	git init
 	git add .
 	git commit -m "initial import" .
+fi
+
+# Normalize module directives before any Go command parses go.mod. This lets an
+# older Gateway toolchain consume a plugin created by a newer Go release:
+# old Go does not understand newer toolchain/godebug/tool/ignore directives
+# and rejects a newer go directive before `go mod edit` can clamp it.
+GW_GO_MM="$(go env GOVERSION 2>/dev/null | sed -E 's/^go([0-9]+\.[0-9]+).*/\1/')"
+if [ -n "$GW_GO_MM" ] && [ -f go.mod ]; then
+    echo "INFO: pinning plugin go directive to Gateway Go ($GW_GO_MM)"
+    gw_go_minor="${GW_GO_MM#*.}"
+    drop_godebug=0
+    drop_tool=0
+    drop_ignore=0
+    [ "$gw_go_minor" -lt 23 ] && drop_godebug=1
+    [ "$gw_go_minor" -lt 24 ] && drop_tool=1
+    [ "$gw_go_minor" -lt 25 ] && drop_ignore=1
+    normalized_go_mod="$(mktemp)"
+    awk \
+        -v gateway_go="$GW_GO_MM" \
+        -v drop_godebug="$drop_godebug" \
+        -v drop_tool="$drop_tool" \
+        -v drop_ignore="$drop_ignore" '
+        skip_block && /^[[:space:]]*\)[[:space:]]*(\/\/.*)?$/ {
+            skip_block = 0
+            next
+        }
+        skip_block { next }
+        (drop_godebug && /^[[:space:]]*godebug[[:space:]]*\(/) ||
+        (drop_tool && /^[[:space:]]*tool[[:space:]]*\(/) ||
+        (drop_ignore && /^[[:space:]]*ignore[[:space:]]*\(/) {
+            skip_block = 1
+            next
+        }
+        /^[[:space:]]*toolchain[[:space:]]+/ { next }
+        drop_godebug && /^[[:space:]]*godebug[[:space:]]+/ { next }
+        drop_tool && /^[[:space:]]*tool[[:space:]]+/ { next }
+        drop_ignore && /^[[:space:]]*ignore[[:space:]]+/ { next }
+        /^[[:space:]]*go[[:space:]]+/ {
+            print "go " gateway_go
+            found_go = 1
+            next
+        }
+        { print }
+        END {
+            if (!found_go) {
+                print ""
+                print "go " gateway_go
+            }
+        }
+    ' go.mod > "$normalized_go_mod"
+    cat "$normalized_go_mod" > go.mod
+    rm -f "$normalized_go_mod"
+
+    # Go 1.23 introduced the godebug directive, but later releases continue to
+    # add individual keys. Ask the actual Gateway toolchain about every key in
+    # a dependency-free probe module; `go mod edit` alone only validates the
+    # directive syntax and accepts keys that `go build` will later reject.
+    if [ "$drop_godebug" = "0" ]; then
+        go mod edit -fmt
+        godebug_keys="$(awk '
+            in_godebug && /^[[:space:]]*\)/ {
+                in_godebug = 0
+                next
+            }
+            in_godebug {
+                key = $1
+                sub(/=.*/, "", key)
+                if (key != "" && key !~ /^\/\//) {
+                    print key
+                }
+                next
+            }
+            /^[[:space:]]*godebug[[:space:]]*\(/ {
+                in_godebug = 1
+                next
+            }
+            /^[[:space:]]*godebug[[:space:]]+/ {
+                key = $2
+                sub(/=.*/, "", key)
+                if (key != "") {
+                    print key
+                }
+            }
+        ' go.mod)"
+        if [ -n "$godebug_keys" ]; then
+            godebug_probe_dir="$(mktemp -d)"
+            printf 'package probe\n' > "$godebug_probe_dir/probe.go"
+            for godebug_key in $godebug_keys; do
+                printf 'module tyk.internal/godebug-probe\n\ngo %s\n\ngodebug %s=1\n' \
+                    "$GW_GO_MM" "$godebug_key" > "$godebug_probe_dir/go.mod"
+                if ! (
+                    cd "$godebug_probe_dir"
+                    GOWORK=off GO111MODULE=on go list . >/dev/null 2>&1
+                ); then
+                    echo "INFO: removing plugin godebug key unsupported by Gateway Go: $godebug_key"
+                    go mod edit "-dropgodebug=$godebug_key"
+                fi
+            done
+            rm -rf "$godebug_probe_dir"
+        fi
+    fi
 fi
 
 # ensureGoMod rewrites a go module based on plugin_id if available.
@@ -180,22 +310,11 @@ function ensureGoMod {
 	esac
 
 	go mod edit -module "$NEW_MODULE"
-	find ./ -type f -name '*.go' -exec sed -i -e "s,\"${OLD_MODULE},\"${NEW_MODULE},g" {} \;
+	GO111MODULE=off go run /usr/local/lib/tyk-plugin-compiler/rewrite-imports.go \
+		"$OLD_MODULE" "$NEW_MODULE" .
 }
 
 ensureGoMod
-
-# Match the plugin module's `go` directive to the Gateway's Go version. The pinned
-# toolchain IS the Gateway's Go, and GOTOOLCHAIN=local refuses a go.mod that asks for a
-# newer Go than the toolchain - so a plugin written for a newer line is clamped down to
-# build cleanly, and we can compile for OLD Gateways (e.g. v5.0.x on go1.16) without the
-# caller hand-editing go.mod. (If the plugin SOURCE genuinely uses language features newer
-# than the Gateway's Go, it correctly cannot build - that is inherent to the old target.)
-GW_GO_MM="$(go env GOVERSION 2>/dev/null | sed -E 's/^go([0-9]+\.[0-9]+).*/\1/')"
-if [ -n "$GW_GO_MM" ] && [ -f go.mod ]; then
-	echo "INFO: pinning plugin go directive to Gateway Go ($GW_GO_MM)"
-	go mod edit -go="$GW_GO_MM"
-fi
 
 # Force the plugin to build against the EXACT vendored Gateway source + dependency
 # graph - the core of Go plugin ABI compatibility. Three methods, same outcome:

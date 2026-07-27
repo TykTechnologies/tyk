@@ -16,10 +16,10 @@ ARG SYSROOT_SUITE=bullseye
 # is built (its cgo is linked with the CentOS 7 gcc 4.8.5 / glibc 2.17 toolchain). 2.31 =
 # Debian bullseye - opt-in, for plugins whose C code needs a glibc 2.18-2.31 function.
 ARG GLIBC_TARGET=2.17
-# DHI busybox-glibc base (free, non-FIPS). SWAP to dhi.io/busybox:1-debian-fips-dev once the org
-# is entitled to the gated FIPS tags - same Debian/glibc lineage, drop-in. FIPS plugin crypto comes
-# from the Go toolchain (GOFIPS140/boringcrypto), not the base, so a non-FIPS base is correct today.
-ARG BASE_IMAGE=dhi.io/busybox:1-debian-dev
+# Shared public DHI FIPS-dev base: minimal Debian tooling plus Docker-authored security metadata.
+# This base is supply-chain hardening, not a claim that every compiler variant is FIPS compliant;
+# FIPS plugin crypto still comes from the matching Gateway Go toolchain and edition settings.
+ARG BASE_IMAGE=dhi.io/busybox:1-debian-fips-dev
 
 ############################################################################
 # Stage 1 - glibc link sysroots (amd64 + arm64 + s390x). Two sources, selected by
@@ -91,8 +91,12 @@ RUN set -eux; \
       # then prune the CentOS userspace bloat (manylinux /usr/lib64 is a whole distro). \
       cp -a /ml/${arch}/lib/.   "$SR/usr/lib/"; \
       cp -a /ml/${arch}/lib64/. "$SR/usr/lib/"; \
-      rm -rf "$SR/usr/lib/python"* "$SR/usr/lib/"*.py "$SR/usr/lib/rpm" "$SR/usr/lib/dracut" \
-             "$SR/usr/lib/dnf"* "$SR/usr/lib/systemd" "$SR/usr/lib/udev" 2>/dev/null || true; \
+      rm -rf "$SR/usr/lib/python"* "$SR/usr/lib/libpython"*.so* "$SR/usr/lib/"*.py \
+             "$SR/usr/lib/rpm" "$SR/usr/lib/dracut" "$SR/usr/lib/dnf"* \
+             "$SR/usr/lib/systemd" "$SR/usr/lib/udev" 2>/dev/null || true; \
+      # Preserve the existing sysroot header inventory, but never ship the Python runtime library: \
+      # the Gateway has no libpython, so a plugin linked to it cannot load in the official image. \
+      test -z "$(find "$SR/usr/lib" -maxdepth 1 -name 'libpython*.so*' -print -quit)"; \
       # repoint any dev symlink that still targets the old split /lib64 path (e.g. \
       # libresolv.so -> ../../lib64/libresolv.so.2) to the basename now present in this flat dir. \
       for l in $(find "$SR/usr/lib" -maxdepth 1 -type l 2>/dev/null || true); do \
@@ -123,6 +127,7 @@ FROM ${BASE_IMAGE} AS base
 # DHI bases default to a non-root user; the compiler needs root to apt-install the toolchain at
 # build time and to write build artifacts + the mounted /plugin-source volume at run time.
 USER root
+ARG BASE_IMAGE
 ARG GLIBC_TARGET
 ARG WITH_CXX=1
 ARG WITH_GIT=1
@@ -133,22 +138,22 @@ ARG DHI_DIGEST=unknown
 #   CROSS (default 0) -> native-only image: host-arch toolchain only = the :V images (build for
 #     their own arch). CROSS=1 -> the -x image: adds the amd64/arm64/s390x cross toolchains =
 #     the :V-x images (cross-compile to any target).
-#   SLIM (default 1) -> purge unused Debian packages + reconcile the scanner manifest (drops
-#     perl/gpgv/ncurses -> ~1 CRIT). EXIT RAMP: rebuild with SLIM=0 to ship WITHOUT the purge if a
-#     future base bump ever makes the purge unsafe - nothing depends on it functionally. The Wolfi
-#     (apk) base has no dpkg and skips the purge regardless.
-ARG SLIM=1
+#   SLIM (default 0) -> no extra filesystem cleanup. When explicitly set to 1, remove documentation
+#     and package-manager caches without changing the installed package closure. The compiler keeps
+#     Git and its declared Perl dependency because Go's direct/private-module fallback needs it.
+ARG SLIM=0
 ARG CROSS=0
 RUN set -eux; \
     if command -v apt-get >/dev/null; then \
         apt-get update; \
-        # GNU userspace: this is a busybox base, so install real coreutils/sed/grep/gawk/findutils/
-        # tar/gzip - build.sh + validate-plugin.sh assume GNU tools, not busybox applets. bash, jq,
+        # GNU userspace: this is a busybox base, so install real coreutils/sed/grep/findutils/tar.
+        # BusyBox's awk and gzip applets cover every use in this image; retaining them avoids adding
+        # vulnerable GNU gawk/gzip packages solely to replace equivalent hardened-base applets. bash, jq,
         # binutils (+gold: OLD Go <1.18 links a NATIVE -buildmode=plugin with -fuse-ld=gold, else
         # the external link dies "cannot find 'ld'"), file, make and native gcc are always needed.
         # curl is intentionally omitted (Go is fetched via BuildKit ADD in Dockerfile.release);
         # ca-certificates stays (Go module HTTPS), and git pulls libcurl/libssh2 regardless.
-        pkgs="bash jq ca-certificates coreutils sed grep gawk findutils tar gzip \
+        pkgs="bash jq ca-certificates coreutils sed grep findutils tar \
               binutils binutils-gold file make gcc"; \
         # CROSS=1 (the -x variant) adds the cross toolchains for amd64/arm64/s390x; CROSS=0 ships
         # native gcc only -> build.sh builds the host arch and fails fast on a cross target (the
@@ -171,55 +176,32 @@ RUN set -eux; \
         # Cross targets (s390x, opposite arch) require the busybox-glibc -x variant. \
     fi
 
-# --- SLIM purge (busybox-glibc only): drop base packages the compiler never uses at runtime, and
-# RECONCILE the distroless scanner manifest so the reduction is visible to scanners. DHI's
-# debian-base tracks packages in /var/lib/dpkg/status.d/<pkg> (which apt/dpkg never update)
-# and bakes an SBOM under /opt/docker/sbom; scanners read both, so a bare purge leaves them
-# reporting packages whose files are already gone. We delete the files AND the stale manifest
-# entries - only for packages we actually remove, never hiding anything still present.
-# KEEP: libtinfo6 (bash needs it) and linux-libc-dev (native cgo's <errno.h> pulls
-# <linux/errno.h>; cross builds use the 2.17 sysroot's own headers). curl is already omitted
-# from the install list above. Runs when SLIM=1 (the default; the SLIM=0 exit ramp skips it). The
-# Wolfi/apk base has no dpkg and skips it regardless. We do NOT suppress anything: residual findings
-# (~1 CRITICAL + ~37 HIGH) stay VISIBLE - they are kernel-UAPI-header CVEs (no kernel runs in
-# this image), but we keep the package because native cgo needs it, so we leave them honestly
-# reported rather than VEX them out. build.sh + validate-plugin.sh invoke none of the dropped pkgs.
+# --- Safe filesystem slimming + package-integrity gate ----------------------
+# Git's Debian package depends on Perl and apt depends on gpgv. They are part of the compiler's
+# real package closure and must stay installed and visible to scanners. SLIM therefore removes only
+# non-executable documentation and caches; it never force-purges packages or edits dpkg/DHI package
+# records. The final audit is unconditional for Debian-based images so a future base/package change
+# cannot publish an internally inconsistent compiler image.
 RUN set -eux; \
-    if [ "$SLIM" = "1" ] && command -v dpkg-query >/dev/null; then \
-      # Purge unused packages that are in the LIVE dpkg db (so apt removes their FILES - honest,
-      # not just a manifest edit). Matched dynamically via `dpkg-query -W | cut -f1` so version-
-      # suffixed names (perl-modules-5.40) are caught; ${} is avoided because BuildKit would blank
-      # it as an undefined build-arg. Only packages with no needed consumer are listed - libexpat1
-      # (git), libsqlite3-0 (PAM/coreutils), libssl3/openssl (apt/ca-certs) are deliberately NOT
-      # here: they are in use and stay honestly reported. perl's orphaned runtime is swept below.
-      pat='^(perl|perl-base|perl-modules.*|libperl[0-9.]+|gpgv|ncurses-(base|bin|term))$'; \
-      # cut -f1 then strip dpkg-query's :arch suffix on Multi-Arch pkgs (libperl5.40:arm64) so the
-      # pattern matches - else libperl (perl's runtime, carrying perl's CVEs) is silently missed.
-      # libperl is safe to purge (rdeps: only perl, also dropped); libexpat1/libsqlite3-0/libssl3
-      # are deliberately excluded - they are in use (git/PAM/apt) and stay honestly reported.
-      drop="$(dpkg-query -W 2>/dev/null | cut -f1 | sed 's/:[^:]*$//' | grep -E "$pat" || true)"; \
-      if [ -n "$drop" ]; then \
-        apt-get purge -y --allow-remove-essential $drop 2>/dev/null || true; \
-        dpkg --purge --force-all $drop 2>/dev/null || true; \
-        apt-get autoremove -y --purge 2>/dev/null || true; \
-      fi; \
-      # Reconcile the distroless scanner manifest ONLY for packages we actually purged above
-      # (apt removed their files; it leaves the status.d entry stale). NEVER clear an entry whose
-      # files remain - that would hide a real, present package. Libs like libperl/libexpat/
-      # libsqlite3 are status.d-only with files in use (git/essentials need them), so they are
-      # NOT in $drop, keep their entries, and stay honestly reported.
-      for p in $drop; do rm -f "/var/lib/dpkg/status.d/$p"; done; \
-      rm -rf /opt/docker/sbom /var/lib/apt/lists/*; \
-      needs="gcc ld jq file make bash git sed awk grep"; \
-      [ "$CROSS" = "1" ] && needs="$needs x86_64-linux-gnu-gcc aarch64-linux-gnu-gcc s390x-linux-gnu-gcc"; \
-      for need in $needs; do \
-        command -v "$need" >/dev/null 2>&1 || { echo "ERROR: SLIM purge removed a required tool: $need" >&2; exit 1; }; \
-      done; \
+    case "$SLIM" in 0|1) ;; *) echo "ERROR: SLIM must be 0 or 1 (got $SLIM)" >&2; exit 1 ;; esac; \
+    if [ "$SLIM" = "1" ]; then \
+      rm -rf /usr/share/doc/* /usr/share/info/* /usr/share/man/* /var/cache/apt/*; \
+    fi; \
+    needs="gcc ld jq file make bash sed awk grep"; \
+    [ "$WITH_GIT" = "1" ] && needs="$needs git"; \
+    [ "$CROSS" = "1" ] && needs="$needs x86_64-linux-gnu-gcc aarch64-linux-gnu-gcc s390x-linux-gnu-gcc"; \
+    for need in $needs; do \
+      command -v "$need" >/dev/null 2>&1 || { echo "ERROR: missing required tool: $need" >&2; exit 1; }; \
+    done; \
+    if command -v dpkg >/dev/null; then \
+      test -z "$(dpkg --audit)"; \
+      apt-get check; \
     fi
 
 COPY --from=sysroots /opt/tyk/sysroots /opt/tyk/sysroots
 COPY data/build.sh           /build.sh
 COPY data/validate-plugin.sh /usr/local/bin/validate-plugin.sh
+COPY data/rewrite-imports.go /usr/local/lib/tyk-plugin-compiler/rewrite-imports.go
 RUN chmod +x /build.sh /usr/local/bin/validate-plugin.sh
 
 # --- boringcrypto-FIPS stdint.h overlay (glibc-2.17 only) -------------------

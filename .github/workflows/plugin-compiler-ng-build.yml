@@ -14,10 +14,10 @@ on:
 env:
   GOLANG_CROSS: 1.25-bullseye
   NG_BASE_IMAGE: tykio/tyk-plugin-compiler-ng-base:latest
-  NG_BASE_SOURCE: dhi.io/busybox:1-debian-dev
+  NG_BASE_SOURCE: dhi.io/busybox:1-debian-fips-dev
   NG_GLIBC_TARGET: "2.17"
   NG_CROSS: "1"
-  NG_SLIM: "1"
+  NG_SLIM: "0"
   NG_WITH_CXX: "1"
   NG_WITH_GIT: "1"
 

@@ -150,16 +150,30 @@ else
 fi
 
 # --- 3. readelf -d: dynamic deps + interpreter ------------------------------
-needed="$("$READELF" -d "$SO" 2>/dev/null | grep NEEDED | sed -E 's/.*\[(.*)\]/\1/' | sort -u)"
+dynamic="$(LC_ALL=C "$READELF" -d "$SO" 2>&1)" || \
+  fail "unable to inspect ELF dynamic dependencies; refusing an unchecked plugin."
+printf '%s\n' "$dynamic" | grep -Eq '^Dynamic section at offset .* contains [0-9]+ entr(y|ies):' || \
+  fail "readelf did not report a valid ELF dynamic section; refusing an unchecked plugin."
+needed="$(printf '%s\n' "$dynamic" | grep NEEDED | sed -E 's/.*\[(.*)\]/\1/' | sort -u)"
 echo "  NEEDED: $(echo "$needed" | tr '\n' ' ')"
 echo "$needed" | grep -q "^libc.so.6$" || echo "  ! note: libc.so.6 not in NEEDED (CGO_ENABLED=0 build?)"
 # Guard against accidental non-glibc / unexpected runtime deps.
 if echo "$needed" | grep -qi "musl"; then
   fail "plugin links musl libc - incompatible with the glibc-based Gateway runtime."
 fi
+while IFS= read -r dep; do
+  dep_name="${dep##*/}"
+  case "$dep_name" in
+    libpython*.so|libpython*.so.*)
+      fail "plugin links $dep, but the official Gateway image does not ship libpython."
+      ;;
+  esac
+done <<< "$needed"
 
 # --- 4. readelf --version-info: GLIBC symbol ceiling ------------------------
-maxglibc="$("$READELF" --version-info "$SO" 2>/dev/null \
+version_info="$(LC_ALL=C "$READELF" --version-info "$SO" 2>&1)" || \
+  fail "unable to inspect ELF version requirements; refusing an unchecked plugin."
+maxglibc="$(printf '%s\n' "$version_info" \
   | grep -oE 'GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?' \
   | sed 's/GLIBC_//' | sort -uV | tail -1)"
 if [ -n "$maxglibc" ]; then
