@@ -108,7 +108,7 @@ const (
 
 type PoliciesConfig struct {
 	// Set this value to `file` to look in the file system for a definition file. Set to `service` to use the Dashboard service.
-	PolicySource PolicySource `json:"policy_source"`
+	PolicySource string `json:"policy_source"`
 
 	// This option is required if `policies.policy_source` is set to `service`.
 	// Set this to the URL of your Tyk Dashboard installation. The URL needs to be formatted as: http://dashboard_host:port.
@@ -628,7 +628,7 @@ type HttpServerOptionsConfig struct {
 	SkipClientCAAnnouncement bool `json:"skip_client_ca_announcement"`
 
 	// Set this to the number of seconds that Tyk uses to flush content from the proxied upstream connection to the open downstream connection.
-	// This option needed be set for streaming protocols like Server Side Events, or gRPC streaming.
+	// This option needs to be set for streaming protocols like gRPC streaming.
 	FlushInterval int `json:"flush_interval"`
 
 	// Allow the use of a double slash in a URL path. This can be useful if you need to pass raw URLs to your API endpoints.
@@ -1266,7 +1266,7 @@ type Config struct {
 	// Configures the output format used for application logs.
 	// Allowed values are `text`, `json`, or `legacy`.
 	// If not set or left empty, it defaults to `text`.
-	LogFormat logger.Format `json:"log_format"`
+	LogFormat string `json:"log_format"`
 
 	// AccessLogs configures the output for access logs.
 	// If not configured, the access log is disabled.
