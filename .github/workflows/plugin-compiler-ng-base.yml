@@ -29,6 +29,7 @@ jobs:
   docker-build:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       id-token: write
     steps:
       - name: "Reclaim some runner space"
@@ -70,7 +71,14 @@ jobs:
         run: |
           digest="$(docker buildx imagetools inspect "$NG_BASE_SOURCE" | awk '/^Digest:/ {print $2; exit}')"
           test -n "$digest"
+          if [[ "$NG_BASE_SOURCE" == *@sha256:* ]]; then
+            test "${NG_BASE_SOURCE##*@}" = "$digest"
+            ref="$NG_BASE_SOURCE"
+          else
+            ref="${NG_BASE_SOURCE}@${digest}"
+          fi
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
 
       - name: Set docker metadata
         id: set-metadata
@@ -93,10 +101,12 @@ jobs:
           file: ci/images/plugin-compiler-ng/Dockerfile.base
           platforms: linux/amd64
           push: true
+          sbom: true
+          provenance: mode=max
           labels: ${{ steps.set-metadata.outputs.labels }}
           tags: ${{ steps.set-metadata.outputs.tags }}
           build-args: |
-            BASE_IMAGE=${{ env.NG_BASE_SOURCE }}
+            BASE_IMAGE=${{ steps.source-base.outputs.ref }}
             GLIBC_TARGET=${{ env.NG_GLIBC_TARGET }}
             CROSS=${{ env.NG_CROSS }}
             SLIM=${{ env.NG_SLIM }}

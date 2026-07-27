@@ -40,6 +40,7 @@ jobs:
       !github.event.pull_request.draft
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       id-token: write
     steps:
       - name: "Reclaim some runner space"
@@ -81,18 +82,38 @@ jobs:
         run: |
           digest="$(docker buildx imagetools inspect "$NG_BASE_SOURCE" | awk '/^Digest:/ {print $2; exit}')"
           test -n "$digest"
+          if [[ "$NG_BASE_SOURCE" == *@sha256:* ]]; then
+            test "${NG_BASE_SOURCE##*@}" = "$digest"
+            ref="$NG_BASE_SOURCE"
+          else
+            ref="${NG_BASE_SOURCE}@${digest}"
+          fi
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Set workflow-local NG base metadata
+        id: set-base-metadata
+        uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175  # v4
+        with:
+          images: |
+            ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler
+            tykio/tyk-plugin-compiler,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+          tags: |
+            type=raw,value=ng-base-${{ github.sha }}
 
       - name: Build NG base for this workflow
+        id: build-ng-base
         uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
         with:
           context: ci/images/plugin-compiler-ng
           file: ci/images/plugin-compiler-ng/Dockerfile.base
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler:ng-base-${{ github.sha }}
+          sbom: true
+          provenance: mode=max
+          tags: ${{ steps.set-base-metadata.outputs.tags }}
           build-args: |
-            BASE_IMAGE=${{ env.NG_BASE_SOURCE }}
+            BASE_IMAGE=${{ steps.source-base.outputs.ref }}
             GLIBC_TARGET=${{ env.NG_GLIBC_TARGET }}
             CROSS=${{ env.NG_CROSS }}
             SLIM=${{ env.NG_SLIM }}
@@ -101,7 +122,13 @@ jobs:
             DHI_DIGEST=${{ steps.source-base.outputs.digest }}
 
       - name: Use workflow-local NG base
-        run: echo "NG_BASE_IMAGE=${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler:ng-base-${{ github.sha }}" >> "$GITHUB_ENV"
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            base="tykio/tyk-plugin-compiler@${{ steps.build-ng-base.outputs.digest }}"
+          else
+            base="${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler@${{ steps.build-ng-base.outputs.digest }}"
+          fi
+          echo "NG_BASE_IMAGE=$base" >> "$GITHUB_ENV"
 
       - name: Set docker metadata
         id: set-metadata-ng
@@ -110,6 +137,8 @@ jobs:
           images: |
             tykio/tyk-plugin-compiler,enable=${{ startsWith(github.ref, 'refs/tags') }}
             ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler
+          flavor: |
+            latest=false
           labels: |
             org.opencontainers.image.title=tyk-plugin-compiler-ng
             org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway (next generation)
@@ -153,6 +182,8 @@ jobs:
           file: ci/images/plugin-compiler-ng/Dockerfile.release
           platforms: linux/amd64
           push: true
+          sbom: true
+          provenance: mode=max
           labels: ${{ steps.set-metadata-ng.outputs.labels }}
           tags: ${{ steps.set-metadata-ng.outputs.tags }}
           build-args: |
@@ -169,6 +200,8 @@ jobs:
           images: |
             tykio/tyk-plugin-compiler-ee,enable=${{ startsWith(github.ref, 'refs/tags') }}
             ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler-ee
+          flavor: |
+            latest=false
           labels: |
             org.opencontainers.image.title=tyk-plugin-compiler-ee-ng
             org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway Enterprise Edition (next generation)
@@ -212,6 +245,8 @@ jobs:
           file: ci/images/plugin-compiler-ng/Dockerfile.release
           platforms: linux/amd64
           push: true
+          sbom: true
+          provenance: mode=max
           labels: ${{ steps.set-metadata-ee-ng.outputs.labels }}
           tags: ${{ steps.set-metadata-ee-ng.outputs.tags }}
           build-args: |
@@ -231,6 +266,8 @@ jobs:
           images: |
             tykio/tyk-plugin-compiler-fips,enable=${{ startsWith(github.ref, 'refs/tags') }}
             ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler-fips
+          flavor: |
+            latest=false
           labels: |
             org.opencontainers.image.title=tyk-plugin-compiler-fips-ng
             org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway FIPS Edition (next generation)
@@ -276,6 +313,8 @@ jobs:
           file: ci/images/plugin-compiler-ng/Dockerfile.release
           platforms: linux/amd64
           push: true
+          sbom: true
+          provenance: mode=max
           labels: ${{ steps.set-metadata-fips-ng.outputs.labels }}
           tags: ${{ steps.set-metadata-fips-ng.outputs.tags }}
           build-args: |
