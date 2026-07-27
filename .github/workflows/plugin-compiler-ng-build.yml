@@ -166,6 +166,7 @@ jobs:
             GOLANG_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
+            WITH_GATEWAY_SELFTEST=1
             DEFAULT_EDITION=ce
 
       - name: Gate NG plugin load
@@ -194,6 +195,7 @@ jobs:
             GOLANG_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
+            WITH_GATEWAY_SELFTEST=0
             DEFAULT_EDITION=ce
 
       - name: Set docker metadata EE
@@ -229,6 +231,7 @@ jobs:
             GOLANG_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
+            WITH_GATEWAY_SELFTEST=1
             DEFAULT_EDITION=ee
             EE_AVAILABLE=true
             EE_BUILD_TAG=ee
@@ -257,6 +260,7 @@ jobs:
             GOLANG_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
+            WITH_GATEWAY_SELFTEST=0
             DEFAULT_EDITION=ee
             EE_AVAILABLE=true
             EE_BUILD_TAG=ee
@@ -295,6 +299,7 @@ jobs:
             GOLANG_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
+            WITH_GATEWAY_SELFTEST=1
             DEFAULT_EDITION=ee-fips
             FIPS_AVAILABLE=true
             FIPS_BUILD_TAG=ee,fips
@@ -325,6 +330,7 @@ jobs:
             GOLANG_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
+            WITH_GATEWAY_SELFTEST=0
             DEFAULT_EDITION=ee-fips
             FIPS_AVAILABLE=true
             FIPS_BUILD_TAG=ee,fips

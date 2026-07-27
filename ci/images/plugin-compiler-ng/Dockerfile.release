@@ -55,7 +55,7 @@ ENV GITHUB_SHA=${GITHUB_SHA} \
     TYK_EE_ARCHS=${EE_ARCHS} \
     TYK_FIPS_ARCHS=${FIPS_ARCHS}
 
-ARG WITH_GATEWAY_SELFTEST=1
+ARG WITH_GATEWAY_SELFTEST=0
 RUN --mount=type=cache,mode=0755,target=/go/pkg/mod \
     --mount=type=cache,mode=0755,target=/root/.cache/go-build \
     if [ "$WITH_GATEWAY_SELFTEST" = "1" ]; then \
