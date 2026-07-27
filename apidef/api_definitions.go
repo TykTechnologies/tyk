@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"text/template"
 	"time"
 
@@ -687,6 +688,10 @@ type APIDefinition struct {
 	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
 	JsonRpcVersion      string         `bson:"json_rpc_version,omitempty" json:"json_rpc_version,omitempty"`
 	ApplicationProtocol string         `bson:"application_protocol,omitempty" json:"application_protocol,omitempty"`
+	// MCPExposure marks a REST API as MCP-callable. When Enabled is true the
+	// gateway loader synthesises a paired adapter spec (Layer B) so that an
+	// operator-managed MCP proxy can route agent tools/call into this API.
+	MCPExposure MCPExposureConfig `bson:"mcp_exposure,omitempty" json:"mcp_exposure,omitempty"`
 	APIID               string         `bson:"api_id" json:"api_id"`
 	OrgID               string         `bson:"org_id" json:"org_id"`
 	UseKeylessAccess    bool           `bson:"use_keyless" json:"use_keyless"`
@@ -1495,6 +1500,58 @@ func (a *APIDefinition) IsMCP() bool {
 // MarkAsMCP configures the API definition as a Model Context Protocol (MCP) API.
 func (a *APIDefinition) MarkAsMCP() {
 	a.SetProtocol(JsonRPC20, AppProtocolMCP)
+}
+
+// MCPExposureConfig is the apidef-side persistence of the OAS
+// `server.mcp` marker. It does not itself wire any middleware — the loader
+// reads Enabled and synthesises a paired Internal adapter spec at load time.
+type MCPExposureConfig struct {
+	// Enabled marks this REST API as MCP-callable. The loader emits a paired
+	// adapter spec with APIID "<this-apiid>__mcp-server".
+	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
+	// Expose is an optional allow-list of sanitised operationIds. When nil
+	// or empty, every operation in the source OAS becomes a tool ("expose
+	// all" default). When non-empty, only operations whose sanitised
+	// operationId appears in the list are exposed.
+	Expose []string `bson:"expose,omitempty" json:"expose,omitempty"`
+}
+
+// IsMCPExposed returns true if the REST API is marked for MCP exposure.
+func (a *APIDefinition) IsMCPExposed() bool {
+	return a.MCPExposure.Enabled
+}
+
+// IsPairedMCPAdapterProxy returns true if this API is a REST-as-MCP proxy
+// whose upstream loops into a synthetic adapter — recognised by a
+// `tyk://<rest-id>__mcp-server` upstream URL.
+//
+// REST-as-MCP proxies are *not* IsMCP() (the JSON-RPC middleware lives on
+// the adapter, not on the proxy itself), but they belong to the MCP
+// management surface — `/tyk/mcps` lists, gets, updates, and deletes
+// them alongside remote-MCP proxies.
+func (a *APIDefinition) IsPairedMCPAdapterProxy() bool {
+	if a == nil {
+		return false
+	}
+	t := strings.TrimSpace(a.Proxy.TargetURL)
+	const scheme = "tyk://"
+	if !strings.HasPrefix(t, scheme) {
+		return false
+	}
+	host := strings.TrimPrefix(t, scheme)
+	if i := strings.IndexAny(host, "/?"); i != -1 {
+		host = host[:i]
+	}
+	host = strings.TrimPrefix(host, "id:")
+	const adapterSuffix = "__mcp-server"
+	return strings.HasSuffix(host, adapterSuffix) && len(host) > len(adapterSuffix)
+}
+
+// IsMCPManaged returns true for APIs that belong to the MCP management
+// surface — both classic MCP proxies (IsMCP()) and REST-as-MCP proxies
+// that loop into a synthetic adapter.
+func (a *APIDefinition) IsMCPManaged() bool {
+	return a.IsMCP() || a.IsPairedMCPAdapterProxy()
 }
 
 // IsChildAPI returns true if this API is a child API in a versioning hierarchy.
