@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	htmltemplate "html/template"
 	"io"
@@ -350,7 +351,7 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 		var tmplExecutor TemplateExecutor
 		tmplExecutor = tmpl
 
-		apiError := APIError{htmltemplate.HTML(htmltemplate.JSEscapeString(errMsg))}
+		apiError := APIError{}
 
 		if contentType == header.ApplicationXML || contentType == header.TextXML || contentType == header.ApplicationSoapXML {
 			apiError.Message = htmltemplate.HTML(errMsg)
@@ -358,6 +359,8 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 			//we look up in the last defined templateName to obtain the template.
 			rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
 			tmplExecutor = rawTmpl
+		} else {
+			apiError.Message = htmltemplate.HTML(e.jsonEscapeString(errMsg))
 		}
 
 		var log bytes.Buffer
@@ -479,4 +482,14 @@ func (e *ErrorHandler) writeDirectOverrideResponse(w http.ResponseWriter, result
 		Header:     respHeader,
 		Body:       io.NopCloser(bytes.NewReader(bodyBytes)),
 	}
+}
+
+func (e *ErrorHandler) jsonEscapeString(s string) string {
+	res, err := json.Marshal(s)
+
+	if err != nil {
+		return ""
+	}
+
+	return string(res[1 : len(res)-1])
 }
