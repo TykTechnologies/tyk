@@ -63,6 +63,7 @@ RUN --mount=type=cache,mode=0755,target=/go/pkg/mod \
         GOBIN=/usr/local/bin go install -tags=goplugin${SELFTEST_BUILD_TAG:+,$SELFTEST_BUILD_TAG} -trimpath .; \
     else \
       echo "skipping gateway self-test binary (WITH_GATEWAY_SELFTEST=0)"; \
+      test ! -e /usr/local/bin/tyk; \
     fi
 
 LABEL description="Next-generation image for Tyk plugin development" \
