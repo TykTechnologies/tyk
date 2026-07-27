@@ -65,7 +65,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	tyklog "github.com/TykTechnologies/tyk/log"
-	"github.com/TykTechnologies/tyk/pkg/escaper"
 	"github.com/TykTechnologies/tyk/pkg/validator"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
@@ -261,9 +260,6 @@ type Gateway struct {
 	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
 	// Built from apidef.ErrorOverrides during gateway startup.
 	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
-
-	// errorEscaperFactory factory used to build escaper
-	errorEscaperFactory *escaper.Factory
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -273,11 +269,6 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 			track404Logs: config.Track404Logs,
 		},
 		ctx: ctx,
-		errorEscaperFactory: escaper.NewFactory(
-			escaper.WithType(config.ErrorMessageEscaper),
-			escaper.WithLogger(log),
-			escaper.WithSkipContentTypes(header.ApplicationXML, header.TextXML, header.ApplicationSoapXML),
-		),
 	}
 	gw.SetConfig(config)
 
