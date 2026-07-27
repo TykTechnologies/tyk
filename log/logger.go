@@ -17,7 +17,7 @@ type (
 		*innerLogger
 		tmpLogsCollector       *tmpLogsCollector
 		setupOnce              invokeOnce
-		emergencyLogger        *logrus.Logger
+		EmergencyLogger        *logrus.Logger
 		OsExit                 func(int)
 		legacyLogFormatEnabled bool
 	}
@@ -41,22 +41,22 @@ func New() *Logger {
 
 	lgr := &Logger{
 		OsExit:           os.Exit,
-		emergencyLogger:  emergencyLogger,
+		EmergencyLogger:  emergencyLogger,
 		innerLogger:      inner,
 		tmpLogsCollector: tmpLogs,
 	}
 
 	inner.ExitFunc = func(code int) {
-		lgr.setupOnce.Do(func(executed bool) {
+		lgr.setupOnce.Try(func(executed bool) {
 			if executed {
 				tmpLogs.Forward(inner)
 			} else {
 				// send logs to emergency logger in case if Fatal was called
-				tmpLogs.Forward(emergencyLogger)
+				tmpLogs.Forward(lgr.EmergencyLogger)
 			}
 		})
 
-		lgr.ExitFunc(code)
+		lgr.OsExit(code)
 	}
 
 	lgr.AddHook(tmpLogs)
@@ -119,11 +119,11 @@ func (l *Logger) Setup(f func(b *Builder)) {
 }
 
 func (l *Logger) Flush() {
-	l.setupOnce.Do(func(executed bool) {
+	l.setupOnce.Try(func(executed bool) {
 		logger := l.innerLogger
 
 		if !executed {
-			logger = l.emergencyLogger
+			logger = l.EmergencyLogger
 		}
 
 		l.tmpLogsCollector.Forward(logger)
@@ -174,12 +174,6 @@ func (l *Logger) SetOutput(_ nonImplementable) {}
 // Shadowed.
 func (l *Logger) SetLevel(_ nonImplementable) {}
 
-// Reset state to default.
-// Added to pass tests.
-func (l *Logger) Reset() CancelFn {
-	return l.setupOnce.reset(false)
-}
-
 type invokeOnce struct {
 	mu    sync.Mutex
 	value bool
@@ -198,28 +192,12 @@ func (s *invokeOnce) MustOnce(fn func()) {
 	fn()
 }
 
-func (s *invokeOnce) Do(fn func(executed bool)) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	fn(s.value)
-}
-
-// reset's value of invoke once runner
-// create for testing purposes
-func (s *invokeOnce) reset(value bool) CancelFn {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	var once sync.Once
-	oldValue := s.value
-	s.value = value
-
-	return func() {
-		once.Do(func() {
-			s.mu.Lock()
-			defer s.mu.Unlock()
-			s.value = oldValue
-		})
+func (s *invokeOnce) Try(fn func(executed bool)) {
+	if s.mu.TryLock() {
+		defer s.mu.Unlock()
+		fn(s.value)
+	} else {
+		fn(false)
 	}
 }
 
