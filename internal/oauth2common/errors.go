@@ -51,6 +51,26 @@ func DecodeClaimsChallenge(body []byte) (claims, authorizationURI string) {
 	return p.Claims, p.AuthorizationURI
 }
 
+// ActorNotAuthorizedError is raised when actorToken.requireMayAct is set and
+// the inbound subject token's may_act claim (RFC 8693 §4.4) does not authorize
+// the configured actor. Rendered as HTTP 403 with no IdP call.
+type ActorNotAuthorizedError struct {
+	Reason string
+}
+
+func (e *ActorNotAuthorizedError) Error() string { return e.Reason }
+
+// MissingActorTokenError is raised when actorToken.source=header is required
+// but the configured header is absent. Rendered as HTTP 401 with an RFC 6750
+// invalid_token Bearer challenge; no fallback to impersonation.
+type MissingActorTokenError struct {
+	Header string
+}
+
+func (e *MissingActorTokenError) Error() string {
+	return fmt.Sprintf("missing actor token header %s", e.Header)
+}
+
 // ExchangeFailedError represents a non-2xx IdP token-endpoint response.
 type ExchangeFailedError struct {
 	Status      int

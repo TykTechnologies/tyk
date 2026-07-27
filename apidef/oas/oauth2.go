@@ -217,6 +217,12 @@ type OAuth2TokenExchangeProvider struct {
 	// when the matched operation has no per-op exchange override.
 	DefaultTarget *OAuth2DefaultTarget `bson:"defaultTarget,omitempty" json:"defaultTarget,omitempty"`
 
+	// ActorToken, when set, makes exchange requests carry `actor_token`
+	// (RFC 8693 delegation intent). When omitted, requests carry only
+	// `subject_token` (impersonation); removing the block reverts to
+	// impersonation with no migration.
+	ActorToken *OAuth2ActorToken `bson:"actorToken,omitempty" json:"actorToken,omitempty"`
+
 	// Timeout caps each call to TokenEndpoint. Uses Tyk's ReadableDuration ("5s", "100ms").
 	// Defaults to 15s when unset.
 	Timeout tyktime.ReadableDuration `bson:"timeout,omitempty" json:"timeout,omitempty"`
@@ -234,6 +240,64 @@ type OAuth2TokenExchangeProvider struct {
 // grant. An empty GrantType defaults to RFC 8693 token-exchange.
 func (p *OAuth2TokenExchangeProvider) IsJWTBearer() bool {
 	return p != nil && p.GrantType == OAuth2ProviderGrantJWTBearer
+}
+
+// OAuth2ActorToken describes how Tyk obtains the actor token sent on the
+// exchange request. Exactly one source sub-block is used, selected by Source.
+type OAuth2ActorToken struct {
+	// Source: client_credentials | header | static.
+	Source string `bson:"source" json:"source"`
+
+	// ActorTokenType is the RFC 8693 token-type URN advertised for the actor
+	// token. Empty defaults to urn:ietf:params:oauth:token-type:access_token,
+	// the interoperable choice (PingOne/PingAM reject :jwt on the actor token).
+	// Operators targeting an RFC-strict IdP may set :jwt. Not surfaced in the UI.
+	ActorTokenType string `bson:"actorTokenType,omitempty" json:"actorTokenType,omitempty"`
+
+	// ClientCredentials — used when Source=="client_credentials".
+	ClientCredentials *OAuth2ActorClientCredentials `bson:"clientCredentials,omitempty" json:"clientCredentials,omitempty"`
+
+	// Header — used when Source=="header".
+	Header *OAuth2ActorHeader `bson:"header,omitempty" json:"header,omitempty"`
+
+	// Static — used when Source=="static". Testing only.
+	Static *OAuth2ActorStatic `bson:"static,omitempty" json:"static,omitempty"`
+
+	// RequireMayAct, when true, makes the gateway verify the inbound subject
+	// token carries a `may_act` claim (RFC 8693 §4.4) authorizing the
+	// configured actor BEFORE calling the IdP — a clear 403 instead of an
+	// opaque IdP rejection. Defaults false: the IdP is the authoritative
+	// enforcement point, and multi-hop/central-policy tokens (e.g. PingFederate
+	// TEPP) may legitimately carry no `may_act`.
+	RequireMayAct *bool `bson:"requireMayAct,omitempty" json:"requireMayAct,omitempty"`
+}
+
+// OAuth2ActorClientCredentials drives the OAuth2 client_credentials flow Tyk
+// uses to mint a gateway-as-actor token. The acquired token is cached for its
+// own lifetime. ClientSecret accepts env://, secrets://, vault://, consul://.
+type OAuth2ActorClientCredentials struct {
+	TokenEndpoint string   `bson:"tokenEndpoint" json:"tokenEndpoint"`
+	ClientID      string   `bson:"clientId" json:"clientId"`
+	ClientSecret  string   `bson:"clientSecret,omitempty" json:"clientSecret,omitempty"`
+	Scopes        []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
+}
+
+// OAuth2ActorHeader pulls the actor token from a request header presented by
+// the upstream caller. Strip defaults true (don't leak to backend); Required
+// defaults true (no silent fallback to impersonation).
+type OAuth2ActorHeader struct {
+	// Name is the request header name. Defaults to "X-Actor-Token".
+	Name string `bson:"name,omitempty" json:"name,omitempty"`
+	// Strip removes the header from the proxied request. Defaults true.
+	Strip *bool `bson:"strip,omitempty" json:"strip,omitempty"`
+	// Required rejects requests missing the header. Defaults true.
+	Required *bool `bson:"required,omitempty" json:"required,omitempty"`
+}
+
+// OAuth2ActorStatic carries a pre-configured static actor token. Testing only —
+// static tokens don't rotate. Token accepts env://, secrets://, vault://, consul://.
+type OAuth2ActorStatic struct {
+	Token string `bson:"token" json:"token"`
 }
 
 // OAuth2ExchangeCache controls caching of exchanged tokens per provider.
@@ -329,6 +393,7 @@ const (
 	OAuth2ErrExchangeFailed     = "exchange_failed"
 	OAuth2ErrNoMatchingProvider = "no_matching_provider"
 	OAuth2ErrMisconfigured      = "misconfigured"
+	OAuth2ErrActorNotAuthorized = "actor_not_authorized"
 
 	// jwt-bearer step-up relay: the IdP's back-channel error code and the
 	// front-channel challenge the gateway re-emits it as.
@@ -357,11 +422,13 @@ const (
 	// RFC 7523 jwt-bearer form key: the inbound token travels as `assertion`.
 	OAuth2FormAssertion = "assertion"
 
-	// RFC 8693 / RFC 7523 grant URNs.
-	OAuth2GrantTypeTokenExchange = "urn:ietf:params:oauth:grant-type:token-exchange"
-	OAuth2GrantTypeJWTBearer     = "urn:ietf:params:oauth:grant-type:jwt-bearer"
-	OAuth2TokenTypeAccessToken   = "urn:ietf:params:oauth:token-type:access_token"
-	OAuth2TokenTypeJWT           = "urn:ietf:params:oauth:token-type:jwt"
+	// RFC 8693 / RFC 7523 grant URNs, plus the plain client_credentials grant
+	// used for actor-token acquisition.
+	OAuth2GrantTypeTokenExchange     = "urn:ietf:params:oauth:grant-type:token-exchange"
+	OAuth2GrantTypeJWTBearer         = "urn:ietf:params:oauth:grant-type:jwt-bearer"
+	OAuth2GrantTypeClientCredentials = "client_credentials"
+	OAuth2TokenTypeAccessToken       = "urn:ietf:params:oauth:token-type:access_token"
+	OAuth2TokenTypeJWT               = "urn:ietf:params:oauth:token-type:jwt"
 
 	// OAuth2TokenExchangeProvider.GrantType values — the last segment of the
 	// grant URN each one selects.
@@ -385,11 +452,22 @@ const (
 	OAuth2CacheModeDerived = "derived"
 	OAuth2CacheModeStatic  = "static"
 
+	// OAuth2ActorToken.Source values, plus the synthesized actor identifier
+	// used for the impersonation (no-delegation) case.
+	OAuth2ActorSourceClientCredentials = "client_credentials"
+	OAuth2ActorSourceHeader            = "header"
+	OAuth2ActorSourceStatic            = "static"
+	OAuth2ActorImpersonation           = "impersonation"
+
 	// JWT standard claim keys.
 	OAuth2ClaimIss = "iss"
 	OAuth2ClaimSub = "sub"
 	OAuth2ClaimExp = "exp"
 	OAuth2ClaimAzp = "azp"
+	// OAuth2ClaimMayAct is the RFC 8693 §4.4 may_act claim; OAuth2ClaimClientID
+	// is the alternate identity member the gateway accepts inside it.
+	OAuth2ClaimMayAct   = "may_act"
+	OAuth2ClaimClientID = "client_id"
 
 	// OAuth2 response / WWW-Authenticate field names.
 	OAuth2FieldError            = "error"
@@ -525,7 +603,10 @@ func validateOAuth2ExchangeProvider(schemeName string, i int, p *OAuth2TokenExch
 	if err := validateExchangeCustomParams(schemeName, p); err != nil {
 		return err
 	}
-	return validateExchangeCacheMode(schemeName, p)
+	if err := validateExchangeCacheMode(schemeName, p); err != nil {
+		return err
+	}
+	return validateOAuth2ActorToken(schemeName, p)
 }
 
 // tokenEndpointContextVarPrefix marks a $tyk_context.* request-time variable in
@@ -650,6 +731,44 @@ func validateExchangeCustomParams(schemeName string, p *OAuth2TokenExchangeProvi
 		if _, reserved := reservedKeys[key]; reserved {
 			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q customParams cannot override reserved %s wire key %q", schemeName, p.Name, grantLabel, key)
 		}
+	}
+	return nil
+}
+
+// validateOAuth2ActorToken enforces that the actorToken block is only used
+// with the token-exchange grant (RFC 7523 jwt-bearer has no actor parameter),
+// names a valid source, carries the sub-block that source requires, and
+// advertises an allowed actor_token_type URN. A no-op when no actor token is
+// configured (impersonation).
+func validateOAuth2ActorToken(schemeName string, p *OAuth2TokenExchangeProvider) error {
+	at := p.ActorToken
+	if at == nil {
+		return nil
+	}
+	providerName := p.Name
+	if p.IsJWTBearer() {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q actorToken is not supported with grantType %q (the jwt-bearer grant has no actor parameter); remove the actorToken block or use grantType %q",
+			schemeName, providerName, OAuth2ProviderGrantJWTBearer, OAuth2ProviderGrantTokenExchange)
+	}
+	if at.ActorTokenType != "" &&
+		at.ActorTokenType != OAuth2TokenTypeAccessToken && at.ActorTokenType != OAuth2TokenTypeJWT {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q actorToken.actorTokenType %q is invalid; valid values are %q and %q",
+			schemeName, providerName, at.ActorTokenType, OAuth2TokenTypeAccessToken, OAuth2TokenTypeJWT)
+	}
+	switch at.Source {
+	case OAuth2ActorSourceClientCredentials:
+		if at.ClientCredentials == nil || at.ClientCredentials.TokenEndpoint == "" || at.ClientCredentials.ClientID == "" {
+			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q actorToken.source=client_credentials requires clientCredentials.tokenEndpoint and clientId", schemeName, providerName)
+		}
+	case OAuth2ActorSourceStatic:
+		if at.Static == nil || at.Static.Token == "" {
+			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q actorToken.source=static requires static.token", schemeName, providerName)
+		}
+	case OAuth2ActorSourceHeader:
+		// header sub-block is optional; defaults apply (X-Actor-Token, strip+required true).
+	default:
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q actorToken.source %q is invalid; valid values are %q, %q, %q",
+			schemeName, providerName, at.Source, OAuth2ActorSourceClientCredentials, OAuth2ActorSourceHeader, OAuth2ActorSourceStatic)
 	}
 	return nil
 }
