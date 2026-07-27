@@ -115,7 +115,7 @@ func (p EventPayload) addOptional(m map[string]interface{}) {
 		m[fieldActorSource] = p.ActorSource
 		m[fieldDelegationObserved] = p.DelegationObserved
 		if p.ActorAzp != "" {
-			m[fieldActorAzp] = p.ActorAzp
+			m[fieldActorAzp] = capField(p.ActorAzp)
 		}
 	}
 	if p.Outcome == oauth2common.OutcomeIdPError {

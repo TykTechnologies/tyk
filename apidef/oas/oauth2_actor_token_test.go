@@ -75,6 +75,26 @@ func teProviderWithActor(at *OAuth2ActorToken) *OAuth2TokenExchange {
 	}
 }
 
+func TestValidateOAuth2Schemes_ActorToken_RejectedUnderJWTBearer(t *testing.T) {
+	te := teProviderWithActor(&OAuth2ActorToken{Source: OAuth2ActorSourceHeader})
+	te.Providers[0].GrantType = OAuth2ProviderGrantJWTBearer
+
+	s := newOAuth2WithTokenExchange("corpOAuth", te)
+	err := s.ValidateOAuth2Schemes()
+	require.Error(t, err, "the jwt-bearer grant has no actor parameter; an actorToken block must fail loud at load")
+	assert.Contains(t, err.Error(), "actorToken")
+	assert.Contains(t, err.Error(), OAuth2ProviderGrantJWTBearer)
+	assert.Contains(t, err.Error(), OAuth2ProviderGrantTokenExchange)
+}
+
+func TestValidateOAuth2Schemes_ActorToken_AllowedUnderExplicitTokenExchange(t *testing.T) {
+	te := teProviderWithActor(&OAuth2ActorToken{Source: OAuth2ActorSourceHeader})
+	te.Providers[0].GrantType = OAuth2ProviderGrantTokenExchange
+
+	s := newOAuth2WithTokenExchange("corpOAuth", te)
+	assert.NoError(t, s.ValidateOAuth2Schemes(), "an explicit token-exchange grant keeps actorToken valid")
+}
+
 func TestValidateOAuth2Schemes_ActorToken_InvalidSource(t *testing.T) {
 	s := newOAuth2WithTokenExchange("corpOAuth", teProviderWithActor(&OAuth2ActorToken{Source: "bogus"}))
 	err := s.ValidateOAuth2Schemes()

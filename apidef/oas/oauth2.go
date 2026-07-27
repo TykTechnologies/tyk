@@ -606,7 +606,7 @@ func validateOAuth2ExchangeProvider(schemeName string, i int, p *OAuth2TokenExch
 	if err := validateExchangeCacheMode(schemeName, p); err != nil {
 		return err
 	}
-	return validateOAuth2ActorToken(schemeName, p.Name, p.ActorToken)
+	return validateOAuth2ActorToken(schemeName, p)
 }
 
 // tokenEndpointContextVarPrefix marks a $tyk_context.* request-time variable in
@@ -735,13 +735,20 @@ func validateExchangeCustomParams(schemeName string, p *OAuth2TokenExchangeProvi
 	return nil
 }
 
-// validateOAuth2ActorToken enforces that the actorToken block names a valid
-// source, carries the sub-block that source requires, and advertises an
-// allowed actor_token_type URN. A no-op when no actor token is configured
-// (impersonation).
-func validateOAuth2ActorToken(schemeName, providerName string, at *OAuth2ActorToken) error {
+// validateOAuth2ActorToken enforces that the actorToken block is only used
+// with the token-exchange grant (RFC 7523 jwt-bearer has no actor parameter),
+// names a valid source, carries the sub-block that source requires, and
+// advertises an allowed actor_token_type URN. A no-op when no actor token is
+// configured (impersonation).
+func validateOAuth2ActorToken(schemeName string, p *OAuth2TokenExchangeProvider) error {
+	at := p.ActorToken
 	if at == nil {
 		return nil
+	}
+	providerName := p.Name
+	if p.IsJWTBearer() {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q actorToken is not supported with grantType %q (the jwt-bearer grant has no actor parameter); remove the actorToken block or use grantType %q",
+			schemeName, providerName, OAuth2ProviderGrantJWTBearer, OAuth2ProviderGrantTokenExchange)
 	}
 	if at.ActorTokenType != "" &&
 		at.ActorTokenType != OAuth2TokenTypeAccessToken && at.ActorTokenType != OAuth2TokenTypeJWT {

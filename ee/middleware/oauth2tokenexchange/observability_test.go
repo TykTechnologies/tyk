@@ -170,6 +170,24 @@ func TestEventPayload_CapsAzpFields(t *testing.T) {
 	}
 }
 
+// TestEventPayload_CapsActorAzp pins that the actor authorized-party field is
+// length-capped like the other azp fields: for the header/static sources it is
+// an azp claim decoded from an unverified caller-supplied token, so its size
+// is attacker-controlled up to the request header limit.
+func TestEventPayload_CapsActorAzp(t *testing.T) {
+	t.Parallel()
+
+	p := okPayload()
+	p.ActorSource = "header"
+	p.ActorAzp = strings.Repeat("c", oauth2common.MaxIdPErrorBodyBytes+500)
+
+	maxLen := oauth2common.MaxIdPErrorBodyBytes + len(truncatedSuffix)
+	for _, m := range []map[string]interface{}{p.LogFields(), p.AuditMeta()} {
+		actor, _ := m["oauth2_actor_azp"].(string)
+		assert.LessOrEqual(t, len(actor), maxLen)
+	}
+}
+
 // TestEventPayload_AuditMeta_Succeeded pins TC7: a successful exchange's audit
 // meta carries the oauth2_-namespaced safe fields and no identity/token.
 func TestEventPayload_AuditMeta_Succeeded(t *testing.T) {
