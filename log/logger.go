@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -47,14 +48,14 @@ func New() *Logger {
 	}
 
 	inner.ExitFunc = func(code int) {
-		lgr.setupOnce.Try(func(executed bool) {
-			if executed {
-				tmpLogs.Forward(inner)
-			} else {
-				// send logs to emergency logger in case if Fatal was called
-				tmpLogs.Forward(lgr.EmergencyLogger)
-			}
-		})
+		executed := lgr.setupOnce.IsReady()
+
+		if executed {
+			tmpLogs.Forward(inner)
+		} else {
+			// send logs to emergency logger in case if Fatal was called
+			tmpLogs.Forward(lgr.EmergencyLogger)
+		}
 
 		lgr.OsExit(code)
 	}
@@ -119,15 +120,15 @@ func (l *Logger) Setup(f func(b *Builder)) {
 }
 
 func (l *Logger) Flush() {
-	l.setupOnce.Try(func(executed bool) {
-		logger := l.innerLogger
+	executed := l.setupOnce.IsReady()
 
-		if !executed {
-			logger = l.EmergencyLogger
-		}
+	logger := l.innerLogger
 
-		l.tmpLogsCollector.Forward(logger)
-	})
+	if !executed {
+		logger = l.EmergencyLogger
+	}
+
+	l.tmpLogsCollector.Forward(logger)
 }
 
 // GetTestHook bind to global logger in during the test.
@@ -174,31 +175,28 @@ func (l *Logger) SetOutput(_ nonImplementable) {}
 // Shadowed.
 func (l *Logger) SetLevel(_ nonImplementable) {}
 
+const (
+	statePending      uint32 = 0
+	stateInitializing uint32 = 1
+	stateReady        uint32 = 2
+)
+
 type invokeOnce struct {
-	mu    sync.Mutex
-	value bool
+	state atomic.Uint32
 }
 
 func (s *invokeOnce) MustOnce(fn func()) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.value {
-		panic("invokeOnce.Must has to be executed only once")
+	if !s.state.CompareAndSwap(statePending, stateInitializing) {
+		panic("invokeOnce.MustOnce has to be executed only once")
 	}
-
-	s.value = true
 
 	fn()
+
+	s.state.Store(stateReady)
 }
 
-func (s *invokeOnce) Try(fn func(executed bool)) {
-	if s.mu.TryLock() {
-		defer s.mu.Unlock()
-		fn(s.value)
-	} else {
-		fn(false)
-	}
+func (s *invokeOnce) IsReady() bool {
+	return s.state.Load() == stateReady
 }
 
 var _ logrus.Hook = new(tmpLogsCollector)
