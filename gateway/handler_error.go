@@ -3,7 +3,6 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	htmltemplate "html/template"
 	"io"
@@ -360,7 +359,7 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 			rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
 			tmplExecutor = rawTmpl
 		} else {
-			apiError.Message = htmltemplate.HTML(e.jsonEscapeString(errMsg))
+			apiError.Message = htmltemplate.HTML(jsonEscapeString(errMsg))
 		}
 
 		var log bytes.Buffer
@@ -482,14 +481,4 @@ func (e *ErrorHandler) writeDirectOverrideResponse(w http.ResponseWriter, result
 		Header:     respHeader,
 		Body:       io.NopCloser(bytes.NewReader(bodyBytes)),
 	}
-}
-
-func (e *ErrorHandler) jsonEscapeString(s string) string {
-	res, err := json.Marshal(s)
-
-	if err != nil {
-		return ""
-	}
-
-	return string(res[1 : len(res)-1])
 }
