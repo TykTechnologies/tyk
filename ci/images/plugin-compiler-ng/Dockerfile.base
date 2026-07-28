@@ -97,6 +97,14 @@ RUN set -eux; \
       # Preserve the existing sysroot header inventory, but never ship the Python runtime library: \
       # the Gateway has no libpython, so a plugin linked to it cannot load in the official image. \
       test -z "$(find "$SR/usr/lib" -maxdepth 1 -name 'libpython*.so*' -print -quit)"; \
+      # manylinux also carries Kerberos linker inputs and runtime plugins that the official \
+      # Gateway does not ship. Remove that family while preserving unrelated generic libraries. \
+      rm -f "$SR/usr/lib"/libkrb5* "$SR/usr/lib"/libgssapi_krb5* \
+            "$SR/usr/lib"/libk5crypto* "$SR/usr/lib"/libgssrpc* \
+            "$SR/usr/lib"/libkadm5* "$SR/usr/lib"/libkdb5* "$SR/usr/lib"/libkrad*; \
+      rm -rf "$SR/usr/lib/krb5"; \
+      test -z "$(find "$SR/usr/lib" -maxdepth 1 \( -name 'libkrb5*' -o -name 'libgssapi_krb5*' -o -name 'libk5crypto*' -o -name 'libgssrpc*' -o -name 'libkadm5*' -o -name 'libkdb5*' -o -name 'libkrad*' \) -print -quit)"; \
+      test ! -e "$SR/usr/lib/krb5"; \
       # repoint any dev symlink that still targets the old split /lib64 path (e.g. \
       # libresolv.so -> ../../lib64/libresolv.so.2) to the basename now present in this flat dir. \
       for l in $(find "$SR/usr/lib" -maxdepth 1 -type l 2>/dev/null || true); do \
