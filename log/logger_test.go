@@ -48,7 +48,7 @@ func Test_Logger(t *testing.T) {
 			var exitCode *int
 
 			lgr := New()
-			lgr.OsExit = func(code int) {
+			lgr.osExit = func(code int) {
 				exitCode = &code
 			}
 			lgr.Setup(func(b *Builder) {
@@ -70,8 +70,8 @@ func Test_Logger(t *testing.T) {
 			const msg = "you must die"
 
 			lgr := New()
-			lgr.OsExit = func(int) {}
-			lgr.EmergencyLogger = emergencyLogger
+			lgr.osExit = func(int) {}
+			lgr.emergencyLogger = emergencyLogger
 			lgr.Setup(func(b *Builder) {
 				b.AddSinker(makeDummySink(buf))
 				lgr.Fatal(msg)
@@ -86,7 +86,7 @@ func Test_Logger(t *testing.T) {
 		buf := bytes.Buffer{}
 
 		lgr := New()
-		lgr.EmergencyLogger.SetOutput(&buf)
+		lgr.emergencyLogger.SetOutput(&buf)
 
 		lgr.Info("fatal startup error")
 		assert.Len(t, lgr.tmpLogsCollector.entries, 1)
@@ -101,7 +101,7 @@ func Test_Logger(t *testing.T) {
 		t.Run("does not add logs to output", func(t *testing.T) {
 			lgr := New()
 			emBuf := &bytes.Buffer{}
-			lgr.EmergencyLogger.SetOutput(emBuf)
+			lgr.emergencyLogger.SetOutput(emBuf)
 
 			lgr.Setup(func(_ *Builder) {})
 
