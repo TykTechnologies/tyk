@@ -357,6 +357,10 @@ func (gw *Gateway) processSpec(
 		fixFuncPath(prefix, mwPostFuncs)
 		fixFuncPath(prefix, mwPostAuthCheckFuncs)
 		fixFuncPath(prefix, mwResponseFuncs)
+
+		if spec.AnalyticsPlugin.Enabled && spec.AnalyticsPlugin.PluginPath != "" && !filepath.IsAbs(spec.AnalyticsPlugin.PluginPath) {
+			spec.AnalyticsPlugin.PluginPath = filepath.Join(prefix, spec.AnalyticsPlugin.PluginPath)
+		}
 	}
 
 	enableVersionOverrides := false
@@ -707,7 +711,6 @@ func (gw *Gateway) processSpec(
 	}
 
 	if spec.APIDefinition.AnalyticsPlugin.Enabled {
-
 		ap := &GoAnalyticsPlugin{
 			Path:     spec.AnalyticsPlugin.PluginPath,
 			FuncName: spec.AnalyticsPlugin.FuncName,
