@@ -787,6 +787,8 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ctxSetUrlRewritten(r, newURL.String() != r.URL.String())
 		r.URL = newURL
 		ctxSetURLRewriteTarget(r, nil)
+	} else {
+		ctxSetUrlRewritten(r, false)
 	}
 	if newMethod := ctxGetTransformRequestMethod(r); newMethod != "" {
 		r.Method = newMethod
