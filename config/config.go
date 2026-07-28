@@ -108,7 +108,7 @@ const (
 
 type PoliciesConfig struct {
 	// Set this value to `file` to look in the file system for a definition file. Set to `service` to use the Dashboard service.
-	PolicySource PolicySource `json:"policy_source"`
+	PolicySource string `json:"policy_source"`
 
 	// This option is required if `policies.policy_source` is set to `service`.
 	// Set this to the URL of your Tyk Dashboard installation. The URL needs to be formatted as: http://dashboard_host:port.
@@ -1266,7 +1266,7 @@ type Config struct {
 	// Configures the output format used for application logs.
 	// Allowed values are `text`, `json`, or `legacy`.
 	// If not set or left empty, it defaults to `text`.
-	LogFormat logger.Format `json:"log_format"`
+	LogFormat string `json:"log_format"`
 
 	// AccessLogs configures the output for access logs.
 	// If not configured, the access log is disabled.
