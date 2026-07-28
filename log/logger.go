@@ -18,8 +18,8 @@ type (
 		*innerLogger
 		tmpLogsCollector       *tmpLogsCollector
 		setupOnce              invokeOnce
-		EmergencyLogger        *logrus.Logger
-		OsExit                 func(int)
+		emergencyLogger        *logrus.Logger
+		osExit                 func(int)
 		legacyLogFormatEnabled bool
 	}
 
@@ -41,23 +41,15 @@ func New() *Logger {
 	inner.SetOutput(io.Discard)
 
 	lgr := &Logger{
-		OsExit:           os.Exit,
-		EmergencyLogger:  emergencyLogger,
+		osExit:           os.Exit,
+		emergencyLogger:  emergencyLogger,
 		innerLogger:      inner,
 		tmpLogsCollector: tmpLogs,
 	}
 
 	inner.ExitFunc = func(code int) {
-		executed := lgr.setupOnce.IsReady()
-
-		if executed {
-			tmpLogs.Forward(inner)
-		} else {
-			// send logs to emergency logger in case if Fatal was called
-			tmpLogs.Forward(lgr.EmergencyLogger)
-		}
-
-		lgr.OsExit(code)
+		lgr.Flush()
+		lgr.osExit(code)
 	}
 
 	lgr.AddHook(tmpLogs)
@@ -80,6 +72,12 @@ func NewNullLogger() (*Logger, *Hook) {
 	lgr.innerLogger = rawLogger
 
 	return lgr, NewHook(hook)
+}
+
+// Reset state to default.
+// Added to pass tests.
+func (l *Logger) Reset() CancelFn {
+	return l.setupOnce.reset()
 }
 
 func (l *Logger) IsLegacyFormatterEnabled() bool {
@@ -120,15 +118,11 @@ func (l *Logger) Setup(f func(b *Builder)) {
 }
 
 func (l *Logger) Flush() {
-	executed := l.setupOnce.IsReady()
-
-	logger := l.innerLogger
-
-	if !executed {
-		logger = l.EmergencyLogger
+	if l.setupOnce.IsReady() {
+		l.tmpLogsCollector.Forward(l.innerLogger)
+	} else {
+		l.tmpLogsCollector.Forward(l.emergencyLogger)
 	}
-
-	l.tmpLogsCollector.Forward(logger)
 }
 
 // GetTestHook bind to global logger in during the test.
@@ -197,6 +191,20 @@ func (s *invokeOnce) MustOnce(fn func()) {
 
 func (s *invokeOnce) IsReady() bool {
 	return s.state.Load() == stateReady
+}
+
+// reset's value of invoke once runner
+// create for testing purposes
+func (s *invokeOnce) reset() CancelFn {
+	var once sync.Once
+	oldValue := s.state.Load()
+	s.state.Store(statePending)
+
+	return func() {
+		once.Do(func() {
+			s.state.Store(oldValue)
+		})
+	}
 }
 
 var _ logrus.Hook = new(tmpLogsCollector)
