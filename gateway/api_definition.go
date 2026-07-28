@@ -2489,6 +2489,11 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 		return
 	}
 
+	// Do not strip an already-final path selected by a rewrite-like middleware.
+	if ctxGetUrlRewritePath(r) != "" {
+		return
+	}
+
 	log.Debug("Stripping proxy listen path: ", a.Proxy.ListenPath)
 
 	r.URL.Path = a.StripListenPath(r.URL.Path)

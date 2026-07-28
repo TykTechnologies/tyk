@@ -1380,6 +1380,17 @@ func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
 		assert.Equal(t, "/get", r.URL.Path)
 		assert.Equal(t, "", r.URL.RawPath)
 	})
+
+	t.Run("strip=true but URL rewrite path is set", func(t *testing.T) {
+		a.Proxy.StripListenPath = true
+		r := httptest.NewRequest(http.MethodGet, "https://proxy.com/listen/get", nil)
+		ctxSetUrlRewritePath(r, r.URL.Path)
+
+		a.SanitizeProxyPaths(r)
+
+		assert.Equal(t, "/listen/get", r.URL.Path)
+		assert.Equal(t, "", r.URL.RawPath)
+	})
 }
 
 func TestEnforcedTimeout(t *testing.T) {
