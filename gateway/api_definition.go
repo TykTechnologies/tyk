@@ -716,7 +716,10 @@ func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
 // document, so resolved values are JSON-escaped automatically — no manual
 // escaping here would be correct.
 func (a APIDefinitionLoader) replaceKVReferences(input *string) error {
-	resolved, err := a.Gw.kvResolver.ResolveAll(a.Gw.ctx, []byte(*input))
+	// Bypass the store cache here: reloading an API definition is an explicit
+	// request to resolve against the current backend state, so a rotated secret
+	// must take effect on this reload, not after the cache TTL expires.
+	resolved, err := a.Gw.kvResolver.ResolveAll(kv.WithCacheBypass(a.Gw.ctx), []byte(*input))
 	if err != nil {
 		return err
 	}

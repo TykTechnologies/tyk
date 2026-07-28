@@ -2,8 +2,10 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -22,6 +24,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/storage/kv"
+	"github.com/TykTechnologies/storage/kv/registry"
+	"github.com/TykTechnologies/storage/kv/resolver"
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -3187,5 +3192,239 @@ func TestLoadDefFromFilePath(t *testing.T) {
 		spec, err := loader.loadDefFromFilePath(tmpFile.Name())
 		assert.Error(t, err)
 		assert.Nil(t, spec)
+	})
+}
+
+// mutableKVProvider is a remote-provider stand-in whose backing values can change
+// between resolutions (simulating secret rotation) and that counts every Get
+// (measuring backend load).
+type mutableKVProvider struct {
+	mu    sync.Mutex
+	data  map[string]string
+	errs  map[string]error
+	calls int
+}
+
+func (p *mutableKVProvider) Get(_ context.Context, key string) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.calls++
+
+	if err, ok := p.errs[key]; ok && err != nil {
+		return "", err
+	}
+
+	val, ok := p.data[key]
+	if !ok {
+		return "", &kv.KeyNotFoundError{KeyPath: key}
+	}
+
+	return val, nil
+}
+
+func (p *mutableKVProvider) set(key, val string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.data[key] = val
+}
+
+func (p *mutableKVProvider) setErr(key string, err error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.errs == nil {
+		p.errs = map[string]error{}
+	}
+	p.errs[key] = err
+}
+
+func (p *mutableKVProvider) callCount() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.calls
+}
+
+func (p *mutableKVProvider) resetCalls() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.calls = 0
+}
+
+func newMutableKVGateway(t *testing.T, cacheEnabled bool) (*Gateway, *mutableKVProvider) {
+	t.Helper()
+
+	gw := NewGateway(config.Config{}, t.Context())
+
+	provider := &mutableKVProvider{data: map[string]string{}}
+
+	const typ = kv.ProviderType("mutable_vault")
+	factories := map[kv.ProviderType]kv.ProviderFactory{
+		typ: func(_ json.RawMessage) (kv.Provider, error) { return provider, nil },
+	}
+	storeCfgs := map[string]kv.StoreConfig{
+		"vault": {Type: typ},
+	}
+
+	cacheBlock := `{"enabled":false}`
+	if cacheEnabled {
+		// TTL far longer than the test runtime, so any freshness we observe is
+		// due to a cache bypass, never to natural TTL expiry.
+		cacheBlock = `{"enabled":true,"ttl":"1h"}`
+	}
+	rawConfig := []byte(`{"kv":{"cache":` + cacheBlock + `}}`)
+
+	reg, err := registry.NewFromConfig(
+		t.Context(),
+		rawConfig,
+		registry.WithDefaultStores(storeCfgs),
+		registry.WithFactories(factories),
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = reg.Close(context.WithoutCancel(t.Context())) })
+
+	gw.kvRegistry = reg
+	gw.kvResolver = resolver.NewResolver(reg)
+
+	return gw, provider
+}
+
+func TestReplaceKVReferences_CacheBypassOnAPIDefResolution(t *testing.T) {
+	t.Run("a non-bypass context serves the stale cached value within TTL", func(t *testing.T) {
+		gw, provider := newMutableKVGateway(t, true)
+		provider.set("k", "v1")
+
+		out1, err := gw.kvResolver.ResolveAll(t.Context(), []byte(`{"target_url":"kv://vault/k"}`))
+		require.NoError(t, err)
+		require.JSONEq(t, `{"target_url":"v1"}`, string(out1))
+
+		provider.set("k", "v2")
+
+		out2, err := gw.kvResolver.ResolveAll(t.Context(), []byte(`{"target_url":"kv://vault/k"}`))
+		require.NoError(t, err)
+		require.JSONEq(t, `{"target_url":"v1"}`, string(out2),
+			"without a bypass the cached v1 is served even though the backend now holds v2")
+	})
+
+	t.Run("a rotated secret is served fresh on the next resolution", func(t *testing.T) {
+		gw, provider := newMutableKVGateway(t, true)
+		l := APIDefinitionLoader{Gw: gw}
+		provider.set("k", "v1")
+
+		out1 := l.replaceSecrets([]byte(`{"target_url":"kv://vault/k"}`))
+		require.JSONEq(t, `{"target_url":"v1"}`, string(out1))
+
+		provider.set("k", "v2")
+
+		out2 := l.replaceSecrets([]byte(`{"target_url":"kv://vault/k"}`))
+		require.JSONEq(t, `{"target_url":"v2"}`, string(out2),
+			"replaceSecrets must bypass the cache so a reload sees the rotated value")
+	})
+
+	t.Run("each resolution reads the backend, not the cache", func(t *testing.T) {
+		gw, provider := newMutableKVGateway(t, true)
+		l := APIDefinitionLoader{Gw: gw}
+		provider.set("k", "v1")
+
+		l.replaceSecrets([]byte(`{"target_url":"kv://vault/k"}`))
+		l.replaceSecrets([]byte(`{"target_url":"kv://vault/k"}`))
+
+		require.Equal(t, 2, provider.callCount(),
+			"two reloads must produce two backend reads; a cached second read would be 1")
+	})
+
+	t.Run("bypass repopulates the cache with the fresh value", func(t *testing.T) {
+		gw, provider := newMutableKVGateway(t, true)
+		l := APIDefinitionLoader{Gw: gw}
+
+		provider.set("k", "v1")
+		l.replaceSecrets([]byte(`{"target_url":"kv://vault/k"}`))
+
+		provider.set("k", "v2")
+		l.replaceSecrets([]byte(`{"target_url":"kv://vault/k"}`))
+
+		store, err := gw.kvRegistry.GetStore("vault")
+		require.NoError(t, err)
+
+		provider.resetCalls()
+		got, err := store.Get(t.Context(), "k")
+		require.NoError(t, err)
+		require.Equal(t, "v2", got, "the bypassed reload must have repopulated the cache with the fresh value")
+		require.Equal(t, 0, provider.callCount(), "the follow-up read must be served from the cache")
+	})
+
+	t.Run("inline $kv{} references are also served fresh on reload", func(t *testing.T) {
+		gw, provider := newMutableKVGateway(t, true)
+		l := APIDefinitionLoader{Gw: gw}
+		provider.set("host", "host-v1")
+
+		out1 := l.replaceSecrets([]byte(`{"target_url":"https://$kv{vault:host}/v1"}`))
+		require.JSONEq(t, `{"target_url":"https://host-v1/v1"}`, string(out1))
+
+		provider.set("host", "host-v2")
+
+		out2 := l.replaceSecrets([]byte(`{"target_url":"https://$kv{vault:host}/v1"}`))
+		require.JSONEq(t, `{"target_url":"https://host-v2/v1"}`, string(out2),
+			"inline references must bypass the cache too")
+	})
+
+	t.Run("a secret shared by many references is fetched once per resolution", func(t *testing.T) {
+		gw, provider := newMutableKVGateway(t, true)
+		l := APIDefinitionLoader{Gw: gw}
+		provider.set("shared", "S")
+
+		provider.resetCalls()
+		out := l.replaceSecrets([]byte(`{"a":"kv://vault/shared","b":"kv://vault/shared","c":"kv://vault/shared"}`))
+
+		require.JSONEq(t, `{"a":"S","b":"S","c":"S"}`, string(out))
+		require.Equal(t, 1, provider.callCount(),
+			"the per-document dedup memo must collapse repeated references to one backend read even under bypass")
+	})
+
+	t.Run("distinct references each resolve to their own value", func(t *testing.T) {
+		gw, provider := newMutableKVGateway(t, true)
+		l := APIDefinitionLoader{Gw: gw}
+		provider.set("a", "AAA")
+		provider.set("b", "BBB")
+
+		out := l.replaceSecrets([]byte(`{"x":"kv://vault/a","y":"kv://vault/b"}`))
+		require.JSONEq(t, `{"x":"AAA","y":"BBB"}`, string(out))
+	})
+
+	t.Run("with the cache disabled, resolution is always fresh", func(t *testing.T) {
+		gw, provider := newMutableKVGateway(t, false)
+		l := APIDefinitionLoader{Gw: gw}
+		provider.set("k", "v1")
+
+		out1 := l.replaceSecrets([]byte(`{"target_url":"kv://vault/k"}`))
+		require.JSONEq(t, `{"target_url":"v1"}`, string(out1))
+
+		provider.set("k", "v2")
+
+		out2 := l.replaceSecrets([]byte(`{"target_url":"kv://vault/k"}`))
+		require.JSONEq(t, `{"target_url":"v2"}`, string(out2),
+			"with no cache the second resolution is fresh regardless of bypass")
+	})
+
+	t.Run("a resolution error leaves the document unchanged", func(t *testing.T) {
+		gw, provider := newMutableKVGateway(t, true)
+		l := APIDefinitionLoader{Gw: gw}
+		provider.setErr("k", errors.New("backend exploded"))
+
+		in := []byte(`{"target_url":"kv://vault/k"}`)
+		out := l.replaceSecrets(in)
+		require.JSONEq(t, string(in), string(out),
+			"on a ResolveAll error the document is returned as-is (bypass must not change error handling)")
+	})
+
+	t.Run("a document with no references is returned unchanged and reads nothing", func(t *testing.T) {
+		gw, provider := newMutableKVGateway(t, true)
+		l := APIDefinitionLoader{Gw: gw}
+
+		provider.resetCalls()
+		in := []byte(`{"target_url":"https://static.example.com"}`)
+		out := l.replaceSecrets(in)
+
+		require.JSONEq(t, string(in), string(out))
+		require.Equal(t, 0, provider.callCount(), "the ref-free fast path must not touch the backend")
 	})
 }
