@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -119,6 +120,8 @@ func loadOASSchema() error {
 }
 
 func validateJSON(schema, document []byte) error {
+	registerKVAwareFormatsOnce.Do(registerKVAwareFormats)
+
 	schemaLoader := gojsonschema.NewBytesLoader(schema)
 	documentLoader := gojsonschema.NewBytesLoader(document)
 	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
@@ -259,4 +262,37 @@ func getMinorVersion(version string) (string, error) {
 
 	segments := v.Segments()
 	return fmt.Sprintf("%d.%d", segments[0], segments[1]), nil
+}
+
+// inlineKVRe matches an inline KV reference token, e.g. "$kv{env:API_HOST}".
+var inlineKVRe = regexp.MustCompile(`\$kv\{[^}]+\}`)
+
+// kvAwareFormatChecker wraps a stock gojsonschema format checker so that inline
+// $kv{...} KV references are accepted inside URI fields, while every other value
+// is validated exactly as before.
+type kvAwareFormatChecker struct {
+	base gojsonschema.FormatChecker
+}
+
+func (c kvAwareFormatChecker) IsFormat(input any) bool {
+	s, ok := input.(string)
+	if !ok {
+		return c.base.IsFormat(input)
+	}
+
+	if inlineKVRe.MatchString(s) {
+		s = inlineKVRe.ReplaceAllString(s, "kvref")
+	}
+
+	return c.base.IsFormat(s)
+}
+
+var registerKVAwareFormatsOnce sync.Once
+
+// registerKVAwareFormats overrides the stock "uri" and "uri-reference" format
+// checkers on the registry with the KV-aware variant.
+func registerKVAwareFormats() {
+	gojsonschema.FormatCheckers.
+		Add("uri", kvAwareFormatChecker{gojsonschema.URIFormatChecker{}}).
+		Add("uri-reference", kvAwareFormatChecker{gojsonschema.URIReferenceFormatChecker{}})
 }

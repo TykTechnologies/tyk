@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	"github.com/buger/jsonparser"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
@@ -506,4 +507,102 @@ func TestGetOASSchema(t *testing.T) {
 		defsKey := GetDefinitionsKey(schema)
 		assert.Equal(t, "$defs", defsKey)
 	})
+}
+
+func TestUpstreamURL_KVReferences(t *testing.T) {
+	base := func(url string) []byte {
+		return []byte(`{
+			"openapi": "3.0.3",
+			"info": {"title": "t", "version": "1"},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {"name": "t", "state": {"active": true}},
+				"server": {"listenPath": {"value": "/t"}},
+				"upstream": {"url": "` + url + `"}
+			}
+		}`)
+	}
+
+	t.Run("inline kv reference in host position", func(t *testing.T) {
+		err := ValidateOASObject(base(`http://$kv{random-consul:target_url_host}:8888`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("inline kv reference as the whole host", func(t *testing.T) {
+		err := ValidateOASObject(base(`http://$kv{consul:host}`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("inline kv reference in the path", func(t *testing.T) {
+		err := ValidateOASObject(base(`https://example.com/$kv{consul:path}`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("whole-value kv reference", func(t *testing.T) {
+		err := ValidateOASObject(base(`kv://consul/services/redis`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("whole-value kv reference with fragment", func(t *testing.T) {
+		err := ValidateOASObject(base(`kv://consul/services/redis#host`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("rejects malformed url around an inline kv token", func(t *testing.T) {
+		err := ValidateOASObject(base(`http://$kv{consul:host}:8888 broken`), "3.0.3")
+		require.Error(t, err)
+	})
+
+	t.Run("rejects a plain invalid url with no kv reference", func(t *testing.T) {
+		err := ValidateOASObject(base(`http://exa mple.com`), "3.0.3")
+		require.Error(t, err)
+	})
+
+	t.Run("accepts an ordinary url with no kv reference", func(t *testing.T) {
+		err := ValidateOASObject(base(`https://example.com/api`), "3.0.3")
+		assert.NoError(t, err)
+	})
+}
+
+func TestKVAwareFormatChecker(t *testing.T) {
+	c := kvAwareFormatChecker{base: gojsonschema.URIReferenceFormatChecker{}}
+
+	tests := []struct {
+		name  string
+		input any
+		valid bool
+	}{
+		{"inline token in host", "http://$kv{consul:host}:8888", true},
+		{"inline token as the whole host", "http://$kv{consul:host}", true},
+		{"inline token in path", "https://example.com/$kv{consul:path}", true},
+		{"inline token in query", "https://example.com/api?h=$kv{consul:host}", true},
+		{"inline token with #fragment", "http://$kv{consul:host#field}:8888", true},
+		{"multiple inline tokens", "https://example.com/$kv{a:b}/$kv{c:d}", true},
+
+		{"whole-value kv reference", "kv://consul/services/redis", true},
+		{"whole-value kv reference with fragment", "kv://consul/services/redis#host", true},
+
+		{"ordinary url without a kv reference", "https://example.com/api", true},
+		{"invalid url with a space", "http://exa mple.com", false},
+		{"backslash rejected even alongside a token", `http://$kv{a:b}\x`, false},
+		{"backslash rejected without a token", `http://a\b`, false},
+		{"non-string input", 123, false},
+
+		// Known limitation: a token standing in for the whole port becomes the
+		// non-numeric placeholder "kvref", which url.Parse rejects as a port.
+		{"token as the whole port is not supported", "http://host:$kv{consul:port}", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.valid, c.IsFormat(tt.input))
+		})
+	}
+}
+
+func TestKVAwareFormatChecker_URIBaseKeepsSchemeRequirement(t *testing.T) {
+	c := kvAwareFormatChecker{base: gojsonschema.URIFormatChecker{}}
+
+	assert.True(t, c.IsFormat("http://$kv{consul:host}:8888"))
+	assert.False(t, c.IsFormat("$kv{consul:host}/path"))
 }
