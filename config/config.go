@@ -226,7 +226,7 @@ type StorageOptionsConf struct {
 	MaxDecompressedSize int64 `json:"max_decompressed_size"`
 
 	// IAMAuth enables IAM-based authentication to cloud-managed Redis/Valkey
-	// (e.g. GCP Memorystore) using short-lived access tokens instead of a static
+	// authentication solution for temporal storage (for example, GCP MemoryStore IAM) 	
 	// instead of the traditional fixed username and password.
 	IAMAuth IAMAuthConfig `json:"iam_auth"`
 }
