@@ -227,7 +227,7 @@ type StorageOptionsConf struct {
 
 	// IAMAuth enables IAM-based authentication to cloud-managed Redis/Valkey
 	// (e.g. GCP Memorystore) using short-lived access tokens instead of a static
-	// password. When enabled, `username` and `password` are ignored for this store.
+	// instead of the traditional fixed username and password.
 	IAMAuth IAMAuthConfig `json:"iam_auth"`
 }
 
