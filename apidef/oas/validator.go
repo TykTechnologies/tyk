@@ -14,6 +14,8 @@ import (
 	"github.com/hashicorp/go-multierror"
 	pkgver "github.com/hashicorp/go-version"
 
+	"github.com/TykTechnologies/storage/kv/resolver"
+
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -267,9 +269,10 @@ func getMinorVersion(version string) (string, error) {
 // inlineKVRe matches an inline KV reference token, e.g. "$kv{env:API_HOST}".
 var inlineKVRe = regexp.MustCompile(`\$kv\{[^}]+\}`)
 
-// kvAwareFormatChecker wraps a stock gojsonschema format checker so that inline
-// $kv{...} KV references are accepted inside URI fields, while every other value
-// is validated exactly as before.
+// kvAwareFormatChecker wraps a stock gojsonschema format checker so that KV
+// references ($kv{...} inline tokens and kv:// whole-value references) are
+// accepted inside URI fields, while every other value is validated exactly as
+// before.
 type kvAwareFormatChecker struct {
 	base gojsonschema.FormatChecker
 }
@@ -278,6 +281,10 @@ func (c kvAwareFormatChecker) IsFormat(input any) bool {
 	s, ok := input.(string)
 	if !ok {
 		return c.base.IsFormat(input)
+	}
+
+	if err := resolver.ValidateSyntax(s); err != nil {
+		return false
 	}
 
 	if inlineKVRe.MatchString(s) {

@@ -564,6 +564,37 @@ func TestUpstreamURL_KVReferences(t *testing.T) {
 	})
 }
 
+func TestUpstreamURL_KVReferences_RejectsMalformed(t *testing.T) {
+	base := func(url string) []byte {
+		return []byte(`{
+			"openapi": "3.0.3",
+			"info": {"title": "t", "version": "1"},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {"name": "t", "state": {"active": true}},
+				"server": {"listenPath": {"value": "/t"}},
+				"upstream": {"url": "` + url + `"}
+			}
+		}`)
+	}
+
+	tests := map[string]string{
+		"inline unclosed token in path (reviewer point 1)": `https://example.com/$kv{unclosed`,
+		"inline token missing store separator":             `https://example.com/$kv{missingcolon}`,
+		"inline token empty store":                         `https://$kv{:onlypath}/x`,
+		"inline token empty path":                          `https://$kv{store:}/x`,
+		"whole-value kv reference without path separator":  `kv://no-path-separator`,
+		"whole-value kv reference empty path":              `kv://vault/`,
+	}
+
+	for name, url := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := ValidateOASObject(base(url), "3.0.3")
+			require.Error(t, err, "malformed KV reference %q must be rejected by validation", url)
+		})
+	}
+}
+
 func TestKVAwareFormatChecker(t *testing.T) {
 	c := kvAwareFormatChecker{base: gojsonschema.URIReferenceFormatChecker{}}
 
@@ -591,6 +622,14 @@ func TestKVAwareFormatChecker(t *testing.T) {
 		// Known limitation: a token standing in for the whole port becomes the
 		// non-numeric placeholder "kvref", which url.Parse rejects as a port.
 		{"token as the whole port is not supported", "http://host:$kv{consul:port}", false},
+
+		{"inline unclosed token in path", "https://example.com/$kv{unclosed", false},
+		{"inline token missing store separator", "https://example.com/$kv{missingcolon}", false},
+		{"inline token empty store", "https://$kv{:onlypath}/x", false},
+		{"inline token empty path", "https://$kv{store:}/x", false},
+		{"whole-value kv reference without path separator", "kv://no-path-separator", false},
+		{"whole-value kv reference empty path", "kv://vault/", false},
+		{"whole-value kv reference empty everything", "kv://", false},
 	}
 
 	for _, tt := range tests {
@@ -600,9 +639,40 @@ func TestKVAwareFormatChecker(t *testing.T) {
 	}
 }
 
-func TestKVAwareFormatChecker_URIBaseKeepsSchemeRequirement(t *testing.T) {
+func TestKVAwareFormatChecker_URIBase(t *testing.T) {
 	c := kvAwareFormatChecker{base: gojsonschema.URIFormatChecker{}}
 
-	assert.True(t, c.IsFormat("http://$kv{consul:host}:8888"))
-	assert.False(t, c.IsFormat("$kv{consul:host}/path"))
+	tests := []struct {
+		name  string
+		input string
+		valid bool
+	}{
+		// valid: a scheme is present (either the URL's own or kv://)
+		{"inline token in host with scheme", "http://$kv{consul:host}:8888", true},
+		{"inline token in path with scheme", "https://example.com/$kv{consul:path}", true},
+		{"ordinary absolute url", "https://example.com/api", true},
+		{"whole-value kv reference has kv scheme", "kv://consul/services/redis", true},
+		{"whole-value kv reference with fragment", "kv://consul/services/redis#host", true},
+
+		// invalid: no scheme (the uri-vs-uri-reference distinction)
+		{"bare inline token as whole value has no scheme", "$kv{consul:host}/path", false},
+		{"bare inline token only has no scheme", "$kv{consul:host}", false},
+		{"scheme-relative reference has no scheme", "example.com/api", false},
+
+		// invalid: malformed KV reference, rejected before the scheme check
+		{"inline unclosed token", "https://example.com/$kv{unclosed", false},
+		{"inline token missing store separator", "https://example.com/$kv{missingcolon}", false},
+		{"inline token empty path", "https://$kv{store:}/x", false},
+		{"whole-value kv reference without path separator", "kv://no-path-separator", false},
+		{"whole-value kv reference empty path", "kv://vault/", false},
+
+		// invalid: plain bad url, no KV involved
+		{"invalid url with a space", "http://exa mple.com", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.valid, c.IsFormat(tt.input))
+		})
+	}
 }
