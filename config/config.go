@@ -243,7 +243,7 @@ type IAMAuthConfig struct {
 	// identity. Leave empty to use the workload's own identity (Workload Identity
 	// on GKE, or GOOGLE_APPLICATION_CREDENTIALS).
 	ServiceAccount string `json:"service_account"`
-	// TokenRefreshBeforeExpiry is how far ahead of token expiry to refresh, as a
+	// The access token issued by the IAM will be refreshed before expiry.
 	// Set the time period before expiry when that refresh will take place as
 	// a human readable duration (for example 2m30s", "5m").
 	// Defaults to "5m" (five minutes) when empty.
