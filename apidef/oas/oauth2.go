@@ -448,6 +448,7 @@ func (s *OAS) ValidateOAuth2Schemes() error {
 	if tykAuth == nil || tykAuth.SecuritySchemes == nil {
 		return nil
 	}
+	overrides := s.activeExchangeOverrides()
 	for name, scheme := range tykAuth.SecuritySchemes {
 		cfg := asOAuth2Scheme(scheme)
 		if cfg == nil || cfg.IsEmpty() {
@@ -456,11 +457,47 @@ func (s *OAS) ValidateOAuth2Schemes() error {
 		if err := validateOAuth2ScopeCheck(name, cfg.ScopeCheck); err != nil {
 			return err
 		}
-		if err := validateOAuth2TokenExchange(name, cfg.TokenExchange); err != nil {
+		if err := validateOAuth2TokenExchange(name, cfg.TokenExchange, overrides); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// exchangeOverride is an enabled per-operation or per-primitive exchange block,
+// labelled by the operationID or primitive name that owns it.
+type exchangeOverride struct {
+	label    string
+	audience string
+}
+
+// activeExchangeOverrides collects every enabled exchange override in the
+// document, sorted by label so validation errors are deterministic.
+func (s *OAS) activeExchangeOverrides() []exchangeOverride {
+	mw := s.GetTykMiddleware()
+	if mw == nil {
+		return nil
+	}
+	var out []exchangeOverride
+	add := func(label string, ex *OAuth2Exchange) {
+		if ex.IsActive() {
+			out = append(out, exchangeOverride{label: label, audience: ex.Audience})
+		}
+	}
+	for label, op := range mw.Operations {
+		if op != nil {
+			add(label, op.Exchange)
+		}
+	}
+	for _, prims := range []MCPPrimitives{mw.McpTools, mw.McpResources, mw.McpPrompts} {
+		for label, prim := range prims {
+			if prim != nil {
+				add(label, prim.Exchange)
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].label < out[j].label })
+	return out
 }
 
 // validateOAuth2ScopeCheck rejects an enabled scopeCheck whose scopeSource is
@@ -480,7 +517,7 @@ func validateOAuth2ScopeCheck(schemeName string, sc *OAuth2ScopeCheck) error {
 	}
 }
 
-func validateOAuth2TokenExchange(schemeName string, te *OAuth2TokenExchange) error {
+func validateOAuth2TokenExchange(schemeName string, te *OAuth2TokenExchange, overrides []exchangeOverride) error {
 	if te == nil || !te.Enabled {
 		return nil
 	}
@@ -494,7 +531,31 @@ func validateOAuth2TokenExchange(schemeName string, te *OAuth2TokenExchange) err
 			return err
 		}
 	}
-	return nil
+	return validateExchangeAudience(schemeName, te.Providers, overrides)
+}
+
+// validateExchangeAudience rejects a config that cannot resolve an audience
+// anywhere: every provider is RFC 8693 with no defaultTarget.audience and no
+// active override sets one. An audience-less override beside a resolvable
+// sibling is left to fail at request time — rejecting the document would take
+// the working endpoints offline too.
+func validateExchangeAudience(schemeName string, providers []OAuth2TokenExchangeProvider, overrides []exchangeOverride) error {
+	for i := range providers {
+		p := &providers[i]
+		if p.IsJWTBearer() || (p.DefaultTarget != nil && p.DefaultTarget.Audience != "") {
+			return nil
+		}
+	}
+	if len(overrides) == 0 {
+		return nil
+	}
+	for _, o := range overrides {
+		if o.audience != "" {
+			return nil
+		}
+	}
+	return fmt.Errorf("oauth2 scheme %q: exchange on %q resolves no audience — every tokenExchange provider uses the %q grant and none sets defaultTarget.audience; set an audience on this exchange block or a provider defaultTarget.audience",
+		schemeName, overrides[0].label, OAuth2ProviderGrantTokenExchange)
 }
 
 // validateOAuth2ExchangeProvider validates a single token-exchange provider and

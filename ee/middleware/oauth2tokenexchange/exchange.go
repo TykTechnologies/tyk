@@ -226,8 +226,9 @@ func (m *Middleware) exchangeWouldFire(st *oauth2common.State, cfg *oas.OAuth2) 
 			}
 		}
 	}
-	for _, p := range cfg.TokenExchange.Providers {
-		if p.DefaultTarget != nil && p.DefaultTarget.Audience != "" {
+	// The shared merge applies the per-grant audience rule.
+	for i := range cfg.TokenExchange.Providers {
+		if oauth2common.MergeTargetForProvider(nil, &cfg.TokenExchange.Providers[i], nil) != nil {
 			return true
 		}
 	}
@@ -250,13 +251,7 @@ func (m *Middleware) resolveExchangeTarget(st *oauth2common.State, provider *oas
 			}
 		}
 	}
-	if provider.DefaultTarget != nil && provider.DefaultTarget.Audience != "" {
-		return &oauth2common.Target{
-			Audience: provider.DefaultTarget.Audience,
-			Scopes:   append([]string(nil), provider.DefaultTarget.Scopes...),
-		}
-	}
-	return nil
+	return oauth2common.MergeTargetForProvider(nil, provider, nil)
 }
 
 // exchangeAtIdP posts the RFC 8693 exchange form to the provider's token endpoint.
