@@ -231,7 +231,8 @@ type StorageOptionsConf struct {
 	IAMAuth IAMAuthConfig `json:"iam_auth"`
 }
 
-// IAMAuthConfig configures IAM-based authentication for cloud-managed Redis/Valkey.
+// Configure the cloud provider's Identity and Access Management (IAM) authentication
+// for temporal storage (Redis/Valkey). If enabled, the standard `username` and `password` are ignored.
 type IAMAuthConfig struct {
 	// Set to true to use IAM-based authentication for this storage connection.
 	Enabled bool `json:"enabled"`
