@@ -780,7 +780,15 @@ jobs:
           BRANCH=${HEAD_REF##*/}
           echo "Checking for branch: $BRANCH in tyk-analytics"
 
-          if git ls-remote --heads https://$GITHUB_TOKEN@github.com/TykTechnologies/tyk-analytics.git refs/heads/$BRANCH | grep -q .; then
+          if ! REMOTE_REF=$(git ls-remote \
+            --heads \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/TykTechnologies/tyk-analytics.git" \
+            "refs/heads/$BRANCH"); then
+            echo "::error::Unable to query tyk-analytics; check GitHub App authentication and repository permissions"
+            exit 1
+          fi
+
+          if [ -n "$REMOTE_REF" ]; then
             echo "✓ Branch '$BRANCH' exists in tyk-analytics"
             echo "branch_exists=true" >> $GITHUB_OUTPUT
             echo "branch=$BRANCH" >> $GITHUB_OUTPUT
