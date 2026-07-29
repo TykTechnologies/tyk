@@ -244,7 +244,9 @@ type IAMAuthConfig struct {
 	// on GKE, or GOOGLE_APPLICATION_CREDENTIALS).
 	ServiceAccount string `json:"service_account"`
 	// TokenRefreshBeforeExpiry is how far ahead of token expiry to refresh, as a
-	// Go duration string (e.g. "5m"). Defaults to "5m" when empty.
+	// Set the time period before expiry when that refresh will take place as
+	// a human readable duration (for example 2m30s", "5m").
+	// Defaults to "5m" (five minutes) when empty.
 	TokenRefreshBeforeExpiry string `json:"token_refresh_before_expiry"`
 }
 
