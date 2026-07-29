@@ -233,7 +233,7 @@ type StorageOptionsConf struct {
 
 // IAMAuthConfig configures IAM-based authentication for cloud-managed Redis/Valkey.
 type IAMAuthConfig struct {
-	// Enabled turns on IAM-based authentication for this storage connection.
+	// Set to true to use IAM-based authentication for this storage connection.
 	Enabled bool `json:"enabled"`
 	// Provider selects the cloud IAM provider. Currently supported: "gcp"
 	// (GCP Memorystore for Valkey and Redis Cluster).
