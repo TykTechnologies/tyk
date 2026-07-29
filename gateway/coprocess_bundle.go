@@ -160,6 +160,13 @@ func (b *Bundle) PartialVerify(bundleFs afero.Fs, skipVerify bool) error {
 func (b *Bundle) AddToSpec() {
 	b.Spec.CustomMiddleware = b.Manifest.CustomMiddleware
 
+	// Map analytics plugin from manifest to APISpec
+	if !b.Manifest.CustomMiddleware.TrafficLogs.Disabled && b.Manifest.CustomMiddleware.TrafficLogs.Name != "" {
+		b.Spec.AnalyticsPlugin.Enabled = true
+		b.Spec.AnalyticsPlugin.FuncName = b.Manifest.CustomMiddleware.TrafficLogs.Name
+		b.Spec.AnalyticsPlugin.PluginPath = b.Manifest.CustomMiddleware.TrafficLogs.Path
+	}
+
 	// Load Python interpreter if the
 	if loadedDrivers[b.Spec.CustomMiddleware.Driver] == nil && b.Spec.CustomMiddleware.Driver == apidef.PythonDriver {
 		var err error
