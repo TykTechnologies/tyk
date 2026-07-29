@@ -837,6 +837,21 @@ type PinnedPublicKey struct {
 	PublicKeys []string `bson:"publicKeys" json:"publicKeys"`
 }
 
+// splitPublicKeys splits a comma-separated list of public key identifiers.
+// Each entry is trimmed of surrounding whitespace; PEM blocks are preserved
+// intact.
+func splitPublicKeys(value string) []string {
+	parts := strings.Split(value, ",")
+	keys := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			keys = append(keys, part)
+		}
+	}
+	return keys
+}
+
 // PinnedPublicKeys is a list of domains and pinned public keys for them.
 type PinnedPublicKeys []PinnedPublicKey
 
@@ -856,7 +871,7 @@ func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
 
 	i = 0
 	for _, domain := range domains {
-		ppk[i] = PinnedPublicKey{Domain: domain, PublicKeys: strings.Split(strings.ReplaceAll(publicKeys[domain], " ", ""), ",")}
+		ppk[i] = PinnedPublicKey{Domain: domain, PublicKeys: splitPublicKeys(publicKeys[domain])}
 		i++
 	}
 }

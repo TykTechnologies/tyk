@@ -30,5 +30,5 @@ spec:
   - name: We should have only 1 proxy to httpbin
     selector: span[tracetest.span.type="http" name="HTTP GET" http.request.method="GET"]
     assertions:
-    - attr:server.address = "httpbin"
+    - attr:server.address = "httpbin.org"
     - attr:tracetest.selected_spans.count = 1

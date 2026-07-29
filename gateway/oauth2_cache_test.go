@@ -86,6 +86,8 @@ func (f *fakeStore) GetListRange(string, int64, int64) ([]string, error) { retur
 func (f *fakeStore) RemoveFromList(string, string) error                 { return nil }
 func (f *fakeStore) AppendToSet(string, string)                          {}
 func (f *fakeStore) Exists(string) (bool, error)                         { return false, nil }
+func (f *fakeStore) SetKeyEx(_ string, _ string, _ int64) error          { return nil }
+func (f *fakeStore) SetRawKeyEx(_ string, _ string, _ int64) error       { return nil }
 
 func TestRedisExchangeCache_MissOnEmpty(t *testing.T) {
 	c := newRedisExchangeCache(newFakeStore(), "secret")
