@@ -101,6 +101,39 @@ func TestSyntheticJSONRPCMethod_LimitsFallbackBodyReadAndPreservesBody(t *testin
 	assert.Equal(t, body, string(preserved))
 }
 
+func TestBufferedResponseWriter_WriteToSetsSafeContentHeaders(t *testing.T) {
+	tests := []struct {
+		name            string
+		contentType     string
+		wantContentType string
+	}{
+		{
+			name:            "defaults to JSON",
+			wantContentType: contentTypeJSON + "; charset=utf-8",
+		},
+		{
+			name:            "preserves existing content type",
+			contentType:     "application/problem+json",
+			wantContentType: "application/problem+json",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			src := newBufferedResponseWriter()
+			if tt.contentType != "" {
+				src.Header().Set(headerContentType, tt.contentType)
+			}
+
+			dst := httptest.NewRecorder()
+			src.writeTo(dst, []byte(`<script>alert("xss")</script>`))
+
+			assert.Equal(t, tt.wantContentType, dst.Header().Get(headerContentType))
+			assert.Equal(t, "nosniff", dst.Header().Get("X-Content-Type-Options"))
+		})
+	}
+}
+
 func TestJSONRPCMiddleware_ProcessRequest_NonPostPassthrough(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{

@@ -470,6 +470,10 @@ func (w *bufferedResponseWriter) writeTo(dst http.ResponseWriter, body []byte) {
 			dst.Header().Add(key, value)
 		}
 	}
+	if dst.Header().Get(headerContentType) == "" {
+		dst.Header().Set(headerContentType, contentTypeJSON+"; charset=utf-8")
+	}
+	dst.Header().Set("X-Content-Type-Options", "nosniff")
 	dst.WriteHeader(w.statusCode)
 	if _, err := dst.Write(body); err != nil {
 		log.WithError(err).Debug("failed to write REST-as-MCP response")
