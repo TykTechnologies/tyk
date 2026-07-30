@@ -762,7 +762,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 
 	mainLog.Info("Loading policies")
 
-	switch config.PolicySource(gw.GetConfig().Policies.PolicySource) {
+	switch gw.GetConfig().Policies.PolicySource {
 	case config.PolicySourceService:
 		if gw.GetConfig().Policies.PolicyConnectionString == "" {
 			mainLog.Fatal("No connection string or node ID present. Failing.")
@@ -1641,7 +1641,7 @@ func (gw *Gateway) initSystem() error {
 
 	// Initialize the appropriate log formatter
 	if !gw.isRunningTests() && os.Getenv("TYK_LOGFORMAT") == "" && !*cli.DebugMode {
-		tyklog.SetupFormatter(tyklog.Format(gwConfig.LogFormat))
+		tyklog.SetupFormatter(gwConfig.LogFormat)
 		mainLog.Debugf("Set log format to %q", gwConfig.LogFormat)
 	}
 
