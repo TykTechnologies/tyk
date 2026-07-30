@@ -6,11 +6,64 @@ import (
 	"net"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 )
+
+// jsonEscapeString encodes s as a JSON string and strips the surrounding
+// quotes, producing a value safe to splice into an existing JSON string
+// literal. This is necessary when substituting secret values (which may
+// contain newlines, quotes, or other special characters) directly into a
+// raw JSON document.
+func jsonEscapeString(s string) string {
+	const hex = "0123456789abcdef"
+
+	escapeIdx := -1
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c < 0x20 || c == '"' || c == '\\' {
+			escapeIdx = i
+			break
+		}
+	}
+
+	if escapeIdx == -1 {
+		return s
+	}
+
+	var b strings.Builder
+	b.Grow(len(s) + 4)
+	b.WriteString(s[:escapeIdx])
+
+	for i := escapeIdx; i < len(s); i++ {
+		c := s[i]
+		switch c {
+		case '"', '\\':
+			b.WriteByte('\\')
+			b.WriteByte(c)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		default:
+			if c < 0x20 {
+
+				b.WriteString(`\u00`)
+				b.WriteByte(hex[c>>4])
+				b.WriteByte(hex[c&0xF])
+			} else {
+				b.WriteByte(c)
+			}
+		}
+	}
+
+	return b.String()
+}
 
 // appendIfMissing ensures dest slice is unique with new items.
 func appendIfMissing(src []string, in ...string) []string {
