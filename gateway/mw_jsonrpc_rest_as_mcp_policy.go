@@ -84,7 +84,10 @@ func parseSyntheticAdapterJSONRPC(r *http.Request) (*JSONRPCRequest, bool, error
 	}
 
 	var rpcReq JSONRPCRequest
-	if err := json.Unmarshal(body, &rpcReq); err != nil || rpcReq.Method == "" {
+	if err := json.Unmarshal(body, &rpcReq); err != nil {
+		return nil, false, err
+	}
+	if rpcReq.Method == "" {
 		return nil, false, nil
 	}
 

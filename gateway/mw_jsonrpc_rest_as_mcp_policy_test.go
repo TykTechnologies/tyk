@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -23,6 +24,22 @@ import (
 	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/user"
 )
+
+func TestParseSyntheticAdapterJSONRPC_ReturnsUnmarshalError(t *testing.T) {
+	body := `{"jsonrpc":"2.0",`
+	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+	req.Header.Set(headerContentType, contentTypeJSON)
+
+	rpcReq, ok, err := parseSyntheticAdapterJSONRPC(req)
+
+	require.Error(t, err)
+	assert.False(t, ok)
+	assert.Nil(t, rpcReq)
+
+	preserved, readErr := io.ReadAll(req.Body)
+	require.NoError(t, readErr)
+	assert.Equal(t, body, string(preserved))
+}
 
 func TestRESTAsMCPPolicy_DeniesBlockedToolBeforeSDK(t *testing.T) {
 	gw, adapterSpec, _ := syntheticAdapterGatewayForCallTest(t)
