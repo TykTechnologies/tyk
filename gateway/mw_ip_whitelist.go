@@ -26,6 +26,13 @@ func (i *IPWhiteListMiddleware) EnabledForSpec() bool {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	remoteIP := net.ParseIP(request.RealIP(r))
+	// net.IP.Equal treats two nil IPs as equal. Reject unparseable client IPs and
+	// skip invalid ACL entries so a bad config entry cannot accidentally allow traffic.
+	if remoteIP == nil {
+		AuthFailed(i, r, request.RealIP(r))
+		reportHealthValue(i.Spec, KeyFailure, "-1")
+		return errors.New("access from this IP has been disallowed"), http.StatusForbidden
+	}
 
 	// Enabled, check incoming IP address
 	for _, ip := range i.Spec.AllowedIPs {
@@ -42,7 +49,7 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 		}
 
 		// We parse the IP to manage IPv4 and IPv6 easily
-		if allowedIP.Equal(remoteIP) {
+		if allowedIP != nil && allowedIP.Equal(remoteIP) {
 			// matched, pass through
 			return nil, http.StatusOK
 		}
