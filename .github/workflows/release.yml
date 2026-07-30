@@ -777,10 +777,18 @@ jobs:
             exit 0
           fi
 
-          BRANCH=${HEAD_REF##*/}
+          BRANCH="$HEAD_REF"
           echo "Checking for branch: $BRANCH in tyk-analytics"
 
-          if git ls-remote --heads https://$GITHUB_TOKEN@github.com/TykTechnologies/tyk-analytics.git refs/heads/$BRANCH | grep -q .; then
+          if ! REMOTE_REF=$(git ls-remote \
+            --heads \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/TykTechnologies/tyk-analytics.git" \
+            "refs/heads/$BRANCH"); then
+            echo "::error::Unable to query tyk-analytics; check GitHub App authentication and repository permissions"
+            exit 1
+          fi
+
+          if [ -n "$REMOTE_REF" ]; then
             echo "✓ Branch '$BRANCH' exists in tyk-analytics"
             echo "branch_exists=true" >> $GITHUB_OUTPUT
             echo "branch=$BRANCH" >> $GITHUB_OUTPUT
@@ -829,6 +837,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HAS_RELEVANT_CHANGES: ${{ steps.check_changes.outputs.has_relevant_changes }}
           ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           echo "=================================="
           echo "📊 Dashboard Image Resolution"
@@ -843,61 +852,69 @@ jobs:
           echo "Has relevant changes in PR: $HAS_RELEVANT_CHANGES"
           echo "=================================="
 
+          # emit <strategy> <dashboard_image> <needs_build> <dashboard_branch>
+          emit() {
+            echo "strategy=$1" >> $GITHUB_OUTPUT
+            echo "dashboard_image=$2" >> $GITHUB_OUTPUT
+            echo "needs_build=$3" >> $GITHUB_OUTPUT
+            echo "dashboard_branch=$4" >> $GITHUB_OUTPUT
+          }
+
+          dash_image_exists() {
+            aws ecr describe-images \
+              --repository-name tyk-analytics \
+              --image-ids imageTag=$1 \
+              --region eu-central-1 > /dev/null 2>&1
+          }
+
           # For non-master base branches, check if the same branch exists in tyk-analytics
           if [ "$BASE_REF" != "master" ]; then
-            if git ls-remote --exit-code --heads "https://x-access-token:${ORG_GH_TOKEN}@github.com/TykTechnologies/tyk-analytics.git" "refs/heads/$BASE_REF" > /dev/null 2>&1; then
-              echo "📋 Strategy: Use release branch '$BASE_REF' from tyk-analytics"
-              echo "    → Base branch exists in tyk-analytics, using it directly"
-              echo "dashboard_image=${REGISTRY}/tyk-analytics:${BASE_REF}" >> $GITHUB_OUTPUT
-              echo "needs_build=false" >> $GITHUB_OUTPUT
-              echo "dashboard_branch=$BASE_REF" >> $GITHUB_OUTPUT
-              echo "strategy=release-branch-match" >> $GITHUB_OUTPUT
-            else
+            if ! git ls-remote --exit-code --heads "https://x-access-token:${ORG_GH_TOKEN}@github.com/TykTechnologies/tyk-analytics.git" "refs/heads/$BASE_REF" > /dev/null 2>&1; then
               echo "ℹ️ Strategy: Use gromit default (base branch '$BASE_REF' not found in tyk-analytics)"
-              echo "    → Falling back to gromit default"
-              echo "dashboard_image=" >> $GITHUB_OUTPUT
-              echo "needs_build=false" >> $GITHUB_OUTPUT
-              echo "dashboard_branch=" >> $GITHUB_OUTPUT
-              echo "strategy=gromit-default" >> $GITHUB_OUTPUT
+              emit gromit-default "" false ""
+            elif dash_image_exists "$BASE_REF"; then
+              echo "📋 Strategy: Use release branch '$BASE_REF' from tyk-analytics"
+              emit release-branch-match "${REGISTRY}/tyk-analytics:${BASE_REF}" false "$BASE_REF"
+            elif [ -n "$PR_NUMBER" ]; then
+              echo "🔨 Strategy: Build dashboard from base branch '$BASE_REF' (branch exists but has no ECR image)"
+              emit build-from-base-branch "${REGISTRY}/tyk-analytics:tyk-${PR_NUMBER}" true "$BASE_REF"
+            else
+              echo "ℹ️ Strategy: Use gromit default (no ECR image for '$BASE_REF' and not a PR)"
+              emit gromit-default "" false ""
             fi
 
-          # Strategy 1: Matching branch exists in tyk-analytics → use gromit
+          # Strategy 1: Matching branch exists in tyk-analytics → use its PR image, or build from it
           elif [ "$BRANCH_EXISTS" = "true" ]; then
-            echo "📋 Strategy: Use matching branch '$BRANCH' via gromit"
-            echo "    → No override needed, gromit will handle it"
-            echo "dashboard_image=" >> $GITHUB_OUTPUT
-            echo "needs_build=false" >> $GITHUB_OUTPUT
-            echo "dashboard_branch=$BRANCH" >> $GITHUB_OUTPUT
-            echo "strategy=gromit-branch" >> $GITHUB_OUTPUT
+            # Find the tyk-analytics PR for the branch by matching its head SHA
+            # against refs/pull/*/head; needs only repository read access
+            TA_REMOTE="https://x-access-token:${GH_TOKEN}@github.com/TykTechnologies/tyk-analytics.git"
+            BRANCH_SHA=$(git ls-remote --heads "$TA_REMOTE" "refs/heads/$BRANCH" | cut -f1 || true)
+            DASH_PR=$(git ls-remote "$TA_REMOTE" 'refs/pull/*/head' 2>/dev/null \
+              | awk -v sha="$BRANCH_SHA" '$1 == sha { split($2, r, "/"); print r[3] }' \
+              | sort -n | tail -1 || true)
+
+            if [ -n "$DASH_PR" ] && dash_image_exists "pr-${DASH_PR}"; then
+              echo "📋 Strategy: Use tyk-analytics PR #${DASH_PR} image (tyk-analytics:pr-${DASH_PR}) for matching branch '$BRANCH'"
+              emit analytics-pr-image "${REGISTRY}/tyk-analytics:pr-${DASH_PR}" false "$BRANCH"
+            else
+              echo "🔨 Strategy: Build dashboard from matching branch '$BRANCH' (no open tyk-analytics PR image)"
+              emit build-from-branch "${REGISTRY}/tyk-analytics:tyk-${PR_NUMBER}" true "$BRANCH"
+            fi
 
           # Strategy 2a: PR has relevant changes → build new image
           elif [ "$HAS_RELEVANT_CHANGES" = "true" ]; then
-            PR_IMAGE_TAG="tyk-${PR_NUMBER}"
-            echo "🔨 Strategy: Build dashboard (PR has relevant package changes)"
-            echo "    → Will update gateway ref to $COMMIT_SHA"
-            echo "    → Will push to: ${REGISTRY}/tyk-analytics:${PR_IMAGE_TAG}"
-            echo "dashboard_image=${REGISTRY}/tyk-analytics:${PR_IMAGE_TAG}" >> $GITHUB_OUTPUT
-            echo "needs_build=true" >> $GITHUB_OUTPUT
-            echo "dashboard_branch=$BASE_REF" >> $GITHUB_OUTPUT
-            echo "strategy=build-required" >> $GITHUB_OUTPUT
+            echo "🔨 Strategy: Build dashboard from '$BASE_REF' with gateway ref $COMMIT_SHA (PR has relevant package changes)"
+            emit build-required "${REGISTRY}/tyk-analytics:tyk-${PR_NUMBER}" true "$BASE_REF"
 
           # Strategy 2b: PR image exists and no relevant changes → reuse existing image
           elif [ "$IMAGE_EXISTS" = "true" ]; then
-            echo "🐳 Strategy: Reuse existing PR image (no relevant package changes in PR)"
-            echo "    → Image: ${REGISTRY}/tyk-analytics:${IMAGE_TAG}"
-            echo "dashboard_image=${REGISTRY}/tyk-analytics:${IMAGE_TAG}" >> $GITHUB_OUTPUT
-            echo "needs_build=false" >> $GITHUB_OUTPUT
-            echo "dashboard_branch=" >> $GITHUB_OUTPUT
-            echo "strategy=reuse-pr-image" >> $GITHUB_OUTPUT
+            echo "🐳 Strategy: Reuse existing PR image tyk-analytics:${IMAGE_TAG} (no relevant package changes in PR)"
+            emit reuse-pr-image "${REGISTRY}/tyk-analytics:${IMAGE_TAG}" false ""
 
           # Strategy 3: Fallback to gromit default
           else
-            echo "ℹ️ Strategy: Use gromit default"
-            echo "    → No matching branch, no existing PR image, no relevant changes"
-            echo "dashboard_image=" >> $GITHUB_OUTPUT
-            echo "needs_build=false" >> $GITHUB_OUTPUT
-            echo "dashboard_branch=" >> $GITHUB_OUTPUT
-            echo "strategy=gromit-default" >> $GITHUB_OUTPUT
+            echo "ℹ️ Strategy: Use gromit default (no matching branch, PR image, or relevant changes)"
+            emit gromit-default "" false ""
           fi
 
           echo "=================================="
