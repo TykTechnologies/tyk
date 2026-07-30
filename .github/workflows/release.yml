@@ -885,9 +885,13 @@ jobs:
 
           # Strategy 1: Matching branch exists in tyk-analytics → use its PR image, or build from it
           elif [ "$BRANCH_EXISTS" = "true" ]; then
-            DASH_PR=$(curl -sf -H "Authorization: Bearer $GH_TOKEN" \
-              "https://api.github.com/repos/TykTechnologies/tyk-analytics/pulls?head=TykTechnologies:${BRANCH}&state=open" \
-              | jq -r '.[0].number // empty' 2>/dev/null || true)
+            # Find the tyk-analytics PR for the branch by matching its head SHA
+            # against refs/pull/*/head; needs only repository read access
+            TA_REMOTE="https://x-access-token:${GH_TOKEN}@github.com/TykTechnologies/tyk-analytics.git"
+            BRANCH_SHA=$(git ls-remote --heads "$TA_REMOTE" "refs/heads/$BRANCH" | cut -f1 || true)
+            DASH_PR=$(git ls-remote "$TA_REMOTE" 'refs/pull/*/head' 2>/dev/null \
+              | awk -v sha="$BRANCH_SHA" '$1 == sha { split($2, r, "/"); print r[3] }' \
+              | sort -n | tail -1 || true)
 
             if [ -n "$DASH_PR" ] && dash_image_exists "pr-${DASH_PR}"; then
               echo "📋 Strategy: Use tyk-analytics PR #${DASH_PR} image (tyk-analytics:pr-${DASH_PR}) for matching branch '$BRANCH'"
