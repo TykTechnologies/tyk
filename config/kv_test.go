@@ -567,8 +567,7 @@ func closeRegistry(t *testing.T, reg *registry.Registry) {
 }
 
 // fakeProvider is a stand-in for an enterprise provider: it ignores the key and
-// returns a fixed value. It is Standalone so the registry doesn't wrap it in a
-// cache, keeping the test focused on the factory-injection path.
+// returns a fixed value.
 type fakeProvider struct{ value string }
 
 func (f fakeProvider) Get(_ context.Context, _ string) (string, error) { return f.value, nil }

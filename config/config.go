@@ -1352,7 +1352,6 @@ type Config struct {
 		Vault  VaultConfig               `json:"vault"`
 		File   FileConfig                `json:"file"`
 		Stores map[string]kv.StoreConfig `json:"stores" ignored:"true"`
-		Cache  kv.CacheConfig            `json:"cache"`
 	} `json:"kv"`
 
 	// Secrets configures a list of key/value pairs for the gateway.

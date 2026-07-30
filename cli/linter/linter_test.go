@@ -87,21 +87,6 @@ var tests = []struct {
 		nil,
 	},
 	{
-		"KVCache",
-		`{"kv": {"cache": {"enabled": true, "ttl": "60s", "refresh_before_expiry": "10s", "negative_ttl_not_found": "300s", "negative_ttl_transient": "5s"}}}`,
-		nil,
-	},
-	{
-		"KVStoresAndCache",
-		`{"kv": {"vault": {"address": "https://vault:8200"}, "cache": {"enabled": true, "ttl": "60s"}, "stores": {"aws-prod": {"type": "aws_secrets_manager", "required": true, "config": {"region": "us-east-1"}}}}}`,
-		nil,
-	},
-	{
-		"KVCacheFieldTypo",
-		`{"kv": {"cache": {"enabledd": true}}}`,
-		`kv.cache: Additional property enabledd is not allowed`,
-	},
-	{
 		"KVStoreFieldTypo",
 		`{"kv": {"stores": {"x": {"typ": "env"}}}}`,
 		`Additional property typ is not allowed`,

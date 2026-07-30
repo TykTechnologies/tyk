@@ -25,7 +25,7 @@ func (gw *Gateway) resolveKV(original string, set func(*config.Config, string), 
 	}
 	if hotReload && resolved != original {
 		gw.kvResolvers = append(gw.kvResolvers, func() error {
-			val, err := gw.kvStoreCtx(kvLib.WithCacheBypass(gw.ctx), original)
+			val, err := gw.kvStoreCtx(gw.ctx, original)
 			if err != nil {
 				return err
 			}

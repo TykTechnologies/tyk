@@ -1648,27 +1648,6 @@
               }
             }
           }
-        },
-        "cache": {
-          "type": ["object", "null"],
-          "additionalProperties": false,
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "ttl": {
-              "type": "string"
-            },
-            "refresh_before_expiry": {
-              "type": "string"
-            },
-            "negative_ttl_not_found": {
-              "type": "string"
-            },
-            "negative_ttl_transient": {
-              "type": "string"
-            }
-          }
         }
       }
     },
