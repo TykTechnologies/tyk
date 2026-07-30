@@ -79,7 +79,9 @@ func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware
 		}
 
 		var tempBody interface{}
-		if err := json.Unmarshal(body, &tempBody); err != nil {
+		decoder := json.NewDecoder(bytes.NewReader(body))
+		decoder.UseNumber()
+		if err := decoder.Decode(&tempBody); err != nil {
 			return err
 		}
 

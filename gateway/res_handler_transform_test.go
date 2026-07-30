@@ -209,6 +209,33 @@ func TestTransformResponseBody(t *testing.T) {
 			Path: "/transform", Code: 200, BodyNotMatch: `{"http_method":"GET"}`,
 		})
 	})
+
+	t.Run("transform body large int64", func(t *testing.T) {
+		transformResponseConf := apidef.TemplateMeta{
+			Disabled: false,
+			Path:     "/transform-large-int",
+			Method:   http.MethodGet,
+			TemplateData: apidef.TemplateData{
+				Mode:           "blob",
+				TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"id":{{.id}}}`)),
+			},
+		}
+		ts.AddDynamicHandler("large-int/transform-large-int", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(`{"id": 9223372036854775645}`))
+		})
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = TestHttpAny + "/large-int"
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{transformResponseConf}
+			})
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/transform-large-int", Code: 200, BodyMatch: `{"id":9223372036854775645}`,
+		})
+	})
 }
 
 func TestResponseTransformMiddleware_Enabled(t *testing.T) {

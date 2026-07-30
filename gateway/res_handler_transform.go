@@ -162,7 +162,9 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		}
 
 		var tempBody interface{}
-		if err := json.Unmarshal(body, &tempBody); err != nil {
+		decoder := json.NewDecoder(bytes.NewReader(body))
+		decoder.UseNumber()
+		if err := decoder.Decode(&tempBody); err != nil {
 			logger.WithError(err).Error("Error unmarshalling JSON")
 			//todo return error
 			break

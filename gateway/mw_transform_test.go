@@ -163,6 +163,37 @@ func TestTransformJSONMarshalXMLInput(t *testing.T) {
 	}
 }
 
+func TestTransformJSONMarshalLargeInt64(t *testing.T) {
+	tmeta := &TransformSpec{}
+	tmpl := `{"id": {{ .id }}}`
+	tmeta.TemplateData.Input = apidef.RequestJSON
+	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(tmpl))
+
+	in := `{"id": 9223372036854775645}`
+	want := `{"id": 9223372036854775645}`
+	r := TestReq(t, "GET", "/", in)
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ad := &apidef.APIDefinition{}
+	spec := &APISpec{APIDefinition: ad}
+	base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+	transform := TransformMiddleware{base}
+
+	if err := transformBody(r, tmeta, &transform); err != nil {
+		t.Fatalf("wanted nil error, got %v", err)
+	}
+	gotBs, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(gotBs); got != want {
+		t.Fatalf("wanted body %q, got %q", want, got)
+	}
+}
+
 func TestTransformJSONMarshalJSONInput(t *testing.T) {
 	tmeta, in := testPrepareTransformJSONMarshal("json")
 
