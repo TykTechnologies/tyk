@@ -595,6 +595,41 @@ func TestUpstreamURL_KVReferences_RejectsMalformed(t *testing.T) {
 	}
 }
 
+func TestValidateOASObject_KVSyntaxInNonURLField(t *testing.T) {
+	doc := func(headerValue string) []byte {
+		return []byte(`{
+			"openapi": "3.0.3",
+			"info": {"title": "t", "version": "1"},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {"name": "t", "state": {"active": true}},
+				"server": {"listenPath": {"value": "/t"}},
+				"upstream": {"url": "http://upstream.url"},
+				"middleware": {
+					"operations": {
+						"getOp": {
+							"transformRequestHeaders": {
+								"enabled": true,
+								"add": [{"name": "X-KV", "value": "` + headerValue + `"}]
+							}
+						}
+					}
+				}
+			}
+		}`)
+	}
+
+	t.Run("accepts a well-formed kv reference in a header value", func(t *testing.T) {
+		err := ValidateOASObject(doc(`kv://vault/db/password`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("rejects a malformed kv reference in a header value", func(t *testing.T) {
+		err := ValidateOASObject(doc(`kv://random-gcpdb-password`), "3.0.3")
+		require.Error(t, err)
+	})
+}
+
 func TestKVAwareFormatChecker(t *testing.T) {
 	c := kvAwareFormatChecker{base: gojsonschema.URIReferenceFormatChecker{}}
 

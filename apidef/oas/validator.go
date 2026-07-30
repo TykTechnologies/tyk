@@ -132,10 +132,6 @@ func validateJSON(schema, document []byte) error {
 		return err
 	}
 
-	if result.Valid() {
-		return nil
-	}
-
 	combinedErr := &multierror.Error{}
 	combinedErr.ErrorFormat = tykerrors.Formatter
 
@@ -143,8 +139,17 @@ func validateJSON(schema, document []byte) error {
 	for _, validationErr := range validationErrs {
 		combinedErr = multierror.Append(combinedErr, errors.New(validationErr.String()))
 	}
-	return combinedErr.ErrorOrNil()
 
+	// The format-scoped checkers only see uri/uri-reference fields, but the
+	// gateway resolves KV references in every string of the definition. Validate
+	// the whole document so a malformed reference in a non-URL field (e.g. a
+	// request-header transform value) is rejected here rather than failing
+	// the resolver at gateway load.
+	if kvErr := resolver.ValidateSyntaxAll(document); kvErr != nil {
+		combinedErr = multierror.Append(combinedErr, kvErr)
+	}
+
+	return combinedErr.ErrorOrNil()
 }
 
 // ValidateOASObject validates an OAS document against a particular OAS version.
