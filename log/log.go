@@ -145,3 +145,9 @@ func defaultFieldMap() logrus.FieldMap {
 		logrus.FieldKeyMsg: "message",
 	}
 }
+
+type InjectTestHookOptions struct {
+	Logger *logrus.Logger
+}
+
+type InjectTestHookOpt func(*InjectTestHookOptions)

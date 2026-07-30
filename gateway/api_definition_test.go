@@ -3211,3 +3211,96 @@ func TestLoadDefFromFilePath(t *testing.T) {
 		assert.Nil(t, spec)
 	})
 }
+
+func TestAPIDefinitionLoaderFromDir_LoadsAPIDefinitionEndingWithCompanionSuffix(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "api_def_suffix_test")
+	assert.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	apiID := "proxy-over-mcp"
+	def := apidef.APIDefinition{
+		Name:  apiID,
+		APIID: apiID,
+		IsOAS: true,
+		Proxy: apidef.ProxyConfig{
+			ListenPath: "/proxy-over-mcp/",
+			TargetURL:  "https://example.org/mcp",
+		},
+	}
+	def.MarkAsMCP()
+
+	apiData, err := json.Marshal(def)
+	assert.NoError(t, err)
+	err = os.WriteFile(filepath.Join(tmpDir, apiID+".json"), apiData, 0644)
+	assert.NoError(t, err)
+
+	oasDoc := &oas.OAS{T: openapi3.T{
+		OpenAPI: "3.0.3",
+		Info:    &openapi3.Info{Title: apiID, Version: "1.0.0"},
+		Paths:   openapi3.NewPaths(),
+	}}
+	oasData, err := json.Marshal(oasDoc)
+	assert.NoError(t, err)
+	err = os.WriteFile(filepath.Join(tmpDir, apiID+"-mcp.json"), oasData, 0644)
+	assert.NoError(t, err)
+
+	gw := &Gateway{apisByID: map[string]*APISpec{}}
+	gw.SetConfig(config.Config{})
+	loader := APIDefinitionLoader{Gw: gw}
+	specs := loader.FromDir(tmpDir)
+
+	assert.Len(t, specs, 1)
+	if assert.NotEmpty(t, specs) {
+		assert.Equal(t, apiID, specs[0].APIID)
+		assert.NotNil(t, specs[0].OAS)
+	}
+}
+
+func TestGatewayWriteSpecFiles_WritesCompanionsOnlyForOASAPIs(t *testing.T) {
+	classic := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "classic",
+		},
+	}
+	oasSpec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "oas",
+			IsOAS: true,
+		},
+		OAS: oas.OAS{T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info:    &openapi3.Info{Title: "oas", Version: "1.0.0"},
+			Paths:   openapi3.NewPaths(),
+		}},
+	}
+	mcpSpec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "mcp",
+			IsOAS: true,
+		},
+		OAS: oas.OAS{T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info:    &openapi3.Info{Title: "mcp", Version: "1.0.0"},
+			Paths:   openapi3.NewPaths(),
+		}},
+	}
+	mcpSpec.MarkAsMCP()
+
+	appPath := t.TempDir()
+	(&Gateway{}).writeSpecFiles([]*APISpec{classic, oasSpec, mcpSpec}, appPath)
+
+	entries, err := os.ReadDir(appPath)
+	require.NoError(t, err)
+
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	assert.ElementsMatch(t, []string{
+		"classic0.json",
+		"oas1.json",
+		"oas1-oas.json",
+		"mcp2.json",
+		"mcp2-mcp.json",
+	}, names)
+}

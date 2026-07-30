@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/mock"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	tempmocks "github.com/TykTechnologies/storage/temporal/tempmocks"
 
@@ -154,17 +153,9 @@ func TestConnectionHandler_statusCheck(t *testing.T) {
 
 	rc := NewConnectionHandler(ctx)
 
-	numberOfCalls := 0
-	wg := sync.WaitGroup{}
-	wg.Add(1)
 	// Add a mock connection to the handler
 	mockConn := tempmocks.NewConnector(t)
-	mockConn.On("Ping", ctx).Return(nil).Run(func(args mock.Arguments) {
-		numberOfCalls++
-		if numberOfCalls == 3 {
-			wg.Done()
-		}
-	})
+	mockConn.On("Ping", ctx).Return(nil)
 
 	rc.storageUp.Store(false)
 	rc.disableStorage.Store(false)
@@ -176,10 +167,7 @@ func TestConnectionHandler_statusCheck(t *testing.T) {
 	// Run statusCheck in a goroutine
 	go rc.statusCheck(ctx)
 
-	// Allow some time for the goroutine to run
-	wg.Wait()
-
-	// Check if storage is up
-	assert.True(t, rc.Connected(), "Expected storage to be connected after status check")
+	require.Eventually(t, rc.Connected, 5*time.Second, 10*time.Millisecond,
+		"Expected storage to be connected after status check")
 	mockConn.AssertNumberOfCalls(t, "Ping", 3)
 }

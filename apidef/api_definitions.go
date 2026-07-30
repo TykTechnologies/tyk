@@ -16,6 +16,7 @@ import (
 	"github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/mcpadapter"
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
 	tyktime "github.com/TykTechnologies/tyk/internal/time"
@@ -64,11 +65,12 @@ const (
 	RequestXML  RequestInputType = "xml"
 	RequestJSON RequestInputType = "json"
 
-	OttoDriver     MiddlewareDriver = "otto"
-	PythonDriver   MiddlewareDriver = "python"
-	LuaDriver      MiddlewareDriver = "lua"
-	GrpcDriver     MiddlewareDriver = "grpc"
-	GoPluginDriver MiddlewareDriver = "goplugin"
+	OttoDriver       MiddlewareDriver = "otto"
+	JavaScriptDriver MiddlewareDriver = "javascript"
+	PythonDriver     MiddlewareDriver = "python"
+	LuaDriver        MiddlewareDriver = "lua"
+	GrpcDriver       MiddlewareDriver = "grpc"
+	GoPluginDriver   MiddlewareDriver = "goplugin"
 
 	BodySource        IdExtractorSource = "body"
 	HeaderSource      IdExtractorSource = "header"
@@ -571,8 +573,15 @@ type MiddlewareDefinition struct {
 	Disabled       bool   `bson:"disabled" json:"disabled"`
 	Name           string `bson:"name" json:"name"`
 	Path           string `bson:"path" json:"path"`
+	Code           string `bson:"code,omitempty" json:"code,omitempty"`
 	RequireSession bool   `bson:"require_session" json:"require_session"`
 	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
+
+	// RuntimeHandlerName is set by the gateway at API-load time when the JS
+	// driver rebrands handler globals to per-(file, name) unique aliases.
+	// Dispatch reads this when non-empty and falls back to Name otherwise.
+	// Transient — never serialized.
+	RuntimeHandlerName string `bson:"-" json:"-"`
 }
 
 // IDExtractorConfig specifies the configuration for ID extractor
@@ -602,6 +611,7 @@ type MiddlewareSection struct {
 	Post        []MiddlewareDefinition `bson:"post" json:"post"`
 	PostKeyAuth []MiddlewareDefinition `bson:"post_key_auth" json:"post_key_auth"`
 	AuthCheck   MiddlewareDefinition   `bson:"auth_check" json:"auth_check"`
+	TrafficLogs MiddlewareDefinition   `bson:"traffic_logs" json:"traffic_logs"`
 	Response    []MiddlewareDefinition `bson:"response" json:"response"`
 	Driver      MiddlewareDriver       `bson:"driver" json:"driver"`
 	IdExtractor MiddlewareIdExtractor  `bson:"id_extractor" json:"id_extractor"`
@@ -746,6 +756,14 @@ type APIDefinition struct {
 	DisableRateLimit                     bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
 	DisableQuota                         bool                   `bson:"disable_quota" json:"disable_quota"`
 	CustomMiddleware                     MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
+	// CustomMiddlewareBundle is the bundle filename (or comma-separated list of
+	// bundle filenames) resolved against the gateway's bundle_base_url. A single
+	// name takes the legacy single-bundle load path unchanged. Two or more
+	// comma-separated names enable multi-bundle composition: each bundle is
+	// fetched into its own subdirectory under the API's bundle root, and the
+	// manifests are merged into the effective custom_middleware section in
+	// declaration order — array hooks (pre/post/post_key_auth/response)
+	// concatenate; auth_check may be set by at most one bundle.
 	CustomMiddlewareBundle               string                 `bson:"custom_middleware_bundle" json:"custom_middleware_bundle"`
 	CustomMiddlewareBundleDisabled       bool                   `bson:"custom_middleware_bundle_disabled" json:"custom_middleware_bundle_disabled"`
 	CacheOptions                         CacheOptions           `bson:"cache_options" json:"cache_options"`
@@ -1480,6 +1498,31 @@ func (a *APIDefinition) MarkAsMCP() {
 	a.SetProtocol(JsonRPC20, AppProtocolMCP)
 }
 
+// IsPairedMCPAdapterProxy returns true if this API is a REST-as-MCP proxy
+// whose upstream loops into a REST-as-MCP adapter target for a REST API.
+func (a *APIDefinition) IsPairedMCPAdapterProxy() bool {
+	if a == nil {
+		return false
+	}
+
+	host, path, ok := mcpadapter.ParseTarget(a.Proxy.TargetURL)
+	if !ok {
+		return false
+	}
+	if mcpadapter.IsAPIID(host) {
+		return path == "" || path == "/"
+	}
+	return mcpadapter.IsLoopPath(path)
+}
+
+// IsMCPManaged reports whether this API belongs to the MCP management surface.
+func (a *APIDefinition) IsMCPManaged() bool {
+	if a == nil {
+		return false
+	}
+	return a.IsMCP() || a.IsPairedMCPAdapterProxy()
+}
+
 // IsChildAPI returns true if this API is a child API in a versioning hierarchy.
 // A child API is identified by having a BaseID that differs from its own APIID.
 func (a *APIDefinition) IsChildAPI() bool {
@@ -1671,6 +1714,7 @@ func DummyAPI() APIDefinition {
 			Pre:         []MiddlewareDefinition{},
 			PostKeyAuth: []MiddlewareDefinition{},
 			AuthCheck:   MiddlewareDefinition{},
+			TrafficLogs: MiddlewareDefinition{},
 			IdExtractor: MiddlewareIdExtractor{
 				ExtractorConfig: map[string]interface{}{},
 			},
