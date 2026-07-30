@@ -448,7 +448,11 @@ func (gw *Gateway) processSpec(
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &PRMMiddleware{BaseMiddleware: baseMid.Copy()})
-	gw.mwAppendEnabled(&chainArray, &MCPLoopAuthBypassMiddleware{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabledForRequest(
+		&chainArray,
+		&MCPLoopAuthBypassMiddleware{BaseMiddleware: baseMid.Copy()},
+		isMCPAdapterLoopRequest,
+	)
 
 	// Track auth middlewares for OR wrapper
 	var authMiddlewares []TykMiddleware
@@ -620,7 +624,11 @@ func (gw *Gateway) processSpec(
 
 	gw.mwAppendEnabled(&chainArray, &OAuth2Middleware{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, getOAuth2ExchangeMw(baseMid.Copy()))
-	gw.mwAppendEnabled(&chainArray, &MCPLoopAuthRestoreMiddleware{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabledForRequest(
+		&chainArray,
+		&MCPLoopAuthRestoreMiddleware{BaseMiddleware: baseMid.Copy()},
+		isMCPAdapterLoopRequest,
+	)
 
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid.Copy(), quotaKey: options.quotaKey})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid.Copy()})
