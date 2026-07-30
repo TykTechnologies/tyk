@@ -21,7 +21,7 @@ func (m *MCPLoopAuthBypassMiddleware) Name() string {
 }
 
 func (m *MCPLoopAuthBypassMiddleware) EnabledForSpec() bool {
-	return mcpLoopAuthEnabledForSpec(m.Spec)
+	return mcpLoopAuthEnabledForSpec(m.Gw, m.Spec)
 }
 
 //nolint:staticcheck // ST1008: middleware interface requires (error, int).
@@ -100,7 +100,7 @@ func (m *MCPLoopAuthRestoreMiddleware) Name() string {
 }
 
 func (m *MCPLoopAuthRestoreMiddleware) EnabledForSpec() bool {
-	return mcpLoopAuthEnabledForSpec(m.Spec)
+	return mcpLoopAuthEnabledForSpec(m.Gw, m.Spec)
 }
 
 //nolint:staticcheck // ST1008: middleware interface requires (error, int).
@@ -112,11 +112,16 @@ func (m *MCPLoopAuthRestoreMiddleware) ProcessRequest(_ http.ResponseWriter, r *
 	return nil, http.StatusOK
 }
 
-func mcpLoopAuthEnabledForSpec(spec *APISpec) bool {
-	if spec == nil || spec.APIDefinition == nil {
+func mcpLoopAuthEnabledForSpec(gw *Gateway, spec *APISpec) bool {
+	if gw == nil || spec == nil || spec.APIDefinition == nil {
 		return false
 	}
-	return !spec.IsMCPManaged() && !spec.IsSyntheticMCPAdapter()
+	if spec.IsMCPManaged() || spec.IsSyntheticMCPAdapter() {
+		return false
+	}
+
+	_, paired := gw.mcpPairingIndex.LookupSource(spec.APIID)
+	return paired
 }
 
 func mcpLoopAuthSessionKey(trust mcpAdapterLoopTrust) string {

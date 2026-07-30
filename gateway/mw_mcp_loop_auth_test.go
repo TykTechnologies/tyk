@@ -156,26 +156,43 @@ func TestMCPLoopAuthBypass_PreAuthorizesThenRestoreClearsBypassStatus(t *testing
 	assert.False(t, ctxMCPAdapterLoopAuthBypassed(req))
 }
 
-func TestMCPLoopAuthBypass_EnabledForSpec(t *testing.T) {
+func TestMCPLoopAuth_EnabledForSpec(t *testing.T) {
 	source := restSourceSpec("rest-1", "org-1", true)
+	unpaired := restSourceSpec("rest-2", "org-1", true)
 	proxy := pairedMCPProxySpec("proxy-1", "org-1", "rest-1", nil)
 	synthetic := buildSyntheticAdapterForRuntimeTest(t)
 
+	snapshot, err := pairing.NewSnapshot([]pairing.Record{{
+		SourceRESTAPIID:  source.APIID,
+		SourceOrgID:      source.OrgID,
+		CallerProxyAPIID: proxy.APIID,
+		CallerProxyOrgID: proxy.OrgID,
+	}})
+	require.NoError(t, err)
+
+	pairedGateway := &Gateway{}
+	pairedGateway.mcpPairingIndex.Set(snapshot)
+	emptyGateway := &Gateway{}
+
 	tests := []struct {
 		name string
+		gw   *Gateway
 		spec *APISpec
 		want bool
 	}{
-		{name: "source REST spec", spec: source, want: true},
-		{name: "paired MCP proxy", spec: proxy, want: false},
-		{name: "synthetic adapter", spec: synthetic, want: false},
-		{name: "nil spec", spec: nil, want: false},
+		{name: "paired source REST spec", gw: pairedGateway, spec: source, want: true},
+		{name: "unpaired REST spec when another pairing exists", gw: pairedGateway, spec: unpaired, want: false},
+		{name: "source REST spec with empty pairing index", gw: emptyGateway, spec: source, want: false},
+		{name: "paired MCP proxy", gw: pairedGateway, spec: proxy, want: false},
+		{name: "synthetic adapter", gw: pairedGateway, spec: synthetic, want: false},
+		{name: "nil spec", gw: pairedGateway, want: false},
+		{name: "nil gateway", spec: source, want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bypass := &MCPLoopAuthBypassMiddleware{BaseMiddleware: &BaseMiddleware{Spec: tt.spec}}
-			restore := &MCPLoopAuthRestoreMiddleware{BaseMiddleware: &BaseMiddleware{Spec: tt.spec}}
+			bypass := &MCPLoopAuthBypassMiddleware{BaseMiddleware: &BaseMiddleware{Spec: tt.spec, Gw: tt.gw}}
+			restore := &MCPLoopAuthRestoreMiddleware{BaseMiddleware: &BaseMiddleware{Spec: tt.spec, Gw: tt.gw}}
 
 			assert.Equal(t, tt.want, bypass.EnabledForSpec())
 			assert.Equal(t, tt.want, restore.EnabledForSpec())
