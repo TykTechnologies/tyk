@@ -634,6 +634,87 @@ func TestJWTMiddleware_PRMWWWAuthenticate(t *testing.T) {
 	})
 }
 
+// jwtPRMOAS builds an OAS JWT API whose authentication carries the given PRM
+// block, on the supplied listen path. Used by the 401-scenario tests below.
+func jwtPRMOAS(listenPath string, prm *oas.ProtectedResourceMetadata) oas.OAS {
+	oasDoc := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info:    &openapi3.Info{Title: "JWT PRM 401", Version: "1.0"},
+			Paths:   openapi3.NewPaths(),
+		},
+	}
+	oasDoc.SetTykExtension(&oas.XTykAPIGateway{
+		Info:     oas.Info{Name: "jwt-prm-401" + listenPath, State: oas.State{Active: true}},
+		Upstream: oas.Upstream{URL: "http://httpbin.org"},
+		Server: oas.Server{
+			ListenPath:     oas.ListenPath{Value: listenPath, Strip: true},
+			Authentication: &oas.Authentication{ProtectedResourceMetadata: prm},
+		},
+	})
+	return oasDoc
+}
+
+// TestJWTMiddleware_PRM_MissingAuth_Returns401 extends the 401-challenge
+// coverage for the JWT middleware beyond the single absent-header case: an
+// empty Authorization header value must also 401, and the 401 response must
+// still carry the informative body alongside the RFC 9728 WWW-Authenticate
+// challenge so a spec-compliant MCP client can begin PRM discovery.
+func TestJWTMiddleware_PRM_MissingAuth_Returns401(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	assertChallenge := func(t *testing.T, resp *http.Response) {
+		t.Helper()
+		wwwAuth := resp.Header.Get(header.WWWAuthenticate)
+		assert.Contains(t, wwwAuth, `Bearer realm="tyk"`)
+		assert.Contains(t, wwwAuth, `resource_metadata=`)
+		assert.Contains(t, wwwAuth, `.well-known/oauth-protected-resource`)
+	}
+
+	staticPRM := &oas.ProtectedResourceMetadata{
+		Enabled:              true,
+		Resource:             "https://api.example.com",
+		AuthorizationServers: []string{"https://auth.example.com"},
+	}
+
+	loadAPI := func(listenPath string) {
+		oasDoc := jwtPRMOAS(listenPath, staticPRM)
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.EnableJWT = true
+			spec.JWTSigningMethod = HMACSign
+			spec.Proxy.ListenPath = listenPath
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+		})
+	}
+
+	t.Run("empty Authorization header still 401 with challenge", func(t *testing.T) {
+		loadAPI("/jwt-prm-empty/")
+
+		resp, _ := ts.Run(t, test.TestCase{
+			Method:  http.MethodGet,
+			Path:    "/jwt-prm-empty/test",
+			Headers: map[string]string{"Authorization": ""},
+			Code:    http.StatusUnauthorized,
+		})
+		assertChallenge(t, resp)
+	})
+
+	t.Run("401 keeps the informative body", func(t *testing.T) {
+		loadAPI("/jwt-prm-body/")
+
+		resp, _ := ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/jwt-prm-body/test",
+			Code:      http.StatusUnauthorized,
+			BodyMatch: `Authorization field missing`,
+		})
+		assertChallenge(t, resp)
+	})
+}
+
 // TestJWTMiddleware_MissingAuth_NoPRM_KeepsLegacy400 is a backward-compatibility
 // regression guard. The 400 -> 401 change on missing auth is gated
 // on PRM being enabled; a JWT API without PRM must keep returning the historic
