@@ -601,7 +601,9 @@ func TestJWTMiddleware_PRMWWWAuthenticate(t *testing.T) {
 		resp, _ := ts.Run(t, test.TestCase{
 			Method: http.MethodGet,
 			Path:   "/jwt-prm/test",
-			Code:   http.StatusBadRequest,
+			// Missing credential on a PRM-enabled API is 401 (not 400) so a
+			// spec-compliant MCP client acts on the WWW-Authenticate challenge.
+			Code: http.StatusUnauthorized,
 		})
 
 		wwwAuth := resp.Header.Get(header.WWWAuthenticate)
@@ -750,11 +752,12 @@ func TestPRMHappyPath_FullDiscoveryFlow(t *testing.T) {
 	})
 
 	// Step 1: Client requests a protected endpoint without credentials.
-	// Expect an error response with a WWW-Authenticate header.
+	// Expect a 401 challenge with a WWW-Authenticate header — a spec-compliant
+	// MCP client only begins PRM discovery on 401 (not 400).
 	resp, _ := ts.Run(t, test.TestCase{
 		Method: http.MethodGet,
 		Path:   "/mcp-api/tools/list",
-		Code:   http.StatusBadRequest,
+		Code:   http.StatusUnauthorized,
 	})
 
 	wwwAuth := resp.Header.Get(header.WWWAuthenticate)
