@@ -633,3 +633,77 @@ func Test_resolveTLSVersions(t *testing.T) {
 		})
 	}
 }
+
+func Test_jsonEscapeString(t *testing.T) {
+
+	t.Run("business logic", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			input    string
+			expected string
+		}{
+			{
+				name:     "Empty string",
+				input:    "",
+				expected: "",
+			},
+			{
+				name:     "Clean text",
+				input:    "plain text",
+				expected: "plain text",
+			},
+			{
+				name:     "Single quote",
+				input:    "O'Connor",
+				expected: "O'Connor",
+			},
+			{
+				name:     "Double quote",
+				input:    `Critical "error"`,
+				expected: `Critical \"error\"`,
+			},
+			{
+				name:     "Backslash",
+				input:    `C:\Windows\System32`,
+				expected: `C:\\Windows\\System32`,
+			},
+			{
+				name:     "Standard control characters",
+				input:    "Line1\nLine2\r\tTab",
+				expected: `Line1\nLine2\r\tTab`,
+			},
+			{
+				name:     "Low control characters",
+				input:    "Char\x00 and char\x1F",
+				expected: `Char\u0000 and char\u001f`,
+			},
+			{
+				name:     "UTF-8 multi-byte characters",
+				input:    "señor pomidor 🚀",
+				expected: "señor pomidor 🚀",
+			},
+			{
+				name:     "Complex combination",
+				input:    `"O'Connor"` + "\n\t\x07\\",
+				expected: `\"O'Connor\"\n\t\u0007\\`,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				got := jsonEscapeString(tt.input)
+				assert.Equal(t, tt.expected, got)
+			})
+		}
+	})
+
+	t.Run("zero allocation", func(t *testing.T) {
+		input := "Clean text O'Connor without characters requiring escape"
+
+		allocs := testing.AllocsPerRun(100, func() {
+			_ = jsonEscapeString(input)
+		})
+
+		assert.Zero(t, allocs)
+	})
+}
