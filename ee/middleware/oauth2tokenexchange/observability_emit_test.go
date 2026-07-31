@@ -4,7 +4,10 @@ package oauth2tokenexchange
 
 import (
 	"context"
+	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -21,6 +24,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/oauth2common"
@@ -44,6 +48,9 @@ type fakeBase struct {
 	metrics   []recordedMetric
 	cacheHits []string
 	events    []recordedEvent
+	// cert is returned by GetClientCertificate; certErr overrides it when set.
+	cert    *tls.Certificate
+	certErr error
 }
 
 func newFakeBase() *fakeBase {
@@ -65,6 +72,16 @@ func (f *fakeBase) RecordExchangeMetric(_ context.Context, outcome, provider str
 
 func (f *fakeBase) RecordExchangeCacheHit(_ context.Context, provider string) {
 	f.cacheHits = append(f.cacheHits, provider)
+}
+
+func (f *fakeBase) GetClientCertificate(certID string) (*tls.Certificate, error) {
+	if f.certErr != nil {
+		return nil, f.certErr
+	}
+	if f.cert == nil {
+		return nil, fmt.Errorf("certificate %q not found", certID)
+	}
+	return f.cert, nil
 }
 
 // --- helpers ---
@@ -353,4 +370,55 @@ func TestProcessRequest_CacheHitOmitsIdPSpan(t *testing.T) {
 	lastEvent := base.events[len(base.events)-1]
 	assert.Equal(t, apidef.TykEvent(event.OAuth2ExchangeSucceeded), lastEvent.name)
 	assert.Equal(t, true, lastEvent.meta["oauth2_exchange_cache_hit"])
+}
+
+// stepUpIdP returns a stub IdP that always answers with an
+// interaction_required claims challenge.
+func stepUpIdP() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(stepUpChallengeBody))
+	}))
+}
+
+// TestProcessRequest_StepUpRequired pins that a jwt-bearer claims challenge is
+// classified as step_up_required — not idp_error — rendered as a terminal 401,
+// never written to the exchanged-token cache, and never audited as a failure.
+func TestProcessRequest_StepUpRequired(t *testing.T) {
+	sr := installRecorder(t)
+	idp := stepUpIdP()
+	t.Cleanup(idp.Close)
+
+	base := newFakeBase()
+	fc := &fakeCache{items: map[string]string{}}
+	m := newMiddleware(base, fc)
+
+	p := provider("corpIdP", idp.URL, true)
+	p.GrantType = oas.OAuth2ProviderGrantJWTBearer
+
+	rec := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "http://gw/api/tools", nil)
+	oauth2common.SetState(r, exchangeState(p))
+
+	err, _ := m.ProcessRequest(rec, r, nil)
+
+	// Rendered as a terminal 401 challenge, not proxied upstream.
+	require.Error(t, err)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	challenge := rec.Header().Get(header.WWWAuthenticate)
+	assert.Contains(t, challenge, `error="insufficient_claims"`)
+	assert.Contains(t, challenge, `claims="`+base64.StdEncoding.EncodeToString([]byte(stepUpClaims))+`"`)
+
+	// Classified as a control-flow event, not a failure.
+	require.Len(t, base.metrics, 1)
+	assert.Equal(t, "step_up_required", base.metrics[0].outcome)
+	exch := findSpan(sr.Ended(), exchangeSpanName)
+	require.NotNil(t, exch)
+	gotOutcome, _ := spanAttr(exch, spanAttrOutcome)
+	assert.Equal(t, "step_up_required", gotOutcome)
+
+	// Never audited as a failure, and the challenge is never cached.
+	assert.Empty(t, base.events, "a step-up challenge must not fire an audit event")
+	assert.Empty(t, fc.items, "a claims challenge must never be written to the token cache")
 }
