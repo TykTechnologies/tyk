@@ -418,8 +418,9 @@ func TestExternalOAuthMiddleware_MissingAuth_NoPRM_KeepsLegacy400(t *testing.T) 
 		testClientSecret = "test-client-secret"
 	)
 
-	introspectionServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"active": true, "username": "u"}`))
+	introspectionServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte(`{"active": true, "username": "u"}`))
+		assert.NoError(t, err)
 	}))
 	defer introspectionServer.Close()
 
@@ -460,8 +461,9 @@ func TestExternalOAuthMiddleware_PRM_MissingAuth_Returns401(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	introspectionServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"active": true, "username": "u"}`))
+	introspectionServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte(`{"active": true, "username": "u"}`))
+		assert.NoError(t, err)
 	}))
 	defer introspectionServer.Close()
 
