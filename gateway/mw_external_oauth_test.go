@@ -401,6 +401,53 @@ func TestExternalOAuthMiddleware_introspection(t *testing.T) {
 	})
 }
 
+// TestExternalOAuthMiddleware_MissingAuth_NoPRM_KeepsLegacy400 is a
+// backward-compatibility regression guard for TT-17848. The external-OAuth
+// missing-auth status changed from 400 to 401 only when PRM is enabled; an
+// external-OAuth API without PRM must keep returning the historic 400 (and no
+// WWW-Authenticate challenge), so existing consumers are not broken.
+func TestExternalOAuthMiddleware_MissingAuth_NoPRM_KeepsLegacy400(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const (
+		testClientID     = "test-client-id"
+		testClientSecret = "test-client-secret"
+	)
+
+	introspectionServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"active": true, "username": "u"}`))
+	}))
+	defer introspectionServer.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/ext-oauth-no-prm/"
+		spec.UseKeylessAccess = false
+		spec.ExternalOAuth.Enabled = true
+		spec.ExternalOAuth.Providers = []apidef.Provider{
+			{
+				Introspection: apidef.Introspection{
+					Enabled:           true,
+					URL:               introspectionServer.URL,
+					ClientID:          testClientID,
+					ClientSecret:      testClientSecret,
+					IdentityBaseField: "username",
+				},
+			},
+		}
+	})
+
+	// No Authorization header, no PRM configured -> legacy 400, no challenge.
+	resp, _ := ts.Run(t, test.TestCase{
+		Method:    http.MethodGet,
+		Path:      "/ext-oauth-no-prm/get",
+		BodyMatch: "authorization field missing",
+		Code:      http.StatusBadRequest,
+	})
+	assert.Empty(t, resp.Header.Get("WWW-Authenticate"),
+		"no PRM configured means the legacy 400 is preserved with no WWW-Authenticate challenge")
+}
+
 func Test_isExpired(t *testing.T) {
 	assert.False(t, isExpired(jwt.MapClaims{}))
 	assert.False(t, isExpired(jwt.MapClaims{"exp": "not integer"}))
