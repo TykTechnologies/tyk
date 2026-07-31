@@ -628,7 +628,7 @@ type HttpServerOptionsConfig struct {
 	SkipClientCAAnnouncement bool `json:"skip_client_ca_announcement"`
 
 	// Set this to the number of seconds that Tyk uses to flush content from the proxied upstream connection to the open downstream connection.
-	// This option needed be set for streaming protocols like Server Side Events, or gRPC streaming.
+	// This option needs to be set for streaming protocols like gRPC streaming.
 	FlushInterval int `json:"flush_interval"`
 
 	// Allow the use of a double slash in a URL path. This can be useful if you need to pass raw URLs to your API endpoints.
@@ -1263,7 +1263,7 @@ type Config struct {
 	// If not set or left empty, it will default to `info`.
 	LogLevel string `json:"log_level"`
 
-	// LogFormat configures the output format of the logs.
+	// Configures the output format used for application logs.
 	// Allowed values are `text`, `json`, or `legacy`.
 	// If not set or left empty, it defaults to `text`.
 	LogFormat logger.Format `json:"log_format"`

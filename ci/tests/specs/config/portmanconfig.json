@@ -360,6 +360,18 @@
     },
     {
       "openApiOperationIds": [
+        "getMCP"
+      ],
+      "overwriteRequestQueryParams": [
+        {
+          "key": "expand",
+          "value": "true",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
         "getMCP",
         "updateMCP",
         "deleteMCP"

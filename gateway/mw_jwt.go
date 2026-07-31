@@ -20,7 +20,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
 	"github.com/ohler55/ojg/jp"
+	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
+	expmaps "golang.org/x/exp/maps"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -834,23 +836,47 @@ func getScopeFromClaim(claims jwt.MapClaims, scopeClaimName string) []string {
 }
 
 func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
-	polIDs := []string{}
-
 	// add all policies matched from scope-policy mapping
-	policiesToApply := map[string]bool{}
+	var policiesToApplySet map[string]struct{}
+	var unmatchedScopes map[string]struct{}
+
 	for _, scopeItem := range scope {
 		if policyID, ok := mapping[scopeItem]; ok {
-			policiesToApply[policyID] = true
-			log.Debugf("Found a matching policy for scope item: %s", scopeItem)
+			if policiesToApplySet == nil {
+				policiesToApplySet = make(map[string]struct{}, min(len(scope), len(mapping)))
+			}
+
+			policiesToApplySet[policyID] = struct{}{}
 		} else {
-			log.Errorf("Couldn't find a matching policy for scope item: %s", scopeItem)
+			if unmatchedScopes == nil {
+				unmatchedScopes = make(map[string]struct{}, len(scope))
+			}
+
+			unmatchedScopes[scopeItem] = struct{}{}
 		}
 	}
-	for id := range policiesToApply {
-		polIDs = append(polIDs, id)
+
+	res := expmaps.Keys(policiesToApplySet)
+
+	if len(res) > 0 {
+		log.Debugf("Found a matching policy for scope item: %s", res)
 	}
 
-	return polIDs
+	// https://tyktech.atlassian.net/browse/TT-5893
+	if len(unmatchedScopes) > 0 {
+		level := logrus.DebugLevel
+		if len(policiesToApplySet) == 0 {
+			level = logrus.ErrorLevel
+		}
+
+		log.Logf(
+			level,
+			"Couldn't find a matching policy for scope item: %s",
+			expmaps.Keys(unmatchedScopes),
+		)
+	}
+
+	return res
 }
 
 func (k *JWTMiddleware) getOAuthClientIDFromClaim(claims jwt.MapClaims) string {
