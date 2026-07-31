@@ -56,7 +56,18 @@ func (k *ExternalOAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 
 	token, _ := k.getAuthToken(k.getAuthType(), r)
 	if token == "" {
-		return k.prmError(w, r, errors.New("authorization field missing"), http.StatusBadRequest)
+		// A missing credential is semantically 401, not 400. RFC 9728 / MCP
+		// clients only begin the PRM-discovery + OAuth flow on a 401 challenge,
+		// so a 400 here leaves spec-compliant clients unable to authenticate.
+		// Gated on PRM so the status code changes only for PRM/MCP APIs; every
+		// other external-OAuth API keeps its long-standing 400. Mirrors the JWT
+		// middleware, and keeps this path consistent with the invalid-token
+		// cases below, which already return 401.
+		missingAuthStatus := http.StatusBadRequest
+		if k.Spec.GetPRMConfig() != nil {
+			missingAuthStatus = http.StatusUnauthorized
+		}
+		return k.prmError(w, r, errors.New("authorization field missing"), missingAuthStatus)
 	}
 
 	token = stripBearer(token)

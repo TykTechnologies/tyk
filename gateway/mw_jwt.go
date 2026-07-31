@@ -1289,7 +1289,19 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 		ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeAuthFieldMissing, k.Name()))
 		k.reportLoginFailure(tykId, r)
-		return k.prmError(w, r, errors.New("Authorization field missing"), http.StatusBadRequest)
+		// A missing credential is semantically 401, not 400. RFC 9728 / MCP
+		// clients only begin the PRM-discovery + OAuth flow on a 401 challenge,
+		// so a 400 here (even with the WWW-Authenticate resource_metadata header)
+		// leaves spec-compliant clients (e.g. VS Code) unable to authenticate.
+		//
+		// Gated on PRM being enabled for this spec so the status code changes
+		// only for APIs that opted into PRM/MCP. Every other JWT API keeps its
+		// long-standing 400 on missing auth, avoiding a global breaking change.
+		missingAuthStatus := http.StatusBadRequest
+		if k.Spec.GetPRMConfig() != nil {
+			missingAuthStatus = http.StatusUnauthorized
+		}
+		return k.prmError(w, r, errors.New("Authorization field missing"), missingAuthStatus)
 	}
 
 	// enable bearer token format
