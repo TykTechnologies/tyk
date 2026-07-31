@@ -3,8 +3,10 @@
 package oauth2tokenexchange
 
 import (
+	"context"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/model"
 )
 
@@ -19,6 +21,17 @@ const (
 // BaseMiddleware is the gateway.BaseMiddleware surface this package needs (avoids circular import).
 type BaseMiddleware interface {
 	model.LoggerProvider
+
+	// FireEvent emits a Tyk audit event for the request.
+	FireEvent(name apidef.TykEvent, meta interface{})
+
+	// RecordExchangeMetric records one exchange decision on the OTel
+	// instruments: the requests counter and the duration histogram, both
+	// labelled by outcome + provider.
+	RecordExchangeMetric(ctx context.Context, outcome, provider string, d time.Duration)
+
+	// RecordExchangeCacheHit increments the dedicated cache_hit counter.
+	RecordExchangeCacheHit(ctx context.Context, provider string)
 }
 
 // EffectiveIdPTimeout returns d, falling back to DefaultIdPTimeout when d is zero.
