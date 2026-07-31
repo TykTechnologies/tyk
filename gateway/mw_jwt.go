@@ -1297,8 +1297,10 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		// Gated on PRM being enabled for this spec so the status code changes
 		// only for APIs that opted into PRM/MCP. Every other JWT API keeps its
 		// long-standing 400 on missing auth, avoiding a global breaking change.
+		// IsPRMEnabled honours both the oauth2-scheme block (new, wins) and the
+		// deprecated top-level block.
 		missingAuthStatus := http.StatusBadRequest
-		if k.Spec.GetPRMConfig() != nil {
+		if k.Spec.IsPRMEnabled() {
 			missingAuthStatus = http.StatusUnauthorized
 		}
 		return k.prmError(w, r, errors.New("Authorization field missing"), missingAuthStatus)

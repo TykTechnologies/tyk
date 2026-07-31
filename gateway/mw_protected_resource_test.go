@@ -91,6 +91,63 @@ func TestGetPRMConfig(t *testing.T) {
 	})
 }
 
+// TestIsPRMEnabled covers the combined PRM detection used to gate the
+// missing-auth 401: it must return true for either config location — the new
+// oauth2-scheme block (which wins) or the deprecated top-level block — and
+// false when neither is enabled.
+func TestIsPRMEnabled(t *testing.T) {
+	newAPISpec := func(auth *oas.Authentication) *APISpec {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{IsOAS: true}}
+		spec.OAS.SetTykExtension(&oas.XTykAPIGateway{
+			Server: oas.Server{
+				ListenPath:     oas.ListenPath{Value: "/"},
+				Authentication: auth,
+			},
+		})
+		return spec
+	}
+
+	t.Run("no authentication block", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{IsOAS: true}}
+		spec.OAS.SetTykExtension(&oas.XTykAPIGateway{
+			Server: oas.Server{ListenPath: oas.ListenPath{Value: "/"}},
+		})
+		assert.False(t, spec.IsPRMEnabled())
+	})
+
+	t.Run("top-level PRM enabled", func(t *testing.T) {
+		spec := newAPISpec(&oas.Authentication{
+			ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{Enabled: true},
+		})
+		assert.True(t, spec.IsPRMEnabled())
+	})
+
+	t.Run("oauth2-scheme PRM enabled", func(t *testing.T) {
+		spec := newAPISpec(&oas.Authentication{
+			SecuritySchemes: oas.SecuritySchemes{
+				"oauth2": &oas.OAuth2{
+					Enabled:                   true,
+					ProtectedResourceMetadata: &oas.OAuth2PRM{Enabled: true},
+				},
+			},
+		})
+		assert.True(t, spec.IsPRMEnabled())
+	})
+
+	t.Run("both locations disabled", func(t *testing.T) {
+		spec := newAPISpec(&oas.Authentication{
+			ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{Enabled: false},
+			SecuritySchemes: oas.SecuritySchemes{
+				"oauth2": &oas.OAuth2{
+					Enabled:                   true,
+					ProtectedResourceMetadata: &oas.OAuth2PRM{Enabled: false},
+				},
+			},
+		})
+		assert.False(t, spec.IsPRMEnabled())
+	})
+}
+
 func TestPRMMiddleware_UsesMirrorModeForPairedMCPProxy(t *testing.T) {
 	doc := pairedMCPProxyOAS("proxy-1", "org-1", "rest-1")
 	doc.GetTykExtension().Server.Authentication = &oas.Authentication{
@@ -710,6 +767,56 @@ func TestJWTMiddleware_PRM_MissingAuth_Returns401(t *testing.T) {
 			Path:      "/jwt-prm-body/test",
 			Code:      http.StatusUnauthorized,
 			BodyMatch: `Authorization field missing`,
+		})
+		assertChallenge(t, resp)
+	})
+
+	// PRM now has two config locations: the deprecated top-level block (covered
+	// above) and the new block under the oauth2 security scheme, which wins. The
+	// 401 gate must fire for the new location too, else an API configured only
+	// the new way would still return 400 on missing auth.
+	t.Run("PRM under the oauth2 scheme (new location) also 401s", func(t *testing.T) {
+		listenPath := "/jwt-prm-oauth2/"
+		oasDoc := oas.OAS{
+			T: openapi3.T{
+				OpenAPI: "3.0.3",
+				Info:    &openapi3.Info{Title: "JWT PRM OAuth2", Version: "1.0"},
+				Paths:   openapi3.NewPaths(),
+			},
+		}
+		oasDoc.SetTykExtension(&oas.XTykAPIGateway{
+			Info:     oas.Info{Name: "jwt-prm-oauth2", State: oas.State{Active: true}},
+			Upstream: oas.Upstream{URL: "http://httpbin.org"},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{Value: listenPath, Strip: true},
+				Authentication: &oas.Authentication{
+					SecuritySchemes: oas.SecuritySchemes{
+						"oauth2": &oas.OAuth2{
+							Enabled: true,
+							ProtectedResourceMetadata: &oas.OAuth2PRM{
+								Enabled:              true,
+								Resource:             "https://api.example.com",
+								AuthorizationServers: []string{"https://auth.example.com"},
+							},
+						},
+					},
+				},
+			},
+		})
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.EnableJWT = true
+			spec.JWTSigningMethod = HMACSign
+			spec.Proxy.ListenPath = listenPath
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+		})
+
+		resp, _ := ts.Run(t, test.TestCase{
+			Method: http.MethodGet,
+			Path:   listenPath + "test",
+			Code:   http.StatusUnauthorized,
 		})
 		assertChallenge(t, resp)
 	})

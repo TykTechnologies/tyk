@@ -62,9 +62,10 @@ func (k *ExternalOAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 		// Gated on PRM so the status code changes only for PRM/MCP APIs; every
 		// other external-OAuth API keeps its long-standing 400. Mirrors the JWT
 		// middleware, and keeps this path consistent with the invalid-token
-		// cases below, which already return 401.
+		// cases below, which already return 401. IsPRMEnabled honours both the
+		// oauth2-scheme block (new, wins) and the deprecated top-level block.
 		missingAuthStatus := http.StatusBadRequest
-		if k.Spec.GetPRMConfig() != nil {
+		if k.Spec.IsPRMEnabled() {
 			missingAuthStatus = http.StatusUnauthorized
 		}
 		return k.prmError(w, r, errors.New("authorization field missing"), missingAuthStatus)
