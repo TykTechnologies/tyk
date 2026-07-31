@@ -402,7 +402,7 @@ func TestExternalOAuthMiddleware_introspection(t *testing.T) {
 }
 
 // TestExternalOAuthMiddleware_MissingAuth_NoPRM_KeepsLegacy400 is a
-// backward-compatibility regression guard for TT-17848. The external-OAuth
+// backward-compatibility regression guard. The external-OAuth
 // missing-auth status changed from 400 to 401 only when PRM is enabled; an
 // external-OAuth API without PRM must keep returning the historic 400 (and no
 // WWW-Authenticate challenge), so existing consumers are not broken.

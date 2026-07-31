@@ -635,7 +635,7 @@ func TestJWTMiddleware_PRMWWWAuthenticate(t *testing.T) {
 }
 
 // TestJWTMiddleware_MissingAuth_NoPRM_KeepsLegacy400 is a backward-compatibility
-// regression guard for TT-17848. The 400 -> 401 change on missing auth is gated
+// regression guard. The 400 -> 401 change on missing auth is gated
 // on PRM being enabled; a JWT API without PRM must keep returning the historic
 // 400 (and no WWW-Authenticate challenge) so existing non-MCP consumers that
 // assert 400 on a missing credential are not broken. This asserts across both
