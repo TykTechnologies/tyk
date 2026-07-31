@@ -27,10 +27,6 @@ import (
 func (m *Middleware) runExchange(r *http.Request, st *oauth2common.State) (oauth2common.Outcome, error) {
 	out := oauth2common.Outcome{}
 	cfg := st.OASConfig
-	if cfg.TokenExchange == nil || len(cfg.TokenExchange.Providers) == 0 {
-		return out, nil
-	}
-
 	// Gate provider matching per RFC 8693 §4.8 — no 403 if no exchange would fire.
 	if !m.exchangeWouldFire(st, cfg) {
 		return out, nil
@@ -52,8 +48,16 @@ func (m *Middleware) runExchange(r *http.Request, st *oauth2common.State) (oauth
 	out.Audience = target.Audience
 	out.Scopes = target.Scopes
 
-	exchanged, err := m.fetchExchangedToken(r, st, provider, target)
+	start := time.Now()
+	exchanged, cacheHit, err := m.fetchExchangedToken(r, st, provider, target)
+	out.CacheHit = cacheHit
+	out.Duration = time.Since(start)
 	if err != nil {
+		var fe *oauth2common.ExchangeFailedError
+		if errors.As(err, &fe) {
+			out.IdpErrorCode = fe.IdpError
+			out.IdpErrorDesc = fe.Description
+		}
 		return out, err
 	}
 	out.ExchangedToken = exchanged
@@ -93,11 +97,13 @@ func inboundRemaining(st *oauth2common.State) time.Duration {
 	return remaining
 }
 
-// fetchExchangedToken returns an exchanged token, using the cache when configured and enabled.
-func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State, provider *oas.OAuth2TokenExchangeProvider, target *oauth2common.Target) (string, error) {
+// fetchExchangedToken returns an exchanged token, using the cache when configured
+// and enabled. It also reports whether the token was served from cache. The
+// caller times the call for the duration metric.
+func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State, provider *oas.OAuth2TokenExchangeProvider, target *oauth2common.Target) (string, bool, error) {
 	if m.Cache == nil || provider.Cache == nil || !provider.Cache.Enabled {
 		token, _, err := m.exchangeAtIdP(r.Context(), provider, st.RawToken, target)
-		return token, err
+		return token, false, err
 	}
 
 	subjectID := subjectIDFromState(st)
@@ -126,7 +132,7 @@ func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State
 		return tok, cacheTTL(provider.Cache, expiresIn, inboundRemaining(st)), nil
 	})
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
 	if hit && ttlRemaining > 0 {
@@ -137,7 +143,7 @@ func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State
 		}).Debug("token exchange cache hit")
 	}
 
-	return token, nil
+	return token, hit, nil
 }
 
 // cacheTTL derives the cache entry lifetime for the provider's cache mode,
@@ -179,8 +185,13 @@ func findActivePrimitive(mw *oas.Middleware, name, primitiveType string) *oas.MC
 	return nil
 }
 
-// exchangeWouldFire reports whether an exchange target exists for this request (RFC 8693 §4.8).
+// exchangeWouldFire reports whether an exchange target exists for this request
+// (RFC 8693 §4.8): providers are configured and a per-primitive, per-operation,
+// or provider-default target resolves.
 func (m *Middleware) exchangeWouldFire(st *oauth2common.State, cfg *oas.OAuth2) bool {
+	if cfg.TokenExchange == nil || len(cfg.TokenExchange.Providers) == 0 {
+		return false
+	}
 	if mw := m.Spec.OAS.GetTykMiddleware(); mw != nil {
 		if st.MatchedPrimitiveName != "" && findActivePrimitive(mw, st.MatchedPrimitiveName, st.MatchedPrimitiveType) != nil {
 			return true
