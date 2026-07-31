@@ -2186,7 +2186,10 @@
         },
         "grantType": {
           "type": "string",
-          "enum": ["token-exchange", "jwt-bearer"],
+          "enum": [
+            "token-exchange",
+            "jwt-bearer"
+          ],
           "description": "Grant the exchange request uses. Defaults to token-exchange (the RFC 8693 grant). Set jwt-bearer (RFC 7523) for identity providers that implement delegation on that grant: the inbound token is sent as assertion and the target audience/scopes are rendered into scope."
         },
         "issuers": {
