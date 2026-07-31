@@ -1599,7 +1599,30 @@ paths:
         validated against the MCP JSON schema (`/tyk/schema?type=mcp`) before being
         stored. The Gateway must be reloaded (`POST /tyk/reload`) for the new MCP
         Proxy definition to take effect.
+
+        When `dryRun=true`, the definition is validated and returned without being
+        persisted, written to disk, versioned, or reloaded. When `expand=true` is
+        also supplied for an internal REST-as-MCP proxy target such as
+        `tyk://orders-rest/mcp`, the response includes the full derived
+        `x-tyk-mcp-server.primitives` catalogue with selected tools marked
+        `allow: true` and unselected tools marked `allow: false`. `expand=true`
+        has no effect for remote MCP proxy upstreams.
       operationId: createMCP
+      parameters:
+      - description: Validate and render the MCP Proxy definition without persisting it.
+        in: query
+        name: dryRun
+        required: false
+        schema:
+          default: false
+          type: boolean
+      - description: Expand an internal REST-as-MCP proxy response with the full configurable tool catalogue.
+        in: query
+        name: expand
+        required: false
+        schema:
+          default: false
+          type: boolean
       requestBody:
         content:
           application/json:
@@ -1640,8 +1663,12 @@ paths:
                 key: e30bee13ad4248c3b529a4c58bb7be4e
                 status: ok
               schema:
-                $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: MCP Proxy definition created.
+                oneOf:
+                - $ref: '#/components/schemas/ApiModifyKeySuccess'
+                - allOf:
+                  - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
+                  - $ref: '#/components/schemas/TykVendorExtension'
+          description: MCP Proxy definition created, or validated dry-run OAS returned.
         "400":
           content:
             application/json:
@@ -1669,8 +1696,21 @@ paths:
       schema:
         type: string
     get:
-      description: Retrieve a single MCP Proxy definition by its ID.
+      description: Retrieve a single MCP Proxy definition by its ID. When
+        `expand=true` is supplied for an internal REST-as-MCP proxy target, the
+        response includes the full derived `x-tyk-mcp-server.primitives`
+        catalogue with selected and unselected tools marked by `allow`. Normal
+        reads return the stored definition exactly. `expand=true` has no effect
+        for remote MCP proxy upstreams.
       operationId: getMCP
+      parameters:
+      - description: Expand an internal REST-as-MCP proxy response with the full configurable tool catalogue.
+        in: query
+        name: expand
+        required: false
+        schema:
+          default: false
+          type: boolean
       responses:
         "200":
           content:
