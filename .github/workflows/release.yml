@@ -33,7 +33,7 @@ env:
 jobs:
   dep-guard:
     if: github.event_name == 'pull_request'
-    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@production
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@TT-17846-fix-dep-guard
     permissions:
       contents: read
   goreleaser:
