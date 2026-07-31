@@ -106,6 +106,8 @@ func (r *ResponseTransformMiddleware) HandleError(rw http.ResponseWriter, req *h
 }
 
 func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	cfg := r.Gw.GetConfig()
+
 	logger := r.logger().WithFields(logrus.Fields{
 		"prefix":      "outbound-transform",
 		"server_name": r.Spec.Proxy.TargetURL,
@@ -161,8 +163,13 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 			body = []byte("{}")
 		}
 
+		decoder := json.NewDecoder(bytes.NewBuffer(body))
+		if cfg.ResponseTransform.JsonDecoder.UseNumber {
+			decoder.UseNumber()
+		}
+
 		var tempBody interface{}
-		if err := json.Unmarshal(body, &tempBody); err != nil {
+		if err := decoder.Decode(&tempBody); err != nil {
 			logger.WithError(err).Error("Error unmarshalling JSON")
 			//todo return error
 			break

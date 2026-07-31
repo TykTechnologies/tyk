@@ -1438,6 +1438,17 @@ type Config struct {
 	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
 	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
 	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
+
+	// ResponseTransform response middleware config
+	ResponseTransform struct {
+		// JsonDecoder config in context of ResponseTransform
+		JsonDecoder struct {
+			// UseNumber enables parsing JSON numbers as json.Number (string-backed) rather than float64.
+			// This preserves the exact value of large integers (e.g., int64 IDs > 2^53-1) during Body Transform,
+			// preventing precision loss and exponential notation issues in Go templates.
+			UseNumber bool `json:"use_number"`
+		} `json:"json_decoder"`
+	} `json:"response_transform"`
 }
 
 // LabsConfig include config for streaming
