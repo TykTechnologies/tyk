@@ -369,6 +369,56 @@ func TestResponseTransformMiddleware(t *testing.T) {
 		})
 	})
 
+	t.Run("Response transform with JSON array", func(t *testing.T) {
+		ts := StartTest(nil)
+
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, err := w.Write([]byte(`[{"id": 1}, {"id": 2}]`))
+			assert.NoError(t, err)
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		t.Cleanup(testServer.Close)
+		t.Cleanup(ts.Close)
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test"
+			spec.Proxy.TargetURL = testServer.URL
+
+			v := spec.VersionData.Versions["Default"]
+
+			v.UseExtendedPaths = true
+			v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{
+				{
+					Path:   "/array",
+					Method: http.MethodGet,
+					TemplateData: apidef.TemplateData{
+						Mode:           apidef.UseBlob,
+						TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"items": [{{ range $index, $element := .array }}{{if $index}},{{end}}{"id": {{$element.id}}}{{ end }}]}`)),
+						Input:          apidef.RequestJSON,
+						EnableSession:  false,
+					},
+				},
+			}
+
+			spec.VersionData.Versions["Default"] = v
+		})
+
+		res, err := ts.Run(t, test.TestCase{
+			Path:      "/test/array",
+			Method:    http.MethodGet,
+			Code:      http.StatusOK,
+		})
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		rawBody, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+
+		assert.JSONEq(t, `{"items": [{"id": 1},{"id": 2}]}`, string(rawBody))
+	})
+
 	t.Run("Response transform with URL rewrite", func(t *testing.T) {
 		ts := StartTest(nil)
 
