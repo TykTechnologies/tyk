@@ -13,6 +13,7 @@ jobs:
       contents: read
     with:
       iac_enabled: false
+      vuln_enabled: false
       tag: service:vulnscan
       scope_type: ACCOUNT
     secrets:
