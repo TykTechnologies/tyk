@@ -506,6 +506,31 @@ func TestAPIDefinition_GenerateAPIID(t *testing.T) {
 	assert.NotEmpty(t, a.APIID)
 }
 
+func TestAPIDefinition_ValidListenPath(t *testing.T) {
+	tests := []struct {
+		name       string
+		listenPath string
+		want       string
+	}{
+		{"empty", "", ""},
+		{"already has leading slash", "/foo", "/foo"},
+		{"missing leading slash", "foo", "/foo"},
+		{"env reference", "env://FOO", "env://FOO"},
+		{"secrets reference", "secrets://foo", "secrets://foo"},
+		{"consul reference", "consul://foo", "consul://foo"},
+		{"vault reference", "vault://secret/data/foo", "vault://secret/data/foo"},
+		{"file reference", "file:///etc/tyk/foo", "file:///etc/tyk/foo"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &APIDefinition{}
+			a.Proxy.ListenPath = tt.listenPath
+			assert.Equal(t, tt.want, a.ValidListenPath())
+		})
+	}
+}
+
 func TestAPIDefinition_GetScopeClaimName(t *testing.T) {
 	var (
 		scopeName        = "scope"
