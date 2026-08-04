@@ -2736,6 +2736,13 @@
             "clientSecret": {
               "$ref": "#/definitions/X-Tyk-NonEmptyString"
             },
+            "method": {
+              "type": "string",
+              "enum": [
+                "client_secret_basic",
+                "client_secret_post"
+              ]
+            },
             "tokenUrl": {
               "$ref": "#/definitions/X-Tyk-NonEmptyString"
             },
@@ -2769,6 +2776,13 @@
             },
             "clientSecret": {
               "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "method": {
+              "type": "string",
+              "enum": [
+                "client_secret_basic",
+                "client_secret_post"
+              ]
             },
             "tokenUrl": {
               "$ref": "#/definitions/X-Tyk-NonEmptyString"
