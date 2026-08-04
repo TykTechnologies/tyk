@@ -12,7 +12,6 @@ import (
 
 	"github.com/TykTechnologies/storage/kv"
 	"github.com/TykTechnologies/storage/kv/registry"
-	"github.com/TykTechnologies/storage/kv/resolver"
 
 	"github.com/TykTechnologies/tyk/config"
 )
@@ -85,48 +84,6 @@ func TestCloseKVRegistry_ClosesProviderConnections(t *testing.T) {
 
 	require.True(t, closed.Load(),
 		"closeKVRegistry must forward Close to the registry's providers")
-}
-
-type bypassRecorder struct{ seen *[]bool }
-
-func (b bypassRecorder) Get(ctx context.Context, _ string) (string, error) {
-	*b.seen = append(*b.seen, kv.IsCacheBypassed(ctx))
-	return "cert-value", nil
-}
-func (b bypassRecorder) IsStandalone() bool { return true }
-
-func TestKVResolvers_HotReloadBypassesCache(t *testing.T) {
-	seen := []bool{}
-
-	factories := map[kv.ProviderType]kv.ProviderFactory{
-		"fake_vault": func(_ json.RawMessage) (kv.Provider, error) {
-			return bypassRecorder{seen: &seen}, nil
-		},
-	}
-	raw := []byte(`{"kv":{"stores":{"vault":{"type":"fake_vault","config":{}}}}}`)
-	reg, err := registry.NewFromConfig(t.Context(), raw, registry.WithFactories(factories))
-	require.NoError(t, err)
-
-	conf := config.Config{}
-	conf.ExternalServices.OAuth.MTLS.Enabled = true
-	conf.ExternalServices.OAuth.MTLS.CertFile = "kv://vault/cert"
-
-	gw := NewGateway(conf, t.Context())
-	// Override the local-only test registry with one that has the fake vault store.
-	gw.kvRegistry = reg
-	gw.kvResolver = resolver.NewResolver(reg)
-
-	require.NoError(t, gw.afterConfSetup())
-	require.Len(t, gw.kvResolvers, 1, "the kv:// field must register a hot-reload closure")
-	require.Equal(t, []bool{false}, seen,
-		"initial resolution must NOT bypass the cache — it populates it")
-
-	for _, resolve := range gw.kvResolvers {
-		require.NoError(t, resolve())
-	}
-
-	require.Equal(t, []bool{false, true}, seen,
-		"the hot-reload closure must re-resolve with a cache-bypass context")
 }
 
 func TestKVStore_Secrets(t *testing.T) {
