@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path"
 	"strings"
 	"text/template"
 	"time"
@@ -1487,10 +1488,9 @@ func (a *APIDefinition) GetAPIDomain() string {
 // pipeline) that ValidListenPath must leave untouched rather than mangling with a leading slash.
 var listenPathTemplatePrefixes = []string{"env://", "secrets://", "consul://", "vault://", "file://"}
 
-// ValidListenPath returns Proxy.ListenPath normalized with a leading slash, so callers get a
-// usable path even when the stored value predates leading-slash validation or bypassed it (e.g.
-// legacy data, or an API definition synced from a source other than the Dashboard API). Empty
-// values and KV/secret template references are returned unchanged.
+// ValidListenPath returns Proxy.ListenPath normalized with a leading slash and cleaned of any
+// "." / ".." segments. Trailing slash is preserved, as it's significant for strict-route
+// matching. Empty values and KV/secret template references are returned unchanged.
 func (a *APIDefinition) ValidListenPath() string {
 	listenPath := a.Proxy.ListenPath
 
@@ -1505,10 +1505,15 @@ func (a *APIDefinition) ValidListenPath() string {
 	}
 
 	if !strings.HasPrefix(listenPath, "/") {
-		return "/" + listenPath
+		listenPath = "/" + listenPath
 	}
 
-	return listenPath
+	cleaned := path.Clean(listenPath)
+	if strings.HasSuffix(listenPath, "/") && cleaned != "/" {
+		cleaned += "/"
+	}
+
+	return cleaned
 }
 
 // SetProtocol configures the transport and application protocol for the API.

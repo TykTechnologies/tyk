@@ -515,11 +515,29 @@ func TestAPIDefinition_ValidListenPath(t *testing.T) {
 		{"empty", "", ""},
 		{"already has leading slash", "/foo", "/foo"},
 		{"missing leading slash", "foo", "/foo"},
+		{"root", "/", "/"},
 		{"env reference", "env://FOO", "env://FOO"},
 		{"secrets reference", "secrets://foo", "secrets://foo"},
 		{"consul reference", "consul://foo", "consul://foo"},
 		{"vault reference", "vault://secret/data/foo", "vault://secret/data/foo"},
 		{"file reference", "file:///etc/tyk/foo", "file:///etc/tyk/foo"},
+		{"env reference containing traversal is left untouched", "env://../FOO", "env://../FOO"},
+
+		// trailing slash is preserved, since it's significant for strict-route matching
+		{"trailing slash preserved", "/foo/", "/foo/"},
+		{"missing leading slash with trailing slash", "foo/", "/foo/"},
+
+		// "." / ".." segments are resolved
+		{"traversal to root", "..", "/"},
+		{"traversal to root with leading slash", "/..", "/"},
+		{"traversal above root collapses to root", "/../..", "/"},
+		{"traversal within path", "/foo/../bar", "/bar"},
+		{"traversal within path with trailing slash", "/foo/../bar/", "/bar/"},
+		{"traversal to root with trailing slash stays root", "/../", "/"},
+		{"current dir segment resolved", "/foo/./bar", "/foo/bar"},
+		{"trailing current dir segment resolved", "/foo/.", "/foo"},
+		{"duplicate slashes collapsed", "//foo//bar", "/foo/bar"},
+		{"traversal substring without dot segment is untouched", "/foo..bar", "/foo..bar"},
 	}
 
 	for _, tt := range tests {
