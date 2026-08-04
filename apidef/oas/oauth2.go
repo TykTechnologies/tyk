@@ -376,8 +376,8 @@ const (
 
 	// OAuth2ClientAuth.Method values, aliased from package apidef so the classic
 	// and OAS formats share one set of constants (apidef cannot import apidef/oas).
-	OAuth2ClientAuthBasic = apidef.OAuth2ClientAuthBasic
-	OAuth2ClientAuthPost  = apidef.OAuth2ClientAuthPost
+	OAuth2ClientAuthBasic         = apidef.OAuth2ClientAuthBasic
+	OAuth2ClientAuthPost          = apidef.OAuth2ClientAuthPost
 	OAuth2ClientAuthPrivateKeyJWT = "private_key_jwt"
 
 	// client_assertion_type value for the private_key_jwt method (RFC 7523 §2.2).
