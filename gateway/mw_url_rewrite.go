@@ -14,6 +14,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/storage/kv/resolver"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -224,7 +225,7 @@ func (gw *Gateway) ReplaceTykVariables(r *http.Request, in string, escape bool) 
 	// them per request for the strings routed through here (the spec itself
 	// is only fixed by a successful reload). It also covers strings that
 	// never went through the API-definition loader.
-	if gw.kvResolver != nil && (strings.Contains(in, "kv://") || strings.Contains(in, "$kv{")) {
+	if gw.kvResolver != nil && resolver.ContainsReferences([]byte(in)) {
 		if resolved, err := gw.kvResolver.Resolve(r.Context(), in); err == nil {
 			in = resolved
 		}
