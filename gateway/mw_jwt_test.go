@@ -308,7 +308,9 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 	authHeaders := map[string]string{"authorization": ""}
 	t.Run("Request with empty authorization header", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 400,
+			// A missing/empty credential is 401 Unauthorized (TT-17423): RFC 9728
+			// / MCP clients only start the PRM+OAuth flow on a 401 challenge.
+			Headers: authHeaders, Code: http.StatusUnauthorized,
 		})
 	})
 }
@@ -323,7 +325,9 @@ func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 	authHeaders := map[string]string{}
 	t.Run("Request without authorization header", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: http.StatusBadRequest, BodyMatch: `Authorization field missing`,
+			// A missing Authorization field is 401 Unauthorized, not 400 (TT-17423):
+			// RFC 9728 / MCP clients only begin the PRM+OAuth flow on a 401 challenge.
+			Headers: authHeaders, Code: http.StatusUnauthorized, BodyMatch: `Authorization field missing`,
 		})
 	})
 }
