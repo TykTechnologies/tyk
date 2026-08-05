@@ -33,7 +33,14 @@ jobs:
 
   docker-build:
     needs: [dep-guard]
+    # The DHI customization that provisions the compiler toolchain is a private
+    # Docker Hub repository, and GitHub withholds secrets from pull requests
+    # raised from a fork. Such a run cannot pull the base at all, so skip it
+    # instead of failing it with an opaque 401. There is deliberately no public
+    # fallback base -- see ci/images/plugin-compiler-ng/Dockerfile.base.
     if: |
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository) &&
       !cancelled() &&
       (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') &&
       !github.event.pull_request.draft
@@ -68,8 +75,10 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@5a88a04c91d5c6f97aae0d9be790e64d9b1d47b7  # v1
 
+      # Runs on pull requests too, unlike the ECR steps above: the toolchain base
+      # lives in a private Docker Hub repository and every event needs to pull it.
+      # Fork pull requests never reach this step -- the job is skipped for them.
       - name: Login to Docker Hub
-        if: ${{ github.event_name != 'pull_request' }}
         uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc  # v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
