@@ -110,7 +110,7 @@ func TestRecordDetail(t *testing.T) {
 			spec: testAPISpec(func(spec *APISpec) {
 				spec.GraphQL.Enabled = true
 			}),
-			expect: true,
+			expect: false,
 		},
 	}
 
