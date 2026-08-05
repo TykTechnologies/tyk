@@ -1064,7 +1064,7 @@ func (u *UpstreamAuth) requestSigningExtractTo(api *apidef.APIDefinition) {
 	if u.RequestSigning == nil {
 		u.RequestSigning = &UpstreamRequestSigning{}
 		defer func() {
-			u.BasicAuth = nil
+			u.RequestSigning = nil
 		}()
 	}
 	u.RequestSigning.ExtractTo(api)
@@ -1149,6 +1149,19 @@ type ClientAuthData struct {
 	ClientID string `bson:"clientId" json:"clientId"`
 	// ClientSecret is the application's secret.
 	ClientSecret string `bson:"clientSecret,omitempty" json:"clientSecret,omitempty"` // client secret is optional for password flow
+	// Method controls how Tyk sends the client credentials to the upstream token
+	// endpoint. Valid values are `client_secret_basic` (RFC 6749 Section 2.3.1 —
+	// credentials in the Authorization header only, no fallback) and
+	// `client_secret_post` (credentials in the request body only, no fallback).
+	// Leave empty for the default auto-detect behaviour: Tyk tries the header
+	// first and falls back to the body on failure. Note this deliberately
+	// differs from the token-exchange `clientAuth.method`, where empty defaults
+	// to client_secret_basic — here empty must preserve the fallback so
+	// existing APIs keep working.
+	//
+	// Tyk classic API definition: `upstream_auth.oauth.client_credentials.method`
+	// and `upstream_auth.oauth.password.method`.
+	Method string `bson:"method,omitempty" json:"method,omitempty"`
 }
 
 // ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
@@ -1168,6 +1181,7 @@ type ClientCredentials struct {
 func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
 	c.ClientID = api.ClientID
 	c.ClientSecret = api.ClientSecret
+	c.Method = api.Method
 	c.TokenURL = api.TokenURL
 	c.Scopes = api.Scopes
 	c.ExtraMetadata = api.ExtraMetadata
@@ -1184,6 +1198,7 @@ func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
 func (p *PasswordAuthentication) Fill(api apidef.PasswordAuthentication) {
 	p.ClientID = api.ClientID
 	p.ClientSecret = api.ClientSecret
+	p.Method = api.Method
 	p.Username = api.Username
 	p.Password = api.Password
 	p.TokenURL = api.TokenURL
@@ -1222,6 +1237,7 @@ func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
 func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
 	api.ClientID = c.ClientID
 	api.ClientSecret = c.ClientSecret
+	api.Method = c.Method
 	api.TokenURL = c.TokenURL
 	api.Scopes = c.Scopes
 	api.ExtraMetadata = c.ExtraMetadata
@@ -1238,6 +1254,7 @@ func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
 func (p *PasswordAuthentication) ExtractTo(api *apidef.PasswordAuthentication) {
 	api.ClientID = p.ClientID
 	api.ClientSecret = p.ClientSecret
+	api.Method = p.Method
 	api.Username = p.Username
 	api.Password = p.Password
 	api.TokenURL = p.TokenURL

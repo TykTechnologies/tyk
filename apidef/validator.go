@@ -226,6 +226,8 @@ var (
 	ErrUpstreamOAuthAuthorizationTypeRequired = errors.New("upstream OAuth authorization type is required")
 	// ErrInvalidUpstreamOAuthAuthorizationType is the error to return when configured OAuth authorization type is invalid.
 	ErrInvalidUpstreamOAuthAuthorizationType = errors.New("invalid OAuth authorization type")
+	// ErrInvalidUpstreamOAuthClientAuthMethod is the error to return when the configured upstream OAuth client authentication method is invalid.
+	ErrInvalidUpstreamOAuthClientAuthMethod = errors.New("invalid upstream OAuth client authentication method, valid values are: client_secret_basic, client_secret_post")
 	// ErrAllLoadBalancingTargetsZeroWeight is the error to return when all load balancing targets have weight 0.
 	ErrAllLoadBalancingTargetsZeroWeight = errors.New("all load balancing targets have weight 0, at least one target must have weight > 0")
 )
@@ -266,6 +268,14 @@ func (r *RuleUpstreamAuth) Validate(apiDef *APIDefinition, validationResult *Val
 	if authType := upstreamAuth.OAuth.AllowedAuthorizeTypes[0]; authType != OAuthAuthorizationTypeClientCredentials && authType != OAuthAuthorizationTypePassword {
 		validationResult.IsValid = false
 		validationResult.AppendError(ErrInvalidUpstreamOAuthAuthorizationType)
+	}
+
+	for _, method := range []string{upstreamOAuth.ClientCredentials.Method, upstreamOAuth.PasswordAuthentication.Method} {
+		if method != "" && method != OAuth2ClientAuthBasic && method != OAuth2ClientAuthPost {
+			validationResult.IsValid = false
+			validationResult.AppendError(ErrInvalidUpstreamOAuthClientAuthMethod)
+			break
+		}
 	}
 }
 
