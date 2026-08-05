@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -3360,4 +3361,52 @@ func TestGatewayWriteSpecFiles_WritesCompanionsOnlyForOASAPIs(t *testing.T) {
 		"mcp2.json",
 		"mcp2-mcp.json",
 	}, names)
+}
+
+func TestAPISpec_PrepareRequestToLog(t *testing.T) {
+	t.Run("without target path", func(t *testing.T) {
+		a := APISpec{APIDefinition: &apidef.APIDefinition{}}
+		a.Proxy.ListenPath = "/listen/"
+		a.Proxy.StripListenPath = true
+
+		r, _ := http.NewRequest(http.MethodGet, "https://proxy.com/listen/get", nil)
+
+		dup := a.PrepareRequestToLog(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/get", dup.URL.Path)
+		assert.Equal(t, "", dup.URL.RawPath)
+	})
+
+	t.Run("with target path", func(t *testing.T) {
+		a := APISpec{APIDefinition: &apidef.APIDefinition{}}
+		a.Proxy.ListenPath = "/listen/"
+		a.Proxy.StripListenPath = true
+		a.target, _ = url.Parse("http://upstream.com/base")
+
+		r, _ := http.NewRequest(http.MethodGet, "https://proxy.com/listen/get", nil)
+
+		dup := a.PrepareRequestToLog(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/base/get", dup.URL.Path)
+		assert.Equal(t, "", dup.URL.RawPath)
+	})
+
+	t.Run("with target path and raw path", func(t *testing.T) {
+		a := APISpec{APIDefinition: &apidef.APIDefinition{}}
+		a.Proxy.ListenPath = "/listen/"
+		a.Proxy.StripListenPath = true
+		a.target, _ = url.Parse("http://upstream.com/base")
+
+		r, _ := http.NewRequest(http.MethodGet, "https://proxy.com/listen/get%20it", nil)
+		r.URL.Path = "/listen/get it"
+		r.URL.RawPath = "/listen/get%20it"
+
+		dup := a.PrepareRequestToLog(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/base/get it", dup.URL.Path)
+		assert.Equal(t, "/base/get%20it", dup.URL.RawPath)
+	})
 }
