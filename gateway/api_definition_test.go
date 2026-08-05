@@ -3358,7 +3358,8 @@ func TestAPISpec_PrepareRequestToLog(t *testing.T) {
 		a.Proxy.ListenPath = "/listen/"
 		a.Proxy.StripListenPath = true
 
-		r, _ := http.NewRequest(http.MethodGet, "https://proxy.com/listen/get", nil)
+		r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://proxy.com/listen/get", nil)
+		assert.NoError(t, err)
 
 		dup := a.PrepareRequestToLog(r)
 
@@ -3368,12 +3369,16 @@ func TestAPISpec_PrepareRequestToLog(t *testing.T) {
 	})
 
 	t.Run("with target path", func(t *testing.T) {
+		var err error
+
 		a := APISpec{APIDefinition: &apidef.APIDefinition{}}
 		a.Proxy.ListenPath = "/listen/"
 		a.Proxy.StripListenPath = true
-		a.target, _ = url.Parse("http://upstream.com/base")
+		a.target, err = url.Parse("http://upstream.com/base")
+		assert.NoError(t, err)
 
-		r, _ := http.NewRequest(http.MethodGet, "https://proxy.com/listen/get", nil)
+		r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://proxy.com/listen/get", nil)
+		assert.NoError(t, err)
 
 		dup := a.PrepareRequestToLog(r)
 
@@ -3383,12 +3388,17 @@ func TestAPISpec_PrepareRequestToLog(t *testing.T) {
 	})
 
 	t.Run("with target path and raw path", func(t *testing.T) {
+		var err error
+
 		a := APISpec{APIDefinition: &apidef.APIDefinition{}}
 		a.Proxy.ListenPath = "/listen/"
 		a.Proxy.StripListenPath = true
-		a.target, _ = url.Parse("http://upstream.com/base")
+		a.target, err = url.Parse("http://upstream.com/base")
+		assert.NoError(t, err)
 
-		r, _ := http.NewRequest(http.MethodGet, "https://proxy.com/listen/get%20it", nil)
+		r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://proxy.com/listen/get%20it", nil)
+		assert.NoError(t, err)
+
 		r.URL.Path = "/listen/get it"
 		r.URL.RawPath = "/listen/get%20it"
 
