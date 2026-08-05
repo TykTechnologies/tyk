@@ -133,14 +133,13 @@ FROM sysroots-${GLIBC_TARGET} AS sysroots
 # Stage 2 - the base toolchain image (no Go, no Gateway source)
 ############################################################################
 FROM ${BASE_IMAGE} AS base
-# DHI bases default to a non-root user; the compiler needs root to apt-install the toolchain at
-# build time and to write build artifacts + the mounted /plugin-source volume at run time.
+# DHI bases default to a non-root user; the compiler needs root to write build artifacts and the
+# mounted /plugin-source volume at run time.
 USER 0
 ARG BASE_IMAGE
 ARG GLIBC_TARGET
 ARG WITH_CXX=1
 ARG WITH_GIT=1
-ARG PREPROVISIONED_TOOLCHAIN=1
 # Immutable DHI source digest recorded on the image for audit and promotion tooling.
 ARG DHI_DIGEST=unknown
 # The release workflow resolves this once and records it on the workflow-local
@@ -155,42 +154,31 @@ ARG GO_TOOLCHAIN_IMAGE_REF=unknown
 #     Git and its declared Perl dependency because Go's direct/private-module fallback needs it.
 ARG SLIM=0
 ARG CROSS=0
+# The compiler toolchain is NEVER installed at build time. It must arrive pre-provisioned in the
+# Docker Hardened Images customization named by BASE_IMAGE, built by Docker from Tyk's declared
+# package list. This is a security requirement, not a convenience: only packages Docker provisions
+# are covered by Docker's maintenance obligation and carry +dhi versions with published DHI
+# vulnerability decisions. A package installed here by apt/apk would be an ordinary upstream build
+# that nobody is obliged to patch and that no DHI advisory covers.
+#
+# Consequence: changing the toolchain package list requires Docker to rebuild the customization
+# first. There is deliberately no fallback -- a base missing the toolchain fails the build.
 RUN set -eux; \
-    case "$PREPROVISIONED_TOOLCHAIN" in 0|1) ;; *) echo "ERROR: PREPROVISIONED_TOOLCHAIN must be 0 or 1 (got $PREPROVISIONED_TOOLCHAIN)" >&2; exit 1 ;; esac; \
-    if [ "$PREPROVISIONED_TOOLCHAIN" = "1" ]; then \
-        echo "Using pre-provisioned compiler toolchain from ${BASE_IMAGE}"; \
-    elif command -v apt-get >/dev/null; then \
-        apt-get update; \
-        # GNU userspace: this is a busybox base, so install real coreutils/sed/grep/findutils/tar.
-        # BusyBox's awk and gzip applets cover every use in this image; retaining them avoids adding
-        # vulnerable GNU gawk/gzip packages solely to replace equivalent hardened-base applets. bash, jq,
-        # binutils (+gold: OLD Go <1.18 links a NATIVE -buildmode=plugin with -fuse-ld=gold, else
-        # the external link dies "cannot find 'ld'"), file, make and native gcc are always needed.
-        # curl is intentionally omitted (Go is fetched via BuildKit ADD in Dockerfile.release);
-        # ca-certificates stays (Go module HTTPS), and git pulls libcurl/libssh2 regardless.
-        pkgs="bash jq ca-certificates coreutils sed grep findutils tar \
-              binutils binutils-gold file make gcc"; \
-        # CROSS=1 (the -x variant) adds the cross toolchains for amd64/arm64/s390x; CROSS=0 ships
-        # native gcc only -> build.sh builds the host arch and fails fast on a cross target (the
-        # same native-only path the Wolfi variant uses).
-        if [ "$CROSS" = "1" ]; then \
-            pkgs="$pkgs gcc-x86-64-linux-gnu gcc-aarch64-linux-gnu gcc-s390x-linux-gnu"; \
-            [ "$WITH_CXX" = "1" ] && pkgs="$pkgs g++ g++-x86-64-linux-gnu g++-aarch64-linux-gnu g++-s390x-linux-gnu"; \
-        else \
-            [ "$WITH_CXX" = "1" ] && pkgs="$pkgs g++"; \
-        fi; \
-        [ "$WITH_GIT" = "1" ] && pkgs="$pkgs git"; \
-        apt-get install -y --no-install-recommends $pkgs; \
-        rm -rf /var/lib/apt/lists/*; \
-    elif command -v apk >/dev/null; then \
-        pkgs="bash jq ca-certificates binutils file make gcc glibc-dev"; \
-        [ "$WITH_GIT" = "1" ] && pkgs="$pkgs git"; \
-        apk add --no-cache $pkgs; \
-        # Wolfi: gcc includes C++; cross-gcc is not packaged, so a Wolfi image builds \
-        # NATIVELY for its own arch only (amd64 image -> amd64, arm64 -> arm64). \
-        # Cross targets (s390x, opposite arch) require the busybox-glibc -x variant. \
-    else \
-        echo "ERROR: non-preprovisioned base has no supported package manager" >&2; \
+    echo "Using pre-provisioned compiler toolchain from ${BASE_IMAGE}"; \
+    missing=""; \
+    for tool in gcc ld ar make file bash jq; do \
+        command -v "$tool" >/dev/null || missing="$missing $tool"; \
+    done; \
+    if [ "$WITH_CXX" = "1" ]; then command -v g++ >/dev/null || missing="$missing g++"; fi; \
+    if [ "$WITH_GIT" = "1" ]; then command -v git >/dev/null || missing="$missing git"; fi; \
+    if [ "$CROSS" = "1" ]; then \
+        for t in x86_64 aarch64 s390x; do \
+            command -v "$t-linux-gnu-gcc" >/dev/null || missing="$missing $t-linux-gnu-gcc"; \
+        done; \
+    fi; \
+    if [ -n "$missing" ]; then \
+        echo "ERROR: BASE_IMAGE ${BASE_IMAGE} is missing pre-provisioned toolchain components:$missing" >&2; \
+        echo "ERROR: the toolchain must be provisioned by the DHI customization, not installed here." >&2; \
         exit 1; \
     fi
 

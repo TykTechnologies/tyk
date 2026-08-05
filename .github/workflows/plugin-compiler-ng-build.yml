@@ -14,7 +14,6 @@ on:
 env:
   GOLANG_CROSS: 1.25-bullseye
   NG_BASE_SOURCE: tykio/dhi-busybox-plugin-compiler:1.37.0-debian13-fips_plugin-compiler-ng-toolchain
-  NG_PR_BASE_SOURCE: debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818
   NG_GLIBC_TARGET: "2.17"
   NG_CROSS: "1"
   NG_SLIM: "0"
@@ -79,10 +78,9 @@ jobs:
       - name: Resolve source base digest
         id: source-base
         run: |
+          # Always the DHI customization. Pull requests build the same base the release
+          # builds, so the compile/load gate validates the artifact that actually ships.
           source="$NG_BASE_SOURCE"
-          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
-            source="$NG_PR_BASE_SOURCE"
-          fi
           inspect="$(docker buildx imagetools inspect "$source" --format '{{json .}}')"
           digest="$(jq -er '.manifest.digest' <<<"$inspect")"
           test -n "$digest"
@@ -157,7 +155,6 @@ jobs:
             SLIM=${{ env.NG_SLIM }}
             WITH_CXX=${{ env.NG_WITH_CXX }}
             WITH_GIT=${{ env.NG_WITH_GIT }}
-            PREPROVISIONED_TOOLCHAIN=${{ github.event_name == 'pull_request' && '0' || '1' }}
             DHI_DIGEST=${{ steps.source-base.outputs.digest }}
             GO_TOOLCHAIN_IMAGE_REF=${{ steps.source-go.outputs.ref }}
 
