@@ -2555,6 +2555,21 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	log.Debug("Upstream path is: ", r.URL.Path)
 }
 
+func (a *APISpec) PrepareRequestToLog(r *http.Request) *http.Request {
+	dup := r.Clone(r.Context())
+	a.SanitizeProxyPaths(dup)
+
+	// appends path if upstream ha path e.g. http://httpbin.org/anything
+	if a.target != nil && a.target.Path != "" {
+		dup.URL.Path = singleJoiningSlash(a.target.Path, dup.URL.Path, a.Proxy.DisableStripSlash)
+		if dup.URL.RawPath != "" {
+			dup.URL.RawPath = singleJoiningSlash(a.target.Path, dup.URL.RawPath, a.Proxy.DisableStripSlash)
+		}
+	}
+
+	return dup
+}
+
 func (a *APISpec) getRedirectTargetUrl(inputUrl *url.URL) (*url.URL, error) {
 	if inputUrl == nil {
 		return nil, errors.New("input url is nil")
