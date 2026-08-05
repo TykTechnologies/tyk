@@ -100,7 +100,10 @@ func (m *OAuth2Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request
 	// Hand off to the EE TokenExchangeMiddleware via request-context state.
 	if exchangeActive {
 		oauth2common.SetState(r, &oauth2common.State{
-			Claims:               claims,
+			Claims: claims,
+			ReplaceVariables: func(in string) string {
+				return m.Gw.ReplaceTykVariables(r, in, false)
+			},
 			RawToken:             rawToken,
 			OASConfig:            cfg,
 			APIID:                m.Spec.APIID,

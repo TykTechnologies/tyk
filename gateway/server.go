@@ -57,6 +57,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/internal/mcp/pairing"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -172,6 +173,7 @@ type Gateway struct {
 	apiSpecs        []*APISpec
 	apisByID        map[string]*APISpec
 	apisHandlesByID *sync.Map
+	mcpPairingIndex pairing.Index
 
 	// prmCache memoises upstream Protected Resource Metadata (RFC 9728) docs
 	// for MCP APIs running in mirror mode. Lazily initialised on first use.

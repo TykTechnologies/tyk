@@ -220,7 +220,7 @@ func (s *APISpec) Unload() {
 func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 	if s.IsOAS {
 		var err error
-		if s.IsMCP() {
+		if s.IsMCPManaged() {
 			// MCP-aware path: empty-mode + no-resource PRM config
 			// resolves to mirror, so users can enable mirror by just
 			// marking the API as MCP without any static fields.
@@ -542,11 +542,7 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 			uniqueWords[m[0]] = true
 			val := os.Getenv(m[1])
 			if val != "" {
-				escaped, err := jsonEscapeString(val)
-				if err != nil {
-					log.WithError(err).Errorf("Couldn't JSON-escape env secret for key: %s", m[1])
-					continue
-				}
+				escaped := jsonEscapeString(val)
 				input = strings.ReplaceAll(input, m[0], escaped)
 			}
 		}
@@ -554,11 +550,7 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 
 	if strings.Contains(input, prefixSecrets) {
 		for k, v := range a.Gw.GetConfig().Secrets {
-			escaped, err := jsonEscapeString(v)
-			if err != nil {
-				log.WithError(err).Errorf("Couldn't JSON-escape config secret for key: %s", k)
-				continue
-			}
+			escaped := jsonEscapeString(v)
 			input = strings.ReplaceAll(input, prefixSecrets+k, escaped)
 		}
 	}
@@ -596,10 +588,7 @@ func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
 
 	for i := 1; i < len(pairs); i++ {
 		key := strings.TrimPrefix(pairs[i].Key, prefixKeys+"/")
-		escaped, err := jsonEscapeString(string(pairs[i].Value))
-		if err != nil {
-			return err
-		}
+		escaped := jsonEscapeString(string(pairs[i].Value))
 		*input = strings.ReplaceAll(*input, prefixConsul+key, escaped)
 	}
 
@@ -641,10 +630,7 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 	}
 
 	for k, v := range pairsMap {
-		escaped, err := jsonEscapeString(fmt.Sprintf("%v", v))
-		if err != nil {
-			return err
-		}
+		escaped := jsonEscapeString(fmt.Sprintf("%v", v))
 		*input = strings.ReplaceAll(*input, prefixVault+k, escaped)
 	}
 
@@ -788,6 +774,36 @@ func (a APIDefinitionLoader) GetMCPFilepath(path string) string {
 	return strings.TrimSuffix(path, ".json") + "-mcp.json"
 }
 
+func (a APIDefinitionLoader) isOASCompanionFile(path string) bool {
+	var apiDefPath string
+	switch {
+	case strings.HasSuffix(path, "-oas.json"):
+		apiDefPath = strings.TrimSuffix(path, "-oas.json") + ".json"
+	case strings.HasSuffix(path, "-mcp.json"):
+		apiDefPath = strings.TrimSuffix(path, "-mcp.json") + ".json"
+	default:
+		return false
+	}
+
+	if _, err := os.Stat(apiDefPath); err != nil {
+		return false
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+
+	var marker struct {
+		OpenAPI string `json:"openapi"`
+		Swagger string `json:"swagger"`
+	}
+	if err := json.Unmarshal(data, &marker); err != nil {
+		return false
+	}
+	return marker.OpenAPI != "" || marker.Swagger != ""
+}
+
 // FromDir will load APIDefinitions from a directory on the filesystem. Definitions need
 // to be the JSON representation of APIDefinition object
 func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
@@ -796,7 +812,7 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
 	for _, path := range paths {
 		// Skip companion files (loaded separately)
-		if strings.HasSuffix(path, "-oas.json") || strings.HasSuffix(path, "-mcp.json") {
+		if a.isOASCompanionFile(path) {
 			continue
 		}
 
@@ -847,7 +863,7 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 		}
 
 		var oasFilepath string
-		if def.IsMCP() {
+		if def.IsMCPManaged() {
 			oasFilepath = a.GetMCPFilepath(filePath)
 		} else {
 			oasFilepath = a.GetOASFilepath(filePath)
