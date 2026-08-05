@@ -224,6 +224,31 @@ type StorageOptionsConf struct {
 	// This limit prevents memory exhaustion during decompression.
 	// Defaults to 104857600 (100MB).
 	MaxDecompressedSize int64 `json:"max_decompressed_size"`
+
+	// Configure the cloud provider's Identity and Access Management (IAM)
+	// authentication solution for temporal storage (for example, GCP MemoryStore IAM)
+	// instead of the traditional fixed username and password.
+	IAMAuth IAMAuthConfig `json:"iam_auth"`
+}
+
+// Configure the cloud provider's Identity and Access Management (IAM) authentication
+// for temporal storage (Redis/Valkey). If enabled, the standard username and password are ignored.
+type IAMAuthConfig struct {
+	// Set to true to use IAM-based authentication for this storage connection.
+	Enabled bool `json:"enabled"`
+	// Provider selects the cloud IAM provider. Currently supported: "gcp"
+	// (GCP Memorystore for Valkey and Redis Cluster).
+	Provider string `json:"provider"`
+	// ServiceAccount, for GCP, optionally impersonates this service account to
+	// mint tokens instead of using the ambient Application Default Credentials
+	// identity. Leave empty to use the workload's own identity (Workload Identity
+	// on GKE, or GOOGLE_APPLICATION_CREDENTIALS).
+	ServiceAccount string `json:"service_account"`
+	// The access token issued by the IAM will be refreshed before expiry.
+	// Set the time period before expiry when that refresh will take place as
+	// a human readable duration (for example "2m30s", "5m").
+	// Defaults to "5m" (five minutes) when empty.
+	TokenRefreshBeforeExpiry string `json:"token_refresh_before_expiry"`
 }
 
 type NormalisedURLConfig struct {
