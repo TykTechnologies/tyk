@@ -43,10 +43,7 @@ func (m *PRMMiddleware) Name() string {
 }
 
 func (m *PRMMiddleware) EnabledForSpec() bool {
-	if name, _ := m.Spec.GetOAuth2PRMConfig(); name != "" {
-		return true
-	}
-	return m.Spec.GetPRMConfig() != nil
+	return m.Spec.IsPRMEnabled()
 }
 
 //nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
