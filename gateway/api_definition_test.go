@@ -1669,6 +1669,74 @@ func TestReplaceSecrets(t *testing.T) {
 	assert.Equal(t, "Ghiur", api2.AuthConfigs[apidef.OAuthType].AuthHeaderName)
 }
 
+// TestMakeSpec_ValidListenPath_KVReference proves the gap ValidListenPath() closes: a
+// Proxy.ListenPath given as a KV reference (env://, secrets://, ...) can resolve to a value
+// with no leading slash — Dashboard can't catch this at write time, since it never sees the
+// resolved value, only the reference. Without normalizing inside MakeSpec, the resolved value
+// would fail httputil.ValidatePath and the API would never load. This exercises the real
+// replaceSecrets -> MakeSpec pipeline (via BuildAndLoadAPI, which loads from disk), not just
+// the ValidListenPath() unit in isolation.
+func TestMakeSpec_ValidListenPath_KVReference(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Setenv("TestMakeSpec_ValidListenPath_KVReference_var", "kv-no-slash")
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "kv-listen-path"
+		spec.Proxy.ListenPath = "env://TestMakeSpec_ValidListenPath_KVReference_var"
+	})
+
+	api := ts.Gw.getApiSpec("kv-listen-path")
+	require.NotNil(t, api)
+	assert.Equal(t, "/kv-no-slash", api.Proxy.ListenPath, "resolved KV reference must be normalized with a leading slash")
+
+	ts.Run(t, test.TestCase{Method: http.MethodGet, Path: "/kv-no-slash/get", Code: http.StatusOK})
+}
+
+// TestMakeSpec_ValidListenPath_TraversalAndStrictRoutes proves ValidListenPath resolves ".."
+// segments while preserving a trailing slash, and that preservation is load-bearing for
+// EnableStrictRoutes: a trailing slash tells explicitRouteSubpaths to rely on mux's own
+// literal-prefix boundary instead of wrapping the handler, while its absence triggers the
+// wrapper, which 404s requests that only share a text prefix with the listen path.
+func TestMakeSpec_ValidListenPath_TraversalAndStrictRoutes(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.EnableStrictRoutes = true
+	})
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.APIID = "traversal-with-slash"
+			spec.Proxy.ListenPath = "/foo/../bar/"
+		},
+		func(spec *APISpec) {
+			spec.APIID = "traversal-no-slash"
+			spec.Proxy.ListenPath = "/foo/../baz"
+		},
+	)
+
+	withSlash := ts.Gw.getApiSpec("traversal-with-slash")
+	require.NotNil(t, withSlash)
+	assert.Equal(t, "/bar/", withSlash.Proxy.ListenPath)
+
+	noSlash := ts.Gw.getApiSpec("traversal-no-slash")
+	require.NotNil(t, noSlash)
+	assert.Equal(t, "/baz", noSlash.Proxy.ListenPath)
+
+	ts.Run(t, []test.TestCase{
+		// trailing slash preserved: mux's literal-prefix match already requires the "/bar/"
+		// boundary, so a merely-prefixed path never reaches this API at all.
+		{Method: http.MethodGet, Path: "/bar/get", Code: http.StatusOK},
+		{Method: http.MethodGet, Path: "/barextra/get", Code: http.StatusNotFound},
+
+		// no trailing slash: mux's PathPrefix("/baz") loosely matches "/bazextra" too, so
+		// explicitRouteSubpaths wraps the handler and rejects it despite the loose mux match.
+		{Method: http.MethodGet, Path: "/baz/get", Code: http.StatusOK},
+		{Method: http.MethodGet, Path: "/bazextra/get", Code: http.StatusNotFound},
+	}...)
+}
+
 func TestReplaceSecretsFileScheme(t *testing.T) {
 	t.Run("file:// references rejected without base_path", func(t *testing.T) {
 		ts := StartTest(nil)
