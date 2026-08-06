@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -33,6 +34,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp/pairing"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 )
@@ -40,6 +42,12 @@ import (
 const (
 	rateLimitEndpoint = "/tyk/rate-limits/"
 )
+
+// isJSDriver returns true for drivers that use in-process JS execution
+// (otto or goja) as opposed to coprocess (python, lua, grpc) or go plugins.
+func isJSDriver(d apidef.MiddlewareDriver) bool {
+	return d == apidef.OttoDriver || d == apidef.JavaScriptDriver
+}
 
 type ChainObject struct {
 	ThisHandler    http.Handler
@@ -231,10 +239,10 @@ func (gw *Gateway) processSpec(
 	}
 
 	// Initialise the auth and session managers (use Redis for now)
-	authStore, orgStore, sessionStore := gw.configureAuthAndOrgStores(gs, spec)
+	authStore, orgStore, _ := gw.configureAuthAndOrgStores(gs, spec)
 
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
-	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
+	spec.Init(authStore, gs.healthStore, orgStore)
 
 	if !spec.ErrorOverridesDisabled && len(spec.ErrorOverrides) > 0 {
 		if compiled := CompileErrorOverrides(spec.ErrorOverrides); compiled != nil {
@@ -260,9 +268,87 @@ func (gw *Gateway) processSpec(
 	var mwPaths []string
 
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = gw.loadCustomMiddleware(spec)
-	if gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || mwDriver == apidef.OttoDriver) {
+	if gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || isJSDriver(mwDriver)) {
 		logger.Debug("Loading JS Paths")
-		spec.JSVM.LoadJSPaths(mwPaths, prefix)
+		if mwDriver == apidef.JavaScriptDriver {
+			// File-mount and bundle modes: load each middleware file with
+			// per-(file, name) handler-name isolation. The IIFE wrap inside
+			// LoadMiddlewareFile keeps each plugin's `var handler = ...`
+			// local and exposes only the per-alias global, so multi-file
+			// bundles (and multi-bundle composition) don't collide on the
+			// same JS-side identifier.
+			fileMiddlewares := []*apidef.MiddlewareDefinition{&mwAuthCheckFunc}
+			for i := range mwPreFuncs {
+				fileMiddlewares = append(fileMiddlewares, &mwPreFuncs[i])
+			}
+			for i := range mwPostFuncs {
+				fileMiddlewares = append(fileMiddlewares, &mwPostFuncs[i])
+			}
+			for i := range mwPostAuthCheckFuncs {
+				fileMiddlewares = append(fileMiddlewares, &mwPostAuthCheckFuncs[i])
+			}
+			for i := range mwResponseFuncs {
+				fileMiddlewares = append(fileMiddlewares, &mwResponseFuncs[i])
+			}
+
+			// Track which absolute paths we've already loaded so we don't
+			// double-compile when multiple manifest entries share a file.
+			loaded := make(map[string]struct{}, len(fileMiddlewares))
+			pathNames := make(map[string][]string)
+
+			for _, md := range fileMiddlewares {
+				if md.Name == "" || md.Path == "" || md.Code != "" {
+					continue
+				}
+				absPath := md.Path
+				if prefix != "" {
+					absPath = filepath.Join(prefix, absPath)
+				}
+				pathNames[absPath] = append(pathNames[absPath], md.Name)
+				md.RuntimeHandlerName = spec.GojaJSVM.AliasFor(absPath, md.Name)
+			}
+
+			for absPath, names := range pathNames {
+				if _, done := loaded[absPath]; done {
+					continue
+				}
+				loaded[absPath] = struct{}{}
+				if err := spec.GojaJSVM.LoadMiddlewareFile(absPath, names); err != nil {
+					logger.WithError(err).Errorf("Failed to load middleware file %q", absPath)
+				}
+			}
+			// Virtual endpoints are pre-loaded separately via
+			// preLoadVirtualMetaCodeGoja (see api_definition.go); their JS
+			// declares its own ResponseFunctionName which the dispatcher
+			// invokes by name — distinct from custom_middleware globals.
+
+			// Load inline code from MiddlewareDefinition.Code fields (goja only).
+			// Each inline middleware gets a unique synthetic path so its handler
+			// global is rebranded distinctly even if multiple inline entries
+			// happen to share the same Name (e.g. all use "handler").
+			inlineCounter := 0
+			loadInline := func(md *apidef.MiddlewareDefinition) {
+				if md.Code == "" {
+					return
+				}
+				gw.loadInlineGojaMiddleware(spec, md, &inlineCounter, logger)
+			}
+			loadInline(&mwAuthCheckFunc)
+			for i := range mwPreFuncs {
+				loadInline(&mwPreFuncs[i])
+			}
+			for i := range mwPostFuncs {
+				loadInline(&mwPostFuncs[i])
+			}
+			for i := range mwPostAuthCheckFuncs {
+				loadInline(&mwPostAuthCheckFuncs[i])
+			}
+			for i := range mwResponseFuncs {
+				loadInline(&mwResponseFuncs[i])
+			}
+		} else {
+			spec.JSVM.LoadJSPaths(mwPaths, prefix)
+		}
 	}
 
 	//  if bundle was used - fix paths for goplugin-type custom middle-wares
@@ -272,6 +358,10 @@ func (gw *Gateway) processSpec(
 		fixFuncPath(prefix, mwPostFuncs)
 		fixFuncPath(prefix, mwPostAuthCheckFuncs)
 		fixFuncPath(prefix, mwResponseFuncs)
+
+		if spec.AnalyticsPlugin.Enabled && spec.AnalyticsPlugin.PluginPath != "" && !filepath.IsAbs(spec.AnalyticsPlugin.PluginPath) {
+			spec.AnalyticsPlugin.PluginPath = filepath.Join(prefix, spec.AnalyticsPlugin.PluginPath)
+		}
 	}
 
 	enableVersionOverrides := false
@@ -335,11 +425,11 @@ func (gw *Gateway) processSpec(
 					APILevel:       true,
 				},
 			)
-		} else if mwDriver != apidef.OttoDriver {
+		} else if !isJSDriver(mwDriver) {
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_Pre, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
-			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid.Copy()))
+			chainArray = append(chainArray, gw.createDynamicMiddleware(pickMiddlewareClassName(obj), true, obj.RequireSession, baseMid.Copy()))
 		}
 	}
 
@@ -358,6 +448,11 @@ func (gw *Gateway) processSpec(
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &PRMMiddleware{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabledForRequest(
+		&chainArray,
+		&MCPLoopAuthBypassMiddleware{BaseMiddleware: baseMid.Copy()},
+		isMCPAdapterLoopRequest,
+	)
 
 	// Track auth middlewares for OR wrapper
 	var authMiddlewares []TykMiddleware
@@ -422,11 +517,11 @@ func (gw *Gateway) processSpec(
 
 		if customPluginAuthEnabled && !mwAuthCheckFunc.Disabled {
 			switch spec.CustomMiddleware.Driver {
-			case apidef.OttoDriver:
+			case apidef.OttoDriver, apidef.JavaScriptDriver:
 				logger.Info("----> Checking security policy: JS Plugin")
 				dynamicMW := &DynamicMiddleware{
 					BaseMiddleware:      baseMid.Copy(),
-					MiddlewareClassName: mwAuthCheckFunc.Name,
+					MiddlewareClassName: pickMiddlewareClassName(mwAuthCheckFunc),
 					Pre:                 true,
 					Auth:                true,
 				}
@@ -507,6 +602,8 @@ func (gw *Gateway) processSpec(
 						APILevel:       true,
 					},
 				)
+			} else if isJSDriver(mwDriver) {
+				chainArray = append(chainArray, gw.createDynamicMiddleware(pickMiddlewareClassName(obj), false, obj.RequireSession, baseMid.Copy()))
 			} else {
 				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_PostKeyAuth, obj.Name, mwDriver, obj.RawBodyOnly, nil})
@@ -527,6 +624,11 @@ func (gw *Gateway) processSpec(
 
 	gw.mwAppendEnabled(&chainArray, &OAuth2Middleware{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, getOAuth2ExchangeMw(baseMid.Copy()))
+	gw.mwAppendEnabledForRequest(
+		&chainArray,
+		&MCPLoopAuthRestoreMiddleware{BaseMiddleware: baseMid.Copy()},
+		isMCPAdapterLoopRequest,
+	)
 
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid.Copy(), quotaKey: options.quotaKey})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid.Copy()})
@@ -575,11 +677,11 @@ func (gw *Gateway) processSpec(
 					APILevel:       true,
 				},
 			)
-		} else if mwDriver != apidef.OttoDriver {
+		} else if !isJSDriver(mwDriver) {
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_Post, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
-			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid.Copy()))
+			chainArray = append(chainArray, gw.createDynamicMiddleware(pickMiddlewareClassName(obj), false, obj.RequireSession, baseMid.Copy()))
 		}
 	}
 
@@ -620,7 +722,6 @@ func (gw *Gateway) processSpec(
 	}
 
 	if spec.APIDefinition.AnalyticsPlugin.Enabled {
-
 		ap := &GoAnalyticsPlugin{
 			Path:     spec.AnalyticsPlugin.PluginPath,
 			FuncName: spec.AnalyticsPlugin.FuncName,
@@ -764,7 +865,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if d.SH.Spec.target.Scheme == "tyk" {
-		handler, _, found := d.Gw.findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
+		handler, _, found := d.Gw.findInternalHTTPHandlerForLoop(d.SH.Spec.target.Host, d.SH.Spec, r)
 
 		if !found {
 			handler := ErrorHandler{d.SH.Base()}
@@ -954,13 +1055,13 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 
 // registerMCPPRMSuffixRoutes wires up the host-root well-known URL
 // (`<root>/.well-known/oauth-protected-resource<listen-path>`) that
-// RFC 9728 §3.1 says clients probe. Only attaches when the API is MCP and
-// has PRM enabled — for all other APIs this is a no-op.
+// RFC 9728 §3.1 says clients probe. Only attaches when the API is MCP-managed
+// and has PRM enabled — for all other APIs this is a no-op.
 //
 // mcp-remote strips the trailing slash off the listen path before building
 // the probe URL, so we register both with and without the trailing slash.
 func (gw *Gateway) registerMCPPRMSuffixRoutes(spec *APISpec, router *mux.Router) {
-	if spec == nil || !spec.IsMCP() {
+	if spec == nil || !spec.IsMCPManaged() {
 		return
 	}
 	prm := spec.GetPRMConfig()
@@ -988,7 +1089,7 @@ func (gw *Gateway) registerMCPPRMSuffixRoutes(spec *APISpec, router *mux.Router)
 	// request with `invalid_target` because mcp-remote sends the
 	// gateway URL as the resource (per the mirrored PRM doc) but the
 	// upstream AS only knows the upstream URL.
-	if prm.IsMirrorMode(spec.IsMCP()) {
+	if prm.IsMirrorMode(spec.IsMCPManaged()) {
 		gw.registerMCPASProxyRoutes(spec, router)
 	}
 }
@@ -1028,7 +1129,7 @@ func (gw *Gateway) mcpPRMSuffixHandler(spec *APISpec) http.HandlerFunc {
 			http.NotFound(w, r)
 			return
 		}
-		if prm.IsMirrorMode(spec.IsMCP()) {
+		if prm.IsMirrorMode(spec.IsMCPManaged()) {
 			if err := mw.serveMirroredPRM(w, r); err != nil {
 				log.WithError(err).Warn("PRM mirror failed at suffix route")
 				http.Error(w, "upstream PRM unavailable", http.StatusBadGateway)
@@ -1088,14 +1189,8 @@ func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxy
 		gw.enforceOrgDataAgeIfQuotasEnabled(spec)
 	}
 
-	sessionStore := gs.redisStore
-	switch spec.SessionProvider.StorageEngine {
-	case RPCStorageEngine:
-		sessionStore = gs.rpcAuthStore
-	}
-
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
-	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
+	spec.Init(authStore, gs.healthStore, orgStore)
 
 	muxer.addTCPService(spec, nil, gw)
 }
@@ -1151,6 +1246,7 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 			return
 		}
 
+		rw.Header().Set("Content-Type", "application/javascript")
 		if err := playgroundTemplate.ExecuteTemplate(rw, playgroundJSTemplateName, nil); err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 		}
@@ -1213,6 +1309,15 @@ func listenPathLength(listenPath string) int {
 // Create the individual API (app) specs based on live configurations and assign middleware
 func (gw *Gateway) loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
+
+	synthesizedSpecs, mcpPairingSnapshot, err := synthesizeMCPAdapterSpecs(specs, gw.currentSyntheticMCPAdapterSpecs())
+	if err != nil {
+		mainLog.WithError(err).Error("failed to synthesize REST-as-MCP adapters")
+		gw.mcpPairingIndex.Set(pairing.Snapshot{})
+	} else {
+		specs = synthesizedSpecs
+		gw.mcpPairingIndex.Set(mcpPairingSnapshot)
+	}
 
 	// Only build usage map in RPC mode (when tracker exists)
 	if gw.certUsageTracker != nil {
@@ -1424,6 +1529,55 @@ func (gw *Gateway) enforceOrgDataAgeIfQuotasEnabled(spec *APISpec) {
 	spec.GlobalConfig.EnforceOrgDataAge = true
 	globalConf.EnforceOrgDataAge = true
 	gw.SetConfig(globalConf)
+}
+
+// loadInlineGojaMiddleware decodes the base64 inline JS for a goja-driven
+// middleware definition, compiles it under a unique synthetic path so its
+// handler global is rebranded distinctly, and stamps the resulting alias
+// onto md.RuntimeHandlerName for dispatch translation.
+//
+// counter is a per-API monotonically increasing counter that ensures distinct
+// synthetic paths even when several inline middleware in the same API def
+// happen to share the same Name.
+func (gw *Gateway) loadInlineGojaMiddleware(spec *APISpec, md *apidef.MiddlewareDefinition, counter *int, logger *logrus.Entry) {
+	decoded, err := base64.StdEncoding.DecodeString(md.Code)
+	if err != nil {
+		logger.WithError(err).Errorf("Failed to decode inline code for middleware %q", md.Name)
+		return
+	}
+	syntheticPath := fmt.Sprintf("__tyk_inline__/%s/%d/%s", spec.APIID, *counter, md.Name)
+	*counter++
+	if err := spec.GojaJSVM.LoadInlineMiddleware(syntheticPath, string(decoded), []string{md.Name}); err != nil {
+		logger.WithError(err).Errorf("Failed to compile inline code for middleware %q", md.Name)
+		return
+	}
+	md.RuntimeHandlerName = spec.GojaJSVM.AliasFor(syntheticPath, md.Name)
+}
+
+// pickMiddlewareClassName returns the JS-side identifier that dispatch should
+// use for a middleware definition. For goja-loaded middleware, it returns the
+// per-(file, name) alias stamped onto RuntimeHandlerName at API-load time.
+// For otto and any other case, it falls back to the original Name.
+func pickMiddlewareClassName(md apidef.MiddlewareDefinition) string {
+	if md.RuntimeHandlerName != "" {
+		return md.RuntimeHandlerName
+	}
+	return md.Name
+}
+
+// collectAllMiddleware gathers MiddlewareDefinition entries from the auth check hook
+// and all hook slices (pre, post, post-key-auth, response) into a single flat slice.
+func collectAllMiddleware(authCheck apidef.MiddlewareDefinition, slices ...[]apidef.MiddlewareDefinition) []apidef.MiddlewareDefinition {
+	total := 1
+	for _, s := range slices {
+		total += len(s)
+	}
+	all := make([]apidef.MiddlewareDefinition, 0, total)
+	all = append(all, authCheck)
+	for _, s := range slices {
+		all = append(all, s...)
+	}
+	return all
 }
 
 // WithQuotaKey overrides quota key manually

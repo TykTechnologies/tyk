@@ -180,3 +180,26 @@ func TestGetOAuth2Config_AcceptsDuplicatesAndReturnsOne(t *testing.T) {
 	assert.True(t, cfg.Enabled)
 	assert.Contains(t, []string{"corpOAuth", "altOAuth"}, name)
 }
+
+func TestAPISpecValidate_AllowsMCPServerExtensionOnPairedProxy(t *testing.T) {
+	doc := pairedMCPProxyOAS("proxy-1", "org-1", "rest-1")
+	doc.SetTykMCPServerExtension(&oas.TykMCPServer{
+		Primitives: []oas.TykMCPServerPrimitive{
+			{Source: oas.TykMCPServerSource{OperationID: "list_orders"}, Name: "orders"},
+		},
+	})
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "proxy-1",
+			OrgID: "org-1",
+			IsOAS: true,
+			Proxy: apidef.ProxyConfig{TargetURL: oas.AdapterLoopURL("rest-1")},
+		},
+		OAS: *doc,
+	}
+
+	require.False(t, spec.IsMCP())
+	require.True(t, spec.IsMCPManaged())
+	require.NoError(t, spec.Validate(config.OASConfig{}))
+}

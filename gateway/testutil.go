@@ -1882,7 +1882,9 @@ func (gw *Gateway) writeSpecFiles(specs []*APISpec, appPath string) {
 	for i, spec := range specs {
 		gw.ensureSpecName(spec)
 		gw.writeAPIDefinitionFile(spec, i, appPath)
-		gw.writeOASFile(spec, i, appPath)
+		if spec.IsOAS {
+			gw.writeOASFile(spec, i, appPath)
+		}
 	}
 }
 

@@ -28,6 +28,7 @@ const (
 	keyRequired                 = "required"
 	mcpSchemaVersionNotFoundFmt = "schema not found for version %q"
 	ExtensionTykAPIGateway      = "x-tyk-api-gateway"
+	ExtensionTykMCPServer       = "x-tyk-mcp-server"
 )
 
 var (
@@ -54,13 +55,22 @@ func GetDefinitionsKey(schemaData []byte) string {
 
 func loadMCPSchema() error {
 	load := func() error {
-		// Load x-tyk-api-gateway extension schema
+		// Load extension schemas.
 		xTykAPIGwSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykAPIGateway))
 		if err != nil {
 			return fmt.Errorf("%s loading failed: %w", ExtensionTykAPIGateway, err)
 		}
-
-		xTykAPIGwSchemaWithoutDefs := jsonparser.Delete(xTykAPIGwSchema, keyDefinitions)
+		xTykMCPServerSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykMCPServer))
+		if err != nil {
+			return fmt.Errorf("%s loading failed: %w", ExtensionTykMCPServer, err)
+		}
+		extensionSchemas := []struct {
+			name string
+			data []byte
+		}{
+			{name: ExtensionTykAPIGateway, data: xTykAPIGwSchema},
+			{name: ExtensionTykMCPServer, data: xTykMCPServerSchema},
+		}
 
 		mcpJSONSchemas = make(map[string][]byte)
 		members, err := schemaDir.ReadDir("schema")
@@ -79,7 +89,7 @@ func loadMCPSchema() error {
 			}
 
 			// Skip extension schemas (we'll inject them)
-			if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykAPIGateway)) {
+			if isMCPExtensionSchema(fileName) {
 				continue
 			}
 
@@ -92,19 +102,20 @@ func loadMCPSchema() error {
 			// Detect which definitions key this schema uses
 			defsKey := GetDefinitionsKey(data)
 
-			// Inject x-tyk-api-gateway extension as property
-			data, err = jsonparser.Set(data, xTykAPIGwSchemaWithoutDefs, keyProperties, ExtensionTykAPIGateway)
-			if err != nil {
-				return err
-			}
+			for _, extSchema := range extensionSchemas {
+				extensionSchemaWithoutDefs := jsonparser.Delete(extSchema.data, keyDefinitions)
 
-			// Merge x-tyk-api-gateway definitions into schema
-			err = jsonparser.ObjectEach(xTykAPIGwSchema, func(key []byte, value []byte, _ jsonparser.ValueType, _ int) error {
-				data, err = jsonparser.Set(data, value, defsKey, string(key))
-				return err
-			}, keyDefinitions)
-			if err != nil {
-				return err
+				// Inject extension as property.
+				data, err = jsonparser.Set(data, extensionSchemaWithoutDefs, keyProperties, extSchema.name)
+				if err != nil {
+					return err
+				}
+
+				// Merge extension definitions into schema.
+				data, err = mergeMCPExtensionDefinitions(data, extSchema.data, defsKey)
+				if err != nil {
+					return err
+				}
 			}
 
 			oasVersion := strings.TrimSuffix(fileName, ".json")
@@ -121,6 +132,37 @@ func loadMCPSchema() error {
 		err = load()
 	})
 	return err
+}
+
+func isMCPExtensionSchema(fileName string) bool {
+	return strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykAPIGateway)) ||
+		strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykMCPServer))
+}
+
+func mergeMCPExtensionDefinitions(data, extensionSchema []byte, defsKey string) ([]byte, error) {
+	var definitions []byte
+	err := jsonparser.ObjectEach(extensionSchema, func(key []byte, value []byte, _ jsonparser.ValueType, _ int) error {
+		if string(key) == keyDefinitions {
+			definitions = append([]byte(nil), value...)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if definitions == nil {
+		return data, nil
+	}
+
+	var setErr error
+	err = jsonparser.ObjectEach(definitions, func(key []byte, value []byte, _ jsonparser.ValueType, _ int) error {
+		data, setErr = jsonparser.Set(data, value, defsKey, string(key))
+		return setErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func validateJSON(schema, document []byte) error {

@@ -16,6 +16,7 @@ import (
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/opentelemetry/metric/metrictest"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/storage"
+	storagemock "github.com/TykTechnologies/tyk/storage/mock"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -42,6 +44,21 @@ type mockStore struct {
 var sess = user.SessionState{
 	OrgID:       "TestBaseMiddleware_OrgSessionExpiry",
 	DataExpires: 110,
+}
+
+type requestConditionalMiddleware struct {
+	*BaseMiddleware
+	calls int
+}
+
+func (m *requestConditionalMiddleware) Name() string {
+	return "requestConditionalMiddleware"
+}
+
+//nolint:staticcheck // ST1008: middleware interface requires (error, int).
+func (m *requestConditionalMiddleware) ProcessRequest(http.ResponseWriter, *http.Request, interface{}) (error, int) {
+	m.calls++
+	return nil, http.StatusOK
 }
 
 func (m mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
@@ -995,6 +1012,46 @@ func TestGateway_mwAppendEnabled_MCP(t *testing.T) {
 	})
 }
 
+func TestGateway_mwAppendEnabledForRequest(t *testing.T) {
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{})
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "request-conditional-api"
+	})[0]
+	mw := &requestConditionalMiddleware{
+		BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw},
+	}
+
+	var chain []alice.Constructor
+	appended := gw.mwAppendEnabledForRequest(&chain, mw, func(r *http.Request) bool {
+		return r.Header.Get("X-Run-Middleware") == "true"
+	})
+	require.True(t, appended)
+	require.Len(t, chain, 1)
+
+	nextCalls := 0
+	handler := alice.New(chain...).Then(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		nextCalls++
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/without-marker", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	assert.Equal(t, http.StatusNoContent, recorder.Code)
+	assert.Zero(t, mw.calls)
+	assert.Equal(t, 1, nextCalls)
+
+	req = httptest.NewRequest(http.MethodGet, "/with-marker", nil)
+	req.Header.Set("X-Run-Middleware", "true")
+	recorder = httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	assert.Equal(t, http.StatusNoContent, recorder.Code)
+	assert.Equal(t, 1, mw.calls)
+	assert.Equal(t, 2, nextCalls)
+}
+
 // testMetricInstruments creates MetricInstruments backed by a real in-memory
 // provider so tests can assert recorded metric values. If defs is non-nil,
 // an API metric registry is configured with the given definitions.
@@ -1423,4 +1480,82 @@ func TestBaseMiddleware_CopyNilLogger_Concurrent(t *testing.T) {
 		require.NotNil(t, got, "goroutine %d", i)
 		assert.Nil(t, got.logger, "Copy of nil logger should leave logger nil (goroutine %d)", i)
 	}
+}
+
+func TestCheckSessionAndIdentityForValidKey_AuthStorePath_MarksSessionAsNew(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HashKeys = false
+		globalConf.LocalSessionCache.DisableCacheSessionState = false
+	})
+	defer ts.Close()
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = uuid.New()
+		spec.UseKeylessAccess = false
+		spec.UseOauth2 = true
+		spec.Auth.AuthHeaderName = "authorization"
+	})[0]
+
+	// rpc/mdcb storage
+	apiStorageHandler := storagemock.NewMockHandler(ctrl)
+	api.AuthManager = &DefaultSessionManager{
+		store: apiStorageHandler,
+		orgID: api.OrgID,
+		Gw:    ts.Gw,
+	}
+
+	// local storage
+	globalStorageHandler := storagemock.NewMockHandler(ctrl)
+	ts.Gw.GlobalSessionManager = &DefaultSessionManager{
+		store: globalStorageHandler,
+		orgID: api.OrgID,
+		Gw:    ts.Gw,
+	}
+
+	key := "auth-store-new-" + uuid.New()
+	session := CreateStandardSession()
+	session.AccessRights = map[string]user.AccessDefinition{
+		api.APIID: {
+			APIID:    api.APIID,
+			Versions: []string{"Default"},
+		},
+	}
+
+	sessionJSON, err := json.Marshal(session)
+	require.NoError(t, err)
+
+	apiStorageHandler.EXPECT().GetKey(gomock.Any()).Return(string(sessionJSON), nil).AnyTimes()
+	apiStorageHandler.EXPECT().GetMultiKey(gomock.Any()).Return([]string{string(sessionJSON)}, nil).AnyTimes()
+	apiStorageHandler.EXPECT().GetRawKey(gomock.Any()).Return(string(sessionJSON), nil).AnyTimes()
+	apiStorageHandler.EXPECT().GetKeyPrefix().Return("").AnyTimes()
+
+	globalStorageHandler.EXPECT().GetKey(gomock.Any()).Return("", storage.ErrKeyNotFound).AnyTimes()
+	globalStorageHandler.EXPECT().GetMultiKey(gomock.Any()).Return(nil, storage.ErrKeyNotFound).AnyTimes()
+	globalStorageHandler.EXPECT().GetRawKey(gomock.Any()).Return("", storage.ErrKeyNotFound).AnyTimes()
+	globalStorageHandler.EXPECT().GetKeyPrefix().Return("").AnyTimes()
+
+	// ensure that session was copied from remote repo into the local one
+	globalStorageHandler.EXPECT().SetKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
+
+	// ensure that session was updated at the end of UpdateRequestSession
+	globalStorageHandler.EXPECT().SetKeyEx(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
+
+	baseMid := NewBaseMiddleware(ts.Gw, api, nil, nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+
+	// global handle simulates absence of session
+	got, ok := baseMid.CheckSessionAndIdentityForValidKey(key, req)
+
+	assert.True(t, ok, "session should be found in auth store")
+	assert.True(t, got.IsRestored(), "session retrieved from AuthManager should be marked as new (IsRestored == false)")
+
+	// simulate session write to context
+	ctxSetSession(req, &got, false, false)
+
+	// Check update session behavior
+	updated := baseMid.UpdateRequestSession(req)
+	assert.True(t, updated, "Should update session if session is touched")
 }
