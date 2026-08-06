@@ -185,6 +185,7 @@ const expectedSchema = "schema {\n    query: Query\n    subscription: Subscripti
 
 const expectedGraphqlConfig = `{
     "enabled": true,
+    "enable_statistics": false,
     "execution_mode": "executionEngine",
     "version": "2",
     "schema": "schema {\n    query: Query\n    subscription: Subscription\n}\n\ntype Query {\n    _: Boolean\n}\n\ntype Subscription {\n    dimLight(streetlightId: String): DimLight\n    turnOff(streetlightId: String): TurnOnOff\n    turnOn(streetlightId: String): TurnOnOff\n}\n\nenum Command {\n    ON\n    OFF\n}\n\n\"\"\"\nDim light\nCommand a particular streetlight to dim the lights.\n\"\"\"\ntype DimLight {\n    \"Percentage to which the light should be dimmed to.\"\n    percentage: Int\n    \"Date and time when the message was sent.\"\n    sentAt: String\n}\n\n\"\"\"\nTurn on/off\nCommand a particular streetlight to turn the lights on or off.\n\"\"\"\ntype TurnOnOff {\n    \"Whether to turn on or off the light.\"\n    command: Command\n    \"Date and time when the message was sent.\"\n    sentAt: String\n}",

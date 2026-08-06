@@ -360,6 +360,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.ResponseProcessors[0].Name",
 		"APIDefinition.ResponseProcessors[0].Options",
 		"APIDefinition.GraphQL.Enabled",
+		"APIDefinition.GraphQL.EnableStatistics",
 		"APIDefinition.GraphQL.ExecutionMode",
 		"APIDefinition.GraphQL.Version",
 		"APIDefinition.GraphQL.Schema",
