@@ -125,6 +125,11 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 	if !spec.GraphQL.Enabled || spec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph {
 		return
 	}
+
+	if !spec.GraphQL.EnableStatistics {
+		return
+	}
+
 	logger := log.WithField("location", "recordGraphDetails")
 	if r.Body == nil {
 		return

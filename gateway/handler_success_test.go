@@ -139,10 +139,11 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 		spec.Proxy.TargetURL = testGraphQLProxyUpstream
 		spec.Proxy.ListenPath = "/"
 		spec.GraphQL = apidef.GraphQLConfig{
-			Enabled:       true,
-			ExecutionMode: apidef.GraphQLExecutionModeProxyOnly,
-			Version:       apidef.GraphQLConfigVersion2,
-			Schema:        gqlProxyUpstreamSchema,
+			Enabled:          true,
+			EnableStatistics: true,
+			ExecutionMode:    apidef.GraphQLExecutionModeProxyOnly,
+			Version:          apidef.GraphQLConfigVersion2,
+			Schema:           gqlProxyUpstreamSchema,
 		}
 	}
 
@@ -167,6 +168,20 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 				assert.ElementsMatch(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)
 				assert.Equal(t, map[string][]string{}, record.GraphQLStats.Types)
 				assert.Equal(t, analytics.OperationQuery, record.GraphQLStats.OperationType)
+			},
+		},
+		{
+			name: "does not extract stats when statistics are disabled",
+			code: http.StatusOK,
+			request: graphql.Request{
+				Query: `{ hello(name: "World") httpMethod }`,
+			},
+			reloadAPI: func(spec *APISpec) {
+				spec.GraphQL.EnableStatistics = false
+			},
+			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
+				assert.False(t, record.GraphQLStats.IsGraphQL)
 			},
 		},
 		{

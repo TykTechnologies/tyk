@@ -34,6 +34,7 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/graphengine"
 	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/test"
@@ -486,6 +487,88 @@ func TestWrappedServeHTTP(t *testing.T) {
 	assert.NotNil(t, proxyResponse, "error on deepCopyBody should return an empty ProxyResponse")
 	assert.Nil(t, proxyResponse.Response, "no response should be expected on error")
 	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+}
+
+type fakeGraphEngine struct {
+	response *http.Response
+}
+
+func (f fakeGraphEngine) Version() graphengine.EngineVersion { return graphengine.EngineVersionUnknown }
+func (f fakeGraphEngine) HasSchema() bool                    { return false }
+func (f fakeGraphEngine) Cancel()                            {}
+func (f fakeGraphEngine) ProcessAndStoreGraphQLRequest(http.ResponseWriter, *http.Request) (error, int) {
+	return nil, 0
+}
+func (f fakeGraphEngine) ProcessGraphQLComplexity(*http.Request, *graphengine.ComplexityAccessDefinition) (error, int) {
+	return nil, 0
+}
+func (f fakeGraphEngine) ProcessGraphQLGranularAccess(http.ResponseWriter, *http.Request, *graphengine.GranularAccessDefinition) (error, int) {
+	return nil, 0
+}
+func (f fakeGraphEngine) HandleReverseProxy(params graphengine.ReverseProxyParams) (*http.Response, bool, error) {
+	return f.response, false, nil
+}
+
+func TestServeHTTP_GraphQLBuffering(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const upstreamURL = "http://upstream.example"
+	target, err := url.Parse(upstreamURL)
+	require.NoError(t, err)
+
+	testCases := []struct {
+		name           string
+		enableStats    bool
+		expectBuffered bool
+	}{
+		{
+			name:           "buffers when GraphQL statistics are enabled",
+			enableStats:    true,
+			expectBuffered: true,
+		},
+		{
+			name:           "does not buffer when GraphQL statistics are disabled",
+			enableStats:    false,
+			expectBuffered: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			engine := fakeGraphEngine{response: &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader("hello")),
+			}}
+
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					GraphQL: apidef.GraphQLConfig{
+						Enabled:          true,
+						EnableStatistics: tc.enableStats,
+					},
+				},
+				GraphEngine: engine,
+			}
+
+			proxy := ts.Gw.TykNewSingleHostReverseProxy(target, spec, nil)
+			recorder := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+			resp := proxy.ServeHTTP(recorder, req)
+
+			require.NotNil(t, resp.Response)
+			if tc.expectBuffered {
+				require.NotNil(t, resp.Response.Body)
+				body, readErr := io.ReadAll(resp.Response.Body)
+				require.NoError(t, readErr)
+				assert.Equal(t, "hello", string(body))
+			} else {
+				assert.Nil(t, resp.Response.Body)
+			}
+		})
+	}
 }
 
 func TestCircuitBreaker5xxs(t *testing.T) {
