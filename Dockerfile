@@ -1,5 +1,5 @@
 ARG GO_VERSION=1.26
-FROM golang:${GO_VERSION}-bookworm
+FROM tykio/golang-cross:${GO_VERSION}-bullseye
 
 # Build essentials
 
