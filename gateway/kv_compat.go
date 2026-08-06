@@ -36,3 +36,20 @@ func dollarSecretToKVRef(label, key string) string {
 		return ""
 	}
 }
+
+// legacyWriteRefToKV rewrites a slave_options.api_key write-back reference into
+// the canonical kv:// form: vault://path.field and consul://key become kv://…,
+// a kv:// reference passes through unchanged. ok is false for a non-reference
+// literal — a directly-stored key with no KV store to write back to.
+func legacyWriteRefToKV(keyPath string) (string, bool) {
+	switch {
+	case strings.HasPrefix(keyPath, "vault://"):
+		return "kv://vault/" + vaultDotToFragment(strings.TrimPrefix(keyPath, "vault://")), true
+	case strings.HasPrefix(keyPath, "consul://"):
+		return "kv://consul/" + strings.TrimPrefix(keyPath, "consul://"), true
+	case strings.HasPrefix(keyPath, "kv://"):
+		return keyPath, true
+	default:
+		return "", false
+	}
+}

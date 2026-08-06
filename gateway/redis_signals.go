@@ -12,11 +12,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/storage/kv"
+	"github.com/TykTechnologies/storage/kv/resolver"
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/storage/kv"
 )
 
 type NotificationCommand string
@@ -341,32 +342,47 @@ func (gw *Gateway) updateKeyInStore(keyPath, newKey string) {
 		return
 	}
 
-	var store kv.Store
-	var storeType string
-	actualPath := ""
-
-	switch {
-	case strings.HasPrefix(keyPath, "vault://"):
-		store = gw.vaultKVStore
-		storeType = "Vault"
-		actualPath = strings.TrimPrefix(keyPath, "vault://")
-	case strings.HasPrefix(keyPath, "consul://"):
-		store = gw.consulKVStore
-		storeType = "Consul"
-		actualPath = strings.TrimPrefix(keyPath, "consul://")
-	default:
+	canonical, ok := legacyWriteRefToKV(keyPath)
+	if !ok {
 		return
 	}
 
-	if store == nil {
+	ref, ok, err := resolver.ParseReference(canonical)
+	if err != nil {
+		log.WithError(err).Warn("Cannot persist rotated API key: malformed KV reference")
 		return
 	}
 
-	if err := store.Put(actualPath, newKey); err != nil {
-		log.WithError(err).Errorf("Failed to update API key in %s", storeType)
+	// ref.Store is always present otherwise the reference is malformed
+	store, err := gw.kvRegistry.GetStore(ref.Store)
+	if err != nil {
+		log.WithError(err).Warnf("Cannot persist rotated API key: KV store %q not found", ref.Store)
 		return
 	}
-	log.Infof("Successfully updated API key in %s", storeType)
+
+	setter, ok := kv.AsSetter(store)
+	if !ok {
+		log.Warnf("Cannot persist rotated API key: KV store %q is not writable", ref.Store)
+		return
+	}
+
+	value := newKey
+	if ref.Field != "" {
+		b, err := json.Marshal(map[string]string{ref.Field: newKey})
+		if err != nil {
+			log.WithError(err).Error("Failed to encode rotated API key")
+			return
+		}
+
+		value = string(b)
+	}
+
+	if err := setter.Set(gw.ctx, ref.Path, value); err != nil {
+		log.WithError(err).Errorf("Failed to update API key in KV store: %q", ref.Store)
+		return
+	}
+
+	log.Infof("Successfully updated API key in KV store %q", ref.Store)
 }
 
 // handleUserKeyReset processes a user key reset notification
