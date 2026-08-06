@@ -593,7 +593,7 @@ func countAccessLogEntries(hook *logrustest.Hook) int {
 }
 
 func TestRedisCacheMiddleware_AnalyticsPath(t *testing.T) {
-	// https://tyktech.atlassian.net/browse/TT-14684
+	// Test covers bug described here https://tyktech.atlassian.net/browse/TT-14684
 
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.AnalyticsConfig.EnableDetailedRecording = true
@@ -644,10 +644,7 @@ func TestRedisCacheMiddleware_AnalyticsPath(t *testing.T) {
 		}
 		defer candidate.Body.Close()
 
-		if candidate.Header.Get("X-Tyk-Cached-Response") != "1" {
-			return false
-		}
-		return true
+		return candidate.Header.Get("X-Tyk-Cached-Response") == "1"
 	}, 5*time.Second, 10*time.Millisecond, "response was not stored in cache")
 
 	hits.mu.Lock()
