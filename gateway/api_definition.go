@@ -289,6 +289,7 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 	spec.Checksum = base64.URLEncoding.EncodeToString(sha256hash[:])
 
 	spec.APIDefinition = def.APIDefinition
+	spec.Proxy.ListenPath = spec.ValidListenPath()
 
 	if currSpec := a.Gw.getApiSpec(def.APIID); !shouldReloadSpec(currSpec, spec) {
 		return currSpec, nil

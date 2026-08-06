@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path"
+	"strings"
 	"text/template"
 	"time"
 
@@ -1440,6 +1442,38 @@ func (a *APIDefinition) GetAPIDomain() string {
 		return ""
 	}
 	return a.Domain
+}
+
+// listenPathTemplatePrefixes are KV/secret reference schemes (resolved elsewhere in the load
+// pipeline) that ValidListenPath must leave untouched rather than mangling with a leading slash.
+var listenPathTemplatePrefixes = []string{"env://", "secrets://", "consul://", "vault://", "file://"}
+
+// ValidListenPath returns Proxy.ListenPath normalized with a leading slash and cleaned of any
+// "." / ".." segments. Trailing slash is preserved, as it's significant for strict-route
+// matching. Empty values and KV/secret template references are returned unchanged.
+func (a *APIDefinition) ValidListenPath() string {
+	listenPath := a.Proxy.ListenPath
+
+	if listenPath == "" {
+		return listenPath
+	}
+
+	for _, prefix := range listenPathTemplatePrefixes {
+		if strings.HasPrefix(listenPath, prefix) {
+			return listenPath
+		}
+	}
+
+	if !strings.HasPrefix(listenPath, "/") {
+		listenPath = "/" + listenPath
+	}
+
+	cleaned := path.Clean(listenPath)
+	if strings.HasSuffix(listenPath, "/") && cleaned != "/" {
+		cleaned += "/"
+	}
+
+	return cleaned
 }
 
 // SetProtocol configures the transport and application protocol for the API.
