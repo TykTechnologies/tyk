@@ -1351,7 +1351,7 @@ type Config struct {
 		Consul ConsulConfig              `json:"consul"`
 		Vault  VaultConfig               `json:"vault"`
 		File   FileConfig                `json:"file"`
-		Stores map[string]kv.StoreConfig `json:"stores" ignored:"true"`
+		Stores map[string]kv.StoreConfig `json:"stores" ignored:"true" structviewer:"obfuscate"`
 	} `json:"kv"`
 
 	// Secrets configures a list of key/value pairs for the gateway.

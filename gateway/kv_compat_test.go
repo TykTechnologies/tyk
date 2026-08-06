@@ -61,3 +61,34 @@ func TestVaultDotToFragment(t *testing.T) {
 		})
 	}
 }
+
+func TestDollarSecretToKVRef(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		label string
+		key   string
+		want  string
+	}{
+		{name: "conf", label: secretsConfLabel, key: "db_password", want: "kv://secrets/db_password"},
+		{name: "env", label: envLabel, key: "db_password", want: "kv://env/db_password"},
+		{name: "consul", label: consulLabel, key: "app/db/password", want: "kv://consul/app/db/password"},
+		{name: "file", label: fileLabel, key: "certs/key.pem", want: "kv://file/certs/key.pem"},
+		{
+			name:  "vault key dot becomes a fragment",
+			label: vaultLabel,
+			key:   "db/creds.password",
+			want:  "kv://vault/db/creds#password",
+		},
+		{name: "unknown label yields no reference", label: metaLabel, key: "x", want: ""},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.want, dollarSecretToKVRef(tc.label, tc.key))
+		})
+	}
+}
