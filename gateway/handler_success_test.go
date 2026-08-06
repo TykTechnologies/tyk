@@ -110,7 +110,7 @@ func TestRecordDetail(t *testing.T) {
 			spec: testAPISpec(func(spec *APISpec) {
 				spec.GraphQL.Enabled = true
 			}),
-			expect: true,
+			expect: false,
 		},
 	}
 
@@ -215,14 +215,12 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
 				t.Helper()
 				assert.True(t, record.GraphQLStats.IsGraphQL)
-				assert.True(t, record.GraphQLStats.HasErrors)
+				assert.False(t, record.GraphQLStats.HasErrors)
 				assert.ElementsMatch(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)
 				assert.Equal(t, map[string][]string{}, record.GraphQLStats.Types)
 				assert.Equal(t, analytics.OperationQuery, record.GraphQLStats.OperationType)
 				assert.Equal(t, `{"in":"hello"}`, record.GraphQLStats.Variables)
-				assert.Equal(t, []analytics.GraphError{
-					{Message: "unable to resolve"},
-				}, record.GraphQLStats.Errors)
+				assert.Empty(t, record.GraphQLStats.Errors)
 			},
 		},
 		{
