@@ -602,13 +602,7 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) Prox
 	startTime := time.Now()
 	p.logger.WithField("ts", startTime.UnixNano()).Debug("Started")
 
-	withCache := recordDetail(req, p.TykAPISpec)
-	// Ensure response body is buffered for GraphQL stats extraction (unless it's a subgraph or streaming request)
-	if !withCache && !httputil.IsStreamingRequest(req) && p.TykAPISpec.GraphQL.Enabled && p.TykAPISpec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
-		withCache = true
-	}
-
-	resp := p.WrappedServeHTTP(rw, req, withCache)
+	resp := p.WrappedServeHTTP(rw, req, recordDetail(req, p.TykAPISpec))
 
 	finishTime := time.Since(startTime)
 	p.logger.WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
