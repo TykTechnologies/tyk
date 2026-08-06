@@ -2320,3 +2320,13 @@ func installFakeKVStores(t *testing.T, gw *Gateway, stores map[string]map[string
 
 	installKVRegistry(t, gw, storeCfgs, factories)
 }
+
+func setTestValue[T any](t *testing.T, ptr *T, value T) {
+	t.Helper()
+
+	prev := *ptr
+	*ptr = value
+	t.Cleanup(func() {
+		*ptr = prev
+	})
+}
