@@ -251,6 +251,18 @@ func (a *APISpec) GetOAuth2PRMConfig() (string, *oas.OAuth2PRM) {
 	return name, cfg.ProtectedResourceMetadata
 }
 
+// IsPRMEnabled reports whether this API serves Protected Resource Metadata
+// via either location: the new oauth2 security scheme block
+// (GetOAuth2PRMConfig, which wins) or the deprecated top-level block
+// (GetPRMConfig). Callers that only need to know "is PRM on" should use this
+// rather than probing one location, so both config styles are honoured.
+func (a *APISpec) IsPRMEnabled() bool {
+	if name, _ := a.GetOAuth2PRMConfig(); name != "" {
+		return true
+	}
+	return a.GetPRMConfig() != nil
+}
+
 // FindSpecMatchesStatus checks if a URL spec has a specific status and returns the URLSpec for it.
 func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (*URLSpec, bool) {
 	matchPath, method := a.getMatchPathAndMethod(r, mode)
