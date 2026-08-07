@@ -545,8 +545,8 @@ func TestServeHTTP_GraphQLBuffering(t *testing.T) {
 			spec := &APISpec{
 				APIDefinition: &apidef.APIDefinition{
 					GraphQL: apidef.GraphQLConfig{
-						Enabled:          true,
-						EnableStatistics: tc.enableStats,
+						Enabled:           true,
+						DisableStatistics: tc.enableStats,
 					},
 				},
 				GraphEngine: engine,

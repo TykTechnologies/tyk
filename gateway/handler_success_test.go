@@ -139,11 +139,11 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 		spec.Proxy.TargetURL = testGraphQLProxyUpstream
 		spec.Proxy.ListenPath = "/"
 		spec.GraphQL = apidef.GraphQLConfig{
-			Enabled:          true,
-			EnableStatistics: true,
-			ExecutionMode:    apidef.GraphQLExecutionModeProxyOnly,
-			Version:          apidef.GraphQLConfigVersion2,
-			Schema:           gqlProxyUpstreamSchema,
+			Enabled:           true,
+			DisableStatistics: false,
+			ExecutionMode:     apidef.GraphQLExecutionModeProxyOnly,
+			Version:           apidef.GraphQLConfigVersion2,
+			Schema:            gqlProxyUpstreamSchema,
 		}
 	}
 
@@ -177,7 +177,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 				Query: `{ hello(name: "World") httpMethod }`,
 			},
 			reloadAPI: func(spec *APISpec) {
-				spec.GraphQL.EnableStatistics = false
+				spec.GraphQL.DisableStatistics = true
 			},
 			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
 				t.Helper()

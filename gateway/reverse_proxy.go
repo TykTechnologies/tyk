@@ -602,8 +602,8 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) Prox
 	startTime := time.Now()
 	p.logger.WithField("ts", startTime.UnixNano()).Debug("Started")
 
-	// Buffer response if detailed recording is enabled OR if GraphQL stats collection is explicitly enabled
-	bufferResponse := recordDetail(req, p.TykAPISpec) || (p.TykAPISpec.GraphQL.Enabled && p.TykAPISpec.GraphQL.EnableStatistics)
+	// Buffer response if detailed recording is enabled OR if GraphQL stats collection is explicitly disabled
+	bufferResponse := recordDetail(req, p.TykAPISpec) || (p.TykAPISpec.GraphQL.Enabled && !p.TykAPISpec.GraphQL.DisableStatistics == false)
 	resp := p.WrappedServeHTTP(rw, req, bufferResponse)
 
 	finishTime := time.Since(startTime)

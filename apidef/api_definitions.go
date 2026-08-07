@@ -1121,8 +1121,8 @@ type CORSConfig struct {
 type GraphQLConfig struct {
 	// Enabled indicates if GraphQL should be enabled.
 	Enabled bool `bson:"enabled" json:"enabled"`
-	// EnableStatistics indicates if GraphQL statistics should be extracted and recorded.
-	EnableStatistics bool `bson:"enable_statistics" json:"enable_statistics"`
+	// DisableStatistics indicates if GraphQL statistics should be extracted and recorded.
+	DisableStatistics bool `bson:"disable_statistics" json:"disable_statistics"`
 	// ExecutionMode is the mode to define how an api behaves.
 	ExecutionMode GraphQLExecutionMode `bson:"execution_mode" json:"execution_mode"`
 	// Version defines the version of the GraphQL config and engine to be used.

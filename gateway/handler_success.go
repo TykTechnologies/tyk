@@ -126,7 +126,7 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 		return
 	}
 
-	if !spec.GraphQL.EnableStatistics {
+	if spec.GraphQL.DisableStatistics {
 		return
 	}
 
