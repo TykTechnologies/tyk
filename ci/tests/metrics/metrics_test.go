@@ -545,6 +545,47 @@ func TestCustomProfile_Instruments(t *testing.T) {
 			},
 		},
 		{
+			name: "configdata dimension populates from API config_data",
+			traffic: func(t *testing.T) {
+				t.Helper()
+				// TrackedAPI (api_id=9) has config_data: {"environment":"staging","team":"platform"}
+				sendTraffic(t, "GET", gatewayURL+"/tracked/ip", 5)
+			},
+			assert: func(t *testing.T) {
+				t.Helper()
+				assertMetricExists(t, `custom_configdata_requests_total{tyk_api_id="9",configdata_environment="staging"}`)
+				assertMetricExists(t, `custom_configdata_requests_total{tyk_api_id="9",configdata_team="platform"}`)
+			},
+		},
+		{
+			name: "configdata dimension has all expected labels",
+			traffic: func(t *testing.T) {
+				t.Helper()
+				sendTraffic(t, "GET", gatewayURL+"/tracked/ip", 5)
+			},
+			assert: func(t *testing.T) {
+				t.Helper()
+				assertMetricHasLabels(t, `custom_configdata_requests_total{tyk_api_id="9"}`, []string{
+					"http_request_method",
+					"tyk_api_id",
+					"configdata_environment",
+					"configdata_team",
+				})
+			},
+		},
+		{
+			name: "configdata dimension uses default for API without config_data",
+			traffic: func(t *testing.T) {
+				t.Helper()
+				// TestAPI (api_id=3) has no config_data, so dimensions should use default "".
+				sendTraffic(t, "GET", gatewayURL+"/test/ip", 5)
+			},
+			assert: func(t *testing.T) {
+				t.Helper()
+				assertMetricExists(t, `custom_configdata_requests_total{tyk_api_id="3",configdata_environment=""}`)
+			},
+		},
+		{
 			name: "default RED instruments are NOT present in custom profile",
 			traffic: func(t *testing.T) {
 				t.Helper()

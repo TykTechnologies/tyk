@@ -1,14 +1,69 @@
 package gateway
 
 import (
+	"crypto/tls"
+	"fmt"
 	"net"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 )
+
+// jsonEscapeString encodes s as a JSON string and strips the surrounding
+// quotes, producing a value safe to splice into an existing JSON string
+// literal. This is necessary when substituting secret values (which may
+// contain newlines, quotes, or other special characters) directly into a
+// raw JSON document.
+func jsonEscapeString(s string) string {
+	const hex = "0123456789abcdef"
+
+	escapeIdx := -1
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c < 0x20 || c == '"' || c == '\\' {
+			escapeIdx = i
+			break
+		}
+	}
+
+	if escapeIdx == -1 {
+		return s
+	}
+
+	var b strings.Builder
+	b.Grow(len(s) + 4)
+	b.WriteString(s[:escapeIdx])
+
+	for i := escapeIdx; i < len(s); i++ {
+		c := s[i]
+		switch c {
+		case '"', '\\':
+			b.WriteByte('\\')
+			b.WriteByte(c)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		default:
+			if c < 0x20 {
+
+				b.WriteString(`\u00`)
+				b.WriteByte(hex[c>>4])
+				b.WriteByte(hex[c&0xF])
+			} else {
+				b.WriteByte(c)
+			}
+		}
+	}
+
+	return b.String()
+}
 
 // appendIfMissing ensures dest slice is unique with new items.
 func appendIfMissing(src []string, in ...string) []string {
@@ -155,6 +210,10 @@ func shouldReloadSpec(existingSpec, newSpec *APISpec) bool {
 		return true
 	}
 
+	if newSpec.IsSyntheticMCPAdapter() {
+		return true
+	}
+
 	if existingSpec.Checksum != newSpec.Checksum {
 		return true
 	}
@@ -215,4 +274,45 @@ func containsEscapedChars(str string) bool {
 	}
 
 	return str != unescaped
+}
+
+func resolveTLSVersions(userMin, userMax uint16) (uint16, uint16, error) {
+	const defaultMin = tls.VersionTLS12
+	const defaultMax = tls.VersionTLS13
+
+	resMin := userMin
+	resMax := userMax
+
+	if resMin == 0 {
+		resMin = defaultMin
+	}
+
+	if resMax == 0 {
+		resMax = defaultMax
+	}
+
+	switch {
+	case userMin != 0 && userMax == 0 && resMin > defaultMax:
+		return 0, 0, fmt.Errorf(
+			"provided minTLS (%s) exceeds the default maximum TLS version (%s); provide both versions explicitly",
+			tls.VersionName(userMin),
+			tls.VersionName(defaultMax),
+		)
+
+	case userMax != 0 && userMin == 0 && resMax < defaultMin:
+		return 0, 0, fmt.Errorf(
+			"provided maxTLS (%s) is lower than the default minimum TLS version (%s); provide both versions explicitly",
+			tls.VersionName(userMax),
+			tls.VersionName(defaultMin),
+		)
+
+	case userMin != 0 && userMax != 0 && userMin > userMax:
+		return 0, 0, fmt.Errorf(
+			"TLS validation error: minTLS (0x%X / %s) cannot be greater than maxTLS (0x%X / %s)",
+			userMin, tls.VersionName(userMin),
+			userMax, tls.VersionName(userMax),
+		)
+	}
+
+	return resMin, resMax, nil
 }

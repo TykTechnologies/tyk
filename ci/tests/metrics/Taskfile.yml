@@ -34,6 +34,8 @@ tasks:
       vars: [GW_PROFILE]
     cmds:
       - echo "=== Setting up profile {{.GW_PROFILE}} ==="
+      # Ensure mount directories are writable by nonroot gateway (uid 65532)
+      - mkdir -p apps 2>/dev/null; chmod 777 apps 2>/dev/null; true
       - GW_PROFILE={{.GW_PROFILE}} docker compose -p metrics-{{.GW_PROFILE}} up -d --wait
       - GW_PROFILE={{.GW_PROFILE}} docker compose -p metrics-{{.GW_PROFILE}} logs -f > /tmp/metrics-{{.GW_PROFILE}}.log 2>&1 &
 

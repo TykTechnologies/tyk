@@ -1,0 +1,21 @@
+{
+  "name": "Test URT - Response Timeout",
+  "api_id": "test-urt",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-urt/",
+    "target_url": "http://backend-slow:5002",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  }
+}

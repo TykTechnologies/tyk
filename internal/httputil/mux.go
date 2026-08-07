@@ -5,15 +5,53 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync/atomic"
 
 	"github.com/gorilla/mux"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 
-	"github.com/TykTechnologies/tyk/internal/maps"
+	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
-// routeCache holds the raw routes as they are mapped from mux parameters to regular expressions.
-// e.g. `/foo/{id}` becomes `^/foo/([^/]+)$` or similar.
-var pathRegexpCache = maps.NewStringMap()
+// pathRegexpCache maps mux-style routes to compiled regex source.
+// Pure LRU (ttl=0): cold entries are evicted by recency under cap pressure.
+var pathRegexpCache = newDefaultPathRegexpCache()
+
+// prevReporter tracks the EvictionLogger backing the current cache so its
+// goroutine can be stopped when ConfigurePathRegexpCache is called again.
+var prevReporter atomic.Pointer[cache.EvictionLogger]
+
+func newDefaultPathRegexpCache() *atomic.Pointer[expirable.LRU[string, string]] {
+	var p atomic.Pointer[expirable.LRU[string, string]]
+	p.Store(expirable.NewLRU[string, string](cache.DefaultLRUMaxEntries, nil, 0))
+	return &p
+}
+
+// ConfigurePathRegexpCache replaces the path-regexp cache. Pure LRU (no TTL,
+// always enabled) — path keys are bounded by API-definition shape.
+func ConfigurePathRegexpCache(maxEntries int, unbounded bool, log cache.LogFunc) {
+	n := maxEntries
+	switch {
+	case unbounded:
+		n = 0
+	case n <= 0:
+		n = cache.DefaultLRUMaxEntries
+	}
+
+	if old := prevReporter.Swap(nil); old != nil {
+		old.Stop()
+	}
+
+	var onEvict expirable.EvictCallback[string, string]
+	if !unbounded && log != nil {
+		rep := cache.NewEvictionLogger("path-regexp cache", log)
+		rep.Start(cache.DefaultEvictionLogInterval)
+		prevReporter.Store(rep)
+		onEvict = func(_, _ string) { rep.Record("") }
+	}
+
+	pathRegexpCache.Store(expirable.NewLRU[string, string](n, onEvict, 0))
+}
 
 // apiLandIDsRegex matches mux-style parameters like `{id}`.
 var apiLangIDsRegex = regexp.MustCompile(`{([^}]+)}`)
@@ -28,8 +66,8 @@ var apiLangIDsRegex = regexp.MustCompile(`{([^}]+)}`)
 func PreparePathRegexp(pattern string, prefix bool, suffix bool) string {
 	// Construct cache key from pattern and flags
 	key := fmt.Sprintf("%s:%v:%v", pattern, prefix, suffix)
-	val, ok := pathRegexpCache.Get(key)
-	if ok {
+	lru := pathRegexpCache.Load()
+	if val, ok := lru.Get(key); ok {
 		return val
 	}
 
@@ -57,7 +95,7 @@ func PreparePathRegexp(pattern string, prefix bool, suffix bool) string {
 	}
 
 	// Save cache for following invocations.
-	pathRegexpCache.Set(key, pattern)
+	lru.Add(key, pattern)
 
 	return pattern
 }

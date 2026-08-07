@@ -1,0 +1,6 @@
+{
+    "type": "https://tyk.io/errors/validation-error",
+    "title": "Validation Error",
+    "status": "{{.StatusCode}}",
+    "detail": "{{.Message}}"
+}

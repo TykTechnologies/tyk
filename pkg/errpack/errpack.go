@@ -3,6 +3,8 @@ package errpack
 import (
 	"fmt"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/internal/errors"
 )
 
@@ -24,9 +26,15 @@ type Type struct {
 }
 
 type Error struct {
-	msg  string
-	prev error
-	typ  Type
+	msg      string
+	prev     error
+	typ      Type
+	logLevel logLevel
+}
+
+type logLevel struct {
+	level   logrus.Level
+	defined bool
 }
 
 type Option func(*Error)
@@ -41,17 +49,31 @@ func New(msg string, opts ...Option) Error {
 	return err
 }
 
-func (e Error) Error() string {
-	if e.prev == nil {
-		return e.msg
+func Wrap(err error, opts ...Option) error {
+	if err == nil {
+		return nil
 	}
 
-	return fmt.Sprintf("%s: %s", e.msg, e.prev.Error())
+	e := Error{msg: err.Error(), typ: TypeUnknown, prev: err}
+
+	for _, op := range opts {
+		op(&e)
+	}
+
+	return e
+}
+
+func (e Error) Error() string {
+	return e.msg
 }
 
 func (e Error) Is(err error) bool {
 	var errp Error
-	return errors.As(err, errp) && errp.typ == e.typ && errp.msg == e.msg
+	return errors.As(err, &errp) && errp.typ == e.typ && errp.msg == e.msg && errp.prev == e.prev
+}
+
+func (e Error) Unwrap() error {
+	return e.prev
 }
 
 // Chain sets error predecessor
@@ -94,4 +116,20 @@ func WithType(typ Type) Option {
 	return func(e *Error) {
 		e.typ = typ
 	}
+}
+
+func WithLogLevel(level logrus.Level) Option {
+	return func(e *Error) {
+		e.logLevel = logLevel{defined: true, level: level}
+	}
+}
+
+func LogLevel(err error, fallback logrus.Level) logrus.Level {
+	var errPtr Error
+
+	if errors.As(err, &errPtr) && errPtr.logLevel.defined {
+		return errPtr.logLevel.level
+	}
+
+	return fallback
 }

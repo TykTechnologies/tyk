@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path"
+	"strings"
 	"text/template"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/mcpadapter"
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
 	tyktime "github.com/TykTechnologies/tyk/internal/time"
@@ -64,11 +67,12 @@ const (
 	RequestXML  RequestInputType = "xml"
 	RequestJSON RequestInputType = "json"
 
-	OttoDriver     MiddlewareDriver = "otto"
-	PythonDriver   MiddlewareDriver = "python"
-	LuaDriver      MiddlewareDriver = "lua"
-	GrpcDriver     MiddlewareDriver = "grpc"
-	GoPluginDriver MiddlewareDriver = "goplugin"
+	OttoDriver       MiddlewareDriver = "otto"
+	JavaScriptDriver MiddlewareDriver = "javascript"
+	PythonDriver     MiddlewareDriver = "python"
+	LuaDriver        MiddlewareDriver = "lua"
+	GrpcDriver       MiddlewareDriver = "grpc"
+	GoPluginDriver   MiddlewareDriver = "goplugin"
 
 	BodySource        IdExtractorSource = "body"
 	HeaderSource      IdExtractorSource = "header"
@@ -134,6 +138,13 @@ const (
 	OAuthAuthorizationTypeClientCredentials = "clientCredentials"
 	// OAuthAuthorizationTypePassword is the authorization type for password flow.
 	OAuthAuthorizationTypePassword = "password"
+
+	// OAuth2ClientAuthBasic and OAuth2ClientAuthPost are the client authentication
+	// methods defined by RFC 6749 Section 2.3.1 (the `token_endpoint_auth_method`
+	// values IdPs publish). Shared by upstream OAuth (ClientAuthData.Method) and
+	// the OAS OAuth2 token-exchange feature (oas.OAuth2ClientAuth.Method).
+	OAuth2ClientAuthBasic = "client_secret_basic"
+	OAuth2ClientAuthPost  = "client_secret_post"
 
 	// JSON-RPC protocol versions
 	JsonRPC20 = "2.0"
@@ -229,7 +240,9 @@ type HardTimeoutMeta struct {
 	Disabled bool   `bson:"disabled" json:"disabled"`
 	Path     string `bson:"path" json:"path"`
 	Method   string `bson:"method" json:"method"`
-	TimeOut  int    `bson:"timeout" json:"timeout"`
+	// Deprecated: Use TimeoutDuration instead.
+	TimeOut         int                      `bson:"timeout" json:"timeout"`
+	TimeoutDuration tyktime.ReadableDuration `bson:"duration,omitempty" json:"duration,omitempty"`
 }
 
 type TrackEndpointMeta struct {
@@ -492,18 +505,20 @@ type VersionInfo struct {
 		WhiteList []string `bson:"white_list" json:"white_list"`
 		BlackList []string `bson:"black_list" json:"black_list"`
 	} `bson:"paths" json:"paths"`
-	UseExtendedPaths              bool              `bson:"use_extended_paths" json:"use_extended_paths"`
-	ExtendedPaths                 ExtendedPathsSet  `bson:"extended_paths" json:"extended_paths"`
-	GlobalHeaders                 map[string]string `bson:"global_headers" json:"global_headers"`
-	GlobalHeadersRemove           []string          `bson:"global_headers_remove" json:"global_headers_remove"`
-	GlobalHeadersDisabled         bool              `bson:"global_headers_disabled" json:"global_headers_disabled"`
-	GlobalResponseHeaders         map[string]string `bson:"global_response_headers" json:"global_response_headers"`
-	GlobalResponseHeadersRemove   []string          `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
-	GlobalResponseHeadersDisabled bool              `bson:"global_response_headers_disabled" json:"global_response_headers_disabled"`
-	IgnoreEndpointCase            bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
-	GlobalSizeLimit               int64             `bson:"global_size_limit" json:"global_size_limit"`
-	GlobalSizeLimitDisabled       bool              `bson:"global_size_limit_disabled" json:"global_size_limit_disabled"`
-	OverrideTarget                string            `bson:"override_target" json:"override_target"`
+	UseExtendedPaths              bool                     `bson:"use_extended_paths" json:"use_extended_paths"`
+	ExtendedPaths                 ExtendedPathsSet         `bson:"extended_paths" json:"extended_paths"`
+	GlobalHeaders                 map[string]string        `bson:"global_headers" json:"global_headers"`
+	GlobalHeadersRemove           []string                 `bson:"global_headers_remove" json:"global_headers_remove"`
+	GlobalHeadersDisabled         bool                     `bson:"global_headers_disabled" json:"global_headers_disabled"`
+	GlobalResponseHeaders         map[string]string        `bson:"global_response_headers" json:"global_response_headers"`
+	GlobalResponseHeadersRemove   []string                 `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
+	GlobalResponseHeadersDisabled bool                     `bson:"global_response_headers_disabled" json:"global_response_headers_disabled"`
+	IgnoreEndpointCase            bool                     `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
+	GlobalSizeLimit               int64                    `bson:"global_size_limit" json:"global_size_limit"`
+	GlobalSizeLimitDisabled       bool                     `bson:"global_size_limit_disabled" json:"global_size_limit_disabled"`
+	GlobalEnforceTimeout          tyktime.ReadableDuration `bson:"global_enforce_timeout" json:"global_enforce_timeout"`
+	GlobalEnforceTimeoutDisabled  bool                     `bson:"global_enforce_timeout_disabled" json:"global_enforce_timeout_disabled"`
+	OverrideTarget                string                   `bson:"override_target" json:"override_target"`
 }
 
 func (v *VersionInfo) GlobalHeadersEnabled() bool {
@@ -567,8 +582,15 @@ type MiddlewareDefinition struct {
 	Disabled       bool   `bson:"disabled" json:"disabled"`
 	Name           string `bson:"name" json:"name"`
 	Path           string `bson:"path" json:"path"`
+	Code           string `bson:"code,omitempty" json:"code,omitempty"`
 	RequireSession bool   `bson:"require_session" json:"require_session"`
 	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
+
+	// RuntimeHandlerName is set by the gateway at API-load time when the JS
+	// driver rebrands handler globals to per-(file, name) unique aliases.
+	// Dispatch reads this when non-empty and falls back to Name otherwise.
+	// Transient — never serialized.
+	RuntimeHandlerName string `bson:"-" json:"-"`
 }
 
 // IDExtractorConfig specifies the configuration for ID extractor
@@ -598,6 +620,7 @@ type MiddlewareSection struct {
 	Post        []MiddlewareDefinition `bson:"post" json:"post"`
 	PostKeyAuth []MiddlewareDefinition `bson:"post_key_auth" json:"post_key_auth"`
 	AuthCheck   MiddlewareDefinition   `bson:"auth_check" json:"auth_check"`
+	TrafficLogs MiddlewareDefinition   `bson:"traffic_logs" json:"traffic_logs"`
 	Response    []MiddlewareDefinition `bson:"response" json:"response"`
 	Driver      MiddlewareDriver       `bson:"driver" json:"driver"`
 	IdExtractor MiddlewareIdExtractor  `bson:"id_extractor" json:"id_extractor"`
@@ -742,6 +765,14 @@ type APIDefinition struct {
 	DisableRateLimit                     bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
 	DisableQuota                         bool                   `bson:"disable_quota" json:"disable_quota"`
 	CustomMiddleware                     MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
+	// CustomMiddlewareBundle is the bundle filename (or comma-separated list of
+	// bundle filenames) resolved against the gateway's bundle_base_url. A single
+	// name takes the legacy single-bundle load path unchanged. Two or more
+	// comma-separated names enable multi-bundle composition: each bundle is
+	// fetched into its own subdirectory under the API's bundle root, and the
+	// manifests are merged into the effective custom_middleware section in
+	// declaration order — array hooks (pre/post/post_key_auth/response)
+	// concatenate; auth_check may be set by at most one bundle.
 	CustomMiddlewareBundle               string                 `bson:"custom_middleware_bundle" json:"custom_middleware_bundle"`
 	CustomMiddlewareBundleDisabled       bool                   `bson:"custom_middleware_bundle_disabled" json:"custom_middleware_bundle_disabled"`
 	CacheOptions                         CacheOptions           `bson:"cache_options" json:"cache_options"`
@@ -790,8 +821,30 @@ type APIDefinition struct {
 	UpstreamAuth UpstreamAuth `bson:"upstream_auth" json:"upstream_auth"`
 
 	// SecurityRequirements stores all OAS security requirements (auto-populated from OpenAPI description import)
-	// When len(SecurityRequirements) > 1, OR logic is automatically applied
-	SecurityRequirements [][]string `json:"security_requirements,omitempty" bson:"security_requirements,omitempty"`
+	// When len(SecurityRequirements) > 1, OR logic is automatically applied.
+	//
+	// Storage tag intentionally omits bson:",omitempty" — a nil here is
+	// the signal that the operator removed all security from the API
+	// and must overwrite any stored value, not be silently dropped from
+	// a $set update.
+	SecurityRequirements [][]string `json:"security_requirements,omitempty" bson:"security_requirements"`
+
+	// SecurityRequirementScopes preserves the per-scheme scope arrays from
+	// OAS root `security:` Security Requirement Objects. Aligned by index
+	// with SecurityRequirements: entry i carries the scope map for the
+	// schemes named in SecurityRequirements[i]. Scopes are honoured only
+	// for schemes whose OAS type is oauth2 or openIdConnect — other
+	// schemes always round-trip with an empty scope array (OAS 3.0
+	// §4.8.30.1).
+	//
+	// Storage tag intentionally omits bson:",omitempty" — see
+	// SecurityRequirements above. A nil after an operator edit must
+	// reach storage as null so the prior value is cleared.
+	SecurityRequirementScopes []map[string][]string `json:"security_requirement_scopes,omitempty" bson:"security_requirement_scopes"`
+
+	// ErrorOverrides contains the configurations for error response customization.
+	ErrorOverrides         ErrorOverridesMap `bson:"error_overrides" json:"error_overrides"`
+	ErrorOverridesDisabled bool              `bson:"error_overrides_disabled" json:"error_overrides_disabled" `
 }
 
 type JWK struct {
@@ -881,6 +934,16 @@ type ClientAuthData struct {
 	ClientID string `bson:"client_id" json:"client_id"`
 	// ClientSecret is the application's secret.
 	ClientSecret string `bson:"client_secret,omitempty" json:"client_secret,omitempty"` // client secret is optional for password flow
+	// Method controls how the client credentials are sent to the upstream token
+	// endpoint (RFC 6749 Section 2.3.1). Valid values are `client_secret_basic`
+	// (credentials in the Authorization header only, no fallback) and
+	// `client_secret_post` (credentials in the request body only, no fallback).
+	// When empty, Tyk keeps the historical auto-detect behaviour: it tries the
+	// header first and falls back to the body on failure. Unlike the OAuth2
+	// token-exchange clientAuth.method, empty deliberately does NOT default to
+	// client_secret_basic — existing APIs pointed at body-only IdPs rely on the
+	// fallback.
+	Method string `bson:"method,omitempty" json:"method,omitempty"`
 }
 
 // ClientCredentials holds the client credentials for upstream OAuth2 authentication.
@@ -1438,6 +1501,38 @@ func (a *APIDefinition) GetAPIDomain() string {
 	return a.Domain
 }
 
+// listenPathTemplatePrefixes are KV/secret reference schemes (resolved elsewhere in the load
+// pipeline) that ValidListenPath must leave untouched rather than mangling with a leading slash.
+var listenPathTemplatePrefixes = []string{"env://", "secrets://", "consul://", "vault://", "file://"}
+
+// ValidListenPath returns Proxy.ListenPath normalized with a leading slash and cleaned of any
+// "." / ".." segments. Trailing slash is preserved, as it's significant for strict-route
+// matching. Empty values and KV/secret template references are returned unchanged.
+func (a *APIDefinition) ValidListenPath() string {
+	listenPath := a.Proxy.ListenPath
+
+	if listenPath == "" {
+		return listenPath
+	}
+
+	for _, prefix := range listenPathTemplatePrefixes {
+		if strings.HasPrefix(listenPath, prefix) {
+			return listenPath
+		}
+	}
+
+	if !strings.HasPrefix(listenPath, "/") {
+		listenPath = "/" + listenPath
+	}
+
+	cleaned := path.Clean(listenPath)
+	if strings.HasSuffix(listenPath, "/") && cleaned != "/" {
+		cleaned += "/"
+	}
+
+	return cleaned
+}
+
 // SetProtocol configures the transport and application protocol for the API.
 func (a *APIDefinition) SetProtocol(transport, application string) {
 	a.JsonRpcVersion = transport
@@ -1452,6 +1547,31 @@ func (a *APIDefinition) IsMCP() bool {
 // MarkAsMCP configures the API definition as a Model Context Protocol (MCP) API.
 func (a *APIDefinition) MarkAsMCP() {
 	a.SetProtocol(JsonRPC20, AppProtocolMCP)
+}
+
+// IsPairedMCPAdapterProxy returns true if this API is a REST-as-MCP proxy
+// whose upstream loops into a REST-as-MCP adapter target for a REST API.
+func (a *APIDefinition) IsPairedMCPAdapterProxy() bool {
+	if a == nil {
+		return false
+	}
+
+	host, path, ok := mcpadapter.ParseTarget(a.Proxy.TargetURL)
+	if !ok {
+		return false
+	}
+	if mcpadapter.IsAPIID(host) {
+		return path == "" || path == "/"
+	}
+	return mcpadapter.IsLoopPath(path)
+}
+
+// IsMCPManaged reports whether this API belongs to the MCP management surface.
+func (a *APIDefinition) IsMCPManaged() bool {
+	if a == nil {
+		return false
+	}
+	return a.IsMCP() || a.IsPairedMCPAdapterProxy()
 }
 
 // IsChildAPI returns true if this API is a child API in a versioning hierarchy.
@@ -1601,6 +1721,26 @@ func DummyAPI() APIDefinition {
 		},
 	}
 
+	errorOverrides := ErrorOverridesMap{
+		"400": []ErrorOverride{
+			{
+				Match: &ErrorMatcher{
+					Flag:           "RLT",
+					MessagePattern: ".*",
+					BodyField:      "error",
+					BodyValue:      "invalid",
+				},
+				Response: ErrorResponse{
+					StatusCode: 400,
+					Body:       "Bad Request",
+					Message:    "Error",
+					Template:   "error",
+					Headers:    map[string]string{"X-Error": "true"},
+				},
+			},
+		},
+	}
+
 	return APIDefinition{
 		VersionData:          versionData,
 		ConfigData:           map[string]interface{}{},
@@ -1625,6 +1765,7 @@ func DummyAPI() APIDefinition {
 			Pre:         []MiddlewareDefinition{},
 			PostKeyAuth: []MiddlewareDefinition{},
 			AuthCheck:   MiddlewareDefinition{},
+			TrafficLogs: MiddlewareDefinition{},
 			IdExtractor: MiddlewareIdExtractor{
 				ExtractorConfig: map[string]interface{}{},
 			},
@@ -1632,9 +1773,10 @@ func DummyAPI() APIDefinition {
 		Proxy: ProxyConfig{
 			DisableStripSlash: true,
 		},
-		CORS:    defaultCORSConfig,
-		Tags:    []string{},
-		GraphQL: graphql,
+		CORS:           defaultCORSConfig,
+		Tags:           []string{},
+		GraphQL:        graphql,
+		ErrorOverrides: errorOverrides,
 	}
 }
 

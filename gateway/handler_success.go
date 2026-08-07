@@ -167,6 +167,15 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 	rec.GraphQLStats = stats
 }
 
+func recordMCPDetails(rec *analytics.AnalyticsRecord, r *http.Request) {
+	rec.MCPStats = analytics.MCPStats{
+		IsMCP:         true,
+		JSONRPCMethod: ctxGetMCPMethod(r),
+		PrimitiveType: ctxGetMCPPrimitiveType(r),
+		PrimitiveName: ctxGetMCPPrimitiveName(r),
+	}
+}
+
 const traceTagPrefix = "trace-id-"
 
 func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []string {
@@ -275,6 +284,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			Host:          host,
 			Path:          trackedPath,
 			RawPath:       r.URL.Path,
+			OriginalPath:  ctxGetOriginalRequestPath(r),
+			ListenPath:    s.Spec.Proxy.ListenPath,
 			ContentLength: r.ContentLength,
 			UserAgent:     r.Header.Get(header.UserAgent),
 			Day:           t.Day(),
@@ -311,6 +322,10 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		if s.Spec.GraphQL.Enabled && s.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
 			record.Tags = append(record.Tags, "tyk-graph-analytics")
 			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(s.Spec.GraphQL.Schema))
+		}
+
+		if s.Spec.IsMCP() {
+			recordMCPDetails(&record, r)
 		}
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter

@@ -12,41 +12,36 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync/atomic"
 	texttemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/ee/middleware/streams"
-	"github.com/TykTechnologies/tyk/storage/kv"
-
-	"github.com/TykTechnologies/tyk/internal/httpctx"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/mcp"
-
-	"github.com/getkin/kin-openapi/routers/gorillamux"
-
-	"github.com/getkin/kin-openapi/openapi3"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
-	"github.com/cenk/backoff"
-
 	"github.com/Masterminds/sprig/v3"
-
+	"github.com/cenk/backoff"
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/routers/gorillamux"
 	"github.com/sirupsen/logrus"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 
-	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
+	"github.com/TykTechnologies/tyk/pkg/schema"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/kv"
 )
 
 // const used by cache middleware
@@ -198,6 +193,9 @@ func (s *APISpec) Unload() {
 	if s.JSVM.VM != nil {
 		s.JSVM.DeInit()
 	}
+	if s.GojaJSVM.Initialized() {
+		s.GojaJSVM.DeInit()
+	}
 
 	if s.HTTPTransport != nil {
 		// Prevent new idle connections to be generated.
@@ -221,7 +219,15 @@ func (s *APISpec) Unload() {
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
 func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 	if s.IsOAS {
-		err := s.OAS.Validate(context.Background(), oas.GetValidationOptionsFromConfig(oasConfig)...)
+		var err error
+		if s.IsMCPManaged() {
+			// MCP-aware path: empty-mode + no-resource PRM config
+			// resolves to mirror, so users can enable mirror by just
+			// marking the API as MCP without any static fields.
+			err = s.OAS.ValidateForMCP(context.Background(), oas.GetValidationOptionsFromConfig(oasConfig)...)
+		} else {
+			err = s.OAS.Validate(context.Background(), oas.GetValidationOptionsFromConfig(oasConfig)...)
+		}
 		if err != nil {
 			return err
 		}
@@ -286,6 +292,7 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 	spec.Checksum = base64.URLEncoding.EncodeToString(sha256hash[:])
 
 	spec.APIDefinition = def.APIDefinition
+	spec.Proxy.ListenPath = spec.ValidListenPath()
 
 	if currSpec := a.Gw.getApiSpec(def.APIID); !shouldReloadSpec(currSpec, spec) {
 		return currSpec, nil
@@ -335,9 +342,14 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		return nil, err
 	}
 
-	if a.Gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || spec.CustomMiddleware.Driver == apidef.OttoDriver) {
-		logger.Debug("Initializing JSVM")
-		spec.JSVM.Init(spec, logger, a.Gw)
+	if a.Gw.GetConfig().EnableJSVM {
+		if spec.CustomMiddleware.Driver == apidef.JavaScriptDriver {
+			logger.Debug("Initializing GojaJSVM")
+			spec.GojaJSVM.Init(spec, logger, a.Gw)
+		} else if spec.hasVirtualEndpoint() || spec.CustomMiddleware.Driver == apidef.OttoDriver {
+			logger.Debug("Initializing JSVM")
+			spec.JSVM.Init(spec, logger, a.Gw)
+		}
 	}
 
 	// Set up Event Handlers
@@ -505,12 +517,14 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 }
 
 var envRegex = regexp.MustCompile(`env://([^"]+)`)
+var fileRegex = regexp.MustCompile(`file://([^"]+)`)
 
 const (
 	prefixEnv       = "env://"
 	prefixSecrets   = "secrets://"
 	prefixConsul    = "consul://"
 	prefixVault     = "vault://"
+	prefixFile      = "file://"
 	prefixKeys      = "tyk-apis"
 	vaultSecretPath = "secret/data/"
 )
@@ -529,14 +543,16 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 			uniqueWords[m[0]] = true
 			val := os.Getenv(m[1])
 			if val != "" {
-				input = strings.Replace(input, m[0], val, -1)
+				escaped := jsonEscapeString(val)
+				input = strings.ReplaceAll(input, m[0], escaped)
 			}
 		}
 	}
 
 	if strings.Contains(input, prefixSecrets) {
 		for k, v := range a.Gw.GetConfig().Secrets {
-			input = strings.Replace(input, prefixSecrets+k, v, -1)
+			escaped := jsonEscapeString(v)
+			input = strings.ReplaceAll(input, prefixSecrets+k, escaped)
 		}
 	}
 
@@ -549,6 +565,12 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 	if strings.Contains(input, prefixVault) {
 		if err := a.replaceVaultSecrets(&input); err != nil {
 			log.WithError(err).Error("Couldn't replace vault secrets")
+		}
+	}
+
+	if strings.Contains(input, prefixFile) {
+		if err := a.replaceFileSecrets(&input); err != nil {
+			log.WithError(err).Error("Couldn't replace file secrets")
 		}
 	}
 
@@ -567,7 +589,8 @@ func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
 
 	for i := 1; i < len(pairs); i++ {
 		key := strings.TrimPrefix(pairs[i].Key, prefixKeys+"/")
-		*input = strings.Replace(*input, prefixConsul+key, string(pairs[i].Value), -1)
+		escaped := jsonEscapeString(string(pairs[i].Value))
+		*input = strings.ReplaceAll(*input, prefixConsul+key, escaped)
 	}
 
 	return nil
@@ -608,10 +631,46 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 	}
 
 	for k, v := range pairsMap {
-		*input = strings.Replace(*input, prefixVault+k, fmt.Sprintf("%v", v), -1)
+		escaped := jsonEscapeString(fmt.Sprintf("%v", v))
+		*input = strings.ReplaceAll(*input, prefixVault+k, escaped)
 	}
 
 	return nil
+}
+
+func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
+	basePath := a.Gw.GetConfig().KV.File.BasePath
+	matches := fileRegex.FindAllStringSubmatch(*input, -1)
+	seen := map[string]bool{}
+	var firstErr error
+	for _, m := range matches {
+		if seen[m[0]] {
+			continue
+		}
+		seen[m[0]] = true
+		val, err := ResolveFileKV(basePath, m[1])
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		// JSON-escape the value before injecting it into the raw JSON document.
+		// Without this, multi-line content (e.g. PEM certificates) produces
+		// literal newlines inside a JSON string, which is invalid JSON.
+		jsonBytes, err := json.Marshal(val)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		// Strip the surrounding quotes since the replacement sits
+		// inside an existing JSON string already.
+		escaped := string(jsonBytes[1 : len(jsonBytes)-1])
+		*input = strings.ReplaceAll(*input, m[0], escaped)
+	}
+	return firstErr
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
@@ -716,6 +775,36 @@ func (a APIDefinitionLoader) GetMCPFilepath(path string) string {
 	return strings.TrimSuffix(path, ".json") + "-mcp.json"
 }
 
+func (a APIDefinitionLoader) isOASCompanionFile(path string) bool {
+	var apiDefPath string
+	switch {
+	case strings.HasSuffix(path, "-oas.json"):
+		apiDefPath = strings.TrimSuffix(path, "-oas.json") + ".json"
+	case strings.HasSuffix(path, "-mcp.json"):
+		apiDefPath = strings.TrimSuffix(path, "-mcp.json") + ".json"
+	default:
+		return false
+	}
+
+	if _, err := os.Stat(apiDefPath); err != nil {
+		return false
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+
+	var marker struct {
+		OpenAPI string `json:"openapi"`
+		Swagger string `json:"swagger"`
+	}
+	if err := json.Unmarshal(data, &marker); err != nil {
+		return false
+	}
+	return marker.OpenAPI != "" || marker.Swagger != ""
+}
+
 // FromDir will load APIDefinitions from a directory on the filesystem. Definitions need
 // to be the JSON representation of APIDefinition object
 func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
@@ -724,7 +813,7 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
 	for _, path := range paths {
 		// Skip companion files (loaded separately)
-		if strings.HasSuffix(path, "-oas.json") || strings.HasSuffix(path, "-mcp.json") {
+		if a.isOASCompanionFile(path) {
 			continue
 		}
 
@@ -759,11 +848,23 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 	nestDef := model.MergedAPI{APIDefinition: &def}
 	if def.IsOAS {
 		loader := openapi3.NewLoader()
-		// use openapi3.ReadFromFile as ReadFromURIFunc since the default implementation cache spec based on file path.
-		loader.ReadFromURIFunc = openapi3.ReadFromFile
+		// Apply replaceSecrets to OAS bytes before parsing so secret prefixes
+		// (vault://, env://, etc.) in the x-tyk-api-gateway extension are resolved.
+		// Scoped to local-file reads only — resolving remote $ref content would be
+		// an injection vector for operator-untrusted bytes.
+		loader.ReadFromURIFunc = func(l *openapi3.Loader, uri *url.URL) ([]byte, error) {
+			b, err := openapi3.ReadFromFile(l, uri)
+			if err != nil {
+				return nil, err
+			}
+			if uri == nil || uri.Scheme == "" || uri.Scheme == "file" {
+				return a.replaceSecrets(b), nil
+			}
+			return b, nil
+		}
 
 		var oasFilepath string
-		if def.IsMCP() {
+		if def.IsMCPManaged() {
 			oasFilepath = a.GetMCPFilepath(filePath)
 		} else {
 			oasFilepath = a.GetOASFilepath(filePath)
@@ -771,7 +872,13 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 
 		oasDoc, err := loader.LoadFromFile(oasFilepath)
 		if err == nil {
-			nestDef.OAS = &oas.OAS{T: *oasDoc}
+			oasObj := &oas.OAS{T: *oasDoc}
+
+			visitor := schema.NewVisitor()
+			visitor.AddSchemaManipulation(schema.TransformUnicodeEscapesToRE2Manipulation)
+			visitor.ProcessOAS(oasObj)
+
+			nestDef.OAS = oasObj
 		}
 	}
 
@@ -1195,7 +1302,11 @@ func (a APIDefinitionLoader) compileVirtualPathsSpec(paths []apidef.VirtualMeta,
 		// Extend with method actions
 		newSpec.VirtualPathSpec = stringSpec
 
-		a.Gw.preLoadVirtualMetaCode(&newSpec.VirtualPathSpec, &apiSpec.JSVM)
+		if apiSpec.CustomMiddleware.Driver == apidef.JavaScriptDriver {
+			a.Gw.preLoadVirtualMetaCodeGoja(&newSpec.VirtualPathSpec, &apiSpec.GojaJSVM)
+		} else {
+			a.Gw.preLoadVirtualMetaCode(&newSpec.VirtualPathSpec, &apiSpec.JSVM)
+		}
 
 		urlSpec = append(urlSpec, newSpec)
 	}
@@ -1372,7 +1483,6 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 			continue
 		}
 
-		// Find the path and method for this operation
 		path, method := a.findPathAndMethodForOperation(apiSpec, operationID)
 		if path == "" || method == "" {
 			continue
@@ -1384,15 +1494,257 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 			OASPath:                path,
 		}
 
-		// The path in OAS is relative to the server URL (listenPath)
-		// For regex matching, we don't prepend listenPath because URLSpec.matchesPath
-		// will strip the listenPath before matching
-		// Use standard regex generation with gateway config
 		a.generateRegex(path, &newSpec, OASValidateRequest, conf)
 		urlSpec = append(urlSpec, newSpec)
 	}
 
+	urlSpec = groupCollapsedValidateRequestSpecs(urlSpec, apiSpec.OAS.Paths)
+
+	urlSpec = a.addStaticPathShields(apiSpec, conf, urlSpec, OASValidateRequest, func(path, method string) URLSpec {
+		return URLSpec{
+			OASValidateRequestMeta: &oas.ValidateRequest{Enabled: false},
+			OASMethod:              method,
+			OASPath:                path,
+		}
+	})
+
+	sortURLSpecsByPathPriority(urlSpec)
+
 	return urlSpec
+}
+
+// groupCollapsedValidateRequestSpecs detects URLSpec entries that compile to the same
+// regex+method pair and groups them as candidates on a single representative URLSpec.
+// Candidates are sorted so that more restrictive path parameter schemas are tried first.
+func groupCollapsedValidateRequestSpecs(specs []URLSpec, oasPaths *openapi3.Paths) []URLSpec {
+	return groupCollapsedSpecs(specs, oasPaths, OASValidateRequest, func(indices []int, specs []URLSpec, toRemove map[int]bool) {
+		mergeGroupIntoPrimary(indices, specs, toRemove)
+	})
+}
+
+// groupCollapsedMockResponseSpecs is the mock response equivalent of
+// groupCollapsedValidateRequestSpecs.
+func groupCollapsedMockResponseSpecs(specs []URLSpec, oasPaths *openapi3.Paths) []URLSpec {
+	return groupCollapsedSpecs(specs, oasPaths, OASMockResponse, func(indices []int, specs []URLSpec, toRemove map[int]bool) {
+		mergeMockGroupIntoPrimary(indices, specs, toRemove)
+	})
+}
+
+// groupCollapsedSpecs is the shared grouping logic for both validate request and mock
+// response. It finds URLSpec entries with the same compiled regex+method, sorts them
+// by restrictiveness, and calls the provided merge function to build candidates.
+func groupCollapsedSpecs(
+	specs []URLSpec,
+	oasPaths *openapi3.Paths,
+	status URLStatus,
+	merge func(indices []int, specs []URLSpec, toRemove map[int]bool),
+) []URLSpec {
+	type key struct {
+		regex  string
+		method string
+	}
+
+	groups := make(map[key][]int)
+	var order []key
+	for i, s := range specs {
+		if s.Status != status || s.spec == nil {
+			continue
+		}
+		k := key{regex: s.spec.String(), method: s.OASMethod}
+		if _, exists := groups[k]; !exists {
+			order = append(order, k)
+		}
+		groups[k] = append(groups[k], i)
+	}
+
+	toRemove := make(map[int]bool)
+	for _, k := range order {
+		indices := groups[k]
+		if len(indices) < 2 {
+			continue
+		}
+		sortByRestrictiveness(indices, specs, oasPaths)
+		merge(indices, specs, toRemove)
+	}
+
+	return removeIndices(specs, toRemove)
+}
+
+// mergeMockGroupIntoPrimary builds MockResponseCandidates from the sorted indices
+// and assigns them to the primary (first) spec.
+func mergeMockGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]bool) {
+	primary := indices[0]
+	candidates := make([]MockResponseCandidate, len(indices))
+	for ci, idx := range indices {
+		candidates[ci] = MockResponseCandidate{
+			OASMockResponseMeta: specs[idx].OASMockResponseMeta,
+			OASMethod:           specs[idx].OASMethod,
+			OASPath:             specs[idx].OASPath,
+		}
+		if idx != primary {
+			toRemove[idx] = true
+		}
+	}
+
+	specs[primary].OASMockResponseMeta = candidates[0].OASMockResponseMeta
+	specs[primary].OASMethod = candidates[0].OASMethod
+	specs[primary].OASPath = candidates[0].OASPath
+	specs[primary].OASMockResponseCandidates = candidates
+}
+
+// sortByRestrictiveness sorts spec indices so that more restrictive path parameter
+// schemas come first. Ties in restrictiveness score are broken by total pattern length
+// (longer patterns are more specific, e.g., ^\d+$ before .*), then alphabetically.
+func sortByRestrictiveness(indices []int, specs []URLSpec, oasPaths *openapi3.Paths) {
+	sort.Slice(indices, func(a, b int) bool {
+		scoreA := pathParamRestrictiveness(specs[indices[a]].OASPath, specs[indices[a]].OASMethod, oasPaths)
+		scoreB := pathParamRestrictiveness(specs[indices[b]].OASPath, specs[indices[b]].OASMethod, oasPaths)
+		if scoreA != scoreB {
+			return scoreA > scoreB
+		}
+		lenA := pathParamPatternLength(specs[indices[a]].OASPath, specs[indices[a]].OASMethod, oasPaths)
+		lenB := pathParamPatternLength(specs[indices[b]].OASPath, specs[indices[b]].OASMethod, oasPaths)
+		if lenA != lenB {
+			return lenA > lenB
+		}
+		return specs[indices[a]].OASPath < specs[indices[b]].OASPath
+	})
+}
+
+// mergeGroupIntoPrimary takes a sorted list of spec indices that share the same
+// regex+method, builds ValidateRequestCandidates from them, and assigns them to
+// the primary (first) spec. Non-primary indices are marked for removal.
+func mergeGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]bool) {
+	primary := indices[0]
+	candidates := make([]ValidateRequestCandidate, len(indices))
+	for ci, idx := range indices {
+		candidates[ci] = ValidateRequestCandidate{
+			OASValidateRequestMeta: specs[idx].OASValidateRequestMeta,
+			OASMethod:              specs[idx].OASMethod,
+			OASPath:                specs[idx].OASPath,
+		}
+		if idx != primary {
+			toRemove[idx] = true
+		}
+	}
+
+	specs[primary].OASValidateRequestMeta = candidates[0].OASValidateRequestMeta
+	specs[primary].OASMethod = candidates[0].OASMethod
+	specs[primary].OASPath = candidates[0].OASPath
+	specs[primary].OASValidateRequestCandidates = candidates
+}
+
+// removeIndices returns a new slice with entries at the given indices removed.
+func removeIndices(specs []URLSpec, toRemove map[int]bool) []URLSpec {
+	if len(toRemove) == 0 {
+		return specs
+	}
+	result := make([]URLSpec, 0, len(specs)-len(toRemove))
+	for i, s := range specs {
+		if !toRemove[i] {
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
+// pathParamRestrictiveness returns a score indicating how restrictive the path parameter
+// schemas are for a given OAS path+method. Higher scores mean more restrictive. A plain
+// type:string with no constraints scores 0 (catch-all), while type:number, type:integer,
+// type:boolean, or any parameter with a pattern/enum/format scores higher.
+func pathParamRestrictiveness(oasPath, method string, oasPaths *openapi3.Paths) int {
+	if oasPaths == nil {
+		return 0
+	}
+	pathItem := oasPaths.Value(oasPath)
+	if pathItem == nil {
+		return 0
+	}
+	op := pathItem.GetOperation(method)
+	if op == nil {
+		return 0
+	}
+
+	score := 0
+	for _, paramRef := range op.Parameters {
+		if paramRef == nil || paramRef.Value == nil || paramRef.Value.In != "path" {
+			continue
+		}
+		param := paramRef.Value
+		if param.Schema == nil || param.Schema.Value == nil {
+			continue
+		}
+		score += schemaRestrictiveness(param.Schema.Value)
+	}
+	return score
+}
+
+// schemaRestrictiveness returns a score for how restrictive a single path parameter
+// schema is. The hierarchy from most to least restrictive:
+//
+//	integer (7) > number (6) > boolean (5) > array (4) > object (3)
+//	> string with constraints (2) > unconstrained string (0)
+//
+// This ensures that integer parameters are tried before number (since every integer
+// is a valid number but not vice versa), and all typed parameters are tried before
+// string which accepts everything.
+func schemaRestrictiveness(s *openapi3.Schema) int {
+	if s.Type != nil {
+		switch {
+		case s.Type.Is("integer"):
+			return 7
+		case s.Type.Is("number"):
+			return 6
+		case s.Type.Is("boolean"):
+			return 5
+		case s.Type.Is("array"):
+			return 4
+		case s.Type.Is("object"):
+			return 3
+		}
+	}
+
+	// type:string or untyped — check for constraints.
+	hasPattern := s.Pattern != ""
+	hasEnum := len(s.Enum) > 0
+	hasFormat := s.Format != ""
+	hasMinLen := s.MinLength != 0
+	hasMaxLen := s.MaxLength != nil
+
+	if hasPattern || hasEnum || hasFormat || hasMinLen || hasMaxLen {
+		return 2
+	}
+
+	// Unconstrained string — matches everything.
+	return 0
+}
+
+// pathParamPatternLength returns the total length of all path parameter pattern strings
+// for a given OAS path+method. Used as a tie-breaker when restrictiveness scores are
+// equal — longer patterns tend to be more specific (e.g., ^\d+$ vs .*).
+func pathParamPatternLength(oasPath, method string, oasPaths *openapi3.Paths) int {
+	if oasPaths == nil {
+		return 0
+	}
+	pathItem := oasPaths.Value(oasPath)
+	if pathItem == nil {
+		return 0
+	}
+	op := pathItem.GetOperation(method)
+	if op == nil {
+		return 0
+	}
+
+	total := 0
+	for _, paramRef := range op.Parameters {
+		if paramRef == nil || paramRef.Value == nil || paramRef.Value.In != "path" {
+			continue
+		}
+		if paramRef.Value.Schema != nil && paramRef.Value.Schema.Value != nil {
+			total += len(paramRef.Value.Schema.Value.Pattern)
+		}
+	}
+	return total
 }
 
 // compileOASMockResponsePathSpec extracts MockResponse operations from OAS middleware
@@ -1417,7 +1769,6 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 			continue
 		}
 
-		// Find the path and method for this operation
 		path, method := a.findPathAndMethodForOperation(apiSpec, operationID)
 		if path == "" || method == "" {
 			continue
@@ -1429,12 +1780,78 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 			OASPath:             path,
 		}
 
-		// Use standard regex generation with gateway config
 		a.generateRegex(path, &newSpec, OASMockResponse, conf)
 		urlSpec = append(urlSpec, newSpec)
 	}
 
+	urlSpec = groupCollapsedMockResponseSpecs(urlSpec, apiSpec.OAS.Paths)
+
+	urlSpec = a.addStaticPathShields(apiSpec, conf, urlSpec, OASMockResponse, func(path, method string) URLSpec {
+		return URLSpec{
+			OASMockResponseMeta: &oas.MockResponse{Enabled: false},
+			OASMethod:           method,
+			OASPath:             path,
+		}
+	})
+
+	sortURLSpecsByPathPriority(urlSpec)
+
 	return urlSpec
+}
+
+// addStaticPathShields adds synthetic disabled URLSpec entries for static OAS paths
+// that don't already have an entry in urlSpec. These entries act as shields: when the
+// middleware scans the path list, a static shield entry matches before any parameterised
+// regex, and the middleware sees Enabled=false and skips it. This prevents parameterised
+// paths (e.g. /employees/{id}) from incorrectly matching static paths (e.g. /employees/static).
+//
+// Shield entries are only added when urlSpec contains at least one parameterised path,
+// since without parameterised paths there is no cross-matching risk.
+func (a APIDefinitionLoader) addStaticPathShields(
+	apiSpec *APISpec,
+	conf config.Config,
+	urlSpec []URLSpec,
+	status URLStatus,
+	newDisabledSpec func(path, method string) URLSpec,
+) []URLSpec {
+	if apiSpec.OAS.Paths == nil {
+		return urlSpec
+	}
+
+	existing, hasParameterised := indexURLSpecs(urlSpec)
+	if !hasParameterised {
+		return urlSpec
+	}
+
+	for path, pathItem := range apiSpec.OAS.Paths.Map() {
+		if httputil.IsMuxTemplate(path) {
+			continue
+		}
+		for method := range pathItem.Operations() {
+			method = strings.ToUpper(method)
+			if _, exists := existing[path+":"+method]; exists {
+				continue
+			}
+			newSpec := newDisabledSpec(path, method)
+			a.generateRegex(path, &newSpec, status, conf)
+			urlSpec = append(urlSpec, newSpec)
+		}
+	}
+
+	return urlSpec
+}
+
+// indexURLSpecs builds a set of "path:METHOD" keys from the given specs and reports
+// whether any spec uses a parameterised (mux-template) path.
+func indexURLSpecs(specs []URLSpec) (existing map[string]struct{}, hasParameterised bool) {
+	existing = make(map[string]struct{}, len(specs))
+	for _, spec := range specs {
+		existing[spec.OASPath+":"+spec.OASMethod] = struct{}{}
+		if httputil.IsMuxTemplate(spec.OASPath) {
+			hasParameterised = true
+		}
+	}
+	return
 }
 
 // findPathAndMethodForOperation finds the path and method for a given operation ID
@@ -1453,6 +1870,14 @@ func (a APIDefinitionLoader) findPathAndMethodForOperation(apiSpec *APISpec, ope
 	}
 
 	return "", ""
+}
+
+// sortURLSpecsByPathPriority sorts URLSpec entries using the same path priority
+// rules as oasutil.SortByPathLength, ensuring consistent ordering across the gateway.
+func sortURLSpecsByPathPriority(specs []URLSpec) {
+	sort.Slice(specs, func(i, j int) bool {
+		return oasutil.PathLess(specs[i].OASPath, specs[j].OASPath)
+	})
 }
 
 // extractMCPPrimitivesToPaths extracts MCP primitives (tools, resources, prompts) from the OAS
@@ -1595,7 +2020,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	return combinedPath, whiteListEnabled
 }
 
-func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Handler) {
+func (a *APISpec) Init(authStore, healthStore, orgStore storage.Handler) {
 	a.AuthManager.Init(authStore)
 	a.Health.Init(healthStore)
 	a.OrgSessionManager.Init(orgStore)

@@ -9,12 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/sirupsen/logrus"
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -398,6 +401,138 @@ func TestExternalOAuthMiddleware_introspection(t *testing.T) {
 				{Path: "/get", Headers: headers, BodyMatch: jwt.ErrTokenExpired.Error(), Code: http.StatusUnauthorized},
 			}...)
 		})
+	})
+}
+
+// TestExternalOAuthMiddleware_MissingAuth_NoPRM_KeepsLegacy400 is a
+// backward-compatibility regression guard. The external-OAuth
+// missing-auth status changed from 400 to 401 only when PRM is enabled; an
+// external-OAuth API without PRM must keep returning the historic 400 (and no
+// WWW-Authenticate challenge), so existing consumers are not broken.
+func TestExternalOAuthMiddleware_MissingAuth_NoPRM_KeepsLegacy400(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const (
+		testClientID     = "test-client-id"
+		testClientSecret = "test-client-secret"
+	)
+
+	introspectionServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte(`{"active": true, "username": "u"}`))
+		assert.NoError(t, err)
+	}))
+	defer introspectionServer.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/ext-oauth-no-prm/"
+		spec.UseKeylessAccess = false
+		spec.ExternalOAuth.Enabled = true
+		spec.ExternalOAuth.Providers = []apidef.Provider{
+			{
+				Introspection: apidef.Introspection{
+					Enabled:           true,
+					URL:               introspectionServer.URL,
+					ClientID:          testClientID,
+					ClientSecret:      testClientSecret,
+					IdentityBaseField: "username",
+				},
+			},
+		}
+	})
+
+	// No Authorization header, no PRM configured -> legacy 400, no challenge.
+	resp, _ := ts.Run(t, test.TestCase{
+		Method:    http.MethodGet,
+		Path:      "/ext-oauth-no-prm/get",
+		BodyMatch: "authorization field missing",
+		Code:      http.StatusBadRequest,
+	})
+	assert.Empty(t, resp.Header.Get("WWW-Authenticate"),
+		"no PRM configured means the legacy 400 is preserved with no WWW-Authenticate challenge")
+}
+
+// TestExternalOAuthMiddleware_PRM_MissingAuth_Returns401 covers the external-OAuth
+// side of the 401 challenge. The middleware is a distinct code path from JWT, and
+// the same PRM-gated 400 -> 401 change applies to it: a missing (or empty)
+// credential on a PRM-enabled external-OAuth API must return 401 with the RFC 9728
+// WWW-Authenticate challenge so an MCP client begins PRM discovery.
+func TestExternalOAuthMiddleware_PRM_MissingAuth_Returns401(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	introspectionServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte(`{"active": true, "username": "u"}`))
+		assert.NoError(t, err)
+	}))
+	defer introspectionServer.Close()
+
+	oasDoc := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info:    &openapi3.Info{Title: "Ext-OAuth PRM 401", Version: "1.0"},
+			Paths:   openapi3.NewPaths(),
+		},
+	}
+	oasDoc.SetTykExtension(&oas.XTykAPIGateway{
+		Info:     oas.Info{Name: "ext-oauth-prm-401", State: oas.State{Active: true}},
+		Upstream: oas.Upstream{URL: "http://httpbin.org"},
+		Server: oas.Server{
+			ListenPath: oas.ListenPath{Value: "/ext-oauth-prm/", Strip: true},
+			Authentication: &oas.Authentication{
+				ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
+					Enabled:              true,
+					Resource:             "https://api.example.com",
+					AuthorizationServers: []string{"https://auth.example.com"},
+				},
+			},
+		},
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/ext-oauth-prm/"
+		spec.UseKeylessAccess = false
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+		spec.ExternalOAuth.Enabled = true
+		spec.ExternalOAuth.Providers = []apidef.Provider{
+			{
+				Introspection: apidef.Introspection{
+					Enabled:           true,
+					URL:               introspectionServer.URL,
+					ClientID:          "test-client-id",
+					ClientSecret:      "test-client-secret",
+					IdentityBaseField: "username",
+				},
+			},
+		}
+	})
+
+	assertChallenge := func(t *testing.T, resp *http.Response) {
+		t.Helper()
+		wwwAuth := resp.Header.Get(header.WWWAuthenticate)
+		assert.Contains(t, wwwAuth, `Bearer realm="tyk"`)
+		assert.Contains(t, wwwAuth, `resource_metadata=`)
+		assert.Contains(t, wwwAuth, `.well-known/oauth-protected-resource`)
+	}
+
+	t.Run("missing Authorization header", func(t *testing.T) {
+		resp, _ := ts.Run(t, test.TestCase{
+			Method: http.MethodGet,
+			Path:   "/ext-oauth-prm/get",
+			Code:   http.StatusUnauthorized,
+		})
+		assertChallenge(t, resp)
+	})
+
+	t.Run("empty Authorization header", func(t *testing.T) {
+		resp, _ := ts.Run(t, test.TestCase{
+			Method:  http.MethodGet,
+			Path:    "/ext-oauth-prm/get",
+			Headers: map[string]string{"Authorization": ""},
+			Code:    http.StatusUnauthorized,
+		})
+		assertChallenge(t, resp)
 	})
 }
 

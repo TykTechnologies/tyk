@@ -1,0 +1,31 @@
+{
+  "name": "Test BTL - Body Too Large",
+  "api_id": "test-btl",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-btl/",
+    "target_url": "http://backend-ok:80",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default",
+        "use_extended_paths": true,
+        "extended_paths": {
+          "size_limits": [
+            {
+              "path": ".*",
+              "method": "POST",
+              "size_limit": 10
+            }
+          ]
+        }
+      }
+    }
+  }
+}

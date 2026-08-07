@@ -12,25 +12,25 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
-	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
-
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	"github.com/paulbellamy/ratecounter"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -179,10 +179,17 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 
+			// Workaround
+			// ProcessRequest signature is too narrow it has to be extended to handle cases like this
+			// Abstraction should not know anything about implementation
+			if errors.Is(err, ErrResponseSucceed) {
+				err = nil
+			}
+
 			if err != nil {
-				writeResponse := true
 				// Prevent double error write
-				if goPlugin, isGoPlugin := actualMW.(*GoPluginMiddleware); isGoPlugin && goPlugin.handler != nil {
+				writeResponse := true
+				if goPlugin, isGoPlugin := actualMW.(*GoPluginMiddleware); isGoPlugin && goPlugin.handler != nil || errors.Is(err, ErrResponseErrorSent) || errors.Is(err, middleware.ErrResponseRendered) {
 					writeResponse = false
 				}
 
@@ -198,7 +205,12 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 					job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 				}
 
-				logger.WithError(err).WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+				logger.
+					WithError(err).
+					WithField("code", errCode).
+					WithField("ns", finishTime.Nanoseconds()).
+					Log(errpack.LogLevel(err, logrus.DebugLevel), "Finished")
+
 				return
 			}
 
@@ -248,6 +260,29 @@ func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware)
 		return true
 	}
 	return false
+}
+
+// mwAppendEnabledForRequest evaluates the request predicate before entering the
+// traced middleware handler, so skipped requests emit no middleware telemetry.
+func (gw *Gateway) mwAppendEnabledForRequest(chain *[]alice.Constructor, mw TykMiddleware, enabled func(*http.Request) bool) bool {
+	if gw.isDisabledForMCP(mw) || !mw.EnabledForSpec() {
+		return false
+	}
+
+	tracedConstructor := gw.createMiddleware(mw)
+	*chain = append(*chain, func(next http.Handler) http.Handler {
+		tracedHandler := tracedConstructor(next)
+
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !enabled(r) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			tracedHandler.ServeHTTP(w, r)
+		})
+	})
+	return true
 }
 
 func (gw *Gateway) responseMWAppendEnabled(chain *[]TykResponseHandler, responseMW TykResponseHandler) bool {
@@ -300,20 +335,27 @@ func NewBaseMiddleware(gw *Gateway, spec *APISpec, proxy ReturningHttpHandler, l
 		if len(v.ExtendedPaths.HardTimeouts) > 0 {
 			baseMid.Spec.EnforcedTimeoutEnabled = true
 		}
+		if !v.GlobalEnforceTimeoutDisabled && v.GlobalEnforceTimeout != 0 {
+			baseMid.Spec.EnforcedTimeoutEnabled = true
+		}
 	}
 
 	return baseMid
 }
 
-// Copy provides a new BaseMiddleware with it's own logger scope (copy).
-// The Spec, Proxy and Gw values are not copied.
+// Copy returns a BaseMiddleware with its own logger scope. Spec, Proxy and
+// Gw are shared. loggerMu guards t.logger against concurrent mutation by
+// SetName / Logger / SetRequestLogger.
 func (t *BaseMiddleware) Copy() *BaseMiddleware {
-	return &BaseMiddleware{
-		logger: t.logger.Dup(),
-		Spec:   t.Spec,
-		Proxy:  t.Proxy,
-		Gw:     t.Gw,
+	t.loggerMu.Lock()
+	logger := t.logger
+	t.loggerMu.Unlock()
+
+	var dupedLogger *logrus.Entry
+	if logger != nil {
+		dupedLogger = logger.Dup()
 	}
+	return &BaseMiddleware{logger: dupedLogger, Spec: t.Spec, Proxy: t.Proxy, Gw: t.Gw}
 }
 
 // Base serves to provide the full BaseMiddleware API. It's part of the TykMiddleware interface.
@@ -449,6 +491,8 @@ func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 
 	// Reset session state, useful for benchmarks when request object stays the same.
 	session.Reset()
+	// Mark session as restored; (makes invoke `SET key val XX` in further calls)
+	session.MarkAsRestored()
 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		t.Gw.SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
@@ -486,6 +530,7 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 	accessLog.WithAPIID(t.Spec.APIID, t.Spec.Name, t.Spec.OrgID)
 	accessLog.WithApiKey(req, hashKeys, gw.obfuscateKey)
 	accessLog.WithRequest(req, latency)
+	accessLog.WithOriginalPath(req)
 	accessLog.WithResponse(resp)
 
 	// Add error classification if present (only on error requests)
@@ -565,6 +610,9 @@ func (t *BaseMiddleware) RecordMetrics(w http.ResponseWriter, r *http.Request, s
 		rc.MCPPrimitiveName = ctxGetMCPPrimitiveName(r)
 		rc.MCPErrorCode = ctxGetJSONRPCErrorCode(r)
 	}
+	if t.Gw.MetricInstruments.NeedsConfigData() && !t.Spec.ConfigDataDisabled && len(t.Spec.ConfigData) > 0 {
+		rc.ConfigData = t.Spec.ConfigData
+	}
 	t.Gw.MetricInstruments.RecordRequest(r.Context())
 	t.Gw.MetricInstruments.RecordAPIMetrics(r.Context(), rc)
 }
@@ -589,17 +637,28 @@ func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
 	return copied
 }
 
+// defaultMinTokenLength is the floor applied to key length when min_token_length
+// is unset. It is enforced at both create time (handleAddOrUpdate) and auth time
+// so the two cannot drift (see TT-17585).
+// See https://github.com/TykTechnologies/tyk/issues/1681.
+const defaultMinTokenLength = 3
+
+// effectiveMinTokenLength returns the configured min_token_length, or the
+// default floor when it is unset (0).
+func effectiveMinTokenLength(configured int) int {
+	if configured == 0 {
+		return defaultMinTokenLength
+	}
+	return configured
+}
+
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
 func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r *http.Request) (user.SessionState, bool) {
 	key := originalKey
-	minLength := t.Spec.GlobalConfig.MinTokenLength
-	if minLength == 0 {
-		// See https://github.com/TykTechnologies/tyk/issues/1681
-		minLength = 3
-	}
+	minLength := effectiveMinTokenLength(t.Spec.GlobalConfig.MinTokenLength)
 
-	if len(key) <= minLength {
+	if len(key) < minLength {
 		return user.SessionState{IsInactive: true}, false
 	}
 
@@ -617,6 +676,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		if found {
 			t.Logger().Debug("--> Key found in local cache")
 			session := cachedVal.(user.SessionState).Clone()
+			session.MarkAsRestored()
 			if err := t.ApplyPolicies(&session); err != nil {
 				t.Logger().Error(err)
 				return session, false
@@ -639,7 +699,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		// If exists, assume it has been authorized and pass on
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			t.Gw.SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			t.Gw.SessionCache.Set(cacheKey, session.Clone(), cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
@@ -663,15 +723,26 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
 		key = session.KeyID
-
 		session := session.Clone()
 		session.SetKeyHash(keyHash)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		t.Logger().Info("Recreating session for key: ", t.Gw.obfuscateKey(key))
 
+		// insert new session
+		if t.Gw.GlobalSessionManager.Store() != t.Spec.AuthManager.Store() {
+			clonedSession := session.Clone()
+			clonedSession.MarkAsNew()
+
+			lifetime := clonedSession.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
+			if err := t.Gw.GlobalSessionManager.UpdateSession(key, &clonedSession, lifetime, false); err != nil {
+				t.Logger().WithError(err).Error("Cant copy session from AuthManager into GlobalSessionManager")
+				return user.SessionState{}, false
+			}
+		}
+
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			go t.Gw.SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			go t.Gw.SessionCache.Set(cacheKey, session.Clone(), cache.DefaultExpiration)
 		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
@@ -690,6 +761,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 
 	// session not found
 	session.KeyID = key
+
 	return session, false
 }
 
@@ -837,6 +909,8 @@ func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykRespo
 		return &HeaderTransform{BaseTykResponseHandler: baseHandler}
 	case "custom_mw_res_hook":
 		return &CustomMiddlewareResponseHook{BaseTykResponseHandler: baseHandler}
+	case "custom_mw_js_res_hook":
+		return &JSResponseMiddleware{BaseTykResponseHandler: baseHandler}
 	case "goplugin_res_hook":
 		return &ResponseGoPluginMiddleware{BaseTykResponseHandler: baseHandler}
 	}
@@ -855,7 +929,7 @@ func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res
 	for _, rh := range chain {
 		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
 			// Abort the request if this handler is a response middleware hook:
-			if rh.Name() == "CustomMiddlewareResponseHook" {
+			if rh.Name() == "CustomMiddlewareResponseHook" || rh.Name() == "JSResponseMiddleware" {
 				rh.HandleError(rw, req)
 				return true, err
 			}

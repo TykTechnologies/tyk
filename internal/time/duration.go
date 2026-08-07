@@ -78,6 +78,11 @@ func (d ReadableDuration) Seconds() float64 {
 	return durationInSeconds
 }
 
+// SecondsCeil returns ReadableDuration rounded up to the seconds.
+func (d ReadableDuration) SecondsCeil() float64 {
+	return math.Ceil(Duration(d).Seconds())
+}
+
 // Millisecond returns ReadableDuration in milliseconds.
 func (d ReadableDuration) Milliseconds() int64 {
 	return Duration(d).Milliseconds()

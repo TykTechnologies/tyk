@@ -1,7 +1,9 @@
 package user
 
 import (
+	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -114,4 +116,27 @@ func TestSessionState_SetCustomPolicies(t *testing.T) {
 		_, ok = list["test"]
 		assert.True(t, ok)
 	})
+}
+
+func TestPolicy_PostExpiryAction_OmittedWhenUnset(t *testing.T) {
+	p := Policy{ID: "p1", Name: "unset"}
+
+	b, err := json.Marshal(p)
+	assert.NoError(t, err)
+	assert.False(t, strings.Contains(string(b), "post_expiry_action"),
+		"expected post_expiry_action to be omitted when unset, got: %s", string(b))
+}
+
+func TestPolicy_PostExpiryAction_IncludedWhenSet(t *testing.T) {
+	p := Policy{ID: "p1", Name: "set", PostExpiryAction: PostExpiryActionRetain}
+
+	b, err := json.Marshal(p)
+	assert.NoError(t, err)
+
+	var decoded map[string]json.RawMessage
+	assert.NoError(t, json.Unmarshal(b, &decoded))
+
+	raw, ok := decoded["post_expiry_action"]
+	assert.True(t, ok, "expected post_expiry_action present when set, got: %s", string(b))
+	assert.Equal(t, `"retain"`, string(raw))
 }

@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/common/option"
 	"github.com/TykTechnologies/tyk/header"
@@ -21,12 +23,20 @@ var _ TykMiddleware = (*mockResponseMiddleware)(nil)
 
 type mockResponseMiddleware struct {
 	*BaseMiddleware
+	hitRecorder hitRecorder
 }
 
 func newMockResponseMiddleware(base *BaseMiddleware, opts ...option.Option[mockResponseMiddleware]) TykMiddleware {
 	return option.New(opts).Build(mockResponseMiddleware{
 		BaseMiddleware: base,
+		hitRecorder:    &realHitRecorder{successHandler: &SuccessHandler{base.Copy()}},
 	})
+}
+
+func withHitRecorder(h hitRecorder) option.Option[mockResponseMiddleware] {
+	return func(m *mockResponseMiddleware) {
+		m.hitRecorder = h
+	}
 }
 
 func (m *mockResponseMiddleware) Name() string {
@@ -61,11 +71,13 @@ func (m *mockResponseMiddleware) forward(res *http.Response, rw http.ResponseWri
 }
 
 func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	start := time.Now()
+
 	if !m.Spec.hasActiveMock() {
 		return nil, http.StatusOK
 	}
 
-	res, err := m.mockResponse(r)
+	res, requestOverwritten, err := m.mockResponse(r)
 
 	if err != nil {
 		return fmt.Errorf("failed to mock response: %w", err), http.StatusInternalServerError
@@ -86,10 +98,16 @@ func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.
 		return fmt.Errorf("failed to forward response: %w", err), http.StatusInternalServerError
 	}
 
+	m.hitRecorder.hit(rw, requestOverwritten, res, start)
+
 	return nil, middleware.StatusRespond
 }
 
-func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, error) {
+func (m *mockResponseMiddleware) mockResponse(r *http.Request) (
+	res *http.Response,
+	internal *http.Request,
+	err error,
+) {
 	// Use FindSpecMatchesStatus to check if this path should be mocked
 	// This ensures the standard regex-based path matching is used, respecting gateway configurations
 	versionInfo, _ := m.Spec.Version(r)
@@ -99,36 +117,39 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 
 	if !found || urlSpec == nil {
 		// No mock response configured for this path
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	mockResponse := urlSpec.OASMockResponseMeta
+	// Resolve the mock response config and OAS path. When multiple candidates
+	// exist (collapsed parameterized paths), disambiguate using path param schemas.
+	mockResponse, oasPath := m.resolveMockCandidate(r, urlSpec)
 	if mockResponse == nil || !mockResponse.Enabled {
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	res := &http.Response{Header: http.Header{}}
+	res = &http.Response{Header: http.Header{}}
+
+	internal = r.Clone(r.Context())
+	internal.URL.Path = oasPath
 
 	var code int
 	var contentType string
 	var body []byte
 	var headers []oas.Header
-	var err error
 
 	if mockResponse.FromOASExamples != nil && mockResponse.FromOASExamples.Enabled {
 		// Find the route using the OAS path from URLSpec, not the actual request path.
 		// This allows prefix/suffix matching to work correctly.
 		strippedPath := m.Spec.StripListenPath(r.URL.Path)
-		route, _, routeErr := m.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
+		route, _, routeErr := m.Spec.findRouteForOASPath(oasPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
 		if routeErr != nil || route == nil {
-			log.Tracef("URL spec matched for mock response but route not found for OAS path %s: %v", urlSpec.OASPath, routeErr)
-			return nil, nil
+			log.Tracef("URL spec matched for mock response but route not found for OAS path %s: %v", oasPath, routeErr)
+			return nil, nil, nil
 		}
 		code, contentType, body, headers, err = mockFromOAS(r, route.Operation, mockResponse.FromOASExamples)
 		res.StatusCode = code
 		if err != nil {
-			err = fmt.Errorf("mock: %w", err)
-			return res, err
+			return res, internal, fmt.Errorf("mock: %w", err)
 		}
 	} else {
 		code, body, headers = mockFromConfig(mockResponse)
@@ -143,12 +164,39 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 	}
 
 	res.StatusCode = code
+	res.Body = nopCloser{ReadSeeker: bytes.NewReader(body)}
 
-	res.Body = io.NopCloser(bytes.NewBuffer(body))
+	if m.Gw.GetConfig().CloseConnections {
+		res.Header.Set(header.Connection, "close")
+	}
 
-	m.Spec.sendRateLimitHeaders(ctxGetSession(r), res)
+	m.Gw.limitHeaderFactory(res.Header).SendQuotas(ctxGetSession(r), m.Spec.APIID)
 
-	return res, nil
+	return res, internal, nil
+}
+
+// resolveMockCandidate returns the mock response config and OAS path to use.
+// When the URLSpec has collapsed candidates, it disambiguates using matchCandidatePath.
+// When there are no candidates, it returns the URLSpec's own config.
+func (m *mockResponseMiddleware) resolveMockCandidate(r *http.Request, urlSpec *URLSpec) (*oas.MockResponse, string) {
+	if len(urlSpec.OASMockResponseCandidates) == 0 {
+		return urlSpec.OASMockResponseMeta, urlSpec.OASPath
+	}
+
+	strippedPath := m.Spec.StripListenPath(r.URL.Path)
+
+	for _, candidate := range urlSpec.OASMockResponseCandidates {
+		if candidate.OASMockResponseMeta == nil || !candidate.OASMockResponseMeta.Enabled {
+			continue
+		}
+
+		if _, _, _, ok := m.Spec.matchCandidatePath(candidate.OASPath, candidate.OASMethod, strippedPath); ok {
+			return candidate.OASMockResponseMeta, candidate.OASPath
+		}
+	}
+
+	// No candidate matched — don't mock.
+	return nil, ""
 }
 
 func mockFromConfig(tykMockRespOp *oas.MockResponse) (int, []byte, []oas.Header) {
@@ -267,4 +315,24 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 	}
 
 	return code, contentType, body, headers, err
+}
+
+type hitRecorder interface {
+	hit(rw http.ResponseWriter, r *http.Request, res *http.Response, start time.Time)
+}
+
+type realHitRecorder struct {
+	successHandler *SuccessHandler
+}
+
+func (s *realHitRecorder) hit(rw http.ResponseWriter, r *http.Request, res *http.Response, start time.Time) {
+	if s.successHandler.Spec.DoNotTrack {
+		return
+	}
+
+	ms := DurationToMillisecond(time.Since(start))
+	latency := analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}
+	s.successHandler.RecordHit(r, latency, res.StatusCode, res, true)
+	s.successHandler.RecordAccessLog(r, res, latency)
+	s.successHandler.Base().RecordMetrics(rw, r, res.StatusCode, latency, res)
 }

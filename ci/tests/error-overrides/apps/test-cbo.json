@@ -1,0 +1,34 @@
+{
+  "name": "Test CBO - Circuit Breaker Open",
+  "api_id": "test-cbo",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-cbo/",
+    "target_url": "http://backend-multi-error:5003",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default",
+        "use_extended_paths": true,
+        "extended_paths": {
+          "circuit_breakers": [
+            {
+              "path": ".*",
+              "method": "GET",
+              "threshold_percent": 0.1,
+              "samples": 3,
+              "return_to_service_after": 60,
+              "disable_half_open_state": false
+            }
+          ]
+        }
+      }
+    }
+  }
+}

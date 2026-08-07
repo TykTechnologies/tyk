@@ -27,17 +27,19 @@ const (
 	vaultLabel       = "$secret_vault."
 	envLabel         = "$secret_env."
 	secretsConfLabel = "$secret_conf."
+	fileLabel        = "$secret_file."
 	triggerKeyPrefix = "trigger"
 	triggerKeySep    = "-"
 )
 
 var dollarMatch = regexp.MustCompile(`\$\d+`)
 var contextMatch = regexp.MustCompile(`\$tyk_context.([A-Za-z0-9_\-\.]+)`)
-var consulMatch = regexp.MustCompile(`\$secret_consul.([A-Za-z0-9\/\-\.]+)`)
-var vaultMatch = regexp.MustCompile(`\$secret_vault.([A-Za-z0-9\/\-\.]+)`)
+var consulMatch = regexp.MustCompile(`\$secret_consul.([A-Za-z0-9_\/\-\.]+)`)
+var vaultMatch = regexp.MustCompile(`\$secret_vault.([A-Za-z0-9_\/\-\.]+)`)
 var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
+var fileMatch = regexp.MustCompile(`\$secret_file\.([A-Za-z0-9_\/\-\.]+)`)
 
 func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	rawPath := r.URL.String()
@@ -241,6 +243,12 @@ func (gw *Gateway) ReplaceTykVariables(r *http.Request, in string, escape bool) 
 		in = gw.replaceVariables(in, vars, contextData, consulLabel, escape)
 	}
 
+	if strings.Contains(in, fileLabel) {
+		contextData := ctxGetData(r)
+		vars := fileMatch.FindAllString(in, -1)
+		in = gw.replaceVariables(in, vars, contextData, fileLabel, escape)
+	}
+
 	if strings.Contains(in, contextLabel) {
 		contextData := ctxGetData(r)
 		vars := contextMatch.FindAllString(in, -1)
@@ -330,6 +338,17 @@ func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]in
 
 			in = strings.Replace(in, v, val, -1)
 
+		case fileLabel:
+
+			val, err := ResolveFileKV(gw.GetConfig().KV.File.BasePath, key)
+			if err != nil {
+				log.WithError(err).Debug("file KV: $secret_file resolution failed")
+				in = emptyStringFn(key, in, v)
+				continue
+			}
+
+			in = strings.Replace(in, v, val, -1)
+
 		default:
 
 			val, ok := vals[key]
@@ -357,6 +376,8 @@ func valToStr(v interface{}) string {
 		s = x
 	case float64:
 		s = strconv.FormatFloat(x, 'f', -1, 64)
+	case int:
+		s = strconv.Itoa(x)
 	case int64:
 		s = strconv.FormatInt(x, 10)
 	case []string:

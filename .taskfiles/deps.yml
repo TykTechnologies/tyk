@@ -21,7 +21,7 @@ tasks:
     status:
       - type mockgen
     cmds:
-      - go install go.uber.org/mock/mockgen@v0.6.0
+      - go install go.uber.org/mock/mockgen@2d1c58167e30f380cf78e44a43b100a14767e817  # v0.6.0
 
   gotestsum:
     internal: true
@@ -29,7 +29,7 @@ tasks:
     status:
       - type gotestsum
     cmds:
-      - go install gotest.tools/gotestsum@latest
+      - go install gotest.tools/gotestsum@c4a0df2e75a225d979a444342dd3db752b53619f  # v1.13.0
 
   golangci-lint:
     internal: true
@@ -37,7 +37,7 @@ tasks:
     status:
       - type golangci-lint
     cmds:
-      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.5.0
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@ff63786c30d6c2926f99d677ab2ecf089e9390ad  # v2.5.0
 
   lefthook:
     internal: true
@@ -45,7 +45,7 @@ tasks:
     status:
       - type lefthook
     cmds:
-      - go install github.com/evilmartians/lefthook@latest
+      - go install github.com/evilmartians/lefthook@83ec3a9212b41d20576c45a4b5dc5bccff2d5e8a  # v2.1.4
 
   exp:
     internal: true
@@ -55,4 +55,4 @@ tasks:
     status:
       - type {{.name}}
     cmds:
-      - go install github.com/TykTechnologies/exp/cmd/{{.name}}@main
+      - go install github.com/TykTechnologies/exp/cmd/{{.name}}@49245597f0620ef8460735bb0ae6e93be5f8ca51  # main

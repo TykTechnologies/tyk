@@ -9,12 +9,9 @@ type regexpStrIntRetSliceStrCache struct {
 	*cache
 }
 
-func newRegexpStrIntRetSliceStrCache(ttl time.Duration, isEnabled bool) *regexpStrIntRetSliceStrCache {
+func newRegexpStrIntRetSliceStrCache(ttl time.Duration, maxEntries int, isEnabled bool, name string, reporter evictionReporter) *regexpStrIntRetSliceStrCache {
 	return &regexpStrIntRetSliceStrCache{
-		cache: newCache(
-			ttl,
-			isEnabled,
-		),
+		cache: newCacheWithSize(ttl, maxEntries, isEnabled, name, reporter),
 	}
 }
 

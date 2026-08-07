@@ -71,6 +71,9 @@
         },
         "min_version": {
           "type": "string"
+        },
+        "compress_policies": {
+          "type": "boolean"
         }
       }
     },
@@ -265,6 +268,27 @@
                   "type": "string"
                 }
               }
+            },
+            "mcp": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "read_sources": {
+                  "type": ["array", "null"],
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "channel": {
+                        "type": "string"
+                      },
+                      "path": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         },
@@ -426,11 +450,48 @@
           }
         }
       }
+    },
+    "ErrorOverrides": {
+      "type": ["object", "null"],
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "match": {
+              "type": "object",
+              "properties": {
+                "flag": { "type": "string" },
+                "message_pattern": { "type": "string" },
+                "body_field": { "type": "string" },
+                "body_value": { "type": "string" }
+              }
+            },
+            "response": {
+              "type": "object",
+              "properties": {
+                "status_code": { "type": "integer" },
+                "body": { "type": "string" },
+                "message": { "type": "string" },
+                "template": { "type": "string" },
+                "headers": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                }
+              }
+            }
+          },
+          "required": ["response"]
+        }
+      }
     }
   },
   "properties": {
     "streaming": {
       "$ref": "#/definitions/Streaming"
+    },
+    "graceful_shutdown_delay_seconds": {
+      "type": "integer"
     },
     "allow_insecure_configs": {
       "type": "boolean"
@@ -927,7 +988,7 @@
     },
     "log_format": {
       "type": "string",
-      "enum": ["", "standard", "json"]
+      "enum": ["", "text", "json", "legacy"]
     },
     "access_logs": {
       "type": ["object", "null"],
@@ -1460,6 +1521,15 @@
     "regexp_cache_expire": {
       "type": "integer"
     },
+    "regexp_cache_max_entries": {
+      "type": "integer"
+    },
+    "disable_regexp_cache_bound": {
+      "type": "boolean"
+    },
+    "disable_auto_max_procs": {
+      "type": "boolean"
+    },
     "proxy_ssl_disable_renegotiation": {
       "type": "boolean"
     },
@@ -1552,6 +1622,14 @@
               "type": "integer"
             }
           }
+        },
+        "file": {
+          "type": ["object", "null"],
+          "properties": {
+            "base_path": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -1610,9 +1688,18 @@
         }
       }
     },
+    "rate_limit_response_headers": {
+      "description": "Determines the type of data that will be returned in the rate limit headers",
+      "type": ["string"],
+      "enum": ["", "quotas", "rate_limits"],
+      "default": "quotas"
+    },
     "allow_unsafe_policy_ids": {
       "type": ["boolean", "null"],
       "additionalProperties": false
+    },
+    "error_overrides": {
+      "$ref": "#/definitions/ErrorOverrides"
     }
   }
 }

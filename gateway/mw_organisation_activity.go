@@ -120,7 +120,13 @@ func (k *OrganizationMonitor) refreshOrgSession(orgID string) {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *user.SessionState) (error, int) {
+//
+//nolint:staticcheck
+func (k *OrganizationMonitor) ProcessRequestLive(
+	r *http.Request,
+	orgSession *user.SessionState,
+) (error, int) {
+
 	logger := k.Logger()
 
 	if orgSession.IsInactive {
@@ -135,11 +141,11 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 		orgSession,
 		k.Spec.OrgID,
 		"",
-		k.Spec.OrgSessionManager.Store(),
 		orgSession.Per > 0 && orgSession.Rate > 0,
 		true,
 		k.Spec,
 		false,
+		nil,
 	)
 
 	sessionLifeTime := orgSession.Lifetime(k.Spec.GetSessionLifetimeRespectsKeyExpiration(), k.Spec.SessionLifetime, k.Gw.GetConfig().ForceGlobalSessionLifetime, k.Gw.GetConfig().GlobalSessionLifetime)
@@ -211,7 +217,12 @@ func (k *OrganizationMonitor) SetOrgSentinel(orgChan chan bool, orgId string) {
 	}
 }
 
-func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request, orgSession *user.SessionState) (error, int) {
+//nolint:staticcheck
+func (k *OrganizationMonitor) ProcessRequestOffThread(
+	r *http.Request,
+	orgSession *user.SessionState,
+) (error, int) {
+
 	orgChanMap.Lock()
 	orgChan, ok := orgChanMap.channels[k.Spec.OrgID]
 	if !ok {
@@ -251,7 +262,8 @@ func (k *OrganizationMonitor) AllowAccessNext(
 	path string,
 	IP string,
 	r *http.Request,
-	session *user.SessionState) {
+	session *user.SessionState,
+) {
 
 	// Is it active?
 	logEntry := k.Gw.getExplicitLogEntryForRequest(k.Logger(), path, IP, k.Spec.OrgID, nil)
@@ -269,11 +281,11 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		session,
 		k.Spec.OrgID,
 		customQuotaKey,
-		k.Spec.OrgSessionManager.Store(),
 		session.Per > 0 && session.Rate > 0,
 		true,
 		k.Spec,
 		false,
+		nil,
 	)
 
 	sessionLifeTime := session.Lifetime(k.Spec.GetSessionLifetimeRespectsKeyExpiration(), k.Spec.SessionLifetime, k.Gw.GetConfig().ForceGlobalSessionLifetime, k.Gw.GetConfig().GlobalSessionLifetime)

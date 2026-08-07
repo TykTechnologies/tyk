@@ -1,0 +1,24 @@
+{
+  "name": "Test AMF - Auth Key Field Missing",
+  "api_id": "test-amf-authkey",
+  "org_id": "default",
+  "use_keyless": false,
+  "active": true,
+  "auth": {
+    "auth_header_name": "Authorization"
+  },
+  "proxy": {
+    "listen_path": "/test-amf-authkey/",
+    "target_url": "http://backend-ok:80",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  }
+}

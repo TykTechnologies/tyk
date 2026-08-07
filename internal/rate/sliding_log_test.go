@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/TykTechnologies/tyk/internal/redis"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/rate"
+	"github.com/TykTechnologies/tyk/internal/redis"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/storage"
 )
@@ -40,7 +40,7 @@ func TestSlidingLog_Do(t *testing.T) {
 		})
 		assert.NotNil(t, rl)
 
-		result, err := rl.Do(ctx, time.Now(), "key", 40, 10)
+		_, result, err := rl.Do(ctx, time.Now(), "key", 40, 10)
 		assert.True(t, result)
 		assert.NoError(t, err)
 	}
@@ -147,24 +147,6 @@ func TestSlidingLog_pipelinerError(t *testing.T) {
 
 const testRequestCount int = 1000
 
-func assertPipelinerError(ctx context.Context, tb testing.TB, conn redis.UniversalClient, tx bool) {
-	rl := rate.NewSlidingLogRedis(conn, tx, nil)
-
-	key, per := uuid.New(), int64(5)
-
-	for i := 0; i < testRequestCount; i++ {
-		now := time.Now()
-		_, err := rl.SetCount(ctx, now, key, per)
-		assert.NoError(tb, err)
-	}
-
-	now := time.Now()
-	count, err := rl.GetCount(ctx, now, key, per)
-
-	assert.NoError(tb, err)
-	assert.Equal(tb, int64(testRequestCount), count)
-}
-
 func assertGetCount(tb testing.TB, ctx context.Context, conn redis.UniversalClient, tx bool) {
 	tb.Helper()
 
@@ -205,7 +187,27 @@ func assertGet(tb testing.TB, ctx context.Context, conn redis.UniversalClient, t
 	assert.Len(tb, count, testRequestCount)
 }
 
-func assertNew(ctx context.Context, tb testing.TB, conn redis.UniversalClient, tx bool) {
+func assertCountScript(tb testing.TB, ctx context.Context, conn redis.UniversalClient) {
+	tb.Helper()
+	rl := rate.NewSlidingLogRedis(conn, true, nil)
+
+	key, per := uuid.New(), int64(5)
+
+	for i := 0; i < testRequestCount; i++ {
+		now := time.Now()
+		_, err := rl.SetCountScript(ctx, now, key, int64(testRequestCount), per)
+		assert.NoError(tb, err)
+	}
+
+	now := time.Now()
+	count, err := rl.GetCount(ctx, now, key, per)
+
+	assert.NoError(tb, err)
+	assert.Equal(tb, int64(testRequestCount), count)
+}
+
+func assertNew(_ context.Context, tb testing.TB, conn redis.UniversalClient, tx bool) {
+	tb.Helper()
 	rl := rate.NewSlidingLogRedis(conn, tx, nil)
 	assert.NotNil(tb, rl)
 }
@@ -232,17 +234,8 @@ func BenchmarkSlidingLog_New(b *testing.B) {
 }
 
 func BenchmarkSlidingLog_Count(b *testing.B) {
-	ctx := context.Background()
-
-	conf, err := config.New()
-	assert.NoError(b, err)
-
-	conn, err := storage.NewConnector(storage.DefaultConn, *conf)
-	assert.Nil(b, err)
-
-	var db redis.UniversalClient
-	ok := conn.As(&db)
-	assert.True(b, ok)
+	ctx := b.Context()
+	db := connectRedis(b)
 
 	b.ResetTimer()
 
@@ -269,4 +262,80 @@ func BenchmarkSlidingLog_Count(b *testing.B) {
 			assertGet(b, ctx, db, true)
 		}
 	})
+
+	b.Run("set/get script", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			assertCountScript(b, ctx, db)
+		}
+	})
+}
+
+func Test_GetCountScript(t *testing.T) {
+	db := connectRedis(t)
+	now := time.Now()
+
+	err := db.Del(t.Context(), "key").Err()
+	require.NoError(t, err)
+
+	slr := rate.NewSlidingLogRedis(db, true, nil)
+	res, err := slr.SetCountScript(t.Context(), now, "key", 3, 10)
+	require.NoError(t, err)
+	require.Equal(t, rate.Stats{
+		Count:     0,
+		Limit:     3,
+		Remaining: 2,
+		Reset:     time.Second * 0,
+	}, res)
+
+	// second hit is allowed
+	res, err = slr.SetCountScript(t.Context(), now.Add(1*time.Second), "key", 3, 10)
+	require.NoError(t, err)
+	require.Equal(t, rate.Stats{
+		Count:     1,
+		Limit:     3,
+		Remaining: 1,
+		Reset:     time.Second * 0,
+	}, res)
+
+	res, err = slr.SetCountScript(t.Context(), now.Add(2*time.Second), "key", 3, 10)
+	require.NoError(t, err)
+	require.Equal(t, rate.Stats{
+		Count:     2,
+		Limit:     3,
+		Remaining: 0,
+		Reset:     time.Second * 10,
+	}, res)
+
+	res, err = slr.SetCountScript(t.Context(), now.Add(3*time.Second), "key", 3, 10)
+	require.NoError(t, err)
+	require.Equal(t, rate.Stats{
+		Count:     3,
+		Limit:     3,
+		Remaining: 0,
+		Reset:     time.Second * 8, // reset after 8 seconds
+	}, res)
+
+	ttl, err := db.TTL(t.Context(), "key").Result()
+	require.NoError(t, err)
+	require.InDelta(t, float64(10), ttl.Seconds(), .1)
+}
+
+func connectRedis(tb testing.TB) redis.UniversalClient {
+	tb.Helper()
+
+	conf, err := config.New()
+	require.NoError(tb, err)
+
+	conn, err := storage.NewConnector(storage.DefaultConn, *conf)
+	require.Nil(tb, err)
+
+	var db redis.UniversalClient
+	ok := conn.As(&db)
+	require.True(tb, ok)
+
+	tb.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	return db
 }

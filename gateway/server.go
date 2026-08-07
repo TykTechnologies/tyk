@@ -27,6 +27,7 @@ import (
 	"time"
 
 	logstashhook "github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/cenkalti/backoff/v4"
 	logrussentry "github.com/evalphobia/logrus_sentry"
 	grayloghook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
@@ -55,13 +56,16 @@ import (
 	"github.com/TykTechnologies/tyk/internal/compression"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/internal/mcp/pairing"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
-	logger "github.com/TykTechnologies/tyk/log"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/pkg/validator"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
@@ -77,10 +81,10 @@ import (
 var (
 	globalMu sync.Mutex
 
-	log       = logger.Get()
+	log       = tyklog.Get()
 	mainLog   = log.WithField("prefix", "main")
 	pubSubLog = log.WithField("prefix", "pub-sub")
-	rawLog    = logger.GetRaw()
+	rawLog    = tyklog.GetRaw()
 
 	memProfFile *os.File
 
@@ -113,6 +117,8 @@ type Gateway struct {
 	config            atomic.Value
 	configMu          sync.Mutex
 	configViewerCache *configViewerCache
+
+	kvResolvers []func() error
 
 	ctx context.Context
 
@@ -167,6 +173,12 @@ type Gateway struct {
 	apiSpecs        []*APISpec
 	apisByID        map[string]*APISpec
 	apisHandlesByID *sync.Map
+	mcpPairingIndex pairing.Index
+
+	// prmCache memoises upstream Protected Resource Metadata (RFC 9728) docs
+	// for MCP APIs running in mirror mode. Lazily initialised on first use.
+	prmCacheOnce sync.Once
+	prmCache     *mcp.PRMCache
 
 	policies *model.Policies
 
@@ -187,6 +199,9 @@ type Gateway struct {
 	// OnConnect this is a callback which is called whenever we transition redis Disconnected to connected
 	OnConnect func()
 
+	// shuttingDown tracks whether the gateway has received a termination signal and is initiating its graceful shutdown sequence.
+	shuttingDown atomic.Bool
+
 	// SessionID is the unique session id which is used while connecting to dashboard to prevent multiple node allocation.
 	SessionID string
 
@@ -198,6 +213,11 @@ type Gateway struct {
 	reloadQueue chan func()
 	// performedSuccessfulReload is used to know whether a successful reload happened
 	performedSuccessfulReload bool
+
+	// reloadRetryBackoff optionally returns a custom backoff strategy for
+	// DoReloadWithRetry. Production code leaves this nil (default exponential
+	// backoff is used). Tests set it to return a fast constant backoff.
+	reloadRetryBackoff func() backoff.BackOff
 
 	requeueLock sync.Mutex
 
@@ -229,15 +249,26 @@ type Gateway struct {
 	// apiJWKCaches cache per api entity
 	apiJWKCaches sync.Map
 
+	// idpRegistry is the in-memory client-IdP registry, a sibling dataset of the
+	// API definitions consulted only as a last fallback in the JWT path.
+	idpRegistry *IdPRegistry
+
+	limitHeaderFactory rate.HeaderSenderFactory
+
 	BundleChecksumVerifier bundleChecksumVerifyFunction
 
 	validator validator.Validator
+
+	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
+	// Built from apidef.ErrorOverrides during gateway startup.
+	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw := &Gateway{
 		DefaultProxyMux: &proxyMux{
-			again: again.New(),
+			again:        again.New(),
+			track404Logs: config.Track404Logs,
 		},
 		ctx: ctx,
 	}
@@ -280,6 +311,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
+	gw.limitHeaderFactory = rate.NewSenderFactory(config.RateLimitResponseHeaders)
 
 	// Only create registry in RPC mode
 	if config.SlaveOptions.UseRPC {
@@ -287,12 +319,22 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	}
 
 	gw.jwkCache = buildJWKSCache(config)
+	gw.idpRegistry = newIdPRegistry(gw)
 	gw.BundleChecksumVerifier = defaultBundleVerifyFunction
 
 	return gw
 }
 
 // cacheCreate will create the caches in *Gateway.
+// PRMCache returns the gateway-wide Protected Resource Metadata cache used
+// by MCP mirror-mode PRM serving. Constructed lazily on first call.
+func (gw *Gateway) PRMCache() *mcp.PRMCache {
+	gw.prmCacheOnce.Do(func() {
+		gw.prmCache = mcp.NewPRMCache(0)
+	})
+	return gw.prmCache
+}
+
 func (gw *Gateway) cacheCreate() {
 	conf := gw.GetConfig()
 
@@ -903,6 +945,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	}
 
 	r.HandleFunc("/debug", gw.traceHandler).Methods("POST")
+	r.HandleFunc("/plugins/test", gw.pluginTestHandler).Methods("POST")
 	r.HandleFunc("/cache/jwks/{apiID}", gw.invalidateJWKSCacheForAPIID).Methods("DELETE")
 	r.HandleFunc("/cache/jwks", gw.invalidateJWKSCacheForAllAPIs).Methods("DELETE")
 	r.HandleFunc("/cache/{apiID}", gw.invalidateCacheHandler).Methods("DELETE")
@@ -1014,7 +1057,7 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 	// Set AuthCheck hook
 	if !spec.CustomMiddleware.AuthCheck.Disabled && spec.CustomMiddleware.AuthCheck.Name != "" {
 		mwAuthCheckFunc = spec.CustomMiddleware.AuthCheck
-		if spec.CustomMiddleware.AuthCheck.Path != "" {
+		if spec.CustomMiddleware.AuthCheck.Code == "" && spec.CustomMiddleware.AuthCheck.Path != "" {
 			// Feed a JS file to Otto
 			mwPaths = append(mwPaths, spec.CustomMiddleware.AuthCheck.Path)
 		}
@@ -1026,7 +1069,9 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 			continue
 		}
 
-		mwPaths = append(mwPaths, mwObj.Path)
+		if mwObj.Code == "" {
+			mwPaths = append(mwPaths, mwObj.Path)
+		}
 		mwPreFuncs = append(mwPreFuncs, mwObj)
 		mainLog.Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
 	}
@@ -1035,7 +1080,9 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 			continue
 		}
 
-		mwPaths = append(mwPaths, mwObj.Path)
+		if mwObj.Code == "" {
+			mwPaths = append(mwPaths, mwObj.Path)
+		}
 		mwPostFuncs = append(mwPostFuncs, mwObj)
 		mainLog.Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
 	}
@@ -1103,6 +1150,9 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 			continue
 		}
 
+		if mw.Path != "" {
+			mwPaths = append(mwPaths, mw.Path)
+		}
 		mwResponseFuncs = append(mwResponseFuncs, mw)
 	}
 
@@ -1123,6 +1173,7 @@ func (gw *Gateway) createResponseMiddlewareChain(
 	)
 	decorate := makeDefaultDecorator(log)
 
+	gw.responseMWAppendEnabled(&responseMWChain, decorate(&MCPListFilterResponseHandler{BaseTykResponseHandler: baseHandler}))
 	gw.responseMWAppendEnabled(&responseMWChain, decorate(&ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler}))
 	headerInjector := decorate(&HeaderInjector{BaseTykResponseHandler: baseHandler})
 	headerInjectorAdded := gw.responseMWAppendEnabled(&responseMWChain, headerInjector)
@@ -1162,6 +1213,8 @@ func (gw *Gateway) createResponseMiddlewareChain(
 		//is it goplugin or other middleware
 		if strings.HasSuffix(mw.Path, ".so") {
 			processor = gw.responseProcessorByName("goplugin_res_hook", baseHandler)
+		} else if isJSDriver(spec.CustomMiddleware.Driver) {
+			processor = gw.responseProcessorByName("custom_mw_js_res_hook", baseHandler)
 		} else {
 			processor = gw.responseProcessorByName("custom_mw_res_hook", baseHandler)
 		}
@@ -1179,6 +1232,10 @@ func (gw *Gateway) createResponseMiddlewareChain(
 		}
 		responseMWChain = append(responseMWChain, processor)
 	}
+
+	// Add error override handler (before cache) - intercepts upstream 4xx/5xx
+	gw.responseMWAppendEnabled(&responseMWChain,
+		decorate(&ResponseErrorOverrideMiddleware{BaseTykResponseHandler: baseHandler}))
 
 	keyPrefix := "cache-" + spec.APIID
 	cacheStore := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
@@ -1206,11 +1263,38 @@ func (gw *Gateway) rpcReloadLoop(rpcKey string) {
 	}
 }
 
-func (gw *Gateway) DoReload() {
+// idpReloadLoop long-polls the dedicated CheckIdPReload RPC. It runs parallel to
+// rpcReloadLoop so a client-IdP change refreshes ONLY the registry (one
+// GetClientIdPs RPC) without a full API/policy resync. Exits on shutdown.
+func (gw *Gateway) idpReloadLoop(rpcKey string) {
+	for {
+		if !gw.RPCListener.CheckForIdPReload(rpcKey) {
+			return
+		}
+	}
+}
+
+// DoReloadWithError performs a full reload of APIs and policies, returning any
+// sync error that prevented a successful reload. The reloadMu mutex is acquired
+// for the duration of the reload, so each call is safe to make concurrently.
+func (gw *Gateway) DoReloadWithError() error {
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
 
 	start := time.Now()
+
+	// Always record the current config state (loaded API and policy counts)
+	// even if the reload fails partway through. This ensures gauges report 0
+	// rather than emitting no data when e.g. MDCB is unreachable.
+	defer func() {
+		gw.MetricInstruments.RecordConfigState(gw.ctx, gw.apisByIDLen(), gw.policies.PolicyCount())
+	}()
+
+	for _, resolve := range gw.kvResolvers {
+		if err := resolve(); err != nil {
+			mainLog.WithError(err).Error("Failed to re-resolve KV value on reload")
+		}
+	}
 
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
@@ -1224,30 +1308,95 @@ func (gw *Gateway) DoReload() {
 	// Load the API Policies
 	if _, err := syncResourcesWithReload("policies", gw.GetConfig(), gw.syncPolicies); err != nil {
 		mainLog.Error("Error during syncing policies")
-		return
+		return err
 	}
 
 	// load the specs
 	if count, err := syncResourcesWithReload("apis", gw.GetConfig(), gw.syncAPISpecs); err != nil {
 		mainLog.Error("Error during syncing apis")
-		return
+		return err
 	} else {
 		// skip re-loading only if dashboard service reported 0 APIs
 		// and current registry had 0 APIs
 		if count == 0 && gw.apisByIDLen() == 0 {
 			mainLog.Warning("No API Definitions found, not reloading")
 			gw.performedSuccessfulReload = true
-			return
+			return nil
 		}
 	}
 
 	gw.loadGlobalApps()
 
+	// Refresh the client-IdP registry AFTER loadGlobalApps populates apisByID.
+	// The segment-aware backstop indexes only bindings whose api_id is present
+	// in apisByID — sequencing this before loadGlobalApps would drop every
+	// binding and 401 registry-only APIs from boot. Every DoReload (startup,
+	// reloadLoop drain, /tyk/reload, RPC NoticeGroupReload) refreshes the
+	// registry as a side effect, giving operators IdP refresh "for free".
+	if gw.idpRegistry != nil {
+		if err := gw.idpRegistry.doRefresh(); err != nil {
+			mainLog.WithError(err).Warn("IdP registry refresh failed during reload — keeping previous snapshot")
+		}
+	}
+
 	gw.MetricInstruments.RecordReload(gw.ctx, time.Since(start))
-	gw.MetricInstruments.RecordConfigState(gw.ctx, gw.apisByIDLen(), gw.policies.PolicyCount())
 
 	gw.performedSuccessfulReload = true
 	mainLog.Info("API reload complete")
+	return nil
+}
+
+// DoReload preserves the func() signature required by RPCStorageHandler,
+// rpc.Connect, reloadLoop, gracefulShutdown, and all test callers.
+// Changing DoReload to return an error would break the stored func() field
+// in RPCStorageHandler and the emergencyModeLoadedFunc func() parameter in
+// rpc.Connect without a much wider refactor.
+func (gw *Gateway) DoReload() {
+	if err := gw.DoReloadWithError(); err != nil {
+		mainLog.Errorf("Reload failed: %v", err)
+	}
+}
+
+// Backoff parameters for DoReloadWithRetry.
+const (
+	reloadRetryInitialInterval = 5 * time.Second
+	reloadRetryMaxInterval     = 60 * time.Second
+	reloadRetryMultiplier      = 2.0
+)
+
+// DoReloadWithRetry calls DoReloadWithError in an exponential-backoff retry
+// loop (5s → 10s → 20s → 40s → 60s cap). It is used at the two startup call
+// sites (Register and startServer) where a failed reload means the gateway has
+// zero APIs and policies and must keep retrying until the upstream recovers.
+//
+// The loop is intentionally NOT used in reloadLoop (the runtime hot-reload
+// path) because that goroutine must remain unblocked so that subsequent
+// pub/sub-triggered reloads can be processed without delay.
+func (gw *Gateway) DoReloadWithRetry(ctx context.Context) {
+	var b backoff.BackOff
+	if gw.reloadRetryBackoff != nil {
+		b = gw.reloadRetryBackoff()
+	} else {
+		eb := backoff.NewExponentialBackOff()
+		eb.InitialInterval = reloadRetryInitialInterval
+		eb.MaxInterval = reloadRetryMaxInterval
+		eb.MaxElapsedTime = 0 // never stop on elapsed time; only ctx or success stops it
+		eb.Multiplier = reloadRetryMultiplier
+		eb.Reset()
+		b = eb
+	}
+
+	err := backoff.Retry(func() error {
+		if err := gw.DoReloadWithError(); err != nil {
+			mainLog.Errorf("Reload failed, will retry: %v", err)
+			return err
+		}
+		return nil
+	}, backoff.WithContext(b, ctx))
+
+	if err != nil && ctx.Err() != nil {
+		mainLog.Warning("Reload retry abandoned: gateway shutting down")
+	}
 }
 
 func createCORSWrapper(spec *APISpec) func(handler http.HandlerFunc) http.HandlerFunc {
@@ -1494,7 +1643,7 @@ func (gw *Gateway) initSystem() error {
 
 	// Initialize the appropriate log formatter
 	if !gw.isRunningTests() && os.Getenv("TYK_LOGFORMAT") == "" && !*cli.DebugMode {
-		log.Formatter = logger.NewFormatter(gwConfig.LogFormat)
+		tyklog.SetupFormatter(gwConfig.LogFormat)
 		mainLog.Debugf("Set log format to %q", gwConfig.LogFormat)
 	}
 
@@ -1543,8 +1692,17 @@ func (gw *Gateway) initSystem() error {
 			return err
 		}
 
+		// Compile error override regex patterns and build indexed lookup
+		// Compilation failures are logged as warnings and those rules are skipped
+		compiled := CompileErrorOverrides(gwConfig.ErrorOverrides)
+		if compiled != nil {
+			gw.SetCompiledErrorOverrides(compiled)
+		}
+
 		gw.SetConfig(gwConfig)
-		gw.afterConfSetup()
+		if err := gw.afterConfSetup(); err != nil {
+			log.WithError(err).Fatal("Could not complete configuration setup.")
+		}
 	}
 
 	overrideTykErrors(gw)
@@ -1601,20 +1759,28 @@ func (gw *Gateway) initSystem() error {
 		}
 	}
 
-	if gwConfig.ProxySSLMaxVersion == 0 {
-		gwConfig.ProxySSLMaxVersion = tls.VersionTLS13
+	if tMin, tMax, err := resolveTLSVersions(gwConfig.ProxySSLMinVersion, gwConfig.ProxySSLMaxVersion); err != nil {
+		return fmt.Errorf("failed to resolve `proxy_ssl_min_version` and `proxy_ssl_max_version`: %w", err)
+	} else {
+		log.
+			WithField("proxy_ssl_min_version", tls.VersionName(tMin)).
+			WithField("proxy_ssl_max_version", tls.VersionName(tMax)).
+			Info("Proxy TLS protocol range resolved and applied")
+
+		gwConfig.ProxySSLMinVersion = tMin
+		gwConfig.ProxySSLMaxVersion = tMax
 	}
 
-	if gwConfig.ProxySSLMinVersion > gwConfig.ProxySSLMaxVersion {
-		gwConfig.ProxySSLMaxVersion = gwConfig.ProxySSLMinVersion
-	}
+	if tMin, tMax, err := resolveTLSVersions(gwConfig.HttpServerOptions.MinVersion, gwConfig.HttpServerOptions.MaxVersion); err != nil {
+		return fmt.Errorf("failed to resolve `http_server_options.min_version` and `http_server_options.max_version`: %w", err)
+	} else {
+		log.
+			WithField("http_server_options.min_version", tls.VersionName(tMin)).
+			WithField("http_server_options.max_version", tls.VersionName(tMax)).
+			Info("HttpServerOptions TLS protocol range resolved and applied")
 
-	if gwConfig.HttpServerOptions.MaxVersion == 0 {
-		gwConfig.HttpServerOptions.MaxVersion = tls.VersionTLS13
-	}
-
-	if gwConfig.HttpServerOptions.MinVersion > gwConfig.HttpServerOptions.MaxVersion {
-		gwConfig.HttpServerOptions.MaxVersion = gwConfig.HttpServerOptions.MinVersion
+		gwConfig.HttpServerOptions.MinVersion = tMin
+		gwConfig.HttpServerOptions.MaxVersion = tMax
 	}
 
 	if gwConfig.UseDBAppConfigs && gwConfig.Policies.PolicySource != config.DefaultDashPolicySource {
@@ -1638,6 +1804,9 @@ func (gw *Gateway) initSystem() error {
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
+
+	gw.limitHeaderFactory = rate.NewSenderFactory(gwConfig.RateLimitResponseHeaders)
+	gw.jwkCache = buildJWKSCache(gwConfig)
 
 	gw.initMembers(gwConfig)
 
@@ -1689,7 +1858,7 @@ func writePIDFile(file string) error {
 
 // afterConfSetup takes care of non-sensical config values (such as zero
 // timeouts) and sets up a few globals that depend on the config.
-func (gw *Gateway) afterConfSetup() {
+func (gw *Gateway) afterConfSetup() error {
 	conf := gw.GetConfig()
 
 	if conf.SlaveOptions.UseRPC {
@@ -1754,7 +1923,26 @@ func (gw *Gateway) afterConfSetup() {
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	gw.initGenericEventHandlers()
-	regexp.ResetCache(time.Second*time.Duration(conf.RegexpCacheExpire), !conf.DisableRegexpCache)
+	configureAutoMaxProcs(conf.DisableAutoMaxProcs)
+
+	maxEntries := conf.RegexpCacheMaxEntries
+	if maxEntries < 0 {
+		mainLog.Warnf("regex cache: RegexpCacheMaxEntries=%d is invalid; "+
+			"use disable_regexp_cache_bound=true to opt out of size eviction. Treating as default.", maxEntries)
+		maxEntries = 0
+	}
+	if conf.DisableRegexpCacheBound {
+		mainLog.Warnf("regex cache: size eviction disabled. Risk: user-driven pattern cardinality can OOM the gateway.")
+	}
+	cacheOpts := cache.LRUOptions{
+		TTL:        time.Second * time.Duration(conf.RegexpCacheExpire),
+		MaxEntries: maxEntries,
+		Unbounded:  conf.DisableRegexpCacheBound,
+		Enabled:    !conf.DisableRegexpCache,
+		Log:        mainLog.Warnf,
+	}
+	regexp.Configure(cacheOpts)
+	httputil.ConfigurePathRegexpCache(maxEntries, conf.DisableRegexpCacheBound, mainLog.Warnf)
 
 	if conf.HealthCheckEndpointName == "" {
 		conf.HealthCheckEndpointName = "hello"
@@ -1768,40 +1956,40 @@ func (gw *Gateway) afterConfSetup() {
 
 	conf.Secret, err = gw.kvStore(conf.Secret)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve the secret key...")
+		return fmt.Errorf("could not retrieve the secret key: %w", err)
 	}
 
 	conf.NodeSecret, err = gw.kvStore(conf.NodeSecret)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve the NodeSecret key...")
+		return fmt.Errorf("could not retrieve the node secret key: %w", err)
 	}
 
 	conf.Storage.Password, err = gw.kvStore(conf.Storage.Password)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve redis password...")
+		return fmt.Errorf("could not retrieve redis password: %w", err)
 	}
 
 	conf.CacheStorage.Password, err = gw.kvStore(conf.CacheStorage.Password)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve cache storage password...")
+		return fmt.Errorf("could not retrieve cache storage password: %w", err)
 	}
 
 	conf.Security.PrivateCertificateEncodingSecret, err = gw.kvStore(conf.Security.PrivateCertificateEncodingSecret)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve the private certificate encoding secret...")
+		return fmt.Errorf("could not retrieve the private certificate encoding secret: %w", err)
 	}
 
 	if conf.UseDBAppConfigs {
 		conf.DBAppConfOptions.ConnectionString, err = gw.kvStore(conf.DBAppConfOptions.ConnectionString)
 		if err != nil {
-			log.WithError(err).Fatal("Could not fetch dashboard connection string.")
+			return fmt.Errorf("could not fetch dashboard connection string: %w", err)
 		}
 	}
 
 	if conf.Policies.PolicySource == "service" {
 		conf.Policies.PolicyConnectionString, err = gw.kvStore(conf.Policies.PolicyConnectionString)
 		if err != nil {
-			log.WithError(err).Fatal("Could not fetch policy connection string.")
+			return fmt.Errorf("could not fetch policy connection string: %w", err)
 		}
 	}
 
@@ -1809,7 +1997,29 @@ func (gw *Gateway) afterConfSetup() {
 		conf.Private.EdgeOriginalAPIKeyPath = conf.SlaveOptions.APIKey
 		conf.SlaveOptions.APIKey, err = gw.kvStore(conf.SlaveOptions.APIKey)
 		if err != nil {
-			log.WithError(err).Fatalf("Could not retrieve API key from KV store.")
+			return fmt.Errorf("could not retrieve API key from KV store: %w", err)
+		}
+	}
+
+	// Retrieve OAuth mTLS certificate paths from KV store
+	if conf.ExternalServices.OAuth.MTLS.Enabled {
+		conf.ExternalServices.OAuth.MTLS.CertFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.CertFile, func(c *config.Config, v string) {
+			c.ExternalServices.OAuth.MTLS.CertFile = v
+		}, true)
+		if err != nil {
+			return fmt.Errorf("could not retrieve OAuth mTLS cert file path from KV store: %w", err)
+		}
+		conf.ExternalServices.OAuth.MTLS.KeyFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.KeyFile, func(c *config.Config, v string) {
+			c.ExternalServices.OAuth.MTLS.KeyFile = v
+		}, true)
+		if err != nil {
+			return fmt.Errorf("could not retrieve OAuth mTLS key file path from KV store: %w", err)
+		}
+		conf.ExternalServices.OAuth.MTLS.CAFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.CAFile, func(c *config.Config, v string) {
+			c.ExternalServices.OAuth.MTLS.CAFile = v
+		}, true)
+		if err != nil {
+			return fmt.Errorf("could not retrieve OAuth mTLS CA file path from KV store: %w", err)
 		}
 	}
 
@@ -1821,6 +2031,27 @@ func (gw *Gateway) afterConfSetup() {
 	}
 
 	gw.SetConfig(conf)
+	return nil
+}
+
+func (gw *Gateway) resolveKV(original string, set func(*config.Config, string), hotReload bool) (string, error) {
+	resolved, err := gw.kvStore(original)
+	if err != nil {
+		return original, err
+	}
+	if hotReload && resolved != original {
+		gw.kvResolvers = append(gw.kvResolvers, func() error {
+			val, err := gw.kvStore(original)
+			if err != nil {
+				return err
+			}
+			conf := gw.GetConfig()
+			set(&conf, val)
+			gw.SetConfig(conf)
+			return nil
+		})
+	}
+	return resolved, nil
 }
 
 func (gw *Gateway) kvStore(value string) (string, error) {
@@ -1864,6 +2095,12 @@ func (gw *Gateway) kvStore(value string) (string, error) {
 		}
 
 		return gw.vaultKVStore.Get(key)
+	}
+
+	if strings.HasPrefix(value, "file://") {
+		path := strings.TrimPrefix(value, "file://")
+		log.Debugf("Retrieving %s from kv file", path)
+		return ResolveFileKV(gw.GetConfig().KV.File.BasePath, path)
 	}
 
 	return value, nil
@@ -1924,7 +2161,7 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 	localStorage := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
 	localStorage.Connect()
 
-	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
+	logger := tyklog.Get().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		return storage.NewMdcbStorage(
@@ -2001,6 +2238,16 @@ func Start() {
 	go func() {
 		sig := <-sigChan
 		mainLog.Infof("Shutdown signal received: %v. Initiating graceful shutdown...", sig)
+
+		gw.shuttingDown.Store(true)
+		if gwConfig.GracefulShutdownDelaySeconds > 0 {
+			mainLog.Infof("Delaying graceful shutdown for %d seconds", gwConfig.GracefulShutdownDelaySeconds)
+
+			select {
+			case <-time.After(time.Duration(gwConfig.GracefulShutdownDelaySeconds) * time.Second):
+			}
+		}
+
 		cancel()
 
 		// we need to set default cfg value here as the ctx is created before the afterconf is executed
@@ -2172,6 +2419,7 @@ func (gw *Gateway) start() {
 
 		gw.RPCListener.Connect()
 		go gw.rpcReloadLoop(slaveOptions.RPCKey)
+		go gw.idpReloadLoop(slaveOptions.RPCKey)
 		go gw.RPCListener.StartRPCKeepaliveWatcher()
 		go gw.RPCListener.StartRPCLoopCheck(slaveOptions.RPCKey)
 	}
@@ -2275,7 +2523,9 @@ func (gw *Gateway) setupPortsWhitelist() {
 
 func (gw *Gateway) startServer() {
 	// Ensure that Control listener and default http listener running on first start
-	muxer := &proxyMux{}
+	muxer := &proxyMux{
+		track404Logs: gw.GetConfig().Track404Logs,
+	}
 
 	router := mux.NewRouter()
 	gw.loadControlAPIEndpoints(router)
@@ -2302,7 +2552,11 @@ func (gw *Gateway) startServer() {
 	mainLog.Info("--> Listening on port: ", gw.GetConfig().ListenPort)
 	mainLog.Info("--> PID: ", gw.hostDetails.PID)
 
-	gw.DoReload()
+	if gw.GetConfig().UseDBAppConfigs {
+		gw.DoReloadWithRetry(gw.ctx)
+	} else {
+		gw.DoReload()
+	}
 }
 
 func (gw *Gateway) GetConfig() config.Config {
@@ -2311,6 +2565,16 @@ func (gw *Gateway) GetConfig() config.Config {
 
 func (gw *Gateway) GetCertificateManager() certs.CertificateManager {
 	return gw.CertificateManager
+}
+
+// GetCompiledErrorOverrides returns the compiled error overrides for O(1) lookup.
+func (gw *Gateway) GetCompiledErrorOverrides() *CompiledErrorOverrides {
+	return gw.compiledErrorOverrides.Load()
+}
+
+// SetCompiledErrorOverrides stores the compiled error overrides.
+func (gw *Gateway) SetCompiledErrorOverrides(compiled *CompiledErrorOverrides) {
+	gw.compiledErrorOverrides.Store(compiled)
 }
 
 func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {

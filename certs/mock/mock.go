@@ -95,6 +95,21 @@ func (mr *MockCertificateManagerMockRecorder) FlushCache() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FlushCache", reflect.TypeOf((*MockCertificateManager)(nil).FlushCache))
 }
 
+// GetId mocks base method.
+func (m *MockCertificateManager) GetId(certData []byte) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetId", certData)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetId indicates an expected call of GetId.
+func (mr *MockCertificateManagerMockRecorder) GetId(certData any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetId", reflect.TypeOf((*MockCertificateManager)(nil).GetId), certData)
+}
+
 // GetRaw mocks base method.
 func (m *MockCertificateManager) GetRaw(certID string) (string, error) {
 	m.ctrl.T.Helper()

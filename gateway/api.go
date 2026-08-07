@@ -54,7 +54,6 @@ import (
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/certs"
@@ -594,6 +593,21 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 			}
 		}
 	} else {
+		// POST path (create). Reject a user-supplied custom key ID that would
+		// be unreachable at auth time: CheckSessionAndIdentityForValidKey uses
+		// `len(key) < MinTokenLength` (see middleware.go), so storing a key
+		// shorter than that length would succeed here but every subsequent
+		// auth attempt with the raw ID would silently 403 (AKI). Empty keyName
+		// is fine — generateToken below will produce a safe-length UUID envelope.
+		minLen := effectiveMinTokenLength(gw.GetConfig().MinTokenLength)
+		if keyName != "" && len(keyName) < minLen {
+			return apiError(fmt.Sprintf(
+				"custom key ID length %d is less than min_token_length (%d); "+
+					"the key would be unreachable at auth time. Use an ID of at least min_token_length characters, "+
+					"or lower min_token_length in the gateway configuration.",
+				len(keyName), minLen,
+			)), http.StatusBadRequest
+		}
 		newSession.DateCreated = time.Now()
 		keyName = gw.generateToken(newSession.OrgID, keyName)
 	}
@@ -1275,11 +1289,21 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 	defer gw.apisMu.RUnlock()
 
 	obj, code := gw.handleGetAPI(apiID, true)
-	if apiOAS, ok := obj.(*oas.OAS); ok && modePublic {
-		apiOAS.RemoveTykExtension()
-	}
-	return obj, code
+	if apiOAS, ok := obj.(*oas.OAS); ok {
+		// We have to operate on oas clone in order to preserve original state after any manipulations on schema.
+		oasClone, _ := apiOAS.Clone() // nolint:errcheck
+		if modePublic {
+			oasClone.RemoveTykExtension()
+		}
 
+		visitor := schema.NewVisitor()
+		visitor.AddSchemaManipulation(schema.RestoreUnicodeEscapesFromRE2Manipulation)
+		visitor.ProcessOAS(oasClone)
+
+		obj = oasClone
+	}
+
+	return obj, code
 }
 
 func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
@@ -1349,6 +1373,10 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 
 		newDef.IsOAS = true
 		oasObj.GetTykExtension().Info.ID = newDef.APIID
+		if errMsg, errCode := gw.validatePairedMCPAdapterUpstream(r, &oasObj); errMsg != "" {
+			return apiError(errMsg), errCode
+		}
+
 		err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
 		if err != nil {
 			return apiError(err.Error()), errCode
@@ -1427,6 +1455,9 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 		}
 
 		newDef.IsOAS = true
+		if errMsg, errCode := gw.validatePairedMCPAdapterUpstream(r, &oasObj); errMsg != "" {
+			return apiError(errMsg), errCode
+		}
 
 		err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
 		if err != nil {
@@ -1452,11 +1483,16 @@ func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefini
 	}
 
 	suffix := "-oas"
-	if apiDef.IsMCP() {
+	if apiDef.IsMCPManaged() {
 		suffix = "-mcp"
 	}
 
-	err, errCode = gw.writeToFile(fs, oasObj, apiDef.APIID+suffix)
+	oasDeepCopy, _ := oasObj.Clone() // nolint:errcheck
+	visitor := schema.NewVisitor()
+	visitor.AddSchemaManipulation(schema.RestoreUnicodeEscapesFromRE2Manipulation)
+	visitor.ProcessOAS(oasDeepCopy)
+
+	err, errCode = gw.writeToFile(fs, oasDeepCopy, apiDef.APIID+suffix)
 	if err != nil {
 		return
 	}
@@ -1505,6 +1541,12 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 	spec := gw.getApiSpec(apiID)
 	if resp, code := validateSpecExists(spec); resp != nil {
 		return resp, code
+	}
+
+	if !spec.IsMCPManaged() {
+		if pairedProxyIDs := gw.pairedMCPProxyIDsReferencingRESTSource(apiID); len(pairedProxyIDs) > 0 {
+			return apiError("API is referenced by paired MCP proxies: " + strings.Join(pairedProxyIDs, ", ")), http.StatusConflict
+		}
 	}
 
 	fs := afero.NewOsFs()
@@ -1628,11 +1670,6 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if oasAPI, ok := obj.(*oas.OAS); ok {
-		visitor := schema.NewVisitor()
-		visitor.AddSchemaManipulation(schema.RestoreUnicodeEscapesFromRE2Manipulation)
-		visitor.ProcessOAS(oasAPI)
-		obj = oasAPI
-
 		gw.setBaseAPIIDHeader(w, oasAPI)
 	}
 
@@ -3288,6 +3325,23 @@ func ctxGetCacheOptions(r *http.Request) *cacheOptions {
 	return key
 }
 
+// ctxSetMatchedBinding stores the client-IdP registry binding matched for this
+// request. JWTMiddleware is a single shared instance per API and its
+// ProcessRequest runs concurrently, so per-request state must live on the
+// context, not the middleware struct.
+func ctxSetMatchedBinding(r *http.Request, b *Binding) {
+	setCtxValue(r, ctx.MatchedIdPBinding, b)
+}
+
+// ctxGetMatchedBinding returns the matched binding for this request, or nil.
+func ctxGetMatchedBinding(r *http.Request) *Binding {
+	b, ok := r.Context().Value(ctx.MatchedIdPBinding).(*Binding)
+	if !ok {
+		return nil
+	}
+	return b
+}
+
 func ctxGetSession(r *http.Request) *user.SessionState {
 	return ctx.GetSession(r)
 }
@@ -3333,6 +3387,30 @@ func ctxGetRequestStartTime(r *http.Request) time.Time {
 		}
 	}
 	return time.Time{}
+}
+
+func ctxSetOriginalRequestPath(r *http.Request, path string) {
+	setCtxValue(r, ctx.OriginalRequestPath, path)
+}
+
+func ctxGetOriginalRequestPath(r *http.Request) string {
+	if v := r.Context().Value(ctx.OriginalRequestPath); v != nil {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+func withOriginalPathSpanAttribute(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if originalPath := ctxGetOriginalRequestPath(r); originalPath != "" {
+			span := otel.SpanFromContext(r.Context())
+			span.SetAttributes(otel.OriginalPathSpanAttribute(originalPath))
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
@@ -3692,6 +3770,11 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	visitor := schema.NewVisitor()
 	visitor.AddSchemaManipulation(schema.TransformUnicodeEscapesToRE2Manipulation)
 	visitor.ProcessOAS(&oasObj)
+
+	reqBodyInBytes, err = json.Marshal(&oasObj)
+	if err != nil {
+		return nil, nil, ErrRequestMalformed
+	}
 
 	return reqBodyInBytes, &oasObj, nil
 }

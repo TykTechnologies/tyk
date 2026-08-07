@@ -208,10 +208,47 @@ type StorageOptionsConf struct {
 	// Defaults to `false`.
 	CompressAPIDefinitions bool `json:"compress_api_definitions"`
 
-	// Maximum decompressed size (in bytes) for API definitions when using compression.
+	// When set to `true`, enables Zstd compression for policies stored in Redis RPC backups.
+	// This feature significantly reduces Redis memory usage in MDCB deployments where policies are cached locally on Data Plane Gateways.
+	// The Gateway can read both compressed and uncompressed formats for backward compatibility.
+	//
+	// You can safely enable this setting on existing deployments.
+	// The Gateway continues to load previously stored uncompressed backups and stores all new backups in compressed form.
+	//
+	// Note: The maximum decompressed size is controlled by `max_decompressed_size`.
+	//
+	// Defaults to `false`.
+	CompressPolicies bool `json:"compress_policies"`
+
+	// Maximum decompressed size (in bytes) for API definitions and Policies when using compression.
 	// This limit prevents memory exhaustion during decompression.
 	// Defaults to 104857600 (100MB).
 	MaxDecompressedSize int64 `json:"max_decompressed_size"`
+
+	// Configure the cloud provider's Identity and Access Management (IAM)
+	// authentication solution for temporal storage (for example, GCP MemoryStore IAM)
+	// instead of the traditional fixed username and password.
+	IAMAuth IAMAuthConfig `json:"iam_auth"`
+}
+
+// Configure the cloud provider's Identity and Access Management (IAM) authentication
+// for temporal storage (Redis/Valkey). If enabled, the standard username and password are ignored.
+type IAMAuthConfig struct {
+	// Set to true to use IAM-based authentication for this storage connection.
+	Enabled bool `json:"enabled"`
+	// Provider selects the cloud IAM provider. Currently supported: "gcp"
+	// (GCP Memorystore for Valkey and Redis Cluster).
+	Provider string `json:"provider"`
+	// ServiceAccount, for GCP, optionally impersonates this service account to
+	// mint tokens instead of using the ambient Application Default Credentials
+	// identity. Leave empty to use the workload's own identity (Workload Identity
+	// on GKE, or GOOGLE_APPLICATION_CREDENTIALS).
+	ServiceAccount string `json:"service_account"`
+	// The access token issued by the IAM will be refreshed before expiry.
+	// Set the time period before expiry when that refresh will take place as
+	// a human readable duration (for example "2m30s", "5m").
+	// Defaults to "5m" (five minutes) when empty.
+	TokenRefreshBeforeExpiry string `json:"token_refresh_before_expiry"`
 }
 
 type NormalisedURLConfig struct {
@@ -311,7 +348,9 @@ type AccessLogsConfig struct {
 	//
 	// Template Options:
 	//
+	// - `api_id` will include the API ID.
 	// - `api_key` will include the obfuscated or hashed key.
+	// - `api_name` will include the API name.
 	// - `circuit_breaker_state` will include the circuit breaker state when applicable.
 	// - `client_ip` will include the IP of the request.
 	// - `error_source` will include the source of an error (e.g., ReverseProxy).
@@ -321,6 +360,7 @@ type AccessLogsConfig struct {
 	// - `latency_total` will include the total latency of the request.
 	// - `method` will include the request method.
 	// - `org_id` will include the organization ID.
+	// - `original_path` will include the original request path before URL rewrites.
 	// - `path` will include the path of the request.
 	// - `protocol` will include the protocol of the request.
 	// - `remote_addr` will include the remote address of the request.
@@ -599,10 +639,12 @@ type HttpServerOptionsConfig struct {
 	// Start your Gateway HTTP server on specific server name
 	ServerName string `json:"server_name"`
 
-	// Minimum TLS version. Possible values: https://tyk.io/docs/api-management/certificates#supported-tls-versions
+	// Minimum TLS version is inherited from Go library, but can be overridden here.
+	// For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-&-cipher-suites
 	MinVersion uint16 `json:"min_version"`
 
-	// Maximum TLS version.
+	// Maximum TLS version is inherited from Go library, but can be overridden here.
+	// For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-&-cipher-suites
 	MaxVersion uint16 `json:"max_version"`
 
 	// When mTLS enabled, this option allows to skip client CA announcement in the TLS handshake.
@@ -611,7 +653,7 @@ type HttpServerOptionsConfig struct {
 	SkipClientCAAnnouncement bool `json:"skip_client_ca_announcement"`
 
 	// Set this to the number of seconds that Tyk uses to flush content from the proxied upstream connection to the open downstream connection.
-	// This option needed be set for streaming protocols like Server Side Events, or gRPC streaming.
+	// This option needs to be set for streaming protocols like gRPC streaming.
 	FlushInterval int `json:"flush_interval"`
 
 	// Allow the use of a double slash in a URL path. This can be useful if you need to pass raw URLs to your API endpoints.
@@ -1104,6 +1146,10 @@ type Config struct {
 	//to finish before shutting down the server. Defaults to 30 seconds.
 	GracefulShutdownTimeoutDuration int `json:"graceful_shutdown_timeout_duration"`
 
+	// GracefulShutdownDelaySeconds sets how many seconds the gateway will wait before proceeding with a graceful shutdown.
+	// During delay and shutdown the readiness endpoint will respond with 503 StatusServiceUnavailable.
+	GracefulShutdownDelaySeconds int `json:"graceful_shutdown_delay_seconds"`
+
 	// Change the expiry time of a refresh token. By default 14 days (in seconds).
 	OauthRefreshExpire int64 `json:"oauth_refresh_token_expire"`
 
@@ -1158,6 +1204,23 @@ type Config struct {
 	// If you set `disable_regexp_cache` to `false`, you can use this setting to limit how long the regular expression cache is kept for in seconds.
 	// The default is 60 seconds. This must be a positive value. If you set to 0 this uses the default value.
 	RegexpCacheExpire int32 `json:"regexp_cache_expire"`
+
+	// RegexpCacheMaxEntries caps the per-cache LRU size for the regex
+	// compile caches. Defaults to 5000 when unset (0).
+	// To opt into the legacy unbounded cache, set `disable_regexp_cache_bound` to true instead.
+	RegexpCacheMaxEntries int `json:"regexp_cache_max_entries"`
+
+	// DisableRegexpCacheBound opts into the legacy unbounded regex compile
+	// cache (no size eviction). Only safe when the distinct-pattern keyspace
+	// is naturally bounded by API/session shape. The default (`false`) keeps the LRU bound active.
+	DisableRegexpCacheBound bool `json:"disable_regexp_cache_bound"`
+
+	// DisableAutoMaxProcs opts out of `automaxprocs` GOMAXPROCS adjustment.
+	// By default Tyk aligns GOMAXPROCS with the container's cgroup CPU quota
+	// Set to `true` only if you are pinning GOMAXPROCS yourself or
+	// running outside a CPU-quota-aware environment. No-op outside cgroup
+	// CPU-quota environments either way.
+	DisableAutoMaxProcs bool `json:"disable_auto_max_procs"`
 
 	// Tyk can cache some data locally, this can speed up lookup times on a single node and lower the number of connections and operations being done on Redis. It will however introduce a slight delay when updating or modifying keys as the cache must expire.
 	// This does not affect rate limiting.
@@ -1225,9 +1288,10 @@ type Config struct {
 	// If not set or left empty, it will default to `info`.
 	LogLevel string `json:"log_level"`
 
-	// You can now configure the log format to be either the standard or json format
-	// If not set or left empty, it will default to `standard`.
-	LogFormat string `json:"log_format"`
+	// Configures the output format used for application logs.
+	// Allowed values are `text`, `json`, or `legacy`.
+	// If not set or left empty, it defaults to `text`.
+	LogFormat logger.Format `json:"log_format"`
 
 	// AccessLogs configures the output for access logs.
 	// If not configured, the access log is disabled.
@@ -1310,6 +1374,7 @@ type Config struct {
 	KV struct {
 		Consul ConsulConfig `json:"consul"`
 		Vault  VaultConfig  `json:"vault"`
+		File   FileConfig   `json:"file"`
 	} `json:"kv"`
 
 	// Secrets configures a list of key/value pairs for the gateway.
@@ -1349,6 +1414,25 @@ type Config struct {
 	// ```
 	OverrideMessages map[string]TykError `bson:"override_messages" json:"override_messages"`
 
+	// ErrorOverrides allows you to customize the error responses that the Gateway will return to API clients.
+	// This configuration will be used to override both Gateway-generated errors (e.g. authentication failures, rate limits, validation errors)
+	// and errors returned by the upstream service (4xx/5xx responses from backend APIs).
+	// Rules are organized by HTTP status code and can include additional matching criteria.
+	// These rules will be superseded by any overrides configured in the API definition
+	//
+	// Sample Override Setting
+	// ```
+	// "error_overrides": {
+	//   "500": [{
+	//     "response": {
+	//       "status_code": 503,
+	//       "body": "{\"error\": \"Service temporarily unavailable\"}"
+	//     }
+	//   }]
+	// }
+	// ```
+	ErrorOverrides apidef.ErrorOverridesMap `json:"error_overrides,omitempty"`
+
 	// Cloud flag shows the Gateway runs in Tyk Cloud.
 	Cloud bool `json:"cloud"`
 
@@ -1375,7 +1459,9 @@ type Config struct {
 	// JWKS holds the configuration for Tyk JWKS functionalities
 	JWKS JWKSConfig `json:"jwks"`
 
-	// AllowUnsafePolicyIds allows unsafe policy identifiers
+	// AllowUnsafePolicyIds allows the use of non-standard characters in policy identifiers (default: false).
+	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
+	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
 	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
 }
 
@@ -1415,6 +1501,16 @@ type ResourceSyncConfig struct {
 type TykError struct {
 	Message string `json:"message"`
 	Code    int    `json:"code"`
+}
+
+// FileConfig configures the file-based KV provider.
+type FileConfig struct {
+	// BasePath is the directory that file:// and $secret_file.<key> references are
+	// resolved relative to. It is a mandatory security boundary: when set, <key>
+	// must be a relative path that stays within this directory (absolute paths and
+	// ".." traversal are rejected). When empty, file:// references are disabled and
+	// every key is rejected.
+	BasePath string `json:"base_path"`
 }
 
 // VaultConfig is used to configure the creation of a client

@@ -81,6 +81,17 @@ func (a *Record) WithTraceID(req *http.Request) *Record {
 	return a
 }
 
+// WithOriginalPath adds the original client request path to the access log record.
+// The original path is only added if a non-empty value exists in the request context.
+func (a *Record) WithOriginalPath(req *http.Request) *Record {
+	if v := req.Context().Value(ctx.OriginalRequestPath); v != nil {
+		if path, ok := v.(string); ok && path != "" {
+			a.fields["original_path"] = path
+		}
+	}
+	return a
+}
+
 // WithAPIID adds API identification fields to the access log record.
 func (a *Record) WithAPIID(apiID, apiName, orgID string) *Record {
 	if apiID != "" {

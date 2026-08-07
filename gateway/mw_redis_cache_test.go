@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"hash"
+	"io"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -22,8 +23,11 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestRedisCacheMiddlewareUnit(t *testing.T) {
@@ -118,11 +122,7 @@ func TestRedisCacheMiddleware(t *testing.T) {
 	check := func(t *testing.T, p params) {
 		subCheck := func(t *testing.T, cachingActive bool, p params) {
 			t.Helper()
-			headersMatch := make(map[string]string)
-			if cachingActive {
-				headersMatch["x-tyk-cached-response"] = "1"
-				p.transferEncoding = nil
-			}
+			requestPath := p.path + "?cache-test=" + uuid.NewHex()
 
 			ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
 				response, err := base64.StdEncoding.DecodeString(record.RawResponse)
@@ -131,10 +131,45 @@ func TestRedisCacheMiddleware(t *testing.T) {
 				assert.Contains(t, string(response), p.bodyMatch)
 			}
 
-			resp, _ := ts.Run(t, []test.TestCase{
-				{Path: p.path, BodyMatch: p.bodyMatch, Code: http.StatusOK},
-				{Path: p.path, HeadersMatch: headersMatch, BodyMatch: p.bodyMatch, Code: http.StatusOK},
-			}...)
+			resp, _ := ts.Run(t, test.TestCase{
+				Path: requestPath, BodyMatch: p.bodyMatch, Code: http.StatusOK,
+			})
+
+			if cachingActive {
+				client := &http.Client{}
+				defer client.CloseIdleConnections()
+
+				var cachedBody string
+				require.Eventually(t, func() bool {
+					req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, ts.URL+requestPath, nil)
+					if err != nil {
+						return false
+					}
+
+					candidate, err := client.Do(req)
+					if err != nil {
+						return false
+					}
+
+					body, readErr := io.ReadAll(candidate.Body)
+					closeErr := candidate.Body.Close()
+					if readErr != nil || closeErr != nil || candidate.Header.Get(cachedResponseHeader) != "1" {
+						return false
+					}
+
+					resp = candidate
+					cachedBody = string(body)
+					return true
+				}, 5*time.Second, 10*time.Millisecond, "response was not stored in cache")
+
+				p.transferEncoding = nil
+				require.Equal(t, http.StatusOK, resp.StatusCode)
+				require.Contains(t, cachedBody, p.bodyMatch)
+			} else {
+				resp, _ = ts.Run(t, test.TestCase{
+					Path: requestPath, BodyMatch: p.bodyMatch, Code: http.StatusOK,
+				})
+			}
 
 			assert.Equal(t, p.transferEncoding, resp.TransferEncoding)
 			assert.Equal(t, p.uncompressed, resp.Uncompressed)
@@ -282,6 +317,79 @@ func TestRedisCacheMiddlewareV2(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRedisCacheMiddleware_RateLimitHeaders(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.RateLimitResponseHeaders = config.SourceQuotas
+	})
+	defer ts.Close()
+
+	ts.AddDynamicHandler("upstream-with-rl-headers", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set(header.XRateLimitLimit, "999")
+		w.Header().Set(header.XRateLimitRemaining, "998")
+		w.Header().Set(header.XRateLimitReset, "1234567890")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/cache-rl-test"
+		spec.Proxy.TargetURL = TestHttpAny + "/upstream-with-rl-headers"
+		spec.Proxy.StripListenPath = true
+		spec.UseKeylessAccess = false
+
+		spec.CacheOptions.CacheTimeout = 60
+		spec.CacheOptions.EnableCache = true
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			// Matching the stripped listen path and all subpaths
+			v.ExtendedPaths.Cached = []string{"/(.*)"}
+		})
+	})[0]
+
+	_, authKey := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{
+			api.APIID: {
+				APIName: api.Name,
+				APIID:   api.APIID,
+				Limit: user.APILimit{
+					QuotaMax:         10,
+					QuotaRenewalRate: 60,
+				},
+			},
+		}
+	})
+
+	authHeader := map[string]string{header.Authorization: authKey}
+
+	resp1, _ := ts.Run(t, []test.TestCase{
+		{
+			Headers: authHeader,
+			Path:    "/cache-rl-test",
+			Code:    http.StatusOK,
+			HeadersNotMatch: map[string]string{
+				cachedResponseHeader: "1",
+			},
+		},
+	}...)
+
+	assert.Equal(t, "10", resp1.Header.Get(header.XRateLimitLimit))
+	assert.Equal(t, "9", resp1.Header.Get(header.XRateLimitRemaining))
+	assert.Len(t, resp1.Header.Values(header.XRateLimitLimit), 1)
+
+	resp2, _ := ts.Run(t, []test.TestCase{
+		{
+			Headers: authHeader,
+			Path:    "/cache-rl-test",
+			Code:    http.StatusOK,
+			HeadersMatch: map[string]string{
+				cachedResponseHeader: "1",
+			},
+		},
+	}...)
+
+	assert.Equal(t, "10", resp2.Header.Get(header.XRateLimitLimit))
+	assert.Equal(t, "8", resp2.Header.Get(header.XRateLimitRemaining))
+	assert.Len(t, resp2.Header.Values(header.XRateLimitLimit), 1)
 }
 
 func Test_isSafeMethod(t *testing.T) {

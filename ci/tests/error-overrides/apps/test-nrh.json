@@ -1,0 +1,24 @@
+{
+  "name": "Test NRH - No Route to Host",
+  "api_id": "test-nrh",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-nrh/",
+    "target_url": "http://10.255.255.1:9999",
+    "strip_listen_path": true,
+    "transport": {
+      "dial_timeout": 5
+    }
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  }
+}

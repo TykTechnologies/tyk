@@ -1,6 +1,8 @@
 package storage
 
-import "testing"
+import (
+	"testing"
+)
 
 func Test_TokenOrg(t *testing.T) {
 	tcs := []struct {

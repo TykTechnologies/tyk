@@ -92,7 +92,6 @@ func (cache *Cache) startCleanupTimer(ctx context.Context) {
 		case <-ticker.C:
 			cache.cleanup()
 		}
-		break
 	}
 done:
 	cache.clear()

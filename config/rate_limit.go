@@ -37,7 +37,19 @@ type RateLimit struct {
 
 	// Controls which algorthm to use as a fallback when your distributed rate limiter can't be used.
 	DRLEnableSentinelRateLimiter bool `json:"drl_enable_sentinel_rate_limiter"`
+
+	// RateLimitResponseHeaders specifies the data source for rate limit headers in HTTP responses.
+	// This controls whether rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining, etc.)
+	// are populated from quota data or rate limit data. Valid values: "quotas", "rate_limits".
+	RateLimitResponseHeaders RateLimitSource `json:"rate_limit_response_headers"`
 }
+
+type RateLimitSource string
+
+const (
+	SourceQuotas     RateLimitSource = "quotas"
+	SourceRateLimits RateLimitSource = "rate_limits"
+)
 
 // String returns a readable setting for the rate limiter in effect.
 func (r *RateLimit) String() string {

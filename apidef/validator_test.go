@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
 func TestValidationResult_HasErrors(t *testing.T) {
@@ -417,6 +420,70 @@ func TestRuleValidateEnforceTimeout_Validate(t *testing.T) {
 	}
 }
 
+func TestRuleValidateGlobalEnforceTimeout_Validate(t *testing.T) {
+	ruleSet := ValidationRuleSet{
+		&RuleValidateGlobalEnforceTimeout{},
+	}
+
+	testCases := []struct {
+		name   string
+		apiDef *APIDefinition
+		result ValidationResult
+	}{
+		{
+			name:   "zero (not configured) is valid",
+			apiDef: &APIDefinition{},
+			result: ValidationResult{IsValid: true},
+		},
+		{
+			name: "positive duration is valid",
+			apiDef: &APIDefinition{
+				VersionData: VersionData{Versions: map[string]VersionInfo{
+					"Default": {GlobalEnforceTimeout: tyktime.ReadableDuration(5 * time.Second)},
+				}},
+			},
+			result: ValidationResult{IsValid: true},
+		},
+		{
+			name: "sub-second (1ms) is valid",
+			apiDef: &APIDefinition{
+				VersionData: VersionData{Versions: map[string]VersionInfo{
+					"Default": {GlobalEnforceTimeout: tyktime.ReadableDuration(time.Millisecond)},
+				}},
+			},
+			result: ValidationResult{IsValid: true},
+		},
+		{
+			name: "negative duration is invalid",
+			apiDef: &APIDefinition{
+				VersionData: VersionData{Versions: map[string]VersionInfo{
+					"Default": {GlobalEnforceTimeout: tyktime.ReadableDuration(-1 * time.Second)},
+				}},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrInvalidGlobalTimeoutValue},
+			},
+		},
+		{
+			name: "negative sub-second is invalid",
+			apiDef: &APIDefinition{
+				VersionData: VersionData{Versions: map[string]VersionInfo{
+					"Default": {GlobalEnforceTimeout: tyktime.ReadableDuration(-500 * time.Millisecond)},
+				}},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrInvalidGlobalTimeoutValue},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, runValidationTest(tc.apiDef, ruleSet, tc.result))
+	}
+}
+
 func TestRuleUpstreamAuth_Validate(t *testing.T) {
 	ruleSet := ValidationRuleSet{
 		&RuleUpstreamAuth{},
@@ -496,6 +563,60 @@ func TestRuleUpstreamAuth_Validate(t *testing.T) {
 			result: ValidationResult{
 				IsValid: false,
 				Errors:  []error{ErrInvalidUpstreamOAuthAuthorizationType},
+			},
+		},
+		{
+			name: "invalid client authentication method",
+			upstreamAuth: UpstreamAuth{
+				Enabled: true,
+				OAuth: UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypeClientCredentials},
+					ClientCredentials: ClientCredentials{
+						ClientAuthData: ClientAuthData{Method: "client_secret_jwt"},
+					},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrInvalidUpstreamOAuthClientAuthMethod},
+			},
+		},
+		{
+			name: "invalid client authentication method on password grant",
+			upstreamAuth: UpstreamAuth{
+				Enabled: true,
+				OAuth: UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypePassword},
+					PasswordAuthentication: PasswordAuthentication{
+						ClientAuthData: ClientAuthData{Method: "bogus"},
+					},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrInvalidUpstreamOAuthClientAuthMethod},
+			},
+		},
+		{
+			name: "valid client authentication methods",
+			upstreamAuth: UpstreamAuth{
+				Enabled: true,
+				OAuth: UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypeClientCredentials},
+					ClientCredentials: ClientCredentials{
+						ClientAuthData: ClientAuthData{Method: OAuth2ClientAuthPost},
+					},
+					PasswordAuthentication: PasswordAuthentication{
+						ClientAuthData: ClientAuthData{Method: OAuth2ClientAuthBasic},
+					},
+				},
+			},
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
 			},
 		},
 	}

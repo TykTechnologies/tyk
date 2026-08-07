@@ -31,6 +31,7 @@ var validDimensionSources = map[string]bool{
 	"header":          true,
 	"context":         true,
 	"response_header": true,
+	"config_data":     true,
 }
 
 // statusCodeClassPattern matches class patterns like "2xx", "4xx", "5xx".
@@ -77,7 +78,7 @@ func ValidateDefinitions(defs []APIMetricDefinition) (warnings []string, err err
 			dimPrefix := fmt.Sprintf("%s.dimensions[%d]", prefix, j)
 
 			if !validDimensionSources[dim.Source] {
-				return warnings, fmt.Errorf("%s: source must be one of metadata, session, header, context, response_header; got %q", dimPrefix, dim.Source)
+				return warnings, fmt.Errorf("%s: source must be one of metadata, session, header, context, response_header, config_data; got %q", dimPrefix, dim.Source)
 			}
 
 			if dim.Key == "" {
@@ -94,7 +95,7 @@ func ValidateDefinitions(defs []APIMetricDefinition) (warnings []string, err err
 					return warnings, fmt.Errorf("%s: unknown session key %q", dimPrefix, dim.Key)
 				}
 			}
-			// header, context, response_header accept any non-empty key (already checked above).
+			// header, context, response_header, config_data accept any non-empty key (already checked above).
 		}
 
 		if len(def.Dimensions) > 10 {

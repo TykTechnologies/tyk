@@ -9,12 +9,9 @@ type regexpByteRetBoolCache struct {
 	*cache
 }
 
-func newRegexpByteRetBoolCache(ttl time.Duration, isEnabled bool) *regexpByteRetBoolCache {
+func newRegexpByteRetBoolCache(ttl time.Duration, maxEntries int, isEnabled bool, name string, reporter evictionReporter) *regexpByteRetBoolCache {
 	return &regexpByteRetBoolCache{
-		cache: newCache(
-			ttl,
-			isEnabled,
-		),
+		cache: newCacheWithSize(ttl, maxEntries, isEnabled, name, reporter),
 	}
 }
 

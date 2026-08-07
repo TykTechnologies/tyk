@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"crypto/tls"
 	"strings"
 	"testing"
 
@@ -247,6 +248,13 @@ func Test_shouldReloadSpec(t *testing.T) {
 	t.Run("checksum mismatch", func(t *testing.T) {
 		t.Parallel()
 		existingSpec, newSpec := &APISpec{Checksum: "1"}, &APISpec{Checksum: "2"}
+		assert.True(t, shouldReloadSpec(existingSpec, newSpec))
+	})
+
+	t.Run("synthetic rest as mcp adapter", func(t *testing.T) {
+		t.Parallel()
+		existingSpec := &APISpec{Checksum: "1", MCPAdapter: MCPAdapterRuntime{Synthetic: true}}
+		newSpec := &APISpec{Checksum: "1", MCPAdapter: MCPAdapterRuntime{Synthetic: true}}
 		assert.True(t, shouldReloadSpec(existingSpec, newSpec))
 	})
 
@@ -549,4 +557,160 @@ func TestContainsEscapedCharacters(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_resolveTLSVersions(t *testing.T) {
+	tests := []struct {
+		name    string
+		uMin    uint16
+		uMax    uint16
+		wantMin uint16
+		wantMax uint16
+		wantErr bool
+	}{
+		{
+			name:    "Both empty - returns defaults",
+			uMin:    0,
+			uMax:    0,
+			wantMin: tls.VersionTLS12,
+			wantMax: tls.VersionTLS13,
+			wantErr: false,
+		},
+		{
+			name:    "Only Min defined (small) - Max stays default",
+			uMin:    tls.VersionTLS11,
+			uMax:    0,
+			wantMin: tls.VersionTLS11,
+			wantMax: tls.VersionTLS13,
+			wantErr: false,
+		},
+		{
+			name:    "Only Min defined (high) - returns error",
+			uMin:    tls.VersionTLS13 + 1,
+			uMax:    0,
+			wantMin: 0,
+			wantMax: 0,
+			wantErr: true,
+		},
+		{
+			name:    "Only Max defined (high) - Min stays default",
+			uMin:    0,
+			uMax:    tls.VersionTLS13,
+			wantMin: tls.VersionTLS12,
+			wantMax: tls.VersionTLS13,
+			wantErr: false,
+		},
+		{
+			name:    "Only Max defined (low) - returns error",
+			uMin:    0,
+			uMax:    tls.VersionTLS11,
+			wantMin: 0,
+			wantMax: 0,
+			wantErr: true,
+		},
+		{
+			name:    "Both defined valid - returns user values",
+			uMin:    tls.VersionTLS12,
+			uMax:    tls.VersionTLS12,
+			wantMin: tls.VersionTLS12,
+			wantMax: tls.VersionTLS12,
+			wantErr: false,
+		},
+		{
+			name:    "Both defined invalid - returns error",
+			uMin:    tls.VersionTLS13,
+			uMax:    tls.VersionTLS12,
+			wantMin: 0,
+			wantMax: 0,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotMin, gotMax, err := resolveTLSVersions(tt.uMin, tt.uMax)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.Equal(t, tt.wantMin, gotMin)
+			assert.Equal(t, tt.wantMax, gotMax)
+		})
+	}
+}
+
+func Test_jsonEscapeString(t *testing.T) {
+
+	t.Run("business logic", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			input    string
+			expected string
+		}{
+			{
+				name:     "Empty string",
+				input:    "",
+				expected: "",
+			},
+			{
+				name:     "Clean text",
+				input:    "plain text",
+				expected: "plain text",
+			},
+			{
+				name:     "Single quote",
+				input:    "O'Connor",
+				expected: "O'Connor",
+			},
+			{
+				name:     "Double quote",
+				input:    `Critical "error"`,
+				expected: `Critical \"error\"`,
+			},
+			{
+				name:     "Backslash",
+				input:    `C:\Windows\System32`,
+				expected: `C:\\Windows\\System32`,
+			},
+			{
+				name:     "Standard control characters",
+				input:    "Line1\nLine2\r\tTab",
+				expected: `Line1\nLine2\r\tTab`,
+			},
+			{
+				name:     "Low control characters",
+				input:    "Char\x00 and char\x1F",
+				expected: `Char\u0000 and char\u001f`,
+			},
+			{
+				name:     "UTF-8 multi-byte characters",
+				input:    "señor pomidor 🚀",
+				expected: "señor pomidor 🚀",
+			},
+			{
+				name:     "Complex combination",
+				input:    `"O'Connor"` + "\n\t\x07\\",
+				expected: `\"O'Connor\"\n\t\u0007\\`,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				got := jsonEscapeString(tt.input)
+				assert.Equal(t, tt.expected, got)
+			})
+		}
+	})
+
+	t.Run("zero allocation", func(t *testing.T) {
+		input := "Clean text O'Connor without characters requiring escape"
+
+		allocs := testing.AllocsPerRun(100, func() {
+			_ = jsonEscapeString(input)
+		})
+
+		assert.Zero(t, allocs)
+	})
 }

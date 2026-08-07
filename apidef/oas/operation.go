@@ -86,6 +86,14 @@ type Operation struct {
 
 	// RateLimit contains endpoint level rate limit configuration.
 	RateLimit *RateLimitEndpoint `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
+
+	// ScopeCheck toggles the operation-level OAuth 2.0 scope check.
+	ScopeCheck *ScopeCheck `bson:"scopeCheck,omitempty" json:"scopeCheck,omitempty"`
+
+	// Exchange overrides the matched OAuth 2.0 token-exchange provider's
+	// default target for this operation. Read by the EE token-exchange
+	// middleware; not propagated to the classic apidef (OAS-native field).
+	Exchange *OAuth2Exchange `bson:"exchange,omitempty" json:"exchange,omitempty"`
 }
 
 // ExtractToExtendedPaths extracts operation-level middleware configuration into a classic

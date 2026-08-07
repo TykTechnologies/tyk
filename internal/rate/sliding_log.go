@@ -2,12 +2,26 @@ package rate
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"strconv"
 	"time"
 
+	"github.com/samber/lo"
+
 	"github.com/TykTechnologies/tyk/internal/rate/model"
 	"github.com/TykTechnologies/tyk/internal/redis"
+)
+
+//go:embed scripts/*.lua
+var fs embed.FS
+
+func mustScript(path string) *redis.Script {
+	return redis.NewScript(string(lo.Must(fs.ReadFile(path))))
+}
+
+var (
+	slidingLogAdd = mustScript("scripts/sliding_log_add.lua")
 )
 
 // SlidingLog implements sliding log storage in redis.
@@ -76,23 +90,18 @@ func (r *SlidingLog) SetCount(ctx context.Context, now time.Time, keyName string
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 
 	var res *redis.IntCmd
-
-	pipeFn := func(pipe redis.Pipeliner) error {
+	if err := r.ExecPipeline(ctx, func(pipe redis.Pipeliner) error {
 		pipe.ZRemRangeByScore(ctx, keyName, "-inf", strconv.Itoa(int(onePeriodAgo.UnixNano())))
 		res = pipe.ZCard(ctx, keyName)
 
-		element := redis.Z{
+		pipe.ZAdd(ctx, keyName, redis.Z{
 			Score:  float64(now.UnixNano()),
 			Member: strconv.Itoa(int(now.UnixNano())),
-		}
+		})
 
-		pipe.ZAdd(ctx, keyName, element)
 		pipe.Expire(ctx, keyName, time.Duration(per)*time.Second)
-
 		return nil
-	}
-
-	if err := r.ExecPipeline(ctx, pipeFn); err != nil {
+	}); err != nil {
 		return 0, err
 	}
 
@@ -174,10 +183,72 @@ func (r *SlidingLog) Get(ctx context.Context, now time.Time, keyName string, per
 // returns an error if any occurred. In case an error occurs, the first value will be `true`.
 // If there are issues with storage availability for example, requests will be blocked rather
 // than let through, as no rate limit can be enforced without storage.
-func (r *SlidingLog) Do(ctx context.Context, now time.Time, key string, maxAllowedRate int64, per int64) (bool, error) {
-	currentRate, err := r.SetCount(ctx, now, key, per)
+func (r *SlidingLog) Do(ctx context.Context, now time.Time, key string, maxAllowed, per int64) (Stats, bool, error) {
+	stats, err := r.SetCountScript(ctx, now, key, maxAllowed, per)
+
 	if err != nil {
-		return true, err
+		return NewEmptyStats(), true, err
 	}
-	return r.smoothingFn(ctx, key, currentRate, maxAllowedRate), err
+
+	return stats, r.smoothingFn(ctx, key, int64(stats.Count), maxAllowed), err
+}
+
+// SetCountScript get current window occupation
+// Deprecated is not complete
+func (r *SlidingLog) SetCountScript(
+	ctx context.Context,
+	now time.Time,
+	key string,
+	maxAllowed, per int64,
+) (Stats, error) {
+
+	now = now.Local()
+	windowStart := now.Add(time.Second * time.Duration(-1*per))
+
+	cmd := slidingLogAdd.Run(
+		ctx, r.conn, []string{key},
+		strconv.FormatInt(now.UnixNano(), 10),
+		strconv.FormatInt(windowStart.UnixNano(), 10),
+		maxAllowed,
+		per,
+	)
+
+	if cmd.Err() != nil {
+		return NewEmptyStats(), cmd.Err()
+	}
+
+	res, err := cmd.Slice()
+	if err != nil {
+		return NewEmptyStats(), err
+	}
+
+	count := res[0].(int64)                                  // nolint:errcheck
+	remaining := res[1].(int64)                              // nolint:errcheck
+	nanoTs, err := strconv.ParseInt(res[2].(string), 10, 64) // nolint:errcheck
+
+	if err != nil {
+		return NewEmptyStats(), err
+	}
+
+	earliestLog := time.Unix(nanoTs/1e9, nanoTs%1e9).Local()
+
+	nextAvailableSlotAt := earliestLog.Add(time.Duration(per) * time.Second)
+
+	var reset time.Duration
+	if remaining > 0 {
+		reset = 0
+	} else {
+		reset = nextAvailableSlotAt.Sub(now)
+	}
+
+	if reset < 0 {
+		reset = 0
+	}
+
+	return Stats{
+		Count:     int(count),
+		Remaining: int(remaining),
+		Limit:     int(maxAllowed),
+		Reset:     reset,
+	}, nil
 }

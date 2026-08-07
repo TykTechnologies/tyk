@@ -1,0 +1,24 @@
+{
+  "name": "Test UCT - Connection Timeout",
+  "api_id": "test-uct",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-uct/",
+    "target_url": "http://10.255.255.1:80",
+    "strip_listen_path": true,
+    "transport": {
+      "dial_timeout": 2
+    }
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  }
+}

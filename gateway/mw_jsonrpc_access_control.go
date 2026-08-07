@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 )
 
@@ -53,7 +54,7 @@ func (m *JSONRPCAccessControlMiddleware) ProcessRequest(w http.ResponseWriter, r
 		return nil, http.StatusOK
 	}
 
-	if checkAccessControlRules(accessDef.JSONRPCMethodsAccessRights, state.Method) {
+	if mcp.CheckAccessControlRules(accessDef.JSONRPCMethodsAccessRights, state.Method) {
 		writeJSONRPCAccessDenied(w, r, fmt.Sprintf("method '%s' is not available", state.Method))
 		return nil, middleware.StatusRespond
 	}
