@@ -1373,10 +1373,10 @@ type Config struct {
 	// This section enables the use of the KV capabilities to substitute configuration values.
 	// See more details https://tyk.io/docs/tyk-self-managed/#store-configuration-with-key-value-store
 	KV struct {
-		Consul ConsulConfig              `json:"consul"`
-		Vault  VaultConfig               `json:"vault"`
-		File   FileConfig                `json:"file"`
-		Stores map[string]kv.StoreConfig `json:"stores" ignored:"true" structviewer:"obfuscate"`
+		Consul ConsulConfig `json:"consul"`
+		Vault  VaultConfig  `json:"vault"`
+		File   FileConfig   `json:"file"`
+		Stores kv.Stores    `json:"stores" structviewer:"obfuscate"`
 	} `json:"kv"`
 
 	// Secrets configures a list of key/value pairs for the gateway.
