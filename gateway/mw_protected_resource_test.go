@@ -91,6 +91,63 @@ func TestGetPRMConfig(t *testing.T) {
 	})
 }
 
+// TestIsPRMEnabled covers the combined PRM detection used to gate the
+// missing-auth 401: it must return true for either config location — the new
+// oauth2-scheme block (which wins) or the deprecated top-level block — and
+// false when neither is enabled.
+func TestIsPRMEnabled(t *testing.T) {
+	newAPISpec := func(auth *oas.Authentication) *APISpec {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{IsOAS: true}}
+		spec.OAS.SetTykExtension(&oas.XTykAPIGateway{
+			Server: oas.Server{
+				ListenPath:     oas.ListenPath{Value: "/"},
+				Authentication: auth,
+			},
+		})
+		return spec
+	}
+
+	t.Run("no authentication block", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{IsOAS: true}}
+		spec.OAS.SetTykExtension(&oas.XTykAPIGateway{
+			Server: oas.Server{ListenPath: oas.ListenPath{Value: "/"}},
+		})
+		assert.False(t, spec.IsPRMEnabled())
+	})
+
+	t.Run("top-level PRM enabled", func(t *testing.T) {
+		spec := newAPISpec(&oas.Authentication{
+			ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{Enabled: true},
+		})
+		assert.True(t, spec.IsPRMEnabled())
+	})
+
+	t.Run("oauth2-scheme PRM enabled", func(t *testing.T) {
+		spec := newAPISpec(&oas.Authentication{
+			SecuritySchemes: oas.SecuritySchemes{
+				"oauth2": &oas.OAuth2{
+					Enabled:                   true,
+					ProtectedResourceMetadata: &oas.OAuth2PRM{Enabled: true},
+				},
+			},
+		})
+		assert.True(t, spec.IsPRMEnabled())
+	})
+
+	t.Run("both locations disabled", func(t *testing.T) {
+		spec := newAPISpec(&oas.Authentication{
+			ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{Enabled: false},
+			SecuritySchemes: oas.SecuritySchemes{
+				"oauth2": &oas.OAuth2{
+					Enabled:                   true,
+					ProtectedResourceMetadata: &oas.OAuth2PRM{Enabled: false},
+				},
+			},
+		})
+		assert.False(t, spec.IsPRMEnabled())
+	})
+}
+
 func TestPRMMiddleware_UsesMirrorModeForPairedMCPProxy(t *testing.T) {
 	doc := pairedMCPProxyOAS("proxy-1", "org-1", "rest-1")
 	doc.GetTykExtension().Server.Authentication = &oas.Authentication{
@@ -601,7 +658,9 @@ func TestJWTMiddleware_PRMWWWAuthenticate(t *testing.T) {
 		resp, _ := ts.Run(t, test.TestCase{
 			Method: http.MethodGet,
 			Path:   "/jwt-prm/test",
-			Code:   http.StatusBadRequest,
+			// Missing credential on a PRM-enabled API is 401 (not 400) so a
+			// spec-compliant MCP client acts on the WWW-Authenticate challenge.
+			Code: http.StatusUnauthorized,
 		})
 
 		wwwAuth := resp.Header.Get(header.WWWAuthenticate)
@@ -621,11 +680,235 @@ func TestJWTMiddleware_PRMWWWAuthenticate(t *testing.T) {
 		resp, _ := ts.Run(t, test.TestCase{
 			Method: http.MethodGet,
 			Path:   "/jwt-no-prm/test",
-			Code:   http.StatusBadRequest,
+			// Not a breaking change: without PRM the missing-auth status stays
+			// 400, exactly as before the 401 fix.
+			Code:      http.StatusBadRequest,
+			BodyMatch: `Authorization field missing`,
 		})
 
 		assert.Empty(t, resp.Header.Get(header.WWWAuthenticate),
 			"WWW-Authenticate header should not be present when PRM is not configured")
+	})
+}
+
+// jwtPRMOAS builds an OAS JWT API whose authentication carries the given PRM
+// block, on the supplied listen path. Used by the 401-scenario tests below.
+func jwtPRMOAS(listenPath string, prm *oas.ProtectedResourceMetadata) oas.OAS {
+	oasDoc := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info:    &openapi3.Info{Title: "JWT PRM 401", Version: "1.0"},
+			Paths:   openapi3.NewPaths(),
+		},
+	}
+	oasDoc.SetTykExtension(&oas.XTykAPIGateway{
+		Info:     oas.Info{Name: "jwt-prm-401" + listenPath, State: oas.State{Active: true}},
+		Upstream: oas.Upstream{URL: "http://httpbin.org"},
+		Server: oas.Server{
+			ListenPath:     oas.ListenPath{Value: listenPath, Strip: true},
+			Authentication: &oas.Authentication{ProtectedResourceMetadata: prm},
+		},
+	})
+	return oasDoc
+}
+
+// TestJWTMiddleware_PRM_MissingAuth_Returns401 extends the 401-challenge
+// coverage for the JWT middleware beyond the single absent-header case: an
+// empty Authorization header value must also 401, and the 401 response must
+// still carry the informative body alongside the RFC 9728 WWW-Authenticate
+// challenge so a spec-compliant MCP client can begin PRM discovery.
+func TestJWTMiddleware_PRM_MissingAuth_Returns401(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	assertChallenge := func(t *testing.T, resp *http.Response) {
+		t.Helper()
+		wwwAuth := resp.Header.Get(header.WWWAuthenticate)
+		assert.Contains(t, wwwAuth, `Bearer realm="tyk"`)
+		assert.Contains(t, wwwAuth, `resource_metadata=`)
+		assert.Contains(t, wwwAuth, `.well-known/oauth-protected-resource`)
+	}
+
+	staticPRM := &oas.ProtectedResourceMetadata{
+		Enabled:              true,
+		Resource:             "https://api.example.com",
+		AuthorizationServers: []string{"https://auth.example.com"},
+	}
+
+	loadAPI := func(listenPath string) {
+		oasDoc := jwtPRMOAS(listenPath, staticPRM)
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.EnableJWT = true
+			spec.JWTSigningMethod = HMACSign
+			spec.Proxy.ListenPath = listenPath
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+		})
+	}
+
+	t.Run("empty Authorization header still 401 with challenge", func(t *testing.T) {
+		loadAPI("/jwt-prm-empty/")
+
+		resp, _ := ts.Run(t, test.TestCase{
+			Method:  http.MethodGet,
+			Path:    "/jwt-prm-empty/test",
+			Headers: map[string]string{"Authorization": ""},
+			Code:    http.StatusUnauthorized,
+		})
+		assertChallenge(t, resp)
+	})
+
+	t.Run("401 keeps the informative body", func(t *testing.T) {
+		loadAPI("/jwt-prm-body/")
+
+		resp, _ := ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/jwt-prm-body/test",
+			Code:      http.StatusUnauthorized,
+			BodyMatch: `Authorization field missing`,
+		})
+		assertChallenge(t, resp)
+	})
+
+	// PRM now has two config locations: the deprecated top-level block (covered
+	// above) and the new block under the oauth2 security scheme, which wins. The
+	// 401 gate must fire for the new location too, else an API configured only
+	// the new way would still return 400 on missing auth.
+	t.Run("PRM under the oauth2 scheme (new location) also 401s", func(t *testing.T) {
+		listenPath := "/jwt-prm-oauth2/"
+		oasDoc := oas.OAS{
+			T: openapi3.T{
+				OpenAPI: "3.0.3",
+				Info:    &openapi3.Info{Title: "JWT PRM OAuth2", Version: "1.0"},
+				Paths:   openapi3.NewPaths(),
+			},
+		}
+		oasDoc.SetTykExtension(&oas.XTykAPIGateway{
+			Info:     oas.Info{Name: "jwt-prm-oauth2", State: oas.State{Active: true}},
+			Upstream: oas.Upstream{URL: "http://httpbin.org"},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{Value: listenPath, Strip: true},
+				Authentication: &oas.Authentication{
+					SecuritySchemes: oas.SecuritySchemes{
+						"oauth2": &oas.OAuth2{
+							Enabled: true,
+							ProtectedResourceMetadata: &oas.OAuth2PRM{
+								Enabled:              true,
+								Resource:             "https://api.example.com",
+								AuthorizationServers: []string{"https://auth.example.com"},
+							},
+						},
+					},
+				},
+			},
+		})
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.EnableJWT = true
+			spec.JWTSigningMethod = HMACSign
+			spec.Proxy.ListenPath = listenPath
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+		})
+
+		resp, _ := ts.Run(t, test.TestCase{
+			Method: http.MethodGet,
+			Path:   listenPath + "test",
+			Code:   http.StatusUnauthorized,
+		})
+		assertChallenge(t, resp)
+	})
+}
+
+// TestJWTMiddleware_MissingAuth_NoPRM_KeepsLegacy400 is a backward-compatibility
+// regression guard. The 400 -> 401 change on missing auth is gated
+// on PRM being enabled; a JWT API without PRM must keep returning the historic
+// 400 (and no WWW-Authenticate challenge) so existing non-MCP consumers that
+// assert 400 on a missing credential are not broken. This asserts across both
+// the classic (non-OAS) and OAS API shapes, and for both an absent header and
+// an empty header value.
+func TestJWTMiddleware_MissingAuth_NoPRM_KeepsLegacy400(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Classic (non-OAS) JWT API — the long-standing configuration path.
+	t.Run("classic JWT API, no header", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.EnableJWT = true
+			spec.JWTSigningMethod = HMACSign
+			spec.Proxy.ListenPath = "/jwt-legacy-noheader/"
+		})
+
+		resp, _ := ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/jwt-legacy-noheader/test",
+			Code:      http.StatusBadRequest,
+			BodyMatch: `Authorization field missing`,
+		})
+		assert.Empty(t, resp.Header.Get(header.WWWAuthenticate))
+	})
+
+	t.Run("classic JWT API, empty header value", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.EnableJWT = true
+			spec.JWTSigningMethod = HMACSign
+			spec.Proxy.ListenPath = "/jwt-legacy-emptyheader/"
+		})
+
+		resp, _ := ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/jwt-legacy-emptyheader/test",
+			Headers:   map[string]string{"Authorization": ""},
+			Code:      http.StatusBadRequest,
+			BodyMatch: `Authorization field missing`,
+		})
+		assert.Empty(t, resp.Header.Get(header.WWWAuthenticate))
+	})
+
+	// OAS JWT API whose authentication block carries no PRM — the same gate must
+	// hold on the OAS shape MCP/PRM APIs use.
+	t.Run("OAS JWT API without PRM block", func(t *testing.T) {
+		oasDoc := oas.OAS{
+			T: openapi3.T{
+				OpenAPI: "3.0.3",
+				Info:    &openapi3.Info{Title: "JWT No-PRM OAS", Version: "1.0"},
+				Paths:   openapi3.NewPaths(),
+			},
+		}
+		oasDoc.SetTykExtension(&oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name:  "jwt-oas-no-prm",
+				State: oas.State{Active: true},
+			},
+			Upstream: oas.Upstream{URL: "http://httpbin.org"},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{Value: "/jwt-oas-no-prm/", Strip: true},
+				// Authentication present, but no ProtectedResourceMetadata.
+				Authentication: &oas.Authentication{},
+			},
+		})
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.EnableJWT = true
+			spec.JWTSigningMethod = HMACSign
+			spec.Proxy.ListenPath = "/jwt-oas-no-prm/"
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+		})
+
+		resp, _ := ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/jwt-oas-no-prm/test",
+			Code:      http.StatusBadRequest,
+			BodyMatch: `Authorization field missing`,
+		})
+		assert.Empty(t, resp.Header.Get(header.WWWAuthenticate),
+			"no PRM configured means no WWW-Authenticate challenge and the legacy 400 is preserved")
 	})
 }
 
@@ -750,11 +1033,12 @@ func TestPRMHappyPath_FullDiscoveryFlow(t *testing.T) {
 	})
 
 	// Step 1: Client requests a protected endpoint without credentials.
-	// Expect an error response with a WWW-Authenticate header.
+	// Expect a 401 challenge with a WWW-Authenticate header — a spec-compliant
+	// MCP client only begins PRM discovery on 401 (not 400).
 	resp, _ := ts.Run(t, test.TestCase{
 		Method: http.MethodGet,
 		Path:   "/mcp-api/tools/list",
-		Code:   http.StatusBadRequest,
+		Code:   http.StatusUnauthorized,
 	})
 
 	wwwAuth := resp.Header.Get(header.WWWAuthenticate)
