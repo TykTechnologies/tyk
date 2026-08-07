@@ -33,6 +33,8 @@ cloud.google.com/go/pubsub v1.50.1 h1:fzbXpPyJnSGvWXF1jabhQeXyxdbCIkXTpjXHy7xviB
 cloud.google.com/go/pubsub v1.50.1/go.mod h1:6YVJv3MzWJUVdvQXG081sFvS0dWQOdnV+oTo++q/xFk=
 cloud.google.com/go/pubsub/v2 v2.0.0 h1:0qS6mRJ41gD1lNmM/vdm6bR7DQu6coQcVwD+VPf0Bz0=
 cloud.google.com/go/pubsub/v2 v2.0.0/go.mod h1:0aztFxNzVQIRSZ8vUr79uH2bS3jwLebwK6q1sgEub+E=
+cloud.google.com/go/secretmanager v1.21.0 h1:e56QQaKWRyzBdUz40AeZaio/ZHAl268cFx3QFAAw9CY=
+cloud.google.com/go/secretmanager v1.21.0/go.mod h1:+nlV+GYqTD8DM+x7Kk3UF7ZPYgdYMowrkZxAmMXORQ8=
 cloud.google.com/go/spanner v1.88.0 h1:HS+5TuEYZOVOXj9K+0EtrbTw7bKBLrMe3vgGsbnehmU=
 cloud.google.com/go/spanner v1.88.0/go.mod h1:MzulBwuuYwQUVdkZXBBFapmXee3N+sQrj2T/yup6uEE=
 cloud.google.com/go/storage v1.59.2 h1:gmOAuG1opU8YvycMNpP+DvHfT9BfzzK5Cy+arP+Nocw=
@@ -79,6 +81,10 @@ github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus v1.10.0 h1:kE5kpeiS
 github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus v1.10.0/go.mod h1:IAN3Z0DMtehoxoQQnfqg1891z1P7GNoDryKtFcAyMBI=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage v1.5.0 h1:AifHbc4mg0x9zW52WOpKbsHaDKuRhlI7TVl47thgQ70=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage v1.5.0/go.mod h1:T5RfihdXtBDxt1Ch2wobif3TvzTdumDy29kahv6AV9A=
+github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets v1.5.0 h1:aMFOzch6ZJo4Ct9hI4A9Y2fPen5YNRTPmkSBhe5m0ZQ=
+github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets v1.5.0/go.mod h1:Oct8bx+g+DXKngU7i/LzFzYt44rmLdMu4uoofIpooVo=
+github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/internal v1.2.0 h1:nCYfgcSyHZXJI8J0IWE5MsCGlb2xp9fJiXyxWgmOFg4=
+github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/internal v1.2.0/go.mod h1:ucUjca2JtSZboY8IoUqyQyuuXvwbMBVwFOm0vdQPNhA=
 github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.1 h1:AMf7YbZOZIW5b66cXNHMWWT/zkjhz5+a+k/3x40EO7E=
 github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.1/go.mod h1:uwfk06ZBcvL/g4VHNjurPfVln9NMbsk2XIZxJ+hu81k=
 github.com/Azure/azure-sdk-for-go/sdk/storage/azqueue v1.0.0 h1:lJwNFV+xYjHREUTHJKx/ZF6CJSt9znxmLw9DqSTvyRU=

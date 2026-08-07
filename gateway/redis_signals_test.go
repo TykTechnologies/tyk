@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	kvlib "github.com/TykTechnologies/storage/kv"
+
 	"github.com/TykTechnologies/tyk/config"
 )
 

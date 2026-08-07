@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/TykTechnologies/storage/kv"
 	"github.com/TykTechnologies/storage/kv/registry"
-	"github.com/stretchr/testify/require"
 )
 
 func TestLoadAndInitKVRegistry_LeavesConfigReferencesUnresolved(t *testing.T) {

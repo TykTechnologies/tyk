@@ -13,6 +13,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/storage/kv"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"

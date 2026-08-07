@@ -9,9 +9,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/storage/kv"
 	"github.com/TykTechnologies/storage/kv/registry"
-	"github.com/sirupsen/logrus"
 )
 
 type kvLogger struct{ l *logrus.Logger }

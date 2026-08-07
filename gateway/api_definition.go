@@ -25,8 +25,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
-
 	"github.com/TykTechnologies/storage/kv"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
