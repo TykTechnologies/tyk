@@ -59,6 +59,7 @@ func LoadAndInitKVRegistry(
 		return nil, fmt.Errorf("load config: %w", err)
 	}
 
+	//nolint:gosec // G117: config intentionally serialized for the KV registry; not logged
 	marshaledBytes, err := json.Marshal(conf)
 	if err != nil {
 		return nil, fmt.Errorf("encode config: %w", err)
@@ -85,6 +86,7 @@ func buildKVConfig(cfg *Config) map[string]kv.StoreConfig {
 
 	// prefix+uppercase reproduces the legacy os.Getenv("TYK_SECRET_" + ToUpper(key)).
 	// Every json.Marshal here takes static scalars and cannot fail — err is discarded.
+	//nolint:errcheck
 	envCfg, _ := json.Marshal(map[string]any{
 		"prefix":    "TYK_SECRET_",
 		"uppercase": true,
@@ -94,6 +96,8 @@ func buildKVConfig(cfg *Config) map[string]kv.StoreConfig {
 		Config: envCfg,
 	}
 
+	// Marshaling a plain struct of scalars (cfg.KV.File) cannot fail — err is discarded.
+	//nolint:errcheck
 	fileCfg, _ := json.Marshal(cfg.KV.File)
 	stores["file"] = kv.StoreConfig{
 		Type:   kv.File,
@@ -144,6 +148,8 @@ func marshalVaultConfig(v VaultConfig) json.RawMessage {
 		Timeout:      v.Timeout.String(),
 		KVVersion:    v.KVVersion,
 	}
+	// Marshaling a flat struct of scalars/strings cannot fail — err is discarded.
+	//nolint:errcheck
 	b, _ := json.Marshal(cfg)
 
 	return b
@@ -154,6 +160,8 @@ func marshalVaultConfig(v VaultConfig) json.RawMessage {
 func marshalConsulConfig(c ConsulConfig) json.RawMessage {
 	type alias ConsulConfig
 
+	// Marshaling a flat struct of scalars/strings cannot fail — err is discarded.
+	//nolint:errcheck
 	b, _ := json.Marshal(struct {
 		alias
 		WaitTime string `json:"wait_time"`

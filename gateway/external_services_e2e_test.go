@@ -629,6 +629,8 @@ func TestE2E_EdgeKeyRotationWriteBackVault(t *testing.T) {
 	)
 
 	mockVault := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Test mock: reading the request body cannot meaningfully fail — err is discarded.
+		//nolint:errcheck
 		body, _ := io.ReadAll(r.Body)
 
 		mu.Lock()
@@ -636,6 +638,9 @@ func TestE2E_EdgeKeyRotationWriteBackVault(t *testing.T) {
 		mu.Unlock()
 
 		w.Header().Set("Content-Type", "application/json")
+		// Test mock: a failed write to the response would surface as a client-side
+		// request error the assertions already catch — err is discarded.
+		//nolint:errcheck
 		_, _ = w.Write([]byte(`{"data":{"version":1}}`))
 	}))
 	defer mockVault.Close()
@@ -692,6 +697,8 @@ func TestE2E_EdgeKeyRotationWriteBackConsul(t *testing.T) {
 	)
 
 	mockConsul := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Test mock: reading the request body cannot meaningfully fail — err is discarded.
+		//nolint:errcheck
 		body, _ := io.ReadAll(r.Body)
 
 		mu.Lock()
@@ -699,6 +706,9 @@ func TestE2E_EdgeKeyRotationWriteBackConsul(t *testing.T) {
 		mu.Unlock()
 
 		// Consul answers a successful KV PUT with 200 and the literal "true".
+		// Test mock: a failed write would surface as a client-side request error
+		// the assertions already catch — err is discarded.
+		//nolint:errcheck
 		_, _ = w.Write([]byte("true"))
 	}))
 	defer mockConsul.Close()
