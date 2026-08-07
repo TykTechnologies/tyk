@@ -110,6 +110,13 @@ func TestRecordDetail(t *testing.T) {
 			spec: testAPISpec(func(spec *APISpec) {
 				spec.GraphQL.Enabled = true
 			}),
+			expect: false,
+		},
+		{
+			title: "request with detailed recording enabled",
+			spec: testAPISpec(func(spec *APISpec) {
+				spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording = true
+			}),
 			expect: true,
 		},
 	}
