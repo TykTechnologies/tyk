@@ -106,6 +106,7 @@ func buildKVConfig(cfg *Config) map[string]kv.StoreConfig {
 
 	// Names "secrets" so legacy secrets:// references route here; values are literal.
 	if len(cfg.Secrets) > 0 {
+		//nolint:errcheck
 		data, _ := json.Marshal(map[string]any{
 			"data": cfg.Secrets,
 		})

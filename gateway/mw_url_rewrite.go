@@ -282,7 +282,7 @@ func (gw *Gateway) ReplaceTykVariables(r *http.Request, in string, escape bool) 
 }
 
 func (gw *Gateway) replaceVariables(
-	ctx context.Context,
+	reqCtx context.Context,
 	in string,
 	vars []string,
 	vals map[string]interface{},
@@ -308,7 +308,7 @@ func (gw *Gateway) replaceVariables(
 
 		case secretsConfLabel, envLabel, vaultLabel, consulLabel, fileLabel:
 
-			val, err := gw.kvResolver.Resolve(ctx, dollarSecretToKVRef(label, key))
+			val, err := gw.kvResolver.Resolve(reqCtx, dollarSecretToKVRef(label, key))
 			if err != nil {
 				in = emptyStringFn(key, in, v)
 				continue

@@ -347,7 +347,7 @@ func (gw *Gateway) updateKeyInStore(keyPath, newKey string) {
 		return
 	}
 
-	ref, ok, err := resolver.ParseReference(canonical)
+	ref, _, err := resolver.ParseReference(canonical)
 	if err != nil {
 		log.WithError(err).Warn("Cannot persist rotated API key: malformed KV reference")
 		return
