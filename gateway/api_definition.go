@@ -2557,17 +2557,20 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 
 func (a *APISpec) PrepareRequestToLog(r *http.Request) *http.Request {
 	dup := r.Clone(r.Context())
-	a.SanitizeProxyPaths(dup)
+	a.PrepareRequestToLogInPlace(dup)
+	return dup
+}
+
+func (a *APISpec) PrepareRequestToLogInPlace(r *http.Request) {
+	a.SanitizeProxyPaths(r)
 
 	// appends path if upstream ha path e.g. http://httpbin.org/anything
 	if a.target != nil && a.target.Path != "" {
-		dup.URL.Path = singleJoiningSlash(a.target.Path, dup.URL.Path, a.Proxy.DisableStripSlash)
-		if dup.URL.RawPath != "" {
-			dup.URL.RawPath = singleJoiningSlash(a.target.Path, dup.URL.RawPath, a.Proxy.DisableStripSlash)
+		r.URL.Path = singleJoiningSlash(a.target.Path, r.URL.Path, a.Proxy.DisableStripSlash)
+		if r.URL.RawPath != "" {
+			r.URL.RawPath = singleJoiningSlash(a.target.Path, r.URL.RawPath, a.Proxy.DisableStripSlash)
 		}
 	}
-
-	return dup
 }
 
 func (a *APISpec) getRedirectTargetUrl(inputUrl *url.URL) (*url.URL, error) {
