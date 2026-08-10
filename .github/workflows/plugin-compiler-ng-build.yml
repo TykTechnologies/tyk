@@ -83,6 +83,97 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+      # Docker does not rebuild a customization when packages it ADDS are
+      # patched -- only a base-image patch or an OCI artifact change triggers
+      # one, and this base is a minimal BusyBox runtime that reports zero
+      # vulnerabilities, so that trigger effectively never fires. Left alone the
+      # toolchain drifts: we observed 12 days on a published expat fix, and a
+      # manual rebuild then pulled expat and linux-libc-dev forward at once.
+      # Reported as docker-hardened-images/advisories#2017.
+      #
+      # There is no supported way to request a rebuild. `customization build`
+      # only offers get/list/logs, and `edit` is a no-op unless the manifest
+      # actually differs -- while still reporting success. So stamp the run id
+      # into an annotation purely to make the manifest unequal. The annotation
+      # carries no meaning; delete this step once Docker ships a real trigger.
+      #
+      # Release events only: a pull request must not be able to rewrite the
+      # shared hardened base.
+      # Never fails the release. A refresh that does not happen means the base is
+      # as fresh as it was yesterday, which is worse than current but far better
+      # than blocking a release on Docker-side behaviour we do not control. The
+      # step still reports loudly, and continue-on-error marks it red in the UI so
+      # a persistently stale base is visible rather than silent.
+      - name: Refresh Docker Hardened Images customization
+        if: ${{ github.event_name != 'pull_request' }}
+        continue-on-error: true
+        env:
+          DHI_CUSTOMIZATION: cz_3gxyrz8ca7x0l
+          DHI_ORG: tykio
+        run: |
+          set -euo pipefail
+          before="$(docker dhi customization build list "$DHI_CUSTOMIZATION" \
+            --org "$DHI_ORG" | awk 'NR==2 {print $1}')"
+          echo "latest build before refresh: ${before:-none}"
+
+          manifest="$RUNNER_TEMP/dhi-customization.yaml"
+          docker dhi customization get "$DHI_CUSTOMIZATION" --org "$DHI_ORG" >"$manifest"
+
+          # Replace any previous stamp so the file does not accumulate them.
+          python3 - "$manifest" "$GITHUB_RUN_ID" <<'PY'
+          import pathlib, re, sys
+          path, run_id = pathlib.Path(sys.argv[1]), sys.argv[2]
+          text = path.read_text()
+          text = re.sub(r'\n *io\.tyk\.rebuild-trigger:.*', '', text)
+          if not text.endswith("\n"):
+              text += "\n"
+          if "annotations:" not in text:
+              text += "\nannotations:\n"
+          text = text.replace(
+              "annotations:\n",
+              f"annotations:\n  io.tyk.rebuild-trigger: \"{run_id}\"\n",
+              1,
+          )
+          path.write_text(text)
+          PY
+
+          docker dhi customization edit "$manifest" --org "$DHI_ORG"
+
+          # `edit` returns success even when it queues nothing, so poll for a
+          # genuinely new build rather than trusting the exit code.
+          for _ in $(seq 1 60); do
+            latest="$(docker dhi customization build list "$DHI_CUSTOMIZATION" \
+              --org "$DHI_ORG" | awk 'NR==2 {print $1}')"
+            if [ -n "$latest" ] && [ "$latest" != "$before" ]; then
+              echo "new build queued: $latest"
+              break
+            fi
+            sleep 10
+          done
+          if [ "$latest" = "$before" ]; then
+            echo "::warning title=DHI customization not refreshed::No rebuild was queued; the compiler will build on the existing base, which may be missing recent package fixes."
+            {
+              printf '### DHI customization refresh\n\n'
+              printf 'No rebuild was queued. Building on the existing base.\n'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          # Wait for every platform build to settle, then fail on any failure.
+          for _ in $(seq 1 120); do
+            pending="$(docker dhi customization build list "$DHI_CUSTOMIZATION" \
+              --org "$DHI_ORG" | awk 'NR>1 && $3 == "IN_PROGRESS"' | wc -l)"
+            [ "$pending" -eq 0 ] && break
+            sleep 15
+          done
+          docker dhi customization build list "$DHI_CUSTOMIZATION" --org "$DHI_ORG" | head -5
+          if docker dhi customization build list "$DHI_CUSTOMIZATION" --org "$DHI_ORG" \
+            | awk 'NR>1 && NR<=3 && $4 == "FAILURE"' | grep -q .; then
+            echo "::warning title=DHI customization rebuild failed::The rebuild was queued but did not succeed; the compiler will build on the previous base."
+            printf '### DHI customization refresh\n\nRebuild queued but failed.\n' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          printf '### DHI customization refresh\n\nRebuilt: %s\n' "$latest" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Resolve source base digest
         id: source-base
