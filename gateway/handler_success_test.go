@@ -659,17 +659,17 @@ type mockReturningHttpHandler struct {
 	serveHTTPForCacheCalled bool
 }
 
-func (m *mockReturningHttpHandler) ServeHTTP(_ http.ResponseWriter, r *http.Request) ProxyResponse {
+func (m *mockReturningHttpHandler) ServeHTTP(_ http.ResponseWriter, _ *http.Request) ProxyResponse {
 	m.serveHTTPCalled = true
 	return ProxyResponse{}
 }
 
-func (m *mockReturningHttpHandler) ServeHTTPForCache(_ http.ResponseWriter, r *http.Request) ProxyResponse {
+func (m *mockReturningHttpHandler) ServeHTTPForCache(_ http.ResponseWriter, _ *http.Request) ProxyResponse {
 	m.serveHTTPForCacheCalled = true
 	return ProxyResponse{}
 }
 
-func (m *mockReturningHttpHandler) CopyResponse(_ io.Writer, r io.Reader, d time.Duration) error {
+func (m *mockReturningHttpHandler) CopyResponse(_ io.Writer, _ io.Reader, _ time.Duration) error {
 	return nil
 }
 
