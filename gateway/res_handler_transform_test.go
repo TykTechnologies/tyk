@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -295,6 +296,117 @@ func TestHeaderTransformBase(t *testing.T) {
 
 	// Check that the returned base is indeed the BaseTykResponseHandler of ht
 	require.Equal(t, &ht.BaseTykResponseHandler, base, "Base method did not return the expected BaseTykResponseHandler")
+}
+
+func TestHeaderTransformResponsePath(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		targetURL   string
+		stripListen bool
+		headerName  string
+		headerValue string
+		wantHeader  string
+	}{
+		{
+			name:        "relative location with root target",
+			targetURL:   "https://upstream.example/",
+			stripListen: true,
+			headerName:  "Location",
+			headerValue: "/some/path",
+			wantHeader:  "/foo/bar/some/path",
+		},
+		{
+			name:        "absolute location with root target",
+			targetURL:   "https://upstream.example/",
+			stripListen: true,
+			headerName:  "Location",
+			headerValue: "https://upstream.example/some/path",
+			wantHeader:  "https://gateway.example/foo/bar/some/path",
+		},
+		{
+			name:        "protocol relative location",
+			targetURL:   "https://upstream.example/",
+			stripListen: true,
+			headerName:  "Location",
+			headerValue: "//upstream.example/some/path",
+			wantHeader:  "//gateway.example/foo/bar/some/path",
+		},
+		{
+			name:        "query and fragment are preserved",
+			targetURL:   "https://upstream.example/",
+			stripListen: true,
+			headerName:  "Location",
+			headerValue: "https://upstream.example/some/path?next=/other/path#section/one",
+			wantHeader:  "https://gateway.example/foo/bar/some/path?next=/other/path#section/one",
+		},
+		{
+			name:        "target path is replaced when stripping listen path",
+			targetURL:   "https://upstream.example/api/",
+			stripListen: true,
+			headerName:  "Location",
+			headerValue: "/api/some/path",
+			wantHeader:  "/foo/bar/some/path",
+		},
+		{
+			name:        "target path is removed without stripping listen path",
+			targetURL:   "https://upstream.example/api/",
+			stripListen: false,
+			headerName:  "Location",
+			headerValue: "https://upstream.example/api/some/path",
+			wantHeader:  "https://gateway.example/some/path",
+		},
+		{
+			name:        "multiple link resources are rewritten",
+			targetURL:   "https://upstream.example/",
+			stripListen: true,
+			headerName:  "Link",
+			headerValue: `<https://upstream.example/one/path?x=/y>; rel="next", </two/path#frag>; rel="prev"`,
+			wantHeader:  `<https://gateway.example/foo/bar/one/path?x=/y>; rel="next", </foo/bar/two/path#frag>; rel="prev"`,
+		},
+		{
+			name:        "non resource header text is left alone",
+			targetURL:   "https://upstream.example/",
+			stripListen: true,
+			headerName:  "X-Debug",
+			headerValue: "segment/one / segment/two",
+			wantHeader:  "segment/one / segment/two",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			target, err := url.Parse(tc.targetURL)
+			require.NoError(t, err)
+
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						ListenPath:      "/foo/bar/",
+						StripListenPath: tc.stripListen,
+					},
+				},
+				target: target,
+			}
+
+			h := &HeaderTransform{
+				BaseTykResponseHandler: BaseTykResponseHandler{
+					Spec: spec,
+					Gw:   NewGateway(config.Config{}, nil),
+				},
+				config: HeaderTransformOptions{
+					RevProxyTransform: RevProxyTransform{
+						Headers:     []string{tc.headerName},
+						Target_host: "https://gateway.example",
+					},
+				},
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "https://gateway.example/foo/bar/request", nil)
+			res := &http.Response{Header: make(http.Header)}
+			res.Header.Set(tc.headerName, tc.headerValue)
+
+			require.NoError(t, h.HandleResponse(nil, res, req, nil))
+			assert.Equal(t, tc.wantHeader, res.Header.Get(tc.headerName))
+		})
+	}
 }
 
 func TestResponseTransformMiddleware(t *testing.T) {
