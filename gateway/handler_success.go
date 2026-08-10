@@ -426,6 +426,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 
 	t1 := time.Now()
 	var resp ProxyResponse
+	// If GraphQL is enabled, use ServeHTTPForCache to ensure the response is cached for analytics.
 	if s.Spec.GraphQL.Enabled {
 		resp = s.Proxy.ServeHTTPForCache(w, r)
 	} else {
