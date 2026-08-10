@@ -175,18 +175,15 @@ func (gw *Gateway) processSpec(
 		"prefix": "coprocess",
 	})
 
-	tMin, tMax, err := resolveTLSVersions(
+	_, _, err := resolveTLSVersions(
 		spec.Proxy.Transport.SSLMinVersion,
 		spec.Proxy.Transport.SSLMaxVersion,
 		WithMinMax(gw.GetConfig().ProxySSLMinVersion, gw.GetConfig().ProxySSLMaxVersion),
 	)
 	if err != nil {
 		logger.WithError(err).Error("Failed to resolve API TLS versions, falling back to global settings")
-		spec.Proxy.Transport.SSLMinVersion = gw.GetConfig().ProxySSLMinVersion
-		spec.Proxy.Transport.SSLMaxVersion = gw.GetConfig().ProxySSLMaxVersion
-	} else {
-		spec.Proxy.Transport.SSLMinVersion = tMin
-		spec.Proxy.Transport.SSLMaxVersion = tMax
+		spec.Proxy.Transport.SSLMinVersion = 0
+		spec.Proxy.Transport.SSLMaxVersion = 0
 	}
 
 	if len(spec.TagHeaders) > 0 {

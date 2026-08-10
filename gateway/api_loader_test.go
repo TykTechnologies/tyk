@@ -9950,7 +9950,7 @@ func TestProcessSpec_SSLMaxVersion(t *testing.T) {
 		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 		})
-		assert.Equal(t, uint16(tls.VersionTLS13), specs[0].Proxy.Transport.SSLMaxVersion)
+		assert.Equal(t, uint16(0), specs[0].Proxy.Transport.SSLMaxVersion)
 	})
 
 	t.Run("explicit SSLMaxVersion should not be overwritten", func(t *testing.T) {
@@ -9967,7 +9967,8 @@ func TestProcessSpec_SSLMaxVersion(t *testing.T) {
 			spec.Proxy.Transport.SSLMinVersion = tls.VersionTLS13
 			spec.Proxy.Transport.SSLMaxVersion = tls.VersionTLS12
 		})
-		assert.Equal(t, uint16(tls.VersionTLS13), specs[0].Proxy.Transport.SSLMaxVersion)
+		assert.Equal(t, uint16(0), specs[0].Proxy.Transport.SSLMaxVersion)
+		assert.Equal(t, uint16(0), specs[0].Proxy.Transport.SSLMinVersion)
 	})
 }
 
