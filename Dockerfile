@@ -1,5 +1,5 @@
-ARG GO_VERSION=1.24
-FROM golang:${GO_VERSION}-bullseye
+ARG GO_VERSION=1.26
+FROM tykio/golang-cross:${GO_VERSION}-bullseye
 
 # Build essentials
 
