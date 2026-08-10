@@ -2,9 +2,12 @@ package gateway
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -647,6 +650,76 @@ func TestSuccessHandler_classifyUpstreamError(t *testing.T) {
 			} else {
 				assert.Nil(t, errClass, "expected no error classification")
 			}
+		})
+	}
+}
+
+type mockReturningHttpHandler struct {
+	serveHTTPCalled         bool
+	serveHTTPForCacheCalled bool
+}
+
+func (m *mockReturningHttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) ProxyResponse {
+	m.serveHTTPCalled = true
+	return ProxyResponse{}
+}
+
+func (m *mockReturningHttpHandler) ServeHTTPForCache(w http.ResponseWriter, r *http.Request) ProxyResponse {
+	m.serveHTTPForCacheCalled = true
+	return ProxyResponse{}
+}
+
+func (m *mockReturningHttpHandler) CopyResponse(w io.Writer, r io.Reader, d time.Duration) error {
+	return nil
+}
+
+func TestSuccessHandler_ServeHTTP_Branching(t *testing.T) {
+	tests := []struct {
+		name                    string
+		graphqlEnabled          bool
+		expectServeHTTP         bool
+		expectServeHTTPForCache bool
+	}{
+		{
+			name:                    "GraphQL disabled calls ServeHTTP",
+			graphqlEnabled:          false,
+			expectServeHTTP:         true,
+			expectServeHTTPForCache: false,
+		},
+		{
+			name:                    "GraphQL enabled calls ServeHTTPForCache",
+			graphqlEnabled:          true,
+			expectServeHTTP:         false,
+			expectServeHTTPForCache: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockProxy := &mockReturningHttpHandler{}
+
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					GraphQL: apidef.GraphQLConfig{
+						Enabled: tt.graphqlEnabled,
+					},
+				},
+			}
+
+			handler := &SuccessHandler{
+				BaseMiddleware: &BaseMiddleware{
+					Spec:  spec,
+					Proxy: mockProxy,
+				},
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			w := httptest.NewRecorder()
+
+			handler.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.expectServeHTTP, mockProxy.serveHTTPCalled)
+			assert.Equal(t, tt.expectServeHTTPForCache, mockProxy.serveHTTPForCacheCalled)
 		})
 	}
 }
