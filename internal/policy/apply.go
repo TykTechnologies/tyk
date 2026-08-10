@@ -207,6 +207,25 @@ func (t *Service) Apply(session *user.SessionState) error {
 	// If some APIs had only ACL partitions, inherit rest from session level
 	for k, v := range rights {
 		if !applyState.didAcl[k] {
+			if existingAR, ok := session.AccessRights[k]; ok {
+				if applyState.didRateLimit[k] {
+					existingAR.Limit.Rate = v.Limit.Rate
+					existingAR.Limit.Per = v.Limit.Per
+					existingAR.Limit.Smoothing = v.Limit.Smoothing
+					existingAR.Limit.ThrottleInterval = v.Limit.ThrottleInterval
+					existingAR.Limit.ThrottleRetryLimit = v.Limit.ThrottleRetryLimit
+					existingAR.Endpoints = v.Endpoints
+				}
+				if applyState.didQuota[k] {
+					existingAR.Limit.QuotaMax = v.Limit.QuotaMax
+					existingAR.Limit.QuotaRenewalRate = v.Limit.QuotaRenewalRate
+					existingAR.Limit.QuotaRenews = v.Limit.QuotaRenews
+				}
+				if applyState.didComplexity[k] {
+					existingAR.Limit.MaxQueryDepth = v.Limit.MaxQueryDepth
+				}
+				session.AccessRights[k] = existingAR
+			}
 			delete(rights, k)
 			continue
 		}
