@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=tykio/golang-cross:1.25-bullseye
+ARG BASE_IMAGE=tykio/golang-cross:1.26-bullseye
 FROM ${BASE_IMAGE}
 
 LABEL description="Image for plugin development"
