@@ -714,3 +714,61 @@ func Test_jsonEscapeString(t *testing.T) {
 		assert.Zero(t, allocs)
 	})
 }
+
+func Test_resolveTLSVersions_WithMinMax(t *testing.T) {
+	tests := []struct {
+		name    string
+		uMin    uint16
+		uMax    uint16
+		defMin  uint16
+		defMax  uint16
+		wantMin uint16
+		wantMax uint16
+		wantErr bool
+	}{
+		{
+			name:    "Both empty - returns custom defaults",
+			uMin:    0,
+			uMax:    0,
+			defMin:  tls.VersionTLS11,
+			defMax:  tls.VersionTLS12,
+			wantMin: tls.VersionTLS11,
+			wantMax: tls.VersionTLS12,
+			wantErr: false,
+		},
+		{
+			name:    "Only Min defined (small) - Max stays custom default",
+			uMin:    tls.VersionTLS10,
+			uMax:    0,
+			defMin:  tls.VersionTLS11,
+			defMax:  tls.VersionTLS12,
+			wantMin: tls.VersionTLS10,
+			wantMax: tls.VersionTLS12,
+			wantErr: false,
+		},
+		{
+			name:    "Only Min defined (high) - returns error against custom default",
+			uMin:    tls.VersionTLS13,
+			uMax:    0,
+			defMin:  tls.VersionTLS11,
+			defMax:  tls.VersionTLS12,
+			wantMin: 0,
+			wantMax: 0,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotMin, gotMax, err := resolveTLSVersions(tt.uMin, tt.uMax, WithMinMax(tt.defMin, tt.defMax))
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.Equal(t, tt.wantMin, gotMin)
+			assert.Equal(t, tt.wantMax, gotMax)
+		})
+	}
+}

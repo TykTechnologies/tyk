@@ -9946,11 +9946,11 @@ func TestProcessSpec_SSLMaxVersion(t *testing.T) {
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
 
-	t.Run("unset SSLMaxVersion remains 0 to inherit gateway-level config", func(t *testing.T) {
+	t.Run("unset SSLMaxVersion is resolved to gateway-level config", func(t *testing.T) {
 		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 		})
-		assert.Equal(t, uint16(0), specs[0].Proxy.Transport.SSLMaxVersion)
+		assert.Equal(t, uint16(tls.VersionTLS13), specs[0].Proxy.Transport.SSLMaxVersion)
 	})
 
 	t.Run("explicit SSLMaxVersion should not be overwritten", func(t *testing.T) {

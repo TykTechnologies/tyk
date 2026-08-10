@@ -276,34 +276,58 @@ func containsEscapedChars(str string) bool {
 	return str != unescaped
 }
 
-func resolveTLSVersions(userMin, userMax uint16) (uint16, uint16, error) {
-	const defaultMin = tls.VersionTLS12
-	const defaultMax = tls.VersionTLS13
+type resolveTLSVersionsOptions struct {
+	defaultMin uint16
+	defaultMax uint16
+}
+
+type ResolveTLSVersionsOption func(*resolveTLSVersionsOptions)
+
+func WithMinMax(minV, maxV uint16) ResolveTLSVersionsOption {
+	return func(o *resolveTLSVersionsOptions) {
+		if minV != 0 {
+			o.defaultMin = minV
+		}
+		if maxV != 0 {
+			o.defaultMax = maxV
+		}
+	}
+}
+
+func resolveTLSVersions(userMin, userMax uint16, opts ...ResolveTLSVersionsOption) (uint16, uint16, error) {
+	options := &resolveTLSVersionsOptions{
+		defaultMin: tls.VersionTLS12,
+		defaultMax: tls.VersionTLS13,
+	}
+
+	for _, opt := range opts {
+		opt(options)
+	}
 
 	resMin := userMin
 	resMax := userMax
 
 	if resMin == 0 {
-		resMin = defaultMin
+		resMin = options.defaultMin
 	}
 
 	if resMax == 0 {
-		resMax = defaultMax
+		resMax = options.defaultMax
 	}
 
 	switch {
-	case userMin != 0 && userMax == 0 && resMin > defaultMax:
+	case userMin != 0 && userMax == 0 && resMin > options.defaultMax:
 		return 0, 0, fmt.Errorf(
 			"provided minTLS (%s) exceeds the default maximum TLS version (%s); provide both versions explicitly",
 			tls.VersionName(userMin),
-			tls.VersionName(defaultMax),
+			tls.VersionName(options.defaultMax),
 		)
 
-	case userMax != 0 && userMin == 0 && resMax < defaultMin:
+	case userMax != 0 && userMin == 0 && resMax < options.defaultMin:
 		return 0, 0, fmt.Errorf(
 			"provided maxTLS (%s) is lower than the default minimum TLS version (%s); provide both versions explicitly",
 			tls.VersionName(userMax),
-			tls.VersionName(defaultMin),
+			tls.VersionName(options.defaultMin),
 		)
 
 	case userMin != 0 && userMax != 0 && userMin > userMax:
