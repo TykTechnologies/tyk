@@ -25,6 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
+	"github.com/TykTechnologies/storage/kv"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -41,7 +42,6 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/storage/kv"
 )
 
 // const used by cache middleware
@@ -520,13 +520,19 @@ var envRegex = regexp.MustCompile(`env://([^"]+)`)
 var fileRegex = regexp.MustCompile(`file://([^"]+)`)
 
 const (
-	prefixEnv       = "env://"
-	prefixSecrets   = "secrets://"
-	prefixConsul    = "consul://"
-	prefixVault     = "vault://"
-	prefixFile      = "file://"
-	prefixKeys      = "tyk-apis"
-	vaultSecretPath = "secret/data/"
+	prefixEnv      = "env://"
+	prefixSecrets  = "secrets://"
+	prefixConsul   = "consul://"
+	prefixVault    = "vault://"
+	prefixFile     = "file://"
+	prefixKeys     = "tyk-apis"
+	prefixKV       = "kv://"
+	prefixKVInline = "$kv{"
+
+	// vaultSecretPath is the LOGICAL vault path of the fixed bulk secret.
+	// The vault provider applies the KV v1/v2 transform (inserting "data/" for
+	// v2) itself, so we must pass the logical path.
+	vaultSecretPath = "secret/" + prefixKeys
 )
 
 func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
@@ -574,22 +580,34 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 		}
 	}
 
+	if strings.Contains(input, prefixKV) || strings.Contains(input, prefixKVInline) {
+		if err := a.replaceKVReferences(&input); err != nil {
+			log.WithError(err).Error("Couldn't replace KV references")
+		}
+	}
+
 	return []byte(input)
 }
 
 func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
-	if err := a.Gw.setUpConsul(); err != nil {
-		return err
-	}
-
-	pairs, _, err := a.Gw.consulKVStore.(*kv.Consul).Store().List(prefixKeys, nil)
+	store, err := a.Gw.kvRegistry.GetStore("consul")
 	if err != nil {
-		return err
+		return fmt.Errorf("retrieve store: %w", err)
 	}
 
-	for i := 1; i < len(pairs); i++ {
-		key := strings.TrimPrefix(pairs[i].Key, prefixKeys+"/")
-		escaped := jsonEscapeString(string(pairs[i].Value))
+	l, ok := kv.AsLister(store)
+	if !ok {
+		return errors.New("assign store to lister interface")
+	}
+
+	pairs, err := l.List(a.Gw.ctx, prefixKeys)
+	if err != nil {
+		return fmt.Errorf("list kv pairs: %w", err)
+	}
+
+	for k, v := range pairs {
+		key := strings.TrimPrefix(k, prefixKeys+"/")
+		escaped := jsonEscapeString(string(v))
 		*input = strings.ReplaceAll(*input, prefixConsul+key, escaped)
 	}
 
@@ -597,40 +615,34 @@ func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
 }
 
 func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
-	if err := a.Gw.setUpVault(); err != nil {
-		return err
-	}
-
-	vault, ok := a.Gw.vaultKVStore.(kv.SecretReader)
-	if !ok {
-		log.Errorf("KV store %T does not implement SecretReader", a.Gw.vaultKVStore)
-		return errors.New("could not read secrets")
-	}
-
-	secret, err := vault.ReadSecret(vaultSecretPath + prefixKeys)
+	store, err := a.Gw.kvRegistry.GetStore("vault")
 	if err != nil {
-		return err
+		return fmt.Errorf("retrieve store: %w", err)
 	}
 
-	if secret == nil {
-		return fmt.Errorf("vault path does not exist: %s%s; vault references in API definitions will not be resolved", vaultSecretPath, prefixKeys)
+	pairsJson, err := store.Get(a.Gw.ctx, vaultSecretPath)
+	if err != nil {
+		var (
+			unavailableErr *kv.StoreUnavailableError
+			notFoundErr    *kv.KeyNotFoundError
+		)
+
+		switch {
+		case errors.As(err, &unavailableErr):
+			return fmt.Errorf("vault path unavailable: %s; vault references in API definitions will not be resolved", vaultSecretPath)
+		case errors.As(err, &notFoundErr):
+			return fmt.Errorf("vault path contains no data: %s; vault references in API definitions will not be resolved", vaultSecretPath)
+		}
 	}
 
-	if secret.Data == nil {
-		return fmt.Errorf("vault path contains no data: %s%s; vault references in API definitions will not be resolved", vaultSecretPath, prefixKeys)
-	}
+	var pairs map[string]any
 
-	pairs, ok := secret.Data["data"]
-	if !ok {
-		return errors.New("no data returned")
-	}
-
-	pairsMap, ok := pairs.(map[string]interface{})
-	if !ok {
+	err = json.Unmarshal([]byte(pairsJson), &pairs)
+	if err != nil {
 		return errors.New("data is not in the map format")
 	}
 
-	for k, v := range pairsMap {
+	for k, v := range pairs {
 		escaped := jsonEscapeString(fmt.Sprintf("%v", v))
 		*input = strings.ReplaceAll(*input, prefixVault+k, escaped)
 	}
@@ -639,22 +651,31 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 }
 
 func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
-	basePath := a.Gw.GetConfig().KV.File.BasePath
+	store, err := a.Gw.kvRegistry.GetStore("file")
+	if err != nil {
+		return err
+	}
+
 	matches := fileRegex.FindAllStringSubmatch(*input, -1)
 	seen := map[string]bool{}
+
 	var firstErr error
+
 	for _, m := range matches {
 		if seen[m[0]] {
 			continue
 		}
+
 		seen[m[0]] = true
-		val, err := ResolveFileKV(basePath, m[1])
+
+		val, err := store.Get(a.Gw.ctx, m[1])
 		if err != nil {
 			if firstErr == nil {
 				firstErr = err
 			}
 			continue
 		}
+
 		// JSON-escape the value before injecting it into the raw JSON document.
 		// Without this, multi-line content (e.g. PEM certificates) produces
 		// literal newlines inside a JSON string, which is invalid JSON.
@@ -663,14 +684,32 @@ func (a APIDefinitionLoader) replaceFileSecrets(input *string) error {
 			if firstErr == nil {
 				firstErr = err
 			}
+
 			continue
 		}
+
 		// Strip the surrounding quotes since the replacement sits
 		// inside an existing JSON string already.
 		escaped := string(jsonBytes[1 : len(jsonBytes)-1])
 		*input = strings.ReplaceAll(*input, m[0], escaped)
 	}
+
 	return firstErr
+}
+
+// replaceKVReferences resolves new-syntax kv:// and $kv{} references via the
+// shared resolver. Unlike the legacy bulk ops, ResolveAll re-serializes the
+// document, so resolved values are JSON-escaped automatically — no manual
+// escaping here would be correct.
+func (a APIDefinitionLoader) replaceKVReferences(input *string) error {
+	resolved, err := a.Gw.kvResolver.ResolveAll(a.Gw.ctx, []byte(*input))
+	if err != nil {
+		return err
+	}
+
+	*input = string(resolved)
+
+	return nil
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.

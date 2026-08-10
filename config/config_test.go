@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/storage/kv"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -95,6 +97,42 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestKVStoresFromEnv(t *testing.T) {
+	t.Setenv("TYK_GW_KV_STORES", `{
+		"vault-prod": {
+			"type": "hashicorp_vault",
+			"required": true,
+			"config": {"address": "http://localhost:8200", "namespace": "team-a"}
+		}
+	}`)
+
+	conf := &Config{}
+	require.NoError(t, FillEnv(conf))
+
+	require.Len(t, conf.KV.Stores, 1)
+	sc, ok := conf.KV.Stores["vault-prod"]
+	require.True(t, ok, "TYK_GW_KV_STORES must define vault-prod")
+	require.Equal(t, kv.Vault, sc.Type)
+	require.True(t, sc.Required)
+	require.JSONEq(t, `{"address": "http://localhost:8200", "namespace": "team-a"}`, string(sc.Config))
+}
+
+func TestKVStoresFromEnvOverridesFile(t *testing.T) {
+	t.Setenv("TYK_GW_KV_STORES", `{"vault-prod": {"type": "hashicorp_vault", "config": {"namespace": "from-env"}}}`)
+
+	conf := &Config{}
+	conf.KV.Stores = kv.Stores{
+		"vault-prod": {Type: kv.Vault, Config: []byte(`{"namespace": "from-file"}`)},
+		"local-file": {Type: kv.File, Config: []byte(`{"base_path": "/etc/secrets"}`)},
+	}
+
+	require.NoError(t, FillEnv(conf))
+
+	require.Len(t, conf.KV.Stores, 2)
+	require.JSONEq(t, `{"namespace": "from-env"}`, string(conf.KV.Stores["vault-prod"].Config), "env overrides the file entry")
+	require.Equal(t, kv.File, conf.KV.Stores["local-file"].Type, "entry absent from env JSON is retained")
 }
 
 func TestConfigFiles(t *testing.T) {

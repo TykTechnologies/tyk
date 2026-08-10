@@ -12,6 +12,8 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 
+	"github.com/TykTechnologies/storage/kv"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -1369,12 +1371,14 @@ type Config struct {
 	// global session lifetime, in seconds.
 	GlobalSessionLifetime int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 
-	// This section enables the use of the KV capabilities to substitute configuration values.
+	// Configure the Key-Value stores for secure storage of secrets and other configuration values.
+	// From Tyk 5.15.0 the dedicated Consul, Vault and File methods are deprecated in favour of the more flexible Stores approach.
 	// See more details https://tyk.io/docs/tyk-self-managed/#store-configuration-with-key-value-store
 	KV struct {
 		Consul ConsulConfig `json:"consul"`
 		Vault  VaultConfig  `json:"vault"`
 		File   FileConfig   `json:"file"`
+		Stores kv.Stores    `json:"stores" structviewer:"obfuscate"`
 	} `json:"kv"`
 
 	// Secrets configures a list of key/value pairs for the gateway.
