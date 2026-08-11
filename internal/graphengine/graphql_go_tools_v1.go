@@ -201,16 +201,11 @@ func (g *graphqlRequestProcessorV1) ProcessRequest(ctx context.Context, w http.R
 	}
 
 	gqlRequest := g.ctxRetrieveRequest(r)
-	normalizationResult, err := gqlRequest.Normalize(g.schema)
-	if err != nil {
-		g.logger.Error("error while normalizing GraphQL request", abstractlogger.Error(err))
-		return ProxyingRequestFailedErr, http.StatusInternalServerError
-	}
 
-	if normalizationResult.Errors != nil && normalizationResult.Errors.Count() > 0 {
-		return writeGraphQLError(g.logger, w, normalizationResult.Errors)
-	}
-
+	// Validation runs before normalization: normalization inlines fragment
+	// spreads and is not resilient to malformed operations (e.g. cyclic
+	// fragment spreads), whereas validation parses the query independently
+	// and can reject such operations safely. See TT-17945.
 	validationResult, err := gqlRequest.ValidateForSchema(g.schema)
 	if err != nil {
 		g.logger.Error("error while validating GraphQL request", abstractlogger.Error(err))
@@ -219,6 +214,16 @@ func (g *graphqlRequestProcessorV1) ProcessRequest(ctx context.Context, w http.R
 
 	if validationResult.Errors != nil && validationResult.Errors.Count() > 0 {
 		return writeGraphQLError(g.logger, w, validationResult.Errors)
+	}
+
+	normalizationResult, err := gqlRequest.Normalize(g.schema)
+	if err != nil {
+		g.logger.Error("error while normalizing GraphQL request", abstractlogger.Error(err))
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	}
+
+	if normalizationResult.Errors != nil && normalizationResult.Errors.Count() > 0 {
+		return writeGraphQLError(g.logger, w, normalizationResult.Errors)
 	}
 
 	inputValidationResult, err := gqlRequest.ValidateInput(g.schema)
@@ -248,10 +253,13 @@ func (g *graphqlRequestProcessorWithOTelV1) ProcessRequest(ctx context.Context, 
 	g.otelExecutor.SetContext(ctx)
 	gqlRequest := g.ctxRetrieveRequest(r)
 
-	// normalization
-	err := g.otelExecutor.Normalize(gqlRequest)
+	// validation runs before normalization: normalization inlines fragment
+	// spreads and is not resilient to malformed operations (e.g. cyclic
+	// fragment spreads), whereas validation parses the query independently
+	// and can reject such operations safely. See TT-17945.
+	err := g.otelExecutor.ValidateForSchema(gqlRequest)
 	if err != nil {
-		g.logger.Error("error while normalizing GraphqlRequest", abstractlogger.Error(err))
+		g.logger.Error("error while validating GraphQL request", abstractlogger.Error(err))
 		var reqErr graphql.RequestErrors
 		if errors.As(err, &reqErr) {
 			return writeGraphQLError(g.logger, w, reqErr)
@@ -259,10 +267,10 @@ func (g *graphqlRequestProcessorWithOTelV1) ProcessRequest(ctx context.Context, 
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
 
-	// validation
-	err = g.otelExecutor.ValidateForSchema(gqlRequest)
+	// normalization
+	err = g.otelExecutor.Normalize(gqlRequest)
 	if err != nil {
-		g.logger.Error("error while validating GraphQL request", abstractlogger.Error(err))
+		g.logger.Error("error while normalizing GraphqlRequest", abstractlogger.Error(err))
 		var reqErr graphql.RequestErrors
 		if errors.As(err, &reqErr) {
 			return writeGraphQLError(g.logger, w, reqErr)
