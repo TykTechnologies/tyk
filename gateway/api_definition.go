@@ -2561,6 +2561,17 @@ func (a *APISpec) PrepareRequestToLog(r *http.Request) *http.Request {
 	return dup
 }
 
+func (a *APISpec) PrepareRequestToLogShallowClone(r *http.Request) *http.Request {
+	dup := *r
+
+	if r.URL != nil {
+		dup.URL = new(*r.URL)
+	}
+
+	a.PrepareRequestToLogInPlace(&dup)
+	return &dup
+}
+
 func (a *APISpec) PrepareRequestToLogInPlace(r *http.Request) {
 	a.SanitizeProxyPaths(r)
 
