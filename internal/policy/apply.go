@@ -116,6 +116,8 @@ func (t *Service) Apply(session *user.SessionState) error {
 		sessionInactiveState = false
 	}
 
+	var appliedPoliciesCount int
+
 	for _, polID := range policyIDs {
 		policy, ok := storage.PolicyByID(polID)
 
@@ -128,6 +130,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 			return err
 		}
+		appliedPoliciesCount++
 		// Check ownership, policy org owner must be the same as API,
 		// otherwise you could overwrite a session key with a policy from a different org!
 		if t.orgID != nil && policy.OrgID != *t.orgID {
@@ -269,7 +272,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 		session.AccessRights = rights
 	}
 
-	if len(rights) == 0 && len(session.AccessRights) == 0 && policyIDs != nil {
+	if appliedPoliciesCount == 0 && policyIDs != nil {
 		return errors.New("key has no valid policies to be applied")
 	}
 
