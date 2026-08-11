@@ -19,7 +19,16 @@ tasks:
     internal: true
     desc: 'Install go.uber.org/mock mockgen'
     status:
+      # Also require mockgen to have been built with a Go toolchain at
+      # least as new as go.mod's, so a bump of the module's Go version
+      # forces a rebuild instead of silently reusing a stale binary that
+      # can't parse newer language features (mockgen otherwise fails with
+      # "package requires newer Go version" and looks like an installer bug).
       - type mockgen
+      - |
+        built=$(go version -m "$(type -P mockgen)" | head -1 | sed 's/.*: go//')
+        required=$(go mod edit -json | jq -r .Go)
+        printf '%s\n%s\n' "$required" "$built" | sort -V -C
     cmds:
       - go install go.uber.org/mock/mockgen@2d1c58167e30f380cf78e44a43b100a14767e817  # v0.6.0
 
