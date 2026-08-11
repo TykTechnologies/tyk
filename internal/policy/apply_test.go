@@ -1475,3 +1475,71 @@ func TestApply_PostExpiryPropagation_Scenarios(t *testing.T) {
 		assert.Equal(t, user.PostExpiryActionDelete, sess.PostExpiryAction)
 	})
 }
+
+func TestApply_NoAcl_UpdatesLimits(t *testing.T) {
+	t.Run("updates rate limits, quotas and complexity when ACL is disabled", func(t *testing.T) {
+		orgID := ""
+
+		pol := user.Policy{
+			ID: "pol-no-acl",
+			Partitions: user.PolicyPartitions{
+				Acl:        false,
+				RateLimit:  true,
+				Quota:      true,
+				Complexity: true,
+			},
+			Rate:             1000,
+			Per:              60,
+			QuotaMax:         5000,
+			QuotaRenewalRate: 3600,
+			MaxQueryDepth:    10,
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {
+					APIID: "api1",
+					Limit: user.APILimit{
+						RateLimit: user.RateLimit{
+							Rate: 1000,
+							Per:  60,
+						},
+						QuotaMax:         5000,
+						QuotaRenews:      1,
+						QuotaRenewalRate: 3600,
+						MaxQueryDepth:    10,
+					},
+				},
+			},
+		}
+		store := policy.NewStoreMap(map[string]user.Policy{"pol-no-acl": pol})
+		svc := policy.New(&orgID, store, logrus.StandardLogger())
+
+		sess := &user.SessionState{
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {
+					APIID: "api1",
+					Limit: user.APILimit{
+						RateLimit: user.RateLimit{
+							Rate: 5,
+							Per:  60,
+						},
+						QuotaMax:         10,
+						QuotaRenews:      1,
+						QuotaRenewalRate: 3600,
+						MaxQueryDepth:    2,
+					},
+				},
+			},
+		}
+		sess.SetPolicies("pol-no-acl")
+
+		err := svc.Apply(sess)
+		assert.NoError(t, err)
+
+		ar, ok := sess.AccessRights["api1"]
+		assert.True(t, ok)
+
+		assert.Equal(t, float64(1000), ar.Limit.Rate)
+		assert.Equal(t, float64(60), ar.Limit.Per)
+		assert.Equal(t, int64(5000), ar.Limit.QuotaMax)
+		assert.Equal(t, 10, ar.Limit.MaxQueryDepth)
+	})
+}
