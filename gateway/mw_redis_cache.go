@@ -268,7 +268,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if !m.Spec.DoNotTrack {
 		ms := DurationToMillisecond(time.Since(t1))
 		latency := analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}
-		m.Spec.PrepareRequestToLogInPlace(r)
+		r = m.Spec.PrepareRequestToLogShallowClone(r)
 		m.sh.RecordHit(r, latency, newRes.StatusCode, newRes, true)
 		m.sh.RecordAccessLog(r, newRes, latency)
 		m.sh.Base().RecordMetrics(w, r, newRes.StatusCode, latency, newRes)
