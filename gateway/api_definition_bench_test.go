@@ -5,8 +5,9 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func BenchmarkPrepareRequestToLog_Clone(b *testing.B) {

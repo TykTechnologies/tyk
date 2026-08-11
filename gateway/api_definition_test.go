@@ -3363,7 +3363,7 @@ func TestGatewayWriteSpecFiles_WritesCompanionsOnlyForOASAPIs(t *testing.T) {
 	}, names)
 }
 
-func TestAPISpec_PrepareRequestToLog(t *testing.T) {
+func TestAPISpec_PrepareRequestToLog_and_ShallowClone(t *testing.T) {
 	t.Run("without target path", func(t *testing.T) {
 		a := APISpec{APIDefinition: &apidef.APIDefinition{}}
 		a.Proxy.ListenPath = "/listen/"
@@ -3373,6 +3373,12 @@ func TestAPISpec_PrepareRequestToLog(t *testing.T) {
 		assert.NoError(t, err)
 
 		dup := a.PrepareRequestToLog(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/get", dup.URL.Path)
+		assert.Equal(t, "", dup.URL.RawPath)
+
+		dup = a.PrepareRequestToLogShallowClone(r)
 
 		assert.NotSame(t, r, dup)
 		assert.Equal(t, "/get", dup.URL.Path)
@@ -3396,6 +3402,12 @@ func TestAPISpec_PrepareRequestToLog(t *testing.T) {
 		assert.NotSame(t, r, dup)
 		assert.Equal(t, "/base/get", dup.URL.Path)
 		assert.Equal(t, "", dup.URL.RawPath)
+
+		dup = a.PrepareRequestToLogShallowClone(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/base/get", dup.URL.Path)
+		assert.Equal(t, "", dup.URL.RawPath)
 	})
 
 	t.Run("with target path and raw path", func(t *testing.T) {
@@ -3414,6 +3426,12 @@ func TestAPISpec_PrepareRequestToLog(t *testing.T) {
 		r.URL.RawPath = "/listen/get%20it"
 
 		dup := a.PrepareRequestToLog(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/base/get it", dup.URL.Path)
+		assert.Equal(t, "/base/get%20it", dup.URL.RawPath)
+
+		dup = a.PrepareRequestToLogShallowClone(r)
 
 		assert.NotSame(t, r, dup)
 		assert.Equal(t, "/base/get it", dup.URL.Path)
