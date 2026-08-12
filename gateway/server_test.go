@@ -17,7 +17,6 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/sirupsen/logrus"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -2274,13 +2273,8 @@ func TestAfterConfSetup_AllowUnsafeBodyTransformTemplatePathsWarning(t *testing.
 
 		// Other tests that go through StartTest drop the level to Error,
 		// which silences the Warn entries this test is checking for.
-		origLevel := log.GetLevel()
-		log.SetLevel(logrus.WarnLevel)
-		defer log.SetLevel(origLevel)
-
-		hook := &logrustest.Hook{}
-		log.AddHook(hook)
-		defer log.ReplaceHooks(make(logrus.LevelHooks))
+		// GetTestHook raises the level to Trace for the duration of the test.
+		hook := log.GetTestHook(t)
 
 		gw := NewGateway(config.Config{AllowUnsafeBodyTransformTemplatePaths: allowUnsafe}, context.Background())
 		require.NoError(t, gw.afterConfSetup())

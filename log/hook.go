@@ -33,3 +33,10 @@ func (h *Hook) FilterBy(predicate func(*logrus.Entry) bool) []*logrus.Entry {
 func (h *Hook) CountBy(predicate func(*logrus.Entry) bool) int {
 	return lo.CountBy(h.AllEntries(), predicate)
 }
+
+// HasEntryWithLevel checks if at least one log entry has level
+func (h *Hook) HasEntryWithLevel(level logrus.Level) bool {
+	return h.SomeBy(func(e *logrus.Entry) bool {
+		return e.Level == level
+	})
+}

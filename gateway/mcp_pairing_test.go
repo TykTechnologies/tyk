@@ -119,7 +119,7 @@ func TestDeriveMCPAdapterCatalogue_BuildsProxySpecificToolViewsAndUnion(t *testi
 }
 
 func TestDeriveMCPAdapterCatalogue_SkipsStaleOverrideAndLogsWarning(t *testing.T) {
-	hook := captureGatewayLog(t, logrus.WarnLevel)
+	hook := log.GetTestHook(t)
 
 	rest := restSourceSpec("rest-1", "org-1", true)
 	proxy := pairedMCPProxySpec("proxy-1", "org-1", "rest-1", &oas.TykMCPServer{
