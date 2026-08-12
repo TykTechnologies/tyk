@@ -32,9 +32,9 @@ const (
 )
 
 func MakeOutput(output Output, opts json.RawMessage) (io.Writer, error) {
-	if fn, ok := outputRegistry[output]; !ok {
-		return nil, fmt.Errorf("unknown output %q for logger", output)
-	} else {
+	if fn, ok := outputRegistry[output]; ok {
 		return fn(opts)
 	}
+
+	return nil, fmt.Errorf("unknown output %q for logger", output)
 }
