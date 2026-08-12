@@ -1587,7 +1587,7 @@ func (gw *Gateway) extractLogLevel(cfg *config.Config) logrus.Level {
 }
 
 func (gw *Gateway) buildSinkWithDest(
-	case_ string,
+	method string,
 	format tyklog.Format,
 	cfg *config.Config,
 ) ([]tyklog.SinkerExtended, error) {
@@ -1596,9 +1596,9 @@ func (gw *Gateway) buildSinkWithDest(
 	sink := tyklog.NewSink(
 		os.Stderr,
 		tyklog.NewFormatter(format),
-		tyklog.NewAcceptorRange(level, logrus.FatalLevel),
+		tyklog.NewAcceptorRange(level, logrus.PanicLevel),
 	)
-	log.Debugf("Building logger format=%q level=%q case=%s", format, level, case_)
+	log.Debugf("Building logger format=%q level=%q case=%s", format, level, method)
 	return []tyklog.SinkerExtended{sink}, nil
 }
 
