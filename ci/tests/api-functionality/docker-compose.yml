@@ -12,6 +12,7 @@ services:
     image: ${GATEWAY_IMAGE}
     depends_on:
       - redis
+      - httpbin.org
     volumes:
       - ./data/api.json:/opt/tyk-gateway/apps/api.json
     ports:
