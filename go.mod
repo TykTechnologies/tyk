@@ -658,4 +658,4 @@ replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi 
 replace github.com/hamba/avro/v2 => github.com/iskorotkov/avro/v2 v2.34.0
 
 // todo: remove temporary pump replace after merging pump
-replace github.com/TykTechnologies/tyk-pump => github.com/TykTechnologies/tyk-pump v0.0.0-20260728202309-958a99ec60f1
+replace github.com/TykTechnologies/tyk-pump => github.com/TykTechnologies/tyk-pump v0.0.0-20261007131405-406ed2a19e43

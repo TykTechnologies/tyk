@@ -11,7 +11,6 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/sirupsen/logrus"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -317,13 +316,7 @@ func TestCallMCPAdapterTool_RejectsToolHiddenFromCallerProxy(t *testing.T) {
 }
 
 func TestCallMCPAdapterTool_LogsToolHiddenFromCallerProxy(t *testing.T) {
-	logger, hook := logrustest.NewNullLogger()
-	logger.SetLevel(logrus.WarnLevel)
-	originalLog := log
-	log = logger
-	t.Cleanup(func() {
-		log = originalLog
-	})
+	hook := log.GetTestHook(t)
 
 	gw, adapterSpec, sourceCalled := syntheticAdapterGatewayForCallTest(t)
 	tool := mustAdapterTool(t, adapterSpec, "make_order")
