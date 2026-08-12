@@ -775,7 +775,7 @@ func TestValidatePairedMCPAdapterUpstream(t *testing.T) {
 }
 
 func TestValidatePairedMCPAdapterUpstream_LogsDeriveWarnings(t *testing.T) {
-	hook := captureGatewayLog(t, logrus.WarnLevel)
+	hook := log.GetTestHook(t)
 
 	rest := restSourceSpec("rest-1", "org-1", true)
 	rest.OAS.Paths = openapi3.NewPaths(
