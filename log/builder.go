@@ -72,7 +72,7 @@ func (b *Builder) buildAndPropagate(dest *Logger) {
 
 	if b.level != nil {
 		for _, sinker := range b.sinkers {
-			sinker.SetAcceptor(NewAcceptorRange(*b.level, logrus.FatalLevel))
+			sinker.SetAcceptor(NewAcceptorRange(*b.level, logrus.PanicLevel))
 		}
 	}
 
