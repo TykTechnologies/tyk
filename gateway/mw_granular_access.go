@@ -10,6 +10,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // GranularAccessMiddleware will check if a URL is specifically enabled for the key
@@ -80,6 +81,11 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 			if err != nil || !match {
 				continue
 			}
+
+			if !m.conditionsMatch(r, accessSpec) {
+				continue
+			}
+
 			return m.pass()
 		}
 
@@ -109,12 +115,37 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 		}
 
 		match := asRegex.MatchString(r.URL.Path)
-		if match {
+		if match && m.conditionsMatch(r, accessSpec) {
 			return m.pass()
 		}
 	}
 
 	return m.block(logger)
+}
+
+// conditionsMatch reports whether the request satisfies every condition on the
+// access spec. Each condition is evaluated in isolation and they combine with
+// AND, so an "any of" rule has to be expressed as a single condition with
+// several options rather than as several conditions.
+//
+// A spec without conditions matches on URL and method alone, as before.
+func (m *GranularAccessMiddleware) conditionsMatch(r *http.Request, accessSpec user.AccessSpec) bool {
+	if len(accessSpec.Conditions) == 0 {
+		return true
+	}
+
+	// The trigger checks record their matches in the request context data.
+	forceContextData(r)
+
+	for index, condition := range accessSpec.Conditions {
+		if !checkTriggerOptions(r, initTriggerOptions(condition.Options), condition.On, index) {
+			m.Logger().WithField("url", accessSpec.URL).WithField("condition", index).
+				Debug("Granular access condition not satisfied")
+			return false
+		}
+	}
+
+	return true
 }
 
 func (m *GranularAccessMiddleware) block(logger *logrus.Entry) (error, int) {

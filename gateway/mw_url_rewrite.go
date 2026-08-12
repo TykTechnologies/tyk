@@ -61,114 +61,13 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 	// Check triggers
 	rewriteToPath := meta.RewriteTo
 	if len(meta.Triggers) > 0 {
-
 		// This feature uses context, we must force it if it doesn't exist
-		contextData := ctxGetData(r)
-		if contextData == nil {
-			contextDataObject := make(map[string]interface{})
-			ctxSetData(r, contextDataObject)
-		}
+		forceContextData(r)
 
 		for tn, triggerOpts := range meta.Triggers {
-			checkAny := false
-			setCount := 0
-			if triggerOpts.On == apidef.Any {
-				checkAny = true
-			}
-
-			// Check headers
-			if len(triggerOpts.Options.HeaderMatches) > 0 {
-				if checkHeaderTrigger(r, triggerOpts.Options.HeaderMatches, checkAny, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
-				}
-			}
-
-			// Check query string
-			if len(triggerOpts.Options.QueryValMatches) > 0 {
-				if checkQueryString(r, triggerOpts.Options.QueryValMatches, checkAny, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
-				}
-			}
-
-			// Check path parts
-			if len(triggerOpts.Options.PathPartMatches) > 0 {
-				if checkPathParts(r, triggerOpts.Options.PathPartMatches, checkAny, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
-				}
-			}
-
-			// Check session meta
-			if session := ctxGetSession(r); session != nil {
-				if len(triggerOpts.Options.SessionMetaMatches) > 0 {
-					if checkSessionTrigger(r, session, triggerOpts.Options.SessionMetaMatches, checkAny, tn) {
-						setCount += 1
-						if checkAny {
-							rewriteToPath = triggerOpts.RewriteTo
-							break
-						}
-					}
-				}
-			}
-
-			// Request context meta
-			if len(triggerOpts.Options.RequestContextMatches) > 0 {
-				if checkContextTrigger(r, triggerOpts.Options.RequestContextMatches, checkAny, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
-				}
-			}
-
-			// Check payload
-			if triggerOpts.Options.PayloadMatches.MatchPattern != "" {
-				if checkPayload(r, triggerOpts.Options.PayloadMatches, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
-				}
-			}
-
-			if !checkAny {
-				// Set total count:
-				total := 0
-				if len(triggerOpts.Options.HeaderMatches) > 0 {
-					total += 1
-				}
-				if len(triggerOpts.Options.QueryValMatches) > 0 {
-					total += 1
-				}
-				if len(triggerOpts.Options.PathPartMatches) > 0 {
-					total += 1
-				}
-				if len(triggerOpts.Options.SessionMetaMatches) > 0 {
-					total += 1
-				}
-				if len(triggerOpts.Options.RequestContextMatches) > 0 {
-					total += 1
-				}
-				if triggerOpts.Options.PayloadMatches.MatchPattern != "" {
-					total += 1
-				}
-				if total == setCount {
-					rewriteToPath = triggerOpts.RewriteTo
-					break
-				}
+			if checkTriggerOptions(r, triggerOpts.Options, triggerOpts.On, tn) {
+				rewriteToPath = triggerOpts.RewriteTo
+				break
 			}
 		}
 	}
@@ -536,6 +435,139 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		ctxSetURLRewriteTarget(r, newURL)
 	}
 	return nil, http.StatusOK
+}
+
+// forceContextData ensures the request carries a context data map. The trigger
+// checks below write their captured matches into it, so it must not be nil.
+func forceContextData(r *http.Request) {
+	if ctxGetData(r) == nil {
+		ctxSetData(r, make(map[string]interface{}))
+	}
+}
+
+// checkTriggerOptions reports whether the request satisfies options. With
+// apidef.Any a single matching option is enough and the remaining ones are not
+// evaluated; otherwise every configured option has to match.
+//
+// triggernum namespaces the matches this records in the request context data,
+// which callers can reference as $tyk_context.trigger-<triggernum>-<name>.
+// Callers must have run forceContextData on the request first.
+func checkTriggerOptions(r *http.Request, options apidef.RoutingTriggerOptions, on apidef.RoutingTriggerOnType, triggernum int) bool {
+	checkAny := on == apidef.Any
+
+	// total counts the configured options, setCount the ones that matched.
+	total, setCount := 0, 0
+
+	// Check headers
+	if len(options.HeaderMatches) > 0 {
+		total++
+		if checkHeaderTrigger(r, options.HeaderMatches, checkAny, triggernum) {
+			if checkAny {
+				return true
+			}
+			setCount++
+		}
+	}
+
+	// Check query string
+	if len(options.QueryValMatches) > 0 {
+		total++
+		if checkQueryString(r, options.QueryValMatches, checkAny, triggernum) {
+			if checkAny {
+				return true
+			}
+			setCount++
+		}
+	}
+
+	// Check path parts
+	if len(options.PathPartMatches) > 0 {
+		total++
+		if checkPathParts(r, options.PathPartMatches, checkAny, triggernum) {
+			if checkAny {
+				return true
+			}
+			setCount++
+		}
+	}
+
+	// Check session meta. A request without a session can never satisfy these,
+	// but they still count towards the total so an "all" trigger won't fire.
+	if len(options.SessionMetaMatches) > 0 {
+		total++
+		if session := ctxGetSession(r); session != nil &&
+			checkSessionTrigger(r, session, options.SessionMetaMatches, checkAny, triggernum) {
+			if checkAny {
+				return true
+			}
+			setCount++
+		}
+	}
+
+	// Request context meta
+	if len(options.RequestContextMatches) > 0 {
+		total++
+		if checkContextTrigger(r, options.RequestContextMatches, checkAny, triggernum) {
+			if checkAny {
+				return true
+			}
+			setCount++
+		}
+	}
+
+	// Check payload
+	if options.PayloadMatches.MatchPattern != "" {
+		total++
+		if checkPayload(r, options.PayloadMatches, triggernum) {
+			if checkAny {
+				return true
+			}
+			setCount++
+		}
+	}
+
+	if checkAny {
+		return false
+	}
+
+	return total == setCount
+}
+
+// initTriggerOptions returns a copy of options with every match pattern
+// compiled. Options that arrive on a session are decoded straight from storage,
+// so unlike API definition triggers they have no compiled regexp yet, and the
+// maps are shared between concurrent requests - hence the copy rather than an
+// in place Init. Patterns that fail to compile are left uncompiled, which makes
+// them match nothing.
+func initTriggerOptions(options apidef.RoutingTriggerOptions) apidef.RoutingTriggerOptions {
+	initialised := apidef.RoutingTriggerOptions{
+		HeaderMatches:         initStringRegexMaps(options.HeaderMatches),
+		QueryValMatches:       initStringRegexMaps(options.QueryValMatches),
+		PathPartMatches:       initStringRegexMaps(options.PathPartMatches),
+		SessionMetaMatches:    initStringRegexMaps(options.SessionMetaMatches),
+		RequestContextMatches: initStringRegexMaps(options.RequestContextMatches),
+		PayloadMatches:        options.PayloadMatches,
+	}
+
+	if initialised.PayloadMatches.MatchPattern != "" {
+		initialised.PayloadMatches.Init()
+	}
+
+	return initialised
+}
+
+func initStringRegexMaps(in map[string]apidef.StringRegexMap) map[string]apidef.StringRegexMap {
+	if len(in) == 0 {
+		return nil
+	}
+
+	out := make(map[string]apidef.StringRegexMap, len(in))
+	for key, match := range in {
+		match.Init()
+		out[key] = match
+	}
+
+	return out
 }
 
 func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {

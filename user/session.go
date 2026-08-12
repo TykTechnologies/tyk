@@ -44,10 +44,25 @@ func IsHashType(t string) bool {
 	return false
 }
 
+// AccessCondition is an additional constraint that a request has to satisfy
+// before the enclosing AccessSpec grants access. It mirrors
+// apidef.RoutingTrigger, minus the RewriteTo field which has no meaning here.
+type AccessCondition struct {
+	// On decides how the options below combine: apidef.All requires every
+	// configured option to match, apidef.Any requires just one of them.
+	On apidef.RoutingTriggerOnType `json:"on" msg:"on"`
+	// Options holds the header, query, path part, session meta, request
+	// context and payload matches to evaluate against the request.
+	Options apidef.RoutingTriggerOptions `json:"options" msg:"options"`
+}
+
 // AccessSpecs define what URLS a user has access to an what methods are enabled
 type AccessSpec struct {
 	URL     string   `json:"url" msg:"url"`
 	Methods []string `json:"methods" msg:"methods"`
+	// Conditions further restrict the matched URL. When set, every condition
+	// has to be satisfied by the request for access to be granted.
+	Conditions []AccessCondition `json:"conditions,omitempty" msg:"conditions"`
 }
 
 // RateLimit holds rate limit configuration.
