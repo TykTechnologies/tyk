@@ -147,4 +147,34 @@ func Test_Log_Format(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("Struct Composition Contract (Mixed Memory Layout)", func(t *testing.T) {
+		type CombinedConfig struct {
+			ByValue   LogFormat  `json:"by_value"`
+			ByPointer *LogFormat `json:"by_pointer"`
+		}
+
+		lf := LogFormat{
+			formatType: LogFormatString,
+			format:     tyklog.Format("strict_validation"),
+		}
+
+		input := CombinedConfig{
+			ByValue:   lf,
+			ByPointer: &lf,
+		}
+		outBytes, err := json.Marshal(input)
+
+		assert.NoError(t, err, "Unexpected error during struct marshal")
+		expectedJSON := `{
+        	"by_value": "strict_validation",
+        	"by_pointer": "strict_validation"
+    	}`
+
+		if !assert.JSONEq(t, expectedJSON, string(outBytes),
+			"Struct marshaling failed to resolve method sets consistently across value and pointer boundaries.") {
+			t.Logf("received %s", string(outBytes))
+			t.Logf("expected => %s", expectedJSON)
+		}
+	})
 }

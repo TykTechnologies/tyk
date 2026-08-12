@@ -8,6 +8,14 @@ import (
 	tyklog "github.com/TykTechnologies/tyk/log"
 )
 
+type LogFormatType int
+
+const (
+	LogFormatUndefined LogFormatType = iota
+	LogFormatString
+	LogFormatSinks
+)
+
 type LogFormat struct {
 	sinks      []tyklog.SinkConfig
 	format     tyklog.Format
@@ -69,16 +77,8 @@ func (lf LogFormat) MarshalJSON() ([]byte, error) {
 	case LogFormatSinks:
 		return json.Marshal(lf.sinks)
 	case LogFormatUndefined:
-		fallthrough
-	default:
 		return []byte("null"), nil
+	default:
+		return nil, errors.New("invalid invariant")
 	}
 }
-
-type LogFormatType int
-
-const (
-	LogFormatUndefined LogFormatType = iota
-	LogFormatString
-	LogFormatSinks
-)
