@@ -12,7 +12,7 @@ on:
       - "v*"
 
 env:
-  GOLANG_CROSS: 1.25-bullseye
+  GOLANG_CROSS: 1.26-bullseye
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

@@ -7,7 +7,7 @@ name: CI lint
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize, labeled]
+    types: [opened, synchronize, reopened, labeled]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,28 +15,16 @@ concurrency:
 
 jobs:
   dep-guard:
-    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@186b3eafdbda5d8ed71646c00e2bfd9893c88aaf
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@production
     permissions:
       contents: read
 
-  generate-token:
-    runs-on: ubuntu-latest
-    outputs:
-      token: ${{ steps.app-token.outputs.token }}
-    steps:
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
-        with:
-          app-id: ${{ secrets.PROBE_APP_ID }}
-          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
-          owner: TykTechnologies
-
   godoc:
-    needs: [dep-guard, generate-token]
+    needs: [dep-guard]
     if: ${{ !github.event.pull_request.draft }}
-    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@d3fa20888fa2878e877e22bb7702141217290e7c  # main
     secrets:
-      ORG_GH_TOKEN: ${{ needs.generate-token.outputs.token }}
+      PROBE_APP_ID: ${{ secrets.PROBE_APP_ID }}
+      PROBE_APP_PRIVATE_KEY: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
     with:
       go-version: stable
