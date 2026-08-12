@@ -44,7 +44,7 @@ jobs:
       (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') &&
       github.event.pull_request.draft == false
     name: '${{ matrix.golang_cross }}'
-    runs-on: ${{ vars.BUILD_RUNNER || vars.DEFAULT_RUNNER }}
+    runs-on: ${{ vars.WARP_RUNNER_8X_X64 || vars.BUILD_RUNNER || vars.DEFAULT_RUNNER }}
     permissions:
       id-token: write # AWS OIDC JWT
       contents: read # actions/checkout
@@ -52,9 +52,9 @@ jobs:
       fail-fast: false
       matrix:
         golang_cross:
-          - 1.25-bullseye
+          - 1.26-bullseye
         include:
-          - golang_cross: 1.25-bullseye
+          - golang_cross: 1.26-bullseye
             goreleaser: 'ci/goreleaser/goreleaser.yml'
             cgo: 1
             rpmvers: 'el/7 el/8 el/9 amazon/2 amazon/2023'
@@ -108,17 +108,24 @@ jobs:
           mask-aws-account-id: false
       - uses: aws-actions/amazon-ecr-login@f2e9fc6c2b355c1890b65e6f6f0e2ac3e6e22f78 # v2
         id: ecr
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         with:
           mask-password: 'true'
-      - uses: WarpBuilds/cache@f643a1ba29942d56621d07fc2d4284c7219868ad # v1
+      # Restore-only here; the matching save runs after Build and only off-PR
+      # (see "Save Go build cache"). PRs read the cache but never write it, so
+      # they don't re-upload the multi-GB cache each run, and the store isn't
+      # churned. master/tags keep the cache warm for PRs to restore from.
+      - uses: WarpBuilds/cache/restore@f643a1ba29942d56621d07fc2d4284c7219868ad # v1
+        id: go-cache
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
+          # loose prefix so a changed go.sum / fresh branch gets a partial
+          # restore instead of a cold rebuild (exact key = no fallback).
           restore-keys: |
-            ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+            ${{ runner.os }}-go-
       - name: Validate Go version
         run: |
           GO_VERSION_STR=$(docker run --rm tykio/golang-cross:${{ matrix.golang_cross }} go version 2>&1 || true)
@@ -184,8 +191,23 @@ jobs:
           -v /tmp/build.sh:/tmp/build.sh                                         \
           -w /go/src/github.com/TykTechnologies/tyk                      \
           tykio/golang-cross:${{ matrix.golang_cross }} /tmp/build.sh
+      # Only master/tags populate the go cache; PRs are read-only (see the
+      # restore step above) so they don't pay the multi-GB upload every run.
+      # Save under the restore step's primary key (computed from the committed
+      # go.sum at job start), NOT a fresh hashFiles() — the build rewrites go.sum,
+      # so re-hashing here would save under a key the next run never looks up,
+      # causing a perpetual re-save + cache eviction. Skip if we already had an
+      # exact hit (nothing new to store).
+      - name: Save Go build cache
+        uses: WarpBuilds/cache/save@f643a1ba29942d56621d07fc2d4284c7219868ad # v1
+        if: ${{ github.event_name != 'pull_request' && steps.go-cache.outputs.cache-hit != 'true' }}
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ steps.go-cache.outputs.cache-primary-key }}
       - name: Install Docker Scout CLI
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
           mkdir -p ~/.docker/cli-plugins
           curl --proto '=https' --tlsv1.2 -fsSL https://github.com/docker/scout-cli/releases/download/v1.22.0/docker-scout_1.22.0_linux_amd64.tar.gz -o /tmp/scout.tar.gz
@@ -195,7 +217,7 @@ jobs:
           chmod +x ~/.docker/cli-plugins/docker-scout
       - name: Docker metadata for ee CI
         id: ci_metadata_ee
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: |
@@ -210,7 +232,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push ee image to CI
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
@@ -227,7 +249,7 @@ jobs:
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
       - name: Verify compression format for ee CI image
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         run: |
           # Resolve the first tag for verification
           TAG=$(echo "${{ steps.ci_metadata_ee.outputs.tags }}" | tr ',' '\n' | head -n1)
@@ -289,7 +311,7 @@ jobs:
             org.opencontainers.image.vendor=tyk.io
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push ee image to prod
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
@@ -305,7 +327,7 @@ jobs:
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
       - name: Verify compression format for ee prod image
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
           # Resolve the first tag for verification
           TAG=$(echo "${{ steps.tag_metadata_ee.outputs.tags }}" | tr ',' '\n' | head -n1)
@@ -348,7 +370,7 @@ jobs:
           fi
           echo "Success: All layers are uniformly compressed using gzip."
       - name: Attach base image VEX to ee
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
           docker scout vex get --org tykio -o /tmp/ee-vex.json tykio/dhi-busybox:1.37-fips || true
           if [ -f /tmp/ee-vex.json ]; then
@@ -361,7 +383,7 @@ jobs:
           fi
       - name: Docker metadata for fips CI
         id: ci_metadata_fips
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: |
@@ -376,7 +398,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push fips image to CI
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
@@ -393,7 +415,7 @@ jobs:
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
       - name: Verify compression format for fips CI image
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         run: |
           # Resolve the first tag for verification
           TAG=$(echo "${{ steps.ci_metadata_fips.outputs.tags }}" | tr ',' '\n' | head -n1)
@@ -454,7 +476,7 @@ jobs:
             org.opencontainers.image.vendor=tyk.io
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push fips image to prod
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
@@ -470,7 +492,7 @@ jobs:
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
       - name: Verify compression format for fips prod image
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
           # Resolve the first tag for verification
           TAG=$(echo "${{ steps.tag_metadata_fips.outputs.tags }}" | tr ',' '\n' | head -n1)
@@ -513,7 +535,7 @@ jobs:
           fi
           echo "Success: All layers are uniformly compressed using gzip."
       - name: Attach base image VEX to fips
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
           docker scout vex get --org tykio -o /tmp/fips-vex.json tykio/dhi-busybox:1.37-fips || true
           if [ -f /tmp/fips-vex.json ]; then
@@ -523,7 +545,7 @@ jobs:
           fi
       - name: Docker metadata for std CI
         id: ci_metadata_std
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: |
@@ -538,7 +560,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push std image to CI
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
@@ -553,7 +575,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway
       - name: Verify compression format for std CI image
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         run: |
           # Resolve the first tag for verification
           TAG=$(echo "${{ steps.ci_metadata_std.outputs.tags }}" | tr ',' '\n' | head -n1)
@@ -615,7 +637,7 @@ jobs:
             org.opencontainers.image.vendor=tyk.io
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push std image to prod
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
@@ -629,7 +651,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway
       - name: Verify compression format for std prod image
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
           # Resolve the first tag for verification
           TAG=$(echo "${{ steps.tag_metadata_std.outputs.tags }}" | tr ',' '\n' | head -n1)
@@ -673,7 +695,7 @@ jobs:
           echo "Success: All layers are uniformly compressed using gzip."
       - name: save deb
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         with:
           name: deb
           retention-days: 1
@@ -683,7 +705,7 @@ jobs:
             !dist/*fips*.deb
       - name: save rpm
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         with:
           name: rpm
           retention-days: 1
@@ -777,10 +799,18 @@ jobs:
             exit 0
           fi
 
-          BRANCH=${HEAD_REF##*/}
+          BRANCH="$HEAD_REF"
           echo "Checking for branch: $BRANCH in tyk-analytics"
 
-          if git ls-remote --heads https://$GITHUB_TOKEN@github.com/TykTechnologies/tyk-analytics.git refs/heads/$BRANCH | grep -q .; then
+          if ! REMOTE_REF=$(git ls-remote \
+            --heads \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/TykTechnologies/tyk-analytics.git" \
+            "refs/heads/$BRANCH"); then
+            echo "::error::Unable to query tyk-analytics; check GitHub App authentication and repository permissions"
+            exit 1
+          fi
+
+          if [ -n "$REMOTE_REF" ]; then
             echo "✓ Branch '$BRANCH' exists in tyk-analytics"
             echo "branch_exists=true" >> $GITHUB_OUTPUT
             echo "branch=$BRANCH" >> $GITHUB_OUTPUT
@@ -829,6 +859,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HAS_RELEVANT_CHANGES: ${{ steps.check_changes.outputs.has_relevant_changes }}
           ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           echo "=================================="
           echo "📊 Dashboard Image Resolution"
@@ -843,61 +874,69 @@ jobs:
           echo "Has relevant changes in PR: $HAS_RELEVANT_CHANGES"
           echo "=================================="
 
+          # emit <strategy> <dashboard_image> <needs_build> <dashboard_branch>
+          emit() {
+            echo "strategy=$1" >> $GITHUB_OUTPUT
+            echo "dashboard_image=$2" >> $GITHUB_OUTPUT
+            echo "needs_build=$3" >> $GITHUB_OUTPUT
+            echo "dashboard_branch=$4" >> $GITHUB_OUTPUT
+          }
+
+          dash_image_exists() {
+            aws ecr describe-images \
+              --repository-name tyk-analytics \
+              --image-ids imageTag=$1 \
+              --region eu-central-1 > /dev/null 2>&1
+          }
+
           # For non-master base branches, check if the same branch exists in tyk-analytics
           if [ "$BASE_REF" != "master" ]; then
-            if git ls-remote --exit-code --heads "https://x-access-token:${ORG_GH_TOKEN}@github.com/TykTechnologies/tyk-analytics.git" "refs/heads/$BASE_REF" > /dev/null 2>&1; then
-              echo "📋 Strategy: Use release branch '$BASE_REF' from tyk-analytics"
-              echo "    → Base branch exists in tyk-analytics, using it directly"
-              echo "dashboard_image=${REGISTRY}/tyk-analytics:${BASE_REF}" >> $GITHUB_OUTPUT
-              echo "needs_build=false" >> $GITHUB_OUTPUT
-              echo "dashboard_branch=$BASE_REF" >> $GITHUB_OUTPUT
-              echo "strategy=release-branch-match" >> $GITHUB_OUTPUT
-            else
+            if ! git ls-remote --exit-code --heads "https://x-access-token:${ORG_GH_TOKEN}@github.com/TykTechnologies/tyk-analytics.git" "refs/heads/$BASE_REF" > /dev/null 2>&1; then
               echo "ℹ️ Strategy: Use gromit default (base branch '$BASE_REF' not found in tyk-analytics)"
-              echo "    → Falling back to gromit default"
-              echo "dashboard_image=" >> $GITHUB_OUTPUT
-              echo "needs_build=false" >> $GITHUB_OUTPUT
-              echo "dashboard_branch=" >> $GITHUB_OUTPUT
-              echo "strategy=gromit-default" >> $GITHUB_OUTPUT
+              emit gromit-default "" false ""
+            elif dash_image_exists "$BASE_REF"; then
+              echo "📋 Strategy: Use release branch '$BASE_REF' from tyk-analytics"
+              emit release-branch-match "${REGISTRY}/tyk-analytics:${BASE_REF}" false "$BASE_REF"
+            elif [ -n "$PR_NUMBER" ]; then
+              echo "🔨 Strategy: Build dashboard from base branch '$BASE_REF' (branch exists but has no ECR image)"
+              emit build-from-base-branch "${REGISTRY}/tyk-analytics:tyk-${PR_NUMBER}" true "$BASE_REF"
+            else
+              echo "ℹ️ Strategy: Use gromit default (no ECR image for '$BASE_REF' and not a PR)"
+              emit gromit-default "" false ""
             fi
 
-          # Strategy 1: Matching branch exists in tyk-analytics → use gromit
+          # Strategy 1: Matching branch exists in tyk-analytics → use its PR image, or build from it
           elif [ "$BRANCH_EXISTS" = "true" ]; then
-            echo "📋 Strategy: Use matching branch '$BRANCH' via gromit"
-            echo "    → No override needed, gromit will handle it"
-            echo "dashboard_image=" >> $GITHUB_OUTPUT
-            echo "needs_build=false" >> $GITHUB_OUTPUT
-            echo "dashboard_branch=$BRANCH" >> $GITHUB_OUTPUT
-            echo "strategy=gromit-branch" >> $GITHUB_OUTPUT
+            # Find the tyk-analytics PR for the branch by matching its head SHA
+            # against refs/pull/*/head; needs only repository read access
+            TA_REMOTE="https://x-access-token:${GH_TOKEN}@github.com/TykTechnologies/tyk-analytics.git"
+            BRANCH_SHA=$(git ls-remote --heads "$TA_REMOTE" "refs/heads/$BRANCH" | cut -f1 || true)
+            DASH_PR=$(git ls-remote "$TA_REMOTE" 'refs/pull/*/head' 2>/dev/null \
+              | awk -v sha="$BRANCH_SHA" '$1 == sha { split($2, r, "/"); print r[3] }' \
+              | sort -n | tail -1 || true)
+
+            if [ -n "$DASH_PR" ] && dash_image_exists "pr-${DASH_PR}"; then
+              echo "📋 Strategy: Use tyk-analytics PR #${DASH_PR} image (tyk-analytics:pr-${DASH_PR}) for matching branch '$BRANCH'"
+              emit analytics-pr-image "${REGISTRY}/tyk-analytics:pr-${DASH_PR}" false "$BRANCH"
+            else
+              echo "🔨 Strategy: Build dashboard from matching branch '$BRANCH' (no open tyk-analytics PR image)"
+              emit build-from-branch "${REGISTRY}/tyk-analytics:tyk-${PR_NUMBER}" true "$BRANCH"
+            fi
 
           # Strategy 2a: PR has relevant changes → build new image
           elif [ "$HAS_RELEVANT_CHANGES" = "true" ]; then
-            PR_IMAGE_TAG="tyk-${PR_NUMBER}"
-            echo "🔨 Strategy: Build dashboard (PR has relevant package changes)"
-            echo "    → Will update gateway ref to $COMMIT_SHA"
-            echo "    → Will push to: ${REGISTRY}/tyk-analytics:${PR_IMAGE_TAG}"
-            echo "dashboard_image=${REGISTRY}/tyk-analytics:${PR_IMAGE_TAG}" >> $GITHUB_OUTPUT
-            echo "needs_build=true" >> $GITHUB_OUTPUT
-            echo "dashboard_branch=$BASE_REF" >> $GITHUB_OUTPUT
-            echo "strategy=build-required" >> $GITHUB_OUTPUT
+            echo "🔨 Strategy: Build dashboard from '$BASE_REF' with gateway ref $COMMIT_SHA (PR has relevant package changes)"
+            emit build-required "${REGISTRY}/tyk-analytics:tyk-${PR_NUMBER}" true "$BASE_REF"
 
           # Strategy 2b: PR image exists and no relevant changes → reuse existing image
           elif [ "$IMAGE_EXISTS" = "true" ]; then
-            echo "🐳 Strategy: Reuse existing PR image (no relevant package changes in PR)"
-            echo "    → Image: ${REGISTRY}/tyk-analytics:${IMAGE_TAG}"
-            echo "dashboard_image=${REGISTRY}/tyk-analytics:${IMAGE_TAG}" >> $GITHUB_OUTPUT
-            echo "needs_build=false" >> $GITHUB_OUTPUT
-            echo "dashboard_branch=" >> $GITHUB_OUTPUT
-            echo "strategy=reuse-pr-image" >> $GITHUB_OUTPUT
+            echo "🐳 Strategy: Reuse existing PR image tyk-analytics:${IMAGE_TAG} (no relevant package changes in PR)"
+            emit reuse-pr-image "${REGISTRY}/tyk-analytics:${IMAGE_TAG}" false ""
 
           # Strategy 3: Fallback to gromit default
           else
-            echo "ℹ️ Strategy: Use gromit default"
-            echo "    → No matching branch, no existing PR image, no relevant changes"
-            echo "dashboard_image=" >> $GITHUB_OUTPUT
-            echo "needs_build=false" >> $GITHUB_OUTPUT
-            echo "dashboard_branch=" >> $GITHUB_OUTPUT
-            echo "strategy=gromit-default" >> $GITHUB_OUTPUT
+            echo "ℹ️ Strategy: Use gromit default (no matching branch, PR image, or relevant changes)"
+            emit gromit-default "" false ""
           fi
 
           echo "=================================="
@@ -1041,7 +1080,7 @@ jobs:
             -e GOMODCACHE=/go/pkg/mod \
             -v /tmp/build-dashboard.sh:/tmp/build-dashboard.sh \
             -w /go/src/github.com/TykTechnologies/tyk-analytics \
-            tykio/golang-cross:1.25-bullseye /tmp/build-dashboard.sh
+            tykio/golang-cross:1.26-bullseye /tmp/build-dashboard.sh
 
           echo "✅ Packages built successfully for $GOARCH"
       - name: Detect platform for Docker build
@@ -1123,7 +1162,9 @@ jobs:
       needs.goreleaser.result == 'success' &&
       needs.resolve-dashboard-image.result == 'success' &&
       (needs.build-dashboard-image.result == 'success' || needs.build-dashboard-image.result == 'skipped')
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+    runs-on: ${{ vars.WARP_RUNNER_8X_X64 || vars.DEFAULT_RUNNER }}
+    # Cost guard: hard cap vs the 360-min default (matters on bigger runners).
+    timeout-minutes: 25
     env:
       XUNIT_REPORT_PATH: ${{ github.workspace}}/test-results.xml
     permissions:
@@ -1187,13 +1228,19 @@ jobs:
           org_gh_token: ${{ steps.app-token.outputs.token }}
       - name: Run API tests
         uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@production
-        timeout-minutes: 45
+        timeout-minutes: 25
         id: test_execution
         with:
           user_api_secret: ${{ steps.env_up.outputs.USER_API_SECRET }}
       - name: Generate test reports and collect logs
         uses: TykTechnologies/github-actions/.github/actions/tests/reporting@production
         if: always() && (steps.test_execution.conclusion != 'skipped')
+        # Bound this best-effort step: `docker compose logs` inside it can hang on
+        # an unresponsive container and otherwise burn the whole job timeout.
+        # continue-on-error keeps a log-collection hang from failing an otherwise
+        # green test run (the real result comes from the Execute step above).
+        timeout-minutes: 8
+        continue-on-error: true
         with:
           report_xml: 'true'
           execution_status: ${{ steps.test_execution.outcome }}
@@ -1238,126 +1285,23 @@ jobs:
     outputs:
       deb: ${{ steps.params.outputs.deb }}
       rpm: ${{ steps.params.outputs.rpm }}
+      rpm_amd64: ${{ steps.params.outputs.rpm_amd64 }}
     steps:
       - name: Set distro matrix
         uses: TykTechnologies/github-actions/.github/actions/tests/distro-matrix@production
         id: params
-  upgrade-deb:
-    services:
-      httpbin.org:
-        image: kennethreitz/httpbin
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+  upgrade-tests:
     needs:
       - test-controller-distros
-    strategy:
-      fail-fast: true
-      matrix:
-        arch:
-          - amd64
-          - arm64
-        distro: ${{ fromJson(needs.test-controller-distros.outputs.deb) }}
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 1
-          sparse-checkout: ci
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: deb
-      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      - name: generate dockerfile
-        run: |
-          echo 'FROM ${{ matrix.distro }}
-          ARG TARGETARCH
-          COPY tyk-gateway*_${TARGETARCH}.deb /tyk-gateway.deb
-          RUN apt-get update && apt-get install -y curl
-          # TODO(security): curl|bash - consider fetching script and verifying checksum before execution
-          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash || echo "Repository setup failed, but continuing" # SECURITY: accepted risk, see TODO above
-          RUN apt-get install -y tyk-gateway=3.0.8 || echo "Previous version not found, testing fresh install"
-          RUN dpkg -i /tyk-gateway.deb
-
-          RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
-          COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
-          CMD ["/opt/tyk-gateway/tyk", "--conf", "/opt/tyk-gateway/tyk.conf"]
-          ' | tee Dockerfile
-      - name: install on ${{ matrix.distro }}
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
-        with:
-          context: "."
-          platforms: linux/${{ matrix.arch }}
-          build-args: |
-            RHELARCH=${{ startsWith(matrix.arch, 'arm64') && 'aarch64' || 'x86_64' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          file: Dockerfile
-          push: false
-          tags: test-${{ matrix.distro }}-${{ matrix.arch }}
-          load: true
-      - name: Test the built container image with api functionality test.
-        run: |
-          docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.services['httpbin.org'].network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
-          sleep 2
-          ./ci/tests/api-functionality/api_test.sh
-          sleep 2
-          docker stop test || true
-  upgrade-rpm:
-    services:
-      httpbin.org:
-        image: kennethreitz/httpbin
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
-    needs:
-      - test-controller-distros
-    strategy:
-      fail-fast: true
-      matrix:
-        arch:
-          - amd64
-          - arm64
-        distro: ${{ fromJson(needs.test-controller-distros.outputs.rpm) }}
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 1
-          sparse-checkout: ci
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: rpm
-      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      - name: generate dockerfile
-        run: |
-          echo 'FROM ${{ matrix.distro }}
-          ARG RHELARCH
-          COPY tyk-gateway*.${RHELARCH}.rpm /tyk-gateway.rpm
-          RUN command -v curl || yum install -y curl
-          RUN command -v useradd || yum install -y shadow-utils
-          # TODO(security): curl|bash - consider fetching script and verifying checksum before execution
-          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.rpm.sh | bash || echo "Repository setup failed, but continuing" # SECURITY: accepted risk, see TODO above
-          RUN yum install -y tyk-gateway-3.0.8-1 || echo "Previous version not found, testing fresh install"
-          RUN curl https://keyserver.tyk.io/tyk.io.rpm.signing.key.2020 -o tyk-gateway.key && rpm --import tyk-gateway.key
-          RUN rpm --checksig /tyk-gateway.rpm
-          RUN rpm -Uvh --force /tyk-gateway.rpm
-
-          RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
-          COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
-          CMD ["/opt/tyk-gateway/tyk", "--conf", "/opt/tyk-gateway/tyk.conf"]
-          ' | tee Dockerfile
-      - name: install on ${{ matrix.distro }}
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
-        with:
-          context: "."
-          platforms: linux/${{ matrix.arch }}
-          build-args: |
-            RHELARCH=${{ startsWith(matrix.arch, 'arm64') && 'aarch64' || 'x86_64' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          file: Dockerfile
-          push: false
-          tags: test-${{ matrix.distro }}-${{ matrix.arch }}
-          load: true
-      - name: Test the built container image with api functionality test.
-        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.services['httpbin.org'].network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
+    uses: TykTechnologies/github-actions/.github/workflows/upgrade-tests.yml@production
+    with:
+      deb: ${{ needs.test-controller-distros.outputs.deb }}
+      rpm: ${{ needs.test-controller-distros.outputs.rpm }}
+      rpm_amd64: ${{ needs.test-controller-distros.outputs.rpm_amd64 }}
+      package_name: tyk-gateway
+      upgrade_repo: tyk-gateway
+      runs_on: ${{ vars.DEFAULT_RUNNER }}
+      run_gateway_tests: true
   release-tests:
     needs:
       - goreleaser
