@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -196,29 +195,6 @@ func installKVSetter(t *testing.T, gw *Gateway, storeName string) *recordingSett
 	return rec
 }
 
-func captureGatewayLog(t *testing.T) *logrustest.Hook {
-	t.Helper()
-
-	logger, hook := logrustest.NewNullLogger()
-	logger.SetLevel(logrus.DebugLevel)
-
-	orig := log
-	log = logger
-	t.Cleanup(func() { log = orig })
-
-	return hook
-}
-
-func hasLevel(hook *logrustest.Hook, level logrus.Level) bool {
-	for _, e := range hook.AllEntries() {
-		if e.Level == level {
-			return true
-		}
-	}
-
-	return false
-}
-
 func TestUpdateKeyInStore_WritesThroughRegistry(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -280,12 +256,12 @@ func TestUpdateKeyInStore_WritesThroughRegistry(t *testing.T) {
 func TestUpdateKeyInStore_UnknownStoreWarnsAndDoesNotWrite(t *testing.T) {
 	gw := NewGateway(config.Config{}, t.Context())
 	rec := installKVSetter(t, gw, "vault")
-	hook := captureGatewayLog(t)
+	hook := log.GetTestHook(t)
 
 	gw.updateKeyInStore("kv://absent/some/key", "NEWKEY")
 
 	require.Zero(t, rec.count(), "must not write to any store")
-	require.True(t, hasLevel(hook, logrus.WarnLevel),
+	require.True(t, hook.HasEntryWithLevel(logrus.WarnLevel),
 		"an unknown store must warn, never silently drop the rotation")
 }
 
@@ -295,11 +271,11 @@ func TestUpdateKeyInStore_NonWritableStoreWarns(t *testing.T) {
 	installFakeKVStores(t, gw, map[string]map[string]string{
 		"vault": {"secret/tyk-apis": `{"api_key":"OLD"}`},
 	})
-	hook := captureGatewayLog(t)
+	hook := log.GetTestHook(t)
 
 	gw.updateKeyInStore("vault://secret/tyk-apis.api_key", "NEWKEY")
 
-	require.True(t, hasLevel(hook, logrus.WarnLevel),
+	require.True(t, hook.HasEntryWithLevel(logrus.WarnLevel),
 		"a non-writable store must warn, never silently drop the rotation")
 }
 
@@ -307,23 +283,23 @@ func TestUpdateKeyInStore_SetErrorIsLogged(t *testing.T) {
 	gw := NewGateway(config.Config{}, t.Context())
 	rec := installKVSetter(t, gw, "vault")
 	rec.setErr = errors.New("backend down")
-	hook := captureGatewayLog(t)
+	hook := log.GetTestHook(t)
 
 	gw.updateKeyInStore("kv://vault/secret/tyk-apis#api_key", "NEWKEY")
 
-	require.True(t, hasLevel(hook, logrus.ErrorLevel),
+	require.True(t, hook.HasEntryWithLevel(logrus.ErrorLevel),
 		"a failed write must be logged at error level")
 }
 
 func TestUpdateKeyInStore_MalformedKVReferenceWarns(t *testing.T) {
 	gw := NewGateway(config.Config{}, t.Context())
 	rec := installKVSetter(t, gw, "vault")
-	hook := captureGatewayLog(t)
+	hook := log.GetTestHook(t)
 
 	gw.updateKeyInStore("kv://no-path-separator", "NEWKEY")
 
 	require.Zero(t, rec.count())
-	require.True(t, hasLevel(hook, logrus.WarnLevel),
+	require.True(t, hook.HasEntryWithLevel(logrus.WarnLevel),
 		"a malformed kv:// reference must warn, not panic or silently drop")
 }
 
@@ -345,14 +321,14 @@ func TestUpdateKeyInStore_SilentNoOps(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gw := NewGateway(config.Config{}, t.Context())
 			rec := installKVSetter(t, gw, "vault")
-			hook := captureGatewayLog(t)
+			hook := log.GetTestHook(t)
 
 			gw.updateKeyInStore(tt.keyPath, "NEWKEY")
 
 			require.Zero(t, rec.count(), "nothing should be written")
-			require.False(t, hasLevel(hook, logrus.WarnLevel),
+			require.False(t, hook.HasEntryWithLevel(logrus.WarnLevel),
 				"a non-reference key is a valid config, not a warning")
-			require.False(t, hasLevel(hook, logrus.ErrorLevel))
+			require.False(t, hook.HasEntryWithLevel(logrus.ErrorLevel))
 		})
 	}
 }

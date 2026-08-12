@@ -173,6 +173,7 @@ func Test_Log_Format(t *testing.T) {
 
 		if !assert.JSONEq(t, expectedJSON, string(outBytes),
 			"Struct marshaling failed to resolve method sets consistently across value and pointer boundaries.") {
+
 			t.Logf("received %s", string(outBytes))
 			t.Logf("expected => %s", expectedJSON)
 		}
