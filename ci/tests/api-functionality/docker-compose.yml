@@ -19,16 +19,6 @@ services:
     environment:
       - TYK_DB_REDISHOST=redis
       - TYK_LOGLEVEL=debug
-    healthcheck:
-      # Without this, `docker compose up --wait` treats gw as ready the
-      # instant the container starts (no healthcheck = immediately
-      # "healthy"), racing api_test.sh's first curl against Tyk's actual
-      # startup — it returns 503 until API endpoints finish loading.
-      test: curl -s --fail http://localhost:8080/hello | jq --exit-status -n 'inputs | if has("status") then .status=="pass" else false end' > /dev/null || exit 1
-      interval: 5s
-      retries: 10
-      start_period: 4s
-      timeout: 10s
 
   gw-checker:
     image: badouralix/curl-jq
