@@ -16,4 +16,7 @@ trap "docker compose down --remove-orphans" EXIT
 
 docker compose up -d --wait --force-recreate || { docker compose logs; exit 1; }
 
-curl -s http://localhost:8080/pyplugin/headers | jq -e '.headers.Foo == "Bar"'
+# gw has no healthcheck of its own, so `--wait` returns as soon as the
+# container starts, not once Tyk has finished loading the API - retry
+# to ride out that gap instead of racing the first request.
+curl -s --retry 10 --retry-delay 10 --retry-all-errors http://localhost:8080/pyplugin/headers | jq -e '.headers.Foo == "Bar"'
