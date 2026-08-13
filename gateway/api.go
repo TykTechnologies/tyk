@@ -371,23 +371,6 @@ func (gw *Gateway) applyPolicy(session *user.SessionState, spec *APISpec) error 
 	return mw.ApplyPolicies(session)
 }
 
-func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APISpec, isHashed bool) error {
-	// use basic middleware to apply policies to key/session (it also saves it)
-	mw := &BaseMiddleware{
-		Spec: spec,
-		Gw:   gw,
-	}
-
-	if err := mw.ApplyPolicies(session); err != nil {
-		return err
-	}
-
-	// calculate lifetime considering access rights
-	lifetime := gw.ApplyLifetime(session, spec)
-
-	return gw.GlobalSessionManager.UpdateSession(keyName, session, lifetime, isHashed)
-}
-
 // GetApiSpecsFromAccessRights from the session.AccessRights returns the collection of api specs
 func (gw *Gateway) GetApiSpecsFromAccessRights(sess *user.SessionState) []*APISpec {
 	var apis []*APISpec
