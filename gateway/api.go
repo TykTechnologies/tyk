@@ -345,7 +345,7 @@ func (gw *Gateway) resetQuotaNeeded(specs []*APISpec) bool {
 	})
 }
 
-func (gw *Gateway) resetQuotaAndSavePolicy(
+func (gw *Gateway) resetQuotaAndSaveSession(
 	keyName string,
 	session *user.SessionState,
 	specs []*APISpec,
@@ -354,7 +354,7 @@ func (gw *Gateway) resetQuotaAndSavePolicy(
 
 	if forceReset {
 		session.QuotaRenews = time.Now().Unix() + session.QuotaRenewalRate
-		gw.GlobalSessionManager.ResetQuota(keyName, session, false) // io op
+		gw.GlobalSessionManager.ResetQuota(keyName, session, isHashed) // io op
 	}
 
 	lifetime := gw.ApplyLifetime(session, specs...)
@@ -362,7 +362,6 @@ func (gw *Gateway) resetQuotaAndSavePolicy(
 }
 
 func (gw *Gateway) applyPolicy(session *user.SessionState, spec *APISpec) error {
-	// use basic middleware to apply policies to key/session (it also saves it)
 	mw := &BaseMiddleware{
 		Spec: spec,
 		Gw:   gw,
@@ -456,10 +455,14 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 			if apiSpec != nil {
 				gw.checkAndApplyTrialPeriod(keyName, newSession, isHashed)
 			}
+
+			if err := gw.applyPolicy(newSession, apiSpec); err != nil {
+				return err
+			}
 		}
 
 		forceReset := !dontReset && gw.resetQuotaNeeded(apisSpecs)
-		if err := gw.resetQuotaAndSavePolicy(keyName, newSession, apisSpecs, isHashed, forceReset); err != nil {
+		if err := gw.resetQuotaAndSaveSession(keyName, newSession, apisSpecs, isHashed, forceReset); err != nil {
 			return err
 		}
 	} else {
@@ -480,7 +483,7 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 
 		gw.checkAndApplyTrialPeriod(keyName, newSession, isHashed)
 		apisSpecs := expmaps.Values(gw.apisByID)
-		if err := gw.resetQuotaAndSavePolicy(keyName, newSession, apisSpecs, isHashed, !dontReset); err != nil {
+		if err := gw.resetQuotaAndSaveSession(keyName, newSession, apisSpecs, isHashed, !dontReset); err != nil {
 			return err
 		}
 	}
@@ -2268,7 +2271,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 		forceReset := gw.resetQuotaNeeded(apiSpecList)
 
-		if err := gw.resetQuotaAndSavePolicy(newKey, newSession, apiSpecList, false, forceReset); err != nil {
+		if err := gw.resetQuotaAndSaveSession(newKey, newSession, apiSpecList, false, forceReset); err != nil {
 			doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
 			return
 		}
@@ -2299,7 +2302,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			apiSpecs := expmaps.Values(gw.apisByID)
 			forceReset := gw.resetQuotaNeeded(apiSpecs)
 
-			if err := gw.resetQuotaAndSavePolicy(newKey, newSession, apiSpecs, false, forceReset); err != nil {
+			if err := gw.resetQuotaAndSaveSession(newKey, newSession, apiSpecs, false, forceReset); err != nil {
 				doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
 				return
 			}
