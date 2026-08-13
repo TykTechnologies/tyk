@@ -111,14 +111,21 @@ jobs:
         if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         with:
           mask-password: 'true'
-      - uses: WarpBuilds/cache@f643a1ba29942d56621d07fc2d4284c7219868ad # v1
+      # Restore-only here; the matching save runs after Build and only off-PR
+      # (see "Save Go build cache"). PRs read the cache but never write it, so
+      # they don't re-upload the multi-GB cache each run, and the store isn't
+      # churned. master/tags keep the cache warm for PRs to restore from.
+      - uses: WarpBuilds/cache/restore@f643a1ba29942d56621d07fc2d4284c7219868ad # v1
+        id: go-cache
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
+          # loose prefix so a changed go.sum / fresh branch gets a partial
+          # restore instead of a cold rebuild (exact key = no fallback).
           restore-keys: |
-            ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+            ${{ runner.os }}-go-
       - name: Validate Go version
         run: |
           GO_VERSION_STR=$(docker run --rm tykio/golang-cross:${{ matrix.golang_cross }} go version 2>&1 || true)
@@ -184,6 +191,21 @@ jobs:
           -v /tmp/build.sh:/tmp/build.sh                                         \
           -w /go/src/github.com/TykTechnologies/tyk                      \
           tykio/golang-cross:${{ matrix.golang_cross }} /tmp/build.sh
+      # Only master/tags populate the go cache; PRs are read-only (see the
+      # restore step above) so they don't pay the multi-GB upload every run.
+      # Save under the restore step's primary key (computed from the committed
+      # go.sum at job start), NOT a fresh hashFiles() — the build rewrites go.sum,
+      # so re-hashing here would save under a key the next run never looks up,
+      # causing a perpetual re-save + cache eviction. Skip if we already had an
+      # exact hit (nothing new to store).
+      - name: Save Go build cache
+        uses: WarpBuilds/cache/save@f643a1ba29942d56621d07fc2d4284c7219868ad # v1
+        if: ${{ github.event_name != 'pull_request' && steps.go-cache.outputs.cache-hit != 'true' }}
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ steps.go-cache.outputs.cache-primary-key }}
       - name: Install Docker Scout CLI
         if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
@@ -1140,7 +1162,9 @@ jobs:
       needs.goreleaser.result == 'success' &&
       needs.resolve-dashboard-image.result == 'success' &&
       (needs.build-dashboard-image.result == 'success' || needs.build-dashboard-image.result == 'skipped')
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+    runs-on: ${{ vars.WARP_RUNNER_8X_X64 || vars.DEFAULT_RUNNER }}
+    # Cost guard: hard cap vs the 360-min default (matters on bigger runners).
+    timeout-minutes: 25
     env:
       XUNIT_REPORT_PATH: ${{ github.workspace}}/test-results.xml
     permissions:
@@ -1204,13 +1228,19 @@ jobs:
           org_gh_token: ${{ steps.app-token.outputs.token }}
       - name: Run API tests
         uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@production
-        timeout-minutes: 45
+        timeout-minutes: 25
         id: test_execution
         with:
           user_api_secret: ${{ steps.env_up.outputs.USER_API_SECRET }}
       - name: Generate test reports and collect logs
         uses: TykTechnologies/github-actions/.github/actions/tests/reporting@production
         if: always() && (steps.test_execution.conclusion != 'skipped')
+        # Bound this best-effort step: `docker compose logs` inside it can hang on
+        # an unresponsive container and otherwise burn the whole job timeout.
+        # continue-on-error keeps a log-collection hang from failing an otherwise
+        # green test run (the real result comes from the Execute step above).
+        timeout-minutes: 8
+        continue-on-error: true
         with:
           report_xml: 'true'
           execution_status: ${{ steps.test_execution.outcome }}
