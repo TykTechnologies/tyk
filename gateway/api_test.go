@@ -6454,17 +6454,19 @@ func TestKeyHandler_CreateAndUpdate_Integration(t *testing.T) {
 		})
 
 		var keyResp map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&keyResp)
+		err := json.NewDecoder(resp.Body).Decode(&keyResp)
+		assert.NoError(t, err)
 		keyID := keyResp["key"].(string)
 
 		// Verify quota is applied
-		ts.Run(t, test.TestCase{
+		_, err = ts.Run(t, test.TestCase{
 			Method:    "GET",
 			Path:      "/tyk/keys/" + keyID + "?api_id=test-api",
 			AdminAuth: true,
 			Code:      200,
 			BodyMatch: `"quota_max":10`,
 		})
+		assert.NoError(t, err)
 	})
 
 	// 2. createKeyHandler with AllowMasterKeys
@@ -6482,16 +6484,18 @@ func TestKeyHandler_CreateAndUpdate_Integration(t *testing.T) {
 		})
 
 		var keyResp map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&keyResp)
+		err := json.NewDecoder(resp.Body).Decode(&keyResp)
+		assert.NoError(t, err)
 		keyID := keyResp["key"].(string)
 
 		// Verify key is created
-		ts.Run(t, test.TestCase{
+		_, err = ts.Run(t, test.TestCase{
 			Method:    "GET",
 			Path:      "/tyk/keys/" + keyID,
 			AdminAuth: true,
 			Code:      200,
 		})
+		assert.NoError(t, err)
 	})
 
 	// 3. doAddOrUpdate with AccessRights
@@ -6505,26 +6509,29 @@ func TestKeyHandler_CreateAndUpdate_Integration(t *testing.T) {
 		sessionJSON := test.MarshalJSON(t)(session)
 
 		// POST to /tyk/keys/{key} uses addOrUpdateKeyHandler which calls doAddOrUpdate
-		resp, _ := ts.Run(t, test.TestCase{
+		resp, err := ts.Run(t, test.TestCase{
 			Method:    "POST",
 			Path:      "/tyk/keys/" + keyID,
 			Data:      string(sessionJSON),
 			AdminAuth: true,
 			Code:      200,
 		})
+		assert.NoError(t, err)
 
 		var keyResp map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&keyResp)
+		err = json.NewDecoder(resp.Body).Decode(&keyResp)
+		assert.NoError(t, err)
 		actualKeyID := keyResp["key"].(string)
 
 		// Verify quota is applied
-		ts.Run(t, test.TestCase{
+		_, err = ts.Run(t, test.TestCase{
 			Method:    "GET",
 			Path:      "/tyk/keys/" + actualKeyID + "?api_id=test-api",
 			AdminAuth: true,
 			Code:      200,
 			BodyMatch: `"quota_max":10`,
 		})
+		assert.NoError(t, err)
 	})
 
 	// 4. doAddOrUpdate with AllowMasterKeys
@@ -6534,25 +6541,28 @@ func TestKeyHandler_CreateAndUpdate_Integration(t *testing.T) {
 		// No AccessRights set
 		sessionJSON := test.MarshalJSON(t)(session)
 
-		resp, _ := ts.Run(t, test.TestCase{
+		resp, err := ts.Run(t, test.TestCase{
 			Method:    "POST",
 			Path:      "/tyk/keys/" + keyID,
 			Data:      string(sessionJSON),
 			AdminAuth: true,
 			Code:      200,
 		})
+		assert.NoError(t, err)
 
 		var keyResp map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&keyResp)
+		err = json.NewDecoder(resp.Body).Decode(&keyResp)
+		assert.NoError(t, err)
 		actualKeyID := keyResp["key"].(string)
 
 		// Verify key is created
-		ts.Run(t, test.TestCase{
+		_, err = ts.Run(t, test.TestCase{
 			Method:    "GET",
 			Path:      "/tyk/keys/" + actualKeyID,
 			AdminAuth: true,
 			Code:      200,
 		})
+		assert.NoError(t, err)
 	})
 }
 
