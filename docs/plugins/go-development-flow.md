@@ -162,6 +162,15 @@ Supplying the argument `build_id` to the *Plugin Compiler* ensures the same plug
 
 Continue with [Tyk Plugin Compiler](https://tyk.io/docs/product-stack/tyk-gateway/advanced-configurations/plugins/golang/go-plugin-compiler/).
 
+{{< note success >}} **Note**
+
+An opt-in next-generation compiler image is published alongside the one described
+above, under the same repositories with a `-ng` tag suffix. It takes the same
+arguments and mounts, and adds cross-compilation, a pinned glibc floor and
+post-build validation. It does **not** rewrite your `go.mod` module path when
+`plugin_id` is supplied, which differs from the behaviour described in this
+section. See [Next-generation Go plugin compiler](go-plugin-compiler-ng.md). {{< /note >}}
+
 ### Using Incorrect Build Flags
 
 When working with Go plugins, it's easy to miss the restriction that the plugin at the very least must be built with the same Go version, and the same flags (notably `-trimpath`) as the Tyk Gateway on which it is to be used.
