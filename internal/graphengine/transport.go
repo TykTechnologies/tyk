@@ -4,6 +4,11 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"strings"
+
+	"golang.org/x/net/http/httpguts"
+
+	"github.com/TykTechnologies/tyk/header"
 )
 
 type NewReusableBodyReadCloserFunc func(io.ReadCloser) (io.ReadCloser, error)
@@ -69,8 +74,21 @@ func (g *GraphQLEngineTransport) RoundTrip(request *http.Request) (res *http.Res
 	return requestTransport.originalTransport.RoundTrip(request)
 }
 
+// isWebSocketHandshake reports whether the request is a websocket upgrade handshake.
+// Mirrors upgradeType in gateway/reverse_proxy.go.
+func isWebSocketHandshake(request *http.Request) bool {
+	if !httpguts.HeaderValuesContainsToken(request.Header[header.Connection], "Upgrade") {
+		return false
+	}
+	return strings.EqualFold(request.Header.Get(header.Upgrade), "websocket")
+}
+
 func (g *GraphQLEngineTransport) handleProxyOnly(proxyOnlyValues *GraphQLProxyOnlyContextValues, request *http.Request) (*http.Response, error) {
-	request.Method = proxyOnlyValues.forwardedRequest.Method
+	// A websocket handshake has to stay a GET. Taking the method of the caller's request
+	// turns the upstream handshake into a POST, which every websocket server rejects.
+	if !isWebSocketHandshake(request) {
+		request.Method = proxyOnlyValues.forwardedRequest.Method
+	}
 	g.setProxyOnlyHeaders(proxyOnlyValues, request)
 	g.applyRequestHeadersRewriteRules(request)
 
@@ -99,7 +117,7 @@ func (g *GraphQLEngineTransport) handleProxyOnly(proxyOnlyValues *GraphQLProxyOn
 		}
 		response.Body = reusableBody
 	}
-	proxyOnlyValues.upstreamResponse = response
+	proxyOnlyValues.setUpstreamResponse(response)
 	return response, err
 }
 

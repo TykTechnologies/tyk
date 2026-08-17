@@ -82,7 +82,7 @@ func (e *EngineV3) handoverWebSocketConnectionToGraphQLExecutionEngine(params *R
 		errChan,
 		conn,
 		executorPool,
-		gqlwebsocketv2.WithContext(params.OutRequest.Context()),
+		gqlwebsocketv2.WithContext(subscriptionRequestContext(e.specCtx, params.OutRequest)),
 		gqlwebsocketv2.WithLogger(e.logger),
 		gqlwebsocketv2.WithProtocolFromRequestHeaders(params.OutRequest),
 	)
@@ -138,9 +138,9 @@ func (e *EngineV3) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphqlv2
 		// This is a valid query for proxy-only mode: query { __typename }
 		// In this case, upstreamResponse is nil.
 		// See TT-6419 for further info.
-		if proxyOnlyCtx.upstreamResponse != nil {
-			header = proxyOnlyCtx.upstreamResponse.Header
-			httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
+		if upstreamResponse := proxyOnlyCtx.getUpstreamResponse(); upstreamResponse != nil {
+			header = upstreamResponse.Header
+			httpStatus = upstreamResponse.StatusCode
 			// change the value of the header's content encoding to use the content encoding defined by the accept encoding
 			contentEncoding := selectContentEncodingToBeUsed(proxyOnlyCtx.forwardedRequest.Header.Get(httpclientv2.AcceptEncodingHeader))
 			header.Set(httpclientv2.ContentEncodingHeader, contentEncoding)

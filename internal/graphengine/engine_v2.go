@@ -54,6 +54,7 @@ type EngineV2 struct {
 	complexityChecker         ComplexityChecker
 	granularAccessChecker     GranularAccessChecker
 	reverseProxyPreHandler    ReverseProxyPreHandler
+	specCtx                   context.Context
 	contextCancel             context.CancelFunc
 	beforeFetchHook           resolve.BeforeFetchHook
 	afterFetchHook            resolve.AfterFetchHook
@@ -150,6 +151,7 @@ func NewEngineV2(options EngineV2Options) (*EngineV2, error) {
 		complexityChecker:         complexityChecker,
 		granularAccessChecker:     granularAccessChecker,
 		reverseProxyPreHandler:    reverseProxyPreHandler,
+		specCtx:                   specCtx,
 		contextCancel:             cancel,
 		beforeFetchHook:           options.Injections.BeforeFetchHook,
 		afterFetchHook:            options.Injections.AfterFetchHook,
@@ -318,9 +320,9 @@ func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 		// This is a valid query for proxy-only mode: query { __typename }
 		// In this case, upstreamResponse is nil.
 		// See TT-6419 for further info.
-		if proxyOnlyCtx.upstreamResponse != nil {
-			header = proxyOnlyCtx.upstreamResponse.Header
-			httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
+		if upstreamResponse := proxyOnlyCtx.getUpstreamResponse(); upstreamResponse != nil {
+			header = upstreamResponse.Header
+			httpStatus = upstreamResponse.StatusCode
 			// change the value of the header's content encoding to use the content encoding defined by the accept encoding
 			contentEncoding := selectContentEncodingToBeUsed(proxyOnlyCtx.forwardedRequest.Header.Get(httpclient.AcceptEncodingHeader))
 			header.Set(httpclient.ContentEncodingHeader, contentEncoding)
@@ -394,7 +396,7 @@ func (e *EngineV2) handoverWebSocketConnectionToGraphQLExecutionEngine(params *R
 		errChan,
 		conn,
 		executorPool,
-		gqlwebsocket.WithContext(params.OutRequest.Context()),
+		gqlwebsocket.WithContext(subscriptionRequestContext(e.specCtx, params.OutRequest)),
 		gqlwebsocket.WithLogger(e.logger),
 		gqlwebsocket.WithProtocolFromRequestHeaders(params.OutRequest),
 	)

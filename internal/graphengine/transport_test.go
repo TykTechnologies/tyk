@@ -397,3 +397,81 @@ func (t taggedRoundTripper) RoundTrip(_ *http.Request) (*http.Response, error) {
 func testReusableReadCloser(readCloser io.ReadCloser) (io.ReadCloser, error) {
 	return readCloser, nil
 }
+
+func TestGraphQLEngineTransport_ProxyOnlyMethod(t *testing.T) {
+	newProxyOnlyTransport := func() *GraphQLEngineTransport {
+		return NewGraphQLEngineTransport(
+			GraphQLEngineTransportTypeProxyOnly,
+			nopRoundTripper{},
+			testReusableReadCloser,
+			ReverseProxyHeadersConfig{},
+		)
+	}
+
+	t.Run("should take the method of the caller for a normal request", func(t *testing.T) {
+		transport := newProxyOnlyTransport()
+		_, ctx, err := prepareInboundRequest(http.MethodPost, "http://example.com/graphql", nil, nil)
+		require.NoError(t, err)
+		outboundRequest, err := prepareOutboundRequest(ctx, http.MethodGet, "http://example.com/graphql", nil, nil)
+		require.NoError(t, err)
+
+		_, err = transport.RoundTrip(outboundRequest)
+		require.NoError(t, err)
+
+		assert.Equal(t, http.MethodPost, outboundRequest.Method)
+	})
+
+	// The upstream subscription handshake is a GET even when the caller used POST. Taking
+	// the caller's method turns it into a POST, which every websocket server rejects.
+	t.Run("should keep the method of a websocket handshake", func(t *testing.T) {
+		transport := newProxyOnlyTransport()
+		_, ctx, err := prepareInboundRequest(http.MethodPost, "http://example.com/graphql", nil, nil)
+		require.NoError(t, err)
+		outboundRequest, err := prepareOutboundRequest(ctx, http.MethodGet, "http://example.com/graphql", nil, map[string]string{
+			"Connection": "Upgrade",
+			"Upgrade":    "websocket",
+		})
+		require.NoError(t, err)
+
+		_, err = transport.RoundTrip(outboundRequest)
+		require.NoError(t, err)
+
+		assert.Equal(t, http.MethodGet, outboundRequest.Method)
+	})
+}
+
+func TestIsWebSocketHandshake(t *testing.T) {
+	newRequest := func(t *testing.T, headers map[string]string) *http.Request {
+		t.Helper()
+		request, err := http.NewRequest(http.MethodGet, "http://example.com/graphql", nil)
+		require.NoError(t, err)
+		for key, value := range headers {
+			request.Header.Set(key, value)
+		}
+		return request
+	}
+
+	t.Run("should detect a handshake", func(t *testing.T) {
+		assert.True(t, isWebSocketHandshake(newRequest(t, map[string]string{
+			"Connection": "Upgrade",
+			"Upgrade":    "websocket",
+		})))
+	})
+
+	t.Run("should ignore the case of the header values", func(t *testing.T) {
+		assert.True(t, isWebSocketHandshake(newRequest(t, map[string]string{
+			"Connection": "keep-alive, upgrade",
+			"Upgrade":    "WebSocket",
+		})))
+	})
+
+	t.Run("should not detect a handshake without both headers", func(t *testing.T) {
+		assert.False(t, isWebSocketHandshake(newRequest(t, nil)))
+		assert.False(t, isWebSocketHandshake(newRequest(t, map[string]string{"Upgrade": "websocket"})))
+		assert.False(t, isWebSocketHandshake(newRequest(t, map[string]string{"Connection": "Upgrade"})))
+		assert.False(t, isWebSocketHandshake(newRequest(t, map[string]string{
+			"Connection": "Upgrade",
+			"Upgrade":    "h2c",
+		})))
+	})
+}

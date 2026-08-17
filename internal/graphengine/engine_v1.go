@@ -212,12 +212,17 @@ func (e *EngineV1) handoverWebSocketConnectionToGraphQLExecutionEngine(params *R
 	}
 	executorPool = subscription.NewExecutorV1Pool(e.ExecutionEngine.NewExecutionHandler())
 
+	// No WithContext here, unlike the v2 and v3 handovers. The legacy version 1 data
+	// sources build their upstream request with http.NewRequest and drop the execution
+	// context, so there is nothing request scoped to carry over, and handing the handler
+	// the request context would only cancel the subscription: net/http cancels that
+	// context as soon as ServeHTTP returns, which happens as soon as the connection is
+	// hijacked.
 	go gqlwebsocket.Handle(
 		done,
 		errChan,
 		conn,
 		executorPool,
-		gqlwebsocket.WithContext(params.OutRequest.Context()),
 		gqlwebsocket.WithLogger(e.logger),
 		gqlwebsocket.WithProtocolFromRequestHeaders(params.OutRequest),
 	)

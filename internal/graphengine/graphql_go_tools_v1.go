@@ -83,7 +83,7 @@ func (g graphqlGoToolsV1) headerModifier(additionalHeaders http.Header) postproc
 }
 
 func (g graphqlGoToolsV1) returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContextValues, resultWriter *graphql.EngineResultWriter, seekReadCloser SeekReadCloserFunc) error {
-	body, err := seekReadCloser(proxyOnlyCtx.upstreamResponse.Body)
+	body, err := seekReadCloser(proxyOnlyCtx.getUpstreamResponse().Body)
 	if body == nil {
 		// Response body already read by graphql-go-tools, and it's not re-readable. Quit silently.
 		return nil

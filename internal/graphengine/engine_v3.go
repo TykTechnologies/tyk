@@ -28,6 +28,7 @@ type EngineV3 struct {
 	complexityChecker         ComplexityChecker
 	granularAccessChecker     GranularAccessChecker
 	reverseProxyPreHandler    ReverseProxyPreHandler
+	specCtx                   context.Context
 	contextCancel             context.CancelFunc
 	newReusableBodyReadCloser NewReusableBodyReadCloserFunc
 	seekReadCloser            SeekReadCloserFunc
@@ -129,6 +130,7 @@ func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 		gqlTools:               gqlTools,
 		tykVariableReplacer:    options.Injections.TykVariableReplacer,
 		seekReadCloser:         options.Injections.SeekReadCloser,
+		specCtx:                specCtx,
 		contextCancel:          cancel,
 		complexityChecker:      complexityChecker,
 		granularAccessChecker:  granularAccessChecker,
