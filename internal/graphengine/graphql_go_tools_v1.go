@@ -72,12 +72,32 @@ func (g graphqlGoToolsV1) handleIntrospection(schema *graphql.Schema) (res *http
 	return
 }
 
-func (g graphqlGoToolsV1) headerModifier(additionalHeaders http.Header) postprocess.HeaderModifier {
+func (g graphqlGoToolsV1) headerModifier(outreq *http.Request, additionalHeaders http.Header, variableReplacer TykVariableReplacer) postprocess.HeaderModifier {
 	return func(header http.Header) {
-		for key := range additionalHeaders {
+		for key, values := range additionalHeaders {
+			// Assigned rather than Set so that a header with more than one value keeps
+			// all of them: the connection key of a subscription is built from every
+			// value, see connectionKey in the graphql-go-tools subscription client.
+			// Set would collapse them to the first one. The key has to be canonicalised
+			// by hand because a direct map write does not do it, while the Get above
+			// does.
 			if header.Get(key) == "" {
-				header.Set(key, additionalHeaders.Get(key))
+				header[http.CanonicalHeaderKey(key)] = append([]string(nil), values...)
 			}
+		}
+
+		// A nil replacer means the caller wants the additional headers merged and nothing
+		// resolved. EngineV1 has no header modifier at all, so this only guards a
+		// partially injected EngineV2.
+		if variableReplacer == nil {
+			return
+		}
+		for key, values := range header {
+			replaced := make([]string, len(values))
+			for index, value := range values {
+				replaced[index] = variableReplacer(outreq, value, false)
+			}
+			header[key] = replaced
 		}
 	}
 }

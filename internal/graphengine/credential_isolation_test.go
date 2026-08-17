@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -117,9 +118,15 @@ func newRecordingSSEUpstream(t *testing.T, recorder *authorizationRecorder) *htt
 	return server
 }
 
-// newRecordingWSUpstream serves a single subscription event over a WebSocket connection.
+// newRecordingWSUpstream serves subscription events over a WebSocket connection.
 // subprotocol selects the protocol to negotiate and dataMessageType the message type that
 // carries the payload: graphql-ws uses "data", graphql-transport-ws uses "next".
+//
+// It answers every subscription that arrives on the connection, not just the first. Most
+// tests open one connection per caller and so only ever use the first, but a test that
+// asserts callers are not multiplexed onto one upstream connection needs the multiplexed
+// ones to be served as well: otherwise they never complete and the test hangs instead of
+// reporting the shared connection.
 func newRecordingWSUpstream(t *testing.T, recorder *authorizationRecorder, subprotocol, dataMessageType string) *httptest.Server {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -141,26 +148,50 @@ func newRecordingWSUpstream(t *testing.T, recorder *authorizationRecorder, subpr
 		if err = connection.Write(ctx, nhooyrwebsocket.MessageText, []byte(`{"type":"connection_ack"}`)); err != nil {
 			return
 		}
-		// start / subscribe
-		_, message, err := connection.Read(ctx)
-		if err != nil {
-			return
+		// start / subscribe, once per subscription multiplexed onto this connection
+		for {
+			_, message, err := connection.Read(ctx)
+			if err != nil {
+				return
+			}
+			var start struct {
+				ID   string `json:"id"`
+				Type string `json:"type"`
+			}
+			if err = json.Unmarshal(message, &start); err != nil {
+				return
+			}
+			// Anything else is a stop, a complete or a keep alive, which carries no
+			// subscription to answer.
+			if start.Type != "start" && start.Type != "subscribe" {
+				continue
+			}
+			data := fmt.Sprintf(`{"type":%q,"id":%q,"payload":{"data":{"count":1}}}`, dataMessageType, start.ID)
+			if err = connection.Write(ctx, nhooyrwebsocket.MessageText, []byte(data)); err != nil {
+				return
+			}
+			complete := fmt.Sprintf(`{"type":"complete","id":%q}`, start.ID)
+			if err = connection.Write(ctx, nhooyrwebsocket.MessageText, []byte(complete)); err != nil {
+				return
+			}
 		}
-		var start struct {
-			ID string `json:"id"`
-		}
-		if err = json.Unmarshal(message, &start); err != nil {
-			return
-		}
-		data := fmt.Sprintf(`{"type":%q,"id":%q,"payload":{"data":{"count":1}}}`, dataMessageType, start.ID)
-		if err = connection.Write(ctx, nhooyrwebsocket.MessageText, []byte(data)); err != nil {
-			return
-		}
-		complete := fmt.Sprintf(`{"type":"complete","id":%q}`, start.ID)
-		_ = connection.Write(ctx, nhooyrwebsocket.MessageText, []byte(complete))
 	}))
 	t.Cleanup(server.Close)
 	return server
+}
+
+// isolationContextHeaderVariable matches the $tyk_context.headers_<Name> form, where the
+// dashes of the header name are written as underscores.
+var isolationContextHeaderVariable = regexp.MustCompile(`\$tyk_context\.headers_([A-Za-z0-9_]+)`)
+
+// isolationVariableReplacer stands in for Gateway.ReplaceTykVariables. It resolves against
+// the request being served, so a value that belongs to another caller stays visible as that
+// caller's value rather than silently becoming correct.
+func isolationVariableReplacer(request *http.Request, value string, _ bool) string {
+	return isolationContextHeaderVariable.ReplaceAllStringFunc(value, func(match string) string {
+		name := strings.ReplaceAll(strings.TrimPrefix(match, "$tyk_context.headers_"), "_", "-")
+		return request.Header.Get(name)
+	})
 }
 
 // newIsolationEngineV2 builds a real EngineV2 that answers every request with operation.
@@ -181,6 +212,7 @@ func newIsolationEngineV2(t *testing.T, apiDefinition *apidef.APIDefinition, ope
 				return &graphql.Request{Query: operation}
 			},
 			NewReusableBodyReadCloser: testReusableReadCloser,
+			TykVariableReplacer:       isolationVariableReplacer,
 		},
 	})
 	require.NoError(t, err)
@@ -207,9 +239,7 @@ func newIsolationEngineV3(t *testing.T, apiDefinition *apidef.APIDefinition, ope
 				return &graphqlv2.Request{Query: operation}
 			},
 			NewReusableBodyReadCloser: testReusableReadCloser,
-			TykVariableReplacer: func(_ *http.Request, value string, _ bool) string {
-				return value
-			},
+			TykVariableReplacer:       isolationVariableReplacer,
 		},
 	})
 	require.NoError(t, err)
@@ -966,6 +996,132 @@ func TestEngineV2_WebSocketUpgradeIsolatesCallerAuthorization(t *testing.T) {
 	}
 
 	assert.Equal(t, []string{"Bearer AAA", "Bearer BBB"}, upstream.values())
+}
+
+// --- Dynamic upstream headers ----------------------------------------------------
+//
+// A UDG global header of $tyk_context.headers_Authorization is how an API definition asks
+// for the caller's credential to be forwarded upstream, and it is the shape where an
+// unresolved value does the most damage. The header modifier is what resolves it, and it has
+// to, because the library applies the modifier before it derives the key that decides whether
+// two callers share one upstream subscription connection: connectionKey in the v1
+// subscription client, UniqueRequestID in the v2 resolver. A value still holding the literal
+// $tyk_context token is the same for every caller, so every caller hashes alike.
+
+const dynamicUpstreamHeader = "X-Upstream-Authorization"
+
+// newDynamicHeaderUDGApiDefinition builds a UDG API whose only upstream credential is a
+// dynamic global header. StripAuthData keeps propagateAuthHeaders out of it, so a concrete
+// per caller value cannot reach the upstream by any other route.
+func newDynamicHeaderUDGApiDefinition(version apidef.GraphQLConfigVersion, upstreamURL string) *apidef.APIDefinition {
+	apiDefinition := newUDGApiDefinition(version, upstreamURL)
+	apiDefinition.StripAuthData = true
+	apiDefinition.GraphQL.Engine.GlobalHeaders = []apidef.UDGGlobalHeader{{
+		Key:   dynamicUpstreamHeader,
+		Value: "$tyk_context.headers_Authorization",
+	}}
+	return apiDefinition
+}
+
+// newDynamicHeaderUDGSubscriptionApiDefinition is the same thing for a subscription served by
+// a GraphQL data source.
+func newDynamicHeaderUDGSubscriptionApiDefinition(t *testing.T, version apidef.GraphQLConfigVersion, subscriptionType apidef.SubscriptionType, upstreamURL string) *apidef.APIDefinition {
+	t.Helper()
+	apiDefinition := newUDGSubscriptionApiDefinition(t, version, subscriptionType, upstreamURL)
+	apiDefinition.StripAuthData = true
+	apiDefinition.GraphQL.Engine.GlobalHeaders = []apidef.UDGGlobalHeader{{
+		Key:   dynamicUpstreamHeader,
+		Value: "$tyk_context.headers_Authorization",
+	}}
+	return apiDefinition
+}
+
+func TestEngineV2_DynamicUpstreamHeaderIsolatesCallerCredential(t *testing.T) {
+	engine := newIsolationEngineV2(t,
+		newDynamicHeaderUDGApiDefinition(apidef.GraphQLConfigVersion2, "http://upstream.example/graphql"),
+		"query { hello }")
+
+	upstream := newAuthorizationRecordingRoundTripper()
+	for _, token := range []string{"Bearer AAA", "Bearer BBB"} {
+		callAs(t, engine, upstream, "", token)
+	}
+
+	assert.Equal(t, []string{"Bearer AAA", "Bearer BBB"}, upstream.headerValues(dynamicUpstreamHeader))
+}
+
+func TestEngineV3_DynamicUpstreamHeaderIsolatesCallerCredential(t *testing.T) {
+	engine := newIsolationEngineV3(t,
+		newDynamicHeaderUDGApiDefinition(apidef.GraphQLConfigVersion3Preview, "http://upstream.example/graphql"),
+		"query { hello }")
+
+	upstream := newAuthorizationRecordingRoundTripper()
+	for _, token := range []string{"Bearer AAA", "Bearer BBB"} {
+		callAs(t, engine, upstream, "", token)
+	}
+
+	waitForUpstreamCalls(t, upstream.authorizationRecorder, 2)
+	assert.ElementsMatch(t, []string{"Bearer AAA", "Bearer BBB"}, upstream.headerValues(dynamicUpstreamHeader))
+}
+
+// The leak in one test. Every caller brings a different credential, and the count of upstream
+// connections is the assertion: an unresolved header value makes all twenty connection keys
+// identical, and the library dials and registers under one lock, so the nineteen callers
+// behind the first one deterministically multiplex onto its connection. Twenty distinct
+// credentials upstream therefore means twenty connections, none of them shared.
+func TestEngineV2_DynamicUpstreamHeaderDoesNotShareSubscriptionConnection(t *testing.T) {
+	upstream := newAuthorizationRecorder(dynamicUpstreamHeader)
+	server := newRecordingWSUpstream(t, upstream, protocolGraphQLWS, messageTypeData)
+	engine := newIsolationEngineV2(t,
+		newDynamicHeaderUDGSubscriptionApiDefinition(t, apidef.GraphQLConfigVersion2, apidef.GQLSubscriptionWS, server.URL),
+		"subscription { count }")
+
+	credentials := concurrentCredentials()
+	callConcurrently(t, engine, http.DefaultTransport, credentials)
+
+	assert.ElementsMatch(t, credentials, upstream.values(),
+		"every caller has to open its own upstream connection with its own credential")
+}
+
+func TestEngineV3_DynamicUpstreamHeaderDoesNotShareSubscriptionConnection(t *testing.T) {
+	upstream := newAuthorizationRecorder(dynamicUpstreamHeader)
+	server := newRecordingWSUpstream(t, upstream, protocolGraphQLWS, messageTypeData)
+	engine := newIsolationEngineV3(t,
+		newDynamicHeaderUDGSubscriptionApiDefinition(t, apidef.GraphQLConfigVersion3Preview, apidef.GQLSubscriptionWS, server.URL),
+		"subscription { count }")
+
+	credentials := concurrentCredentials()
+	callConcurrently(t, engine, http.DefaultTransport, credentials)
+
+	waitForUpstreamCalls(t, upstream, len(credentials))
+	assert.ElementsMatch(t, credentials, upstream.values(),
+		"every caller has to open its own upstream connection with its own credential")
+}
+
+// The plain fetch path under the same load, to catch a replacer that reads the wrong request
+// when several are in flight. Cold, so nothing is cached when the burst starts.
+func TestEngineV2_ConcurrentDynamicHeaderCallersDoNotShareCredentials(t *testing.T) {
+	engine := newIsolationEngineV2(t,
+		newDynamicHeaderUDGApiDefinition(apidef.GraphQLConfigVersion2, "http://upstream.example/graphql"),
+		"query { hello }")
+
+	upstream := newAuthorizationRecordingRoundTripper()
+	credentials := concurrentCredentials()
+	callConcurrently(t, engine, upstream, credentials)
+
+	assert.ElementsMatch(t, credentials, upstream.headerValues(dynamicUpstreamHeader))
+}
+
+func TestEngineV3_ConcurrentDynamicHeaderCallersDoNotShareCredentials(t *testing.T) {
+	engine := newIsolationEngineV3(t,
+		newDynamicHeaderUDGApiDefinition(apidef.GraphQLConfigVersion3Preview, "http://upstream.example/graphql"),
+		"query { hello }")
+
+	upstream := newAuthorizationRecordingRoundTripper()
+	credentials := concurrentCredentials()
+	callConcurrently(t, engine, upstream, credentials)
+
+	waitForUpstreamCalls(t, upstream.authorizationRecorder, len(credentials))
+	assert.ElementsMatch(t, credentials, upstream.headerValues(dynamicUpstreamHeader))
 }
 
 // Engine v3 has no WebSocket upgrade test. 3-preview accepts the upgrade and starts the

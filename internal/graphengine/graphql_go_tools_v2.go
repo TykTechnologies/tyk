@@ -76,15 +76,23 @@ func (g graphqlGoToolsV2) handleIntrospection(schema *graphqlv2.Schema) (res *ht
 
 func (g graphqlGoToolsV2) headerModifier(outreq *http.Request, additionalHeaders http.Header, variableReplacer TykVariableReplacer) postprocessv2.HeaderModifier {
 	return func(header http.Header) {
-		for key := range additionalHeaders {
+		for key, values := range additionalHeaders {
+			// See the v1 modifier: assigned rather than Set to keep every value of a
+			// multi-value header, canonicalised by hand because a map write does not.
 			if header.Get(key) == "" {
-				header.Set(key, additionalHeaders.Get(key))
+				header[http.CanonicalHeaderKey(key)] = append([]string(nil), values...)
 			}
 		}
 
-		for key := range header {
-			val := variableReplacer(outreq, header.Get(key), false)
-			header.Set(key, val)
+		if variableReplacer == nil {
+			return
+		}
+		for key, values := range header {
+			replaced := make([]string, len(values))
+			for index, value := range values {
+				replaced[index] = variableReplacer(outreq, value, false)
+			}
+			header[key] = replaced
 		}
 	}
 }
