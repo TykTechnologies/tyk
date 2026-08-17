@@ -82,6 +82,7 @@ func (e *EngineV3) handoverWebSocketConnectionToGraphQLExecutionEngine(params *R
 		errChan,
 		conn,
 		executorPool,
+		gqlwebsocketv2.WithContext(params.OutRequest.Context()),
 		gqlwebsocketv2.WithLogger(e.logger),
 		gqlwebsocketv2.WithProtocolFromRequestHeaders(params.OutRequest),
 	)
@@ -103,6 +104,7 @@ func (e *EngineV3) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphqlv2
 	isProxyOnly := isProxyOnly(e.apiDefinition)
 	span := otel.SpanFromContext(outreq.Context())
 	reqCtx := otel.ContextWithSpan(context.Background(), span)
+	reqCtx = copyGraphQLEngineTransportContextValue(reqCtx, outreq.Context())
 	if isProxyOnly {
 		reqCtx = SetProxyOnlyContextValue(reqCtx, outreq)
 	}

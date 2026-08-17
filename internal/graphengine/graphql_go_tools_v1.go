@@ -481,12 +481,8 @@ type reverseProxyPreHandlerV1 struct {
 }
 
 func (r *reverseProxyPreHandlerV1) PreHandle(params ReverseProxyParams) (reverseProxyType ReverseProxyType, err error) {
-	r.httpClient.Transport = NewGraphQLEngineTransport(
-		DetermineGraphQLEngineTransportType(r.apiDefinition),
-		params.RoundTripper,
-		r.newReusableBodyReadCloser,
-		params.HeadersConfig,
-	)
+	requestContext := SetGraphQLEngineTransportContextValue(params.OutRequest.Context(), params.RoundTripper, params.HeadersConfig)
+	*params.OutRequest = *params.OutRequest.WithContext(requestContext)
 
 	switch {
 	case params.IsCORSPreflight:

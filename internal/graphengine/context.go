@@ -16,7 +16,36 @@ const (
 
 type contextKey struct{}
 
+type transportContextKey struct{}
+
 var graphqlProxyContextInfo = contextKey{}
+var graphqlTransportContextInfo = transportContextKey{}
+
+type graphQLEngineTransportContextValues struct {
+	roundTripper  http.RoundTripper
+	headersConfig ReverseProxyHeadersConfig
+}
+
+func SetGraphQLEngineTransportContextValue(ctx context.Context, roundTripper http.RoundTripper, headersConfig ReverseProxyHeadersConfig) context.Context {
+	value := &graphQLEngineTransportContextValues{
+		roundTripper:  roundTripper,
+		headersConfig: headersConfig,
+	}
+	return context.WithValue(ctx, graphqlTransportContextInfo, value)
+}
+
+func copyGraphQLEngineTransportContextValue(target, source context.Context) context.Context {
+	value, _ := source.Value(graphqlTransportContextInfo).(*graphQLEngineTransportContextValues)
+	if value == nil {
+		return target
+	}
+	return context.WithValue(target, graphqlTransportContextInfo, value)
+}
+
+func getGraphQLEngineTransportContextValue(ctx context.Context) *graphQLEngineTransportContextValues {
+	value, _ := ctx.Value(graphqlTransportContextInfo).(*graphQLEngineTransportContextValues)
+	return value
+}
 
 type GraphQLProxyOnlyContextValues struct {
 	forwardedRequest       *http.Request

@@ -77,6 +77,9 @@ type EngineV2Options struct {
 func NewEngineV2(options EngineV2Options) (*EngineV2, error) {
 	logger := createAbstractLogrusLogger(options.Logger)
 	gqlTools := graphqlGoToolsV1{}
+	transportType := DetermineGraphQLEngineTransportType(options.ApiDefinition)
+	configureGraphQLEngineHTTPClient(options.HttpClient, transportType, options.Injections.NewReusableBodyReadCloser)
+	configureGraphQLEngineHTTPClient(options.StreamingClient, transportType, options.Injections.NewReusableBodyReadCloser)
 
 	var parsedSchema = options.Schema
 	if parsedSchema == nil {
@@ -279,6 +282,7 @@ func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 	isProxyOnly := isProxyOnly(e.ApiDefinition)
 	span := otel.SpanFromContext(outreq.Context())
 	reqCtx := otel.ContextWithSpan(context.Background(), span)
+	reqCtx = copyGraphQLEngineTransportContextValue(reqCtx, outreq.Context())
 	if isProxyOnly {
 		reqCtx = SetProxyOnlyContextValue(reqCtx, outreq)
 	}
@@ -390,6 +394,7 @@ func (e *EngineV2) handoverWebSocketConnectionToGraphQLExecutionEngine(params *R
 		errChan,
 		conn,
 		executorPool,
+		gqlwebsocket.WithContext(params.OutRequest.Context()),
 		gqlwebsocket.WithLogger(e.logger),
 		gqlwebsocket.WithProtocolFromRequestHeaders(params.OutRequest),
 	)

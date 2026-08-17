@@ -22,6 +22,9 @@ func NewGraphQLEngineTransport(
 	newReusableBodyReadCloser NewReusableBodyReadCloserFunc,
 	headersConfig ReverseProxyHeadersConfig,
 ) *GraphQLEngineTransport {
+	if originalTransport == nil {
+		originalTransport = http.DefaultTransport
+	}
 	transport := &GraphQLEngineTransport{
 		originalTransport:         originalTransport,
 		transportType:             transportType,
@@ -31,16 +34,39 @@ func NewGraphQLEngineTransport(
 	return transport
 }
 
+func configureGraphQLEngineHTTPClient(client *http.Client, transportType GraphQLEngineTransportType, newReusableBodyReadCloser NewReusableBodyReadCloserFunc) {
+	if client == nil {
+		return
+	}
+	if _, ok := client.Transport.(*GraphQLEngineTransport); ok {
+		return
+	}
+	client.Transport = NewGraphQLEngineTransport(transportType, client.Transport, newReusableBodyReadCloser, ReverseProxyHeadersConfig{})
+}
+
 func (g *GraphQLEngineTransport) RoundTrip(request *http.Request) (res *http.Response, err error) {
-	switch g.transportType {
-	case GraphQLEngineTransportTypeProxyOnly:
-		val := GetProxyOnlyContextValue(request.Context())
-		if val != nil {
-			return g.handleProxyOnly(val, request)
+	requestTransport := g
+	if values := getGraphQLEngineTransportContextValue(request.Context()); values != nil {
+		requestTransport = &GraphQLEngineTransport{
+			originalTransport:         values.roundTripper,
+			transportType:             g.transportType,
+			newReusableBodyReadCloser: g.newReusableBodyReadCloser,
+			headersConfig:             values.headersConfig,
+		}
+		if requestTransport.originalTransport == nil {
+			requestTransport.originalTransport = g.originalTransport
 		}
 	}
 
-	return g.originalTransport.RoundTrip(request)
+	switch requestTransport.transportType {
+	case GraphQLEngineTransportTypeProxyOnly:
+		val := GetProxyOnlyContextValue(request.Context())
+		if val != nil {
+			return requestTransport.handleProxyOnly(val, request)
+		}
+	}
+
+	return requestTransport.originalTransport.RoundTrip(request)
 }
 
 func (g *GraphQLEngineTransport) handleProxyOnly(proxyOnlyValues *GraphQLProxyOnlyContextValues, request *http.Request) (*http.Response, error) {

@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/jensneuse/abstractlogger"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -323,6 +326,139 @@ func TestEngineV1_HandleReverseProxy(t *testing.T) {
 		assert.Nil(t, result)
 	})
 
+}
+
+func TestNewEngineV1_ConfiguresHTTPClient(t *testing.T) {
+	newEngine := func(t *testing.T, client *http.Client, executionMode apidef.GraphQLExecutionMode) *EngineV1 {
+		t.Helper()
+		logger := logrus.New()
+		logger.SetOutput(io.Discard)
+		engine, err := NewEngineV1(EngineV1Options{
+			Logger:        logger,
+			ApiDefinition: generateApiDefinitionEngineV1("http://upstream.example/api", executionMode),
+			HttpClient:    client,
+			Injections: EngineV1Injections{
+				ContextRetrieveRequest: func(*http.Request) *graphql.Request {
+					return &graphql.Request{Query: "query { hello }"}
+				},
+				NewReusableBodyReadCloser: testReusableReadCloser,
+			},
+		})
+		require.NoError(t, err)
+		return engine
+	}
+
+	t.Run("should install a stable engine transport that keeps the transport of the client", func(t *testing.T) {
+		client := &http.Client{Transport: taggedRoundTripper("client")}
+
+		newEngine(t, client, apidef.GraphQLExecutionModeExecutionEngine)
+
+		transport, ok := client.Transport.(*GraphQLEngineTransport)
+		require.True(t, ok, "the client transport should be wrapped")
+		assert.Equal(t, taggedRoundTripper("client"), transport.originalTransport)
+		assert.Equal(t, GraphQLEngineTransportTypeMultiUpstream, transport.transportType)
+	})
+
+	t.Run("should derive the transport type from the execution mode", func(t *testing.T) {
+		client := &http.Client{Transport: taggedRoundTripper("client")}
+
+		newEngine(t, client, apidef.GraphQLExecutionModeProxyOnly)
+
+		transport, ok := client.Transport.(*GraphQLEngineTransport)
+		require.True(t, ok, "the client transport should be wrapped")
+		assert.Equal(t, GraphQLEngineTransportTypeProxyOnly, transport.transportType)
+	})
+
+	t.Run("should not wrap the transport of a reused client twice", func(t *testing.T) {
+		client := &http.Client{Transport: taggedRoundTripper("client")}
+
+		newEngine(t, client, apidef.GraphQLExecutionModeExecutionEngine)
+		configuredTransport := client.Transport
+		newEngine(t, client, apidef.GraphQLExecutionModeExecutionEngine)
+
+		assert.Same(t, configuredTransport, client.Transport)
+	})
+}
+
+func TestEngineV1_HandleReverseProxyUsesTheClientTransport(t *testing.T) {
+	// The legacy version 1 data sources (HttpJsonDataSource, GraphQLDataSource) build
+	// their upstream request with http.NewRequest and therefore drop the execution
+	// context, so the round tripper of the request cannot reach the engine transport.
+	// EngineV1 upstream fetches consequently run on the transport of the per API client
+	// that NewEngineV1 wrapped, and never on the round tripper of another caller.
+	//
+	// If graphql-go-tools starts to build those requests with http.NewRequestWithContext,
+	// this test fails and both callers see their own round tripper instead. That is the
+	// better behaviour - update the expectation here when it happens.
+	recorder := &transportTagRecorder{}
+	logger := logrus.New()
+	logger.SetOutput(io.Discard)
+	client := &http.Client{Transport: recorder.roundTripper("client")}
+	engine, err := NewEngineV1(EngineV1Options{
+		Logger:        logger,
+		ApiDefinition: generateApiDefinitionEngineV1("http://upstream.example/api", apidef.GraphQLExecutionModeExecutionEngine),
+		HttpClient:    client,
+		Injections: EngineV1Injections{
+			ContextRetrieveRequest: func(*http.Request) *graphql.Request {
+				return &graphql.Request{Query: "query { hello }"}
+			},
+			NewReusableBodyReadCloser: testReusableReadCloser,
+		},
+	})
+	require.NoError(t, err)
+
+	for _, tag := range []string{"caller-a", "caller-b"} {
+		request, err := http.NewRequest(http.MethodPost, "http://gateway.example/graphql", nil)
+		require.NoError(t, err)
+		response, hijacked, err := engine.HandleReverseProxy(ReverseProxyParams{
+			RoundTripper: recorder.roundTripper(tag),
+			OutRequest:   request,
+			NeedsEngine:  true,
+		})
+		require.NoError(t, err)
+		assert.False(t, hijacked)
+		require.NotNil(t, response)
+		_ = response.Body.Close()
+	}
+
+	assert.Equal(t, []string{"client", "client"}, recorder.values())
+	// The shared client keeps the transport that the constructor installed.
+	_, ok := client.Transport.(*GraphQLEngineTransport)
+	assert.True(t, ok)
+}
+
+// transportTagRecorder hands out round trippers that record which one an upstream
+// fetch went through. The version 1 handover does not propagate auth headers, so the
+// identity of the round tripper is what tells two callers apart.
+type transportTagRecorder struct {
+	mu   sync.Mutex
+	tags []string
+}
+
+func (r *transportTagRecorder) roundTripper(tag string) http.RoundTripper {
+	return roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		r.mu.Lock()
+		r.tags = append(r.tags, tag)
+		r.mu.Unlock()
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(bytes.NewBufferString(`{"hello":"world"}`)),
+			Request:    request,
+		}, nil
+	})
+}
+
+func (r *transportTagRecorder) values() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.tags...)
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return f(request)
 }
 
 type testEngineV1Options struct {

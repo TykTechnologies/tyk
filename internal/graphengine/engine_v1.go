@@ -1,7 +1,6 @@
 package graphengine
 
 import (
-	"context"
 	"errors"
 	"net/http"
 
@@ -52,6 +51,7 @@ type EngineV1Options struct {
 func NewEngineV1(options EngineV1Options) (*EngineV1, error) {
 	logger := createAbstractLogrusLogger(options.Logger)
 	gqlTools := graphqlGoToolsV1{}
+	configureGraphQLEngineHTTPClient(options.HttpClient, DetermineGraphQLEngineTransportType(options.ApiDefinition), options.Injections.NewReusableBodyReadCloser)
 
 	var parsedSchema = options.Schema
 	if parsedSchema == nil {
@@ -186,7 +186,7 @@ func (e *EngineV1) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 	}
 
 	var result *graphql.ExecutionResult
-	result, err = e.ExecutionEngine.Execute(context.Background(), gqlRequest, graphql.ExecutionOptions{ExtraArguments: gqlRequest.Variables})
+	result, err = e.ExecutionEngine.Execute(outreq.Context(), gqlRequest, graphql.ExecutionOptions{ExtraArguments: gqlRequest.Variables})
 	if err != nil {
 		return
 	}
@@ -217,6 +217,7 @@ func (e *EngineV1) handoverWebSocketConnectionToGraphQLExecutionEngine(params *R
 		errChan,
 		conn,
 		executorPool,
+		gqlwebsocket.WithContext(params.OutRequest.Context()),
 		gqlwebsocket.WithLogger(e.logger),
 		gqlwebsocket.WithProtocolFromRequestHeaders(params.OutRequest),
 	)

@@ -56,6 +56,9 @@ type EngineV3Options struct {
 func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 	logger := createAbstractLogrusLogger(options.Logger)
 	gqlTools := graphqlGoToolsV2{}
+	transportType := DetermineGraphQLEngineTransportType(options.ApiDefinition)
+	configureGraphQLEngineHTTPClient(options.HttpClient, transportType, options.Injections.NewReusableBodyReadCloser)
+	configureGraphQLEngineHTTPClient(options.StreamingClient, transportType, options.Injections.NewReusableBodyReadCloser)
 
 	var parsedSchema = options.Schema
 	if parsedSchema == nil {

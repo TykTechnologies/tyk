@@ -3,12 +3,16 @@ package graphengine
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
+	nhooyrwebsocket "github.com/coder/websocket"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,6 +23,73 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
+
+type authorizationRecordingRoundTripper struct {
+	mu       sync.Mutex
+	received []string
+}
+
+func (r *authorizationRecordingRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
+	r.mu.Lock()
+	r.received = append(r.received, request.Header.Get("Authorization"))
+	r.mu.Unlock()
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     make(http.Header),
+		Body:       io.NopCloser(bytes.NewBufferString(`{"hello":"world"}`)),
+		Request:    request,
+	}, nil
+}
+
+func (r *authorizationRecordingRoundTripper) values() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.received...)
+}
+
+func newAuthorizationRecordingWSUpstream(t *testing.T) (*httptest.Server, *authorizationRecordingRoundTripper) {
+	t.Helper()
+	recorder := &authorizationRecordingRoundTripper{}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		recorder.mu.Lock()
+		recorder.received = append(recorder.received, request.Header.Get("Authorization"))
+		recorder.mu.Unlock()
+
+		connection, err := nhooyrwebsocket.Accept(writer, request, &nhooyrwebsocket.AcceptOptions{
+			Subprotocols: []string{"graphql-ws"},
+		})
+		if err != nil {
+			return
+		}
+		defer connection.CloseNow()
+		ctx := request.Context()
+		_, _, err = connection.Read(ctx)
+		if err != nil {
+			return
+		}
+		if err = connection.Write(ctx, nhooyrwebsocket.MessageText, []byte(`{"type":"connection_ack"}`)); err != nil {
+			return
+		}
+		_, message, err := connection.Read(ctx)
+		if err != nil {
+			return
+		}
+		var start struct {
+			ID string `json:"id"`
+		}
+		if err = json.Unmarshal(message, &start); err != nil {
+			return
+		}
+		data := fmt.Sprintf(`{"type":"data","id":%q,"payload":{"data":{"count":1}}}`, start.ID)
+		if err = connection.Write(ctx, nhooyrwebsocket.MessageText, []byte(data)); err != nil {
+			return
+		}
+		complete := fmt.Sprintf(`{"type":"complete","id":%q}`, start.ID)
+		_ = connection.Write(ctx, nhooyrwebsocket.MessageText, []byte(complete))
+	}))
+	t.Cleanup(server.Close)
+	return server, recorder
+}
 
 type engineV2Mocks struct {
 	controller             *gomock.Controller
@@ -375,6 +446,227 @@ func TestEngineV2_HandleReverseProxy(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, hijacked)
 		assert.Nil(t, result)
+	})
+}
+
+func TestEngineV2_HandleReverseProxyIsolatesCallerAuthorization(t *testing.T) {
+	apiDefinition := newTestApiDefinitionV2(apidef.GraphQLExecutionModeExecutionEngine, "http://upstream.example/graphql")
+	apiDefinition.UseStandardAuth = true
+	apiDefinition.StripAuthData = false
+	client := &http.Client{}
+	logger := logrus.New()
+	logger.SetOutput(io.Discard)
+	engine, err := NewEngineV2(EngineV2Options{
+		Logger:          logger,
+		ApiDefinition:   apiDefinition,
+		HttpClient:      client,
+		StreamingClient: client,
+		Injections: EngineV2Injections{
+			ContextRetrieveRequest: func(*http.Request) *graphql.Request {
+				return &graphql.Request{Query: "query { hello }"}
+			},
+			NewReusableBodyReadCloser: testReusableReadCloser,
+		},
+	})
+	require.NoError(t, err)
+	t.Cleanup(engine.Cancel)
+
+	upstream := &authorizationRecordingRoundTripper{}
+	for _, token := range []string{"Bearer AAA", "Bearer BBB"} {
+		request, err := http.NewRequest(http.MethodPost, "http://gateway.example/graphql", nil)
+		require.NoError(t, err)
+		request.Header.Set("Authorization", token)
+		response, hijacked, err := engine.HandleReverseProxy(ReverseProxyParams{
+			RoundTripper: upstream,
+			OutRequest:   request,
+			NeedsEngine:  true,
+		})
+		require.NoError(t, err)
+		assert.False(t, hijacked)
+		require.NotNil(t, response)
+		_ = response.Body.Close()
+	}
+
+	assert.Equal(t, []string{"Bearer AAA", "Bearer BBB"}, upstream.values())
+}
+
+func TestEngineV2_SSESubscriptionIsolatesCallerAuthorization(t *testing.T) {
+	upstream := &authorizationRecordingRoundTripper{}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		upstream.mu.Lock()
+		upstream.received = append(upstream.received, request.Header.Get("Authorization"))
+		upstream.mu.Unlock()
+		writer.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(writer, "event: next\ndata: {\"data\":{\"count\":1}}\n\nevent: complete\n\n")
+	}))
+	t.Cleanup(server.Close)
+
+	dataSourceConfig, err := json.Marshal(apidef.GraphQLEngineDataSourceConfigGraphQL{
+		URL:              server.URL,
+		Method:           http.MethodPost,
+		SubscriptionType: apidef.GQLSubscriptionSSE,
+		SSEUsePost:       true,
+	})
+	require.NoError(t, err)
+	apiDefinition := &apidef.APIDefinition{
+		UseStandardAuth: true,
+		GraphQL: apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeExecutionEngine,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        "type Query { hello: String } type Subscription { count: Int }",
+			Engine: apidef.GraphQLEngineConfig{DataSources: []apidef.GraphQLEngineDataSource{{
+				Kind:       apidef.GraphQLEngineDataSourceKindGraphQL,
+				Name:       "subscription",
+				RootFields: []apidef.GraphQLTypeFields{{Type: "Subscription", Fields: []string{"count"}}},
+				Config:     dataSourceConfig,
+			}}},
+		},
+	}
+	client := &http.Client{}
+	logger := logrus.New()
+	logger.SetOutput(io.Discard)
+	engine, err := NewEngineV2(EngineV2Options{
+		Logger:          logger,
+		ApiDefinition:   apiDefinition,
+		HttpClient:      client,
+		StreamingClient: client,
+		Injections: EngineV2Injections{
+			ContextRetrieveRequest: func(*http.Request) *graphql.Request {
+				return &graphql.Request{Query: "subscription { count }"}
+			},
+			NewReusableBodyReadCloser: testReusableReadCloser,
+		},
+	})
+	require.NoError(t, err)
+	t.Cleanup(engine.Cancel)
+
+	for _, token := range []string{"Bearer AAA", "Bearer BBB"} {
+		request, err := http.NewRequest(http.MethodPost, "http://gateway.example/graphql", nil)
+		require.NoError(t, err)
+		request.Header.Set("Authorization", token)
+		response, _, err := engine.HandleReverseProxy(ReverseProxyParams{
+			RoundTripper: http.DefaultTransport,
+			OutRequest:   request,
+			NeedsEngine:  true,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		_ = response.Body.Close()
+	}
+
+	assert.Equal(t, []string{"Bearer AAA", "Bearer BBB"}, upstream.values())
+}
+
+func TestEngineV2_WebSocketSubscriptionIsolatesCallerAuthorization(t *testing.T) {
+	server, upstream := newAuthorizationRecordingWSUpstream(t)
+	dataSourceConfig, err := json.Marshal(apidef.GraphQLEngineDataSourceConfigGraphQL{
+		URL:              server.URL,
+		SubscriptionType: apidef.GQLSubscriptionWS,
+	})
+	require.NoError(t, err)
+	apiDefinition := &apidef.APIDefinition{
+		UseStandardAuth: true,
+		GraphQL: apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeExecutionEngine,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        "type Query { hello: String } type Subscription { count: Int }",
+			Engine: apidef.GraphQLEngineConfig{DataSources: []apidef.GraphQLEngineDataSource{{
+				Kind:       apidef.GraphQLEngineDataSourceKindGraphQL,
+				Name:       "subscription",
+				RootFields: []apidef.GraphQLTypeFields{{Type: "Subscription", Fields: []string{"count"}}},
+				Config:     dataSourceConfig,
+			}}},
+		},
+	}
+	client := &http.Client{}
+	logger := logrus.New()
+	logger.SetOutput(io.Discard)
+	engine, err := NewEngineV2(EngineV2Options{
+		Logger:          logger,
+		ApiDefinition:   apiDefinition,
+		HttpClient:      client,
+		StreamingClient: client,
+		Injections: EngineV2Injections{
+			ContextRetrieveRequest: func(*http.Request) *graphql.Request {
+				return &graphql.Request{Query: "subscription { count }"}
+			},
+			NewReusableBodyReadCloser: testReusableReadCloser,
+		},
+	})
+	require.NoError(t, err)
+	t.Cleanup(engine.Cancel)
+
+	for _, token := range []string{"Bearer AAA", "Bearer BBB"} {
+		request, err := http.NewRequest(http.MethodPost, "http://gateway.example/graphql", nil)
+		require.NoError(t, err)
+		request.Header.Set("Authorization", token)
+		response, _, err := engine.HandleReverseProxy(ReverseProxyParams{
+			RoundTripper: http.DefaultTransport,
+			OutRequest:   request,
+			NeedsEngine:  true,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		_ = response.Body.Close()
+	}
+
+	assert.Equal(t, []string{"Bearer AAA", "Bearer BBB"}, upstream.values())
+}
+
+func TestNewEngineV2_ConfiguresHTTPClients(t *testing.T) {
+	newEngine := func(t *testing.T, httpClient, streamingClient *http.Client) *EngineV2 {
+		t.Helper()
+		logger := logrus.New()
+		logger.SetOutput(io.Discard)
+		engine, err := NewEngineV2(EngineV2Options{
+			Logger:          logger,
+			ApiDefinition:   newTestApiDefinitionV2(apidef.GraphQLExecutionModeExecutionEngine, "http://upstream.example/graphql"),
+			HttpClient:      httpClient,
+			StreamingClient: streamingClient,
+			Injections: EngineV2Injections{
+				ContextRetrieveRequest: func(*http.Request) *graphql.Request {
+					return &graphql.Request{Query: "query { hello }"}
+				},
+				NewReusableBodyReadCloser: testReusableReadCloser,
+			},
+		})
+		require.NoError(t, err)
+		t.Cleanup(engine.Cancel)
+		return engine
+	}
+
+	t.Run("should configure both the http client and the streaming client", func(t *testing.T) {
+		httpClient := &http.Client{Transport: taggedRoundTripper("http")}
+		streamingClient := &http.Client{Transport: taggedRoundTripper("streaming")}
+
+		newEngine(t, httpClient, streamingClient)
+
+		httpTransport, ok := httpClient.Transport.(*GraphQLEngineTransport)
+		require.True(t, ok, "the http client transport should be wrapped")
+		assert.Equal(t, taggedRoundTripper("http"), httpTransport.originalTransport)
+		streamingTransport, ok := streamingClient.Transport.(*GraphQLEngineTransport)
+		require.True(t, ok, "the streaming client transport should be wrapped")
+		assert.Equal(t, taggedRoundTripper("streaming"), streamingTransport.originalTransport)
+	})
+
+	t.Run("should wrap a client that is shared between both roles only once", func(t *testing.T) {
+		// The gateway passes one client per API as both the http and the streaming client,
+		// see gateway/mw_graphql.go.
+		client := &http.Client{Transport: taggedRoundTripper("shared")}
+
+		newEngine(t, client, client)
+
+		transport, ok := client.Transport.(*GraphQLEngineTransport)
+		require.True(t, ok, "the client transport should be wrapped")
+		assert.Equal(t, taggedRoundTripper("shared"), transport.originalTransport)
+	})
+
+	t.Run("should not fail when a client is nil", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			newEngine(t, nil, nil)
+		})
 	})
 }
 
