@@ -583,21 +583,13 @@ func TestEngineV3_CustomAuthHeaderNameIsolatesCallerCredential(t *testing.T) {
 // case. Every caller gets a unique credential and the multiset has to come back intact:
 // ElementsMatch catches a lost credential and a duplicated one alike.
 //
-// Both tests send one warm-up request before fanning out, which is also the production
-// state of an API that has served a request: the execution plan is cached, which is the
-// condition the credential defect needs.
-//
-// The warm-up is also what keeps these green under -race against the currently pinned
-// graphql-go-tools, which memoises lazily and without synchronisation in two places that a
-// cold concurrent burst hits. Both predate the version bump, byte for byte, and both are
-// fixed by scratchpad/gql-repro/fixes/graphql-go-tools/0006 and 0007:
-//   - v1 pkg/graphql/schema.go Schema.Hash writes s.hash on first use, and every request
-//     validates against the one *Schema of the API spec.
-//   - v2 pkg/engine/resolve/resolve.go ResolveGraphQLResponse writes response.Info on the
-//     cached plan on first use.
-//
-// Once those land and the pin moves, the warm-up is no longer required for -race, only for
-// the warm plan cache.
+// The tests come in two shapes. The warm ones send a request before fanning out, so the
+// execution plan is cached when the burst starts, which is the state the credential defect
+// needs and the state of any API that has served a request. The cold ones start with
+// nothing cached, which is what exercises the lazily initialised state inside
+// graphql-go-tools: the schema hash and the info of a cached plan were both filled in on
+// first use, so a cold burst raced on them. Both are fixed as of the pinned
+// graphql-go-tools 1ff2d4d7.
 
 const concurrentIsolationCallers = 20
 
@@ -621,6 +613,31 @@ func callConcurrently(t *testing.T, engine Engine, roundTripper http.RoundTrippe
 		}(credential)
 	}
 	waitGroup.Wait()
+}
+
+func TestEngineV2_ConcurrentColdCallersDoNotShareCredentials(t *testing.T) {
+	engine := newIsolationEngineV2(t,
+		newUDGApiDefinition(apidef.GraphQLConfigVersion2, "http://upstream.example/graphql"),
+		"query { hello }")
+
+	upstream := newAuthorizationRecordingRoundTripper()
+	credentials := concurrentCredentials()
+	callConcurrently(t, engine, upstream, credentials)
+
+	assert.ElementsMatch(t, credentials, upstream.values())
+}
+
+func TestEngineV3_ConcurrentColdCallersDoNotShareCredentials(t *testing.T) {
+	engine := newIsolationEngineV3(t,
+		newUDGApiDefinition(apidef.GraphQLConfigVersion3Preview, "http://upstream.example/graphql"),
+		"query { hello }")
+
+	upstream := newAuthorizationRecordingRoundTripper()
+	credentials := concurrentCredentials()
+	callConcurrently(t, engine, upstream, credentials)
+
+	waitForUpstreamCalls(t, upstream.authorizationRecorder, len(credentials))
+	assert.ElementsMatch(t, credentials, upstream.values())
 }
 
 func TestEngineV2_ConcurrentCallersDoNotShareCredentials(t *testing.T) {
