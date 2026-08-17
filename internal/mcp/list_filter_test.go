@@ -270,6 +270,28 @@ func TestFilterItemsWithRuleSets(t *testing.T) {
 }
 
 func TestFilterJSONRPCBody(t *testing.T) {
+	t.Run("unchanged list preserves original bytes and cache hints", func(t *testing.T) {
+		body := []byte("{\n  \"jsonrpc\": \"2.0\", \"id\": 1, \"result\": {\"tools\": [{\"name\": \"allowed\"}], \"cacheScope\": \"public\", \"ttlMs\": 3000}\n}")
+		result, changed := FilterJSONRPCBody(body, ListFilterConfigs["tools"], user.AccessControlRules{Allowed: []string{"allowed"}})
+		assert.False(t, changed)
+		assert.Nil(t, result, "caller must retain the original bytes when nothing was removed")
+	})
+
+	t.Run("edited paginated list receives private zero-TTL hints", func(t *testing.T) {
+		body := []byte(`{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"allowed"},{"name":"secret"}],"nextCursor":"page-2","cacheScope":"public","ttlMs":3000,"extension":{"kept":true}}}`)
+		result, changed := FilterJSONRPCBody(body, ListFilterConfigs["tools"], user.AccessControlRules{Allowed: []string{"allowed"}})
+		require.True(t, changed)
+
+		var envelope JSONRPCResponse
+		require.NoError(t, json.Unmarshal(result, &envelope))
+		var responseResult map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(envelope.Result, &responseResult))
+		assert.JSONEq(t, `"private"`, string(responseResult["cacheScope"]))
+		assert.JSONEq(t, `0`, string(responseResult["ttlMs"]))
+		assert.JSONEq(t, `"page-2"`, string(responseResult["nextCursor"]))
+		assert.JSONEq(t, `{"kept":true}`, string(responseResult["extension"]))
+	})
+
 	t.Run("batch JSON-RPC array passes through (returns false)", func(t *testing.T) {
 		// JSON-RPC batch = top-level array. Not supported for filtering.
 		batch := `[{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"a"}]}},{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"b"}]}}]`
@@ -339,6 +361,15 @@ func TestFilterInitializeCapabilitiesBody(t *testing.T) {
 	assert.NotContains(t, capabilities, "tools")
 	assert.Contains(t, capabilities, "resources")
 	assert.Contains(t, capabilities, "prompts")
+	assert.JSONEq(t, `"private"`, string(responseResult["cacheScope"]))
+	assert.JSONEq(t, `0`, string(responseResult["ttlMs"]))
+
+	t.Run("unchanged capabilities preserve original response", func(t *testing.T) {
+		unchangedBody := []byte("{\n\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":{\"tools\":{}},\"cacheScope\":\"public\",\"ttlMs\":42}}")
+		unchanged, changed := FilterInitializeCapabilitiesBody(unchangedBody, []user.AccessControlRules{{Allowed: []string{".*"}}})
+		assert.False(t, changed)
+		assert.Nil(t, unchanged)
+	})
 }
 
 func TestInferListConfigFromResult(t *testing.T) {
