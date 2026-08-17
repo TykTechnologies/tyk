@@ -279,6 +279,18 @@ func NewConnector(connType string, conf config.Config) (model.Connector, error) 
 		opts = append(opts, model.WithTLS(&tls))
 	}
 
+	if cfg.IAMAuth.Enabled {
+		iamOpt, err := buildIAMAuthOption(context.Background(), cfg.IAMAuth)
+		if err != nil {
+			return nil, err
+		}
+		if !cfg.UseSSL {
+			log.Warning("IAM auth is enabled without TLS (use_ssl=false); " +
+				"in-transit encryption is strongly recommended for cloud-managed Redis/Valkey")
+		}
+		opts = append(opts, iamOpt)
+	}
+
 	return connector.NewConnector(model.RedisV9Type, opts...)
 }
 

@@ -46,6 +46,21 @@ var sess = user.SessionState{
 	DataExpires: 110,
 }
 
+type requestConditionalMiddleware struct {
+	*BaseMiddleware
+	calls int
+}
+
+func (m *requestConditionalMiddleware) Name() string {
+	return "requestConditionalMiddleware"
+}
+
+//nolint:staticcheck // ST1008: middleware interface requires (error, int).
+func (m *requestConditionalMiddleware) ProcessRequest(http.ResponseWriter, *http.Request, interface{}) (error, int) {
+	m.calls++
+	return nil, http.StatusOK
+}
+
 func (m mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
 	return sess.Clone(), !m.DetailNotFound
 }
@@ -995,6 +1010,46 @@ func TestGateway_mwAppendEnabled_MCP(t *testing.T) {
 		assert.True(t, result, "mwAppendEnabled should return true for non-restricted middleware on MCP")
 		assert.Len(t, chain, 1, "Chain should have non-restricted middleware for MCP APIs")
 	})
+}
+
+func TestGateway_mwAppendEnabledForRequest(t *testing.T) {
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{})
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "request-conditional-api"
+	})[0]
+	mw := &requestConditionalMiddleware{
+		BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw},
+	}
+
+	var chain []alice.Constructor
+	appended := gw.mwAppendEnabledForRequest(&chain, mw, func(r *http.Request) bool {
+		return r.Header.Get("X-Run-Middleware") == "true"
+	})
+	require.True(t, appended)
+	require.Len(t, chain, 1)
+
+	nextCalls := 0
+	handler := alice.New(chain...).Then(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		nextCalls++
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/without-marker", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	assert.Equal(t, http.StatusNoContent, recorder.Code)
+	assert.Zero(t, mw.calls)
+	assert.Equal(t, 1, nextCalls)
+
+	req = httptest.NewRequest(http.MethodGet, "/with-marker", nil)
+	req.Header.Set("X-Run-Middleware", "true")
+	recorder = httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	assert.Equal(t, http.StatusNoContent, recorder.Code)
+	assert.Equal(t, 1, mw.calls)
+	assert.Equal(t, 2, nextCalls)
 }
 
 // testMetricInstruments creates MetricInstruments backed by a real in-memory

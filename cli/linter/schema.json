@@ -1633,6 +1633,24 @@
               "type": "string"
             }
           }
+        },
+        "stores": {
+          "type": ["object", "null"],
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "config": {
+                "type": ["object", "null"]
+              }
+            }
+          }
         }
       }
     },

@@ -12,6 +12,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -95,12 +96,13 @@ func TestVirtualEndpoint(t *testing.T) {
 			ts := StartTest(nil)
 			defer ts.Close()
 
-			ts.testPrepareVirtualEndpointWithDriver(virtTestJS, "GET", "/virt1",
+			virtualPath := "/virt1-" + uuid.NewHex()
+			ts.testPrepareVirtualEndpointWithDriver(virtTestJS, "GET", virtualPath,
 				proxyOnErrorDisabled, keylessAuthEnabled, cacheEnabled, false, driver)
 
 			_, _ = ts.Run(t,
 				test.TestCase{
-					Path:      "/virt1",
+					Path:      virtualPath,
 					Code:      202,
 					BodyMatch: "foobar",
 					HeadersNotMatch: map[string]string{
@@ -112,7 +114,7 @@ func TestVirtualEndpoint(t *testing.T) {
 					},
 				},
 				test.TestCase{
-					Path:      "/virt1",
+					Path:      virtualPath,
 					Code:      202,
 					BodyMatch: "foobar",
 					HeadersMatch: map[string]string{

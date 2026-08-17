@@ -262,6 +262,29 @@ func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware)
 	return false
 }
 
+// mwAppendEnabledForRequest evaluates the request predicate before entering the
+// traced middleware handler, so skipped requests emit no middleware telemetry.
+func (gw *Gateway) mwAppendEnabledForRequest(chain *[]alice.Constructor, mw TykMiddleware, enabled func(*http.Request) bool) bool {
+	if gw.isDisabledForMCP(mw) || !mw.EnabledForSpec() {
+		return false
+	}
+
+	tracedConstructor := gw.createMiddleware(mw)
+	*chain = append(*chain, func(next http.Handler) http.Handler {
+		tracedHandler := tracedConstructor(next)
+
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !enabled(r) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			tracedHandler.ServeHTTP(w, r)
+		})
+	})
+	return true
+}
+
 func (gw *Gateway) responseMWAppendEnabled(chain *[]TykResponseHandler, responseMW TykResponseHandler) bool {
 	if responseMW.Enabled() {
 		*chain = append(*chain, responseMW)

@@ -12,6 +12,8 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 
+	"github.com/TykTechnologies/storage/kv"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -224,6 +226,31 @@ type StorageOptionsConf struct {
 	// This limit prevents memory exhaustion during decompression.
 	// Defaults to 104857600 (100MB).
 	MaxDecompressedSize int64 `json:"max_decompressed_size"`
+
+	// Configure the cloud provider's Identity and Access Management (IAM)
+	// authentication solution for temporal storage (for example, GCP MemoryStore IAM)
+	// instead of the traditional fixed username and password.
+	IAMAuth IAMAuthConfig `json:"iam_auth"`
+}
+
+// Configure the cloud provider's Identity and Access Management (IAM) authentication
+// for temporal storage (Redis/Valkey). If enabled, the standard username and password are ignored.
+type IAMAuthConfig struct {
+	// Set to true to use IAM-based authentication for this storage connection.
+	Enabled bool `json:"enabled"`
+	// Provider selects the cloud IAM provider. Currently supported: "gcp"
+	// (GCP Memorystore for Valkey and Redis Cluster).
+	Provider string `json:"provider"`
+	// ServiceAccount, for GCP, optionally impersonates this service account to
+	// mint tokens instead of using the ambient Application Default Credentials
+	// identity. Leave empty to use the workload's own identity (Workload Identity
+	// on GKE, or GOOGLE_APPLICATION_CREDENTIALS).
+	ServiceAccount string `json:"service_account"`
+	// The access token issued by the IAM will be refreshed before expiry.
+	// Set the time period before expiry when that refresh will take place as
+	// a human readable duration (for example "2m30s", "5m").
+	// Defaults to "5m" (five minutes) when empty.
+	TokenRefreshBeforeExpiry string `json:"token_refresh_before_expiry"`
 }
 
 type NormalisedURLConfig struct {
@@ -632,7 +659,7 @@ type HttpServerOptionsConfig struct {
 	SkipClientCAAnnouncement bool `json:"skip_client_ca_announcement"`
 
 	// Set this to the number of seconds that Tyk uses to flush content from the proxied upstream connection to the open downstream connection.
-	// This option needed be set for streaming protocols like Server Side Events, or gRPC streaming.
+	// This option needs to be set for streaming protocols like gRPC streaming.
 	FlushInterval int `json:"flush_interval"`
 
 	// Allow the use of a double slash in a URL path. This can be useful if you need to pass raw URLs to your API endpoints.
@@ -1348,12 +1375,14 @@ type Config struct {
 	// global session lifetime, in seconds.
 	GlobalSessionLifetime int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 
-	// This section enables the use of the KV capabilities to substitute configuration values.
+	// Configure the Key-Value stores for secure storage of secrets and other configuration values.
+	// From Tyk 5.15.0 the dedicated Consul, Vault and File methods are deprecated in favour of the more flexible Stores approach.
 	// See more details https://tyk.io/docs/tyk-self-managed/#store-configuration-with-key-value-store
 	KV struct {
 		Consul ConsulConfig `json:"consul"`
 		Vault  VaultConfig  `json:"vault"`
 		File   FileConfig   `json:"file"`
+		Stores kv.Stores    `json:"stores" structviewer:"obfuscate"`
 	} `json:"kv"`
 
 	// Secrets configures a list of key/value pairs for the gateway.

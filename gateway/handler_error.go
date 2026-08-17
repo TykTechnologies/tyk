@@ -346,14 +346,16 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 		var tmplExecutor TemplateExecutor
 		tmplExecutor = tmpl
 
-		apiError := APIError{htmltemplate.HTML(htmltemplate.JSEscapeString(errMsg))}
+		apiError := APIError{}
 
 		if contentType == header.ApplicationXML || contentType == header.TextXML || contentType == header.ApplicationSoapXML {
-			apiError.Message = htmltemplate.HTML(errMsg)
+			apiError.Message = htmltemplate.HTML(htmltemplate.HTMLEscapeString(errMsg))
 
 			//we look up in the last defined templateName to obtain the template.
 			rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
 			tmplExecutor = rawTmpl
+		} else {
+			apiError.Message = htmltemplate.HTML(jsonEscapeString(errMsg))
 		}
 
 		var log bytes.Buffer
