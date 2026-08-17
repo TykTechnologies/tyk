@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"hash"
+	"io"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -24,6 +25,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -120,11 +122,7 @@ func TestRedisCacheMiddleware(t *testing.T) {
 	check := func(t *testing.T, p params) {
 		subCheck := func(t *testing.T, cachingActive bool, p params) {
 			t.Helper()
-			headersMatch := make(map[string]string)
-			if cachingActive {
-				headersMatch["x-tyk-cached-response"] = "1"
-				p.transferEncoding = nil
-			}
+			requestPath := p.path + "?cache-test=" + uuid.NewHex()
 
 			ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
 				response, err := base64.StdEncoding.DecodeString(record.RawResponse)
@@ -133,10 +131,45 @@ func TestRedisCacheMiddleware(t *testing.T) {
 				assert.Contains(t, string(response), p.bodyMatch)
 			}
 
-			resp, _ := ts.Run(t, []test.TestCase{
-				{Path: p.path, BodyMatch: p.bodyMatch, Code: http.StatusOK},
-				{Path: p.path, HeadersMatch: headersMatch, BodyMatch: p.bodyMatch, Code: http.StatusOK},
-			}...)
+			resp, _ := ts.Run(t, test.TestCase{
+				Path: requestPath, BodyMatch: p.bodyMatch, Code: http.StatusOK,
+			})
+
+			if cachingActive {
+				client := &http.Client{}
+				defer client.CloseIdleConnections()
+
+				var cachedBody string
+				require.Eventually(t, func() bool {
+					req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, ts.URL+requestPath, nil)
+					if err != nil {
+						return false
+					}
+
+					candidate, err := client.Do(req)
+					if err != nil {
+						return false
+					}
+
+					body, readErr := io.ReadAll(candidate.Body)
+					closeErr := candidate.Body.Close()
+					if readErr != nil || closeErr != nil || candidate.Header.Get(cachedResponseHeader) != "1" {
+						return false
+					}
+
+					resp = candidate
+					cachedBody = string(body)
+					return true
+				}, 5*time.Second, 10*time.Millisecond, "response was not stored in cache")
+
+				p.transferEncoding = nil
+				require.Equal(t, http.StatusOK, resp.StatusCode)
+				require.Contains(t, cachedBody, p.bodyMatch)
+			} else {
+				resp, _ = ts.Run(t, test.TestCase{
+					Path: requestPath, BodyMatch: p.bodyMatch, Code: http.StatusOK,
+				})
+			}
 
 			assert.Equal(t, p.transferEncoding, resp.TransferEncoding)
 			assert.Equal(t, p.uncompressed, resp.Uncompressed)

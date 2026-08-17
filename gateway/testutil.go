@@ -27,33 +27,33 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/stretchr/testify/assert"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
-	"github.com/TykTechnologies/tyk/rpc"
-
 	"github.com/golang-jwt/jwt/v4"
-
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	kvlib "github.com/TykTechnologies/storage/kv"
+	kvregistry "github.com/TykTechnologies/storage/kv/registry"
+	kvresolver "github.com/TykTechnologies/storage/kv/resolver"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/cli"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/uuid"
-
-	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/cli"
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
-	_ "github.com/TykTechnologies/tyk/templates" // Don't delete
 	"github.com/TykTechnologies/tyk/test"
-	_ "github.com/TykTechnologies/tyk/testdata" // Don't delete
 	"github.com/TykTechnologies/tyk/user"
+
+	_ "github.com/TykTechnologies/tyk/templates" // Don't delete
+	_ "github.com/TykTechnologies/tyk/testdata"  // Don't delete
 )
 
 const jsonContentType = "application/json"
@@ -1152,12 +1152,6 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	}
 	gwConfig.CoProcessOptions = s.config.CoprocessConfig
 
-	gw := NewGateway(gwConfig, s.ctx)
-	gw.setTestMode(true)
-	gw.ConnectionWatcher = httputil.NewConnectionWatcher()
-
-	s.MockHandle = MockHandle
-
 	var err error
 	gwConfig.Storage.Database = mathrand.Intn(15)
 	gwConfig.AppPath, err = ioutil.TempDir("", "tyk-test-")
@@ -1195,6 +1189,21 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	if genConf != nil {
 		genConf(&gwConfig)
 	}
+
+	// The gateway is constructed only after gwConfig has reached its final
+	// shape (defaults, test overrides, env, genConf). NewGateway builds parts
+	// of the gateway FROM the config it receives; a later SetConfig swaps the
+	// live config but does not rebuild those parts, so any config applied
+	// after construction is silently invisible to them. This also mirrors
+	// production, where the config is fully loaded and resolved before the
+	// gateway is built, and config changes restart the process. (Concrete
+	// example: the KV registry snapshots conf.Secrets and kv.file.base_path
+	// into its stores at construction.)
+	gw := NewGateway(gwConfig, s.ctx)
+	gw.setTestMode(true)
+	gw.ConnectionWatcher = httputil.NewConnectionWatcher()
+
+	s.MockHandle = MockHandle
 
 	s.TestServerRouter = s.testHttpHandler(gw)
 
@@ -1868,7 +1877,9 @@ func (gw *Gateway) writeSpecFiles(specs []*APISpec, appPath string) {
 	for i, spec := range specs {
 		gw.ensureSpecName(spec)
 		gw.writeAPIDefinitionFile(spec, i, appPath)
-		gw.writeOASFile(spec, i, appPath)
+		if spec.IsOAS {
+			gw.writeOASFile(spec, i, appPath)
+		}
 	}
 }
 
@@ -2217,4 +2228,95 @@ func createMockReadCloserWithError(err error) *MockReadCloser {
 	return &MockReadCloser{
 		Reader: &MockErrorReader{err},
 	}
+}
+
+// fakeKVProvider is a registry-backed stand-in for a remote provider: a fixed
+// key→value map with the same not-found contract every real remote provider
+// (vault, consul, and future ones like aws/azure) implements. Standalone, so
+// the registry skips the cache wrapper and tests observe every Get.
+type fakeKVProvider struct {
+	data map[string]string
+}
+
+func (f fakeKVProvider) Get(_ context.Context, key string) (string, error) {
+	val, ok := f.data[key]
+	if !ok {
+		return "", &kvlib.KeyNotFoundError{KeyPath: key}
+	}
+
+	return val, nil
+}
+
+func (f fakeKVProvider) IsStandalone() bool { return true }
+
+// List returns every entry whose key has the given prefix, mirroring the
+// consul provider's Lister.
+func (f fakeKVProvider) List(_ context.Context, prefix string) (map[string]string, error) {
+	out := make(map[string]string)
+	for k, v := range f.data {
+		if strings.HasPrefix(k, prefix) {
+			out[k] = v
+		}
+	}
+
+	return out, nil
+}
+
+// installKVRegistry replaces the gateway's registry and resolver with ones
+// built from the given store configs and factories (WithFactories merges on
+// top of the OSS defaults, so real provider types work with nil factories).
+// Test-mode gateways carry a local-only registry, so tests that need a
+// remote-type store — real or fake — install it through here.
+func installKVRegistry(
+	t *testing.T,
+	gw *Gateway,
+	storeCfgs map[string]kvlib.StoreConfig,
+	factories map[kvlib.ProviderType]kvlib.ProviderFactory,
+) {
+	t.Helper()
+
+	// Keep the gateway-promoted env store alongside the injected ones: tests
+	// mix $secret_env./env:// with remote stores, and swapping the registry
+	// must not disable env resolution.
+	if _, ok := storeCfgs["env"]; !ok {
+		envCfg, err := json.Marshal(map[string]any{"prefix": "TYK_SECRET_", "uppercase": true})
+		require.NoError(t, err)
+		storeCfgs["env"] = kvlib.StoreConfig{Type: kvlib.Env, Config: envCfg}
+	}
+
+	reg, err := kvregistry.NewFromConfig(
+		t.Context(),
+		nil,
+		kvregistry.WithDefaultStores(storeCfgs),
+		kvregistry.WithFactories(factories),
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = reg.Close(context.WithoutCancel(t.Context())) })
+
+	gw.kvRegistry = reg
+	gw.kvResolver = kvresolver.NewResolver(reg)
+}
+
+// installFakeKVStores replaces the gateway's registry and resolver with ones
+// carrying a fake provider per entry: store name → its key→value data. Any
+// store name works — new-syntax references (kv://<name>/...) route purely by
+// name, so future stores like "aws-prod" are faked the same way. The names
+// "vault"/"consul" additionally exercise the legacy-prefix routing
+// (vault:///consul:///$secret_*), which is hardwired to those two stores.
+func installFakeKVStores(t *testing.T, gw *Gateway, stores map[string]map[string]string) {
+	t.Helper()
+
+	factories := make(map[kvlib.ProviderType]kvlib.ProviderFactory, len(stores))
+	storeCfgs := make(map[string]kvlib.StoreConfig, len(stores))
+
+	for name, data := range stores {
+		typ := kvlib.ProviderType("fake_" + name)
+		provider := fakeKVProvider{data: data}
+		factories[typ] = func(_ json.RawMessage) (kvlib.Provider, error) {
+			return provider, nil
+		}
+		storeCfgs[name] = kvlib.StoreConfig{Type: typ}
+	}
+
+	installKVRegistry(t, gw, storeCfgs, factories)
 }

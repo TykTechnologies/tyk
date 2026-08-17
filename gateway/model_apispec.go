@@ -24,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
+	restmcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
 
 	_ "github.com/TykTechnologies/tyk/internal/mcp" // registers MCP VEM prefixes
 )
@@ -83,6 +84,10 @@ type APISpec struct {
 	// Value: VEM path (e.g., "/mcp-tool:get-weather")
 	MCPPrimitives map[string]string
 
+	// MCPAdapter holds runtime-only REST-as-MCP synthetic adapter state. It is
+	// never extracted to/persisted from API definitions or OAS documents.
+	MCPAdapter MCPAdapterRuntime
+
 	JSONRPCRouter jsonrpc.Router
 
 	// OperationsAllowListEnabled is true if any JSON-RPC operation (method-level) has
@@ -110,6 +115,17 @@ type APISpec struct {
 	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
 	// Built from apidef.ErrorOverrides during gateway startup.
 	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
+}
+
+// MCPAdapterRuntime groups runtime-only state for a synthetic REST-as-MCP
+// adapter API.
+type MCPAdapterRuntime struct {
+	Synthetic                bool
+	SourceRESTAPIID          string
+	SDKAdapter               *restmcpadapter.SDKAdapter
+	AllowedCallerProxyAPIIDs []string
+	ToolViews                map[string]oas.MCPToolView
+	UnionTools               []oas.DerivedTool
 }
 
 // GetJSRunner returns the active JSRunner for this API spec based on the
@@ -177,12 +193,12 @@ func (a *APISpec) SetCompiledErrorOverrides(compiled *CompiledErrorOverrides) {
 // Resolution order:
 //  1. If the OAS doc has an explicit `protectedResourceMetadata` block with
 //     `enabled: true`, return it as configured.
-//  2. If the API is MCP and no explicit PRM block is provided (or the
+//  2. If the API is MCP-managed and no explicit PRM block is provided (or the
 //     authentication block is missing entirely), synthesise a default
 //     `enabled: true, mode: ""` so mirror mode kicks in automatically.
 //     The empty-mode + no-resource shape resolves to mirror in
-//     EffectiveMode, so users can put Tyk in front of a remote MCP with
-//     zero PRM-specific config.
+//     EffectiveMode, so users can put Tyk in front of an MCP-managed API
+//     with zero PRM-specific config.
 //  3. Otherwise return nil — the API has no PRM serving.
 func (a *APISpec) GetPRMConfig() *oas.ProtectedResourceMetadata {
 	ext := a.GetTykExtension()
@@ -195,8 +211,8 @@ func (a *APISpec) GetPRMConfig() *oas.ProtectedResourceMetadata {
 		return prm
 	}
 
-	// MCP-only default: mirror without any explicit PRM config.
-	if prm == nil && a.IsMCP() {
+	// MCP-managed default: mirror without any explicit PRM config.
+	if prm == nil && a.IsMCPManaged() {
 		return &oas.ProtectedResourceMetadata{Enabled: true}
 	}
 	return nil
@@ -233,6 +249,18 @@ func (a *APISpec) GetOAuth2PRMConfig() (string, *oas.OAuth2PRM) {
 		return "", nil
 	}
 	return name, cfg.ProtectedResourceMetadata
+}
+
+// IsPRMEnabled reports whether this API serves Protected Resource Metadata
+// via either location: the new oauth2 security scheme block
+// (GetOAuth2PRMConfig, which wins) or the deprecated top-level block
+// (GetPRMConfig). Callers that only need to know "is PRM on" should use this
+// rather than probing one location, so both config styles are honoured.
+func (a *APISpec) IsPRMEnabled() bool {
+	if name, _ := a.GetOAuth2PRMConfig(); name != "" {
+		return true
+	}
+	return a.GetPRMConfig() != nil
 }
 
 // FindSpecMatchesStatus checks if a URL spec has a specific status and returns the URLSpec for it.
@@ -451,4 +479,10 @@ func (a *APISpec) APIType() string {
 	default:
 		return "classic"
 	}
+}
+
+// IsSyntheticMCPAdapter reports whether this spec is a hidden runtime-only
+// adapter synthesized for a REST-as-MCP proxy/source pairing.
+func (a *APISpec) IsSyntheticMCPAdapter() bool {
+	return a != nil && a.MCPAdapter.Synthetic
 }

@@ -85,7 +85,14 @@ func NewSessionLimiter(
 
 	switch storageConf.Type {
 	case "redis":
-		sessionLimiter.limiterStorage = rate.NewStorage(storageConf, externalServicesConfig)
+		limiterStorage, err := rate.NewStorage(storageConf, externalServicesConfig)
+		if err != nil {
+			// A misconfigured IAM credentials provider is an unrecoverable
+			// startup error: without storage the redis rate limiter would nil
+			// panic at request time, so fail loudly here instead.
+			log.WithError(err).Fatal("[RATELIMIT] failed to initialise rate limiter redis storage")
+		}
+		sessionLimiter.limiterStorage = limiterStorage
 	}
 
 	sessionLimiter.smoothing = rate.NewSmoothing(sessionLimiter.limiterStorage)
