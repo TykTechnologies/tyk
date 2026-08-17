@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/jensneuse/abstractlogger"
 	"github.com/sirupsen/logrus"
@@ -34,196 +33,45 @@ func NewTestEngine(t *testing.T) *EngineV3 {
 }
 
 func TestEngineV3_HandleReverseProxyIsolatesCallerAuthorization(t *testing.T) {
-	apiDefinition := newTestApiDefinitionV2(apidef.GraphQLExecutionModeExecutionEngine, "http://upstream.example/graphql")
-	apiDefinition.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
-	apiDefinition.UseStandardAuth = true
-	apiDefinition.StripAuthData = false
-	schema, err := graphqlv2.NewSchemaFromString(apiDefinition.GraphQL.Schema)
-	require.NoError(t, err)
-	client := &http.Client{}
-	logger := logrus.New()
-	logger.SetOutput(io.Discard)
-	engine, err := NewEngineV3(EngineV3Options{
-		Logger:          logger,
-		Schema:          schema,
-		ApiDefinition:   apiDefinition,
-		HttpClient:      client,
-		StreamingClient: client,
-		Injections: EngineV3Injections{
-			ContextRetrieveRequest: func(*http.Request) *graphqlv2.Request {
-				return &graphqlv2.Request{Query: "query { hello }"}
-			},
-			NewReusableBodyReadCloser: testReusableReadCloser,
-			TykVariableReplacer: func(_ *http.Request, value string, _ bool) string {
-				return value
-			},
-		},
-	})
-	require.NoError(t, err)
-	t.Cleanup(engine.Cancel)
+	apiDefinition := newUDGApiDefinition(apidef.GraphQLConfigVersion3Preview, "http://upstream.example/graphql")
+	engine := newIsolationEngineV3(t, apiDefinition, "query { hello }")
 
-	upstream := &authorizationRecordingRoundTripper{}
+	upstream := newAuthorizationRecordingRoundTripper()
 	for _, token := range []string{"Bearer AAA", "Bearer BBB"} {
-		request, err := http.NewRequest(http.MethodPost, "http://gateway.example/graphql", nil)
-		require.NoError(t, err)
-		request.Header.Set("Authorization", token)
-		response, hijacked, err := engine.HandleReverseProxy(ReverseProxyParams{
-			RoundTripper: upstream,
-			OutRequest:   request,
-			NeedsEngine:  true,
-		})
-		require.NoError(t, err)
-		assert.False(t, hijacked)
-		require.NotNil(t, response)
-		_ = response.Body.Close()
+		callAs(t, engine, upstream, "", token)
 	}
 
-	require.Eventually(t, func() bool {
-		return len(upstream.values()) == 2
-	}, 5*time.Second, 10*time.Millisecond)
+	waitForUpstreamCalls(t, upstream.authorizationRecorder, 2)
 	assert.ElementsMatch(t, []string{"Bearer AAA", "Bearer BBB"}, upstream.values())
 }
 
 func TestEngineV3_SSESubscriptionIsolatesCallerAuthorization(t *testing.T) {
-	upstream := &authorizationRecordingRoundTripper{}
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		upstream.mu.Lock()
-		upstream.received = append(upstream.received, request.Header.Get("Authorization"))
-		upstream.mu.Unlock()
-		writer.Header().Set("Content-Type", "text/event-stream")
-		_, _ = io.WriteString(writer, "event: next\ndata: {\"data\":{\"count\":1}}\n\nevent: complete\n\n")
-	}))
-	t.Cleanup(server.Close)
-
-	dataSourceConfig, err := json.Marshal(apidef.GraphQLEngineDataSourceConfigGraphQL{
-		URL:              server.URL,
-		Method:           http.MethodPost,
-		SubscriptionType: apidef.GQLSubscriptionSSE,
-		SSEUsePost:       true,
-	})
-	require.NoError(t, err)
-	apiDefinition := &apidef.APIDefinition{
-		UseStandardAuth: true,
-		GraphQL: apidef.GraphQLConfig{
-			Enabled:       true,
-			ExecutionMode: apidef.GraphQLExecutionModeExecutionEngine,
-			Version:       apidef.GraphQLConfigVersion3Preview,
-			Schema:        "type Query { hello: String } type Subscription { count: Int }",
-			Engine: apidef.GraphQLEngineConfig{DataSources: []apidef.GraphQLEngineDataSource{{
-				Kind:       apidef.GraphQLEngineDataSourceKindGraphQL,
-				Name:       "subscription",
-				RootFields: []apidef.GraphQLTypeFields{{Type: "Subscription", Fields: []string{"count"}}},
-				Config:     dataSourceConfig,
-			}}},
-		},
-	}
-	schema, err := graphqlv2.NewSchemaFromString(apiDefinition.GraphQL.Schema)
-	require.NoError(t, err)
-	client := &http.Client{}
-	logger := logrus.New()
-	logger.SetOutput(io.Discard)
-	engine, err := NewEngineV3(EngineV3Options{
-		Logger:          logger,
-		Schema:          schema,
-		ApiDefinition:   apiDefinition,
-		HttpClient:      client,
-		StreamingClient: client,
-		Injections: EngineV3Injections{
-			ContextRetrieveRequest: func(*http.Request) *graphqlv2.Request {
-				return &graphqlv2.Request{Query: "subscription { count }"}
-			},
-			NewReusableBodyReadCloser: testReusableReadCloser,
-			TykVariableReplacer: func(_ *http.Request, value string, _ bool) string {
-				return value
-			},
-		},
-	})
-	require.NoError(t, err)
-	t.Cleanup(engine.Cancel)
+	upstream := newAuthorizationRecorder("")
+	server := newRecordingSSEUpstream(t, upstream)
+	engine := newIsolationEngineV3(t,
+		newUDGSubscriptionApiDefinition(t, apidef.GraphQLConfigVersion3Preview, apidef.GQLSubscriptionSSE, server.URL),
+		"subscription { count }")
 
 	for _, token := range []string{"Bearer AAA", "Bearer BBB"} {
-		request, err := http.NewRequest(http.MethodPost, "http://gateway.example/graphql", nil)
-		require.NoError(t, err)
-		request.Header.Set("Authorization", token)
-		response, _, err := engine.HandleReverseProxy(ReverseProxyParams{
-			RoundTripper: http.DefaultTransport,
-			OutRequest:   request,
-			NeedsEngine:  true,
-		})
-		require.NoError(t, err)
-		require.NotNil(t, response)
-		_ = response.Body.Close()
+		callAs(t, engine, http.DefaultTransport, "", token)
 	}
 
-	require.Eventually(t, func() bool {
-		return len(upstream.values()) == 2
-	}, 5*time.Second, 10*time.Millisecond)
+	waitForUpstreamCalls(t, upstream, 2)
 	assert.ElementsMatch(t, []string{"Bearer AAA", "Bearer BBB"}, upstream.values())
 }
 
 func TestEngineV3_WebSocketSubscriptionIsolatesCallerAuthorization(t *testing.T) {
-	server, upstream := newAuthorizationRecordingWSUpstream(t)
-	dataSourceConfig, err := json.Marshal(apidef.GraphQLEngineDataSourceConfigGraphQL{
-		URL:              server.URL,
-		SubscriptionType: apidef.GQLSubscriptionWS,
-	})
-	require.NoError(t, err)
-	apiDefinition := &apidef.APIDefinition{
-		UseStandardAuth: true,
-		GraphQL: apidef.GraphQLConfig{
-			Enabled:       true,
-			ExecutionMode: apidef.GraphQLExecutionModeExecutionEngine,
-			Version:       apidef.GraphQLConfigVersion3Preview,
-			Schema:        "type Query { hello: String } type Subscription { count: Int }",
-			Engine: apidef.GraphQLEngineConfig{DataSources: []apidef.GraphQLEngineDataSource{{
-				Kind:       apidef.GraphQLEngineDataSourceKindGraphQL,
-				Name:       "subscription",
-				RootFields: []apidef.GraphQLTypeFields{{Type: "Subscription", Fields: []string{"count"}}},
-				Config:     dataSourceConfig,
-			}}},
-		},
-	}
-	schema, err := graphqlv2.NewSchemaFromString(apiDefinition.GraphQL.Schema)
-	require.NoError(t, err)
-	client := &http.Client{}
-	logger := logrus.New()
-	logger.SetOutput(io.Discard)
-	engine, err := NewEngineV3(EngineV3Options{
-		Logger:          logger,
-		Schema:          schema,
-		ApiDefinition:   apiDefinition,
-		HttpClient:      client,
-		StreamingClient: client,
-		Injections: EngineV3Injections{
-			ContextRetrieveRequest: func(*http.Request) *graphqlv2.Request {
-				return &graphqlv2.Request{Query: "subscription { count }"}
-			},
-			NewReusableBodyReadCloser: testReusableReadCloser,
-			TykVariableReplacer: func(_ *http.Request, value string, _ bool) string {
-				return value
-			},
-		},
-	})
-	require.NoError(t, err)
-	t.Cleanup(engine.Cancel)
+	upstream := newAuthorizationRecorder("")
+	server := newRecordingWSUpstream(t, upstream, protocolGraphQLWS, messageTypeData)
+	engine := newIsolationEngineV3(t,
+		newUDGSubscriptionApiDefinition(t, apidef.GraphQLConfigVersion3Preview, apidef.GQLSubscriptionWS, server.URL),
+		"subscription { count }")
 
 	for _, token := range []string{"Bearer AAA", "Bearer BBB"} {
-		request, err := http.NewRequest(http.MethodPost, "http://gateway.example/graphql", nil)
-		require.NoError(t, err)
-		request.Header.Set("Authorization", token)
-		response, _, err := engine.HandleReverseProxy(ReverseProxyParams{
-			RoundTripper: http.DefaultTransport,
-			OutRequest:   request,
-			NeedsEngine:  true,
-		})
-		require.NoError(t, err)
-		require.NotNil(t, response)
-		_ = response.Body.Close()
+		callAs(t, engine, http.DefaultTransport, "", token)
 	}
 
-	require.Eventually(t, func() bool {
-		return len(upstream.values()) == 2
-	}, 5*time.Second, 10*time.Millisecond)
+	waitForUpstreamCalls(t, upstream, 2)
 	assert.ElementsMatch(t, []string{"Bearer AAA", "Bearer BBB"}, upstream.values())
 }
 
