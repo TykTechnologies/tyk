@@ -2,9 +2,11 @@ package graphengine
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -473,5 +475,85 @@ func TestIsWebSocketHandshake(t *testing.T) {
 			"Connection": "Upgrade",
 			"Upgrade":    "h2c",
 		})))
+	})
+}
+
+// The fallback round tripper serves the engines whose upstream requests cannot carry one of
+// their own, which today is EngineV1 alone. It is the only state of the engine transport
+// shared between callers, so it needs both the fallback behaviour and the locking.
+func TestGraphQLEngineTransport_FallbackRoundTripper(t *testing.T) {
+	newTransport := func() *GraphQLEngineTransport {
+		return NewGraphQLEngineTransport(
+			GraphQLEngineTransportTypeMultiUpstream,
+			taggedRoundTripper("original"),
+			testReusableReadCloser,
+			ReverseProxyHeadersConfig{},
+		)
+	}
+
+	request := func(t *testing.T) *http.Request {
+		t.Helper()
+		outreq, err := http.NewRequest(http.MethodPost, "http://upstream.example/graphql", nil)
+		require.NoError(t, err)
+		return outreq
+	}
+
+	t.Run("falls back to the original transport when none was set", func(t *testing.T) {
+		response, err := newTransport().RoundTrip(request(t))
+		require.NoError(t, err)
+		assert.Equal(t, "original", response.Header.Get("X-Transport"))
+	})
+
+	t.Run("uses the fallback for a request that carries no round tripper", func(t *testing.T) {
+		transport := newTransport()
+		transport.setFallbackRoundTripper(taggedRoundTripper("gateway"))
+
+		response, err := transport.RoundTrip(request(t))
+		require.NoError(t, err)
+		assert.Equal(t, "gateway", response.Header.Get("X-Transport"))
+	})
+
+	t.Run("the round tripper of the request still wins over the fallback", func(t *testing.T) {
+		// EngineV2 and EngineV3 stay fully request scoped: their fetches carry the round
+		// tripper of the caller and must never reach the shared fallback.
+		transport := newTransport()
+		transport.setFallbackRoundTripper(taggedRoundTripper("gateway"))
+
+		outreq := request(t)
+		outreq = outreq.WithContext(SetGraphQLEngineTransportContextValue(
+			outreq.Context(), taggedRoundTripper("caller"), ReverseProxyHeadersConfig{}))
+
+		response, err := transport.RoundTrip(outreq)
+		require.NoError(t, err)
+		assert.Equal(t, "caller", response.Header.Get("X-Transport"))
+	})
+
+	t.Run("a nil round tripper does not clear the fallback", func(t *testing.T) {
+		transport := newTransport()
+		transport.setFallbackRoundTripper(taggedRoundTripper("gateway"))
+		transport.setFallbackRoundTripper(nil)
+
+		response, err := transport.RoundTrip(request(t))
+		require.NoError(t, err)
+		assert.Equal(t, "gateway", response.Header.Get("X-Transport"))
+	})
+
+	t.Run("refreshing the fallback while it is in use does not race", func(t *testing.T) {
+		transport := newTransport()
+		var waitGroup sync.WaitGroup
+		for i := 0; i < 50; i++ {
+			waitGroup.Add(2)
+			go func(i int) {
+				defer waitGroup.Done()
+				transport.setFallbackRoundTripper(taggedRoundTripper(fmt.Sprintf("gateway-%02d", i)))
+			}(i)
+			go func() {
+				defer waitGroup.Done()
+				response, err := transport.RoundTrip(request(t))
+				require.NoError(t, err)
+				assert.NotEmpty(t, response.Header.Get("X-Transport"))
+			}()
+		}
+		waitGroup.Wait()
 	})
 }

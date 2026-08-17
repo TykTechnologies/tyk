@@ -380,16 +380,14 @@ func TestNewEngineV1_ConfiguresHTTPClient(t *testing.T) {
 	})
 }
 
-func TestEngineV1_HandleReverseProxyUsesTheClientTransport(t *testing.T) {
+func TestEngineV1_HandleReverseProxyUsesTheGatewayRoundTripper(t *testing.T) {
 	// The legacy version 1 data sources (HttpJsonDataSource, GraphQLDataSource) build
 	// their upstream request with http.NewRequest and therefore drop the execution
-	// context, so the round tripper of the request cannot reach the engine transport.
-	// EngineV1 upstream fetches consequently run on the transport of the per API client
-	// that NewEngineV1 wrapped, and never on the round tripper of another caller.
-	//
-	// If graphql-go-tools starts to build those requests with http.NewRequestWithContext,
-	// this test fails and both callers see their own round tripper instead. That is the
-	// better behaviour - update the expectation here when it happens.
+	// context, so the round tripper of the request cannot reach the engine transport the
+	// way it does for EngineV2 and EngineV3. It arrives as the transport level fallback
+	// instead, which is what keeps a tyk:// internal data source working: only the
+	// gateway round tripper can route one, and the plain transport of the API client
+	// cannot. See fallbackRoundTripper and TestGraphQL_InternalDataSource.
 	recorder := &transportTagRecorder{}
 	logger := logrus.New()
 	logger.SetOutput(io.Discard)
@@ -421,11 +419,21 @@ func TestEngineV1_HandleReverseProxyUsesTheClientTransport(t *testing.T) {
 		_ = response.Body.Close()
 	}
 
-	assert.Equal(t, []string{"client", "client"}, recorder.values())
+	// Each caller's fetch goes through the round tripper of that caller's request, because
+	// the fallback is refreshed on every PreHandle.
+	assert.Equal(t, []string{"caller-a", "caller-b"}, recorder.values())
 	// The shared client keeps the transport that the constructor installed.
 	_, ok := client.Transport.(*GraphQLEngineTransport)
 	assert.True(t, ok)
 }
+
+// No concurrent EngineV1 counterpart to the tests above. The version 1 planner in
+// graphql-go-tools is not safe for concurrent execution - a burst through one EngineV1
+// races inside Planner.Plan and the legacy data source planners, with no Tyk code on the
+// stack. Untouched by the pinned library bump (pkg/execution and pkg/astvisitor are
+// identical across the pins), so it is a pre-existing property of the deprecated config
+// version 1, not something this package can guard. The thread safety that is ours, the
+// shared fallback round tripper, is covered in transport_test.go instead.
 
 // transportTagRecorder hands out round trippers that record which one an upstream
 // fetch went through. The version 1 handover does not propagate auth headers, so the

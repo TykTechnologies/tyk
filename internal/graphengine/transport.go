@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 
 	"golang.org/x/net/http/httpguts"
 
@@ -19,6 +20,22 @@ type GraphQLEngineTransport struct {
 	transportType             GraphQLEngineTransportType
 	newReusableBodyReadCloser NewReusableBodyReadCloserFunc
 	headersConfig             ReverseProxyHeadersConfig
+
+	// fallbackRoundTripper serves the engines whose upstream requests cannot carry the
+	// per request round tripper, which today means EngineV1 alone: its legacy data
+	// sources build the upstream request with http.NewRequest and drop the execution
+	// context, so getGraphQLEngineTransportContextValue below finds nothing. Without it
+	// those fetches fall through to the plain transport of the API client, which cannot
+	// reach the gateway and so cannot serve a tyk:// internal data source.
+	//
+	// Shared across callers, unlike everything else here, so it is only sound while the
+	// round tripper the gateway hands over carries no caller state. It does not: it is
+	// the *TykRoundTripper cached on the API spec, whose only per request input is the
+	// request itself. The wrapper that used to make it caller specific was removed along
+	// with the double variable resolution, see handleGraphQL in gateway/reverse_proxy.go.
+	// Do not restore a caller specific round tripper there without removing this.
+	mu                   sync.RWMutex
+	fallbackRoundTripper http.RoundTripper
 }
 
 func NewGraphQLEngineTransport(
@@ -49,6 +66,25 @@ func configureGraphQLEngineHTTPClient(client *http.Client, transportType GraphQL
 	client.Transport = NewGraphQLEngineTransport(transportType, client.Transport, newReusableBodyReadCloser, ReverseProxyHeadersConfig{})
 }
 
+// setFallbackRoundTripper records the round tripper to use for requests that arrive without
+// one of their own. Refreshed per request rather than stored once, because the gateway
+// rebuilds the transport of an API when max_conn_time expires and the old one stops opening
+// connections.
+func (g *GraphQLEngineTransport) setFallbackRoundTripper(roundTripper http.RoundTripper) {
+	if roundTripper == nil {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.fallbackRoundTripper = roundTripper
+}
+
+func (g *GraphQLEngineTransport) fallback() http.RoundTripper {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.fallbackRoundTripper
+}
+
 func (g *GraphQLEngineTransport) RoundTrip(request *http.Request) (res *http.Response, err error) {
 	requestTransport := g
 	if values := getGraphQLEngineTransportContextValue(request.Context()); values != nil {
@@ -71,6 +107,12 @@ func (g *GraphQLEngineTransport) RoundTrip(request *http.Request) (res *http.Res
 		}
 	}
 
+	// requestTransport == g means the request carried no round tripper of its own.
+	if requestTransport == g {
+		if fallback := g.fallback(); fallback != nil {
+			return fallback.RoundTrip(request)
+		}
+	}
 	return requestTransport.originalTransport.RoundTrip(request)
 }
 

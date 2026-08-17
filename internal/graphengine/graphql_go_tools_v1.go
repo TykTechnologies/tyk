@@ -501,6 +501,12 @@ type reverseProxyPreHandlerV1 struct {
 }
 
 func (r *reverseProxyPreHandlerV1) PreHandle(params ReverseProxyParams) (reverseProxyType ReverseProxyType, err error) {
+	// EngineV1 is the only engine that needs this. Its data sources drop the execution
+	// context, so the request scoped round tripper below never reaches them and a tyk://
+	// internal data source has nothing that can route it. See fallbackRoundTripper.
+	if transport, ok := r.httpClient.Transport.(*GraphQLEngineTransport); ok {
+		transport.setFallbackRoundTripper(params.RoundTripper)
+	}
 	requestContext := SetGraphQLEngineTransportContextValue(params.OutRequest.Context(), params.RoundTripper, params.HeadersConfig)
 	*params.OutRequest = *params.OutRequest.WithContext(requestContext)
 
