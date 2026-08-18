@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/internal/osutil"
+	"github.com/TykTechnologies/tyk/pkg/osutil"
 )
 
 // setupTestDir creates a temporary directory for testing and returns its path.
