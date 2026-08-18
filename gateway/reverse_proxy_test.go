@@ -1230,6 +1230,51 @@ func TestGraphQL_ProxyOnlyHeaders(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("the consumer's credential reaches the upstream once", func(t *testing.T) {
+		// Two writers put it there and neither knows about the other: with strip_auth_data
+		// off the engine adds the consumer's auth header to the fetch input through
+		// propagateAuthHeaders, and setProxyOnlyHeaders then forwards the consumer's
+		// headers again. The upstream used to receive the credential twice.
+		spec := defaultSpec
+		spec.GraphQL.Proxy.RequestHeadersRewrite = nil
+		spec.UseKeylessAccess = false
+		spec.UseStandardAuth = true
+		spec.StripAuthData = false
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.AuthTokenType: {AuthHeaderName: "X-API-KEY"},
+		}
+		g.Gw.LoadAPI(spec)
+
+		_, authKey := g.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				spec.APIID: {APIName: spec.Name, APIID: spec.APIID, Versions: []string{"Default"}},
+			}
+			s.OrgID = spec.OrgID
+		})
+
+		g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
+			values := r.Header.Values("X-Api-Key")
+			if len(values) != 1 {
+				t.Errorf("upstream received X-Api-Key %d times: %v", len(values), values)
+				return
+			}
+			if values[0] != authKey {
+				t.Errorf("upstream received the wrong credential: %q", values[0])
+			}
+		})
+		_, err := g.Run(t, test.TestCase{
+			Path: "/",
+			Headers: map[string]string{
+				"X-API-KEY": authKey,
+			},
+			Method: http.MethodPost,
+			Data: graphql.Request{
+				Query: gqlContinentQuery,
+			},
+		})
+		assert.NoError(t, err)
+	})
+
 	t.Run("a variable inside a header the caller sent is not expanded", func(t *testing.T) {
 		// Only values that come from the API definition are resolved. A round tripper that
 		// walked every outgoing header used to sit on this path and expanded whatever the

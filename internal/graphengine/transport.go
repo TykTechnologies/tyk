@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 
@@ -255,12 +256,27 @@ func (g *GraphQLEngineTransport) setProxyOnlyHeaders(proxyOnlyValues *GraphQLPro
 			continue
 		}
 
+		// Prioritize consumer's header value when immutable headers are turned on.
+		// Delete the header from request_headers add the consumer's value. See TT-11990 and TT-12190.
+		//
+		// Deleted once, before any of the consumer's values are added. Inside the loop
+		// below it deleted the value added on the previous pass, so a consumer header
+		// with more than one value came out holding only its last one.
+		if g.headersConfig.ProxyOnly.UseImmutableHeaders && r.Header.Get(forwardedHeaderKey) != "" {
+			r.Header.Del(forwardedHeaderKey)
+		}
+
+		// What the engine put on the request, before the consumer's values are added. The
+		// engine and this loop are two writers that do not know about each other: with
+		// strip_auth_data off, additionalUpstreamHeaders has already added the consumer's
+		// auth header to the fetch input, and adding it again here sends the credential
+		// upstream twice. Compared against a snapshot rather than the header as it grows,
+		// so a consumer that really did send the same value twice keeps both.
+		engineValues := slices.Clone(r.Header.Values(forwardedHeaderKey))
+
 		for _, forwardedHeaderValue := range forwardedHeaderValues {
-			exitingHeaderValue := r.Header.Get(forwardedHeaderKey)
-			// Prioritize consumer's header value when immutable headers are turned on.
-			// Delete the header from request_headers add the consumer's value. See TT-11990 and TT-12190.
-			if g.headersConfig.ProxyOnly.UseImmutableHeaders && exitingHeaderValue != "" {
-				r.Header.Del(forwardedHeaderKey)
+			if slices.Contains(engineValues, forwardedHeaderValue) {
+				continue
 			}
 			r.Header.Add(forwardedHeaderKey, forwardedHeaderValue)
 		}

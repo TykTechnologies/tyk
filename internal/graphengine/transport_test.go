@@ -141,7 +141,7 @@ func TestGraphQLEngineTransport_RoundTrip(t *testing.T) {
 
 			_, err = transport.RoundTrip(outboundRequest)
 			assert.NoError(t, err)
-			assert.Equal(t, "none", outboundRequest.Header.Get("Authorization"))
+			assert.Equal(t, []string{"none", "Bearer 123"}, outboundRequest.Header.Values("Authorization"))
 		})
 
 		t.Run("should not overwrite request headers when the request turns use_immutable_headers on", func(t *testing.T) {
@@ -169,7 +169,7 @@ func TestGraphQLEngineTransport_RoundTrip(t *testing.T) {
 
 			_, err = transport.RoundTrip(outboundRequest)
 			assert.NoError(t, err)
-			assert.Equal(t, "Bearer 123", outboundRequest.Header.Get("Authorization"))
+			assert.Equal(t, []string{"Bearer 123"}, outboundRequest.Header.Values("Authorization"))
 		})
 
 		t.Run("should apply the request headers rewrite rules of the request", func(t *testing.T) {
@@ -258,8 +258,10 @@ func TestGraphQLEngineTransport_RoundTrip(t *testing.T) {
 
 			_, err = transport.RoundTrip(outboundRequest)
 			assert.NoError(t, err)
-			assert.Equal(t, "none", outboundRequest.Header.Get("Authorization"))
-			assert.Equal(t, "added-custom-value", outboundRequest.Header.Get("X-Custom"))
+			// Both values reach the upstream, the engine's first. Asserted as a list
+			// because Get would hide a duplicate.
+			assert.Equal(t, []string{"none", "Bearer 123"}, outboundRequest.Header.Values("Authorization"))
+			assert.Equal(t, []string{"added-custom-value"}, outboundRequest.Header.Values("X-Custom"))
 		})
 
 		t.Run("should not overwrite request headers when use_immutable_headers is true", func(t *testing.T) {
@@ -287,8 +289,8 @@ func TestGraphQLEngineTransport_RoundTrip(t *testing.T) {
 
 			_, err = transport.RoundTrip(outboundRequest)
 			assert.NoError(t, err)
-			assert.Equal(t, "Bearer 123", outboundRequest.Header.Get("Authorization"))
-			assert.Equal(t, "added-custom-value", outboundRequest.Header.Get("X-Custom"))
+			assert.Equal(t, []string{"Bearer 123"}, outboundRequest.Header.Values("Authorization"))
+			assert.Equal(t, []string{"added-custom-value"}, outboundRequest.Header.Values("X-Custom"))
 		})
 	})
 }
@@ -555,5 +557,108 @@ func TestGraphQLEngineTransport_FallbackRoundTripper(t *testing.T) {
 			}()
 		}
 		waitGroup.Wait()
+	})
+}
+
+// setProxyOnlyHeaders forwards the consumer's headers onto the upstream request that the
+// engine already built. Two writers meet here: with strip_auth_data off the engine has
+// already put the consumer's auth header on the request through additionalUpstreamHeaders,
+// and forwarding it again sends the credential upstream twice.
+func TestGraphQLEngineTransport_SetProxyOnlyHeaders(t *testing.T) {
+	// forward runs setProxyOnlyHeaders with the consumer's headers over the headers the
+	// engine had already placed on the upstream request, and returns the result.
+	forward := func(t *testing.T, useImmutableHeaders bool, engineHeader, consumerHeader http.Header) http.Header {
+		t.Helper()
+		inbound, err := http.NewRequest(http.MethodPost, "http://gateway.example/graphql", nil)
+		require.NoError(t, err)
+		inbound.Header = consumerHeader
+
+		outbound, err := http.NewRequest(http.MethodPost, "http://upstream.example/graphql", nil)
+		require.NoError(t, err)
+		outbound.Header = engineHeader
+
+		transport := NewGraphQLEngineTransport(
+			GraphQLEngineTransportTypeProxyOnly,
+			nopRoundTripper{},
+			testReusableReadCloser,
+			ReverseProxyHeadersConfig{
+				ProxyOnly: ProxyOnlyHeadersConfig{UseImmutableHeaders: useImmutableHeaders},
+			},
+		)
+		transport.setProxyOnlyHeaders(GetProxyOnlyContextValue(SetProxyOnlyContextValue(inbound.Context(), inbound)), outbound)
+		return outbound.Header
+	}
+
+	t.Run("does not forward a value the engine already set", func(t *testing.T) {
+		// The reported defect: the upstream received x-api-key twice, same value.
+		header := forward(t, false,
+			http.Header{"X-Api-Key": {"key-aaa"}},
+			http.Header{"X-Api-Key": {"key-aaa"}})
+
+		assert.Equal(t, []string{"key-aaa"}, header.Values("X-Api-Key"))
+	})
+
+	t.Run("keeps a differing configured value alongside the consumer's", func(t *testing.T) {
+		// request_headers semantics, TT-11990 and TT-12190: with immutable headers off
+		// both values reach the upstream.
+		header := forward(t, false,
+			http.Header{"X-Custom": {"from-request-headers"}},
+			http.Header{"X-Custom": {"from-consumer"}})
+
+		assert.Equal(t, []string{"from-request-headers", "from-consumer"}, header.Values("X-Custom"))
+	})
+
+	t.Run("the consumer wins when immutable headers are on", func(t *testing.T) {
+		header := forward(t, true,
+			http.Header{"X-Custom": {"from-request-headers"}},
+			http.Header{"X-Custom": {"from-consumer"}})
+
+		assert.Equal(t, []string{"from-consumer"}, header.Values("X-Custom"))
+	})
+
+	t.Run("keeps every value of a multi value consumer header when immutable headers are on", func(t *testing.T) {
+		// The delete used to sit inside the value loop, so it removed the value added on
+		// the previous pass and only the last one survived.
+		header := forward(t, true,
+			http.Header{"X-Custom": {"from-request-headers"}},
+			http.Header{"X-Custom": {"first", "second", "third"}})
+
+		assert.Equal(t, []string{"first", "second", "third"}, header.Values("X-Custom"))
+	})
+
+	t.Run("keeps every value of a multi value consumer header when immutable headers are off", func(t *testing.T) {
+		header := forward(t, false,
+			http.Header{},
+			http.Header{"X-Custom": {"first", "second", "third"}})
+
+		assert.Equal(t, []string{"first", "second", "third"}, header.Values("X-Custom"))
+	})
+
+	t.Run("forwards a duplicate the consumer itself sent", func(t *testing.T) {
+		// Only an overlap with what the engine wrote is dropped. What the consumer sent
+		// twice is none of this function's business.
+		header := forward(t, false,
+			http.Header{},
+			http.Header{"X-Custom": {"same", "same"}})
+
+		assert.Equal(t, []string{"same", "same"}, header.Values("X-Custom"))
+	})
+
+	t.Run("drops only the overlapping value of a partially overlapping header", func(t *testing.T) {
+		header := forward(t, false,
+			http.Header{"X-Custom": {"shared"}},
+			http.Header{"X-Custom": {"shared", "extra"}})
+
+		assert.Equal(t, []string{"shared", "extra"}, header.Values("X-Custom"))
+	})
+
+	t.Run("still skips the ignored headers", func(t *testing.T) {
+		header := forward(t, false,
+			http.Header{"Content-Type": {"application/json"}},
+			http.Header{"Content-Type": {"text/plain"}, "Content-Length": {"12"}, "Date": {"now"}})
+
+		assert.Equal(t, []string{"application/json"}, header.Values("Content-Type"))
+		assert.Empty(t, header.Values("Content-Length"))
+		assert.Empty(t, header.Values("Date"))
 	})
 }

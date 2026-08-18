@@ -75,12 +75,28 @@ func (r *authorizationRecorder) values() []string {
 }
 
 // headerValues returns the value of name for every recorded upstream connection, in order.
+// Only the first value of each, so it cannot see a header the upstream received twice - use
+// headerValueLists for that.
 func (r *authorizationRecorder) headerValues(name string) []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	values := make([]string, 0, len(r.received))
 	for _, recorded := range r.received {
 		values = append(values, recorded.Get(name))
+	}
+	return values
+}
+
+// headerValueLists returns every value of name that each recorded upstream connection carried.
+// A credential forwarded twice shows up here and nowhere else: two writers put the caller's
+// auth header on a proxy-only request, the engine through propagateAuthHeaders and the
+// transport through setProxyOnlyHeaders.
+func (r *authorizationRecorder) headerValueLists(name string) [][]string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	values := make([][]string, 0, len(r.received))
+	for _, recorded := range r.received {
+		values = append(values, recorded.Values(name))
 	}
 	return values
 }
@@ -344,6 +360,17 @@ func newProxyOnlyApiDefinition(version apidef.GraphQLConfigVersion, targetURL st
 	return apiDefinition
 }
 
+// assertHeaderArrivedOnce fails if any recorded upstream connection carried name more than
+// once. Proxy-only has two writers for the caller's auth header and neither knows about the
+// other, so a duplicate is the default failure mode rather than an exotic one.
+func assertHeaderArrivedOnce(t *testing.T, recorder *authorizationRecorder, name string) {
+	t.Helper()
+	for i, values := range recorder.headerValueLists(name) {
+		assert.LessOrEqual(t, len(values), 1,
+			"upstream connection %d received %s %d times: %v", i, name, len(values), values)
+	}
+}
+
 // waitForUpstreamCalls waits for count upstream connections. The engine v3 resolver
 // completes fetches asynchronously, so unlike the v2 tests those have to poll.
 func waitForUpstreamCalls(t *testing.T, recorder *authorizationRecorder, count int) {
@@ -374,6 +401,7 @@ func TestEngineV2_ProxyOnlyHTTPIsolatesCallerAuthorization(t *testing.T) {
 	assert.Equal(t, []string{"Bearer a", "Bearer b"}, upstream.values())
 	// Proves the proxy-only branch of the transport ran: nothing else forwards X-Caller.
 	assert.Equal(t, []string{"a", "b"}, upstream.headerValues("X-Caller"))
+	assertHeaderArrivedOnce(t, upstream.authorizationRecorder, "Authorization")
 }
 
 func TestEngineV2_ProxyOnlySSESubscriptionIsolatesCallerAuthorization(t *testing.T) {
@@ -388,6 +416,7 @@ func TestEngineV2_ProxyOnlySSESubscriptionIsolatesCallerAuthorization(t *testing
 	}
 
 	assert.Equal(t, []string{"Bearer AAA", "Bearer BBB"}, upstream.values())
+	assertHeaderArrivedOnce(t, upstream, "Authorization")
 }
 
 func TestEngineV2_ProxyOnlyWebSocketSubscriptionIsolatesCallerAuthorization(t *testing.T) {
@@ -402,6 +431,7 @@ func TestEngineV2_ProxyOnlyWebSocketSubscriptionIsolatesCallerAuthorization(t *t
 	}
 
 	assert.Equal(t, []string{"Bearer AAA", "Bearer BBB"}, upstream.values())
+	assertHeaderArrivedOnce(t, upstream, "Authorization")
 }
 
 func TestEngineV3_ProxyOnlyHTTPIsolatesCallerAuthorization(t *testing.T) {
@@ -417,6 +447,7 @@ func TestEngineV3_ProxyOnlyHTTPIsolatesCallerAuthorization(t *testing.T) {
 	waitForUpstreamCalls(t, upstream.authorizationRecorder, 2)
 	assert.ElementsMatch(t, []string{"Bearer a", "Bearer b"}, upstream.values())
 	assert.ElementsMatch(t, []string{"a", "b"}, upstream.headerValues("X-Caller"))
+	assertHeaderArrivedOnce(t, upstream.authorizationRecorder, "Authorization")
 }
 
 func TestEngineV3_ProxyOnlySSESubscriptionIsolatesCallerAuthorization(t *testing.T) {
@@ -432,6 +463,7 @@ func TestEngineV3_ProxyOnlySSESubscriptionIsolatesCallerAuthorization(t *testing
 
 	waitForUpstreamCalls(t, upstream, 2)
 	assert.ElementsMatch(t, []string{"Bearer AAA", "Bearer BBB"}, upstream.values())
+	assertHeaderArrivedOnce(t, upstream, "Authorization")
 }
 
 func TestEngineV3_ProxyOnlyWebSocketSubscriptionIsolatesCallerAuthorization(t *testing.T) {
@@ -447,6 +479,45 @@ func TestEngineV3_ProxyOnlyWebSocketSubscriptionIsolatesCallerAuthorization(t *t
 
 	waitForUpstreamCalls(t, upstream, 2)
 	assert.ElementsMatch(t, []string{"Bearer AAA", "Bearer BBB"}, upstream.values())
+	assertHeaderArrivedOnce(t, upstream, "Authorization")
+}
+
+// The reported shape: proxy-only, strip_auth_data off, a custom auth header name that the
+// consumer sends. The engine adds it to the fetch input through propagateAuthHeaders and the
+// transport forwards it again, so the upstream used to see the credential twice.
+func newProxyOnlyCustomAuthApiDefinition(version apidef.GraphQLConfigVersion, targetURL string) *apidef.APIDefinition {
+	apiDefinition := newProxyOnlyApiDefinition(version, targetURL, apidef.GQLSubscriptionUndefined)
+	apiDefinition.AuthConfigs = map[string]apidef.AuthConfig{
+		apidef.AuthTokenType: {AuthHeaderName: "X-Api-Key"},
+	}
+	return apiDefinition
+}
+
+func TestEngineV2_ProxyOnlyForwardsTheCallerCredentialOnce(t *testing.T) {
+	engine := newIsolationEngineV2(t,
+		newProxyOnlyCustomAuthApiDefinition(apidef.GraphQLConfigVersion2, "http://upstream.example/graphql"),
+		"query { hello }")
+
+	upstream := newAuthorizationRecordingRoundTripper()
+	for _, key := range []string{"key-aaa", "key-bbb"} {
+		callAs(t, engine, upstream, "X-Api-Key", key)
+	}
+
+	assert.Equal(t, [][]string{{"key-aaa"}, {"key-bbb"}}, upstream.headerValueLists("X-Api-Key"))
+}
+
+func TestEngineV3_ProxyOnlyForwardsTheCallerCredentialOnce(t *testing.T) {
+	engine := newIsolationEngineV3(t,
+		newProxyOnlyCustomAuthApiDefinition(apidef.GraphQLConfigVersion3Preview, "http://upstream.example/graphql"),
+		"query { hello }")
+
+	upstream := newAuthorizationRecordingRoundTripper()
+	for _, key := range []string{"key-aaa", "key-bbb"} {
+		callAs(t, engine, upstream, "X-Api-Key", key)
+	}
+
+	waitForUpstreamCalls(t, upstream.authorizationRecorder, 2)
+	assert.ElementsMatch(t, [][]string{{"key-aaa"}, {"key-bbb"}}, upstream.headerValueLists("X-Api-Key"))
 }
 
 // --- graphql-transport-ws --------------------------------------------------------
