@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -357,6 +358,68 @@ func TestSDKAdapter_StreamableHTTPHandlerNilOptionsReusesStatefulHandlerWithoutL
 		},
 	}))
 	assertNoToolListChanged(t, changed)
+}
+
+func TestSDKAdapter_ProtocolHandlersAreCachedAndShareServer(t *testing.T) {
+	t.Parallel()
+	adapter := newProtocolTestAdapter(t, []oas.DerivedTool{protocolTestTool("one")})
+
+	stateful := adapter.ProtocolHTTPHandler(false)
+	stateless := adapter.ProtocolHTTPHandler(true)
+	require.NotNil(t, stateful)
+	require.NotNil(t, stateless)
+	assert.Same(t, stateful, adapter.ProtocolHTTPHandler(false))
+	assert.Same(t, stateless, adapter.ProtocolHTTPHandler(true))
+	assert.NotSame(t, stateful, stateless)
+
+	require.NoError(t, adapter.UpdateTools([]oas.DerivedTool{protocolTestTool("two")}))
+	assert.Same(t, stateful, adapter.ProtocolHTTPHandler(false))
+	assert.Same(t, stateless, adapter.ProtocolHTTPHandler(true))
+	adapter.mu.RLock()
+	_, hasTwo := adapter.tools["two"]
+	adapter.mu.RUnlock()
+	assert.True(t, hasTwo)
+}
+
+func TestSDKAdapter_ConcurrentMixedHandlersAndToolRefresh(t *testing.T) {
+	t.Parallel()
+	adapter := newProtocolTestAdapter(t, []oas.DerivedTool{protocolTestTool("initial")})
+	var wg sync.WaitGroup
+	for index := 0; index < 40; index++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			for iteration := 0; iteration < 50; iteration++ {
+				require.NotNil(t, adapter.ProtocolHTTPHandler((index+iteration)%2 == 0))
+				adapter.mu.RLock()
+				_ = len(adapter.tools)
+				adapter.mu.RUnlock()
+			}
+		}(index)
+	}
+	for iteration := 0; iteration < 25; iteration++ {
+		require.NoError(t, adapter.UpdateTools([]oas.DerivedTool{protocolTestTool(fmt.Sprintf("tool-%d", iteration))}))
+	}
+	wg.Wait()
+}
+
+func newProtocolTestAdapter(t *testing.T, tools []oas.DerivedTool) *SDKAdapter {
+	t.Helper()
+	adapter, err := NewSDKAdapter(SDKServerConfig{
+		Name: "handler-test", Tools: tools,
+		CallTool: func(context.Context, *oas.DerivedTool, map[string]any) (*Recorder, error) {
+			return NewRecorder(), nil
+		},
+	})
+	require.NoError(t, err)
+	return adapter
+}
+
+func protocolTestTool(name string) oas.DerivedTool {
+	return oas.DerivedTool{
+		Name: name, Method: http.MethodGet, PathTemplate: "/" + name,
+		InputSchema: map[string]any{"type": "object"},
+	}
 }
 
 type loopbackRoundTripper struct {

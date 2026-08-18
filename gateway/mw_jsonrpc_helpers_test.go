@@ -56,3 +56,30 @@ func TestWriteJSONRPCAccessDenied_WithoutState(t *testing.T) {
 	body := w.Body.String()
 	assert.Contains(t, body, "jsonrpc")
 }
+
+func TestMCPAdapterUsesStatelessHandler(t *testing.T) {
+	t.Parallel()
+	request := func(header, session, method, params string) *mcp.ProtocolContext {
+		return mcp.NewProtocolContext(header, session, &mcp.RequestEnvelope{Method: method, Params: json.RawMessage(params)}, nil)
+	}
+	modernMetadata := `{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}`
+
+	tests := []struct {
+		name string
+		ctx  *mcp.ProtocolContext
+		want bool
+	}{
+		{"modern", request(mcp.ModernProtocolVersion, "", mcp.MethodToolsList, modernMetadata), true},
+		{"modern ignores session header", request(mcp.ModernProtocolVersion, "session", mcp.MethodToolsList, modernMetadata), true},
+		{"modern initialize remains stateful", request(mcp.ModernProtocolVersion, "", mcp.MethodInitialize, modernMetadata), false},
+		{"explicit legacy", request(mcp.LegacyFallbackProtocolVersion, "", mcp.MethodToolsList, `{}`), false},
+		{"session fallback", request("", "session", mcp.MethodToolsList, `{}`), false},
+		{"declaration free fallback", request("", "", mcp.MethodToolsList, `{}`), false},
+		{"mismatch", request(mcp.ModernProtocolVersion, "", mcp.MethodToolsList, `{"_meta":{"io.modelcontextprotocol/protocolVersion":"2025-11-25"}}`), false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.want, mcpAdapterUsesStatelessHandler(test.ctx))
+		})
+	}
+}

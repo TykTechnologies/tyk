@@ -28,9 +28,10 @@ const MaxToolArgumentsBytes = 1 << 20 // 1 MiB
 // Updating the tool set mutates the server in place; list-change notifications
 // are intentionally not advertised for REST-as-MCP adapters.
 type SDKAdapter struct {
-	server   *mcpsdk.Server
-	callTool ToolCallFunc
-	handler  http.Handler
+	server           *mcpsdk.Server
+	callTool         ToolCallFunc
+	statefulHandler  http.Handler
+	statelessHandler http.Handler
 
 	mu    sync.RWMutex
 	tools map[string]oas.DerivedTool
@@ -79,7 +80,8 @@ func NewSDKAdapter(config SDKServerConfig) (*SDKAdapter, error) {
 		callTool: config.CallTool,
 		tools:    map[string]oas.DerivedTool{},
 	}
-	adapter.handler = adapter.newStreamableHTTPHandler(defaultSDKAdapterStreamableHTTPOptions())
+	adapter.statefulHandler = adapter.newStreamableHTTPHandler(defaultSDKAdapterStreamableHTTPOptions(false))
+	adapter.statelessHandler = adapter.newStreamableHTTPHandler(defaultSDKAdapterStreamableHTTPOptions(true))
 	if err := adapter.UpdateTools(config.Tools); err != nil {
 		return nil, err
 	}
@@ -118,9 +120,23 @@ func (a *SDKAdapter) UpdateCallTool(callTool ToolCallFunc) error {
 // requests. Non-nil options intentionally build a separate handler.
 func (a *SDKAdapter) StreamableHTTPHandler(opts *mcpsdk.StreamableHTTPOptions) http.Handler {
 	if opts == nil {
-		return a.handler
+		return a.statefulHandler
 	}
 	return a.newStreamableHTTPHandler(opts)
+}
+
+// ProtocolHTTPHandler returns one of the two adapter-owned handlers. Both
+// handlers share the same SDK server, callback, catalogue, and synchronization.
+// Selection is deliberately explicit so production routing never allocates a
+// transport handler per request.
+func (a *SDKAdapter) ProtocolHTTPHandler(stateless bool) http.Handler {
+	if a == nil {
+		return nil
+	}
+	if stateless {
+		return a.statelessHandler
+	}
+	return a.statefulHandler
 }
 
 func (a *SDKAdapter) newStreamableHTTPHandler(opts *mcpsdk.StreamableHTTPOptions) http.Handler {
@@ -129,9 +145,11 @@ func (a *SDKAdapter) newStreamableHTTPHandler(opts *mcpsdk.StreamableHTTPOptions
 	}, opts)
 }
 
-func defaultSDKAdapterStreamableHTTPOptions() *mcpsdk.StreamableHTTPOptions {
+func defaultSDKAdapterStreamableHTTPOptions(stateless bool) *mcpsdk.StreamableHTTPOptions {
 	return &mcpsdk.StreamableHTTPOptions{
-		JSONResponse: true,
+		Stateless:                    stateless,
+		JSONResponse:                 true,
+		PropagateRequestCancellation: stateless,
 	}
 }
 

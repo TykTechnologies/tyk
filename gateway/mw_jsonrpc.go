@@ -16,6 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	restmcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	otelmcp "github.com/TykTechnologies/tyk/internal/otel/mcp"
@@ -344,7 +345,7 @@ func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWri
 		// stateful transport surface available to established legacy sessions.
 		normaliseMCPStreamableAccept(r)
 		installMCPAdapterCallContext(r, m.Gw, m.Spec)
-		m.Spec.MCPAdapter.SDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(w, r)
+		mcpAdapterHTTPHandler(r, m.Spec.MCPAdapter.SDKAdapter).ServeHTTP(w, r)
 		return nil, middleware.StatusRespond
 	}
 
@@ -364,14 +365,27 @@ func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWri
 
 	if method == mcp.MethodToolsList || (policyCtx != nil && policyCtx.listConfig != nil) {
 		rec := newBufferedResponseWriter()
-		m.Spec.MCPAdapter.SDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(rec, r)
+		mcpAdapterHTTPHandler(r, m.Spec.MCPAdapter.SDKAdapter).ServeHTTP(rec, r)
 		view, ok := m.syntheticMCPToolViewForCaller(r)
 		m.writeSyntheticMCPToolsListResponse(w, r, rec, view, ok, policyCtx)
 		return nil, middleware.StatusRespond
 	}
 
-	m.Spec.MCPAdapter.SDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(w, r)
+	mcpAdapterHTTPHandler(r, m.Spec.MCPAdapter.SDKAdapter).ServeHTTP(w, r)
 	return nil, middleware.StatusRespond
+}
+
+// mcpAdapterHTTPHandler selects only from the already-validated ingress
+// context. Initialize remains stateful for legacy session establishment;
+// otherwise only unambiguously modern traffic is stateless.
+func mcpAdapterHTTPHandler(r *http.Request, sdkAdapter *restmcpadapter.SDKAdapter) http.Handler {
+	protocolContext := httpctx.GetMCPProtocolContext(r)
+	return sdkAdapter.ProtocolHTTPHandler(mcpAdapterUsesStatelessHandler(protocolContext))
+}
+
+func mcpAdapterUsesStatelessHandler(protocolContext *mcp.ProtocolContext) bool {
+	return protocolContext != nil && protocolContext.IsModern() &&
+		(protocolContext.Envelope == nil || protocolContext.Envelope.Method != mcp.MethodInitialize)
 }
 
 func syntheticJSONRPCMethod(r *http.Request) string {
