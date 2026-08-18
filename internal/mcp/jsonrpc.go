@@ -17,7 +17,8 @@ const (
 
 // MCP JSON-RPC method names as defined in the Model Context Protocol specification.
 const (
-	MethodInitialize = "initialize"
+	MethodInitialize     = "initialize"
+	MethodServerDiscover = "server/discover"
 
 	// Tool methods
 	MethodToolsCall = "tools/call"

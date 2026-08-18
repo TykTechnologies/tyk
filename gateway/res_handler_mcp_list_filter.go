@@ -66,6 +66,15 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 		filter = func(body []byte) ([]byte, bool) {
 			return mcp.FilterInitializeCapabilitiesBody(body, ruleSets)
 		}
+	case state.Method == mcp.MethodServerDiscover:
+		globalRules, credentialRules := discoveryJSONRPCRuleSets(h.Spec, ses)
+		filter = func(body []byte) ([]byte, bool) {
+			filtered, changed, credentialSpecific := mcp.FilterDiscoveryBody(body, globalRules, credentialRules)
+			if credentialSpecific {
+				markMCPResponseEdited(req)
+			}
+			return filtered, changed
+		}
 	default:
 		return nil
 	}
@@ -91,7 +100,9 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 	res.Body = io.NopCloser(bytes.NewReader(newBody))
 	res.ContentLength = int64(len(newBody))
 	res.Header.Set("Content-Length", strconv.Itoa(len(newBody)))
-	markMCPResponseEdited(req)
+	if state.Method != mcp.MethodServerDiscover {
+		markMCPResponseEdited(req)
+	}
 
 	return nil
 }

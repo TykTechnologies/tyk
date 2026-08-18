@@ -33,22 +33,22 @@ func buildMCPListFilterSSESpec(apiID string, middleware *oas.Middleware) *APISpe
 func TestNewMCPListFilterSSEHook(t *testing.T) {
 	apiID := "test-api"
 
-	t.Run("nil session returns nil", func(t *testing.T) {
+	t.Run("nil session still normalizes discovery", func(t *testing.T) {
 		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), nil)
-		assert.Nil(t, hook)
+		assert.NotNil(t, hook)
 	})
 
-	t.Run("empty access rights returns nil", func(t *testing.T) {
+	t.Run("empty access rights still normalizes discovery", func(t *testing.T) {
 		ses := &user.SessionState{
 			AccessRights: map[string]user.AccessDefinition{
 				apiID: {},
 			},
 		}
 		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
-		assert.Nil(t, hook)
+		assert.NotNil(t, hook)
 	})
 
-	t.Run("wrong API ID returns nil", func(t *testing.T) {
+	t.Run("wrong API ID still normalizes discovery", func(t *testing.T) {
 		ses := &user.SessionState{
 			AccessRights: map[string]user.AccessDefinition{
 				"other-api": {
@@ -59,7 +59,7 @@ func TestNewMCPListFilterSSEHook(t *testing.T) {
 			},
 		}
 		hook := NewMCPListFilterSSEHook(buildMCPListFilterSSESpec(apiID, nil), ses)
-		assert.Nil(t, hook)
+		assert.NotNil(t, hook)
 	})
 
 	t.Run("configured rules returns hook", func(t *testing.T) {

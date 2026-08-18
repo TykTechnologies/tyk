@@ -20,6 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	otelmcp "github.com/TykTechnologies/tyk/internal/otel/mcp"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const (
@@ -363,9 +364,13 @@ func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWri
 	normaliseMCPStreamableAccept(r)
 	installMCPAdapterCallContext(r, m.Gw, m.Spec)
 
-	if method == mcp.MethodToolsList || (policyCtx != nil && policyCtx.listConfig != nil) {
+	if method == mcp.MethodToolsList || method == mcp.MethodServerDiscover || (policyCtx != nil && policyCtx.listConfig != nil) {
 		rec := newBufferedResponseWriter()
 		mcpAdapterHTTPHandler(r, m.Spec.MCPAdapter.SDKAdapter).ServeHTTP(rec, r)
+		if method == mcp.MethodServerDiscover {
+			m.writeSyntheticMCPDiscoveryResponse(w, r, rec, policyCtx)
+			return nil, middleware.StatusRespond
+		}
 		view, ok := m.syntheticMCPToolViewForCaller(r)
 		m.writeSyntheticMCPToolsListResponse(w, r, rec, view, ok, policyCtx)
 		return nil, middleware.StatusRespond
@@ -373,6 +378,23 @@ func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWri
 
 	mcpAdapterHTTPHandler(r, m.Spec.MCPAdapter.SDKAdapter).ServeHTTP(w, r)
 	return nil, middleware.StatusRespond
+}
+
+func (m *JSONRPCMiddleware) writeSyntheticMCPDiscoveryResponse(w http.ResponseWriter, r *http.Request, rec *bufferedResponseWriter, policyCtx *restAsMCPPolicyContext) {
+	body := rec.body.Bytes()
+	if rec.statusCode < http.StatusBadRequest {
+		var globalRules, credentialRules []user.AccessControlRules
+		if policyCtx != nil {
+			globalRules, credentialRules = discoveryJSONRPCRuleSets(policyCtx.proxySpec, policyCtx.session)
+		}
+		if filtered, changed, credentialSpecific := mcp.FilterDiscoveryBody(body, globalRules, credentialRules); changed {
+			body = filtered
+			if credentialSpecific {
+				markMCPResponseEdited(r)
+			}
+		}
+	}
+	rec.writeTo(w, body)
 }
 
 // mcpAdapterHTTPHandler selects only from the already-validated ingress

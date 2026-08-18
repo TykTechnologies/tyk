@@ -2,10 +2,91 @@ package mcp
 
 import (
 	"encoding/json"
+	"slices"
 
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )
+
+// FilterDiscoveryBody intersects an upstream server/discover result with the
+// Gateway's routable versions and filters known capabilities using JSON-RPC
+// method rules. Unknown result, capability, metadata, and extension fields are
+// retained byte-for-byte until an actual edit requires re-encoding.
+//
+// credentialSpecific is true only when credential rules removed a capability
+// that global rules would have retained. Only that case receives private,
+// zero-TTL cache hints.
+func FilterDiscoveryBody(body []byte, globalRules, credentialRules []user.AccessControlRules) (filtered []byte, changed, credentialSpecific bool) {
+	var envelope JSONRPCResponse
+	if json.Unmarshal(body, &envelope) != nil || envelope.Result == nil {
+		return nil, false, false
+	}
+	var result map[string]json.RawMessage
+	if json.Unmarshal(envelope.Result, &result) != nil {
+		return nil, false, false
+	}
+
+	if versionsRaw, present := result["supportedVersions"]; present {
+		var upstream []string
+		if json.Unmarshal(versionsRaw, &upstream) == nil {
+			upstreamSet := make(map[string]struct{}, len(upstream))
+			for _, version := range upstream {
+				upstreamSet[version] = struct{}{}
+			}
+			versions := make([]string, 0, len(servedProtocolVersions))
+			for _, served := range servedProtocolVersions {
+				if _, supported := upstreamSet[served]; supported {
+					versions = append(versions, served)
+				}
+			}
+			if !slices.Equal(versions, upstream) {
+				result["supportedVersions"], _ = json.Marshal(versions)
+				changed = true
+			}
+		}
+	}
+
+	if capabilitiesRaw, present := result["capabilities"]; present {
+		var capabilities map[string]json.RawMessage
+		if json.Unmarshal(capabilitiesRaw, &capabilities) == nil {
+			capabilitiesChanged := false
+			for capability, methods := range InitializeCapabilityMethods {
+				if _, advertised := capabilities[capability]; !advertised {
+					continue
+				}
+				globalDenied := AnyMethodDenied(globalRules, methods)
+				credentialDenied := AnyMethodDenied(credentialRules, methods)
+				if !globalDenied && !credentialDenied {
+					continue
+				}
+				delete(capabilities, capability)
+				capabilitiesChanged = true
+				credentialSpecific = credentialSpecific || (!globalDenied && credentialDenied)
+			}
+			if capabilitiesChanged {
+				result["capabilities"], _ = json.Marshal(capabilities)
+				changed = true
+			}
+		}
+	}
+
+	if !changed {
+		return nil, false, false
+	}
+	if credentialSpecific {
+		SetPrivateCacheHints(result)
+	}
+	resultBytes, err := json.Marshal(result)
+	if err != nil {
+		return nil, false, false
+	}
+	envelope.Result = resultBytes
+	filtered, err = json.Marshal(&envelope)
+	if err != nil {
+		return nil, false, false
+	}
+	return filtered, true, credentialSpecific
+}
 
 // ListFilterConfig holds the configuration for filtering a specific list method.
 type ListFilterConfig struct {
