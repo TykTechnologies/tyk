@@ -15,9 +15,12 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	tykctx "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -191,6 +194,44 @@ func TestErrorHandler_writeJSONRPCErrorResponse_ReturnsFullResponse(t *testing.T
 
 	// Verify what was written to ResponseWriter matches returned body
 	assert.Equal(t, body, w.Body.Bytes())
+}
+
+func TestErrorHandler_ModernClassifiedCodeWireAndContextConsistency(t *testing.T) {
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	spec.MarkAsMCP()
+	handler := ErrorHandler{BaseMiddleware: &BaseMiddleware{Spec: spec}}
+
+	tests := []struct {
+		name     string
+		status   int
+		flag     tykerrors.ResponseFlag
+		expected int
+	}{
+		{name: "authentication", status: http.StatusForbidden, flag: tykerrors.AKI, expected: jsonrpcerrors.CodeModernAuthRequired},
+		{name: "authorization", status: http.StatusForbidden, flag: tykerrors.ACD, expected: jsonrpcerrors.CodeModernAccessDenied},
+		{name: "quota", status: http.StatusForbidden, flag: tykerrors.QEX, expected: jsonrpcerrors.CodeModernQuotaExceeded},
+		{name: "rate limit", status: http.StatusTooManyRequests, flag: tykerrors.RLT, expected: jsonrpcerrors.CodeModernRateLimitExceeded},
+		{name: "IP", status: http.StatusForbidden, flag: tykerrors.IPB, expected: jsonrpcerrors.CodeModernIPBlocked},
+		{name: "upstream", status: http.StatusInternalServerError, flag: tykerrors.UCF, expected: jsonrpcerrors.CodeModernUpstreamError},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+			envelope := &mcp.RequestEnvelope{JSONRPC: "2.0", Method: "tools/list", ID: test.name}
+			httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(mcp.ModernProtocolVersion, "", envelope, nil))
+			httpctx.SetJSONRPCRoutingState(r, &httpctx.JSONRPCRoutingState{Method: envelope.Method, ID: envelope.ID})
+			tykctx.SetErrorClassification(r, tykerrors.NewErrorClassification(test.flag, test.name))
+			w := httptest.NewRecorder()
+
+			handler.writeJSONRPCErrorResponse(w, r, test.name, test.status)
+
+			var response jsonrpcerrors.JSONRPCErrorResponse
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+			assert.Equal(t, test.expected, response.Error.Code)
+			assert.Equal(t, response.Error.Code, ctxGetJSONRPCErrorCode(r))
+		})
+	}
 }
 
 func TestErrorHandler_shouldWriteJSONRPCError(t *testing.T) {

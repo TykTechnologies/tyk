@@ -32,7 +32,12 @@ type JSONRPCErrorResponse struct {
 // Returns the JSON response body for analytics recording.
 func WriteJSONRPCError(w http.ResponseWriter, requestID interface{}, httpCode int, message string) []byte {
 	rpcCode := MapHTTPStatusToJSONRPCCode(httpCode)
+	return WriteJSONRPCErrorWithCode(w, requestID, httpCode, rpcCode, message)
+}
 
+// WriteJSONRPCErrorWithCode writes a response using a code already selected by
+// the request-aware Gateway classifier.
+func WriteJSONRPCErrorWithCode(w http.ResponseWriter, requestID interface{}, httpCode, rpcCode int, message string) []byte {
 	response := buildErrorResponse(requestID, rpcCode, message, httpCode)
 
 	return writeJSONResponse(w, httpCode, response)
