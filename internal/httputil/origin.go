@@ -95,17 +95,23 @@ func ParseTrustedProxyCIDRs(cidrs []string) ([]netip.Prefix, error) {
 // ExternalOrigin returns the canonical origin visible to the requester. Proxy
 // headers are considered only when the immediate network peer is trusted.
 func ExternalOrigin(r *http.Request, trustedProxyCIDRs []string) (string, error) {
+	prefixes, err := ParseTrustedProxyCIDRs(trustedProxyCIDRs)
+	if err != nil {
+		return "", err
+	}
+	return ExternalOriginWithTrustedProxies(r, prefixes)
+}
+
+// ExternalOriginWithTrustedProxies is ExternalOrigin's request-path form for
+// callers that parsed their immutable proxy configuration at load time.
+func ExternalOriginWithTrustedProxies(r *http.Request, trustedProxyPrefixes []netip.Prefix) (string, error) {
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"
 	}
 	host := r.Host
 
-	prefixes, err := ParseTrustedProxyCIDRs(trustedProxyCIDRs)
-	if err != nil {
-		return "", err
-	}
-	if peerIsTrusted(r.RemoteAddr, prefixes) {
+	if peerIsTrusted(r.RemoteAddr, trustedProxyPrefixes) {
 		forwardedProto, forwardedHost := rightmostForwarded(r.Header.Values("Forwarded"))
 		if forwardedProto != "" {
 			scheme = forwardedProto

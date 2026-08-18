@@ -47,15 +47,12 @@ func (m *MCPOriginValidationMiddleware) ProcessRequest(w http.ResponseWriter, r 
 		return nil, http.StatusOK
 	}
 
-	if m.Spec.MCP != nil {
-		trusted, canonicalErr := internalhttputil.CanonicalOrigins(m.Spec.MCP.TrustedOrigins)
-		if canonicalErr != nil {
+	if m.Spec != nil {
+		if configErr := m.Spec.prepareMCPOriginConfig(); configErr != nil {
 			return rejectMCPOrigin(w)
 		}
-		for _, allowed := range trusted {
-			if origin == allowed {
-				return nil, http.StatusOK
-			}
+		if _, allowed := m.Spec.mcpTrustedOrigins[origin]; allowed {
+			return nil, http.StatusOK
 		}
 	}
 
@@ -63,11 +60,36 @@ func (m *MCPOriginValidationMiddleware) ProcessRequest(w http.ResponseWriter, r 
 }
 
 func externalOriginForSpec(r *http.Request, spec *APISpec) (string, error) {
-	var trustedProxyCIDRs []string
-	if spec != nil {
-		trustedProxyCIDRs = spec.GlobalConfig.HttpServerOptions.TrustedProxyCIDRs
+	if spec == nil {
+		return internalhttputil.ExternalOriginWithTrustedProxies(r, nil)
 	}
-	return internalhttputil.ExternalOrigin(r, trustedProxyCIDRs)
+	if err := spec.prepareMCPOriginConfig(); err != nil {
+		return "", err
+	}
+	return internalhttputil.ExternalOriginWithTrustedProxies(r, spec.mcpTrustedProxyPrefixes)
+}
+
+func (spec *APISpec) prepareMCPOriginConfig() error {
+	spec.mcpOriginConfigOnce.Do(func() {
+		var configuredOrigins []string
+		if spec.MCP != nil {
+			configuredOrigins = spec.MCP.TrustedOrigins
+		}
+		origins, err := internalhttputil.CanonicalOrigins(configuredOrigins)
+		if err != nil {
+			spec.mcpOriginConfigErr = err
+			return
+		}
+		spec.mcpTrustedOrigins = make(map[string]struct{}, len(origins))
+		for _, origin := range origins {
+			spec.mcpTrustedOrigins[origin] = struct{}{}
+		}
+
+		spec.mcpTrustedProxyPrefixes, spec.mcpOriginConfigErr = internalhttputil.ParseTrustedProxyCIDRs(
+			spec.GlobalConfig.HttpServerOptions.TrustedProxyCIDRs,
+		)
+	})
+	return spec.mcpOriginConfigErr
 }
 
 func rejectMCPOrigin(w http.ResponseWriter) (error, int) {

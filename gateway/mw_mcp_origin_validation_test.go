@@ -76,3 +76,39 @@ func TestMCPOriginValidationMiddleware(t *testing.T) {
 		})
 	}
 }
+
+func TestMCPOriginValidationPreparesImmutableConfigOnce(t *testing.T) {
+	t.Parallel()
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			ApplicationProtocol: apidef.AppProtocolMCP,
+			MCP:                 &apidef.MCPConfig{TrustedOrigins: []string{"HTTPS://CLIENT.EXAMPLE:443"}},
+		},
+		GlobalConfig: config.Config{HttpServerOptions: config.HttpServerOptionsConfig{
+			TrustedProxyCIDRs: []string{"10.0.0.0/8"},
+		}},
+	}
+	require.NoError(t, spec.prepareMCPOriginConfig())
+	assert.Contains(t, spec.mcpTrustedOrigins, "https://client.example")
+	require.Len(t, spec.mcpTrustedProxyPrefixes, 1)
+
+	// Loaded API specs are immutable. Corrupting the source slices after
+	// preparation proves subsequent requests use the parsed runtime cache.
+	spec.MCP.TrustedOrigins[0] = "null"
+	spec.GlobalConfig.HttpServerOptions.TrustedProxyCIDRs[0] = "not-a-cidr"
+	require.NoError(t, spec.prepareMCPOriginConfig())
+
+	req := httptest.NewRequest(http.MethodPost, "http://internal.example/mcp", nil)
+	req.RemoteAddr = "10.0.0.2:80"
+	req.Header.Set("Forwarded", "for=192.0.2.1;proto=https;host=public.example")
+	external, err := externalOriginForSpec(req, spec)
+	require.NoError(t, err)
+	assert.Equal(t, "https://public.example", external)
+
+	mw := &MCPOriginValidationMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec}}
+	req.Header.Set("Origin", "https://client.example")
+	err, status := mw.ProcessRequest(httptest.NewRecorder(), req, nil)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, status)
+}
