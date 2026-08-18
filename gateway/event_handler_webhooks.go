@@ -21,6 +21,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/httpclient"
+	"github.com/TykTechnologies/tyk/pkg/osutil"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -75,19 +76,34 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 
 	// Pre-load template on init
 	if w.conf.TemplatePath != "" {
-		w.template, err = htmltemplate.ParseFiles(w.conf.TemplatePath)
+		templateRoot, err := osutil.NewRoot(w.Gw.GetConfig().TemplatePath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "webhooks",
 				"target": w.conf.TargetPath,
-			}).Warning("Custom template load failure, using default: ", err)
-		}
+			}).Warning("Failed to initialize template root, using default: ", err)
+		} else {
+			safePath, err := templateRoot.Ensure(w.conf.TemplatePath)
+			if err != nil {
+				log.WithFields(logrus.Fields{
+					"prefix": "webhooks",
+					"target": w.conf.TargetPath,
+				}).Warning("Invalid template path, using default: ", err)
+			} else {
+				w.template, err = htmltemplate.ParseFiles(safePath)
+				if err != nil {
+					log.WithFields(logrus.Fields{
+						"prefix": "webhooks",
+						"target": w.conf.TargetPath,
+					}).Warning("Custom template load failure, using default: ", err)
+				}
 
-		if strings.HasSuffix(w.conf.TemplatePath, ".json") {
-			w.contentType = header.ApplicationJSON
+				if strings.HasSuffix(w.conf.TemplatePath, ".json") {
+					w.contentType = header.ApplicationJSON
+				}
+			}
 		}
 	}
-
 	// We use the default if TemplatePath was empty or if we failed
 	// to load it.
 	if w.template == nil {
