@@ -26,7 +26,8 @@ func TestNewProtocolContext(t *testing.T) {
 	}{
 		{
 			name: "matching header and metadata body", header: "2026-07-28",
-			envelope:   envelope("tools/list", `{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}`),
+			session:    "modern-must-ignore-session",
+			envelope:   envelope("tools/list", `{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}`),
 			wantSource: ProtocolVersionSourceHeaderBody, declared: "2026-07-28", effective: "2026-07-28",
 		},
 		{

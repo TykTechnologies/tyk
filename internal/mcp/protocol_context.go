@@ -19,6 +19,30 @@ const (
 	ModernProtocolVersion = "2026-07-28"
 )
 
+// servedProtocolVersions is ordered newest to oldest and is shared by ingress,
+// handler selection, and server discovery.
+var servedProtocolVersions = []string{
+	ModernProtocolVersion,
+	"2025-11-25",
+	"2025-06-18",
+	LegacyFallbackProtocolVersion,
+}
+
+// ServedProtocolVersions returns a copy of the ordered version registry.
+func ServedProtocolVersions() []string {
+	return append([]string(nil), servedProtocolVersions...)
+}
+
+// IsServedProtocolVersion reports whether Gateway can actually route a version.
+func IsServedProtocolVersion(version string) bool {
+	for _, served := range servedProtocolVersions {
+		if version == served {
+			return true
+		}
+	}
+	return false
+}
+
 // ProtocolVersionSource describes how the effective MCP version was detected.
 type ProtocolVersionSource string
 
@@ -56,6 +80,11 @@ type ProtocolContext struct {
 	MetadataProtocolVersion   string
 	InitializeProtocolVersion string
 	BodyProtocolVersionRaw    json.RawMessage
+	Metadata                  map[string]json.RawMessage
+	ClientCapabilities        json.RawMessage
+	ClientInfo                json.RawMessage
+	MetadataProtocolPresent   bool
+	MetadataProtocolValid     bool
 	HasSession                bool
 	DeclarationMismatch       bool
 
@@ -128,11 +157,17 @@ func (c *ProtocolContext) extractBodyProtocolVersion() (version string, declared
 	if rawMeta, ok := params["_meta"]; ok {
 		var metadata map[string]json.RawMessage
 		if json.Unmarshal(rawMeta, &metadata) == nil {
+			c.Metadata = metadata
+			c.ClientCapabilities = append([]byte(nil), metadata["io.modelcontextprotocol/clientCapabilities"]...)
+			c.ClientInfo = append([]byte(nil), metadata["io.modelcontextprotocol/clientInfo"]...)
 			if raw, exists := metadata[MetaKeyProtocolVersion]; exists {
+				c.MetadataProtocolPresent = true
 				c.BodyProtocolVersionRaw = append([]byte(nil), raw...)
 				declared = true
 				if json.Unmarshal(raw, &c.MetadataProtocolVersion) != nil || c.MetadataProtocolVersion == "" {
 					mismatch = true
+				} else {
+					c.MetadataProtocolValid = true
 				}
 			}
 		}

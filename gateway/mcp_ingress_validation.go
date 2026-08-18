@@ -1,0 +1,192 @@
+package gateway
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/mcp"
+)
+
+// validateMCPIngress validates modern protocol metadata and mirrored headers
+// after the one bounded body parse and before routing reaches side effects.
+func (m *JSONRPCMiddleware) validateMCPIngress(w http.ResponseWriter, r *http.Request) bool {
+	protocolContext := httpctx.GetMCPProtocolContext(r)
+	modern, ingressErr := mcp.ValidateProtocolDeclarations(protocolContext)
+	if ingressErr != nil {
+		m.writeMCPIngressError(w, r, ingressErr)
+		return false
+	}
+	if !modern {
+		return true
+	}
+	if ingressErr = mcp.ValidateModernMirroredHeaders(r.Header, protocolContext.Envelope); ingressErr != nil {
+		m.writeMCPIngressError(w, r, ingressErr)
+		return false
+	}
+	if m.Spec != nil && m.Spec.IsSyntheticMCPAdapter() {
+		if ingressErr = m.validateRESTAsMCPParamHeaders(r, protocolContext.Envelope); ingressErr != nil {
+			m.writeMCPIngressError(w, r, ingressErr)
+			return false
+		}
+	}
+	return true
+}
+
+func (m *JSONRPCMiddleware) writeMCPIngressError(w http.ResponseWriter, r *http.Request, ingressErr *mcp.IngressError) {
+	protocolContext := httpctx.GetMCPProtocolContext(r)
+	var requestID any
+	if protocolContext != nil && protocolContext.Envelope != nil {
+		requestID = protocolContext.Envelope.ID
+	}
+	m.writeJSONRPCError(w, r, requestID, ingressErr.Code, ingressErr.Message, ingressErr.Data)
+}
+
+func rejectModernMCPHTTPMethod(w http.ResponseWriter, r *http.Request) bool {
+	protocolContext := httpctx.GetMCPProtocolContext(r)
+	if protocolContext == nil || !protocolContext.IsModern() ||
+		(r.Method != http.MethodGet && r.Method != http.MethodDelete) {
+		return false
+	}
+	w.Header().Set("Allow", http.MethodPost)
+	http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	return true
+}
+
+type mcpParamHeaderBinding struct {
+	path   []string
+	header string
+}
+
+func (m *JSONRPCMiddleware) validateRESTAsMCPParamHeaders(r *http.Request, envelope *mcp.RequestEnvelope) *mcp.IngressError {
+	if envelope == nil || envelope.Method != mcp.MethodToolsCall {
+		return nil
+	}
+	tool, found := m.restAsMCPIngressTool(r, envelope)
+	if !found {
+		return nil
+	}
+	bindings := collectMCPParamHeaderBindings(tool.InputSchema)
+	expectedHeaders := make(map[string]struct{}, len(bindings))
+
+	var params struct {
+		Arguments map[string]any `json:"arguments"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(envelope.Params))
+	decoder.UseNumber()
+	if decoder.Decode(&params) != nil {
+		return nil
+	}
+
+	for _, binding := range bindings {
+		fullHeader := mcp.HeaderParamPrefix + binding.header
+		expectedHeaders[strings.ToLower(fullHeader)] = struct{}{}
+		argument, exists := nestedMCPArgument(params.Arguments, binding.path)
+		headerValue := r.Header.Get(fullHeader)
+		if !exists || argument == nil {
+			if headerValue != "" {
+				return mcpHeaderMismatch("unexpected %s header for absent or null parameter %q", fullHeader, strings.Join(binding.path, "."))
+			}
+			continue
+		}
+		if headerValue == "" {
+			return mcpHeaderMismatch("missing %s header for parameter %q", fullHeader, strings.Join(binding.path, "."))
+		}
+		decoded, valid := mcp.DecodeMirroredHeader(headerValue)
+		if !valid {
+			return mcpHeaderMismatch("%s header contains invalid Base64 encoding", fullHeader)
+		}
+		expected, valid := mcpPrimitiveString(argument)
+		if !valid || decoded != expected {
+			return mcpHeaderMismatch("%s header value does not match body parameter %q", fullHeader, strings.Join(binding.path, "."))
+		}
+	}
+
+	for header := range r.Header {
+		if strings.HasPrefix(strings.ToLower(header), strings.ToLower(mcp.HeaderParamPrefix)) {
+			if _, expected := expectedHeaders[strings.ToLower(header)]; !expected {
+				return mcpHeaderMismatch("unexpected %s header", header)
+			}
+		}
+	}
+	return nil
+}
+
+func (m *JSONRPCMiddleware) restAsMCPIngressTool(r *http.Request, envelope *mcp.RequestEnvelope) (oas.DerivedTool, bool) {
+	var params struct {
+		Name string `json:"name"`
+	}
+	if json.Unmarshal(envelope.Params, &params) != nil || params.Name == "" || m.Spec == nil {
+		return oas.DerivedTool{}, false
+	}
+	if callerID := ctxGetMCPAdapterCallerProxyID(r); callerID != "" {
+		if view, exists := m.Spec.MCPAdapter.ToolViews[callerID]; exists {
+			return view.ToolByName(params.Name)
+		}
+	}
+	for _, tool := range m.Spec.MCPAdapter.UnionTools {
+		if tool.Name == params.Name {
+			return tool, true
+		}
+	}
+	return oas.DerivedTool{}, false
+}
+
+func collectMCPParamHeaderBindings(schema map[string]any) []mcpParamHeaderBinding {
+	var bindings []mcpParamHeaderBinding
+	var walk func(map[string]any, []string)
+	walk = func(current map[string]any, prefix []string) {
+		properties, _ := current["properties"].(map[string]any)
+		for name, raw := range properties {
+			property, _ := raw.(map[string]any)
+			path := append(append([]string(nil), prefix...), name)
+			if header, _ := property["x-mcp-header"].(string); header != "" {
+				bindings = append(bindings, mcpParamHeaderBinding{path: path, header: header})
+			}
+			walk(property, path)
+		}
+	}
+	walk(schema, nil)
+	return bindings
+}
+
+func nestedMCPArgument(arguments map[string]any, path []string) (any, bool) {
+	var current any = arguments
+	for _, part := range path {
+		object, ok := current.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		current, ok = object[part]
+		if !ok {
+			return nil, false
+		}
+	}
+	return current, true
+}
+
+func mcpPrimitiveString(value any) (string, bool) {
+	switch typed := value.(type) {
+	case string:
+		return typed, true
+	case bool:
+		return strconv.FormatBool(typed), true
+	case json.Number:
+		integer, err := strconv.ParseInt(typed.String(), 10, 64)
+		if err != nil || integer > 1<<53-1 || integer < -(1<<53-1) {
+			return "", false
+		}
+		return strconv.FormatInt(integer, 10), true
+	default:
+		return "", false
+	}
+}
+
+func mcpHeaderMismatch(format string, args ...any) *mcp.IngressError {
+	return &mcp.IngressError{Code: mcp.CodeHeaderMismatch, Message: fmt.Sprintf(format, args...)}
+}
