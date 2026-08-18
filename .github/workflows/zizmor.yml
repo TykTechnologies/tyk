@@ -3,16 +3,24 @@
 name: zizmor
 on:
   pull_request:
+    paths:
+      - ".github/workflows/**"
+      - ".github/actions/**"
   push:
     branches:
       - master
+    paths:
+      - ".github/workflows/**"
+      - ".github/actions/**"
+  workflow_dispatch:
 permissions: {}
 jobs:
   zizmor:
     uses: TykTechnologies/github-actions/.github/workflows/zizmor.yml@production
+    with:
+      upload_sarif: true
     permissions:
       security-events: write
       contents: read
       actions: read
-    secrets:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      pull-requests: write
