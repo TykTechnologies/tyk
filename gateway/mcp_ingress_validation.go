@@ -1,9 +1,9 @@
 package gateway
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -63,6 +63,11 @@ type mcpParamHeaderBinding struct {
 	header string
 }
 
+type mcpIngressTool struct {
+	tool                oas.DerivedTool
+	paramHeaderBindings []mcpParamHeaderBinding
+}
+
 func (m *JSONRPCMiddleware) validateRESTAsMCPParamHeaders(r *http.Request, envelope *mcp.RequestEnvelope) *mcp.IngressError {
 	if envelope == nil || envelope.Method != mcp.MethodToolsCall {
 		return nil
@@ -71,22 +76,18 @@ func (m *JSONRPCMiddleware) validateRESTAsMCPParamHeaders(r *http.Request, envel
 	if !found {
 		return nil
 	}
-	bindings := collectMCPParamHeaderBindings(tool.InputSchema)
+	bindings := tool.paramHeaderBindings
 	expectedHeaders := make(map[string]struct{}, len(bindings))
 
-	var params struct {
-		Arguments map[string]any `json:"arguments"`
-	}
-	decoder := json.NewDecoder(bytes.NewReader(envelope.Params))
-	decoder.UseNumber()
-	if decoder.Decode(&params) != nil {
+	arguments, err := envelope.Arguments()
+	if err != nil {
 		return nil
 	}
 
 	for _, binding := range bindings {
 		fullHeader := mcp.HeaderParamPrefix + binding.header
 		expectedHeaders[strings.ToLower(fullHeader)] = struct{}{}
-		argument, exists := nestedMCPArgument(params.Arguments, binding.path)
+		argument, exists := nestedMCPArgument(arguments, binding.path)
 		headerValue := r.Header.Get(fullHeader)
 		if !exists || argument == nil {
 			if headerValue != "" {
@@ -101,8 +102,7 @@ func (m *JSONRPCMiddleware) validateRESTAsMCPParamHeaders(r *http.Request, envel
 		if !valid {
 			return mcpHeaderMismatch("%s header contains invalid Base64 encoding", fullHeader)
 		}
-		expected, valid := mcpPrimitiveString(argument)
-		if !valid || decoded != expected {
+		if !mcpPrimitiveHeaderMatches(argument, decoded) {
 			return mcpHeaderMismatch("%s header value does not match body parameter %q", fullHeader, strings.Join(binding.path, "."))
 		}
 	}
@@ -117,24 +117,38 @@ func (m *JSONRPCMiddleware) validateRESTAsMCPParamHeaders(r *http.Request, envel
 	return nil
 }
 
-func (m *JSONRPCMiddleware) restAsMCPIngressTool(r *http.Request, envelope *mcp.RequestEnvelope) (oas.DerivedTool, bool) {
-	var params struct {
-		Name string `json:"name"`
-	}
-	if json.Unmarshal(envelope.Params, &params) != nil || params.Name == "" || m.Spec == nil {
-		return oas.DerivedTool{}, false
+func (m *JSONRPCMiddleware) restAsMCPIngressTool(r *http.Request, envelope *mcp.RequestEnvelope) (mcpIngressTool, bool) {
+	name, ok := envelope.ParamString(mcp.ParamKeyName)
+	if !ok || name == "" || m.Spec == nil {
+		return mcpIngressTool{}, false
 	}
 	if callerID := ctxGetMCPAdapterCallerProxyID(r); callerID != "" {
-		if view, exists := m.Spec.MCPAdapter.ToolViews[callerID]; exists {
-			return view.ToolByName(params.Name)
+		if tools, exists := m.Spec.MCPAdapter.IngressToolsByCaller[callerID]; exists {
+			tool, found := tools[name]
+			return tool, found
 		}
 	}
-	for _, tool := range m.Spec.MCPAdapter.UnionTools {
-		if tool.Name == params.Name {
-			return tool, true
+	tool, found := m.Spec.MCPAdapter.IngressToolsByCaller[""][name]
+	return tool, found
+}
+
+func buildMCPIngressToolIndex(toolViews map[string]oas.MCPToolView, unionTools []oas.DerivedTool) map[string]map[string]mcpIngressTool {
+	index := make(map[string]map[string]mcpIngressTool, len(toolViews)+1)
+	add := func(callerID string, tools []oas.DerivedTool) {
+		byName := make(map[string]mcpIngressTool, len(tools))
+		for _, tool := range tools {
+			byName[tool.Name] = mcpIngressTool{
+				tool:                tool,
+				paramHeaderBindings: collectMCPParamHeaderBindings(tool.InputSchema),
+			}
 		}
+		index[callerID] = byName
 	}
-	return oas.DerivedTool{}, false
+	add("", unionTools)
+	for callerID, view := range toolViews {
+		add(callerID, view.Tools)
+	}
+	return index
 }
 
 func collectMCPParamHeaderBindings(schema map[string]any) []mcpParamHeaderBinding {
@@ -178,13 +192,32 @@ func mcpPrimitiveString(value any) (string, bool) {
 		return strconv.FormatBool(typed), true
 	case json.Number:
 		integer, err := strconv.ParseInt(typed.String(), 10, 64)
-		if err != nil || integer > 1<<53-1 || integer < -(1<<53-1) {
+		if err == nil {
+			if integer > 1<<53-1 || integer < -(1<<53-1) {
+				return "", false
+			}
+			return strconv.FormatInt(integer, 10), true
+		}
+		floating, err := strconv.ParseFloat(typed.String(), 64)
+		if err != nil || math.IsInf(floating, 0) || math.IsNaN(floating) {
 			return "", false
 		}
-		return strconv.FormatInt(integer, 10), true
+		return strconv.FormatFloat(floating, 'g', -1, 64), true
 	default:
 		return "", false
 	}
+}
+
+func mcpPrimitiveHeaderMatches(value any, decodedHeader string) bool {
+	expected, valid := mcpPrimitiveString(value)
+	if !valid {
+		return false
+	}
+	if _, numeric := value.(json.Number); numeric {
+		actual, valid := mcpPrimitiveString(json.Number(decodedHeader))
+		return valid && actual == expected
+	}
+	return decodedHeader == expected
 }
 
 func mcpHeaderMismatch(format string, args ...any) *mcp.IngressError {

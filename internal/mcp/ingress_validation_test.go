@@ -87,6 +87,17 @@ func TestValidateModernMirroredHeaders(t *testing.T) {
 	assert.Equal(t, CodeHeaderMismatch, ValidateModernMirroredHeaders(header, envelope).Code)
 	header.Set(HeaderName, "=?base64?broken?=")
 	assert.Equal(t, CodeHeaderMismatch, ValidateModernMirroredHeaders(header, envelope).Code)
+
+	header.Set(HeaderName, "=?base64?"+base64.StdEncoding.EncodeToString([]byte("café"))+"?=")
+	header.Del(HeaderMethod)
+	assert.Equal(t, CodeHeaderMismatch, ValidateModernMirroredHeaders(header, envelope).Code)
+	header.Set(HeaderMethod, MethodPromptsGet)
+	assert.Equal(t, CodeHeaderMismatch, ValidateModernMirroredHeaders(header, envelope).Code)
+	header.Set(HeaderMethod, MethodToolsCall)
+	header[HeaderParamPrefix+"Count"] = []string{"7", "8"}
+	assert.Equal(t, CodeHeaderMismatch, ValidateModernMirroredHeaders(header, envelope).Code)
+	header.Set(HeaderParamPrefix+"bad name", "7")
+	assert.Equal(t, CodeHeaderMismatch, ValidateModernMirroredHeaders(header, envelope).Code)
 }
 
 func TestDecodeMirroredHeader(t *testing.T) {
@@ -94,6 +105,9 @@ func TestDecodeMirroredHeader(t *testing.T) {
 	decoded, ok := DecodeMirroredHeader("plain")
 	assert.True(t, ok)
 	assert.Equal(t, "plain", decoded)
+	decoded, ok = DecodeMirroredHeader("=?base64?" + base64.StdEncoding.EncodeToString([]byte("café")) + "?=")
+	assert.True(t, ok)
+	assert.Equal(t, "café", decoded)
 	_, ok = DecodeMirroredHeader("=?base64?broken")
 	assert.False(t, ok)
 }

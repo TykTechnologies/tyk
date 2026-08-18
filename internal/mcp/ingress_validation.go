@@ -105,9 +105,9 @@ func requiredClientCapability(envelope *RequestEnvelope) string {
 	switch envelope.Method {
 	case MethodSamplingCreateMessage:
 		return "sampling"
-	case "roots/list":
+	case MethodRootsList:
 		return "roots"
-	case "elicitation/create":
+	case MethodElicitationCreate:
 		return "elicitation"
 	default:
 		return ""
@@ -182,12 +182,8 @@ func primitiveName(envelope *RequestEnvelope) (string, bool) {
 	default:
 		return "", false
 	}
-	var params map[string]json.RawMessage
-	if json.Unmarshal(envelope.Params, &params) != nil {
-		return "", true
-	}
-	var name string
-	if json.Unmarshal(params[field], &name) != nil {
+	name, ok := envelope.ParamString(field)
+	if !ok {
 		return "", true
 	}
 	return name, true

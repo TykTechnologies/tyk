@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 )
@@ -61,6 +62,64 @@ type RequestEnvelope struct {
 	Method  string          `json:"method"`
 	Params  json.RawMessage `json:"params,omitempty"`
 	ID      any             `json:"id,omitempty"`
+
+	paramsObject    map[string]json.RawMessage
+	paramsErr       error
+	paramsParsed    bool
+	arguments       map[string]any
+	argumentsErr    error
+	argumentsParsed bool
+}
+
+// ParamsObject returns the request params decoded once as raw fields. The
+// retained map lets ingress metadata and mirrored-header validation share the
+// bounded request parse without repeatedly deserializing the whole object.
+func (e *RequestEnvelope) ParamsObject() (map[string]json.RawMessage, error) {
+	if e == nil {
+		return nil, nil
+	}
+	if !e.paramsParsed {
+		e.paramsParsed = true
+		e.paramsErr = json.Unmarshal(e.Params, &e.paramsObject)
+	}
+	return e.paramsObject, e.paramsErr
+}
+
+// ParamString returns one string-valued parameter from the cached params.
+func (e *RequestEnvelope) ParamString(name string) (string, bool) {
+	params, err := e.ParamsObject()
+	if err != nil {
+		return "", false
+	}
+	var value string
+	if json.Unmarshal(params[name], &value) != nil {
+		return "", false
+	}
+	return value, true
+}
+
+// Arguments returns tools/call arguments decoded once with json.Number
+// preservation for schema-aware mirrored-header comparison.
+func (e *RequestEnvelope) Arguments() (map[string]any, error) {
+	if e == nil {
+		return nil, nil
+	}
+	if !e.argumentsParsed {
+		e.argumentsParsed = true
+		params, err := e.ParamsObject()
+		if err != nil {
+			e.argumentsErr = err
+			return nil, err
+		}
+		rawArguments, present := params["arguments"]
+		if !present {
+			return nil, nil
+		}
+		decoder := json.NewDecoder(bytes.NewReader(rawArguments))
+		decoder.UseNumber()
+		e.argumentsErr = decoder.Decode(&e.arguments)
+	}
+	return e.arguments, e.argumentsErr
 }
 
 // IsModern reports whether the normalized context unambiguously selected the
@@ -142,8 +201,8 @@ func (c *ProtocolContext) extractBodyProtocolVersion() (version string, declared
 		return "", false, false
 	}
 
-	var params map[string]json.RawMessage
-	if json.Unmarshal(c.Envelope.Params, &params) != nil {
+	params, err := c.Envelope.ParamsObject()
+	if err != nil {
 		return "", false, false
 	}
 	if raw, ok := params["protocolVersion"]; ok {

@@ -72,3 +72,25 @@ func TestNewProtocolContext(t *testing.T) {
 		})
 	}
 }
+
+func TestRequestEnvelopeCachesParamsAndArguments(t *testing.T) {
+	t.Parallel()
+
+	envelope := &RequestEnvelope{Params: json.RawMessage(`{"name":"tool","arguments":{"ratio":1.25}}`)}
+	assert.Equal(t, "tool", mustParamString(t, envelope, "name"))
+
+	// Request envelopes are immutable after ingress. Replacing the raw bytes
+	// proves subsequent consumers share the retained params parse.
+	envelope.Params = json.RawMessage(`not-json`)
+	arguments, err := envelope.Arguments()
+	require.NoError(t, err)
+	assert.Equal(t, json.Number("1.25"), arguments["ratio"])
+	assert.Equal(t, "tool", mustParamString(t, envelope, "name"))
+}
+
+func mustParamString(t *testing.T, envelope *RequestEnvelope, name string) string {
+	t.Helper()
+	value, ok := envelope.ParamString(name)
+	require.True(t, ok)
+	return value
+}
