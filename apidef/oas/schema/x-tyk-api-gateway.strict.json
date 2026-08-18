@@ -1446,6 +1446,21 @@
       ],
       "additionalProperties": false
     },
+    "X-Tyk-MCP": {
+      "type": "object",
+      "properties": {
+        "trustedOrigins": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": [
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "X-Tyk-Server": {
       "type": "object",
       "properties": {
@@ -1473,6 +1488,9 @@
         },
         "detailedTracing": {
           "$ref": "#/definitions/X-Tyk-DetailedTracing"
+        },
+        "mcp": {
+          "$ref": "#/definitions/X-Tyk-MCP"
         },
         "eventHandlers": {
           "type": "array",

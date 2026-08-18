@@ -11,7 +11,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 )
@@ -197,12 +196,15 @@ func (gw *Gateway) upstreamPRMDoc(ctx context.Context, spec *APISpec) (*mcp.PRMD
 // scheme + host + the API's listen path. Used as the rewritten `resource`
 // field so RFC 9728 §3.3 origin validation passes.
 func gatewayResourceURL(r *http.Request, spec *APISpec) string {
-	scheme := httputil.RequestScheme(r)
+	origin, err := externalOriginForSpec(r, spec)
+	if err != nil {
+		return ""
+	}
 	listen := spec.Proxy.ListenPath
 	if !strings.HasSuffix(listen, "/") {
 		listen += "/"
 	}
-	return fmt.Sprintf("%s://%s%s", scheme, r.Host, listen)
+	return origin + listen
 }
 
 // prmWellKnownPath returns the full well-known path for the PRM endpoint,
@@ -235,7 +237,11 @@ func prmMetadataURL(r *http.Request, spec *APISpec) string {
 	} else {
 		return ""
 	}
-	return fmt.Sprintf("%s://%s%s", httputil.RequestScheme(r), r.Host, wellKnown)
+	origin, err := externalOriginForSpec(r, spec)
+	if err != nil {
+		return ""
+	}
+	return origin + wellKnown
 }
 
 // setPRMWWWAuthenticateHeader sets the WWW-Authenticate header with a Bearer challenge

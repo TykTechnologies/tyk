@@ -34,6 +34,9 @@ type Server struct {
 	// Tyk classic API definition: `detailed_tracing`
 	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty"`
 
+	// MCP contains request-security settings for MCP APIs.
+	MCP *MCP `bson:"mcp,omitempty" json:"mcp,omitempty"`
+
 	// EventHandlers contains the configuration related to Tyk Events.
 	//
 	// Tyk classic API definition: `event_handlers`
@@ -113,6 +116,11 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 		s.DetailedTracing = nil
 	}
 
+	s.MCP = nil
+	if api.MCP != nil {
+		s.MCP = &MCP{TrustedOrigins: append([]string(nil), api.MCP.TrustedOrigins...)}
+	}
+
 	if s.EventHandlers == nil {
 		s.EventHandlers = EventHandlers{}
 	}
@@ -176,6 +184,11 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 
 	s.DetailedTracing.ExtractTo(api)
 
+	api.MCP = nil
+	if s.MCP != nil {
+		api.MCP = &apidef.MCPConfig{TrustedOrigins: append([]string(nil), s.MCP.TrustedOrigins...)}
+	}
+
 	if s.EventHandlers == nil {
 		s.EventHandlers = EventHandlers{}
 		defer func() {
@@ -187,6 +200,15 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 
 	s.extractIPAccessControlTo(api)
 	s.extractBatchProcessingTo(api)
+}
+
+// MCP contains MCP request-security settings.
+type MCP struct {
+	// TrustedOrigins contains concrete HTTP(S) origins allowed to send MCP
+	// requests in addition to the API's own externally visible origin.
+	//
+	// Tyk classic API definition: `mcp.trusted_origins`.
+	TrustedOrigins []string `bson:"trustedOrigins,omitempty" json:"trustedOrigins,omitempty"`
 }
 
 // ListenPath is the base path on Tyk to which requests for this API
