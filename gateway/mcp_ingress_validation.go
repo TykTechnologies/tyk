@@ -212,11 +212,32 @@ func mcpPrimitiveHeaderMatches(value any, decodedHeader string) bool {
 	if !valid {
 		return false
 	}
-	if _, numeric := value.(json.Number); numeric {
-		actual, valid := mcpPrimitiveString(json.Number(decodedHeader))
-		return valid && actual == expected
+	if expectedNumber, numeric := value.(json.Number); numeric {
+		expectedValue, valid := mcpNumericValue(expectedNumber)
+		if !valid {
+			return false
+		}
+		actualValue, valid := mcpNumericValue(json.Number(decodedHeader))
+		return valid && actualValue == expectedValue
 	}
 	return decodedHeader == expected
+}
+
+func mcpNumericValue(value json.Number) (float64, bool) {
+	if integer, err := strconv.ParseInt(value.String(), 10, 64); err == nil {
+		if integer > 1<<53-1 || integer < -(1<<53-1) {
+			return 0, false
+		}
+		return float64(integer), true
+	}
+	floating, err := strconv.ParseFloat(value.String(), 64)
+	if err != nil || math.IsInf(floating, 0) || math.IsNaN(floating) {
+		return 0, false
+	}
+	if math.Trunc(floating) == floating && (floating > 1<<53-1 || floating < -(1<<53-1)) {
+		return 0, false
+	}
+	return floating, true
 }
 
 func mcpParamHeaderMismatch() *mcp.IngressError {

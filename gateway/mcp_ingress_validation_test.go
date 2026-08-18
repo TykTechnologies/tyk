@@ -62,8 +62,8 @@ func TestValidateRESTAsMCPParamHeaders(t *testing.T) {
 		},
 		{
 			name:      "equivalent exponent number matches",
-			arguments: `{"ratio":1e3}`,
-			headers:   map[string]string{"Mcp-Param-Ratio": "1000"},
+			arguments: `{"ratio":1e6}`,
+			headers:   map[string]string{"Mcp-Param-Ratio": "1000000"},
 		},
 		{
 			name:      "missing required mirror",
