@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	tyklog "github.com/TykTechnologies/tyk/log"
 )
 
 // ---------------------------------------------------------------------------
@@ -54,8 +55,8 @@ func TestJSVMAPIHelper_MakeHTTPRequest_Success(t *testing.T) {
 	h := &JSVMAPIHelper{
 		Gw:     ts.Gw,
 		Spec:   &APISpec{APIDefinition: &apidef.APIDefinition{}},
-		Log:    logrus.NewEntry(log),
-		RawLog: rawLog,
+		Log:    log.NewEntry(),
+		RawLog: tyklog.GetRaw(),
 	}
 
 	input := fmt.Sprintf(`{"Method":"GET","Domain":"%s","Resource":"/"}`, server.URL)
@@ -79,8 +80,8 @@ func TestJSVMAPIHelper_MakeHTTPRequest_WithBody(t *testing.T) {
 	h := &JSVMAPIHelper{
 		Gw:     ts.Gw,
 		Spec:   &APISpec{APIDefinition: &apidef.APIDefinition{}},
-		Log:    logrus.NewEntry(log),
-		RawLog: rawLog,
+		Log:    log.NewEntry(),
+		RawLog: tyklog.GetRaw(),
 	}
 
 	input := fmt.Sprintf(`{"Method":"POST","Domain":"%s","Resource":"/","Body":"test body"}`, server.URL)
@@ -107,8 +108,8 @@ func TestJSVMAPIHelper_MakeHTTPRequest_WithFormData(t *testing.T) {
 	h := &JSVMAPIHelper{
 		Gw:     ts.Gw,
 		Spec:   &APISpec{APIDefinition: &apidef.APIDefinition{}},
-		Log:    logrus.NewEntry(log),
-		RawLog: rawLog,
+		Log:    log.NewEntry(),
+		RawLog: tyklog.GetRaw(),
 	}
 
 	input := fmt.Sprintf(`{"Method":"POST","Domain":"%s","Resource":"/","FormData":{"key":"value"}}`, server.URL)
@@ -171,8 +172,8 @@ func TestJSVMAPIHelper_GetKeyData_NonExistentKey(t *testing.T) {
 	h := &JSVMAPIHelper{
 		Spec:   &APISpec{APIDefinition: &apidef.APIDefinition{}},
 		Gw:     ts.Gw,
-		Log:    logrus.NewEntry(log),
-		RawLog: rawLog,
+		Log:    log.NewEntry(),
+		RawLog: tyklog.GetRaw(),
 	}
 
 	// Non-existent key: should return valid JSON (typically "null").
@@ -188,8 +189,8 @@ func TestJSVMAPIHelper_BatchRequest_InvalidJSON(t *testing.T) {
 
 	h := &JSVMAPIHelper{
 		Gw:     ts.Gw,
-		Log:    logrus.NewEntry(log),
-		RawLog: rawLog,
+		Log:    log.NewEntry(),
+		RawLog: tyklog.GetRaw(),
 	}
 
 	_, err := h.BatchRequest("{invalid json}")

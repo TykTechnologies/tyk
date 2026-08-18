@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	logrus "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/model"
+	tyklog "github.com/TykTechnologies/tyk/log"
 )
 
 func (ts *Test) createWebHookHandler(t *testing.T) *WebHookHandler {
@@ -553,8 +553,7 @@ func TestWebhookTemplateFuncs(t *testing.T) {
 	})
 
 	t.Run("as_RFC3339_from_string", func(t *testing.T) {
-		noopLogger, _ := logrus.NewNullLogger()
-		asRFC3339FromStringFunc := templateFuncAsRFC3339FromString(noopLogger)
+		asRFC3339FromStringFunc := templateFuncAsRFC3339FromString(tyklog.Get())
 
 		t.Run("invalid time", func(t *testing.T) {
 			input := "2025/01/02 03:04:05"

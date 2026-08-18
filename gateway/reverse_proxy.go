@@ -233,7 +233,7 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 	})
 
 	if logger == nil {
-		logger = logrus.NewEntry(log)
+		logger = log.NewEntry()
 	}
 
 	logger = logger.WithField("mw", "ReverseProxy")
