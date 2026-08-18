@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
@@ -173,6 +174,11 @@ func recordMCPDetails(rec *analytics.AnalyticsRecord, r *http.Request) {
 		JSONRPCMethod: ctxGetMCPMethod(r),
 		PrimitiveType: ctxGetMCPPrimitiveType(r),
 		PrimitiveName: ctxGetMCPPrimitiveName(r),
+	}
+	if protocolContext := httpctx.GetMCPProtocolContext(r); protocolContext != nil {
+		rec.MCPStats.EffectiveProtocolVersion = protocolContext.EffectiveProtocolVersion
+		rec.MCPStats.DeclaredProtocolVersion = protocolContext.DeclaredProtocolVersion
+		rec.MCPStats.ProtocolVersionSource = string(protocolContext.ProtocolVersionSource)
 	}
 }
 

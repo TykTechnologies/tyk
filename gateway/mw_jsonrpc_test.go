@@ -88,17 +88,36 @@ func TestSyntheticJSONRPCMethod_UsesRoutingStateBeforeReadingBody(t *testing.T) 
 	assert.Equal(t, mcp.MethodToolsList, syntheticJSONRPCMethod(r))
 }
 
-func TestSyntheticJSONRPCMethod_LimitsFallbackBodyReadAndPreservesBody(t *testing.T) {
-	body := `{"jsonrpc":"2.0","method":"tools/list","params":{"padding":"` +
-		strings.Repeat("x", syntheticJSONRPCMethodReadLimit+1) +
-		`"}}`
-	r := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+func TestSyntheticJSONRPCMethod_UsesParsedIngressEnvelope(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext("", "", &mcp.RequestEnvelope{Method: mcp.MethodToolsList}, nil))
 
-	assert.Equal(t, "", syntheticJSONRPCMethod(r))
+	assert.Equal(t, mcp.MethodToolsList, syntheticJSONRPCMethod(r))
+}
 
-	preserved, err := io.ReadAll(r.Body)
+func TestJSONRPCMiddleware_ReadsAndParsesIngressOnce(t *testing.T) {
+	body := `{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}}`
+	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+	req.Header.Set(headerContentType, contentTypeJSON)
+	req.Header.Set(mcp.HeaderProtocolVersion, "2026-07-28")
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{}}
+	rec := httptest.NewRecorder()
+
+	first, raw, err := mw.readAndParseJSONRPC(rec, req)
 	require.NoError(t, err)
-	assert.Equal(t, body, string(preserved))
+	require.Equal(t, mcp.MethodToolsList, first.Method)
+	assert.Equal(t, body, string(raw))
+
+	req.Body = &errorReadCloser{err: io.ErrUnexpectedEOF}
+	second, secondRaw, err := mw.readAndParseJSONRPC(rec, req)
+	require.NoError(t, err)
+	assert.Same(t, first, second)
+	assert.Equal(t, raw, secondRaw)
+
+	protocolContext := httpctx.GetMCPProtocolContext(req)
+	require.NotNil(t, protocolContext)
+	assert.Equal(t, mcp.ProtocolVersionSourceHeaderBody, protocolContext.ProtocolVersionSource)
+	assert.Equal(t, "2026-07-28", protocolContext.EffectiveProtocolVersion)
 }
 
 func TestBufferedResponseWriter_WriteToSetsSafeContentHeaders(t *testing.T) {

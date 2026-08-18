@@ -25,15 +25,16 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-func TestParseSyntheticAdapterJSONRPC_ReturnsUnmarshalError(t *testing.T) {
+func TestJSONRPCIngressParse_ReturnsUnmarshalErrorAndPreservesBody(t *testing.T) {
 	body := `{"jsonrpc":"2.0",`
 	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
 	req.Header.Set(headerContentType, contentTypeJSON)
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{}}
+	rec := httptest.NewRecorder()
 
-	rpcReq, ok, err := parseSyntheticAdapterJSONRPC(req)
+	rpcReq, _, err := mw.readAndParseJSONRPC(rec, req)
 
 	require.Error(t, err)
-	assert.False(t, ok)
 	assert.Nil(t, rpcReq)
 
 	preserved, readErr := io.ReadAll(req.Body)
@@ -233,7 +234,7 @@ func TestRESTAsMCPPolicy_RejectsOversizedJSONRPCBeforeSDK(t *testing.T) {
 	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec, Gw: gw}}
 	sessionID := initializeSyntheticAdapterSession(t, mw, "proxy-1")
 	body := `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"orders","arguments":{"payload":"` +
-		strings.Repeat("x", syntheticJSONRPCMethodReadLimit) +
+		strings.Repeat("x", mcpIngressReadLimit) +
 		`"}}}`
 	req := restAsMCPPolicyRequest(t, sessionID, body)
 	ctxSetMCPAdapterCallerProxyID(req, "proxy-1")
@@ -245,7 +246,7 @@ func TestRESTAsMCPPolicy_RejectsOversizedJSONRPCBeforeSDK(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	assert.Contains(t, rec.Body.String(), mcp.ErrMsgParseError)
+	assert.Contains(t, rec.Body.String(), mcp.ErrMsgInvalidRequest)
 	assert.False(t, called)
 }
 
