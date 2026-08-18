@@ -60,6 +60,8 @@ const (
 	IHD ResponseFlag = "IHD" // Invalid header (400)
 	CRQ ResponseFlag = "CRQ" // Cert required (401)
 	CMM ResponseFlag = "CMM" // Cert mismatch (401)
+	ACD ResponseFlag = "ACD" // Access denied by policy
+	IPB ResponseFlag = "IPB" // Client IP blocked
 )
 
 // String returns the string representation of the ResponseFlag.

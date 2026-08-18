@@ -391,9 +391,10 @@ func (e *ErrorHandler) writeJSONRPCErrorResponse(w http.ResponseWriter, r *http.
 		requestID = state.ID
 	}
 
-	ctxSetJSONRPCErrorCode(r, jsonrpcerrors.MapHTTPStatusToJSONRPCCode(httpCode))
+	rpcCode := jsonrpcerrors.SelectJSONRPCCode(httpCode, tykctx.GetErrorClassification(r), httpctx.GetMCPProtocolContext(r))
+	ctxSetJSONRPCErrorCode(r, rpcCode)
 
-	responseBody := jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
+	responseBody := jsonrpcerrors.WriteJSONRPCErrorWithCode(w, requestID, httpCode, rpcCode, errMsg)
 
 	return &http.Response{
 		StatusCode: httpCode,
