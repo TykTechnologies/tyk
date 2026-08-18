@@ -26,7 +26,8 @@ func TestNewProtocolContext(t *testing.T) {
 	}{
 		{
 			name: "matching header and metadata body", header: "2026-07-28",
-			envelope:   envelope("tools/list", `{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}`),
+			session:    "modern-must-ignore-session",
+			envelope:   envelope("tools/list", `{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}`),
 			wantSource: ProtocolVersionSourceHeaderBody, declared: "2026-07-28", effective: "2026-07-28",
 		},
 		{
@@ -70,4 +71,26 @@ func TestNewProtocolContext(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRequestEnvelopeCachesParamsAndArguments(t *testing.T) {
+	t.Parallel()
+
+	envelope := &RequestEnvelope{Params: json.RawMessage(`{"name":"tool","arguments":{"ratio":1.25}}`)}
+	assert.Equal(t, "tool", mustParamString(t, envelope, "name"))
+
+	// Request envelopes are immutable after ingress. Replacing the raw bytes
+	// proves subsequent consumers share the retained params parse.
+	envelope.Params = json.RawMessage(`not-json`)
+	arguments, err := envelope.Arguments()
+	require.NoError(t, err)
+	assert.Equal(t, json.Number("1.25"), arguments["ratio"])
+	assert.Equal(t, "tool", mustParamString(t, envelope, "name"))
+}
+
+func mustParamString(t *testing.T, envelope *RequestEnvelope, name string) string {
+	t.Helper()
+	value, ok := envelope.ParamString(name)
+	require.True(t, ok)
+	return value
 }

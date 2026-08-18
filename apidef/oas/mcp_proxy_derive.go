@@ -1019,6 +1019,9 @@ func schemaForOpenAPISchema(src *openapi3.Schema, fallbackType string) map[strin
 	if src.Format != "" {
 		schema[schemaKeyFormat] = src.Format
 	}
+	if header, ok := src.Extensions["x-mcp-header"]; ok {
+		schema["x-mcp-header"] = header
+	}
 	if len(src.Enum) > 0 {
 		schema[schemaKeyEnum] = append([]any(nil), src.Enum...)
 	}

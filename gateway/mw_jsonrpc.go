@@ -198,6 +198,9 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 				r.Header.Get(mcp.HeaderProtocolVersion), r.Header.Get(mcp.HeaderSessionID), nil, nil,
 			))
 		}
+		if rejectModernMCPHTTPMethod(w, r) {
+			return nil, middleware.StatusRespond
+		}
 		if m.Spec.IsSyntheticMCPAdapter() {
 			return m.processSyntheticMCPAdapterRequest(w, r)
 		}
@@ -209,6 +212,9 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		// Error response already written by readAndParseJSONRPC
 		return nil, middleware.StatusRespond //nolint:nilerr
+	}
+	if !m.validateMCPIngress(w, r) {
+		return nil, middleware.StatusRespond
 	}
 	if m.Spec.IsSyntheticMCPAdapter() {
 		return m.processSyntheticMCPAdapterRequest(w, r)
@@ -317,6 +323,8 @@ func (m *JSONRPCMiddleware) mapJSONRPCErrorToHTTP(code int) int {
 		return http.StatusNotFound
 	case code == mcp.JSONRPCInvalidParams:
 		return http.StatusBadRequest
+	case code == mcp.CodeHeaderMismatch || code == mcp.CodeMissingRequiredClientCapabilities || code == mcp.CodeUnsupportedProtocolVersion:
+		return http.StatusBadRequest
 	case code >= -32099 && code <= -32000:
 		// Server errors (e.g., policy violations)
 		return http.StatusForbidden
@@ -332,8 +340,11 @@ func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWri
 		return nil, middleware.StatusRespond
 	}
 	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		// Modern GET and DELETE were rejected before this function. Keep the
+		// stateful transport surface available to established legacy sessions.
+		normaliseMCPStreamableAccept(r)
+		installMCPAdapterCallContext(r, m.Gw, m.Spec)
+		m.Spec.MCPAdapter.SDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(w, r)
 		return nil, middleware.StatusRespond
 	}
 

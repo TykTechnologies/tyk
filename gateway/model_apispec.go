@@ -134,6 +134,7 @@ type MCPAdapterRuntime struct {
 	AllowedCallerProxyAPIIDs []string
 	ToolViews                map[string]oas.MCPToolView
 	UnionTools               []oas.DerivedTool
+	IngressToolsByCaller     map[string]map[string]mcpIngressTool
 }
 
 // GetJSRunner returns the active JSRunner for this API spec based on the

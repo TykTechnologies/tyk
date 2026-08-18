@@ -34,6 +34,8 @@ const (
 
 	// Client capability methods
 	MethodSamplingCreateMessage = "sampling/createMessage"
+	MethodRootsList             = "roots/list"
+	MethodElicitationCreate     = "elicitation/create"
 )
 
 // JSON-RPC parameter keys used across MCP methods

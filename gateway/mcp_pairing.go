@@ -259,6 +259,7 @@ func buildMCPAdapterSpec(rest *APISpec, proxies []*APISpec, existing *APISpec) (
 			AllowedCallerProxyAPIIDs: allowedCallers,
 			ToolViews:                catalogue.toolViews,
 			UnionTools:               append([]oas.DerivedTool(nil), catalogue.unionTools...),
+			IngressToolsByCaller:     buildMCPIngressToolIndex(catalogue.toolViews, catalogue.unionTools),
 		},
 		JSONRPCRouter: mcp.NewRouter(),
 	}, nil
