@@ -125,16 +125,16 @@ func ValidateModernMirroredHeaders(header http.Header, envelope *RequestEnvelope
 		return &IngressError{Code: CodeHeaderMismatch, Message: "missing or malformed Mcp-Method header"}
 	}
 	if method != envelope.Method {
-		return &IngressError{Code: CodeHeaderMismatch, Message: fmt.Sprintf("Mcp-Method header value %q does not match body value %q", method, envelope.Method)}
+		return &IngressError{Code: CodeHeaderMismatch, Message: "Mcp-Method header does not match the request body"}
 	}
 
 	if name, required := primitiveName(envelope); required {
 		headerName, valid := DecodeMirroredHeader(header.Get(HeaderName))
 		if !valid || headerName == "" {
-			return &IngressError{Code: CodeHeaderMismatch, Message: fmt.Sprintf("missing or malformed Mcp-Name header for method %q", envelope.Method)}
+			return &IngressError{Code: CodeHeaderMismatch, Message: "missing or malformed Mcp-Name header"}
 		}
 		if headerName != name {
-			return &IngressError{Code: CodeHeaderMismatch, Message: fmt.Sprintf("Mcp-Name header value %q does not match body value %q", headerName, name)}
+			return &IngressError{Code: CodeHeaderMismatch, Message: "Mcp-Name header does not match the request body"}
 		}
 	}
 
@@ -143,10 +143,10 @@ func ValidateModernMirroredHeaders(header http.Header, envelope *RequestEnvelope
 			continue
 		}
 		if !validHeaderToken(key[len(HeaderParamPrefix):]) || len(values) != 1 {
-			return &IngressError{Code: CodeHeaderMismatch, Message: fmt.Sprintf("malformed %s header", key)}
+			return &IngressError{Code: CodeHeaderMismatch, Message: "malformed Mcp-Param header"}
 		}
 		if _, valid := DecodeMirroredHeader(values[0]); !valid {
-			return &IngressError{Code: CodeHeaderMismatch, Message: fmt.Sprintf("%s header contains invalid Base64 encoding", key)}
+			return &IngressError{Code: CodeHeaderMismatch, Message: "Mcp-Param header contains invalid Base64 encoding"}
 		}
 	}
 	return nil

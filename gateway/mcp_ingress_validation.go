@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"encoding/json"
-	"fmt"
 	"math"
 	"net/http"
 	"strconv"
@@ -91,26 +90,26 @@ func (m *JSONRPCMiddleware) validateRESTAsMCPParamHeaders(r *http.Request, envel
 		headerValue := r.Header.Get(fullHeader)
 		if !exists || argument == nil {
 			if headerValue != "" {
-				return mcpHeaderMismatch("unexpected %s header for absent or null parameter %q", fullHeader, strings.Join(binding.path, "."))
+				return mcpParamHeaderMismatch()
 			}
 			continue
 		}
 		if headerValue == "" {
-			return mcpHeaderMismatch("missing %s header for parameter %q", fullHeader, strings.Join(binding.path, "."))
+			return mcpParamHeaderMismatch()
 		}
 		decoded, valid := mcp.DecodeMirroredHeader(headerValue)
 		if !valid {
-			return mcpHeaderMismatch("%s header contains invalid Base64 encoding", fullHeader)
+			return mcpParamHeaderMismatch()
 		}
 		if !mcpPrimitiveHeaderMatches(argument, decoded) {
-			return mcpHeaderMismatch("%s header value does not match body parameter %q", fullHeader, strings.Join(binding.path, "."))
+			return mcpParamHeaderMismatch()
 		}
 	}
 
 	for header := range r.Header {
 		if strings.HasPrefix(strings.ToLower(header), strings.ToLower(mcp.HeaderParamPrefix)) {
 			if _, expected := expectedHeaders[strings.ToLower(header)]; !expected {
-				return mcpHeaderMismatch("unexpected %s header", header)
+				return mcpParamHeaderMismatch()
 			}
 		}
 	}
@@ -220,6 +219,6 @@ func mcpPrimitiveHeaderMatches(value any, decodedHeader string) bool {
 	return decodedHeader == expected
 }
 
-func mcpHeaderMismatch(format string, args ...any) *mcp.IngressError {
-	return &mcp.IngressError{Code: mcp.CodeHeaderMismatch, Message: fmt.Sprintf(format, args...)}
+func mcpParamHeaderMismatch() *mcp.IngressError {
+	return &mcp.IngressError{Code: mcp.CodeHeaderMismatch, Message: "Mcp-Param headers do not match request parameters"}
 }

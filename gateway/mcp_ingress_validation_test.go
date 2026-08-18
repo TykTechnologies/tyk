@@ -101,6 +101,8 @@ func TestValidateRESTAsMCPParamHeaders(t *testing.T) {
 			if test.wantError {
 				require.NotNil(t, ingressErr)
 				assert.Equal(t, mcp.CodeHeaderMismatch, ingressErr.Code)
+				assert.NotContains(t, ingressErr.Message, "count")
+				assert.NotContains(t, ingressErr.Message, "ratio")
 				return
 			}
 			assert.Nil(t, ingressErr)

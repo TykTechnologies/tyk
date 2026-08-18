@@ -92,7 +92,10 @@ func TestValidateModernMirroredHeaders(t *testing.T) {
 	header.Del(HeaderMethod)
 	assert.Equal(t, CodeHeaderMismatch, ValidateModernMirroredHeaders(header, envelope).Code)
 	header.Set(HeaderMethod, MethodPromptsGet)
-	assert.Equal(t, CodeHeaderMismatch, ValidateModernMirroredHeaders(header, envelope).Code)
+	ingressErr := ValidateModernMirroredHeaders(header, envelope)
+	assert.Equal(t, CodeHeaderMismatch, ingressErr.Code)
+	assert.NotContains(t, ingressErr.Message, MethodPromptsGet)
+	assert.NotContains(t, ingressErr.Message, MethodToolsCall)
 	header.Set(HeaderMethod, MethodToolsCall)
 	header[HeaderParamPrefix+"Count"] = []string{"7", "8"}
 	assert.Equal(t, CodeHeaderMismatch, ValidateModernMirroredHeaders(header, envelope).Code)
