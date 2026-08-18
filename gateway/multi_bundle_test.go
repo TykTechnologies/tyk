@@ -217,7 +217,7 @@ func TestLoadBundleWithFs_CommaSeparatedMergesBothBundles(t *testing.T) {
 	_, err = manifestA.WriteString(`{
 		"file_list": ["plugin.js"],
 		"custom_middleware": {
-			"driver": "javascript",
+			"driver": "otto",
 			"pre":  [{"name": "preA",  "path": "plugin.js"}],
 			"post": [{"name": "postA", "path": "plugin.js"}]
 		},
@@ -233,7 +233,7 @@ func TestLoadBundleWithFs_CommaSeparatedMergesBothBundles(t *testing.T) {
 	_, err = manifestB.WriteString(`{
 		"file_list": ["plugin.js"],
 		"custom_middleware": {
-			"driver": "javascript",
+			"driver": "otto",
 			"pre":      [{"name": "preB",      "path": "plugin.js"}],
 			"response": [{"name": "responseB", "path": "plugin.js"}]
 		},
