@@ -16,6 +16,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -568,6 +569,9 @@ func TestPRMWWWAuthenticateHeader(t *testing.T) {
 					ListenPath: "/test-api/",
 				},
 			},
+			GlobalConfig: config.Config{HttpServerOptions: config.HttpServerOptionsConfig{
+				TrustedProxyCIDRs: []string{"192.0.2.0/24"},
+			}},
 		}
 		spec.OAS.SetTykExtension(&oas.XTykAPIGateway{
 			Server: oas.Server{

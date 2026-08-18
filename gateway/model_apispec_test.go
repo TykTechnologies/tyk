@@ -203,3 +203,22 @@ func TestAPISpecValidate_AllowsMCPServerExtensionOnPairedProxy(t *testing.T) {
 	require.True(t, spec.IsMCPManaged())
 	require.NoError(t, spec.Validate(config.OASConfig{}))
 }
+
+func TestAPISpecValidate_ClassicMCPTrustedOrigins(t *testing.T) {
+	valid := &APISpec{APIDefinition: &apidef.APIDefinition{
+		ApplicationProtocol: apidef.AppProtocolMCP,
+		MCP:                 &apidef.MCPConfig{TrustedOrigins: []string{"https://client.example"}},
+	}}
+	require.NoError(t, valid.Validate(config.OASConfig{}))
+
+	invalid := &APISpec{APIDefinition: &apidef.APIDefinition{
+		ApplicationProtocol: apidef.AppProtocolMCP,
+		MCP:                 &apidef.MCPConfig{TrustedOrigins: []string{"null"}},
+	}}
+	assert.Error(t, invalid.Validate(config.OASConfig{}))
+
+	nonMCP := &APISpec{APIDefinition: &apidef.APIDefinition{
+		MCP: &apidef.MCPConfig{TrustedOrigins: []string{"https://client.example"}},
+	}}
+	assert.Error(t, nonMCP.Validate(config.OASConfig{}))
+}
