@@ -27,7 +27,7 @@ const (
 	httpHeaderContentLength = "Content-Length"
 )
 
-const syntheticJSONRPCMethodReadLimit = 1 << 20
+const mcpIngressReadLimit = 1 << 20
 
 // JSONRPCMiddleware handles JSON-RPC 2.0 request detection and routing.
 // When a client sends a JSON-RPC request to a JSON-RPC endpoint, the middleware detects it,
@@ -37,13 +37,9 @@ type JSONRPCMiddleware struct {
 	*BaseMiddleware
 }
 
-// JSONRPCRequest represents a JSON-RPC 2.0 request structure.
-type JSONRPCRequest struct {
-	JSONRPC string          `json:"jsonrpc"`
-	Method  string          `json:"method"`
-	Params  json.RawMessage `json:"params,omitempty"`
-	ID      any             `json:"id,omitempty"`
-}
+// JSONRPCRequest is retained as an alias for callers while MCP ingress owns
+// the canonical parsed envelope.
+type JSONRPCRequest = mcp.RequestEnvelope
 
 // JSONRPCError represents a JSON-RPC 2.0 error object.
 type JSONRPCError struct {
@@ -88,20 +84,40 @@ func (m *JSONRPCMiddleware) validateJSONRPCRequest(r *http.Request) bool {
 // read) can resolve a configured body path without re-reading the request.
 // Request body size limits are enforced at the gateway level (proxy_muxer).
 func (m *JSONRPCMiddleware) readAndParseJSONRPC(w http.ResponseWriter, r *http.Request) (*JSONRPCRequest, []byte, error) {
-	// Read the request body (already size-limited by gateway if configured)
-	body, err := io.ReadAll(r.Body)
+	if ingress := httpctx.GetMCPProtocolContext(r); ingress != nil && ingress.Envelope != nil {
+		return ingress.Envelope, ingress.RawBody, nil
+	}
+
+	// Bound the single ingress read even when no API-level limit is configured.
+	body, err := io.ReadAll(io.LimitReader(r.Body, mcpIngressReadLimit+1))
 	if err != nil {
+		httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(
+			r.Header.Get(mcp.HeaderProtocolVersion), r.Header.Get(mcp.HeaderSessionID), nil, body,
+		))
 		m.writeJSONRPCError(w, r, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
 		return nil, nil, err
 	}
 	// Restore body for upstream
 	r.Body = io.NopCloser(bytes.NewReader(body))
+	if len(body) > mcpIngressReadLimit {
+		httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(
+			r.Header.Get(mcp.HeaderProtocolVersion), r.Header.Get(mcp.HeaderSessionID), nil, body,
+		))
+		m.writeJSONRPCError(w, r, nil, mcp.JSONRPCInvalidRequest, mcp.ErrMsgInvalidRequest, nil)
+		return nil, nil, fmt.Errorf("MCP request exceeds %d bytes", mcpIngressReadLimit)
+	}
 
 	var rpcReq JSONRPCRequest
 	if err := json.Unmarshal(body, &rpcReq); err != nil {
+		httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(
+			r.Header.Get(mcp.HeaderProtocolVersion), r.Header.Get(mcp.HeaderSessionID), nil, body,
+		))
 		m.writeJSONRPCError(w, r, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
 		return nil, nil, err
 	}
+	httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(
+		r.Header.Get(mcp.HeaderProtocolVersion), r.Header.Get(mcp.HeaderSessionID), &rpcReq, body,
+	))
 
 	// Validate JSON-RPC 2.0 structure
 	if rpcReq.JSONRPC != apidef.JsonRPC20 || rpcReq.Method == "" {
@@ -169,10 +185,6 @@ func primitiveTypeForMethod(method string) string {
 //
 //nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
 func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ any) (error, int) {
-	if m.Spec.IsSyntheticMCPAdapter() {
-		return m.processSyntheticMCPAdapterRequest(w, r)
-	}
-
 	// Skip if routing already initialized (we're at a VEM path, not the listen path)
 	// This middleware should only run ONCE at the listen path to parse and route the request
 	if httpctx.GetJSONRPCRoutingState(r) != nil {
@@ -181,6 +193,14 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Validate request type
 	if !m.validateJSONRPCRequest(r) {
+		if httpctx.GetMCPProtocolContext(r) == nil {
+			httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(
+				r.Header.Get(mcp.HeaderProtocolVersion), r.Header.Get(mcp.HeaderSessionID), nil, nil,
+			))
+		}
+		if m.Spec.IsSyntheticMCPAdapter() {
+			return m.processSyntheticMCPAdapterRequest(w, r)
+		}
 		return nil, http.StatusOK
 	}
 
@@ -189,6 +209,9 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		// Error response already written by readAndParseJSONRPC
 		return nil, middleware.StatusRespond //nolint:nilerr
+	}
+	if m.Spec.IsSyntheticMCPAdapter() {
+		return m.processSyntheticMCPAdapterRequest(w, r)
 	}
 
 	// Route based on method
@@ -341,34 +364,16 @@ func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWri
 }
 
 func syntheticJSONRPCMethod(r *http.Request) string {
-	if r == nil || r.Method != http.MethodPost || r.Body == nil {
+	if r == nil {
 		return ""
 	}
 	if state := httpctx.GetJSONRPCRoutingState(r); state != nil && state.Method != "" {
 		return state.Method
 	}
-	body, err := io.ReadAll(io.LimitReader(r.Body, syntheticJSONRPCMethodReadLimit+1))
-	r.Body = prefixedReadCloser{
-		Reader: io.MultiReader(bytes.NewReader(body), r.Body),
-		Closer: r.Body,
+	if ingress := httpctx.GetMCPProtocolContext(r); ingress != nil && ingress.Envelope != nil {
+		return ingress.Envelope.Method
 	}
-	if err != nil {
-		return ""
-	}
-	if len(body) > syntheticJSONRPCMethodReadLimit {
-		return ""
-	}
-
-	var req JSONRPCRequest
-	if err := json.Unmarshal(body, &req); err != nil {
-		return ""
-	}
-	return req.Method
-}
-
-type prefixedReadCloser struct {
-	io.Reader
-	io.Closer
+	return ""
 }
 
 func normaliseMCPStreamableAccept(r *http.Request) {

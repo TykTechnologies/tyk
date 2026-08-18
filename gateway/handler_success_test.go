@@ -18,6 +18,8 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	ctxpkg "github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -436,6 +438,9 @@ func TestRecordMCPDetails(t *testing.T) {
 		ctxSetMCPMethod(req, "tools/call")
 		ctxSetMCPPrimitiveType(req, "tool")
 		ctxSetMCPPrimitiveName(req, "my_tool")
+		httpctx.SetMCPProtocolContext(req, mcp.NewProtocolContext(
+			"2026-07-28", "", &mcp.RequestEnvelope{Method: "tools/call"}, nil,
+		))
 
 		var rec analytics.AnalyticsRecord
 		recordMCPDetails(&rec, req)
@@ -444,6 +449,9 @@ func TestRecordMCPDetails(t *testing.T) {
 		assert.Equal(t, "tools/call", rec.MCPStats.JSONRPCMethod)
 		assert.Equal(t, "tool", rec.MCPStats.PrimitiveType)
 		assert.Equal(t, "my_tool", rec.MCPStats.PrimitiveName)
+		assert.Equal(t, "2026-07-28", rec.MCPStats.EffectiveProtocolVersion)
+		assert.Equal(t, "2026-07-28", rec.MCPStats.DeclaredProtocolVersion)
+		assert.Equal(t, "header", rec.MCPStats.ProtocolVersionSource)
 	})
 
 	t.Run("list operation has empty PrimitiveType and PrimitiveName", func(t *testing.T) {
