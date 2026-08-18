@@ -198,9 +198,9 @@ func (s *APISpec) Unload() {
 	}
 
 	if s.HTTPTransport != nil {
-		// Prevent new idle connections to be generated.
-		s.HTTPTransport.transport.DisableKeepAlives = true
-		s.HTTPTransport.transport.CloseIdleConnections()
+		// Retire both pools: an h2c API's connections live on the separate
+		// http2.Transport, which closing the HTTP/1 one leaves untouched.
+		s.HTTPTransport.Retire()
 		s.HTTPTransport = nil
 	}
 

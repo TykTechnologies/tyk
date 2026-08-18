@@ -130,6 +130,11 @@ type Gateway struct {
 	DRLManager *drl.DRL
 	reloadMu   sync.Mutex
 
+	// upstreamDNS holds the DNS pollers driving upstream load balancing, one
+	// per API. They are owned here rather than by the APISpec because a reload
+	// discards the spec it replaces without unloading it.
+	upstreamDNS upstreamDNSRegistry
+
 	Analytics            RedisAnalyticsHandler
 	GlobalEventsJSVM     JSVM
 	MainNotifier         RedisNotifier

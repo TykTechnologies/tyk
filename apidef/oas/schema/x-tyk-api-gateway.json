@@ -1499,6 +1499,9 @@
         "loadBalancing": {
           "$ref": "#/definitions/X-Tyk-LoadBalancing"
         },
+        "dnsLoadBalancing": {
+          "$ref": "#/definitions/X-Tyk-DNSLoadBalancing"
+        },
         "preserveHostHeader": {
           "$ref": "#/definitions/X-Tyk-PreserveHostHeader"
         },
@@ -2893,6 +2896,21 @@
       "properties": {
         "enabled": {
           "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-DNSLoadBalancing": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "refreshInterval": {
+          "type": "integer",
+          "minimum": -1
         }
       },
       "required": [
