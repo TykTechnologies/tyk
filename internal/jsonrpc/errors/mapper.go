@@ -17,24 +17,24 @@ const (
 	CodeAuthRequired = -32001
 	// CodeAccessDenied indicates authorization failed (-32002).
 	CodeAccessDenied = -32002
-	// CodeRateLimitExceeded indicates rate limit has been exceeded (-32003).
-	CodeRateLimitExceeded = -32003
-	// CodeUpstreamError indicates an upstream/backend service error (-32004).
-	CodeUpstreamError = -32004
-	// CodeQuotaExceeded indicates API quota has been exceeded (-32005).
-	CodeQuotaExceeded = -32005
-	// CodeIPBlocked indicates the IP address is blocked (-32006).
-	CodeIPBlocked = -32006
+	// CodeQuotaExceeded indicates API quota has been exceeded (-32003).
+	CodeQuotaExceeded = -32003
+	// CodeRateLimitExceeded indicates rate limit has been exceeded (-32004).
+	CodeRateLimitExceeded = -32004
+	// CodeIPBlocked indicates the IP address is blocked (-32005).
+	CodeIPBlocked = -32005
+	// CodeUpstreamError indicates an upstream/backend service error (-32006).
+	CodeUpstreamError = -32006
 
 	// Modern server-defined namespace. The semantic suffix matches the legacy
 	// namespace so dashboards and logs can classify both eras identically.
 	CodeModernServerError       = -33000
 	CodeModernAuthRequired      = -33001
 	CodeModernAccessDenied      = -33002
-	CodeModernRateLimitExceeded = -33003
-	CodeModernUpstreamError     = -33004
-	CodeModernQuotaExceeded     = -33005
-	CodeModernIPBlocked         = -33006
+	CodeModernQuotaExceeded     = -33003
+	CodeModernRateLimitExceeded = -33004
+	CodeModernIPBlocked         = -33005
+	CodeModernUpstreamError     = -33006
 )
 
 type errorKind int
@@ -56,7 +56,7 @@ func SelectJSONRPCCode(httpStatus int, classification *tykerrors.ErrorClassifica
 	kind := classifyError(httpStatus, classification)
 	if kind == errorKindNone {
 		code := MapHTTPStatusToJSONRPCCode(httpStatus)
-		if protocolContext.IsModern() && code >= CodeIPBlocked && code <= CodeServerError {
+		if protocolContext.IsModern() && code >= CodeUpstreamError && code <= CodeServerError {
 			return code - 1000
 		}
 		return code

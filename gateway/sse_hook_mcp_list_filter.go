@@ -29,7 +29,7 @@ func NewMCPListFilterSSEHook(spec *APISpec, ses *user.SessionState) *MCPListFilt
 		return nil
 	}
 
-	if !hasMCPDiscoveryFiltering(spec, ses) {
+	if !spec.IsMCP() || !hasMCPDiscoveryFiltering(spec, ses) {
 		return nil
 	}
 	return &MCPListFilterSSEHook{spec: spec, ses: ses}
@@ -91,6 +91,11 @@ func (h *MCPListFilterSSEHook) filterSSEData(data []byte) ([]byte, bool) {
 	if err := json.Unmarshal(envelope.Result, &result); err != nil {
 		return nil, false
 	}
+	if _, discovery := result["supportedVersions"]; discovery {
+		globalRules, credentialRules := discoveryJSONRPCRuleSets(h.spec, h.ses)
+		filtered, changed, _ := mcp.FilterDiscoveryBody(data, globalRules, credentialRules)
+		return filtered, changed
+	}
 
 	cfg := mcp.InferListConfigFromResult(result)
 	if cfg != nil {
@@ -109,6 +114,11 @@ func (h *MCPListFilterSSEHook) filterSSEData(data []byte) ([]byte, bool) {
 }
 
 func hasMCPDiscoveryFiltering(spec *APISpec, ses *user.SessionState) bool {
+	// server/discover version normalization applies to every MCP response,
+	// even when no credential-specific filtering is configured.
+	if spec != nil && spec.IsMCP() {
+		return true
+	}
 	if !oasPrimitiveRules(spec, mcp.ListFilterConfigs["tools"]).IsEmpty() ||
 		!oasPrimitiveRules(spec, mcp.ListFilterConfigs["prompts"]).IsEmpty() ||
 		!oasPrimitiveRules(spec, mcp.ListFilterConfigs["resources"]).IsEmpty() ||

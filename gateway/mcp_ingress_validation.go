@@ -34,6 +34,12 @@ func (m *JSONRPCMiddleware) validateMCPIngress(w http.ResponseWriter, r *http.Re
 			return false
 		}
 	}
+	// Routing and analytics use the retained protocol context, not these
+	// stateful transport headers. Removing them after validation prevents a
+	// modern native upstream (and the local SDK adapter) from treating the
+	// request as a stateful resume/event-stream operation.
+	r.Header.Del(mcp.HeaderSessionID)
+	r.Header.Del("Last-Event-ID")
 	return true
 }
 
@@ -43,7 +49,8 @@ func (m *JSONRPCMiddleware) writeMCPIngressError(w http.ResponseWriter, r *http.
 	if protocolContext != nil && protocolContext.Envelope != nil {
 		requestID = protocolContext.Envelope.ID
 	}
-	m.writeJSONRPCError(w, r, requestID, ingressErr.Code, ingressErr.Message, ingressErr.Data)
+	response := m.writeJSONRPCError(w, r, requestID, ingressErr.Code, ingressErr.Message, ingressErr.Data)
+	m.recordMCPIngressErrorAnalytics(r, response)
 }
 
 func rejectModernMCPHTTPMethod(w http.ResponseWriter, r *http.Request) bool {

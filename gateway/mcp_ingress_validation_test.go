@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
@@ -10,8 +11,35 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 )
+
+func TestValidateMCPIngress_StripsStatefulHeadersAfterModernValidation(t *testing.T) {
+	middleware := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: &APISpec{}}}
+	envelope := &mcp.RequestEnvelope{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  mcp.MethodToolsList,
+		Params: json.RawMessage(`{"_meta":{
+			"io.modelcontextprotocol/protocolVersion":"2026-07-28",
+			"io.modelcontextprotocol/clientCapabilities":{}
+		}}`),
+	}
+	req := httptest.NewRequest(http.MethodPost, "http://gateway.example/mcp", nil)
+	req.Header.Set(mcp.HeaderProtocolVersion, mcp.ModernProtocolVersion)
+	req.Header.Set(mcp.HeaderMethod, mcp.MethodToolsList)
+	req.Header.Set(mcp.HeaderSessionID, "ignored")
+	req.Header.Set("Last-Event-ID", "ignored")
+	httpctx.SetMCPProtocolContext(req, mcp.NewProtocolContext(
+		mcp.ModernProtocolVersion, "ignored", envelope, nil,
+	))
+
+	assert.True(t, middleware.validateMCPIngress(httptest.NewRecorder(), req))
+	assert.Empty(t, req.Header.Get(mcp.HeaderSessionID))
+	assert.Empty(t, req.Header.Get("Last-Event-ID"))
+	assert.True(t, httpctx.GetMCPProtocolContext(req).HasSession)
+}
 
 func testRESTAsMCPIngressMiddleware() *JSONRPCMiddleware {
 	tool := oas.DerivedTool{

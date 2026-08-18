@@ -263,6 +263,10 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 					log.Error("Couldn't read response body", err)
 				}
 
+				// respBodyReader may decode content according to the response
+				// headers, so give it a fresh reader rather than the exhausted
+				// body that io.ReadAll just consumed.
+				responseCopy.Body = ioutil.NopCloser(bytes.NewBuffer(responseContent))
 				responseCopy.Body = respBodyReader(r, responseCopy)
 
 				// Get the wire format representation

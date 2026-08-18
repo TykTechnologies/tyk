@@ -111,6 +111,36 @@ func TestSyntheticAdapterProcessRequest_RunsWithExistingJSONRPCRoutingState(t *t
 	assert.Contains(t, rec.Body.String(), `"result"`)
 }
 
+func TestSyntheticAdapterProcessRequest_ModernIgnoresStatefulHeaders(t *testing.T) {
+	adapterSpec := buildSyntheticAdapterForRuntimeTest(t)
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec}}
+
+	body := []byte(`{
+		"jsonrpc":"2.0",
+		"id":1,
+		"method":"tools/list",
+		"params":{"_meta":{
+			"io.modelcontextprotocol/protocolVersion":"2026-07-28",
+			"io.modelcontextprotocol/clientCapabilities":{}
+		}}
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	req.Header.Set("Mcp-Protocol-Version", "2026-07-28")
+	req.Header.Set("Mcp-Method", "tools/list")
+	req.Header.Set("Mcp-Session-Id", "ignored")
+	req.Header.Set("Last-Event-ID", "ignored")
+	rec := httptest.NewRecorder()
+
+	err, status := mw.ProcessRequest(rec, req, nil)
+	require.NoError(t, err)
+	assert.Equal(t, middleware.StatusRespond, status)
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Empty(t, rec.Header().Get("Mcp-Session-Id"))
+	assert.Contains(t, rec.Body.String(), `"tools"`)
+}
+
 func TestRESTAsMCPAdapter_RejectsNonPOSTMethods(t *testing.T) {
 	adapterSpec := buildSyntheticAdapterForRuntimeTest(t)
 	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec}}
