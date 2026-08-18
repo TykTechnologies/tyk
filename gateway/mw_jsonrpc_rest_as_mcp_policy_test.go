@@ -138,6 +138,11 @@ func TestRESTAsMCPPolicy_FiltersToolsListResponseForCallerView(t *testing.T) {
 	tools := jsonRPCToolsList(t, rec.Body.Bytes())
 	assert.Equal(t, []string{"orders"}, tools)
 	assert.NotContains(t, rec.Body.String(), "make_order")
+	var envelope map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &envelope))
+	result := envelope["result"].(map[string]any)
+	assert.Equal(t, "private", result["cacheScope"])
+	assert.EqualValues(t, 0, result["ttlMs"])
 }
 
 func TestRESTAsMCPPolicy_EndpointRateLimitBlocksToolCall(t *testing.T) {
