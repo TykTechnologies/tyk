@@ -210,7 +210,7 @@ var InitializeCapabilityMethods = map[string][]string{
 	"tools":     {MethodToolsList, MethodToolsCall},
 	"resources": {MethodResourcesList, MethodResourcesTemplatesList, MethodResourcesRead},
 	"prompts":   {MethodPromptsList, MethodPromptsGet},
-	"sampling":  {MethodSamplingCreate},
+	"sampling":  {MethodSamplingCreateMessage},
 }
 
 // FilterInitializeCapabilitiesBody removes initialize response capabilities

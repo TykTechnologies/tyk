@@ -33,7 +33,7 @@ const (
 	MethodPromptsList = "prompts/list"
 
 	// Client capability methods
-	MethodSamplingCreate = "sampling/create"
+	MethodSamplingCreateMessage = "sampling/createMessage"
 )
 
 // JSON-RPC parameter keys used across MCP methods

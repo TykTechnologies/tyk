@@ -814,7 +814,7 @@ func TestMCPListFilterResponseHandler_HandleResponse_InitializeCapabilitiesFilte
 				"api-1": {
 					APIID: "api-1",
 					JSONRPCMethodsAccessRights: user.AccessControlRules{
-						Blocked: []string{mcp.MethodSamplingCreate},
+						Blocked: []string{mcp.MethodSamplingCreateMessage},
 					},
 				},
 			},

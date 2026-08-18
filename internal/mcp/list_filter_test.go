@@ -344,7 +344,7 @@ func TestFilterInitializeCapabilitiesBody(t *testing.T) {
 	body := []byte(`{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-26","capabilities":{"tools":{"listChanged":true},"resources":{"subscribe":true},"prompts":{},"sampling":{}},"serverInfo":{"name":"test","version":"1.0.0"}}}`)
 
 	result, ok := FilterInitializeCapabilitiesBody(body, []user.AccessControlRules{
-		{Blocked: []string{MethodSamplingCreate, MethodToolsList}},
+		{Blocked: []string{MethodSamplingCreateMessage, MethodToolsList}},
 	})
 	require.True(t, ok)
 
@@ -370,6 +370,36 @@ func TestFilterInitializeCapabilitiesBody(t *testing.T) {
 		assert.False(t, changed)
 		assert.Nil(t, unchanged)
 	})
+}
+
+func TestSamplingCapabilityUsesCreateMessageMethod(t *testing.T) {
+	body := []byte(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"sampling":{}}}}`)
+	tests := []struct {
+		name        string
+		blocked     string
+		wantChanged bool
+	}{
+		{name: "correct createMessage method removes sampling", blocked: MethodSamplingCreateMessage, wantChanged: true},
+		{name: "obsolete create method does not control sampling", blocked: "sampling/create", wantChanged: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filtered, changed := FilterInitializeCapabilitiesBody(body, []user.AccessControlRules{{Blocked: []string{tt.blocked}}})
+			assert.Equal(t, tt.wantChanged, changed)
+			if !tt.wantChanged {
+				assert.Nil(t, filtered)
+				return
+			}
+			var envelope JSONRPCResponse
+			require.NoError(t, json.Unmarshal(filtered, &envelope))
+			var result map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(envelope.Result, &result))
+			var capabilities map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(result["capabilities"], &capabilities))
+			assert.NotContains(t, capabilities, "sampling")
+		})
+	}
 }
 
 func TestInferListConfigFromResult(t *testing.T) {
