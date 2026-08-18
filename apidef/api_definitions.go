@@ -641,6 +641,30 @@ type ResponseProcessor struct {
 	Options interface{} `bson:"options" json:"options"`
 }
 
+// DNSLoadBalancingConfig configures DNS-sourced load balancing for an API's
+// upstream: the hostname in `target_url` is re-resolved on a timer and requests
+// are distributed across the addresses it returns.
+//
+// This is per-API rather than gateway-level because the thing it describes is a
+// property of one upstream. It sits next to `enable_load_balancing`, which
+// balances across a static list, and `service_discovery`, which sources targets
+// from a key/value store; this sources them from DNS.
+//
+// Only useful against a headless Kubernetes Service, or any other name that
+// resolves to one address per backend. A ClusterIP resolves to a single virtual
+// IP, so there is nothing to distribute over and the cluster dataplane binds
+// each connection to one backend regardless.
+type DNSLoadBalancingConfig struct {
+	// Enabled turns on periodic re-resolution of the upstream hostname.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// RefreshInterval is how often, in seconds, the hostname is re-resolved.
+	// 0 selects the default of 30 seconds; values below 10 are raised to 10,
+	// because the added DNS load is `gateways x APIs / interval` against a
+	// shared resolver. A negative value disables refreshing.
+	RefreshInterval int64 `bson:"refresh_interval" json:"refresh_interval"`
+}
+
 type ServiceDiscoveryConfiguration struct {
 	UseDiscoveryService bool   `bson:"use_discovery_service" json:"use_discovery_service"`
 	QueryEndpoint       string `bson:"query_endpoint" json:"query_endpoint"`
@@ -1097,6 +1121,7 @@ type ProxyConfig struct {
 	StructuredTargetList        *HostList                     `bson:"-" json:"-"`
 	CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
 	ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
+	DNSLoadBalancing            DNSLoadBalancingConfig        `bson:"dns_load_balancing" json:"dns_load_balancing"`
 	Transport                   struct {
 		SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
 		SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`

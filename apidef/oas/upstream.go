@@ -44,6 +44,11 @@ type Upstream struct {
 	// Tyk classic API definition: `proxy.enable_load_balancing` and `proxy.targets`.
 	LoadBalancing *LoadBalancing `bson:"loadBalancing,omitempty" json:"loadBalancing,omitempty"`
 
+	// DNSLoadBalancing contains configuration for distributing requests across the
+	// addresses the upstream hostname resolves to, refreshed on a timer.
+	// Tyk classic API definition: `proxy.dns_load_balancing`.
+	DNSLoadBalancing *DNSLoadBalancing `bson:"dnsLoadBalancing,omitempty" json:"dnsLoadBalancing,omitempty"`
+
 	// PreserveHostHeader contains the configuration for preserving the host header.
 	// Tyk classic API definition: `proxy.preserve_host_header`.
 	PreserveHostHeader *PreserveHostHeader `bson:"preserveHostHeader,omitempty" json:"preserveHostHeader,omitempty"`
@@ -150,6 +155,7 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	}
 
 	u.fillLoadBalancing(api)
+	u.fillDNSLoadBalancing(api)
 	u.fillPreserveHostHeader(api)
 	u.fillPreserveTrailingSlash(api)
 }
@@ -236,6 +242,7 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	u.Authentication.ExtractTo(api)
 
 	u.loadBalancingExtractTo(api)
+	u.dnsLoadBalancingExtractTo(api)
 
 	if u.TLSTransport == nil {
 		u.TLSTransport = &TLSTransport{}
@@ -307,6 +314,75 @@ func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 	}
 
 	u.LoadBalancing.ExtractTo(api)
+}
+
+// DNSLoadBalancing distributes requests across the addresses the upstream
+// hostname resolves to, re-resolving on a timer so that backends added or
+// removed after the API was loaded are picked up.
+//
+// It sits alongside `loadBalancing`, which distributes across a statically
+// configured list, and `serviceDiscovery`, which sources targets from a
+// key/value store. This sources them from DNS, which makes it the option that
+// works without an API server or a discovery service — on Kubernetes, ECS,
+// Nomad, or plain VMs.
+//
+// Only useful against a name that resolves to one address per backend, such as
+// a headless Kubernetes Service. A ClusterIP resolves to a single virtual IP,
+// so there is nothing to distribute over.
+//
+// Example:
+//
+//	{
+//	    "enabled": true,
+//	    "refreshInterval": 10
+//	}
+type DNSLoadBalancing struct {
+	// Enabled activates DNS-sourced load balancing for this upstream.
+	//
+	// Tyk classic API definition: `proxy.dns_load_balancing.enabled`
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+
+	// RefreshInterval is how often, in seconds, the upstream hostname is
+	// re-resolved. 0 selects the default of 30 seconds; values below 10 are
+	// raised to 10, because the added DNS load is `gateways x APIs / interval`
+	// against a shared resolver. A negative value disables refreshing.
+	//
+	// Tyk classic API definition: `proxy.dns_load_balancing.refresh_interval`
+	RefreshInterval int64 `bson:"refreshInterval,omitempty" json:"refreshInterval,omitempty"`
+}
+
+// Fill populates the DNSLoadBalancing structure from the classic API definition.
+func (d *DNSLoadBalancing) Fill(api apidef.APIDefinition) {
+	d.Enabled = api.Proxy.DNSLoadBalancing.Enabled
+	d.RefreshInterval = api.Proxy.DNSLoadBalancing.RefreshInterval
+}
+
+// ExtractTo copies the DNSLoadBalancing structure into the classic API definition.
+func (d *DNSLoadBalancing) ExtractTo(api *apidef.APIDefinition) {
+	api.Proxy.DNSLoadBalancing.Enabled = d.Enabled
+	api.Proxy.DNSLoadBalancing.RefreshInterval = d.RefreshInterval
+}
+
+func (u *Upstream) fillDNSLoadBalancing(api apidef.APIDefinition) {
+	if u.DNSLoadBalancing == nil {
+		u.DNSLoadBalancing = &DNSLoadBalancing{}
+	}
+
+	u.DNSLoadBalancing.Fill(api)
+	if ShouldOmit(u.DNSLoadBalancing) {
+		u.DNSLoadBalancing = nil
+	}
+}
+
+func (u *Upstream) dnsLoadBalancingExtractTo(api *apidef.APIDefinition) {
+	if u.DNSLoadBalancing == nil {
+		u.DNSLoadBalancing = &DNSLoadBalancing{}
+		defer func() {
+			u.DNSLoadBalancing = nil
+		}()
+	}
+
+	u.DNSLoadBalancing.ExtractTo(api)
 }
 
 // TLSTransport contains the configuration for TLS transport settings.
