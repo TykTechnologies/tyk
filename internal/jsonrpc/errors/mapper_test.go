@@ -126,6 +126,17 @@ func TestSelectJSONRPCCode_ProtocolNamespaceAndClassification(t *testing.T) {
 	})
 }
 
+func TestJSONRPCErrorCodeContracts(t *testing.T) {
+	assert.Equal(t, -32003, CodeQuotaExceeded)
+	assert.Equal(t, -32004, CodeRateLimitExceeded)
+	assert.Equal(t, -32005, CodeIPBlocked)
+	assert.Equal(t, -32006, CodeUpstreamError)
+	assert.Equal(t, -33003, CodeModernQuotaExceeded)
+	assert.Equal(t, -33004, CodeModernRateLimitExceeded)
+	assert.Equal(t, -33005, CodeModernIPBlocked)
+	assert.Equal(t, -33006, CodeModernUpstreamError)
+}
+
 func TestMapHTTPStatusToJSONRPCCode_AllDefinedCodes(t *testing.T) {
 	// Ensure all common HTTP status codes have defined mappings
 	commonStatuses := []int{

@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -13,6 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -240,6 +242,52 @@ func TestMCPAnalytics_ErrorPath_RecordsMCPStats(t *testing.T) {
 	assert.Equal(t, "tools/call", rec.MCPStats.JSONRPCMethod)
 	assert.Equal(t, "tool", rec.MCPStats.PrimitiveType)
 	assert.Equal(t, "get_weather", rec.MCPStats.PrimitiveName)
+}
+
+func TestMCPAnalytics_IngressRejectionRecordsProtocolContext(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.AnalyticsConfig.EnableDetailedRecording = true
+	})
+	defer ts.Close()
+
+	loadMCPAPI(t, ts, &oas.Middleware{})
+	captured := captureAnalytics(ts)
+
+	_, _ = ts.Run(t, test.TestCase{
+		Method: http.MethodPost,
+		Path:   "/mcp",
+		Headers: map[string]string{
+			"Content-Type":            "application/json",
+			"Accept":                  "application/json",
+			mcp.HeaderProtocolVersion: mcp.ModernProtocolVersion,
+			mcp.HeaderMethod:          mcp.MethodToolsList,
+		},
+		Data: map[string]any{
+			"jsonrpc": "2.0",
+			"method":  mcp.MethodToolsList,
+			"params": map[string]any{
+				"_meta": map[string]any{
+					mcp.MetaKeyProtocolVersion:    mcp.LegacyFallbackProtocolVersion,
+					mcp.MetaKeyClientCapabilities: map[string]any{},
+				},
+			},
+			"id": "mismatch",
+		},
+		Code:      http.StatusBadRequest,
+		BodyMatch: `"code":-32020`,
+	})
+
+	rec := captured.Load()
+	require.NotNil(t, rec, "rejected ingress request should produce analytics")
+	assert.True(t, rec.MCPStats.IsMCP)
+	assert.Equal(t, mcp.MethodToolsList, rec.MCPStats.JSONRPCMethod)
+	assert.Empty(t, rec.MCPStats.EffectiveProtocolVersion)
+	assert.Empty(t, rec.MCPStats.DeclaredProtocolVersion)
+	assert.Equal(t, string(mcp.ProtocolVersionSourceHeaderBody), rec.MCPStats.ProtocolVersionSource)
+	assert.Equal(t, http.StatusBadRequest, rec.ResponseCode)
+	rawResponse, err := base64.StdEncoding.DecodeString(rec.RawResponse)
+	require.NoError(t, err)
+	assert.Contains(t, string(rawResponse), `"code":-32020`)
 }
 
 func TestRecordMCPDetails_TagsRequestWithoutJSONRPCState(t *testing.T) {

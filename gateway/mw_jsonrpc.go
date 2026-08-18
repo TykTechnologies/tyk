@@ -10,7 +10,9 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
@@ -190,6 +192,13 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// Skip if routing already initialized (we're at a VEM path, not the listen path)
 	// This middleware should only run ONCE at the listen path to parse and route the request
 	if httpctx.GetJSONRPCRoutingState(r) != nil {
+		// Paired REST-as-MCP proxies keep the outer routing state on the
+		// internal tyk:// hop. The hidden adapter still has to terminate the
+		// request with its SDK handler; falling through would proxy to the
+		// adapter's placeholder target (127.0.0.1:80).
+		if m.Spec.IsSyntheticMCPAdapter() {
+			return m.processSyntheticMCPAdapterRequest(w, r)
+		}
 		return nil, http.StatusOK
 	}
 
@@ -214,6 +223,21 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		// Error response already written by readAndParseJSONRPC
 		return nil, middleware.StatusRespond //nolint:nilerr
+	}
+	// Populate analytics dimensions from the retained envelope before ingress
+	// validation, so rejected requests retain the same method/primitive context
+	// as requests that proceed to routing.
+	ctxSetMCPMethod(r, rpcReq.Method)
+	ctxSetMCPPrimitiveType(r, primitiveTypeForMethod(rpcReq.Method))
+	switch rpcReq.Method {
+	case mcp.MethodToolsCall, mcp.MethodPromptsGet:
+		if name, ok := rpcReq.ParamString(mcp.ParamKeyName); ok {
+			ctxSetMCPPrimitiveName(r, name)
+		}
+	case mcp.MethodResourcesRead:
+		if uri, ok := rpcReq.ParamString(mcp.ParamKeyURI); ok {
+			ctxSetMCPPrimitiveName(r, uri)
+		}
 	}
 	if !m.validateMCPIngress(w, r) {
 		return nil, middleware.StatusRespond
@@ -296,7 +320,7 @@ func (m *JSONRPCMiddleware) writeMCPTraceContext(r *http.Request, body []byte) {
 }
 
 // writeJSONRPCError writes a JSON-RPC 2.0 error response.
-func (m *JSONRPCMiddleware) writeJSONRPCError(w http.ResponseWriter, r *http.Request, id any, code int, message string, data any) {
+func (m *JSONRPCMiddleware) writeJSONRPCError(w http.ResponseWriter, r *http.Request, id any, code int, message string, data any) *http.Response {
 	ctxSetJSONRPCErrorCode(r, code)
 
 	response := JSONRPCErrorResponse{
@@ -310,10 +334,37 @@ func (m *JSONRPCMiddleware) writeJSONRPCError(w http.ResponseWriter, r *http.Req
 	}
 
 	httpCode := m.mapJSONRPCErrorToHTTP(code)
+	var body bytes.Buffer
+	json.NewEncoder(&body).Encode(response) //nolint:errcheck
 
 	w.Header().Set(headerContentType, contentTypeJSON)
 	w.WriteHeader(httpCode)
-	json.NewEncoder(w).Encode(response) //nolint:errcheck
+	_, _ = w.Write(body.Bytes())
+
+	return &http.Response{
+		StatusCode:    httpCode,
+		Status:        fmt.Sprintf("%d %s", httpCode, http.StatusText(httpCode)),
+		Header:        w.Header().Clone(),
+		Body:          io.NopCloser(bytes.NewReader(body.Bytes())),
+		ContentLength: int64(body.Len()),
+		Request:       r,
+	}
+}
+
+func (m *JSONRPCMiddleware) recordMCPIngressErrorAnalytics(r *http.Request, response *http.Response) {
+	if m == nil || m.BaseMiddleware == nil || m.Gw == nil || m.Spec == nil || response == nil {
+		return
+	}
+
+	var latency analytics.Latency
+	if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
+		totalMs := int64(DurationToMillisecond(time.Since(requestStartTime)))
+		latency = analytics.Latency{Total: totalMs, Gateway: totalMs}
+	}
+
+	(&SuccessHandler{BaseMiddleware: m.BaseMiddleware.Copy()}).RecordHit(
+		r, latency, response.StatusCode, response, false,
+	)
 }
 
 // mapJSONRPCErrorToHTTP maps JSON-RPC error codes to HTTP status codes.
@@ -402,7 +453,15 @@ func (m *JSONRPCMiddleware) writeSyntheticMCPDiscoveryResponse(w http.ResponseWr
 // otherwise only unambiguously modern traffic is stateless.
 func mcpAdapterHTTPHandler(r *http.Request, sdkAdapter *restmcpadapter.SDKAdapter) http.Handler {
 	protocolContext := httpctx.GetMCPProtocolContext(r)
-	return sdkAdapter.ProtocolHTTPHandler(mcpAdapterUsesStatelessHandler(protocolContext))
+	stateless := mcpAdapterUsesStatelessHandler(protocolContext)
+	if stateless {
+		// These headers belong to the stateful transport. They are deliberately
+		// ignored for modern routing and must not leak into the stateless SDK
+		// handler, which correctly rejects Last-Event-ID on POST requests.
+		r.Header.Del(mcp.HeaderSessionID)
+		r.Header.Del("Last-Event-ID")
+	}
+	return sdkAdapter.ProtocolHTTPHandler(stateless)
 }
 
 func mcpAdapterUsesStatelessHandler(protocolContext *mcp.ProtocolContext) bool {
