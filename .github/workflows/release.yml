@@ -945,7 +945,7 @@ jobs:
   build-dashboard-image:
     if: needs.resolve-dashboard-image.outputs.needs_build == 'true'
     needs: resolve-dashboard-image
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+    runs-on: ${{ vars.WARP_RUNNER_8X_X64 || vars.DEFAULT_RUNNER }}
     permissions:
       id-token: write
       contents: read
