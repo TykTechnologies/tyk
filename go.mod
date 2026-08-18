@@ -636,4 +636,10 @@ replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 =>
 
 replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.512.1-0.20260817104659-7198d52254ff
 
+// SECURITY: CVE-2026-46384, CVE-2026-46385, GHSA-mx64-mj3q-7prj in the Avro decoder.
+//
+// DROP THIS REPLACE when either holds:
+//   1. apache/pulsar-client-go stops depending on hamba/avro
+//      (still pins v2.29.0 as of v0.21.0, 2026-07), or
+//   2. a fixed github.com/hamba/avro/v2 release appears (archived, so unlikely).
 replace github.com/hamba/avro => github.com/iskorotkov/avro/v2 v2.33.1
