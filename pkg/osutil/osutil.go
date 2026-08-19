@@ -37,8 +37,14 @@ func NewRoot(path string) (*Root, error) {
 
 // Ensure that relative path is inside root directory.
 // Methods detects escapes out of root directory.
-func (r *Root) Ensure(relative string) (string, error) {
-	fullPath := filepath.Join(r.rootPath, relative)
+func (r *Root) Ensure(target string) (string, error) {
+	var fullPath string
+
+	if filepath.IsAbs(target) {
+		fullPath = filepath.Clean(target)
+	} else {
+		fullPath = filepath.Join(r.rootPath, target)
+	}
 
 	rootWithSep := r.rootPath
 	if !strings.HasSuffix(rootWithSep, string(os.PathSeparator)) {
@@ -46,7 +52,7 @@ func (r *Root) Ensure(relative string) (string, error) {
 	}
 
 	if fullPath != r.rootPath && !strings.HasPrefix(fullPath, rootWithSep) {
-		return "", fmt.Errorf("invalid path: '%s' attempts to escape root directory", relative)
+		return "", fmt.Errorf("invalid path: '%s' attempts to escape root directory", target)
 	}
 
 	return fullPath, nil
