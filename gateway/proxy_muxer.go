@@ -11,6 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"github.com/TykTechnologies/tyk/ctx"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 
@@ -68,6 +69,9 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctxSetRequestStartTime(r, time.Now())
 	// Capture original request path before any middleware modifications
 	ctxSetOriginalRequestPath(r, r.URL.Path)
+
+	// Inject RequestContext to track request state
+	ctxSetRequestContext(r, &ctx.RequestContext{})
 
 	if r.Body != nil {
 		if !h.handleRequestLimits(w, r) {
