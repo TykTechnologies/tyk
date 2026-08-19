@@ -33,8 +33,9 @@ import (
 type handleWrapper struct {
 	router http.Handler // *mux.Router
 
-	maxContentLength   int64
-	maxRequestBodySize int64
+	maxContentLength       int64
+	maxRequestBodySize     int64
+	requestBodyPassthrough bool
 }
 
 // h2cWrapper tracks handleWrapper for swapping w.router on reloads.
@@ -75,7 +76,11 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if h.maxRequestBodySize > 0 {
+	switch {
+	case h.requestBodyPassthrough:
+		// body streams straight through to the upstream; MaxBytesReader (if
+		// any) was already applied above by handleRequestLimits
+	case h.maxRequestBodySize > 0:
 		// this greedily reads in the request body and
 		// make request body to be nopCloser and re-readable
 		// before serve it through chain of middlewares
@@ -88,7 +93,7 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			httputil.InternalServerError(w, r)
 			return
 		}
-	} else {
+	default:
 		// this leaves the body on lazy read as before
 		if _, err := copyRequest(r); err != nil {
 			log.WithError(err).Error("Error reading request body")
@@ -467,8 +472,9 @@ func (m *proxyMux) serve(gw *Gateway) {
 			}
 
 			h := &handleWrapper{
-				router:             p.router,
-				maxRequestBodySize: conf.HttpServerOptions.MaxRequestBodySize,
+				router:                 p.router,
+				maxRequestBodySize:     conf.HttpServerOptions.MaxRequestBodySize,
+				requestBodyPassthrough: conf.HttpServerOptions.EnableRequestBodyPassthrough,
 			}
 
 			// by default enabling h2c by wrapping handler in h2c. This ensures all features including tracing work
