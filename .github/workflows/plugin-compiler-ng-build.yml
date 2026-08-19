@@ -1,0 +1,702 @@
+---
+name: Plugin-compiler NG build
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  push:
+    branches:
+      - master
+      - release-**
+    tags:
+      - "v*"
+
+env:
+  GOLANG_CROSS: 1.26-bullseye
+  NG_BASE_SOURCE: tykio/dhi-busybox-plugin-compiler:1.37.0-debian13-fips_plugin-compiler-ng-toolchain
+  NG_GLIBC_TARGET: "2.17"
+  NG_CROSS: "1"
+  NG_SLIM: "0"
+  NG_WITH_CXX: "1"
+  NG_WITH_GIT: "1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ startsWith(github.ref, 'refs/tags/') && 'tags' || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  dep-guard:
+    if: github.event_name == 'pull_request'
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@d3fa20888fa2878e877e22bb7702141217290e7c  # main
+    permissions:
+      contents: read
+
+  docker-build:
+    needs: [dep-guard]
+    # The DHI customization that provisions the compiler toolchain is a private
+    # Docker Hub repository, and GitHub withholds secrets from pull requests
+    # raised from a fork. Such a run cannot pull the base at all, so skip it
+    # instead of failing it with an opaque 401. There is deliberately no public
+    # fallback base -- see ci/images/plugin-compiler-ng/Dockerfile.base.
+    if: |
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository) &&
+      !cancelled() &&
+      (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') &&
+      !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Reclaim runner space
+        run: sudo rm -rf /usr/local/bin/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
+        with:
+          driver: ${{ github.event_name == 'pull_request' && 'docker' || 'docker-container' }}
+
+      - name: Configure AWS credentials
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: aws-actions/configure-aws-credentials@5fd3084fc36e372ff1fff382a39b10d03659f355  # v2
+        with:
+          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
+          role-session-name: ci-plugin-compiler-ng-push
+          aws-region: eu-central-1
+
+      - name: Login to AWS ECR
+        if: ${{ github.event_name != 'pull_request' }}
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@5a88a04c91d5c6f97aae0d9be790e64d9b1d47b7  # v1
+
+      # Runs on pull requests too, unlike the ECR steps above: the toolchain base
+      # lives in a private Docker Hub repository and every event needs to pull it.
+      # Fork pull requests never reach this step -- the job is skipped for them.
+      - name: Login to Docker Hub
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc  # v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      # Docker does not rebuild a customization when packages it ADDS are
+      # patched -- only a base-image patch or an OCI artifact change triggers
+      # one, and this base is a minimal BusyBox runtime that reports zero
+      # vulnerabilities, so that trigger effectively never fires. Left alone the
+      # toolchain drifts: we observed 12 days on a published expat fix, and a
+      # manual rebuild then pulled expat and linux-libc-dev forward at once.
+      # Reported as docker-hardened-images/advisories#2017.
+      #
+      # There is no supported way to request a rebuild. `customization build`
+      # only offers get/list/logs, and `edit` is a no-op unless the manifest
+      # actually differs -- while still reporting success. So stamp the run id
+      # into an annotation purely to make the manifest unequal. The annotation
+      # carries no meaning; delete this step once Docker ships a real trigger.
+      #
+      # Release events only: a pull request must not be able to rewrite the
+      # shared hardened base.
+      # Never fails the release. A refresh that does not happen means the base is
+      # as fresh as it was yesterday, which is worse than current but far better
+      # than blocking a release on Docker-side behaviour we do not control. The
+      # step still reports loudly, and continue-on-error marks it red in the UI so
+      # a persistently stale base is visible rather than silent.
+      - name: Refresh Docker Hardened Images customization
+        if: ${{ github.event_name != 'pull_request' }}
+        continue-on-error: true
+        env:
+          DHI_CUSTOMIZATION: cz_3gxyrz8ca7x0l
+          DHI_ORG: tykio
+        run: |
+          set -euo pipefail
+          # `docker dhi` ships with Docker Desktop and is absent from hosted
+          # runners. Without this guard the first call falls through to plain
+          # `docker`, which reports `unknown flag: --org` and exit 125 -- an error
+          # that says nothing about the actual problem.
+          if [ -z "${DHI_ORG:-}" ]; then
+            echo "::warning title=DHI org not resolved::No Docker Hub organization could be derived for the customization, so it cannot be refreshed."
+            printf '### DHI customization refresh\n\nSkipped: no organization resolved.\n' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if ! docker dhi --help >/dev/null 2>&1; then
+            echo "::warning title=DHI CLI unavailable::docker dhi is not installed on this runner, so the customization cannot be refreshed. The compiler will build on the existing base, which may be missing recent package fixes."
+            printf '### DHI customization refresh\n\nSkipped: docker dhi is not available on this runner.\n' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          before="$(docker dhi customization build list "$DHI_CUSTOMIZATION" \
+            --org "$DHI_ORG" | awk 'NR==2 {print $1}')"
+          echo "latest build before refresh: ${before:-none}"
+
+          manifest="$RUNNER_TEMP/dhi-customization.yaml"
+          docker dhi customization get "$DHI_CUSTOMIZATION" --org "$DHI_ORG" >"$manifest"
+
+          # Replace any previous stamp so the file does not accumulate them.
+          python3 - "$manifest" "$GITHUB_RUN_ID" <<'PY'
+          import pathlib, re, sys
+
+          path, run_id = pathlib.Path(sys.argv[1]), sys.argv[2]
+          text = path.read_text()
+          if not text.endswith("\n"):
+              text += "\n"
+
+          # Drop a previous stamp so the manifest does not accumulate them.
+          text = re.sub(r'^ *io\.tyk\.rebuild-trigger:.*\n', '', text, flags=re.M)
+
+          # Only a TOP-LEVEL `annotations:` may be stamped. Matching any occurrence
+          # would hit a nested or similarly-named key (`image-annotations:`) and
+          # dedent the new entry out of its mapping, corrupting the manifest that is
+          # about to be sent to Docker.
+          stamp = f'annotations:\n  io.tyk.rebuild-trigger: "{run_id}"\n'
+          pattern = re.compile(r'^annotations:[ \t]*\n', re.M)
+          matches = pattern.findall(text)
+          if len(matches) > 1:
+              raise SystemExit("refusing to stamp: multiple top-level annotations blocks")
+          if matches:
+              text = pattern.sub(stamp, text, count=1)
+          else:
+              text += stamp
+          path.write_text(text)
+          PY
+
+          docker dhi customization edit "$manifest" --org "$DHI_ORG"
+
+          # `edit` returns success even when it queues nothing, so poll for a
+          # genuinely new build rather than trusting the exit code.
+          for _ in $(seq 1 60); do
+            latest="$(docker dhi customization build list "$DHI_CUSTOMIZATION" \
+              --org "$DHI_ORG" | awk 'NR==2 {print $1}')"
+            if [ -n "$latest" ] && [ "$latest" != "$before" ]; then
+              echo "new build queued: $latest"
+              break
+            fi
+            sleep 10
+          done
+          if [ -z "${latest:-}" ] || [ "$latest" = "$before" ]; then
+            echo "::warning title=DHI customization not refreshed::No rebuild was queued; the compiler will build on the existing base, which may be missing recent package fixes."
+            {
+              printf '### DHI customization refresh\n\n'
+              printf 'No rebuild was queued. Building on the existing base.\n'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          # Wait for every platform build to settle, then fail on any failure.
+          for _ in $(seq 1 120); do
+            pending="$(docker dhi customization build list "$DHI_CUSTOMIZATION" \
+              --org "$DHI_ORG" | awk 'NR>1 && $3 == "IN_PROGRESS"' | wc -l)"
+            [ "$pending" -eq 0 ] && break
+            sleep 15
+          done
+          docker dhi customization build list "$DHI_CUSTOMIZATION" --org "$DHI_ORG" | head -5
+          # Columns: 1=ID 2=PLATFORM 3=STATUS 4=RESULT 5=STARTED. Check every row of
+          # the batch we just queued -- they share a STARTED timestamp, and there is
+          # one per platform -- rather than a fixed number of rows.
+          if docker dhi customization build list "$DHI_CUSTOMIZATION" --org "$DHI_ORG" \
+            | awk 'NR==2 {started=$5} NR>1 && $5 == started && $4 == "FAILURE"' | grep -q .; then
+            echo "::warning title=DHI customization rebuild failed::The rebuild was queued but did not succeed; the compiler will build on the previous base."
+            printf '### DHI customization refresh\n\nRebuild queued but failed.\n' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          printf '### DHI customization refresh\n\nRebuilt: %s\n' "$latest" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Resolve source base digest
+        id: source-base
+        run: |
+          # Always the DHI customization. Pull requests build the same base the release
+          # builds, so the compile/load gate validates the artifact that actually ships.
+          source="$NG_BASE_SOURCE"
+          inspect="$(docker buildx imagetools inspect "$source" --format '{{json .}}')"
+          digest="$(jq -er '.manifest.digest' <<<"$inspect")"
+          test -n "$digest"
+          case "$digest" in sha256:*) ;; *) echo "unexpected source digest: $digest" >&2; exit 1 ;; esac
+          if jq -e '(.manifest.manifests? | type) == "array"' <<<"$inspect" >/dev/null; then
+            platform_digest="$(jq -er '
+              [.manifest.manifests[] | select(
+                .platform.os == "linux" and
+                .platform.architecture == "amd64"
+              )] |
+              if length == 1 then .[0].digest
+              else error("expected exactly one linux/amd64 source manifest")
+              end
+            ' <<<"$inspect")"
+          else
+            platform_digest="$digest"
+          fi
+          case "$platform_digest" in sha256:*) ;; *) echo "unexpected source platform digest: $platform_digest" >&2; exit 1 ;; esac
+          if [[ "$source" == *@sha256:* ]]; then
+            test "${source##*@}" = "$digest"
+            ref="$source"
+          else
+            ref="${source}@${digest}"
+          fi
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "platform_digest=$platform_digest" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve Go toolchain digest
+        id: source-go
+        run: |
+          go_source="tykio/golang-cross:${GOLANG_CROSS}"
+          inspect="$(docker buildx imagetools inspect "$go_source" --format '{{json .}}')"
+          digest="$(jq -er '.manifest.digest' <<<"$inspect")"
+          test -n "$digest"
+          case "$digest" in sha256:*) ;; *) echo "unexpected Go toolchain digest: $digest" >&2; exit 1 ;; esac
+          if jq -e '(.manifest.manifests? | type) == "array"' <<<"$inspect" >/dev/null; then
+            platform_digest="$(jq -er '
+              [.manifest.manifests[] | select(
+                .platform.os == "linux" and
+                .platform.architecture == "amd64"
+              )] |
+              if length == 1 then .[0].digest
+              else error("expected exactly one linux/amd64 Go toolchain manifest")
+              end
+            ' <<<"$inspect")"
+          else
+            platform_digest="$digest"
+          fi
+          case "$platform_digest" in sha256:*) ;; *) echo "unexpected Go toolchain platform digest: $platform_digest" >&2; exit 1 ;; esac
+          ref="${go_source}@${digest}"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "platform_digest=$platform_digest" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Build workflow-local NG base
+        id: build-ng-base
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: ci/images/plugin-compiler-ng
+          file: ci/images/plugin-compiler-ng/Dockerfile.base
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
+          sbom: ${{ github.event_name != 'pull_request' }}
+          provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || 'false' }}
+          tags: ${{ github.event_name == 'pull_request' && format('tyk-plugin-compiler-ng-base:{0}', github.sha) || format('{0}/tyk-plugin-compiler:ng-base-{1}-{2}', steps.login-ecr.outputs.registry, github.run_id, github.run_attempt) }}
+          build-args: |
+            BASE_IMAGE=${{ steps.source-base.outputs.ref }}
+            GLIBC_TARGET=${{ env.NG_GLIBC_TARGET }}
+            CROSS=${{ env.NG_CROSS }}
+            SLIM=${{ env.NG_SLIM }}
+            WITH_CXX=${{ env.NG_WITH_CXX }}
+            WITH_GIT=${{ env.NG_WITH_GIT }}
+            DHI_DIGEST=${{ steps.source-base.outputs.digest }}
+            GO_TOOLCHAIN_IMAGE_REF=${{ steps.source-go.outputs.ref }}
+
+      - name: Select workflow-local NG base
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            base="tyk-plugin-compiler-ng-base:$GITHUB_SHA"
+          else
+            base="${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler@${{ steps.build-ng-base.outputs.digest }}"
+          fi
+          echo "NG_BASE_IMAGE=$base" >> "$GITHUB_ENV"
+
+      - name: Set Docker metadata
+        if: ${{ github.event_name != 'pull_request' }}
+        id: set-metadata-ng
+        uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175  # v4
+        with:
+          images: |
+            tykio/tyk-plugin-compiler,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+            ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler
+          flavor: |
+            latest=false
+          labels: |
+            org.opencontainers.image.title=tyk-plugin-compiler-ng
+            org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway (next generation)
+          tags: |
+            type=semver,pattern=v{{version}},suffix=-ng
+            type=semver,pattern=v{{major}}.{{minor}},suffix=-ng
+            type=semver,pattern={{raw}},suffix=-ng
+            type=sha,format=long,suffix=-ng
+
+      - name: Build local NG gate image
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler-ng/Dockerfile.release
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: tyk-plugin-compiler-ng-gate:std
+          build-args: |
+            BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
+            GOLANG_IMAGE=${{ steps.source-go.outputs.ref }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ github.ref_name }}
+            WITH_GATEWAY_SELFTEST=1
+            DEFAULT_EDITION=ce
+
+      - name: Gate NG plugin load
+        run: ci/images/plugin-compiler-ng/scripts/loadtest-gate.sh tyk-plugin-compiler-ng-gate:std ce
+
+      - name: Validate NG cross-build arm64
+        run: VALIDATE_ONLY=1 ci/images/plugin-compiler-ng/scripts/loadtest-gate.sh tyk-plugin-compiler-ng-gate:std ce arm64
+
+      - name: Validate NG cross-build s390x
+        run: VALIDATE_ONLY=1 ci/images/plugin-compiler-ng/scripts/loadtest-gate.sh tyk-plugin-compiler-ng-gate:std ce s390x
+
+
+      - name: Build and push NG image
+        if: ${{ github.event_name != 'pull_request' }}
+        id: build-push-ng
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler-ng/Dockerfile.release
+          platforms: linux/amd64
+          push: true
+          sbom: true
+          provenance: mode=max
+          labels: ${{ steps.set-metadata-ng.outputs.labels }}
+          tags: ${{ steps.set-metadata-ng.outputs.tags }}
+          build-args: |
+            BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
+            GOLANG_IMAGE=${{ steps.source-go.outputs.ref }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ github.ref_name }}
+            WITH_GATEWAY_SELFTEST=0
+            DEFAULT_EDITION=ce
+
+      - name: Verify pushed NG digest and attestations
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          PUBLISHED_DIGEST: ${{ steps.build-push-ng.outputs.digest }}
+          PUBLISHED_TAGS: ${{ steps.set-metadata-ng.outputs.tags }}
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/plugin-compiler-ng-evidence/std"
+          mkdir -p "$evidence_dir"
+          {
+            printf 'variant=%s\n' 'std'
+            printf 'published_digest=%s\n' "$PUBLISHED_DIGEST"
+            printf 'source_base=%s\n' '${{ steps.source-base.outputs.ref }}'
+            printf 'source_base_linux_amd64_digest=%s\n' '${{ steps.source-base.outputs.platform_digest }}'
+            printf 'go_toolchain=%s\n' '${{ steps.source-go.outputs.ref }}'
+            printf 'go_toolchain_linux_amd64_digest=%s\n' '${{ steps.source-go.outputs.platform_digest }}'
+            printf 'workflow_base=%s\n' "$NG_BASE_IMAGE"
+            printf 'published_tags<<EOF\n%s\nEOF\n' "$PUBLISHED_TAGS"
+          } > "$evidence_dir/metadata.txt"
+
+          case "$PUBLISHED_DIGEST" in sha256:*) ;; *) echo "unexpected published digest: $PUBLISHED_DIGEST" >&2; exit 1 ;; esac
+
+          repositories="$evidence_dir/repositories.txt"
+          printf '%s\n' "$PUBLISHED_TAGS" |
+            tr ',' '\n' |
+            sed '/^[[:space:]]*$/d; s/[[:space:]]*$//' |
+            while IFS= read -r tag; do printf '%s\n' "${tag%:*}"; done |
+            sort -u > "$repositories"
+
+          expected_repositories=1
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            expected_repositories=2
+          fi
+          actual_repositories="$(wc -l < "$repositories" | tr -d '[:space:]')"
+          test "$actual_repositories" = "$expected_repositories"
+
+          while IFS= read -r repository; do
+            exact_ref="${repository}@${PUBLISHED_DIGEST}"
+            safe_repository="$(printf '%s' "$repository" | tr '/:.' '_')"
+            inspect_file="$evidence_dir/${safe_repository}.inspect.txt"
+            sbom_file="$evidence_dir/${safe_repository}.sbom.json"
+            provenance_file="$evidence_dir/${safe_repository}.provenance.json"
+
+            docker buildx imagetools inspect "$exact_ref" | tee "$inspect_file"
+            resolved="$(awk '/^Digest:/ {print $2; exit}' "$inspect_file")"
+            test "$resolved" = "$PUBLISHED_DIGEST"
+
+            docker buildx imagetools inspect "$exact_ref" --format '{{json .SBOM}}' > "$sbom_file"
+            jq -e '[.. | objects | select(has("SPDX"))] | length > 0' "$sbom_file" >/dev/null
+
+            docker buildx imagetools inspect "$exact_ref" --format '{{json .Provenance}}' > "$provenance_file"
+            jq -e '[.. | objects | select(has("SLSA"))] | length > 0' "$provenance_file" >/dev/null
+
+            printf 'verified %s\n' "$exact_ref" | tee -a "$evidence_dir/verified-refs.txt" "$GITHUB_STEP_SUMMARY"
+          done < "$repositories"
+
+      - name: Retain pushed NG evidence
+        if: ${{ always() && github.event_name != 'pull_request' && steps.build-push-ng.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: plugin-compiler-ng-std-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/plugin-compiler-ng-evidence/std
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Set Docker metadata EE
+        if: ${{ github.event_name != 'pull_request' }}
+        id: set-metadata-ee-ng
+        uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175  # v4
+        with:
+          images: |
+            tykio/tyk-plugin-compiler-ee,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+            ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler-ee
+          flavor: |
+            latest=false
+          labels: |
+            org.opencontainers.image.title=tyk-plugin-compiler-ee-ng
+            org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway Enterprise Edition (next generation)
+          tags: |
+            type=semver,pattern=v{{version}},suffix=-ng
+            type=semver,pattern=v{{major}}.{{minor}},suffix=-ng
+            type=semver,pattern={{raw}},suffix=-ng
+            type=sha,format=long,suffix=-ng
+
+      - name: Build local NG gate image EE
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler-ng/Dockerfile.release
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: tyk-plugin-compiler-ng-gate:ee
+          build-args: |
+            BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
+            GOLANG_IMAGE=${{ steps.source-go.outputs.ref }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ github.ref_name }}
+            WITH_GATEWAY_SELFTEST=1
+            DEFAULT_EDITION=ee
+            EE_AVAILABLE=true
+            EE_BUILD_TAG=ee
+            SELFTEST_BUILD_TAG=ee
+
+      - name: Gate NG plugin load EE
+        run: ci/images/plugin-compiler-ng/scripts/loadtest-gate.sh tyk-plugin-compiler-ng-gate:ee ee
+
+      - name: Validate NG cross-build arm64 EE
+        run: VALIDATE_ONLY=1 ci/images/plugin-compiler-ng/scripts/loadtest-gate.sh tyk-plugin-compiler-ng-gate:ee ee arm64
+
+
+      - name: Build and push NG image EE
+        if: ${{ github.event_name != 'pull_request' }}
+        id: build-push-ee-ng
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler-ng/Dockerfile.release
+          platforms: linux/amd64
+          push: true
+          sbom: true
+          provenance: mode=max
+          labels: ${{ steps.set-metadata-ee-ng.outputs.labels }}
+          tags: ${{ steps.set-metadata-ee-ng.outputs.tags }}
+          build-args: |
+            BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
+            GOLANG_IMAGE=${{ steps.source-go.outputs.ref }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ github.ref_name }}
+            WITH_GATEWAY_SELFTEST=0
+            DEFAULT_EDITION=ee
+            EE_AVAILABLE=true
+            EE_BUILD_TAG=ee
+            SELFTEST_BUILD_TAG=ee
+
+      - name: Verify pushed NG digest and attestations EE
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          PUBLISHED_DIGEST: ${{ steps.build-push-ee-ng.outputs.digest }}
+          PUBLISHED_TAGS: ${{ steps.set-metadata-ee-ng.outputs.tags }}
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/plugin-compiler-ng-evidence/ee"
+          mkdir -p "$evidence_dir"
+          {
+            printf 'variant=%s\n' 'ee'
+            printf 'published_digest=%s\n' "$PUBLISHED_DIGEST"
+            printf 'source_base=%s\n' '${{ steps.source-base.outputs.ref }}'
+            printf 'source_base_linux_amd64_digest=%s\n' '${{ steps.source-base.outputs.platform_digest }}'
+            printf 'go_toolchain=%s\n' '${{ steps.source-go.outputs.ref }}'
+            printf 'go_toolchain_linux_amd64_digest=%s\n' '${{ steps.source-go.outputs.platform_digest }}'
+            printf 'workflow_base=%s\n' "$NG_BASE_IMAGE"
+            printf 'published_tags<<EOF\n%s\nEOF\n' "$PUBLISHED_TAGS"
+          } > "$evidence_dir/metadata.txt"
+
+          case "$PUBLISHED_DIGEST" in sha256:*) ;; *) echo "unexpected published digest: $PUBLISHED_DIGEST" >&2; exit 1 ;; esac
+
+          repositories="$evidence_dir/repositories.txt"
+          printf '%s\n' "$PUBLISHED_TAGS" |
+            tr ',' '\n' |
+            sed '/^[[:space:]]*$/d; s/[[:space:]]*$//' |
+            while IFS= read -r tag; do printf '%s\n' "${tag%:*}"; done |
+            sort -u > "$repositories"
+
+          expected_repositories=1
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            expected_repositories=2
+          fi
+          actual_repositories="$(wc -l < "$repositories" | tr -d '[:space:]')"
+          test "$actual_repositories" = "$expected_repositories"
+
+          while IFS= read -r repository; do
+            exact_ref="${repository}@${PUBLISHED_DIGEST}"
+            safe_repository="$(printf '%s' "$repository" | tr '/:.' '_')"
+            inspect_file="$evidence_dir/${safe_repository}.inspect.txt"
+            sbom_file="$evidence_dir/${safe_repository}.sbom.json"
+            provenance_file="$evidence_dir/${safe_repository}.provenance.json"
+
+            docker buildx imagetools inspect "$exact_ref" | tee "$inspect_file"
+            resolved="$(awk '/^Digest:/ {print $2; exit}' "$inspect_file")"
+            test "$resolved" = "$PUBLISHED_DIGEST"
+
+            docker buildx imagetools inspect "$exact_ref" --format '{{json .SBOM}}' > "$sbom_file"
+            jq -e '[.. | objects | select(has("SPDX"))] | length > 0' "$sbom_file" >/dev/null
+
+            docker buildx imagetools inspect "$exact_ref" --format '{{json .Provenance}}' > "$provenance_file"
+            jq -e '[.. | objects | select(has("SLSA"))] | length > 0' "$provenance_file" >/dev/null
+
+            printf 'verified %s\n' "$exact_ref" | tee -a "$evidence_dir/verified-refs.txt" "$GITHUB_STEP_SUMMARY"
+          done < "$repositories"
+
+      - name: Retain pushed NG evidence EE
+        if: ${{ always() && github.event_name != 'pull_request' && steps.build-push-ee-ng.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: plugin-compiler-ng-ee-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/plugin-compiler-ng-evidence/ee
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Set Docker metadata FIPS
+        if: ${{ github.event_name != 'pull_request' }}
+        id: set-metadata-fips-ng
+        uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175  # v4
+        with:
+          images: |
+            tykio/tyk-plugin-compiler-fips,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+            ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler-fips
+          flavor: |
+            latest=false
+          labels: |
+            org.opencontainers.image.title=tyk-plugin-compiler-fips-ng
+            org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway FIPS Edition (next generation)
+          tags: |
+            type=semver,pattern=v{{version}},suffix=-ng
+            type=semver,pattern=v{{major}}.{{minor}},suffix=-ng
+            type=semver,pattern={{raw}},suffix=-ng
+            type=sha,format=long,suffix=-ng
+
+      - name: Build local NG gate image FIPS
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler-ng/Dockerfile.release
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: tyk-plugin-compiler-ng-gate:fips
+          build-args: |
+            BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
+            GOLANG_IMAGE=${{ steps.source-go.outputs.ref }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ github.ref_name }}
+            WITH_GATEWAY_SELFTEST=1
+            DEFAULT_EDITION=ee-fips
+            FIPS_AVAILABLE=true
+            FIPS_BUILD_TAG=ee,fips
+            FIPS_GOFIPS140=v1.0.0
+            SELFTEST_BUILD_TAG=ee,fips
+            SELFTEST_GOFIPS140=v1.0.0
+
+      - name: Gate NG plugin load FIPS
+        run: ci/images/plugin-compiler-ng/scripts/loadtest-gate.sh tyk-plugin-compiler-ng-gate:fips ee-fips
+
+      - name: Validate NG cross-build arm64 FIPS
+        run: VALIDATE_ONLY=1 ci/images/plugin-compiler-ng/scripts/loadtest-gate.sh tyk-plugin-compiler-ng-gate:fips ee-fips arm64
+
+
+      - name: Build and push NG image FIPS
+        if: ${{ github.event_name != 'pull_request' }}
+        id: build-push-fips-ng
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler-ng/Dockerfile.release
+          platforms: linux/amd64
+          push: true
+          sbom: true
+          provenance: mode=max
+          labels: ${{ steps.set-metadata-fips-ng.outputs.labels }}
+          tags: ${{ steps.set-metadata-fips-ng.outputs.tags }}
+          build-args: |
+            BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
+            GOLANG_IMAGE=${{ steps.source-go.outputs.ref }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ github.ref_name }}
+            WITH_GATEWAY_SELFTEST=0
+            DEFAULT_EDITION=ee-fips
+            FIPS_AVAILABLE=true
+            FIPS_BUILD_TAG=ee,fips
+            FIPS_GOFIPS140=v1.0.0
+            SELFTEST_BUILD_TAG=ee,fips
+            SELFTEST_GOFIPS140=v1.0.0
+
+      - name: Verify pushed NG digest and attestations FIPS
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          PUBLISHED_DIGEST: ${{ steps.build-push-fips-ng.outputs.digest }}
+          PUBLISHED_TAGS: ${{ steps.set-metadata-fips-ng.outputs.tags }}
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/plugin-compiler-ng-evidence/fips"
+          mkdir -p "$evidence_dir"
+          {
+            printf 'variant=%s\n' 'fips'
+            printf 'published_digest=%s\n' "$PUBLISHED_DIGEST"
+            printf 'source_base=%s\n' '${{ steps.source-base.outputs.ref }}'
+            printf 'source_base_linux_amd64_digest=%s\n' '${{ steps.source-base.outputs.platform_digest }}'
+            printf 'go_toolchain=%s\n' '${{ steps.source-go.outputs.ref }}'
+            printf 'go_toolchain_linux_amd64_digest=%s\n' '${{ steps.source-go.outputs.platform_digest }}'
+            printf 'workflow_base=%s\n' "$NG_BASE_IMAGE"
+            printf 'published_tags<<EOF\n%s\nEOF\n' "$PUBLISHED_TAGS"
+          } > "$evidence_dir/metadata.txt"
+
+          case "$PUBLISHED_DIGEST" in sha256:*) ;; *) echo "unexpected published digest: $PUBLISHED_DIGEST" >&2; exit 1 ;; esac
+
+          repositories="$evidence_dir/repositories.txt"
+          printf '%s\n' "$PUBLISHED_TAGS" |
+            tr ',' '\n' |
+            sed '/^[[:space:]]*$/d; s/[[:space:]]*$//' |
+            while IFS= read -r tag; do printf '%s\n' "${tag%:*}"; done |
+            sort -u > "$repositories"
+
+          expected_repositories=1
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            expected_repositories=2
+          fi
+          actual_repositories="$(wc -l < "$repositories" | tr -d '[:space:]')"
+          test "$actual_repositories" = "$expected_repositories"
+
+          while IFS= read -r repository; do
+            exact_ref="${repository}@${PUBLISHED_DIGEST}"
+            safe_repository="$(printf '%s' "$repository" | tr '/:.' '_')"
+            inspect_file="$evidence_dir/${safe_repository}.inspect.txt"
+            sbom_file="$evidence_dir/${safe_repository}.sbom.json"
+            provenance_file="$evidence_dir/${safe_repository}.provenance.json"
+
+            docker buildx imagetools inspect "$exact_ref" | tee "$inspect_file"
+            resolved="$(awk '/^Digest:/ {print $2; exit}' "$inspect_file")"
+            test "$resolved" = "$PUBLISHED_DIGEST"
+
+            docker buildx imagetools inspect "$exact_ref" --format '{{json .SBOM}}' > "$sbom_file"
+            jq -e '[.. | objects | select(has("SPDX"))] | length > 0' "$sbom_file" >/dev/null
+
+            docker buildx imagetools inspect "$exact_ref" --format '{{json .Provenance}}' > "$provenance_file"
+            jq -e '[.. | objects | select(has("SLSA"))] | length > 0' "$provenance_file" >/dev/null
+
+            printf 'verified %s\n' "$exact_ref" | tee -a "$evidence_dir/verified-refs.txt" "$GITHUB_STEP_SUMMARY"
+          done < "$repositories"
+
+      - name: Retain pushed NG evidence FIPS
+        if: ${{ always() && github.event_name != 'pull_request' && steps.build-push-fips-ng.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: plugin-compiler-ng-fips-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/plugin-compiler-ng-evidence/fips
+          if-no-files-found: error
+          retention-days: 30
