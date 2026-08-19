@@ -30,7 +30,7 @@ require (
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
 	github.com/TykTechnologies/storage v1.5.0
-	github.com/TykTechnologies/tyk-pump v1.15.0-rc1.0.20260609132845-8a614d6efd02
+	github.com/TykTechnologies/tyk-pump v1.17.0-rc2
 	github.com/akutz/memconn v0.1.0
 	github.com/bshuster-repo/logrus-logstash-hook v1.1.0
 	github.com/buger/jsonparser v1.1.2
@@ -76,10 +76,10 @@ require (
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.uber.org/automaxprocs v1.6.0
-	golang.org/x/crypto v0.53.0
-	golang.org/x/net v0.56.0
-	golang.org/x/sync v0.21.0
-	google.golang.org/grpc v1.82.0
+	golang.org/x/crypto v0.54.0
+	golang.org/x/net v0.57.0
+	golang.org/x/sync v0.22.0
+	google.golang.org/grpc v1.82.1
 	google.golang.org/grpc/examples v0.0.0-20250407062114-b368379ef8f6 // test
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.2
@@ -217,7 +217,7 @@ require (
 	github.com/aws/aws-lambda-go v1.46.0 // indirect
 	github.com/aws/aws-msk-iam-sasl-signer-go v1.0.4 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.43.0 // indirect
-	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.8 // indirect
+	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.10 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.32.31 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.30 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.12.17 // indirect
@@ -234,16 +234,16 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/firehose v1.24.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.13 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.13 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.9.19 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.11.23 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.31 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.21 // indirect
-	github.com/aws/aws-sdk-go-v2/service/kinesis v1.43.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/kinesis v1.43.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.88.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.44.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.5.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sns v1.27.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sqs v1.29.7 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sqs v1.42.27 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.33.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.38.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.45.0 // indirect
@@ -591,14 +591,14 @@ require (
 	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/image v0.43.0 // indirect
-	golang.org/x/mod v0.36.0 // indirect
+	golang.org/x/image v0.45.0 // indirect
+	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/telemetry v0.0.0-20260508192327-42602be52be6 // indirect
-	golang.org/x/term v0.44.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/telemetry v0.0.0-20260708182218-49f421fb7959 // indirect
+	golang.org/x/term v0.45.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.45.0 // indirect
+	golang.org/x/tools v0.48.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/api v0.287.1 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
@@ -634,4 +634,12 @@ require (
 
 replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
 
-replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.92.1-0.20260211103127-0004a8367058
+replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.512.1-0.20260817104659-7198d52254ff
+
+// SECURITY: CVE-2026-46384, CVE-2026-46385, GHSA-mx64-mj3q-7prj in the Avro decoder.
+//
+// DROP THIS REPLACE when either holds:
+//   1. apache/pulsar-client-go stops depending on hamba/avro
+//      (still pins v2.29.0 as of v0.21.0, 2026-07), or
+//   2. a fixed github.com/hamba/avro/v2 release appears (archived, so unlikely).
+replace github.com/hamba/avro => github.com/iskorotkov/avro/v2 v2.33.1
