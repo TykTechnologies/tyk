@@ -513,11 +513,12 @@ func TestWebhookContentTypeHeader(t *testing.T) {
 		ExpectedContentType string
 	}{
 		{"MissingTemplatePath", "", nil, "application/json"},
-		{"MissingTemplatePath/CustomHeaders", "", map[string]string{"Content-Type": "application/xml"}, "application/xml"},
+		{"MissingTemplatePath_CustomHeaders", "", map[string]string{"Content-Type": "application/xml"}, "application/xml"},
 		{"InvalidTemplatePath", "randomPath", nil, "application/json"},
-		{"InvalidTemplatePath/CustomHeaders", "randomPath", map[string]string{"Content-Type": "application/xml"}, "application/xml"},
+		{"InvalidTemplatePath_CustomHeaders", "randomPath", map[string]string{"Content-Type": "application/xml"}, "application/xml"},
 		{"CustomTemplate", filepath.Join(templatePath, "transform_test.tmpl"), nil, ""},
-		{"CustomTemplate/CustomHeaders", filepath.Join(templatePath, "breaker_webhook.json"), map[string]string{"Content-Type": "application/xml"}, "application/xml"},
+		{"CustomTemplate_RelativePath", "transform_test.tmpl", nil, ""},
+		{"CustomTemplate_CustomHeaders", filepath.Join(templatePath, "breaker_webhook.json"), map[string]string{"Content-Type": "application/xml"}, "application/xml"},
 	}
 
 	for _, ts := range tests {
@@ -534,10 +535,7 @@ func TestWebhookContentTypeHeader(t *testing.T) {
 
 			req, err := hook.BuildRequest("")
 			assert.NoError(t, err)
-
-			if req.Header.Get(header.ContentType) != ts.ExpectedContentType {
-				t.Fatalf("Expect Content-Type %s. Got %s", ts.ExpectedContentType, req.Header.Get("Content-Type"))
-			}
+			assert.Equal(t, ts.ExpectedContentType, req.Header.Get("Content-Type"))
 		})
 	}
 
