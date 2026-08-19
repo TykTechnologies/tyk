@@ -112,7 +112,8 @@ func (k *BasicAuthKeyIsValid) basicAuthHeaderCredentials(w http.ResponseWriter, 
 		return
 	}
 
-	authValues := strings.Split(string(authvaluesStr), ":")
+	// RFC 7617: credentials are "userid:password" where password may contain ':'.
+	authValues := strings.SplitN(string(authvaluesStr), ":", 2)
 	if len(authValues) != 2 {
 		// Header malformed
 		logger.Info("Attempted access with malformed header, values not in basic auth format.")
