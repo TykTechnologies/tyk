@@ -19,7 +19,8 @@ func setupTestDir(t *testing.T) string {
 	assert.NoError(t, err, "Failed to create temp directory")
 
 	t.Cleanup(func() {
-		os.RemoveAll(tempDir)
+		err = os.RemoveAll(tempDir)
+		assert.NoError(t, err, "Failed to remove temp directory")
 	})
 
 	return tempDir
@@ -113,6 +114,38 @@ func TestEnsure(t *testing.T) {
 		assert.Error(t, err)
 		assert.Empty(t, fullPath)
 		assert.Contains(t, err.Error(), "attempts to escape root directory")
+	})
+
+	t.Run("BlocksSymlinkEscapingRoot", func(t *testing.T) {
+		// Create an external file completely outside the root
+		externalDir := setupTestDir(t)
+		secretFile := filepath.Join(externalDir, "secret.txt")
+		err := os.WriteFile(secretFile, []byte("sensitive data"), 0644)
+		assert.NoError(t, err)
+
+		// Create a symlink INSIDE the root pointing to the EXTERNAL directory
+		symlinkName := filepath.Join(tempDir, "malicious_link")
+		err = os.Symlink(externalDir, symlinkName)
+		assert.NoError(t, err)
+
+		// Attempt to read the external file through the internal symlink
+		attackPath := "malicious_link/secret.txt"
+
+		fullPath, err := root.Ensure(attackPath)
+
+		assert.Error(t, err, "Ensure must detect and block symlinks pointing outside root")
+		assert.Empty(t, fullPath)
+		assert.Contains(t, err.Error(), "attempts to escape root directory")
+	})
+
+	t.Run("AllowsNewFileCreation", func(t *testing.T) {
+		// Proves that we did not break standard operations on non-existent files.
+		newFilePath := "nested/dir/that/does/not/exist/yet.txt"
+
+		fullPath, err := root.Ensure(newFilePath)
+
+		assert.NoError(t, err, "Ensure must allow non-existent files to be validated")
+		assert.Equal(t, filepath.Join(root.RootPath(), newFilePath), fullPath)
 	})
 }
 
