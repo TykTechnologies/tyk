@@ -84,6 +84,36 @@ func TestEnsure(t *testing.T) {
 		assert.Error(t, err)
 		assert.Equal(t, "", ensured)
 	})
+
+	t.Run("ValidAbsolutePath", func(t *testing.T) {
+		absPath := filepath.Join(tempDir, "internal_dir", "safe_file.txt")
+
+		fullPath, err := root.Ensure(absPath)
+
+		assert.NoError(t, err)
+		assert.Equal(t, absPath, fullPath)
+	})
+
+	t.Run("InvalidAbsolutePath_OutsideRoot", func(t *testing.T) {
+		parentDir := filepath.Dir(tempDir)
+		absPath := filepath.Join(parentDir, "unauthorized_file.txt")
+
+		fullPath, err := root.Ensure(absPath)
+
+		assert.Error(t, err)
+		assert.Empty(t, fullPath)
+		assert.Contains(t, err.Error(), "attempts to escape root directory")
+	})
+
+	t.Run("InvalidAbsolutePath_Traversal", func(t *testing.T) {
+		rawAbsPath := fmt.Sprintf("%s%c..%cunauthorized_file.txt", tempDir, os.PathSeparator, os.PathSeparator)
+
+		fullPath, err := root.Ensure(rawAbsPath)
+
+		assert.Error(t, err)
+		assert.Empty(t, fullPath)
+		assert.Contains(t, err.Error(), "attempts to escape root directory")
+	})
 }
 
 func TestWriteFile(t *testing.T) {
