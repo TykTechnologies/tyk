@@ -25,7 +25,7 @@ func getRawRequest(r *http.Request, spec *APISpec) string {
 		}()
 	}
 
-	r.Write(&wireFormatReq)
+	_ = r.Write(&wireFormatReq)
 	rawRequest := base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
 
 	return rawRequest
