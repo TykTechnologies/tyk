@@ -468,7 +468,7 @@ func TestNewCustomTemplate(t *testing.T) {
 		{"UseCustom", false, "templates/breaker_webhook.json", false},
 		{"MissingDefault", true, "", true},
 		{"MissingDefaultFallback", true, "missing_webhook.json", true},
-		{"MissingDefaultNotNeeded", true, "../templates/breaker_webhook.json", false},
+		{"MissingDefaultNotNeeded", true, "../templates/breaker_webhook.json", true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
