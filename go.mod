@@ -635,7 +635,7 @@ require (
 
 replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
 
-replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.512.1-0.20260817104659-7198d52254ff
+replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.92.1-0.20260817104659-7198d52254ff
 
 // SECURITY: GO-2026-5048, CVE-2026-46384, CVE-2026-46385, GHSA-mx64-mj3q-7prj in
 // the Avro decoder. github.com/hamba/avro is archived and will not be patched, so

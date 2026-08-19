@@ -75,35 +75,8 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 	w.store.Connect()
 
 	// Pre-load template on init
-	if w.conf.TemplatePath != "" {
-		templateRoot, err := osutil.NewRoot(w.Gw.GetConfig().TemplatePath)
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "webhooks",
-				"target": w.conf.TargetPath,
-			}).Warning("Failed to initialize template root, using default: ", err)
-		} else {
-			safePath, err := templateRoot.Ensure(w.conf.TemplatePath)
-			if err != nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "webhooks",
-					"target": w.conf.TargetPath,
-				}).Warning("Invalid template path, using default: ", err)
-			} else {
-				w.template, err = htmltemplate.ParseFiles(safePath)
-				if err != nil {
-					log.WithFields(logrus.Fields{
-						"prefix": "webhooks",
-						"target": w.conf.TargetPath,
-					}).Warning("Custom template load failure, using default: ", err)
-				}
+	w.preLoadCustomTemplate()
 
-				if strings.HasSuffix(w.conf.TemplatePath, ".json") {
-					w.contentType = header.ApplicationJSON
-				}
-			}
-		}
-	}
 	// We use the default if TemplatePath was empty or if we failed
 	// to load it.
 	if w.template == nil {
@@ -155,6 +128,36 @@ func (w *WebHookHandler) WasHookFired(checksum string) bool {
 	}
 
 	return true
+}
+
+func (w *WebHookHandler) preLoadCustomTemplate() {
+	if w.conf.TemplatePath == "" {
+		return
+	}
+
+	log := log.WithField("target", w.conf.TargetPath).WithField("prefix", "webhooks")
+
+	templateRoot, err := osutil.NewRoot(w.Gw.GetConfig().TemplatePath)
+	if err != nil {
+		log.WithError(err).Warning("Failed to initialize template root, using default.")
+		return
+	}
+
+	safePath, err := templateRoot.Ensure(w.conf.TemplatePath)
+	if err != nil {
+		log.WithError(err).Warning("Invalid template path, using default.")
+		return
+	}
+
+	w.template, err = htmltemplate.ParseFiles(safePath)
+	if err != nil {
+		log.WithError(err).Warning("Custom template load failure, using default.")
+		return
+	}
+
+	if strings.HasSuffix(w.conf.TemplatePath, ".json") {
+		w.contentType = header.ApplicationJSON
+	}
 }
 
 // setHookFired will create an expiring key for the checksum of the event
