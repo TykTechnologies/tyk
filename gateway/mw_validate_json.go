@@ -65,13 +65,16 @@ func (k *ValidateJSON) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ 
 
 	// Handle Failure
 	if !result.Valid() {
-		if vPathMeta.ErrorResponseCode == 0 {
-			vPathMeta.ErrorResponseCode = http.StatusUnprocessableEntity
+		// Use a local status code so we do not mutate shared API definition
+		// metadata under concurrent request handling.
+		code := vPathMeta.ErrorResponseCode
+		if code == 0 {
+			code = http.StatusUnprocessableEntity
 		}
 		formattedErr := k.formatError(result.Errors())
 		ctx.SetErrorClassification(r, tykerrors.ClassifyJSONValidationError(tykerrors.ErrTypeSchemaValidationFailed, k.Name()).
 			WithTemplateData(map[string]any{"InvalidParams": formattedErr.Error()}))
-		return formattedErr, vPathMeta.ErrorResponseCode
+		return formattedErr, code
 	}
 
 	// Handle Success
