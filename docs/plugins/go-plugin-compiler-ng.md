@@ -21,14 +21,15 @@ At the time of writing, NG images are published on alpha tags only, the most rec
 
 ## What NG is and why it exists
 
-The plugin compiler exists because a Go plugin must be built with the same toolchain, build tags and build flags as the Gateway that loads it. NG keeps that contract and adds four things:
+A Go plugin must be built with the same toolchain, build tags and build flags as the Gateway that loads it. That is why the plugin compiler exists, and NG keeps that contract exactly. What it changes is everything around it.
 
-- **Cross-compilation from a single image.** One NG image can target `linux/amd64`, `linux/arm64` and `linux/s390x`.
-- **A pinned glibc link sysroot.** The C library, C runtime objects and headers used for the link come from a sysroot pinned to glibc 2.17, not from the image's own (newer) base OS. Plugins therefore keep the same low glibc symbol floor even though the image itself is built on a modern base.
-- **Post-build validation.** After a successful build the artifact is inspected and the build *fails* with an actionable message if the architecture, Go version, edition build tags, FIPS mode or glibc ceiling do not match what was requested. Set `VALIDATE=0` to skip.
-- **A Docker Hardened Images (DHI) base.** The C toolchain is provisioned by Docker into the base image. There is no build-time `apt-get` in the compiler image, and the image build fails closed if the base is missing a tool it expects.
+**A much smaller vulnerability surface.** NG is built on a Docker Hardened Image. Its toolchain is provided by Docker rather than installed at build time, and Docker publishes assessments for the packages it ships. Scanned with Tyk's published VEX feed applied, the NG image reports **0 Critical and 0 High** findings. This applies to the FIPS image too, so a FIPS build no longer means accepting a larger set of findings. See [Scanning the image](#scanning-the-image-for-vulnerabilities) to reproduce it yourself.
 
-Scanned with Tyk's published VEX feed applied, the NG image reports 0 CRITICAL and 0 HIGH findings. See [Scanning the image](#scanning-the-image-for-vulnerabilities) for how to reproduce that.
+**Builds for more architectures from one image.** A single NG image targets `linux/amd64`, `linux/arm64` and `linux/s390x`, so you no longer need a separate build path per architecture.
+
+**Problems surface at build time, not at load time.** After a build, NG checks the plugin it produced: the architecture, Go version, edition, FIPS mode and glibc requirements. If any of them do not match what the Gateway expects, the build fails with a message explaining why, instead of the plugin failing later when the Gateway tries to load it.
+
+**Compatibility with older Linux distributions is preserved.** Plugins are linked against glibc 2.17, so they keep running on the same range of systems as before even though the image itself is built on a modern base.
 
 ## Choosing between the two compilers
 
@@ -178,7 +179,7 @@ Each of these would otherwise surface as an opaque `plugin was built with a diff
 
 ## Scanning the image for vulnerabilities
 
-NG is built on a Docker Hardened Images base, and Docker publishes affectedness decisions (VEX statements) for the packages it provisions. Those decisions are what make the difference between a raw scan and the reported result.
+NG is built on a Docker Hardened Image. Docker publishes assessments (VEX statements) saying which reported vulnerabilities actually affect the packages it ships. Applying those assessments is what turns a long raw scan result into an accurate one.
 
 Scanning without VEX gives 84 HIGH/CRITICAL rows across 60 distinct CVEs. Essentially all of them are in kernel headers (`linux-libc-dev`), `perl`, `busybox` and `libcurl4t64` — packages Docker has assessed as not affecting the image.
 
@@ -213,15 +214,19 @@ Three things are easy to get wrong here:
 2. If you have other VEX repositories configured, list `tyk-dhi` **first**. A repository that merely lists a package shadows lower-priority repositories for that package, even when it carries no statement for the CVE in question. This was reported upstream as `aquasecurity/trivy` discussion 11083, with a fix proposed in PR 11082.
 3. Pass `--show-suppressed`. Without it, suppressed findings disappear from the report with no indication that anything was suppressed. {{< /note >}}
 
-## Known limitations
+## Things to know before you switch
 
-- NG images are published on alpha tags at the time of writing. They are not published for released Gateway versions.
-- The compiler images are `linux/amd64` only; on an arm64 host they run under emulation.
-- Each image ships one glibc sysroot set (2.17 in published images). There is no run-time switch to a different glibc target.
-- The edition is fixed per image. `EDITION=ee` or `EDITION=ee-fips` fails in an image that was not built for that edition.
-- `linux/s390x` is only available for the CE edition, because EE and FIPS Gateways are not published for that architecture.
-- Published NG images deliberately contain no Gateway executable. The existing compiler image installs one, which means it ships the Gateway inside a build tool; NG builds it only into unpublished gate images used by CI to prove a plugin loads, and the release build fails if the binary is present. The practical consequence is that you cannot run `tyk plugin load` inside the compiler container -- load the plugin into a Gateway container instead.
-- `plugin_id` no longer rewrites your module path or import paths (see [Positional arguments](#positional-arguments)).
+**Alpha tags only, for now.** NG images are published on alpha tags. The existing compiler remains the image used for released Gateway versions.
+
+**Choose the image that matches your edition.** Edition is fixed per image, so use the CE, EE or FIPS image that matches the Gateway you are building for. The build stops with a clear message if they do not match, rather than producing a plugin that will not load.
+
+**Architecture coverage follows the Gateway.** `linux/s390x` is available for CE only, because EE and FIPS Gateways are not published for that architecture.
+
+**On Apple silicon and other ARM64 machines**, the compiler image runs through emulation. Builds work but are slower, and you should pass `GOARCH` explicitly rather than relying on the host architecture.
+
+**Test your plugin in a Gateway container.** The NG image does not include a Gateway binary, so load and exercise your plugin in a Gateway container rather than inside the compiler.
+
+**`plugin_id` no longer rewrites your module path.** If you supply `plugin_id`, it names the build directory only; your `go.mod` and import paths are left alone. See [Positional arguments](#positional-arguments) if you relied on the previous behaviour.
 
 ## Relationship to the existing plugin compiler
 
