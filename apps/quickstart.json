@@ -6,6 +6,7 @@
         "location": "",
         "key": ""
     },
+    "tags": ["llm", "anthropic"],
     "use_keyless": true,
     "auth": {
         "auth_header_name": ""
@@ -27,8 +28,14 @@
     },
     "proxy": {
         "listen_path": "/quickstart/",
-        "target_url": "http://httpbin.org/",
+        "target_url": "https://api.anthropic.com",
         "strip_listen_path": true
     },
-    "do_not_track": true
+    "do_not_track": true,
+    "response_processors": [
+        {
+            "name": "llm_reponse_reporter",
+            "options": {}
+        }
+    ]
 }
