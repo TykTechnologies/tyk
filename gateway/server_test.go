@@ -2257,3 +2257,33 @@ func TestRegister_DoesNotReload(t *testing.T) {
 	assert.Equal(t, "nonce-1", ts.Gw.ServiceNonce)
 	ts.Gw.ServiceNonceMutex.RUnlock()
 }
+
+func TestNewGateway_OSRootInitialization(t *testing.T) {
+	t.Run("successful initialization with valid TemplatePath", func(t *testing.T) {
+		tempDir := t.TempDir()
+
+		cfg := config.Config{
+			TemplatePath: tempDir,
+		}
+
+		gw := NewGateway(cfg, context.Background())
+
+		require.NotNil(t, gw.OSRoot, "OSRoot should be initialized when TemplatePath is valid")
+
+		safePath, err := gw.OSRoot.Ensure("test.tmpl")
+		require.NoError(t, err)
+		// OSRoot resolves symlinks, so compare against the resolved root rather
+		// than the raw TemplatePath (on macOS /var resolves to /private/var).
+		assert.Equal(t, filepath.Join(gw.OSRoot.RootPath(), "test.tmpl"), safePath)
+	})
+
+	t.Run("initialization fails with invalid TemplatePath", func(t *testing.T) {
+		cfg := config.Config{
+			TemplatePath: "/path/that/does/not/exist/12345",
+		}
+
+		gw := NewGateway(cfg, context.Background())
+
+		assert.Nil(t, gw.OSRoot, "OSRoot should be nil when TemplatePath is invalid")
+	})
+}
