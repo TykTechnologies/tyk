@@ -17,7 +17,7 @@ If you are new to building Go plugins, start with [Custom Go plugin development 
 
 {{< note success >}} **Note**
 
-At the time of writing, NG images are published on alpha tags only, the most recent being `v5.15.0-alpha11-ng`. The existing plugin compiler remains the image used for released Gateway versions. {{< /note >}}
+At the time of writing, NG images are published on alpha tags only, the most recent being `v5.15.0-alpha12-ng`. The existing plugin compiler remains the image used for released Gateway versions. {{< /note >}}
 
 ## What NG is and why it exists
 
@@ -26,6 +26,8 @@ A Go plugin must be built with the same toolchain, build tags and build flags as
 **A much smaller vulnerability surface.** NG is built on a Docker Hardened Image. Its toolchain is provided by Docker rather than installed at build time, and Docker publishes assessments for the packages it ships. Scanned with Tyk's published VEX feed applied, the NG image reports **0 Critical and 0 High** findings. This applies to the FIPS image too, so a FIPS build no longer means accepting a larger set of findings. See [Scanning the image](#scanning-the-image-for-vulnerabilities) to reproduce it yourself.
 
 **Builds for more architectures from one image.** A single NG image targets `linux/amd64`, `linux/arm64` and `linux/s390x`, so you no longer need a separate build path per architecture.
+
+**Runs natively on ARM64 machines.** The image is published for `linux/arm64` as well as `linux/amd64`. On Apple silicon or Graviton it runs on the host architecture instead of through emulation, so builds are quicker and behave the same as they do on an x86 machine.
 
 **Problems surface at build time, not at load time.** After a build, NG checks the plugin it produced: the architecture, Go version, edition, FIPS mode and glibc requirements. If any of them do not match what the Gateway expects, the build fails with a message explaining why, instead of the plugin failing later when the Gateway tries to load it.
 
@@ -39,6 +41,7 @@ A Go plugin must be built with the same toolchain, build tags and build flags as
 | Published for | released Gateway versions | alpha tags at the time of writing |
 | Invocation | `/build.sh <plugin_name> [plugin_id] [GOOS] [GOARCH]`, source at `/plugin-source` | identical |
 | Target architectures | `linux/amd64`, `linux/arm64` | `linux/amd64`, `linux/arm64`, `linux/s390x` (CE); `linux/amd64`, `linux/arm64` (EE and FIPS) |
+| Host architectures the image runs on | `linux/amd64` | `linux/amd64`, `linux/arm64` |
 | glibc floor of the produced plugin | follows the image's base OS | pinned by a glibc 2.17 link sysroot shipped in the image |
 | Post-build checks | none | architecture, Go version, edition tags, FIPS evidence, glibc ceiling, linked libraries |
 | `plugin_id` behaviour | rewrites the plugin `go.mod` module path and Go import paths | only names the build directory; an existing `go.mod` is never rewritten |
@@ -71,7 +74,7 @@ Mount your plugin source at `/plugin-source` and pass the output name. The entry
 
 ```bash
 docker run --rm -v "$(pwd):/plugin-source" \
-  tykio/tyk-plugin-compiler:v5.15.0-alpha11-ng plugin.so
+  tykio/tyk-plugin-compiler:v5.15.0-alpha12-ng plugin.so
 ```
 
 The built plugin is moved back into `/plugin-source`, so it appears in your working directory. The output file name is `{plugin_name%.*}_{GATEWAY_VERSION}_{GOOS}_{GOARCH}.so` — for the example above, `plugin_v5.15.0_linux_amd64.so`.
@@ -80,10 +83,10 @@ For Enterprise or FIPS plugins, change the repository:
 
 ```bash
 docker run --rm -v "$(pwd):/plugin-source" \
-  tykio/tyk-plugin-compiler-ee:v5.15.0-alpha11-ng plugin.so
+  tykio/tyk-plugin-compiler-ee:v5.15.0-alpha12-ng plugin.so
 
 docker run --rm -v "$(pwd):/plugin-source" \
-  tykio/tyk-plugin-compiler-fips:v5.15.0-alpha11-ng plugin.so
+  tykio/tyk-plugin-compiler-fips:v5.15.0-alpha12-ng plugin.so
 ```
 
 ### Positional arguments
@@ -97,7 +100,7 @@ The four positional arguments are unchanged from the existing compiler:
 
 ```bash
 docker run --rm -v "$(pwd):/plugin-source" \
-  tykio/tyk-plugin-compiler:v5.15.0-alpha11-ng plugin.so "$(date +%s)"
+  tykio/tyk-plugin-compiler:v5.15.0-alpha12-ng plugin.so "$(date +%s)"
 ```
 
 {{< note success >}} **Note**
@@ -128,26 +131,26 @@ Pass the target as the third and fourth positional arguments:
 
 ```bash
 docker run --rm -v "$(pwd):/plugin-source" \
-  tykio/tyk-plugin-compiler:v5.15.0-alpha11-ng plugin.so "" linux arm64
+  tykio/tyk-plugin-compiler:v5.15.0-alpha12-ng plugin.so "" linux arm64
 ```
 
 or as environment variables:
 
 ```bash
 docker run --rm -e GOOS=linux -e GOARCH=arm64 -v "$(pwd):/plugin-source" \
-  tykio/tyk-plugin-compiler:v5.15.0-alpha11-ng plugin.so
+  tykio/tyk-plugin-compiler:v5.15.0-alpha12-ng plugin.so
 ```
 
 Both forms produce `plugin_v5.15.0_linux_arm64.so`. `s390x` works the same way with the CE image:
 
 ```bash
 docker run --rm -e GOARCH=s390x -v "$(pwd):/plugin-source" \
-  tykio/tyk-plugin-compiler:v5.15.0-alpha11-ng plugin.so
+  tykio/tyk-plugin-compiler:v5.15.0-alpha12-ng plugin.so
 ```
 
 The set of allowed target architectures is checked against the architectures the chosen edition's Gateway is published for. Asking the EE or FIPS image for `s390x` fails with a message listing the architectures that edition supports, because no such Gateway exists to load the plugin.
 
-The published compiler images themselves are `linux/amd64`. On an arm64 host (for example Apple silicon) Docker runs them through emulation, so do not rely on the host architecture to select the target — pass `GOARCH` explicitly.
+The published compiler images run natively on both `linux/amd64` and `linux/arm64`, so on Apple silicon or Graviton the build is not emulated. The target architecture is still a separate choice from the host: set `GOARCH` explicitly whenever you want something other than the machine you are on.
 
 ## Post-build validation
 
@@ -203,7 +206,7 @@ trivy vex repo download
 
 trivy image --scanners vuln --severity HIGH,CRITICAL \
   --vex repo --show-suppressed \
-  tykio/tyk-plugin-compiler-ee:v5.15.0-alpha11-ng
+  tykio/tyk-plugin-compiler-ee:v5.15.0-alpha12-ng
 ```
 
 {{< note success >}} **Note**
@@ -222,7 +225,7 @@ Three things are easy to get wrong here:
 
 **Architecture coverage follows the Gateway.** `linux/s390x` is available for CE only, because EE and FIPS Gateways are not published for that architecture.
 
-**On Apple silicon and other ARM64 machines**, the compiler image runs through emulation. Builds work but are slower, and you should pass `GOARCH` explicitly rather than relying on the host architecture.
+**On Apple silicon and other ARM64 machines**, the compiler runs natively rather than through emulation. Set `GOARCH` explicitly when the plugin you want is for a different architecture than the machine you are building on.
 
 **Test your plugin in a Gateway container.** The NG image does not include a Gateway binary, so load and exercise your plugin in a Gateway container rather than inside the compiler.
 
