@@ -495,7 +495,7 @@ set +x
 
 # --- Post-build validation (opt-out with VALIDATE=0) ------------------------
 if [[ "$VALIDATE" != "0" ]] && [ -x /usr/local/bin/validate-plugin.sh ]; then
-	GATEWAY_GO_VERSION="$(go version | awk '{print $3}')" \
+	GATEWAY_GO_VERSION="${TYK_GATEWAY_GO_VERSION:-$(go version | awk '{print $3}')}" \
 	EXPECT_GOARCH="$GOARCH" EXPECT_GOOS="$GOOS" \
 	MAX_GLIBC="$TYK_GLIBC_TARGET" \
 	GW_TYK_REVISION="$GITHUB_SHA" \

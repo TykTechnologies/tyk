@@ -84,8 +84,9 @@ EOF
 
 archenv=(); platform=()
 if [ -n "$GOARCH" ]; then archenv=(-e GOARCH="$GOARCH"); platform=(--platform "linux/$GOARCH"); fi
-# Optional: pin the COMPILER's own runtime platform (e.g. exercise the amd64 image under QEMU on an
-# arm64 host). Default empty = run the compiler on the host's native arch. CI never sets it.
+# Optional: pin the COMPILER's own runtime platform. Default empty = run the compiler on the host's
+# native arch. The Tier B gate sets it to exercise a non-native image under emulation, which is why
+# it pairs with VALIDATE_ONLY=1 -- the load/HTTP gate below needs a Gateway of that architecture.
 cplat=(); [ -n "${COMPILER_PLATFORM:-}" ] && cplat=(--platform "$COMPILER_PLATFORM")
 echo "== gate: building test-plugin with $COMPILER (EDITION=$EDITION GOARCH=${GOARCH:-native} compiler=${COMPILER_PLATFORM:-native}) =="
 docker run --rm -e EDITION="$EDITION" ${archenv[@]+"${archenv[@]}"} ${cplat[@]+"${cplat[@]}"} -v "$PLUGDIR:/plugin-source" "$COMPILER" plugin.so
