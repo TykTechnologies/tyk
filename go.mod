@@ -177,7 +177,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azqueue v1.0.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.7.2 // indirect
-	github.com/BurntSushi/toml v1.5.0 // indirect
+	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/ClickHouse/ch-go v0.71.0 // indirect
 	github.com/ClickHouse/clickhouse-go/v2 v2.43.0 // indirect
 	github.com/DataDog/datadog-api-client-go/v2 v2.56.0 // indirect
@@ -193,7 +193,7 @@ require (
 	github.com/Jeffail/shutdown v1.0.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
-	github.com/Masterminds/semver/v3 v3.3.0 // indirect
+	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
 	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
@@ -293,7 +293,7 @@ require (
 	github.com/dgraph-io/ristretto/v2 v2.3.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/dlclark/regexp2 v1.11.4 // indirect
+	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/docker/cli v29.2.0+incompatible // indirect
 	github.com/docker/docker v28.5.2+incompatible // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
@@ -403,6 +403,7 @@ require (
 	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/influxdata/go-syslog/v3 v3.0.0 // indirect
 	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c // indirect
+	github.com/iskorotkov/avro/v2 v2.34.0 // indirect
 	github.com/itchyny/gojq v0.12.16 // indirect
 	github.com/itchyny/timefmt-go v0.1.6 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -531,7 +532,7 @@ require (
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/cast v1.7.0 // indirect
-	github.com/spf13/pflag v1.0.6 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/sugarme/regexpset v0.0.0-20200920021344-4d4ec8eaf93c // indirect
@@ -636,10 +637,12 @@ replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 =>
 
 replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.512.1-0.20260817104659-7198d52254ff
 
-// SECURITY: CVE-2026-46384, CVE-2026-46385, GHSA-mx64-mj3q-7prj in the Avro decoder.
+// SECURITY: GO-2026-5048, CVE-2026-46384, CVE-2026-46385, GHSA-mx64-mj3q-7prj in
+// the Avro decoder. github.com/hamba/avro is archived and will not be patched, so
+// we redirect it to the maintained fork github.com/iskorotkov/avro.
 //
-// DROP THIS REPLACE when either holds:
+// DROP THIS REPLACE (and the iskorotkov/avro/v2 require) when either holds:
 //   1. apache/pulsar-client-go stops depending on hamba/avro
 //      (still pins v2.29.0 as of v0.21.0, 2026-07), or
 //   2. a fixed github.com/hamba/avro/v2 release appears (archived, so unlikely).
-replace github.com/hamba/avro => github.com/iskorotkov/avro/v2 v2.33.1
+replace github.com/hamba/avro/v2 => github.com/iskorotkov/avro/v2 v2.34.0
