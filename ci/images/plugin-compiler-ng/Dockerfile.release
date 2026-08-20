@@ -1,14 +1,75 @@
 # syntax=docker/dockerfile:1.7
 ARG GOLANG_IMAGE=tykio/golang-cross:1.26-bullseye
 ARG BASE_IMAGE
+# The exact Go version the gateway is built with, e.g. go1.26.4, as reported by
+# GOLANG_IMAGE. A compiler whose Go differs from the gateway's by so much as a
+# patch release produces plugins that fail at plugin.Open, so wherever the
+# toolchain does not come from GOLANG_IMAGE itself this has to be stated.
+#
+# Empty is legitimate and means "whatever GOLANG_IMAGE carries": on amd64 the
+# toolchain is COPYed out of that image, so the two agree by construction and
+# there is nothing to assert. Platforms that fetch Go elsewhere require it, and
+# say so where they use it.
+ARG GO_VERSION=
+ARG GO_TARBALL_SHA256_ARM64=
 
-FROM ${GOLANG_IMAGE} AS go-toolchain
+# amd64 takes the toolchain straight from golang-cross, exactly as before. The
+# gateway release runs that same image, so on this architecture the two are
+# identical by construction rather than by assertion.
+FROM --platform=linux/amd64 ${GOLANG_IMAGE} AS go-src-amd64
+
+# golang-cross is published for amd64 only, so arm64 fetches the stock go.dev
+# tarball at the version golang-cross reports. The version still originates from
+# the same image the gateway uses; only the bits come from upstream.
+#
+# Pinned to BUILDPLATFORM so the download and unpack run on the build host and
+# are never emulated -- the same approach Dockerfile.base uses for the sysroots.
+FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS go-src-arm64
+ARG GO_VERSION
+ARG GO_TARBALL_SHA256_ARM64
+RUN set -eux; \
+    if [ -z "$GO_VERSION" ] || [ -z "$GO_TARBALL_SHA256_ARM64" ]; then \
+        echo "ERROR: building for arm64 needs GO_VERSION and GO_TARBALL_SHA256_ARM64." >&2; \
+        echo "ERROR: golang-cross is amd64-only, so there is nothing to copy from." >&2; \
+        exit 1; \
+    fi; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates curl; \
+    rm -rf /var/lib/apt/lists/*; \
+    curl -fsSL --retry 3 --proto '=https' --tlsv1.2 \
+        -o /tmp/go.tgz "https://go.dev/dl/${GO_VERSION}.linux-arm64.tar.gz"; \
+    echo "${GO_TARBALL_SHA256_ARM64}  /tmp/go.tgz" | sha256sum -c -; \
+    tar -C /usr/local -xzf /tmp/go.tgz; \
+    rm /tmp/go.tgz; \
+    test "$(head -1 /usr/local/go/VERSION)" = "$GO_VERSION"
+
+# Selects one of the two stages above. Any other TARGETARCH fails here with
+# "failed to find stage go-src-<arch>", which is the intent: a platform with
+# no toolchain source must not silently fall through to one that has.
+FROM go-src-${TARGETARCH} AS go-toolchain
 
 FROM ${BASE_IMAGE}
+ARG GO_VERSION
 
 COPY --from=go-toolchain /usr/local/go /usr/local/go
 
-ENV GOTOOLCHAIN=local
+# When set, this is the gateway's Go version as declared from outside the image.
+# build.sh prefers it over `go version`, so validate-plugin.sh compares a built
+# plugin against the gateway's version rather than restating the image's own.
+ENV GOTOOLCHAIN=local \
+    TYK_GATEWAY_GO_VERSION=${GO_VERSION}
+
+# The toolchain that ends up here must be the gateway's, whichever stage it came
+# from. Unset means it was COPYed from GOLANG_IMAGE, where that holds by
+# construction; set means it was fetched independently and has to be proven.
+RUN set -eux; \
+    have="$(go version | awk '{print $3}')"; \
+    case "$have" in go1.*) ;; *) echo "ERROR: no usable Go toolchain: $have" >&2; exit 1 ;; esac; \
+    if [ -n "$GO_VERSION" ] && [ "$have" != "$GO_VERSION" ]; then \
+        echo "ERROR: image Go $have does not match the gateway's $GO_VERSION" >&2; \
+        echo "ERROR: plugins built here would fail to load." >&2; \
+        exit 1; \
+    fi
 
 COPY go.mod go.sum $TYK_GW_PATH/
 WORKDIR $TYK_GW_PATH
