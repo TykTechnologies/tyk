@@ -69,6 +69,25 @@ func TestGateway_afterConfSetup(t *testing.T) {
 	}
 	fileBackendExpected.KV.File.BasePath = fileKVDir
 
+	// base_path configures the file store, which the registry snapshots at
+	// NewGateway time (SetConfig does not rebuild it). So it must be present in
+	// the config the gateway is constructed with — setting it post-construction
+	// is invisible. Built as a var because KV is an anonymous struct that can't
+	// be set in a composite literal.
+	fileInitialConfig := config.Config{
+		ExternalServices: config.ExternalServiceConfig{
+			OAuth: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  true,
+					CertFile: "file://cert.pem",
+					KeyFile:  "file://key.pem",
+					CAFile:   "file://ca.pem",
+				},
+			},
+		},
+	}
+	fileInitialConfig.KV.File.BasePath = fileKVDir
+
 	tests := []struct {
 		name            string
 		initialConfig   config.Config
@@ -248,21 +267,23 @@ func TestGateway_afterConfSetup(t *testing.T) {
 					OAuth: config.ServiceConfig{
 						MTLS: config.MTLSConfig{
 							Enabled:  true,
-							CertFile: "vault://secret/oauth/cert_file",
-							KeyFile:  "vault://secret/oauth/key_file",
-							CAFile:   "vault://secret/oauth/ca_file",
+							CertFile: "vault://secret/oauth.cert_file",
+							KeyFile:  "vault://secret/oauth.key_file",
+							CAFile:   "vault://secret/oauth.ca_file",
 						},
 					},
 				},
 			},
-			setup: func(_ *testing.T, gw *Gateway) {
-				gw.vaultKVStore = &mockKVStore{
-					store: map[string]string{
-						"secret/oauth/cert_file": "/vault/path/to/cert.pem",
-						"secret/oauth/key_file":  "/vault/path/to/key.pem",
-						"secret/oauth/ca_file":   "/vault/path/to/ca.pem",
+			setup: func(t *testing.T, gw *Gateway) {
+				installFakeKVStores(t, gw, map[string]map[string]string{
+					"vault": {
+						"secret/oauth": `{
+							"cert_file": "/vault/path/to/cert.pem",
+							"key_file":  "/vault/path/to/key.pem",
+							"ca_file":   "/vault/path/to/ca.pem"
+						}`,
 					},
-				}
+				})
 			},
 			expectedConfig: config.Config{
 				ExternalServices: config.ExternalServiceConfig{
@@ -296,14 +317,14 @@ func TestGateway_afterConfSetup(t *testing.T) {
 					},
 				},
 			},
-			setup: func(_ *testing.T, gw *Gateway) {
-				gw.consulKVStore = &mockKVStore{
-					store: map[string]string{
+			setup: func(t *testing.T, gw *Gateway) {
+				installFakeKVStores(t, gw, map[string]map[string]string{
+					"consul": {
 						"oauth/cert_file": "/consul/path/to/cert.pem",
 						"oauth/key_file":  "/consul/path/to/key.pem",
 						"oauth/ca_file":   "/consul/path/to/ca.pem",
 					},
-				}
+				})
 			},
 			expectedConfig: config.Config{
 				ExternalServices: config.ExternalServiceConfig{
@@ -324,19 +345,8 @@ func TestGateway_afterConfSetup(t *testing.T) {
 			},
 		},
 		{
-			name:          "oauth mtls kv store - file backend",
-			initialConfig: config.Config{},
-			setup: func(t *testing.T, gw *Gateway) {
-				t.Helper()
-
-				conf := gw.GetConfig()
-				conf.KV.File.BasePath = fileKVDir
-				conf.ExternalServices.OAuth.MTLS.Enabled = true
-				conf.ExternalServices.OAuth.MTLS.CertFile = "file://cert.pem"
-				conf.ExternalServices.OAuth.MTLS.KeyFile = "file://key.pem"
-				conf.ExternalServices.OAuth.MTLS.CAFile = "file://ca.pem"
-				gw.SetConfig(conf)
-			},
+			name:           "oauth mtls kv store - file backend",
+			initialConfig:  fileInitialConfig,
 			expectedConfig: fileBackendExpected,
 		},
 		{
@@ -519,53 +529,52 @@ func TestGateway_afterConfSetup(t *testing.T) {
 }
 
 func TestGateway_kvResolvers_hotReload(t *testing.T) {
-	initialCert := "secrets://oauth_cert"
-	initialKey := "secrets://oauth_key"
-	initialCA := "secrets://oauth_ca"
+	dir := t.TempDir()
+	writeFile := func(name, content string) {
+		t.Helper()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600))
+	}
+	writeFile("cert.pem", "-----INITIAL CERT-----")
+	writeFile("key.pem", "-----INITIAL KEY-----")
+	writeFile("ca.pem", "-----INITIAL CA-----")
 
-	gw := NewGateway(config.Config{
-		Secrets: map[string]string{
-			"oauth_cert": "/initial/cert.pem",
-			"oauth_key":  "/initial/key.pem",
-			"oauth_ca":   "/initial/ca.pem",
-		},
+	conf := config.Config{
 		ExternalServices: config.ExternalServiceConfig{
 			OAuth: config.ServiceConfig{
 				MTLS: config.MTLSConfig{
 					Enabled:  true,
-					CertFile: initialCert,
-					KeyFile:  initialKey,
-					CAFile:   initialCA,
+					CertFile: "file://cert.pem",
+					KeyFile:  "file://key.pem",
+					CAFile:   "file://ca.pem",
 				},
 			},
 		},
-	}, context.Background())
+	}
+	conf.KV.File.BasePath = dir
 
+	gw := NewGateway(conf, t.Context())
 	require.NoError(t, gw.afterConfSetup())
 
-	conf := gw.GetConfig()
-	assert.Equal(t, "/initial/cert.pem", conf.ExternalServices.OAuth.MTLS.CertFile)
-	assert.Equal(t, "/initial/key.pem", conf.ExternalServices.OAuth.MTLS.KeyFile)
-	assert.Equal(t, "/initial/ca.pem", conf.ExternalServices.OAuth.MTLS.CAFile)
-	assert.Len(t, gw.kvResolvers, 3)
+	got := gw.GetConfig()
+	assert.Equal(t, "-----INITIAL CERT-----", got.ExternalServices.OAuth.MTLS.CertFile)
+	assert.Equal(t, "-----INITIAL KEY-----", got.ExternalServices.OAuth.MTLS.KeyFile)
+	assert.Equal(t, "-----INITIAL CA-----", got.ExternalServices.OAuth.MTLS.CAFile)
+	assert.Len(t, gw.kvResolvers, 3, "each resolved file:// field registers a hot-reload closure")
 
-	// simulate updated secrets
-	updatedConf := gw.GetConfig()
-	updatedConf.Secrets = map[string]string{
-		"oauth_cert": "/updated/cert.pem",
-		"oauth_key":  "/updated/key.pem",
-		"oauth_ca":   "/updated/ca.pem",
-	}
-	gw.SetConfig(updatedConf)
+	// Rotate the certs on disk — no config change, no process restart.
+	writeFile("cert.pem", "-----ROTATED CERT-----")
+	writeFile("key.pem", "-----ROTATED KEY-----")
+	writeFile("ca.pem", "-----ROTATED CA-----")
 
 	for _, resolve := range gw.kvResolvers {
 		require.NoError(t, resolve())
 	}
 
-	conf = gw.GetConfig()
-	assert.Equal(t, "/updated/cert.pem", conf.ExternalServices.OAuth.MTLS.CertFile)
-	assert.Equal(t, "/updated/key.pem", conf.ExternalServices.OAuth.MTLS.KeyFile)
-	assert.Equal(t, "/updated/ca.pem", conf.ExternalServices.OAuth.MTLS.CAFile)
+	got = gw.GetConfig()
+	assert.Equal(t, "-----ROTATED CERT-----", got.ExternalServices.OAuth.MTLS.CertFile,
+		"the closure re-reads rotated file content on hot reload")
+	assert.Equal(t, "-----ROTATED KEY-----", got.ExternalServices.OAuth.MTLS.KeyFile)
+	assert.Equal(t, "-----ROTATED CA-----", got.ExternalServices.OAuth.MTLS.CAFile)
 }
 
 func TestGateway_kvResolvers_notRegisteredWhenMTLSDisabled(t *testing.T) {
@@ -600,6 +609,87 @@ func TestGateway_kvResolvers_notRegisteredForPlainValues(t *testing.T) {
 
 	require.NoError(t, gw.afterConfSetup())
 	assert.Empty(t, gw.kvResolvers)
+}
+
+func TestAfterConfSetup_NewSyntaxFieldRegistersClosure(t *testing.T) {
+	live := config.Config{
+		Secrets: map[string]string{"oauth_cert": "/resolved/cert.pem"},
+	}
+	live.ExternalServices.OAuth.MTLS.Enabled = true
+	// The field holds a kv:// reference, as it does after Load — the config is
+	// no longer resolved up front, so afterConfSetup resolves it in place.
+	live.ExternalServices.OAuth.MTLS.CertFile = "kv://secrets/oauth_cert"
+
+	gw := NewGateway(live, t.Context())
+	require.NoError(t, gw.afterConfSetup())
+
+	require.Len(t, gw.kvResolvers, 1,
+		"a field holding a kv:// reference must register a hot-reload closure")
+
+	got := gw.GetConfig()
+	require.Equal(t, "/resolved/cert.pem", got.ExternalServices.OAuth.MTLS.CertFile,
+		"the reference must be resolved into the live config")
+}
+
+func TestAfterConfSetup_SlaveAPIKeyOriginalIsCaptured(t *testing.T) {
+	live := config.Config{
+		Secrets: map[string]string{"edge_api_key": "/resolved/api-key"},
+	}
+	// The field holds the original kv:// reference, as it does after Load.
+	live.SlaveOptions.APIKey = "kv://secrets/edge_api_key"
+
+	gw := NewGateway(live, t.Context())
+	require.NoError(t, gw.afterConfSetup())
+
+	got := gw.GetConfig()
+	require.Equal(t, "kv://secrets/edge_api_key", got.Private.EdgeOriginalAPIKeyPath,
+		"EdgeOriginalAPIKeyPath must hold the ORIGINAL reference, captured before the field is resolved")
+	require.Equal(t, "/resolved/api-key", got.SlaveOptions.APIKey,
+		"the live APIKey must be the resolved value")
+}
+
+func TestAfterConfSetup_MTLS_MissingStoreDoesNotFailStartup(t *testing.T) {
+	live := config.Config{}
+	live.ExternalServices.OAuth.MTLS.Enabled = true
+	// vault is NOT configured
+	live.ExternalServices.OAuth.MTLS.CertFile = "kv://vault/secret/cert#value"
+
+	gw := NewGateway(live, t.Context())
+	require.NoError(t, gw.afterConfSetup(),
+		"an enabled mTLS reference to an unconfigured store must not fail startup")
+
+	got := gw.GetConfig()
+	require.Equal(t, "kv://vault/secret/cert#value", got.ExternalServices.OAuth.MTLS.CertFile,
+		"the unresolved reference must be left in place, not blanked")
+	require.Empty(t, gw.kvResolvers,
+		"an unresolved reference registers no hot-reload closure (resolved == original)")
+}
+
+func TestAfterConfSetup_MTLS_ConfiguredStoreMissingKeyFailsStartup(t *testing.T) {
+	live := config.Config{
+		Secrets: map[string]string{"present": "x"},
+	}
+	live.ExternalServices.OAuth.MTLS.Enabled = true
+	live.ExternalServices.OAuth.MTLS.CertFile = "kv://secrets/absent_key"
+
+	gw := NewGateway(live, t.Context())
+	require.Error(t, gw.afterConfSetup(),
+		"a reference to a configured store with a missing key must stay a hard startup error")
+}
+
+func TestAfterConfSetup_MTLS_DisabledSectionNeverResolvesKV(t *testing.T) {
+	live := config.Config{}
+	live.ExternalServices.OAuth.MTLS.Enabled = false
+	live.ExternalServices.OAuth.MTLS.CertFile = "kv://vault/secret/cert#value"
+
+	gw := NewGateway(live, t.Context())
+	require.NoError(t, gw.afterConfSetup(),
+		"a disabled mTLS section must never fail startup on its KV reference")
+
+	got := gw.GetConfig()
+	require.Equal(t, "kv://vault/secret/cert#value", got.ExternalServices.OAuth.MTLS.CertFile,
+		"a disabled section's reference must be left untouched")
+	require.Empty(t, gw.kvResolvers)
 }
 
 func TestGateway_apisByIDLen(t *testing.T) {

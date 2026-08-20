@@ -1373,6 +1373,10 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 
 		newDef.IsOAS = true
 		oasObj.GetTykExtension().Info.ID = newDef.APIID
+		if errMsg, errCode := gw.validatePairedMCPAdapterUpstream(r, &oasObj); errMsg != "" {
+			return apiError(errMsg), errCode
+		}
+
 		err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
 		if err != nil {
 			return apiError(err.Error()), errCode
@@ -1451,6 +1455,9 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 		}
 
 		newDef.IsOAS = true
+		if errMsg, errCode := gw.validatePairedMCPAdapterUpstream(r, &oasObj); errMsg != "" {
+			return apiError(errMsg), errCode
+		}
 
 		err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
 		if err != nil {
@@ -1476,7 +1483,7 @@ func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefini
 	}
 
 	suffix := "-oas"
-	if apiDef.IsMCP() {
+	if apiDef.IsMCPManaged() {
 		suffix = "-mcp"
 	}
 
@@ -1534,6 +1541,12 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 	spec := gw.getApiSpec(apiID)
 	if resp, code := validateSpecExists(spec); resp != nil {
 		return resp, code
+	}
+
+	if !spec.IsMCPManaged() {
+		if pairedProxyIDs := gw.pairedMCPProxyIDsReferencingRESTSource(apiID); len(pairedProxyIDs) > 0 {
+			return apiError("API is referenced by paired MCP proxies: " + strings.Join(pairedProxyIDs, ", ")), http.StatusConflict
+		}
 	}
 
 	fs := afero.NewOsFs()

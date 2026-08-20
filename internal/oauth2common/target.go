@@ -1,6 +1,10 @@
 package oauth2common
 
-import "github.com/TykTechnologies/tyk/apidef/oas"
+import (
+	"strings"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
+)
 
 // Target is the (audience, scopes) pair sent to the IdP.
 // Nil means no exchange target could be resolved.
@@ -9,28 +13,45 @@ type Target struct {
 	Scopes   []string
 }
 
-// SelectExchangeProvider returns the provider whose Issuers contains iss,
-// or the sole provider when iss is empty and only one is configured.
+// SelectExchangeProvider returns the provider whose Issuers matches iss, or
+// the sole provider when iss is empty and only one is configured. Dispatch is
+// deterministic: exact entries are checked first across all providers, then
+// regex: entries in provider order — first match wins.
 func SelectExchangeProvider(providers []oas.OAuth2TokenExchangeProvider, iss string) *oas.OAuth2TokenExchangeProvider {
-	if iss != "" {
-		for i := range providers {
-			p := &providers[i]
-			for _, allowed := range p.Issuers {
-				if allowed == iss {
-					return p
-				}
-			}
+	if iss == "" {
+		if len(providers) == 1 {
+			return &providers[0]
 		}
 		return nil
 	}
-	if len(providers) == 1 {
-		return &providers[0]
+	for i := range providers {
+		p := &providers[i]
+		for _, allowed := range p.Issuers {
+			if !strings.HasPrefix(allowed, oas.OAuth2IssuerRegexPrefix) && allowed == iss {
+				return p
+			}
+		}
+	}
+	for i := range providers {
+		p := &providers[i]
+		for _, allowed := range p.Issuers {
+			pattern, isRegex := strings.CutPrefix(allowed, oas.OAuth2IssuerRegexPrefix)
+			if !isRegex {
+				continue
+			}
+			// Load-time validation guarantees the pattern compiles; a
+			// non-compiling entry here simply never matches.
+			if re, err := compiledIssuerRegex(pattern); err == nil && re.MatchString(iss) {
+				return p
+			}
+		}
 	}
 	return nil
 }
 
 // MergeTargetForProvider merges the per-op exchange override with the provider
-// defaultTarget (most-specific wins). Returns nil when no audience can be resolved.
+// defaultTarget (most-specific wins). Returns nil when no audience resolves,
+// except under jwt-bearer — RFC 7523 has no audience wire parameter.
 func MergeTargetForProvider(ex *oas.OAuth2Exchange, provider *oas.OAuth2TokenExchangeProvider, inferredScopes []string) *Target {
 	t := &Target{}
 	if ex != nil {
@@ -48,7 +69,7 @@ func MergeTargetForProvider(ex *oas.OAuth2Exchange, provider *oas.OAuth2TokenExc
 			t.Scopes = append([]string(nil), provider.DefaultTarget.Scopes...)
 		}
 	}
-	if t.Audience == "" {
+	if t.Audience == "" && !provider.IsJWTBearer() {
 		return nil
 	}
 	return t

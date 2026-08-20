@@ -12,7 +12,7 @@ on:
       - "v*"
 
 env:
-  GOLANG_CROSS: 1.25-bullseye
+  GOLANG_CROSS: 1.26-bullseye
   NG_BASE_SOURCE: tykio/dhi-busybox-plugin-compiler:1.37.0-debian13-fips_plugin-compiler-ng-toolchain
   NG_GLIBC_TARGET: "2.17"
   NG_CROSS: "1"
@@ -112,6 +112,21 @@ jobs:
           DHI_ORG: tykio
         run: |
           set -euo pipefail
+          # `docker dhi` ships with Docker Desktop and is absent from hosted
+          # runners. Without this guard the first call falls through to plain
+          # `docker`, which reports `unknown flag: --org` and exit 125 -- an error
+          # that says nothing about the actual problem.
+          if [ -z "${DHI_ORG:-}" ]; then
+            echo "::warning title=DHI org not resolved::No Docker Hub organization could be derived for the customization, so it cannot be refreshed."
+            printf '### DHI customization refresh\n\nSkipped: no organization resolved.\n' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if ! docker dhi --help >/dev/null 2>&1; then
+            echo "::warning title=DHI CLI unavailable::docker dhi is not installed on this runner, so the customization cannot be refreshed. The compiler will build on the existing base, which may be missing recent package fixes."
+            printf '### DHI customization refresh\n\nSkipped: docker dhi is not available on this runner.\n' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
           before="$(docker dhi customization build list "$DHI_CUSTOMIZATION" \
             --org "$DHI_ORG" | awk 'NR==2 {print $1}')"
           echo "latest build before refresh: ${before:-none}"
@@ -122,18 +137,28 @@ jobs:
           # Replace any previous stamp so the file does not accumulate them.
           python3 - "$manifest" "$GITHUB_RUN_ID" <<'PY'
           import pathlib, re, sys
+
           path, run_id = pathlib.Path(sys.argv[1]), sys.argv[2]
           text = path.read_text()
-          text = re.sub(r'\n *io\.tyk\.rebuild-trigger:.*', '', text)
           if not text.endswith("\n"):
               text += "\n"
-          if "annotations:" not in text:
-              text += "\nannotations:\n"
-          text = text.replace(
-              "annotations:\n",
-              f"annotations:\n  io.tyk.rebuild-trigger: \"{run_id}\"\n",
-              1,
-          )
+
+          # Drop a previous stamp so the manifest does not accumulate them.
+          text = re.sub(r'^ *io\.tyk\.rebuild-trigger:.*\n', '', text, flags=re.M)
+
+          # Only a TOP-LEVEL `annotations:` may be stamped. Matching any occurrence
+          # would hit a nested or similarly-named key (`image-annotations:`) and
+          # dedent the new entry out of its mapping, corrupting the manifest that is
+          # about to be sent to Docker.
+          stamp = f'annotations:\n  io.tyk.rebuild-trigger: "{run_id}"\n'
+          pattern = re.compile(r'^annotations:[ \t]*\n', re.M)
+          matches = pattern.findall(text)
+          if len(matches) > 1:
+              raise SystemExit("refusing to stamp: multiple top-level annotations blocks")
+          if matches:
+              text = pattern.sub(stamp, text, count=1)
+          else:
+              text += stamp
           path.write_text(text)
           PY
 
@@ -150,7 +175,7 @@ jobs:
             fi
             sleep 10
           done
-          if [ "$latest" = "$before" ]; then
+          if [ -z "${latest:-}" ] || [ "$latest" = "$before" ]; then
             echo "::warning title=DHI customization not refreshed::No rebuild was queued; the compiler will build on the existing base, which may be missing recent package fixes."
             {
               printf '### DHI customization refresh\n\n'
@@ -167,8 +192,11 @@ jobs:
             sleep 15
           done
           docker dhi customization build list "$DHI_CUSTOMIZATION" --org "$DHI_ORG" | head -5
+          # Columns: 1=ID 2=PLATFORM 3=STATUS 4=RESULT 5=STARTED. Check every row of
+          # the batch we just queued -- they share a STARTED timestamp, and there is
+          # one per platform -- rather than a fixed number of rows.
           if docker dhi customization build list "$DHI_CUSTOMIZATION" --org "$DHI_ORG" \
-            | awk 'NR>1 && NR<=3 && $4 == "FAILURE"' | grep -q .; then
+            | awk 'NR==2 {started=$5} NR>1 && $5 == started && $4 == "FAILURE"' | grep -q .; then
             echo "::warning title=DHI customization rebuild failed::The rebuild was queued but did not succeed; the compiler will build on the previous base."
             printf '### DHI customization refresh\n\nRebuild queued but failed.\n' >> "$GITHUB_STEP_SUMMARY"
             exit 1

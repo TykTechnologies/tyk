@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -12,6 +13,8 @@ import (
 	"github.com/buger/jsonparser"
 	"github.com/hashicorp/go-multierror"
 	pkgver "github.com/hashicorp/go-version"
+
+	"github.com/TykTechnologies/storage/kv/resolver"
 
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
@@ -119,16 +122,14 @@ func loadOASSchema() error {
 }
 
 func validateJSON(schema, document []byte) error {
+	registerKVAwareFormatsOnce.Do(registerKVAwareFormats)
+
 	schemaLoader := gojsonschema.NewBytesLoader(schema)
 	documentLoader := gojsonschema.NewBytesLoader(document)
 	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
 
 	if err != nil {
 		return err
-	}
-
-	if result.Valid() {
-		return nil
 	}
 
 	combinedErr := &multierror.Error{}
@@ -138,8 +139,17 @@ func validateJSON(schema, document []byte) error {
 	for _, validationErr := range validationErrs {
 		combinedErr = multierror.Append(combinedErr, errors.New(validationErr.String()))
 	}
-	return combinedErr.ErrorOrNil()
 
+	// The format-scoped checkers only see uri/uri-reference fields, but the
+	// gateway resolves KV references in every string of the definition. Validate
+	// the whole document so a malformed reference in a non-URL field (e.g. a
+	// request-header transform value) is rejected here rather than failing
+	// the resolver at gateway load.
+	if kvErr := resolver.ValidateSyntaxAll(document); kvErr != nil {
+		combinedErr = multierror.Append(combinedErr, kvErr)
+	}
+
+	return combinedErr.ErrorOrNil()
 }
 
 // ValidateOASObject validates an OAS document against a particular OAS version.
@@ -259,4 +269,42 @@ func getMinorVersion(version string) (string, error) {
 
 	segments := v.Segments()
 	return fmt.Sprintf("%d.%d", segments[0], segments[1]), nil
+}
+
+// inlineKVRe matches an inline KV reference token, e.g. "$kv{env:API_HOST}".
+var inlineKVRe = regexp.MustCompile(`\$kv\{[^}]+\}`)
+
+// kvAwareFormatChecker wraps a stock gojsonschema format checker so that KV
+// references ($kv{...} inline tokens and kv:// whole-value references) are
+// accepted inside URI fields, while every other value is validated exactly as
+// before.
+type kvAwareFormatChecker struct {
+	base gojsonschema.FormatChecker
+}
+
+func (c kvAwareFormatChecker) IsFormat(input any) bool {
+	s, ok := input.(string)
+	if !ok {
+		return c.base.IsFormat(input)
+	}
+
+	if err := resolver.ValidateSyntax(s); err != nil {
+		return false
+	}
+
+	if inlineKVRe.MatchString(s) {
+		s = inlineKVRe.ReplaceAllString(s, "kvref")
+	}
+
+	return c.base.IsFormat(s)
+}
+
+var registerKVAwareFormatsOnce sync.Once
+
+// registerKVAwareFormats overrides the stock "uri" and "uri-reference" format
+// checkers on the registry with the KV-aware variant.
+func registerKVAwareFormats() {
+	gojsonschema.FormatCheckers.
+		Add("uri", kvAwareFormatChecker{gojsonschema.URIFormatChecker{}}).
+		Add("uri-reference", kvAwareFormatChecker{gojsonschema.URIReferenceFormatChecker{}})
 }

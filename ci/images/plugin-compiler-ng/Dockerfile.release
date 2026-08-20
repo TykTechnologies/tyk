@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-ARG GOLANG_IMAGE=tykio/golang-cross:1.25-bullseye
+ARG GOLANG_IMAGE=tykio/golang-cross:1.26-bullseye
 ARG BASE_IMAGE
 
 FROM ${GOLANG_IMAGE} AS go-toolchain
