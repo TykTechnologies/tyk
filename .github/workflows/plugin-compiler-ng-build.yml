@@ -57,6 +57,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The runners are amd64. Every other image platform is built and gated
+      # under emulation, so binfmt has to be registered before buildx starts.
+      # Rendered only while linux/amd64,linux/arm64 asks for a non-native
+      # platform -- an amd64-only image installs nothing.
+      - name: Set up QEMU
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130  # v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
         with:
@@ -227,6 +235,20 @@ jobs:
             platform_digest="$digest"
           fi
           case "$platform_digest" in sha256:*) ;; *) echo "unexpected source platform digest: $platform_digest" >&2; exit 1 ;; esac
+          # BASE_IMAGE is passed as the index digest, so buildx picks the right
+          # manifest per platform on its own. Check up front that every platform
+          # we are about to build is actually in there: a missing one otherwise
+          # surfaces much later as a bare "no match for platform" from a build
+          # step that has no idea which of its inputs was at fault.
+          for want in linux/amd64 linux/arm64; do
+            jq -e --arg want "$want" '
+              [.manifest.manifests[]? | select("\(.platform.os)/\(.platform.architecture)" == $want)]
+              | length == 1
+            ' <<<"$inspect" >/dev/null || {
+              echo "::error title=Base image is missing a platform::${source} does not publish ${want}; the DHI customization has to be built for it first" >&2
+              exit 1
+            }
+          done
           if [[ "$source" == *@sha256:* ]]; then
             test "${source##*@}" = "$digest"
             ref="$source"
@@ -245,6 +267,9 @@ jobs:
           digest="$(jq -er '.manifest.digest' <<<"$inspect")"
           test -n "$digest"
           case "$digest" in sha256:*) ;; *) echo "unexpected Go toolchain digest: $digest" >&2; exit 1 ;; esac
+          # amd64 on purpose, and not a copy of the base check above: golang-cross
+          # is published for amd64 only. Other platforms take the Go distribution
+          # from go.dev instead -- see the sha256 resolution further down.
           if jq -e '(.manifest.manifests? | type) == "array"' <<<"$inspect" >/dev/null; then
             platform_digest="$(jq -er '
               [.manifest.manifests[] | select(
@@ -264,13 +289,50 @@ jobs:
           echo "platform_digest=$platform_digest" >> "$GITHUB_OUTPUT"
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
 
+          # golang-cross is the authority for WHICH Go version the gateway uses,
+          # because the gateway release runs this same image. Read the version
+          # out of it so platforms that cannot COPY from it can still be pinned
+          # to exactly that version.
+          #
+          # This costs a full pull of golang-cross into the daemon, which is why
+          # it is not done unconditionally: an amd64 image COPYs its toolchain
+          # from that image anyway and reads the version out of it for free.
+          go_version="$(docker run --rm --platform linux/amd64 "$ref" go version | awk '{print $3}')"
+          case "$go_version" in
+            go1.*) ;;
+            *) echo "unexpected Go version from ${ref}: $go_version" >&2; exit 1 ;;
+          esac
+          echo "version=$go_version" >> "$GITHUB_OUTPUT"
+
+          # golang-cross is published for amd64 only, so every other platform
+          # takes the stock go.dev tarball at the version resolved above. Pin the
+          # checksum here, before anything is downloaded, so the image build
+          # verifies against a value settled outside it.
+          #
+          # Deliberately fatal: this only renders when a platform that needs the
+          # tarball is being built, and guessing a checksum is not an option.
+          sha_arm64="$(curl -fsSL --retry 3 --proto '=https' --tlsv1.2 \
+            'https://go.dev/dl/?mode=json&include=all' | jq -er --arg v "$go_version" '
+              [.[] | select(.version == $v) | .files[]
+                 | select(.os == "linux" and .arch == "arm64" and .kind == "archive")]
+              | if length == 1 then .[0].sha256
+                else error("no unique linux-arm64 archive for \($v)")
+                end')"
+          case "$sha_arm64" in
+            ????????????????????????????????????????????????????????????????) ;;
+            *) echo "unexpected sha256 for ${go_version} linux-arm64: $sha_arm64" >&2; exit 1 ;;
+          esac
+          echo "sha256_arm64=$sha_arm64" >> "$GITHUB_OUTPUT"
+
       - name: Build workflow-local NG base
         id: build-ng-base
         uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
         with:
           context: ci/images/plugin-compiler-ng
           file: ci/images/plugin-compiler-ng/Dockerfile.base
-          platforms: linux/amd64
+          # Pull requests use the `docker` driver, which builds one platform
+          # only, and they never push -- so they stay on the gate platform.
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           push: ${{ github.event_name != 'pull_request' }}
           load: ${{ github.event_name == 'pull_request' }}
           sbom: ${{ github.event_name != 'pull_request' }}
@@ -319,6 +381,7 @@ jobs:
         with:
           context: .
           file: ci/images/plugin-compiler-ng/Dockerfile.release
+          # Single platform deliberately: `load: true` accepts exactly one.
           platforms: linux/amd64
           push: false
           load: true
@@ -326,6 +389,8 @@ jobs:
           build-args: |
             BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
             GOLANG_IMAGE=${{ steps.source-go.outputs.ref }}
+            GO_VERSION=${{ steps.source-go.outputs.version }}
+            GO_TARBALL_SHA256_ARM64=${{ steps.source-go.outputs.sha256_arm64 }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
             WITH_GATEWAY_SELFTEST=1
@@ -348,7 +413,7 @@ jobs:
         with:
           context: .
           file: ci/images/plugin-compiler-ng/Dockerfile.release
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           sbom: true
           provenance: mode=max
@@ -357,6 +422,8 @@ jobs:
           build-args: |
             BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
             GOLANG_IMAGE=${{ steps.source-go.outputs.ref }}
+            GO_VERSION=${{ steps.source-go.outputs.version }}
+            GO_TARBALL_SHA256_ARM64=${{ steps.source-go.outputs.sha256_arm64 }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
             WITH_GATEWAY_SELFTEST=0
@@ -415,6 +482,28 @@ jobs:
             docker buildx imagetools inspect "$exact_ref" --format '{{json .Provenance}}' > "$provenance_file"
             jq -e '[.. | objects | select(has("SLSA"))] | length > 0' "$provenance_file" >/dev/null
 
+            # The index must offer exactly the platforms that were asked for --
+            # no more, no fewer. buildx reports success for a partially built
+            # index, and an attestation manifest carries `unknown/unknown`, so
+            # counting manifests or trusting the exit code would both pass while
+            # a platform silently went missing. `.manifests` being absent
+            # entirely means the push produced a bare manifest instead of an
+            # index, which is the same failure in its most extreme form, so name
+            # it rather than letting jq fall over on a missing key.
+            platforms_file="$evidence_dir/${safe_repository}.platforms.txt"
+            docker buildx imagetools inspect "$exact_ref" --raw |
+              jq -er 'if has("manifests") then
+                        .manifests[]
+                        | select(.platform.os != "unknown")   # attestations carry unknown/unknown
+                        | "\(.platform.os)/\(.platform.architecture)"
+                      else error("published ref is not an image index") end' |
+              sort -u > "$platforms_file"
+            printf '%s\n' linux/amd64 linux/arm64 > "$evidence_dir/platforms.expected.txt"
+            if ! diff -u "$evidence_dir/platforms.expected.txt" "$platforms_file"; then
+              echo "::error title=Published platforms do not match::${exact_ref} does not publish exactly linux/amd64,linux/arm64" >&2
+              exit 1
+            fi
+
             printf 'verified %s\n' "$exact_ref" | tee -a "$evidence_dir/verified-refs.txt" "$GITHUB_STEP_SUMMARY"
           done < "$repositories"
 
@@ -451,6 +540,7 @@ jobs:
         with:
           context: .
           file: ci/images/plugin-compiler-ng/Dockerfile.release
+          # Single platform deliberately: `load: true` accepts exactly one.
           platforms: linux/amd64
           push: false
           load: true
@@ -458,6 +548,8 @@ jobs:
           build-args: |
             BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
             GOLANG_IMAGE=${{ steps.source-go.outputs.ref }}
+            GO_VERSION=${{ steps.source-go.outputs.version }}
+            GO_TARBALL_SHA256_ARM64=${{ steps.source-go.outputs.sha256_arm64 }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
             WITH_GATEWAY_SELFTEST=1
@@ -473,6 +565,48 @@ jobs:
         run: VALIDATE_ONLY=1 ci/images/plugin-compiler-ng/scripts/loadtest-gate.sh tyk-plugin-compiler-ng-gate:ee ee arm64
 
 
+      # Tier B gate. The push below emits a single OCI index covering every
+      # platform, so a broken linux/arm64 image blocks the whole push --
+      # including platforms that are perfectly fine. Build and exercise this one
+      # on its own first, where a failure is attributable and nothing has been
+      # published yet.
+      #
+      # WITH_GATEWAY_SELFTEST=0 on purpose: VALIDATE_ONLY skips the load/HTTP
+      # gate, so the gateway binary would be built under emulation and never run.
+      - name: Build linux/arm64 NG gate image EE
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler-ng/Dockerfile.release
+          platforms: linux/arm64
+          push: false
+          load: true
+          tags: tyk-plugin-compiler-ng-gate-linux-arm64:ee
+          build-args: |
+            BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
+            GOLANG_IMAGE=${{ steps.source-go.outputs.ref }}
+            GO_VERSION=${{ steps.source-go.outputs.version }}
+            GO_TARBALL_SHA256_ARM64=${{ steps.source-go.outputs.sha256_arm64 }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ github.ref_name }}
+            WITH_GATEWAY_SELFTEST=0
+            DEFAULT_EDITION=ee
+            EE_AVAILABLE=true
+            EE_BUILD_TAG=ee
+            SELFTEST_BUILD_TAG=ee
+
+      # Proves the linux/arm64 toolchain executes and emits a loadable
+      # object for its own architecture -- strictly more than the cross-build
+      # checks above, which only ever exercise the amd64 image.
+      #
+      # It stops short of plugin.Open in a linux/arm64 gateway: that needs a
+      # runner of this architecture. See the PR for the gap and the follow-up.
+      - name: Validate linux/arm64 NG toolchain EE
+        if: ${{ github.event_name != 'pull_request' }}
+        run: VALIDATE_ONLY=1 COMPILER_PLATFORM=linux/arm64 ci/images/plugin-compiler-ng/scripts/loadtest-gate.sh tyk-plugin-compiler-ng-gate-linux-arm64:ee ee
+
+
       - name: Build and push NG image EE
         if: ${{ github.event_name != 'pull_request' }}
         id: build-push-ee-ng
@@ -480,7 +614,7 @@ jobs:
         with:
           context: .
           file: ci/images/plugin-compiler-ng/Dockerfile.release
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           sbom: true
           provenance: mode=max
@@ -489,6 +623,8 @@ jobs:
           build-args: |
             BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
             GOLANG_IMAGE=${{ steps.source-go.outputs.ref }}
+            GO_VERSION=${{ steps.source-go.outputs.version }}
+            GO_TARBALL_SHA256_ARM64=${{ steps.source-go.outputs.sha256_arm64 }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
             WITH_GATEWAY_SELFTEST=0
@@ -550,6 +686,28 @@ jobs:
             docker buildx imagetools inspect "$exact_ref" --format '{{json .Provenance}}' > "$provenance_file"
             jq -e '[.. | objects | select(has("SLSA"))] | length > 0' "$provenance_file" >/dev/null
 
+            # The index must offer exactly the platforms that were asked for --
+            # no more, no fewer. buildx reports success for a partially built
+            # index, and an attestation manifest carries `unknown/unknown`, so
+            # counting manifests or trusting the exit code would both pass while
+            # a platform silently went missing. `.manifests` being absent
+            # entirely means the push produced a bare manifest instead of an
+            # index, which is the same failure in its most extreme form, so name
+            # it rather than letting jq fall over on a missing key.
+            platforms_file="$evidence_dir/${safe_repository}.platforms.txt"
+            docker buildx imagetools inspect "$exact_ref" --raw |
+              jq -er 'if has("manifests") then
+                        .manifests[]
+                        | select(.platform.os != "unknown")   # attestations carry unknown/unknown
+                        | "\(.platform.os)/\(.platform.architecture)"
+                      else error("published ref is not an image index") end' |
+              sort -u > "$platforms_file"
+            printf '%s\n' linux/amd64 linux/arm64 > "$evidence_dir/platforms.expected.txt"
+            if ! diff -u "$evidence_dir/platforms.expected.txt" "$platforms_file"; then
+              echo "::error title=Published platforms do not match::${exact_ref} does not publish exactly linux/amd64,linux/arm64" >&2
+              exit 1
+            fi
+
             printf 'verified %s\n' "$exact_ref" | tee -a "$evidence_dir/verified-refs.txt" "$GITHUB_STEP_SUMMARY"
           done < "$repositories"
 
@@ -586,6 +744,7 @@ jobs:
         with:
           context: .
           file: ci/images/plugin-compiler-ng/Dockerfile.release
+          # Single platform deliberately: `load: true` accepts exactly one.
           platforms: linux/amd64
           push: false
           load: true
@@ -593,6 +752,8 @@ jobs:
           build-args: |
             BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
             GOLANG_IMAGE=${{ steps.source-go.outputs.ref }}
+            GO_VERSION=${{ steps.source-go.outputs.version }}
+            GO_TARBALL_SHA256_ARM64=${{ steps.source-go.outputs.sha256_arm64 }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
             WITH_GATEWAY_SELFTEST=1
@@ -617,7 +778,7 @@ jobs:
         with:
           context: .
           file: ci/images/plugin-compiler-ng/Dockerfile.release
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           sbom: true
           provenance: mode=max
@@ -626,6 +787,8 @@ jobs:
           build-args: |
             BASE_IMAGE=${{ env.NG_BASE_IMAGE }}
             GOLANG_IMAGE=${{ steps.source-go.outputs.ref }}
+            GO_VERSION=${{ steps.source-go.outputs.version }}
+            GO_TARBALL_SHA256_ARM64=${{ steps.source-go.outputs.sha256_arm64 }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
             WITH_GATEWAY_SELFTEST=0
@@ -688,6 +851,28 @@ jobs:
 
             docker buildx imagetools inspect "$exact_ref" --format '{{json .Provenance}}' > "$provenance_file"
             jq -e '[.. | objects | select(has("SLSA"))] | length > 0' "$provenance_file" >/dev/null
+
+            # The index must offer exactly the platforms that were asked for --
+            # no more, no fewer. buildx reports success for a partially built
+            # index, and an attestation manifest carries `unknown/unknown`, so
+            # counting manifests or trusting the exit code would both pass while
+            # a platform silently went missing. `.manifests` being absent
+            # entirely means the push produced a bare manifest instead of an
+            # index, which is the same failure in its most extreme form, so name
+            # it rather than letting jq fall over on a missing key.
+            platforms_file="$evidence_dir/${safe_repository}.platforms.txt"
+            docker buildx imagetools inspect "$exact_ref" --raw |
+              jq -er 'if has("manifests") then
+                        .manifests[]
+                        | select(.platform.os != "unknown")   # attestations carry unknown/unknown
+                        | "\(.platform.os)/\(.platform.architecture)"
+                      else error("published ref is not an image index") end' |
+              sort -u > "$platforms_file"
+            printf '%s\n' linux/amd64 linux/arm64 > "$evidence_dir/platforms.expected.txt"
+            if ! diff -u "$evidence_dir/platforms.expected.txt" "$platforms_file"; then
+              echo "::error title=Published platforms do not match::${exact_ref} does not publish exactly linux/amd64,linux/arm64" >&2
+              exit 1
+            fi
 
             printf 'verified %s\n' "$exact_ref" | tee -a "$evidence_dir/verified-refs.txt" "$GITHUB_STEP_SUMMARY"
           done < "$repositories"
