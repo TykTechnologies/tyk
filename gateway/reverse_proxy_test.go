@@ -1116,7 +1116,13 @@ func TestGraphQL_UDGHeaders(t *testing.T) {
 					strings.Contains(string(b), `{"name":"Context","value":"request-context"}`) &&
 					strings.Contains(string(b), `{"name":"Global-Static","value":"foobar"}`) &&
 					strings.Contains(string(b), `{"name":"Global-Context","value":"follow-up-request-global-context"}`) &&
-					strings.Contains(string(b), `{"name":"Does-Exist-Already","value":"ds-does-exist-already"}`)
+					strings.Contains(string(b), `{"name":"Does-Exist-Already","value":"ds-does-exist-already"}`) &&
+					// A header with more than one value has to keep all of them. The round
+					// tripper that used to resolve variables on the way to the upstream read
+					// with Get and wrote with Set, so it collapsed this to gzip alone.
+					strings.Contains(string(b), `{"name":"Accept-Encoding","value":"gzip"}`) &&
+					strings.Contains(string(b), `{"name":"Accept-Encoding","value":"deflate"}`) &&
+					strings.Contains(string(b), `{"name":"Accept-Encoding","value":"br"}`)
 			},
 		},
 	}...)
@@ -1187,6 +1193,107 @@ func TestGraphQL_ProxyOnlyHeaders(t *testing.T) {
 			Path: "/",
 			Headers: map[string]string{
 				"Test-Header": "test-value",
+			},
+			Method: http.MethodPost,
+			Data: graphql.Request{
+				Query: gqlContinentQuery,
+			},
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("test context variable request headers rewrite", func(t *testing.T) {
+		// request_headers_rewrite is applied by the engine transport, after the header
+		// modifier has already finalised the fetch headers, so it is resolved where the
+		// rules are built instead. See handleGraphQL.
+		spec := defaultSpec
+		spec.GraphQL.Proxy.RequestHeadersRewrite = map[string]apidef.RequestHeadersRewriteConfig{
+			"X-Rewritten": {Value: "$tyk_context.headers_Test_Header"},
+		}
+		spec.EnableContextVars = true
+		g.Gw.LoadAPI(spec)
+		g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
+			if !headerCheck("X-Rewritten", "test-value", r.Header) {
+				t.Errorf("rewritten header not resolved, got %q", r.Header.Get("X-Rewritten"))
+			}
+		})
+		_, err := g.Run(t, test.TestCase{
+			Path: "/",
+			Headers: map[string]string{
+				"Test-Header": "test-value",
+			},
+			Method: http.MethodPost,
+			Data: graphql.Request{
+				Query: gqlContinentQuery,
+			},
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("the consumer's credential reaches the upstream once", func(t *testing.T) {
+		// Two writers put it there and neither knows about the other: with strip_auth_data
+		// off the engine adds the consumer's auth header to the fetch input through
+		// propagateAuthHeaders, and setProxyOnlyHeaders then forwards the consumer's
+		// headers again. The upstream used to receive the credential twice.
+		spec := defaultSpec
+		spec.GraphQL.Proxy.RequestHeadersRewrite = nil
+		spec.UseKeylessAccess = false
+		spec.UseStandardAuth = true
+		spec.StripAuthData = false
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.AuthTokenType: {AuthHeaderName: "X-API-KEY"},
+		}
+		g.Gw.LoadAPI(spec)
+
+		_, authKey := g.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				spec.APIID: {APIName: spec.Name, APIID: spec.APIID, Versions: []string{"Default"}},
+			}
+			s.OrgID = spec.OrgID
+		})
+
+		g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
+			values := r.Header.Values("X-Api-Key")
+			if len(values) != 1 {
+				t.Errorf("upstream received X-Api-Key %d times: %v", len(values), values)
+				return
+			}
+			if values[0] != authKey {
+				t.Errorf("upstream received the wrong credential: %q", values[0])
+			}
+		})
+		_, err := g.Run(t, test.TestCase{
+			Path: "/",
+			Headers: map[string]string{
+				"X-API-KEY": authKey,
+			},
+			Method: http.MethodPost,
+			Data: graphql.Request{
+				Query: gqlContinentQuery,
+			},
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("a variable inside a header the caller sent is not expanded", func(t *testing.T) {
+		// Only values that come from the API definition are resolved. A round tripper that
+		// walked every outgoing header used to sit on this path and expanded whatever the
+		// caller had put in one, which let a caller read the context of their own session
+		// back out of the upstream request. See handleGraphQL.
+		spec := defaultSpec
+		spec.GraphQL.Proxy.RequestHeadersRewrite = nil
+		spec.EnableContextVars = true
+		g.Gw.LoadAPI(spec)
+		g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
+			if !headerCheck("X-Injection-Probe", "$tyk_context.headers_Test_Header", r.Header) {
+				t.Errorf("caller supplied variable was expanded, got %q", r.Header.Get("X-Injection-Probe"))
+			}
+		})
+		_, err := g.Run(t, test.TestCase{
+			Path: "/",
+			Headers: map[string]string{
+				"Test-Header":       "test-value",
+				"X-Injection-Probe": "$tyk_context.headers_Test_Header",
 			},
 			Method: http.MethodPost,
 			Data: graphql.Request{

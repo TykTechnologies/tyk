@@ -1089,32 +1089,28 @@ func isCORSPreflight(r *http.Request) bool {
 	return r.Method == http.MethodOptions
 }
 
-type variableReplaceRoundTripper struct {
-	next   http.RoundTripper
-	outReq *http.Request
-	gw     *Gateway
-}
-
-func (d *variableReplaceRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	for key := range req.Header {
-		val := d.gw.ReplaceTykVariables(d.outReq, req.Header.Get(key), false)
-		req.Header.Set(key, val)
-	}
-
-	return d.next.RoundTrip(req)
-}
-
 func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
 	needsEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
 
 	requestHeadersRewrite := make(map[string]apidef.RequestHeadersRewriteConfig)
 	for key, value := range p.TykAPISpec.GraphQL.Proxy.RequestHeadersRewrite {
+		// Resolved here, once, because these are the only header values the graph engine
+		// adds that no header modifier sees: the transport applies them itself, after the
+		// engine has already finalised the fetch headers.
+		//
+		// Nothing else on this path resolves variables any more. Upstream headers of the
+		// engine, global and per data source alike, are resolved by the header modifier
+		// while the fetch input is built, which is what the subscription connection key is
+		// computed from (TT-17921). A round tripper that walked the outgoing headers
+		// instead used to sit here, and it ran too late for that key, collapsed multi
+		// value headers and expanded variables inside header values the caller had sent.
+		value.Value = p.Gw.ReplaceTykVariables(outreq, value.Value, false)
 		// Use the canonical format of the MIME header key.
 		requestHeadersRewrite[textproto.CanonicalMIMEHeaderKey(key)] = value
 	}
 	res, hijacked, err = p.TykAPISpec.GraphEngine.HandleReverseProxy(graphengine.ReverseProxyParams{
-		RoundTripper:       &variableReplaceRoundTripper{next: roundTripper, outReq: outreq, gw: p.Gw},
+		RoundTripper:       roundTripper,
 		ResponseWriter:     w,
 		OutRequest:         outreq,
 		WebSocketUpgrader:  &p.wsUpgrader,
