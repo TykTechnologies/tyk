@@ -409,15 +409,15 @@ type ReverseProxy struct {
 
 var idleConnTimeout = 90
 
-func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
-	timeout := 30.0
-	if dialerTimeout > 0 {
-		log.Debug("Setting timeout for outbound request to: ", dialerTimeout)
-		timeout = dialerTimeout
+func (p *ReverseProxy) defaultTransport(dialTimeout float64) *http.Transport {
+	if dialTimeout == 0 {
+		dialTimeout = 30.0
 	}
 
+	log.Debug("Setting timeout for outbound request to: ", dialTimeout)
+
 	dialer := &net.Dialer{
-		Timeout:   time.Duration(float64(timeout) * float64(time.Second)),
+		Timeout:   time.Duration(dialTimeout * float64(time.Second)),
 		KeepAlive: 30 * time.Second,
 		DualStack: true,
 	}
@@ -435,7 +435,7 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 		MaxIdleConns:          p.Gw.GetConfig().MaxIdleConns,
 		MaxIdleConnsPerHost:   p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
 		IdleConnTimeout:       time.Duration(idleConnTimeout) * time.Second,
-		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
+		ResponseHeaderTimeout: time.Duration(0), // Response timeout has to be controlled within context
 		TLSHandshakeTimeout:   10 * time.Second,
 	}
 
@@ -625,13 +625,15 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 	return resp
 }
 
-const defaultProxyTimeout float64 = 30
-
-func proxyTimeout(spec *APISpec) float64 {
+func calculateDialTimeout(spec *APISpec) float64 {
+	const defaultDialTimeoutTimeout float64 = 30
 	if spec.GlobalConfig.ProxyDefaultTimeout > 0 {
+		// I don't know why, but `proxy_default_timeout` is being treated like a DialTimeout.
+		// IMO it makes sense providing other optional config value like `http_deal_tomeout`.
+		// Actual function adds ambiguity into sense of `proxy_default_timeout`.
 		return spec.GlobalConfig.ProxyDefaultTimeout
 	}
-	return defaultProxyTimeout
+	return defaultDialTimeoutTimeout
 }
 
 // GetEnforcedTimeoutSettings returns the enforced timeout for the current request by checking
@@ -770,9 +772,9 @@ func tlsClientConfig(s *APISpec, gw *Gateway) *tls.Config {
 	return config
 }
 
-func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, outReq *http.Request) *TykRoundTripper {
+func (p *ReverseProxy) httpTransport(dialTimeout float64, req *http.Request, outReq *http.Request) *TykRoundTripper {
 	p.logger.Debug("Creating new transport")
-	transport := p.defaultTransport(timeOut) // modifies a newly created transport
+	transport := p.defaultTransport(dialTimeout) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
 
@@ -933,6 +935,7 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		tr := otel.HTTPRoundTripper(baseRoundTripper)
 		return tr.RoundTrip(r)
 	}
+
 	if rt.h2ctransport != nil {
 		return rt.h2ctransport.RoundTrip(r)
 	}
@@ -1138,8 +1141,24 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 	return res, hijacked, err
 }
 
-func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outreq *http.Request) (res *http.Response, err error) {
+func (p *ReverseProxy) sendRequestToUpstream(roundTripper http.RoundTripper, outreq *http.Request) (res *http.Response, err error) {
 	return roundTripper.RoundTrip(outreq)
+}
+
+func (p *ReverseProxy) applyTimeout(r *http.Request) *http.Request {
+	httpDialTimeout := calculateDialTimeout(p.TykAPISpec)
+	reqTimeout, isTimeoutEnforced := p.GetEnforcedTimeoutSettings(p.TykAPISpec, r)
+
+	if !isTimeoutEnforced {
+		// set to global (gw-scoped value) if is not enforced by endpoint-level or api-level
+		reqTimeout = time.Duration(httpDialTimeout) * time.Second
+	}
+
+	timeoutContext, cancel := context.WithTimeout(r.Context(), reqTimeout)
+	defer cancel()
+	r = r.WithContext(timeoutContext)
+
+	return r
 }
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) ProxyResponse {
@@ -1260,16 +1279,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	p.TykAPISpec.Lock()
-
-	enforcedTimeout, isTimeoutEnforced := p.GetEnforcedTimeoutSettings(p.TykAPISpec, outreq)
-
-	// limit request time with context timeout
-	if isTimeoutEnforced {
-		timeoutContext, cancel := context.WithTimeout(outreq.Context(), enforcedTimeout)
-		defer cancel()
-
-		outreq = outreq.WithContext(timeoutContext)
-	}
+	outreq = p.applyTimeout(outreq)
 
 	// create HTTP transport
 	createTransport := p.TykAPISpec.HTTPTransport == nil
@@ -1288,22 +1298,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			oldTransport.DisableKeepAlives = true
 		}
 
-		timeout := proxyTimeout(p.TykAPISpec)
-		transportTimeout := timeout
-
-		// If an enforced timeout is configured for this API endpoint, we use context timeout instead of transport timeout
-		// to avoid conflicts between ResponseHeaderTimeout and context timeout
-		if isTimeoutEnforced {
-			// Don't pass the enforced timeout to transport - let context timeout handle it
-			// Use the default proxy timeout for transport instead
-			transportTimeout = proxyTimeout(p.TykAPISpec)
-			p.logger.Debug("Using context timeout for hard timeout, transport timeout: ", transportTimeout)
-		} else {
-			// For non-enforced timeouts, we can use the global timeout on transport
-			p.logger.Debug("Using transport timeout: ", timeout)
-		}
-
-		p.TykAPISpec.HTTPTransport = p.httpTransport(transportTimeout, rw, req, outreq)
+		p.TykAPISpec.HTTPTransport = p.httpTransport(calculateDialTimeout(p.TykAPISpec), req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 
 		if oldTransport != nil {
