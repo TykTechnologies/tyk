@@ -869,6 +869,8 @@ github.com/influxdata/go-syslog/v3 v3.0.0 h1:jichmjSZlYK0VMmlz+k4WeOQd7z745YLsvG
 github.com/influxdata/go-syslog/v3 v3.0.0/go.mod h1:tulsOp+CecTAYC27u9miMgq21GqXRW6VdKbOG+QSP4Q=
 github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c h1:qSHzRbhzK8RdXOsAdfDgO49TtqC1oZ+acxPrkfTxcCs=
 github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c/go.mod h1:qj24IKcXYK6Iy9ceXlo3Tc+vtHo9lIhSX5JddghvEPo=
+github.com/iskorotkov/avro/v2 v2.33.1 h1:/tyfa5IFPNDkeB59kuyu9fyPZ3aiwv9YsMZwd39CNg0=
+github.com/iskorotkov/avro/v2 v2.33.1/go.mod h1:yNyfWEaSvNBFk7FtQHUxMGO9YZzsCxxNqnzDKzzRCaY=
 github.com/iskorotkov/avro/v2 v2.34.0 h1:NSUmRFg8Gy51BuALFC6l6n0z1DFz6eAZT6XcjjIJ+FA=
 github.com/iskorotkov/avro/v2 v2.34.0/go.mod h1:euwnxvsKRkeD5nh0T7DLxBmJvRyycOyDBuDnTfDgwT8=
 github.com/itchyny/gojq v0.12.16 h1:yLfgLxhIr/6sJNVmYfQjTIv0jGctu6/DgDoivmxTr7g=
