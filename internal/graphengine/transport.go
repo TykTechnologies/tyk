@@ -4,6 +4,13 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"slices"
+	"strings"
+	"sync"
+
+	"golang.org/x/net/http/httpguts"
+
+	"github.com/TykTechnologies/tyk/header"
 )
 
 type NewReusableBodyReadCloserFunc func(io.ReadCloser) (io.ReadCloser, error)
@@ -14,6 +21,22 @@ type GraphQLEngineTransport struct {
 	transportType             GraphQLEngineTransportType
 	newReusableBodyReadCloser NewReusableBodyReadCloserFunc
 	headersConfig             ReverseProxyHeadersConfig
+
+	// fallbackRoundTripper serves the engines whose upstream requests cannot carry the
+	// per request round tripper, which today means EngineV1 alone: its legacy data
+	// sources build the upstream request with http.NewRequest and drop the execution
+	// context, so getGraphQLEngineTransportContextValue below finds nothing. Without it
+	// those fetches fall through to the plain transport of the API client, which cannot
+	// reach the gateway and so cannot serve a tyk:// internal data source.
+	//
+	// Shared across callers, unlike everything else here, so it is only sound while the
+	// round tripper the gateway hands over carries no caller state. It does not: it is
+	// the *TykRoundTripper cached on the API spec, whose only per request input is the
+	// request itself. The wrapper that used to make it caller specific was removed along
+	// with the double variable resolution, see handleGraphQL in gateway/reverse_proxy.go.
+	// Do not restore a caller specific round tripper there without removing this.
+	mu                   sync.RWMutex
+	fallbackRoundTripper http.RoundTripper
 }
 
 func NewGraphQLEngineTransport(
@@ -22,6 +45,9 @@ func NewGraphQLEngineTransport(
 	newReusableBodyReadCloser NewReusableBodyReadCloserFunc,
 	headersConfig ReverseProxyHeadersConfig,
 ) *GraphQLEngineTransport {
+	if originalTransport == nil {
+		originalTransport = http.DefaultTransport
+	}
 	transport := &GraphQLEngineTransport{
 		originalTransport:         originalTransport,
 		transportType:             transportType,
@@ -31,20 +57,81 @@ func NewGraphQLEngineTransport(
 	return transport
 }
 
+func configureGraphQLEngineHTTPClient(client *http.Client, transportType GraphQLEngineTransportType, newReusableBodyReadCloser NewReusableBodyReadCloserFunc) {
+	if client == nil {
+		return
+	}
+	if _, ok := client.Transport.(*GraphQLEngineTransport); ok {
+		return
+	}
+	client.Transport = NewGraphQLEngineTransport(transportType, client.Transport, newReusableBodyReadCloser, ReverseProxyHeadersConfig{})
+}
+
+// setFallbackRoundTripper records the round tripper to use for requests that arrive without
+// one of their own. Refreshed per request rather than stored once, because the gateway
+// rebuilds the transport of an API when max_conn_time expires and the old one stops opening
+// connections.
+func (g *GraphQLEngineTransport) setFallbackRoundTripper(roundTripper http.RoundTripper) {
+	if roundTripper == nil {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.fallbackRoundTripper = roundTripper
+}
+
+func (g *GraphQLEngineTransport) fallback() http.RoundTripper {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.fallbackRoundTripper
+}
+
 func (g *GraphQLEngineTransport) RoundTrip(request *http.Request) (res *http.Response, err error) {
-	switch g.transportType {
-	case GraphQLEngineTransportTypeProxyOnly:
-		val := GetProxyOnlyContextValue(request.Context())
-		if val != nil {
-			return g.handleProxyOnly(val, request)
+	requestTransport := g
+	if values := getGraphQLEngineTransportContextValue(request.Context()); values != nil {
+		requestTransport = &GraphQLEngineTransport{
+			originalTransport:         values.roundTripper,
+			transportType:             g.transportType,
+			newReusableBodyReadCloser: g.newReusableBodyReadCloser,
+			headersConfig:             values.headersConfig,
+		}
+		if requestTransport.originalTransport == nil {
+			requestTransport.originalTransport = g.originalTransport
 		}
 	}
 
-	return g.originalTransport.RoundTrip(request)
+	switch requestTransport.transportType {
+	case GraphQLEngineTransportTypeProxyOnly:
+		val := GetProxyOnlyContextValue(request.Context())
+		if val != nil {
+			return requestTransport.handleProxyOnly(val, request)
+		}
+	}
+
+	// requestTransport == g means the request carried no round tripper of its own.
+	if requestTransport == g {
+		if fallback := g.fallback(); fallback != nil {
+			return fallback.RoundTrip(request)
+		}
+	}
+	return requestTransport.originalTransport.RoundTrip(request)
+}
+
+// isWebSocketHandshake reports whether the request is a websocket upgrade handshake.
+// Mirrors upgradeType in gateway/reverse_proxy.go.
+func isWebSocketHandshake(request *http.Request) bool {
+	if !httpguts.HeaderValuesContainsToken(request.Header[header.Connection], "Upgrade") {
+		return false
+	}
+	return strings.EqualFold(request.Header.Get(header.Upgrade), "websocket")
 }
 
 func (g *GraphQLEngineTransport) handleProxyOnly(proxyOnlyValues *GraphQLProxyOnlyContextValues, request *http.Request) (*http.Response, error) {
-	request.Method = proxyOnlyValues.forwardedRequest.Method
+	// A websocket handshake has to stay a GET. Taking the method of the caller's request
+	// turns the upstream handshake into a POST, which every websocket server rejects.
+	if !isWebSocketHandshake(request) {
+		request.Method = proxyOnlyValues.forwardedRequest.Method
+	}
 	g.setProxyOnlyHeaders(proxyOnlyValues, request)
 	g.applyRequestHeadersRewriteRules(request)
 
@@ -73,7 +160,7 @@ func (g *GraphQLEngineTransport) handleProxyOnly(proxyOnlyValues *GraphQLProxyOn
 		}
 		response.Body = reusableBody
 	}
-	proxyOnlyValues.upstreamResponse = response
+	proxyOnlyValues.setUpstreamResponse(response)
 	return response, err
 }
 
@@ -169,12 +256,27 @@ func (g *GraphQLEngineTransport) setProxyOnlyHeaders(proxyOnlyValues *GraphQLPro
 			continue
 		}
 
+		// Prioritize consumer's header value when immutable headers are turned on.
+		// Delete the header from request_headers add the consumer's value. See TT-11990 and TT-12190.
+		//
+		// Deleted once, before any of the consumer's values are added. Inside the loop
+		// below it deleted the value added on the previous pass, so a consumer header
+		// with more than one value came out holding only its last one.
+		if g.headersConfig.ProxyOnly.UseImmutableHeaders && r.Header.Get(forwardedHeaderKey) != "" {
+			r.Header.Del(forwardedHeaderKey)
+		}
+
+		// What the engine put on the request, before the consumer's values are added. The
+		// engine and this loop are two writers that do not know about each other: with
+		// strip_auth_data off, additionalUpstreamHeaders has already added the consumer's
+		// auth header to the fetch input, and adding it again here sends the credential
+		// upstream twice. Compared against a snapshot rather than the header as it grows,
+		// so a consumer that really did send the same value twice keeps both.
+		engineValues := slices.Clone(r.Header.Values(forwardedHeaderKey))
+
 		for _, forwardedHeaderValue := range forwardedHeaderValues {
-			exitingHeaderValue := r.Header.Get(forwardedHeaderKey)
-			// Prioritize consumer's header value when immutable headers are turned on.
-			// Delete the header from request_headers add the consumer's value. See TT-11990 and TT-12190.
-			if g.headersConfig.ProxyOnly.UseImmutableHeaders && exitingHeaderValue != "" {
-				r.Header.Del(forwardedHeaderKey)
+			if slices.Contains(engineValues, forwardedHeaderValue) {
+				continue
 			}
 			r.Header.Add(forwardedHeaderKey, forwardedHeaderValue)
 		}
