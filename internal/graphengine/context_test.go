@@ -156,8 +156,8 @@ func TestSubscriptionRequestContext(t *testing.T) {
 		request, cancelRequest := newRequestWithTransportValues(t, taggedRoundTripper("caller"))
 		defer cancelRequest()
 
-		assert.NotNil(t, subscriptionRequestContext(nil, request))
-		assert.NotNil(t, subscriptionRequestContext(nil, nil))
+		assert.NotNil(t, subscriptionRequestContext(nil, request)) //nolint:staticcheck // SA1012: the nil context is what this test covers
+		assert.NotNil(t, subscriptionRequestContext(nil, nil))     //nolint:staticcheck // SA1012: the nil context is what this test covers
 		assert.Nil(t, getGraphQLEngineTransportContextValue(subscriptionRequestContext(context.Background(), nil)))
 	})
 }

@@ -36,15 +36,18 @@ func SetGraphQLEngineTransportContextValue(ctx context.Context, roundTripper htt
 }
 
 func copyGraphQLEngineTransportContextValue(target, source context.Context) context.Context {
-	value, _ := source.Value(graphqlTransportContextInfo).(*graphQLEngineTransportContextValues)
-	if value == nil {
+	value, ok := source.Value(graphqlTransportContextInfo).(*graphQLEngineTransportContextValues)
+	if !ok || value == nil {
 		return target
 	}
 	return context.WithValue(target, graphqlTransportContextInfo, value)
 }
 
 func getGraphQLEngineTransportContextValue(ctx context.Context) *graphQLEngineTransportContextValues {
-	value, _ := ctx.Value(graphqlTransportContextInfo).(*graphQLEngineTransportContextValues)
+	value, ok := ctx.Value(graphqlTransportContextInfo).(*graphQLEngineTransportContextValues)
+	if !ok {
+		return nil
+	}
 	return value
 }
 

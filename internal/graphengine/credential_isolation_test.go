@@ -9,8 +9,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -128,7 +130,8 @@ func newRecordingSSEUpstream(t *testing.T, recorder *authorizationRecorder) *htt
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		recorder.recordRequest(request)
 		writer.Header().Set("Content-Type", "text/event-stream")
-		_, _ = io.WriteString(writer, "event: next\ndata: {\"data\":{\"count\":1}}\n\nevent: complete\n\n")
+		_, err := io.WriteString(writer, "event: next\ndata: {\"data\":{\"count\":1}}\n\nevent: complete\n\n")
+		assert.NoError(t, err)
 	}))
 	t.Cleanup(server.Close)
 	return server
@@ -147,53 +150,77 @@ func newRecordingWSUpstream(t *testing.T, recorder *authorizationRecorder, subpr
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		recorder.recordRequest(request)
-
-		connection, err := nhooyrwebsocket.Accept(writer, request, &nhooyrwebsocket.AcceptOptions{
-			Subprotocols: []string{subprotocol},
-		})
-		if err != nil {
-			return
-		}
-		defer connection.CloseNow()
-		ctx := request.Context()
-		// connection_init
-		_, _, err = connection.Read(ctx)
-		if err != nil {
-			return
-		}
-		if err = connection.Write(ctx, nhooyrwebsocket.MessageText, []byte(`{"type":"connection_ack"}`)); err != nil {
-			return
-		}
-		// start / subscribe, once per subscription multiplexed onto this connection
-		for {
-			_, message, err := connection.Read(ctx)
-			if err != nil {
-				return
-			}
-			var start struct {
-				ID   string `json:"id"`
-				Type string `json:"type"`
-			}
-			if err = json.Unmarshal(message, &start); err != nil {
-				return
-			}
-			// Anything else is a stop, a complete or a keep alive, which carries no
-			// subscription to answer.
-			if start.Type != "start" && start.Type != "subscribe" {
-				continue
-			}
-			data := fmt.Sprintf(`{"type":%q,"id":%q,"payload":{"data":{"count":1}}}`, dataMessageType, start.ID)
-			if err = connection.Write(ctx, nhooyrwebsocket.MessageText, []byte(data)); err != nil {
-				return
-			}
-			complete := fmt.Sprintf(`{"type":"complete","id":%q}`, start.ID)
-			if err = connection.Write(ctx, nhooyrwebsocket.MessageText, []byte(complete)); err != nil {
-				return
-			}
-		}
+		serveRecordingWSConnection(writer, request, subprotocol, dataMessageType)
 	}))
 	t.Cleanup(server.Close)
 	return server
+}
+
+// serveRecordingWSConnection accepts the WebSocket connection, acknowledges the handshake
+// and then answers every subscription that arrives on it.
+//
+// It runs on a hijacked connection, which httptest.Server.Close does not wait for, so it
+// must never touch *testing.T: the goroutine can outlive the test. Every failure path
+// therefore just returns and lets the test observe the missing payload.
+func serveRecordingWSConnection(writer http.ResponseWriter, request *http.Request, subprotocol, dataMessageType string) {
+	connection, err := nhooyrwebsocket.Accept(writer, request, &nhooyrwebsocket.AcceptOptions{
+		Subprotocols: []string{subprotocol},
+	})
+	if err != nil {
+		return
+	}
+	defer connection.CloseNow() //nolint:errcheck // hijacked handler, cannot touch t; net.ErrClosed is the normal path
+
+	ctx := request.Context()
+	// connection_init
+	if _, _, err = connection.Read(ctx); err != nil {
+		return
+	}
+	if err = connection.Write(ctx, nhooyrwebsocket.MessageText, []byte(`{"type":"connection_ack"}`)); err != nil {
+		return
+	}
+	// start / subscribe, once per subscription multiplexed onto this connection
+	for {
+		_, message, err := connection.Read(ctx)
+		if err != nil {
+			return
+		}
+		if err = answerWSSubscription(ctx, connection, message, dataMessageType); err != nil {
+			return
+		}
+	}
+}
+
+// answerWSSubscription answers one start message with a single payload followed by a
+// complete. Anything else is a stop, a complete or a keep alive, which carries no
+// subscription to answer, so it is ignored.
+func answerWSSubscription(ctx context.Context, connection *nhooyrwebsocket.Conn, message []byte, dataMessageType string) error {
+	var start struct {
+		ID   string `json:"id"`
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(message, &start); err != nil {
+		return err
+	}
+	if start.Type != "start" && start.Type != "subscribe" {
+		return nil
+	}
+	data := fmt.Sprintf(`{"type":%q,"id":%q,"payload":{"data":{"count":1}}}`, dataMessageType, start.ID)
+	if err := connection.Write(ctx, nhooyrwebsocket.MessageText, []byte(data)); err != nil {
+		return err
+	}
+	complete := fmt.Sprintf(`{"type":"complete","id":%q}`, start.ID)
+	return connection.Write(ctx, nhooyrwebsocket.MessageText, []byte(complete))
+}
+
+// closeWSConnection closes connection and fails the test on anything other than the
+// expected already-closed error: coder/websocket reports net.ErrClosed when the peer
+// closed first, which is how these subscriptions normally end.
+func closeWSConnection(t *testing.T, connection *nhooyrwebsocket.Conn) {
+	t.Helper()
+	if err := connection.CloseNow(); err != nil && !errors.Is(err, net.ErrClosed) {
+		assert.NoError(t, err)
+	}
 }
 
 // isolationContextHeaderVariable matches the $tyk_context.headers_<Name> form, where the
@@ -822,7 +849,8 @@ func newRecordingGraphQLUpstream(t *testing.T, recorder *authorizationRecorder, 
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		recorder.recordRequest(request)
 		writer.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(writer, responseBody)
+		_, err := io.WriteString(writer, responseBody)
+		assert.NoError(t, err)
 	}))
 	t.Cleanup(server.Close)
 	return server
@@ -1018,9 +1046,7 @@ func subscribeOverWebSocket(t *testing.T, gatewayURL, headerName, credential, op
 		HTTPHeader:   requestHeader,
 	})
 	require.NoError(t, err)
-	defer func() {
-		_ = connection.CloseNow()
-	}()
+	defer closeWSConnection(t, connection)
 
 	require.NoError(t, connection.Write(ctx, nhooyrwebsocket.MessageText, []byte(`{"type":"connection_init"}`)))
 	_, acknowledgement, err := connection.Read(ctx)

@@ -915,7 +915,7 @@ func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
 		require.NoError(t, err)
 
 		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t, apidef.GraphQLExecutionModeProxyOnly)
-		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(_ *http.Request) *graphql.Request {
 			return &graphql.Request{Query: `{ hello }`}
 		}
 		headersConfig := ReverseProxyHeadersConfig{
@@ -942,7 +942,7 @@ func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
 		require.NoError(t, err)
 
 		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t, apidef.GraphQLExecutionModeProxyOnly)
-		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(_ *http.Request) *graphql.Request {
 			return nil
 		}
 
@@ -964,7 +964,7 @@ func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
 		require.NoError(t, err)
 
 		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t, apidef.GraphQLExecutionModeProxyOnly)
-		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(_ *http.Request) *graphql.Request {
 			return &graphql.Request{Query: `{ hello }`}
 		}
 		configureGraphQLEngineHTTPClient(
@@ -986,7 +986,7 @@ func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
 
 	t.Run("should keep the round tripper of every request when called more than once", func(t *testing.T) {
 		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t, apidef.GraphQLExecutionModeProxyOnly)
-		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(_ *http.Request) *graphql.Request {
 			return &graphql.Request{Query: `{ hello }`}
 		}
 

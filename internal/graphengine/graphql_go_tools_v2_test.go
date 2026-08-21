@@ -165,7 +165,7 @@ func TestReverseProxyPreHandlerV2_PreHandle(t *testing.T) {
 		require.NoError(t, err)
 
 		reverseProxyPreHandler := newTestReverseProxyPreHandlerV2(t)
-		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphqlv2.Request {
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(_ *http.Request) *graphqlv2.Request {
 			return &graphqlv2.Request{Query: `{ hello }`}
 		}
 		headersConfig := ReverseProxyHeadersConfig{
@@ -192,7 +192,7 @@ func TestReverseProxyPreHandlerV2_PreHandle(t *testing.T) {
 		require.NoError(t, err)
 
 		reverseProxyPreHandler := newTestReverseProxyPreHandlerV2(t)
-		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphqlv2.Request {
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(_ *http.Request) *graphqlv2.Request {
 			return nil
 		}
 
@@ -214,7 +214,7 @@ func TestReverseProxyPreHandlerV2_PreHandle(t *testing.T) {
 		require.NoError(t, err)
 
 		reverseProxyPreHandler := newTestReverseProxyPreHandlerV2(t)
-		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphqlv2.Request {
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(_ *http.Request) *graphqlv2.Request {
 			return &graphqlv2.Request{Query: `{ hello }`}
 		}
 		configureGraphQLEngineHTTPClient(
@@ -236,7 +236,7 @@ func TestReverseProxyPreHandlerV2_PreHandle(t *testing.T) {
 
 	t.Run("should keep the round tripper of every request when called more than once", func(t *testing.T) {
 		reverseProxyPreHandler := newTestReverseProxyPreHandlerV2(t)
-		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphqlv2.Request {
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(_ *http.Request) *graphqlv2.Request {
 			return &graphqlv2.Request{Query: `{ hello }`}
 		}
 
