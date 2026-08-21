@@ -72,18 +72,38 @@ func (g graphqlGoToolsV1) handleIntrospection(schema *graphql.Schema) (res *http
 	return
 }
 
-func (g graphqlGoToolsV1) headerModifier(additionalHeaders http.Header) postprocess.HeaderModifier {
+func (g graphqlGoToolsV1) headerModifier(outreq *http.Request, additionalHeaders http.Header, variableReplacer TykVariableReplacer) postprocess.HeaderModifier {
 	return func(header http.Header) {
-		for key := range additionalHeaders {
+		for key, values := range additionalHeaders {
+			// Assigned rather than Set so that a header with more than one value keeps
+			// all of them: the connection key of a subscription is built from every
+			// value, see connectionKey in the graphql-go-tools subscription client.
+			// Set would collapse them to the first one. The key has to be canonicalised
+			// by hand because a direct map write does not do it, while the Get above
+			// does.
 			if header.Get(key) == "" {
-				header.Set(key, additionalHeaders.Get(key))
+				header[http.CanonicalHeaderKey(key)] = append([]string(nil), values...)
 			}
+		}
+
+		// A nil replacer means the caller wants the additional headers merged and nothing
+		// resolved. EngineV1 has no header modifier at all, so this only guards a
+		// partially injected EngineV2.
+		if variableReplacer == nil {
+			return
+		}
+		for key, values := range header {
+			replaced := make([]string, len(values))
+			for index, value := range values {
+				replaced[index] = variableReplacer(outreq, value, false)
+			}
+			header[key] = replaced
 		}
 	}
 }
 
 func (g graphqlGoToolsV1) returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContextValues, resultWriter *graphql.EngineResultWriter, seekReadCloser SeekReadCloserFunc) error {
-	body, err := seekReadCloser(proxyOnlyCtx.upstreamResponse.Body)
+	body, err := seekReadCloser(proxyOnlyCtx.getUpstreamResponse().Body)
 	if body == nil {
 		// Response body already read by graphql-go-tools, and it's not re-readable. Quit silently.
 		return nil
@@ -481,12 +501,14 @@ type reverseProxyPreHandlerV1 struct {
 }
 
 func (r *reverseProxyPreHandlerV1) PreHandle(params ReverseProxyParams) (reverseProxyType ReverseProxyType, err error) {
-	r.httpClient.Transport = NewGraphQLEngineTransport(
-		DetermineGraphQLEngineTransportType(r.apiDefinition),
-		params.RoundTripper,
-		r.newReusableBodyReadCloser,
-		params.HeadersConfig,
-	)
+	// EngineV1 is the only engine that needs this. Its data sources drop the execution
+	// context, so the request scoped round tripper below never reaches them and a tyk://
+	// internal data source has nothing that can route it. See fallbackRoundTripper.
+	if transport, ok := r.httpClient.Transport.(*GraphQLEngineTransport); ok {
+		transport.setFallbackRoundTripper(params.RoundTripper)
+	}
+	requestContext := SetGraphQLEngineTransportContextValue(params.OutRequest.Context(), params.RoundTripper, params.HeadersConfig)
+	*params.OutRequest = *params.OutRequest.WithContext(requestContext)
 
 	switch {
 	case params.IsCORSPreflight:
