@@ -284,7 +284,7 @@
       "license": "Apache-2.0",
       "adaptation_notes": "Script tag payload in query parameter; multi-value Accept headers carried via headers_array to exercise the mapping. PL1."
     },
-    "required_features": [],
+    "required_features": ["libinjection_operators"],
     "request": {
       "method": "GET",
       "path": "/search",
@@ -329,7 +329,7 @@
       "license": "Apache-2.0",
       "adaptation_notes": "Classic tautology in query parameter. PL1."
     },
-    "required_features": [],
+    "required_features": ["libinjection_operators"],
     "request": {
       "method": "GET",
       "path": "/items",
@@ -507,7 +507,7 @@
       "source_file": null,
       "original_test_name": null,
       "license": null,
-      "adaptation_notes": "100-byte seed repeated 1024 times (102400 bytes) exceeds the configured request body limit; the engine must apply the limit policy without crashing and still answer the request."
+      "adaptation_notes": "100-byte seed repeated 104858 times (10485800 bytes) exceeds the shared 10 MiB experiment limit by 40 bytes; the engine must apply the limit policy without crashing."
     },
     "required_features": ["request_body_limit"],
     "request": {
@@ -519,7 +519,7 @@
       "query_params": {},
       "cookies": [],
       "body_base64": "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQQ==",
-      "body_repeat": 1024
+      "body_repeat": 104858
     },
     "expectations": {
       "block": {
@@ -679,7 +679,7 @@
   {
     "schema_version": 1,
     "id": "corpus-exclusion-arg-name",
-    "attack_family": "942",
+    "attack_family": "930",
     "applicable": true,
     "provenance": {
       "kind": "authored",
@@ -688,16 +688,16 @@
       "source_file": null,
       "original_test_name": null,
       "license": null,
-      "adaptation_notes": "SQLi tautology placed in the excluded parameter 'search'; the configured rule exclusion must suppress the libinjection match so the request passes. Same payload without the exclusion is corpus-942-sqli-libinjection."
+      "adaptation_notes": "Path traversal placed in the excluded parameter 'file'; the configured rule exclusion must suppress rule 930120 so the request passes. The base detection is corpus-930-lfi-passwd."
     },
     "required_features": ["rule_exclusions"],
     "request": {
       "method": "GET",
-      "path": "/search",
+      "path": "/download",
       "proto": "HTTP/1.1",
       "headers": {},
       "headers_array": {},
-      "query_params": { "search": "1' or '1'='1" },
+      "query_params": { "file": "../../../etc/passwd" },
       "cookies": [],
       "body_base64": ""
     },
@@ -707,14 +707,14 @@
         "enforced": false,
         "status": 200,
         "upstream_reached": true,
-        "matched_rule_ids": { "required": [], "forbidden": ["942100"] }
+        "matched_rule_ids": { "required": [], "forbidden": ["930120"] }
       },
       "audit": {
         "verdict": "allow",
         "enforced": false,
         "status": 200,
         "upstream_reached": true,
-        "matched_rule_ids": { "required": [], "forbidden": ["942100"] },
+        "matched_rule_ids": { "required": [], "forbidden": ["930120"] },
         "log_record": false
       }
     }
@@ -722,7 +722,7 @@
   {
     "schema_version": 1,
     "id": "corpus-body-restore-inspected",
-    "attack_family": "942",
+    "attack_family": "930",
     "applicable": true,
     "provenance": {
       "kind": "authored",
@@ -731,7 +731,7 @@
       "source_file": null,
       "original_test_name": null,
       "license": null,
-      "adaptation_notes": "SQLi form body is inspected, so blocking mode must refuse it; in audit mode upstream must receive the original bytes, proven by the upstream echo body_match. PL1."
+      "adaptation_notes": "A rule-930120 path traversal form value is inspected, so blocking mode must refuse it; in audit mode upstream must receive the original bytes, proven by body_match. This tests restoration without libinjection."
     },
     "required_features": ["request_body_inspection", "body_restoration"],
     "request": {
@@ -742,7 +742,7 @@
       "headers_array": {},
       "query_params": {},
       "cookies": [],
-      "body_base64": "dXNlcj1hZG1pbictLSZwYXNzPXg="
+      "body_base64": "ZmlsZT0uLi8uLi8uLi9ldGMvcGFzc3dk"
     },
     "expectations": {
       "block": {
@@ -751,7 +751,7 @@
         "status": 403,
         "upstream_reached": false,
         "anomaly_score": { "min": 5 },
-        "matched_rule_ids": { "required": ["942100"], "forbidden": [] }
+        "matched_rule_ids": { "required": ["930120"], "forbidden": [] }
       },
       "audit": {
         "verdict": "block",
@@ -759,9 +759,9 @@
         "status": 200,
         "upstream_reached": true,
         "anomaly_score": { "min": 5 },
-        "matched_rule_ids": { "required": ["942100"], "forbidden": [] },
+        "matched_rule_ids": { "required": ["930120"], "forbidden": [] },
         "log_record": true,
-        "body_match": "admin'--"
+        "body_match": "etc/passwd"
       }
     }
   },

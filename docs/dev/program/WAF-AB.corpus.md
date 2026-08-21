@@ -1,6 +1,8 @@
 # WAF A/B — Shared Corpus Format
 
-Status: accepted with amendments on 2026-08-21. Scope: both Tracks.
+Status: accepted with amendments on 2026-08-21. Scope: both Tracks. The
+approved calibration adds `libinjection_operators`, makes the oversize case
+exceed 10 MiB, and keeps generic behaviour cases independent of libinjection.
 
 ## 1. Canonical location and amendment rule
 
@@ -84,6 +86,8 @@ A case declares every capability it depends on:
 - `rule_exclusions` — configured rule exclusions suppress matches.
 - `inspection_failure_policy` — inspection errors follow a configured
   fail-open/fail-closed policy.
+- `libinjection_operators` — the case requires CRS `@detectSQLi` or
+  `@detectXSS` behaviour backed by libinjection.
 
 The vocabulary is track-neutral. Adding a name requires a format amendment;
 Tracks must not interpret names Track-specifically.
