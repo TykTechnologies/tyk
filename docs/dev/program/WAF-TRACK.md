@@ -22,11 +22,13 @@ generated rules distributable without rebuilding Gateway.
 
 The plan must:
 
-1. research and pin CRS plus the parser or CRSLang tooling;
+1. verify the approved CRS pin and research parser or CRSLang tooling;
 2. map the current Goja request, body, and lifecycle capabilities;
-3. name the public request-inspection test Seam;
-4. define the minimum generic ABI delta;
-5. define the shared corpus and benchmark commands; and
-6. report the target rules that depend on unsupported libinjection behavior.
+3. choose the integration point that best fits the JavaScript architecture;
+4. define a runner at the approved public HTTP test Seam;
+5. define the minimum generic ABI delta;
+6. use the approved shared corpus and benchmark commands; and
+7. report the target rules that depend on unsupported libinjection behavior.
 
-Do not change or copy the native Go Track.
+Do not use the native Go plan as an architecture template. Compare the final
+solutions only through the shared contract and measured evidence.

