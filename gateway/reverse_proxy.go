@@ -1145,7 +1145,7 @@ func (p *ReverseProxy) sendRequestToUpstream(roundTripper http.RoundTripper, out
 	return roundTripper.RoundTrip(outreq)
 }
 
-func (p *ReverseProxy) applyTimeout(r *http.Request) *http.Request {
+func (p *ReverseProxy) applyTimeout(r *http.Request) (*http.Request, context.CancelFunc) {
 	httpDialTimeout := calculateDialTimeout(p.TykAPISpec)
 	reqTimeout, isTimeoutEnforced := p.GetEnforcedTimeoutSettings(p.TykAPISpec, r)
 
@@ -1155,10 +1155,7 @@ func (p *ReverseProxy) applyTimeout(r *http.Request) *http.Request {
 	}
 
 	timeoutContext, cancel := context.WithTimeout(r.Context(), reqTimeout)
-	defer cancel()
-	r = r.WithContext(timeoutContext)
-
-	return r
+	return r.WithContext(timeoutContext), cancel
 }
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) ProxyResponse {
@@ -1279,7 +1276,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	p.TykAPISpec.Lock()
-	outreq = p.applyTimeout(outreq)
+	outreq, cancel := p.applyTimeout(outreq)
+	defer cancel()
 
 	// create HTTP transport
 	createTransport := p.TykAPISpec.HTTPTransport == nil
