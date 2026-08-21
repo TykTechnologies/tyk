@@ -25,7 +25,7 @@ require (
 	github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481
 	github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6
 	github.com/TykTechnologies/goverify v0.0.0-20260203113354-7a104729566e
-	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20260624141309-dae0d8d8d038
+	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20260818151404-c416c52a2dd3
 	github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
@@ -96,10 +96,11 @@ require (
 	github.com/Azure/go-amqp v1.4.0
 	github.com/IBM/sarama v1.46.3
 	github.com/Jeffail/gabs/v2 v2.7.0
-	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20250926102005-c54e73aae17d
+	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20260818151404-c416c52a2dd3
 	github.com/TykTechnologies/opentelemetry v0.0.26
 	github.com/TykTechnologies/structviewer v1.2.0
 	github.com/alecthomas/kingpin/v2 v2.4.0
+	github.com/coder/websocket v1.8.13
 	github.com/eclipse/paho.mqtt.golang v1.5.1
 	github.com/getkin/kin-openapi v0.133.0
 	github.com/go-playground/validator/v10 v10.30.1
@@ -263,7 +264,6 @@ require (
 	github.com/clbanning/mxj/v2 v2.7.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20260202195803-dba9d589def2 // indirect
 	github.com/cockroachdb/apd/v3 v3.2.1 // indirect
-	github.com/coder/websocket v1.8.13 // indirect
 	github.com/colinmarc/hdfs v1.1.3 // indirect
 	github.com/containerd/continuity v0.4.2 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
