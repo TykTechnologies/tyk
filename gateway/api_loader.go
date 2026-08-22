@@ -445,6 +445,12 @@ func (gw *Gateway) processSpec(
 		gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid.Copy()})
 	}
 
+	// WAFMiddleware inspects the request after size limiting and before
+	// context variables are recorded. EnabledForSpec gates it off for MCP
+	// and JSON-RPC APIs; it is independent of EnableJSVM and
+	// CustomMiddleware.Driver.
+	gw.mwAppendEnabled(&chainArray, &WAFMiddleware{BaseMiddleware: baseMid.Copy()})
+
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &PRMMiddleware{BaseMiddleware: baseMid.Copy()})

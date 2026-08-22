@@ -932,10 +932,9 @@ var wafCorpusFamilyOrder = []string{
 }
 
 // wafTrackGlobalEnabled records that the Track boots the test gateway with
-// its WAF global setting enabled. The global config keys land with the
-// middleware-integration bead; until then no global gate exists, the global
-// setting is implicitly on, and the per-API WAF configuration surface alone
-// controls enablement.
+// its WAF global setting enabled against the committed stub engine
+// fixtures; the per-API WAF configuration surface then controls mode and
+// enablement per corpus API.
 const wafTrackGlobalEnabled = true
 
 // wafTrackClaimedFeatures is the set of corpus required_features names this
@@ -1276,11 +1275,14 @@ func buildWafCorpusReport(results []wafCaseResult) *wafCorpusReport {
 func runWAFSharedCorpus(t *testing.T, corpusCases []wafCorpusCase) ([]wafCaseResult, *wafCorpusReport) {
 	t.Helper()
 
-	ts := StartTest(func(_ *config.Config) {
-		// The WAF global gate lands with the middleware-integration bead's
-		// config keys. Until then no global gate exists, the global setting
-		// is implicitly enabled (wafTrackGlobalEnabled), and the per-API WAF
-		// configuration surface alone controls enablement.
+	ts := StartTest(func(c *config.Config) {
+		// The middleware-integration bead's global gate: the Track boots
+		// the test gateway with the WAF global setting enabled, pointing
+		// at the committed stub engine fixtures.
+		c.WAF.Enabled = true
+		c.WAF.EnginePath = wafStubEnginePath
+		c.WAF.RulesetPath = wafStubRulesetPath
+		c.WAF.BodyLimit = wafRequestBodyLimit
 	})
 	defer ts.Close()
 

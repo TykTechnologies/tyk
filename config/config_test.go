@@ -71,6 +71,11 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 			func(c *Config) interface{} { return c.Security.CertificateExpiryMonitor.EventCooldownSeconds },
 			86400, 43200,
 		},
+		{
+			"WAFBodyLimit", "TYK_GW_WAF_BODYLIMIT",
+			func(c *Config) interface{} { return c.WAF.BodyLimit },
+			DefaultWAFBodyLimit, DefaultWAFBodyLimit + 1,
+		},
 	}
 
 	for _, tc := range cases {

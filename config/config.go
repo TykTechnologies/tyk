@@ -61,6 +61,9 @@ var (
 			Enabled:     false,
 			AllowUnsafe: []string{},
 		},
+		WAF: WAFConfig{
+			BodyLimit: DefaultWAFBodyLimit,
+		},
 		PIDFileLocation: "/var/run/tyk/tyk-gateway.pid",
 		Security: SecurityConfig{
 			CertificateExpiryMonitor: CertificateExpiryMonitorConfig{
@@ -98,6 +101,11 @@ const (
 	DefaultDashPolicyRecordName = "tyk_policies"
 
 	DefaultOTelResourceName = "tyk-gateway"
+
+	// DefaultWAFBodyLimit is the shared 10 MiB experiment body limit for
+	// WAF inspection (WAF-AB.contract.md, "WAF-GO approved choices"). It is
+	// not an approved production default.
+	DefaultWAFBodyLimit = 10 << 20
 )
 
 type PolicySource string
@@ -1273,6 +1281,12 @@ type Config struct {
 	// Configuration options for Python and gRPC plugins.
 	CoProcessOptions CoProcessConfig `json:"coprocess_options"`
 
+	// WAF configures the waf-js Web Application Firewall gate shared by
+	// every API that enables WAF inspection. It is independent of
+	// EnableJSVM, which continues to control only custom JavaScript
+	// middleware and virtual endpoints.
+	WAF WAFConfig `json:"waf"`
+
 	// Ignore the case of any endpoints for APIs managed by Tyk. Setting this to `true` will override any individual API and Ignore, Blacklist and Whitelist plugin endpoint settings.
 	IgnoreEndpointCase bool `json:"ignore_endpoint_case"`
 
@@ -1500,6 +1514,39 @@ type ResourceSyncConfig struct {
 
 	// Interval configures the interval in seconds between each retry on a resource sync error.
 	Interval int `json:"interval"`
+}
+
+// WAFConfig is the global WAF (waf-js track) configuration. WAF inspection
+// runs only when both the global Enabled flag and the per-API WAF flag are
+// set; MCP and JSON-RPC APIs are excluded and recorded as an unsupported
+// feature.
+type WAFConfig struct {
+	// Enabled is the global WAF gate. When false no API runs WAF
+	// inspection, regardless of per-API settings.
+	Enabled bool `json:"enabled"`
+
+	// EnginePath is the engine artifact path, resolved against the gateway
+	// working directory.
+	EnginePath string `json:"engine_path"`
+
+	// RulesetPath is the generated ruleset artifact path, resolved against
+	// the gateway working directory. It must stay inside the engine
+	// artifact's directory.
+	RulesetPath string `json:"ruleset_path"`
+
+	// InspectionLimit bounds one WAF inspection, in milliseconds. Zero
+	// selects the gateway default. A per-API timeout overrides it.
+	InspectionLimit int `json:"inspection_limit"`
+
+	// BodyLimit is the request-body inspection limit in bytes. It defaults
+	// to the shared 10 MiB experiment limit. A per-API body limit
+	// overrides it.
+	BodyLimit int `json:"body_limit"`
+
+	// PoolSize is the engine runtime-pool size. The key is reserved for
+	// the pooling bead; the current host uses one fresh runtime per
+	// inspection.
+	PoolSize int `json:"pool_size"`
 }
 
 type TykError struct {
