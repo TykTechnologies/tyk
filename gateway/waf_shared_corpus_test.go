@@ -7,15 +7,21 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -895,4 +901,864 @@ func TestWAFSharedCorpusBodyBytes(t *testing.T) {
 		assert.Equal(t, "1f8b0800000000000000", hex.EncodeToString(truncatedBody))
 		assert.False(t, bytes.Contains(truncatedBody, wafCorpusReplacementChar))
 	})
+}
+
+// ——————————————————————————————————————————————————————————————
+// Shared-seam runner (WAF-AB.contract.md "Shared test seam" and
+// WAF-AB.corpus.md Sections 6, 7, and 9).
+
+// Classifications, verbatim from WAF-AB.corpus.md Section 7.
+const (
+	wafClassPass               = "pass"
+	wafClassUnexpectedFailure  = "unexpected_failure"
+	wafClassUnsupportedFeature = "unsupported_feature"
+	wafClassHostUnavailable    = "host_unavailable"
+	wafClassNotApplicable      = "not_applicable"
+)
+
+// wafClassificationOrder is the fixed print order for classification counts.
+var wafClassificationOrder = []string{
+	wafClassPass,
+	wafClassUnexpectedFailure,
+	wafClassUnsupportedFeature,
+	wafClassHostUnavailable,
+	wafClassNotApplicable,
+}
+
+// wafCorpusFamilyOrder is the fixed print order for the per-family breakdown.
+var wafCorpusFamilyOrder = []string{
+	"920", "930", "931", "932", "933", "934",
+	"941", "942", "943", "944", "none",
+}
+
+// wafTrackGlobalEnabled records that the Track boots the test gateway with
+// its WAF global setting enabled. The global config keys land with the
+// middleware-integration bead; until then no global gate exists, the global
+// setting is implicitly on, and the per-API WAF configuration surface alone
+// controls enablement.
+const wafTrackGlobalEnabled = true
+
+// wafTrackClaimedFeatures is the set of corpus required_features names this
+// Track claims (WAF-AB.corpus.md Section 5). No engine beads have landed, so
+// the Track claims none and every feature-declaring case classifies
+// unsupported_feature with a recorded reason.
+var wafTrackClaimedFeatures = map[string]struct{}{}
+
+// wafUnclaimedFeatures returns the required_features names the Track does not
+// claim, in declared order.
+func wafUnclaimedFeatures(required []string) []string {
+	var unclaimed []string
+	for _, feature := range required {
+		if _, ok := wafTrackClaimedFeatures[feature]; !ok {
+			unclaimed = append(unclaimed, feature)
+		}
+	}
+	return unclaimed
+}
+
+// wafTrackRulesLoaded reports the CRS rules active in the Track's engine
+// configuration. No engine beads have landed, so zero rules are loaded and
+// the digest covers the empty ruleset.
+func wafTrackRulesLoaded() (count int, digest string) {
+	return 0, wafCorpusSHA256Hex(nil)
+}
+
+// wafDecisionRecord carries the closed shared WAF log-contract fields the
+// runner asserts on (WAF-AB.contract.md "Shared WAF log contract"): the
+// decision, matched rule IDs, and anomaly score.
+type wafDecisionRecord struct {
+	Mode           string
+	Path           string
+	Verdict        string
+	Enforced       bool
+	AnomalyScore   *int
+	MatchedRuleIDs []string
+}
+
+// wafTrackDecisionRecords returns the decision records observed for one
+// corpus replay. The log-record bead wires emission; until then no records
+// exist, so log_record:true expectations mismatch (stage-appropriate) and
+// log_record:false runs never fail for emitting one.
+func wafTrackDecisionRecords(_, _ string) []wafDecisionRecord {
+	return nil
+}
+
+// wafUpstreamRecorder captures what the echo upstream received for the most
+// recent replay. Replays are sequential and the gateway proxies
+// synchronously, so a reset/read cycle attributes one observation per replay.
+type wafUpstreamRecorder struct {
+	mu       sync.Mutex
+	hits     int
+	path     string
+	bodySize int
+	bodySHA  string
+}
+
+func (r *wafUpstreamRecorder) reset() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.hits, r.path, r.bodySize, r.bodySHA = 0, "", 0, ""
+}
+
+func (r *wafUpstreamRecorder) record(path string, body []byte) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.hits++
+	if r.hits > 1 {
+		return
+	}
+	r.path = path
+	r.bodySize = len(body)
+	r.bodySHA = wafCorpusSHA256Hex(body)
+}
+
+// snapshot returns hits plus the first received path, size, and digest.
+func (r *wafUpstreamRecorder) snapshot() (hits int, path string, size int, sha string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.hits, r.path, r.bodySize, r.bodySHA
+}
+
+// wafReplayLog adapts testing.TB so ts.Run transport failures become
+// host_unavailable evidence instead of failing the Go test; classification,
+// not the framework, owns the verdict.
+type wafReplayLog struct {
+	testing.TB
+	failures []string
+}
+
+func (l *wafReplayLog) Error(args ...any) { l.failures = append(l.failures, fmt.Sprint(args...)) }
+func (l *wafReplayLog) Errorf(format string, args ...any) {
+	l.failures = append(l.failures, fmt.Sprintf(format, args...))
+}
+func (l *wafReplayLog) Fatal(args ...any)                 { l.Error(args...) }
+func (l *wafReplayLog) Fatalf(format string, args ...any) { l.Errorf(format, args...) }
+func (l *wafReplayLog) Fail()                             { l.Error("Fail") }
+func (l *wafReplayLog) FailNow()                          { l.Error("FailNow") }
+func (l *wafReplayLog) Failed() bool                      { return len(l.failures) > 0 }
+
+// wafModeObservation is the evidence one replay produced, restricted to the
+// assertable seam surface: status, response body, upstream reachability, and
+// recorded log effects.
+type wafModeObservation struct {
+	Mode               string
+	Status             int
+	UpstreamReached    bool
+	UpstreamHits       int
+	UpstreamPath       string
+	UpstreamBodySHA256 string
+	ExpectedBodySHA256 string
+	ResponseBody       []byte
+}
+
+// wafObservedVerdict derives the on-the-wire verdict from status and upstream
+// reachability. A CRS block returns 403 and a fail-closed internal failure
+// returns 503, both without reaching upstream; everything else is allow.
+func wafObservedVerdict(o wafModeObservation) (verdict string, enforced bool) {
+	if !o.UpstreamReached && (o.Status == http.StatusForbidden || o.Status == http.StatusServiceUnavailable) {
+		return "block", true
+	}
+	return "allow", false
+}
+
+// wafCompareModeExpectation compares one replay's evidence against its
+// mode-keyed expectation and returns every mismatch reason. Per Section 6,
+// anomaly_score and matched_rule_ids are checked when decision-record
+// evidence is available; log_record true requires the record, log_record
+// false never fails a run that emits one.
+func wafCompareModeExpectation(mode string, exp wafCorpusExpectation, obs wafModeObservation, records []wafDecisionRecord) []string {
+	var mismatches []string
+
+	if obs.Status != exp.Status {
+		mismatches = append(mismatches, fmt.Sprintf("status: got %d want %d", obs.Status, exp.Status))
+	}
+	if obs.UpstreamReached != exp.UpstreamReached {
+		mismatches = append(mismatches, fmt.Sprintf("upstream_reached: got %t want %t", obs.UpstreamReached, exp.UpstreamReached))
+	}
+
+	verdict, enforced := wafObservedVerdict(obs)
+	if verdict != exp.Verdict {
+		mismatches = append(mismatches, fmt.Sprintf("verdict: got %s want %s", verdict, exp.Verdict))
+	}
+	if enforced != exp.Enforced {
+		mismatches = append(mismatches, fmt.Sprintf("enforced: got %t want %t", enforced, exp.Enforced))
+	}
+
+	if mode == wafCorpusModeAudit {
+		// Audit rule: upstream is reached, the status is unchanged from
+		// no-WAF behaviour (carried by the status comparison above), and no
+		// block is enforced.
+		if !obs.UpstreamReached {
+			mismatches = append(mismatches, "audit rule: upstream must be reached")
+		}
+		if enforced {
+			mismatches = append(mismatches, "audit rule: no block may be enforced")
+		}
+	}
+
+	if exp.BodyMatch != "" {
+		re, err := regexp.Compile(exp.BodyMatch)
+		if err != nil {
+			mismatches = append(mismatches, fmt.Sprintf("body_match: bad pattern %q: %v", exp.BodyMatch, err))
+		} else if !re.Match(obs.ResponseBody) {
+			mismatches = append(mismatches, fmt.Sprintf("body_match: response body does not contain %q", exp.BodyMatch))
+		}
+	}
+
+	if obs.UpstreamReached {
+		// Body restoration: the upstream must receive the original bytes
+		// unchanged, proven by digest against the loader-computed body.
+		if obs.UpstreamBodySHA256 != obs.ExpectedBodySHA256 {
+			mismatches = append(mismatches, fmt.Sprintf("body restoration: upstream received digest %s want %s", obs.UpstreamBodySHA256, obs.ExpectedBodySHA256))
+		}
+	}
+	if obs.UpstreamReached && obs.UpstreamHits != 1 {
+		mismatches = append(mismatches, fmt.Sprintf("upstream: expected exactly one upstream hit, got %d", obs.UpstreamHits))
+	}
+
+	if exp.LogRecord {
+		if len(records) == 0 {
+			mismatches = append(mismatches, "decision record: log_record=true but no decision record observed")
+		} else {
+			record := records[0]
+			if record.Verdict != "block" && record.Verdict != "allow" {
+				mismatches = append(mismatches, fmt.Sprintf("decision record: missing verdict, got %q", record.Verdict))
+			}
+			if record.MatchedRuleIDs == nil {
+				mismatches = append(mismatches, "decision record: missing matched rule IDs")
+			}
+			if record.AnomalyScore == nil {
+				mismatches = append(mismatches, "decision record: missing anomaly score")
+			}
+			if record.Verdict != exp.Verdict {
+				mismatches = append(mismatches, fmt.Sprintf("decision record verdict: got %s want %s", record.Verdict, exp.Verdict))
+			}
+			if exp.MatchedRuleIDs != nil {
+				matched := make(map[string]struct{}, len(record.MatchedRuleIDs))
+				for _, id := range record.MatchedRuleIDs {
+					matched[id] = struct{}{}
+				}
+				for _, id := range exp.MatchedRuleIDs.Required {
+					if _, ok := matched[id]; !ok {
+						mismatches = append(mismatches, fmt.Sprintf("matched rule IDs: required %s not matched", id))
+					}
+				}
+				for _, id := range exp.MatchedRuleIDs.Forbidden {
+					if _, ok := matched[id]; ok {
+						mismatches = append(mismatches, fmt.Sprintf("matched rule IDs: forbidden %s matched", id))
+					}
+				}
+			}
+			if exp.AnomalyScore != nil && record.AnomalyScore != nil {
+				score := *record.AnomalyScore
+				if exp.AnomalyScore.Min != nil && score < *exp.AnomalyScore.Min {
+					mismatches = append(mismatches, fmt.Sprintf("anomaly score: got %d want min %d", score, *exp.AnomalyScore.Min))
+				}
+				if exp.AnomalyScore.Max != nil && score > *exp.AnomalyScore.Max {
+					mismatches = append(mismatches, fmt.Sprintf("anomaly score: got %d want max %d", score, *exp.AnomalyScore.Max))
+				}
+			}
+		}
+	}
+	// log_record false: an emitted record never fails the run. No checks.
+
+	return mismatches
+}
+
+// wafModeResult records one (case, mode) replay outcome.
+type wafModeResult struct {
+	Mode               string
+	Status             int
+	UpstreamReached    bool
+	UpstreamBodySHA256 string
+	ExpectedBodySHA256 string
+	HostUnavailable    bool
+	OK                 bool
+	Mismatches         []string
+}
+
+// wafCaseResult records exactly one classification per corpus case plus the
+// evidence behind it.
+type wafCaseResult struct {
+	ID        string
+	Family    string
+	Class     string
+	Reason    string
+	Unclaimed []string
+	Modes     []wafModeResult
+}
+
+// wafCorpusReport is the per-run report required by WAF-AB.corpus.md
+// Section 7: applicable pass count and rate, rules loaded with digest,
+// deduplicated unsupported features, classification counts, and a
+// per-family breakdown.
+type wafCorpusReport struct {
+	Total              int
+	ApplicablePassed   int
+	ApplicableExecuted int
+	RulesLoaded        int
+	RulesDigest        string
+	Unsupported        []string
+	Counts             map[string]int
+	FamilyPass         map[string]int
+	FamilyUnexpected   map[string]int
+}
+
+func (r *wafCorpusReport) String() string {
+	rate := 0.0
+	if r.ApplicableExecuted > 0 {
+		rate = 100 * float64(r.ApplicablePassed) / float64(r.ApplicableExecuted)
+	}
+
+	features := "none"
+	if len(r.Unsupported) > 0 {
+		features = strings.Join(r.Unsupported, ", ")
+	}
+
+	lines := []string{
+		"WAF shared corpus report",
+		fmt.Sprintf("Applicable tests passed: %d/%d (%.1f%%)", r.ApplicablePassed, r.ApplicableExecuted, rate),
+		fmt.Sprintf("Rules loaded: %d (digest %s)", r.RulesLoaded, r.RulesDigest),
+		fmt.Sprintf("Unsupported features: %s", features),
+		"Classification counts:",
+	}
+	for _, class := range wafClassificationOrder {
+		lines = append(lines, fmt.Sprintf("  %s: %d", class, r.Counts[class]))
+	}
+	lines = append(lines, "Per-family breakdown:")
+	for _, family := range wafCorpusFamilyOrder {
+		lines = append(lines, fmt.Sprintf("  %s: pass=%d unexpected_failure=%d", family, r.FamilyPass[family], r.FamilyUnexpected[family]))
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func buildWafCorpusReport(results []wafCaseResult) *wafCorpusReport {
+	report := &wafCorpusReport{
+		Total:            len(results),
+		Counts:           make(map[string]int, len(wafClassificationOrder)),
+		FamilyPass:       make(map[string]int, len(wafCorpusFamilyOrder)),
+		FamilyUnexpected: make(map[string]int, len(wafCorpusFamilyOrder)),
+	}
+	for _, class := range wafClassificationOrder {
+		report.Counts[class] = 0
+	}
+
+	unsupported := map[string]struct{}{}
+	for _, result := range results {
+		report.Counts[result.Class]++
+		for _, feature := range result.Unclaimed {
+			unsupported[feature] = struct{}{}
+		}
+		switch result.Class {
+		case wafClassPass:
+			report.FamilyPass[result.Family]++
+		case wafClassUnexpectedFailure:
+			report.FamilyUnexpected[result.Family]++
+		}
+	}
+
+	report.Unsupported = make([]string, 0, len(unsupported))
+	for feature := range unsupported {
+		report.Unsupported = append(report.Unsupported, feature)
+	}
+	sort.Strings(report.Unsupported)
+
+	report.ApplicablePassed = report.Counts[wafClassPass]
+	report.ApplicableExecuted = report.Counts[wafClassPass] + report.Counts[wafClassUnexpectedFailure]
+	report.RulesLoaded, report.RulesDigest = wafTrackRulesLoaded()
+	return report
+}
+
+// runWAFSharedCorpus boots the test gateway with the WAF global setting
+// enabled, builds one API per mode on the WAF configuration surface with a
+// reachable echo upstream, replays every corpus case through ts.Run, and
+// classifies each executed case exactly once.
+func runWAFSharedCorpus(t *testing.T, corpusCases []wafCorpusCase) ([]wafCaseResult, *wafCorpusReport) {
+	t.Helper()
+
+	ts := StartTest(func(_ *config.Config) {
+		// The WAF global gate lands with the middleware-integration bead's
+		// config keys. Until then no global gate exists, the global setting
+		// is implicitly enabled (wafTrackGlobalEnabled), and the per-API WAF
+		// configuration surface alone controls enablement.
+	})
+	defer ts.Close()
+
+	recorder := &wafUpstreamRecorder{}
+	echo := func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		recorder.record(r.URL.Path, body)
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write(body); err != nil {
+			return
+		}
+	}
+
+	modes := []string{wafCorpusModeAudit, wafCorpusModeBlock}
+	listenPath := map[string]string{
+		wafCorpusModeAudit: "/waf-audit-mode",
+		wafCorpusModeBlock: "/waf-block-mode",
+	}
+	upstreamKey := map[string]string{
+		wafCorpusModeAudit: "waf-corpus-audit",
+		wafCorpusModeBlock: "waf-corpus-block",
+	}
+
+	// Register the echo upstream for every (mode, case path) pair. With
+	// StripListenPath the gateway forwards the stripped case path after the
+	// mode's target path, so the root case "/" lands on the bare key and
+	// every other case on key+path.
+	for _, mode := range modes {
+		for _, c := range corpusCases {
+			key := upstreamKey[mode]
+			if c.Request.Path != "/" {
+				key += c.Request.Path
+			}
+			ts.AddDynamicHandler(key, echo)
+		}
+	}
+
+	// One API per mode using the WAF configuration surface.
+	apiGens := make([]func(spec *APISpec), 0, len(modes))
+	for _, mode := range modes {
+		apiGens = append(apiGens, func(spec *APISpec) {
+			spec.APIID = "waf-corpus-" + mode
+			spec.Name = "waf-corpus-" + mode
+			spec.Proxy.ListenPath = listenPath[mode]
+			spec.Proxy.TargetURL = TestHttpAny + "/" + upstreamKey[mode]
+			spec.Proxy.StripListenPath = true
+			if wafTrackGlobalEnabled {
+				spec.WAF = apidef.WAFConfig{
+					Enabled:   true,
+					Mode:      mode,
+					BodyLimit: wafRequestBodyLimit,
+				}
+			}
+		})
+	}
+	for _, spec := range ts.Gw.BuildAndLoadAPI(apiGens...) {
+		require.Emptyf(t, spec.WAF.Validate(), "API %s WAF config must validate", spec.APIID)
+		assert.Equalf(t, spec.APIID, "waf-corpus-"+spec.WAF.EffectiveMode(), "API %s mode", spec.APIID)
+	}
+
+	results := make([]wafCaseResult, 0, len(corpusCases))
+	for _, c := range corpusCases {
+		result := wafCaseResult{ID: c.ID, Family: c.AttackFamily}
+
+		switch {
+		case !c.Applicable:
+			result.Class = wafClassNotApplicable
+			result.Reason = "applicable=false; skipped, never failed"
+			results = append(results, result)
+			continue
+
+		case len(wafUnclaimedFeatures(c.RequiredFeatures)) > 0:
+			unclaimed := wafUnclaimedFeatures(c.RequiredFeatures)
+			result.Class = wafClassUnsupportedFeature
+			result.Unclaimed = unclaimed
+			result.Reason = fmt.Sprintf("required features not claimed by the Track: %s", strings.Join(unclaimed, ", "))
+			if c.Request.Proto != "" && c.Request.Proto != "HTTP/1.1" {
+				result.Reason += fmt.Sprintf("; request proto %s not drivable at the seam", c.Request.Proto)
+			}
+			results = append(results, result)
+			continue
+
+		case c.Request.Proto != "" && c.Request.Proto != "HTTP/1.1":
+			// A protocol case without a declared protocol feature is still
+			// classified with a recorded reason, never silently skipped.
+			result.Class = wafClassUnsupportedFeature
+			result.Reason = fmt.Sprintf("request proto %s not drivable at the seam", c.Request.Proto)
+			results = append(results, result)
+			continue
+		}
+
+		body, err := c.bodyBytes()
+		if err != nil {
+			result.Class = wafClassUnexpectedFailure
+			result.Reason = fmt.Sprintf("harness: expanding body: %v", err)
+			results = append(results, result)
+			continue
+		}
+
+		tc, err := c.testCase()
+		if err != nil {
+			result.Class = wafClassUnexpectedFailure
+			result.Reason = fmt.Sprintf("harness: building test case: %v", err)
+			results = append(results, result)
+			continue
+		}
+
+		hostUnavailable := ""
+		for _, mode := range modes {
+			modeResult := wafModeResult{Mode: mode, ExpectedBodySHA256: wafCorpusSHA256Hex(body)}
+
+			recorder.reset()
+			replayLog := &wafReplayLog{TB: t}
+			tc.Path = listenPath[mode] + c.Request.Path
+			resp, runErr := ts.Run(replayLog, tc)
+
+			if runErr != nil {
+				modeResult.HostUnavailable = true
+				if hostUnavailable == "" {
+					hostUnavailable = fmt.Sprintf("gateway or upstream unavailable in %s mode: %v", mode, runErr)
+				}
+				result.Modes = append(result.Modes, modeResult)
+				continue
+			}
+
+			obs := wafModeObservation{
+				Mode:               mode,
+				ExpectedBodySHA256: modeResult.ExpectedBodySHA256,
+			}
+			if resp != nil {
+				obs.Status = resp.StatusCode
+				respBody, readErr := io.ReadAll(resp.Body)
+				if readErr != nil {
+					modeResult.Mismatches = append(modeResult.Mismatches, fmt.Sprintf("harness: reading response body: %v", readErr))
+				}
+				obs.ResponseBody = respBody
+			}
+			hits, upstreamPath, _, upstreamSHA := recorder.snapshot()
+			obs.UpstreamHits = hits
+			obs.UpstreamPath = upstreamPath
+			obs.UpstreamReached = hits > 0
+			if obs.UpstreamReached {
+				obs.UpstreamBodySHA256 = upstreamSHA
+			}
+
+			// 502/504 mean the gateway or upstream was unreachable or timed
+			// out; they are never corpus expectations.
+			if obs.Status == http.StatusBadGateway || obs.Status == http.StatusGatewayTimeout {
+				modeResult.HostUnavailable = true
+				if hostUnavailable == "" {
+					hostUnavailable = fmt.Sprintf("gateway or upstream unavailable in %s mode: status %d", mode, obs.Status)
+				}
+				result.Modes = append(result.Modes, modeResult)
+				continue
+			}
+
+			if len(replayLog.failures) > 0 {
+				modeResult.Mismatches = append(modeResult.Mismatches,
+					fmt.Sprintf("harness: replay framework reported: %s", strings.Join(replayLog.failures, "; ")))
+			}
+
+			modeResult.Status = obs.Status
+			modeResult.UpstreamReached = obs.UpstreamReached
+			modeResult.UpstreamBodySHA256 = obs.UpstreamBodySHA256
+			modeResult.Mismatches = append(modeResult.Mismatches,
+				wafCompareModeExpectation(mode, c.Expectations[mode], obs, wafTrackDecisionRecords(c.Request.Path, mode))...)
+			modeResult.OK = len(modeResult.Mismatches) == 0
+
+			result.Modes = append(result.Modes, modeResult)
+		}
+
+		switch {
+		case hostUnavailable != "":
+			result.Class = wafClassHostUnavailable
+			result.Reason = hostUnavailable
+		case wafAllModesOK(result.Modes):
+			result.Class = wafClassPass
+		default:
+			result.Class = wafClassUnexpectedFailure
+			var mismatches []string
+			for _, modeResult := range result.Modes {
+				if len(modeResult.Mismatches) > 0 {
+					mismatches = append(mismatches, fmt.Sprintf("[%s] %s", modeResult.Mode, strings.Join(modeResult.Mismatches, "; ")))
+				}
+			}
+			result.Reason = strings.Join(mismatches, " | ")
+		}
+
+		if result.Class != wafClassPass {
+			t.Logf("waf corpus: case %s classified %s: %s", result.ID, result.Class, result.Reason)
+		}
+		results = append(results, result)
+	}
+
+	return results, buildWafCorpusReport(results)
+}
+
+func wafAllModesOK(modeResults []wafModeResult) bool {
+	if len(modeResults) == 0 {
+		return false
+	}
+	for _, modeResult := range modeResults {
+		if !modeResult.OK {
+			return false
+		}
+	}
+	return true
+}
+
+func TestWAFSharedCorpus(t *testing.T) {
+	corpusCases, err := loadWAFCorpusFixture(wafCorpusDir(t))
+	require.NoError(t, err)
+
+	t.Run("mode and log-record expectation semantics", func(t *testing.T) {
+		score := 7
+		min := 5
+		fullRecord := wafDecisionRecord{
+			Mode:           wafCorpusModeAudit,
+			Verdict:        "block",
+			AnomalyScore:   &score,
+			MatchedRuleIDs: []string{"920274"},
+		}
+		allowAll := wafCorpusExpectation{
+			Verdict:         "allow",
+			Enforced:        false,
+			Status:          http.StatusOK,
+			UpstreamReached: true,
+		}
+		passObs := wafModeObservation{
+			Mode:               wafCorpusModeAudit,
+			Status:             http.StatusOK,
+			UpstreamReached:    true,
+			UpstreamHits:       1,
+			UpstreamBodySHA256: wafCorpusSHA256Hex(nil),
+			ExpectedBodySHA256: wafCorpusSHA256Hex(nil),
+		}
+
+		t.Run("log_record true requires a decision record", func(t *testing.T) {
+			exp := allowAll
+			exp.LogRecord = true
+			mismatches := wafCompareModeExpectation(wafCorpusModeAudit, exp, passObs, nil)
+			assert.Contains(t, mismatchesString(mismatches), "decision record: log_record=true but no decision record observed")
+		})
+
+		t.Run("log_record false never fails a run that emits one", func(t *testing.T) {
+			mismatches := wafCompareModeExpectation(wafCorpusModeAudit, allowAll, passObs, []wafDecisionRecord{fullRecord})
+			assert.Empty(t, mismatches)
+		})
+
+		t.Run("the decision record carries verdict, matched rule IDs, and anomaly score", func(t *testing.T) {
+			exp := wafCorpusExpectation{
+				Verdict:         "block",
+				Enforced:        true,
+				Status:          http.StatusForbidden,
+				UpstreamReached: false,
+				LogRecord:       true,
+				AnomalyScore:    &wafCorpusAnomalyScore{Min: &min},
+				MatchedRuleIDs:  &wafCorpusMatchedRuleIDs{Required: []string{"920274"}},
+			}
+			blockedObs := wafModeObservation{Mode: wafCorpusModeBlock, Status: http.StatusForbidden, UpstreamReached: false}
+
+			incomplete := wafDecisionRecord{Mode: wafCorpusModeBlock, Verdict: "block"}
+			joined := mismatchesString(wafCompareModeExpectation(wafCorpusModeBlock, exp, blockedObs, []wafDecisionRecord{incomplete}))
+			assert.Contains(t, joined, "decision record: missing matched rule IDs")
+			assert.Contains(t, joined, "decision record: missing anomaly score")
+
+			complete := wafCompareModeExpectation(wafCorpusModeBlock, exp, blockedObs, []wafDecisionRecord{fullRecord})
+			assert.Empty(t, complete)
+		})
+
+		t.Run("matched rule IDs honour required and forbidden sets", func(t *testing.T) {
+			exp := wafCorpusExpectation{
+				Verdict:         "block",
+				Enforced:        true,
+				Status:          http.StatusForbidden,
+				UpstreamReached: false,
+				LogRecord:       true,
+				MatchedRuleIDs:  &wafCorpusMatchedRuleIDs{Required: []string{"930120"}, Forbidden: []string{"920274"}},
+			}
+			blockedObs := wafModeObservation{Mode: wafCorpusModeBlock, Status: http.StatusForbidden, UpstreamReached: false}
+			joined := mismatchesString(wafCompareModeExpectation(wafCorpusModeBlock, exp, blockedObs, []wafDecisionRecord{fullRecord}))
+			assert.Contains(t, joined, "matched rule IDs: required 930120 not matched")
+			assert.Contains(t, joined, "matched rule IDs: forbidden 920274 matched")
+		})
+
+		t.Run("audit rule requires upstream reach and no enforcement", func(t *testing.T) {
+			blocked := passObs
+			blocked.Status = http.StatusForbidden
+			blocked.UpstreamReached = false
+			blocked.UpstreamBodySHA256 = ""
+			joined := mismatchesString(wafCompareModeExpectation(wafCorpusModeAudit, allowAll, blocked, nil))
+			assert.Contains(t, joined, "audit rule: upstream must be reached")
+			assert.Contains(t, joined, "audit rule: no block may be enforced")
+		})
+
+		t.Run("block-mode enforcement matches without a decision record", func(t *testing.T) {
+			exp := wafCorpusExpectation{
+				Verdict:         "block",
+				Enforced:        true,
+				Status:          http.StatusForbidden,
+				UpstreamReached: false,
+			}
+			blocked := wafModeObservation{Mode: wafCorpusModeBlock, Status: http.StatusForbidden, UpstreamReached: false}
+			assert.Empty(t, wafCompareModeExpectation(wafCorpusModeBlock, exp, blocked, nil))
+		})
+
+		t.Run("body restoration compares upstream digests with loader digests", func(t *testing.T) {
+			tampered := passObs
+			tampered.UpstreamBodySHA256 = wafCorpusSHA256Hex([]byte("tampered"))
+			joined := mismatchesString(wafCompareModeExpectation(wafCorpusModeAudit, allowAll, tampered, nil))
+			assert.Contains(t, joined, "body restoration: upstream received digest")
+		})
+	})
+
+	results, report := runWAFSharedCorpus(t, corpusCases)
+	t.Log("\n" + report.String())
+
+	byID := make(map[string]wafCaseResult, len(results))
+	for _, result := range results {
+		byID[result.ID] = result
+	}
+
+	t.Run("every case is classified exactly once", func(t *testing.T) {
+		require.Len(t, results, len(corpusCases))
+		valid := map[string]struct{}{
+			wafClassPass:               {},
+			wafClassUnexpectedFailure:  {},
+			wafClassUnsupportedFeature: {},
+			wafClassHostUnavailable:    {},
+			wafClassNotApplicable:      {},
+		}
+		for _, result := range results {
+			assert.Containsf(t, valid, result.Class, "case %s classification %q outside the five-value enum", result.ID, result.Class)
+		}
+		for _, c := range corpusCases {
+			_, ok := byID[c.ID]
+			assert.Truef(t, ok, "case %s missing from results", c.ID)
+		}
+		total := 0
+		for _, count := range report.Counts {
+			total += count
+		}
+		assert.Equal(t, len(corpusCases), total, "classification counts must sum to the corpus size")
+	})
+
+	t.Run("stage-appropriate distribution while the Track claims no features", func(t *testing.T) {
+		idsFor := func(class string) []string {
+			var ids []string
+			for _, result := range results {
+				if result.Class == class {
+					ids = append(ids, result.ID)
+				}
+			}
+			return ids
+		}
+
+		// With no engine, only benign traffic matches expectations; every
+		// executed attack expectation classifies unexpected_failure until
+		// engine beads land.
+		assert.ElementsMatch(t, []string{"corpus-benign-get"}, idsFor(wafClassPass))
+		assert.ElementsMatch(t, []string{
+			"corpus-920-host-ip",
+			"corpus-930-lfi-passwd",
+			"corpus-931-rfi-url",
+			"corpus-933-php-wrapper",
+			"corpus-934-nodejs-require",
+			"corpus-943-session-fixation",
+		}, idsFor(wafClassUnexpectedFailure))
+		assert.Len(t, idsFor(wafClassUnsupportedFeature), len(corpusCases)-7)
+		assert.Empty(t, idsFor(wafClassHostUnavailable))
+		assert.Empty(t, idsFor(wafClassNotApplicable))
+	})
+
+	t.Run("report prints every required section", func(t *testing.T) {
+		rendered := report.String()
+		assert.Contains(t, rendered, "WAF shared corpus report")
+		assert.Contains(t, rendered, "Applicable tests passed: 1/7 (14.3%)")
+		assert.Contains(t, rendered, fmt.Sprintf("Rules loaded: 0 (digest %s)", wafCorpusSHA256Hex(nil)))
+
+		assert.Contains(t, rendered, "Unsupported features:")
+		for feature := range wafCorpusFeatureRegistry {
+			assert.Containsf(t, rendered, feature, "every fixture feature must be reported")
+		}
+
+		assert.Contains(t, rendered, "Classification counts:")
+		assert.Contains(t, rendered, "pass: 1")
+		assert.Contains(t, rendered, "unexpected_failure: 6")
+		assert.Contains(t, rendered, "unsupported_feature: 11")
+		assert.Contains(t, rendered, "host_unavailable: 0")
+		assert.Contains(t, rendered, "not_applicable: 0")
+
+		assert.Contains(t, rendered, "Per-family breakdown:")
+		assert.Contains(t, rendered, "920: pass=0 unexpected_failure=1")
+		assert.Contains(t, rendered, "930: pass=0 unexpected_failure=1")
+		assert.Contains(t, rendered, "931: pass=0 unexpected_failure=1")
+		assert.Contains(t, rendered, "932: pass=0 unexpected_failure=0")
+		assert.Contains(t, rendered, "933: pass=0 unexpected_failure=1")
+		assert.Contains(t, rendered, "934: pass=0 unexpected_failure=1")
+		assert.Contains(t, rendered, "941: pass=0 unexpected_failure=0")
+		assert.Contains(t, rendered, "942: pass=0 unexpected_failure=0")
+		assert.Contains(t, rendered, "943: pass=0 unexpected_failure=1")
+		assert.Contains(t, rendered, "944: pass=0 unexpected_failure=0")
+		assert.Contains(t, rendered, "none: pass=1 unexpected_failure=0")
+	})
+
+	t.Run("audit-mode expectations hold at the seam", func(t *testing.T) {
+		benign := byID["corpus-benign-get"]
+		require.Equal(t, wafClassPass, benign.Class)
+		require.Len(t, benign.Modes, 2)
+
+		audit := wafModeResultFor(t, benign.Modes, wafCorpusModeAudit)
+		assert.True(t, audit.OK)
+		assert.Equal(t, http.StatusOK, audit.Status)
+		assert.True(t, audit.UpstreamReached, "audit mode must reach upstream")
+		assert.False(t, audit.HostUnavailable)
+
+		// Every executed attack case still reaches upstream in audit mode:
+		// detection expectations fail, transport semantics must not.
+		for _, id := range []string{
+			"corpus-920-host-ip",
+			"corpus-930-lfi-passwd",
+			"corpus-931-rfi-url",
+			"corpus-933-php-wrapper",
+			"corpus-934-nodejs-require",
+			"corpus-943-session-fixation",
+		} {
+			result := byID[id]
+			require.Equalf(t, wafClassUnexpectedFailure, result.Class, "case %s", id)
+			audit := wafModeResultFor(t, result.Modes, wafCorpusModeAudit)
+			assert.Truef(t, audit.UpstreamReached, "case %s audit mode must reach upstream", id)
+			assert.Equalf(t, http.StatusOK, audit.Status, "case %s audit status must be unchanged from no-WAF behaviour", id)
+			assert.Contains(t, mismatchesString(audit.Mismatches), "decision record", "case %s audit log_record=true must require the decision record")
+		}
+	})
+
+	t.Run("body restoration matches loader-computed digests", func(t *testing.T) {
+		for _, result := range results {
+			want, ok := wafCorpusBodyDigests[result.ID]
+			require.Truef(t, ok, "no loader digest recorded for %s", result.ID)
+			for _, modeResult := range result.Modes {
+				assert.Equalf(t, want.sha256, modeResult.ExpectedBodySHA256, "case %s %s loader-computed digest", result.ID, modeResult.Mode)
+				if modeResult.UpstreamReached {
+					assert.Equalf(t, want.sha256, modeResult.UpstreamBodySHA256, "case %s %s upstream must receive original bytes unchanged", result.ID, modeResult.Mode)
+				}
+			}
+		}
+	})
+
+	t.Run("protocol cases classify with a recorded reason", func(t *testing.T) {
+		h2c := byID["corpus-h2c-upgrade"]
+		assert.Equal(t, wafClassUnsupportedFeature, h2c.Class)
+		assert.Contains(t, h2c.Reason, "h2c_upgrade")
+
+		h2 := byID["corpus-tls-h2-benign"]
+		assert.Equal(t, wafClassUnsupportedFeature, h2.Class)
+		assert.Contains(t, h2.Reason, "http2_tls")
+		assert.Contains(t, h2.Reason, "HTTP/2.0")
+
+		assert.Contains(t, report.Unsupported, "h2c_upgrade")
+		assert.Contains(t, report.Unsupported, "http2_tls")
+	})
+}
+
+func wafModeResultFor(t *testing.T, modeResults []wafModeResult, mode string) wafModeResult {
+	t.Helper()
+	for _, modeResult := range modeResults {
+		if modeResult.Mode == mode {
+			return modeResult
+		}
+	}
+	t.Fatalf("no result for mode %s", mode)
+	return wafModeResult{}
+}
+
+func mismatchesString(mismatches []string) string {
+	return strings.Join(mismatches, "; ")
 }
