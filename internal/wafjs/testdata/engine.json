@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "kind": "wafjs-engine",
+  "version": "1",
+  "javascript": "// WAF-JS stub engine (host build/inspection fixture).\n//\n// Exports the single inspection entry point and returns a well-formed allow\n// finding. A reused transaction reports a block with skip_reason\n// \"transaction_reuse\" so tests can detect state leaking between inspections.\nglobalThis.wafjsInspect = function (tx, request) {\n\tif (tx.inspected) {\n\t\treturn {\n\t\t\tverdict: \"block\",\n\t\t\tanomaly_score: 0,\n\t\t\tmatched_rule_ids: [],\n\t\t\tinspection_scope: [],\n\t\t\tbody_inspected: false,\n\t\t\tskip_reason: \"transaction_reuse\",\n\t\t\tunsupported_features: []\n\t\t};\n\t}\n\ttx.inspected = true;\n\ttx.method = request.method;\n\ttx.rule_count = globalThis.wafjsRuleset ? globalThis.wafjsRuleset.length : -1;\n\treturn {\n\t\tverdict: \"allow\",\n\t\tanomaly_score: 0,\n\t\tmatched_rule_ids: [],\n\t\tinspection_scope: [\"args\", \"headers\", \"cookies\"],\n\t\tbody_inspected: false,\n\t\tskip_reason: \"\",\n\t\tunsupported_features: []\n\t};\n};\n"
+}

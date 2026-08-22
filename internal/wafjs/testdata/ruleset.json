@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "kind": "wafjs-ruleset",
+  "version": "1",
+  "crs_release": "v4.25.1",
+  "crs_manifest_sha256": "0539e66e7627fe71c160a644d8fb7ab6e450d53c9de208be5f95a35c70e1a154",
+  "rules": [
+    {
+      "id": "920100",
+      "family": "920",
+      "severity": 1
+    }
+  ]
+}
