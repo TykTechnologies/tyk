@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"slices"
 	"strings"
 	"text/template"
 	"time"
@@ -732,39 +733,39 @@ type APIDefinition struct {
 	// CertificatePinningDisabled disables public key pinning
 	CertificatePinningDisabled bool `bson:"certificate_pinning_disabled" json:"certificate_pinning_disabled,omitempty"`
 
-	EnableJWT                            bool                   `bson:"enable_jwt" json:"enable_jwt"`
-	UseStandardAuth                      bool                   `bson:"use_standard_auth" json:"use_standard_auth"`
-	UseGoPluginAuth                      bool                   `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`       // Deprecated. Use CustomPluginAuthEnabled instead.
-	EnableCoProcessAuth                  bool                   `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"` // Deprecated. Use CustomPluginAuthEnabled instead.
-	CustomPluginAuthEnabled              bool                   `bson:"custom_plugin_auth_enabled" json:"custom_plugin_auth_enabled"`
-	JWTSigningMethod                     string                 `bson:"jwt_signing_method" json:"jwt_signing_method"`
-	JWTSource                            string                 `bson:"jwt_source" json:"jwt_source"`
-	JWTJwksURIs                          []JWK                  `bson:"jwt_jwks_uris" json:"jwt_jwks_uris"`
-	JWTIdentityBaseField                 string                 `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
-	JWTClientIDBaseField                 string                 `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
-	JWTPolicyFieldName                   string                 `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
-	JWTDefaultPolicies                   []string               `bson:"jwt_default_policies" json:"jwt_default_policies"`
-	JWTIssuedAtValidationSkew            uint64                 `bson:"jwt_issued_at_validation_skew" json:"jwt_issued_at_validation_skew"`
-	JWTExpiresAtValidationSkew           uint64                 `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
-	JWTNotBeforeValidationSkew           uint64                 `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
-	JWTSkipKid                           bool                   `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
-	Scopes                               Scopes                 `bson:"scopes" json:"scopes,omitempty"`
-	IDPClientIDMappingDisabled           bool                   `bson:"idp_client_id_mapping_disabled" json:"idp_client_id_mapping_disabled"`
-	JWTScopeToPolicyMapping              map[string]string      `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
-	JWTScopeClaimName                    string                 `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
-	NotificationsDetails                 NotificationsManager   `bson:"notifications" json:"notifications"`
-	EnableSignatureChecking              bool                   `bson:"enable_signature_checking" json:"enable_signature_checking"`
-	HmacAllowedClockSkew                 float64                `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
-	HmacAllowedAlgorithms                []string               `bson:"hmac_allowed_algorithms" json:"hmac_allowed_algorithms"`
-	RequestSigning                       RequestSigningMeta     `bson:"request_signing" json:"request_signing"`
-	BaseIdentityProvidedBy               AuthTypeEnum           `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
-	VersionDefinition                    VersionDefinition      `bson:"definition" json:"definition"`
-	VersionData                          VersionData            `bson:"version_data" json:"version_data"` // Deprecated. Use VersionDefinition instead.
-	UptimeTests                          UptimeTests            `bson:"uptime_tests" json:"uptime_tests"`
-	Proxy                                ProxyConfig            `bson:"proxy" json:"proxy"`
-	DisableRateLimit                     bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
-	DisableQuota                         bool                   `bson:"disable_quota" json:"disable_quota"`
-	CustomMiddleware                     MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
+	EnableJWT                  bool                 `bson:"enable_jwt" json:"enable_jwt"`
+	UseStandardAuth            bool                 `bson:"use_standard_auth" json:"use_standard_auth"`
+	UseGoPluginAuth            bool                 `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`       // Deprecated. Use CustomPluginAuthEnabled instead.
+	EnableCoProcessAuth        bool                 `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"` // Deprecated. Use CustomPluginAuthEnabled instead.
+	CustomPluginAuthEnabled    bool                 `bson:"custom_plugin_auth_enabled" json:"custom_plugin_auth_enabled"`
+	JWTSigningMethod           string               `bson:"jwt_signing_method" json:"jwt_signing_method"`
+	JWTSource                  string               `bson:"jwt_source" json:"jwt_source"`
+	JWTJwksURIs                []JWK                `bson:"jwt_jwks_uris" json:"jwt_jwks_uris"`
+	JWTIdentityBaseField       string               `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
+	JWTClientIDBaseField       string               `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
+	JWTPolicyFieldName         string               `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
+	JWTDefaultPolicies         []string             `bson:"jwt_default_policies" json:"jwt_default_policies"`
+	JWTIssuedAtValidationSkew  uint64               `bson:"jwt_issued_at_validation_skew" json:"jwt_issued_at_validation_skew"`
+	JWTExpiresAtValidationSkew uint64               `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
+	JWTNotBeforeValidationSkew uint64               `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
+	JWTSkipKid                 bool                 `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
+	Scopes                     Scopes               `bson:"scopes" json:"scopes,omitempty"`
+	IDPClientIDMappingDisabled bool                 `bson:"idp_client_id_mapping_disabled" json:"idp_client_id_mapping_disabled"`
+	JWTScopeToPolicyMapping    map[string]string    `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
+	JWTScopeClaimName          string               `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
+	NotificationsDetails       NotificationsManager `bson:"notifications" json:"notifications"`
+	EnableSignatureChecking    bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
+	HmacAllowedClockSkew       float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
+	HmacAllowedAlgorithms      []string             `bson:"hmac_allowed_algorithms" json:"hmac_allowed_algorithms"`
+	RequestSigning             RequestSigningMeta   `bson:"request_signing" json:"request_signing"`
+	BaseIdentityProvidedBy     AuthTypeEnum         `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
+	VersionDefinition          VersionDefinition    `bson:"definition" json:"definition"`
+	VersionData                VersionData          `bson:"version_data" json:"version_data"` // Deprecated. Use VersionDefinition instead.
+	UptimeTests                UptimeTests          `bson:"uptime_tests" json:"uptime_tests"`
+	Proxy                      ProxyConfig          `bson:"proxy" json:"proxy"`
+	DisableRateLimit           bool                 `bson:"disable_rate_limit" json:"disable_rate_limit"`
+	DisableQuota               bool                 `bson:"disable_quota" json:"disable_quota"`
+	CustomMiddleware           MiddlewareSection    `bson:"custom_middleware" json:"custom_middleware"`
 	// CustomMiddlewareBundle is the bundle filename (or comma-separated list of
 	// bundle filenames) resolved against the gateway's bundle_base_url. A single
 	// name takes the legacy single-bundle load path unchanged. Two or more
@@ -802,6 +803,7 @@ type APIDefinition struct {
 	ConfigDataDisabled                   bool                   `bson:"config_data_disabled" json:"config_data_disabled"`
 	TagHeaders                           []string               `bson:"tag_headers" json:"tag_headers"`
 	GlobalRateLimit                      GlobalRateLimit        `bson:"global_rate_limit" json:"global_rate_limit"`
+	WAF                                  WAFConfig              `bson:"waf,omitempty" json:"waf,omitzero"`
 	StripAuthData                        bool                   `bson:"strip_auth_data" json:"strip_auth_data"`
 	EnableDetailedRecording              bool                   `bson:"enable_detailed_recording" json:"enable_detailed_recording"`
 	GraphQL                              GraphQLConfig          `bson:"graphql" json:"graphql"`
@@ -1937,4 +1939,126 @@ func (l *LogEventHandlerConf) Scan(in any) error {
 	}
 	*l = *conf
 	return nil
+}
+
+// WAF execution modes.
+const (
+	WAFModeAudit = "audit"
+	WAFModeBlock = "block"
+)
+
+// WAF request collections that can be excluded from inspection.
+const (
+	WAFCollectionArgs    = "args"
+	WAFCollectionHeaders = "headers"
+	WAFCollectionBody    = "body"
+	WAFCollectionCookies = "cookies"
+)
+
+// WAFCollections lists every supported WAF collection.
+var WAFCollections = []string{
+	WAFCollectionArgs,
+	WAFCollectionHeaders,
+	WAFCollectionBody,
+	WAFCollectionCookies,
+}
+
+// WAFConfig is the classic API definition WAF configuration.
+type WAFConfig struct {
+	Enabled          bool                 `bson:"enabled,omitempty" json:"enabled,omitempty"`
+	Mode             string               `bson:"mode,omitempty" json:"mode,omitempty"`
+	FailClosed       bool                 `bson:"fail_closed,omitempty" json:"fail_closed,omitempty"`
+	TimeoutMs        int                  `bson:"timeout_ms,omitempty" json:"timeout_ms,omitempty"`
+	BodyLimit        int                  `bson:"body_limit,omitempty" json:"body_limit,omitempty"`
+	ExcludedPaths    []string             `bson:"excluded_paths,omitempty" json:"excluded_paths,omitempty"`
+	RuleExclusions   []WAFRuleExclusion   `bson:"rule_exclusions,omitempty" json:"rule_exclusions,omitempty"`
+	TargetExclusions []WAFTargetExclusion `bson:"target_exclusions,omitempty" json:"target_exclusions,omitempty"`
+}
+
+// WAFRuleExclusion disables specific rules.
+type WAFRuleExclusion struct {
+	RuleIDs []string `bson:"rule_ids,omitempty" json:"rule_ids,omitempty"`
+}
+
+// WAFTargetExclusion disables inspection of a collection.
+type WAFTargetExclusion struct {
+	Collection string `bson:"collection,omitempty" json:"collection,omitempty"`
+}
+
+// EffectiveMode returns the configured mode, defaulting to audit.
+func (c WAFConfig) EffectiveMode() string {
+	if c.Mode == "" {
+		return WAFModeAudit
+	}
+	return c.Mode
+}
+
+// IsValidWAFRuleID reports whether id is a supported CRS rule ID.
+// Supported rule IDs are six digits in the 9xxxxx CRS range.
+func IsValidWAFRuleID(id string) bool {
+	if len(id) != 6 || id[0] != '9' {
+		return false
+	}
+	for _, r := range id {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// Validate checks the WAF configuration and returns every violation found.
+func (c WAFConfig) Validate() []error {
+	var errs []error
+
+	if c.Mode != "" && c.Mode != WAFModeAudit && c.Mode != WAFModeBlock {
+		errs = append(errs, fmt.Errorf("%w: %s", ErrInvalidWAFMode, c.Mode))
+	}
+	if c.TimeoutMs < 0 {
+		errs = append(errs, ErrInvalidWAFTimeout)
+	}
+	if c.BodyLimit < 0 {
+		errs = append(errs, ErrInvalidWAFBodyLimit)
+	}
+	for _, excludedPath := range c.ExcludedPaths {
+		if excludedPath == "" {
+			errs = append(errs, ErrInvalidWAFPath)
+			break
+		}
+	}
+
+	for _, exclusion := range c.RuleExclusions {
+		if len(exclusion.RuleIDs) == 0 {
+			errs = append(errs, ErrEmptyWAFRuleIDList)
+			continue
+		}
+		for _, ruleID := range exclusion.RuleIDs {
+			if !IsValidWAFRuleID(ruleID) {
+				errs = append(errs, fmt.Errorf("%w: %s", ErrUnknownWAFRuleID, ruleID))
+			}
+		}
+	}
+
+	seenRuleExclusions := make(map[string]struct{}, len(c.RuleExclusions))
+	for _, exclusion := range c.RuleExclusions {
+		key := "rule:" + strings.Join(exclusion.RuleIDs, ",")
+		if _, dup := seenRuleExclusions[key]; dup {
+			errs = append(errs, fmt.Errorf("%w: %s", ErrDuplicateWAFExclusion, key))
+		}
+		seenRuleExclusions[key] = struct{}{}
+	}
+
+	seenTargetExclusions := make(map[string]struct{}, len(c.TargetExclusions))
+	for _, exclusion := range c.TargetExclusions {
+		if !slices.Contains(WAFCollections, exclusion.Collection) {
+			errs = append(errs, fmt.Errorf("%w: %s", ErrUnknownWAFCollection, exclusion.Collection))
+		}
+		key := "target:" + exclusion.Collection
+		if _, dup := seenTargetExclusions[key]; dup {
+			errs = append(errs, fmt.Errorf("%w: %s", ErrDuplicateWAFExclusion, key))
+		}
+		seenTargetExclusions[key] = struct{}{}
+	}
+
+	return errs
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -1792,5 +1793,140 @@ func TestMiddleware_ExtractPrimitivesToExtendedPaths(t *testing.T) {
 		assert.Equal(t, "/mcp-tool:tool-name", ep.Internal[0].Path)
 		assert.Equal(t, "/mcp-resource:resource://path", ep.Internal[1].Path)
 		assert.Equal(t, "/mcp-prompt:prompt-name", ep.Internal[2].Path)
+	})
+}
+
+func TestWAF(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		var emptyWAF WAF
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		emptyWAF.ExtractTo(&convertedAPI)
+
+		var resultWAF WAF
+		resultWAF.Fill(convertedAPI)
+
+		assert.Equal(t, emptyWAF, resultWAF)
+	})
+
+	t.Run("absent in global", func(t *testing.T) {
+		var global Global
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		global.ExtractTo(&convertedAPI)
+
+		assert.Equal(t, apidef.WAFConfig{}, convertedAPI.WAF)
+		assert.Nil(t, global.WAF)
+
+		var resultGlobal Global
+		resultGlobal.Fill(convertedAPI)
+
+		assert.Nil(t, resultGlobal.WAF)
+		assert.Equal(t, global, resultGlobal)
+	})
+
+	t.Run("round trip all fields", func(t *testing.T) {
+		global := Global{
+			WAF: &WAF{
+				Enabled:    true,
+				Mode:       apidef.WAFModeBlock,
+				FailClosed: true,
+				TimeoutMs:  250,
+				BodyLimit:  4096,
+				ExcludedPaths: []string{
+					"/health",
+					"/status",
+				},
+				RuleExclusions: []WAFRuleExclusion{
+					{RuleIDs: []string{"920100", "942100"}},
+					{RuleIDs: []string{"930100"}},
+				},
+				TargetExclusions: []WAFTargetExclusion{
+					{Collection: apidef.WAFCollectionArgs},
+					{Collection: apidef.WAFCollectionBody},
+				},
+			},
+		}
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		global.ExtractTo(&convertedAPI)
+
+		expected := apidef.WAFConfig{
+			Enabled:    true,
+			Mode:       apidef.WAFModeBlock,
+			FailClosed: true,
+			TimeoutMs:  250,
+			BodyLimit:  4096,
+			ExcludedPaths: []string{
+				"/health",
+				"/status",
+			},
+			RuleExclusions: []apidef.WAFRuleExclusion{
+				{RuleIDs: []string{"920100", "942100"}},
+				{RuleIDs: []string{"930100"}},
+			},
+			TargetExclusions: []apidef.WAFTargetExclusion{
+				{Collection: apidef.WAFCollectionArgs},
+				{Collection: apidef.WAFCollectionBody},
+			},
+		}
+		assert.Equal(t, expected, convertedAPI.WAF)
+
+		var resultGlobal Global
+		resultGlobal.Fill(convertedAPI)
+		assert.Equal(t, global, resultGlobal)
+	})
+
+	t.Run("classic and oas definitions are equivalent", func(t *testing.T) {
+		classic := apidef.WAFConfig{
+			Enabled:    true,
+			Mode:       apidef.WAFModeAudit,
+			FailClosed: true,
+			TimeoutMs:  100,
+			BodyLimit:  2048,
+			ExcludedPaths: []string{
+				"/health",
+			},
+			RuleExclusions: []apidef.WAFRuleExclusion{
+				{RuleIDs: []string{"920100"}},
+			},
+			TargetExclusions: []apidef.WAFTargetExclusion{
+				{Collection: apidef.WAFCollectionHeaders},
+			},
+		}
+
+		api := apidef.APIDefinition{WAF: classic}
+
+		var global Global
+		global.Fill(api)
+		require.NotNil(t, global.WAF)
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		global.ExtractTo(&convertedAPI)
+
+		assert.Equal(t, classic, convertedAPI.WAF)
+	})
+
+	t.Run("json names", func(t *testing.T) {
+		data, err := json.Marshal(&WAF{
+			Enabled:          true,
+			Mode:             apidef.WAFModeBlock,
+			FailClosed:       true,
+			TimeoutMs:        1,
+			BodyLimit:        2,
+			ExcludedPaths:    []string{"/health"},
+			RuleExclusions:   []WAFRuleExclusion{{RuleIDs: []string{"920100"}}},
+			TargetExclusions: []WAFTargetExclusion{{Collection: apidef.WAFCollectionArgs}},
+		})
+		require.NoError(t, err)
+
+		expected := `{"enabled":true,"mode":"block","failClosed":true,"timeoutMs":1,"bodyLimit":2,` +
+			`"excludedPaths":["/health"],"ruleExclusions":[{"ruleIDs":["920100"]}],` +
+			`"targetExclusions":[{"collection":"args"}]}`
+		assert.JSONEq(t, expected, string(data))
 	})
 }

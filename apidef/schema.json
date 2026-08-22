@@ -694,6 +694,60 @@
         }
       }
     },
+    "waf": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "fail_closed": {
+          "type": "boolean"
+        },
+        "timeout_ms": {
+          "type": "integer"
+        },
+        "body_limit": {
+          "type": "integer"
+        },
+        "excluded_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rule_exclusions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "rule_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "target_exclusions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "collection": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
     "request_signing": {
       "type": [
         "object",

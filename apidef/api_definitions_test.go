@@ -1298,3 +1298,62 @@ func TestVersionDefinition_ResolvedDefault(t *testing.T) {
 		})
 	}
 }
+
+func TestAPIDefinition_WAF(t *testing.T) {
+	t.Run("defaults", func(t *testing.T) {
+		var waf WAFConfig
+		assert.False(t, waf.Enabled)
+		assert.Equal(t, WAFModeAudit, waf.EffectiveMode())
+		assert.False(t, waf.FailClosed)
+	})
+
+	t.Run("effective mode", func(t *testing.T) {
+		assert.Equal(t, WAFModeAudit, WAFConfig{}.EffectiveMode())
+		assert.Equal(t, WAFModeAudit, WAFConfig{Mode: WAFModeAudit}.EffectiveMode())
+		assert.Equal(t, WAFModeBlock, WAFConfig{Mode: WAFModeBlock}.EffectiveMode())
+	})
+
+	t.Run("rule id validity", func(t *testing.T) {
+		assert.True(t, IsValidWAFRuleID("920100"))
+		assert.True(t, IsValidWAFRuleID("999999"))
+		assert.False(t, IsValidWAFRuleID("92010"))
+		assert.False(t, IsValidWAFRuleID("9201000"))
+		assert.False(t, IsValidWAFRuleID("120100"))
+		assert.False(t, IsValidWAFRuleID("92010a"))
+		assert.False(t, IsValidWAFRuleID(""))
+	})
+
+	t.Run("zero value omits waf from json", func(t *testing.T) {
+		data, err := json.Marshal(&APIDefinition{})
+		require.NoError(t, err)
+		assert.NotContains(t, string(data), "\"waf\"")
+	})
+
+	t.Run("json round trip", func(t *testing.T) {
+		api := APIDefinition{
+			WAF: WAFConfig{
+				Enabled:    true,
+				Mode:       WAFModeBlock,
+				FailClosed: true,
+				TimeoutMs:  250,
+				BodyLimit:  4096,
+				ExcludedPaths: []string{
+					"/health",
+				},
+				RuleExclusions: []WAFRuleExclusion{
+					{RuleIDs: []string{"920100", "942100"}},
+				},
+				TargetExclusions: []WAFTargetExclusion{
+					{Collection: WAFCollectionArgs},
+				},
+			},
+		}
+
+		data, err := json.Marshal(&api)
+		require.NoError(t, err)
+
+		var decoded APIDefinition
+		require.NoError(t, json.Unmarshal(data, &decoded))
+		assert.Equal(t, api.WAF, decoded.WAF)
+	})
+}

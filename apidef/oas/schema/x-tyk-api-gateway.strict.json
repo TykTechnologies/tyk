@@ -632,6 +632,9 @@
         "requestSizeLimit": {
           "$ref": "#/definitions/X-Tyk-GlobalRequestSizeLimit"
         },
+        "waf": {
+          "$ref": "#/definitions/X-Tyk-WAF"
+        },
         "skipRateLimit": {
           "type": "boolean"
         },
@@ -2779,6 +2782,75 @@
       "required": [
         "enabled",
         "value"
+      ],
+      "additionalProperties": false
+    },
+    "X-Tyk-WAF": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "failClosed": {
+          "type": "boolean"
+        },
+        "timeoutMs": {
+          "type": "integer"
+        },
+        "bodyLimit": {
+          "type": "integer"
+        },
+        "excludedPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ruleExclusions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/X-Tyk-WAFRuleExclusion"
+          }
+        },
+        "targetExclusions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/X-Tyk-WAFTargetExclusion"
+          }
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "X-Tyk-WAFRuleExclusion": {
+      "type": "object",
+      "properties": {
+        "ruleIDs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "ruleIDs"
+      ],
+      "additionalProperties": false
+    },
+    "X-Tyk-WAFTargetExclusion": {
+      "type": "object",
+      "properties": {
+        "collection": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "collection"
       ],
       "additionalProperties": false
     },

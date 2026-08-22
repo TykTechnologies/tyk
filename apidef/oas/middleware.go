@@ -160,6 +160,10 @@ type Global struct {
 	// RequestSizeLimit contains the configuration related to limiting the global request size.
 	RequestSizeLimit *GlobalRequestSizeLimit `bson:"requestSizeLimit,omitempty" json:"requestSizeLimit,omitempty"`
 
+	// WAF contains the configuration related to the Web Application Firewall.
+	// Tyk classic API definition: `waf`.
+	WAF *WAF `bson:"waf,omitempty" json:"waf,omitempty"`
+
 	// IgnoreCase contains the configuration to treat routes as case-insensitive.
 	IgnoreCase *IgnoreCase `bson:"ignoreCase,omitempty" json:"ignoreCase,omitempty"`
 
@@ -304,6 +308,7 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	g.fillTrafficLogs(api)
 
 	g.fillRequestSizeLimit(api)
+	g.fillWAF(api)
 
 	g.fillSkips(api)
 }
@@ -327,6 +332,17 @@ func (g *Global) fillRequestSizeLimit(api apidef.APIDefinition) {
 	g.RequestSizeLimit.Fill(api)
 	if ShouldOmit(g.RequestSizeLimit) {
 		g.RequestSizeLimit = nil
+	}
+}
+
+func (g *Global) fillWAF(api apidef.APIDefinition) {
+	if g.WAF == nil {
+		g.WAF = &WAF{}
+	}
+
+	g.WAF.Fill(api)
+	if ShouldOmit(g.WAF) {
+		g.WAF = nil
 	}
 }
 
@@ -422,6 +438,7 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	updateMainVersion(api, vInfo)
 
 	g.extractRequestSizeLimitTo(api)
+	g.extractWAFTo(api)
 
 	g.extractSkipsTo(api)
 }
@@ -446,6 +463,17 @@ func (g *Global) extractRequestSizeLimitTo(api *apidef.APIDefinition) {
 	}
 
 	g.RequestSizeLimit.ExtractTo(api)
+}
+
+func (g *Global) extractWAFTo(api *apidef.APIDefinition) {
+	if g.WAF == nil {
+		g.WAF = &WAF{}
+		defer func() {
+			g.WAF = nil
+		}()
+	}
+
+	g.WAF.ExtractTo(api)
 }
 
 func (g *Global) extractContextVariablesTo(api *apidef.APIDefinition) {
@@ -1964,4 +1992,116 @@ func (p *IgnoreCase) ExtractTo(api *apidef.APIDefinition) {
 	}()
 
 	mainVersion.IgnoreEndpointCase = p.Enabled
+}
+
+// WAF holds the configuration related to the Web Application Firewall.
+type WAF struct {
+	// Enabled activates the WAF for the API.
+	//
+	// Tyk classic API definition: `waf.enabled`.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Mode is the WAF execution mode: audit or block.
+	//
+	// Tyk classic API definition: `waf.mode`.
+	Mode string `bson:"mode,omitempty" json:"mode,omitempty"`
+	// FailClosed rejects requests when the WAF engine fails.
+	//
+	// Tyk classic API definition: `waf.fail_closed`.
+	FailClosed bool `bson:"failClosed,omitempty" json:"failClosed,omitempty"`
+	// TimeoutMs is the WAF processing timeout in milliseconds.
+	//
+	// Tyk classic API definition: `waf.timeout_ms`.
+	TimeoutMs int `bson:"timeoutMs,omitempty" json:"timeoutMs,omitempty"`
+	// BodyLimit is the maximum request body size in bytes inspected by the WAF.
+	//
+	// Tyk classic API definition: `waf.body_limit`.
+	BodyLimit int `bson:"bodyLimit,omitempty" json:"bodyLimit,omitempty"`
+	// ExcludedPaths lists request paths excluded from WAF inspection.
+	//
+	// Tyk classic API definition: `waf.excluded_paths`.
+	ExcludedPaths []string `bson:"excludedPaths,omitempty" json:"excludedPaths,omitempty"`
+	// RuleExclusions lists WAF rules disabled for the API.
+	//
+	// Tyk classic API definition: `waf.rule_exclusions`.
+	RuleExclusions []WAFRuleExclusion `bson:"ruleExclusions,omitempty" json:"ruleExclusions,omitempty"`
+	// TargetExclusions lists request collections excluded from WAF inspection.
+	//
+	// Tyk classic API definition: `waf.target_exclusions`.
+	TargetExclusions []WAFTargetExclusion `bson:"targetExclusions,omitempty" json:"targetExclusions,omitempty"`
+}
+
+// Fill fills *WAF from apidef.APIDefinition.
+func (w *WAF) Fill(api apidef.APIDefinition) {
+	w.Enabled = api.WAF.Enabled
+	w.Mode = api.WAF.Mode
+	w.FailClosed = api.WAF.FailClosed
+	w.TimeoutMs = api.WAF.TimeoutMs
+	w.BodyLimit = api.WAF.BodyLimit
+	w.ExcludedPaths = api.WAF.ExcludedPaths
+
+	if len(api.WAF.RuleExclusions) > 0 {
+		w.RuleExclusions = make([]WAFRuleExclusion, 0, len(api.WAF.RuleExclusions))
+		for _, exclusion := range api.WAF.RuleExclusions {
+			w.RuleExclusions = append(w.RuleExclusions, WAFRuleExclusion{
+				RuleIDs: exclusion.RuleIDs,
+			})
+		}
+	}
+
+	if len(api.WAF.TargetExclusions) > 0 {
+		w.TargetExclusions = make([]WAFTargetExclusion, 0, len(api.WAF.TargetExclusions))
+		for _, exclusion := range api.WAF.TargetExclusions {
+			w.TargetExclusions = append(w.TargetExclusions, WAFTargetExclusion{
+				Collection: exclusion.Collection,
+			})
+		}
+	}
+}
+
+// ExtractTo extracts *WAF into *apidef.APIDefinition.
+func (w *WAF) ExtractTo(api *apidef.APIDefinition) {
+	api.WAF.Enabled = w.Enabled
+	api.WAF.Mode = w.Mode
+	api.WAF.FailClosed = w.FailClosed
+	api.WAF.TimeoutMs = w.TimeoutMs
+	api.WAF.BodyLimit = w.BodyLimit
+	api.WAF.ExcludedPaths = w.ExcludedPaths
+
+	if len(w.RuleExclusions) > 0 {
+		api.WAF.RuleExclusions = make([]apidef.WAFRuleExclusion, 0, len(w.RuleExclusions))
+		for _, exclusion := range w.RuleExclusions {
+			api.WAF.RuleExclusions = append(api.WAF.RuleExclusions, apidef.WAFRuleExclusion{
+				RuleIDs: exclusion.RuleIDs,
+			})
+		}
+	} else {
+		api.WAF.RuleExclusions = nil
+	}
+
+	if len(w.TargetExclusions) > 0 {
+		api.WAF.TargetExclusions = make([]apidef.WAFTargetExclusion, 0, len(w.TargetExclusions))
+		for _, exclusion := range w.TargetExclusions {
+			api.WAF.TargetExclusions = append(api.WAF.TargetExclusions, apidef.WAFTargetExclusion{
+				Collection: exclusion.Collection,
+			})
+		}
+	} else {
+		api.WAF.TargetExclusions = nil
+	}
+}
+
+// WAFRuleExclusion disables specific WAF rules.
+type WAFRuleExclusion struct {
+	// RuleIDs lists the WAF rule IDs to disable.
+	//
+	// Tyk classic API definition: `waf.rule_exclusions[].rule_ids`.
+	RuleIDs []string `bson:"ruleIDs,omitempty" json:"ruleIDs,omitempty"`
+}
+
+// WAFTargetExclusion disables WAF inspection of a request collection.
+type WAFTargetExclusion struct {
+	// Collection is the request collection excluded from inspection.
+	//
+	// Tyk classic API definition: `waf.target_exclusions[].collection`.
+	Collection string `bson:"collection,omitempty" json:"collection,omitempty"`
 }

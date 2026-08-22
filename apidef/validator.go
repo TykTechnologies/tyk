@@ -60,6 +60,7 @@ var DefaultValidationRuleSet = ValidationRuleSet{
 	&RuleValidateEnforceTimeout{},
 	&RuleUpstreamAuth{},
 	&RuleLoadBalancingTargets{},
+	&RuleValidateWAF{},
 }
 
 func Validate(definition *APIDefinition, ruleSet ValidationRuleSet) ValidationResult {
@@ -293,5 +294,28 @@ func (r *RuleLoadBalancingTargets) Validate(apiDef *APIDefinition, validationRes
 	if len(apiDef.Proxy.Targets) == 0 {
 		validationResult.IsValid = false
 		validationResult.AppendError(ErrAllLoadBalancingTargetsZeroWeight)
+	}
+}
+
+// WAF configuration validation errors.
+var (
+	ErrInvalidWAFMode        = errors.New("invalid WAF mode, valid values are: audit, block")
+	ErrInvalidWAFTimeout     = errors.New("invalid WAF timeout value")
+	ErrInvalidWAFBodyLimit   = errors.New("invalid WAF body limit value")
+	ErrInvalidWAFPath        = errors.New("invalid WAF excluded path value")
+	ErrEmptyWAFRuleIDList    = errors.New("WAF rule exclusion must list at least one rule ID")
+	ErrUnknownWAFRuleID      = errors.New("unknown WAF rule ID")
+	ErrUnknownWAFCollection  = errors.New("unknown WAF collection")
+	ErrDuplicateWAFExclusion = errors.New("duplicate WAF exclusion")
+)
+
+// RuleValidateWAF validates the WAF configuration of an API definition.
+type RuleValidateWAF struct{}
+
+func (r *RuleValidateWAF) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
+	errs := apiDef.WAF.Validate()
+	if len(errs) > 0 {
+		validationResult.IsValid = false
+		validationResult.Errors = append(validationResult.Errors, errs...)
 	}
 }

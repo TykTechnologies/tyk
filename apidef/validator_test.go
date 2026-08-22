@@ -704,3 +704,150 @@ func TestRuleLoadBalancingTargets_Validate(t *testing.T) {
 		t.Run(tc.name, runValidationTest(tc.apiDef, ruleSet, tc.result))
 	}
 }
+
+func TestRuleValidateWAF(t *testing.T) {
+	t.Run("valid configurations", func(t *testing.T) {
+		tests := []struct {
+			name string
+			waf  WAFConfig
+		}{
+			{
+				name: "zero value",
+				waf:  WAFConfig{},
+			},
+			{
+				name: "enabled audit defaults",
+				waf:  WAFConfig{Enabled: true},
+			},
+			{
+				name: "enabled block with fail closed and limits",
+				waf: WAFConfig{
+					Enabled:    true,
+					Mode:       WAFModeBlock,
+					FailClosed: true,
+					TimeoutMs:  100,
+					BodyLimit:  1024,
+				},
+			},
+			{
+				name: "excluded paths",
+				waf:  WAFConfig{ExcludedPaths: []string{"/health", "/status"}},
+			},
+			{
+				name: "rule exclusion",
+				waf:  WAFConfig{RuleExclusions: []WAFRuleExclusion{{RuleIDs: []string{"920100", "942100"}}}},
+			},
+			{
+				name: "target exclusion",
+				waf:  WAFConfig{TargetExclusions: []WAFTargetExclusion{{Collection: WAFCollectionArgs}, {Collection: WAFCollectionHeaders}}},
+			},
+		}
+
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				def := &APIDefinition{WAF: tc.waf}
+				result := Validate(def, DefaultValidationRuleSet)
+				assert.True(t, result.IsValid)
+				assert.Empty(t, result.Errors)
+			})
+		}
+	})
+
+	t.Run("invalid configurations", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			waf    WAFConfig
+			expect []error
+		}{
+			{
+				name:   "invalid mode",
+				waf:    WAFConfig{Mode: "enforce"},
+				expect: []error{ErrInvalidWAFMode},
+			},
+			{
+				name:   "negative timeout",
+				waf:    WAFConfig{TimeoutMs: -1},
+				expect: []error{ErrInvalidWAFTimeout},
+			},
+			{
+				name:   "negative body limit",
+				waf:    WAFConfig{BodyLimit: -10},
+				expect: []error{ErrInvalidWAFBodyLimit},
+			},
+			{
+				name:   "empty excluded path",
+				waf:    WAFConfig{ExcludedPaths: []string{"/ok", ""}},
+				expect: []error{ErrInvalidWAFPath},
+			},
+			{
+				name:   "empty rule id list",
+				waf:    WAFConfig{RuleExclusions: []WAFRuleExclusion{{}}},
+				expect: []error{ErrEmptyWAFRuleIDList},
+			},
+			{
+				name:   "unknown rule id",
+				waf:    WAFConfig{RuleExclusions: []WAFRuleExclusion{{RuleIDs: []string{"123456"}}}},
+				expect: []error{ErrUnknownWAFRuleID},
+			},
+			{
+				name:   "unknown collection",
+				waf:    WAFConfig{TargetExclusions: []WAFTargetExclusion{{Collection: "query"}}},
+				expect: []error{ErrUnknownWAFCollection},
+			},
+			{
+				name: "duplicate rule exclusion",
+				waf: WAFConfig{
+					RuleExclusions: []WAFRuleExclusion{
+						{RuleIDs: []string{"920100"}},
+						{RuleIDs: []string{"920100"}},
+					},
+				},
+				expect: []error{ErrDuplicateWAFExclusion},
+			},
+			{
+				name: "duplicate target exclusion",
+				waf: WAFConfig{
+					TargetExclusions: []WAFTargetExclusion{
+						{Collection: WAFCollectionBody},
+						{Collection: WAFCollectionBody},
+					},
+				},
+				expect: []error{ErrDuplicateWAFExclusion},
+			},
+		}
+
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				def := &APIDefinition{WAF: tc.waf}
+				result := Validate(def, DefaultValidationRuleSet)
+				assert.False(t, result.IsValid)
+				assert.Len(t, result.Errors, len(tc.expect))
+				for i, expect := range tc.expect {
+					assert.ErrorIs(t, result.Errors[i], expect)
+				}
+			})
+		}
+	})
+
+	t.Run("multiple violations reported together", func(t *testing.T) {
+		def := &APIDefinition{WAF: WAFConfig{
+			Mode:      "invalid",
+			TimeoutMs: -1,
+			BodyLimit: -1,
+			RuleExclusions: []WAFRuleExclusion{
+				{RuleIDs: []string{"bad"}},
+			},
+			TargetExclusions: []WAFTargetExclusion{{Collection: "nope"}},
+		}}
+		result := Validate(def, DefaultValidationRuleSet)
+		assert.False(t, result.IsValid)
+		assert.Len(t, result.Errors, 5)
+
+		all := errors.Join(result.Errors...)
+		assert.ErrorIs(t, all, ErrInvalidWAFMode)
+		assert.ErrorIs(t, all, ErrInvalidWAFTimeout)
+		assert.ErrorIs(t, all, ErrInvalidWAFBodyLimit)
+		assert.ErrorIs(t, all, ErrUnknownWAFRuleID)
+		assert.ErrorIs(t, all, ErrUnknownWAFCollection)
+	})
+}
