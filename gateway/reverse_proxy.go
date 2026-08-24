@@ -1275,6 +1275,12 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	requestTimeout, isRequestTimeoutEnforced := p.GetEnforcedTimeoutSettings(p.TykAPISpec, outreq)
 
+	if isRequestTimeoutEnforced {
+		timeoutContext, cancel := context.WithCancel(outreq.Context())
+		defer cancel()
+		outreq = outreq.WithContext(timeoutContext)
+	}
+
 	// create HTTP transport
 	createTransport := p.TykAPISpec.HTTPTransport == nil
 

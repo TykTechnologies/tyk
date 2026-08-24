@@ -39,6 +39,20 @@ func (c *cancelReadCloser) Close() error {
 	}
 	return nil
 }
+
+type cancelReadWriteCloser struct {
+	io.ReadWriteCloser
+	cancel context.CancelFunc
+}
+
+func (c *cancelReadWriteCloser) Close() error {
+	c.cancel()
+	if c.ReadWriteCloser != nil {
+		return c.ReadWriteCloser.Close()
+	}
+	return nil
+}
+
 func invokeRtWithCancel(
 	rt RoundTripper,
 	req *http.Request,
@@ -77,17 +91,4 @@ func invokeRtWithCancel(
 	}
 
 	return
-}
-
-type cancelReadWriteCloser struct {
-	io.ReadWriteCloser
-	cancel context.CancelFunc
-}
-
-func (c *cancelReadWriteCloser) Close() error {
-	c.cancel()
-	if c.ReadWriteCloser != nil {
-		return c.ReadWriteCloser.Close()
-	}
-	return nil
 }
