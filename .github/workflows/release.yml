@@ -86,7 +86,6 @@ jobs:
           echo "branch=${HEAD_REF##*/}" >> $GITHUB_OUTPUT
       - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      - uses: sigstore/cosign-installer@d7d6bc7722e3daa8354c50bcb52f4837da5e9b6a # v3
       - name: Login to DockerHub
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
@@ -206,15 +205,6 @@ jobs:
             ~/.cache/go-build
             ~/go/pkg/mod
           key: ${{ steps.go-cache.outputs.cache-primary-key }}
-      - name: Install Docker Scout CLI
-        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
-        run: |
-          mkdir -p ~/.docker/cli-plugins
-          curl --proto '=https' --tlsv1.2 -fsSL https://github.com/docker/scout-cli/releases/download/v1.22.0/docker-scout_1.22.0_linux_amd64.tar.gz -o /tmp/scout.tar.gz
-          curl --proto '=https' --tlsv1.2 -fsSL https://github.com/docker/scout-cli/releases/download/v1.22.0/docker-scout_1.22.0_checksums.txt -o /tmp/scout_checksums.txt
-          grep "docker-scout_1.22.0_linux_amd64.tar.gz" /tmp/scout_checksums.txt | awk '{print $1 "  /tmp/scout.tar.gz"}' | sha256sum -c -
-          tar -xzf /tmp/scout.tar.gz -C ~/.docker/cli-plugins/ docker-scout
-          chmod +x ~/.docker/cli-plugins/docker-scout
       - name: Docker metadata for ee CI
         id: ci_metadata_ee
         if: ${{ matrix.golang_cross == '1.26-bullseye' }}
@@ -239,6 +229,7 @@ jobs:
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
+          sbom: true
           outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -318,6 +309,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           file: ci/Dockerfile.distroless
           provenance: mode=max
+          sbom: true
           cache-from: type=gha
           outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_ee.outputs.tags }}
@@ -369,18 +361,6 @@ jobs:
             verify_manifest manifest.json
           fi
           echo "Success: All layers are uniformly compressed using gzip."
-      - name: Attach base image VEX to ee
-        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
-        run: |
-          docker scout vex get --org tykio -o /tmp/ee-vex.json tykio/dhi-busybox:1.37-fips || true
-          if [ -f /tmp/ee-vex.json ]; then
-            cosign attest --yes --type openvex \
-              --predicate /tmp/ee-vex.json \
-              docker.tyk.io/tyk-gateway/tyk-gateway-ee:${{ github.ref_name }} || true
-            cosign attest --yes --type openvex \
-              --predicate /tmp/ee-vex.json \
-              tykio/tyk-gateway-ee:${{ github.ref_name }} || true
-          fi
       - name: Docker metadata for fips CI
         id: ci_metadata_fips
         if: ${{ matrix.golang_cross == '1.26-bullseye' }}
@@ -405,6 +385,7 @@ jobs:
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
+          sbom: true
           outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -483,6 +464,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           file: ci/Dockerfile.distroless
           provenance: mode=max
+          sbom: true
           cache-from: type=gha
           outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_fips.outputs.tags }}
@@ -534,15 +516,6 @@ jobs:
             verify_manifest manifest.json
           fi
           echo "Success: All layers are uniformly compressed using gzip."
-      - name: Attach base image VEX to fips
-        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
-        run: |
-          docker scout vex get --org tykio -o /tmp/fips-vex.json tykio/dhi-busybox:1.37-fips || true
-          if [ -f /tmp/fips-vex.json ]; then
-            cosign attest --yes --type openvex \
-              --predicate /tmp/fips-vex.json \
-              tykio/tyk-gateway-fips:${{ github.ref_name }} || true
-          fi
       - name: Docker metadata for std CI
         id: ci_metadata_std
         if: ${{ matrix.golang_cross == '1.26-bullseye' }}
@@ -567,6 +540,7 @@ jobs:
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64,linux/s390x' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
+          sbom: true
           outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -644,6 +618,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/s390x
           file: ci/Dockerfile.distroless
           provenance: mode=max
+          sbom: true
           cache-from: type=gha
           outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_std.outputs.tags }}

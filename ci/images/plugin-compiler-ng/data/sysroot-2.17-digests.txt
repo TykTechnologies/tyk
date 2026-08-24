@@ -1,0 +1,22 @@
+# manylinux2014 image digests = the glibc-2.17 (RHEL 7 / CentOS 7 ABI) sysroot sources.
+#
+# This list is the ARCH CEILING for GLIBC_TARGET=2.17 builds: we can only produce a 2.17
+# plugin for an arch that has a manylinux2014 image here. All variants are CentOS 7 /
+# glibc 2.17 (the ABI is frozen, so these digests rarely need bumping - re-pin only to
+# refresh the runtime-unused userspace, never for the floor itself).
+#
+# Keep the Dockerfile.base `FROM ... manylinux2014_<v>@<digest>` lines in sync with this
+# file. Captured 2026-06-06 via `crane digest quay.io/pypa/manylinux2014_<variant>`.
+#
+#   variant   go-arch    wired in Dockerfile.base?   notes
+#   x86_64    amd64      yes                          Gateway ships amd64
+#   aarch64   arm64      yes                          Gateway ships arm64
+#   s390x     s390x      yes                          Gateway ships s390x
+#   ppc64le   ppc64le    no (no Gateway image yet)    ready if a Gateway adds ppc64le
+#   i686      386        no (32-bit; irrelevant)      Go plugins are 64-bit only
+
+MANYLINUX2014_x86_64=sha256:5e3012db7af44490157351ba6726fd92e8dba9b421ea819ac7925b4478ad3f17
+MANYLINUX2014_aarch64=sha256:88be65bf6654ffb068b2c07fb321ce1a128ccc092b62bbb79027217dbdec12ae
+MANYLINUX2014_s390x=sha256:554ae29bc5aa3dbb1ce3062114180b6c4b9d7f5c555ede43652baf4f5d71959c
+MANYLINUX2014_ppc64le=sha256:4db68e0eb49f8e191ecf2952a54364a879ef1d69cc4beb622308b4e5a01fefce
+MANYLINUX2014_i686=sha256:4ba805bd245853fc79f5fbb13952207756cd4072343b72f2a145f31a6a0e119f
