@@ -2705,10 +2705,12 @@ func TestTimeoutCachingBugFix(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/default") {
 			time.Sleep(1 * time.Second)
-			w.Write([]byte("Default OK"))
+			_, err := w.Write([]byte("Default OK"))
+			assert.NoError(t, err)
 		} else if strings.HasPrefix(r.URL.Path, "/enforced") {
 			time.Sleep(3 * time.Second) // Delay (3s) is BETWEEN default (2s) and enforced (5s)
-			w.Write([]byte("Enforced OK"))
+			_, err := w.Write([]byte("Enforced OK"))
+			assert.NoError(t, err)
 		}
 	}))
 	defer upstream.Close()
@@ -2721,9 +2723,9 @@ func TestTimeoutCachingBugFix(t *testing.T) {
 			version.UseExtendedPaths = true
 			version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
 				{
-					Path:     "/enforced",
-					Method:   http.MethodGet,
-					TimeOut:  5, // Enforced timeout: 5s
+					Path:    "/enforced",
+					Method:  http.MethodGet,
+					TimeOut: 5, // Enforced timeout: 5s
 				},
 			}
 		})
@@ -2749,7 +2751,6 @@ func TestTimeoutCachingBugFix(t *testing.T) {
 		BodyMatch: "Enforced OK",
 	})
 }
-
 
 func TestAPILevelTimeout(t *testing.T) {
 	t.Parallel()

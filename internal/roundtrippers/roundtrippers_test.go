@@ -31,14 +31,14 @@ func TestCombine(t *testing.T) {
 			})
 		}
 
-		init := RoundTripperFn(func(r *http.Request) (*http.Response, error) {
+		init := RoundTripperFn(func(_ *http.Request) (*http.Response, error) {
 			order = append(order, "init")
 			return &http.Response{StatusCode: http.StatusOK}, nil
 		})
 
 		rt := Combine(init, mw1, mw2)
-		req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
-		
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "http://example.com", nil)
+
 		res, err := rt.RoundTrip(req)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, res.StatusCode)
@@ -56,13 +56,13 @@ func TestCombine(t *testing.T) {
 			})
 		}
 
-		init := RoundTripperFn(func(r *http.Request) (*http.Response, error) {
+		init := RoundTripperFn(func(_ *http.Request) (*http.Response, error) {
 			return &http.Response{StatusCode: http.StatusOK}, nil
 		})
 
 		rt := Combine(init, nil, mw1, nil)
-		req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
-		
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "http://example.com", nil)
+
 		res, err := rt.RoundTrip(req)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, res.StatusCode)

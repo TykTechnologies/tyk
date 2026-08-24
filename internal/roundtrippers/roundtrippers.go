@@ -45,6 +45,7 @@ func invokeRtWithCancel(
 	req *http.Request,
 	cancel context.CancelFunc,
 ) (response *http.Response, err error) {
+
 	defer func() {
 		if err := recover(); err != nil {
 			cancel()

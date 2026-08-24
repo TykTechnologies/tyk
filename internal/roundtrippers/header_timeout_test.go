@@ -33,7 +33,7 @@ func TestHeadersTimeout(t *testing.T) {
 		})
 
 		rt := mw(next)
-		req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "http://example.com", nil)
 
 		_, err := rt.RoundTrip(req)
 		require.Error(t, err)
@@ -65,7 +65,7 @@ func TestHeadersTimeout(t *testing.T) {
 		})
 
 		rt := mw(next)
-		req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "http://example.com", nil)
 
 		res, err := rt.RoundTrip(req)
 		require.NoError(t, err)
@@ -83,7 +83,7 @@ func TestHeadersTimeout(t *testing.T) {
 		})
 
 		rt := mw(next)
-		req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "http://example.com", nil)
 
 		res, err := rt.RoundTrip(req)
 		require.NoError(t, err)
