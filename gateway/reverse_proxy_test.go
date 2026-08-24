@@ -2694,6 +2694,62 @@ func TestTimeoutPrioritization(t *testing.T) {
 		})
 	})
 }
+func TestTimeoutCachingBugFix(t *testing.T) {
+	t.Parallel()
+
+	ts := StartTest(func(c *config.Config) {
+		c.ProxyDefaultTimeout = 2 // Default transport timeout: 2s
+	})
+	defer ts.Close()
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/default") {
+			time.Sleep(1 * time.Second)
+			w.Write([]byte("Default OK"))
+		} else if strings.HasPrefix(r.URL.Path, "/enforced") {
+			time.Sleep(3 * time.Second) // Delay (3s) is BETWEEN default (2s) and enforced (5s)
+			w.Write([]byte("Enforced OK"))
+		}
+	}))
+	defer upstream.Close()
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = upstream.URL
+		spec.EnforcedTimeoutEnabled = true
+		UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+			version.UseExtendedPaths = true
+			version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+				{
+					Path:     "/enforced",
+					Method:   http.MethodGet,
+					TimeOut:  5, // Enforced timeout: 5s
+				},
+			}
+		})
+	})[0]
+	ts.Gw.LoadAPI(api)
+
+	// REQUEST 1: Endpoint WITHOUT enforced timeout.
+	// This forces the creation and caching of the transport.
+	_, _ = ts.Run(t, test.TestCase{
+		Method:    http.MethodGet,
+		Path:      "/default",
+		Code:      http.StatusOK,
+		BodyMatch: "Default OK",
+	})
+
+	// REQUEST 2: Endpoint WITH enforced timeout (5s).
+	// Delay is 3s. Since 3s < 5s, it should SUCCEED.
+	// If the bug exists, the cached transport (2s) will kill this request, returning 504.
+	_, _ = ts.Run(t, test.TestCase{
+		Method:    http.MethodGet,
+		Path:      "/enforced",
+		Code:      http.StatusOK,
+		BodyMatch: "Enforced OK",
+	})
+}
+
 
 func TestAPILevelTimeout(t *testing.T) {
 	t.Parallel()
