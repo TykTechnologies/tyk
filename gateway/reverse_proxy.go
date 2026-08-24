@@ -432,11 +432,15 @@ func (p *ReverseProxy) defaultTransport(dialTimeout float64) *http.Transport {
 	}
 
 	transport := &http.Transport{
-		DialContext:           dialContextFunc,
-		MaxIdleConns:          p.Gw.GetConfig().MaxIdleConns,
-		MaxIdleConnsPerHost:   p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
-		IdleConnTimeout:       time.Duration(idleConnTimeout) * time.Second,
-		ResponseHeaderTimeout: time.Duration(0), // Response timeout has to be controlled within context
+		DialContext:         dialContextFunc,
+		MaxIdleConns:        p.Gw.GetConfig().MaxIdleConns,
+		MaxIdleConnsPerHost: p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
+		IdleConnTimeout:     time.Duration(idleConnTimeout) * time.Second,
+
+		// ResponseHeaderTimeout logic moved to roundtrippers.HeadersTimeout decorator.
+		// It was colliding with the enforced (endpoint-level/api-level) timeout.
+		// @see https://tyktech.atlassian.net/browse/TT-17873
+		ResponseHeaderTimeout: time.Duration(0),
 		TLSHandshakeTimeout:   10 * time.Second,
 	}
 
