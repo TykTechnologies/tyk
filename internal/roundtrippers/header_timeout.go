@@ -11,15 +11,16 @@ import (
 	"github.com/TykTechnologies/tyk/internal/errors"
 )
 
-type headersTimeoutOpts struct {
-	disabled bool
+type headersTimeoutOpt struct {
+	disabled   bool
+	disabledFn func(*http.Request) bool
 }
 
-type HeadersTimeoutOpt func(*headersTimeoutOpts)
+type HeadersTimeoutOpt func(*headersTimeoutOpt)
 
 func HeadersTimeout(timeout time.Duration, opts ...HeadersTimeoutOpt) Middleware {
 	return func(next RoundTripper) RoundTripper {
-		opt := headersTimeoutOpts{disabled: false}
+		opt := headersTimeoutOpt{disabled: false}
 		for _, apply := range opts {
 			apply(&opt)
 		}
@@ -29,6 +30,10 @@ func HeadersTimeout(timeout time.Duration, opts ...HeadersTimeoutOpt) Middleware
 		}
 
 		return RoundTripperFn(func(r *http.Request) (response *http.Response, err error) {
+			if opt.disabledFn != nil && opt.disabledFn(r) {
+				return next.RoundTrip(r)
+			}
+
 			ctx, cancel := context.WithCancel(r.Context())
 
 			// The tracker takes full ownership of the state
@@ -56,8 +61,14 @@ func HeadersTimeout(timeout time.Duration, opts ...HeadersTimeoutOpt) Middleware
 }
 
 func WithHeadersTimeoutDisabled(disabled bool) HeadersTimeoutOpt {
-	return func(opts *headersTimeoutOpts) {
+	return func(opts *headersTimeoutOpt) {
 		opts.disabled = disabled
+	}
+}
+
+func WithHeadersTimeoutDisableFn(disabledFn func(*http.Request) bool) HeadersTimeoutOpt {
+	return func(opt *headersTimeoutOpt) {
+		opt.disabledFn = disabledFn
 	}
 }
 

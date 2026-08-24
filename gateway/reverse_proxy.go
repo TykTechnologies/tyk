@@ -910,12 +910,8 @@ type TykRoundTripper struct {
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 
-	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
-
-	if r.URL.Scheme == "tyk" || hasInternalHeader {
-		if hasInternalHeader {
-			r.Header.Del(apidef.TykInternalApiHeader)
-		}
+	if isInternalLoop(r) {
+		r.Header.Del(apidef.TykInternalApiHeader)
 
 		handler, _, found := rt.Gw.findInternalHTTPHandlerForLoop(r.Host, nil, r)
 		if !found {
@@ -1275,12 +1271,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	requestTimeout, isRequestTimeoutEnforced := p.GetEnforcedTimeoutSettings(p.TykAPISpec, outreq)
 
-	if isRequestTimeoutEnforced {
-		timeoutContext, cancel := context.WithCancel(outreq.Context())
-		defer cancel()
-		outreq = outreq.WithContext(timeoutContext)
-	}
-
 	// create HTTP transport
 	createTransport := p.TykAPISpec.HTTPTransport == nil
 
@@ -1348,9 +1338,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	var decoratedRoundTripper = roundtrippers.Combine(
 		roundTripper,
-		roundtrippers.Timeout(requestTimeout),
+		roundtrippers.Timeout(
+			requestTimeout,
+			roundtrippers.WithTimeoutDisableFn(isInternalLoop),
+		),
 		roundtrippers.HeadersTimeout(
 			fallbackHeadersTimeout,
+			roundtrippers.WithHeadersTimeoutDisableFn(isInternalLoop),
 			roundtrippers.WithHeadersTimeoutDisabled(isRequestTimeoutEnforced),
 		),
 	)
@@ -2143,4 +2137,14 @@ func (p *ReverseProxy) checkUpstreamCertificateExpiry(cert *tls.Certificate) {
 			WithError(err).
 			Warning("Failed to add upstream certificate to expiry check batch")
 	}
+}
+
+func isInternalLoop(r *http.Request) bool {
+	if r.URL == nil {
+		return false
+	}
+
+	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
+
+	return r.URL.Scheme == "tyk" || r.URL.Scheme == "tyk-internal" || hasInternalHeader
 }
