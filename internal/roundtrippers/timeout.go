@@ -14,8 +14,7 @@ func Timeout(timeout time.Duration) Middleware {
 
 		return RoundTripperFn(func(r *http.Request) (*http.Response, error) {
 			ctx, cancel := context.WithTimeout(r.Context(), timeout)
-			defer cancel()
-			return next.RoundTrip(r.WithContext(ctx))
+			return invokeRtWithCancel(next, r.WithContext(ctx), cancel)
 		})
 	}
 }

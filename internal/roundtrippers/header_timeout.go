@@ -4,7 +4,10 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptrace"
+	"sync/atomic"
 	"time"
+
+	"github.com/TykTechnologies/tyk/internal/errors"
 )
 
 type headersTimeoutOpts struct {
@@ -24,12 +27,13 @@ func HeadersTimeout(timeout time.Duration, opts ...HeadersTimeoutOpt) Middleware
 			return next
 		}
 
-		return RoundTripperFn(func(r *http.Request) (*http.Response, error) {
+		return RoundTripperFn(func(r *http.Request) (response *http.Response, err error) {
 			ctx, cancel := context.WithCancel(r.Context())
-			defer cancel()
 
 			timer := time.NewTimer(timeout)
 			timer.Stop()
+
+			var timedOut atomic.Bool
 
 			trace := &httptrace.ClientTrace{
 				WroteRequest: func(_ httptrace.WroteRequestInfo) {
@@ -38,6 +42,7 @@ func HeadersTimeout(timeout time.Duration, opts ...HeadersTimeoutOpt) Middleware
 					go func() {
 						select {
 						case <-timer.C:
+							timedOut.Store(true)
 							cancel()
 						case <-ctx.Done():
 						}
@@ -48,8 +53,17 @@ func HeadersTimeout(timeout time.Duration, opts ...HeadersTimeoutOpt) Middleware
 				},
 			}
 
-			ctx = httptrace.WithClientTrace(ctx, trace)
-			return next.RoundTrip(r.WithContext(ctx))
+			response, err = invokeRtWithCancel(
+				next,
+				r.WithContext(httptrace.WithClientTrace(ctx, trace)),
+				cancel,
+			)
+
+			if err != nil && timedOut.Load() {
+				err = errors.Join(err, ErrHeadersTimeout)
+			}
+
+			return
 		})
 	}
 }
