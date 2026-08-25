@@ -79,6 +79,11 @@ func (t *headersTimeoutTracker) OnWroteRequest(_ httptrace.WroteRequestInfo) {
 		return
 	}
 
+	// Ignore secondary timer initialization
+	if t.timer != nil {
+		return
+	}
+
 	t.timer = time.AfterFunc(t.timeout, func() {
 		t.timedOut.Store(true)
 		t.cancel()
