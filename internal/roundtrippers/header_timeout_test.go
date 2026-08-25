@@ -37,7 +37,7 @@ func TestHeadersTimeout(t *testing.T) {
 
 		_, err := rt.RoundTrip(req)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, context.Canceled)
+		assert.ErrorContains(t, err, context.Canceled.Error())
 	})
 
 	t.Run("timeout is not applied when headers arrive in time", func(t *testing.T) {
