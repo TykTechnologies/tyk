@@ -506,6 +506,9 @@
         "enable_detailed_recording": {
           "type": "boolean"
         },
+        "allow_unsafe_detailed_logs": {
+          "type": "boolean"
+        },
         "purge_interval": {
           "type": "number"
         },

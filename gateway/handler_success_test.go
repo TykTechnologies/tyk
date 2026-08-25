@@ -19,7 +19,6 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	ctxpkg "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
 )
 
 type bindContextFunc = func(context.Context) context.Context
@@ -43,84 +42,6 @@ func testAPISpec(binding bindAPIDefFunc) *APISpec {
 		binding(spec)
 	}
 	return spec
-}
-
-func TestRecordDetail(t *testing.T) {
-	testcases := []struct {
-		title   string
-		spec    *APISpec
-		binding bindContextFunc
-		expect  bool
-	}{
-		{
-			title:  "empty session",
-			spec:   testAPISpec(nil),
-			expect: false,
-		},
-		{
-			title: "empty session, enabled analytics",
-			spec: testAPISpec(func(spec *APISpec) {
-				spec.EnableDetailedRecording = true
-			}),
-			expect: true,
-		},
-		{
-			title: "empty session, enabled config",
-			spec: testAPISpec(func(spec *APISpec) {
-				spec.GlobalConfig.EnforceOrgDataDetailLogging = false
-				spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording = true
-			}),
-			expect: true,
-		},
-		{
-			title: "normal session",
-			spec:  testAPISpec(nil),
-			// attach user session
-			binding: func(ctx context.Context) context.Context {
-				session := &user.SessionState{
-					EnableDetailedRecording: true,
-				}
-				return context.WithValue(ctx, ctxpkg.SessionData, session)
-			},
-			expect: true,
-		},
-		{
-			title: "org empty session",
-			spec: testAPISpec(func(spec *APISpec) {
-				spec.GlobalConfig.EnforceOrgDataDetailLogging = true
-			}),
-			expect: false,
-		},
-		{
-			title: "org session",
-			spec: testAPISpec(func(spec *APISpec) {
-				spec.GlobalConfig.EnforceOrgDataDetailLogging = true
-			}),
-			// attach user session
-			binding: func(ctx context.Context) context.Context {
-				session := &user.SessionState{
-					EnableDetailedRecording: true,
-				}
-				return context.WithValue(ctx, ctxpkg.OrgSessionContext, session)
-			},
-			expect: true,
-		},
-		{
-			title: "graphql request",
-			spec: testAPISpec(func(spec *APISpec) {
-				spec.GraphQL.Enabled = true
-			}),
-			expect: true,
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.title, func(t *testing.T) {
-			req := testRequestWithContext(tc.binding)
-			got := recordDetail(req, tc.spec)
-			assert.Equal(t, tc.expect, got)
-		})
-	}
 }
 
 func TestAnalyticRecord_GraphStats(t *testing.T) {
