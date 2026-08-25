@@ -2,6 +2,7 @@ package roundtrippers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptrace"
 	"sync"
@@ -33,7 +34,7 @@ func HeadersTimeout(timeout time.Duration) Middleware {
 				cancel,
 			)
 
-			if err != nil && tracker.HasTimedOut() {
+			if tracker.HasTimedOut() && errors.Is(err, context.Canceled) {
 				err = ErrHeadersTimeout
 			}
 

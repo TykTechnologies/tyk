@@ -1,7 +1,6 @@
 package roundtrippers
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httptrace"
@@ -37,7 +36,7 @@ func TestHeadersTimeout(t *testing.T) {
 
 		_, err := rt.RoundTrip(req)
 		require.Error(t, err)
-		assert.ErrorContains(t, err, context.Canceled.Error())
+		assert.ErrorIs(t, err, ErrHeadersTimeout)
 	})
 
 	t.Run("timeout is not applied when headers arrive in time", func(t *testing.T) {
