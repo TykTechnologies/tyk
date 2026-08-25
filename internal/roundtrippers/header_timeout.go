@@ -2,13 +2,12 @@ package roundtrippers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptrace"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/TykTechnologies/tyk/internal/errors"
 )
 
 func HeadersTimeout(timeout time.Duration) Middleware {
@@ -36,7 +35,8 @@ func HeadersTimeout(timeout time.Duration) Middleware {
 			)
 
 			if err != nil && tracker.HasTimedOut() {
-				err = errors.Join(err, ErrHeadersTimeout)
+				// original error is masked intentionally because of it conflicts with ErrorClassifier
+				err = fmt.Errorf("%w: %v", ErrHeadersTimeout, err)
 			}
 
 			return
