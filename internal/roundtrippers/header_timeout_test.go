@@ -71,22 +71,4 @@ func TestHeadersTimeout(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, res.StatusCode)
 	})
-
-	t.Run("timeout is disabled", func(t *testing.T) {
-		timeout := 10 * time.Millisecond
-		mw := HeadersTimeout(timeout, WithHeadersTimeoutDisabled(true))
-
-		next := RoundTripperFn(func(r *http.Request) (*http.Response, error) {
-			trace := httptrace.ContextClientTrace(r.Context())
-			assert.Nil(t, trace) // Trace shouldn't be injected if disabled
-			return &http.Response{StatusCode: http.StatusOK}, nil
-		})
-
-		rt := mw(next)
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "http://example.com", nil)
-
-		res, err := rt.RoundTrip(req)
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusOK, res.StatusCode)
-	})
 }

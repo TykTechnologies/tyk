@@ -846,10 +846,10 @@ func (p *ReverseProxy) httpTransport(dialTimeout float64, req *http.Request, out
 			},
 			AllowHTTP: true,
 		}
-		return &TykRoundTripper{transport, h2t, p.logger, p.Gw}
+		return &TykRoundTripper{transport: transport, h2ctransport: h2t}
 	}
 
-	return &TykRoundTripper{transport, nil, p.logger, p.Gw}
+	return &TykRoundTripper{transport: transport, h2ctransport: nil}
 }
 
 func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config, hostName string) {
@@ -901,39 +901,45 @@ func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config,
 	}
 }
 
+func isInternalLoop(r *http.Request) bool {
+	if r.URL == nil {
+		return false
+	}
+
+	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
+
+	return r.URL.Scheme == "tyk" || r.URL.Scheme == "tyk-internal" || hasInternalHeader
+}
+
+func internalLoopRoundTripperMiddleware(gw *Gateway, logger *logrus.Entry) roundtrippers.Middleware {
+	return func(next roundtrippers.RoundTripper) roundtrippers.RoundTripper {
+		return roundtrippers.RoundTripperFn(func(r *http.Request) (*http.Response, error) {
+			if !isInternalLoop(r) {
+				return next.RoundTrip(r)
+			}
+
+			r.Header.Del(apidef.TykInternalApiHeader)
+
+			handler, _, found := gw.findInternalHTTPHandlerForLoop(r.Host, nil, r)
+
+			if !found {
+				logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
+				return nil, errors.New("handler could")
+			}
+
+			logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
+
+			return handleInMemoryLoop(handler, r)
+		})
+	}
+}
+
 type TykRoundTripper struct {
 	transport    *http.Transport
 	h2ctransport *http2.Transport
-	logger       *logrus.Entry
-	Gw           *Gateway `json:"-"`
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
-
-	if isInternalLoop(r) {
-		r.Header.Del(apidef.TykInternalApiHeader)
-
-		handler, _, found := rt.Gw.findInternalHTTPHandlerForLoop(r.Host, nil, r)
-		if !found {
-			rt.logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
-			return nil, errors.New("handler could")
-		}
-
-		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
-
-		return handleInMemoryLoop(handler, r)
-	}
-
-	if rt.Gw.GetConfig().OpenTelemetry.TracesEnabled() {
-		var baseRoundTripper http.RoundTripper = rt.transport
-		if rt.h2ctransport != nil {
-			baseRoundTripper = rt.h2ctransport
-		}
-
-		tr := otel.HTTPRoundTripper(baseRoundTripper)
-		return tr.RoundTrip(r)
-	}
-
 	if rt.h2ctransport != nil {
 		return rt.h2ctransport.RoundTrip(r)
 	}
@@ -1338,14 +1344,12 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	var decoratedRoundTripper = roundtrippers.Combine(
 		roundTripper,
-		roundtrippers.Timeout(
-			requestTimeout,
-			roundtrippers.WithTimeoutDisableFn(isInternalLoop),
-		),
-		roundtrippers.HeadersTimeout(
-			fallbackHeadersTimeout,
-			roundtrippers.WithHeadersTimeoutDisableFn(isInternalLoop),
-			roundtrippers.WithHeadersTimeoutDisabled(isRequestTimeoutEnforced),
+		internalLoopRoundTripperMiddleware(p.Gw, p.logger),
+		roundtrippers.SkipIf(otel.HTTPRoundTripper, !p.Gw.GetConfig().OpenTelemetry.TracesEnabled()),
+		roundtrippers.Timeout(requestTimeout),
+		roundtrippers.SkipIf(
+			roundtrippers.HeadersTimeout(fallbackHeadersTimeout),
+			isRequestTimeoutEnforced,
 		),
 	)
 
@@ -2137,14 +2141,4 @@ func (p *ReverseProxy) checkUpstreamCertificateExpiry(cert *tls.Certificate) {
 			WithError(err).
 			Warning("Failed to add upstream certificate to expiry check batch")
 	}
-}
-
-func isInternalLoop(r *http.Request) bool {
-	if r.URL == nil {
-		return false
-	}
-
-	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
-
-	return r.URL.Scheme == "tyk" || r.URL.Scheme == "tyk-internal" || hasInternalHeader
 }
