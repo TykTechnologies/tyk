@@ -73,32 +73,46 @@ func (m *GranularAccessMiddleware) conditionMatch(r *http.Request, condition use
 	// total counts the configured option groups, satisfied the ones that passed.
 	total, satisfied := 0, 0
 
-	group := func(configured bool, eval func() bool) bool {
+	// group evaluates one option group and reports whether it settles the
+	// condition, and if so with what answer: under "any" the first satisfied
+	// group settles it, under "all" the first unsatisfied one does.
+	//
+	// Stopping early is not only about speed. The groups are evaluated cheapest
+	// first, with the payload last, so short circuiting is what stops a request
+	// whose header or query condition has already failed from having its whole
+	// body read into memory.
+	group := func(configured bool, eval func() bool) (settled, granted bool) {
 		if !configured {
-			return false
+			return false, false
 		}
 
 		total++
-		if eval() {
-			if checkAny {
-				return true
-			}
-			satisfied++
+
+		if !eval() {
+			// Under "all" one unsatisfied group is the whole answer. Under
+			// "any" there may still be a later group that passes.
+			return !checkAny, false
 		}
 
-		return false
+		if checkAny {
+			return true, true
+		}
+
+		satisfied++
+
+		return false, false
 	}
 
-	if group(len(options.HeaderMatches) > 0, func() bool {
+	if settled, granted := group(len(options.HeaderMatches) > 0, func() bool {
 		return matchNamedValues(options.HeaderMatches, checkAny, func(name string) ([]string, bool) {
 			values, ok := r.Header[textproto.CanonicalMIMEHeaderKey(name)]
 			return values, ok
 		})
-	}) {
-		return true
+	}); settled {
+		return granted
 	}
 
-	if group(len(options.QueryValMatches) > 0, func() bool {
+	if settled, granted := group(len(options.QueryValMatches) > 0, func() bool {
 		if query == nil {
 			query = r.URL.Query()
 		}
@@ -107,11 +121,11 @@ func (m *GranularAccessMiddleware) conditionMatch(r *http.Request, condition use
 			values, ok := query[name]
 			return values, ok
 		})
-	}) {
-		return true
+	}); settled {
+		return granted
 	}
 
-	if group(len(options.PathPartMatches) > 0, func() bool {
+	if settled, granted := group(len(options.PathPartMatches) > 0, func() bool {
 		parts := strings.Split(r.URL.Path, "/")
 
 		// Every part is a candidate, so the matcher sees them as the values
@@ -120,11 +134,11 @@ func (m *GranularAccessMiddleware) conditionMatch(r *http.Request, condition use
 		return matchNamedValues(options.PathPartMatches, checkAny, func(string) ([]string, bool) {
 			return parts, true
 		}, matchAnyValue)
-	}) {
-		return true
+	}); settled {
+		return granted
 	}
 
-	if group(len(options.SessionMetaMatches) > 0, func() bool {
+	if settled, granted := group(len(options.SessionMetaMatches) > 0, func() bool {
 		session := ctxGetSession(r)
 
 		return matchNamedValues(options.SessionMetaMatches, checkAny, func(name string) ([]string, bool) {
@@ -134,21 +148,21 @@ func (m *GranularAccessMiddleware) conditionMatch(r *http.Request, condition use
 
 			return stringValue(session.MetaData[name])
 		})
-	}) {
-		return true
+	}); settled {
+		return granted
 	}
 
-	if group(len(options.RequestContextMatches) > 0, func() bool {
+	if settled, granted := group(len(options.RequestContextMatches) > 0, func() bool {
 		contextData := ctxGetData(r)
 
 		return matchNamedValues(options.RequestContextMatches, checkAny, func(name string) ([]string, bool) {
 			return stringValue(contextData[name])
 		})
-	}) {
-		return true
+	}); settled {
+		return granted
 	}
 
-	if group(options.PayloadMatches.MatchPattern != "", func() bool {
+	if settled, granted := group(options.PayloadMatches.MatchPattern != "", func() bool {
 		body, err := readRequestBody(r)
 		if err != nil {
 			m.Logger().WithError(err).Error("Could not read request body to evaluate access condition")
@@ -156,8 +170,8 @@ func (m *GranularAccessMiddleware) conditionMatch(r *http.Request, condition use
 		}
 
 		return matchValues(options.PayloadMatches, []string{body}, true, matchAnyValue)
-	}) {
-		return true
+	}); settled {
+		return granted
 	}
 
 	if checkAny {

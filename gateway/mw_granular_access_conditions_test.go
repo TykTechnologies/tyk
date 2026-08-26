@@ -397,3 +397,85 @@ func TestAccessConditions_AbsenceSpellings(t *testing.T) {
 		})
 	}
 }
+
+// readTracker records whether anything read from it.
+type readTracker struct {
+	reader io.Reader
+	read   bool
+}
+
+func (t *readTracker) Read(p []byte) (int, error) {
+	t.read = true
+	return t.reader.Read(p)
+}
+
+// TestAccessConditions_PayloadNotReadWhenAlreadyDecided checks that a request
+// whose cheaper conditions have already settled the outcome does not have its
+// body read.
+//
+// This is a resource concern, not a correctness one: reading the payload pulls
+// the whole body into memory, and the Gateway only bounds that when
+// max_request_body_size is configured, which it is not by default. A request
+// that was going to be refused on its headers regardless should not pay for it.
+func TestAccessConditions_PayloadNotReadWhenAlreadyDecided(t *testing.T) {
+	newRequest := func(t *testing.T) (*http.Request, *readTracker) {
+		t.Helper()
+
+		tracker := &readTracker{reader: strings.NewReader(`{"tenant": "acme"}`)}
+
+		r, err := http.NewRequest(http.MethodPost, "http://x/connections?persnbr=123", io.NopCloser(tracker))
+		assert.NoError(t, err)
+
+		return r, tracker
+	}
+
+	m := &GranularAccessMiddleware{BaseMiddleware: &BaseMiddleware{}}
+
+	payload := apidef.StringRegexMap{MatchPattern: `"tenant":\s*"acme"`}
+
+	t.Run("all: an earlier failure means the body is never read", func(t *testing.T) {
+		r, tracker := newRequest(t)
+
+		spec := user.AccessSpec{Conditions: []user.AccessCondition{{
+			On: apidef.All,
+			Options: apidef.RoutingTriggerOptions{
+				// Not satisfied, so the condition is already decided.
+				QueryValMatches: map[string]apidef.StringRegexMap{"persnbr": {MatchPattern: "^nope$"}},
+				PayloadMatches:  payload,
+			},
+		}}}
+
+		assert.False(t, m.conditionsMatch(r, spec))
+		assert.False(t, tracker.read, "the body was read even though the query condition had already failed")
+	})
+
+	t.Run("any: an earlier success means the body is never read", func(t *testing.T) {
+		r, tracker := newRequest(t)
+
+		spec := user.AccessSpec{Conditions: []user.AccessCondition{{
+			On: apidef.Any,
+			Options: apidef.RoutingTriggerOptions{
+				QueryValMatches: map[string]apidef.StringRegexMap{"persnbr": {MatchPattern: "^[0-9]+$"}},
+				PayloadMatches:  payload,
+			},
+		}}}
+
+		assert.True(t, m.conditionsMatch(r, spec))
+		assert.False(t, tracker.read, "the body was read even though the query condition had already passed")
+	})
+
+	t.Run("the body is still read when it is what decides the outcome", func(t *testing.T) {
+		r, tracker := newRequest(t)
+
+		spec := user.AccessSpec{Conditions: []user.AccessCondition{{
+			On: apidef.All,
+			Options: apidef.RoutingTriggerOptions{
+				QueryValMatches: map[string]apidef.StringRegexMap{"persnbr": {MatchPattern: "^[0-9]+$"}},
+				PayloadMatches:  payload,
+			},
+		}}}
+
+		assert.True(t, m.conditionsMatch(r, spec))
+		assert.True(t, tracker.read)
+	})
+}
