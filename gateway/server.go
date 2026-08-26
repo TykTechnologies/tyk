@@ -212,6 +212,11 @@ type Gateway struct {
 	// performedSuccessfulReload is used to know whether a successful reload happened
 	performedSuccessfulReload bool
 
+	// rpcSyncStatus tracks fingerprints of the API/policy payloads most
+	// recently fetched over RPC; reported to MDCB after each successful
+	// reload so the control plane can verify this node is in sync.
+	rpcSyncStatus rpcSyncStatus
+
 	// reloadRetryBackoff optionally returns a custom backoff strategy for
 	// DoReloadWithRetry. Production code leaves this nil (default exponential
 	// backoff is used). Tests set it to return a fast constant backoff.
@@ -1345,6 +1350,7 @@ func (gw *Gateway) DoReloadWithError() error {
 		if count == 0 && gw.apisByIDLen() == 0 {
 			mainLog.Warning("No API Definitions found, not reloading")
 			gw.performedSuccessfulReload = true
+			gw.reportNodeSyncStatus(true)
 			return nil
 		}
 	}
@@ -1366,6 +1372,7 @@ func (gw *Gateway) DoReloadWithError() error {
 	gw.MetricInstruments.RecordReload(gw.ctx, time.Since(start))
 
 	gw.performedSuccessfulReload = true
+	gw.reportNodeSyncStatus(true)
 	mainLog.Info("API reload complete")
 	return nil
 }
