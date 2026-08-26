@@ -183,13 +183,85 @@ go build
 ```
 Go version 1.22 is required to build `master`, the current development version. Tyk is officially supported on `Linux/amd64`, `Linux/i386` and `Linux/arm64`.
 
-To run tests locally use the following command:
-```console
-go test ./...
-```
-Note that tests require Redis to be running on the same machine (default port).
+## Testing
 
-To write your own test please use this guide [https://github.com/TykTechnologies/tyk/blob/master/TESTING.md](https://github.com/TykTechnologies/tyk/blob/master/TESTING.md)
+### Prerequisites
+
+The test suite needs a Redis instance and an HTTP echo server. The repository ships a Compose file that provides both:
+
+```console
+docker compose up -d redis httpbin
+```
+
+Compose creates the required network, publishes Redis on port 6379 and httpbin on port 3123. If either port is already in use, stop the conflicting service before you start the containers.
+
+Tear the services down when you finish:
+
+```console
+docker compose down
+```
+
+### Running the tests
+
+If you have [Task](https://taskfile.dev/) installed, run the whole suite with:
+
+```console
+task test:integration
+```
+
+Task starts and stops the services for you, detects your local Python version, and applies the flags described below.
+
+To run the tests directly with `go` instead:
+
+```console
+CI=true go test -count=1 -p 1 ./...
+```
+
+| Setting | Why you need it |
+| --- | --- |
+| `CI=true` | Skips tests that the codebase marks as unreliable outside CI. |
+| `-count=1` | Disables the test cache. Without it, Go reports cached results from earlier runs and only changed packages actually execute. |
+| `-p 1` | Runs one package at a time. Each package starts its own gateway against the same Redis, and running them concurrently can exhaust the connection pool. |
+
+### Python plugin tests
+
+The `dlpython` and `coprocess/python` packages load the Python C API at runtime, so they need a `python3-config` binary on your `PATH`. On most systems this comes from your Python development package.
+
+The `dlpython` tests look for Python 3.5 unless you tell them otherwise, and fail with `Couldn't find Python 3.5` on newer installations. Set `PYTHON_VERSION` to the version you have:
+
+```console
+PYTHON_VERSION=3.12 CI=true go test -count=1 ./dlpython/...
+```
+
+`task test:integration` sets this for you from your local `python3`.
+
+The `coprocess/python` package runs Python middleware end to end, so it needs a working Python plugin environment rather than just a matching version. Set the version the gateway uses through the `python_version` config field.
+
+### Troubleshooting
+
+**`panic: can't connect to redis, timeout`**
+
+The gateway allows two seconds to reach Redis. Running many packages at once, or a Redis that blocks on disk writes, can exceed that. Run with `-p 1` first.
+
+If the panic continues, disable append-only persistence on the test Redis. Test data is disposable, so you lose nothing by trading durability for steadier connections. Create a `docker-compose.override.yml` file:
+
+```yaml
+services:
+  redis:
+    command: redis-server --appendonly no
+```
+
+**The suite finishes far faster than expected**
+
+Go is serving cached results. Add `-count=1`.
+
+**`Bind for 0.0.0.0:6379 failed: port is already allocated`**
+
+Another Redis already holds the port. Stop it, or remove the leftover container with `docker rm -f <name>`.
+
+### Writing tests
+
+To write your own tests, see the [testing guide](https://github.com/TykTechnologies/tyk/blob/master/TESTING.md).
 
 ## Contributing
 
