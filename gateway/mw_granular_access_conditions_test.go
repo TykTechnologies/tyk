@@ -256,10 +256,12 @@ func TestAccessConditions_MultipleConditionsAreAnded(t *testing.T) {
 		},
 	}
 
-	r, _ := http.NewRequest(http.MethodGet, "http://x/connections?persnbr=1", nil)
+	r, err := http.NewRequest(http.MethodGet, "http://x/connections?persnbr=1", nil)
+	assert.NoError(t, err)
 	assert.True(t, m.conditionsMatch(r, spec))
 
-	r, _ = http.NewRequest(http.MethodGet, "http://x/connections?persnbr=1&account=2", nil)
+	r, err = http.NewRequest(http.MethodGet, "http://x/connections?persnbr=1&account=2", nil)
+	assert.NoError(t, err)
 	assert.False(t, m.conditionsMatch(r, spec), "second condition must still be enforced")
 }
 

@@ -3,11 +3,12 @@ package gateway
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
