@@ -8,13 +8,13 @@ on:  # yamllint disable-line rule:truthy
 
 jobs:
   s1_scanner:
-    uses: TykTechnologies/github-actions/.github/workflows/s1-cns-scan.yml@d3fa20888fa2878e877e22bb7702141217290e7c  # main
+    uses: TykTechnologies/github-actions/.github/workflows/s1-cns-scan.yml@production  # main
     permissions:
       contents: read
     with:
       iac_enabled: false
       vuln_enabled: false
-      tag: service:vulnscan
+      policy_id: ${{ vars.S1_POLICY_ID }}
       scope_type: ACCOUNT
     secrets:
       S1_API_TOKEN: ${{ secrets.S1_API_TOKEN }}
