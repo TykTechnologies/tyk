@@ -20,7 +20,8 @@ import (
 type Key uint
 
 const (
-	SessionData Key = iota
+	RequestContextKey Key = iota
+	SessionData
 	// Deprecated: UpdateSession was used to trigger a session update, use *SessionData.Touch instead.
 	UpdateSession
 	AuthToken
