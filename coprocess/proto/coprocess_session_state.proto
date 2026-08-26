@@ -4,6 +4,53 @@ package coprocess;
 
 option go_package = "/coprocess";
 
+// StringRegexMap is a single match rule: a regular expression, and whether the
+// value has to match it or has to not match it.
+message StringRegexMap {
+  // MatchRx is the regular expression the value is tested against. An empty
+  // expression places no constraint on the value, so paired with Reverse it
+  // means "this name must not be supplied at all".
+  string match_rx = 1;
+
+  // Reverse inverts the rule: the value must not match, and a name that is not
+  // supplied satisfies it.
+  bool reverse = 2;
+}
+
+// RoutingTriggerOptions groups the match rules an AccessCondition evaluates
+// against a request. Each map is keyed by the name being matched: a header
+// name, a query parameter name, and so on.
+message RoutingTriggerOptions {
+  // HeaderMatches holds the rules to apply to request headers, keyed by header name.
+  map<string, StringRegexMap> header_matches = 1;
+
+  // QueryValMatches holds the rules to apply to query string parameters, keyed by parameter name.
+  map<string, StringRegexMap> query_val_matches = 2;
+
+  // PathPartMatches holds the rules to apply to the segments of the request path, keyed by rule name.
+  map<string, StringRegexMap> path_part_matches = 3;
+
+  // SessionMetaMatches holds the rules to apply to the session's metadata, keyed by metadata key.
+  map<string, StringRegexMap> session_meta_matches = 4;
+
+  // RequestContextMatches holds the rules to apply to values set on the request by earlier middleware, keyed by name.
+  map<string, StringRegexMap> request_context_matches = 5;
+
+  // PayloadMatches is the rule to apply to the request body. Unlike the fields above it is a single rule, not a map.
+  StringRegexMap payload_matches = 6;
+}
+
+// AccessCondition is an additional constraint a request has to satisfy before
+// the enclosing AccessSpec grants access. See also AccessSpec.
+message AccessCondition {
+  // On decides how the options combine: "all" requires every configured option
+  // to match, "any" requires just one of them. Empty means "all".
+  string on = 1;
+
+  // Options holds the match rules to evaluate against the request.
+  RoutingTriggerOptions options = 2;
+}
+
 // AccessSpec defines an API's URL (endpoint) and associated list of allowed methods.
 message AccessSpec {
   // Url is a URL (endpoint) belonging to the API associated with the request session.
@@ -12,6 +59,11 @@ message AccessSpec {
   // Methods is a list of allowed methods for the URL (endpoint), e.g. 'methods': [ 'GET'. 'POST', 'PUT', 'PATCH' ]
   // The list of methods are case sensitive.
   repeated string methods = 2;
+
+  // Conditions further restrict the matched URL. When set, every condition has
+  // to be satisfied by the request for access to be granted. Conditions fail
+  // closed: a plugin that drops them widens the access the session grants.
+  repeated AccessCondition conditions = 3;
 }
 
 // AccessDefinition is defined as an attribute within a SessionState instance.

@@ -3,6 +3,7 @@ package gateway
 import (
 	"io"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -319,4 +320,80 @@ func TestAccessConditions_PathParts(t *testing.T) {
 	}
 	assert.False(t, evalCondition(t, reverse, "http://x/admin/connections", nil, ""))
 	assert.True(t, evalCondition(t, reverse, "http://x/public/connections", nil, ""))
+}
+
+// TestAccessConditions_EveryTriggerOptionIsEvaluated guards the coupling
+// between access conditions and apidef.RoutingTriggerOptions, which access
+// conditions borrow as their configuration shape.
+//
+// An option the evaluator does not know about is not merely unimplemented: the
+// condition would be accepted, appear to constrain the request, and then be
+// ignored, granting access the operator believed they had restricted. So a
+// field added here for URL Rewrite's benefit has to be handled here too, or
+// deliberately rejected at validation.
+func TestAccessConditions_EveryTriggerOptionIsEvaluated(t *testing.T) {
+	evaluated := map[string]bool{
+		"HeaderMatches":         true,
+		"QueryValMatches":       true,
+		"PathPartMatches":       true,
+		"SessionMetaMatches":    true,
+		"RequestContextMatches": true,
+		"PayloadMatches":        true,
+	}
+
+	optionsType := reflect.TypeOf(apidef.RoutingTriggerOptions{})
+	for i := 0; i < optionsType.NumField(); i++ {
+		name := optionsType.Field(i).Name
+
+		if !evaluated[name] {
+			t.Errorf("apidef.RoutingTriggerOptions gained field %q, which the access condition evaluator ignores. "+
+				"Either evaluate it in conditionMatch or reject it in AccessCondition.Validate, "+
+				"then add it here.", name)
+
+			continue
+		}
+
+		delete(evaluated, name)
+	}
+
+	for name := range evaluated {
+		t.Errorf("the access condition evaluator handles %q, which apidef.RoutingTriggerOptions no longer has", name)
+	}
+}
+
+// TestAccessConditions_AbsenceSpellings pins the two ways a condition says
+// "this name must not be supplied". The empty pattern is the one to document:
+// it says nothing about the value, so reversing it can only be about presence.
+func TestAccessConditions_AbsenceSpellings(t *testing.T) {
+	for _, spelling := range []struct {
+		name   string
+		option apidef.StringRegexMap
+	}{
+		{name: "empty pattern reversed", option: apidef.StringRegexMap{Reverse: true}},
+		{name: "match anything reversed", option: apidef.StringRegexMap{MatchPattern: ".*", Reverse: true}},
+	} {
+		t.Run(spelling.name, func(t *testing.T) {
+			condition := user.AccessCondition{
+				On:      apidef.All,
+				Options: apidef.RoutingTriggerOptions{QueryValMatches: map[string]apidef.StringRegexMap{"persnbr": spelling.option}},
+			}
+
+			for _, tc := range []struct {
+				query string
+				want  bool
+			}{
+				{query: "", want: true},
+				{query: "?page=2", want: true},
+				{query: "?persnbr=123", want: false},
+				{query: "?persnbr=", want: false},
+				{query: "?persnbr=1&persnbr=2", want: false},
+			} {
+				got := evalCondition(t, condition, "http://x/connections"+tc.query, nil, "")
+
+				if got != tc.want {
+					t.Errorf("%q: got %v, want %v", tc.query, got, tc.want)
+				}
+			}
+		})
+	}
 }

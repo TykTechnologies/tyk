@@ -533,43 +533,6 @@ func checkTriggerOptions(r *http.Request, options apidef.RoutingTriggerOptions, 
 	return total == setCount
 }
 
-// initTriggerOptions returns a copy of options with every match pattern
-// compiled. Options that arrive on a session are decoded straight from storage,
-// so unlike API definition triggers they have no compiled regexp yet, and the
-// maps are shared between concurrent requests - hence the copy rather than an
-// in place Init. Patterns that fail to compile are left uncompiled, which makes
-// them match nothing.
-func initTriggerOptions(options apidef.RoutingTriggerOptions) apidef.RoutingTriggerOptions {
-	initialised := apidef.RoutingTriggerOptions{
-		HeaderMatches:         initStringRegexMaps(options.HeaderMatches),
-		QueryValMatches:       initStringRegexMaps(options.QueryValMatches),
-		PathPartMatches:       initStringRegexMaps(options.PathPartMatches),
-		SessionMetaMatches:    initStringRegexMaps(options.SessionMetaMatches),
-		RequestContextMatches: initStringRegexMaps(options.RequestContextMatches),
-		PayloadMatches:        options.PayloadMatches,
-	}
-
-	if initialised.PayloadMatches.MatchPattern != "" {
-		initialised.PayloadMatches.Init()
-	}
-
-	return initialised
-}
-
-func initStringRegexMaps(in map[string]apidef.StringRegexMap) map[string]apidef.StringRegexMap {
-	if len(in) == 0 {
-		return nil
-	}
-
-	out := make(map[string]apidef.StringRegexMap, len(in))
-	for key, match := range in {
-		match.Init()
-		out[key] = match
-	}
-
-	return out
-}
-
 func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {
 	contextData := ctxGetData(r)
 	fCount := 0
