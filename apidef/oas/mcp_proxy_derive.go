@@ -1207,6 +1207,17 @@ func buildMCPToolViewWithMode(canonical []DerivedTool, config *TykMCPServer, str
 // ExpandMCPServerConfig builds a full configurable primitive catalogue from a
 // source REST OAS and a compact proxy-side x-tyk-mcp-server extension.
 func ExpandMCPServerConfig(srcOAS *OAS, config *TykMCPServer) (*TykMCPServer, []DeriveWarning, error) {
+	return expandMCPServerConfig(srcOAS, config, true)
+}
+
+// ExpandMCPServerConfigTolerant builds a full configurable primitive catalogue
+// while skipping configured primitive sources that are no longer present in the
+// source catalogue. It is intended for derived views of saved proxy definitions.
+func ExpandMCPServerConfigTolerant(srcOAS *OAS, config *TykMCPServer) (*TykMCPServer, []DeriveWarning, error) {
+	return expandMCPServerConfig(srcOAS, config, false)
+}
+
+func expandMCPServerConfig(srcOAS *OAS, config *TykMCPServer, strict bool) (*TykMCPServer, []DeriveWarning, error) {
 	primitives, warnings, err := DeriveSourcePrimitives(srcOAS)
 	if err != nil {
 		return nil, warnings, err
@@ -1214,7 +1225,7 @@ func ExpandMCPServerConfig(srcOAS *OAS, config *TykMCPServer) (*TykMCPServer, []
 
 	tools := ToolPrimitives(primitives)
 	catalogue := newMCPToolViewCatalogue(tools)
-	selection, viewWarnings, err := buildMCPToolViewSelection(config, catalogue, true)
+	selection, viewWarnings, err := buildMCPToolViewSelection(config, catalogue, strict)
 	warnings = append(warnings, viewWarnings...)
 	if err != nil {
 		return nil, warnings, err
