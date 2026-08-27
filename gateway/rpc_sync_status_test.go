@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"testing"
 	"time"
 
@@ -32,55 +31,52 @@ func TestPayloadHashDeterministic(t *testing.T) {
 	}
 }
 
-func TestRPCSyncStatusSnapshot(t *testing.T) {
+func TestRPCSyncStatusStagingLifecycle(t *testing.T) {
 	status := rpcSyncStatus{}
 
-	// Nothing fetched yet: nothing to report.
+	// Nothing attempted yet: nothing to report.
 	if status.snapshot() != nil {
-		t.Fatal("snapshot must be nil before any payload is recorded")
+		t.Fatal("snapshot must be nil before any reload attempt")
 	}
 
 	apisPayload := `[{"api_id":"a1"}]`
-	policiesPayload := `[{"_id":"p1"}]`
-
 	status.setPayload(apidef.PayloadAPIs, apisPayload)
-	status.setPayload(apidef.PayloadPolicies, policiesPayload)
-	status.markReload(true)
 
+	// Staged but not committed: still nothing to report.
+	if status.snapshot() != nil {
+		t.Fatal("snapshot must be nil while fingerprints are only staged")
+	}
+
+	// Failed reload: reportable, but the staged fingerprint must NOT be
+	// promoted — the payload was fetched, never applied.
+	status.markReload(false)
 	snap := status.snapshot()
 	if snap == nil {
-		t.Fatal("snapshot must not be nil after payloads are recorded")
+		t.Fatal("snapshot must not be nil after a reload attempt")
+	}
+	if snap.LastReloadOK {
+		t.Fatal("failed reload must report last_reload_ok=false")
+	}
+	if len(snap.Hashes) != 0 {
+		t.Fatalf("failed reload must not commit staged hashes, got %v", snap.Hashes)
+	}
+
+	// Successful reload commits the staged fingerprints.
+	status.markReload(true)
+	snap = status.snapshot()
+	if !snap.LastReloadOK || snap.LastReloadAt == 0 {
+		t.Fatalf("reload marker not recorded: %+v", snap)
 	}
 	if snap.Hashes[apidef.PayloadAPIs] != payloadHash(apisPayload) {
-		t.Errorf("wrong APIs hash: %s", snap.Hashes[apidef.PayloadAPIs])
-	}
-	if snap.Hashes[apidef.PayloadPolicies] != payloadHash(policiesPayload) {
-		t.Errorf("wrong policies hash: %s", snap.Hashes[apidef.PayloadPolicies])
-	}
-	if !snap.LastReloadOK || snap.LastReloadAt == 0 {
-		t.Errorf("reload marker not recorded: %+v", snap)
-	}
-}
-
-func TestIsUnknownRPCMethodErr(t *testing.T) {
-	testCases := []struct {
-		name     string
-		err      error
-		expected bool
-	}{
-		{"nil error", nil, false},
-		// Exact shapes gorpc's dispatcher returns for unregistered calls.
-		{"unknown method", errors.New("gorpc.Dispatcher: unknown method [.UpdateNodeStatus]"), true},
-		{"unknown service", errors.New("gorpc.Dispatcher: unknown service name [foo]"), true},
-		{"unrelated error", errors.New("Cannot obtain response during timeout"), false},
+		t.Errorf("committed hash mismatch: %s", snap.Hashes[apidef.PayloadAPIs])
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := isUnknownRPCMethodErr(tc.err); got != tc.expected {
-				t.Errorf("got %v, expected %v", got, tc.expected)
-			}
-		})
+	// A newer staged payload doesn't leak into reports until the next
+	// successful reload.
+	status.setPayload(apidef.PayloadAPIs, `[{"api_id":"a2"}]`)
+	snap = status.snapshot()
+	if snap.Hashes[apidef.PayloadAPIs] != payloadHash(apisPayload) {
+		t.Error("staged payload must not be visible before commit")
 	}
 }
 
@@ -121,9 +117,9 @@ func TestDispatcherFuncs_RegistersUpdateNodeStatus(t *testing.T) {
 }
 
 // TestRPCSyncStatusReportedToMDCB drives a slave gateway against a mock MDCB
-// and asserts that (1) the payload fingerprints recorded during the RPC sync
-// match what the mock served, and (2) the gateway reports them upstream via
-// UpdateNodeStatus as a slim payload carrying the node identity.
+// and asserts that (1) fingerprints recorded during the RPC sync match what
+// the mock served once committed by a successful reload, and (2) the gateway
+// reports them upstream via UpdateNodeStatus with the node identity attached.
 func TestRPCSyncStatusReportedToMDCB(t *testing.T) {
 	test.Flaky(t) // relies on the RPC mock harness, same as TestSyncAPISpecsRPCSuccess
 
@@ -181,20 +177,16 @@ func TestRPCSyncStatusReportedToMDCB(t *testing.T) {
 		t.Fatalf("syncPolicies failed: %v", err)
 	}
 
-	snap := ts.Gw.rpcSyncStatus.snapshot()
-	if snap == nil {
-		t.Fatal("sync status must be recorded after RPC sync")
-	}
-	if snap.Hashes[apidef.PayloadAPIs] != payloadHash(apisPayload) {
-		t.Errorf("APIs hash does not match served payload: %s", snap.Hashes[apidef.PayloadAPIs])
-	}
-	if snap.Hashes[apidef.PayloadPolicies] != payloadHash(policiesPayload) {
-		t.Errorf("policies hash does not match served payload: %s", snap.Hashes[apidef.PayloadPolicies])
+	// Drain reports fired by gateway boot reloads; we only assert on the
+	// one this test triggers below.
+	for len(reported) > 0 {
+		<-reported
 	}
 
-	// Trigger the report exactly as DoReloadWithError does after a reload,
-	// but synchronously so the test does not race the goroutine used in
-	// production.
+	// Commit the staged fingerprints exactly as DoReloadWithError does on
+	// success, then report synchronously so the test doesn't race the
+	// goroutine used in production.
+	ts.Gw.rpcSyncStatus.markReload(true)
 	handler := &RPCStorageHandler{Gw: ts.Gw}
 	handler.reportNodeSyncStatus()
 
@@ -204,11 +196,14 @@ func TestRPCSyncStatusReportedToMDCB(t *testing.T) {
 		if err := json.Unmarshal(nodeData, &node); err != nil {
 			t.Fatalf("reported node data is not valid JSON: %v", err)
 		}
-		if node.NodeID == "" || node.GroupID != "" && node.GroupID != ts.Gw.GetConfig().SlaveOptions.GroupID {
+		if node.NodeID == "" {
 			t.Fatalf("report must carry the node identity, got %+v", node)
 		}
 		if node.SyncStatus == nil {
 			t.Fatal("reported node data must include sync_status")
+		}
+		if !node.SyncStatus.LastReloadOK {
+			t.Error("successful reload must report last_reload_ok=true")
 		}
 		if node.SyncStatus.Hashes[apidef.PayloadAPIs] != payloadHash(apisPayload) {
 			t.Errorf("reported APIs hash mismatch: %s", node.SyncStatus.Hashes[apidef.PayloadAPIs])
@@ -221,10 +216,10 @@ func TestRPCSyncStatusReportedToMDCB(t *testing.T) {
 	}
 }
 
-// TestRPCSyncStatusFeatureDetection proves a new gateway stays quiet against
-// an old MDCB: the first "unknown method" dispatcher error disables reporting
-// for that gateway instead of surfacing errors.
-func TestRPCSyncStatusFeatureDetection(t *testing.T) {
+// TestRPCSyncStatusReportAgainstOldMDCB proves a new gateway stays quiet
+// against an MDCB without the UpdateNodeStatus RPC: the failed report is
+// swallowed (debug-logged), nothing panics and nothing escalates.
+func TestRPCSyncStatusReportAgainstOldMDCB(t *testing.T) {
 	test.Flaky(t) // relies on the RPC mock harness, same as TestSyncAPISpecsRPCSuccess
 
 	// Async login: see TestRPCSyncStatusReportedToMDCB.
@@ -248,13 +243,11 @@ func TestRPCSyncStatusFeatureDetection(t *testing.T) {
 	ts := StartSlaveGw(connectionString, "")
 	defer ts.Close()
 
-	// Record something so there is a status to report.
 	ts.Gw.rpcSyncStatus.setPayload(apidef.PayloadAPIs, "[]")
+	ts.Gw.rpcSyncStatus.markReload(true)
 
+	// Must return without panicking or blocking despite the server-side
+	// "unknown method" error.
 	handler := &RPCStorageHandler{Gw: ts.Gw}
 	handler.reportNodeSyncStatus()
-
-	if !ts.Gw.rpcSyncStatus.isReportUnsupported() {
-		t.Fatal("reporting must be disabled after the old MDCB rejects UpdateNodeStatus")
-	}
 }

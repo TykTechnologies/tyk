@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"encoding/json"
-	"strings"
 	"sync"
 	"time"
 
@@ -11,22 +10,20 @@ import (
 	"github.com/TykTechnologies/tyk/rpc"
 )
 
-// rpcSyncStatus tracks fingerprints of the config payloads most recently
-// fetched over RPC, keyed by payload kind (model.PayloadAPIs, ...). After
-// each reload the gateway reports them to MDCB via the UpdateNodeStatus RPC
-// so the control plane can verify this node is running the configuration it
-// served.
+// rpcSyncStatus tracks fingerprints of config payloads fetched over RPC,
+// keyed by payload kind (model.PayloadAPIs, ...). Fingerprints are STAGED
+// at fetch time and COMMITTED only when the reload that consumed them
+// succeeds, so a payload that was fetched but never applied (parse error,
+// emergency fallback to the Redis backup) is never reported as running.
 type rpcSyncStatus struct {
 	mu           sync.Mutex
-	hashes       map[string]string
+	staged       map[string]string
+	committed    map[string]string
 	lastReloadAt int64
 	lastReloadOK bool
-	// reportUnsupported flips to true the first time MDCB answers
-	// UpdateNodeStatus with an "unknown method" dispatcher error, i.e. we
-	// are talking to an MDCB that predates sync-status reporting. Reporting
-	// is then skipped for the lifetime of this gateway so mixed-version
-	// fleets stay quiet.
-	reportUnsupported bool
+	// attempted turns true on the first reload; before that there is
+	// nothing meaningful to report.
+	attempted bool
 }
 
 // payloadHash returns the hex-encoded SHA-256 of a configuration payload
@@ -36,45 +33,46 @@ func payloadHash(payload string) string {
 	return crypto.HashStr(payload, crypto.HashSha256)
 }
 
+// setPayload stages the fingerprint of a payload as received; it becomes
+// reportable only once markReload(true) commits it.
 func (s *rpcSyncStatus) setPayload(kind, payload string) {
 	h := payloadHash(payload)
 	s.mu.Lock()
-	if s.hashes == nil {
-		s.hashes = make(map[string]string)
+	if s.staged == nil {
+		s.staged = make(map[string]string)
 	}
-	s.hashes[kind] = h
+	s.staged[kind] = h
 	s.mu.Unlock()
 }
 
+// markReload records a reload outcome. On success the staged fingerprints
+// are promoted to committed — they now describe the running configuration.
 func (s *rpcSyncStatus) markReload(ok bool) {
 	s.mu.Lock()
+	s.attempted = true
 	s.lastReloadAt = time.Now().Unix()
 	s.lastReloadOK = ok
+	if ok {
+		if s.committed == nil {
+			s.committed = make(map[string]string)
+		}
+		for kind, hash := range s.staged {
+			s.committed[kind] = hash
+		}
+	}
 	s.mu.Unlock()
 }
 
-func (s *rpcSyncStatus) setReportUnsupported() {
-	s.mu.Lock()
-	s.reportUnsupported = true
-	s.mu.Unlock()
-}
-
-func (s *rpcSyncStatus) isReportUnsupported() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.reportUnsupported
-}
-
-// snapshot returns the current sync state as the wire model, or nil when
-// nothing has been fetched over RPC yet (nothing meaningful to report).
+// snapshot returns the reportable sync state — committed fingerprints only —
+// or nil before the first reload attempt.
 func (s *rpcSyncStatus) snapshot() *model.SyncStatus {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(s.hashes) == 0 {
+	if !s.attempted {
 		return nil
 	}
-	hashes := make(map[string]string, len(s.hashes))
-	for kind, hash := range s.hashes {
+	hashes := make(map[string]string, len(s.committed))
+	for kind, hash := range s.committed {
 		hashes[kind] = hash
 	}
 	return &model.SyncStatus{
@@ -85,24 +83,11 @@ func (s *rpcSyncStatus) snapshot() *model.SyncStatus {
 	}
 }
 
-// isUnknownRPCMethodErr detects the gorpc dispatcher errors returned when the
-// server has no handler registered for the requested function. The strings
-// mirror gorpc dispatcher.go:342 ("unknown service name") and :349 ("unknown
-// method") — the only two shapes the library produces.
-func isUnknownRPCMethodErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, "unknown method") ||
-		strings.Contains(msg, "unknown service name")
-}
-
 // buildSyncReport returns a minimal NodeData payload for UpdateNodeStatus:
-// node identity plus sync status. The full stats/health blob already travels
-// with every group login and MDCB patches the sync fields into its stored
-// record, so re-sending everything on every reload would be wasted work.
-// Returns nil when there is nothing to report yet.
+// node identity plus sync status. MDCB validates the identity against the
+// connection's group-login binding and keeps stats/health from the login
+// blob, so nothing else needs to travel here. Returns nil when there is
+// nothing to report yet.
 func (r *RPCStorageHandler) buildSyncReport() []byte {
 	status := r.Gw.rpcSyncStatus.snapshot()
 	if status == nil {
@@ -110,14 +95,8 @@ func (r *RPCStorageHandler) buildSyncReport() []byte {
 	}
 
 	node := model.NodeData{
-		NodeID:  r.Gw.GetNodeID(),
-		GroupID: r.Gw.GetConfig().SlaveOptions.GroupID,
-		// Counts only: the per-API/policy ID lists are the expensive part
-		// of the stats blob and still refresh with every login.
-		Stats: model.GWStats{
-			APIsCount:     r.Gw.apisByIDLen(),
-			PoliciesCount: r.Gw.policies.PolicyCount(),
-		},
+		NodeID:     r.Gw.GetNodeID(),
+		GroupID:    r.Gw.GetConfig().SlaveOptions.GroupID,
 		SyncStatus: status,
 	}
 
@@ -129,25 +108,17 @@ func (r *RPCStorageHandler) buildSyncReport() []byte {
 	return data
 }
 
-// reportNodeSyncStatus sends the node's config fingerprints to MDCB. It is
-// fire-and-forget by design: failures are logged and never affect the reload
-// that triggered the report.
+// reportNodeSyncStatus sends the node's sync report to MDCB. It is
+// fire-and-forget by design: failures — including MDCBs that predate the
+// UpdateNodeStatus RPC — are debug-logged and never affect the reload that
+// triggered the report.
 func (r *RPCStorageHandler) reportNodeSyncStatus() {
-	if r.Gw.rpcSyncStatus.isReportUnsupported() {
-		return
-	}
-
 	report := r.buildSyncReport()
 	if report == nil {
 		return
 	}
 
 	if _, err := rpc.FuncClientSingleton("UpdateNodeStatus", report); err != nil {
-		if isUnknownRPCMethodErr(err) {
-			r.Gw.rpcSyncStatus.setReportUnsupported()
-			log.Debug("MDCB does not support UpdateNodeStatus, disabling sync status reporting")
-			return
-		}
 		log.WithError(err).Debug("Failed to report node sync status to MDCB")
 	}
 }
