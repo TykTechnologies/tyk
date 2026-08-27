@@ -3,11 +3,13 @@ package gateway
 import (
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
@@ -479,5 +481,37 @@ func TestAccessConditions_PayloadNotReadWhenAlreadyDecided(t *testing.T) {
 
 		assert.True(t, m.conditionsMatch(r, spec))
 		assert.True(t, tracker.read)
+	})
+}
+
+// TestAccessConditions_RequestContextWithoutData covers a request that has no
+// context data at all, which is the normal case: unlike the URL Rewrite
+// middleware, the granular access middleware deliberately does not call
+// forceContextData, because an access check must not have side effects on the
+// trigger numbering a later URL Rewrite relies on.
+//
+// Reading from a nil map is defined in Go and yields the zero value, so a
+// missing context is read as "the name was not supplied" rather than panicking.
+// That is the behaviour access control needs: a plain rule cannot be satisfied
+// by a value that is not there, and a reversed one is.
+func TestAccessConditions_RequestContextWithoutData(t *testing.T) {
+	require.Nil(t, ctxGetData(httptest.NewRequest(http.MethodGet, "/connections", nil)),
+		"this test is only meaningful while a fresh request carries no context data")
+
+	contextCondition := func(option apidef.StringRegexMap) user.AccessCondition {
+		return user.AccessCondition{
+			On:      apidef.All,
+			Options: apidef.RoutingTriggerOptions{RequestContextMatches: map[string]apidef.StringRegexMap{"tenant": option}},
+		}
+	}
+
+	t.Run("a value that must be present is absent, so access is refused", func(t *testing.T) {
+		assert.False(t, evalCondition(t, contextCondition(apidef.StringRegexMap{MatchPattern: "^acme$"}),
+			"http://x/connections", nil, ""))
+	})
+
+	t.Run("a value that must not be present is absent, so access is granted", func(t *testing.T) {
+		assert.True(t, evalCondition(t, contextCondition(apidef.StringRegexMap{Reverse: true}),
+			"http://x/connections", nil, ""))
 	})
 }

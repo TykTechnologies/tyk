@@ -445,9 +445,57 @@ func forceContextData(r *http.Request) {
 	}
 }
 
+// triggerOptionCheck is one configured group of trigger options, paired with
+// the check that decides whether the request satisfies it.
+type triggerOptionCheck struct {
+	configured bool
+	check      func() bool
+}
+
+// triggerOptionChecks returns the option groups of a trigger, in evaluation
+// order.
+func triggerOptionChecks(r *http.Request, options apidef.RoutingTriggerOptions, checkAny bool, triggernum int) []triggerOptionCheck {
+	return []triggerOptionCheck{
+		{
+			configured: len(options.HeaderMatches) > 0,
+			check:      func() bool { return checkHeaderTrigger(r, options.HeaderMatches, checkAny, triggernum) },
+		},
+		{
+			configured: len(options.QueryValMatches) > 0,
+			check:      func() bool { return checkQueryString(r, options.QueryValMatches, checkAny, triggernum) },
+		},
+		{
+			configured: len(options.PathPartMatches) > 0,
+			check:      func() bool { return checkPathParts(r, options.PathPartMatches, checkAny, triggernum) },
+		},
+		{
+			// A request without a session can never satisfy these, but they
+			// still count towards the total so an "all" trigger won't fire.
+			configured: len(options.SessionMetaMatches) > 0,
+			check: func() bool {
+				session := ctxGetSession(r)
+				return session != nil && checkSessionTrigger(r, session, options.SessionMetaMatches, checkAny, triggernum)
+			},
+		},
+		{
+			configured: len(options.RequestContextMatches) > 0,
+			check:      func() bool { return checkContextTrigger(r, options.RequestContextMatches, checkAny, triggernum) },
+		},
+		{
+			configured: options.PayloadMatches.MatchPattern != "",
+			check:      func() bool { return checkPayload(r, options.PayloadMatches, triggernum) },
+		},
+	}
+}
+
 // checkTriggerOptions reports whether the request satisfies options. With
 // apidef.Any a single matching option is enough and the remaining ones are not
 // evaluated; otherwise every configured option has to match.
+//
+// Note that under "all" the remaining options are still evaluated after one
+// fails. That is deliberate: the checks record their matches in the request
+// context data for rewrite templates to reference, so skipping them would change
+// what a rewrite can interpolate.
 //
 // triggernum namespaces the matches this records in the request context data,
 // which callers can reference as $tyk_context.trigger-<triggernum>-<name>.
@@ -458,70 +506,18 @@ func checkTriggerOptions(r *http.Request, options apidef.RoutingTriggerOptions, 
 	// total counts the configured options, setCount the ones that matched.
 	total, setCount := 0, 0
 
-	// Check headers
-	if len(options.HeaderMatches) > 0 {
-		total++
-		if checkHeaderTrigger(r, options.HeaderMatches, checkAny, triggernum) {
-			if checkAny {
-				return true
-			}
-			setCount++
+	for _, option := range triggerOptionChecks(r, options, checkAny, triggernum) {
+		if !option.configured {
+			continue
 		}
-	}
 
-	// Check query string
-	if len(options.QueryValMatches) > 0 {
 		total++
-		if checkQueryString(r, options.QueryValMatches, checkAny, triggernum) {
+
+		if option.check() {
 			if checkAny {
 				return true
 			}
-			setCount++
-		}
-	}
 
-	// Check path parts
-	if len(options.PathPartMatches) > 0 {
-		total++
-		if checkPathParts(r, options.PathPartMatches, checkAny, triggernum) {
-			if checkAny {
-				return true
-			}
-			setCount++
-		}
-	}
-
-	// Check session meta. A request without a session can never satisfy these,
-	// but they still count towards the total so an "all" trigger won't fire.
-	if len(options.SessionMetaMatches) > 0 {
-		total++
-		if session := ctxGetSession(r); session != nil &&
-			checkSessionTrigger(r, session, options.SessionMetaMatches, checkAny, triggernum) {
-			if checkAny {
-				return true
-			}
-			setCount++
-		}
-	}
-
-	// Request context meta
-	if len(options.RequestContextMatches) > 0 {
-		total++
-		if checkContextTrigger(r, options.RequestContextMatches, checkAny, triggernum) {
-			if checkAny {
-				return true
-			}
-			setCount++
-		}
-	}
-
-	// Check payload
-	if options.PayloadMatches.MatchPattern != "" {
-		total++
-		if checkPayload(r, options.PayloadMatches, triggernum) {
-			if checkAny {
-				return true
-			}
 			setCount++
 		}
 	}

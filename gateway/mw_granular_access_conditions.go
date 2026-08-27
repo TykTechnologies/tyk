@@ -60,131 +60,172 @@ func (m *GranularAccessMiddleware) conditionsMatch(r *http.Request, accessSpec u
 	return true
 }
 
+// accessConditionGroup is one group of options within a condition, paired with
+// the test that decides whether the request satisfies it.
+type accessConditionGroup struct {
+	// configured reports whether the operator set this group at all. A group
+	// nobody configured constrains nothing and does not count either way.
+	configured bool
+	// match is called only for a configured group, and only until the outcome
+	// is settled. That is what keeps the expensive groups from running.
+	match func() bool
+}
+
+// conditionGroups returns a condition's option groups in the order they should
+// be evaluated: cheapest first, with the payload last, because matching against
+// it reads the whole request body into memory.
+func (m *GranularAccessMiddleware) conditionGroups(r *http.Request, condition user.AccessCondition) []accessConditionGroup {
+	options := condition.Options
+	checkAny := condition.On == apidef.Any
+
+	return []accessConditionGroup{
+		{
+			configured: len(options.HeaderMatches) > 0,
+			match:      func() bool { return matchHeaders(r, options.HeaderMatches, checkAny) },
+		},
+		{
+			configured: len(options.QueryValMatches) > 0,
+			match:      func() bool { return matchQueryValues(r, options.QueryValMatches, checkAny) },
+		},
+		{
+			configured: len(options.PathPartMatches) > 0,
+			match:      func() bool { return matchPathParts(r, options.PathPartMatches, checkAny) },
+		},
+		{
+			configured: len(options.SessionMetaMatches) > 0,
+			match:      func() bool { return matchSessionMeta(r, options.SessionMetaMatches, checkAny) },
+		},
+		{
+			configured: len(options.RequestContextMatches) > 0,
+			match:      func() bool { return matchRequestContext(r, options.RequestContextMatches, checkAny) },
+		},
+		{
+			configured: options.PayloadMatches.MatchPattern != "",
+			match:      func() bool { return m.matchPayload(r, options.PayloadMatches) },
+		},
+	}
+}
+
 // conditionMatch evaluates a single condition. On decides how the configured
 // option groups combine: apidef.Any is satisfied by one group, anything else
 // requires all of them.
+//
+// Evaluation stops as soon as the answer is settled - under "any" at the first
+// satisfied group, under "all" at the first unsatisfied one. That is not only
+// about speed: it is what stops a request whose header or query condition has
+// already failed from having its whole body read for a payload match.
 func (m *GranularAccessMiddleware) conditionMatch(r *http.Request, condition user.AccessCondition) bool {
 	checkAny := condition.On == apidef.Any
-	options := condition.Options
-
-	// Parsed lazily and only once, however many option groups need them.
-	var query map[string][]string
 
 	// total counts the configured option groups, satisfied the ones that passed.
 	total, satisfied := 0, 0
 
-	// group evaluates one option group and reports whether it settles the
-	// condition, and if so with what answer: under "any" the first satisfied
-	// group settles it, under "all" the first unsatisfied one does.
-	//
-	// Stopping early is not only about speed. The groups are evaluated cheapest
-	// first, with the payload last, so short circuiting is what stops a request
-	// whose header or query condition has already failed from having its whole
-	// body read into memory.
-	group := func(configured bool, eval func() bool) (settled, granted bool) {
-		if !configured {
-			return false, false
+	for _, group := range m.conditionGroups(r, condition) {
+		if !group.configured {
+			continue
 		}
 
 		total++
 
-		if !eval() {
-			// Under "all" one unsatisfied group is the whole answer. Under
-			// "any" there may still be a later group that passes.
-			return !checkAny, false
-		}
-
-		if checkAny {
-			return true, true
-		}
-
-		satisfied++
-
-		return false, false
-	}
-
-	if settled, granted := group(len(options.HeaderMatches) > 0, func() bool {
-		return matchNamedValues(options.HeaderMatches, checkAny, func(name string) ([]string, bool) {
-			values, ok := r.Header[textproto.CanonicalMIMEHeaderKey(name)]
-			return values, ok
-		})
-	}); settled {
-		return granted
-	}
-
-	if settled, granted := group(len(options.QueryValMatches) > 0, func() bool {
-		if query == nil {
-			query = r.URL.Query()
-		}
-
-		return matchNamedValues(options.QueryValMatches, checkAny, func(name string) ([]string, bool) {
-			values, ok := query[name]
-			return values, ok
-		})
-	}); settled {
-		return granted
-	}
-
-	if settled, granted := group(len(options.PathPartMatches) > 0, func() bool {
-		parts := strings.Split(r.URL.Path, "/")
-
-		// Every part is a candidate, so the matcher sees them as the values
-		// supplied for that name: a plain pattern is satisfied when some part
-		// matches, a reversed one when no part does.
-		return matchNamedValues(options.PathPartMatches, checkAny, func(string) ([]string, bool) {
-			return parts, true
-		}, matchAnyValue)
-	}); settled {
-		return granted
-	}
-
-	if settled, granted := group(len(options.SessionMetaMatches) > 0, func() bool {
-		session := ctxGetSession(r)
-
-		return matchNamedValues(options.SessionMetaMatches, checkAny, func(name string) ([]string, bool) {
-			if session == nil {
-				return nil, false
+		if group.match() {
+			if checkAny {
+				return true
 			}
 
-			return stringValue(session.MetaData[name])
-		})
-	}); settled {
-		return granted
-	}
+			satisfied++
 
-	if settled, granted := group(len(options.RequestContextMatches) > 0, func() bool {
-		contextData := ctxGetData(r)
-
-		return matchNamedValues(options.RequestContextMatches, checkAny, func(name string) ([]string, bool) {
-			return stringValue(contextData[name])
-		})
-	}); settled {
-		return granted
-	}
-
-	if settled, granted := group(options.PayloadMatches.MatchPattern != "", func() bool {
-		body, err := readRequestBody(r)
-		if err != nil {
-			m.Logger().WithError(err).Error("Could not read request body to evaluate access condition")
-			return false
+			continue
 		}
 
-		return matchValues(options.PayloadMatches, []string{body}, true, matchAnyValue)
-	}); settled {
-		return granted
+		// Under "all" one unsatisfied group is the whole answer. Under "any"
+		// a later group may still pass.
+		if !checkAny {
+			return false
+		}
 	}
 
-	if checkAny {
-		return false
-	}
-
-	// A condition that configures nothing constrains nothing, which for an
-	// access decision is a misconfiguration rather than a licence to pass.
-	if total == 0 {
+	// Reaching here under "any" means nothing matched. A condition that
+	// configures nothing constrains nothing, which for an access decision is a
+	// misconfiguration rather than a licence to pass.
+	if checkAny || total == 0 {
 		return false
 	}
 
 	return total == satisfied
+}
+
+// matchHeaders evaluates the header matches. Header names are canonicalised, so
+// they are matched case insensitively as HTTP requires.
+func matchHeaders(r *http.Request, options map[string]apidef.StringRegexMap, checkAny bool) bool {
+	return matchNamedValues(options, checkAny, func(name string) ([]string, bool) {
+		values, ok := r.Header[textproto.CanonicalMIMEHeaderKey(name)]
+		return values, ok
+	})
+}
+
+// matchQueryValues evaluates the query string matches. Parameter names are case
+// sensitive, and the order they appear in makes no difference.
+func matchQueryValues(r *http.Request, options map[string]apidef.StringRegexMap, checkAny bool) bool {
+	query := r.URL.Query()
+
+	return matchNamedValues(options, checkAny, func(name string) ([]string, bool) {
+		values, ok := query[name]
+		return values, ok
+	})
+}
+
+// matchPathParts evaluates the path part matches. Every part is a candidate, so
+// the matcher sees them as the values supplied for that name: a plain pattern is
+// satisfied when some part matches, a reversed one when no part does.
+func matchPathParts(r *http.Request, options map[string]apidef.StringRegexMap, checkAny bool) bool {
+	parts := strings.Split(r.URL.Path, "/")
+
+	return matchNamedValues(options, checkAny, func(string) ([]string, bool) {
+		return parts, true
+	}, matchAnyValue)
+}
+
+// matchSessionMeta evaluates the matches against the session's metadata. A
+// request with no session supplies no values, so a plain pattern cannot be
+// satisfied and a reversed one is.
+func matchSessionMeta(r *http.Request, options map[string]apidef.StringRegexMap, checkAny bool) bool {
+	session := ctxGetSession(r)
+
+	return matchNamedValues(options, checkAny, func(name string) ([]string, bool) {
+		if session == nil {
+			return nil, false
+		}
+
+		return stringValue(session.MetaData[name])
+	})
+}
+
+// matchRequestContext evaluates the matches against values earlier middleware
+// recorded on the request.
+//
+// Unlike the URL Rewrite middleware this deliberately does not force the context
+// data into existence: an access check must not have side effects on the trigger
+// numbering a later rewrite relies on. Reading from the resulting nil map is
+// defined in Go and yields the zero value, so a request with no context data is
+// read as supplying no values.
+func matchRequestContext(r *http.Request, options map[string]apidef.StringRegexMap, checkAny bool) bool {
+	contextData := ctxGetData(r)
+
+	return matchNamedValues(options, checkAny, func(name string) ([]string, bool) {
+		return stringValue(contextData[name])
+	})
+}
+
+// matchPayload evaluates the match against the request body. A body that cannot
+// be read fails the match rather than passing it.
+func (m *GranularAccessMiddleware) matchPayload(r *http.Request, option apidef.StringRegexMap) bool {
+	body, err := readRequestBody(r)
+	if err != nil {
+		m.Logger().WithError(err).Error("Could not read request body to evaluate access condition")
+		return false
+	}
+
+	return matchValues(option, []string{body}, true, matchAnyValue)
 }
 
 // valueLookup returns the values supplied for a name and whether the name was
