@@ -1345,12 +1345,12 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	var decoratedRoundTripper = roundtrippers.Combine(
 		roundTripper,
 		internalLoopRoundTripperMiddleware(p.Gw, p.logger),
-		roundtrippers.SkipIf(otel.HTTPRoundTripper, !p.Gw.GetConfig().OpenTelemetry.TracesEnabled()),
 		roundtrippers.Timeout(requestTimeout),
 		roundtrippers.SkipIf(
 			roundtrippers.HeadersTimeout(fallbackHeadersTimeout),
 			isRequestTimeoutEnforced,
 		),
+		roundtrippers.SkipIf(otel.HTTPRoundTripper, !p.Gw.GetConfig().OpenTelemetry.TracesEnabled()),
 	)
 
 	if breakerEnforced {
