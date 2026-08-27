@@ -798,7 +798,7 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 	payload := defString.(string)
 	// Fingerprint the payload exactly as received so MDCB can later verify
 	// this node applied what it served (see rpc_sync_status.go).
-	r.Gw.rpcSyncStatus.setAPIsPayload(payload)
+	r.Gw.rpcSyncStatus.setPayload(model.PayloadAPIs, payload)
 	return payload
 }
 
@@ -852,7 +852,7 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 		payload := defString.(string)
 		// Fingerprint the payload exactly as received so MDCB can later
 		// verify this node applied what it served (see rpc_sync_status.go).
-		r.Gw.rpcSyncStatus.setPoliciesPayload(payload)
+		r.Gw.rpcSyncStatus.setPayload(model.PayloadPolicies, payload)
 		return payload
 	}
 	return ""

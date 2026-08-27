@@ -1306,9 +1306,13 @@ func (gw *Gateway) idpReloadLoop(rpcKey string) {
 // DoReloadWithError performs a full reload of APIs and policies, returning any
 // sync error that prevented a successful reload. The reloadMu mutex is acquired
 // for the duration of the reload, so each call is safe to make concurrently.
-func (gw *Gateway) DoReloadWithError() error {
+func (gw *Gateway) DoReloadWithError() (err error) {
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
+
+	// Report the outcome — success or failure — to MDCB from this single
+	// choke point rather than from each return path (see rpc_sync_status.go).
+	defer func() { gw.reportNodeSyncStatus(err == nil) }()
 
 	start := time.Now()
 
@@ -1350,7 +1354,6 @@ func (gw *Gateway) DoReloadWithError() error {
 		if count == 0 && gw.apisByIDLen() == 0 {
 			mainLog.Warning("No API Definitions found, not reloading")
 			gw.performedSuccessfulReload = true
-			gw.reportNodeSyncStatus(true)
 			return nil
 		}
 	}
@@ -1372,7 +1375,6 @@ func (gw *Gateway) DoReloadWithError() error {
 	gw.MetricInstruments.RecordReload(gw.ctx, time.Since(start))
 
 	gw.performedSuccessfulReload = true
-	gw.reportNodeSyncStatus(true)
 	mainLog.Info("API reload complete")
 	return nil
 }

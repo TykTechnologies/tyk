@@ -31,6 +31,9 @@ type (
 
 // Other.
 const (
+	PayloadAPIs     = apidef.PayloadAPIs
+	PayloadPolicies = apidef.PayloadPolicies
+
 	Pass      = apidef.Pass
 	Warn      = apidef.Warn
 	Fail      = apidef.Fail
