@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"github.com/sirupsen/logrus"
+
 	"encoding/json"
 	"sync"
 	"time"
@@ -120,7 +122,15 @@ func (r *RPCStorageHandler) reportNodeSyncStatus() {
 
 	if _, err := rpc.FuncClientSingleton("UpdateNodeStatus", report); err != nil {
 		log.WithError(err).Debug("Failed to report node sync status to MDCB")
+		return
 	}
+
+	status := r.Gw.rpcSyncStatus.snapshot()
+	log.WithFields(logrus.Fields{
+		"reload_ok":      status.LastReloadOK,
+		"emergency_mode": status.EmergencyMode,
+		"hashes":         status.Hashes,
+	}).Info("Reported sync status to MDCB")
 }
 
 // reportNodeSyncStatus is deferred by DoReloadWithError so every reload —
