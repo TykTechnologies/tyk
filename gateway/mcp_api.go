@@ -433,7 +433,7 @@ func (gw *Gateway) handleGetMCPWithExpand(apiID string, expand bool) (interface{
 		return obj, code
 	}
 
-	expanded, err := gw.expandMCPProxyDefinition(oasObj)
+	expanded, err := gw.expandSavedMCPProxyDefinition(oasObj)
 	if err != nil {
 		return apiError(err.Error()), http.StatusBadRequest
 	}
@@ -474,6 +474,16 @@ func boolQueryParam(r *http.Request, name string) (bool, error) {
 }
 
 func (gw *Gateway) expandMCPProxyDefinition(proxyOAS *oas.OAS) (*oas.OAS, error) {
+	return gw.expandMCPProxyDefinitionWith(proxyOAS, oas.ExpandMCPServerConfig)
+}
+
+func (gw *Gateway) expandSavedMCPProxyDefinition(proxyOAS *oas.OAS) (*oas.OAS, error) {
+	return gw.expandMCPProxyDefinitionWith(proxyOAS, oas.ExpandMCPServerConfigTolerant)
+}
+
+type mcpServerConfigExpander func(*oas.OAS, *oas.TykMCPServer) (*oas.TykMCPServer, []oas.DeriveWarning, error)
+
+func (gw *Gateway) expandMCPProxyDefinitionWith(proxyOAS *oas.OAS, expandConfig mcpServerConfigExpander) (*oas.OAS, error) {
 	if proxyOAS == nil {
 		return nil, fmt.Errorf("MCP Proxy OAS is nil")
 	}
@@ -496,7 +506,7 @@ func (gw *Gateway) expandMCPProxyDefinition(proxyOAS *oas.OAS) (*oas.OAS, error)
 		return nil, err
 	}
 
-	mcpServer, warnings, err := oas.ExpandMCPServerConfig(&rest.OAS, expanded.GetTykMCPServerExtension())
+	mcpServer, warnings, err := expandConfig(&rest.OAS, expanded.GetTykMCPServerExtension())
 	logMCPDeriveWarnings(proxyDef.APIID, restAPIID, warnings)
 	if err != nil {
 		return nil, err
