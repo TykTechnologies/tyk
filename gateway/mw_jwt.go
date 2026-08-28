@@ -835,7 +835,7 @@ func getScopeFromClaim(claims jwt.MapClaims, scopeClaimName string) []string {
 	return toScopeStringsSlice(lookedUp, nil, false)
 }
 
-func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
+func mapScopeToPolicies(mapping map[string]string, scope []string, log *logrus.Logger) []string {
 	// add all policies matched from scope-policy mapping
 	var policiesToApplySet map[string]struct{}
 	var unmatchedScopes map[string]struct{}
@@ -1070,7 +1070,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 
 			// add all policies matched from scope-policy mapping
-			mappedPolIDs := mapScopeToPolicies(scopeMap, scope)
+			mappedPolIDs := mapScopeToPolicies(scopeMap, scope, log)
 			if len(mappedPolIDs) > 0 {
 				k.Logger().Debugf("Identified policy(s) to apply to this token from scope claim: %s", scopeClaimName)
 			} else {
