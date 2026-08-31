@@ -179,6 +179,27 @@ func GetOASDefinition(r *http.Request) *oas.OAS {
 	return nil
 }
 
+// GetOASConfigData returns the config data of the OAS API definition valid for the request.
+// It does not deep copy the whole API definition, making it faster than GetOASDefinition.
+func GetOASConfigData(r *http.Request) (map[string]interface{}, error) {
+	v := r.Context().Value(OASDefinition)
+	if v == nil {
+		return nil, errors.New("OAS definition not found in request context")
+	}
+
+	oasDef, ok := v.(*oas.OAS)
+	if !ok || oasDef == nil {
+		return nil, errors.New("OAS definition not found in request context")
+	}
+
+	mw := oasDef.GetTykMiddleware()
+	if mw == nil || mw.Global == nil || mw.Global.PluginConfig == nil || mw.Global.PluginConfig.Data == nil {
+		return nil, errors.New("config data is nil")
+	}
+
+	return mw.Global.PluginConfig.Data.Value, nil
+}
+
 // SetErrorClassification sets the error classification for the request context.
 // This is used to store structured error information for access logs.
 func SetErrorClassification(r *http.Request, ec *errors.ErrorClassification) {

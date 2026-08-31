@@ -85,6 +85,74 @@ func BenchmarkGetOASDefinition(b *testing.B) {
 	}
 }
 
+func TestGetOASConfigData(t *testing.T) {
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+
+	// Test when OAS definition is not in context
+	configData, err := ctx.GetOASConfigData(req)
+	assert.Nil(t, configData)
+	assert.Error(t, err)
+	assert.Equal(t, "OAS definition not found in request context", err.Error())
+
+	// Test when OAS definition is in context but no config data
+	oasDef := &oas.OAS{}
+	ctx.SetOASDefinition(req, oasDef)
+	configData, err = ctx.GetOASConfigData(req)
+	assert.Nil(t, configData)
+	assert.Error(t, err)
+	assert.Equal(t, "config data is nil", err.Error())
+
+	// Test when config data is present
+	expectedConfigData := map[string]interface{}{
+		"key": "value",
+	}
+	oasDefWithConfig := &oas.OAS{}
+	oasDefWithConfig.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Global: &oas.Global{
+				PluginConfig: &oas.PluginConfig{
+					Data: &oas.PluginConfigData{
+						Value: expectedConfigData,
+					},
+				},
+			},
+		},
+	})
+	ctx.SetOASDefinition(req, oasDefWithConfig)
+	configData, err = ctx.GetOASConfigData(req)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedConfigData, configData)
+}
+
+// Benchmark for GetOASConfigData
+func BenchmarkGetOASConfigData(b *testing.B) {
+	expectedConfigData := map[string]interface{}{
+		"key": "value",
+	}
+	oasDefWithConfig := &oas.OAS{}
+	oasDefWithConfig.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Global: &oas.Global{
+				PluginConfig: &oas.PluginConfig{
+					Data: &oas.PluginConfigData{
+						Value: expectedConfigData,
+					},
+				},
+			},
+		},
+	})
+
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	ctx.SetOASDefinition(req, oasDefWithConfig)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		configData, err := ctx.GetOASConfigData(req)
+		assert.NoError(b, err)
+		assert.Equal(b, expectedConfigData, configData)
+	}
+}
+
 // TestContextKeyUniqueness verifies all context keys have unique values
 func TestContextKeyUniqueness(t *testing.T) {
 	keys := map[ctx.Key]string{
