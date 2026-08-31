@@ -101,6 +101,9 @@ var (
 		"Disconnect": func(clientAddr string, groupData *model.GroupLoginRequest) error {
 			return nil
 		},
+		"UpdateNodeStatus": func(clientAddr string, nodeData []byte) error {
+			return nil
+		},
 	}
 )
 
@@ -199,6 +202,7 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 			PID:      r.Gw.hostDetails.PID,
 			Address:  r.Gw.hostDetails.Address,
 		},
+		SyncStatus: r.Gw.rpcSyncStatus.snapshot(),
 	}
 
 	data, err := json.Marshal(node)
@@ -790,7 +794,12 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 		log.Warning("RPC Handler: GetApiDefinitions() returned nil, returning empty string")
 		return ""
 	}
-	return defString.(string)
+
+	payload := defString.(string)
+	// Fingerprint the payload exactly as received so MDCB can later verify
+	// this node applied what it served (see rpc_sync_status.go).
+	r.Gw.rpcSyncStatus.setPayload(model.PayloadAPIs, payload)
+	return payload
 }
 
 // GetClientIdPs pulls the client-IdP registry from the RPC server. The payload
@@ -840,7 +849,11 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 	}
 
 	if defString != nil {
-		return defString.(string)
+		payload := defString.(string)
+		// Fingerprint the payload exactly as received so MDCB can later
+		// verify this node applied what it served (see rpc_sync_status.go).
+		r.Gw.rpcSyncStatus.setPayload(model.PayloadPolicies, payload)
+		return payload
 	}
 	return ""
 }

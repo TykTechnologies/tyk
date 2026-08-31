@@ -41,6 +41,32 @@ type NodeData struct {
 	Health          map[string]HealthCheckItem `json:"health"`
 	Stats           GWStats                    `json:"stats"`
 	HostDetails     HostDetails                `json:"host_details"`
+	// SyncStatus carries fingerprints of the configuration this node is
+	// actually running so the control plane (MDCB) can verify data-plane
+	// sync state. Nil when the node does not report sync status (older
+	// gateways, or non-RPC deployments), which downstream consumers must
+	// treat as "sync state unknown".
+	SyncStatus *SyncStatus `json:"sync_status,omitempty"`
+}
+
+// Payload kinds used as SyncStatus.Hashes keys — one per configuration
+// payload a gateway fetches over RPC and the control plane can verify.
+const (
+	PayloadAPIs     = "apis"
+	PayloadPolicies = "policies"
+)
+
+// SyncStatus is the gateway-reported proof of which configuration payloads a
+// node has fetched and applied. Hashes maps payload kind (PayloadAPIs, ...)
+// to the hex-encoded SHA-256 of the exact payload bytes received over RPC, so
+// the control plane can compare them against the payloads it served without
+// shipping the content around. Keying by kind lets new payloads (e.g. client
+// IdPs) join verification without another wire-format change.
+type SyncStatus struct {
+	Hashes        map[string]string `json:"hashes,omitempty"`
+	LastReloadAt  int64             `json:"last_reload_at,omitempty"`
+	LastReloadOK  bool              `json:"last_reload_ok,omitempty"`
+	EmergencyMode bool              `json:"emergency_mode,omitempty"`
 }
 
 // LoadedAPIInfo represents a loaded API with its metadata.
