@@ -59,7 +59,7 @@ type TracesConfig struct {
 
 	// MCPTraceContext configures where Tyk reads an MCP request's W3C trace
 	// context from (ordered, first-match-wins). Omitted ⇒ the canonical
-	// [{header}, {body, path: params._meta}] default.
+	// `[{header}, {body, path: params._meta}]` default.
 	MCPTraceContext MCPTraceContextConfig `json:"mcp"`
 }
 
