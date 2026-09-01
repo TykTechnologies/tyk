@@ -68,6 +68,7 @@ const (
 	embeddedPEMCacheKeyPrefix = "embedded-pem-"
 )
 
+// test
 var (
 	CertManagerLogPrefix = "cert_storage"
 )
