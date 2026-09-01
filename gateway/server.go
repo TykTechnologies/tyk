@@ -1389,9 +1389,9 @@ const (
 )
 
 // DoReloadWithRetry calls DoReloadWithError in an exponential-backoff retry
-// loop (5s → 10s → 20s → 40s → 60s cap). It is used at the two startup call
-// sites (Register and startServer) where a failed reload means the gateway has
-// zero APIs and policies and must keep retrying until the upstream recovers.
+// loop (5s → 10s → 20s → 40s → 60s cap). It is used during startServer where
+// a failed initial reload means the gateway has zero APIs and policies and must
+// keep retrying until the upstream recovers.
 //
 // The loop is intentionally NOT used in reloadLoop (the runtime hot-reload
 // path) because that goroutine must remain unblocked so that subsequent
