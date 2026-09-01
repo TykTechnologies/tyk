@@ -359,38 +359,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 	reportHealthValue(s.Spec, RequestLog, strconv.FormatInt(timing.Total, 10))
 }
 
-func recordDetail(r *http.Request, spec *APISpec) bool {
-	// when streaming in grpc, we do not record the request
-	if httputil.IsStreamingRequest(r) {
-		return false
-	}
-
-	return recordDetailUnsafe(r, spec)
-}
-
-func recordDetailUnsafe(r *http.Request, spec *APISpec) bool {
-	if spec.EnableDetailedRecording {
-		return true
-	}
-
-	if session := ctxGetSession(r); session != nil {
-		if session.EnableDetailedRecording || session.EnableDetailRecording { // nolint:staticcheck // Deprecated DetailRecording
-			return true
-		}
-	}
-
-	// decide based on org session.
-	if spec.GlobalConfig.EnforceOrgDataDetailLogging {
-		session, ok := r.Context().Value(ctx.OrgSessionContext).(*user.SessionState)
-		if ok && session != nil {
-			return session.EnableDetailedRecording || session.EnableDetailRecording // nolint:staticcheck // Deprecated DetailRecording
-		}
-	}
-
-	// no org session found, use global config
-	return spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
-}
-
 // classifyUpstreamError classifies upstream responses for structured access logs.
 // Currently handles 5XX status codes; can be extended for other error classifications.
 // If a classification was already set earlier in the request lifecycle (e.g. NHU from
@@ -423,13 +391,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
 
 	t1 := time.Now()
-	var resp ProxyResponse
-	// If GraphQL is enabled, use ServeHTTPForCache to ensure the response is cached for analytics.
-	if s.Spec.GraphQL.Enabled {
-		resp = s.Proxy.ServeHTTPForCache(w, r)
-	} else {
-		resp = s.Proxy.ServeHTTP(w, r)
-	}
+	resp := s.Proxy.ServeHTTP(w, r)
 
 	t2 := time.Now()
 	proxyDuration := t2.Sub(t1)
