@@ -26,6 +26,7 @@ _Tyk Gateway_ is provided ‘Batteries-included’, with no feature lockout. Ena
 
 Tyk runs natively on _Kubernetes_, if you prefer, thanks to the _[Tyk Kubernetes Operator](https://github.com/TykTechnologies/tyk-operator)_
 
+
 <table>
   <tr>
    <td>
