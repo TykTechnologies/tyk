@@ -182,12 +182,7 @@ func GetOASDefinition(r *http.Request) *oas.OAS {
 // GetOASConfigData returns the config data of the OAS API definition valid for the request.
 // It does not deep copy the whole API definition, making it faster than GetOASDefinition.
 func GetOASConfigData(r *http.Request) (map[string]interface{}, error) {
-	v := r.Context().Value(OASDefinition)
-	if v == nil {
-		return nil, errors.New("OAS definition not found in request context")
-	}
-
-	oasDef, ok := v.(*oas.OAS)
+	oasDef, ok := r.Context().Value(OASDefinition).(*oas.OAS)
 	if !ok || oasDef == nil {
 		return nil, errors.New("OAS definition not found in request context")
 	}
