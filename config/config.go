@@ -611,10 +611,10 @@ type HttpServerOptionsConfig struct {
 	// Start your Gateway HTTP server on specific server name
 	ServerName string `json:"server_name"`
 
-	// Minimum TLS version. Possible values: https://tyk.io/docs/api-management/certificates#supported-tls-versions
+	// Minimum TLS version. For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-and-cipher-suites
 	MinVersion uint16 `json:"min_version"`
 
-	// Maximum TLS version.
+	// Maximum TLS version. For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-and-cipher-suites
 	MaxVersion uint16 `json:"max_version"`
 
 	// When mTLS enabled, this option allows to skip client CA announcement in the TLS handshake.
@@ -1424,7 +1424,9 @@ type Config struct {
 	// JWKS holds the configuration for Tyk JWKS functionalities
 	JWKS JWKSConfig `json:"jwks"`
 
-	// AllowUnsafePolicyIds allows unsafe policy identifiers
+	// AllowUnsafePolicyIds allows the use of non-standard characters in policy identifiers (default: false).
+	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
+	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
 	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
 }
 
