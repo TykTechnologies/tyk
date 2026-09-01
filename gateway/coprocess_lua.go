@@ -252,7 +252,7 @@ func (d *LuaDispatcher) DispatchEvent(eventJSON []byte) {
 	C.free(unsafe.Pointer(CEventJSON))
 }
 
-// NewCoProcessDispatcher wraps all the actions needed for this CP.
+// NewLuaDispatcher wraps all the actions needed for this CP.
 func NewLuaDispatcher() (coprocess.Dispatcher, error) {
 	dispatcher := &LuaDispatcher{}
 	dispatcher.LoadModules()
