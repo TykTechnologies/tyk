@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -156,4 +157,57 @@ func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 			}...)
 		})
 	})
+}
+
+func BenchmarkGranularAccessMiddleware(b *testing.B) {
+	g := StartTest(func(c *config.Config) {
+		c.HttpServerOptions.EnablePathPrefixMatching = true
+	})
+	defer g.Close()
+
+	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/test"
+		spec.UseKeylessAccess = false
+	})[0]
+
+	mw := &GranularAccessMiddleware{
+		BaseMiddleware: &BaseMiddleware{
+			Spec: api,
+			Gw:   g.Gw,
+		},
+	}
+
+	session := &user.SessionState{
+		AccessRights: map[string]user.AccessDefinition{
+			api.APIID: {
+				APIID:   api.APIID,
+				APIName: api.Name,
+				AllowedURLs: []user.AccessSpec{
+					{
+						URL:     "^/test/valid_path",
+						Methods: []string{"GET"},
+					},
+					{
+						URL:     "^/test/another_path",
+						Methods: []string{"GET"},
+					},
+					{
+						URL:     "^/test/yet_another_path",
+						Methods: []string{"GET"},
+					},
+				},
+			},
+		},
+	}
+
+	req, _ := http.NewRequest("GET", "/test/valid_path", nil)
+	ctxSetSession(req, session, false, false)
+	w := httptest.NewRecorder()
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		mw.ProcessRequest(w, req, nil)
+	}
 }
