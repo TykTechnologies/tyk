@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -637,4 +638,109 @@ func TestGRPCConfigData(t *testing.T) {
 		}...)
 	})
 
+}
+
+func BenchmarkGRPCDispatch_MemoryOverhead(b *testing.B) {
+	ts, cleanupFn := startTestServices(b)
+	b.Cleanup(cleanupFn)
+
+	// Create a session with a large amount of metadata and access rights
+	// to simulate a real-world scenario and exacerbate ProtoSessionState allocations
+	keyID := gateway.CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.MetaData = map[string]interface{}{}
+		for i := 0; i < 100; i++ {
+			s.MetaData[fmt.Sprintf("key_%d", i)] = strings.Repeat("a", 100)
+		}
+		s.AccessRights = map[string]user.AccessDefinition{
+			"1": {
+				APIID:    "1",
+				APIName:  "API 1",
+				Versions: []string{"Default"},
+			},
+		}
+		for i := 0; i < 50; i++ {
+			s.AccessRights[fmt.Sprintf("api_%d", i)] = user.AccessDefinition{
+				APIID:    fmt.Sprintf("api_%d", i),
+				APIName:  fmt.Sprintf("API %d", i),
+				Versions: []string{"Default"},
+			}
+		}
+	})
+	headers := map[string]string{"authorization": keyID}
+	b.Run("Pre Hook with Large Session", func(b *testing.B) {
+		basepath := "/grpc-test-api/"
+		b.ReportAllocs() // This will print B/op and allocs/op
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			ts.Run(b, test.TestCase{
+				Path:    basepath,
+				Method:  http.MethodGet,
+				Code:    http.StatusOK,
+				Headers: headers,
+			})
+		}
+	})
+
+	emptyKeyID := gateway.CreateSession(ts.Gw, func(s *user.SessionState) {})
+	emptyHeaders := map[string]string{"authorization": emptyKeyID}
+
+	b.Run("Pre Hook with Empty Session", func(b *testing.B) {
+		basepath := "/grpc-test-api/"
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			ts.Run(b, test.TestCase{
+				Path:    basepath,
+				Method:  http.MethodGet,
+				Code:    http.StatusOK,
+				Headers: emptyHeaders,
+			})
+		}
+	})
+}
+
+func TestGRPCDispatch_MemoryLeakCheck(t *testing.T) {
+	ts, cleanupFn := startTestServices(t)
+	t.Cleanup(cleanupFn)
+
+	keyID := gateway.CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.MetaData = map[string]interface{}{}
+		for i := 0; i < 100; i++ {
+			s.MetaData[fmt.Sprintf("key_%d", i)] = strings.Repeat("a", 100)
+		}
+		s.AccessRights = map[string]user.AccessDefinition{
+			"1": {
+				APIID:    "1",
+				APIName:  "API 1",
+				Versions: []string{"Default"},
+			},
+		}
+	})
+	headers := map[string]string{"authorization": keyID}
+
+	var m runtime.MemStats
+	runtime.GC() // Clean up before starting
+	runtime.ReadMemStats(&m)
+	initialAlloc := m.Alloc
+
+	// Run a large number of requests
+	for i := 0; i < 5000; i++ {
+		ts.Run(t, test.TestCase{
+			Path:    "/grpc-test-api/",
+			Method:  http.MethodGet,
+			Code:    http.StatusOK,
+			Headers: headers,
+		})
+	}
+
+	runtime.GC() // Force GC to see what is retained
+	runtime.ReadMemStats(&m)
+	finalAlloc := m.Alloc
+
+	t.Logf("Initial Alloc: %d bytes", initialAlloc)
+	t.Logf("Final Alloc: %d bytes", finalAlloc)
+	t.Logf("Difference: %d bytes", int64(finalAlloc)-int64(initialAlloc))
+
+	// If it was a leak, the difference would be huge (e.g., hundreds of MBs).
+	// Since it's just churn, the difference will be relatively small after GC.
 }
