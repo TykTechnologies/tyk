@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:6-alpine
+
+  upstream:
+    image: kennethreitz/httpbin
+
+  gateway-1cpu-1gmp:
+    image: tykio/tyk-gateway:v5.3.0
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./confs/tyk.conf:/opt/tyk-gateway/tyk.conf
+      - ./apps:/opt/tyk-gateway/apps
+    environment:
+      - GOMAXPROCS=1
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+    depends_on:
+      - redis
+      - upstream
+
+  gateway-2cpu-2gmp:
+    image: tykio/tyk-gateway:v5.3.0
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./confs/tyk.conf:/opt/tyk-gateway/tyk.conf
+      - ./apps:/opt/tyk-gateway/apps
+    environment:
+      - GOMAXPROCS=2
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+    depends_on:
+      - redis
+      - upstream
+
+  gateway-2cpu-unset:
+    image: tykio/tyk-gateway:v5.3.0
+    ports:
+      - "8083:8080"
+    volumes:
+      - ./confs/tyk.conf:/opt/tyk-gateway/tyk.conf
+      - ./apps:/opt/tyk-gateway/apps
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+    depends_on:
+      - redis
+      - upstream
