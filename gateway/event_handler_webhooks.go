@@ -151,11 +151,13 @@ func (w *WebHookHandler) preLoadCustomTemplate() {
 
 	w.template, err = htmltemplate.ParseFiles(safePath)
 	if err != nil {
-		log.WithError(err).Warning("Custom template load failure, using default.")
+		log.WithError(err).
+			WithField("path", safePath).
+			Warning("Custom template load failure, using default.")
 		return
 	}
 
-	if strings.HasSuffix(w.conf.TemplatePath, ".json") {
+	if strings.EqualFold(filepath.Ext(w.conf.TemplatePath), ".json") {
 		w.contentType = header.ApplicationJSON
 	}
 }
