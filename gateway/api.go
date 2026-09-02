@@ -538,6 +538,11 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
+	if err := validateAccessConditions(newSession.AccessRights); err != nil {
+		log.Error(err)
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
 	mw := &BaseMiddleware{Gw: gw}
 	mw.ApplyPolicies(newSession)
 
@@ -1166,6 +1171,11 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 	}
 
 	if err := gw.validateNonMCPFieldsOnMCPProxy(newPol.AccessRights); err != nil {
+		log.Error(err)
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
+	if err := validateAccessConditions(newPol.AccessRights); err != nil {
 		log.Error(err)
 		return apiError(err.Error()), http.StatusBadRequest
 	}
@@ -2221,6 +2231,12 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Validate mtls_static_certificate_bindings
 	if err := gw.validateMtlsStaticCertificateBindings(newSession.MtlsStaticCertificateBindings, newSession.OrgID); err != nil {
+		doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+		return
+	}
+
+	if err := validateAccessConditions(newSession.AccessRights); err != nil {
+		log.Error(err)
 		doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 		return
 	}

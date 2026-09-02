@@ -632,6 +632,13 @@ func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
 			copied[i].Methods = make([]string, len(as.Methods))
 			copy(copied[i].Methods, as.Methods)
 		}
+		// Conditions decide access, so a copy that dropped them would widen
+		// it. They are copied by value: AccessCondition holds maps, which are
+		// shared with the input, but nothing mutates them after load.
+		if as.Conditions != nil {
+			copied[i].Conditions = make([]user.AccessCondition, len(as.Conditions))
+			copy(copied[i].Conditions, as.Conditions)
+		}
 	}
 
 	return copied
