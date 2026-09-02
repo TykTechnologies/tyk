@@ -2264,3 +2264,31 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 	assert.GreaterOrEqual(t, policyCount, succeedOnCall,
 		"policy endpoint should have been retried at least %d times", succeedOnCall)
 }
+
+func TestNewGateway_OSRootInitialization(t *testing.T) {
+	t.Run("successful initialization with valid TemplatePath", func(t *testing.T) {
+		tempDir := t.TempDir()
+
+		cfg := config.Config{
+			TemplatePath: tempDir,
+		}
+
+		gw := NewGateway(cfg, context.Background())
+
+		require.NotNil(t, gw.OSRoot, "OSRoot should be initialized when TemplatePath is valid")
+
+		safePath, err := gw.OSRoot.Ensure("test.tmpl")
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Join(tempDir, "test.tmpl"), safePath)
+	})
+
+	t.Run("initialization fails with invalid TemplatePath", func(t *testing.T) {
+		cfg := config.Config{
+			TemplatePath: "/path/that/does/not/exist/12345",
+		}
+
+		gw := NewGateway(cfg, context.Background())
+
+		assert.Nil(t, gw.OSRoot, "OSRoot should be nil when TemplatePath is invalid")
+	})
+}

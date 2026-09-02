@@ -1066,8 +1066,19 @@ func (a APIDefinitionLoader) filterSprigFuncs() texttemplate.FuncMap {
 
 func (a APIDefinitionLoader) loadFileTemplate(path string) (*texttemplate.Template, error) {
 	log.Debug("-- Loading template: ", path)
-	tmpName := filepath.Base(path)
-	return apidef.Template.New(tmpName).Funcs(a.filterSprigFuncs()).ParseFiles(path)
+
+	if a.Gw == nil || a.Gw.OSRoot == nil {
+		return nil, errors.New("OSRoot is not initialized")
+	}
+
+	safePath, err := a.Gw.OSRoot.Ensure(path)
+	if err != nil {
+		log.WithError(err).Warning("Path escape detected or invalid template path")
+		return nil, err
+	}
+
+	tmpName := filepath.Base(safePath)
+	return apidef.Template.New(tmpName).Funcs(a.filterSprigFuncs()).ParseFiles(safePath)
 }
 
 func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*texttemplate.Template, error) {
