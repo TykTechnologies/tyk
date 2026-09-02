@@ -319,6 +319,20 @@ func (m *GoPluginMiddleware) handlePluginResponse(
 	return ErrResponseSucceed, middleware.StatusRespond
 }
 
+// levelForPluginStatus maps the status code sent by a Go-plugin to the level
+// used for the "Failed to process request" log line. Codes conventionally used
+// for intentional throttling and backpressure are logged at Warn so that
+// plugin rejects do not flood severity-based alerting; everything else,
+// including auth failures, stays at Error.
+func levelForPluginStatus(code int) logrus.Level {
+	switch code {
+	case http.StatusRequestTimeout, http.StatusTeapot, http.StatusTooManyRequests, http.StatusServiceUnavailable:
+		return logrus.WarnLevel
+	default:
+		return logrus.ErrorLevel
+	}
+}
+
 func (m *GoPluginMiddleware) handleErrorResponse(
 	r *http.Request,
 	rw *customResponseWriter,
@@ -339,7 +353,7 @@ func (m *GoPluginMiddleware) handleErrorResponse(
 
 	// base middleware will report this error to analytics if needed
 	err := fmt.Errorf("plugin function sent error response code: %d", rw.statusCodeSent)
-	logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
+	logger.WithError(err).Log(levelForPluginStatus(rw.statusCodeSent), "Failed to process request with Go-plugin middleware func")
 
 	if rw.responseSent {
 		err = fmt.Errorf("%w: %w", ErrResponseErrorSent, err)
