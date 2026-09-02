@@ -121,7 +121,7 @@ type Authentication struct {
 //
 // On non-MCP APIs only static is meaningful; mirror is a no-op.
 //
-// Deprecated: Use OAuth2PRM (under SecuritySchemes[<name>].OAuth2) instead.
+// Deprecated: Use OAuth2PRM (under `SecuritySchemes[<name>].OAuth2`) instead.
 // This type backs the legacy top-level Authentication.ProtectedResourceMetadata
 // field; the new per-scheme location is the runtime source of truth and the
 // legacy block is kept only for downgrade safety.
