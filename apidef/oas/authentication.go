@@ -98,7 +98,7 @@ type Authentication struct {
 	// for authorization server discovery. This is used by MCP clients to discover which
 	// authorization server to use for accessing the API.
 	//
-	// Deprecated: Use SecuritySchemes[<name>].OAuth2.ProtectedResourceMetadata instead.
+	// Deprecated: Use `SecuritySchemes[<name>].OAuth2.ProtectedResourceMetadata` instead.
 	// The new per-scheme location is the runtime source of truth; this top-level
 	// field is kept for downgrade safety and will be removed in a future major version.
 	ProtectedResourceMetadata *ProtectedResourceMetadata `bson:"protectedResourceMetadata,omitempty" json:"protectedResourceMetadata,omitempty"`
