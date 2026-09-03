@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1376,6 +1377,17 @@ func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
 		a.SanitizeProxyPaths(r)
 
 		assert.Equal(t, "/get", r.URL.Path)
+		assert.Equal(t, "", r.URL.RawPath)
+	})
+
+	t.Run("strip=true but URL rewrite path is set", func(t *testing.T) {
+		a.Proxy.StripListenPath = true
+		r := httptest.NewRequest(http.MethodGet, "https://proxy.com/listen/get", nil)
+		ctxSetUrlRewritePath(r, r.URL.Path)
+
+		a.SanitizeProxyPaths(r)
+
+		assert.Equal(t, "/listen/get", r.URL.Path)
 		assert.Equal(t, "", r.URL.RawPath)
 	})
 }
@@ -3349,4 +3361,80 @@ func TestGatewayWriteSpecFiles_WritesCompanionsOnlyForOASAPIs(t *testing.T) {
 		"mcp2.json",
 		"mcp2-mcp.json",
 	}, names)
+}
+
+func TestAPISpec_PrepareRequestToLog_and_ShallowClone(t *testing.T) {
+	t.Run("without target path", func(t *testing.T) {
+		a := APISpec{APIDefinition: &apidef.APIDefinition{}}
+		a.Proxy.ListenPath = "/listen/"
+		a.Proxy.StripListenPath = true
+
+		r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://proxy.com/listen/get", nil)
+		assert.NoError(t, err)
+
+		dup := a.PrepareRequestToLog(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/get", dup.URL.Path)
+		assert.Equal(t, "", dup.URL.RawPath)
+
+		dup = a.PrepareRequestToLogShallowClone(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/get", dup.URL.Path)
+		assert.Equal(t, "", dup.URL.RawPath)
+	})
+
+	t.Run("with target path", func(t *testing.T) {
+		var err error
+
+		a := APISpec{APIDefinition: &apidef.APIDefinition{}}
+		a.Proxy.ListenPath = "/listen/"
+		a.Proxy.StripListenPath = true
+		a.target, err = url.Parse("http://upstream.com/base")
+		assert.NoError(t, err)
+
+		r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://proxy.com/listen/get", nil)
+		assert.NoError(t, err)
+
+		dup := a.PrepareRequestToLog(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/base/get", dup.URL.Path)
+		assert.Equal(t, "", dup.URL.RawPath)
+
+		dup = a.PrepareRequestToLogShallowClone(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/base/get", dup.URL.Path)
+		assert.Equal(t, "", dup.URL.RawPath)
+	})
+
+	t.Run("with target path and raw path", func(t *testing.T) {
+		var err error
+
+		a := APISpec{APIDefinition: &apidef.APIDefinition{}}
+		a.Proxy.ListenPath = "/listen/"
+		a.Proxy.StripListenPath = true
+		a.target, err = url.Parse("http://upstream.com/base")
+		assert.NoError(t, err)
+
+		r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://proxy.com/listen/get%20it", nil)
+		assert.NoError(t, err)
+
+		r.URL.Path = "/listen/get it"
+		r.URL.RawPath = "/listen/get%20it"
+
+		dup := a.PrepareRequestToLog(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/base/get it", dup.URL.Path)
+		assert.Equal(t, "/base/get%20it", dup.URL.RawPath)
+
+		dup = a.PrepareRequestToLogShallowClone(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/base/get it", dup.URL.Path)
+		assert.Equal(t, "/base/get%20it", dup.URL.RawPath)
+	})
 }
