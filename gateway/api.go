@@ -1868,8 +1868,15 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 			// Return single key detail
 			obj, code = gw.handleGetDetail(keyName, apiID, orgID, isHashed)
 			if code != http.StatusOK && hashKeyFunction != "" {
-				// try to use legacy key format
+				// Try to use legacy key format.
 				obj, code = gw.handleGetDetail(origKeyName, apiID, orgID, isHashed)
+			}
+
+			// Inject the Key ID as a header if successful
+			if code == http.StatusOK {
+				if session, ok := obj.(user.SessionState); ok && session.KeyID != "" {
+					w.Header().Set(header.XTykSessionKeyId, session.KeyID)
+				}
 			}
 		} else {
 			// Return list of keys
