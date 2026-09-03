@@ -263,7 +263,11 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	)
 
 	ts := StartTest(nil)
-	ts.MockHandle, _ = test.InitDNSMock(etcHostsMap, nil)
+	// Take a handle on the process-wide mock without registering anything:
+	// flakySetupTestReverseProxyDnsCache pushes etcHostsMap below, and pulls it
+	// again on teardown. Registering here as well would append each address to
+	// itself, so every lookup would answer with the list twice over.
+	ts.MockHandle, _ = test.InitDNSMock(map[string][]string{}, nil)
 	defer ts.Close()
 	defer func() {
 		_ = ts.MockHandle.ShutdownDnsMock()
@@ -1897,9 +1901,13 @@ func TestEnsureTransport(t *testing.T) {
 		{"http://httpbin.org:80 ", "https", "http://httpbin.org:80"},
 		{"httpbin.org:2000 ", "tls", "tls://httpbin.org:2000"},
 		{"httpbin.org:2000 ", "", "http://httpbin.org:2000"},
-		// This is the h2c proto to http conversion
+		// This is the h2c proto to http conversion. Only an *inherited* h2c
+		// scheme is coalesced: `protocol` is what the API listens on, so it
+		// says nothing about the upstream. An explicitly written h2c:// target
+		// survives, because the h2c transport is chosen from the URL scheme
+		// after the Director has run.
 		{"http://httpbin.org ", "h2c", "http://httpbin.org"},
-		{"h2c://httpbin.org ", "h2c", "http://httpbin.org"},
+		{"h2c://httpbin.org ", "h2c", "h2c://httpbin.org"},
 		{"httpbin.org ", "h2c", "http://httpbin.org"},
 		// This is the default parse section
 		{"https://httpbin.org ", "https", "https://httpbin.org"},

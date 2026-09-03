@@ -110,8 +110,20 @@ type DnsMockHandle struct {
 	ShutdownDnsMock func() error
 }
 
-var once sync.Once
+var (
+	mockOnce   sync.Once
+	sharedMock *DnsMockHandle
+	sharedErr  error
+)
 
+// PushDomains registers domainsMap and domainsErrorMap with the mock server and
+// returns a function that restores what was registered before, so a test can
+// scope its own domains and leave the server as it found it.
+//
+// A domain already registered is replaced, not added to. Appending would make
+// a second push of an overlapping set — which is how a scale event is
+// simulated: same name, more addresses — answer with the addresses it has in
+// common twice over.
 func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsErrorMap map[string]int) func() {
 	handler := h.mockServer.Handler.(*dnsMockHandler)
 	handler.muDomainsToAddresses.Lock()
@@ -141,12 +153,7 @@ func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsError
 	}
 
 	for key, ips := range domainsMap {
-		addr, ok := dta[key]
-		if !ok {
-			dta[key] = ips
-		} else {
-			dta[key] = append(addr, ips...)
-		}
+		dta[key] = ips
 	}
 
 	for key, rCode := range domainsErrorMap {
@@ -159,7 +166,42 @@ func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsError
 // InitDNSMock initializes dns server on udp:0 address and replaces net.DefaultResolver in order
 // to route all dns queries within tests to this server.
 // InitDNSMock returns handle, which can be used to add/remove dns query mock responses or initialization error.
+//
+// Only one mock server exists per process, because net.DefaultResolver can only
+// point at one of them. Every call registers its domains with that one server
+// and returns a handle to it, so a second caller neither loses its mappings nor
+// makes the first caller's domains unresolvable. Registering the same domain
+// twice replaces the earlier mapping; use DnsMockHandle.PushDomains for a
+// scoped, restorable override.
 func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int) (*DnsMockHandle, error) {
+	mockOnce.Do(func() {
+		sharedMock, sharedErr = startDNSMock()
+	})
+	if sharedErr != nil {
+		return sharedMock, sharedErr
+	}
+
+	if domainsMap == nil {
+		domainsMap = DomainsToAddresses
+	}
+
+	handler := sharedMock.mockServer.Handler.(*dnsMockHandler)
+	handler.muDomainsToAddresses.Lock()
+	defer handler.muDomainsToAddresses.Unlock()
+
+	for domain, addresses := range domainsMap {
+		handler.domainsToAddresses[domain] = addresses
+	}
+	for domain, rcode := range domainsErrorMap {
+		handler.domainsToErrors[domain] = rcode
+	}
+
+	return sharedMock, nil
+}
+
+// startDNSMock brings up the single process-wide mock server and points
+// net.DefaultResolver at it.
+func startDNSMock() (*DnsMockHandle, error) {
 	addr, _ := net.ResolveUDPAddr("udp", ":0")
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
@@ -174,16 +216,11 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 	mockServer := &dns.Server{PacketConn: conn, NotifyStartedFunc: started}
 	handle := &DnsMockHandle{id: time.Now().String(), mockServer: mockServer}
 
-	dnsMux := &dnsMockHandler{muDomainsToAddresses: sync.RWMutex{}}
-
-	if domainsMap != nil {
-		dnsMux.domainsToAddresses = domainsMap
-	} else {
-		dnsMux.domainsToAddresses = DomainsToAddresses
-	}
-
-	if domainsErrorMap != nil {
-		dnsMux.domainsToErrors = domainsErrorMap
+	// Both maps are non-nil for the life of the server: callers register into
+	// them rather than replacing them, and PushDomains writes into them too.
+	dnsMux := &dnsMockHandler{
+		domainsToAddresses: map[string][]string{},
+		domainsToErrors:    map[string]int{},
 	}
 
 	mockServer.Handler = dnsMux
@@ -206,10 +243,7 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 		},
 	}
 
-	// TODO: this is destructive, TT-5112
-	once.Do(func() {
-		net.DefaultResolver = mockResolver
-	})
+	net.DefaultResolver = mockResolver
 
 	handle.ShutdownDnsMock = func() error {
 		// We run tests against O(1) packages, we can

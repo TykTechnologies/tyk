@@ -19,6 +19,7 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/agentprotocol"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
+	"github.com/TykTechnologies/tyk/internal/dnspoll"
 	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
@@ -64,6 +65,12 @@ type APISpec struct {
 	GlobalConfig             config.Config
 	OrgHasNoSession          bool
 	AnalyticsPluginConfig    *GoAnalyticsPlugin
+
+	// upstreamDNSPoller re-resolves the upstream hostname on a timer and
+	// rewrites StructuredTargetList with the addresses it finds. Non-nil only
+	// when upstream DNS load balancing is on and this API's target is a
+	// pollable name; it is set during load and read-only thereafter.
+	upstreamDNSPoller *dnspoll.Poller
 
 	unloadHooks []func()
 

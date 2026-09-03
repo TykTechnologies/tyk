@@ -141,12 +141,20 @@ func EnsureTransport(host, protocol string) string {
 		protocol = "http"
 	}
 
-	// if host has no protocol, amend it
+	// If the host has no protocol, amend it from the API's listen protocol.
+	//
+	// Only a scheme inherited that way is coalesced to http. `protocol` is the
+	// protocol the API *listens* on, and an API may perfectly well listen on
+	// h2c while proxying to an HTTP/1.1 upstream, so "h2c" arriving from there
+	// says nothing about the upstream. An h2c:// written into the target
+	// explicitly does, and must survive: the h2c transport is selected further
+	// down on outReq.URL.Scheme == "h2c", after the Director has run, so
+	// rewriting it here downgrades a load-balanced gRPC upstream to HTTP/1.1 —
+	// which a real gRPC server rejects outright.
 	if !strings.Contains(host, "://") {
 		host = protocol + "://" + host
+		host = strings.Replace(host, "h2c://", "http://", 1)
 	}
-
-	host = strings.Replace(host, "h2c://", "http://", 1)
 
 	u, err := url.Parse(host)
 	if err != nil {
@@ -156,7 +164,7 @@ func EnsureTransport(host, protocol string) string {
 }
 
 func (gw *Gateway) nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
-	if spec.Proxy.EnableLoadBalancing {
+	if spec.Proxy.EnableLoadBalancing || upstreamDNSLoadBalancingEnabled(spec) {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a HostList
 		startPos := spec.RoundRobin.WithLen(targetData.Len())
@@ -245,6 +253,10 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		target := target
 		gw := gw
 
+		// authorityHost, when set, is the Host header to send instead of the
+		// address actually being dialled. See the upstream DNS case below.
+		authorityHost := ""
+
 		hostList := spec.Proxy.StructuredTargetList
 		switch {
 		case spec.Proxy.ServiceDiscovery.UseDiscoveryService:
@@ -255,7 +267,7 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 				break
 			}
 			fallthrough // implies load balancing, with replaced host list
-		case spec.Proxy.EnableLoadBalancing:
+		case spec.Proxy.EnableLoadBalancing || upstreamDNSLoadBalancingEnabled(spec):
 			host, err := gw.nextTarget(hostList, spec)
 			if err != nil {
 				logger.Error("[PROXY] [LOAD BALANCING] ", err)
@@ -266,6 +278,22 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 			if err != nil {
 				logger.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
 			} else {
+				// A DNS-sourced target list holds pod addresses, which are the
+				// right thing to dial and the wrong thing to claim. Keep the
+				// configured service name as the authority.
+				//
+				// This split is what makes the whole approach work without a
+				// new connection pool: the HTTP/2 pool is keyed on
+				// req.URL.Host, while the :authority header comes from
+				// req.Host. Varying the first across pods gives one connection
+				// per pod; holding the second at the service name means each
+				// of them still presents the name the upstream expects, which
+				// anything routing on :authority or validating a certificate
+				// against it depends on.
+				if upstreamDNSLoadBalancingEnabled(spec) {
+					authorityHost = target.Host
+				}
+
 				// Only replace target if everything is OK
 				target = lbRemote
 				targetQuery = target.RawQuery
@@ -315,6 +343,11 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 
 		if !spec.Proxy.PreserveHostHeader {
 			req.Host = targetToUse.Host
+			// A URL rewrite that retained the host chose targetToUse itself, so
+			// it outranks the service name recovered above.
+			if authorityHost != "" && targetToUse == target {
+				req.Host = authorityHost
+			}
 		}
 
 		if targetQuery == "" || req.URL.RawQuery == "" {
@@ -841,6 +874,13 @@ func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, re
 				return net.Dial(network, addr)
 			},
 			AllowHTTP: true,
+			// A bare http2.Transport has no idle timeout, so its ClientConns
+			// never self-close and its readLoop goroutine keeps them reachable
+			// from GC. The pool is keyed per authority, so with a
+			// DNS-sourced target list that is one connection per pod, and a
+			// pool that never sheds departed pods accumulates them for the life
+			// of the process.
+			IdleConnTimeout: defaultH2CIdleConnTimeout,
 		}
 		return &TykRoundTripper{transport, h2t, p.logger, p.Gw}
 	}
@@ -902,6 +942,30 @@ type TykRoundTripper struct {
 	h2ctransport *http2.Transport
 	logger       *logrus.Entry
 	Gw           *Gateway `json:"-"`
+}
+
+// defaultH2CIdleConnTimeout bounds how long an unused h2c connection is kept.
+const defaultH2CIdleConnTimeout = 90 * time.Second
+
+// Retire releases the connections held by a round tripper that is being
+// superseded or discarded.
+//
+// Both transports have to be retired, not just the HTTP/1 one. They are
+// independent pools: the h2c transport is a separate http2.Transport with its
+// own ClientConns, so closing only rt.transport leaves every h2c connection
+// open, along with the readLoop goroutine that keeps it alive.
+func (rt *TykRoundTripper) Retire() {
+	if rt == nil {
+		return
+	}
+	if rt.transport != nil {
+		// Prevent new idle connections from being generated.
+		rt.transport.DisableKeepAlives = true
+		rt.transport.CloseIdleConnections()
+	}
+	if rt.h2ctransport != nil {
+		rt.h2ctransport.CloseIdleConnections()
+	}
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -1280,12 +1344,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	if createTransport {
-		var oldTransport *http.Transport
+		var oldTransport *TykRoundTripper
 
 		if p.TykAPISpec.HTTPTransport != nil {
-			oldTransport = p.TykAPISpec.HTTPTransport.transport
+			oldTransport = p.TykAPISpec.HTTPTransport
 			// Prevent new idle connections to be generated.
-			oldTransport.DisableKeepAlives = true
+			if oldTransport.transport != nil {
+				oldTransport.transport.DisableKeepAlives = true
+			}
 		}
 
 		timeout := proxyTimeout(p.TykAPISpec)
@@ -1306,9 +1372,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		p.TykAPISpec.HTTPTransport = p.httpTransport(transportTimeout, rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 
-		if oldTransport != nil {
-			oldTransport.CloseIdleConnections()
-		}
+		oldTransport.Retire()
 	}
 
 	roundTripper = p.TykAPISpec.HTTPTransport

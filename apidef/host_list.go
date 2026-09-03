@@ -29,8 +29,17 @@ func (h *HostList) Set(newList []string) {
 	h.hosts = newList
 }
 
+// All returns a copy of the host list. The copy matters: the list is now
+// rewritten in place by the upstream DNS poller while requests are reading it,
+// so handing out the backing slice would let a caller range over it while Set
+// swaps it underneath.
 func (h *HostList) All() []string {
-	return h.hosts
+	h.hMutex.RLock()
+	defer h.hMutex.RUnlock()
+
+	out := make([]string, len(h.hosts))
+	copy(out, h.hosts)
+	return out
 }
 
 func (h *HostList) GetIndex(i int) (string, error) {
