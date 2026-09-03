@@ -237,7 +237,14 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	// Without this guard, each VEM continuation step produces a non-MCP
 	// analytics record that leaks internal routing paths into the endpoints table.
 	if copiedResponse != nil && !d.Spec.IsMCP() {
-		d.sh.RecordHit(r, analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}, copiedResponse.StatusCode, copiedResponse, false)
+		logRequest := d.Spec.PrepareRequestToLogShallowClone(r)
+		d.sh.RecordHit(
+			logRequest,
+			analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)},
+			copiedResponse.StatusCode,
+			copiedResponse,
+			false,
+		)
 	}
 
 	return copiedResponse, nil
