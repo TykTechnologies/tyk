@@ -391,7 +391,12 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
 
 	t1 := time.Now()
-	resp := s.Proxy.ServeHTTP(w, r)
+	var resp ProxyResponse
+	if s.Spec.GraphQL.Enabled {
+		resp = s.Proxy.ServeHTTPForCache(w, r)
+	} else {
+		resp = s.Proxy.ServeHTTP(w, r)
+	}
 
 	t2 := time.Now()
 	proxyDuration := t2.Sub(t1)
