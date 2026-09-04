@@ -8,6 +8,7 @@ import (
 	"testing"
 	texttemplate "text/template"
 
+	"github.com/TykTechnologies/tyk/internal/result"
 	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -22,7 +23,7 @@ func testPrepareTransformNonAscii() (*TransformSpec, string) {
 	tmpl := `[{{range $x, $s := .names.name}}"{{$s}}"{{if not $x}}, {{end}}{{end}}]`
 	tmeta := &TransformSpec{}
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = texttemplate.Must(texttemplate.New("blob").Parse(tmpl))
+	tmeta.Template = result.NewOk(texttemplate.Must(texttemplate.New("blob").Parse(tmpl)))
 	return tmeta, in
 }
 
@@ -43,7 +44,7 @@ func TestTransformNonAscii(t *testing.T) {
 
 	transform := TransformMiddleware{base}
 
-	if err := transformBody(r, tmeta, &transform); err != nil {
+	if err := transform.transformBody(r, tmeta); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -72,7 +73,7 @@ func BenchmarkTransformNonAscii(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		r := TestReq(b, "GET", "/", in)
 
-		if err := transformBody(r, tmeta, transform); err != nil {
+		if err := transform.transformBody(r, tmeta); err != nil {
 			b.Fatalf("wanted nil error, got %v", err)
 		}
 	}
@@ -85,7 +86,7 @@ func TestTransformXMLCrash(t *testing.T) {
 	r := TestReq(t, "GET", "/", in)
 	tmeta := &TransformSpec{}
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(""))
+	tmeta.Template = result.NewOk(texttemplate.Must(apidef.Template.New("").Parse("")))
 
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -96,7 +97,7 @@ func TestTransformXMLCrash(t *testing.T) {
 
 	transform := TransformMiddleware{base}
 
-	if err := transformBody(r, tmeta, &transform); err == nil {
+	if err := transform.transformBody(r, tmeta); err == nil {
 		t.Fatalf("wanted error, got nil")
 	}
 }
@@ -105,7 +106,7 @@ func testPrepareTransformJSONMarshal(inputType string) (tmeta *TransformSpec, in
 	tmeta = &TransformSpec{}
 	tmpl := `[{{range $x, $s := .names.name}}{{$s | jsonMarshal}}{{if not $x}}, {{end}}{{end}}]`
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(tmpl))
+	tmeta.Template = result.NewOk(texttemplate.Must(apidef.Template.New("").Parse(tmpl)))
 
 	switch inputType {
 	case "json":
@@ -124,7 +125,7 @@ func testPrepareTransformJSONMarshal(inputType string) (tmeta *TransformSpec, in
 
 func testPrepareTransformXMLMarshal(tmpl string, inputType apidef.RequestInputType) (tmeta *TransformSpec) {
 	tmeta = &TransformSpec{}
-	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(tmpl))
+	tmeta.Template = result.NewOk(texttemplate.Must(apidef.Template.New("").Parse(tmpl)))
 
 	switch inputType {
 	case apidef.RequestJSON:
@@ -151,7 +152,7 @@ func TestTransformJSONMarshalXMLInput(t *testing.T) {
 
 	transform := TransformMiddleware{base}
 
-	if err := transformBody(r, tmeta, &transform); err != nil {
+	if err := transform.transformBody(r, tmeta); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -178,7 +179,7 @@ func TestTransformJSONMarshalJSONInput(t *testing.T) {
 
 	transform := TransformMiddleware{base}
 
-	if err := transformBody(r, tmeta, &transform); err != nil {
+	if err := transform.transformBody(r, tmeta); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -194,7 +195,7 @@ func testPrepareTransformJSONMarshalArray(tb testing.TB) (tmeta *TransformSpec, 
 	tmeta = &TransformSpec{}
 	tmpl := `[{{ range $key, $value := .array }}{{ if $key }},{{ end }}{{ .abc }}{{ end }}]`
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(tmpl))
+	tmeta.Template = result.NewOk(texttemplate.Must(apidef.Template.New("").Parse(tmpl)))
 
 	tmeta.TemplateData.Input = apidef.RequestJSON
 	in = `[{"abc": 123}, {"abc": 456}]`
@@ -217,7 +218,7 @@ func TestTransformJSONMarshalJSONArrayInput(t *testing.T) {
 
 	transform := TransformMiddleware{base}
 
-	if err := transformBody(r, tmeta, &transform); err != nil {
+	if err := transform.transformBody(r, tmeta); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -244,7 +245,7 @@ func BenchmarkTransformJSONMarshal(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		r := TestReq(b, "GET", "/", in)
-		if err := transformBody(r, tmeta, &transform); err != nil {
+		if err := transform.transformBody(r, tmeta); err != nil {
 			b.Fatalf("wanted nil error, got %v", err)
 		}
 	}
@@ -265,7 +266,7 @@ func TestTransformXMLMarshal(t *testing.T) {
 
 		transform := TransformMiddleware{base}
 
-		if err := transformBody(r, tmeta, &transform); err != nil {
+		if err := transform.transformBody(r, tmeta); err != nil {
 			t.Fatalf("wanted nil error, got %v", err)
 		}
 		gotBs, err := ioutil.ReadAll(r.Body)

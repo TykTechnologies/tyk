@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -41,28 +42,41 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	vInfo, _ := t.Spec.Version(r)
 	versionPaths := t.Spec.RxPaths[vInfo.Name]
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, Transformed)
+
 	if !found {
 		return nil, http.StatusOK
 	}
-	err := transformBody(r, meta.(*TransformSpec), t)
 
-	if err != nil {
-		t.Logger().WithError(err).Error("Body transform failure")
-	} else {
-		t.Logger().Debugf("%s", msgBodyTransformed)
+	tMeta, ok := meta.(*TransformSpec)
+	if !ok {
+		t.Logger().Error("Invalid casting")
+		return errors.New("internal server error"), http.StatusInternalServerError
 	}
+
+	if err := t.transformBody(r, tMeta); err != nil {
+		t.Logger().WithError(err).Error("Body transform failure")
+		return fmt.Errorf("body transform failure: %w", err), http.StatusInternalServerError
+	}
+
+	t.Logger().Debugf("%s", msgBodyTransformed)
 
 	return nil, http.StatusOK
 }
 
-func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware) error {
+func (t *TransformMiddleware) transformBody(r *http.Request, meta *TransformSpec) error {
+	tpl, err := meta.Template.Get()
+
+	if err != nil {
+		return err
+	}
+
 	body, _ := ioutil.ReadAll(r.Body)
 	defer r.Body.Close()
 
 	// Put into an interface:
 	bodyData := make(map[string]interface{})
 
-	switch tmeta.TemplateData.Input {
+	switch meta.TemplateData.Input {
 	case apidef.RequestXML:
 		if len(body) == 0 {
 			body = []byte("<_/>")
@@ -90,10 +104,10 @@ func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware
 			bodyData = tempBody.(map[string]interface{})
 		}
 	default:
-		return fmt.Errorf("unsupported request input type: %v", tmeta.TemplateData.Input)
+		return fmt.Errorf("unsupported request input type: %v", meta.TemplateData.Input)
 	}
 
-	if tmeta.TemplateData.EnableSession {
+	if meta.TemplateData.EnableSession {
 		if session := ctxGetSession(r); session != nil {
 			bodyData["_tyk_meta"] = session.MetaData
 		} else {
@@ -107,7 +121,7 @@ func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware
 
 	// Apply to template
 	var bodyBuffer bytes.Buffer
-	if err := tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
+	if err := tpl.Execute(&bodyBuffer, bodyData); err != nil {
 		return fmt.Errorf("failed to apply template to request: %w", err)
 	}
 
