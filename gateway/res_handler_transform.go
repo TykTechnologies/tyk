@@ -188,9 +188,14 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		}
 	}
 
+	tpl, err := tmeta.Template.Get()
+	if err != nil {
+		return err
+	}
+
 	// Apply to template
 	var bodyBuffer bytes.Buffer
-	if err := tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
+	if err := tpl.Execute(&bodyBuffer, bodyData); err != nil {
 		logger.WithError(err).Error("Failed to apply template to request")
 	} else {
 		logger.Debugf("%s", msgBodyTransformed)
