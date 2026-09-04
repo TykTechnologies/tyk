@@ -395,6 +395,7 @@ func TestHandleRedisEvent_NoticeFragmentChanged(t *testing.T) {
 
 		// Verify that the handled callback was called with NoticeFragmentChanged
 		assert.Equal(t, NoticeFragmentChanged, reloadedCommand, "should trigger reload for fragment changes")
+		assert.True(t, reloadCalled, "reload callback should be called")
 	})
 
 	t.Run("NoticeFragmentChanged works alongside NoticePolicyChanged", func(t *testing.T) {
@@ -426,6 +427,7 @@ func TestHandleRedisEvent_NoticeFragmentChanged(t *testing.T) {
 				ts.Gw.handleRedisEvent(msg, handled, reloaded)
 
 				assert.Equal(t, tc.command, reloadedCommand, "should trigger reload for %s", tc.command)
+				assert.True(t, reloadCalled, "reload callback should be called")
 			})
 		}
 	})
