@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/sprig/v3"
+	"github.com/TykTechnologies/tyk/internal/result"
 	"github.com/cenk/backoff"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/routers/gorillamux"
@@ -140,7 +141,7 @@ type EndPointCacheMeta struct {
 
 type TransformSpec struct {
 	apidef.TemplateMeta
-	Template *texttemplate.Template
+	Template result.Result[*texttemplate.Template]
 	// Blocked is set when the template path was rejected at load time. Matching
 	// requests fail with a generic error instead of skipping the transform.
 	Blocked bool
@@ -1180,19 +1181,17 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 
 		newTransformSpec := TransformSpec{TemplateMeta: stringSpec}
 
-		// Load the templates
-		var err error
-
 		switch stringSpec.TemplateData.Mode {
 		case apidef.UseFile:
 			log.Debug("-- Using File mode")
-			newTransformSpec.Template, err = a.loadFileTemplate(stringSpec.TemplateData.TemplateSource)
+			newTransformSpec.Template = result.New(a.loadFileTemplate(stringSpec.TemplateData.TemplateSource))
 		case apidef.UseBlob:
 			log.Debug("-- Blob mode")
-			newTransformSpec.Template, err = a.loadBlobTemplate(stringSpec.TemplateData.TemplateSource)
+			newTransformSpec.Template = result.New(a.loadBlobTemplate(stringSpec.TemplateData.TemplateSource))
 		default:
 			log.Warning("[Transform Templates] No template mode defined! Found: ", stringSpec.TemplateData.Mode)
-			err = errors.New("No valid template mode defined, must be either 'file' or 'blob'")
+			log.Error("Template load failure! Skipping transformation: No valid template mode defined, must be either 'file' or 'blob'")
+			continue
 		}
 
 		if stat == Transformed {
@@ -1201,24 +1200,7 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 			newSpec.TransformResponseAction = newTransformSpec
 		}
 
-		switch {
-		case err == nil:
-			urlSpec = append(urlSpec, newSpec)
-			log.Debug("-- Loaded")
-		case errors.Is(err, errUnsafeTemplatePath):
-			// Keep the spec so matching requests fail rather than silently
-			// passing through untransformed.
-			log.Error("Template path rejected! Requests to this path will fail: ", err)
-			if stat == Transformed {
-				newSpec.TransformAction.Blocked = true
-			} else {
-				newSpec.TransformResponseAction.Blocked = true
-			}
-			urlSpec = append(urlSpec, newSpec)
-		default:
-			log.Error("Template load failure! Skipping transformation: ", err)
-		}
-
+		urlSpec = append(urlSpec, newSpec)
 	}
 
 	return urlSpec
@@ -2347,7 +2329,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			}
 		}
 
-		if rxPaths[i].TransformAction.Template != nil {
+		if rxPaths[i].TransformAction.Template.IsOk() {
 			return a.getURLStatus(rxPaths[i].Status), &rxPaths[i].TransformAction
 		}
 
