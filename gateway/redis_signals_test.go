@@ -356,3 +356,95 @@ func TestUpdateKeyInStore_SilentNoOps(t *testing.T) {
 		})
 	}
 }
+
+func TestHandleRedisEvent_NoticeFragmentChanged(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	reloadCalled := false
+	var reloadedCommand NotificationCommand
+
+	// Mock the handled callback to track if reload was triggered
+	handled := func(cmd NotificationCommand) {
+		reloadedCommand = cmd
+	}
+
+	// Mock the reloaded callback
+	reloaded := func() {
+		reloadCalled = true
+	}
+
+	t.Run("NoticeFragmentChanged triggers reload", func(t *testing.T) {
+		reloadCalled = false
+		reloadedCommand = ""
+
+		notification := Notification{
+			Command: NoticeFragmentChanged,
+			Payload: "test-org-id",
+			Gw:      ts.Gw,
+		}
+		notification.Sign()
+
+		notifJSON, err := json.Marshal(notification)
+		require.NoError(t, err)
+
+		// Create a mock message
+		msg := &mockMessage{payload: string(notifJSON)}
+
+		ts.Gw.handleRedisEvent(msg, handled, reloaded)
+
+		// Verify that the handled callback was called with NoticeFragmentChanged
+		assert.Equal(t, NoticeFragmentChanged, reloadedCommand, "should trigger reload for fragment changes")
+	})
+
+	t.Run("NoticeFragmentChanged works alongside NoticePolicyChanged", func(t *testing.T) {
+		testCases := []struct {
+			name    string
+			command NotificationCommand
+		}{
+			{"NoticePolicyChanged", NoticePolicyChanged},
+			{"NoticeFragmentChanged", NoticeFragmentChanged},
+			{"NoticeApiUpdated", NoticeApiUpdated},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				reloadCalled = false
+				reloadedCommand = ""
+
+				notification := Notification{
+					Command: tc.command,
+					Payload: "test-org-id",
+					Gw:      ts.Gw,
+				}
+				notification.Sign()
+
+				notifJSON, err := json.Marshal(notification)
+				require.NoError(t, err)
+
+				msg := &mockMessage{payload: string(notifJSON)}
+				ts.Gw.handleRedisEvent(msg, handled, reloaded)
+
+				assert.Equal(t, tc.command, reloadedCommand, "should trigger reload for %s", tc.command)
+			})
+		}
+	})
+}
+
+// mockMessage implements the temporal Message interface for testing
+type mockMessage struct {
+	payload string
+	msgType int
+}
+
+func (m *mockMessage) Payload() (string, error) {
+	return m.payload, nil
+}
+
+func (m *mockMessage) Type() int {
+	return 1 // MessageTypeMessage
+}
+
+func (m *mockMessage) Channel() string {
+	return RedisPubSubChannel
+}
