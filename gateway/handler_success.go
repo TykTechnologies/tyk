@@ -129,6 +129,11 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 	if r.Body == nil {
 		return
 	}
+	// the request body passes straight through to the upstream and is not
+	// available to re-read for graph analytics
+	if spec.EnableRequestBodyPassthrough {
+		return
+	}
 	body, err := io.ReadAll(r.Body)
 	defer func() {
 		_ = r.Body.Close()
