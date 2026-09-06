@@ -311,3 +311,22 @@ func TestMCPAnalytics_RecordHitCount(t *testing.T) {
 
 	assert.Equal(t, int32(3), count.Load(), "each MCP request should produce exactly one analytics record")
 }
+
+func TestMCPAnalytics_RejectedEnvelopeRetainsDeclaration(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	loadMCPAPI(t, ts, &oas.Middleware{})
+	captured := captureAnalytics(ts)
+	_, _ = ts.Run(t, test.TestCase{
+		Method: http.MethodPost, Path: "/mcp", Code: http.StatusBadRequest,
+		Headers: map[string]string{"Content-Type": "application/json", "MCP-Protocol-Version": "2026-07-28"},
+		Data:    `{"jsonrpc":"wrong","id":9007199254740993,"method":"server/discover"}`,
+	})
+	rec := captured.Load()
+	require.NotNil(t, rec)
+	assert.Equal(t, "2026-07-28", rec.MCPStats.DeclaredProtocolVersion)
+	assert.Equal(t, "header", rec.MCPStats.ProtocolVersionSource)
+	assert.Equal(t, "server/discover", rec.MCPStats.JSONRPCMethod)
+	assert.Equal(t, "discovery", rec.MCPStats.PrimitiveType)
+	assert.Equal(t, -32600, rec.MCPStats.JSONRPCErrorCode)
+}
