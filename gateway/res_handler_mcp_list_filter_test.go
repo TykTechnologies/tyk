@@ -1120,6 +1120,49 @@ func TestMCPListFilterResponseHandler_CacheSafetyTracksActualEdits(t *testing.T)
 	})
 }
 
+func TestMCPListFilterResponseHandler_DiscoveryFiltering(t *testing.T) {
+	h := buildMCPListFilterHandler("api-1", true)
+	session := &user.SessionState{AccessRights: map[string]user.AccessDefinition{
+		"api-1": {
+			APIID:                      "api-1",
+			JSONRPCMethodsAccessRights: user.AccessControlRules{Blocked: []string{mcp.MethodToolsCall}},
+		},
+	}}
+	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodServerDiscover, ID: 1})
+	options := &cacheOptions{}
+	ctxSetCacheOptions(req, options)
+	res := makeHTTPResponse([]byte(`{"jsonrpc":"2.0","id":1,"result":{"resultType":"complete","_meta":{"vendor":"kept"},"supportedVersions":["2026-07-28","2024-11-05"],"capabilities":{"tools":{},"resources":{},"vendor":{}},"instructions":"kept"}}`))
+
+	require.NoError(t, h.HandleResponse(httptest.NewRecorder(), res, req, session))
+	var envelope mcp.JSONRPCResponse
+	require.NoError(t, json.Unmarshal(readResponseBody(t, res), &envelope))
+	var result map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(envelope.Result, &result))
+	assert.JSONEq(t, `["2026-07-28"]`, string(result["supportedVersions"]))
+	assert.JSONEq(t, `{"resources":{},"vendor":{}}`, string(result["capabilities"]))
+	assert.JSONEq(t, `"private"`, string(result["cacheScope"]))
+	assert.JSONEq(t, `0`, string(result["ttlMs"]))
+	assert.JSONEq(t, `{"vendor":"kept"}`, string(result["_meta"]))
+	assert.JSONEq(t, `"kept"`, string(result["instructions"]))
+	assert.True(t, options.responseEdited)
+}
+
+func TestMCPListFilterResponseHandler_DiscoveryGlobalEditDoesNotDisableCache(t *testing.T) {
+	h := buildMCPListFilterHandler("api-1", true)
+	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodServerDiscover, ID: 1})
+	options := &cacheOptions{}
+	ctxSetCacheOptions(req, options)
+	res := makeHTTPResponse([]byte(`{"jsonrpc":"2.0","id":1,"result":{"cacheScope":"public","ttlMs":99,"supportedVersions":["2025-03-26","2024-11-05"],"capabilities":{"tools":{}}}}`))
+
+	require.NoError(t, h.HandleResponse(httptest.NewRecorder(), res, req, nil))
+	body := readResponseBody(t, res)
+	assert.NotContains(t, string(body), "2024-11-05")
+	assert.Contains(t, string(body), `"cacheScope":"public"`)
+	assert.False(t, options.responseEdited)
+}
+
 func TestMCPListFilterResponseHandler_HandleResponse_WrongAPIID(t *testing.T) {
 	h := buildMCPListFilterHandler("api-1", true)
 	rw := httptest.NewRecorder()
