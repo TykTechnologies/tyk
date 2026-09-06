@@ -197,9 +197,13 @@ func TestErrorHandler_writeJSONRPCErrorResponse_ReturnsFullResponse(t *testing.T
 }
 
 func TestErrorHandler_ModernClassifiedCodeWireAndContextConsistency(t *testing.T) {
-	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	ts := StartTest(nil)
+	defer ts.Close()
+	logger, hook := logrustest.NewNullLogger()
+	logger.SetLevel(logrus.DebugLevel)
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{DoNotTrack: true}}
 	spec.MarkAsMCP()
-	handler := ErrorHandler{BaseMiddleware: &BaseMiddleware{Spec: spec}}
+	handler := ErrorHandler{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: ts.Gw, logger: logrus.NewEntry(logger)}}
 
 	tests := []struct {
 		name     string
@@ -217,6 +221,7 @@ func TestErrorHandler_ModernClassifiedCodeWireAndContextConsistency(t *testing.T
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			hook.Reset()
 			r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
 			envelope := &mcp.RequestEnvelope{JSONRPC: "2.0", Method: "tools/list", ID: tc.name}
 			httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(mcp.ModernProtocolVersion, "", envelope, nil))
@@ -224,12 +229,14 @@ func TestErrorHandler_ModernClassifiedCodeWireAndContextConsistency(t *testing.T
 			tykctx.SetErrorClassification(r, tykerrors.NewErrorClassification(tc.flag, tc.name))
 			w := httptest.NewRecorder()
 
-			handler.writeJSONRPCErrorResponse(w, r, tc.name, tc.status)
+			handler.HandleError(w, r, tc.name, tc.status, true)
 
 			var response jsonrpcerrors.JSONRPCErrorResponse
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 			assert.Equal(t, tc.expected, response.Error.Code)
 			assert.Equal(t, response.Error.Code, ctxGetJSONRPCErrorCode(r))
+			require.NotNil(t, hook.LastEntry())
+			assert.Equal(t, response.Error.Code, hook.LastEntry().Data["jsonrpc_error_code"])
 		})
 	}
 }
