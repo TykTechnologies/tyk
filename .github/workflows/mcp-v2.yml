@@ -6,7 +6,7 @@ permissions:
   contents: read
 concurrency:
   group: mcp-v2-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   tests:
     if: contains(github.head_ref, '-v2-mcp-') || contains(github.head_ref, '-v2-modern-mcp-')
