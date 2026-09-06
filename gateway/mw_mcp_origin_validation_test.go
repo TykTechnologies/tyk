@@ -144,3 +144,19 @@ func TestMCPOriginCORSFallbackAndExplicitPrecedence(t *testing.T) {
 		})
 	}
 }
+
+func TestMCPOriginGuardRunsForOptionsPassthrough(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{ApplicationProtocol: apidef.AppProtocolMCP}}
+	spec.CORS.OptionsPassthrough = true
+	mw := &MCPOriginValidationMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: ts.Gw}}
+	called := false
+	handler := ts.Gw.createMiddleware(mw)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { called = true }))
+	req := httptest.NewRequest(http.MethodOptions, "http://gateway.example/mcp", nil)
+	req.Header.Set("Origin", "https://evil.example")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusForbidden, rec.Code)
+	require.False(t, called, "rejected Origin must not reach downstream processing")
+}
