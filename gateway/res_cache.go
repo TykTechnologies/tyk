@@ -67,6 +67,13 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 		return nil
 	}
 
+	if ses == nil {
+		ses = ctxGetSession(r)
+	}
+	if credentialSpecificMCPFilteringApplies(m.Spec, r, ses) {
+		return nil
+	}
+
 	// Has cache been enabled on the request?
 	options := ctxGetCacheOptions(r)
 	if options == nil {
