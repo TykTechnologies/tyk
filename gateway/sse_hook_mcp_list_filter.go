@@ -2,10 +2,10 @@ package gateway
 
 import (
 	"encoding/json"
-	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"net/http"
 	"strings"
 
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/user"
 )

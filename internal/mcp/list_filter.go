@@ -45,7 +45,11 @@ func FilterDiscoveryBody(body []byte, globalRules, credentialRules []user.Access
 				}
 			}
 			if !slices.Equal(versions, upstream) {
-				result["supportedVersions"], _ = json.Marshal(versions)
+				encodedVersions, err := json.Marshal(versions)
+				if err != nil {
+					return nil, false, false
+				}
+				result["supportedVersions"] = encodedVersions
 				changed = true
 			}
 		}
@@ -69,7 +73,11 @@ func FilterDiscoveryBody(body []byte, globalRules, credentialRules []user.Access
 				credentialSpecific = credentialSpecific || (!globalDenied && credentialDenied)
 			}
 			if capabilitiesChanged {
-				result["capabilities"], _ = json.Marshal(capabilities)
+				encodedCapabilities, err := json.Marshal(capabilities)
+				if err != nil {
+					return nil, false, false
+				}
+				result["capabilities"] = encodedCapabilities
 				changed = true
 			}
 		}
