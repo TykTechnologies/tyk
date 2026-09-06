@@ -135,7 +135,8 @@ func TestMCPOriginCORSFallbackAndExplicitPrecedence(t *testing.T) {
 			req := httptest.NewRequest("POST", "http://gateway.example/mcp", nil)
 			req.Header.Set("Origin", tc.origin)
 			rec := httptest.NewRecorder()
-			_, status := mw.ProcessRequest(rec, req, nil)
+			err, status := mw.ProcessRequest(rec, req, nil)
+			require.NoError(t, err)
 			if tc.allowed {
 				require.Equal(t, http.StatusOK, status)
 			} else {
@@ -152,7 +153,7 @@ func TestMCPOriginGuardRunsForOptionsPassthrough(t *testing.T) {
 	spec.CORS.OptionsPassthrough = true
 	mw := &MCPOriginValidationMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: ts.Gw}}
 	called := false
-	handler := ts.Gw.createMiddleware(mw)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { called = true }))
+	handler := ts.Gw.createMiddleware(mw)(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) { called = true }))
 	req := httptest.NewRequest(http.MethodOptions, "http://gateway.example/mcp", nil)
 	req.Header.Set("Origin", "https://evil.example")
 	rec := httptest.NewRecorder()
