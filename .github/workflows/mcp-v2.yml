@@ -11,7 +11,7 @@ jobs:
   tests:
     if: contains(github.head_ref, '-v2-mcp-') || contains(github.head_ref, '-v2-modern-mcp-')
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     services:
       redis:
         image: redis:6-alpine
@@ -43,7 +43,7 @@ jobs:
         run: go test -json -p 1 -parallel 1 -race -cover -tags 'goplugin dev' -timeout 15m -count=1 ./gateway ./internal/mcp/... ./internal/jsonrpc/... ./internal/httpctx ./internal/httputil ./apidef/... ./config ./user > artifacts/gateway.json 2>&1
       - name: Produce JUnit report
         if: always()
-        run: go run gotest.tools/gotestsum@v1.12.0 --junitfile artifacts/gateway.xml --raw-command cat artifacts/gateway.json
+        run: go run gotest.tools/gotestsum@v1.13.0 --junitfile artifacts/gateway.xml --raw-command cat artifacts/gateway.json
       - name: Production and development builds
         run: |
           go build -tags goplugin -trimpath -o /tmp/tyk-production .
