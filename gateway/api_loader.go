@@ -401,6 +401,10 @@ func (gw *Gateway) processSpec(
 		logger.Info("Checking security policy: Open")
 	}
 
+	// Origin validation must run before body parsing, authentication, policy,
+	// and quota side effects for MCP traffic.
+	gw.mwAppendEnabled(&chainArray, &MCPOriginValidationMiddleware{BaseMiddleware: baseMid.Copy()})
+
 	// For MCP/JSON-RPC APIs, add RequestSizeLimitMiddleware early to prevent DoS attacks.
 	// JSONRPCMiddleware reads the entire request body, so size must be validated first.
 	if spec.IsMCP() {
