@@ -56,3 +56,17 @@ func TestMCPIngressNativeAndSyntheticSupport(t *testing.T) {
 		})
 	}
 }
+
+func TestModernMethodRejectionRetainsValidation(t *testing.T) {
+	for _, method := range []string{http.MethodGet, http.MethodDelete} {
+		r := httptest.NewRequest(method, "/mcp", nil)
+		r.Header.Set(mcp.HeaderProtocolVersion, mcp.ModernProtocolVersion)
+		ingress := mcp.NewProtocolContext(mcp.ModernProtocolVersion, "", nil, nil)
+		httpctx.SetMCPProtocolContext(r, ingress)
+		w := httptest.NewRecorder()
+		require.True(t, rejectModernMCPHTTPMethod(w, r))
+		require.Equal(t, http.StatusMethodNotAllowed, ingress.Validation.HTTPStatus)
+		require.Equal(t, http.StatusMethodNotAllowed, w.Code)
+		require.Equal(t, 0, ingress.Validation.Code, "plain HTTP errors do not invent a JSON-RPC wire code")
+	}
+}
