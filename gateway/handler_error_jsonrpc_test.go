@@ -215,20 +215,20 @@ func TestErrorHandler_ModernClassifiedCodeWireAndContextConsistency(t *testing.T
 		{name: "upstream", status: http.StatusInternalServerError, flag: tykerrors.UCF, expected: jsonrpcerrors.CodeModernUpstreamError},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
-			envelope := &mcp.RequestEnvelope{JSONRPC: "2.0", Method: "tools/list", ID: test.name}
+			envelope := &mcp.RequestEnvelope{JSONRPC: "2.0", Method: "tools/list", ID: tc.name}
 			httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(mcp.ModernProtocolVersion, "", envelope, nil))
 			httpctx.SetJSONRPCRoutingState(r, &httpctx.JSONRPCRoutingState{Method: envelope.Method, ID: envelope.ID})
-			tykctx.SetErrorClassification(r, tykerrors.NewErrorClassification(test.flag, test.name))
+			tykctx.SetErrorClassification(r, tykerrors.NewErrorClassification(tc.flag, tc.name))
 			w := httptest.NewRecorder()
 
-			handler.writeJSONRPCErrorResponse(w, r, test.name, test.status)
+			handler.writeJSONRPCErrorResponse(w, r, tc.name, tc.status)
 
 			var response jsonrpcerrors.JSONRPCErrorResponse
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
-			assert.Equal(t, test.expected, response.Error.Code)
+			assert.Equal(t, tc.expected, response.Error.Code)
 			assert.Equal(t, response.Error.Code, ctxGetJSONRPCErrorCode(r))
 		})
 	}
