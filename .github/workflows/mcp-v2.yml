@@ -40,11 +40,11 @@ jobs:
       - name: Build plugin fixture
         run: go build -cover -tags 'goplugin dev' -buildmode=plugin -o test/goplugins/goplugins.so ./test/goplugins
       - name: Complete Gateway and affected package tests
-        run: go test -json -p 1 -parallel 1 -cover -tags 'goplugin dev' -timeout 15m -count=1 ./gateway ./internal/mcp/... ./internal/jsonrpc/... ./internal/httpctx ./internal/httputil ./apidef/... ./config ./user > artifacts/gateway.json 2>&1
+        run: go test -json -p 1 -parallel 1 -cover -tags 'goplugin dev' -timeout 15m -count=1 ./gateway ./internal/mcp/... ./internal/jsonrpc/... ./internal/httpctx ./internal/httputil ./apidef/... ./config ./user > artifacts/gateway.json 2> artifacts/gateway.log
       - name: Race tests for changed shared packages
-        run: go test -json -p 1 -race -count=1 ./internal/mcp/... ./internal/jsonrpc/... ./internal/httpctx ./internal/httputil ./apidef/... ./config ./user > artifacts/shared-race.json 2>&1
+        run: go test -json -p 1 -race -count=1 ./internal/mcp/... ./internal/jsonrpc/... ./internal/httpctx ./internal/httputil ./apidef/... ./config ./user > artifacts/shared-race.json 2> artifacts/shared-race.log
       - name: Race tests for MCP response filtering and request state
-        run: go test -json -p 1 -parallel 1 -race -tags 'goplugin dev' -count=1 ./gateway -run 'SSETap|FilteredSSE|MCP.*(Origin|Protocol|Ingress|Discovery)|CredentialSpecificMCPFiltering|ResponseCacheRejectsCredentialRepresentationWithoutRewrite|ResponseCacheMiddleware_SkipsEditedAndStreamingMCPResponses|ModernClassifiedCode' > artifacts/gateway-race.json 2>&1
+        run: go test -json -p 1 -parallel 1 -race -tags 'goplugin dev' -count=1 ./gateway -run 'SSETap|FilteredSSE|MCP.*(Origin|Protocol|Ingress|Discovery)|CredentialSpecificMCPFiltering|ResponseCacheRejectsCredentialRepresentationWithoutRewrite|ResponseCacheMiddleware_SkipsEditedAndStreamingMCPResponses|ModernClassifiedCode' > artifacts/gateway-race.json 2> artifacts/gateway-race.log
       - name: Produce JUnit report
         if: always()
         run: |
