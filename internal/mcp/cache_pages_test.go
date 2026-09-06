@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/user"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestCredentialDependentPages(t *testing.T) {

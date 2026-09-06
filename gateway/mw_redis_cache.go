@@ -154,6 +154,9 @@ type cacheOptions struct {
 func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	t1 := time.Now()
 	if credentialSpecificMCPFilteringApplies(m.Spec, r, ctxGetSession(r)) {
+		// An internal loop may carry cache state armed by an earlier API.
+		// Credential-dependent MCP representations must not reuse that writer.
+		ctxSetCacheOptions(r, nil)
 		m.Logger().Debug("Bypassing response cache for credential-specific MCP filtering")
 		return nil, http.StatusOK
 	}
