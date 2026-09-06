@@ -173,7 +173,9 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			startTime := time.Now()
 			logger.WithField("ts", startTime.UnixNano()).WithField("mw", mw.Name()).Debug("Started")
 
-			if mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
+			// Browser preflights still require MCP Origin validation.
+			_, originGuard := actualMW.(*MCPOriginValidationMiddleware)
+			if !originGuard && mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				next.ServeHTTP(w, r)
 				return
 			}
