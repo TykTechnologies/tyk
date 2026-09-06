@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
@@ -169,10 +170,20 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 
 func recordMCPDetails(rec *analytics.AnalyticsRecord, r *http.Request) {
 	rec.MCPStats = analytics.MCPStats{
-		IsMCP:         true,
-		JSONRPCMethod: ctxGetMCPMethod(r),
-		PrimitiveType: ctxGetMCPPrimitiveType(r),
-		PrimitiveName: ctxGetMCPPrimitiveName(r),
+		IsMCP:            true,
+		JSONRPCErrorCode: ctxGetJSONRPCErrorCode(r),
+		JSONRPCMethod:    ctxGetMCPMethod(r),
+		PrimitiveType:    ctxGetMCPPrimitiveType(r),
+		PrimitiveName:    ctxGetMCPPrimitiveName(r),
+	}
+	if protocolContext := httpctx.GetMCPProtocolContext(r); protocolContext != nil {
+		if rec.MCPStats.JSONRPCMethod == "" && protocolContext.Envelope != nil {
+			rec.MCPStats.JSONRPCMethod = protocolContext.Envelope.Method
+			rec.MCPStats.PrimitiveType = primitiveTypeForMethod(protocolContext.Envelope.Method)
+		}
+		rec.MCPStats.EffectiveProtocolVersion = protocolContext.EffectiveProtocolVersion
+		rec.MCPStats.DeclaredProtocolVersion = protocolContext.DeclaredProtocolVersion
+		rec.MCPStats.ProtocolVersionSource = string(protocolContext.ProtocolVersionSource)
 	}
 }
 
