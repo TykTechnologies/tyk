@@ -109,6 +109,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			response = e.writeTemplateErrorResponse(w, r, errMsg, errCode)
 		}
 	}
+	if rpcCode := ctxGetJSONRPCErrorCode(r); e.Spec.IsMCP() && rpcCode != 0 {
+		e.Logger().WithField("jsonrpc_error_code", rpcCode).
+			WithField("api_id", e.Spec.APIID).
+			WithField("path", r.URL.Path).
+			Debug("MCP request rejected")
+	}
 
 	// Calculate latency for error responses (needed for both API metrics and analytics).
 	var latency analytics.Latency
