@@ -51,7 +51,8 @@ func TestRedisCacheMiddleware_BypassesCredentialSpecificMCPFiltering(t *testing.
 	// First warm the actual configured POST cache path without credential rules.
 	// The same credential acquiring filtering rules must bypass that stored result.
 	warm := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
-	_, _ = middleware.ProcessRequest(httptest.NewRecorder(), warm, nil)
+	warmErr, _ := middleware.ProcessRequest(httptest.NewRecorder(), warm, nil)
+	require.NoError(t, warmErr)
 	require.Equal(t, 1, store.getCalls, "control request must reach cache lookup")
 	require.NotNil(t, ctxGetCacheOptions(warm), "control must arm the cache writer")
 	writer := &ResponseCacheMiddleware{BaseTykResponseHandler: BaseTykResponseHandler{Spec: spec}, store: store}
@@ -75,6 +76,7 @@ func TestRedisCacheMiddleware_BypassesCredentialSpecificMCPFiltering(t *testing.
 		},
 	}})
 
+	ctxSetCacheOptions(req, &cacheOptions{key: "earlier-api-cache", timeout: 60})
 	err, status := middleware.ProcessRequest(httptest.NewRecorder(), req, nil)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, status)
@@ -151,4 +153,30 @@ func TestResponseCacheMiddleware_SkipsEditedAndStreamingMCPResponses(t *testing.
 			assert.Empty(t, store.Data)
 		})
 	}
+}
+
+type cacheBodyReadSpy struct {
+	io.Reader
+	reads int
+}
+
+func (r *cacheBodyReadSpy) Read(p []byte) (int, error) {
+	r.reads++
+	return r.Reader.Read(p)
+}
+
+func TestResponseCacheRejectsCredentialRepresentationWithoutRewrite(t *testing.T) {
+	spec := BuildAPI(func(spec *APISpec) { spec.MarkAsMCP(); spec.CacheOptions.EnableCache = true })[0]
+	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodToolsList})
+	ses := &user.SessionState{AccessRights: map[string]user.AccessDefinition{spec.APIID: {MCPAccessRights: user.MCPAccessRights{Tools: user.AccessControlRules{Blocked: []string{"hidden"}}}}}}
+	ctxSetCacheOptions(req, &cacheOptions{key: "already-armed", timeout: 60})
+	store := &cacheReadCountingStore{DummyStorage: storage.NewDummyStorage(), written: make(chan struct{}, 1)}
+	writer := &ResponseCacheMiddleware{BaseTykResponseHandler: BaseTykResponseHandler{Spec: spec}, store: store}
+	// Upstream may already carry correct privacy hints, requiring no byte rewrite.
+	// Cache write prevention must remain independent of whether rewriting ran.
+	body := &cacheBodyReadSpy{Reader: bytes.NewBufferString(`{"result":{"tools":[],"cacheScope":"private","ttlMs":0}}`)}
+	res := &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(body)}
+	require.NoError(t, writer.HandleResponse(httptest.NewRecorder(), res, req, ses))
+	require.Zero(t, body.reads, "cache writer must reject before reading or encoding the representation")
 }
