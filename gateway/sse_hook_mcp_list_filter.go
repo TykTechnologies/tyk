@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"encoding/json"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"net/http"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/internal/mcp"
@@ -24,12 +26,18 @@ type MCPListFilterSSEHook struct {
 // NewMCPListFilterSSEHook creates a hook that filters list response events
 // based on OAS middleware rules and session access rights for the given API.
 // Returns nil if no filtering is needed.
-func NewMCPListFilterSSEHook(spec *APISpec, ses *user.SessionState) *MCPListFilterSSEHook {
+func NewMCPListFilterSSEHook(spec *APISpec, ses *user.SessionState, requests ...*http.Request) *MCPListFilterSSEHook {
 	if spec == nil {
 		return nil
 	}
 
-	if !hasMCPDiscoveryFiltering(spec, ses) {
+	discoveryRequest := false
+	if len(requests) > 0 && requests[0] != nil {
+		if state := httpctx.GetJSONRPCRoutingState(requests[0]); state != nil {
+			discoveryRequest = state.Method == mcp.MethodServerDiscover
+		}
+	}
+	if !spec.IsMCP() || (!discoveryRequest && !hasMCPDiscoveryFiltering(spec, ses)) {
 		return nil
 	}
 	return &MCPListFilterSSEHook{spec: spec, ses: ses}
@@ -90,6 +98,11 @@ func (h *MCPListFilterSSEHook) filterSSEData(data []byte) ([]byte, bool) {
 	var result map[string]json.RawMessage
 	if err := json.Unmarshal(envelope.Result, &result); err != nil {
 		return nil, false
+	}
+	if _, discovery := result["supportedVersions"]; discovery {
+		globalRules, credentialRules := discoveryJSONRPCRuleSets(h.spec, h.ses)
+		filtered, changed, _ := mcp.FilterDiscoveryBody(data, globalRules, credentialRules, h.spec)
+		return filtered, changed
 	}
 
 	cfg := mcp.InferListConfigFromResult(result)
