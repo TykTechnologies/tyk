@@ -137,7 +137,7 @@ func headerValues(header http.Header, key string) []string {
 }
 
 // ValidateModernMirroredHeaders validates Mcp-Method, conditional Mcp-Name,
-// and the syntax/encoding of Mcp-Param-* headers.
+// including their multiplicity, encoding and agreement with the body.
 func ValidateModernMirroredHeaders(header http.Header, envelope *RequestEnvelope) *IngressError {
 	if envelope == nil {
 		return &IngressError{Code: JSONRPCInvalidParams, Message: "missing JSON-RPC request envelope"}
@@ -229,22 +229,4 @@ func primitiveName(envelope *RequestEnvelope) (string, bool) {
 		return "", true
 	}
 	return name, true
-}
-
-func validHeaderToken(value string) bool {
-	if value == "" {
-		return false
-	}
-	for _, char := range value {
-		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') {
-			continue
-		}
-		switch char {
-		case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
-			continue
-		default:
-			return false
-		}
-	}
-	return true
 }
