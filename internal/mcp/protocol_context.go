@@ -16,6 +16,7 @@ const (
 	// LegacyFallbackProtocolVersion is the effective version for established
 	// sessions and declaration-free legacy requests.
 	LegacyFallbackProtocolVersion = "2025-03-26"
+	ModernProtocolVersion         = "2026-07-28"
 )
 
 // ProtocolVersionSource describes how the effective MCP version was detected.
@@ -163,4 +164,9 @@ func (c *ProtocolContext) extractBodyProtocolVersion() (version string, declared
 	default:
 		return "", declared, mismatch
 	}
+}
+
+// IsModern reports an unambiguous modern protocol selection.
+func (c *ProtocolContext) IsModern() bool {
+	return c != nil && !c.DeclarationMismatch && c.EffectiveProtocolVersion == ModernProtocolVersion
 }
