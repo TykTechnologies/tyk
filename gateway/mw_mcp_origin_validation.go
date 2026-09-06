@@ -99,6 +99,7 @@ func (spec *APISpec) prepareMCPOriginConfig() error {
 	return spec.mcpOriginConfigErr
 }
 
+//nolint:staticcheck // middleware helpers use the interface's (error, status) return order.
 func rejectMCPOrigin(w http.ResponseWriter) (error, int) {
 	http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 	return nil, middleware.StatusRespond
