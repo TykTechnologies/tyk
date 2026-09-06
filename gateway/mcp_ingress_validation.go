@@ -54,6 +54,7 @@ func rejectModernMCPHTTPMethod(w http.ResponseWriter, r *http.Request) bool {
 	if ingress == nil || !ingress.IsModern() || (r.Method != http.MethodGet && r.Method != http.MethodDelete) {
 		return false
 	}
+	ingress.Validation = mcp.ProtocolValidation{Checked: true, HTTPStatus: http.StatusMethodNotAllowed, Message: http.StatusText(http.StatusMethodNotAllowed)}
 	w.Header().Set("Allow", http.MethodPost)
 	http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	return true
