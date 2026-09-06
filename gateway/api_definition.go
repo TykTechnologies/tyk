@@ -232,6 +232,14 @@ func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 			return err
 		}
 	}
+	if s.MCP != nil {
+		if !s.IsMCPManaged() {
+			return errors.New("mcp configuration is valid only for MCP APIs")
+		}
+		if err := s.MCP.Validate(); err != nil {
+			return err
+		}
+	}
 
 	// For tcp services we need to make sure we can bind to the port.
 	switch s.Protocol {
