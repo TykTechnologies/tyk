@@ -2,14 +2,17 @@ package gateway
 
 import (
 	"encoding/base64"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	texttemplate "text/template"
 
 	"github.com/TykTechnologies/tyk/internal/result"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -392,10 +395,172 @@ func TestTransformRequestBody(t *testing.T) {
 	})
 }
 
-func TestTransform(t *testing.T) {
+func TestTransformMiddleware(t *testing.T) {
 	t.Run("ProcessRequest", func(t *testing.T) {
+		mockEchoServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, err := io.Copy(w, r.Body)
+			assert.NoError(t, err)
+		}))
+		t.Cleanup(mockEchoServer.Close)
 
+		ts := StartTest(nil)
+		defer ts.Close()
 
+		t.Run("unmatched path passes through with StatusOK", func(t *testing.T) {
+			api := BuildAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/"
+				UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+					v.ExtendedPaths.Transform = []apidef.TemplateMeta{
+						{
+							Path:   "/transform",
+							Method: http.MethodPost,
+							TemplateData: apidef.TemplateData{
+								Input:          apidef.RequestJSON,
+								Mode:           apidef.UseBlob,
+								TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"hello":"{{.name}}"}`)),
+							},
+						},
+					}
+				})
+			})[0]
+			ts.Gw.LoadAPI(api)
+
+			mw := &TransformMiddleware{
+				BaseMiddleware: &BaseMiddleware{
+					Spec: api,
+					Gw:   ts.Gw,
+				},
+			}
+
+			req := TestReq(t, http.MethodPost, "/unmatched", `{"name":"world"}`)
+			err, code := mw.ProcessRequest(nil, req, nil)
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusOK, code)
+		})
+
+		t.Run("successful transformation updates request body and returns StatusOK", func(t *testing.T) {
+			ts.Gw.BuildAndLoadAPI(
+				func(spec *APISpec) {
+					spec.Proxy.TargetURL = mockEchoServer.URL
+					spec.Proxy.ListenPath = "/"
+
+					UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+						v.ExtendedPaths.Transform = []apidef.TemplateMeta{
+							{
+								Path:   "/transform",
+								Method: http.MethodPost,
+								TemplateData: apidef.TemplateData{
+									Input:          apidef.RequestJSON,
+									Mode:           apidef.UseBlob,
+									TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"greeting":"hello {{.name}}"}`)),
+								},
+							},
+						}
+					})
+				},
+			)
+
+			resp, err := ts.Run(t, test.TestCase{
+				Method:    http.MethodPost,
+				Path:      "/transform",
+				Data:      `{"name":"tyk"}`,
+				Code:      http.StatusOK,
+				BodyMatch: `{"greeting":"hello tyk"}`,
+			})
+
+			assert.NoError(t, err)
+			assert.NotNil(t, resp)
+
+			body, err := io.ReadAll(resp.Body)
+			assert.Equal(t, `{"greeting":"hello tyk"}`, string(body))
+		})
+
+		t.Run("template compilation error in Result returns StatusInternalServerError", func(t *testing.T) {
+			api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = mockEchoServer.URL
+				UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+					v.ExtendedPaths.Transform = []apidef.TemplateMeta{
+						{
+							Path:   "/bad-template",
+							Method: http.MethodPost,
+							TemplateData: apidef.TemplateData{
+								Input:          apidef.RequestJSON,
+								Mode:           apidef.UseBlob,
+								TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{{ .unclosed`)),
+							},
+						},
+					}
+				})
+			})[0]
+
+			assert.NotNil(t, api)
+
+			_, _ = ts.Run(t, test.TestCase{
+				Method: http.MethodPost,
+				Path:   "/bad-template",
+				Data:   `{"name":"tyk"}`,
+				Code:   http.StatusInternalServerError,
+			})
+		})
+
+		t.Run("invalid template mode in Result returns StatusInternalServerError", func(t *testing.T) {
+			api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = mockEchoServer.URL
+				UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+					v.ExtendedPaths.Transform = []apidef.TemplateMeta{
+						{
+							Path:   "/invalid-mode",
+							Method: http.MethodPost,
+							TemplateData: apidef.TemplateData{
+								Input: apidef.RequestJSON,
+								Mode:  "invalid_mode",
+							},
+						},
+					}
+				})
+			})[0]
+
+			assert.NotNil(t, api)
+
+			_, _ = ts.Run(t, test.TestCase{
+				Method: http.MethodPost,
+				Path:   "/invalid-mode",
+				Data:   `{"name":"tyk"}`,
+				Code:   http.StatusInternalServerError,
+			})
+		})
+
+		t.Run("malformed request body returns StatusInternalServerError", func(t *testing.T) {
+
+			api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = mockEchoServer.URL
+				UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+					v.ExtendedPaths.Transform = []apidef.TemplateMeta{
+						{
+							Path:   "/transform",
+							Method: http.MethodPost,
+							TemplateData: apidef.TemplateData{
+								Input:          apidef.RequestJSON,
+								Mode:           apidef.UseBlob,
+								TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"hello":"{{.name}}"}`)),
+							},
+						},
+					}
+				})
+			})[0]
+
+			assert.NotNil(t, api)
+
+			_, _ = ts.Run(t, test.TestCase{
+				Method: http.MethodPost,
+				Path:   "/transform",
+				Data:   `{malformed-json`,
+				Code:   http.StatusInternalServerError,
+			})
+		})
 	})
 }
-
