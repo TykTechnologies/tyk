@@ -473,6 +473,7 @@ func TestTransformMiddleware(t *testing.T) {
 			assert.NotNil(t, resp)
 
 			body, err := io.ReadAll(resp.Body)
+			assert.NoError(t, err)
 			assert.Equal(t, `{"greeting":"hello tyk"}`, string(body))
 		})
 
@@ -534,7 +535,6 @@ func TestTransformMiddleware(t *testing.T) {
 		})
 
 		t.Run("malformed request body returns StatusInternalServerError", func(t *testing.T) {
-
 			api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Proxy.ListenPath = "/"
 				spec.Proxy.TargetURL = mockEchoServer.URL
