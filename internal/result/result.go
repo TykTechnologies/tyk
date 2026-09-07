@@ -12,10 +12,20 @@ func New[T any](value T, err error) Result[T] {
 	}
 }
 
-func NewOk[T any](value T) Result[T] {
+func Ok[T any](value T) Result[T] {
 	return Result[T]{
 		err:   nil,
 		value: value,
+	}
+}
+
+func Err[T any](err error) Result[T] {
+	if err == nil {
+		panic("result: Err called with nil error")
+	}
+
+	return Result[T]{
+		err: err,
 	}
 }
 
