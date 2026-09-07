@@ -4,8 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/internal/result"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/TykTechnologies/tyk/internal/result"
 )
 
 type ResultTestSuite struct {
