@@ -641,28 +641,67 @@ type ResponseProcessor struct {
 	Options interface{} `bson:"options" json:"options"`
 }
 
-// DNSLoadBalancingConfig configures DNS-sourced load balancing for an API's
-// upstream: the hostname in `target_url` is re-resolved on a timer and requests
-// are distributed across the addresses it returns.
+// DNSDiscoveryConfig configures DNS as a source for an API's target list: the
+// hostname in `target_url` is resolved and every address it returns becomes a
+// target.
 //
-// This is per-API rather than gateway-level because the thing it describes is a
-// property of one upstream. It sits next to `enable_load_balancing`, which
-// balances across a static list, and `service_discovery`, which sources targets
-// from a key/value store; this sources them from DNS.
+// This is a source, not a balancing policy. It answers "where does the list of
+// addresses come from", the same question `service_discovery` answers from a
+// registry and `target_list` answers from hand-written configuration. Whether
+// the list is distributed across is still `enable_load_balancing`, so both have
+// to be on for requests to reach more than one address. That split is
+// deliberate: it is the model the gateway already has, and it keeps DNS from
+// becoming a second, competing balancing switch.
+//
+// It is per-API rather than gateway-level because the thing it describes is a
+// property of one upstream. Resolution itself is not per-API: one scheduler for
+// the gateway refreshes each distinct hostname once, however many APIs point at
+// it, which is how Envoy, NGINX, HAProxy and Kong all key this work.
 //
 // Only useful against a headless Kubernetes Service, or any other name that
 // resolves to one address per backend. A ClusterIP resolves to a single virtual
 // IP, so there is nothing to distribute over and the cluster dataplane binds
 // each connection to one backend regardless.
-type DNSLoadBalancingConfig struct {
-	// Enabled turns on periodic re-resolution of the upstream hostname.
+type DNSDiscoveryConfig struct {
+	// Enabled sources the API's target list from DNS.
 	Enabled bool `bson:"enabled" json:"enabled"`
 
-	// RefreshInterval is how often, in seconds, the hostname is re-resolved.
-	// 0 selects the default of 30 seconds; values below 10 are raised to 10,
-	// because the added DNS load is `gateways x APIs / interval` against a
-	// shared resolver. A negative value disables refreshing.
+	// RefreshInterval is how often, in seconds, the upstream hostname is
+	// re-resolved in the background. It bounds how long a pod created by an
+	// autoscaling event waits before receiving traffic.
+	//
+	// 0 selects the default of 30 seconds; values below 5 are raised to 5. A
+	// small random amount is added to each cycle so that gateways started
+	// together do not resolve in lockstep.
+	//
+	// Refreshing is deliberately on a fixed interval rather than driven by the
+	// record's own TTL. A caching resolver hands one answer to every gateway
+	// behind it, so TTL-aligned refreshes arrive together and raising the TTL
+	// lowers average query load without lowering the peak. HAProxy ignores the
+	// record TTL for the same reason, and Envoy only honours it on request.
+	//
+	// Where several APIs share an upstream hostname, the shortest interval any
+	// of them asks for is the one used, since they share one refresh.
 	RefreshInterval int64 `bson:"refresh_interval" json:"refresh_interval"`
+
+	// StaleTTL is how long, in seconds, the last known good address set keeps
+	// being used while the resolver is unreachable. Past it the API falls back
+	// to its configured target, which is the behaviour it would have had
+	// without this setting, so resolution returns to the dial path.
+	//
+	// This covers resolver failures such as timeouts, not a name that has gone
+	// away: an authoritative answer that the name does not exist is applied at
+	// once, because there is nothing stale to preserve.
+	//
+	// 0 selects the default of 300 seconds. A negative value never gives up,
+	// keeping the last known good set for as long as the process runs. The
+	// default is deliberately far shorter than the equivalent in Kong, which
+	// defaults to an hour and drew reports of deleted Kubernetes endpoints
+	// still receiving traffic.
+	//
+	// Where several APIs share an upstream hostname, the shortest value any of
+	// them asks for is the one used, as with the refresh interval.
+	StaleTTL int64 `bson:"stale_ttl" json:"stale_ttl"`
 }
 
 type ServiceDiscoveryConfiguration struct {
@@ -756,39 +795,39 @@ type APIDefinition struct {
 	// CertificatePinningDisabled disables public key pinning
 	CertificatePinningDisabled bool `bson:"certificate_pinning_disabled" json:"certificate_pinning_disabled,omitempty"`
 
-	EnableJWT                            bool                   `bson:"enable_jwt" json:"enable_jwt"`
-	UseStandardAuth                      bool                   `bson:"use_standard_auth" json:"use_standard_auth"`
-	UseGoPluginAuth                      bool                   `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`       // Deprecated. Use CustomPluginAuthEnabled instead.
-	EnableCoProcessAuth                  bool                   `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"` // Deprecated. Use CustomPluginAuthEnabled instead.
-	CustomPluginAuthEnabled              bool                   `bson:"custom_plugin_auth_enabled" json:"custom_plugin_auth_enabled"`
-	JWTSigningMethod                     string                 `bson:"jwt_signing_method" json:"jwt_signing_method"`
-	JWTSource                            string                 `bson:"jwt_source" json:"jwt_source"`
-	JWTJwksURIs                          []JWK                  `bson:"jwt_jwks_uris" json:"jwt_jwks_uris"`
-	JWTIdentityBaseField                 string                 `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
-	JWTClientIDBaseField                 string                 `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
-	JWTPolicyFieldName                   string                 `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
-	JWTDefaultPolicies                   []string               `bson:"jwt_default_policies" json:"jwt_default_policies"`
-	JWTIssuedAtValidationSkew            uint64                 `bson:"jwt_issued_at_validation_skew" json:"jwt_issued_at_validation_skew"`
-	JWTExpiresAtValidationSkew           uint64                 `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
-	JWTNotBeforeValidationSkew           uint64                 `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
-	JWTSkipKid                           bool                   `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
-	Scopes                               Scopes                 `bson:"scopes" json:"scopes,omitempty"`
-	IDPClientIDMappingDisabled           bool                   `bson:"idp_client_id_mapping_disabled" json:"idp_client_id_mapping_disabled"`
-	JWTScopeToPolicyMapping              map[string]string      `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
-	JWTScopeClaimName                    string                 `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
-	NotificationsDetails                 NotificationsManager   `bson:"notifications" json:"notifications"`
-	EnableSignatureChecking              bool                   `bson:"enable_signature_checking" json:"enable_signature_checking"`
-	HmacAllowedClockSkew                 float64                `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
-	HmacAllowedAlgorithms                []string               `bson:"hmac_allowed_algorithms" json:"hmac_allowed_algorithms"`
-	RequestSigning                       RequestSigningMeta     `bson:"request_signing" json:"request_signing"`
-	BaseIdentityProvidedBy               AuthTypeEnum           `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
-	VersionDefinition                    VersionDefinition      `bson:"definition" json:"definition"`
-	VersionData                          VersionData            `bson:"version_data" json:"version_data"` // Deprecated. Use VersionDefinition instead.
-	UptimeTests                          UptimeTests            `bson:"uptime_tests" json:"uptime_tests"`
-	Proxy                                ProxyConfig            `bson:"proxy" json:"proxy"`
-	DisableRateLimit                     bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
-	DisableQuota                         bool                   `bson:"disable_quota" json:"disable_quota"`
-	CustomMiddleware                     MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
+	EnableJWT                  bool                 `bson:"enable_jwt" json:"enable_jwt"`
+	UseStandardAuth            bool                 `bson:"use_standard_auth" json:"use_standard_auth"`
+	UseGoPluginAuth            bool                 `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`       // Deprecated. Use CustomPluginAuthEnabled instead.
+	EnableCoProcessAuth        bool                 `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"` // Deprecated. Use CustomPluginAuthEnabled instead.
+	CustomPluginAuthEnabled    bool                 `bson:"custom_plugin_auth_enabled" json:"custom_plugin_auth_enabled"`
+	JWTSigningMethod           string               `bson:"jwt_signing_method" json:"jwt_signing_method"`
+	JWTSource                  string               `bson:"jwt_source" json:"jwt_source"`
+	JWTJwksURIs                []JWK                `bson:"jwt_jwks_uris" json:"jwt_jwks_uris"`
+	JWTIdentityBaseField       string               `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
+	JWTClientIDBaseField       string               `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
+	JWTPolicyFieldName         string               `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
+	JWTDefaultPolicies         []string             `bson:"jwt_default_policies" json:"jwt_default_policies"`
+	JWTIssuedAtValidationSkew  uint64               `bson:"jwt_issued_at_validation_skew" json:"jwt_issued_at_validation_skew"`
+	JWTExpiresAtValidationSkew uint64               `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
+	JWTNotBeforeValidationSkew uint64               `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
+	JWTSkipKid                 bool                 `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
+	Scopes                     Scopes               `bson:"scopes" json:"scopes,omitempty"`
+	IDPClientIDMappingDisabled bool                 `bson:"idp_client_id_mapping_disabled" json:"idp_client_id_mapping_disabled"`
+	JWTScopeToPolicyMapping    map[string]string    `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
+	JWTScopeClaimName          string               `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
+	NotificationsDetails       NotificationsManager `bson:"notifications" json:"notifications"`
+	EnableSignatureChecking    bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
+	HmacAllowedClockSkew       float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
+	HmacAllowedAlgorithms      []string             `bson:"hmac_allowed_algorithms" json:"hmac_allowed_algorithms"`
+	RequestSigning             RequestSigningMeta   `bson:"request_signing" json:"request_signing"`
+	BaseIdentityProvidedBy     AuthTypeEnum         `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
+	VersionDefinition          VersionDefinition    `bson:"definition" json:"definition"`
+	VersionData                VersionData          `bson:"version_data" json:"version_data"` // Deprecated. Use VersionDefinition instead.
+	UptimeTests                UptimeTests          `bson:"uptime_tests" json:"uptime_tests"`
+	Proxy                      ProxyConfig          `bson:"proxy" json:"proxy"`
+	DisableRateLimit           bool                 `bson:"disable_rate_limit" json:"disable_rate_limit"`
+	DisableQuota               bool                 `bson:"disable_quota" json:"disable_quota"`
+	CustomMiddleware           MiddlewareSection    `bson:"custom_middleware" json:"custom_middleware"`
 	// CustomMiddlewareBundle is the bundle filename (or comma-separated list of
 	// bundle filenames) resolved against the gateway's bundle_base_url. A single
 	// name takes the legacy single-bundle load path unchanged. Two or more
@@ -1121,7 +1160,7 @@ type ProxyConfig struct {
 	StructuredTargetList        *HostList                     `bson:"-" json:"-"`
 	CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
 	ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-	DNSLoadBalancing            DNSLoadBalancingConfig        `bson:"dns_load_balancing" json:"dns_load_balancing"`
+	DNSDiscovery                DNSDiscoveryConfig            `bson:"dns_discovery" json:"dns_discovery"`
 	Transport                   struct {
 		SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
 		SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`

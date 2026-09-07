@@ -186,7 +186,7 @@ func (p *Poller) resolve() error {
 		return err
 	}
 
-	addrs = normalise(addrs)
+	addrs = Normalise(addrs)
 	if len(addrs) == 0 {
 		// A successful lookup that returned nothing is treated exactly like a
 		// failure: hold the last-good set rather than publish an empty one.
@@ -208,10 +208,16 @@ func (p *Poller) resolve() error {
 	return nil
 }
 
-// normalise sorts and de-duplicates, so that a resolver shuffling its answers —
-// which CoreDNS's loadbalance plugin does by default — is not mistaken for a
-// membership change.
-func normalise(addrs []string) []string {
+// Normalise sorts and de-duplicates an address set, so that a resolver
+// shuffling its answers, which CoreDNS's loadbalance plugin does by default, is
+// not mistaken for a membership change.
+//
+// Exported because it is one of the two rules both DNS paths have to get right:
+// the plugin resolver here, and upstream DNS discovery in the gateway package.
+// The other rule, never publishing an empty set, cannot be shared as a function
+// because each path holds its own last-good set, so each states it separately
+// and tests it separately.
+func Normalise(addrs []string) []string {
 	if len(addrs) == 0 {
 		return nil
 	}

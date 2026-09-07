@@ -614,8 +614,13 @@ func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 				// Per-API, alongside enable_load_balancing and
 				// service_discovery: which upstream to rediscover is a property
 				// of this API, not of the gateway.
-				spec.Proxy.DNSLoadBalancing.Enabled = enabled
-				spec.Proxy.DNSLoadBalancing.RefreshInterval = 10
+				// DNS discovery is a source; enable_load_balancing is the
+				// policy that distributes what it produces. Both go on
+				// together, and the control arm has neither, which is the
+				// released behaviour: one target, one connection, one pod.
+				spec.Proxy.EnableLoadBalancing = enabled
+				spec.Proxy.DNSDiscovery.Enabled = enabled
+				spec.Proxy.DNSDiscovery.RefreshInterval = 10
 			})
 
 			for i := 0; i < requests; i++ {
@@ -644,7 +649,7 @@ func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 				// so the whole run multiplexes onto one connection to one pod.
 				// If this ever spreads, the enabled arm above proves nothing.
 				if len(idle) != len(pods)-1 {
-					t.Errorf("control: with upstream_dns_load_balancing disabled, %d of %d pods were idle, "+
+					t.Errorf("control: with dns_discovery disabled, %d of %d pods were idle, "+
 						"want %d. Traffic is expected to pin to a single pod, because the h2c transport "+
 						"has no resolver and its connection pool is keyed on the authority. If it spreads "+
 						"here, the enabled arm is not measuring the new option.",
@@ -654,7 +659,7 @@ func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 			}
 
 			if len(idle) > 0 {
-				t.Fatalf("with upstream_dns_load_balancing enabled, %d of %d pods received NO traffic: %s.\n"+
+				t.Fatalf("with dns_discovery enabled, %d of %d pods received NO traffic: %s.\n"+
 					"Every address the Service resolves to should appear in the target list and take a "+
 					"share of the requests.", len(idle), len(pods), strings.Join(idle, ", "))
 			}

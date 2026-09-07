@@ -164,7 +164,7 @@ func EnsureTransport(host, protocol string) string {
 }
 
 func (gw *Gateway) nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
-	if spec.Proxy.EnableLoadBalancing || upstreamDNSLoadBalancingEnabled(spec) {
+	if spec.Proxy.EnableLoadBalancing {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a HostList
 		startPos := spec.RoundRobin.WithLen(targetData.Len())
@@ -267,7 +267,19 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 				break
 			}
 			fallthrough // implies load balancing, with replaced host list
-		case spec.Proxy.EnableLoadBalancing || upstreamDNSLoadBalancingEnabled(spec):
+		case upstreamDNSDiscoveryEnabled(spec):
+			// A third source, alongside the static list and service discovery.
+			// Resolved here rather than on a timer, so an API receiving no
+			// requests costs nothing and the address set for a hostname is
+			// looked up once however many APIs point at it.
+			resolved, err := gw.urlFromDNS(spec)
+			if err != nil {
+				logger.Error("[PROXY] [DNS DISCOVERY] Failed target lookup: ", err)
+				break
+			}
+			hostList = resolved
+			fallthrough // implies load balancing, with replaced host list
+		case spec.Proxy.EnableLoadBalancing:
 			host, err := gw.nextTarget(hostList, spec)
 			if err != nil {
 				logger.Error("[PROXY] [LOAD BALANCING] ", err)
@@ -290,7 +302,7 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 				// of them still presents the name the upstream expects, which
 				// anything routing on :authority or validating a certificate
 				// against it depends on.
-				if upstreamDNSLoadBalancingEnabled(spec) {
+				if upstreamDNSDiscoveryEnabled(spec) {
 					authorityHost = target.Host
 				}
 

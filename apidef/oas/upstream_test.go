@@ -1527,7 +1527,7 @@ func TestPreserveHostHeader(t *testing.T) {
 	})
 }
 
-func TestDNSLoadBalancing(t *testing.T) {
+func TestDNSDiscovery(t *testing.T) {
 	t.Parallel()
 
 	t.Run("round trip", func(t *testing.T) {
@@ -1535,37 +1535,37 @@ func TestDNSLoadBalancing(t *testing.T) {
 
 		testcases := []struct {
 			title string
-			input apidef.DNSLoadBalancingConfig
+			input apidef.DNSDiscoveryConfig
 			// omitted is true when the OAS object should be dropped entirely,
 			// which is what ShouldOmit does for an all-zero value.
 			omitted bool
 		}{
 			{
 				title:   "disabled and unset is omitted",
-				input:   apidef.DNSLoadBalancingConfig{},
+				input:   apidef.DNSDiscoveryConfig{},
 				omitted: true,
 			},
 			{
 				title: "enabled with the default interval",
-				input: apidef.DNSLoadBalancingConfig{Enabled: true},
+				input: apidef.DNSDiscoveryConfig{Enabled: true},
 			},
 			{
 				title: "enabled with an explicit interval",
-				input: apidef.DNSLoadBalancingConfig{Enabled: true, RefreshInterval: 10},
+				input: apidef.DNSDiscoveryConfig{Enabled: true, RefreshInterval: 10},
 			},
 			{
-				// A negative interval disables refreshing, so it must survive
-				// the round trip rather than being normalised to zero, which
-				// means "use the default".
-				title: "refreshing disabled by a negative interval",
-				input: apidef.DNSLoadBalancingConfig{Enabled: true, RefreshInterval: -1},
+				// Below the floor, which is applied when the API loads rather
+				// than during conversion, so the configured value has to
+				// survive the round trip unchanged.
+				title: "interval below the floor",
+				input: apidef.DNSDiscoveryConfig{Enabled: true, RefreshInterval: 1},
 			},
 			{
 				// Not a useful configuration, but it must not be silently
 				// rewritten: an interval set while disabled is preserved so an
 				// operator toggling `enabled` gets the interval they left.
 				title: "interval set while disabled",
-				input: apidef.DNSLoadBalancingConfig{RefreshInterval: 30},
+				input: apidef.DNSDiscoveryConfig{RefreshInterval: 30},
 			},
 		}
 
@@ -1574,22 +1574,22 @@ func TestDNSLoadBalancing(t *testing.T) {
 				t.Parallel()
 
 				var api apidef.APIDefinition
-				api.Proxy.DNSLoadBalancing = tc.input
+				api.Proxy.DNSDiscovery = tc.input
 
 				var upstream Upstream
 				upstream.Fill(api)
 
 				if tc.omitted {
-					assert.Nil(t, upstream.DNSLoadBalancing)
+					assert.Nil(t, upstream.DNSDiscovery)
 				} else {
-					assert.NotNil(t, upstream.DNSLoadBalancing)
+					assert.NotNil(t, upstream.DNSDiscovery)
 				}
 
 				var converted apidef.APIDefinition
 				converted.SetDisabledFlags()
 				upstream.ExtractTo(&converted)
 
-				assert.Equal(t, tc.input, converted.Proxy.DNSLoadBalancing)
+				assert.Equal(t, tc.input, converted.Proxy.DNSDiscovery)
 			})
 		}
 	})
@@ -1598,7 +1598,7 @@ func TestDNSLoadBalancing(t *testing.T) {
 		t.Parallel()
 
 		var api apidef.APIDefinition
-		api.Proxy.DNSLoadBalancing = apidef.DNSLoadBalancingConfig{
+		api.Proxy.DNSDiscovery = apidef.DNSDiscoveryConfig{
 			Enabled:         true,
 			RefreshInterval: 15,
 		}
@@ -1606,6 +1606,6 @@ func TestDNSLoadBalancing(t *testing.T) {
 		var upstream Upstream
 		upstream.Fill(api)
 
-		assert.Equal(t, &DNSLoadBalancing{Enabled: true, RefreshInterval: 15}, upstream.DNSLoadBalancing)
+		assert.Equal(t, &DNSDiscovery{Enabled: true, RefreshInterval: 15}, upstream.DNSDiscovery)
 	})
 }

@@ -54,7 +54,7 @@ func TestBareGRPCEndpoint(t *testing.T) {
 // Only the plugin path has an environment variable, and only the plugin path
 // should: coprocess_grpc_server is one gateway-level target shared by every API
 // with a gRPC plugin. The upstream equivalent is per-API
-// (proxy.dns_load_balancing), because which upstream to rediscover is a
+// (proxy.dns_discovery), because which upstream to rediscover is a
 // property of one API rather than of the gateway.
 func TestDNSRefreshIntervalEnvVar(t *testing.T) {
 	t.Setenv("TYK_GW_COPROCESSOPTIONS_GRPCDNSREFRESHINTERVAL", "15")

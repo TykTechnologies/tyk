@@ -19,7 +19,6 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/agentprotocol"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
-	"github.com/TykTechnologies/tyk/internal/dnspoll"
 	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
@@ -66,11 +65,12 @@ type APISpec struct {
 	OrgHasNoSession          bool
 	AnalyticsPluginConfig    *GoAnalyticsPlugin
 
-	// upstreamDNSPoller re-resolves the upstream hostname on a timer and
-	// rewrites StructuredTargetList with the addresses it finds. Non-nil only
-	// when upstream DNS load balancing is on and this API's target is a
-	// pollable name; it is set during load and read-only thereafter.
-	upstreamDNSPoller *dnspoll.Poller
+	// dnsDiscovery is what this API resolves when DNS is its target-list
+	// source: the upstream name, its port, and how long a resolved set is
+	// reused. Non-nil only when dns_discovery is on and the API's target is a
+	// resolvable name; it is set during load and read-only thereafter, and its
+	// presence is what turns the feature on for this API.
+	dnsDiscovery *dnsDiscoveryPlan
 
 	unloadHooks []func()
 

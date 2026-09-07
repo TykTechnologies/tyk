@@ -1499,8 +1499,8 @@
         "loadBalancing": {
           "$ref": "#/definitions/X-Tyk-LoadBalancing"
         },
-        "dnsLoadBalancing": {
-          "$ref": "#/definitions/X-Tyk-DNSLoadBalancing"
+        "dnsDiscovery": {
+          "$ref": "#/definitions/X-Tyk-DNSDiscovery"
         },
         "preserveHostHeader": {
           "$ref": "#/definitions/X-Tyk-PreserveHostHeader"
@@ -2902,7 +2902,7 @@
         "enabled"
       ]
     },
-    "X-Tyk-DNSLoadBalancing": {
+    "X-Tyk-DNSDiscovery": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -2910,7 +2910,10 @@
         },
         "refreshInterval": {
           "type": "integer",
-          "minimum": -1
+          "minimum": 0
+        },
+        "staleTTL": {
+          "type": "integer"
         }
       },
       "required": [
