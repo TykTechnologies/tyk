@@ -1,11 +1,22 @@
 package result
 
+import "errors"
+
+var (
+	ErrNilError = errors.New("nil error porvided")
+)
+
 type Result[T any] struct {
 	value T
 	err   error
 }
 
 func New[T any](value T, err error) Result[T] {
+	if err != nil {
+		var zero T
+		value = zero
+	}
+
 	return Result[T]{
 		err:   err,
 		value: value,
@@ -21,7 +32,17 @@ func Ok[T any](value T) Result[T] {
 
 func Err[T any](err error) Result[T] {
 	if err == nil {
-		panic("result: Err called with nil error")
+		err = ErrNilError
+	}
+
+	return Result[T]{
+		err: err,
+	}
+}
+
+func MustErr[T any](err error) Result[T] {
+	if err == nil {
+		panic(ErrNilError)
 	}
 
 	return Result[T]{
@@ -56,6 +77,6 @@ func (r Result[T]) IsOk() bool {
 	return r.err == nil
 }
 
-func (r Result[T]) Err() (error, bool) {
-	return r.err, r.err != nil
+func (r Result[T]) Err() error {
+	return r.err
 }

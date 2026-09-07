@@ -63,6 +63,29 @@ func (s *ResultTestSuite) TestOk() {
 	})
 }
 
+func (s *ResultTestSuite) TestMustErr() {
+	s.Run("Given a valid error instance", func() {
+		// When creating an Err result
+		res := result.MustErr[string](s.errSample)
+
+		// Then status flags should indicate failure
+		s.False(res.IsOk())
+		s.True(res.IsError())
+
+		// And retrieving value with MustGet should panic
+		s.PanicsWithValue(s.errSample, func() {
+			_ = res.MustGet()
+		})
+	})
+
+	s.Run("Given a nil error passed to Err constructor", func() {
+		// Then it must immediately panic to prevent inconsistent state
+		s.PanicsWithValue(result.ErrNilError, func() {
+			_ = result.MustErr[int](nil)
+		})
+	})
+}
+
 func (s *ResultTestSuite) TestErr() {
 	s.Run("Given a valid error instance", func() {
 		// When creating an Err result
@@ -79,10 +102,9 @@ func (s *ResultTestSuite) TestErr() {
 	})
 
 	s.Run("Given a nil error passed to Err constructor", func() {
-		// Then it must immediately panic to prevent inconsistent state
-		s.PanicsWithValue("result: Err called with nil error", func() {
-			_ = result.Err[int](nil)
-		})
+		res := result.Err[int](nil)
+		s.Assert().True(res.IsError())
+		s.Assert().ErrorIs(res.Err(), result.ErrNilError)
 	})
 }
 
@@ -113,10 +135,9 @@ func (s *ResultTestSuite) TestErrMethod() {
 		res := result.Err[int](s.errSample)
 
 		// When retrieving the error details
-		err, hasErr := res.Err()
+		err := res.Err()
 
 		// Then error and flag should reflect the failure state
-		s.True(hasErr)
 		s.ErrorIs(err, s.errSample)
 	})
 
@@ -124,10 +145,7 @@ func (s *ResultTestSuite) TestErrMethod() {
 		res := result.Ok(42)
 
 		// When retrieving the error details
-		err, hasErr := res.Err()
-
-		// Then error should be nil and flag should be false
-		s.False(hasErr)
+		err := res.Err()
 		s.NoError(err)
 	})
 }
