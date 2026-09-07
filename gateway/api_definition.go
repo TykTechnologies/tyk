@@ -2329,7 +2329,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			}
 		}
 
-		if rxPaths[i].TransformAction.Template.IsOk() {
+		if tpl, _ := rxPaths[i].TransformAction.Template.Get(); tpl != nil {
 			return a.getURLStatus(rxPaths[i].Status), &rxPaths[i].TransformAction
 		}
 
