@@ -1110,7 +1110,6 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 			newTransformSpec.Template = result.Err[*texttemplate.Template](
 				errors.New("Template load failure! Skipping transformation: No valid template mode defined, must be either 'file' or 'blob'"),
 			)
-			continue
 		}
 
 		if stat == Transformed {
@@ -2248,7 +2247,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			}
 		}
 
-		if tpl, _ := rxPaths[i].TransformAction.Template.Get(); tpl != nil {
+		if rxPaths[i].Status == Transformed {
 			return a.getURLStatus(rxPaths[i].Status), &rxPaths[i].TransformAction
 		}
 
