@@ -2560,6 +2560,35 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	log.Debug("Upstream path is: ", r.URL.Path)
 }
 
+func (a *APISpec) PrepareRequestToLog(r *http.Request) *http.Request {
+	dup := r.Clone(r.Context())
+	a.PrepareRequestToLogInPlace(dup)
+	return dup
+}
+
+func (a *APISpec) PrepareRequestToLogShallowClone(r *http.Request) *http.Request {
+	dup := *r
+
+	if r.URL != nil {
+		dup.URL = new(*r.URL)
+	}
+
+	a.PrepareRequestToLogInPlace(&dup)
+	return &dup
+}
+
+func (a *APISpec) PrepareRequestToLogInPlace(r *http.Request) {
+	a.SanitizeProxyPaths(r)
+
+	// appends path if upstream ha path e.g. http://httpbin.org/anything
+	if a.target != nil && a.target.Path != "" {
+		r.URL.Path = singleJoiningSlash(a.target.Path, r.URL.Path, a.Proxy.DisableStripSlash)
+		if r.URL.RawPath != "" {
+			r.URL.RawPath = singleJoiningSlash(a.target.Path, r.URL.RawPath, a.Proxy.DisableStripSlash)
+		}
+	}
+}
+
 func (a *APISpec) getRedirectTargetUrl(inputUrl *url.URL) (*url.URL, error) {
 	if inputUrl == nil {
 		return nil, errors.New("input url is nil")

@@ -84,7 +84,7 @@ type MCPTraceSource struct {
 type MCPTraceContextConfig struct {
 	// ReadSources is an ordered, first-match-wins list of places to look for
 	// the inbound trace context. When omitted, it defaults to
-	// [{header}, {body, path: params._meta}].
+	// `[{header}, {body, path: params._meta}]`.
 	ReadSources []MCPTraceSource `json:"read_sources,omitempty"`
 }
 

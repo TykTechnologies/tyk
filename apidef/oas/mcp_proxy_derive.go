@@ -21,15 +21,15 @@ import (
 //
 // It carries everything the adapter middleware needs — method, path
 // template, where each argument lives (path / query / header / body /
-// body.<field>), and the synthesised input JSON schema that is served
+// `body.<field>`), and the synthesised input JSON schema that is served
 // back on `tools/list`.
 type DerivedTool struct {
 	// OperationID is the source REST operationId this tool calls.
 	OperationID string `json:"-"`
 
 	// SourceKey identifies the source operation even when operationId is
-	// absent. OperationId-backed tools use "operationId:<id>"; path+method
-	// fallbacks use "http:<METHOD> <PATH>".
+	// absent. OperationId-backed tools use `operationId:<id>`; path+method
+	// fallbacks use `http:<METHOD> <PATH>`.
 	SourceKey string `json:"-"`
 
 	// CanonicalName is the source-derived MCP tool name before any proxy-side
@@ -45,16 +45,16 @@ type DerivedTool struct {
 	// Method is the HTTP method (GET, POST, ...).
 	Method string `json:"-"`
 
-	// PathTemplate is the OAS path template (e.g. "/orders/{id}").
+	// PathTemplate is the OAS path template (e.g. `/orders/{id}`).
 	PathTemplate string `json:"-"`
 
 	// ParamLocations maps each argument name to its source location.
 	// Recognised values:
-	//   - "path"
-	//   - "query"
-	//   - "header"
-	//   - "body"          (the whole JSON body)
-	//   - "body.<field>"  (a single JSON body field)
+	//   - `path`
+	//   - `query`
+	//   - `header`
+	//   - `body`          (the whole JSON body)
+	//   - `body.<field>`  (a single JSON body field)
 	// Locations are used internally by the REST-as-MCP adapter.
 	ParamLocations map[string]string `json:"-"`
 
