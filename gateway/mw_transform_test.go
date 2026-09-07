@@ -391,3 +391,11 @@ func TestTransformRequestBody(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{Path: "/get", Data: body, BodyNotMatch: bodyMatch, Code: http.StatusOK})
 	})
 }
+
+func TestTransform(t *testing.T) {
+	t.Run("ProcessRequest", func(t *testing.T) {
+
+
+	})
+}
+

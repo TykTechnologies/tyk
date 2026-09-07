@@ -29,11 +29,18 @@ func Err[T any](err error) Result[T] {
 	}
 }
 
-func (r *Result[T]) Get() (T, error) {
+func (r Result[T]) Get() (T, error) {
 	return r.value, r.err
 }
 
-func (r *Result[T]) MustGet() T {
+func (r Result[T]) GetOr(defaultValue T) T {
+	if r.err == nil {
+		return r.value
+	}
+	return defaultValue
+}
+
+func (r Result[T]) MustGet() T {
 	if r.err != nil {
 		panic(r.err)
 	}
@@ -41,10 +48,14 @@ func (r *Result[T]) MustGet() T {
 	return r.value
 }
 
-func (r *Result[T]) IsError() bool {
+func (r Result[T]) IsError() bool {
 	return r.err != nil
 }
 
-func (r *Result[T]) IsOk() bool {
+func (r Result[T]) IsOk() bool {
 	return r.err == nil
+}
+
+func (r Result[T]) Err() (error, bool) {
+	return r.err, r.err != nil
 }
