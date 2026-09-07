@@ -1107,7 +1107,9 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 			newTransformSpec.Template = result.New(a.loadBlobTemplate(stringSpec.TemplateData.TemplateSource))
 		default:
 			log.Warning("[Transform Templates] No template mode defined! Found: ", stringSpec.TemplateData.Mode)
-			log.Error("Template load failure! Skipping transformation: No valid template mode defined, must be either 'file' or 'blob'")
+			newTransformSpec.Template = result.Err[*texttemplate.Template](
+				errors.New("Template load failure! Skipping transformation: No valid template mode defined, must be either 'file' or 'blob'"),
+			)
 			continue
 		}
 
