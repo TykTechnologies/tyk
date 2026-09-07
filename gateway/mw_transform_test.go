@@ -12,14 +12,14 @@ import (
 	"testing"
 	texttemplate "text/template"
 
-	"github.com/TykTechnologies/tyk/internal/result"
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/result"
 	"github.com/TykTechnologies/tyk/test"
 )
 
