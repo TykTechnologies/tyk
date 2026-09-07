@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
@@ -84,6 +85,29 @@ func hasMCPFields(ar user.AccessDefinition) bool {
 // validateMCPFieldsInAccessRights returns an error if any MCP-specific fields are set
 // on an access right whose API is loaded and is not an MCP Proxy.
 // Unknown APIs (not yet loaded) are skipped to avoid false negatives during bootstrap.
+// validateAccessConditions rejects access rights carrying a granular access
+// condition that the Gateway would not be able to evaluate. Conditions fail
+// closed, so an unreadable one denies every request the enclosing entry would
+// otherwise have granted; reporting it here turns a silent outage on live
+// traffic into an error at the point the key or policy is written.
+func validateAccessConditions(accessRights map[string]user.AccessDefinition) error {
+	// Sorted so that a payload with several bad entries always reports the
+	// same one, rather than whichever the map iteration reached first.
+	apiIDs := make([]string, 0, len(accessRights))
+	for apiID := range accessRights {
+		apiIDs = append(apiIDs, apiID)
+	}
+	sort.Strings(apiIDs)
+
+	for _, apiID := range apiIDs {
+		if err := user.ValidateAccessSpecs(accessRights[apiID].AllowedURLs); err != nil {
+			return fmt.Errorf("access_rights[%q]: %w", apiID, err)
+		}
+	}
+
+	return nil
+}
+
 func (gw *Gateway) validateMCPFieldsInAccessRights(accessRights map[string]user.AccessDefinition) error {
 	for apiID, ar := range accessRights {
 		if !hasMCPFields(ar) {
