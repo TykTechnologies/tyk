@@ -3,7 +3,7 @@ package result
 import "errors"
 
 var (
-	ErrNilError = errors.New("nil error porvided")
+	ErrNilError = errors.New("nil error provided")
 )
 
 type Result[T any] struct {
