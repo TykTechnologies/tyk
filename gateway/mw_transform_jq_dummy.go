@@ -26,6 +26,8 @@ func (t *TransformJQMiddleware) EnabledForSpec() bool {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
+//
+//nolint:staticcheck
 func (t *TransformJQMiddleware) ProcessRequest(_ http.ResponseWriter, _ *http.Request, _ any) (error, int) {
 	return nil, 200
 }

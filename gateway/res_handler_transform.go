@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -129,8 +130,7 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	body, err := r.GetResponseBody(respBody, logger)
 	if err != nil {
 		if errors.Is(err, ErrResponseSizeLimitExceeded) {
-			handler := ErrorHandler{&BaseMiddleware{Spec: r.Spec, Gw: r.Gw}}
-			handler.HandleError(rw, req, "Response body too large", http.StatusInternalServerError, true)
+			r.handleError(rw, req, http.StatusInternalServerError, "Response body too large")
 		}
 
 		return err
@@ -190,6 +190,11 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 
 	tpl, err := tmeta.Template.Get()
 	if err != nil {
+		r.handleError(
+			rw, req,
+			http.StatusInternalServerError,
+			fmt.Sprintf("invalid template provided: %s", err.Error()),
+		)
 		return err
 	}
 
@@ -237,4 +242,9 @@ func (r *ResponseTransformMiddleware) GetResponseBody(respBody io.Reader, logger
 	}
 
 	return body, nil
+}
+
+func (r *ResponseTransformMiddleware) handleError(rw http.ResponseWriter, req *http.Request, code int, message string) {
+	handler := ErrorHandler{&BaseMiddleware{Spec: r.Spec, Gw: r.Gw}}
+	handler.HandleError(rw, req, message, code, true)
 }
