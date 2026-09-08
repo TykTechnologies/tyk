@@ -59,7 +59,7 @@ func MyPluginAuthCheck(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx.SetSession(r, session, true, true)
-	rw.Header().Set(header.XAuthResult, "OK")
+	rw.Header().Add(header.XAuthResult, "OK")
 }
 
 // MyPluginPostKeyAuth checks if session is present, adds custom header with session-alias
