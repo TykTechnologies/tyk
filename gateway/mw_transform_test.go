@@ -473,6 +473,7 @@ func TestTransformMiddleware(t *testing.T) {
 			assert.NotNil(t, resp)
 
 			body, err := io.ReadAll(resp.Body)
+			assert.NoError(t, err)
 			assert.Equal(t, `{"greeting":"hello tyk"}`, string(body))
 		})
 
