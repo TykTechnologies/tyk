@@ -1,6 +1,3 @@
-//go:build !jq
-// +build !jq
-
 package gateway
 
 import (
