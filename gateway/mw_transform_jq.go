@@ -14,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type TransformJQMiddleware struct {
@@ -45,9 +46,10 @@ func (t *TransformJQMiddleware) EnabledForSpec() bool {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformJQMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	vInfo, _ := t.Spec.Version(r)
-	versionPaths := t.Spec.RxPaths[vInfo.Name]
-	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, TransformedJQ)
 
+	versionPaths, _ := a.RxPaths[vInfo.Name]
+
+	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, TransformedJQ)
 	if !found {
 		return nil, http.StatusOK
 	}
@@ -91,11 +93,11 @@ func (t *TransformJQMiddleware) transformJQBody(r *http.Request, ts *TransformJQ
 	bodyBuffer := bytes.NewBuffer(transformed)
 	r.Body = ioutil.NopCloser(bodyBuffer)
 	r.ContentLength = int64(bodyBuffer.Len())
-	cfg := t.Gw.GetConfig()
-
+	t
 	// Replace header in the request
+	ignoreCanonical := t.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	for hName, hValue := range jqResult.RewriteHeaders {
-		setCustomHeader(r.Header, hName, hValue, cfg.IgnoreCanonicalMIMEHeaderKey)
+		setCustomHeader(r.Header, hName, hValue, ignoreCanonical)
 	}
 
 	if t.Spec.EnableContextVars {
@@ -157,14 +159,13 @@ type TransformJQSpec struct {
 	JQFilter *JQ
 }
 
-func (a *APIDefinitionLoader) compileTransformJQPathSpec(paths []apidef.TransformJQMeta, stat URLStatus) []URLSpec {
-	cfg := a.Gw.GetConfig()
+func (a *APIDefinitionLoader) compileTransformJQPathSpec(paths []apidef.TransformJQMeta, stat URLStatus, conf config.Config) []URLSpec {
 	urlSpec := []URLSpec{}
 
 	log.Debug("Checking for JQ tranform paths ...")
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat, cfg)
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		newTransformSpec := TransformJQSpec{TransformJQMeta: stringSpec}
 
 		var err error
