@@ -38,7 +38,9 @@ func (t *TransformMiddleware) EnabledForSpec() bool {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+//
+//nolint:staticcheck
+func (t *TransformMiddleware) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ any) (error, int) {
 	vInfo, _ := t.Spec.Version(r)
 	versionPaths := t.Spec.RxPaths[vInfo.Name]
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, Transformed)
