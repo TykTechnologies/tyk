@@ -102,7 +102,7 @@
     },
     "proxy": {
         "listen_path": "/versioned-not-detailed/",
-        "target_url": "http://httpbin:80/",
+        "target_url": "http://httpbin.org/",
         "strip_listen_path": true
     },
     "do_not_track": true

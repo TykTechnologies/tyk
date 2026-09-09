@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/time"
@@ -112,6 +113,137 @@ func TestUpstream(t *testing.T) {
 		resultUpstream.Fill(convertedAPI)
 
 		assert.Equal(t, emptyUpstream, resultUpstream)
+	})
+
+	t.Run("enforce timeout", func(t *testing.T) {
+		newAPI := func() apidef.APIDefinition {
+			var api apidef.APIDefinition
+			api.VersionData.Versions = map[string]apidef.VersionInfo{Main: {}}
+			api.SetDisabledFlags()
+			return api
+		}
+		mainVersion := func(api apidef.APIDefinition) apidef.VersionInfo {
+			return api.VersionData.Versions[Main]
+		}
+
+		t.Run("enabled with duration round-trips correctly", func(t *testing.T) {
+			upstream := Upstream{
+				EnforceTimeout: &GlobalEnforceTimeout{
+					Enabled:  true,
+					Duration: ReadableDuration(5 * time.Second),
+				},
+			}
+
+			api := newAPI()
+			upstream.ExtractTo(&api)
+
+			require.Equal(t, time.ReadableDuration(5*time.Second), mainVersion(api).GlobalEnforceTimeout)
+			assert.False(t, mainVersion(api).GlobalEnforceTimeoutDisabled)
+
+			var result Upstream
+			result.Fill(api)
+
+			assert.Equal(t, upstream, result)
+		})
+
+		t.Run("disabled with duration round-trips correctly", func(t *testing.T) {
+			upstream := Upstream{
+				EnforceTimeout: &GlobalEnforceTimeout{
+					Enabled:  false,
+					Duration: ReadableDuration(10 * time.Second),
+				},
+			}
+
+			api := newAPI()
+			upstream.ExtractTo(&api)
+
+			assert.Equal(t, time.ReadableDuration(10*time.Second), mainVersion(api).GlobalEnforceTimeout)
+			assert.True(t, mainVersion(api).GlobalEnforceTimeoutDisabled)
+
+			var result Upstream
+			result.Fill(api)
+
+			assert.Equal(t, upstream, result)
+		})
+
+		t.Run("nil enforceTimeout produces zero apidef values", func(t *testing.T) {
+			upstream := Upstream{EnforceTimeout: nil}
+
+			api := newAPI()
+			upstream.ExtractTo(&api)
+
+			assert.Equal(t, time.ReadableDuration(0), mainVersion(api).GlobalEnforceTimeout)
+			assert.True(t, mainVersion(api).GlobalEnforceTimeoutDisabled)
+		})
+
+		t.Run("zero apidef values produce nil enforceTimeout", func(t *testing.T) {
+			api := newAPI()
+
+			var result Upstream
+			result.Fill(api)
+
+			assert.Nil(t, result.EnforceTimeout)
+		})
+
+		t.Run("sub-second duration round-trips correctly", func(t *testing.T) {
+			upstream := Upstream{
+				EnforceTimeout: &GlobalEnforceTimeout{
+					Enabled:  true,
+					Duration: ReadableDuration(500 * time.Millisecond),
+				},
+			}
+
+			api := newAPI()
+			upstream.ExtractTo(&api)
+
+			assert.Equal(t, time.ReadableDuration(500*time.Millisecond), mainVersion(api).GlobalEnforceTimeout)
+
+			var result Upstream
+			result.Fill(api)
+
+			assert.Equal(t, upstream, result)
+		})
+	})
+
+	t.Run("upstream oauth client auth method", func(t *testing.T) {
+		upstream := Upstream{
+			Authentication: &UpstreamAuth{
+				Enabled: true,
+				OAuth: &UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{apidef.OAuthAuthorizationTypeClientCredentials},
+					ClientCredentials: &ClientCredentials{
+						ClientAuthData: ClientAuthData{
+							ClientID:     "client-id",
+							ClientSecret: "client-secret",
+							Method:       apidef.OAuth2ClientAuthPost,
+						},
+						TokenURL: "https://idp.example.com/token",
+					},
+					PasswordAuthentication: &PasswordAuthentication{
+						ClientAuthData: ClientAuthData{
+							ClientID: "client-id",
+							Method:   apidef.OAuth2ClientAuthBasic,
+						},
+						Username: "user",
+						Password: "pass",
+						TokenURL: "https://idp.example.com/token",
+					},
+				},
+			},
+		}
+
+		var api apidef.APIDefinition
+		api.SetDisabledFlags()
+		upstream.ExtractTo(&api)
+
+		assert.Equal(t, apidef.OAuth2ClientAuthPost, api.UpstreamAuth.OAuth.ClientCredentials.Method)
+		assert.Equal(t, apidef.OAuth2ClientAuthBasic, api.UpstreamAuth.OAuth.PasswordAuthentication.Method)
+
+		var result Upstream
+		result.Fill(api)
+
+		assert.Equal(t, upstream, result)
 	})
 
 	t.Run("rate limit", func(t *testing.T) {
@@ -380,6 +512,58 @@ func TestPinnedPublicKeys(t *testing.T) {
 	resultPinnedPublicKeys.Fill(convertedPinnedPublicKeys)
 
 	assert.Equal(t, pinnedPublicKeys, resultPinnedPublicKeys)
+}
+
+func TestSplitPublicKeys(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		title    string
+		input    string
+		expected []string
+	}{
+		{
+			"single fingerprint",
+			"abc123",
+			[]string{"abc123"},
+		},
+		{
+			"comma-separated fingerprints",
+			"abc123,def456",
+			[]string{"abc123", "def456"},
+		},
+		{
+			"fingerprints with spaces around separator",
+			"abc123, def456",
+			[]string{"abc123", "def456"},
+		},
+		{
+			"fingerprint with leading and trailing spaces",
+			"  abc123  ",
+			[]string{"abc123"},
+		},
+		{
+			"raw PEM block preserved as single entry",
+			"-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----",
+			[]string{"-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"},
+		},
+		{
+			"raw PEM block with surrounding whitespace trimmed",
+			"  -----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----  ",
+			[]string{"-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"},
+		},
+		{
+			"empty string produces no keys",
+			"",
+			[]string{},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.title, func(t *testing.T) {
+			assert.Equal(t, tc.expected, splitPublicKeys(tc.input))
+		})
+	}
 }
 
 func TestCertificatePinning(t *testing.T) {

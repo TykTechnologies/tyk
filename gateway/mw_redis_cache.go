@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
-
 	"github.com/TykTechnologies/murmur3"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
@@ -246,8 +246,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		newRes.Header.Del(h)
 	}
 
-	m.Spec.sendRateLimitHeaders(ctxGetSession(r), newRes)
-
+	m.Gw.limitHeaderFactory(newRes.Header).SendQuotas(ctxGetSession(r), m.Spec.APIID)
 	newRes.Header.Set(cachedResponseHeader, "1")
 
 	copyHeader(w.Header(), newRes.Header, m.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
@@ -269,6 +268,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if !m.Spec.DoNotTrack {
 		ms := DurationToMillisecond(time.Since(t1))
 		latency := analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}
+		r = m.Spec.PrepareRequestToLogShallowClone(r)
 		m.sh.RecordHit(r, latency, newRes.StatusCode, newRes, true)
 		m.sh.RecordAccessLog(r, newRes, latency)
 		m.sh.Base().RecordMetrics(w, r, newRes.StatusCode, latency, newRes)

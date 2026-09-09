@@ -12,17 +12,11 @@ var (
 
 // Bucket interface for interacting with leaky buckets: https://en.wikipedia.org/wiki/Leaky_bucket
 type Bucket interface {
-	// Capacity of the bucket.
-	Capacity() uint
-
-	// Remaining space in the bucket.
-	Remaining() uint
-
-	// Reset returns when the bucket will be drained.
-	Reset() time.Time
-
 	// Add to the bucket. Returns bucket state after adding.
 	Add(uint) (BucketState, error)
+
+	// State returns bucket state.
+	State() BucketState
 }
 
 // BucketState is a snapshot of a bucket's properties.

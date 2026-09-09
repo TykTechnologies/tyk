@@ -7,7 +7,7 @@ import (
 )
 
 func TestCompile(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 	// 1st miss
 	rx, err := Compile("^abc.*$")
 	if err != nil {
@@ -33,7 +33,7 @@ func TestCompile(t *testing.T) {
 }
 
 func BenchmarkRegExpCompile(b *testing.B) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	b.ReportAllocs()
 
@@ -51,7 +51,7 @@ func BenchmarkRegExpCompile(b *testing.B) {
 }
 
 func TestCompilePOSIX(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 	// 1st miss
 	rx, err := CompilePOSIX("^abc.*$")
 	if err != nil {
@@ -77,7 +77,7 @@ func TestCompilePOSIX(t *testing.T) {
 }
 
 func BenchmarkRegExpCompilePOSIX(b *testing.B) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	b.ReportAllocs()
 
@@ -95,7 +95,7 @@ func BenchmarkRegExpCompilePOSIX(b *testing.B) {
 }
 
 func TestMustCompile(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 	// 1st miss
 	rx := MustCompile("^abc.*$")
 	if rx.FromCache {
@@ -126,7 +126,7 @@ func TestMustCompile(t *testing.T) {
 }
 
 func BenchmarkRegExpMustCompile(b *testing.B) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	b.ReportAllocs()
 
@@ -140,7 +140,7 @@ func BenchmarkRegExpMustCompile(b *testing.B) {
 }
 
 func TestMustCompilePOSIX(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 	// 1st miss
 	rx := MustCompilePOSIX("^abc.*$")
 	if rx.FromCache {
@@ -171,7 +171,7 @@ func TestMustCompilePOSIX(t *testing.T) {
 }
 
 func BenchmarkRegExpMustCompilePOSIX(b *testing.B) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 	b.ReportAllocs()
 
 	var rx *Regexp
@@ -184,7 +184,7 @@ func BenchmarkRegExpMustCompilePOSIX(b *testing.B) {
 }
 
 func TestMatchString(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 	// 1st miss
 	matched, err := MatchString("^abc.*$", "abcedfxyz")
 	if err != nil {
@@ -204,7 +204,7 @@ func TestMatchString(t *testing.T) {
 }
 
 func TestMatchStringFailed(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 	_, err := MatchString("*", "abcedfxyz")
 	if err == nil {
 		t.Error("Expected error")
@@ -212,7 +212,7 @@ func TestMatchStringFailed(t *testing.T) {
 }
 
 func TestMatchStringRegexpNotSet(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 	rx := Regexp{}
 	matched := rx.MatchString("abcdefxyz")
 	if matched {
@@ -221,7 +221,7 @@ func TestMatchStringRegexpNotSet(t *testing.T) {
 }
 
 func BenchmarkRegExpMatchString(b *testing.B) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 	b.ReportAllocs()
 
 	matched := false
@@ -239,7 +239,7 @@ func BenchmarkRegExpMatchString(b *testing.B) {
 }
 
 func TestMatch(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 	data := []byte("abcdefxyz")
 	// 1st miss
 	matched, err := Match("^abc.*$", data)
@@ -260,7 +260,7 @@ func TestMatch(t *testing.T) {
 }
 
 func TestMatchFailed(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 	_, err := Match("*", []byte("abcdefxyz"))
 	if err == nil {
 		t.Error("Expected error")
@@ -268,7 +268,7 @@ func TestMatchFailed(t *testing.T) {
 }
 
 func TestMatchRegexpNotSet(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 	rx := Regexp{}
 	matched := rx.Match([]byte("abcdefxyz"))
 	if matched {
@@ -277,7 +277,7 @@ func TestMatchRegexpNotSet(t *testing.T) {
 }
 
 func BenchmarkRegExpMatch(b *testing.B) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	b.ReportAllocs()
 
@@ -345,7 +345,7 @@ func TestCopy(t *testing.T) {
 }
 
 func TestReplaceAllString(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 	// 1st miss
 	rx := MustCompile("abc")
 	newStr := rx.ReplaceAllString("qweabcxyz", "123")
@@ -360,7 +360,7 @@ func TestReplaceAllString(t *testing.T) {
 }
 
 func TestReplaceAllStringRegexpNotSet(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 	rx := &Regexp{}
 	newStr := rx.ReplaceAllString("qweabcxyz", "123")
 	if newStr != "" {
@@ -371,7 +371,7 @@ func TestReplaceAllStringRegexpNotSet(t *testing.T) {
 func BenchmarkRegexpReplaceAllString(b *testing.B) {
 	b.ReportAllocs()
 
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	rx := MustCompile("abc")
 	str := ""
@@ -385,7 +385,7 @@ func BenchmarkRegexpReplaceAllString(b *testing.B) {
 }
 
 func TestReplaceAllLiteralString(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 	// 1st miss
 	rx := MustCompile("abc")
 	newStr := rx.ReplaceAllLiteralString("qweabcxyz", "123")
@@ -400,7 +400,7 @@ func TestReplaceAllLiteralString(t *testing.T) {
 }
 
 func TestReplaceAllLiteralStringRegexpNotSet(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 	rx := &Regexp{}
 	newStr := rx.ReplaceAllLiteralString("qweabcxyz", "123")
 	if newStr != "" {
@@ -411,7 +411,7 @@ func TestReplaceAllLiteralStringRegexpNotSet(t *testing.T) {
 func BenchmarkRegexpReplaceAllLiteralString(b *testing.B) {
 	b.ReportAllocs()
 
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	rx := MustCompile("abc")
 	str := ""
@@ -425,7 +425,7 @@ func BenchmarkRegexpReplaceAllLiteralString(b *testing.B) {
 }
 
 func TestReplaceAllStringFunc(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	f := func(s string) string {
 		return strings.ToUpper(s)
@@ -445,7 +445,7 @@ func TestReplaceAllStringFunc(t *testing.T) {
 }
 
 func TestReplaceAllStringFuncRegexpNotSet(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	f := func(s string) string {
 		return strings.ToUpper(s)
@@ -461,7 +461,7 @@ func TestReplaceAllStringFuncRegexpNotSet(t *testing.T) {
 func BenchmarkRegexpReplaceAllStringFunc(b *testing.B) {
 	b.ReportAllocs()
 
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	f := func(s string) string {
 		return strings.ToUpper(s)
@@ -479,7 +479,7 @@ func BenchmarkRegexpReplaceAllStringFunc(b *testing.B) {
 }
 
 func TestFindAllString(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	// 1st miss
 	rx := MustCompile("abc")
@@ -496,7 +496,7 @@ func TestFindAllString(t *testing.T) {
 }
 
 func TestFindAllStringRegexpNotSet(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	rx := &Regexp{}
 
@@ -509,7 +509,7 @@ func TestFindAllStringRegexpNotSet(t *testing.T) {
 func BenchmarkRegexpFindAllString(b *testing.B) {
 	b.ReportAllocs()
 
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	rx := MustCompile("abc")
 	var res []string
@@ -522,7 +522,7 @@ func BenchmarkRegexpFindAllString(b *testing.B) {
 }
 
 func TestFindAllStringSubmatch(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	// 1st miss
 	rx := MustCompile("abc")
@@ -543,7 +543,7 @@ func TestFindAllStringSubmatch(t *testing.T) {
 }
 
 func TestTestFindAllStringSubmatchRegexpNotSet(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	rx := &Regexp{}
 
@@ -556,7 +556,7 @@ func TestTestFindAllStringSubmatchRegexpNotSet(t *testing.T) {
 func BenchmarkRegexpFindAllStringSubmatch(b *testing.B) {
 	b.ReportAllocs()
 
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	rx := MustCompile("abc")
 	var res [][]string
@@ -569,7 +569,7 @@ func BenchmarkRegexpFindAllStringSubmatch(b *testing.B) {
 }
 
 func TestFindStringSubmatch(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	// 1st miss
 	rx := MustCompile("abc(\\w)")
@@ -587,7 +587,7 @@ func TestFindStringSubmatch(t *testing.T) {
 }
 
 func TestTestFindStringSubmatchRegexpNotSet(t *testing.T) {
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	rx := &Regexp{}
 
@@ -600,7 +600,7 @@ func TestTestFindStringSubmatchRegexpNotSet(t *testing.T) {
 func BenchmarkRegexpFindStringSubmatch(b *testing.B) {
 	b.ReportAllocs()
 
-	ResetCache(defaultCacheItemTTL, true)
+	Reset(true)
 
 	rx := MustCompile("abc(\\w)")
 	var res []string

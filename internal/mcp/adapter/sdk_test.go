@@ -1,0 +1,637 @@
+package adapter
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	sdkjsonrpc "github.com/modelcontextprotocol/go-sdk/jsonrpc"
+	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
+)
+
+func connectSDKServer(t *testing.T, server *mcpsdk.Server, options ...*mcpsdk.ClientOptions) *mcpsdk.ClientSession {
+	t.Helper()
+
+	ctx := context.Background()
+	serverTransport, clientTransport := mcpsdk.NewInMemoryTransports()
+	serverSession, err := server.Connect(ctx, serverTransport, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, serverSession.Close()) })
+
+	var opts *mcpsdk.ClientOptions
+	if len(options) > 0 {
+		opts = options[0]
+	}
+	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "adapter-test-client", Version: "v0.0.1"}, opts)
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, clientSession.Close()) })
+
+	return clientSession
+}
+
+func assertNoToolListChanged(t *testing.T, changed <-chan struct{}) {
+	t.Helper()
+
+	select {
+	case <-changed:
+		t.Fatal("unexpected tools/list_changed notification")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestNewSDKServer_AdvertisesDerivedToolsWithoutListChangedNotifications(t *testing.T) {
+	t.Parallel()
+
+	server, err := NewSDKServer(SDKServerConfig{
+		Name:  "Orders [MCP adapter]",
+		Tools: sampleTools(),
+		CallTool: func(context.Context, *oas.DerivedTool, map[string]any) (*Recorder, error) {
+			return NewRecorder(), nil
+		},
+	})
+	require.NoError(t, err)
+
+	session := connectSDKServer(t, server)
+	init := session.InitializeResult()
+	require.NotNil(t, init.Capabilities.Tools)
+	assert.False(t, init.Capabilities.Tools.ListChanged)
+
+	list, err := session.ListTools(context.Background(), &mcpsdk.ListToolsParams{})
+	require.NoError(t, err)
+	require.Len(t, list.Tools, 2)
+	assert.Equal(t, "createOrder", list.Tools[0].Name)
+	assert.Equal(t, "getOrder", list.Tools[1].Name)
+	assert.Equal(t, "fetch an order", list.Tools[1].Description)
+	schema := list.Tools[1].InputSchema.(map[string]any)
+	assert.Equal(t, "object", schema["type"])
+	assert.Equal(t, map[string]any{"id": map[string]any{"type": "string"}}, schema["properties"])
+	assert.Equal(t, []any{"id"}, schema["required"])
+	annotations := list.Tools[1].Annotations
+	require.NotNil(t, annotations)
+	assert.Equal(t, "Get order", annotations.Title)
+	assert.True(t, annotations.ReadOnlyHint)
+	require.NotNil(t, annotations.DestructiveHint)
+	assert.False(t, *annotations.DestructiveHint)
+	assert.True(t, annotations.IdempotentHint)
+	require.NotNil(t, annotations.OpenWorldHint)
+	assert.False(t, *annotations.OpenWorldHint)
+	assert.Equal(t, map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"id": map[string]any{"type": "string"},
+		},
+	}, list.Tools[1].OutputSchema)
+}
+
+func TestNewSDKServer_CallToolDispatchesDerivedTool(t *testing.T) {
+	t.Parallel()
+
+	var (
+		calledTool *oas.DerivedTool
+		calledArgs map[string]any
+	)
+
+	server, err := NewSDKServer(SDKServerConfig{
+		Name:  "Orders [MCP adapter]",
+		Tools: sampleTools(),
+		CallTool: func(_ context.Context, tool *oas.DerivedTool, args map[string]any) (*Recorder, error) {
+			calledTool = tool
+			calledArgs = args
+
+			rec := NewRecorder()
+			rec.Header().Set("Content-Type", "application/json")
+			rec.WriteHeader(http.StatusAccepted)
+			_, err := rec.Write([]byte(`{"ok":true}`))
+			require.NoError(t, err)
+			return rec, nil
+		},
+	})
+	require.NoError(t, err)
+
+	session := connectSDKServer(t, server)
+	result, err := session.CallTool(context.Background(), &mcpsdk.CallToolParams{
+		Name:      "getOrder",
+		Arguments: map[string]any{"id": "42", "verbose": true},
+	})
+	require.NoError(t, err)
+
+	require.NotNil(t, calledTool)
+	assert.Equal(t, "getOrder", calledTool.Name)
+	assert.Equal(t, map[string]any{"id": "42", "verbose": true}, calledArgs)
+	assert.False(t, result.IsError)
+	assert.EqualValues(t, http.StatusAccepted, result.Meta["upstreamHttpStatus"])
+	assert.Equal(t, "application/json", result.Meta["upstreamContentType"])
+	require.Len(t, result.Content, 1)
+	assert.Equal(t, `{"ok":true}`, result.Content[0].(*mcpsdk.TextContent).Text)
+	assert.Equal(t, map[string]any{"ok": true}, result.StructuredContent)
+}
+
+func TestNewSDKServer_CallToolSanitizesInternalErrors(t *testing.T) {
+	t.Parallel()
+
+	server, err := NewSDKServer(SDKServerConfig{
+		Name:  "Orders [MCP adapter]",
+		Tools: sampleTools(),
+		CallTool: func(context.Context, *oas.DerivedTool, map[string]any) (*Recorder, error) {
+			return nil, errors.New("dial tcp internal.orders.service.local/10.0.0.7:443: connect: connection refused")
+		},
+	})
+	require.NoError(t, err)
+
+	session := connectSDKServer(t, server)
+	result, err := session.CallTool(context.Background(), &mcpsdk.CallToolParams{
+		Name:      "getOrder",
+		Arguments: map[string]any{"id": "42"},
+	})
+
+	require.Nil(t, result)
+	require.Error(t, err)
+	var rpcErr *sdkjsonrpc.Error
+	require.ErrorAs(t, err, &rpcErr)
+	assert.EqualValues(t, sdkjsonrpc.CodeInternalError, rpcErr.Code)
+	assert.Equal(t, "internal tool error", rpcErr.Message)
+	assert.NotContains(t, err.Error(), "internal.orders.service.local")
+	assert.NotContains(t, err.Error(), "10.0.0.7")
+}
+
+func TestNewSDKServer_CallToolWrapsNonObjectStructuredContent(t *testing.T) {
+	t.Parallel()
+
+	tool := oas.DerivedTool{
+		Name:           "list_ids",
+		Method:         http.MethodGet,
+		PathTemplate:   "/ids",
+		ParamLocations: map[string]string{},
+		InputSchema:    map[string]any{"type": "object"},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"result": map[string]any{
+					"type":  "array",
+					"items": map[string]any{"type": "string"},
+				},
+			},
+			"required": []string{"result"},
+		},
+	}
+
+	server, err := NewSDKServer(SDKServerConfig{
+		Name:  "Orders [MCP adapter]",
+		Tools: []oas.DerivedTool{tool},
+		CallTool: func(context.Context, *oas.DerivedTool, map[string]any) (*Recorder, error) {
+			rec := NewRecorder()
+			rec.Header().Set("Content-Type", "application/json")
+			_, err := rec.Write([]byte(`["abc-123"]`))
+			require.NoError(t, err)
+			return rec, nil
+		},
+	})
+	require.NoError(t, err)
+
+	session := connectSDKServer(t, server)
+	result, err := session.CallTool(context.Background(), &mcpsdk.CallToolParams{Name: "list_ids"})
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]any{"result": []any{"abc-123"}}, result.StructuredContent)
+}
+
+func TestIsJSONContentType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		contentType string
+		want        bool
+	}{
+		{name: "application json", contentType: "application/json", want: true},
+		{name: "application json with charset", contentType: "application/json; charset=utf-8", want: true},
+		{name: "problem json suffix", contentType: "application/problem+json", want: true},
+		{name: "vendor json suffix", contentType: "application/vnd.company.resource+json", want: true},
+		{name: "not json subtype", contentType: "application/not-json", want: false},
+		{name: "text json", contentType: "text/json", want: false},
+		{name: "json word without suffix", contentType: "application/vnd.company.json-problem", want: false},
+		{name: "empty", contentType: "", want: false},
+		{name: "invalid", contentType: "application/json; charset", want: false},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, isJSONContentType(tt.contentType))
+		})
+	}
+}
+
+func TestSDKToolResult_TruncationNoticeIsVisible(t *testing.T) {
+	t.Parallel()
+
+	rec := NewRecorder()
+	rec.Header().Set("Content-Type", "application/json")
+	_, err := rec.Write(bytes.Repeat([]byte("{"), BodyTruncationBytes+1))
+	require.NoError(t, err)
+
+	result := SDKToolResult(rec)
+	assert.Equal(t, true, result.Meta["truncated"])
+	require.Len(t, result.Content, 1)
+	text := result.Content[0].(*mcpsdk.TextContent).Text
+	assert.Contains(t, text, "The upstream response was truncated")
+	assert.Contains(t, text, "The content above is incomplete.")
+	assert.NotContains(t, strings.ToLower(text), "tyk")
+}
+
+func TestSDKAdapter_UpdateToolsDoesNotAdvertiseOrEmitListChanged(t *testing.T) {
+	t.Parallel()
+
+	adapter, err := NewSDKAdapter(SDKServerConfig{
+		Name:  "Orders [MCP adapter]",
+		Tools: sampleTools(),
+		CallTool: func(context.Context, *oas.DerivedTool, map[string]any) (*Recorder, error) {
+			return NewRecorder(), nil
+		},
+	})
+	require.NoError(t, err)
+
+	changed := make(chan struct{}, 1)
+	session := connectSDKServer(t, adapter.Server(), &mcpsdk.ClientOptions{
+		ToolListChangedHandler: func(context.Context, *mcpsdk.ToolListChangedRequest) {
+			changed <- struct{}{}
+		},
+	})
+	init := session.InitializeResult()
+	require.NotNil(t, init.Capabilities.Tools)
+	assert.False(t, init.Capabilities.Tools.ListChanged)
+
+	updated := []oas.DerivedTool{
+		{
+			Name:           "getOrder",
+			Description:    "fetch an order by id",
+			Method:         http.MethodGet,
+			PathTemplate:   "/orders/{id}",
+			ParamLocations: map[string]string{"id": "path"},
+			InputSchema:    map[string]any{"type": "object", "properties": map[string]any{"id": map[string]any{"type": "string"}}},
+		},
+		{
+			Name:           "listOrders",
+			Description:    "list orders",
+			Method:         http.MethodGet,
+			PathTemplate:   "/orders",
+			ParamLocations: map[string]string{"limit": "query"},
+			InputSchema:    map[string]any{"type": "object", "properties": map[string]any{"limit": map[string]any{"type": "integer"}}},
+		},
+	}
+
+	require.NoError(t, adapter.UpdateTools(updated))
+	assertNoToolListChanged(t, changed)
+
+	list, err := session.ListTools(context.Background(), &mcpsdk.ListToolsParams{})
+	require.NoError(t, err)
+	require.Len(t, list.Tools, 2)
+	assert.Equal(t, "getOrder", list.Tools[0].Name)
+	assert.Equal(t, "fetch an order by id", list.Tools[0].Description)
+	assert.Equal(t, "listOrders", list.Tools[1].Name)
+}
+
+func TestSDKAdapter_StreamableHTTPHandlerNilOptionsReusesStatefulHandlerWithoutListChanged(t *testing.T) {
+	t.Parallel()
+
+	adapter, err := NewSDKAdapter(SDKServerConfig{
+		Name:  "Orders [MCP adapter]",
+		Tools: sampleTools(),
+		CallTool: func(context.Context, *oas.DerivedTool, map[string]any) (*Recorder, error) {
+			return NewRecorder(), nil
+		},
+	})
+	require.NoError(t, err)
+
+	loopbackHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		adapter.StreamableHTTPHandler(nil).ServeHTTP(w, r)
+	})
+
+	changed := make(chan struct{}, 1)
+	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "adapter-streamable-test-client", Version: "v0.0.1"}, &mcpsdk.ClientOptions{
+		ToolListChangedHandler: func(context.Context, *mcpsdk.ToolListChangedRequest) {
+			changed <- struct{}{}
+		},
+	})
+	session, err := client.Connect(context.Background(), &mcpsdk.StreamableClientTransport{
+		Endpoint:   "http://mcp.test/mcp",
+		HTTPClient: &http.Client{Transport: loopbackRoundTripper{handler: loopbackHandler}},
+	}, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, session.Close()) })
+
+	init := session.InitializeResult()
+	require.NotNil(t, init.Capabilities.Tools)
+	assert.False(t, init.Capabilities.Tools.ListChanged)
+
+	require.NoError(t, adapter.UpdateTools([]oas.DerivedTool{
+		{
+			Name:           "getOrder",
+			Description:    "fetch an order by id",
+			Method:         http.MethodGet,
+			PathTemplate:   "/orders/{id}",
+			ParamLocations: map[string]string{"id": "path"},
+			InputSchema:    map[string]any{"type": "object", "properties": map[string]any{"id": map[string]any{"type": "string"}}},
+		},
+		{
+			Name:           "listOrders",
+			Description:    "list orders",
+			Method:         http.MethodGet,
+			PathTemplate:   "/orders",
+			ParamLocations: map[string]string{"limit": "query"},
+			InputSchema:    map[string]any{"type": "object", "properties": map[string]any{"limit": map[string]any{"type": "integer"}}},
+		},
+	}))
+	assertNoToolListChanged(t, changed)
+}
+
+type loopbackRoundTripper struct {
+	handler http.Handler
+}
+
+func (rt loopbackRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	pr, pw := io.Pipe()
+	rw := &loopbackResponseWriter{
+		header:        http.Header{},
+		body:          pw,
+		status:        http.StatusOK,
+		headerWritten: make(chan struct{}),
+	}
+
+	go func() {
+		defer rw.finish()
+		rt.handler.ServeHTTP(rw, req)
+	}()
+
+	select {
+	case <-rw.headerWritten:
+		return &http.Response{
+			StatusCode: rw.status,
+			Status:     http.StatusText(rw.status),
+			Header:     rw.header.Clone(),
+			Body:       pr,
+			Request:    req,
+		}, nil
+	case <-req.Context().Done():
+		_ = pr.CloseWithError(req.Context().Err())
+		_ = pw.CloseWithError(req.Context().Err())
+		return nil, req.Context().Err()
+	}
+}
+
+type loopbackResponseWriter struct {
+	header http.Header
+	body   *io.PipeWriter
+
+	status        int
+	headerOnce    sync.Once
+	headerWritten chan struct{}
+}
+
+func (w *loopbackResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *loopbackResponseWriter) WriteHeader(status int) {
+	w.headerOnce.Do(func() {
+		w.status = status
+		close(w.headerWritten)
+	})
+}
+
+func (w *loopbackResponseWriter) Write(p []byte) (int, error) {
+	w.WriteHeader(http.StatusOK)
+	return w.body.Write(p)
+}
+
+func (w *loopbackResponseWriter) Flush() {
+	w.WriteHeader(http.StatusOK)
+}
+
+func (w *loopbackResponseWriter) finish() {
+	w.WriteHeader(w.status)
+	_ = w.body.Close()
+}
+
+func TestNewSDKStreamableHTTPHandler_HandlesInitializeAsJSON(t *testing.T) {
+	t.Parallel()
+
+	handler, err := NewSDKStreamableHTTPHandler(SDKServerConfig{
+		Name:  "Orders [MCP adapter]",
+		Tools: sampleTools(),
+		CallTool: func(context.Context, *oas.DerivedTool, map[string]any) (*Recorder, error) {
+			return NewRecorder(), nil
+		},
+	}, nil)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{
+		"jsonrpc":"2.0",
+		"id":1,
+		"method":"initialize",
+		"params":{
+			"protocolVersion":"2025-06-18",
+			"clientInfo":{"name":"test","version":"v0.0.1"},
+			"capabilities":{}
+		}
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	result := body["result"].(map[string]any)
+	assert.Equal(t, "Orders [MCP adapter]", result["serverInfo"].(map[string]any)["name"])
+	capabilities := result["capabilities"].(map[string]any)
+	tools := capabilities["tools"].(map[string]any)
+	assert.NotContains(t, tools, "listChanged")
+}
+
+func TestNewSDKStreamableHTTPHandler_UnknownToolArgumentsReturnInvalidParams(t *testing.T) {
+	t.Parallel()
+
+	result := exerciseUnknownToolArgumentCall(t)
+	require.True(t, result.callToolCalled)
+	assertUnknownToolArgumentInvalidParams(t, result.response)
+}
+
+func TestRESTAsMCPToolCall_RejectsUnknownArgumentsBeforeSourceChain(t *testing.T) {
+	t.Parallel()
+
+	result := exerciseUnknownToolArgumentCall(t)
+	require.True(t, result.callToolCalled)
+	assert.False(t, result.sourceChainCalled)
+	assertUnknownToolArgumentInvalidParams(t, result.response)
+}
+
+func TestNewSDKStreamableHTTPHandler_InvalidToolArgumentsReturnInvalidParams(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		arguments   string
+		wantMessage string
+	}{
+		{
+			name:        "non object",
+			arguments:   `[]`,
+			wantMessage: "invalid tools/call arguments",
+		},
+		{
+			name:        "oversized",
+			arguments:   `{"body":"` + strings.Repeat("x", MaxToolArgumentsBytes) + `"}`,
+			wantMessage: "tools/call arguments exceed",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			called := false
+			body := exerciseToolCallWithArguments(t, tt.arguments, func(context.Context, *oas.DerivedTool, map[string]any) (*Recorder, error) {
+				called = true
+				return NewRecorder(), nil
+			})
+
+			assert.False(t, called)
+			errObj := body["error"].(map[string]any)
+			assert.EqualValues(t, sdkjsonrpc.CodeInvalidParams, errObj["code"])
+			assert.Contains(t, errObj["message"], tt.wantMessage)
+		})
+	}
+}
+
+func TestUnmarshalToolArgs_RejectsOversizedRawArgumentsBeforeTrimming(t *testing.T) {
+	t.Parallel()
+
+	raw := append(bytes.Repeat([]byte(" "), MaxToolArgumentsBytes+1), []byte("{}")...)
+	_, err := unmarshalToolArgs(&mcpsdk.CallToolRequest{
+		Params: &mcpsdk.CallToolParamsRaw{Arguments: json.RawMessage(raw)},
+	})
+
+	require.Error(t, err)
+	assert.True(t, IsInvalidParams(err))
+	assert.Contains(t, err.Error(), "tools/call arguments exceed")
+}
+
+type unknownToolArgumentCallResult struct {
+	callToolCalled    bool
+	sourceChainCalled bool
+	response          map[string]any
+}
+
+func exerciseUnknownToolArgumentCall(t *testing.T) unknownToolArgumentCallResult {
+	t.Helper()
+
+	called := false
+	sourceCalled := false
+	tool := oas.DerivedTool{
+		Name:           "get_order",
+		Method:         http.MethodGet,
+		PathTemplate:   "/orders/{id}",
+		ParamLocations: map[string]string{"id": oas.DerivedParamLocationPath},
+		InputSchema:    map[string]any{"type": "object"},
+	}
+	parent := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	handler, err := NewSDKStreamableHTTPHandler(SDKServerConfig{
+		Name:  "Orders [MCP adapter]",
+		Tools: []oas.DerivedTool{tool},
+		CallTool: func(_ context.Context, tool *oas.DerivedTool, args map[string]any) (*Recorder, error) {
+			called = true
+			_, err := BuildUpstreamRequest(parent, tool, "rest-1", args)
+			if err != nil {
+				return nil, err
+			}
+			sourceCalled = true
+			return NewRecorder(), nil
+		},
+	}, nil)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{
+		"jsonrpc":"2.0",
+		"id":1,
+		"method":"tools/call",
+		"params":{"name":"get_order","arguments":{"id":"42","unknown":"x"}}
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+
+	return unknownToolArgumentCallResult{
+		callToolCalled:    called,
+		sourceChainCalled: sourceCalled,
+		response:          body,
+	}
+}
+
+func assertUnknownToolArgumentInvalidParams(t *testing.T, body map[string]any) {
+	t.Helper()
+
+	errObj := body["error"].(map[string]any)
+	assert.EqualValues(t, sdkjsonrpc.CodeInvalidParams, errObj["code"])
+	assert.Contains(t, errObj["message"], `unknown argument "unknown"`)
+}
+
+func exerciseToolCallWithArguments(t *testing.T, arguments string, callTool ToolCallFunc) map[string]any {
+	t.Helper()
+
+	tool := oas.DerivedTool{
+		Name:           "get_order",
+		Method:         http.MethodGet,
+		PathTemplate:   "/orders",
+		ParamLocations: map[string]string{},
+		InputSchema:    map[string]any{"type": "object"},
+	}
+	handler, err := NewSDKStreamableHTTPHandler(SDKServerConfig{
+		Name:     "Orders [MCP adapter]",
+		Tools:    []oas.DerivedTool{tool},
+		CallTool: callTool,
+	}, nil)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{
+		"jsonrpc":"2.0",
+		"id":1,
+		"method":"tools/call",
+		"params":{"name":"get_order","arguments":`+arguments+`}
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	return body
+}

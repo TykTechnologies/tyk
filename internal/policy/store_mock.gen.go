@@ -115,6 +115,44 @@ func (c *MockRPCDataLoaderGetApiDefinitionsCall) DoAndReturn(f func(string, []st
 	return c
 }
 
+// GetClientIdPs mocks base method.
+func (m *MockRPCDataLoader) GetClientIdPs(orgId string, tags []string) string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetClientIdPs", orgId, tags)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetClientIdPs indicates an expected call of GetClientIdPs.
+func (mr *MockRPCDataLoaderMockRecorder) GetClientIdPs(orgId, tags any) *MockRPCDataLoaderGetClientIdPsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClientIdPs", reflect.TypeOf((*MockRPCDataLoader)(nil).GetClientIdPs), orgId, tags)
+	return &MockRPCDataLoaderGetClientIdPsCall{Call: call}
+}
+
+// MockRPCDataLoaderGetClientIdPsCall wrap *gomock.Call
+type MockRPCDataLoaderGetClientIdPsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockRPCDataLoaderGetClientIdPsCall) Return(arg0 string) *MockRPCDataLoaderGetClientIdPsCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockRPCDataLoaderGetClientIdPsCall) Do(f func(string, []string) string) *MockRPCDataLoaderGetClientIdPsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockRPCDataLoaderGetClientIdPsCall) DoAndReturn(f func(string, []string) string) *MockRPCDataLoaderGetClientIdPsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetPolicies mocks base method.
 func (m *MockRPCDataLoader) GetPolicies(orgId string) string {
 	m.ctrl.T.Helper()

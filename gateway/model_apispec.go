@@ -4,11 +4,12 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
@@ -16,7 +17,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/agentprotocol"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/errors"
@@ -24,7 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
-	"github.com/TykTechnologies/tyk/user"
+	restmcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
 
 	_ "github.com/TykTechnologies/tyk/internal/mcp" // registers MCP VEM prefixes
 )
@@ -48,6 +48,7 @@ type APISpec struct {
 	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
 	Health                   HealthChecker
 	JSVM                     JSVM
+	GojaJSVM                 GojaJSVM
 	ResponseChain            []TykResponseHandler
 	RoundRobin               RoundRobin
 	URLRewriteEnabled        bool
@@ -83,6 +84,10 @@ type APISpec struct {
 	// Value: VEM path (e.g., "/mcp-tool:get-weather")
 	MCPPrimitives map[string]string
 
+	// MCPAdapter holds runtime-only REST-as-MCP synthetic adapter state. It is
+	// never extracted to/persisted from API definitions or OAS documents.
+	MCPAdapter MCPAdapterRuntime
+
 	JSONRPCRouter jsonrpc.Router
 
 	// OperationsAllowListEnabled is true if any JSON-RPC operation (method-level) has
@@ -106,6 +111,36 @@ type APISpec struct {
 	// all primitives on every JSON-RPC request that doesn't match a VEM.
 	// This is a convenience flag that combines ToolsAllowListEnabled, ResourcesAllowListEnabled, and PromptsAllowListEnabled.
 	MCPAllowListEnabled bool
+
+	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
+	// Built from apidef.ErrorOverrides during gateway startup.
+	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
+}
+
+// MCPAdapterRuntime groups runtime-only state for a synthetic REST-as-MCP
+// adapter API.
+type MCPAdapterRuntime struct {
+	Synthetic                bool
+	SourceRESTAPIID          string
+	SDKAdapter               *restmcpadapter.SDKAdapter
+	AllowedCallerProxyAPIIDs []string
+	ToolViews                map[string]oas.MCPToolView
+	UnionTools               []oas.DerivedTool
+}
+
+// GetJSRunner returns the active JSRunner for this API spec based on the
+// configured middleware driver. Returns nil if no JS VM is initialized.
+func (a *APISpec) GetJSRunner() JSRunner {
+	if a.CustomMiddleware.Driver == apidef.JavaScriptDriver {
+		if a.GojaJSVM.Ready() {
+			return &a.GojaJSVM
+		}
+		return nil
+	}
+	if a.JSVM.Ready() {
+		return &a.JSVM
+	}
+	return nil
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
@@ -142,19 +177,90 @@ func (a *APISpec) GetTykExtension() *oas.XTykAPIGateway {
 	return res
 }
 
+// GetCompiledErrorOverrides returns the compiled error overrides for O(1) lookup.
+func (a *APISpec) GetCompiledErrorOverrides() *CompiledErrorOverrides {
+	return a.compiledErrorOverrides.Load()
+}
+
+// SetCompiledErrorOverrides stores the compiled error overrides.
+func (a *APISpec) SetCompiledErrorOverrides(compiled *CompiledErrorOverrides) {
+	a.compiledErrorOverrides.Store(compiled)
+}
+
 // GetPRMConfig returns the Protected Resource Metadata configuration
-// if the API is an OAS API Definition (OAS API, MCP Proxy, Stream API) with PRM enabled.
-// Returns nil otherwise.
+// for the API.
+//
+// Resolution order:
+//  1. If the OAS doc has an explicit `protectedResourceMetadata` block with
+//     `enabled: true`, return it as configured.
+//  2. If the API is MCP-managed and no explicit PRM block is provided (or the
+//     authentication block is missing entirely), synthesise a default
+//     `enabled: true, mode: ""` so mirror mode kicks in automatically.
+//     The empty-mode + no-resource shape resolves to mirror in
+//     EffectiveMode, so users can put Tyk in front of an MCP-managed API
+//     with zero PRM-specific config.
+//  3. Otherwise return nil — the API has no PRM serving.
 func (a *APISpec) GetPRMConfig() *oas.ProtectedResourceMetadata {
 	ext := a.GetTykExtension()
+	var prm *oas.ProtectedResourceMetadata
+	if ext != nil && ext.Server.Authentication != nil {
+		prm = ext.Server.Authentication.ProtectedResourceMetadata
+	}
+
+	if prm != nil && prm.Enabled {
+		return prm
+	}
+
+	// MCP-managed default: mirror without any explicit PRM config.
+	if prm == nil && a.IsMCPManaged() {
+		return &oas.ProtectedResourceMetadata{Enabled: true}
+	}
+	return nil
+}
+
+// GetOAuth2Config returns a configured oauth2 security scheme on this
+// API, if any. Returns the scheme's name and the typed config.
+// Duplicate oauth2 schemes are not validated at load time (matching the
+// behaviour of every other auth scheme on this map); when more than one
+// is configured, the choice is map-iteration dependent.
+func (a *APISpec) GetOAuth2Config() (string, *oas.OAuth2) {
+	if !a.IsOAS {
+		return "", nil
+	}
+	ext := a.GetTykExtension()
 	if ext == nil || ext.Server.Authentication == nil {
-		return nil
+		return "", nil
 	}
-	prm := ext.Server.Authentication.ProtectedResourceMetadata
-	if prm == nil || !prm.Enabled {
-		return nil
+	for name := range ext.Server.Authentication.SecuritySchemes {
+		if cfg := a.OAS.GetTykOAuth2Config(name); cfg != nil {
+			return name, cfg
+		}
 	}
-	return prm
+	return "", nil
+}
+
+// GetOAuth2PRMConfig returns the new-style PRM config carried under the
+// oauth2 security scheme and its scheme name, when enabled; ("", nil)
+// otherwise. Wins over the deprecated top-level block (GetPRMConfig)
+// when both exist.
+func (a *APISpec) GetOAuth2PRMConfig() (string, *oas.OAuth2PRM) {
+	name, cfg := a.GetOAuth2Config()
+	if cfg == nil || cfg.ProtectedResourceMetadata == nil || !cfg.ProtectedResourceMetadata.Enabled {
+		return "", nil
+	}
+	return name, cfg.ProtectedResourceMetadata
+}
+
+// IsPRMEnabled reports whether this API serves Protected Resource Metadata
+// via either location: the new oauth2 security scheme block
+// (GetOAuth2PRMConfig, which wins) or the deprecated top-level block
+// (GetPRMConfig). Callers that only need to know "is PRM on" should use this
+// rather than probing one location, so both config styles are honoured.
+func (a *APISpec) IsPRMEnabled() bool {
+	if name, _ := a.GetOAuth2PRMConfig(); name != "" {
+		return true
+	}
+	return a.GetPRMConfig() != nil
 }
 
 // FindSpecMatchesStatus checks if a URL spec has a specific status and returns the URLSpec for it.
@@ -218,15 +324,12 @@ func (a *APISpec) injectIntoReqContext(req *http.Request) {
 	}
 }
 
-func (a *APISpec) findOperation(r *http.Request) *Operation {
-	middleware := a.OAS.GetTykMiddleware()
-	if middleware == nil {
-		return nil
-	}
-
+// findOASRoute matches the request to an OAS route via the API's OAS
+// router (path templates included). Returns nil when none matches.
+func (a *APISpec) findOASRoute(r *http.Request) (*routers.Route, map[string]string) {
 	if a.oasRouter == nil {
 		log.Warningf("OAS router not initialized properly. Unable to find route for %s %v", r.Method, r.URL)
-		return nil
+		return nil, nil
 	}
 
 	rClone := *r
@@ -236,11 +339,25 @@ func (a *APISpec) findOperation(r *http.Request) *Operation {
 
 	if errors.Is(err, routers.ErrPathNotFound) {
 		log.Tracef("Unable to find route for %s %v at spec %v", r.Method, r.URL, a.Id)
-		return nil
+		return nil, nil
 	}
 
 	if err != nil {
 		log.Errorf("Error finding route: %v", err)
+		return nil, nil
+	}
+
+	return route, pathParams
+}
+
+func (a *APISpec) findOperation(r *http.Request) *Operation {
+	middleware := a.OAS.GetTykMiddleware()
+	if middleware == nil {
+		return nil
+	}
+
+	route, pathParams := a.findOASRoute(r)
+	if route == nil {
 		return nil
 	}
 
@@ -303,6 +420,29 @@ func (a *APISpec) findRouteForOASPath(oasPath, method, actualPath, fullRequestPa
 	return route, pathParams, nil
 }
 
+// matchCandidatePath looks up the path item and operation from the OAS spec for a
+// candidate path+method, extracts path parameters from the actual request path, and
+// validates them against the operation's path parameter schemas. Returns the operation,
+// path params, and true if the candidate matches; false otherwise.
+// This is the shared disambiguation logic used by both validate request and mock response.
+func (a *APISpec) matchCandidatePath(oasPath, oasMethod, strippedPath string) (*openapi3.PathItem, *openapi3.Operation, map[string]string, bool) {
+	pathItem := a.OAS.Paths.Value(oasPath)
+	if pathItem == nil {
+		return nil, nil, nil, false
+	}
+	operation := pathItem.GetOperation(oasMethod)
+	if operation == nil {
+		return nil, nil, nil, false
+	}
+
+	pathParams := extractPathParams(oasPath, strippedPath)
+	if !pathParamsMatchOperation(pathParams, operation) {
+		return nil, nil, nil, false
+	}
+
+	return pathItem, operation, pathParams, true
+}
+
 // extractPathParams extracts path parameter values from actualPath based on the
 // OAS path pattern. For example, if oasPath is "/users/{id}" and actualPath is
 // "/users/123", it returns map[string]string{"id": "123"}.
@@ -341,18 +481,8 @@ func (a *APISpec) APIType() string {
 	}
 }
 
-func (a *APISpec) sendRateLimitHeaders(session *user.SessionState, dest *http.Response) {
-	quotaMax, quotaRemaining, quotaRenews := int64(0), int64(0), int64(0)
-
-	if session != nil {
-		quotaMax, quotaRemaining, _, quotaRenews = session.GetQuotaLimitByAPIID(a.APIID)
-	}
-
-	if dest.Header == nil {
-		dest.Header = http.Header{}
-	}
-
-	dest.Header.Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-	dest.Header.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-	dest.Header.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
+// IsSyntheticMCPAdapter reports whether this spec is a hidden runtime-only
+// adapter synthesized for a REST-as-MCP proxy/source pairing.
+func (a *APISpec) IsSyntheticMCPAdapter() bool {
+	return a != nil && a.MCPAdapter.Synthetic
 }

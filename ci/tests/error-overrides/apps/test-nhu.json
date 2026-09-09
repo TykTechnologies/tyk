@@ -1,0 +1,54 @@
+{
+  "name": "Test NHU - No Healthy Upstreams",
+  "api_id": "test-nhu",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-nhu/",
+    "target_url": "http://backend-down-1:9999",
+    "strip_listen_path": true,
+    "enable_load_balancing": true,
+    "target_list": [
+      "http://backend-down-1:9999",
+      "http://backend-down-2:9998",
+      "http://backend-down-3:9997"
+    ],
+    "check_host_against_uptime_tests": true,
+    "service_discovery": {
+      "use_discovery_service": false
+    }
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  },
+  "uptime_tests": {
+    "check_list": [
+      {
+        "url": "http://backend-down-1:9999/health",
+        "method": "GET"
+      },
+      {
+        "url": "http://backend-down-2:9998/health",
+        "method": "GET"
+      },
+      {
+        "url": "http://backend-down-3:9997/health",
+        "method": "GET"
+      }
+    ],
+    "config": {
+      "expire_utime_after": 10,
+      "service_discovery": {
+        "use_discovery_service": false
+      },
+      "recheck_wait": 5
+    }
+  }
+}

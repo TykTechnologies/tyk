@@ -54,6 +54,7 @@ type EngineV2 struct {
 	complexityChecker         ComplexityChecker
 	granularAccessChecker     GranularAccessChecker
 	reverseProxyPreHandler    ReverseProxyPreHandler
+	specCtx                   context.Context
 	contextCancel             context.CancelFunc
 	beforeFetchHook           resolve.BeforeFetchHook
 	afterFetchHook            resolve.AfterFetchHook
@@ -77,6 +78,9 @@ type EngineV2Options struct {
 func NewEngineV2(options EngineV2Options) (*EngineV2, error) {
 	logger := createAbstractLogrusLogger(options.Logger)
 	gqlTools := graphqlGoToolsV1{}
+	transportType := DetermineGraphQLEngineTransportType(options.ApiDefinition)
+	configureGraphQLEngineHTTPClient(options.HttpClient, transportType, options.Injections.NewReusableBodyReadCloser)
+	configureGraphQLEngineHTTPClient(options.StreamingClient, transportType, options.Injections.NewReusableBodyReadCloser)
 
 	var parsedSchema = options.Schema
 	if parsedSchema == nil {
@@ -147,6 +151,7 @@ func NewEngineV2(options EngineV2Options) (*EngineV2, error) {
 		complexityChecker:         complexityChecker,
 		granularAccessChecker:     granularAccessChecker,
 		reverseProxyPreHandler:    reverseProxyPreHandler,
+		specCtx:                   specCtx,
 		contextCancel:             cancel,
 		beforeFetchHook:           options.Injections.BeforeFetchHook,
 		afterFetchHook:            options.Injections.AfterFetchHook,
@@ -279,6 +284,7 @@ func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 	isProxyOnly := isProxyOnly(e.ApiDefinition)
 	span := otel.SpanFromContext(outreq.Context())
 	reqCtx := otel.ContextWithSpan(context.Background(), span)
+	reqCtx = copyGraphQLEngineTransportContextValue(reqCtx, outreq.Context())
 	if isProxyOnly {
 		reqCtx = SetProxyOnlyContextValue(reqCtx, outreq)
 	}
@@ -290,7 +296,7 @@ func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 	}
 
 	upstreamHeaders := additionalUpstreamHeaders(e.logger, outreq, e.ApiDefinition)
-	execOptions = append(execOptions, graphql.WithHeaderModifier(e.gqlTools.headerModifier(upstreamHeaders)))
+	execOptions = append(execOptions, graphql.WithHeaderModifier(e.gqlTools.headerModifier(outreq, upstreamHeaders, e.tykVariableReplacer)))
 
 	if e.OpenTelemetry.Executor != nil {
 		if err = e.OpenTelemetry.Executor.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...); err != nil {
@@ -314,9 +320,9 @@ func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 		// This is a valid query for proxy-only mode: query { __typename }
 		// In this case, upstreamResponse is nil.
 		// See TT-6419 for further info.
-		if proxyOnlyCtx.upstreamResponse != nil {
-			header = proxyOnlyCtx.upstreamResponse.Header
-			httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
+		if upstreamResponse := proxyOnlyCtx.getUpstreamResponse(); upstreamResponse != nil {
+			header = upstreamResponse.Header
+			httpStatus = upstreamResponse.StatusCode
 			// change the value of the header's content encoding to use the content encoding defined by the accept encoding
 			contentEncoding := selectContentEncodingToBeUsed(proxyOnlyCtx.forwardedRequest.Header.Get(httpclient.AcceptEncodingHeader))
 			header.Set(httpclient.ContentEncodingHeader, contentEncoding)
@@ -382,7 +388,7 @@ func (e *EngineV2) handoverWebSocketConnectionToGraphQLExecutionEngine(params *R
 	executorPool = subscription.NewExecutorV2Pool(
 		e.ExecutionEngine,
 		initialRequestContext,
-		subscription.WithExecutorV2HeaderModifier(e.gqlTools.headerModifier(upstreamHeaders)),
+		subscription.WithExecutorV2HeaderModifier(e.gqlTools.headerModifier(params.OutRequest, upstreamHeaders, e.tykVariableReplacer)),
 	)
 
 	go gqlwebsocket.Handle(
@@ -390,6 +396,7 @@ func (e *EngineV2) handoverWebSocketConnectionToGraphQLExecutionEngine(params *R
 		errChan,
 		conn,
 		executorPool,
+		gqlwebsocket.WithContext(subscriptionRequestContext(e.specCtx, params.OutRequest)),
 		gqlwebsocket.WithLogger(e.logger),
 		gqlwebsocket.WithProtocolFromRequestHeaders(params.OutRequest),
 	)

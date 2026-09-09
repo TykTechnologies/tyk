@@ -1,27 +1,119 @@
-/*
-Package regexp implmenets API of Go's native "regexp" but with caching results in memory
-*/
+// Package regexp wraps Go's standard "regexp" with a process-wide
+// bounded LRU. Intended for Tyk gateway internals.
+//
+// The cached *regexp.Regexp is shared across all callers and MUST NOT
+// be mutated. Read-only methods (Match*, Find*, ReplaceAll*, String,
+// NumSubexp, SubexpNames, LiteralPrefix) are safe for concurrent use
+// since Go 1.12.
 package regexp
 
 import (
 	"io"
 	"regexp"
 	"strconv"
+	"sync/atomic"
 	"time"
+
+	internalcache "github.com/TykTechnologies/tyk/internal/cache"
 )
 
+const defaultCacheTTL = 60 * time.Second
+
+// LogFunc aliases the shared LRU eviction LogFunc.
+type LogFunc = internalcache.LogFunc
+
+// CacheOptions aliases internalcache.LRUOptions; kept as the public type
+// for code already wired against this package.
+type CacheOptions = internalcache.LRUOptions
+
+// The cache pointers are seeded eagerly at package load via newAtomicCache
+// so the hot path never observes a nil Load(). Configure() and tests
+// replace them via .Store() in applyCacheConfig.
 var (
-	compileCache                 = newRegexpCache(defaultCacheItemTTL, true, regexp.Compile)
-	compilePOSIXCache            = newRegexpCache(defaultCacheItemTTL, true, regexp.CompilePOSIX)
-	matchStringCache             = newRegexpStrRetBoolCache(defaultCacheItemTTL, true)
-	matchCache                   = newRegexpByteRetBoolCache(defaultCacheItemTTL, true)
-	replaceAllStringCache        = newRegexpStrStrRetStrCache(defaultCacheItemTTL, true)
-	replaceAllLiteralStringCache = newRegexpStrStrRetStrCache(defaultCacheItemTTL, true)
-	replaceAllStringFuncCache    = newRegexpStrFuncRetStrCache(defaultCacheItemTTL, true)
-	findStringSubmatchCache      = newRegexpStrRetSliceStrCache(defaultCacheItemTTL, true)
-	findAllStringCache           = newRegexpStrIntRetSliceStrCache(defaultCacheItemTTL, true)
-	findAllStringSubmatchCache   = newRegexpStrIntRetSliceSliceStrCache(defaultCacheItemTTL, true)
+	compileCache                 = newAtomicCache(newRegexpCache(0, defaultCacheMaxEntries, true, "compile", nil, regexp.Compile))
+	compilePOSIXCache            = newAtomicCache(newRegexpCache(0, defaultCacheMaxEntries, true, "compilePOSIX", nil, regexp.CompilePOSIX))
+	matchStringCache             = newAtomicCache(newRegexpStrRetBoolCache(0, defaultCacheMaxEntries, true, "matchString", nil))
+	matchCache                   = newAtomicCache(newRegexpByteRetBoolCache(0, defaultCacheMaxEntries, true, "match", nil))
+	replaceAllStringCache        = newAtomicCache(newRegexpStrStrRetStrCache(0, defaultCacheMaxEntries, true, "replaceAllString", nil))
+	replaceAllLiteralStringCache = newAtomicCache(newRegexpStrStrRetStrCache(0, defaultCacheMaxEntries, true, "replaceAllLiteralString", nil))
+	replaceAllStringFuncCache    = newAtomicCache(newRegexpStrFuncRetStrCache(0, defaultCacheMaxEntries, true, "replaceAllStringFunc", nil))
+	findStringSubmatchCache      = newAtomicCache(newRegexpStrRetSliceStrCache(0, defaultCacheMaxEntries, true, "findStringSubmatch", nil))
+	findAllStringCache           = newAtomicCache(newRegexpStrIntRetSliceStrCache(0, defaultCacheMaxEntries, true, "findAllString", nil))
+	findAllStringSubmatchCache   = newAtomicCache(newRegexpStrIntRetSliceSliceStrCache(0, defaultCacheMaxEntries, true, "findAllStringSubmatch", nil))
 )
+
+func newAtomicCache[T any](v *T) *atomic.Pointer[T] {
+	var p atomic.Pointer[T]
+	p.Store(v)
+	return &p
+}
+
+// Configure (re)builds the package-level caches from opts. Intended for
+// one-shot gateway startup wiring; safe to call again from tests.
+func Configure(opts CacheOptions) {
+	if opts.TTL <= 0 {
+		opts.TTL = defaultCacheTTL
+	}
+	applyCacheConfig(opts)
+}
+
+// Reset toggles the cache-enabled flag and purges all entries. Bounds
+// (TTL/MaxEntries) are fixed at Configure time and not affected here.
+func Reset(isEnabled bool) {
+	compileCache.Load().reset(isEnabled)
+	compilePOSIXCache.Load().reset(isEnabled)
+	matchStringCache.Load().reset(isEnabled)
+	matchCache.Load().reset(isEnabled)
+	replaceAllStringCache.Load().reset(isEnabled)
+	replaceAllLiteralStringCache.Load().reset(isEnabled)
+	replaceAllStringFuncCache.Load().reset(isEnabled)
+	findStringSubmatchCache.Load().reset(isEnabled)
+	findAllStringCache.Load().reset(isEnabled)
+	findAllStringSubmatchCache.Load().reset(isEnabled)
+}
+
+// Deprecated: use Reset(isEnabled).
+func ResetCache(_ time.Duration, isEnabled bool) {
+	Reset(isEnabled)
+}
+
+// prevReporter tracks the last EvictionLogger so its goroutine can be
+// stopped when applyCacheConfig is called again.
+var prevReporter atomic.Pointer[internalcache.EvictionLogger]
+
+// applyCacheConfig (re)builds all package caches and, if opts.Log is set,
+// starts the eviction-summary ticker.
+//
+// opts.TTL is passed through verbatim. ttl=0 disables the expirable.LRU
+// cleanup goroutine (golang-lru/v2 has no Close); the package-level
+// bootstrap caches use ttl=0 to avoid leaking goroutines when Configure()
+// later replaces them. Public callers go through Configure(), which fills
+// in the default TTL.
+func applyCacheConfig(opts CacheOptions) {
+	ttl := opts.TTL
+	maxEntries := internalcache.ResolveMaxEntries(opts)
+	if old := prevReporter.Swap(nil); old != nil {
+		old.Stop()
+	}
+
+	rep := internalcache.NewEvictionLogger("regex cache", opts.Log)
+
+	compileCache.Store(newRegexpCache(ttl, maxEntries, opts.Enabled, "compile", rep, regexp.Compile))
+	compilePOSIXCache.Store(newRegexpCache(ttl, maxEntries, opts.Enabled, "compilePOSIX", rep, regexp.CompilePOSIX))
+	matchStringCache.Store(newRegexpStrRetBoolCache(ttl, maxEntries, opts.Enabled, "matchString", rep))
+	matchCache.Store(newRegexpByteRetBoolCache(ttl, maxEntries, opts.Enabled, "match", rep))
+	replaceAllStringCache.Store(newRegexpStrStrRetStrCache(ttl, maxEntries, opts.Enabled, "replaceAllString", rep))
+	replaceAllLiteralStringCache.Store(newRegexpStrStrRetStrCache(ttl, maxEntries, opts.Enabled, "replaceAllLiteralString", rep))
+	replaceAllStringFuncCache.Store(newRegexpStrFuncRetStrCache(ttl, maxEntries, opts.Enabled, "replaceAllStringFunc", rep))
+	findStringSubmatchCache.Store(newRegexpStrRetSliceStrCache(ttl, maxEntries, opts.Enabled, "findStringSubmatch", rep))
+	findAllStringCache.Store(newRegexpStrIntRetSliceStrCache(ttl, maxEntries, opts.Enabled, "findAllString", rep))
+	findAllStringSubmatchCache.Store(newRegexpStrIntRetSliceSliceStrCache(ttl, maxEntries, opts.Enabled, "findAllStringSubmatch", rep))
+
+	if opts.Log != nil {
+		rep.Start(internalcache.DefaultEvictionLogInterval)
+		prevReporter.Store(rep)
+	}
+}
 
 // Regexp is a wrapper around regexp.Regexp but with caching
 type Regexp struct {
@@ -29,32 +121,14 @@ type Regexp struct {
 	FromCache bool
 }
 
-// ResetCache resets cache to initial state
-func ResetCache(ttl time.Duration, isEnabled bool) {
-	if ttl == 0 {
-		ttl = defaultCacheItemTTL
-	}
-
-	compileCache.reset(ttl, isEnabled)
-	compilePOSIXCache.reset(ttl, isEnabled)
-	matchStringCache.reset(ttl, isEnabled)
-	matchCache.reset(ttl, isEnabled)
-	replaceAllStringCache.reset(ttl, isEnabled)
-	replaceAllLiteralStringCache.reset(ttl, isEnabled)
-	replaceAllStringFuncCache.reset(ttl, isEnabled)
-	findStringSubmatchCache.reset(ttl, isEnabled)
-	findAllStringCache.reset(ttl, isEnabled)
-	findAllStringSubmatchCache.reset(ttl, isEnabled)
-}
-
 // Compile does the same as regexp.Compile but returns cached *Regexp instead.
 func Compile(expr string) (*Regexp, error) {
-	return compileCache.do(expr)
+	return compileCache.Load().do(expr)
 }
 
 // CompilePOSIX does the same as regexp.CompilePOSIX but returns cached *Regexp instead.
 func CompilePOSIX(expr string) (*Regexp, error) {
-	return compilePOSIXCache.do(expr)
+	return compilePOSIXCache.Load().do(expr)
 }
 
 // MustCompile is the same as regexp.MustCompile but returns cached *Regexp instead.
@@ -175,7 +249,7 @@ func (re *Regexp) MatchString(s string) bool {
 	if re.Regexp == nil {
 		return false
 	}
-	return matchStringCache.do(re.Regexp, s, re.Regexp.MatchString)
+	return matchStringCache.Load().do(re.Regexp, s, re.Regexp.MatchString)
 }
 
 // Match reports whether the Regexp matches the byte slice b.
@@ -183,7 +257,7 @@ func (re *Regexp) Match(b []byte) bool {
 	if re.Regexp == nil {
 		return false
 	}
-	return matchCache.do(re.Regexp, b, re.Regexp.Match)
+	return matchCache.Load().do(re.Regexp, b, re.Regexp.Match)
 }
 
 // ReplaceAllString is the same as regexp.Regexp.ReplaceAllString but returns cached result instead.
@@ -191,7 +265,7 @@ func (re *Regexp) ReplaceAllString(src, repl string) string {
 	if re.Regexp == nil {
 		return ""
 	}
-	return replaceAllStringCache.do(re.Regexp, src, repl, re.Regexp.ReplaceAllString)
+	return replaceAllStringCache.Load().do(re.Regexp, src, repl, re.Regexp.ReplaceAllString)
 }
 
 // ReplaceAllLiteralString is the same as regexp.Regexp.ReplaceAllLiteralString but returns cached result instead.
@@ -199,7 +273,7 @@ func (re *Regexp) ReplaceAllLiteralString(src, repl string) string {
 	if re.Regexp == nil {
 		return ""
 	}
-	return replaceAllLiteralStringCache.do(re.Regexp, src, repl, re.Regexp.ReplaceAllLiteralString)
+	return replaceAllLiteralStringCache.Load().do(re.Regexp, src, repl, re.Regexp.ReplaceAllLiteralString)
 }
 
 // ReplaceAllStringFunc is the same as regexp.Regexp.ReplaceAllStringFunc but returns cached result instead.
@@ -207,7 +281,7 @@ func (re *Regexp) ReplaceAllStringFunc(src string, repl func(string) string) str
 	if re.Regexp == nil {
 		return ""
 	}
-	return replaceAllStringFuncCache.do(re.Regexp, src, repl, re.Regexp.ReplaceAllStringFunc)
+	return replaceAllStringFuncCache.Load().do(re.Regexp, src, repl, re.Regexp.ReplaceAllStringFunc)
 }
 
 // ReplaceAll is the same as regexp.Regexp.ReplaceAll but returns cached result instead.
@@ -322,7 +396,7 @@ func (re *Regexp) FindStringSubmatch(s string) []string {
 	if re.Regexp == nil {
 		return []string{}
 	}
-	return findStringSubmatchCache.do(re.Regexp, s, re.Regexp.FindStringSubmatch)
+	return findStringSubmatchCache.Load().do(re.Regexp, s, re.Regexp.FindStringSubmatch)
 }
 
 // FindStringSubmatchIndex is the same as regexp.Regexp.FindStringSubmatchIndex but returns cached result instead.
@@ -365,7 +439,7 @@ func (re *Regexp) FindAllString(s string, n int) []string {
 	if re.Regexp == nil {
 		return []string{}
 	}
-	return findAllStringCache.do(re.Regexp, s, n, re.Regexp.FindAllString)
+	return findAllStringCache.Load().do(re.Regexp, s, n, re.Regexp.FindAllString)
 }
 
 // FindAllStringIndex is the same as regexp.Regexp.FindAllStringIndex but returns cached result instead.
@@ -400,7 +474,7 @@ func (re *Regexp) FindAllStringSubmatch(s string, n int) [][]string {
 	if re.Regexp == nil {
 		return [][]string{}
 	}
-	return findAllStringSubmatchCache.do(re.Regexp, s, n, re.Regexp.FindAllStringSubmatch)
+	return findAllStringSubmatchCache.Load().do(re.Regexp, s, n, re.Regexp.FindAllStringSubmatch)
 }
 
 // FindAllStringSubmatchIndex is the same as regexp.Regexp.FindAllStringSubmatchIndex but returns cached result instead.

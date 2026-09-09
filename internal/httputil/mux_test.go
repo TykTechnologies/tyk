@@ -1,11 +1,13 @@
 package httputil_test
 
 import (
+	"fmt"
 	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
@@ -183,4 +185,109 @@ func TestMatchPaths(t *testing.T) {
 			assert.Equal(t, tt.isErr, err != nil)
 		})
 	}
+}
+
+// TestPreparePathRegexp_FixedOutputs verifies that PreparePathRegexp produces
+// consistent output for a fixed table of (pattern, prefix, suffix) inputs.
+func TestPreparePathRegexp_FixedOutputs(t *testing.T) {
+	tests := []struct {
+		pattern string
+		prefix  bool
+		suffix  bool
+		want    string
+	}{
+		{"/users", true, false, "^/users"},
+		{"/users", true, true, "^/users$"},
+		{"/users/{id}", true, false, "^/users/([^/]+)"},
+		{"/users/{id}", true, true, "^/users/([^/]+)$"},
+		{"users", false, false, "users"},
+		{"users", false, true, "users$"},
+		{"/items/*", true, false, "^/items/.*"},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(fmt.Sprintf("%s prefix=%v suffix=%v", tc.pattern, tc.prefix, tc.suffix), func(t *testing.T) {
+			got := httputil.PreparePathRegexp(tc.pattern, tc.prefix, tc.suffix)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+// TestPathRegexpCache_EvictsAtCap verifies eviction at the configured
+// cap, with recomputation correctness on a re-fetched key.
+func TestPathRegexpCache_EvictsAtCap(t *testing.T) {
+	httputil.ConfigurePathRegexpCache(2, false, nil)
+	t.Cleanup(func() { httputil.ConfigurePathRegexpCache(0, false, nil) })
+
+	first := "/route-0"
+	wantFirst := httputil.PreparePathRegexp(first, true, false)
+	httputil.PreparePathRegexp("/route-1", true, false)
+	httputil.PreparePathRegexp("/route-2", true, false)
+
+	got := httputil.PreparePathRegexp(first, true, false)
+	assert.Equal(t, wantFirst, got, "evicted entry should recompute to same value")
+}
+
+// TestConfigurePathRegexpCache covers ConfigurePathRegexpCache behavior across
+// maxEntries values:
+//   - maxEntries > 0 enforces a cap of exactly that size.
+//   - maxEntries <= 0 (without unbounded) clamps to DefaultLRUMaxEntries;
+//     it does NOT disable size eviction.
+//   - unbounded=true is the only way to disable size eviction.
+func TestConfigurePathRegexpCache(t *testing.T) {
+	t.Cleanup(func() { httputil.ConfigurePathRegexpCache(0, false, nil) })
+
+	t.Run("bounded", func(t *testing.T) {
+		httputil.ConfigurePathRegexpCache(10, false, nil)
+		for i := 0; i < 12; i++ {
+			httputil.PreparePathRegexp(fmt.Sprintf("/bounded-%d", i), true, false)
+		}
+		assert.Equal(t, 10, httputil.PathRegexpCacheLen(),
+			"cache should cap at maxEntries=10")
+	})
+
+	t.Run("negative_clamps_to_default", func(t *testing.T) {
+		httputil.ConfigurePathRegexpCache(-1, false, nil)
+		for i := 0; i < cache.DefaultLRUMaxEntries+1; i++ {
+			httputil.PreparePathRegexp(fmt.Sprintf("/neg-%d", i), true, false)
+		}
+		assert.Equal(t, cache.DefaultLRUMaxEntries, httputil.PathRegexpCacheLen(),
+			"negative maxEntries should clamp to DefaultLRUMaxEntries, not disable eviction")
+	})
+
+	t.Run("zero_clamps_to_default", func(t *testing.T) {
+		httputil.ConfigurePathRegexpCache(0, false, nil)
+		for i := 0; i < cache.DefaultLRUMaxEntries+1; i++ {
+			httputil.PreparePathRegexp(fmt.Sprintf("/zero-%d", i), true, false)
+		}
+		assert.Equal(t, cache.DefaultLRUMaxEntries, httputil.PathRegexpCacheLen(),
+			"zero maxEntries should clamp to DefaultLRUMaxEntries")
+	})
+
+	t.Run("unbounded", func(t *testing.T) {
+		httputil.ConfigurePathRegexpCache(0, true, nil)
+		n := cache.DefaultLRUMaxEntries + 100
+		for i := 0; i < n; i++ {
+			httputil.PreparePathRegexp(fmt.Sprintf("/unb-%d", i), true, false)
+		}
+		assert.Equal(t, n, httputil.PathRegexpCacheLen(),
+			"unbounded should allow growth past DefaultLRUMaxEntries")
+	})
+
+	t.Run("unbounded_no_eviction_log", func(t *testing.T) {
+		var logged []string
+		logFunc := func(format string, args ...any) {
+			logged = append(logged, fmt.Sprintf(format, args...))
+		}
+		// Verify the !unbounded guard prevents EvictionLogger creation: with
+		// unbounded=true the reporter is never wired, so no log lines are
+		// produced even when a non-nil LogFunc is passed. Note: this test does
+		// not exercise the 5-minute ticker path; it proves the guard itself.
+		httputil.ConfigurePathRegexpCache(0, true, logFunc)
+		for i := 0; i < cache.DefaultLRUMaxEntries+100; i++ {
+			httputil.PreparePathRegexp(fmt.Sprintf("/unb-log-%d", i), true, false)
+		}
+		assert.Empty(t, logged, "unbounded cache must not produce eviction log lines")
+	})
 }

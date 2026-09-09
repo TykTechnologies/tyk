@@ -31,9 +31,10 @@ func TestDefaultAPIMetrics_AllDimensionsUnder10(t *testing.T) {
 
 func TestDefaultAPIMetrics_NoRouteOrApiNameOrOrgId(t *testing.T) {
 	excludedKeys := map[string]bool{
-		"route":    true,
-		"api_name": true,
-		"org_id":   true,
+		"listen_path": true,
+		"endpoint":    true,
+		"api_name":    true,
+		"org_id":      true,
 	}
 
 	defs := DefaultAPIMetrics()

@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/opentelemetry/metric/metrictest"
 
@@ -26,6 +29,8 @@ import (
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/storage"
+	storagemock "github.com/TykTechnologies/tyk/storage/mock"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -39,6 +44,21 @@ type mockStore struct {
 var sess = user.SessionState{
 	OrgID:       "TestBaseMiddleware_OrgSessionExpiry",
 	DataExpires: 110,
+}
+
+type requestConditionalMiddleware struct {
+	*BaseMiddleware
+	calls int
+}
+
+func (m *requestConditionalMiddleware) Name() string {
+	return "requestConditionalMiddleware"
+}
+
+//nolint:staticcheck // ST1008: middleware interface requires (error, int).
+func (m *requestConditionalMiddleware) ProcessRequest(http.ResponseWriter, *http.Request, interface{}) (error, int) {
+	m.calls++
+	return nil, http.StatusOK
 }
 
 func (m mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
@@ -155,6 +175,103 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 	assert.Equal(t, "t5", getToken(jwt.getAuthType(), jwt.getAuthToken))
 	assert.Equal(t, "t6", getToken(oauth.getAuthType(), oauth.getAuthToken))
 	assert.Equal(t, "t7", getToken(oidc.getAuthType(), oidc.getAuthToken))
+}
+
+func TestCheckSessionAndIdentityForValidKey_CachesSessionWithoutSharingAccessRights(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HashKeys = false
+		globalConf.LocalSessionCache.DisableCacheSessionState = false
+	})
+	defer ts.Close()
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = uuid.New()
+		spec.UseKeylessAccess = false
+		spec.Auth.AuthHeaderName = "authorization"
+	})[0]
+
+	key := "cache-isolation-" + uuid.New()
+	session := CreateStandardSession()
+	session.AccessRights = map[string]user.AccessDefinition{
+		api.APIID: {
+			APIID:    api.APIID,
+			Versions: []string{"Default"},
+			Limit: user.APILimit{
+				RateLimit: user.RateLimit{
+					Rate: 100,
+					Per:  60,
+				},
+			},
+		},
+	}
+	require.NoError(t, ts.Gw.GlobalSessionManager.UpdateSession(key, session, 60, false))
+	defer ts.Gw.GlobalSessionManager.RemoveSession(session.OrgID, key, false)
+	defer ts.Gw.SessionCache.Delete(key)
+
+	baseMid := NewBaseMiddleware(ts.Gw, api, nil, nil)
+	got, ok := baseMid.CheckSessionAndIdentityForValidKey(key, httptest.NewRequest(http.MethodGet, "/", nil))
+	require.True(t, ok)
+	require.Equal(t, api.APIID, got.AccessRights[api.APIID].AllowanceScope)
+
+	cachedVal, found := ts.Gw.SessionCache.Get(key)
+	require.True(t, found)
+
+	cached := cachedVal.(user.SessionState)
+	require.Empty(t, cached.AccessRights[api.APIID].AllowanceScope)
+}
+
+func TestCheckSessionAndIdentityForValidKey_AuthStorePath_CachesClonedSession(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HashKeys = false
+		globalConf.LocalSessionCache.DisableCacheSessionState = false
+	})
+	defer ts.Close()
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = uuid.New()
+		spec.UseKeylessAccess = false
+		spec.UseOauth2 = true
+		spec.Auth.AuthHeaderName = "authorization"
+	})[0]
+
+	key := "auth-store-" + uuid.New()
+	session := CreateStandardSession()
+	session.AccessRights = map[string]user.AccessDefinition{
+		api.APIID: {
+			APIID:    api.APIID,
+			Versions: []string{"Default"},
+			Limit: user.APILimit{
+				RateLimit: user.RateLimit{
+					Rate: 100,
+					Per:  60,
+				},
+			},
+		},
+	}
+
+	require.NoError(t, api.AuthManager.UpdateSession(key, session, 60, false))
+	defer api.AuthManager.RemoveSession(session.OrgID, key, false)
+
+	baseMid := NewBaseMiddleware(ts.Gw, api, nil, nil)
+	got, ok := baseMid.CheckSessionAndIdentityForValidKey(key, httptest.NewRequest(http.MethodGet, "/", nil))
+	require.True(t, ok, "session should be found in auth store")
+
+	require.Equal(t, api.APIID, got.AccessRights[api.APIID].AllowanceScope)
+
+	time.Sleep(100 * time.Millisecond)
+
+	cacheKey := key
+	if ts.Gw.GetConfig().HashKeys {
+		cacheKey = storage.HashStr(key, storage.HashMurmur64)
+	}
+
+	cachedVal, found := ts.Gw.SessionCache.Get(cacheKey)
+	require.True(t, found, "session should be cached after auth store lookup")
+
+	cached := cachedVal.(user.SessionState)
+	require.Empty(t, cached.AccessRights[api.APIID].AllowanceScope, "cached session should not have AllowanceScope set by policy application")
+
+	ts.Gw.SessionCache.Delete(cacheKey)
 }
 
 func TestBaseMiddleware_getAuthToken(t *testing.T) {
@@ -420,7 +537,7 @@ func TestSessionLimiter_RedisQuotaExceeded_ExpiredAtReset(t *testing.T) {
 		}
 
 		beforeTime := time.Now()
-		blocked := limiter.RedisQuotaExceeded(req, session, quotaKey, "", limit, g.Gw.GlobalSessionManager.Store(), false)
+		blocked := limiter.RedisQuotaExceeded(req, session, quotaKey, "", limit, false, false)
 		afterTime := time.Now()
 
 		assert.Equal(t, quotaMax-1, session.QuotaRemaining, "Quota remaining should be quotaMax - 1 after increment")
@@ -475,7 +592,7 @@ func TestSessionLimiter_RedisQuotaExceeded_ExpiredAtReset(t *testing.T) {
 		}
 
 		beforeTime := time.Now()
-		blocked := limiter.RedisQuotaExceeded(req, session, quotaKey, scope, limit, g.Gw.GlobalSessionManager.Store(), false)
+		blocked := limiter.RedisQuotaExceeded(req, session, quotaKey, scope, limit, false, false)
 		afterTime := time.Now()
 
 		accessDef := session.AccessRights["api1"]
@@ -710,6 +827,82 @@ func TestRecordAccessLog_TraceID(t *testing.T) {
 	}
 }
 
+func TestRecordAccessLog_OriginalPath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	tests := []struct {
+		name               string
+		originalPath       string
+		expectOriginalPath bool
+	}{
+		{
+			name:               "AL-1: original_path present when context value is non-empty",
+			originalPath:       "/api/v1/users",
+			expectOriginalPath: true,
+		},
+		{
+			name:               "AL-2: original_path omitted when context value is empty",
+			originalPath:       "",
+			expectOriginalPath: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, hook := logrustest.NewNullLogger()
+
+			gwConfig := ts.Gw.GetConfig()
+			gwConfig.AccessLogs.Enabled = true
+			ts.Gw.SetConfig(gwConfig)
+
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{},
+				GlobalConfig:  gwConfig,
+			}
+
+			baseMw := &BaseMiddleware{
+				Spec:   spec,
+				Gw:     ts.Gw,
+				logger: logger.WithField("prefix", "test"),
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
+
+			if tc.originalPath != "" {
+				reqCtx := context.WithValue(req.Context(), ctxpkg.OriginalRequestPath, tc.originalPath)
+				req = req.WithContext(reqCtx)
+			}
+
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+			}
+
+			latency := analytics.Latency{
+				Total:    100,
+				Upstream: 80,
+				Gateway:  20,
+			}
+
+			baseMw.RecordAccessLog(req, resp, latency)
+
+			assert.NotEmpty(t, hook.Entries, "Expected a log entry")
+			lastEntry := hook.LastEntry()
+
+			_, hasOriginalPath := lastEntry.Data["original_path"]
+			assert.Equal(t, tc.expectOriginalPath, hasOriginalPath,
+				"original_path field presence mismatch")
+
+			if tc.expectOriginalPath {
+				assert.Equal(t, tc.originalPath, lastEntry.Data["original_path"],
+					"original_path value should match context value")
+			}
+
+			hook.Reset()
+		})
+	}
+}
+
 func TestGateway_isDisabledForMCP(t *testing.T) {
 	gw := &Gateway{}
 
@@ -817,6 +1010,46 @@ func TestGateway_mwAppendEnabled_MCP(t *testing.T) {
 		assert.True(t, result, "mwAppendEnabled should return true for non-restricted middleware on MCP")
 		assert.Len(t, chain, 1, "Chain should have non-restricted middleware for MCP APIs")
 	})
+}
+
+func TestGateway_mwAppendEnabledForRequest(t *testing.T) {
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{})
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "request-conditional-api"
+	})[0]
+	mw := &requestConditionalMiddleware{
+		BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw},
+	}
+
+	var chain []alice.Constructor
+	appended := gw.mwAppendEnabledForRequest(&chain, mw, func(r *http.Request) bool {
+		return r.Header.Get("X-Run-Middleware") == "true"
+	})
+	require.True(t, appended)
+	require.Len(t, chain, 1)
+
+	nextCalls := 0
+	handler := alice.New(chain...).Then(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		nextCalls++
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/without-marker", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	assert.Equal(t, http.StatusNoContent, recorder.Code)
+	assert.Zero(t, mw.calls)
+	assert.Equal(t, 1, nextCalls)
+
+	req = httptest.NewRequest(http.MethodGet, "/with-marker", nil)
+	req.Header.Set("X-Run-Middleware", "true")
+	recorder = httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	assert.Equal(t, http.StatusNoContent, recorder.Code)
+	assert.Equal(t, 1, mw.calls)
+	assert.Equal(t, 2, nextCalls)
 }
 
 // testMetricInstruments creates MetricInstruments backed by a real in-memory
@@ -1220,4 +1453,109 @@ func TestRecordAccessLog_APIType(t *testing.T) {
 			hook.Reset()
 		})
 	}
+}
+
+func TestBaseMiddleware_CopyNilLogger_Concurrent(t *testing.T) {
+	spec := &APISpec{}
+	proxy := ReturningHttpHandler(nil)
+	gw := &Gateway{}
+
+	bm := &BaseMiddleware{Spec: spec, Proxy: proxy, Gw: gw}
+
+	const n = 100
+	var wg sync.WaitGroup
+	wg.Add(n)
+	results := make([]*BaseMiddleware, n)
+
+	for i := 0; i < n; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			require.NotPanics(t, func() { results[i] = bm.Copy() })
+		}()
+	}
+	wg.Wait()
+
+	for i, got := range results {
+		require.NotNil(t, got, "goroutine %d", i)
+		assert.Nil(t, got.logger, "Copy of nil logger should leave logger nil (goroutine %d)", i)
+	}
+}
+
+func TestCheckSessionAndIdentityForValidKey_AuthStorePath_MarksSessionAsNew(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HashKeys = false
+		globalConf.LocalSessionCache.DisableCacheSessionState = false
+	})
+	defer ts.Close()
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = uuid.New()
+		spec.UseKeylessAccess = false
+		spec.UseOauth2 = true
+		spec.Auth.AuthHeaderName = "authorization"
+	})[0]
+
+	// rpc/mdcb storage
+	apiStorageHandler := storagemock.NewMockHandler(ctrl)
+	api.AuthManager = &DefaultSessionManager{
+		store: apiStorageHandler,
+		orgID: api.OrgID,
+		Gw:    ts.Gw,
+	}
+
+	// local storage
+	globalStorageHandler := storagemock.NewMockHandler(ctrl)
+	ts.Gw.GlobalSessionManager = &DefaultSessionManager{
+		store: globalStorageHandler,
+		orgID: api.OrgID,
+		Gw:    ts.Gw,
+	}
+
+	key := "auth-store-new-" + uuid.New()
+	session := CreateStandardSession()
+	session.AccessRights = map[string]user.AccessDefinition{
+		api.APIID: {
+			APIID:    api.APIID,
+			Versions: []string{"Default"},
+		},
+	}
+
+	sessionJSON, err := json.Marshal(session)
+	require.NoError(t, err)
+
+	apiStorageHandler.EXPECT().GetKey(gomock.Any()).Return(string(sessionJSON), nil).AnyTimes()
+	apiStorageHandler.EXPECT().GetMultiKey(gomock.Any()).Return([]string{string(sessionJSON)}, nil).AnyTimes()
+	apiStorageHandler.EXPECT().GetRawKey(gomock.Any()).Return(string(sessionJSON), nil).AnyTimes()
+	apiStorageHandler.EXPECT().GetKeyPrefix().Return("").AnyTimes()
+
+	globalStorageHandler.EXPECT().GetKey(gomock.Any()).Return("", storage.ErrKeyNotFound).AnyTimes()
+	globalStorageHandler.EXPECT().GetMultiKey(gomock.Any()).Return(nil, storage.ErrKeyNotFound).AnyTimes()
+	globalStorageHandler.EXPECT().GetRawKey(gomock.Any()).Return("", storage.ErrKeyNotFound).AnyTimes()
+	globalStorageHandler.EXPECT().GetKeyPrefix().Return("").AnyTimes()
+
+	// ensure that session was copied from remote repo into the local one
+	globalStorageHandler.EXPECT().SetKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
+
+	// ensure that session was updated at the end of UpdateRequestSession
+	globalStorageHandler.EXPECT().SetKeyEx(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
+
+	baseMid := NewBaseMiddleware(ts.Gw, api, nil, nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+
+	// global handle simulates absence of session
+	got, ok := baseMid.CheckSessionAndIdentityForValidKey(key, req)
+
+	assert.True(t, ok, "session should be found in auth store")
+	assert.True(t, got.IsRestored(), "session retrieved from AuthManager should be marked as new (IsRestored == false)")
+
+	// simulate session write to context
+	ctxSetSession(req, &got, false, false)
+
+	// Check update session behavior
+	updated := baseMid.UpdateRequestSession(req)
+	assert.True(t, updated, "Should update session if session is touched")
 }

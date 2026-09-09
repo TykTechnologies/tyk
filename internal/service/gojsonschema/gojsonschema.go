@@ -5,11 +5,14 @@ import (
 )
 
 type (
-	JSONLoader              = gojsonschema.JSONLoader
-	ResultError             = gojsonschema.ResultError
-	Result                  = gojsonschema.Result
-	FormatCheckerChain      = gojsonschema.FormatCheckerChain
-	DoesNotMatchFormatError = gojsonschema.DoesNotMatchFormatError
+	JSONLoader                = gojsonschema.JSONLoader
+	ResultError               = gojsonschema.ResultError
+	Result                    = gojsonschema.Result
+	FormatCheckerChain        = gojsonschema.FormatCheckerChain
+	DoesNotMatchFormatError   = gojsonschema.DoesNotMatchFormatError
+	FormatChecker             = gojsonschema.FormatChecker
+	URIFormatChecker          = gojsonschema.URIFormatChecker
+	URIReferenceFormatChecker = gojsonschema.URIReferenceFormatChecker
 )
 
 var (

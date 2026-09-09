@@ -2,17 +2,19 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/textproto"
 	"net/url"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/storage/kv/resolver"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
@@ -27,17 +29,19 @@ const (
 	vaultLabel       = "$secret_vault."
 	envLabel         = "$secret_env."
 	secretsConfLabel = "$secret_conf."
+	fileLabel        = "$secret_file."
 	triggerKeyPrefix = "trigger"
 	triggerKeySep    = "-"
 )
 
 var dollarMatch = regexp.MustCompile(`\$\d+`)
 var contextMatch = regexp.MustCompile(`\$tyk_context.([A-Za-z0-9_\-\.]+)`)
-var consulMatch = regexp.MustCompile(`\$secret_consul.([A-Za-z0-9\/\-\.]+)`)
-var vaultMatch = regexp.MustCompile(`\$secret_vault.([A-Za-z0-9\/\-\.]+)`)
+var consulMatch = regexp.MustCompile(`\$secret_consul.([A-Za-z0-9_\/\-\.]+)`)
+var vaultMatch = regexp.MustCompile(`\$secret_vault.([A-Za-z0-9_\/\-\.]+)`)
 var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
+var fileMatch = regexp.MustCompile(`\$secret_file\.([A-Za-z0-9_\/\-\.]+)`)
 
 func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	rawPath := r.URL.String()
@@ -57,114 +61,13 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 	// Check triggers
 	rewriteToPath := meta.RewriteTo
 	if len(meta.Triggers) > 0 {
-
 		// This feature uses context, we must force it if it doesn't exist
-		contextData := ctxGetData(r)
-		if contextData == nil {
-			contextDataObject := make(map[string]interface{})
-			ctxSetData(r, contextDataObject)
-		}
+		forceContextData(r)
 
 		for tn, triggerOpts := range meta.Triggers {
-			checkAny := false
-			setCount := 0
-			if triggerOpts.On == apidef.Any {
-				checkAny = true
-			}
-
-			// Check headers
-			if len(triggerOpts.Options.HeaderMatches) > 0 {
-				if checkHeaderTrigger(r, triggerOpts.Options.HeaderMatches, checkAny, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
-				}
-			}
-
-			// Check query string
-			if len(triggerOpts.Options.QueryValMatches) > 0 {
-				if checkQueryString(r, triggerOpts.Options.QueryValMatches, checkAny, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
-				}
-			}
-
-			// Check path parts
-			if len(triggerOpts.Options.PathPartMatches) > 0 {
-				if checkPathParts(r, triggerOpts.Options.PathPartMatches, checkAny, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
-				}
-			}
-
-			// Check session meta
-			if session := ctxGetSession(r); session != nil {
-				if len(triggerOpts.Options.SessionMetaMatches) > 0 {
-					if checkSessionTrigger(r, session, triggerOpts.Options.SessionMetaMatches, checkAny, tn) {
-						setCount += 1
-						if checkAny {
-							rewriteToPath = triggerOpts.RewriteTo
-							break
-						}
-					}
-				}
-			}
-
-			// Request context meta
-			if len(triggerOpts.Options.RequestContextMatches) > 0 {
-				if checkContextTrigger(r, triggerOpts.Options.RequestContextMatches, checkAny, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
-				}
-			}
-
-			// Check payload
-			if triggerOpts.Options.PayloadMatches.MatchPattern != "" {
-				if checkPayload(r, triggerOpts.Options.PayloadMatches, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
-				}
-			}
-
-			if !checkAny {
-				// Set total count:
-				total := 0
-				if len(triggerOpts.Options.HeaderMatches) > 0 {
-					total += 1
-				}
-				if len(triggerOpts.Options.QueryValMatches) > 0 {
-					total += 1
-				}
-				if len(triggerOpts.Options.PathPartMatches) > 0 {
-					total += 1
-				}
-				if len(triggerOpts.Options.SessionMetaMatches) > 0 {
-					total += 1
-				}
-				if len(triggerOpts.Options.RequestContextMatches) > 0 {
-					total += 1
-				}
-				if triggerOpts.Options.PayloadMatches.MatchPattern != "" {
-					total += 1
-				}
-				if total == setCount {
-					rewriteToPath = triggerOpts.RewriteTo
-					break
-				}
+			if checkTriggerOptions(r, triggerOpts.Options, triggerOpts.On, tn) {
+				rewriteToPath = triggerOpts.RewriteTo
+				break
 			}
 		}
 	}
@@ -216,51 +119,75 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 // parameter for a HTTP request would. If no replacement has been made, `in`
 // is returned without modification.
 func (gw *Gateway) ReplaceTykVariables(r *http.Request, in string, escape bool) string {
+	// kv:// and $kv{} tokens in API definitions are resolved once at API load
+	// (replaceSecrets), so they rarely reach this point. When that load-time
+	// pass fails, the spec keeps its literal tokens — this pass then resolves
+	// them per request for the strings routed through here (the spec itself
+	// is only fixed by a successful reload). It also covers strings that
+	// never went through the API-definition loader.
+	if gw.kvResolver != nil && resolver.ContainsReferences([]byte(in)) {
+		if resolved, err := gw.kvResolver.Resolve(r.Context(), in); err == nil {
+			in = resolved
+		}
+	}
 
 	if strings.Contains(in, secretsConfLabel) {
 		contextData := ctxGetData(r)
 		vars := secretsConfMatch.FindAllString(in, -1)
-		in = gw.replaceVariables(in, vars, contextData, secretsConfLabel, escape)
+		in = gw.replaceVariables(r.Context(), in, vars, contextData, secretsConfLabel, escape)
 	}
 
 	if strings.Contains(in, envLabel) {
 		contextData := ctxGetData(r)
 		vars := envValueMatch.FindAllString(in, -1)
-		in = gw.replaceVariables(in, vars, contextData, envLabel, escape)
+		in = gw.replaceVariables(r.Context(), in, vars, contextData, envLabel, escape)
 	}
 
 	if strings.Contains(in, vaultLabel) {
 		contextData := ctxGetData(r)
 		vars := vaultMatch.FindAllString(in, -1)
-		in = gw.replaceVariables(in, vars, contextData, vaultLabel, escape)
+		in = gw.replaceVariables(r.Context(), in, vars, contextData, vaultLabel, escape)
 	}
 
 	if strings.Contains(in, consulLabel) {
 		contextData := ctxGetData(r)
 		vars := consulMatch.FindAllString(in, -1)
-		in = gw.replaceVariables(in, vars, contextData, consulLabel, escape)
+		in = gw.replaceVariables(r.Context(), in, vars, contextData, consulLabel, escape)
+	}
+
+	if strings.Contains(in, fileLabel) {
+		contextData := ctxGetData(r)
+		vars := fileMatch.FindAllString(in, -1)
+		in = gw.replaceVariables(r.Context(), in, vars, contextData, fileLabel, escape)
 	}
 
 	if strings.Contains(in, contextLabel) {
 		contextData := ctxGetData(r)
 		vars := contextMatch.FindAllString(in, -1)
-		in = gw.replaceVariables(in, vars, contextData, contextLabel, escape)
+		in = gw.replaceVariables(r.Context(), in, vars, contextData, contextLabel, escape)
 	}
 
 	if strings.Contains(in, metaLabel) {
 		vars := metaMatch.FindAllString(in, -1)
 		session := ctxGetSession(r)
 		if session == nil {
-			in = gw.replaceVariables(in, vars, nil, metaLabel, escape)
+			in = gw.replaceVariables(r.Context(), in, vars, nil, metaLabel, escape)
 		} else {
-			in = gw.replaceVariables(in, vars, session.MetaData, metaLabel, escape)
+			in = gw.replaceVariables(r.Context(), in, vars, session.MetaData, metaLabel, escape)
 		}
 	}
 	//todo add config_data
 	return in
 }
 
-func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]interface{}, label string, escape bool) string {
+func (gw *Gateway) replaceVariables(
+	reqCtx context.Context,
+	in string,
+	vars []string,
+	vals map[string]interface{},
+	label string,
+	escape bool,
+) string {
 
 	emptyStringFn := func(key, in, val string) string {
 		in = strings.Replace(in, val, "", -1)
@@ -278,57 +205,15 @@ func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]in
 
 		switch label {
 
-		case secretsConfLabel:
+		case secretsConfLabel, envLabel, vaultLabel, consulLabel, fileLabel:
 
-			secrets := gw.GetConfig().Secrets
-
-			val, ok := secrets[key]
-			if !ok || val == "" {
-				in = emptyStringFn(key, in, v)
-				continue
-			}
-
-			in = strings.Replace(in, v, val, -1)
-
-		case envLabel:
-
-			val := os.Getenv(fmt.Sprintf("TYK_SECRET_%s", strings.ToUpper(key)))
-			if val == "" {
-				in = emptyStringFn(key, in, v)
-				continue
-			}
-
-			in = strings.Replace(in, v, val, -1)
-
-		case vaultLabel:
-
-			if err := gw.setUpVault(); err != nil {
-				in = emptyStringFn(key, in, v)
-				continue
-			}
-
-			val, err := gw.vaultKVStore.Get(key)
+			val, err := gw.kvResolver.Resolve(reqCtx, dollarSecretToKVRef(label, key))
 			if err != nil {
 				in = emptyStringFn(key, in, v)
 				continue
 			}
 
-			in = strings.Replace(in, v, val, -1)
-
-		case consulLabel:
-
-			if err := gw.setUpConsul(); err != nil {
-				in = emptyStringFn(key, in, v)
-				continue
-			}
-
-			val, err := gw.consulKVStore.Get(key)
-			if err != nil {
-				in = strings.Replace(in, v, "", -1)
-				continue
-			}
-
-			in = strings.Replace(in, v, val, -1)
+			in = strings.ReplaceAll(in, v, val)
 
 		default:
 
@@ -339,7 +224,7 @@ func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]in
 				if escape && !strings.HasPrefix(valStr, "http") {
 					valStr = url.QueryEscape(valStr)
 				}
-				in = strings.Replace(in, v, valStr, -1)
+				in = strings.ReplaceAll(in, v, valStr)
 				continue
 			}
 
@@ -357,6 +242,8 @@ func valToStr(v interface{}) string {
 		s = x
 	case float64:
 		s = strconv.FormatFloat(x, 'f', -1, 64)
+	case int:
+		s = strconv.Itoa(x)
 	case int64:
 		s = strconv.FormatInt(x, 10)
 	case []string:
@@ -548,6 +435,98 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		ctxSetURLRewriteTarget(r, newURL)
 	}
 	return nil, http.StatusOK
+}
+
+// forceContextData ensures the request carries a context data map. The trigger
+// checks below write their captured matches into it, so it must not be nil.
+func forceContextData(r *http.Request) {
+	if ctxGetData(r) == nil {
+		ctxSetData(r, make(map[string]interface{}))
+	}
+}
+
+// triggerOptionCheck is one configured group of trigger options, paired with
+// the check that decides whether the request satisfies it.
+type triggerOptionCheck struct {
+	configured bool
+	check      func() bool
+}
+
+// triggerOptionChecks returns the option groups of a trigger, in evaluation
+// order.
+func triggerOptionChecks(r *http.Request, options apidef.RoutingTriggerOptions, checkAny bool, triggernum int) []triggerOptionCheck {
+	return []triggerOptionCheck{
+		{
+			configured: len(options.HeaderMatches) > 0,
+			check:      func() bool { return checkHeaderTrigger(r, options.HeaderMatches, checkAny, triggernum) },
+		},
+		{
+			configured: len(options.QueryValMatches) > 0,
+			check:      func() bool { return checkQueryString(r, options.QueryValMatches, checkAny, triggernum) },
+		},
+		{
+			configured: len(options.PathPartMatches) > 0,
+			check:      func() bool { return checkPathParts(r, options.PathPartMatches, checkAny, triggernum) },
+		},
+		{
+			// A request without a session can never satisfy these, but they
+			// still count towards the total so an "all" trigger won't fire.
+			configured: len(options.SessionMetaMatches) > 0,
+			check: func() bool {
+				session := ctxGetSession(r)
+				return session != nil && checkSessionTrigger(r, session, options.SessionMetaMatches, checkAny, triggernum)
+			},
+		},
+		{
+			configured: len(options.RequestContextMatches) > 0,
+			check:      func() bool { return checkContextTrigger(r, options.RequestContextMatches, checkAny, triggernum) },
+		},
+		{
+			configured: options.PayloadMatches.MatchPattern != "",
+			check:      func() bool { return checkPayload(r, options.PayloadMatches, triggernum) },
+		},
+	}
+}
+
+// checkTriggerOptions reports whether the request satisfies options. With
+// apidef.Any a single matching option is enough and the remaining ones are not
+// evaluated; otherwise every configured option has to match.
+//
+// Note that under "all" the remaining options are still evaluated after one
+// fails. That is deliberate: the checks record their matches in the request
+// context data for rewrite templates to reference, so skipping them would change
+// what a rewrite can interpolate.
+//
+// triggernum namespaces the matches this records in the request context data,
+// which callers can reference as $tyk_context.trigger-<triggernum>-<name>.
+// Callers must have run forceContextData on the request first.
+func checkTriggerOptions(r *http.Request, options apidef.RoutingTriggerOptions, on apidef.RoutingTriggerOnType, triggernum int) bool {
+	checkAny := on == apidef.Any
+
+	// total counts the configured options, setCount the ones that matched.
+	total, setCount := 0, 0
+
+	for _, option := range triggerOptionChecks(r, options, checkAny, triggernum) {
+		if !option.configured {
+			continue
+		}
+
+		total++
+
+		if option.check() {
+			if checkAny {
+				return true
+			}
+
+			setCount++
+		}
+	}
+
+	if checkAny {
+		return false
+	}
+
+	return total == setCount
 }
 
 func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {

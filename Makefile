@@ -49,6 +49,16 @@ build:
 build-linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -tags "$(TAGS)" -o $(BINARY_LINUX) -v .
 
+# TYK_LOGLEVEL=debug dlv --listen=localhost:2345 --headless=true --api-version=2 --accept-multiclient exec -- ./tyk --conf=tyk_gw.conf
+build-debug:
+	$(GOBUILD) -gcflags="all=-N -l" -tags "$(TAGS)" -o $(BINARY_NAME) .
+
+# build plugins for tests
+build-plugins:
+	@go build -tags goplugin -buildmode=plugin -gcflags "all=-N -l" -o ./test/goplugins/goplugins_debug.so ./test/goplugins/
+	@go build -tags goplugin -buildmode=plugin -race -o ./test/goplugins/goplugins_race.so ./test/goplugins/
+	@go build -tags goplugin -buildmode=plugin -o ./test/goplugins/goplugins.so ./test/goplugins/
+
 .PHONY: install
 install:
 	$(GOINSTALL) -tags "$(TAGS)"
@@ -92,4 +102,3 @@ docker:
 
 docker-std: build
 	docker build --platform ${BUILD_PLATFORM} --no-cache -t internal/tyk-gateway:std -f ci/Dockerfile.std .
-

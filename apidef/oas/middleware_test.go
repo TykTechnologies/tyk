@@ -460,6 +460,20 @@ func TestExtendedPaths(t *testing.T) {
 		paths := make(Paths)
 		Fill(t, &paths, 0)
 
+		// Timeout is coupled with the deprecated 'Value' due to backward and forward compatibility.
+		// Value is automatically rounded up to the nearest second when Timeout is set up during fill and extract process.
+		for _, path := range paths {
+			path.Get.EnforceTimeout.Duration = 0
+			path.Options.EnforceTimeout.Duration = 0
+			path.Delete.EnforceTimeout.Duration = 0
+			path.Connect.EnforceTimeout.Duration = 0
+			path.Head.EnforceTimeout.Duration = 0
+			path.Patch.EnforceTimeout.Duration = 0
+			path.Post.EnforceTimeout.Duration = 0
+			path.Put.EnforceTimeout.Duration = 0
+			path.Trace.EnforceTimeout.Duration = 0
+		}
+
 		var convertedEP apidef.ExtendedPathsSet
 		paths.ExtractTo(&convertedEP)
 
@@ -683,6 +697,132 @@ func TestCustomPlugins(t *testing.T) {
 		newPrePlugin := make(CustomPlugins, 1)
 		newPrePlugin.Fill(mwDefs)
 		assert.Equal(t, customPlugins, newPrePlugin)
+	})
+}
+
+func TestCustomPlugins_InlineCodeRoundtrip(t *testing.T) {
+	t.Parallel()
+
+	t.Run("full roundtrip with all fields", func(t *testing.T) {
+		t.Parallel()
+		original := CustomPlugins{
+			{
+				Enabled:        true,
+				FunctionName:   "myHandler",
+				Path:           "/path/to/plugin.js",
+				Code:           "dmFyIHg9MTsK",
+				RawBodyOnly:    true,
+				RequireSession: true,
+			},
+		}
+
+		// ExtractTo
+		mwDefs := make([]apidef.MiddlewareDefinition, len(original))
+		original.ExtractTo(mwDefs)
+
+		// Fill back
+		var result CustomPlugins
+		result.Fill(mwDefs)
+
+		assert.Equal(t, original, result)
+	})
+
+	t.Run("Code survives roundtrip", func(t *testing.T) {
+		t.Parallel()
+		plugins := CustomPlugins{
+			{
+				Enabled:      true,
+				FunctionName: "inlineFunc",
+				Code:         "dmFyIHg9MTsK",
+			},
+		}
+
+		// ExtractTo and verify MiddlewareDefinition fields
+		mwDefs := make([]apidef.MiddlewareDefinition, 1)
+		plugins.ExtractTo(mwDefs)
+
+		assert.Equal(t, "dmFyIHg9MTsK", mwDefs[0].Code)
+		assert.Equal(t, "inlineFunc", mwDefs[0].Name)
+		assert.False(t, mwDefs[0].Disabled)
+
+		// Fill back and verify CustomPlugin fields
+		var roundtripped CustomPlugins
+		roundtripped.Fill(mwDefs)
+
+		assert.Equal(t, plugins, roundtripped)
+	})
+
+	t.Run("Code without Path", func(t *testing.T) {
+		t.Parallel()
+		plugins := CustomPlugins{
+			{
+				Enabled:      true,
+				FunctionName: "inlineOnly",
+				Path:         "",
+				Code:         "dmFyIHg9MTsK",
+			},
+		}
+
+		mwDefs := make([]apidef.MiddlewareDefinition, 1)
+		plugins.ExtractTo(mwDefs)
+
+		assert.Equal(t, "dmFyIHg9MTsK", mwDefs[0].Code)
+		assert.Empty(t, mwDefs[0].Path)
+
+		var result CustomPlugins
+		result.Fill(mwDefs)
+
+		assert.Equal(t, plugins, result)
+		assert.Empty(t, result[0].Path)
+		assert.Equal(t, "dmFyIHg9MTsK", result[0].Code)
+	})
+
+	t.Run("Path without Code backward compat", func(t *testing.T) {
+		t.Parallel()
+		plugins := CustomPlugins{
+			{
+				Enabled:      true,
+				FunctionName: "filePlugin",
+				Path:         "/path/to/plugin.js",
+				Code:         "",
+				RawBodyOnly:  true,
+			},
+		}
+
+		mwDefs := make([]apidef.MiddlewareDefinition, 1)
+		plugins.ExtractTo(mwDefs)
+
+		assert.Equal(t, "/path/to/plugin.js", mwDefs[0].Path)
+		assert.Empty(t, mwDefs[0].Code)
+		assert.True(t, mwDefs[0].RawBodyOnly)
+
+		var result CustomPlugins
+		result.Fill(mwDefs)
+
+		assert.Equal(t, plugins, result)
+	})
+
+	t.Run("RequireSession roundtrip", func(t *testing.T) {
+		t.Parallel()
+		plugins := CustomPlugins{
+			{
+				Enabled:        true,
+				FunctionName:   "sessionMw",
+				Path:           "/session.js",
+				RequireSession: true,
+			},
+		}
+
+		// Fill -> ExtractTo direction
+		mwDefs := make([]apidef.MiddlewareDefinition, 1)
+		plugins.ExtractTo(mwDefs)
+		assert.True(t, mwDefs[0].RequireSession)
+
+		// ExtractTo -> Fill direction
+		var result CustomPlugins
+		result.Fill(mwDefs)
+		assert.True(t, result[0].RequireSession)
+		assert.Equal(t, plugins, result)
 	})
 }
 

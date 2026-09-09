@@ -11,6 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@apideck/portman": "1.30.7"
+    "@apideck/portman": "1.30.7",
+    "tslib": "^2.6.2"
   }
 }

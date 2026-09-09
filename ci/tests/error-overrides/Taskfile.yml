@@ -1,0 +1,48 @@
+---
+version: "3"
+
+vars:
+  GATEWAY_IMAGE: ${GATEWAY_IMAGE:-tykio/tyk-gateway:latest}
+
+tasks:
+  deps:
+    desc: "verify test dependencies (templates)"
+    cmds:
+      - echo "=== Verifying test dependencies ==="
+      - test -f templates/error_upstream.json || (echo "Missing templates/error_upstream.json" && exit 1)
+      - test -f templates/error_validation.json || (echo "Missing templates/error_validation.json" && exit 1)
+      - echo "All required templates found"
+
+  info:
+    desc: "Print pre-flight info"
+    cmds:
+      - docker compose ps
+      - docker version
+
+  clean-certs:
+    desc: "clean certificates to avoid stale cert/key mismatch issues"
+    cmds:
+      - echo "Cleaning certificates..."
+      - rm -rf ./certs/*
+
+  setup:
+    desc: "setup error-overrides test environment"
+    deps: [deps, clean-certs]
+    cmds:
+      - echo "=== Setting up error-overrides test environment ==="
+      - echo "Using gateway image{{":"}} {{.GATEWAY_IMAGE}}"
+      - docker compose up -d --force-recreate
+      - echo "Waiting for services to be ready..."
+      - sleep 5
+
+  test:
+    desc: "run error-overrides tests"
+    cmds:
+      - echo "=== Running error-overrides tests ==="
+      - export TYK_OVERRIDE_URL="http://localhost:8080" && export TYK_OVERRIDE_CONTAINER="$(docker compose ps -q tyk-gateway)" && export TYK_LOG_FILE="/tmp/tyk-override-access.log" && ./scripts/run-override-tests.sh run
+
+  teardown:
+    desc: "teardown error-overrides test environment"
+    cmds:
+      - echo "=== Tearing down error-overrides test environment ==="
+      - docker compose down --remove-orphans --volumes

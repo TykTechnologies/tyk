@@ -60,6 +60,10 @@ type Upstream struct {
 	// Proxy contains the configuration for an internal proxy.
 	// Tyk classic API definition: `proxy.proxy_url`
 	Proxy *Proxy `bson:"proxy,omitempty" json:"proxy,omitempty"`
+
+	// EnforceTimeout contains the configuration related to API level timeout duration.
+	// Tyk classic API definition: `version_data.versions.<version_name>.global_enforce_timeout`.
+	EnforceTimeout *GlobalEnforceTimeout `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
@@ -134,6 +138,15 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	u.Proxy.Fill(api)
 	if ShouldOmit(u.Proxy) {
 		u.Proxy = nil
+	}
+
+	if u.EnforceTimeout == nil {
+		u.EnforceTimeout = &GlobalEnforceTimeout{}
+	}
+
+	u.EnforceTimeout.Fill(api)
+	if ShouldOmit(u.EnforceTimeout) {
+		u.EnforceTimeout = nil
 	}
 
 	u.fillLoadBalancing(api)
@@ -239,6 +252,14 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 		}()
 	}
 	u.Proxy.ExtractTo(api)
+
+	if u.EnforceTimeout == nil {
+		u.EnforceTimeout = &GlobalEnforceTimeout{}
+		defer func() {
+			u.EnforceTimeout = nil
+		}()
+	}
+	u.EnforceTimeout.ExtractTo(api)
 
 	u.preserveHostHeaderExtractTo(api)
 	u.preserveTrailingSlashExtractTo(api)
@@ -816,6 +837,21 @@ type PinnedPublicKey struct {
 	PublicKeys []string `bson:"publicKeys" json:"publicKeys"`
 }
 
+// splitPublicKeys splits a comma-separated list of public key identifiers.
+// Each entry is trimmed of surrounding whitespace; PEM blocks are preserved
+// intact.
+func splitPublicKeys(value string) []string {
+	parts := strings.Split(value, ",")
+	keys := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			keys = append(keys, part)
+		}
+	}
+	return keys
+}
+
 // PinnedPublicKeys is a list of domains and pinned public keys for them.
 type PinnedPublicKeys []PinnedPublicKey
 
@@ -835,7 +871,7 @@ func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
 
 	i = 0
 	for _, domain := range domains {
-		ppk[i] = PinnedPublicKey{Domain: domain, PublicKeys: strings.Split(strings.ReplaceAll(publicKeys[domain], " ", ""), ",")}
+		ppk[i] = PinnedPublicKey{Domain: domain, PublicKeys: splitPublicKeys(publicKeys[domain])}
 		i++
 	}
 }
@@ -1028,7 +1064,7 @@ func (u *UpstreamAuth) requestSigningExtractTo(api *apidef.APIDefinition) {
 	if u.RequestSigning == nil {
 		u.RequestSigning = &UpstreamRequestSigning{}
 		defer func() {
-			u.BasicAuth = nil
+			u.RequestSigning = nil
 		}()
 	}
 	u.RequestSigning.ExtractTo(api)
@@ -1113,6 +1149,19 @@ type ClientAuthData struct {
 	ClientID string `bson:"clientId" json:"clientId"`
 	// ClientSecret is the application's secret.
 	ClientSecret string `bson:"clientSecret,omitempty" json:"clientSecret,omitempty"` // client secret is optional for password flow
+	// Method controls how Tyk sends the client credentials to the upstream token
+	// endpoint. Valid values are `client_secret_basic` (RFC 6749 Section 2.3.1 —
+	// credentials in the Authorization header only, no fallback) and
+	// `client_secret_post` (credentials in the request body only, no fallback).
+	// Leave empty for the default auto-detect behaviour: Tyk tries the header
+	// first and falls back to the body on failure. Note this deliberately
+	// differs from the token-exchange `clientAuth.method`, where empty defaults
+	// to client_secret_basic — here empty must preserve the fallback so
+	// existing APIs keep working.
+	//
+	// Tyk classic API definition: `upstream_auth.oauth.client_credentials.method`
+	// and `upstream_auth.oauth.password.method`.
+	Method string `bson:"method,omitempty" json:"method,omitempty"`
 }
 
 // ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
@@ -1132,6 +1181,7 @@ type ClientCredentials struct {
 func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
 	c.ClientID = api.ClientID
 	c.ClientSecret = api.ClientSecret
+	c.Method = api.Method
 	c.TokenURL = api.TokenURL
 	c.Scopes = api.Scopes
 	c.ExtraMetadata = api.ExtraMetadata
@@ -1148,6 +1198,7 @@ func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
 func (p *PasswordAuthentication) Fill(api apidef.PasswordAuthentication) {
 	p.ClientID = api.ClientID
 	p.ClientSecret = api.ClientSecret
+	p.Method = api.Method
 	p.Username = api.Username
 	p.Password = api.Password
 	p.TokenURL = api.TokenURL
@@ -1186,6 +1237,7 @@ func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
 func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
 	api.ClientID = c.ClientID
 	api.ClientSecret = c.ClientSecret
+	api.Method = c.Method
 	api.TokenURL = c.TokenURL
 	api.Scopes = c.Scopes
 	api.ExtraMetadata = c.ExtraMetadata
@@ -1202,6 +1254,7 @@ func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
 func (p *PasswordAuthentication) ExtractTo(api *apidef.PasswordAuthentication) {
 	api.ClientID = p.ClientID
 	api.ClientSecret = p.ClientSecret
+	api.Method = p.Method
 	api.Username = p.Username
 	api.Password = p.Password
 	api.TokenURL = p.TokenURL
@@ -1407,4 +1460,37 @@ func (p *PreserveTrailingSlash) Fill(api apidef.APIDefinition) {
 // ExtractTo extracts *PreserveTrailingSlash into *apidef.APIDefinition.
 func (p *PreserveTrailingSlash) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.DisableStripSlash = p.Enabled
+}
+
+// GlobalEnforceTimeout holds the configuration for enforcing a timeout at the API level.
+type GlobalEnforceTimeout struct {
+	// Enabled is a boolean flag. If set to `true`, the API-level timeout will be enforced
+	// across all endpoints that do not have an endpoint-level timeout configured.
+	//
+	// Tyk classic API definition: `version_data.versions.<version_name>.global_enforce_timeout_disabled` (negated).
+	Enabled bool `json:"enabled" bson:"enabled"`
+
+	// Duration is the configured timeout using a human-readable format (e.g. `5s`, `500ms`, `1m`).
+	// Supported units: ms, s, m.
+	//
+	// Tyk classic API definition: `version_data.versions.<version_name>.global_enforce_timeout`.
+	Duration time.ReadableDuration `json:"duration,omitempty" bson:"duration,omitempty"`
+}
+
+// Fill fills *GlobalEnforceTimeout from apidef.APIDefinition.
+func (g *GlobalEnforceTimeout) Fill(api apidef.APIDefinition) {
+	mainVersion := api.VersionData.Versions[Main]
+	g.Enabled = !mainVersion.GlobalEnforceTimeoutDisabled
+	g.Duration = mainVersion.GlobalEnforceTimeout
+}
+
+// ExtractTo extracts *GlobalEnforceTimeout to *apidef.APIDefinition.
+func (g *GlobalEnforceTimeout) ExtractTo(api *apidef.APIDefinition) {
+	if api.VersionData.Versions == nil {
+		api.VersionData.Versions = make(map[string]apidef.VersionInfo)
+	}
+	mainVersion := api.VersionData.Versions[Main]
+	mainVersion.GlobalEnforceTimeoutDisabled = !g.Enabled
+	mainVersion.GlobalEnforceTimeout = g.Duration
+	api.VersionData.Versions[Main] = mainVersion
 }

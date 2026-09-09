@@ -25,6 +25,8 @@ tasks:
   setup:
     desc: "setup e2e opentelemetry tests"
     cmds:
+      # Ensure mount directories are writable by nonroot gateway (uid 65532)
+      - mkdir -p apps policies 2>/dev/null; chmod 777 apps policies 2>/dev/null; true
       - docker compose up -d --wait
       - task: tracetest:configure
 

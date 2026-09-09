@@ -1,14 +1,21 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/drl"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -474,4 +481,271 @@ func TestSessionLimiter_RateLimitInfo(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestSessionLimiter(t *testing.T) {
+	newSessionLimiter := func(t *testing.T) SessionLimiter {
+		t.Helper()
+		tc := StartTest(nil)
+		t.Cleanup(tc.Close)
+
+		cfg := tc.Gw.GetConfig()
+		drlManager := &drl.DRL{}
+		return NewSessionLimiter(tc.Gw.ctx, &cfg, drlManager, &cfg.ExternalServices)
+	}
+
+	limiter := newSessionLimiter(t)
+	key := "test_session_limiter"
+
+	t.Run("ForwardMessage", func(t *testing.T) {
+		t.Run("attaches context variables when EnableContextVars is true", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			session := &user.SessionState{
+				Rate:        10,
+				Per:         60,
+				QuotaMax:    100,
+				QuotaRenews: time.Now().Add(time.Hour).Unix(),
+			}
+			api := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					APIID:             "test-api",
+					EnableContextVars: true,
+				},
+			}
+
+			reason := limiter.ForwardMessage(
+				r,
+				session,
+				key+"_fw_rl_1",
+				key+"_fw_q_1",
+				true,
+				true,
+				api,
+				false,
+				nil,
+			)
+
+			require.Equal(t, sessionFailNone, reason)
+
+			data := ctxGetData(r)
+			require.NotNil(t, data)
+
+			require.Contains(t, data, ctxDataKeyRateLimitLimit)
+			require.Contains(t, data, ctxDataKeyRateLimitRemaining)
+			require.Contains(t, data, ctxDataKeyRateLimitReset)
+
+			require.Contains(t, data, ctxDataKeyQuotaLimit)
+			require.Contains(t, data, ctxDataKeyQuotaRemaining)
+			require.Contains(t, data, ctxDataKeyQuotaReset)
+		})
+
+		t.Run("does not attach context variables when EnableContextVars is false", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			session := &user.SessionState{
+				Rate:        10,
+				Per:         60,
+				QuotaMax:    100,
+				QuotaRenews: time.Now().Add(time.Hour).Unix(),
+			}
+			api := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					APIID:             "test-api",
+					EnableContextVars: false,
+				},
+			}
+
+			reason := limiter.ForwardMessage(
+				r,
+				session,
+				key+"_fw_rl_2",
+				key+"_fw_q_2",
+				true,
+				true,
+				api,
+				false,
+				nil,
+			)
+
+			require.Equal(t, sessionFailNone, reason)
+
+			data := ctxGetData(r)
+			require.Nil(t, data)
+		})
+	})
+
+	t.Run("limitSentinel", func(t *testing.T) {
+		t.Run("returns false if key does not exist", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			cmd := limiter.limiterStorage.Del(r.Context(), key+SentinelRateLimitKeyPostfix)
+			require.NoError(t, cmd.Err())
+
+			expires, ok := limiter.limitSentinel(
+				r,
+				&user.SessionState{},
+				key,
+				&user.APILimit{RateLimit: user.RateLimit{Rate: 60, Per: 60}},
+				false,
+			)
+
+			require.False(t, ok, "is not blocked if key does not exist")
+			require.Equal(t, time.Duration(0), expires, "expires is zero")
+		})
+
+		t.Run("returns TTL from the key", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			eps := 0.1
+			exp := time.Second * 60
+			cmd := limiter.limiterStorage.SetEx(r.Context(), key+SentinelRateLimitKeyPostfix, "1", exp)
+			require.NoError(t, cmd.Err())
+
+			expires, ok := limiter.limitSentinel(
+				r,
+				&user.SessionState{},
+				key,
+				&user.APILimit{RateLimit: user.RateLimit{Rate: 60, Per: 60}},
+				false,
+			)
+
+			require.True(t, ok, "is blocked")
+			require.True(t, (expires.Seconds()-exp.Seconds()) < eps, "is in range of epsilon")
+		})
+
+		// key without ttl is rather exception, so it has no sens writing tests for this case
+	})
+
+	t.Run("extendContextWithQuota", func(t *testing.T) {
+		t.Run("extends request with quota information if is enabled", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			limiter.extendContextWithQuota(r, 1, 2, 3, true)
+
+			data := ctxGetData(r)
+			require.NotNil(t, data)
+			require.Equal(t, 1, data[ctxDataKeyQuotaLimit])
+			require.Equal(t, 2, data[ctxDataKeyQuotaRemaining])
+			require.Equal(t, 3, data[ctxDataKeyQuotaReset])
+		})
+
+		t.Run("does not extend request with quota information if is disabled", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			limiter.extendContextWithQuota(r, 1, 2, 3, false)
+
+			data := ctxGetData(r)
+			require.Nil(t, data)
+		})
+	})
+
+	t.Run("extendContextWithLimits", func(t *testing.T) {
+		t.Run("extends", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			limiter.extendContextWithLimits(r, rate.Stats{
+				Limit:     2,
+				Remaining: 1,
+				Reset:     time.Second * 10,
+			}, true)
+
+			data := ctxGetData(r)
+			require.NotNil(t, data)
+			assert.Equal(t, 2, data[ctxDataKeyRateLimitLimit])
+			assert.Equal(t, 1, data[ctxDataKeyRateLimitRemaining])
+
+			resetTime := int64(data[ctxDataKeyRateLimitReset].(int))
+			expectedTime := time.Now().Add(10 * time.Second).Unix()
+			assert.InDelta(t, expectedTime, resetTime, 1)
+		})
+
+		t.Run("does not extend if is disabled", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			limiter.extendContextWithLimits(r, rate.Stats{}, false)
+
+			data := ctxGetData(r)
+			require.Nil(t, data)
+		})
+	})
+
+	t.Run("limitRedis", func(t *testing.T) {
+		redisKey := key + "_redis"
+		r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+		require.NoError(t, err)
+
+		cmd := limiter.limiterStorage.Del(r.Context(), key+SentinelRateLimitKeyPostfix, redisKey)
+		require.NoError(t, cmd.Err())
+
+		session := &user.SessionState{}
+		apiLimit := &user.APILimit{RateLimit: user.RateLimit{Rate: 2, Per: 60}}
+
+		state, block := limiter.limitRedis(r, session, redisKey, apiLimit, false)
+		assert.True(t, state.Reset == 0, "first cal is not blocked reset")
+		assert.False(t, block, "first cal is not blocked block")
+
+		state, block = limiter.limitRedis(r, session, redisKey, apiLimit, false)
+		assert.InDelta(t, 60.0, state.Reset.Seconds(), 0.1, "second cal is blocked for all")
+		assert.False(t, block, "second cal is not blocked block")
+
+		state, block = limiter.limitRedis(r, session, redisKey, apiLimit, false)
+		assert.InDelta(t, 60.0, state.Reset.Seconds(), 0.1, "third call is blocked for all window size")
+		assert.True(t, block, "third call is blocked")
+	})
+
+	t.Run("limitDRL should correctly report blocked status during dry run when remaining tokens are insufficient", func(t *testing.T) {
+		drlManager := &drl.DRL{RequestTokenValue: 2}
+		drlManager.SetCurrentTokenValue(3)
+
+		limiter := newSessionLimiter(t)
+		limiter.drlManager = drlManager
+
+		apiLimit := &user.APILimit{RateLimit: user.RateLimit{Rate: 2, Per: 60}}
+		bucketKey := "test-drl-dryrun-key"
+
+		state, blocked := limiter.limitDRL(bucketKey, apiLimit, false)
+		require.False(t, blocked)
+		require.Equal(t, uint(1), state.Remaining)
+
+		_, blocked = limiter.limitDRL(bucketKey, apiLimit, true)
+		require.True(t, blocked, fmt.Sprintf(
+			"Dry run should return blocked=true when available tokens (%d) are less than cost (%d)",
+			state.Remaining,
+			drlManager.RequestTokenValue,
+		))
+	})
+}
+
+// TestNewBucketStateChecker verifies the conversion from token-based bucket state
+// to request-based rate limit statistics. The DRL uses tokens internally where
+// each request consumes multiple tokens, but the API returns request-based stats.
+func TestNewBucketStateChecker(t *testing.T) {
+	rateLimit := 100.0
+
+	// Token bucket state (all values in tokens, not requests)
+	state := model.BucketState{
+		Capacity:  10000,
+		Remaining: 5000,
+		Reset:     time.Now().Add(10 * time.Second),
+	}
+	shouldBlock := false
+	tokenValue := uint(100)
+
+	checker := newBucketStateChecker(rateLimit, state, shouldBlock, tokenValue)
+	stats, block, err := checker.Check()
+
+	assert.NoError(t, err)
+	assert.False(t, block)
+	assert.Equal(t, 100, stats.Limit)
+	assert.Equal(t, 50, stats.Remaining) // state.Remaining / tokenValue
+	assert.InDelta(t, float64(10*time.Second), float64(stats.Reset), float64(time.Second))
 }

@@ -76,7 +76,6 @@ main
 /coprocess/*.pb.go-e
 ci/tests/specs/tmp
 ci/tests/specs/node_modules
-ci/tests/specs/package-lock.json
 ci/tests/specs/gateway.collection.postman.json
 ci/tests/specs/.env
 ci/tests/specs/apps
@@ -93,3 +92,6 @@ ci/tests/specs/policies
 # unknown json files
 /gateway/test.json
 /gateway/child-v1.json
+
+local-apps
+tyk-local

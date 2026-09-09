@@ -2,13 +2,11 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
 
 // DashboardAuthError represents a non-nonce authentication failure
@@ -106,16 +104,15 @@ func (gw *Gateway) HandleDashboardResponseReadError(err error, errorContext stri
 	return false
 }
 
-// attemptDashboardRecovery attempts to re-register the node with the dashboard
+// attemptDashboardRecovery attempts to re-register the node with the dashboard.
+// It uses gw.ctx so that recovery is cancelled when the Gateway receives a shutdown
+// signal (SIGTERM/SIGINT), preventing goroutines from blocking indefinitely.
 func (gw *Gateway) attemptDashboardRecovery() error {
 	if gw.DashService == nil {
 		return errors.New("dashboard service not available for recovery")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	return gw.DashService.Register(ctx)
+	return gw.DashService.Register(gw.ctx)
 }
 
 // shouldRetryOnNetworkError checks if an error is a network error that might benefit from retry

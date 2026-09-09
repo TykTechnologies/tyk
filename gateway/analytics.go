@@ -100,7 +100,9 @@ func (r *RedisAnalyticsHandler) Stop() {
 
 	// close channel to stop workers
 	r.mu.Lock()
-	close(r.recordsChan)
+	if r.recordsChan != nil {
+		close(r.recordsChan)
+	}
 	r.mu.Unlock()
 
 	// wait for all workers to be done
@@ -204,6 +206,9 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			}
 			if !strings.HasPrefix(record.RawPath, "/") {
 				record.RawPath = "/" + record.RawPath
+			}
+			if record.OriginalPath != "" && !strings.HasPrefix(record.OriginalPath, "/") {
+				record.OriginalPath = "/" + record.OriginalPath
 			}
 
 			if encoded, err := r.analyticsSerializer.Encode(record); err != nil {

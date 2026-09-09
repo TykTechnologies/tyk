@@ -105,6 +105,11 @@ func TestXTykGateway_Lint(t *testing.T) {
 			settings.Middleware.Global.TrafficLogs.Plugins[i].RequireSession = false
 		}
 
+		for _, operation := range settings.Middleware.Operations {
+			operation.EnforceTimeout.Value = 2
+			operation.EnforceTimeout.Duration = ReadableDuration(2 * time.Second)
+		}
+
 		settings.Upstream.Authentication = &UpstreamAuth{
 			Enabled:   false,
 			BasicAuth: nil,
@@ -137,6 +142,9 @@ func TestXTykGateway_Lint(t *testing.T) {
 		settings.Upstream.TLSTransport.MinVersion = "1.2"
 		settings.Upstream.TLSTransport.MaxVersion = "1.2"
 		settings.Upstream.TLSTransport.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA"}
+		if settings.Upstream.EnforceTimeout != nil {
+			settings.Upstream.EnforceTimeout.Duration = ReadableDuration(5 * time.Second)
+		}
 
 		if settings.Info.Versioning != nil {
 			switch settings.Info.Versioning.Location {

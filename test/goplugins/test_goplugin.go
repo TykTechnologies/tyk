@@ -227,3 +227,81 @@ func MyPluginApplyingPolicy(rw http.ResponseWriter, r *http.Request) {
 
 	ctx.SetSession(r, session, true)
 }
+
+func RejectWithBody(
+	rw http.ResponseWriter,
+	_ *http.Request,
+) {
+
+	rw.WriteHeader(403)
+	_, _ = rw.Write([]byte(`hello`)) // nolint:errcheck
+}
+
+func RejectWithoutBody(
+	rw http.ResponseWriter,
+	_ *http.Request,
+) {
+
+	rw.WriteHeader(403)
+}
+
+func MyAnalyticsPluginAddTag(record *analytics.AnalyticsRecord) {
+	str, err := base64.StdEncoding.DecodeString(record.RawResponse)
+	record.Tags = append(record.Tags, "TEST")
+
+	if err != nil {
+		return
+	}
+
+	var b = &bytes.Buffer{}
+	b.Write(str)
+
+	r := bufio.NewReader(b)
+	var resp *http.Response
+	resp, err = http.ReadResponse(r, nil)
+	if err != nil {
+		return
+	}
+	resp.Header.Del("Server")
+	resp.Header.Add("Test", "test")
+
+	var bNew bytes.Buffer
+	_ = resp.Write(&bNew)
+	record.RawResponse = base64.StdEncoding.EncodeToString(bNew.Bytes())
+}
+
+// MyPluginAccessingOASConfigData reads the API's config_data from the OAS
+// definition using ctx.GetOASConfigData (no deep copy of the whole OAS doc,
+func MyPluginAccessingOASConfigData(rw http.ResponseWriter, r *http.Request) {
+	configData, err := ctx.GetOASConfigData(r)
+	if err != nil {
+		// e.g. "config data is nil" when the API has no plugin config data
+		rw.Header().Add("X-Plugin-Config-Data-Error", err.Error())
+		return
+	}
+
+	pluginConfig, ok := configData["my-context-data"].(string)
+	if !ok || pluginConfig == "" {
+		rw.Header().Add("X-Plugin-Config-Data", "null")
+		return
+	}
+
+	rw.Header().Add("X-Plugin-Config-Data", pluginConfig)
+}
+
+// MyResponsePluginAccessingOASConfigData is the response-middleware variant.
+func MyResponsePluginAccessingOASConfigData(rw http.ResponseWriter, _ *http.Response, req *http.Request) {
+	configData, err := ctx.GetOASConfigData(req)
+	if err != nil {
+		rw.Header().Add("X-Plugin-Config-Data-Error", err.Error())
+		return
+	}
+
+	pluginConfig, ok := configData["my-context-data"].(string)
+	if !ok || pluginConfig == "" {
+		rw.Header().Add("X-Plugin-Config-Data", "null")
+		return
+	}
+
+	rw.Header().Add("X-Plugin-Config-Data", pluginConfig)
+}

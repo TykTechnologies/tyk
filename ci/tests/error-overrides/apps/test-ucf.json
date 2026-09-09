@@ -1,0 +1,21 @@
+{
+  "name": "Test UCF - Connection Refused",
+  "api_id": "test-ucf",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-ucf/",
+    "target_url": "http://localhost:9999",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  }
+}

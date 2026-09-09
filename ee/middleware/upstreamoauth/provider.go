@@ -88,12 +88,34 @@ func (p *ClientCredentialsOAuthProvider) headerEnabled(OAuthSpec *Middleware) bo
 	return OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.Header.Enabled
 }
 
+// authStyle maps a ClientAuthData.Method value to the oauth2 library's
+// AuthStyle. Empty keeps the library's auto-detect: header first, body
+// fallback. Unrecognised values are rejected by API-load validation, but can
+// still arrive here (e.g. definitions loaded from disk); they fall back to
+// auto-detect with a warning so the misconfiguration is observable.
+func authStyle(OAuthSpec *Middleware, method string) oauth2.AuthStyle {
+	switch method {
+	case apidef.OAuth2ClientAuthBasic:
+		return oauth2.AuthStyleInHeader
+	case apidef.OAuth2ClientAuthPost:
+		return oauth2.AuthStyleInParams
+	case "":
+		return oauth2.AuthStyleAutoDetect
+	default:
+		if OAuthSpec.Base != nil {
+			OAuthSpec.Logger().WithField("method", method).Warning("Unsupported upstream OAuth client authentication method, falling back to auto-detect")
+		}
+		return oauth2.AuthStyleAutoDetect
+	}
+}
+
 func newOAuth2ClientCredentialsConfig(OAuthSpec *Middleware) oauth2clientcredentials.Config {
 	return oauth2clientcredentials.Config{
 		ClientID:     OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ClientID,
 		ClientSecret: OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ClientSecret,
 		TokenURL:     OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.TokenURL,
 		Scopes:       OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.Scopes,
+		AuthStyle:    authStyle(OAuthSpec, OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.Method),
 	}
 }
 
@@ -102,7 +124,8 @@ func newOAuth2PasswordConfig(OAuthSpec *Middleware) oauth2.Config {
 		ClientID:     OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ClientID,
 		ClientSecret: OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ClientSecret,
 		Endpoint: oauth2.Endpoint{
-			TokenURL: OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.TokenURL,
+			TokenURL:  OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.TokenURL,
+			AuthStyle: authStyle(OAuthSpec, OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Method),
 		},
 		Scopes: OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Scopes,
 	}

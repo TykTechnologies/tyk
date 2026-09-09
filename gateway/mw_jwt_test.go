@@ -5365,3 +5365,83 @@ func TestJWTPostExpiry(t *testing.T) {
 		assert.Equal(t, int64(0), session.PostExpiryGracePeriod)
 	})
 }
+
+func Test_mapScopeToPolicies_TT5893(t *testing.T) {
+	// https://tyktech.atlassian.net/browse/TT-5893
+
+	injectLogger := func(t *testing.T) (tmpLogger *logrus.Logger, hook *logrustest.Hook) {
+		t.Helper()
+
+		tmpLogger, hook = logrustest.NewNullLogger()
+		tmpLogger.SetLevel(logrus.TraceLevel)
+
+		realLogger := log
+
+		log = tmpLogger
+		t.Cleanup(func() {
+			log = realLogger
+		})
+
+		return
+	}
+
+	t.Run("Unmatched scopes should be logged at the DEBUG level when at least one scope successfully matches a policy", func(t *testing.T) {
+		t.Run("logs only matches with debug level", func(t *testing.T) {
+			_, hook := injectLogger(t)
+
+			res := mapScopeToPolicies(map[string]string{
+				"scope1": "policy1",
+				"scope2": "policy2",
+			}, []string{"scope1", "scope2"})
+
+			entries := hook.AllEntries()
+
+			assert.Len(t, entries, 1)
+			entry := entries[0]
+			assert.Equal(t, logrus.DebugLevel, entry.Level)
+			assert.Contains(t, entry.Message, "Found a matching policy for scope item: ")
+
+			assert.ElementsMatch(t, []string{"policy1", "policy2"}, res)
+		})
+
+		t.Run("logs error if no one scope matches", func(t *testing.T) {
+			_, hook := injectLogger(t)
+
+			res := mapScopeToPolicies(map[string]string{
+				"scope1": "policy1",
+				"scope2": "policy2",
+			}, []string{"scope3"})
+
+			entries := hook.AllEntries()
+			assert.Len(t, entries, 1)
+			entry := entries[0]
+			assert.Equal(t, "Couldn't find a matching policy for scope item: [scope3]", entry.Message)
+			assert.Equal(t, logrus.ErrorLevel, entry.Level)
+
+			assert.Len(t, res, 0)
+		})
+
+		t.Run("logs if at least one scope matches", func(t *testing.T) {
+			_, hook := injectLogger(t)
+
+			res := mapScopeToPolicies(map[string]string{
+				"scope1": "policy1",
+				"scope2": "policy2",
+			}, []string{"scope1", "scope3"})
+
+			entries := hook.AllEntries()
+
+			assert.Len(t, entries, 2)
+			match := entries[0]
+			nonMatch := entries[1]
+
+			assert.Equal(t, match.Message, "Found a matching policy for scope item: [policy1]")
+			assert.Equal(t, logrus.DebugLevel, match.Level)
+
+			assert.Equal(t, nonMatch.Message, "Couldn't find a matching policy for scope item: [scope3]")
+			assert.Equal(t, logrus.DebugLevel, nonMatch.Level)
+
+			assert.ElementsMatch(t, []string{"policy1"}, res)
+		})
+	})
+}

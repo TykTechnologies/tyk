@@ -174,7 +174,7 @@ func BenchmarkDimensionBuilder_Build_10Dims(b *testing.B) {
 		{Source: "metadata", Key: "org_id", Label: "d5"},
 		{Source: "metadata", Key: "host", Label: "d6"},
 		{Source: "metadata", Key: "scheme", Label: "d7"},
-		{Source: "metadata", Key: "route", Label: "d8"},
+		{Source: "metadata", Key: "listen_path", Label: "d8"},
 		{Source: "metadata", Key: "api_version", Label: "d9"},
 		{Source: "metadata", Key: "response_flag", Label: "d10"},
 	}

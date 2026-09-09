@@ -1,0 +1,6 @@
+{
+    "type": "https://tyk.io/errors/upstream-error",
+    "title": "Upstream Service Error",
+    "status": "{{.StatusCode}}",
+    "detail": "{{.Message}}"
+}

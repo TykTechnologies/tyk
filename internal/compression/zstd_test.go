@@ -1,6 +1,7 @@
 package compression
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 )
@@ -280,6 +281,45 @@ func TestIsZstdCompressed(t *testing.T) {
 				t.Errorf("IsZstdCompressed() = %v, want %v", result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestDecompressZstd_MaxSizeLimit(t *testing.T) {
+	// 2MB uncompressed data (exceeds the 1MB minimum limit)
+	bigData := bytes.Repeat([]byte("a"), 2*1024*1024)
+	compressed, err := CompressZstd(bigData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	orig := maxDecompressedSize
+	defer SetMaxDecompressedSize(orig)
+
+	// Set limit to minimum (1MB) — below the 2MB data, should fail
+	SetMaxDecompressedSize(minDecompressedSize)
+	_, err = DecompressZstd(compressed)
+	if err == nil {
+		t.Error("expected error when decompressed size exceeds limit")
+	}
+
+	// Set limit above decompressed size — should succeed
+	SetMaxDecompressedSize(3 * 1024 * 1024)
+	result, err := DecompressZstd(compressed)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !bytes.Equal(result, bigData) {
+		t.Error("decompressed data doesn't match original")
+	}
+}
+
+func TestSetMaxDecompressedSize_ClampsBelowMinimum(t *testing.T) {
+	orig := maxDecompressedSize
+	defer SetMaxDecompressedSize(orig)
+
+	SetMaxDecompressedSize(512) // well below 1MB minimum
+	if maxDecompressedSize != minDecompressedSize {
+		t.Errorf("expected maxDecompressedSize to be clamped to %d, got %d", minDecompressedSize, maxDecompressedSize)
 	}
 }
 

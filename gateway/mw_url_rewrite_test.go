@@ -5,11 +5,15 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -1313,10 +1317,11 @@ func TestValToStr(t *testing.T) {
 		12.22,              // float
 		float64(123452342), // float64
 		"abc,def",          // string url encode
+		13,                 // int
 	}
 
 	str := valToStr(example)
-	expected := "abc,456,12.22,123452342,abc%2Cdef"
+	expected := "abc,456,12.22,123452342,abc%2Cdef,13"
 
 	if str != expected {
 		t.Errorf("expected (%s) got (%s)", expected, str)
@@ -1337,6 +1342,276 @@ func TestLoopingUrl(t *testing.T) {
 			assert.Equal(t, tc.expectedHost, LoopingUrl(tc.host))
 		})
 	}
+}
+
+func TestReplaceTykVariables(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	installFakeKVStores(t, ts.Gw, map[string]map[string]string{
+		"vault": {
+			"kv-v2/layer1/layer2/dev": `{"API_KEY": "vault_api_key_value"}`,
+			"simplekey":               "simple_vault_value",
+		},
+		"consul": {
+			"path/to/db_password": "consul_db_password_value",
+			"anotherkey":          "another_consul_value",
+		},
+		"secrets": {
+			"conf_key": "conf_secret_value",
+		},
+	})
+
+	t.Setenv("TYK_SECRET_ENV_VAR", "env_var_value")
+	t.Setenv("TYK_SECRET_ENV_VAR_WITH_UNDERSCORE", "env_var_underscore_value")
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Vault secret with underscore",
+			input:    "$secret_vault.kv-v2/layer1/layer2/dev.API_KEY",
+			expected: "vault_api_key_value",
+		},
+		{
+			name:     "Vault secret without underscore",
+			input:    "$secret_vault.simplekey",
+			expected: "simple_vault_value",
+		},
+		{
+			name:     "Consul secret with underscore",
+			input:    "$secret_consul.path/to/db_password",
+			expected: "consul_db_password_value",
+		},
+		{
+			name:     "Consul secret without underscore",
+			input:    "$secret_consul.anotherkey",
+			expected: "another_consul_value",
+		},
+		{
+			name:     "Environment variable",
+			input:    "$secret_env.env_var",
+			expected: "env_var_value",
+		},
+		{
+			name:     "Environment variable with underscore",
+			input:    "$secret_env.env_var_with_underscore",
+			expected: "env_var_underscore_value",
+		},
+		{
+			name:     "Mixed string with Vault secret",
+			input:    "My API Key is: $secret_vault.kv-v2/layer1/layer2/dev.API_KEY and some other text",
+			expected: "My API Key is: vault_api_key_value and some other text",
+		},
+		{
+			name:     "Mixed string with Consul secret",
+			input:    "My DB Password is: $secret_consul.path/to/db_password and some other text",
+			expected: "My DB Password is: consul_db_password_value and some other text",
+		},
+		{
+			name:     "Multiple secrets of different types",
+			input:    "Vault: $secret_vault.simplekey, Consul: $secret_consul.anotherkey, Env: $secret_env.env_var",
+			expected: "Vault: simple_vault_value, Consul: another_consul_value, Env: env_var_value",
+		},
+		{
+			name:     "Non-existent Vault secret",
+			input:    "$secret_vault.non_existent_key",
+			expected: "",
+		},
+		{
+			name:     "Non-existent Consul secret",
+			input:    "$secret_consul.another_non_existent_key",
+			expected: "",
+		},
+		{
+			name:     "Non-existent environment variable",
+			input:    "$secret_env.non_existent_env_var",
+			expected: "",
+		},
+		{
+			name:     "Config secret",
+			input:    "$secret_conf.conf_key",
+			expected: "conf_secret_value",
+		},
+		{
+			name:     "Non-existent config secret",
+			input:    "$secret_conf.non_existent_conf_key",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			result := ts.Gw.ReplaceTykVariables(req, tt.input, false)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestReplaceTykVariables_SecretConf(t *testing.T) {
+	ts := StartTest(func(conf *config.Config) {
+		conf.Secrets = map[string]string{
+			"api_token": "conf-token-value",
+			"blank":     "",
+		}
+	})
+	defer ts.Close()
+
+	req := httptest.NewRequest("GET", "/", nil)
+
+	t.Run("present key resolves from the promoted secrets store", func(t *testing.T) {
+		got := ts.Gw.ReplaceTykVariables(req, "token=$secret_conf.api_token", false)
+		assert.Equal(t, "token=conf-token-value", got)
+	})
+
+	t.Run("missing key resolves to empty string", func(t *testing.T) {
+		got := ts.Gw.ReplaceTykVariables(req, "token=$secret_conf.missing", false)
+		assert.Equal(t, "token=", got)
+	})
+
+	t.Run("present key with empty value resolves to empty string", func(t *testing.T) {
+		// Legacy treated ok-but-empty the same as missing (token → "");
+		// resolving "" through the inline store produces the same output.
+		got := ts.Gw.ReplaceTykVariables(req, "token=$secret_conf.blank", false)
+		assert.Equal(t, "token=", got)
+	})
+}
+
+func TestReplaceTykVariables_NewSyntax(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Setenv("TYK_SECRET_HOST", "myhost")
+	t.Setenv("TYK_SECRET_USER", "alice")
+	t.Setenv("TYK_SECRET_PASS", "s3cret")
+	t.Setenv("TYK_SECRET_OTHER", "otherval")
+	t.Setenv("TYK_SECRET_RAW", "a b/c") // contains chars url.QueryEscape would change
+
+	req := httptest.NewRequest("GET", "/", nil)
+
+	t.Run("kv:// whole-value reference is fully replaced", func(t *testing.T) {
+		assert.Equal(t, "myhost", ts.Gw.ReplaceTykVariables(req, "kv://env/host", false))
+	})
+
+	t.Run("$kv{} inline token is replaced within a larger string", func(t *testing.T) {
+		assert.Equal(t, "https://myhost/v1", ts.Gw.ReplaceTykVariables(req, "https://$kv{env:host}/v1", false))
+	})
+
+	t.Run("multiple $kv{} tokens all resolve", func(t *testing.T) {
+		assert.Equal(t, "alice:s3cret", ts.Gw.ReplaceTykVariables(req, "$kv{env:user}:$kv{env:pass}", false))
+	})
+
+	t.Run("mixed $kv{} and $secret_* — both passes complete", func(t *testing.T) {
+		// Pass 1 resolves $kv{env:host}; Pass 2 resolves $secret_env.other.
+		got := ts.Gw.ReplaceTykVariables(req, "https://$kv{env:host}/$secret_env.other", false)
+		assert.Equal(t, "https://myhost/otherval", got)
+	})
+
+	t.Run("malformed kv:// reference is left unchanged, not emptied", func(t *testing.T) {
+		in := "kv://no-path-separator"
+		assert.Equal(t, in, ts.Gw.ReplaceTykVariables(req, in, false),
+			"a Pass 1 resolve error leaves the input as-is (unlike $secret_* which empties)")
+	})
+
+	t.Run("KV values are not URL-encoded even when escape=true", func(t *testing.T) {
+		got := ts.Gw.ReplaceTykVariables(req, "$kv{env:raw}", true)
+		assert.Equal(t, "a b/c", got,
+			"Pass 1 completes before the escape logic, so KV values are never URL-encoded")
+	})
+}
+
+func TestReplaceTykVariablesFileSecret(t *testing.T) {
+	dir := t.TempDir()
+	secretFile := filepath.Join(dir, "api-key")
+	require.NoError(t, os.WriteFile(secretFile, []byte("file-secret-value\n"), 0600))
+
+	pemFile := filepath.Join(dir, "cert.pem")
+	require.NoError(t, os.WriteFile(pemFile, []byte("-----BEGIN CERT-----\nABC\n-----END CERT-----\n"), 0600))
+
+	// No base_path configured — file:// resolution is disabled, so $secret_file.
+	// references resolve to an empty string while other providers are unaffected.
+	t.Run("no base_path", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		t.Setenv("TYK_SECRET_TEST_FILE_KV_VAR", "env-test-val")
+
+		tests := []struct {
+			name     string
+			input    string
+			expected string
+		}{
+			{
+				name:     "absolute $secret_file. rejected, resolves to empty",
+				input:    "$secret_file." + secretFile,
+				expected: "",
+			},
+			{
+				name:     "relative $secret_file. rejected, resolves to empty",
+				input:    "$secret_file.api-key",
+				expected: "",
+			},
+			{
+				name:     "non-existent file resolves to empty string",
+				input:    "$secret_file./nonexistent/path/file",
+				expected: "",
+			},
+			{
+				name:     "other secret providers unaffected; file resolves to empty",
+				input:    "env=$secret_env.TEST_FILE_KV_VAR file=$secret_file." + secretFile,
+				expected: "env=env-test-val file=",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				req := httptest.NewRequest("GET", "/", nil)
+				result := ts.Gw.ReplaceTykVariables(req, tt.input, false)
+				assert.Equal(t, tt.expected, result)
+			})
+		}
+	})
+
+	t.Run("with base_path configured", func(t *testing.T) {
+		ts := StartTest(func(conf *config.Config) {
+			conf.KV.File.BasePath = dir
+		})
+		defer ts.Close()
+
+		t.Run("resolves relative key under base_path", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			result := ts.Gw.ReplaceTykVariables(req, "$secret_file.api-key", false)
+			assert.Equal(t, "file-secret-value", result)
+		})
+
+		t.Run("multi-line PEM resolved under base_path", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			result := ts.Gw.ReplaceTykVariables(req, "$secret_file.cert.pem", false)
+			assert.Equal(t, "-----BEGIN CERT-----\nABC\n-----END CERT-----", result)
+		})
+
+		t.Run("not URL-encoded when escape=true", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			result := ts.Gw.ReplaceTykVariables(req, "$secret_file.api-key", true)
+			assert.Equal(t, "file-secret-value", result)
+			assert.NotContains(t, result, "%")
+		})
+
+		t.Run("absolute path rejected when base_path is set", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			result := ts.Gw.ReplaceTykVariables(req, "$secret_file."+secretFile, false)
+			assert.Equal(t, "", result)
+		})
+
+		t.Run("dotdot traversal rejected — resolves to empty string", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			result := ts.Gw.ReplaceTykVariables(req, "$secret_file../etc/passwd", false)
+			assert.Equal(t, "", result)
+		})
+	})
 }
 
 func TestURLRewriteMiddleware_CheckHostRewrite(t *testing.T) {

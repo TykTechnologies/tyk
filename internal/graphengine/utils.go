@@ -140,7 +140,75 @@ func additionalUpstreamHeaders(logger abstractlogger.Logger, outreq *http.Reques
 		}
 	}
 
+	// When StripAuthData is false, propagate auth headers from the original request
+	// to the upstream. This is the only propagation point for a proxy-only websocket
+	// upgrade, where the transport is not involved at all.
+	//
+	// Every other proxy-only path also reaches setProxyOnlyHeaders, which forwards the
+	// consumer's headers again, so this writes a value that is about to be written a
+	// second time. The only-when-absent guard in the header modifier does not prevent
+	// that: it runs while the fetch input is built, long before the transport adds
+	// anything. setProxyOnlyHeaders is what drops the duplicate.
+	if !apiDefinition.StripAuthData {
+		propagateAuthHeaders(outreq, upstreamHeaders, apiDefinition)
+	}
+
 	return upstreamHeaders
+}
+
+// propagateAuthHeaders copies the authentication header from the original request
+// into the upstream headers based on the API's enabled auth method.
+// Only the auth config for the active auth method is consulted.
+func propagateAuthHeaders(outreq *http.Request, upstreamHeaders http.Header, apiDefinition *apidef.APIDefinition) {
+	authType := activeAuthType(apiDefinition)
+	if authType == "" {
+		return
+	}
+
+	config, ok := apiDefinition.AuthConfigs[authType]
+	// For backward compatibility when AuthConfigs doesn't have the key
+	if !ok && (authType == apidef.AuthTokenType || authType == apidef.JWTType) {
+		config = apiDefinition.Auth
+	} else if !ok {
+		return
+	}
+
+	if config.DisableHeader {
+		return
+	}
+
+	authHeaderName := header.Authorization
+	if config.AuthHeaderName != "" {
+		authHeaderName = config.AuthHeaderName
+	}
+	if val := outreq.Header.Get(authHeaderName); val != "" {
+		upstreamHeaders.Set(authHeaderName, val)
+	}
+}
+
+// activeAuthType returns the AuthConfigs key for the auth method enabled
+// on the API definition. Returns empty string if no recognised auth method
+// is enabled or if the API is keyless.
+func activeAuthType(apiDefinition *apidef.APIDefinition) string {
+	switch {
+	case apiDefinition.UseKeylessAccess:
+		return ""
+	case apiDefinition.EnableJWT:
+		return apidef.JWTType
+	case apiDefinition.UseBasicAuth:
+		return apidef.BasicType
+	case apiDefinition.EnableSignatureChecking:
+		return apidef.HMACType
+	case apiDefinition.UseOauth2:
+		return apidef.OAuthType
+	case apiDefinition.ExternalOAuth.Enabled:
+		return apidef.ExternalOAuthType
+	case apiDefinition.UseOpenID:
+		return apidef.OIDCType
+	default:
+		// UseStandardAuth or fallback — auth token is the default
+		return apidef.AuthTokenType
+	}
 }
 
 func headerStructToHeaderMap(headers []apidef.UDGGlobalHeader) map[string]string {

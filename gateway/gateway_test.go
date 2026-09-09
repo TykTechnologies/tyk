@@ -74,10 +74,10 @@ func TestParambasedAuth(t *testing.T) {
 }
 
 func TestStripPathWithURLRewrite(t *testing.T) {
-	ts := StartTest(nil)
-	t.Cleanup(ts.Close)
-
 	t.Run("rewrite URL containing listen path", func(t *testing.T) {
+		ts := StartTest(nil)
+		t.Cleanup(ts.Close)
+
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			version := spec.VersionData.Versions["v1"]
 			json.Unmarshal([]byte(`{
@@ -100,6 +100,93 @@ func TestStripPathWithURLRewrite(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: "/myapi/anything/a/myapi/b/c", BodyMatch: `"Url":"/something/a/myapi/b/c"`},
 		}...)
+	})
+
+	buildAPI := func(ts *Test, rewritePath, matchPattern, rewriteTo string) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/anything/"
+			spec.Proxy.StripListenPath = true
+			spec.UseKeylessAccess = true
+
+			if rewriteTo == "" {
+				return
+			}
+
+			UpdateAPIVersion(spec, "v1", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
+					Path:         rewritePath,
+					Method:       http.MethodGet,
+					MatchPattern: matchPattern,
+					RewriteTo:    rewriteTo,
+				}}
+			})
+		})
+	}
+
+	tests := []struct {
+		name         string
+		rewritePath  string
+		matchPattern string
+		rewriteTo    string
+		want         string
+	}{
+		{
+			name:         "rewritten path beginning with listen path is preserved",
+			rewritePath:  "/xml",
+			matchPattern: "/(.*)$",
+			rewriteTo:    "/anything/bla/$1",
+			want:         `"Url":"/anything/bla/anything/xml"`,
+		},
+		{
+			name:         "identity rewrite is authoritative",
+			rewritePath:  "/xml",
+			matchPattern: "/(.*)$",
+			rewriteTo:    "/$1",
+			want:         `"Url":"/anything/xml"`,
+		},
+		{
+			name: "ordinary request still strips listen path",
+			want: `"Url":"/xml"`,
+		},
+		{
+			name:         "non-matching rewrite still strips listen path",
+			rewritePath:  "/other",
+			matchPattern: "/other/(.*)$",
+			rewriteTo:    "/anything/bla/$1",
+			want:         `"Url":"/xml"`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := StartTest(nil)
+			t.Cleanup(ts.Close)
+			buildAPI(ts, tc.rewritePath, tc.matchPattern, tc.rewriteTo)
+
+			_, _ = ts.Run(t, test.TestCase{
+				Path:      "/anything/xml",
+				Code:      http.StatusOK,
+				BodyMatch: tc.want,
+			})
+		})
+	}
+
+	t.Run("absolute host rewrite preserves path beginning with listen path", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = fmt.Fprint(w, r.URL.Path)
+		}))
+		t.Cleanup(upstream.Close)
+
+		ts := StartTest(nil)
+		t.Cleanup(ts.Close)
+		buildAPI(ts, "/xml", "/(.*)$", upstream.URL+"/anything/bla/$1")
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/anything/xml",
+			Code:      http.StatusOK,
+			BodyMatch: `^/anything/bla/anything/xml$`,
+		})
 	})
 }
 

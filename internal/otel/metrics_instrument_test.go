@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/TykTechnologies/opentelemetry/metric/metrictest"
 
@@ -199,13 +200,14 @@ func TestRecordReload_Accumulates(t *testing.T) {
 
 func TestSetRegistry(t *testing.T) {
 	tests := []struct {
-		name          string
-		defs          []apimetrics.APIMetricDefinition
-		wantPanic     bool
-		needsSession  bool
-		needsContext  bool
-		needsResponse bool
-		wantMetric    string // if non-empty, record a request and assert this counter exists
+		name            string
+		defs            []apimetrics.APIMetricDefinition
+		wantPanic       bool
+		needsSession    bool
+		needsContext    bool
+		needsResponse   bool
+		needsConfigData bool
+		wantMetric      string // if non-empty, record a request and assert this counter exists
 	}{
 		{
 			name: "metadata dimension registers and records",
@@ -255,6 +257,18 @@ func TestSetRegistry(t *testing.T) {
 			wantMetric:   "test.context",
 		},
 		{
+			name: "config_data dimension sets NeedsConfigData",
+			defs: []apimetrics.APIMetricDefinition{{
+				Name: "test.config_data",
+				Type: "counter",
+				Dimensions: []apimetrics.DimensionDefinition{
+					{Source: "config_data", Key: "environment", Label: "env", Default: "unknown"},
+				},
+			}},
+			needsConfigData: true,
+			wantMetric:      "test.config_data",
+		},
+		{
 			name: "invalid definition panics",
 			defs: []apimetrics.APIMetricDefinition{{
 				Name: "",
@@ -280,6 +294,7 @@ func TestSetRegistry(t *testing.T) {
 			assert.Equal(t, tt.needsSession, inst.NeedsSession())
 			assert.Equal(t, tt.needsContext, inst.NeedsContext())
 			assert.Equal(t, tt.needsResponse, inst.NeedsResponse())
+			assert.Equal(t, tt.needsConfigData, inst.NeedsConfigData())
 
 			if tt.wantMetric != "" {
 				rc := &apimetrics.RequestContext{
@@ -293,6 +308,91 @@ func TestSetRegistry(t *testing.T) {
 				metrictest.AssertSum(t, m, int64(1))
 			}
 		})
+	}
+}
+
+// --- Token-exchange (RFC 8693) instruments ---
+
+func TestRecordExchange_Noop(t *testing.T) {
+	inst := noopProvider(t)
+	require.NotPanics(t, func() {
+		inst.RecordExchange(context.Background(), "ok", "corpIdP", 80*time.Millisecond)
+		inst.RecordCacheHit(context.Background(), "corpIdP")
+	})
+}
+
+// TestRecordExchange_RequestsLabelledByOutcomeAndProvider pins TC1/TC5: the
+// requests counter increments per call, carrying exactly the bounded
+// `outcome` and `provider` labels — no token-derived label ever appears.
+func TestRecordExchange_RequestsLabelledByOutcomeAndProvider(t *testing.T) {
+	inst, tp := activeProvider(t)
+	ctx := context.Background()
+
+	inst.RecordExchange(ctx, "ok", "corpIdP", 80*time.Millisecond)
+
+	m := tp.FindMetric(t, exchangeMetricRequests)
+	metrictest.AssertSumWithAttrs(t, m, int64(1),
+		attribute.String(exchangeAttrOutcome, "ok"),
+		attribute.String(exchangeAttrProvider, "corpIdP"),
+	)
+	// TC5: a single record yields a single datapoint — any extra (e.g.
+	// token-derived) label would split it into more.
+	metrictest.AssertDataPointCount(t, m, 1)
+}
+
+// TestRecordExchange_DurationRecordedEveryAttempt pins TC2: the duration
+// histogram records on every attempt — both the cache miss (IdP latency) and
+// the cache hit (sub-millisecond) — so the cache speedup is visible.
+func TestRecordExchange_DurationRecordedEveryAttempt(t *testing.T) {
+	inst, tp := activeProvider(t)
+	ctx := context.Background()
+
+	inst.RecordExchange(ctx, "ok", "corpIdP", 80*time.Millisecond) // miss → IdP latency
+	inst.RecordExchange(ctx, "ok", "corpIdP", 0)                   // hit → sub-millisecond
+
+	metrictest.AssertSumWithAttrs(t, tp.FindMetric(t, exchangeMetricRequests), int64(2),
+		attribute.String(exchangeAttrOutcome, "ok"), attribute.String(exchangeAttrProvider, "corpIdP"))
+	metrictest.AssertHistogramCount(t, tp.FindMetric(t, exchangeMetricDuration), uint64(2))
+}
+
+// TestRecordCacheHit_SeparateCounter pins TC13: a cache hit is recorded on the
+// dedicated `cache_hit` counter (labelled by provider only), NOT as a
+// `cache_hit` outcome on the requests counter.
+func TestRecordCacheHit_SeparateCounter(t *testing.T) {
+	inst, tp := activeProvider(t)
+	ctx := context.Background()
+
+	inst.RecordExchange(ctx, "ok", "corpIdP", 80*time.Millisecond) // miss (ok)
+	inst.RecordExchange(ctx, "ok", "corpIdP", 0)                   // hit (ok, served from cache)
+	inst.RecordCacheHit(ctx, "corpIdP")                            // the warm request only
+
+	// requests{outcome=ok,provider=corpIdP} counted twice; one datapoint
+	// (no separate cache_hit outcome).
+	reqs := tp.FindMetric(t, exchangeMetricRequests)
+	metrictest.AssertSumWithAttrs(t, reqs, int64(2),
+		attribute.String(exchangeAttrOutcome, "ok"), attribute.String(exchangeAttrProvider, "corpIdP"))
+	metrictest.AssertDataPointCount(t, reqs, 1)
+
+	// cache_hit{provider=corpIdP} incremented once, labelled by provider only.
+	ch := tp.FindMetric(t, exchangeMetricCacheHit)
+	metrictest.AssertSumWithAttrs(t, ch, int64(1), attribute.String(exchangeAttrProvider, "corpIdP"))
+	metrictest.AssertDataPointCount(t, ch, 1)
+}
+
+func TestExchangeMetricNames_Registered(t *testing.T) {
+	inst, tp := activeProvider(t)
+	ctx := context.Background()
+
+	inst.RecordExchange(ctx, "ok", "corpIdP", time.Millisecond)
+	inst.RecordCacheHit(ctx, "corpIdP")
+
+	names := tp.MetricNames()
+	for _, name := range []string{
+		exchangeMetricRequests,
+		exchangeMetricDuration,
+		exchangeMetricCacheHit,
+	} {
+		assert.Contains(t, names, name)
 	}
 }
 

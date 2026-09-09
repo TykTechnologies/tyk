@@ -272,3 +272,28 @@ func TestUsageTracker_ReplaceAll(t *testing.T) {
 	})
 
 }
+
+// TestExtractCertificatesFromSpec_SkipsEmbeddedPEM verifies that inline PEM
+// values in spec.Certificates / ClientCertificates / UpstreamCertificates /
+// PinnedPublicKeys are NOT added to the usage map. They are inline content
+// and have no corresponding MDCB sync target.
+func TestExtractCertificatesFromSpec_SkipsEmbeddedPEM(t *testing.T) {
+	embeddedPEM := "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJANRA...\n-----END CERTIFICATE-----"
+
+	spec := createTestAPISpec(
+		"api1",
+		[]string{"real-cert-id-1", embeddedPEM},
+		[]string{"real-cert-id-2", embeddedPEM},
+		map[string]string{"upstream-a": "real-cert-id-3", "upstream-b": embeddedPEM},
+		map[string]string{"pinned-a": "real-key-id-1", "pinned-b": embeddedPEM},
+	)
+
+	got := extractCertificatesFromSpec(spec)
+
+	assert.Equal(t, 4, len(got), "embedded PEMs must be excluded from the usage set")
+	assert.Contains(t, got, "real-cert-id-1")
+	assert.Contains(t, got, "real-cert-id-2")
+	assert.Contains(t, got, "real-cert-id-3")
+	assert.Contains(t, got, "real-key-id-1")
+	assert.NotContains(t, got, embeddedPEM, "embedded PEM should not appear as a map key")
+}

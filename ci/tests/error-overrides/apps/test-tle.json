@@ -1,0 +1,24 @@
+{
+  "name": "Test TLE - TLS Expired",
+  "api_id": "test-tle",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-tle/",
+    "target_url": "https://backend-tls-expired:443",
+    "strip_listen_path": true,
+    "transport": {
+      "ssl_insecure_skip_verify": false
+    }
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  }
+}

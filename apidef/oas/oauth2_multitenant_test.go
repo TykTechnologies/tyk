@@ -1,0 +1,101 @@
+package oas
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// multiTenantScheme builds a one-provider token-exchange scheme with the given
+// issuers and tokenEndpoint.
+func multiTenantScheme(issuers []string, tokenEndpoint string) *OAS {
+	return newOAuth2WithTokenExchange("corpOAuth", &OAuth2TokenExchange{
+		Enabled: true,
+		Providers: []OAuth2TokenExchangeProvider{{
+			Name:          "corp-idp",
+			GrantType:     OAuth2ProviderGrantJWTBearer,
+			Issuers:       issuers,
+			TokenEndpoint: tokenEndpoint,
+			ClientAuth:    &OAuth2ClientAuth{ClientID: "cid"},
+		}},
+	})
+}
+
+func TestValidateOAuth2Schemes_RegexIssuers(t *testing.T) {
+	const canonical = `regex:^https://login\.example\.com/[^/]+/v2\.0$`
+
+	t.Run("canonical anchored entry loads", func(t *testing.T) {
+		s := multiTenantScheme([]string{canonical}, "https://login.example.com/common/token")
+		assert.NoError(t, s.ValidateOAuth2Schemes())
+	})
+
+	t.Run("anchored but non-compiling entry is a load error", func(t *testing.T) {
+		s := multiTenantScheme([]string{"regex:^https://[unclosed$"}, "https://idp/token")
+		err := s.ValidateOAuth2Schemes()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "compile")
+	})
+
+	t.Run("anchoring is checked before compilation", func(t *testing.T) {
+		// Unanchored and non-compiling: the anchoring failure is reported first.
+		s := multiTenantScheme([]string{"regex:[unclosed"}, "https://idp/token")
+		err := s.ValidateOAuth2Schemes()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "anchored")
+	})
+
+	t.Run("unanchored entry is a load error naming the anchoring requirement", func(t *testing.T) {
+		s := multiTenantScheme([]string{`regex:https://login\.example\.com/[^/]+/v2\.0`}, "https://idp/token")
+		err := s.ValidateOAuth2Schemes()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "anchored")
+	})
+
+	t.Run("exact entries with regex metacharacters still validate unchanged", func(t *testing.T) {
+		s := multiTenantScheme([]string{"https://idp.example.com/realms/prod"}, "https://idp/token")
+		assert.NoError(t, s.ValidateOAuth2Schemes())
+	})
+
+	t.Run("duplicate exact issuers across providers stay rejected", func(t *testing.T) {
+		s := newOAuth2WithTokenExchange("corpOAuth", &OAuth2TokenExchange{
+			Enabled: true,
+			Providers: []OAuth2TokenExchangeProvider{
+				{Name: "a", Issuers: []string{"https://shared"}, TokenEndpoint: "https://a/token", ClientAuth: &OAuth2ClientAuth{ClientID: "c"}},
+				{Name: "b", Issuers: []string{"https://shared"}, TokenEndpoint: "https://b/token", ClientAuth: &OAuth2ClientAuth{ClientID: "c"}},
+			},
+		})
+		require.Error(t, s.ValidateOAuth2Schemes())
+	})
+
+	t.Run("identical regex entries on two providers are not an overlap error — order decides", func(t *testing.T) {
+		s := newOAuth2WithTokenExchange("corpOAuth", &OAuth2TokenExchange{
+			Enabled: true,
+			Providers: []OAuth2TokenExchangeProvider{
+				{Name: "a", Issuers: []string{canonical}, TokenEndpoint: "https://a/token", ClientAuth: &OAuth2ClientAuth{ClientID: "c"}},
+				{Name: "b", Issuers: []string{canonical}, TokenEndpoint: "https://b/token", ClientAuth: &OAuth2ClientAuth{ClientID: "c"}},
+			},
+		})
+		assert.NoError(t, s.ValidateOAuth2Schemes())
+	})
+}
+
+func TestValidateOAuth2Schemes_TokenEndpointVariable(t *testing.T) {
+	// Variables load anywhere in the URL string; resolution is request-time.
+	for name, endpoint := range map[string]string{
+		"jwt_claims variable in the path": "https://login.example.com/$tyk_context.jwt_claims_tid/oauth2/v2.0/token",
+		"variable in host position":       "https://$tyk_context.jwt_claims_tid.example.com/token",
+		"non-jwt_claims context variable": "https://login.example.com/$tyk_context.headers_X-Tenant/token",
+		"whole endpoint is a variable":    "$tyk_context.jwt_claims_token_endpoint",
+	} {
+		t.Run(name+" loads", func(t *testing.T) {
+			s := multiTenantScheme([]string{"https://idp"}, endpoint)
+			assert.NoError(t, s.ValidateOAuth2Schemes())
+		})
+	}
+
+	t.Run("a non-URL tokenEndpoint is still a load error", func(t *testing.T) {
+		s := multiTenantScheme([]string{"https://idp"}, "not-a-url")
+		require.Error(t, s.ValidateOAuth2Schemes())
+	})
+}

@@ -44,10 +44,25 @@ func IsHashType(t string) bool {
 	return false
 }
 
+// AccessCondition is an additional constraint that a request has to satisfy
+// before the enclosing AccessSpec grants access. It mirrors
+// apidef.RoutingTrigger, minus the RewriteTo field which has no meaning here.
+type AccessCondition struct {
+	// On decides how the options below combine: apidef.All requires every
+	// configured option to match, apidef.Any requires just one of them.
+	On apidef.RoutingTriggerOnType `json:"on" msg:"on"`
+	// Options holds the header, query, path part, session meta, request
+	// context and payload matches to evaluate against the request.
+	Options apidef.RoutingTriggerOptions `json:"options" msg:"options"`
+}
+
 // AccessSpecs define what URLS a user has access to an what methods are enabled
 type AccessSpec struct {
 	URL     string   `json:"url" msg:"url"`
 	Methods []string `json:"methods" msg:"methods"`
+	// Conditions further restrict the matched URL. When set, every condition
+	// has to be satisfied by the request for access to be granted.
+	Conditions []AccessCondition `json:"conditions,omitempty" msg:"conditions"`
 }
 
 // RateLimit holds rate limit configuration.
@@ -348,6 +363,11 @@ type SessionState struct {
 	// modified holds the hint if a session has been modified for update.
 	// use Touch() to set it, and IsModified() to get it.
 	modified bool
+
+	// isRestored
+	// The flag holds information if session was restored or not.
+	// Use MarkAsRestored() to mark session as restored, and IsRestored() to get it.
+	isRestored bool
 }
 
 func NewSessionState() *SessionState {
@@ -379,6 +399,21 @@ func (s *SessionState) Touch() {
 // Reset marks the session as not modified, skipping related updates.
 func (s *SessionState) Reset() {
 	s.modified = false
+}
+
+// MarkAsRestored marks the session as restored.
+func (s *SessionState) MarkAsRestored() {
+	s.isRestored = true
+}
+
+// MarkAsNew marks the session as new.
+func (s *SessionState) MarkAsNew() {
+	s.isRestored = false
+}
+
+// IsRestored informs if session is a new one.
+func (s *SessionState) IsRestored() bool {
+	return s.isRestored
 }
 
 // IsModified will return true if session has been modified to trigger an update.

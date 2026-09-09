@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -18,8 +20,8 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
@@ -854,6 +856,9 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	tsDash := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/apis" {
 			w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {}}]}`))
+		} else if r.URL.Path == "/system/clientidps" {
+			// The reload also refreshes the client-IdP registry; return an empty feed.
+			mustWriteJSON(t, w, `{"Status": "OK", "Nonce": "1", "Message": []}`)
 		} else {
 			t.Fatal("Unknown dashboard API request", r)
 		}
@@ -1207,6 +1212,9 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 			}
 
 			callNum += 1
+		} else if r.URL.Path == "/system/clientidps" {
+			// The reload also refreshes the client-IdP registry; return an empty feed.
+			mustWriteJSON(t, w, `{"Status": "OK", "Nonce": "1", "Message": []}`)
 		} else {
 			t.Fatal("Unknown dashboard API request", r)
 		}
@@ -1369,6 +1377,17 @@ func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
 		a.SanitizeProxyPaths(r)
 
 		assert.Equal(t, "/get", r.URL.Path)
+		assert.Equal(t, "", r.URL.RawPath)
+	})
+
+	t.Run("strip=true but URL rewrite path is set", func(t *testing.T) {
+		a.Proxy.StripListenPath = true
+		r := httptest.NewRequest(http.MethodGet, "https://proxy.com/listen/get", nil)
+		ctxSetUrlRewritePath(r, r.URL.Path)
+
+		a.SanitizeProxyPaths(r)
+
+		assert.Equal(t, "/listen/get", r.URL.Path)
 		assert.Equal(t, "", r.URL.RawPath)
 	})
 }
@@ -1660,6 +1679,278 @@ func TestReplaceSecrets(t *testing.T) {
 	assert.Equal(t, "Ghiur", api2.AuthConfigs[apidef.OAuthType].AuthHeaderName)
 }
 
+func TestReplaceSecrets_NewSyntax(t *testing.T) {
+	t.Setenv("TYK_SECRET_TOKEN", "tok-new")
+	t.Setenv("RAW_TOKEN", "tok-raw")
+
+	gw := NewGateway(config.Config{
+		Secrets: map[string]string{
+			"db_url": "resolved-db-url",
+			// A value that MUST be JSON-escaped to keep the document valid.
+			"cert": "-----BEGIN-----\nline\twith \"quotes\"\n-----END-----\n",
+		},
+	}, t.Context())
+
+	l := APIDefinitionLoader{Gw: gw}
+
+	t.Run("kv:// whole-value reference is resolved", func(t *testing.T) {
+		out := l.replaceSecrets([]byte(`{"target_url":"kv://secrets/db_url"}`))
+		require.JSONEq(t, `{"target_url":"resolved-db-url"}`, string(out))
+	})
+
+	t.Run("$kv{} inline token is resolved within a string", func(t *testing.T) {
+		out := l.replaceSecrets([]byte(`{"target_url":"https://$kv{secrets:db_url}/v1"}`))
+		require.JSONEq(t, `{"target_url":"https://resolved-db-url/v1"}`, string(out))
+	})
+
+	t.Run("env semantics differ: env:// is raw, $kv{env:} is TYK_SECRET_ prefixed", func(t *testing.T) {
+		legacy := l.replaceSecrets([]byte(`{"a":"env://RAW_TOKEN"}`))
+		require.JSONEq(t, `{"a":"tok-raw"}`, string(legacy),
+			"legacy env:// reads the variable name directly")
+
+		newSyntax := l.replaceSecrets([]byte(`{"a":"$kv{env:token}"}`))
+		require.JSONEq(t, `{"a":"tok-new"}`, string(newSyntax),
+			"$kv{env:token} reads TYK_SECRET_TOKEN")
+	})
+
+	t.Run("malformed kv:// reference leaves the document unchanged", func(t *testing.T) {
+		in := []byte(`{"a":"kv://no-path-separator"}`)
+		out := l.replaceSecrets(in)
+		require.JSONEq(t, string(in), string(out),
+			"on a ResolveAll error the document is returned as-is, not corrupted")
+	})
+
+	t.Run("mixed legacy and new syntax both resolve", func(t *testing.T) {
+		out := l.replaceSecrets([]byte(`{"legacy":"secrets://db_url","new":"kv://secrets/db_url"}`))
+		s := string(out)
+		require.NotContains(t, s, "secrets://db_url", "legacy reference must be resolved")
+		require.NotContains(t, s, "kv://secrets/db_url", "new reference must be resolved")
+		require.JSONEq(t, `{"legacy":"resolved-db-url","new":"resolved-db-url"}`, s)
+	})
+
+	t.Run("resolved value needing JSON escaping keeps the document valid", func(t *testing.T) {
+		// ResolveAll parses the document, resolves string values, and
+		// re-serializes — so values with quotes/newlines are JSON-escaped
+		// automatically.
+		out := l.replaceSecrets([]byte(`{"cert":"kv://secrets/cert"}`))
+
+		var result map[string]string
+		require.NoError(t, json.Unmarshal(out, &result),
+			"output must be valid JSON after resolving a value with quotes/newlines")
+		require.Equal(t, "-----BEGIN-----\nline\twith \"quotes\"\n-----END-----\n", result["cert"],
+			"the resolved value round-trips exactly — escaped once, not double-escaped")
+	})
+}
+
+// TestMakeSpec_ValidListenPath_KVReference proves the gap ValidListenPath() closes: a
+// Proxy.ListenPath given as a KV reference (env://, secrets://, ...) can resolve to a value
+// with no leading slash — Dashboard can't catch this at write time, since it never sees the
+// resolved value, only the reference. Without normalizing inside MakeSpec, the resolved value
+// would fail httputil.ValidatePath and the API would never load. This exercises the real
+// replaceSecrets -> MakeSpec pipeline (via BuildAndLoadAPI, which loads from disk), not just
+// the ValidListenPath() unit in isolation.
+func TestMakeSpec_ValidListenPath_KVReference(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Setenv("TestMakeSpec_ValidListenPath_KVReference_var", "kv-no-slash")
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "kv-listen-path"
+		spec.Proxy.ListenPath = "env://TestMakeSpec_ValidListenPath_KVReference_var"
+	})
+
+	api := ts.Gw.getApiSpec("kv-listen-path")
+	require.NotNil(t, api)
+	assert.Equal(t, "/kv-no-slash", api.Proxy.ListenPath, "resolved KV reference must be normalized with a leading slash")
+
+	ts.Run(t, test.TestCase{Method: http.MethodGet, Path: "/kv-no-slash/get", Code: http.StatusOK})
+}
+
+// TestMakeSpec_ValidListenPath_TraversalAndStrictRoutes proves ValidListenPath resolves ".."
+// segments while preserving a trailing slash, and that preservation is load-bearing for
+// EnableStrictRoutes: a trailing slash tells explicitRouteSubpaths to rely on mux's own
+// literal-prefix boundary instead of wrapping the handler, while its absence triggers the
+// wrapper, which 404s requests that only share a text prefix with the listen path.
+func TestMakeSpec_ValidListenPath_TraversalAndStrictRoutes(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.EnableStrictRoutes = true
+	})
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.APIID = "traversal-with-slash"
+			spec.Proxy.ListenPath = "/foo/../bar/"
+		},
+		func(spec *APISpec) {
+			spec.APIID = "traversal-no-slash"
+			spec.Proxy.ListenPath = "/foo/../baz"
+		},
+	)
+
+	withSlash := ts.Gw.getApiSpec("traversal-with-slash")
+	require.NotNil(t, withSlash)
+	assert.Equal(t, "/bar/", withSlash.Proxy.ListenPath)
+
+	noSlash := ts.Gw.getApiSpec("traversal-no-slash")
+	require.NotNil(t, noSlash)
+	assert.Equal(t, "/baz", noSlash.Proxy.ListenPath)
+
+	ts.Run(t, []test.TestCase{
+		// trailing slash preserved: mux's literal-prefix match already requires the "/bar/"
+		// boundary, so a merely-prefixed path never reaches this API at all.
+		{Method: http.MethodGet, Path: "/bar/get", Code: http.StatusOK},
+		{Method: http.MethodGet, Path: "/barextra/get", Code: http.StatusNotFound},
+
+		// no trailing slash: mux's PathPrefix("/baz") loosely matches "/bazextra" too, so
+		// explicitRouteSubpaths wraps the handler and rejects it despite the loose mux match.
+		{Method: http.MethodGet, Path: "/baz/get", Code: http.StatusOK},
+		{Method: http.MethodGet, Path: "/bazextra/get", Code: http.StatusNotFound},
+	}...)
+}
+
+func TestReplaceSecretsFileScheme(t *testing.T) {
+	t.Run("file:// references rejected without base_path", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		t.Run("absolute file:// reference left unresolved", func(t *testing.T) {
+			dir := t.TempDir()
+			f := filepath.Join(dir, "jwt-secret")
+			require.NoError(t, os.WriteFile(f, []byte("my-jwt-signing-key\n"), 0600))
+
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.APIID = "file-kv-1"
+				spec.JWTSource = "file://" + f
+			})
+
+			api := ts.Gw.getApiSpec("file-kv-1")
+			require.NotNil(t, api)
+			assert.NotContains(t, api.JWTSource, "my-jwt-signing-key", "file contents must not be injected without base_path")
+			assert.Equal(t, "file://"+f, api.JWTSource, "raw file:// reference should be left unresolved")
+		})
+
+		t.Run("relative file:// reference left unresolved", func(t *testing.T) {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.APIID = "file-kv-2"
+				spec.JWTSource = "file://jwt-secret"
+			})
+
+			api := ts.Gw.getApiSpec("file-kv-2")
+			require.NotNil(t, api)
+			assert.Equal(t, "file://jwt-secret", api.JWTSource, "raw file:// reference should be left unresolved")
+		})
+	})
+
+	t.Run("relative key resolved via base_path", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "jwt-secret"), []byte("key-from-mount"), 0600))
+
+		ts := StartTest(func(conf *config.Config) {
+			conf.KV.File.BasePath = dir
+		})
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "file-kv-3"
+			spec.JWTSource = "file://jwt-secret"
+		})
+
+		api := ts.Gw.getApiSpec("file-kv-3")
+		require.NotNil(t, api)
+		assert.Equal(t, "key-from-mount", api.JWTSource)
+	})
+
+	t.Run("absolute path in API definition is rejected", func(t *testing.T) {
+		baseDir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(baseDir, "jwt-secret"), []byte("allowed-value"), 0600))
+
+		outsideDir := t.TempDir()
+		secret := filepath.Join(outsideDir, "passwd")
+		require.NoError(t, os.WriteFile(secret, []byte("root:x:0:0:secret"), 0600))
+
+		ts := StartTest(func(conf *config.Config) {
+			conf.KV.File.BasePath = baseDir
+		})
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "file-kv-abs-reject"
+			spec.JWTSource = "file://" + secret
+		})
+
+		api := ts.Gw.getApiSpec("file-kv-abs-reject")
+		require.NotNil(t, api)
+		assert.NotContains(t, api.JWTSource, "root:x:0:0", "absolute-path file contents must not be injected")
+		assert.Equal(t, "file://"+secret, api.JWTSource, "raw file:// reference should be left unresolved")
+	})
+
+	t.Run("multi-line PEM content is valid JSON after substitution", func(t *testing.T) {
+		dir := t.TempDir()
+		pem := "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJ\n-----END CERTIFICATE-----"
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "tls.crt"), []byte(pem+"\n"), 0600))
+
+		ts := StartTest(func(conf *config.Config) {
+			conf.KV.File.BasePath = dir
+		})
+		defer ts.Close()
+
+		// If the replacement is not JSON-escaped, the literal newlines in the PEM
+		// produce invalid JSON and BuildAndLoadAPI silently loads nothing.
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "file-kv-pem"
+			spec.JWTSource = "file://tls.crt"
+		})
+
+		api := ts.Gw.getApiSpec("file-kv-pem")
+		require.NotNil(t, api)
+		assert.Equal(t, pem, api.JWTSource)
+	})
+}
+
+func TestReplaceSecrets_LegacyVaultConsul(t *testing.T) {
+	gw := NewGateway(config.Config{}, t.Context())
+
+	installFakeKVStores(t, gw, map[string]map[string]string{
+		"consul": {
+			"tyk-apis/c2_value": "consul-c2-resolved",
+		},
+		"vault": {
+			"secret/tyk-apis": `{"auth_header_name":"vault-field-resolved"}`,
+		},
+	})
+
+	l := APIDefinitionLoader{Gw: gw}
+
+	t.Run("consul whole value", func(t *testing.T) {
+		out := l.replaceSecrets([]byte(`{"target_url":"consul://c2_value"}`))
+		require.JSONEq(t, `{"target_url":"consul-c2-resolved"}`, string(out))
+	})
+
+	t.Run("consul inline within a larger string", func(t *testing.T) {
+		out := l.replaceSecrets([]byte(`{"h":"prefix-consul://c2_value-suffix"}`))
+		require.JSONEq(t, `{"h":"prefix-consul-c2-resolved-suffix"}`, string(out))
+	})
+
+	t.Run("vault whole value resolves a field of secret/tyk-apis", func(t *testing.T) {
+		out := l.replaceSecrets([]byte(`{"auth_header_name":"vault://auth_header_name"}`))
+		require.JSONEq(t, `{"auth_header_name":"vault-field-resolved"}`, string(out))
+	})
+
+	t.Run("vault inline within a larger string", func(t *testing.T) {
+		out := l.replaceSecrets([]byte(`{"h":"prefix-vault://auth_header_name-suffix"}`))
+		require.JSONEq(t, `{"h":"prefix-vault-field-resolved-suffix"}`, string(out))
+	})
+
+	t.Run("legacy and new syntax for the same target resolve together", func(t *testing.T) {
+		out := l.replaceSecrets([]byte(
+			`{"legacy":"consul://c2_value","new":"kv://consul/tyk-apis/c2_value"}`))
+		require.JSONEq(t,
+			`{"legacy":"consul-c2-resolved","new":"consul-c2-resolved"}`, string(out))
+	})
+}
+
 func TestInternalEndpointMW_TT_11126(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -1703,7 +1994,7 @@ func TestFromDashboardServiceAutoRecovery(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/register/node") {
 			registrationCount++
 			w.Header().Set("Content-Type", "application/json")
-			response := NodeResponseOK{
+			response := NodeResponse{
 				Status:  "ok",
 				Message: map[string]string{"NodeID": "test-node-id"},
 				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
@@ -1891,7 +2182,7 @@ func TestFromDashboardServiceNoNodeIDFound(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/register/node") {
 			registrationCount++
 			w.Header().Set("Content-Type", "application/json")
-			response := NodeResponseOK{
+			response := NodeResponse{
 				Status:  "ok",
 				Message: map[string]string{"NodeID": "test-node-id"},
 				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
@@ -2077,7 +2368,7 @@ func TestFromDashboardServiceNetworkErrorRecovery(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/register/node") {
 			registrationCount++
 			w.Header().Set("Content-Type", "application/json")
-			response := NodeResponseOK{
+			response := NodeResponse{
 				Status:  "ok",
 				Message: map[string]string{"NodeID": "test-node-id"},
 				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
@@ -2455,168 +2746,102 @@ func TestAPISpec_Version(t *testing.T) {
 
 }
 
-// mockVaultSecretReader implements vaultSecretReader and kv.Store for testing.
-type mockVaultSecretReader struct {
-	secret *vaultapi.Secret
-	err    error
-}
-
-func (m *mockVaultSecretReader) ReadSecret(_ string) (*vaultapi.Secret, error) {
-	return m.secret, m.err
-}
-
-func (m *mockVaultSecretReader) Get(_ string) (string, error) { return "", nil }
-func (m *mockVaultSecretReader) Put(_, _ string) error        { return nil }
-
-// mockKVStoreWithoutSecretReader implements kv.Store but NOT kv.SecretReader.
-type mockKVStoreWithoutSecretReader struct{}
-
-func (m *mockKVStoreWithoutSecretReader) Get(_ string) (string, error) { return "", nil }
-func (m *mockKVStoreWithoutSecretReader) Put(_, _ string) error        { return nil }
-
 // TT-14791: A non-existent Vault path caused a panic due to nil secret.
 func TestReplaceVaultSecrets(t *testing.T) {
-	t.Run("vault store does not implement SecretReader", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
+	// newLoader builds a redis-free gateway with the given fake KV stores.
+	// A nil map installs a registry with no vault store.
+	newLoader := func(t *testing.T, stores map[string]map[string]string) APIDefinitionLoader {
+		t.Helper()
 
-		ts.Gw.vaultKVStore = &mockKVStoreWithoutSecretReader{}
+		gw := NewGateway(config.Config{}, t.Context())
+		installFakeKVStores(t, gw, stores)
 
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
+		return APIDefinitionLoader{Gw: gw}
+	}
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "could not read secrets")
+	// withVaultSecret puts the given JSON at the fixed secret's logical path.
+	withVaultSecret := func(secretJSON string) map[string]map[string]string {
+		return map[string]map[string]string{"vault": {vaultSecretPath: secretJSON}}
+	}
+
+	t.Run("resolves fields whole-value and inline", func(t *testing.T) {
+		l := newLoader(t, withVaultSecret(`{"auth_header_name":"X-From-Vault","db":"hunter2"}`))
+
+		input := `{"a":"vault://auth_header_name","b":"prefix-vault://db-suffix"}`
+		require.NoError(t, l.replaceVaultSecrets(&input))
+		require.JSONEq(t, `{"a":"X-From-Vault","b":"prefix-hunter2-suffix"}`, input)
 	})
 
-	t.Run("vault path does not exist - nil secret", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
+	t.Run("multiline value keeps the document valid JSON", func(t *testing.T) {
+		multiline := "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIU\n-----END CERTIFICATE-----\n"
+		secretJSON, err := json.Marshal(map[string]string{"certo": multiline})
+		require.NoError(t, err)
 
-		// nil secret simulates non-existent path
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{secret: nil, err: nil}
+		l := newLoader(t, withVaultSecret(string(secretJSON)))
 
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
+		input := `{"allowlist":["vault://certo"]}`
+		require.NoError(t, l.replaceVaultSecrets(&input))
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "vault path does not exist")
+		var result map[string]any
+		require.NoError(t, json.Unmarshal([]byte(input), &result), "substituted JSON must be valid")
 	})
 
-	t.Run("vault path contains no data", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
+	t.Run("store not registered", func(t *testing.T) {
+		l := newLoader(t, nil) // registry has no vault store
 
-		// non-nil secret but nil Data simulates empty/deleted secret
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{
-			secret: &vaultapi.Secret{Data: nil},
-			err:    nil,
-		}
-
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "vault path contains no data")
+		input := `{"a":"vault://x"}`
+		require.Error(t, l.replaceVaultSecrets(&input))
+		require.Contains(t, input, "vault://x", "reference must be left literal")
 	})
 
-	t.Run("vault ReadSecret returns error", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
+	t.Run("fixed secret missing", func(t *testing.T) {
+		l := newLoader(t, map[string]map[string]string{"vault": {"some/other/path": "{}"}})
 
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{
-			secret: nil,
-			err:    errors.New("vault server unavailable"),
-		}
-
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "vault server unavailable")
+		input := `{"a":"vault://x"}`
+		require.Error(t, l.replaceVaultSecrets(&input))
+		require.Contains(t, input, "vault://x", "reference must be left literal")
 	})
 
-	t.Run("vault secret missing data key", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
+	t.Run("secret value is not JSON", func(t *testing.T) {
+		l := newLoader(t, withVaultSecret("not-json"))
 
-		// secret.Data exists but doesn't have "data" key
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{
-			secret: &vaultapi.Secret{
-				Data: map[string]interface{}{
-					"other-key": "some-value",
-				},
-			},
-		}
-
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "no data returned")
+		input := `{"a":"vault://x"}`
+		require.Error(t, l.replaceVaultSecrets(&input))
+		require.Contains(t, input, "vault://x", "reference must be left literal")
 	})
+}
 
-	t.Run("vault secret data is wrong type", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
+func TestReplaceEnvSecretsMultilineJSON(t *testing.T) {
+	multiline := "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIU\n-----END CERTIFICATE-----\n"
+	t.Setenv("CERT_VALUE", multiline)
 
-		// secret.Data["data"] exists but is not a map
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{
-			secret: &vaultapi.Secret{
-				Data: map[string]interface{}{
-					"data": "not-a-map",
-				},
-			},
-		}
+	ts := StartTest(nil)
+	defer ts.Close()
 
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
+	l := APIDefinitionLoader{Gw: ts.Gw}
+	input := `{"allowlist":["env://CERT_VALUE"]}`
+	out := l.replaceSecrets([]byte(input))
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "data is not in the map format")
-	})
+	var result map[string]interface{}
+	assert.NoError(t, json.Unmarshal(out, &result), "substituted JSON must be valid after env:// replacement")
+}
 
-	t.Run("vault secrets replaced successfully", func(t *testing.T) {
-		ts := StartTest(nil, TestConfig{
-			Delay: 10 * time.Millisecond,
-		})
-		defer ts.Close()
+func TestReplaceInlineSecretsMultilineJSON(t *testing.T) {
+	multiline := "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIU\n-----END CERTIFICATE-----\n"
 
-		ts.Gw.vaultKVStore = &mockVaultSecretReader{
-			secret: &vaultapi.Secret{
-				Data: map[string]interface{}{
-					"data": map[string]interface{}{
-						"secret-key": "my-secret-value",
-					},
-				},
-			},
-		}
+	ts := StartTest(nil)
+	defer ts.Close()
 
-		l := APIDefinitionLoader{Gw: ts.Gw}
-		input := "some-api-key: vault://secret-key"
-		err := l.replaceVaultSecrets(&input)
+	conf := ts.Gw.GetConfig()
+	conf.Secrets = map[string]string{"certo": multiline}
+	ts.Gw.SetConfig(conf)
 
-		assert.NoError(t, err)
-		assert.Equal(t, "some-api-key: my-secret-value", input)
-	})
+	l := APIDefinitionLoader{Gw: ts.Gw}
+	input := `{"allowlist":["secrets://certo"]}`
+	out := l.replaceSecrets([]byte(input))
+
+	var result map[string]interface{}
+	assert.NoError(t, json.Unmarshal(out, &result), "substituted JSON must be valid after secrets:// replacement")
 }
 
 func TestPopulateMCPPrimitivesMap(t *testing.T) {
@@ -2935,5 +3160,281 @@ func TestURLAllowedAndIgnored_CORSPreflight(t *testing.T) {
 		spec.CORS.OptionsPassthrough = false
 		status, _ := spec.URLAllowedAndIgnored(req, paths, true)
 		assert.Equal(t, EndPointNotAllowed, status)
+	})
+}
+
+func TestLoadDefFromFilePath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	loader := APIDefinitionLoader{Gw: ts.Gw}
+
+	t.Run("load classic definition", func(t *testing.T) {
+		apiName := "Test API"
+		apiID := "test-api-1"
+		def := apidef.APIDefinition{
+			Name:  apiName,
+			APIID: apiID,
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/test-api-1",
+			},
+		}
+		data, err := json.Marshal(def)
+		assert.NoError(t, err)
+
+		tmpFile, err := os.CreateTemp("", "api_def_*.json")
+		assert.NoError(t, err)
+		defer os.Remove(tmpFile.Name())
+
+		_, err = tmpFile.Write(data)
+		assert.NoError(t, err)
+		tmpFile.Close()
+
+		spec, err := loader.loadDefFromFilePath(tmpFile.Name())
+		assert.NoError(t, err)
+		assert.NotNil(t, spec)
+		assert.Equal(t, apiName, spec.Name)
+		assert.Equal(t, apiID, spec.APIID)
+	})
+
+	t.Run("load OAS definition", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "oas_test")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tmpDir)
+
+		apiFilePath := filepath.Join(tmpDir, "test-api.json")
+		oasFilePath := filepath.Join(tmpDir, "test-api-oas.json")
+
+		// Test whether schema validator successfully applies schema manipulation to oas doc.
+		expectedPatternAfterLoad := "{\"^[\\\\x{0000}-\\\\x{017f}]*$\"}"
+		schema := openapi3.NewSchema()
+		schema.Pattern = "{\"^[\\\\u0000-\\\\u017f]*$\"}"
+		oasDoc := &oas.OAS{
+			T: openapi3.T{
+				Components: &openapi3.Components{
+					Schemas: openapi3.Schemas{
+						"Schema1": openapi3.NewSchemaRef("", schema),
+					},
+				},
+			},
+		}
+		oasData, err := json.Marshal(oasDoc)
+		assert.NoError(t, err)
+
+		err = os.WriteFile(oasFilePath, oasData, 0644)
+		assert.NoError(t, err)
+
+		apiName := "Test OAS API"
+		apiID := "test-oas-api-1"
+		def := apidef.APIDefinition{
+			Name:  apiName,
+			APIID: apiID,
+			IsOAS: true,
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/test-oas-api-1",
+			},
+		}
+		data, err := json.Marshal(def)
+		assert.NoError(t, err)
+
+		err = os.WriteFile(apiFilePath, data, 0644)
+		assert.NoError(t, err)
+
+		spec, err := loader.loadDefFromFilePath(apiFilePath)
+		assert.NoError(t, err)
+		assert.NotNil(t, spec)
+		assert.Equal(t, apiName, spec.Name)
+		assert.Equal(t, apiID, spec.APIID)
+		assert.NotNil(t, spec.OAS)
+		assert.Equal(t, expectedPatternAfterLoad, spec.OAS.Components.Schemas["Schema1"].Value.Pattern)
+	})
+
+	t.Run("file not found", func(t *testing.T) {
+		spec, err := loader.loadDefFromFilePath("non_existent_file.json")
+		assert.Error(t, err)
+		assert.Nil(t, spec)
+	})
+
+	t.Run("invalid json", func(t *testing.T) {
+		tmpFile, err := os.CreateTemp("", "api_def_*.json")
+		assert.NoError(t, err)
+		defer os.Remove(tmpFile.Name())
+
+		_, err = tmpFile.Write([]byte("{invalid json}"))
+		assert.NoError(t, err)
+		tmpFile.Close()
+
+		spec, err := loader.loadDefFromFilePath(tmpFile.Name())
+		assert.Error(t, err)
+		assert.Nil(t, spec)
+	})
+}
+
+func TestAPIDefinitionLoaderFromDir_LoadsAPIDefinitionEndingWithCompanionSuffix(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "api_def_suffix_test")
+	assert.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	apiID := "proxy-over-mcp"
+	def := apidef.APIDefinition{
+		Name:  apiID,
+		APIID: apiID,
+		IsOAS: true,
+		Proxy: apidef.ProxyConfig{
+			ListenPath: "/proxy-over-mcp/",
+			TargetURL:  "https://example.org/mcp",
+		},
+	}
+	def.MarkAsMCP()
+
+	apiData, err := json.Marshal(def)
+	assert.NoError(t, err)
+	err = os.WriteFile(filepath.Join(tmpDir, apiID+".json"), apiData, 0644)
+	assert.NoError(t, err)
+
+	oasDoc := &oas.OAS{T: openapi3.T{
+		OpenAPI: "3.0.3",
+		Info:    &openapi3.Info{Title: apiID, Version: "1.0.0"},
+		Paths:   openapi3.NewPaths(),
+	}}
+	oasData, err := json.Marshal(oasDoc)
+	assert.NoError(t, err)
+	err = os.WriteFile(filepath.Join(tmpDir, apiID+"-mcp.json"), oasData, 0644)
+	assert.NoError(t, err)
+
+	gw := &Gateway{apisByID: map[string]*APISpec{}}
+	gw.SetConfig(config.Config{})
+	loader := APIDefinitionLoader{Gw: gw}
+	specs := loader.FromDir(tmpDir)
+
+	assert.Len(t, specs, 1)
+	if assert.NotEmpty(t, specs) {
+		assert.Equal(t, apiID, specs[0].APIID)
+		assert.NotNil(t, specs[0].OAS)
+	}
+}
+
+func TestGatewayWriteSpecFiles_WritesCompanionsOnlyForOASAPIs(t *testing.T) {
+	classic := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "classic",
+		},
+	}
+	oasSpec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "oas",
+			IsOAS: true,
+		},
+		OAS: oas.OAS{T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info:    &openapi3.Info{Title: "oas", Version: "1.0.0"},
+			Paths:   openapi3.NewPaths(),
+		}},
+	}
+	mcpSpec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "mcp",
+			IsOAS: true,
+		},
+		OAS: oas.OAS{T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info:    &openapi3.Info{Title: "mcp", Version: "1.0.0"},
+			Paths:   openapi3.NewPaths(),
+		}},
+	}
+	mcpSpec.MarkAsMCP()
+
+	appPath := t.TempDir()
+	(&Gateway{}).writeSpecFiles([]*APISpec{classic, oasSpec, mcpSpec}, appPath)
+
+	entries, err := os.ReadDir(appPath)
+	require.NoError(t, err)
+
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	assert.ElementsMatch(t, []string{
+		"classic0.json",
+		"oas1.json",
+		"oas1-oas.json",
+		"mcp2.json",
+		"mcp2-mcp.json",
+	}, names)
+}
+
+func TestAPISpec_PrepareRequestToLog_and_ShallowClone(t *testing.T) {
+	t.Run("without target path", func(t *testing.T) {
+		a := APISpec{APIDefinition: &apidef.APIDefinition{}}
+		a.Proxy.ListenPath = "/listen/"
+		a.Proxy.StripListenPath = true
+
+		r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://proxy.com/listen/get", nil)
+		assert.NoError(t, err)
+
+		dup := a.PrepareRequestToLog(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/get", dup.URL.Path)
+		assert.Equal(t, "", dup.URL.RawPath)
+
+		dup = a.PrepareRequestToLogShallowClone(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/get", dup.URL.Path)
+		assert.Equal(t, "", dup.URL.RawPath)
+	})
+
+	t.Run("with target path", func(t *testing.T) {
+		var err error
+
+		a := APISpec{APIDefinition: &apidef.APIDefinition{}}
+		a.Proxy.ListenPath = "/listen/"
+		a.Proxy.StripListenPath = true
+		a.target, err = url.Parse("http://upstream.com/base")
+		assert.NoError(t, err)
+
+		r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://proxy.com/listen/get", nil)
+		assert.NoError(t, err)
+
+		dup := a.PrepareRequestToLog(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/base/get", dup.URL.Path)
+		assert.Equal(t, "", dup.URL.RawPath)
+
+		dup = a.PrepareRequestToLogShallowClone(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/base/get", dup.URL.Path)
+		assert.Equal(t, "", dup.URL.RawPath)
+	})
+
+	t.Run("with target path and raw path", func(t *testing.T) {
+		var err error
+
+		a := APISpec{APIDefinition: &apidef.APIDefinition{}}
+		a.Proxy.ListenPath = "/listen/"
+		a.Proxy.StripListenPath = true
+		a.target, err = url.Parse("http://upstream.com/base")
+		assert.NoError(t, err)
+
+		r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://proxy.com/listen/get%20it", nil)
+		assert.NoError(t, err)
+
+		r.URL.Path = "/listen/get it"
+		r.URL.RawPath = "/listen/get%20it"
+
+		dup := a.PrepareRequestToLog(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/base/get it", dup.URL.Path)
+		assert.Equal(t, "/base/get%20it", dup.URL.RawPath)
+
+		dup = a.PrepareRequestToLogShallowClone(r)
+
+		assert.NotSame(t, r, dup)
+		assert.Equal(t, "/base/get it", dup.URL.Path)
+		assert.Equal(t, "/base/get%20it", dup.URL.RawPath)
 	})
 }

@@ -67,6 +67,8 @@ const (
 	JSONRPCRoutingState
 	// MCPRouting indicates the request came via MCP JSON-RPC routing
 	MCPRouting
+	// OriginalRequestPath stores the original request path before any middleware modifications
+	OriginalRequestPath
 	// MCPMethod stores the JSON-RPC method name for MCP metrics dimensions.
 	MCPMethod
 	// MCPPrimitiveType stores the MCP primitive type (tool/resource/prompt) for metrics dimensions.
@@ -75,6 +77,10 @@ const (
 	MCPPrimitiveName
 	// JSONRPCErrorCode stores the JSON-RPC error code for metrics dimensions.
 	JSONRPCErrorCode
+	// MatchedIdPBinding holds the per-request client-IdP registry binding matched
+	// in the JWT middleware. The value (a *gateway.Binding) is type-asserted on
+	// the gateway side; only the key lives here to avoid an import cycle.
+	MatchedIdPBinding
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
@@ -171,6 +177,22 @@ func GetOASDefinition(r *http.Request) *oas.OAS {
 	}
 
 	return nil
+}
+
+// GetOASConfigData returns the config data of the OAS API definition valid for the request.
+// It does not deep copy the whole API definition, making it faster than GetOASDefinition.
+func GetOASConfigData(r *http.Request) (map[string]interface{}, error) {
+	oasDef, ok := r.Context().Value(OASDefinition).(*oas.OAS)
+	if !ok || oasDef == nil {
+		return nil, errors.New("OAS definition not found in request context")
+	}
+
+	mw := oasDef.GetTykMiddleware()
+	if mw == nil || mw.Global == nil || mw.Global.PluginConfig == nil || mw.Global.PluginConfig.Data == nil {
+		return nil, errors.New("config data is nil")
+	}
+
+	return mw.Global.PluginConfig.Data.Value, nil
 }
 
 // SetErrorClassification sets the error classification for the request context.

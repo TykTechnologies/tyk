@@ -1,0 +1,595 @@
+services:
+  # Redis for Tyk Gateway
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6399:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Tyk Gateway with error_overrides enabled
+  tyk-gateway:
+    image: ${GATEWAY_IMAGE:-tykio/tyk-gateway:latest}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./configs/tyk.conf:/opt/tyk-gateway/tyk.conf:ro
+      - ./apps:/opt/tyk-gateway/apps:ro
+      - ./policies:/opt/tyk-gateway/policies:ro
+      - ./certs:/opt/tyk-gateway/certs:ro
+      - ./templates:/opt/tyk-gateway/templates:ro
+    environment:
+      - TYK_GW_SECRET=352d20ee67be67f6340b4c0605b044b7
+      - TYK_GW_STORAGE_HOST=redis
+      - TYK_GW_STORAGE_PORT=6379
+      - TYK_GW_STORAGE_DATABASE=1
+      - SSL_CERT_FILE=/opt/tyk-gateway/certs/ca.crt
+    depends_on:
+      redis:
+        condition: service_healthy
+      cert-generator:
+        condition: service_completed_successfully
+      backend-ok:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/hello"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # Generates test certificates for TLS scenarios
+  cert-generator:
+    image: alpine:3.19
+    volumes:
+      - ./certs:/certs
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        apk add --no-cache openssl
+        mkdir -p /certs
+
+        # Generate CA
+        openssl genrsa -out /certs/ca.key 2048
+        openssl req -x509 -new -nodes -key /certs/ca.key -sha256 -days 365 \
+          -out /certs/ca.crt -subj "/CN=Test CA"
+
+        # Valid certificate for backend-ok
+        openssl genrsa -out /certs/valid.key 2048
+        openssl req -new -key /certs/valid.key -out /certs/valid.csr \
+          -subj "/CN=backend-ok"
+        openssl x509 -req -in /certs/valid.csr -CA /certs/ca.crt -CAkey /certs/ca.key \
+          -CAcreateserial -out /certs/valid.crt -days 365 -sha256
+
+        # Expired certificate with SAN extension (required for proper TLE detection)
+        # Without SAN, Go's TLS stack returns HostnameError (TLM) before checking expiry.
+        # Uses openssl ca with config file to set past dates (openssl x509 doesn't support date setting)
+        openssl genrsa -out /certs/expired.key 2048
+        openssl req -new -key /certs/expired.key -out /certs/expired.csr \
+          -subj "/CN=backend-tls-expired"
+        # Create CA config for signing with expired dates
+        cat > /certs/expired_ca.cnf << 'CAEOF'
+        [ ca ]
+        default_ca = CA_default
+        [ CA_default ]
+        database = /certs/index.txt
+        serial = /certs/serial
+        new_certs_dir = /certs
+        certificate = /certs/ca.crt
+        private_key = /certs/ca.key
+        default_md = sha256
+        policy = policy_any
+        copy_extensions = copyall
+        default_startdate = 200101000000Z
+        default_enddate = 200102000000Z
+        [ policy_any ]
+        commonName = supplied
+        CAEOF
+        # Setup CA database
+        touch /certs/index.txt
+        echo "01" > /certs/serial
+        # Create SAN extension file
+        echo "subjectAltName=DNS:backend-tls-expired" > /certs/expired_san.cnf
+        # Sign with CA using config (creates expired cert with SAN)
+        openssl ca -batch -config /certs/expired_ca.cnf -in /certs/expired.csr \
+          -out /certs/expired.crt -extfile /certs/expired_san.cnf 2>/dev/null
+
+        # Self-signed certificate (not signed by CA) with SAN extension
+        # The SAN extension is required for proper TLN detection - without it,
+        # Go's TLS stack returns HostnameError (TLM) before checking authority.
+        openssl genrsa -out /certs/selfsigned.key 2048
+        openssl req -x509 -new -nodes -key /certs/selfsigned.key -sha256 -days 365 \
+          -out /certs/selfsigned.crt -subj "/CN=backend-tls-selfsigned" \
+          -addext "subjectAltName=DNS:backend-tls-selfsigned,DNS:localhost"
+
+        # Invalid certificate (CA-signed, correct SAN, but wrong key usage - emailProtection only)
+        # Triggers x509.CertificateInvalidError (TLI) because cert is not valid for server auth
+        # Requires CA to be trusted (SSL_CERT_FILE) so Go gets past chain validation to usage check
+        openssl genrsa -out /certs/invalid.key 2048
+        openssl req -new -key /certs/invalid.key -out /certs/invalid.csr \
+          -subj "/CN=backend-tls-invalid"
+        cat > /certs/invalid_ext.cnf << 'EXTEOF'
+        subjectAltName=DNS:backend-tls-invalid
+        extendedKeyUsage=emailProtection
+        EXTEOF
+        openssl x509 -req -in /certs/invalid.csr -CA /certs/ca.crt -CAkey /certs/ca.key \
+          -CAcreateserial -out /certs/invalid.crt -days 365 -sha256 \
+          -extfile /certs/invalid_ext.cnf
+
+        # Wrong hostname certificate
+        openssl genrsa -out /certs/wronghost.key 2048
+        openssl req -new -key /certs/wronghost.key -out /certs/wronghost.csr \
+          -subj "/CN=wrong-hostname.example.com"
+        openssl x509 -req -in /certs/wronghost.csr -CA /certs/ca.crt -CAkey /certs/ca.key \
+          -CAcreateserial -out /certs/wronghost.crt -days 365 -sha256
+
+        echo "Certificates generated successfully"
+        ls -la /certs/
+        # Keep container running briefly so other services can start
+        sleep 5
+
+  # Healthy backend - returns 200 OK
+  backend-ok:
+    image: nginx:alpine
+    ports:
+      - "5001:80"
+    volumes:
+      - ./configs/nginx-ok.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Slow backend - 120s delay to trigger upstream response timeout (URT)
+  backend-slow:
+    image: python:3.11-alpine
+    ports:
+      - "5002:5002"
+    command:
+      - python
+      - -c
+      - |
+        from http.server import HTTPServer, BaseHTTPRequestHandler
+        import time
+
+        class SlowHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path == '/health':
+                    self.send_response(200)
+                    self.end_headers()
+                    self.wfile.write(b'OK')
+                    return
+                # Delay for 120 seconds to trigger timeout
+                time.sleep(120)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'Finally responded')
+
+            def log_message(self, format, *args):
+                print(f"[backend-slow] {args[0]}")
+
+        print("Starting slow backend on port 5002...")
+        HTTPServer(('0.0.0.0', 5002), SlowHandler).serve_forever()
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5002/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Multi-error backend - handles all upstream error test scenarios
+  backend-multi-error:
+    image: python:3.11-alpine
+    ports:
+      - "5003:5003"
+    command:
+      - python
+      - -c
+      - |
+        from http.server import HTTPServer, BaseHTTPRequestHandler
+        import json
+
+        class ErrorHandler(BaseHTTPRequestHandler):
+            error_codes = [500, 502, 503, 504]
+            current_index = 0
+
+            def do_GET(self):
+                # Health check
+                if self.path == '/health':
+                    self.send_response(200)
+                    self.end_headers()
+                    self.wfile.write(b'OK')
+                    return
+
+                # 5xx rotation (for URS flag test)
+                if self.path in ['/', '/5xx', '/500', '/502', '/503', '/504']:
+                    if self.path == '/500':
+                        code = 500
+                    elif self.path == '/502':
+                        code = 502
+                    elif self.path == '/503':
+                        code = 503
+                    elif self.path == '/504':
+                        code = 504
+                    else:
+                        # Cycle through error codes
+                        code = ErrorHandler.error_codes[ErrorHandler.current_index]
+                        ErrorHandler.current_index = (ErrorHandler.current_index + 1) % len(ErrorHandler.error_codes)
+
+                    self.send_response(code)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    body = {'error': f'upstream_error_{code}', 'message': f'Upstream returned {code}'}
+                    self.wfile.write(json.dumps(body).encode())
+                    return
+
+                # 404 with JSON body (for body_field matching)
+                if self.path == '/404-json':
+                    self.send_response(404)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    body = {'error': {'code': 'RESOURCE_NOT_FOUND', 'message': 'User not found'}}
+                    self.wfile.write(json.dumps(body).encode())
+                    return
+
+                # 404 with HTML (for message_pattern matching)
+                if self.path == '/404-html':
+                    self.send_response(404)
+                    self.send_header('Content-Type', 'text/html')
+                    self.end_headers()
+                    html = '<html><body><h1>Page Not Found</h1><p>The requested resource does not exist.</p></body></html>'
+                    self.wfile.write(html.encode())
+                    return
+
+                # 400 for no-match test (use 4xx to avoid matching 5xx URS rule)
+                if self.path == '/400-nomatch':
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    body = {'error': 'bad_request', 'message': 'Invalid input'}
+                    self.wfile.write(json.dumps(body).encode())
+                    return
+
+                # 500 Match test with configured field and value
+                if self.path == '/500-complex':
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    body = {
+                        'error': {
+                            'type': 'database_timeout',
+                            'code': 1045
+                        },
+                        'message': 'Connection to db lost'
+                    }
+                    self.wfile.write(json.dumps(body).encode())
+                    return
+
+                # 500 Template Variable Detection
+                if self.path == '/500-template':
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    body = {'error': 'template', 'message': 'Template test'}
+                    self.wfile.write(json.dumps(body).encode())
+                    return
+
+                # 500 JSON Escaping in Inline Templates
+                if self.path == '/500-json-escape':
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    body = {'error': 'json_escape', 'message': 'JSON escape test'}
+                    self.wfile.write(json.dumps(body).encode())
+                    return
+
+                # 500 Upstream Body Truncation Limit (maxBodySizeForMatching)
+                if self.path == '/500-truncation':
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    # Create a body larger than 4KB (maxBodySizeForMatching)
+                    padding = "A" * (4096 + 10)
+                    body = {'error': 'truncation', 'message': 'Truncation test', 'padding': padding, 'target_value': 'find_me_if_you_can'}
+                    self.wfile.write(json.dumps(body).encode())
+                    return
+
+                # Default 404
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b'Not Found')
+
+            def log_message(self, format, *args):
+                print(f"[backend-multi-error] {args[0]}")
+
+        print("Starting multi-error backend on port 5003...")
+        HTTPServer(('0.0.0.0', 5003), ErrorHandler).serve_forever()
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5003/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # TLS backend with expired certificate (TLE)
+  backend-tls-expired:
+    image: nginx:alpine
+    ports:
+      - "5004:443"
+    volumes:
+      - ./certs:/certs:ro
+    depends_on:
+      cert-generator:
+        condition: service_completed_successfully
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        # Wait for certificates
+        while [ ! -f /certs/expired.crt ]; do sleep 1; done
+        # Create nginx config with expired cert
+        cat > /etc/nginx/conf.d/default.conf << 'EOF'
+        server {
+            listen 443 ssl;
+            server_name backend-tls-expired;
+            ssl_certificate /certs/expired.crt;
+            ssl_certificate_key /certs/expired.key;
+            location / {
+                return 200 'TLS Expired Backend OK';
+                add_header Content-Type text/plain;
+            }
+            location /health {
+                return 200 'OK';
+            }
+        }
+        EOF
+        nginx -g 'daemon off;'
+
+  # TLS backend with self-signed certificate (TLN - not trusted)
+  backend-tls-selfsigned:
+    image: nginx:alpine
+    ports:
+      - "5005:443"
+    volumes:
+      - ./certs:/certs:ro
+    depends_on:
+      cert-generator:
+        condition: service_completed_successfully
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        while [ ! -f /certs/selfsigned.crt ]; do sleep 1; done
+        cat > /etc/nginx/conf.d/default.conf << 'EOF'
+        server {
+            listen 443 ssl;
+            server_name backend-tls-selfsigned;
+            ssl_certificate /certs/selfsigned.crt;
+            ssl_certificate_key /certs/selfsigned.key;
+            location / {
+                return 200 'TLS Self-Signed Backend OK';
+                add_header Content-Type text/plain;
+            }
+            location /health {
+                return 200 'OK';
+            }
+        }
+        EOF
+        nginx -g 'daemon off;'
+
+  # TLS backend with wrong hostname certificate (TLM)
+  backend-tls-wronghost:
+    image: nginx:alpine
+    ports:
+      - "5006:443"
+    volumes:
+      - ./certs:/certs:ro
+    depends_on:
+      cert-generator:
+        condition: service_completed_successfully
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        while [ ! -f /certs/wronghost.crt ]; do sleep 1; done
+        cat > /etc/nginx/conf.d/default.conf << 'EOF'
+        server {
+            listen 443 ssl;
+            server_name backend-tls-wronghost;
+            ssl_certificate /certs/wronghost.crt;
+            ssl_certificate_key /certs/wronghost.key;
+            location / {
+                return 200 'TLS Wrong Host Backend OK';
+                add_header Content-Type text/plain;
+            }
+            location /health {
+                return 200 'OK';
+            }
+        }
+        EOF
+        nginx -g 'daemon off;'
+
+  # TLS backend with invalid certificate - wrong key usage (TLI)
+  backend-tls-invalid:
+    image: nginx:alpine
+    ports:
+      - "5010:443"
+    volumes:
+      - ./certs:/certs:ro
+    depends_on:
+      cert-generator:
+        condition: service_completed_successfully
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        while [ ! -f /certs/invalid.crt ]; do sleep 1; done
+        cat > /etc/nginx/conf.d/default.conf << 'EOF'
+        server {
+            listen 443 ssl;
+            server_name backend-tls-invalid;
+            ssl_certificate /certs/invalid.crt;
+            ssl_certificate_key /certs/invalid.key;
+            location / {
+                return 200 'TLS Invalid Backend OK';
+                add_header Content-Type text/plain;
+            }
+            location /health {
+                return 200 'OK';
+            }
+        }
+        EOF
+        nginx -g 'daemon off;'
+
+  # Connection reset backend (URR)
+  backend-reset:
+    image: python:3.11-alpine
+    ports:
+      - "5007:5007"
+    command:
+      - python
+      - -c
+      - |
+        import socket
+        import struct
+        import threading
+
+        def handle_client(conn, addr):
+            print(f"[backend-reset] Connection from {addr}")
+            try:
+                # Read some data first
+                data = conn.recv(1024)
+                if b'/health' in data:
+                    conn.send(b'HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK')
+                    conn.close()
+                    return
+                # Set SO_LINGER to send RST instead of FIN
+                conn.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+                conn.close()  # This will send RST
+                print(f"[backend-reset] Sent RST to {addr}")
+            except Exception as e:
+                print(f"[backend-reset] Error: {e}")
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('0.0.0.0', 5007))
+        sock.listen(5)
+        print("Starting connection reset backend on port 5007...")
+
+        while True:
+            conn, addr = sock.accept()
+            threading.Thread(target=handle_client, args=(conn, addr)).start()
+
+  # TLS backend with only TLS 1.2 and specific cipher - may trigger TLP with mismatched client
+  backend-tls-oldproto:
+    image: nginx:alpine
+    ports:
+      - "5008:443"
+    volumes:
+      - ./certs:/certs:ro
+    depends_on:
+      cert-generator:
+        condition: service_completed_successfully
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        while [ ! -f /certs/selfsigned.crt ]; do sleep 1; done
+        cat > /etc/nginx/conf.d/default.conf << 'EOF'
+        server {
+            listen 443 ssl;
+            server_name backend-tls-oldproto;
+            ssl_certificate /certs/selfsigned.crt;
+            ssl_certificate_key /certs/selfsigned.key;
+            # Only TLS 1.2 with specific cipher suite
+            ssl_protocols TLSv1.2;
+            ssl_ciphers ECDHE-RSA-AES128-SHA256;
+            ssl_prefer_server_ciphers on;
+            location / {
+                return 200 'TLS Old Protocol Backend OK';
+                add_header Content-Type text/plain;
+            }
+            location /health {
+                return 200 'OK';
+            }
+        }
+        EOF
+        nginx -g 'daemon off;'
+
+  # Malformed HTTP response backend (UPE) - accepts TCP, sends garbage instead of valid HTTP
+  backend-malformed:
+    image: python:3.11-alpine
+    ports:
+      - "5011:5011"
+    command:
+      - python
+      - -c
+      - |
+        import socket
+        import threading
+
+        def handle_client(conn, addr):
+            print(f"[backend-malformed] Connection from {addr}")
+            try:
+                data = conn.recv(1024)
+                if b'/health' in data:
+                    conn.send(b'HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK')
+                    conn.close()
+                    return
+                # Send garbage that is not valid HTTP
+                conn.send(b'GARBAGE\r\nThis is not HTTP\r\n\r\n')
+                conn.close()
+                print(f"[backend-malformed] Sent malformed response to {addr}")
+            except Exception as e:
+                print(f"[backend-malformed] Error: {e}")
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('0.0.0.0', 5011))
+        sock.listen(5)
+        print("Starting malformed HTTP backend on port 5011...")
+
+        while True:
+            conn, addr = sock.accept()
+            threading.Thread(target=handle_client, args=(conn, addr)).start()
+
+  # TLS handshake failure backend - sends garbage on TLS port
+  backend-tls-handshake-fail:
+    image: python:3.11-alpine
+    ports:
+      - "5009:5009"
+    command:
+      - python
+      - -c
+      - |
+        import socket
+        import threading
+
+        def handle_client(conn, addr):
+            print(f"[backend-tls-handshake-fail] Connection from {addr}")
+            try:
+                # Read client hello
+                data = conn.recv(1024)
+                # Send garbage instead of valid TLS response
+                conn.send(b'\x15\x03\x01\x00\x02\x02\x50')  # TLS alert: protocol_version
+                conn.close()
+                print(f"[backend-tls-handshake-fail] Sent TLS alert to {addr}")
+            except Exception as e:
+                print(f"[backend-tls-handshake-fail] Error: {e}")
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('0.0.0.0', 5009))
+        sock.listen(5)
+        print("Starting TLS handshake failure backend on port 5009...")
+
+        while True:
+            conn, addr = sock.accept()
+            threading.Thread(target=handle_client, args=(conn, addr)).start()
+
+networks:
+  default:
+    name: qa-test-network

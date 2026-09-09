@@ -1,0 +1,25 @@
+{
+  "name": "Test TLP - TLS Protocol Error",
+  "api_id": "test-tlp",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-tlp/",
+    "target_url": "https://backend-tls-oldproto:443",
+    "strip_listen_path": true,
+    "transport": {
+      "ssl_insecure_skip_verify": false,
+      "ssl_min_version": 772
+    }
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  }
+}

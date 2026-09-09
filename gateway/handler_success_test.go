@@ -19,7 +19,6 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	ctxpkg "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
 )
 
 type bindContextFunc = func(context.Context) context.Context
@@ -43,84 +42,6 @@ func testAPISpec(binding bindAPIDefFunc) *APISpec {
 		binding(spec)
 	}
 	return spec
-}
-
-func TestRecordDetail(t *testing.T) {
-	testcases := []struct {
-		title   string
-		spec    *APISpec
-		binding bindContextFunc
-		expect  bool
-	}{
-		{
-			title:  "empty session",
-			spec:   testAPISpec(nil),
-			expect: false,
-		},
-		{
-			title: "empty session, enabled analytics",
-			spec: testAPISpec(func(spec *APISpec) {
-				spec.EnableDetailedRecording = true
-			}),
-			expect: true,
-		},
-		{
-			title: "empty session, enabled config",
-			spec: testAPISpec(func(spec *APISpec) {
-				spec.GlobalConfig.EnforceOrgDataDetailLogging = false
-				spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording = true
-			}),
-			expect: true,
-		},
-		{
-			title: "normal session",
-			spec:  testAPISpec(nil),
-			// attach user session
-			binding: func(ctx context.Context) context.Context {
-				session := &user.SessionState{
-					EnableDetailedRecording: true,
-				}
-				return context.WithValue(ctx, ctxpkg.SessionData, session)
-			},
-			expect: true,
-		},
-		{
-			title: "org empty session",
-			spec: testAPISpec(func(spec *APISpec) {
-				spec.GlobalConfig.EnforceOrgDataDetailLogging = true
-			}),
-			expect: false,
-		},
-		{
-			title: "org session",
-			spec: testAPISpec(func(spec *APISpec) {
-				spec.GlobalConfig.EnforceOrgDataDetailLogging = true
-			}),
-			// attach user session
-			binding: func(ctx context.Context) context.Context {
-				session := &user.SessionState{
-					EnableDetailedRecording: true,
-				}
-				return context.WithValue(ctx, ctxpkg.OrgSessionContext, session)
-			},
-			expect: true,
-		},
-		{
-			title: "graphql request",
-			spec: testAPISpec(func(spec *APISpec) {
-				spec.GraphQL.Enabled = true
-			}),
-			expect: true,
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.title, func(t *testing.T) {
-			req := testRequestWithContext(tc.binding)
-			got := recordDetail(req, tc.spec)
-			assert.Equal(t, tc.expect, got)
-		})
-	}
 }
 
 func TestAnalyticRecord_GraphStats(t *testing.T) {
@@ -427,6 +348,73 @@ func TestSuccessHandler_addTraceIDTag(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRecordMCPDetails(t *testing.T) {
+	t.Run("populates MCPStats from context values", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(context.Background(), "POST", "/mcp", nil)
+		assert.NoError(t, err)
+		ctxSetMCPMethod(req, "tools/call")
+		ctxSetMCPPrimitiveType(req, "tool")
+		ctxSetMCPPrimitiveName(req, "my_tool")
+
+		var rec analytics.AnalyticsRecord
+		recordMCPDetails(&rec, req)
+
+		assert.True(t, rec.MCPStats.IsMCP)
+		assert.Equal(t, "tools/call", rec.MCPStats.JSONRPCMethod)
+		assert.Equal(t, "tool", rec.MCPStats.PrimitiveType)
+		assert.Equal(t, "my_tool", rec.MCPStats.PrimitiveName)
+	})
+
+	t.Run("list operation has empty PrimitiveType and PrimitiveName", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(context.Background(), "POST", "/mcp", nil)
+		assert.NoError(t, err)
+		ctxSetMCPMethod(req, "tools/list")
+
+		var rec analytics.AnalyticsRecord
+		recordMCPDetails(&rec, req)
+
+		assert.True(t, rec.MCPStats.IsMCP)
+		assert.Equal(t, "tools/list", rec.MCPStats.JSONRPCMethod)
+		assert.Empty(t, rec.MCPStats.PrimitiveType)
+		assert.Empty(t, rec.MCPStats.PrimitiveName)
+	})
+
+	t.Run("initialize has empty PrimitiveType and PrimitiveName", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(context.Background(), "POST", "/mcp", nil)
+		assert.NoError(t, err)
+		ctxSetMCPMethod(req, "initialize")
+
+		var rec analytics.AnalyticsRecord
+		recordMCPDetails(&rec, req)
+
+		assert.True(t, rec.MCPStats.IsMCP)
+		assert.Equal(t, "initialize", rec.MCPStats.JSONRPCMethod)
+		assert.Empty(t, rec.MCPStats.PrimitiveType)
+		assert.Empty(t, rec.MCPStats.PrimitiveName)
+	})
+
+	t.Run("no MCP context still tags record as MCP", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(context.Background(), "GET", "/api/users", nil)
+		assert.NoError(t, err)
+
+		original := analytics.AnalyticsRecord{
+			APIID:        "rest-api",
+			Path:         "/api/users",
+			ResponseCode: 200,
+		}
+		rec := original
+		recordMCPDetails(&rec, req)
+
+		assert.True(t, rec.MCPStats.IsMCP)
+		assert.Equal(t, original.Path, rec.Path)
+		assert.Equal(t, original.APIID, rec.APIID)
+		assert.Equal(t, original.ResponseCode, rec.ResponseCode)
+		assert.Empty(t, rec.MCPStats.JSONRPCMethod)
+		assert.Empty(t, rec.MCPStats.PrimitiveType)
+		assert.Empty(t, rec.MCPStats.PrimitiveName)
+	})
 }
 
 func TestSuccessHandler_classifyUpstreamError(t *testing.T) {

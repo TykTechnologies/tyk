@@ -17,3 +17,6 @@ services:
     environment:
       - TYK_LOGLEVEL=debug
       - TYK_DB_REDISHOST=redis
+
+  httpbin.org:
+    image: kennethreitz/httpbin

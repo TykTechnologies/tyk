@@ -29,8 +29,14 @@ func (m *GoAnalyticsPlugin) loadAnalyticsPlugin() bool {
 		return true
 	}
 
-	// try to load plugin
-	var err error
+	newPath, err := goplugin.GetPluginFileNameToLoad(goplugin.FileSystemStorage{}, m.Path)
+	if err != nil {
+		m.logger.WithError(err).Error("plugin file not found")
+		return false
+	}
+	if m.Path != newPath {
+		m.Path = newPath
+	}
 
 	if m.handler, err = goplugin.GetAnalyticsHandler(m.Path, m.FuncName); err != nil {
 		m.logger.WithError(err).Error("Could not load Go-plugin for analytics")

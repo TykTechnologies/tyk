@@ -17,6 +17,7 @@ type RequestContext struct {
 	APIName             string
 	OrgID               string
 	ListenPath          string
+	Endpoint            string // matched endpoint path (tracked path or URL path)
 	Token               string // hashed auth token
 	APIVersion          string
 	IPAddress           string // client IP (resolved by the recording site via request.RealIP)
@@ -35,4 +36,7 @@ type RequestContext struct {
 	MCPPrimitiveType string // e.g., "tool"
 	MCPPrimitiveName string // e.g., "get_weather"
 	MCPErrorCode     int    // e.g., -32601
+
+	// ConfigData from the API definition (nil when ConfigDataDisabled or empty).
+	ConfigData map[string]interface{}
 }

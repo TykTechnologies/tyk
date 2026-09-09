@@ -72,8 +72,16 @@ func (m MdcbStorage) SetKey(key string, content string, TTL int64) error {
 	return nil
 }
 
+func (m MdcbStorage) SetKeyEx(key string, content string, TTL int64) error {
+	return m.local.SetKeyEx(key, content, TTL)
+}
+
 func (m MdcbStorage) SetRawKey(string, string, int64) error {
 	panic("implement me")
+}
+
+func (m MdcbStorage) SetRawKeyEx(key, content string, TTL int64) error {
+	return m.local.SetRawKeyEx(key, content, TTL)
 }
 
 func (m MdcbStorage) SetExp(string, int64) error {
