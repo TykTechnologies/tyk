@@ -269,3 +269,39 @@ func MyAnalyticsPluginAddTag(record *analytics.AnalyticsRecord) {
 	_ = resp.Write(&bNew)
 	record.RawResponse = base64.StdEncoding.EncodeToString(bNew.Bytes())
 }
+
+// MyPluginAccessingOASConfigData reads the API's config_data from the OAS
+// definition using ctx.GetOASConfigData (no deep copy of the whole OAS doc,
+func MyPluginAccessingOASConfigData(rw http.ResponseWriter, r *http.Request) {
+	configData, err := ctx.GetOASConfigData(r)
+	if err != nil {
+		// e.g. "config data is nil" when the API has no plugin config data
+		rw.Header().Add("X-Plugin-Config-Data-Error", err.Error())
+		return
+	}
+
+	pluginConfig, ok := configData["my-context-data"].(string)
+	if !ok || pluginConfig == "" {
+		rw.Header().Add("X-Plugin-Config-Data", "null")
+		return
+	}
+
+	rw.Header().Add("X-Plugin-Config-Data", pluginConfig)
+}
+
+// MyResponsePluginAccessingOASConfigData is the response-middleware variant.
+func MyResponsePluginAccessingOASConfigData(rw http.ResponseWriter, _ *http.Response, req *http.Request) {
+	configData, err := ctx.GetOASConfigData(req)
+	if err != nil {
+		rw.Header().Add("X-Plugin-Config-Data-Error", err.Error())
+		return
+	}
+
+	pluginConfig, ok := configData["my-context-data"].(string)
+	if !ok || pluginConfig == "" {
+		rw.Header().Add("X-Plugin-Config-Data", "null")
+		return
+	}
+
+	rw.Header().Add("X-Plugin-Config-Data", pluginConfig)
+}

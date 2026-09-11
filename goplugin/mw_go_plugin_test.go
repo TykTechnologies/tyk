@@ -562,6 +562,167 @@ func TestGoPlugin_AccessingOASAPIDef(t *testing.T) {
 	}...)
 }
 
+func TestGoPlugin_AccessingOASConfigData(t *testing.T) {
+	ts := gateway.StartTest(nil)
+	defer ts.Close()
+
+	const (
+		oasDocTitle      = "My OAS Documentation ConfigData"
+		pluginConfigData = "my-plugin-config"
+	)
+
+	t.Run("pre plugin reads config_data via ctx.GetOASConfigData", func(t *testing.T) {
+		oasDoc := oas.OAS{}
+		oasDoc.OpenAPI = "3.0.3"
+		oasDoc.Info = &openapi3.Info{
+			Version: "1",
+			Title:   oasDocTitle,
+		}
+		oasDoc.Paths = openapi3.NewPaths()
+
+		oasDoc.SetTykExtension(&oas.XTykAPIGateway{
+			Middleware: &oas.Middleware{
+				Global: &oas.Global{
+					PluginConfig: &oas.PluginConfig{
+						Data: &oas.PluginConfigData{
+							Value: map[string]interface{}{
+								"my-context-data": pluginConfigData,
+							},
+						},
+					},
+				},
+			},
+		})
+
+		err := oasDoc.Validate(context.Background())
+		assert.NoError(t, err)
+
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+			spec.Proxy.ListenPath = "/oas-goplugin-config-data/"
+			spec.UseKeylessAccess = true
+			spec.UseStandardAuth = false
+			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				Pre: []apidef.MiddlewareDefinition{
+					{
+						Name: "MyPluginAccessingOASConfigData",
+						Path: goPluginFilename(),
+					},
+				},
+			}
+		})
+
+		ts.Run(t, []test.TestCase{
+			{
+				Path: "/oas-goplugin-config-data/get",
+				Code: http.StatusOK,
+				HeadersMatch: map[string]string{
+					"X-Plugin-Config-Data": pluginConfigData,
+				},
+			},
+		}...)
+	})
+
+	t.Run("pre plugin gets error when config_data is not set", func(t *testing.T) {
+		oasDoc := oas.OAS{}
+		oasDoc.OpenAPI = "3.0.3"
+		oasDoc.Info = &openapi3.Info{
+			Version: "1",
+			Title:   oasDocTitle,
+		}
+		oasDoc.Paths = openapi3.NewPaths()
+
+		oasDoc.SetTykExtension(&oas.XTykAPIGateway{})
+
+		err := oasDoc.Validate(context.Background())
+		assert.NoError(t, err)
+
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+			spec.Proxy.ListenPath = "/oas-goplugin-no-config-data/"
+			spec.UseKeylessAccess = true
+			spec.UseStandardAuth = false
+			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				Pre: []apidef.MiddlewareDefinition{
+					{
+						Name: "MyPluginAccessingOASConfigData",
+						Path: goPluginFilename(),
+					},
+				},
+			}
+		})
+
+		ts.Run(t, []test.TestCase{
+			{
+				Path: "/oas-goplugin-no-config-data/get",
+				Code: http.StatusOK,
+				HeadersMatch: map[string]string{
+					"X-Plugin-Config-Data-Error": "config data is nil",
+				},
+			},
+		}...)
+	})
+
+	t.Run("response plugin reads config_data via ctx.GetOASConfigData", func(t *testing.T) {
+		oasDoc := oas.OAS{}
+		oasDoc.OpenAPI = "3.0.3"
+		oasDoc.Info = &openapi3.Info{
+			Version: "1",
+			Title:   oasDocTitle,
+		}
+		oasDoc.Paths = openapi3.NewPaths()
+
+		oasDoc.SetTykExtension(&oas.XTykAPIGateway{
+			Middleware: &oas.Middleware{
+				Global: &oas.Global{
+					PluginConfig: &oas.PluginConfig{
+						Data: &oas.PluginConfigData{
+							Value: map[string]interface{}{
+								"my-context-data": pluginConfigData,
+							},
+						},
+					},
+				},
+			},
+		})
+
+		err := oasDoc.Validate(context.Background())
+		assert.NoError(t, err)
+
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+			spec.Proxy.ListenPath = "/oas-goplugin-config-data-resp/"
+			spec.UseKeylessAccess = true
+			spec.UseStandardAuth = false
+			spec.UseGoPluginAuth = false
+			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				Response: []apidef.MiddlewareDefinition{
+					{
+						Name: "MyResponsePluginAccessingOASConfigData",
+						Path: goPluginFilename(),
+					},
+				},
+			}
+		})
+
+		ts.Run(t, []test.TestCase{
+			{
+				Path: "/oas-goplugin-config-data-resp/get",
+				Code: http.StatusOK,
+				HeadersMatch: map[string]string{
+					"X-Plugin-Config-Data": pluginConfigData,
+				},
+			},
+		}...)
+	})
+}
+
 func TestGoPlugin_MyResponsePluginAccessingOASAPI(t *testing.T) {
 	ts := gateway.StartTest(nil)
 	defer ts.Close()
