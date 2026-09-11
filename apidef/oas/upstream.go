@@ -44,6 +44,11 @@ type Upstream struct {
 	// Tyk classic API definition: `proxy.enable_load_balancing` and `proxy.targets`.
 	LoadBalancing *LoadBalancing `bson:"loadBalancing,omitempty" json:"loadBalancing,omitempty"`
 
+	// DNSDiscovery contains configuration for sourcing this upstream's target
+	// list from DNS, by resolving the hostname in url.
+	// Tyk classic API definition: `proxy.dns_discovery`.
+	DNSDiscovery *DNSDiscovery `bson:"dnsDiscovery,omitempty" json:"dnsDiscovery,omitempty"`
+
 	// PreserveHostHeader contains the configuration for preserving the host header.
 	// Tyk classic API definition: `proxy.preserve_host_header`.
 	PreserveHostHeader *PreserveHostHeader `bson:"preserveHostHeader,omitempty" json:"preserveHostHeader,omitempty"`
@@ -150,6 +155,7 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	}
 
 	u.fillLoadBalancing(api)
+	u.fillDNSDiscovery(api)
 	u.fillPreserveHostHeader(api)
 	u.fillPreserveTrailingSlash(api)
 }
@@ -236,6 +242,7 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	u.Authentication.ExtractTo(api)
 
 	u.loadBalancingExtractTo(api)
+	u.dnsDiscoveryExtractTo(api)
 
 	if u.TLSTransport == nil {
 		u.TLSTransport = &TLSTransport{}
@@ -307,6 +314,94 @@ func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 	}
 
 	u.LoadBalancing.ExtractTo(api)
+}
+
+// DNSDiscovery sources this upstream's target list from DNS: the hostname in
+// `url` is resolved and every address it returns becomes a target.
+//
+// It is a source rather than a balancing policy. It sits alongside
+// `serviceDiscovery`, which sources targets from a key/value store, and the
+// static `loadBalancing.targets` written by hand. Whether the resulting list is
+// distributed across is still `loadBalancing.enabled`, so both have to be on
+// for requests to reach more than one address.
+//
+// Resolution runs in the background, on one scheduler for the gateway keyed by
+// hostname, so a backend added after the API was loaded starts receiving
+// traffic within `refreshInterval` of becoming ready whether or not the API is
+// currently receiving requests.
+//
+// Only useful against a name that resolves to one address per backend, such as
+// a headless Kubernetes Service. A ClusterIP resolves to a single virtual IP,
+// so there is nothing to distribute over.
+//
+// Example:
+//
+//	{
+//	    "enabled": true,
+//	    "refreshInterval": 10,
+//	    "staleTTL": 300
+//	}
+type DNSDiscovery struct {
+	// Enabled sources this upstream's target list from DNS.
+	//
+	// Tyk classic API definition: `proxy.dns_discovery.enabled`
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+
+	// RefreshInterval is how often, in seconds, the upstream hostname is
+	// re-resolved in the background. It bounds how long a backend added by an
+	// autoscaling event waits before receiving traffic.
+	//
+	// 0 selects the default of 30 seconds; values below 5 are raised to 5.
+	//
+	// Tyk classic API definition: `proxy.dns_discovery.refresh_interval`
+	RefreshInterval int64 `bson:"refreshInterval,omitempty" json:"refreshInterval,omitempty"`
+
+	// StaleTTL is how long, in seconds, the last known good address set keeps
+	// being used while the resolver is unreachable. Past it the upstream falls
+	// back to its configured url. An authoritative answer that the name does
+	// not exist is applied at once instead, since nothing stale is worth
+	// preserving.
+	//
+	// 0 selects the default of 300 seconds; a negative value never gives up.
+	//
+	// Tyk classic API definition: `proxy.dns_discovery.stale_ttl`
+	StaleTTL int64 `bson:"staleTTL,omitempty" json:"staleTTL,omitempty"`
+}
+
+// Fill populates the DNSDiscovery structure from the classic API definition.
+func (d *DNSDiscovery) Fill(api apidef.APIDefinition) {
+	d.Enabled = api.Proxy.DNSDiscovery.Enabled
+	d.RefreshInterval = api.Proxy.DNSDiscovery.RefreshInterval
+	d.StaleTTL = api.Proxy.DNSDiscovery.StaleTTL
+}
+
+// ExtractTo copies the DNSDiscovery structure into the classic API definition.
+func (d *DNSDiscovery) ExtractTo(api *apidef.APIDefinition) {
+	api.Proxy.DNSDiscovery.Enabled = d.Enabled
+	api.Proxy.DNSDiscovery.RefreshInterval = d.RefreshInterval
+	api.Proxy.DNSDiscovery.StaleTTL = d.StaleTTL
+}
+
+func (u *Upstream) fillDNSDiscovery(api apidef.APIDefinition) {
+	if u.DNSDiscovery == nil {
+		u.DNSDiscovery = &DNSDiscovery{}
+	}
+
+	u.DNSDiscovery.Fill(api)
+	if ShouldOmit(u.DNSDiscovery) {
+		u.DNSDiscovery = nil
+	}
+}
+
+func (u *Upstream) dnsDiscoveryExtractTo(api *apidef.APIDefinition) {
+	if u.DNSDiscovery == nil {
+		u.DNSDiscovery = &DNSDiscovery{}
+		defer func() {
+			u.DNSDiscovery = nil
+		}()
+	}
+
+	u.DNSDiscovery.ExtractTo(api)
 }
 
 // TLSTransport contains the configuration for TLS transport settings.

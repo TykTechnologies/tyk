@@ -1526,3 +1526,86 @@ func TestPreserveHostHeader(t *testing.T) {
 		}
 	})
 }
+
+func TestDNSDiscovery(t *testing.T) {
+	t.Parallel()
+
+	t.Run("round trip", func(t *testing.T) {
+		t.Parallel()
+
+		testcases := []struct {
+			title string
+			input apidef.DNSDiscoveryConfig
+			// omitted is true when the OAS object should be dropped entirely,
+			// which is what ShouldOmit does for an all-zero value.
+			omitted bool
+		}{
+			{
+				title:   "disabled and unset is omitted",
+				input:   apidef.DNSDiscoveryConfig{},
+				omitted: true,
+			},
+			{
+				title: "enabled with the default interval",
+				input: apidef.DNSDiscoveryConfig{Enabled: true},
+			},
+			{
+				title: "enabled with an explicit interval",
+				input: apidef.DNSDiscoveryConfig{Enabled: true, RefreshInterval: 10},
+			},
+			{
+				// Below the floor, which is applied when the API loads rather
+				// than during conversion, so the configured value has to
+				// survive the round trip unchanged.
+				title: "interval below the floor",
+				input: apidef.DNSDiscoveryConfig{Enabled: true, RefreshInterval: 1},
+			},
+			{
+				// Not a useful configuration, but it must not be silently
+				// rewritten: an interval set while disabled is preserved so an
+				// operator toggling `enabled` gets the interval they left.
+				title: "interval set while disabled",
+				input: apidef.DNSDiscoveryConfig{RefreshInterval: 30},
+			},
+		}
+
+		for _, tc := range testcases {
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				var api apidef.APIDefinition
+				api.Proxy.DNSDiscovery = tc.input
+
+				var upstream Upstream
+				upstream.Fill(api)
+
+				if tc.omitted {
+					assert.Nil(t, upstream.DNSDiscovery)
+				} else {
+					assert.NotNil(t, upstream.DNSDiscovery)
+				}
+
+				var converted apidef.APIDefinition
+				converted.SetDisabledFlags()
+				upstream.ExtractTo(&converted)
+
+				assert.Equal(t, tc.input, converted.Proxy.DNSDiscovery)
+			})
+		}
+	})
+
+	t.Run("field mapping", func(t *testing.T) {
+		t.Parallel()
+
+		var api apidef.APIDefinition
+		api.Proxy.DNSDiscovery = apidef.DNSDiscoveryConfig{
+			Enabled:         true,
+			RefreshInterval: 15,
+		}
+
+		var upstream Upstream
+		upstream.Fill(api)
+
+		assert.Equal(t, &DNSDiscovery{Enabled: true, RefreshInterval: 15}, upstream.DNSDiscovery)
+	})
+}

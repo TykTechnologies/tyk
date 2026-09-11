@@ -238,6 +238,12 @@ func (gw *Gateway) processSpec(
 		spec.Proxy.StructuredTargetList = sl
 	}
 
+	// DNS discovery is a third source for that same list, supplying addresses
+	// resolved from the upstream name instead of read from configuration. This
+	// subscribes the API to its upstream hostname on the gateway's scheduler,
+	// or releases it when the API no longer wants discovery.
+	gw.setupUpstreamDNSDiscovery(spec, logger)
+
 	// Initialise the auth and session managers (use Redis for now)
 	authStore, orgStore, _ := gw.configureAuthAndOrgStores(gs, spec)
 

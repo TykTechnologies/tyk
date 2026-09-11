@@ -751,11 +751,58 @@ type CoProcessConfig struct {
 	// GRPCRoundRobinLoadBalancing enables round robin load balancing for gRPC services; you must provide the address of the load balanced service using `dns:///` protocol in `coprocess_grpc_server`.
 	GRPCRoundRobinLoadBalancing bool `json:"grpc_round_robin_load_balancing"`
 
+	// GRPCDNSRefreshInterval is how often, in seconds, the gRPC plugin target is
+	// re-resolved so that pods created by an autoscaling event are discovered.
+	// Only meaningful together with `grpc_round_robin_load_balancing`, and only
+	// against a headless Service — a ClusterIP resolves to one virtual IP and
+	// hides individual pods.
+	//
+	// 0 selects the default of 30 seconds; a negative value turns polling off,
+	// restoring the stock grpc-go behaviour of re-resolving only when a
+	// connection fails. Values below 10 are raised to 10, because the added DNS
+	// load is `gateways x APIs / interval` against a shared CoreDNS.
+	//
+	// The environment variable is TYK_GW_COPROCESSOPTIONS_GRPCDNSREFRESHINTERVAL.
+	GRPCDNSRefreshInterval int64 `json:"grpc_dns_refresh_interval"`
+
 	// Sets the path to built-in Tyk modules. This will be part of the Python module lookup path. The value used here is the default one for most installations.
 	PythonPathPrefix string `json:"python_path_prefix"`
 
 	// If you have multiple Python versions installed you can specify your version.
 	PythonVersion string `json:"python_version"`
+}
+
+// DNS refresh interval bounds, shared by both gRPC paths. They match
+// rpc/dns_monitor.go, so the gateway's two DNS pollers agree on what is
+// reasonable to ask of a shared CoreDNS.
+const (
+	// DNSRefreshIntervalDefault is used when the configured interval is 0.
+	DNSRefreshIntervalDefault = 30 * time.Second
+
+	// DNSRefreshIntervalMinimum is the floor applied to any positive interval.
+	DNSRefreshIntervalMinimum = 10 * time.Second
+)
+
+// ResolveDNSRefreshInterval turns a configured interval in seconds into a
+// duration, and reports whether polling is enabled at all.
+//
+// A negative value disables polling. 0 cannot mean "disabled" here: defaults
+// throughout this package are applied as `if conf.X == 0 { conf.X = default }`,
+// so a zero is indistinguishable from an unset field. `dns_cache.ttl` uses the
+// same negative sentinel for the same reason.
+func ResolveDNSRefreshInterval(seconds int64) (time.Duration, bool) {
+	switch {
+	case seconds < 0:
+		return 0, false
+	case seconds == 0:
+		return DNSRefreshIntervalDefault, true
+	}
+
+	interval := time.Duration(seconds) * time.Second
+	if interval < DNSRefreshIntervalMinimum {
+		interval = DNSRefreshIntervalMinimum
+	}
+	return interval, true
 }
 
 type CertificatesConfig struct {
