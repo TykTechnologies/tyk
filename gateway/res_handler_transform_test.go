@@ -298,6 +298,52 @@ func TestHeaderTransformBase(t *testing.T) {
 }
 
 func TestResponseTransformMiddleware(t *testing.T) {
+	t.Run("response transform responds 500 if provided template is invalid", func(t *testing.T) {
+		ts := StartTest(nil)
+
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, err := w.Write([]byte(`{"name":"world"}`))
+			assert.NoError(t, err)
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		t.Cleanup(testServer.Close)
+		t.Cleanup(ts.Close)
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = testServer.URL
+
+			v := spec.VersionData.Versions["Default"]
+
+			v.UseExtendedPaths = true
+			v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{
+				{
+					Path:   "/invalid-template",
+					Method: http.MethodGet,
+					TemplateData: apidef.TemplateData{
+						Mode:           apidef.UseBlob,
+						TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"greeting": "hello {{.name"}`)),
+						Input:          apidef.RequestJSON,
+						EnableSession:  false,
+					},
+				},
+			}
+
+			spec.VersionData.Versions["Default"] = v
+		})
+
+		_, err := ts.Run(t, test.TestCase{
+			Path:      "/invalid-template",
+			Method:    http.MethodGet,
+			Code:      http.StatusInternalServerError,
+			BodyMatch: "invalid template provided",
+		})
+
+		assert.NoError(t, err)
+	})
+
 	t.Run("Response transform alone", func(t *testing.T) {
 		ts := StartTest(nil)
 
