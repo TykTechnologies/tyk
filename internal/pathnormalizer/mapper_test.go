@@ -151,3 +151,37 @@ func TestMapper_untypedParameterSchema(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "/user/{customRegex2}", entry.Normalized)
 }
+
+// TestMapper_FindOrCreate_refill covers filling a Classic API onto an OAS
+// document that an earlier fill of that same API produced. The dashboard does
+// this on every API save, so it has to land on the existing path rather than
+// mint a second one or fail as a collision.
+func TestMapper_FindOrCreate_refill(t *testing.T) {
+	first, err := NewMapper(openapi3.NewPaths())
+	require.NoError(t, err)
+
+	created, err := first.FindOrCreate("/user/[0-9]+", "GET")
+	require.NoError(t, err)
+	require.Equal(t, "/user/{customRegex1}", created.Normalized)
+
+	// Rebuild the document the way a fill would leave it, then fill again.
+	doc := openapi3.NewPaths()
+	item := &openapi3.PathItem{}
+	item.SetOperation("GET", &openapi3.Operation{OperationID: created.OperationID})
+	item.Parameters = openapi3.Parameters{}
+	created.ExtendPathParameters(&item.Parameters)
+	doc.Set(created.Normalized, item)
+
+	second, err := NewMapper(doc)
+	require.NoError(t, err)
+
+	again, err := second.FindOrCreate("/user/[0-9]+", "GET")
+	require.NoError(t, err, "re-filling an API onto its own output must not collide")
+	assert.Equal(t, created.Normalized, again.Normalized)
+	assert.Equal(t, "[0-9]+", patternOf(t, again, "customRegex1"))
+
+	// A genuinely new endpoint still gets a name of its own.
+	other, err := second.FindOrCreate("/user/[a-zA-Z]+", "GET")
+	require.NoError(t, err)
+	assert.Equal(t, "/user/{customRegex2}", other.Normalized)
+}

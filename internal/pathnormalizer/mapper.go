@@ -123,6 +123,16 @@ func (m *Mapper) findOrCreate(path, method string) (Entry, error) {
 		return *entry, nil
 	}
 
+	// An entry seeded from a document holds the OAS path key in Extended, so a
+	// classic path never matches it by path alone. The operation ID does carry
+	// the original classic path, which is how a document previously generated
+	// from this very API is recognised on a later fill. Without this the second
+	// fill mints a fresh placeholder and add() rejects it as an operation ID
+	// collision.
+	if entry, ok := m.operationsMap[operationId(path, method)]; ok {
+		return *entry, nil
+	}
+
 	normalized, err := m.parse(path)
 
 	if err != nil {
