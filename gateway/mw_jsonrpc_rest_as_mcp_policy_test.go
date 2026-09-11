@@ -72,7 +72,7 @@ func TestRESTAsMCPPolicy_DeniesBlockedToolBeforeSDK(t *testing.T) {
 	}))
 	rec := httptest.NewRecorder()
 
-	err, status := mw.ProcessRequest(rec, req, nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
 
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
@@ -103,7 +103,7 @@ func TestRESTAsMCPPolicy_MethodDeniedBeforeSDK(t *testing.T) {
 	}))
 	rec := httptest.NewRecorder()
 
-	err, status := mw.ProcessRequest(rec, req, nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
 
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
@@ -130,7 +130,7 @@ func TestRESTAsMCPPolicy_FiltersToolsListResponseForCallerView(t *testing.T) {
 	}))
 	rec := httptest.NewRecorder()
 
-	err, status := mw.ProcessRequest(rec, req, nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
 
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
@@ -176,13 +176,13 @@ func TestRESTAsMCPPolicy_EndpointRateLimitBlocksToolCall(t *testing.T) {
 	}
 
 	first := httptest.NewRecorder()
-	err, status := mw.ProcessRequest(first, makeRequest(), nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, first, makeRequest())
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
 	assert.Equal(t, http.StatusOK, first.Code)
 
 	second := httptest.NewRecorder()
-	err, status = mw.ProcessRequest(second, makeRequest(), nil)
+	err, status = processAdmittedSyntheticForTest(t, mw, second, makeRequest())
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
 	assert.Equal(t, http.StatusTooManyRequests, second.Code)
@@ -208,7 +208,7 @@ func TestRESTAsMCPPolicy_AliasUsesCallerFacingName(t *testing.T) {
 	}))
 	rec := httptest.NewRecorder()
 
-	err, status := mw.ProcessRequest(rec, req, nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
 
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
@@ -240,7 +240,7 @@ func TestRESTAsMCPPolicy_RejectsOversizedJSONRPCBeforeSDK(t *testing.T) {
 	setSessionForTest(req, restAsMCPSession("proxy-1", user.AccessDefinition{APIID: "proxy-1"}))
 	rec := httptest.NewRecorder()
 
-	err, status := mw.ProcessRequest(rec, req, nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
 
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)

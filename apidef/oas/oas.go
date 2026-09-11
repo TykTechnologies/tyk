@@ -11,6 +11,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	internalhttputil "github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
 	"github.com/TykTechnologies/tyk/internal/reflect"
 
@@ -572,9 +573,10 @@ func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) e
 	compliantModeErr := s.validateCompliantModeAuthentication()
 	prmErr := s.validatePRM()
 	mcpServerErr := s.validateMCPServerExtensionPlacement(false)
+	mcpOriginErr := s.validateMCPOrigins(false)
 	oauth2Err := s.ValidateOAuth2Schemes()
 
-	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, mcpServerErr, oauth2Err)
+	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, mcpServerErr, mcpOriginErr, oauth2Err)
 }
 
 // Normalize converts the OAS api to a normalized state.
@@ -771,8 +773,21 @@ func (s *OAS) ValidateForMCP(ctx context.Context, opts ...openapi3.ValidationOpt
 		prmErr = tykAuth.ProtectedResourceMetadata.Validate(true)
 	}
 	mcpServerErr := s.validateMCPServerExtensionPlacement(true)
+	mcpOriginErr := s.validateMCPOrigins(true)
 
-	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, mcpServerErr, oauth2Err)
+	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, mcpServerErr, mcpOriginErr, oauth2Err)
+}
+
+func (s *OAS) validateMCPOrigins(isMCP bool) error {
+	ext := s.GetTykExtension()
+	if ext == nil || ext.Server.MCP == nil {
+		return nil
+	}
+	if !isMCP {
+		return errors.New("server.mcp is valid only for MCP APIs")
+	}
+	_, err := internalhttputil.CanonicalOrigins(ext.Server.MCP.TrustedOrigins)
+	return err
 }
 
 // APIDef holds both OAS and Classic forms of an API definition.
