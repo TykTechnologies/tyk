@@ -6412,6 +6412,160 @@ func TestAPIListFilter_IncludeTypes(t *testing.T) {
 	})
 }
 
+func TestKeyHandler_CreateAndUpdate_Integration(t *testing.T) {
+	ts := StartTest(func(c *config.Config) {
+		c.AllowMasterKeys = true // Enable master keys for testing
+	})
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-api"
+		spec.UseKeylessAccess = false
+		spec.Auth.UseParam = true
+	})
+
+	// Add a policy
+	ts.Gw.policies.Add(user.Policy{
+		Active:           true,
+		QuotaMax:         10,
+		QuotaRenewalRate: 300,
+		AccessRights: map[string]user.AccessDefinition{"test-api": {
+			APIID: "test-api", Versions: []string{"Default"},
+		}},
+		OrgID: "default",
+		ID:    "test_policy",
+	})
+
+	// 1. createKeyHandler with AccessRights
+	t.Run("createKeyHandler with AccessRights", func(t *testing.T) {
+		session := CreateStandardSession()
+		session.AccessRights = map[string]user.AccessDefinition{"test-api": {
+			APIID: "test-api", Versions: []string{"Default"},
+		}}
+		session.ApplyPolicies = []string{"test_policy"}
+		sessionJSON := test.MarshalJSON(t)(session)
+
+		resp, _ := ts.Run(t, test.TestCase{
+			Method:    "POST",
+			Path:      "/tyk/keys/create",
+			Data:      string(sessionJSON),
+			AdminAuth: true,
+			Code:      200,
+		})
+
+		var keyResp map[string]interface{}
+		err := json.NewDecoder(resp.Body).Decode(&keyResp)
+		assert.NoError(t, err)
+		keyID := keyResp["key"].(string)
+
+		// Verify quota is applied
+		_, err = ts.Run(t, test.TestCase{
+			Method:    "GET",
+			Path:      "/tyk/keys/" + keyID + "?api_id=test-api",
+			AdminAuth: true,
+			Code:      200,
+			BodyMatch: `"quota_max":10`,
+		})
+		assert.NoError(t, err)
+	})
+
+	// 2. createKeyHandler with AllowMasterKeys
+	t.Run("createKeyHandler with AllowMasterKeys", func(t *testing.T) {
+		session := CreateStandardSession()
+		// No AccessRights set, should be allowed because AllowMasterKeys = true
+		sessionJSON := test.MarshalJSON(t)(session)
+
+		resp, _ := ts.Run(t, test.TestCase{
+			Method:    "POST",
+			Path:      "/tyk/keys/create",
+			Data:      string(sessionJSON),
+			AdminAuth: true,
+			Code:      200,
+		})
+
+		var keyResp map[string]interface{}
+		err := json.NewDecoder(resp.Body).Decode(&keyResp)
+		assert.NoError(t, err)
+		keyID := keyResp["key"].(string)
+
+		// Verify key is created
+		_, err = ts.Run(t, test.TestCase{
+			Method:    "GET",
+			Path:      "/tyk/keys/" + keyID,
+			AdminAuth: true,
+			Code:      200,
+		})
+		assert.NoError(t, err)
+	})
+
+	// 3. doAddOrUpdate with AccessRights
+	t.Run("doAddOrUpdate with AccessRights", func(t *testing.T) {
+		keyID := uuid.New()
+		session := CreateStandardSession()
+		session.AccessRights = map[string]user.AccessDefinition{"test-api": {
+			APIID: "test-api", Versions: []string{"Default"},
+		}}
+		session.ApplyPolicies = []string{"test_policy"}
+		sessionJSON := test.MarshalJSON(t)(session)
+
+		// POST to /tyk/keys/{key} uses addOrUpdateKeyHandler which calls doAddOrUpdate
+		resp, err := ts.Run(t, test.TestCase{
+			Method:    "POST",
+			Path:      "/tyk/keys/" + keyID,
+			Data:      string(sessionJSON),
+			AdminAuth: true,
+			Code:      200,
+		})
+		assert.NoError(t, err)
+
+		var keyResp map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&keyResp)
+		assert.NoError(t, err)
+		actualKeyID := keyResp["key"].(string)
+
+		// Verify quota is applied
+		_, err = ts.Run(t, test.TestCase{
+			Method:    "GET",
+			Path:      "/tyk/keys/" + actualKeyID + "?api_id=test-api",
+			AdminAuth: true,
+			Code:      200,
+			BodyMatch: `"quota_max":10`,
+		})
+		assert.NoError(t, err)
+	})
+
+	// 4. doAddOrUpdate with AllowMasterKeys
+	t.Run("doAddOrUpdate with AllowMasterKeys", func(t *testing.T) {
+		keyID := uuid.New()
+		session := CreateStandardSession()
+		// No AccessRights set
+		sessionJSON := test.MarshalJSON(t)(session)
+
+		resp, err := ts.Run(t, test.TestCase{
+			Method:    "POST",
+			Path:      "/tyk/keys/" + keyID,
+			Data:      string(sessionJSON),
+			AdminAuth: true,
+			Code:      200,
+		})
+		assert.NoError(t, err)
+
+		var keyResp map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&keyResp)
+		assert.NoError(t, err)
+		actualKeyID := keyResp["key"].(string)
+
+		// Verify key is created
+		_, err = ts.Run(t, test.TestCase{
+			Method:    "GET",
+			Path:      "/tyk/keys/" + actualKeyID,
+			AdminAuth: true,
+			Code:      200,
+		})
+		assert.NoError(t, err)
+	})
+}
+
 func (gw *Gateway) removePersistentPolicyById(id string) error {
 	root, err := gw.newPolicyPathRoot()
 
