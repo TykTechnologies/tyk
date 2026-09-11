@@ -346,7 +346,6 @@ func newUDGSubscriptionApiDefinition(t *testing.T, version apidef.GraphQLConfigV
 		URL:              upstreamURL,
 		Method:           http.MethodPost,
 		SubscriptionType: subscriptionType,
-		SSEUsePost:       subscriptionType == apidef.GQLSubscriptionSSE,
 	})
 	require.NoError(t, err)
 	return &apidef.APIDefinition{
@@ -377,9 +376,8 @@ func newProxyOnlyApiDefinition(version apidef.GraphQLConfigVersion, targetURL st
 			Version:       version,
 			Schema:        isolationTestSchema,
 			Proxy: apidef.GraphQLProxyConfig{
+				// This release has no sse_use_post equivalent, so SSE is always a GET here.
 				SubscriptionType: subscriptionType,
-				// Engine v3 proxy-only has no SSEUsePost equivalent, so SSE is a GET there.
-				SSEUsePost: subscriptionType == apidef.GQLSubscriptionSSE && version == apidef.GraphQLConfigVersion2,
 			},
 		},
 	}
