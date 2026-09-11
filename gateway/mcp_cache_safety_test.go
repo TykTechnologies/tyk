@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -50,7 +51,7 @@ func TestRedisCacheMiddleware_BypassesCredentialSpecificMCPFiltering(t *testing.
 	middleware := &RedisCacheMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec}, store: store}
 	// First warm the actual configured POST cache path without credential rules.
 	// The same credential acquiring filtering rules must bypass that stored result.
-	warm := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
+	warm := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/mcp", bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
 	warmErr, _ := middleware.ProcessRequest(httptest.NewRecorder(), warm, nil)
 	require.NoError(t, warmErr)
 	require.Equal(t, 1, store.getCalls, "control request must reach cache lookup")
@@ -65,7 +66,7 @@ func TestRedisCacheMiddleware_BypassesCredentialSpecificMCPFiltering(t *testing.
 		t.Fatal("cache writer did not populate store")
 	}
 	require.NotEmpty(t, store.Data, "control request must populate the configured cache")
-	req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/mcp", bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
 	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodToolsList})
 	setSessionForTest(req, &user.SessionState{AccessRights: map[string]user.AccessDefinition{
 		spec.APIID: {
@@ -89,7 +90,7 @@ func TestCredentialSpecificMCPFilteringApplies(t *testing.T) {
 		spec.APIID = "mcp-api"
 		spec.MarkAsMCP()
 	})[0]
-	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/mcp", nil)
 	session := &user.SessionState{AccessRights: map[string]user.AccessDefinition{
 		spec.APIID: {
 			APIID: spec.APIID,
@@ -140,7 +141,7 @@ func TestResponseCacheMiddleware_SkipsEditedAndStreamingMCPResponses(t *testing.
 				BaseTykResponseHandler: BaseTykResponseHandler{Spec: spec},
 				store:                  store,
 			}
-			req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/mcp", nil)
 			ctxSetCacheOptions(req, &cacheOptions{key: "cache-key", timeout: 60, responseEdited: tt.responseEdited})
 			res := &http.Response{
 				StatusCode:    http.StatusOK,
@@ -167,7 +168,7 @@ func (r *cacheBodyReadSpy) Read(p []byte) (int, error) {
 
 func TestResponseCacheRejectsCredentialRepresentationWithoutRewrite(t *testing.T) {
 	spec := BuildAPI(func(spec *APISpec) { spec.MarkAsMCP(); spec.CacheOptions.EnableCache = true })[0]
-	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/mcp", nil)
 	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodToolsList})
 	ses := &user.SessionState{AccessRights: map[string]user.AccessDefinition{spec.APIID: {MCPAccessRights: user.MCPAccessRights{Tools: user.AccessControlRules{Blocked: []string{"hidden"}}}}}}
 	ctxSetCacheOptions(req, &cacheOptions{key: "already-armed", timeout: 60})
