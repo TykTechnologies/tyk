@@ -27,8 +27,15 @@ func (m *MCPOriginValidationMiddleware) EnabledForSpec() bool {
 //
 //nolint:staticcheck // middleware interface requires the status return value
 func (m *MCPOriginValidationMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if m.Spec != nil && m.Spec.IsSyntheticMCPAdapter() {
+		if !validMCPAdapterOriginHop(r, m.Gw, m.Spec) {
+			return rejectMCPOrigin(w)
+		}
+		return nil, http.StatusOK
+	}
 	originHeaders := r.Header.Values("Origin")
 	if len(originHeaders) == 0 {
+		acceptMCPOrigin(r, m.Spec, "")
 		return nil, http.StatusOK
 	}
 	if len(originHeaders) != 1 {
@@ -44,6 +51,7 @@ func (m *MCPOriginValidationMiddleware) ProcessRequest(w http.ResponseWriter, r 
 		return rejectMCPOrigin(w)
 	}
 	if origin == external {
+		acceptMCPOrigin(r, m.Spec, origin)
 		return nil, http.StatusOK
 	}
 
@@ -52,6 +60,7 @@ func (m *MCPOriginValidationMiddleware) ProcessRequest(w http.ResponseWriter, r 
 			return rejectMCPOrigin(w)
 		}
 		if _, allowed := m.Spec.mcpTrustedOrigins[origin]; allowed {
+			acceptMCPOrigin(r, m.Spec, origin)
 			return nil, http.StatusOK
 		}
 	}
