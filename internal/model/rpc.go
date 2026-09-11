@@ -22,6 +22,7 @@ type (
 	HostDetails = apidef.HostDetails
 	NodeData    = apidef.NodeData
 	GWStats     = apidef.GWStats
+	SyncStatus  = apidef.SyncStatus
 
 	// Loaded resource info types
 	LoadedAPIInfo    = apidef.LoadedAPIInfo
@@ -30,6 +31,9 @@ type (
 
 // Other.
 const (
+	PayloadAPIs     = apidef.PayloadAPIs
+	PayloadPolicies = apidef.PayloadPolicies
+
 	Pass      = apidef.Pass
 	Warn      = apidef.Warn
 	Fail      = apidef.Fail
