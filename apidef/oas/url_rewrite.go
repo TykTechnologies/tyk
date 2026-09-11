@@ -280,9 +280,13 @@ func (i URLRewriteInput) Err() error {
 	return nil
 }
 
-func (s *OAS) fillURLRewrite(metas []apidef.URLRewriteMeta) {
+func (s *OAS) fillURLRewrite(metas []apidef.URLRewriteMeta, m pathMapper) {
 	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
+		operationID, ok := m.mapEndpoint(s, meta.Path, meta.Method)
+		if !ok {
+			continue
+		}
+
 		operation := s.GetTykExtension().getOperation(operationID)
 
 		if operation.URLRewrite == nil {
