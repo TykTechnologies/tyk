@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/jensneuse/abstractlogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -274,4 +276,88 @@ func newTestReverseProxyPreHandlerV2(t *testing.T) *reverseProxyPreHandlerV2 {
 			return closer, nil
 		},
 	}
+}
+
+func TestGranularAccessCheckerV2_CheckGraphQLRequestFieldAllowance(t *testing.T) {
+	t.Run("input object types", func(t *testing.T) {
+		schemaStr := `
+			input UserInput {
+				name: String
+				email: String
+			}
+			type Mutation {
+				createUser(input: UserInput!): String
+			}
+			type Query {
+				hello: String
+			}
+		`
+		gqlTools := graphqlGoToolsV2{}
+		parsedSchema, err := gqlTools.parseSchema(schemaStr)
+		require.NoError(t, err)
+
+		t.Run("should block restricted input object field (inline)", func(t *testing.T) {
+			operation := `mutation { createUser(input: {name: "John", email: "john@example.com"}) }`
+			request, err := http.NewRequest(
+				http.MethodPost,
+				"http://example.com",
+				bytes.NewBuffer([]byte(fmt.Sprintf(`{"query": %q}`, operation))),
+			)
+			require.NoError(t, err)
+
+			granularAccessChecker := &granularAccessCheckerV2{
+				logger: abstractlogger.NoopLogger,
+				schema: parsedSchema,
+				ctxRetrieveGraphQLRequest: func(r *http.Request) *graphqlv2.Request {
+					return &graphqlv2.Request{
+						Query: operation,
+					}
+				},
+			}
+
+			result := granularAccessChecker.CheckGraphQLRequestFieldAllowance(httptest.NewRecorder(), request, &GranularAccessDefinition{
+				RestrictedTypes: []GranularAccessType{
+					{
+						Name:   "UserInput",
+						Fields: []string{"email"},
+					},
+				},
+			})
+			assert.Equal(t, GranularAccessFailReasonValidationError, result.FailReason)
+			assert.Contains(t, result.ValidationError.Error(), "field: email is restricted on type: UserInput")
+		})
+
+		t.Run("should block restricted input object field (variable)", func(t *testing.T) {
+			operation := `mutation ($in: UserInput!) { createUser(input: $in) }`
+			variables := `{"in": {"name": "John", "email": "john@example.com"}}`
+			request, err := http.NewRequest(
+				http.MethodPost,
+				"http://example.com",
+				bytes.NewBuffer([]byte(fmt.Sprintf(`{"query": %q, "variables": %s}`, operation, variables))),
+			)
+			require.NoError(t, err)
+
+			granularAccessChecker := &granularAccessCheckerV2{
+				logger: abstractlogger.NoopLogger,
+				schema: parsedSchema,
+				ctxRetrieveGraphQLRequest: func(r *http.Request) *graphqlv2.Request {
+					return &graphqlv2.Request{
+						Query:     operation,
+						Variables: []byte(variables),
+					}
+				},
+			}
+
+			result := granularAccessChecker.CheckGraphQLRequestFieldAllowance(httptest.NewRecorder(), request, &GranularAccessDefinition{
+				RestrictedTypes: []GranularAccessType{
+					{
+						Name:   "UserInput",
+						Fields: []string{"email"},
+					},
+				},
+			})
+			assert.Equal(t, GranularAccessFailReasonValidationError, result.FailReason)
+			assert.Contains(t, result.ValidationError.Error(), "field: email is restricted on type: UserInput")
+		})
+	})
 }
