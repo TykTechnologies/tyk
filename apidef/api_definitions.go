@@ -698,15 +698,17 @@ type APIDefinition struct {
 	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
 	JsonRpcVersion      string         `bson:"json_rpc_version,omitempty" json:"json_rpc_version,omitempty"`
 	ApplicationProtocol string         `bson:"application_protocol,omitempty" json:"application_protocol,omitempty"`
-	MCP                 *MCPConfig     `bson:"mcp,omitempty" json:"mcp,omitempty"`
-	APIID               string         `bson:"api_id" json:"api_id"`
-	OrgID               string         `bson:"org_id" json:"org_id"`
-	UseKeylessAccess    bool           `bson:"use_keyless" json:"use_keyless"`
-	UseOauth2           bool           `bson:"use_oauth2" json:"use_oauth2"`
-	ExternalOAuth       ExternalOAuth  `bson:"external_oauth" json:"external_oauth"`
-	UseOpenID           bool           `bson:"use_openid" json:"use_openid"`
-	OpenIDOptions       OpenIDOptions  `bson:"openid_options" json:"openid_options"`
-	Oauth2Meta          struct {
+	// MCP must serialize nil as BSON null: Dashboard updates use $set, so
+	// omitting it would retain a previously stored Origin configuration.
+	MCP              *MCPConfig    `bson:"mcp" json:"mcp,omitempty"`
+	APIID            string        `bson:"api_id" json:"api_id"`
+	OrgID            string        `bson:"org_id" json:"org_id"`
+	UseKeylessAccess bool          `bson:"use_keyless" json:"use_keyless"`
+	UseOauth2        bool          `bson:"use_oauth2" json:"use_oauth2"`
+	ExternalOAuth    ExternalOAuth `bson:"external_oauth" json:"external_oauth"`
+	UseOpenID        bool          `bson:"use_openid" json:"use_openid"`
+	OpenIDOptions    OpenIDOptions `bson:"openid_options" json:"openid_options"`
+	Oauth2Meta       struct {
 		AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
