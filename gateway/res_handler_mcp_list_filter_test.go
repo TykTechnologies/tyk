@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -1088,7 +1089,7 @@ func TestMCPListFilterResponseHandler_CacheSafetyTracksActualEdits(t *testing.T)
 	}}
 
 	t.Run("removed item makes result private and disables cache write", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/mcp", nil)
 		httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodToolsList, ID: 1})
 		options := &cacheOptions{}
 		ctxSetCacheOptions(req, options)
@@ -1107,7 +1108,7 @@ func TestMCPListFilterResponseHandler_CacheSafetyTracksActualEdits(t *testing.T)
 	})
 
 	t.Run("fully authorized page remains credential dependent", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/mcp", nil)
 		httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodToolsList, ID: 1})
 		options := &cacheOptions{}
 		ctxSetCacheOptions(req, options)
