@@ -3,11 +3,14 @@ package enginev3
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/graphql_datasource"
 	kafkadatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/kafka_datasource"
 	restdatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/rest_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/staticdatasource"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/plan"
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/federation"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -24,7 +27,13 @@ type UniversalDataGraph struct {
 func (u *UniversalDataGraph) EngineConfigV3() (*graphql.EngineV2Configuration, error) {
 	var err error
 	if u.Schema == nil {
-		u.Schema, err = parseSchema(u.ApiDefinition.GraphQL.Schema)
+		schemaStr := u.ApiDefinition.GraphQL.Schema
+		// Inject Apollo Federation Schema
+		schemaStr, err = federation.BuildFederationSchema(schemaStr, schemaStr)
+		if err != nil {
+			return nil, err
+		}
+		u.Schema, err = parseSchema(schemaStr)
 		if err != nil {
 			return nil, err
 		}
@@ -38,6 +47,24 @@ func (u *UniversalDataGraph) EngineConfigV3() (*graphql.EngineV2Configuration, e
 	if err != nil {
 		return nil, err
 	}
+
+	// Add entities datasource
+	datsSources = append(datsSources, createEntitiesDataSource())
+
+	// Add service datasource
+	serviceDataSource := plan.DataSourceConfiguration{
+		RootNodes: []plan.TypeField{
+			{
+				TypeName:   "Query",
+				FieldNames: []string{"_service"},
+			},
+		},
+		Factory: &staticdatasource.Factory{},
+		Custom: staticdatasource.ConfigJSON(staticdatasource.Configuration{
+			Data: `{"_service":{"sdl":` + strconv.Quote(u.ApiDefinition.GraphQL.Schema) + `}}`,
+		}),
+	}
+	datsSources = append(datsSources, serviceDataSource)
 
 	conf.SetFieldConfigurations(fieldConfigs)
 	conf.SetDataSources(datsSources)
