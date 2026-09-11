@@ -93,6 +93,24 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 		// whitespace between cookies
 		stripFromCookieTest(t, req, key, sa, "Dummy=DUMMY; NonDefaultName=AUTHORIZATION; Dummy2=DUMMY2", "Dummy=DUMMY; Dummy2=DUMMY2")
 	})
+
+	t.Run("does not strip cookies that only share a name prefix", func(t *testing.T) {
+		req, err := http.NewRequest("GET", "http://example.com", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sa := StripAuth{BaseMiddleware: &BaseMiddleware{}}
+		sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+		key := "Auth"
+		sa.Spec.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.AuthTokenType: {CookieName: key},
+		}
+		// AuthToken must remain; only Auth=... should be removed.
+		stripFromCookieTest(t, req, key, sa,
+			"Auth=SECRET;AuthToken=KEEP;Authorization=KEEP2",
+			"AuthToken=KEEP;Authorization=KEEP2")
+	})
 }
 
 func stripFromCookieTest(t *testing.T, req *http.Request, key string, sa StripAuth, value string, expected string) {
