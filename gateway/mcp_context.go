@@ -5,10 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"net/http"
+
+	sdkAuth "github.com/modelcontextprotocol/go-sdk/auth"
+
 	internalhttputil "github.com/TykTechnologies/tyk/internal/httputil"
 	restmcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
-	sdkAuth "github.com/modelcontextprotocol/go-sdk/auth"
-	"net/http"
 )
 
 type mcpContextKey string
