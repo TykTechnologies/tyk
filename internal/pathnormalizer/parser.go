@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -31,6 +32,7 @@ var (
 // Parser responsible for parsing user-defined path of given OAS.
 type Parser struct {
 	anonymousReCounter int
+	anonymousReName    *regexp.Regexp
 	prefix             string
 	stripSlashes       bool
 	ctrResets          bool
@@ -61,12 +63,34 @@ func WithCtrResets() option.Option[Parser] {
 
 // NewParser instantiates new parser instance
 func NewParser(opts ...option.Option[Parser]) *Parser {
-	return option.New(opts).Build(Parser{
+	parser := option.New(opts).Build(Parser{
 		anonymousReCounter: 0,
 		prefix:             RePrefix,
 		stripSlashes:       true,
 		ctrResets:          false,
 	})
+
+	parser.anonymousReName = regexp.MustCompile(`^` + regexp.QuoteMeta(parser.prefix) + `(\d+)$`)
+
+	return parser
+}
+
+// reserve keeps the anonymous name counter ahead of any placeholder the document
+// already carries, so a freshly minted name can never land on one that is taken.
+// Without it, parsing a document that already holds e.g. /user/{customRegex1}
+// would hand the very same name to the next anonymous regex.
+func (p *Parser) reserve(name string) {
+	match := p.anonymousReName.FindStringSubmatch(name)
+
+	if match == nil {
+		return
+	}
+
+	// An unparsable number here means a name far longer than anything we mint,
+	// so there is nothing to reserve against.
+	if n, err := strconv.Atoi(match[1]); err == nil && n > p.anonymousReCounter {
+		p.anonymousReCounter = n
+	}
 }
 
 // Parse responsible for parsing next one path.
@@ -318,6 +342,8 @@ func (p *pathParser) newPathPartRe(name, pattern string) (pathPart, error) {
 	if _, err := regexp.Compile(fmt.Sprintf("^%s$", pattern)); err != nil {
 		return pathPart{}, p.parseError(err)
 	}
+
+	p.parent.reserve(name)
 
 	return pathPart{
 		name:    name,

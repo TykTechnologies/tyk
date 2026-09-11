@@ -80,6 +80,11 @@ func isTypeOf(ref *openapi3.ParameterRef, expectedType string) bool {
 		return false
 	}
 
+	// Type is nil whenever the schema omits "type", which is valid OAS.
+	if ref.Value.Schema.Value.Type == nil {
+		return false
+	}
+
 	for _, typ := range *(ref.Value.Schema.Value.Type) {
 		if typ == expectedType {
 			return true
