@@ -28,7 +28,10 @@ tests:
               required: true
               schema:
                 type: string
-                pattern: <nil>
+                # Migration constrains a mux parameter carrying no regex of its
+                # own to a single path segment. The ordinary fill cycle still
+                # leaves it unset; see TestOAS_Fill_legacyConversionUnchanged.
+                pattern: "[^/]+"
   - source: "classic"
     input:
       version_data:
@@ -56,7 +59,8 @@ tests:
               required: true
               schema:
                 type: string
-                pattern: "<nil>"
+                # Carried over from {testId:[0-9]+}; migration used to drop it.
+                pattern: "[0-9]+"
   - source: "classic"
     input:
       version_data:
@@ -134,13 +138,14 @@ tests:
               required: true
               schema:
                 type: string
-                pattern: <nil>
+                # Carried over from {[0-9]+}; migration used to drop it.
+                pattern: "[0-9]+"
             - name: id
               in: path
               required: true
               schema:
                 type: string
-                pattern: <nil>
+                pattern: "[^/]+"
   - source: "classic"
     input:
       version_data:
@@ -168,7 +173,7 @@ tests:
               required: true
               schema:
                 type: string
-                pattern: <nil>
+                pattern: "[^/]+"
             - name: customRegex1
               in: path
               required: true
