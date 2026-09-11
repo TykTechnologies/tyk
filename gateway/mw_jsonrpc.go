@@ -326,7 +326,10 @@ func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWri
 		method = syntheticJSONRPCMethod(r)
 	}
 	normaliseMCPStreamableAccept(r)
-	installMCPAdapterCallContext(r, m.Gw, m.Spec)
+	if !installMCPAdapterRequestBinding(r, m.Gw, m.Spec) {
+		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return nil, middleware.StatusRespond
+	}
 
 	if method == mcp.MethodToolsList || (policyCtx != nil && policyCtx.listConfig != nil) {
 		rec := newBufferedResponseWriter()

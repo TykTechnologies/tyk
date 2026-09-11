@@ -80,15 +80,22 @@ func (gw *Gateway) currentSyntheticMCPAdapterSpecs() map[string]*APISpec {
 
 func (gw *Gateway) findInternalHTTPHandlerForLoop(apiNameOrID string, caller *APISpec, r *http.Request) (handler http.Handler, targetAPI *APISpec, ok bool) {
 	targetName := apiNameOrID
-	if caller != nil && caller.APIDefinition != nil && caller.IsPairedMCPAdapterProxy() {
-		if _, restAPIID, paired := pairedMCPAdapterTarget(caller.Proxy.TargetURL); paired {
-			targetName = pairing.CanonicalAdapterAPIID(restAPIID)
-			if r != nil {
-				ctxSetMCPAdapterCallerProxyID(r, caller.APIID)
-			}
-		}
+	if caller == nil || caller.APIDefinition == nil || !caller.IsPairedMCPAdapterProxy() {
+		return gw.findInternalHttpHandlerByNameOrID(targetName)
 	}
-	return gw.findInternalHttpHandlerByNameOrID(targetName)
+	_, restAPIID, paired := pairedMCPAdapterTarget(caller.Proxy.TargetURL)
+	if !paired {
+		return nil, nil, false
+	}
+	targetName = pairing.CanonicalAdapterAPIID(restAPIID)
+	handler, targetAPI, ok = gw.findInternalHttpHandlerByNameOrID(targetName)
+	if !ok || r == nil || !establishMCPAdapterOriginHop(r, gw, caller, targetAPI) {
+		// Keep denial local and before any adapter body parsing or SDK work.
+		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		}), targetAPI, true
+	}
+	return handler, targetAPI, true
 }
 
 func computeMCPPairing(specs []*APISpec) (pairing.Snapshot, error) {
@@ -169,10 +176,11 @@ func buildMCPAdapterSpec(rest *APISpec, proxies []*APISpec, existing *APISpec) (
 	}
 	if sdkAdapter == nil {
 		sdkAdapter, err = restmcpadapter.NewSDKAdapter(restmcpadapter.SDKServerConfig{
-			Name:     adapterID,
-			Version:  "1.0",
-			Tools:    catalogue.unionTools,
-			CallTool: defaultMCPAdapterCallTool,
+			Name:                  adapterID,
+			Version:               "1.0",
+			Tools:                 catalogue.unionTools,
+			CallTool:              defaultMCPAdapterCallTool,
+			RequireRequestBinding: true,
 		})
 		if err != nil {
 			return nil, err
@@ -346,6 +354,11 @@ func callerProxyIDs(proxies []*APISpec) []string {
 }
 
 func defaultMCPAdapterCallTool(ctx context.Context, tool *oas.DerivedTool, args map[string]any) (*restmcpadapter.Recorder, error) {
+	current, ok := restmcpadapter.CurrentRequestContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("REST-as-MCP current request binding is missing")
+	}
+	ctx = current
 	gw := mcpAdapterGatewayFromContext(ctx)
 	adapterSpec := mcpAdapterSpecFromContext(ctx)
 	parentReq := mcpAdapterParentRequestFromContext(ctx)
