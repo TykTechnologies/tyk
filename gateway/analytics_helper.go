@@ -68,6 +68,12 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 		return false
 	}
 
+	// the request body passes straight through to the upstream and is not
+	// available to re-read for detailed recording
+	if spec.EnableRequestBodyPassthrough {
+		return false
+	}
+
 	return recordDetailUnsafe(r, spec)
 }
 
