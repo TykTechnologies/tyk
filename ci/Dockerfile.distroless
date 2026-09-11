@@ -11,7 +11,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # The _ after the pkg name is to match tyk-gateway strictly and not tyk-gateway-fips (for example)
 COPY ${BUILD_PACKAGE_NAME}_*${TARGETARCH}.deb /
 ARG NONROOT_CHOWN=false
-RUN dpkg -i /${BUILD_PACKAGE_NAME}_*${TARGETARCH}.deb && rm /*.deb \
+RUN dpkg -i /"${BUILD_PACKAGE_NAME}"_*"${TARGETARCH}".deb && rm /*.deb \
     && chmod -R a+rX /opt/tyk-gateway/ \
     && mkdir -p /opt/tyk-gateway/middleware/bundles \
     && chmod a+rwX /opt/tyk-gateway/middleware /opt/tyk-gateway/middleware/bundles \
