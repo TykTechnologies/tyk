@@ -133,6 +133,11 @@ func TestMCPOriginHopRejectsChangedOrForgedProvenance(t *testing.T) {
 	req := httptest.NewRequest("POST", "http://gateway/mcp", nil)
 	acceptMCPOrigin(req, caller, "")
 	require.True(t, establishMCPAdapterOriginHop(req, gw, caller, target))
+	source := gw.apisByID["rest-1"]
+	_, _, _ = gw.findInternalHTTPHandlerForLoop(target.APIID, source, req)
+	require.False(t, validMCPAdapterOriginHop(req, gw, target), "unrelated internal loop reused a prior proof")
+	acceptMCPOrigin(req, caller, "")
+	require.True(t, establishMCPAdapterOriginHop(req, gw, caller, target))
 	gw.mcpPairingIndex.Set(pairing.Snapshot{})
 	require.False(t, validMCPAdapterOriginHop(req, gw, target))
 }
