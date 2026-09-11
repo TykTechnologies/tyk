@@ -37,7 +37,6 @@ type Parser struct {
 	anonymousReName    *regexp.Regexp
 	prefix             string
 	stripSlashes       bool
-	ctrResets          bool
 }
 
 // WithNoStripSlashes skip strip slashes.
@@ -55,21 +54,12 @@ func WithPrefix(prefix string) option.Option[Parser] {
 	}
 }
 
-// WithCtrResets enables counter resets on each parse call.
-// Useful for testing.
-func WithCtrResets() option.Option[Parser] {
-	return func(parser *Parser) {
-		parser.ctrResets = true
-	}
-}
-
 // NewParser instantiates new parser instance
 func NewParser(opts ...option.Option[Parser]) *Parser {
 	parser := option.New(opts).Build(Parser{
 		anonymousReCounter: 0,
 		prefix:             RePrefix,
 		stripSlashes:       true,
-		ctrResets:          false,
 	})
 
 	parser.anonymousReName = regexp.MustCompile(`^` + regexp.QuoteMeta(parser.prefix) + `(\d+)$`)
@@ -97,12 +87,6 @@ func (p *Parser) reserve(name string) {
 
 // Parse responsible for parsing next one path.
 func (p *Parser) Parse(path string) (*NormalizedPath, error) {
-	if p.ctrResets {
-		defer func() {
-			p.anonymousReCounter = 0
-		}()
-	}
-
 	singlePathParser := newPathParser(path, p)
 
 	pPath, err := singlePathParser.parse()
