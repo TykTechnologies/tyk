@@ -33,6 +33,10 @@ func NewMapper(in *openapi3.Paths) (*Mapper, error) {
 }
 
 func newMapper(in *openapi3.Paths) (*Mapper, error) {
+	if in == nil {
+		in = openapi3.NewPaths()
+	}
+
 	in = reflect.Clone(in)
 	normalizedPaths := openapi3.NewPaths()
 	entriesNumber := countPathsEntries(in)
@@ -101,14 +105,12 @@ func (m *Mapper) add(newEntry Entry) error {
 	return nil
 }
 
+// FindOrCreate resolves an endpoint to its normalized path, creating the entry
+// when the mapper has not seen it yet. The error is returned rather than logged:
+// the caller knows which API and which endpoint it is converting, and is the one
+// able to tell whoever asked for the conversion.
 func (m *Mapper) FindOrCreate(path, method string) (Entry, error) {
-	entry, err := m.findOrCreate(path, method)
-
-	if err != nil {
-		log.WithError(err).Error("failed to find or create entry")
-	}
-
-	return entry, err
+	return m.findOrCreate(path, method)
 }
 
 func (m *Mapper) findOrCreate(path, method string) (Entry, error) {
