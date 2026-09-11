@@ -81,6 +81,10 @@ func (gw *Gateway) currentSyntheticMCPAdapterSpecs() map[string]*APISpec {
 func (gw *Gateway) findInternalHTTPHandlerForLoop(apiNameOrID string, caller *APISpec, r *http.Request) (handler http.Handler, targetAPI *APISpec, ok bool) {
 	targetName := apiNameOrID
 	if caller == nil || caller.APIDefinition == nil || !caller.IsPairedMCPAdapterProxy() {
+		if r != nil {
+			// An unrelated internal loop must not reuse an earlier adapter hop.
+			setCtxValue(r, mcpOriginHopKey, mcpOriginHop{})
+		}
 		return gw.findInternalHttpHandlerByNameOrID(targetName)
 	}
 	_, restAPIID, paired := pairedMCPAdapterTarget(caller.Proxy.TargetURL)
