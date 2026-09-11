@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -77,8 +78,23 @@ func (m *JSONRPCMiddleware) validateJSONRPCRequest(r *http.Request) bool {
 		return false
 	}
 
-	contentType := r.Header.Get(headerContentType)
-	return strings.HasPrefix(contentType, contentTypeJSON)
+	return isJSONRPCContentType(r.Header.Get(headerContentType))
+}
+
+// isJSONRPCContentType reports whether the Content-Type identifies a JSON body
+// for JSON-RPC/MCP routing. HTTP media types are case-insensitive (RFC 9110
+// §8.3.1), and the MCP execution engine (go-sdk) accepts them case-insensitively
+// via mime.ParseMediaType. The security gate MUST use the same case-insensitive
+// recognition as the engine: a byte-exact prefix check here fails open on
+// variants like "Application/json", letting a request slip past MCP access
+// control while the engine still executes it.
+func isJSONRPCContentType(contentType string) bool {
+	mediaType, _, err := mime.ParseMediaType(strings.TrimSpace(contentType))
+	if err != nil {
+		return false
+	}
+	// mime.ParseMediaType already lower-cases the media type.
+	return mediaType == contentTypeJSON || strings.HasSuffix(mediaType, "+json")
 }
 
 // readAndParseJSONRPC reads the request body and parses it as JSON-RPC 2.0.

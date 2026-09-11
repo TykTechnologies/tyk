@@ -84,6 +84,54 @@ func TestRESTAsMCPPolicy_DeniesBlockedToolBeforeSDK(t *testing.T) {
 	assert.Equal(t, "orders", ctxGetMCPPrimitiveName(req))
 }
 
+// TestRESTAsMCPPolicy_DeniesBlockedToolWithCaseVariantContentType is the
+// regression test for the Content-Type case differential (CHAIN 2): a
+// low-privilege caller must not bypass Tool-Based Access Control by sending
+// "Content-Type: Application/json" (capital A). The SDK adapter accepts the
+// case variant, so the policy gate must recognise it identically — otherwise
+// the request runs unrouted and the denied tool executes.
+func TestRESTAsMCPPolicy_DeniesBlockedToolWithCaseVariantContentType(t *testing.T) {
+	gw, adapterSpec, _ := syntheticAdapterGatewayForCallTest(t)
+	called := false
+	var err error
+	adapterSpec.MCPAdapter.SDKAdapter, err = mcpadapter.NewSDKAdapter(mcpadapter.SDKServerConfig{
+		Name:  adapterSpec.Name,
+		Tools: adapterSpec.MCPAdapter.UnionTools,
+		CallTool: func(context.Context, *oas.DerivedTool, map[string]any) (*mcpadapter.Recorder, error) {
+			called = true
+			return mcpadapter.NewRecorder(), nil
+		},
+	})
+	require.NoError(t, err)
+
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec, Gw: gw}}
+	sessionID := initializeSyntheticAdapterSession(t, mw, "proxy-1")
+	req := restAsMCPPolicyRequest(t, sessionID, `{
+		"jsonrpc":"2.0",
+		"id":2,
+		"method":"tools/call",
+		"params":{"name":"orders","arguments":{}}
+	}`)
+	// The exploit: a single capital letter in the media type.
+	req.Header.Set("Content-Type", "Application/json")
+	ctxSetMCPAdapterCallerProxyID(req, "proxy-1")
+	setSessionForTest(req, restAsMCPSession("proxy-1", user.AccessDefinition{
+		APIID: "proxy-1",
+		MCPAccessRights: user.MCPAccessRights{
+			Tools: user.AccessControlRules{Blocked: []string{"orders"}},
+		},
+	}))
+	rec := httptest.NewRecorder()
+
+	err, status := mw.ProcessRequest(rec, req, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, middleware.StatusRespond, status)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Contains(t, rec.Body.String(), "tool 'orders' is not available")
+	assert.False(t, called, "blocked tool must not reach the SDK adapter")
+}
+
 func TestRESTAsMCPPolicy_MethodDeniedBeforeSDK(t *testing.T) {
 	gw, adapterSpec, _ := syntheticAdapterGatewayForCallTest(t)
 	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec, Gw: gw}}
