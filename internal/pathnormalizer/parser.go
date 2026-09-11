@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -449,11 +450,5 @@ func isDigit(s byte) bool {
 }
 
 func isOneOf(s byte, str string) bool {
-	for _, r := range []byte(str) {
-		if r == s {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains([]byte(str), s)
 }
