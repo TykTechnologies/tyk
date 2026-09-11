@@ -73,7 +73,38 @@ func (s *OAS) MarshalJSON() ([]byte, error) {
 }
 
 // Fill fills *OAS definition from apidef.APIDefinition.
+//
+// This is the ordinary fill cycle, the one that runs whenever an OAS API is
+// loaded or saved. It converts paths exactly as Tyk always has, quirks included,
+// because customers route on the behaviour those quirks produce. Do not move it
+// onto the normalizing mapper: migration is the only place a changed conversion
+// belongs, and it has fillForMigration.
 func (s *OAS) Fill(api apidef.APIDefinition) {
+	s.fill(api, &legacyPathMapper{})
+}
+
+// fillForMigration fills *OAS definition from apidef.APIDefinition as part of a
+// Classic-to-OAS migration.
+//
+// Unlike Fill it normalizes paths, so that two Classic endpoints differing only
+// by their regex keep placeholder names of their own rather than one silently
+// overwriting the other. It reports every endpoint it could not convert instead
+// of logging and carrying on, since not every Classic API can be migrated and
+// the user asking for the migration is the one who needs to know.
+func (s *OAS) fillForMigration(api apidef.APIDefinition) error {
+	mapper, err := newNormalizingPathMapper(s.ensurePaths())
+	if err != nil {
+		return err
+	}
+
+	s.fill(api, mapper)
+
+	return mapper.err()
+}
+
+// fill is the body both entry points share. The mapper decides how Classic
+// paths become OAS paths, and is the only difference between them.
+func (s *OAS) fill(api apidef.APIDefinition, mapper pathMapper) {
 	xTykAPIGateway := s.GetTykExtension()
 	if xTykAPIGateway == nil {
 		xTykAPIGateway = &XTykAPIGateway{}
@@ -81,7 +112,7 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	}
 
 	xTykAPIGateway.Fill(api)
-	s.fillPathsAndOperations(api.VersionData.Versions[Main].ExtendedPaths)
+	s.fillPathsAndOperations(api.VersionData.Versions[Main].ExtendedPaths, mapper)
 	s.fillSecurity(api)
 
 	if ShouldOmit(xTykAPIGateway) {
@@ -818,7 +849,12 @@ func NewOASFromClassicAPIDefinition(api *apidef.APIDefinition) (*OAS, error) {
 func FillOASFromClassicAPIDefinition(api *apidef.APIDefinition, oas *OAS) (*OAS, error) {
 	api.IsOAS = true
 
-	oas.Fill(*api)
+	// Migration is the one conversion that normalizes paths, and the one that
+	// reports what it could not convert.
+	if err := oas.fillForMigration(*api); err != nil {
+		return nil, err
+	}
+
 	oas.setRequiredFields(api.Name, api.VersionName)
 	clearClassicAPIForSomeFeatures(api)
 

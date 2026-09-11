@@ -118,7 +118,7 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 	})
 	convertedOAS.Paths = convertedPaths
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Middleware: &Middleware{Operations: Operations{}}})
-	convertedOAS.fillPathsAndOperations(ep)
+	convertedOAS.fillPathsAndOperations(ep, &legacyPathMapper{})
 
 	assert.Equal(t, oas.getTykOperations(), convertedOAS.getTykOperations())
 
@@ -1030,7 +1030,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				}
 			}
 
-			spec.fillMockResponsePaths(spec.Paths, tt.ep)
+			spec.fillMockResponsePaths(spec.Paths, tt.ep, &legacyPathMapper{})
 			tt.want(t, spec)
 		})
 	}
@@ -1082,7 +1082,7 @@ func TestOAS_fillAllowance(t *testing.T) {
 			},
 		}
 
-		s.fillAllowance(endpointMetas, allow)
+		s.fillAllowance(endpointMetas, allow, &legacyPathMapper{})
 
 		operationID := s.getOperationID("/test", http.MethodGet)
 		operation := s.GetTykExtension().getOperation(operationID)
@@ -1113,7 +1113,7 @@ func TestOAS_fillAllowance(t *testing.T) {
 			},
 		}
 
-		s.fillAllowance(endpointMetas, block)
+		s.fillAllowance(endpointMetas, block, &legacyPathMapper{})
 
 		operationID := s.getOperationID("/test", http.MethodGet)
 		operation := s.GetTykExtension().getOperation(operationID)
@@ -1144,7 +1144,7 @@ func TestOAS_fillAllowance(t *testing.T) {
 			},
 		}
 
-		s.fillAllowance(endpointMetas, ignoreAuthentication)
+		s.fillAllowance(endpointMetas, ignoreAuthentication, &legacyPathMapper{})
 
 		operationID := s.getOperationID("/test", http.MethodGet)
 		operation := s.GetTykExtension().getOperation(operationID)
@@ -1180,7 +1180,7 @@ func TestOAS_fillAllowance(t *testing.T) {
 			},
 		}
 
-		spec.fillAllowance(endpointMetas, allow)
+		spec.fillAllowance(endpointMetas, allow, &legacyPathMapper{})
 
 		operationID := spec.getOperationID("/test", http.MethodGet)
 		operation := spec.GetTykExtension().getOperation(operationID)
@@ -1203,7 +1203,7 @@ func TestOAS_fillAllowance(t *testing.T) {
 
 		var endpointMetas []apidef.EndPointMeta
 
-		s.fillAllowance(endpointMetas, allow)
+		s.fillAllowance(endpointMetas, allow, &legacyPathMapper{})
 
 		assert.Empty(t, s.Paths.Map())
 	})
@@ -1229,7 +1229,7 @@ func TestOAS_fillAllowance(t *testing.T) {
 			},
 		}
 
-		s.fillAllowance(endpointMetas, allow)
+		s.fillAllowance(endpointMetas, allow, &legacyPathMapper{})
 
 		operationID := s.getOperationID("/test", http.MethodGet)
 		operation := s.GetTykExtension().getOperation(operationID)
