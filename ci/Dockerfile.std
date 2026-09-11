@@ -15,7 +15,7 @@ RUN rm -fv /usr/bin/passwd /usr/sbin/adduser || true
 
 # Comment this to test in dev
 COPY dist/${BUILD_PACKAGE_NAME}_*_${TARGETARCH}.deb /
-RUN dpkg -i /${BUILD_PACKAGE_NAME}_*_${TARGETARCH}.deb && find / -maxdepth 1 -name "*.deb" -delete
+RUN dpkg -i /"${BUILD_PACKAGE_NAME}"_*_"${TARGETARCH}".deb && find / -maxdepth 1 -name "*.deb" -delete
 
 # Clean up caches, unwanted .a and .o files
 RUN rm -rf /root/.cache \
