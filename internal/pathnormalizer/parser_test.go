@@ -143,12 +143,24 @@ func TestParser(t *testing.T) {
 		parser := pathnormalizer.NewParser(pathnormalizer.WithCtrResets())
 
 		_, err := parser.Parse("/users/{aaa[0-9]{2}/}")
-		assert.ErrorContains(t, err, pathnormalizer.ErrUnexpectedSlash.Error())
+		assert.ErrorContains(t, err, pathnormalizer.ErrUnbalancedBrace.Error())
 
 		_, err = parser.Parse("/users/aaa[0-9]{2/}")
-		assert.ErrorContains(t, err, pathnormalizer.ErrUnexpectedSlash.Error())
+		assert.ErrorContains(t, err, pathnormalizer.ErrUnbalancedBrace.Error())
 
 		_, err = parser.Parse("/users/{[0-9]{2}}[0-9]{2}")
+		assert.ErrorContains(t, err, pathnormalizer.ErrUnexpectedSymbol.Error())
+
+		// A brace left open at the very end used to read past the input.
+		_, err = parser.Parse("/{")
+		assert.ErrorContains(t, err, pathnormalizer.ErrUnbalancedBrace.Error())
+
+		_, err = parser.Parse("/user/{")
+		assert.ErrorContains(t, err, pathnormalizer.ErrUnbalancedBrace.Error())
+
+		// A closing brace with nothing to close is a stray symbol, not an
+		// unreachable state.
+		_, err = parser.Parse("/abc}")
 		assert.ErrorContains(t, err, pathnormalizer.ErrUnexpectedSymbol.Error())
 	})
 }
