@@ -21,6 +21,11 @@ type Mapper struct {
 	extendedMap   map[endpoint]*Entry
 	normalizedMap map[endpoint]*Entry
 	operationsMap map[string]*Entry
+
+	// parsedPaths caches normalization per path, and pathParams the parameters
+	// derived from it. Both are keyed by path alone, never by endpoint: see parse.
+	parsedPaths map[string]*NormalizedPath
+	pathParams  map[string]*openapi3.Parameters
 }
 
 func NewMapper(in *openapi3.Paths) (*Mapper, error) {
@@ -45,10 +50,12 @@ func newMapper(in *openapi3.Paths) (*Mapper, error) {
 		extendedMap:   make(map[endpoint]*Entry, entriesNumber),
 		normalizedMap: make(map[endpoint]*Entry, entriesNumber),
 		operationsMap: make(map[string]*Entry, entriesNumber),
+		parsedPaths:   make(map[string]*NormalizedPath, entriesNumber),
+		pathParams:    make(map[string]*openapi3.Parameters, entriesNumber),
 	}
 
 	for _, item := range oasutil.SortByPathLength(*in) {
-		normalized, err := mapper.parser.Parse(item.Path)
+		normalized, err := mapper.parse(item.Path)
 
 		if err != nil {
 			return nil, err
@@ -58,6 +65,7 @@ func newMapper(in *openapi3.Paths) (*Mapper, error) {
 		pathItem := reflect.Clone(item.PathItem)
 		extractParametersFromPath(&pathItem.Parameters, normalized.ParameterRefs())
 		normalizedPaths.Set(normalized.path, pathItem)
+		mapper.pathParams[normalized.path] = &pathItem.Parameters
 
 		for method, op := range item.Operations() {
 			extractParametersFromPath(&op.Parameters, normalized.ParameterRefs())
@@ -135,15 +143,11 @@ func (m *Mapper) findOrCreate(path, method string) (Entry, error) {
 		return *entry, nil
 	}
 
-	normalized, err := m.parser.Parse(path)
+	normalized, err := m.parse(path)
 
 	if err != nil {
 		return Entry{}, err
 	}
-
-	pathItem := openapi3.PathItem{}
-	pathItem.Parameters = openapi3.NewParameters()
-	extractParametersFromPath(&pathItem.Parameters, normalized.ParameterRefs())
 
 	entry := Entry{
 		Method:      method,
@@ -151,7 +155,7 @@ func (m *Mapper) findOrCreate(path, method string) (Entry, error) {
 		Extended:    path,
 		Normalized:  normalized.path,
 		mapper:      m,
-		parameters:  &pathItem.Parameters,
+		parameters:  m.parametersFor(normalized),
 	}
 
 	if err := m.add(entry); err != nil {
@@ -159,6 +163,44 @@ func (m *Mapper) findOrCreate(path, method string) (Entry, error) {
 	}
 
 	return entry, nil
+}
+
+// parse normalizes path, reusing the result of an earlier parse of the same path.
+// Normalization is memoised per path rather than per endpoint on purpose: the
+// anonymous regex counter is mapper-wide, so re-parsing one path for a second
+// HTTP method would mint fresh placeholder names and split what should be a
+// single PathItem into two.
+func (m *Mapper) parse(path string) (*NormalizedPath, error) {
+	if normalized, ok := m.parsedPaths[path]; ok {
+		return normalized, nil
+	}
+
+	normalized, err := m.parser.Parse(path)
+
+	if err != nil {
+		return nil, err
+	}
+
+	m.parsedPaths[path] = normalized
+	// An already normalized path maps onto itself, so that a later lookup by the
+	// normalized form resolves to the same PathItem instead of re-parsing it.
+	m.parsedPaths[normalized.path] = normalized
+
+	return normalized, nil
+}
+
+// parametersFor returns the path parameters shared by every endpoint on the
+// normalized path, creating them on first use.
+func (m *Mapper) parametersFor(normalized *NormalizedPath) *openapi3.Parameters {
+	if params, ok := m.pathParams[normalized.path]; ok {
+		return params
+	}
+
+	params := openapi3.NewParameters()
+	extractParametersFromPath(&params, normalized.ParameterRefs())
+	m.pathParams[normalized.path] = &params
+
+	return &params
 }
 
 func (m *Mapper) getNormalized() *openapi3.Paths {
