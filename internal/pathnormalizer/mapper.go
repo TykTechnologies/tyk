@@ -29,13 +29,7 @@ type Mapper struct {
 }
 
 func NewMapper(in *openapi3.Paths) (*Mapper, error) {
-	m, err := newMapper(in)
-
-	if err != nil {
-		log.WithError(err).Error("failed to create mapper")
-	}
-
-	return m, err
+	return newMapper(in)
 }
 
 func newMapper(in *openapi3.Paths) (*Mapper, error) {
@@ -83,20 +77,6 @@ func newMapper(in *openapi3.Paths) (*Mapper, error) {
 	}
 
 	return mapper, nil
-}
-
-func MustMapper(in *openapi3.Paths) *Mapper {
-	mapper, err := NewMapper(in)
-
-	if err != nil {
-		panic(err)
-	}
-
-	return mapper
-}
-
-func MustDummyMapper() *Mapper {
-	return MustMapper(openapi3.NewPaths())
 }
 
 func (m *Mapper) add(newEntry Entry) error {

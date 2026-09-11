@@ -18,7 +18,6 @@ func TestParser(t *testing.T) {
 			expectedParams   map[string]string
 		}
 
-		parser := pathnormalizer.NewParser(pathnormalizer.WithCtrResets())
 		emptyMap := make(map[string]string)
 
 		for _, tc := range []testCase{
@@ -98,7 +97,10 @@ func TestParser(t *testing.T) {
 			{"grpc nested service", "/v1.Service/stats.Service", "v1.Service/stats.Service", map[string]string{}},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				nPath, err := parser.Parse(tc.path)
+				// A parser per case, so each one starts numbering anonymous
+				// regexes from one. The shared-counter behaviour is covered by
+				// the "global ctr" cases below.
+				nPath, err := pathnormalizer.NewParser().Parse(tc.path)
 				assert.NoError(t, err)
 
 				assert.Equal(t, tc.expectedIdPrefix, nPath.RawOpIdPrefix())
@@ -140,7 +142,7 @@ func TestParser(t *testing.T) {
 	})
 
 	t.Run("negative test cases", func(t *testing.T) {
-		parser := pathnormalizer.NewParser(pathnormalizer.WithCtrResets())
+		parser := pathnormalizer.NewParser()
 
 		_, err := parser.Parse("/users/{aaa[0-9]{2}/}")
 		assert.ErrorContains(t, err, pathnormalizer.ErrUnbalancedBrace.Error())

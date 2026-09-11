@@ -47,6 +47,7 @@ func (p *parameters) extendExistent(newRef *openapi3.ParameterRef, idx int) {
 	case isTypeOf(existent, openapi3.TypeString) &&
 		isTypeOf(newRef, openapi3.TypeString) &&
 		isPatternDefined(existent):
+		return
 
 	case !isTypeOf(existent, openapi3.TypeString):
 		// prefer type from input
