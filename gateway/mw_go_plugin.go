@@ -329,9 +329,9 @@ func (m *GoPluginMiddleware) handleErrorResponse(
 	switch rw.statusCodeSent {
 	case http.StatusUnauthorized, http.StatusForbidden:
 		if rw.statusCodeSent == http.StatusUnauthorized {
-			logger.WithField("status_code", rw.statusCodeSent).Error("Authentication error in Go-plugin middleware func")
-		} else {
 			logger.WithField("status_code", rw.statusCodeSent).Error("Authorization error in Go-plugin middleware func")
+		} else {
+			logger.WithField("status_code", rw.statusCodeSent).Error("Authentication error in Go-plugin middleware func")
 		}
 
 		m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
