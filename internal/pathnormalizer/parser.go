@@ -27,6 +27,7 @@ var (
 	ErrUnreachableCase  = errors.New("unreachable case")
 	ErrUnexpectedSlash  = errors.New("unexpected slash symbol in pattern")
 	ErrUnexpectedSymbol = errors.New("unexpected symbol")
+	ErrUnbalancedBrace  = errors.New("unbalanced brace in pattern")
 )
 
 // Parser responsible for parsing user-defined path of given OAS.
@@ -165,7 +166,9 @@ func (p *pathParser) parse() ([]pathPart, error) {
 }
 
 func (p *pathParser) consumeMuxIdentifier() (res string, ok bool, finished bool) {
-	if !isLetter(p.src[p.pos]) {
+	// The caller may have consumed the last byte of the path, e.g. a trailing "{",
+	// so the cursor has to be checked before it is read.
+	if p.pos >= len(p.src) || !isLetter(p.src[p.pos]) {
 		return
 	}
 
@@ -237,7 +240,7 @@ loop:
 
 	if openBraceCtr != 0 {
 		p.pos--
-		return pathPart{}, p.parseError(ErrUnexpectedSlash)
+		return pathPart{}, p.parseError(ErrUnbalancedBrace)
 	}
 
 	if !idParsedOk {
@@ -258,8 +261,9 @@ func (p *pathParser) parseError(err error) parseError {
 func (p *pathParser) parseAnonymousRe() (pathPart, error) {
 	paramName, idParsedOk, isFinished := p.consumeMuxIdentifier()
 
+	// A closing brace ended the identifier although nothing opened one.
 	if isFinished {
-		return pathPart{}, p.parseError(ErrUnreachableCase)
+		return pathPart{}, p.parseError(ErrUnexpectedSymbol)
 	}
 
 	start := p.pos
@@ -282,7 +286,7 @@ loop:
 	}
 
 	if braceCtr != 0 {
-		return pathPart{}, p.parseError(ErrUnexpectedSlash)
+		return pathPart{}, p.parseError(ErrUnbalancedBrace)
 	}
 
 	if !idParsedOk {
