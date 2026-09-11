@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/jensneuse/abstractlogger"
 	"github.com/sirupsen/logrus"
@@ -21,6 +22,21 @@ import (
 	internalgraphql "github.com/TykTechnologies/tyk/internal/graphql"
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
+
+// cyclicFragmentSpreadQuery is a GraphQL document whose fragments spread
+// each other in a cycle. Before TT-17945, normalizing this crashed the whole
+// process with an unrecoverable stack overflow; it must now be rejected as
+// a normal validation error, before Normalize ever runs.
+const cyclicFragmentSpreadQuery = `
+query Q {
+	...frag1
+}
+fragment frag1 on Query {
+	...frag2
+}
+fragment frag2 on Query {
+	...frag1
+}`
 
 func TestGraphqlRequestProcessorV1_ProcessRequest(t *testing.T) {
 	t.Run("should return error and 500 when request is nil", func(t *testing.T) {
@@ -50,7 +66,43 @@ func TestGraphqlRequestProcessorV1_ProcessRequest(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Equal(t, 400, statusCode)
-		assert.Equal(t, `{"errors":[{"message":"field: goodBye not defined on type: Query","path":["query","goodBye"]}]}`, body.String())
+		// Since TT-17945, ValidateForSchema runs before Normalize, so this
+		// error now comes from the FieldSelections validation rule rather
+		// than a normalization-time check; the message and 400 status are
+		// unchanged, but the reported path no longer includes the field name.
+		assert.Equal(t, `{"errors":[{"message":"field: goodBye not defined on type: Query","path":["query"]}]}`, body.String())
+	})
+
+	t.Run("should reject cyclic fragment spreads instead of crashing (TT-17945)", func(t *testing.T) {
+		processor := newTestGraphqlRequestProcessorV1(t)
+		processor.ctxRetrieveRequest = func(r *http.Request) *graphql.Request {
+			return &graphql.Request{
+				Query: cyclicFragmentSpreadQuery,
+			}
+		}
+
+		request, err := http.NewRequest(http.MethodPost, "http://example.com", bytes.NewBuffer([]byte(fmt.Sprintf(`{"query": %q}`, cyclicFragmentSpreadQuery))))
+		require.NoError(t, err)
+
+		recorder := httptest.NewRecorder()
+
+		done := make(chan struct{})
+		var err2 error
+		var statusCode int
+		go func() {
+			defer close(done)
+			err2, statusCode = processor.ProcessRequest(context.Background(), recorder, request)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("ProcessRequest did not return - likely a stack overflow regression")
+		}
+
+		assert.Error(t, err2)
+		assert.Equal(t, 400, statusCode)
+		assert.Contains(t, recorder.Body.String(), "forms fragment cycle")
 	})
 
 	t.Run("should return error and 400 when input validation fails", func(t *testing.T) {
@@ -124,7 +176,43 @@ func TestGraphqlRequestProcessorWithOtelV1_ProcessRequest(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Equal(t, 400, statusCode)
-		assert.Equal(t, `{"errors":[{"message":"field: goodBye not defined on type: Query","path":["query","goodBye"]}]}`, body.String())
+		// Since TT-17945, ValidateForSchema runs before Normalize, so this
+		// error now comes from the FieldSelections validation rule rather
+		// than a normalization-time check; the message and 400 status are
+		// unchanged, but the reported path no longer includes the field name.
+		assert.Equal(t, `{"errors":[{"message":"field: goodBye not defined on type: Query","path":["query"]}]}`, body.String())
+	})
+
+	t.Run("should reject cyclic fragment spreads instead of crashing (TT-17945)", func(t *testing.T) {
+		processor := newTestGraphqlRequestProcessorWithOtelV1(t)
+		processor.ctxRetrieveRequest = func(r *http.Request) *graphql.Request {
+			return &graphql.Request{
+				Query: cyclicFragmentSpreadQuery,
+			}
+		}
+
+		request, err := http.NewRequest(http.MethodPost, "http://example.com", bytes.NewBuffer([]byte(fmt.Sprintf(`{"query": %q}`, cyclicFragmentSpreadQuery))))
+		require.NoError(t, err)
+
+		recorder := httptest.NewRecorder()
+
+		done := make(chan struct{})
+		var err2 error
+		var statusCode int
+		go func() {
+			defer close(done)
+			err2, statusCode = processor.ProcessRequest(context.Background(), recorder, request)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("ProcessRequest did not return - likely a stack overflow regression")
+		}
+
+		assert.Error(t, err2)
+		assert.Equal(t, 400, statusCode)
+		assert.Contains(t, recorder.Body.String(), "forms fragment cycle")
 	})
 
 	t.Run("should return error and 400 when input validation fails", func(t *testing.T) {
