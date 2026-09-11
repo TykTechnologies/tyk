@@ -2,12 +2,6 @@ package pathnormalizer
 
 import (
 	"github.com/getkin/kin-openapi/openapi3"
-
-	logger "github.com/TykTechnologies/tyk/log"
-)
-
-var (
-	log = logger.Get()
 )
 
 // Validate validates paths keys can be normalized from user-defined keys to proper ones.
