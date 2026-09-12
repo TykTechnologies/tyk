@@ -74,7 +74,15 @@ type mcpOAuthBrokerUpstreamCapture struct {
 	registrationHeaders   []http.Header
 	registeredRedirects   []string
 	registeredClientID    string
+	registrationResponse  string
+	registrationToken     string
 	registrationRequests  int
+	registrationDeletes   int
+	unrelatedDeletes      int
+	lastDeleteAuth        string
+	deleteStatus          int
+	deleteRedirect        string
+	deleteBody            string
 	authorizationRequests int
 	tokenRequests         int
 	runtimeRequests       int
@@ -89,6 +97,8 @@ func newMCPBrokerTest(t *testing.T, listenPath string) (*Test, *httptest.Server,
 	t.Helper()
 	capture := &mcpOAuthBrokerUpstreamCapture{
 		registeredClientID: "upstream-public-client",
+		registrationToken:  "upstream-management-secret",
+		deleteStatus:       http.StatusNoContent,
 		codeChallenges:     map[string]string{},
 		refreshToken:       "upstream-refresh-1",
 	}
@@ -118,9 +128,37 @@ func newMCPBrokerTest(t *testing.T, listenPath string) (*Test, *httptest.Server,
 			}
 			_ = json.NewDecoder(r.Body).Decode(&registration)
 			capture.registeredRedirects = append([]string(nil), registration.RedirectURIs...)
+			responseBody := capture.registrationResponse
+			if responseBody == "" {
+				responseBody = fmt.Sprintf(`{"client_id":%q,"token_endpoint_auth_method":"none","registration_client_uri":%q,"registration_access_token":%q}`,
+					capture.registeredClientID, upstream.URL+"/register/"+capture.registeredClientID, capture.registrationToken)
+			}
 			capture.mu.Unlock()
 			w.WriteHeader(http.StatusCreated)
-			_, _ = fmt.Fprintf(w, `{"client_id":%q,"token_endpoint_auth_method":"none"}`, capture.registeredClientID)
+			_, _ = io.WriteString(w, responseBody)
+		case "/register/upstream-public-client":
+			if r.Method != http.MethodDelete {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+			capture.mu.Lock()
+			capture.registrationDeletes++
+			capture.lastDeleteAuth = r.Header.Get(header.Authorization)
+			deleteStatus := capture.deleteStatus
+			deleteRedirect := capture.deleteRedirect
+			deleteBody := capture.deleteBody
+			capture.mu.Unlock()
+			if deleteRedirect != "" {
+				http.Redirect(w, r, deleteRedirect, http.StatusFound)
+				return
+			}
+			w.WriteHeader(deleteStatus)
+			_, _ = io.WriteString(w, deleteBody)
+		case "/unrelated-registration":
+			capture.mu.Lock()
+			capture.unrelatedDeletes++
+			capture.mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
 		case "/authorize":
 			capture.mu.Lock()
 			capture.authorizationRequests++
@@ -278,6 +316,134 @@ func registerMCPBrokerClient(t *testing.T, ts *Test, redirectURI string) string 
 	require.NotEmpty(t, clientID)
 	require.NotEqual(t, "upstream-public-client", clientID)
 	return clientID
+}
+
+func runMCPBrokerRegistrationWithFailedPersistence(t *testing.T, ts *Test) *httptest.ResponseRecorder {
+	t.Helper()
+	broker := newMCPOAuthBroker(ts.Gw, ts.Gw.getApiSpec("test"))
+	broker.store = faultingMCPOAuthBrokerStore{mcpOAuthBrokerStore: broker.store, putPrefix: ":client:"}
+	body := `{"redirect_uris":["https://client.example/callback"],"token_endpoint_auth_method":"none"}`
+	request := httptest.NewRequest(http.MethodPost, ts.URL+"/__tyk-as/test/register", strings.NewReader(body))
+	request.Header.Set(header.ContentType, header.ApplicationJSON)
+	response := httptest.NewRecorder()
+	broker.registrationHandler(response, request)
+	return response
+}
+
+func TestMCPOAuthBrokerDCRRollsBackFailedPersistence(t *testing.T) {
+	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
+	response := runMCPBrokerRegistrationWithFailedPersistence(t, ts)
+	require.Equal(t, http.StatusServiceUnavailable, response.Code)
+	require.Equal(t, `{"error":"temporarily_unavailable"}`+"\n", response.Body.String())
+	capture.mu.Lock()
+	defer capture.mu.Unlock()
+	require.Equal(t, 1, capture.registrationRequests)
+	require.Equal(t, 1, capture.registrationDeletes)
+	require.Zero(t, capture.unrelatedDeletes)
+	require.Equal(t, "Bearer "+capture.registrationToken, capture.lastDeleteAuth)
+	require.NotContains(t, response.Body.String(), capture.registrationToken)
+}
+
+func TestMCPOAuthBrokerDCRRollbackFailuresAreBoundedAndSanitized(t *testing.T) {
+	for _, testCase := range []struct {
+		name       string
+		configure  func(*mcpOAuthBrokerUpstreamCapture, string)
+		wantDelete int
+	}{
+		{
+			name: "delete rejected",
+			configure: func(capture *mcpOAuthBrokerUpstreamCapture, _ string) {
+				capture.deleteStatus = http.StatusInternalServerError
+				capture.deleteBody = "provider failure containing " + capture.registrationToken
+			},
+			wantDelete: 1,
+		},
+		{
+			name: "redirect is not followed",
+			configure: func(capture *mcpOAuthBrokerUpstreamCapture, upstreamURL string) {
+				capture.deleteRedirect = upstreamURL + "/unrelated-registration"
+			},
+			wantDelete: 1,
+		},
+		{
+			name: "oversized delete response",
+			configure: func(capture *mcpOAuthBrokerUpstreamCapture, _ string) {
+				capture.deleteStatus = http.StatusOK
+				capture.deleteBody = strings.Repeat("x", mcpOAuthBrokerBodyMax+1)
+			},
+			wantDelete: 1,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			ts, upstream, capture := newMCPBrokerTest(t, "/mcp/")
+			capture.mu.Lock()
+			testCase.configure(capture, upstream.URL)
+			capture.mu.Unlock()
+			logger, hook := logrustest.NewNullLogger()
+			originalLog := log
+			log = logger
+			t.Cleanup(func() { log = originalLog })
+
+			response := runMCPBrokerRegistrationWithFailedPersistence(t, ts)
+			require.Equal(t, http.StatusServiceUnavailable, response.Code)
+			require.NotContains(t, response.Body.String(), capture.registrationToken)
+			capture.mu.Lock()
+			require.Equal(t, testCase.wantDelete, capture.registrationDeletes)
+			require.Zero(t, capture.unrelatedDeletes)
+			capture.mu.Unlock()
+			require.NotEmpty(t, hook.AllEntries())
+			for _, entry := range hook.AllEntries() {
+				require.NotContains(t, entry.Message, capture.registrationToken)
+				require.NotContains(t, fmt.Sprint(entry.Data), capture.registrationToken)
+			}
+		})
+	}
+}
+
+func TestMCPOAuthBrokerDCRRejectsInvalidManagementMetadata(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		response func(string) string
+	}{
+		{name: "missing management URI", response: func(string) string {
+			return `{"client_id":"upstream-public-client","token_endpoint_auth_method":"none","registration_access_token":"management-secret"}`
+		}},
+		{name: "missing management bearer", response: func(upstreamURL string) string {
+			return fmt.Sprintf(`{"client_id":"upstream-public-client","token_endpoint_auth_method":"none","registration_client_uri":%q}`, upstreamURL+"/register/upstream-public-client")
+		}},
+		{name: "wrong authority", response: func(string) string {
+			return `{"client_id":"upstream-public-client","token_endpoint_auth_method":"none","registration_client_uri":"https://attacker.example/register/upstream-public-client","registration_access_token":"management-secret"}`
+		}},
+		{name: "malformed URI", response: func(upstreamURL string) string {
+			return fmt.Sprintf(`{"client_id":"upstream-public-client","token_endpoint_auth_method":"none","registration_client_uri":%q,"registration_access_token":"management-secret"}`, upstreamURL+"/register/%zz")
+		}},
+		{name: "management URI query", response: func(upstreamURL string) string {
+			return fmt.Sprintf(`{"client_id":"upstream-public-client","token_endpoint_auth_method":"none","registration_client_uri":%q,"registration_access_token":"management-secret"}`, upstreamURL+"/register/upstream-public-client?target=unrelated")
+		}},
+		{name: "invalid bearer", response: func(upstreamURL string) string {
+			return fmt.Sprintf(`{"client_id":"upstream-public-client","token_endpoint_auth_method":"none","registration_client_uri":%q,"registration_access_token":" management-secret"}`, upstreamURL+"/register/upstream-public-client")
+		}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			ts, upstream, capture := newMCPBrokerTest(t, "/mcp/")
+			capture.mu.Lock()
+			capture.registrationResponse = testCase.response(upstream.URL)
+			capture.mu.Unlock()
+			body := `{"redirect_uris":["https://client.example/callback"],"token_endpoint_auth_method":"none"}`
+			response, _ := ts.Run(t, test.TestCase{
+				Method: http.MethodPost, Path: "/__tyk-as/test/register", Data: body,
+				Headers: map[string]string{"Content-Type": "application/json"}, Code: http.StatusBadGateway,
+			})
+			responseBody, err := io.ReadAll(response.Body)
+			require.NoError(t, err)
+			require.NotContains(t, string(responseBody), "management-secret")
+			capture.mu.Lock()
+			require.Equal(t, 1, capture.registrationRequests)
+			require.Zero(t, capture.registrationDeletes)
+			require.Zero(t, capture.unrelatedDeletes)
+			capture.mu.Unlock()
+		})
+	}
 }
 
 func TestMCPOAuthBrokerDCRAndAuthorizeFoundation(t *testing.T) {
