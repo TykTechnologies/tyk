@@ -1391,6 +1391,9 @@
     "X-Tyk-MCP": {
       "type": "object",
       "properties": {
+        "oauthBroker": {
+          "$ref": "#/definitions/X-Tyk-MCP-OAuthBroker"
+        },
         "trustedOrigins": {
           "type": "array",
           "uniqueItems": true,
@@ -1401,6 +1404,17 @@
           ]
         }
       }
+    },
+    "X-Tyk-MCP-OAuthBroker": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "publicOrigin": { "type": "string" },
+        "publicResource": { "type": "string" },
+        "upstreamResource": { "type": "string" },
+        "allowInsecureLoopback": { "type": "boolean" }
+      },
+      "required": ["enabled"]
     },
     "X-Tyk-Server": {
       "type": "object",

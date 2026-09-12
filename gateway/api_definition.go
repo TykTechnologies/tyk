@@ -241,6 +241,11 @@ func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 				return err
 			}
 		}
+		if s.MCP.OAuthBroker != nil {
+			if err := s.MCP.OAuthBroker.Validate(s.Proxy.ListenPath); err != nil {
+				return err
+			}
+		}
 	}
 
 	// For tcp services we need to make sure we can bind to the port.
