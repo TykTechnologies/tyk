@@ -2037,7 +2037,8 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (string, bool) {
 }
 
 func (p *ReverseProxy) addAuthInfo(outReq, req *http.Request) {
-	if !p.TykAPISpec.UpstreamAuth.IsEnabled() {
+	brokerEnabled := p.TykAPISpec.MCP != nil && p.TykAPISpec.MCP.OAuthBroker != nil && p.TykAPISpec.MCP.OAuthBroker.Enabled
+	if !p.TykAPISpec.UpstreamAuth.IsEnabled() && !brokerEnabled {
 		return
 	}
 
