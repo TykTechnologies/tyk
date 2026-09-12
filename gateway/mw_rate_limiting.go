@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -50,6 +51,13 @@ func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token strin
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
+		return nil, http.StatusOK
+	}
+
+	// MCP JSON-RPC virtual endpoints are internal stages of the request that
+	// already consumed the session rate and quota on public ingress. Endpoint
+	// limits are enforced separately by RateLimitForAPI on each VEM stage.
+	if isMCPJSONRPCVirtualEndpointLoop(k.Spec, r) {
 		return nil, http.StatusOK
 	}
 
@@ -156,4 +164,8 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 
 	// Request is valid, carry on
 	return nil, http.StatusOK
+}
+
+func isMCPJSONRPCVirtualEndpointLoop(spec *APISpec, r *http.Request) bool {
+	return spec != nil && spec.IsMCP() && httpctx.IsSelfLooping(r) && httpctx.GetJSONRPCRoutingState(r) != nil
 }
