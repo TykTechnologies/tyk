@@ -508,6 +508,91 @@ func TestNewSDKStreamableHTTPHandler_HandlesInitializeAsJSON(t *testing.T) {
 	assert.NotContains(t, tools, "listChanged")
 }
 
+func TestNewSDKStreamableHTTPHandler_SourceNotFoundResultHasJSONAndSSEParity(t *testing.T) {
+	for _, tt := range []struct {
+		name         string
+		jsonResponse bool
+		contentType  string
+	}{
+		{name: "json", jsonResponse: true, contentType: "application/json"},
+		{name: "sse", jsonResponse: false, contentType: "text/event-stream"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tool := oas.DerivedTool{
+				Name:           "get_order",
+				Method:         http.MethodGet,
+				PathTemplate:   "/orders/{id}",
+				ParamLocations: map[string]string{"id": oas.DerivedParamLocationPath},
+				InputSchema: map[string]any{
+					"type":       "object",
+					"properties": map[string]any{"id": map[string]any{"type": "string"}},
+					"required":   []string{"id"},
+				},
+			}
+			sourceCalls := 0
+			source := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				sourceCalls++
+				assert.Equal(t, "/orders/missing", r.URL.Path)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNotFound)
+				_, err := w.Write([]byte(`{"error":"order not found"}`))
+				require.NoError(t, err)
+			})
+			parent := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+			handler, err := NewSDKStreamableHTTPHandler(SDKServerConfig{
+				Name:  "Orders [MCP adapter]",
+				Tools: []oas.DerivedTool{tool},
+				CallTool: func(_ context.Context, tool *oas.DerivedTool, args map[string]any) (*Recorder, error) {
+					upstream, err := BuildUpstreamRequest(parent, tool, "rest-orders", args)
+					if err != nil {
+						return nil, err
+					}
+					rec := NewRecorder()
+					source.ServeHTTP(rec, upstream)
+					return rec, nil
+				},
+			}, &mcpsdk.StreamableHTTPOptions{Stateless: true, JSONResponse: tt.jsonResponse})
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{
+				"jsonrpc":"2.0",
+				"id":"source-404-9007199254740993",
+				"method":"tools/call",
+				"params":{"name":"get_order","arguments":{"id":"missing"}}
+			}`))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Accept", "application/json, text/event-stream")
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusOK, rec.Code)
+			assert.Contains(t, rec.Header().Get("Content-Type"), tt.contentType)
+			body := rec.Body.String()
+			if !tt.jsonResponse {
+				for _, line := range strings.Split(body, "\n") {
+					if strings.HasPrefix(line, "data: ") {
+						body = strings.TrimPrefix(line, "data: ")
+						break
+					}
+				}
+			}
+			var response map[string]any
+			require.NoError(t, json.Unmarshal([]byte(body), &response), "response body: %s", rec.Body.String())
+			assert.Equal(t, "source-404-9007199254740993", response["id"])
+			assert.NotContains(t, response, "error")
+			result := response["result"].(map[string]any)
+			assert.Equal(t, true, result["isError"])
+			assert.EqualValues(t, http.StatusNotFound, result["_meta"].(map[string]any)["upstreamHttpStatus"])
+			assert.Equal(t, "application/json", result["_meta"].(map[string]any)["upstreamContentType"])
+			content := result["content"].([]any)
+			require.Len(t, content, 1)
+			assert.Equal(t, `{"error":"order not found"}`, content[0].(map[string]any)["text"])
+			assert.Equal(t, 1, sourceCalls)
+		})
+	}
+}
+
 func TestNewSDKStreamableHTTPHandler_UnknownToolArgumentsReturnInvalidParams(t *testing.T) {
 	t.Parallel()
 
