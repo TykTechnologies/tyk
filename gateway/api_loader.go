@@ -647,12 +647,14 @@ func (gw *Gateway) processSpec(
 		gw.mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid.Copy()})
 	}
 
-	if upstreamBasicAuthMw := getUpstreamBasicAuthMw(baseMid); upstreamBasicAuthMw != nil {
-		gw.mwAppendEnabled(&chainArray, upstreamBasicAuthMw)
-	}
+	if shouldLoadGenericUpstreamAuth(spec) {
+		if upstreamBasicAuthMw := getUpstreamBasicAuthMw(baseMid); upstreamBasicAuthMw != nil {
+			gw.mwAppendEnabled(&chainArray, upstreamBasicAuthMw)
+		}
 
-	if upstreamOAuthMw := getUpstreamOAuthMw(baseMid); upstreamOAuthMw != nil {
-		gw.mwAppendEnabled(&chainArray, upstreamOAuthMw)
+		if upstreamOAuthMw := getUpstreamOAuthMw(baseMid); upstreamOAuthMw != nil {
+			gw.mwAppendEnabled(&chainArray, upstreamOAuthMw)
+		}
 	}
 
 	gw.mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid.Copy()})
@@ -746,6 +748,10 @@ func (gw *Gateway) processSpec(
 	}).Info("API Loaded")
 
 	return &chainDef
+}
+
+func shouldLoadGenericUpstreamAuth(spec *APISpec) bool {
+	return spec == nil || spec.MCP == nil || spec.MCP.OAuthBroker == nil || !spec.MCP.OAuthBroker.Enabled
 }
 
 func (gw *Gateway) configureAuthAndOrgStores(gs *generalStores, spec *APISpec) (storage.Handler, storage.Handler, storage.Handler) {
