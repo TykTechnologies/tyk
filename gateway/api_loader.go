@@ -640,6 +640,7 @@ func (gw *Gateway) processSpec(
 	if streamMw := getStreamingMiddleware(baseMid); streamMw != nil {
 		gw.mwAppendEnabled(&chainArray, streamMw)
 	}
+	gw.mwAppendEnabled(&chainArray, &MCPOAuthBrokerTokenMiddleware{BaseMiddleware: baseMid.Copy()})
 
 	if !spec.UseKeylessAccess {
 		gw.mwAppendEnabled(&chainArray, &GraphQLComplexityMiddleware{BaseMiddleware: baseMid.Copy()})
@@ -1117,8 +1118,8 @@ func (gw *Gateway) registerMCPASBrokerRoutes(spec *APISpec, router *mux.Router) 
 	router.HandleFunc(prefixMetadataPath, broker.metadataHandler).Methods(http.MethodGet)
 	router.HandleFunc(issuerPath+"/register", broker.registrationHandler).Methods(http.MethodPost)
 	router.HandleFunc(issuerPath+"/authorize", broker.authorizeHandler).Methods(http.MethodGet)
-	router.HandleFunc(issuerPath+"/callback", broker.unfinishedHandler).Methods(http.MethodGet)
-	router.HandleFunc(issuerPath+"/token", broker.unfinishedHandler).Methods(http.MethodPost)
+	router.HandleFunc(issuerPath+"/callback", broker.callbackHandler).Methods(http.MethodGet)
+	router.HandleFunc(issuerPath+"/token", broker.tokenHandler).Methods(http.MethodPost)
 	mainLog.WithField("api_id", spec.APIID).Debugf("registered MCP OAuth broker routes under %s", issuerPath)
 }
 

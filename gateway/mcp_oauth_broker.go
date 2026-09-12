@@ -180,6 +180,7 @@ func (b *mcpOAuthBroker) metadataHandler(w http.ResponseWriter, r *http.Request)
 }
 
 func (b *mcpOAuthBroker) registrationHandler(w http.ResponseWriter, r *http.Request) {
+	mcpOAuthSetNoStore(w)
 	if !b.validPublicRequest(r) {
 		mcpOAuthError(w, http.StatusBadRequest, "invalid_request")
 		return
@@ -273,8 +274,7 @@ func (b *mcpOAuthBroker) registrationHandler(w http.ResponseWriter, r *http.Requ
 		RedirectURIs: slices.Clone(redirects), UpstreamClientID: upstreamClientID,
 		UpstreamTokenAuthMethod: "none",
 	}
-	mappingJSON, _ := json.Marshal(mapping)
-	if err := b.store.Put(r.Context(), b.clientKey(downstreamClientID), mappingJSON, 0); err != nil {
+	if err := b.putRecord(r.Context(), b.clientKey(downstreamClientID), mapping, 0); err != nil {
 		mcpOAuthError(w, http.StatusServiceUnavailable, "temporarily_unavailable")
 		return
 	}
@@ -288,6 +288,7 @@ func (b *mcpOAuthBroker) registrationHandler(w http.ResponseWriter, r *http.Requ
 }
 
 func (b *mcpOAuthBroker) authorizeHandler(w http.ResponseWriter, r *http.Request) {
+	mcpOAuthSetNoStore(w)
 	if !b.validPublicRequest(r) {
 		mcpOAuthError(w, http.StatusBadRequest, "invalid_request")
 		return
@@ -304,13 +305,13 @@ func (b *mcpOAuthBroker) authorizeHandler(w http.ResponseWriter, r *http.Request
 		mcpOAuthError(w, http.StatusBadRequest, "invalid_request")
 		return
 	}
-	mappingRaw, found, err := b.store.Get(r.Context(), b.clientKey(query.Get("client_id")))
+	var mapping mcpOAuthClientMapping
+	found, err := b.getRecord(r.Context(), b.clientKey(query.Get("client_id")), &mapping)
 	if err != nil {
 		mcpOAuthError(w, http.StatusServiceUnavailable, "temporarily_unavailable")
 		return
 	}
-	var mapping mcpOAuthClientMapping
-	if !found || json.Unmarshal(mappingRaw, &mapping) != nil || !b.validMapping(mapping, query.Get("redirect_uri")) {
+	if !found || !b.validMapping(mapping, query.Get("redirect_uri")) {
 		mcpOAuthError(w, http.StatusBadRequest, "invalid_request")
 		return
 	}
@@ -344,8 +345,7 @@ func (b *mcpOAuthBroker) authorizeHandler(w http.ResponseWriter, r *http.Request
 		RedirectURI: query.Get("redirect_uri"), OriginalState: query.Get("state"),
 		DownstreamChallenge: query.Get("code_challenge"), UpstreamVerifier: upstreamVerifier, Scope: query.Get("scope"),
 	}
-	stateJSON, _ := json.Marshal(state)
-	if err := b.store.Put(r.Context(), mcpOAuthBrokerKey("state", b.spec.OrgID, b.spec.APIID, upstreamState), stateJSON, mcpOAuthBrokerStateTTL); err != nil {
+	if err := b.putRecord(r.Context(), mcpOAuthBrokerKey("state", b.spec.OrgID, b.spec.APIID, upstreamState), state, mcpOAuthBrokerStateTTL); err != nil {
 		mcpOAuthError(w, http.StatusServiceUnavailable, "temporarily_unavailable")
 		return
 	}
@@ -397,14 +397,6 @@ func metadataSupportsMCPOAuthScope(metadata map[string]any, requested string) bo
 		}
 	}
 	return true
-}
-
-func (b *mcpOAuthBroker) unfinishedHandler(w http.ResponseWriter, r *http.Request) {
-	if !b.validPublicRequest(r) {
-		mcpOAuthError(w, http.StatusBadRequest, "invalid_request")
-		return
-	}
-	mcpOAuthError(w, http.StatusNotImplemented, "temporarily_unavailable")
 }
 
 func (b *mcpOAuthBroker) doUpstream(ctx context.Context, method, target, contentType string, body []byte) (*http.Response, error) {
@@ -540,6 +532,7 @@ func decodeStrictMCPOAuthObject(body []byte, target any) error {
 		for _, securityField := range []string{
 			"redirect_uris", "token_endpoint_auth_method", "client_id", "client_secret",
 			"registration_access_token", "registration_client_uri",
+			"access_token", "refresh_token", "token_type", "expires_in", "scope",
 		} {
 			if strings.EqualFold(name, securityField) {
 				if _, duplicate := seenSecurity[securityField]; duplicate {
