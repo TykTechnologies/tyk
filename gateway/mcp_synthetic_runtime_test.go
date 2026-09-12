@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -483,6 +484,67 @@ func TestCallMCPAdapterTool_ForwardsQueryParamsThroughJSONRPC(t *testing.T) {
 	content := result["content"].([]any)
 	text := content[0].(map[string]any)["text"]
 	assert.Equal(t, `{"query":"limit=10"}`, text)
+}
+
+func TestCallMCPAdapterTool_DropsUnsafeSourceOASHeaderProjection(t *testing.T) {
+	for _, managedAuth := range []bool{false, true} {
+		t.Run(fmt.Sprintf("managed_auth_%t", managedAuth), func(t *testing.T) {
+			rest := restSourceSpec("rest-headers", "org-1", true)
+			rest.OAS.Paths.Set("/headers", &openapi3.PathItem{
+				Get: &openapi3.Operation{
+					OperationID: "read_headers",
+					Parameters: openapi3.Parameters{
+						&openapi3.ParameterRef{Value: &openapi3.Parameter{Name: "Authorization", In: openapi3.ParameterInHeader, Schema: openapi3.NewStringSchema().NewRef()}},
+						&openapi3.ParameterRef{Value: &openapi3.Parameter{Name: "X-Region", In: openapi3.ParameterInHeader, Schema: openapi3.NewArraySchema().WithItems(openapi3.NewStringSchema()).NewRef()}},
+					},
+				},
+			})
+			proxy := pairedMCPProxySpec("proxy-headers", "org-1", "rest-headers", &oas.TykMCPServer{
+				Primitives: []oas.TykMCPServerPrimitive{{
+					Source: oas.TykMCPServerSource{OperationID: "read_headers"}, Name: "headers", Allow: boolPtr(true),
+					Parameters: []oas.TykMCPServerParameter{
+						{Param: "Authorization", Name: "region"},
+						{Param: "X-Region", Name: "Authorization"},
+					},
+				}},
+			})
+			adapterSpec, err := buildMCPAdapterSpec(rest, []*APISpec{proxy}, nil)
+			require.NoError(t, err)
+			tool := mustAdapterTool(t, adapterSpec, "headers")
+			require.Equal(t, "Authorization", tool.ParamSourceNames["region"])
+			require.Equal(t, "X-Region", tool.ParamSourceNames["Authorization"])
+
+			gw := &Gateway{
+				apisByID:        map[string]*APISpec{"rest-headers": rest, adapterSpec.APIID: adapterSpec, "proxy-headers": proxy},
+				apisHandlesByID: &sync.Map{},
+			}
+			called := false
+			gw.apisHandlesByID.Store("rest-headers", &ChainObject{ThisHandler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				assert.NotContains(t, r.Header.Values("Authorization"), "attacker-value")
+				assert.Equal(t, "eu,us", r.Header.Get("X-Region"))
+				if managedAuth {
+					r.Header.Set("Authorization", "Bearer managed-source-credential")
+					assert.Equal(t, "Bearer managed-source-credential", r.Header.Get("Authorization"))
+				} else {
+					assert.Empty(t, r.Header.Get("Authorization"))
+				}
+				w.WriteHeader(http.StatusOK)
+			})})
+			snapshot, err := computeMCPPairing([]*APISpec{rest, proxy})
+			require.NoError(t, err)
+			gw.mcpPairingIndex.Set(snapshot)
+
+			rec, err := defaultMCPAdapterCallTool(
+				mcpAdapterCallContext(t, gw, adapterSpec, "proxy-headers"),
+				&tool,
+				map[string]any{"region": "attacker-value", "Authorization": []any{"eu", "us"}},
+			)
+			require.NoError(t, err)
+			require.True(t, called)
+			require.Equal(t, http.StatusOK, rec.Status())
+		})
+	}
 }
 
 func initializeSyntheticAdapterSession(t *testing.T, mw *JSONRPCMiddleware, callerProxyID ...string) string {
