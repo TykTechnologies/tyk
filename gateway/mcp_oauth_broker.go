@@ -87,12 +87,20 @@ func (b *mcpOAuthBroker) clientKey(clientID string) string {
 }
 
 func mcpOAuthBrokerKey(kind string, parts ...string) string {
+	// Redis Cluster requires every key touched by an atomic Lua operation to
+	// share a hash slot. Broker records are therefore colocated per org/API,
+	// using a hashed tag so neither identity appears in the storage key.
+	scope := sha256.New()
+	for index := 0; index < 2 && index < len(parts); index++ {
+		_, _ = scope.Write([]byte{0})
+		_, _ = scope.Write([]byte(parts[index]))
+	}
 	hash := sha256.New()
 	for _, part := range parts {
 		_, _ = hash.Write([]byte{0})
 		_, _ = hash.Write([]byte(part))
 	}
-	return kind + ":" + hex.EncodeToString(hash.Sum(nil))
+	return "{" + hex.EncodeToString(scope.Sum(nil)) + "}:" + kind + ":" + hex.EncodeToString(hash.Sum(nil))
 }
 
 func randomMCPOAuthValue() (string, error) {
