@@ -868,11 +868,12 @@ type MCPConfig struct {
 // by the MCP OAuth broker. PublicOrigin is an origin without a path;
 // PublicResource must equal PublicOrigin plus the API listen path.
 type MCPOAuthBrokerConfig struct {
-	Enabled               bool   `bson:"enabled" json:"enabled"`
-	PublicOrigin          string `bson:"public_origin,omitempty" json:"public_origin,omitempty"`
-	PublicResource        string `bson:"public_resource,omitempty" json:"public_resource,omitempty"`
-	UpstreamResource      string `bson:"upstream_resource,omitempty" json:"upstream_resource,omitempty"`
-	AllowInsecureLoopback bool   `bson:"allow_insecure_loopback,omitempty" json:"allow_insecure_loopback,omitempty"`
+	Enabled                bool     `bson:"enabled" json:"enabled"`
+	PublicOrigin           string   `bson:"public_origin,omitempty" json:"public_origin,omitempty"`
+	PublicResource         string   `bson:"public_resource,omitempty" json:"public_resource,omitempty"`
+	UpstreamResource       string   `bson:"upstream_resource,omitempty" json:"upstream_resource,omitempty"`
+	TrustedEndpointOrigins []string `bson:"trusted_endpoint_origins,omitempty" json:"trusted_endpoint_origins,omitempty"`
+	AllowInsecureLoopback  bool     `bson:"allow_insecure_loopback,omitempty" json:"allow_insecure_loopback,omitempty"`
 }
 
 // Validate validates MCP request-security configuration.

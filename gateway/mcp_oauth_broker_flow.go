@@ -351,7 +351,11 @@ func (b *mcpOAuthBroker) exchangeUpstreamCode(ctx context.Context, state mcpOAut
 		"grant_type": {"authorization_code"}, "code": {code}, "client_id": {state.UpstreamClientID},
 		"redirect_uri": {b.callbackURL()}, "code_verifier": {state.UpstreamVerifier}, "resource": {state.UpstreamResource},
 	}
-	return b.exchangeUpstreamToken(ctx, state.UpstreamIssuer, state.UpstreamToken, state.Scope, form)
+	response, err := b.exchangeUpstreamToken(ctx, state.UpstreamIssuer, state.UpstreamToken, state.Scope, form)
+	if err == nil && response.RefreshToken == "" {
+		return mcpOAuthUpstreamTokenResponse{}, errors.New("upstream authorization grant does not support refresh")
+	}
+	return response, err
 }
 
 func (b *mcpOAuthBroker) exchangeUpstreamRefresh(ctx context.Context, grant mcpOAuthTokenGrant) (mcpOAuthUpstreamTokenResponse, error) {
@@ -363,7 +367,7 @@ func (b *mcpOAuthBroker) exchangeUpstreamRefresh(ctx context.Context, grant mcpO
 }
 
 func (b *mcpOAuthBroker) exchangeUpstreamToken(ctx context.Context, issuer, endpoint, scope string, form url.Values) (mcpOAuthUpstreamTokenResponse, error) {
-	if !trustedMCPOAuthEndpoint(issuer, endpoint, b.config.AllowInsecureLoopback) {
+	if !trustedMCPOAuthEndpoint(issuer, endpoint, b.config.AllowInsecureLoopback, b.config.TrustedEndpointOrigins...) {
 		return mcpOAuthUpstreamTokenResponse{}, errors.New("invalid upstream token endpoint")
 	}
 	response, err := b.doUpstream(ctx, http.MethodPost, endpoint, "application/x-www-form-urlencoded", []byte(form.Encode()))
@@ -398,7 +402,7 @@ func (b *mcpOAuthBroker) exchangeUpstreamToken(ctx context.Context, issuer, endp
 func (b *mcpOAuthBroker) validAuthorizationState(state mcpOAuthAuthorizationState) bool {
 	return state.OrgID == b.spec.OrgID && state.APIID == b.spec.APIID && state.PublicIssuer == b.publicIssuer() &&
 		state.PublicResource == b.config.PublicResource && state.UpstreamResource == b.config.UpstreamResource &&
-		trustedMCPOAuthEndpoint(state.UpstreamIssuer, state.UpstreamToken, b.config.AllowInsecureLoopback) &&
+		trustedMCPOAuthEndpoint(state.UpstreamIssuer, state.UpstreamToken, b.config.AllowInsecureLoopback, b.config.TrustedEndpointOrigins...) &&
 		state.DownstreamClientID != "" && state.UpstreamClientID != "" && state.RedirectURI != "" &&
 		validMCPOAuthPKCE(state.DownstreamChallenge) && validMCPOAuthPKCE(state.UpstreamVerifier)
 }

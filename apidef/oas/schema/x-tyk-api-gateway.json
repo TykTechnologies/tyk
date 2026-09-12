@@ -1412,6 +1412,11 @@
         "publicOrigin": { "type": "string" },
         "publicResource": { "type": "string" },
         "upstreamResource": { "type": "string" },
+        "trustedEndpointOrigins": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": [{ "type": "string" }]
+        },
         "allowInsecureLoopback": { "type": "boolean" }
       },
       "required": ["enabled"]

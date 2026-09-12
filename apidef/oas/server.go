@@ -121,11 +121,12 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 		s.MCP = &MCP{TrustedOrigins: append([]string(nil), api.MCP.TrustedOrigins...)}
 		if api.MCP.OAuthBroker != nil {
 			s.MCP.OAuthBroker = &MCPOAuthBroker{
-				Enabled:               api.MCP.OAuthBroker.Enabled,
-				PublicOrigin:          api.MCP.OAuthBroker.PublicOrigin,
-				PublicResource:        api.MCP.OAuthBroker.PublicResource,
-				UpstreamResource:      api.MCP.OAuthBroker.UpstreamResource,
-				AllowInsecureLoopback: api.MCP.OAuthBroker.AllowInsecureLoopback,
+				Enabled:                api.MCP.OAuthBroker.Enabled,
+				PublicOrigin:           api.MCP.OAuthBroker.PublicOrigin,
+				PublicResource:         api.MCP.OAuthBroker.PublicResource,
+				UpstreamResource:       api.MCP.OAuthBroker.UpstreamResource,
+				TrustedEndpointOrigins: append([]string(nil), api.MCP.OAuthBroker.TrustedEndpointOrigins...),
+				AllowInsecureLoopback:  api.MCP.OAuthBroker.AllowInsecureLoopback,
 			}
 		}
 	}
@@ -198,11 +199,12 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 		api.MCP = &apidef.MCPConfig{TrustedOrigins: append([]string(nil), s.MCP.TrustedOrigins...)}
 		if s.MCP.OAuthBroker != nil {
 			api.MCP.OAuthBroker = &apidef.MCPOAuthBrokerConfig{
-				Enabled:               s.MCP.OAuthBroker.Enabled,
-				PublicOrigin:          s.MCP.OAuthBroker.PublicOrigin,
-				PublicResource:        s.MCP.OAuthBroker.PublicResource,
-				UpstreamResource:      s.MCP.OAuthBroker.UpstreamResource,
-				AllowInsecureLoopback: s.MCP.OAuthBroker.AllowInsecureLoopback,
+				Enabled:                s.MCP.OAuthBroker.Enabled,
+				PublicOrigin:           s.MCP.OAuthBroker.PublicOrigin,
+				PublicResource:         s.MCP.OAuthBroker.PublicResource,
+				UpstreamResource:       s.MCP.OAuthBroker.UpstreamResource,
+				TrustedEndpointOrigins: append([]string(nil), s.MCP.OAuthBroker.TrustedEndpointOrigins...),
+				AllowInsecureLoopback:  s.MCP.OAuthBroker.AllowInsecureLoopback,
 			}
 		}
 	}
@@ -235,11 +237,12 @@ type MCP struct {
 // MCPOAuthBroker contains the fixed public and upstream identities used by
 // the MCP OAuth authorization broker.
 type MCPOAuthBroker struct {
-	Enabled               bool   `bson:"enabled" json:"enabled"`
-	PublicOrigin          string `bson:"publicOrigin,omitempty" json:"publicOrigin,omitempty"`
-	PublicResource        string `bson:"publicResource,omitempty" json:"publicResource,omitempty"`
-	UpstreamResource      string `bson:"upstreamResource,omitempty" json:"upstreamResource,omitempty"`
-	AllowInsecureLoopback bool   `bson:"allowInsecureLoopback,omitempty" json:"allowInsecureLoopback,omitempty"`
+	Enabled                bool     `bson:"enabled" json:"enabled"`
+	PublicOrigin           string   `bson:"publicOrigin,omitempty" json:"publicOrigin,omitempty"`
+	PublicResource         string   `bson:"publicResource,omitempty" json:"publicResource,omitempty"`
+	UpstreamResource       string   `bson:"upstreamResource,omitempty" json:"upstreamResource,omitempty"`
+	TrustedEndpointOrigins []string `bson:"trustedEndpointOrigins,omitempty" json:"trustedEndpointOrigins,omitempty"`
+	AllowInsecureLoopback  bool     `bson:"allowInsecureLoopback,omitempty" json:"allowInsecureLoopback,omitempty"`
 }
 
 // ListenPath is the base path on Tyk to which requests for this API

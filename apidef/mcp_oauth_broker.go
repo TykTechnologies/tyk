@@ -29,6 +29,18 @@ func (c *MCPOAuthBrokerConfig) Validate(listenPath string) error {
 	if err := validateMCPBrokerURL("upstream resource", c.UpstreamResource, false, c.AllowInsecureLoopback); err != nil {
 		return err
 	}
+	trusted, err := internalhttputil.CanonicalOrigins(c.TrustedEndpointOrigins)
+	if err != nil || len(trusted) != len(c.TrustedEndpointOrigins) {
+		return fmt.Errorf("MCP OAuth broker trusted endpoint origins must be unique canonical origins")
+	}
+	for index, origin := range trusted {
+		if origin != c.TrustedEndpointOrigins[index] {
+			return fmt.Errorf("MCP OAuth broker trusted endpoint origins must use their exact canonical form")
+		}
+		if err := validateMCPBrokerURL("trusted endpoint origin", origin, true, c.AllowInsecureLoopback); err != nil {
+			return err
+		}
+	}
 	if listenPath != "" {
 		if !strings.HasPrefix(listenPath, "/") {
 			return fmt.Errorf("MCP OAuth broker listen path must start with /")

@@ -6,6 +6,7 @@ func TestMCPOAuthBrokerConfigValidate(t *testing.T) {
 	valid := MCPOAuthBrokerConfig{
 		Enabled: true, PublicOrigin: "https://gateway.example",
 		PublicResource: "https://gateway.example/mcp/", UpstreamResource: "https://upstream.example/mcp/",
+		TrustedEndpointOrigins: []string{"https://tokens.example"},
 	}
 	if err := valid.Validate("/mcp/"); err != nil {
 		t.Fatalf("valid broker config: %v", err)
@@ -31,6 +32,12 @@ func TestMCPOAuthBrokerConfigValidate(t *testing.T) {
 			config.PublicResource = "http://gateway.example/mcp/"
 		},
 		"insecure upstream": func(config *MCPOAuthBrokerConfig) { config.UpstreamResource = "http://upstream.example/mcp/" },
+		"duplicate trusted endpoint": func(config *MCPOAuthBrokerConfig) {
+			config.TrustedEndpointOrigins = []string{"https://tokens.example", "https://tokens.example"}
+		},
+		"noncanonical trusted endpoint": func(config *MCPOAuthBrokerConfig) {
+			config.TrustedEndpointOrigins = []string{"HTTPS://TOKENS.EXAMPLE:443"}
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			config := valid
