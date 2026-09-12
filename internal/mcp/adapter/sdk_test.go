@@ -139,6 +139,47 @@ func TestNewSDKServer_CallToolDispatchesDerivedTool(t *testing.T) {
 	assert.Equal(t, map[string]any{"ok": true}, result.StructuredContent)
 }
 
+func TestNewSDKServer_ForbiddenHeaderDropsUntypedValueBeforeSerialization(t *testing.T) {
+	t.Parallel()
+	called := false
+	var upstream *http.Request
+	tool := oas.DerivedTool{
+		Name: "header_guard", Method: http.MethodGet, PathTemplate: "/headers",
+		ParamLocations:   map[string]string{"region": oas.DerivedParamLocationHeader},
+		ParamSourceNames: map[string]string{"region": "Authorization"},
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"region": map[string]any{"type": "string"},
+			},
+			"required": []string{"region"},
+		},
+	}
+	server, err := NewSDKServer(SDKServerConfig{
+		Name: "header guard", Tools: []oas.DerivedTool{tool},
+		CallTool: func(_ context.Context, tool *oas.DerivedTool, args map[string]any) (*Recorder, error) {
+			called = true
+			var err error
+			upstream, err = BuildUpstreamRequest(httptest.NewRequest(http.MethodPost, "/mcp", nil), tool, "rest-1", args)
+			if err != nil {
+				return nil, err
+			}
+			return NewRecorder(), nil
+		},
+	})
+	require.NoError(t, err)
+	session := connectSDKServer(t, server)
+
+	result, err := session.CallTool(context.Background(), &mcpsdk.CallToolParams{
+		Name: "header_guard", Arguments: map[string]any{"region": map[string]any{"attacker": true}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.True(t, called)
+	require.NotNil(t, upstream)
+	assert.Empty(t, upstream.Header.Get("Authorization"))
+}
+
 func TestNewSDKServer_CallToolSanitizesInternalErrors(t *testing.T) {
 	t.Parallel()
 
