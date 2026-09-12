@@ -8,7 +8,7 @@ import (
 )
 
 // SupportedProtocolVersions describes the runtime behind this endpoint.
-// TT-18004 can extend synthetic support without changing ingress or discovery.
+// Synthetic adapters remain legacy-only until their runtime supports modern requests.
 func (s *APISpec) SupportedProtocolVersions() []string {
 	if s != nil && (s.IsSyntheticMCPAdapter() || s.IsPairedMCPAdapterProxy()) {
 		return mcp.LegacyProtocolVersions()
@@ -33,7 +33,7 @@ func (m *JSONRPCMiddleware) validateMCPIngress(w http.ResponseWriter, r *http.Re
 	if modern {
 		// Removed stateful transport headers cannot affect modern routing/resumption.
 		r.Header.Del(mcp.HeaderSessionID)
-		r.Header.Del("Last-Event-ID")
+		r.Header.Del(mcp.HeaderLastEventID)
 	}
 	if ingress != nil {
 		ingress.Validation = mcp.ProtocolValidation{Checked: true}
@@ -51,7 +51,7 @@ func (m *JSONRPCMiddleware) writeMCPIngressError(w http.ResponseWriter, r *http.
 
 func rejectModernMCPHTTPMethod(w http.ResponseWriter, r *http.Request) bool {
 	ingress := httpctx.GetMCPProtocolContext(r)
-	if ingress == nil || !ingress.IsModern() || (r.Method != http.MethodGet && r.Method != http.MethodDelete) {
+	if ingress == nil || !ingress.IsModern() || r.Method == http.MethodPost || r.Method == http.MethodOptions {
 		return false
 	}
 	ingress.Validation = mcp.ProtocolValidation{Checked: true, HTTPStatus: http.StatusMethodNotAllowed, Message: http.StatusText(http.StatusMethodNotAllowed)}
