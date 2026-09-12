@@ -85,8 +85,8 @@ func TestPRMCacheCloneIsolation(t *testing.T) {
 
 func TestFetchUpstreamPRM(t *testing.T) {
 	stub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("MCP-Protocol-Version") == "" {
-			t.Errorf("missing MCP-Protocol-Version header")
+		if r.Header.Get("MCP-Protocol-Version") != "" {
+			t.Errorf("unexpected MCP-Protocol-Version header")
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"resource":"https://upstream.example/v1/mcp","authorization_servers":["https://auth.example/t"]}`)) //nolint:errcheck
