@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -484,6 +485,109 @@ func TestCallMCPAdapterTool_ForwardsQueryParamsThroughJSONRPC(t *testing.T) {
 	content := result["content"].([]any)
 	text := content[0].(map[string]any)["text"]
 	assert.Equal(t, `{"query":"limit=10"}`, text)
+}
+
+func TestRESTAsMCPAdapter_SourceNotFoundIsToolErrorAndSessionContinues(t *testing.T) {
+	rest := restSourceSpec("rest-orders", "org-1", true)
+	rest.OAS.Paths.Set("/orders/{id}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "get_order",
+			Parameters: openapi3.Parameters{
+				&openapi3.ParameterRef{Value: &openapi3.Parameter{
+					Name:     "id",
+					In:       openapi3.ParameterInPath,
+					Required: true,
+					Schema:   openapi3.NewStringSchema().NewRef(),
+				}},
+			},
+		},
+	})
+	proxy := pairedMCPProxySpec("proxy-orders", "org-1", "rest-orders", &oas.TykMCPServer{
+		Primitives: []oas.TykMCPServerPrimitive{{
+			Source: oas.TykMCPServerSource{OperationID: "get_order"},
+			Name:   "get_order",
+			Allow:  boolPtr(true),
+		}},
+	})
+	adapterSpec, err := buildMCPAdapterSpec(rest, []*APISpec{proxy}, nil)
+	require.NoError(t, err)
+
+	var sourceCalls atomic.Int32
+	gw := &Gateway{
+		apisByID: map[string]*APISpec{
+			"rest-orders":     rest,
+			adapterSpec.APIID: adapterSpec,
+			"proxy-orders":    proxy,
+		},
+		apisHandlesByID: &sync.Map{},
+	}
+	gw.apisHandlesByID.Store("rest-orders", &ChainObject{ThisHandler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sourceCalls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/orders/missing" {
+			w.WriteHeader(http.StatusNotFound)
+			_, err := w.Write([]byte(`{"error":"order not found"}`))
+			require.NoError(t, err)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte(`{"id":"found","status":"ready"}`))
+		require.NoError(t, err)
+	})})
+	snapshot, err := computeMCPPairing([]*APISpec{rest, proxy})
+	require.NoError(t, err)
+	gw.mcpPairingIndex.Set(snapshot)
+
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec, Gw: gw}}
+	sessionID := initializeSyntheticAdapterSession(t, mw, "proxy-orders")
+
+	call := func(id, orderID string) map[string]any {
+		t.Helper()
+		payload, err := json.Marshal(map[string]any{
+			"jsonrpc": "2.0",
+			"id":      id,
+			"method":  "tools/call",
+			"params": map[string]any{
+				"name":      "get_order",
+				"arguments": map[string]any{"id": orderID},
+			},
+		})
+		require.NoError(t, err)
+		req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Mcp-Session-Id", sessionID)
+		ctxSetMCPAdapterCallerProxyID(req, "proxy-orders")
+		rec := httptest.NewRecorder()
+
+		err, status := mw.ProcessRequest(rec, req, nil)
+		require.NoError(t, err)
+		require.Equal(t, middleware.StatusRespond, status)
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, id, body["id"])
+		assert.NotContains(t, body, "error", "response body: %s", rec.Body.String())
+		return body["result"].(map[string]any)
+	}
+
+	missing := call("missing-9007199254740993", "missing")
+	assert.Equal(t, true, missing["isError"])
+	assert.EqualValues(t, http.StatusNotFound, missing["_meta"].(map[string]any)["upstreamHttpStatus"])
+	assert.Equal(t, "application/json", missing["_meta"].(map[string]any)["upstreamContentType"])
+	missingContent := missing["content"].([]any)
+	require.Len(t, missingContent, 1)
+	assert.Equal(t, `{"error":"order not found"}`, missingContent[0].(map[string]any)["text"])
+	assert.NotContains(t, missing, "structuredContent")
+	assert.EqualValues(t, 1, sourceCalls.Load())
+
+	found := call("found-after-missing", "found")
+	assert.NotContains(t, found, "isError")
+	assert.EqualValues(t, http.StatusOK, found["_meta"].(map[string]any)["upstreamHttpStatus"])
+	foundContent := found["content"].([]any)
+	require.Len(t, foundContent, 1)
+	assert.Equal(t, `{"id":"found","status":"ready"}`, foundContent[0].(map[string]any)["text"])
+	assert.EqualValues(t, 2, sourceCalls.Load())
 }
 
 func TestCallMCPAdapterTool_DropsUnsafeSourceOASHeaderProjection(t *testing.T) {
