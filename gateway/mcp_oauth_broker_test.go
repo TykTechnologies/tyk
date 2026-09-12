@@ -50,6 +50,16 @@ type failingMCPOAuthBrokerIssueStore struct {
 	mcpOAuthBrokerStore
 }
 
+type cancelOnMCPOAuthClientPutStore struct {
+	mcpOAuthBrokerStore
+	cancel context.CancelFunc
+}
+
+func (s cancelOnMCPOAuthClientPutStore) Put(context.Context, string, []byte, time.Duration) error {
+	s.cancel()
+	return errors.New("injected persistence failure after request cancellation")
+}
+
 func (s failingMCPOAuthBrokerIssueStore) Issue(context.Context, string, []mcpOAuthBrokerIssueRecord) error {
 	return errors.New("injected atomic issue failure")
 }
@@ -342,6 +352,24 @@ func TestMCPOAuthBrokerDCRRollsBackFailedPersistence(t *testing.T) {
 	require.Zero(t, capture.unrelatedDeletes)
 	require.Equal(t, "Bearer "+capture.registrationToken, capture.lastDeleteAuth)
 	require.NotContains(t, response.Body.String(), capture.registrationToken)
+}
+
+func TestMCPOAuthBrokerDCRRollbackSurvivesRequestCancellationAtPersistenceFailure(t *testing.T) {
+	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
+	broker := newMCPOAuthBroker(ts.Gw, ts.Gw.getApiSpec("test"))
+	requestContext, cancel := context.WithCancel(context.Background())
+	broker.store = cancelOnMCPOAuthClientPutStore{mcpOAuthBrokerStore: broker.store, cancel: cancel}
+	body := `{"redirect_uris":["https://client.example/callback"],"token_endpoint_auth_method":"none"}`
+	request := httptest.NewRequest(http.MethodPost, ts.URL+"/__tyk-as/test/register", strings.NewReader(body)).WithContext(requestContext)
+	request.Header.Set(header.ContentType, header.ApplicationJSON)
+	response := httptest.NewRecorder()
+	broker.registrationHandler(response, request)
+	require.Equal(t, http.StatusServiceUnavailable, response.Code)
+	capture.mu.Lock()
+	defer capture.mu.Unlock()
+	require.Equal(t, 1, capture.registrationRequests)
+	require.Equal(t, 1, capture.registrationDeletes)
+	require.Zero(t, capture.unrelatedDeletes)
 }
 
 func TestMCPOAuthBrokerDCRRollbackFailuresAreBoundedAndSanitized(t *testing.T) {

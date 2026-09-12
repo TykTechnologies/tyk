@@ -25,8 +25,9 @@ import (
 )
 
 const (
-	mcpOAuthBrokerStateTTL = 10 * time.Minute
-	mcpOAuthBrokerBodyMax  = 64 << 10
+	mcpOAuthBrokerStateTTL    = 10 * time.Minute
+	mcpOAuthBrokerBodyMax     = 64 << 10
+	mcpOAuthBrokerHTTPTimeout = 10 * time.Second
 )
 
 type mcpOAuthBroker struct {
@@ -329,7 +330,9 @@ func validMCPOAuthBearerValue(value string) bool {
 }
 
 func (b *mcpOAuthBroker) rollbackUpstreamRegistration(ctx context.Context, managementEndpoint, accessToken string) error {
-	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, managementEndpoint, nil)
+	rollbackContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), mcpOAuthBrokerHTTPTimeout)
+	defer cancel()
+	request, err := http.NewRequestWithContext(rollbackContext, http.MethodDelete, managementEndpoint, nil)
 	if err != nil {
 		return errors.New("invalid upstream registration rollback request")
 	}
@@ -337,7 +340,7 @@ func (b *mcpOAuthBroker) rollbackUpstreamRegistration(ctx context.Context, manag
 	request.Header.Set(header.Authorization, "Bearer "+accessToken)
 	client := *b.client
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	client.Timeout = 10 * time.Second
+	client.Timeout = mcpOAuthBrokerHTTPTimeout
 	response, err := client.Do(request)
 	if err != nil {
 		return errors.New("upstream registration rollback request failed")
@@ -473,7 +476,7 @@ func (b *mcpOAuthBroker) doUpstream(ctx context.Context, method, target, content
 	}
 	client := *b.client
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	client.Timeout = 10 * time.Second
+	client.Timeout = mcpOAuthBrokerHTTPTimeout
 	return client.Do(request)
 }
 
