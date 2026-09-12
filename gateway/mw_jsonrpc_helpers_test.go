@@ -2,16 +2,42 @@ package gateway
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/ctx"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 )
+
+func TestSelectAndStoreMCPJSONRPCCode(t *testing.T) {
+	tests := []struct {
+		name     string
+		protocol string
+		want     int
+	}{
+		{name: "modern", protocol: mcp.ModernProtocolVersion, want: jsonrpcerrors.CodeModernAuthRequired},
+		{name: "legacy", protocol: mcp.LegacyFallbackProtocolVersion, want: jsonrpcerrors.CodeAccessDenied},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+			httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(test.protocol, "", nil, nil))
+			ctx.SetErrorClassification(r, tykerrors.NewErrorClassification(tykerrors.AKI, "invalid_key"))
+
+			got := selectAndStoreMCPJSONRPCCode(r, http.StatusForbidden)
+
+			assert.Equal(t, test.want, got)
+			assert.Equal(t, got, ctxGetJSONRPCErrorCode(r))
+		})
+	}
+}
 
 func TestWriteJSONRPCAccessDenied_WithState(t *testing.T) {
 	r := httptest.NewRequest("POST", "/mcp", nil)
