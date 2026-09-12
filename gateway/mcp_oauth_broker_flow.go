@@ -284,13 +284,6 @@ func (b *mcpOAuthBroker) refreshToken(w http.ResponseWriter, r *http.Request, fo
 }
 
 func (b *mcpOAuthBroker) issueDownstreamTokens(w http.ResponseWriter, r *http.Request, grant mcpOAuthTokenGrant) {
-	if revoked, err := b.refreshFamilyRevoked(r.Context(), grant.FamilyID); err != nil {
-		mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
-		return
-	} else if revoked {
-		mcpOAuthErrorNoStore(w, http.StatusBadRequest, "invalid_grant")
-		return
-	}
 	accessToken, err := randomMCPOAuthValue()
 	if err != nil {
 		mcpOAuthErrorNoStore(w, http.StatusInternalServerError, "server_error")
@@ -311,15 +304,26 @@ func (b *mcpOAuthBroker) issueDownstreamTokens(w http.ResponseWriter, r *http.Re
 		return
 	}
 	grant.ExpiresAt = now.Add(accessTTL).Unix()
-	if err := b.putRecord(r.Context(), b.accessKey(accessToken), grant, accessTTL); err != nil {
-		mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
-		return
+	records := make([]mcpOAuthBrokerIssueRecord, 0, 3)
+	for _, record := range []struct {
+		key string
+		ttl time.Duration
+	}{
+		{key: b.accessKey(accessToken), ttl: accessTTL},
+		{key: b.refreshFamilyKey(refreshToken), ttl: mcpOAuthBrokerRefreshTokenTTL},
+		{key: b.refreshKey(refreshToken), ttl: mcpOAuthBrokerRefreshTokenTTL},
+	} {
+		sealed, err := b.sealRecord(record.key, grant)
+		if err != nil {
+			mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
+			return
+		}
+		records = append(records, mcpOAuthBrokerIssueRecord{key: record.key, value: sealed, ttl: record.ttl})
 	}
-	if err := b.putRecord(r.Context(), b.refreshFamilyKey(refreshToken), grant, mcpOAuthBrokerRefreshTokenTTL); err != nil {
-		mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
+	if err := b.store.Issue(r.Context(), b.revokedFamilyKey(grant.FamilyID), records); errors.Is(err, errMCPOAuthBrokerFamilyRevoked) {
+		mcpOAuthErrorNoStore(w, http.StatusBadRequest, "invalid_grant")
 		return
-	}
-	if err := b.putRecord(r.Context(), b.refreshKey(refreshToken), grant, mcpOAuthBrokerRefreshTokenTTL); err != nil {
+	} else if err != nil {
 		mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
 		return
 	}
