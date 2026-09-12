@@ -137,3 +137,124 @@ func TestMCPIngressEndpointAndHeaderContracts(t *testing.T) {
 	headers["Mcp-Param-Unrecognized"] = []string{"=?base64?unknown-custom-encoding", "second"}
 	require.Nil(t, ValidateModernMirroredHeaders(headers, envelope), "unknown bindings belong to the upstream")
 }
+
+func TestModernIngressRejectsInvalidMetadataShapes(t *testing.T) {
+	t.Parallel()
+	const version = `"2026-07-28"`
+	tests := []struct {
+		name   string
+		params string
+	}{
+		{"null params", `null`},
+		{"null metadata", `{"_meta":null}`},
+		{"array metadata", `{"_meta":[]}`},
+		{"scalar metadata", `{"_meta":1}`},
+		{"null capabilities", `{"_meta":{"io.modelcontextprotocol/protocolVersion":` + version + `,"io.modelcontextprotocol/clientCapabilities":null}}`},
+		{"array capabilities", `{"_meta":{"io.modelcontextprotocol/protocolVersion":` + version + `,"io.modelcontextprotocol/clientCapabilities":[]}}`},
+		{"scalar capabilities", `{"_meta":{"io.modelcontextprotocol/protocolVersion":` + version + `,"io.modelcontextprotocol/clientCapabilities":true}}`},
+		{"null nested capability", `{"_meta":{"io.modelcontextprotocol/protocolVersion":` + version + `,"io.modelcontextprotocol/clientCapabilities":{"sampling":null}}}`},
+		{"array nested capability", `{"_meta":{"io.modelcontextprotocol/protocolVersion":` + version + `,"io.modelcontextprotocol/clientCapabilities":{"roots":[]}}}`},
+		{"scalar nested capability", `{"_meta":{"io.modelcontextprotocol/protocolVersion":` + version + `,"io.modelcontextprotocol/clientCapabilities":{"tasks":1}}}`},
+		{"null client info", `{"_meta":{"io.modelcontextprotocol/protocolVersion":` + version + `,"io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":null}}`},
+		{"array client info", `{"_meta":{"io.modelcontextprotocol/protocolVersion":` + version + `,"io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":[]}}`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var params json.RawMessage = []byte(test.params)
+			ctx := NewProtocolContext(ModernProtocolVersion, "", &RequestEnvelope{Method: MethodToolsList, Params: params}, nil)
+			modern, ingressErr := ValidateProtocolDeclarations(ctx)
+			require.True(t, modern)
+			require.NotNil(t, ingressErr)
+			require.Equal(t, JSONRPCInvalidParams, ingressErr.Code)
+		})
+	}
+}
+
+func TestModernIngressRequiresMatchingVersionDeclarations(t *testing.T) {
+	t.Parallel()
+	validMeta := func(version string) json.RawMessage {
+		return json.RawMessage(`{"_meta":{"io.modelcontextprotocol/protocolVersion":"` + version + `","io.modelcontextprotocol/clientCapabilities":{}}}`)
+	}
+	tests := []struct {
+		name       string
+		header     string
+		params     json.RawMessage
+		wantCode   int
+		wantModern bool
+	}{
+		{"missing header", "", validMeta(ModernProtocolVersion), CodeHeaderMismatch, true},
+		{"mismatched header", ModernProtocolVersion, validMeta("2025-11-25"), CodeHeaderMismatch, true},
+		{"unknown matching version", "2099-01-01", validMeta("2099-01-01"), CodeUnsupportedProtocolVersion, false},
+		{"unknown header with modern body", "2099-01-01", validMeta(ModernProtocolVersion), CodeHeaderMismatch, true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := NewProtocolContext(test.header, "", &RequestEnvelope{Method: MethodToolsList, Params: test.params}, nil)
+			modern, ingressErr := ValidateProtocolDeclarations(ctx)
+			require.Equal(t, test.wantModern, modern)
+			require.NotNil(t, ingressErr)
+			require.Equal(t, test.wantCode, ingressErr.Code)
+			if test.wantCode == CodeUnsupportedProtocolVersion {
+				data := ingressErr.Data.(map[string]any)
+				require.Equal(t, ServedProtocolVersions(), data["supported"])
+			}
+		})
+	}
+}
+
+func TestProtocolHeaderRejectsCaseVariantAndCombinedMultiplicity(t *testing.T) {
+	t.Parallel()
+	for _, header := range []http.Header{
+		{HeaderProtocolVersion: {ModernProtocolVersion}, "mcp-protocol-version": {ModernProtocolVersion}},
+		{HeaderProtocolVersion: {ModernProtocolVersion + "," + ModernProtocolVersion}},
+	} {
+		err := ValidateProtocolHeader(header)
+		require.NotNil(t, err)
+		require.Equal(t, CodeHeaderMismatch, err.Code)
+	}
+}
+
+func TestModernMirroredHeaderMultiplicityAndEncoding(t *testing.T) {
+	t.Parallel()
+	envelope := &RequestEnvelope{Method: MethodToolsCall, Params: json.RawMessage(`{"name":"café"}`)}
+	encodedName := "=?base64?" + base64.StdEncoding.EncodeToString([]byte("café")) + "?="
+	valid := http.Header{HeaderMethod: {MethodToolsCall}, HeaderName: {encodedName}}
+	require.Nil(t, ValidateModernMirroredHeaders(valid, envelope))
+
+	tests := []struct {
+		name   string
+		header http.Header
+	}{
+		{"missing method", http.Header{HeaderName: {encodedName}}},
+		{"duplicate method", http.Header{HeaderMethod: {MethodToolsCall, MethodToolsCall}, HeaderName: {encodedName}}},
+		{"case variant duplicate method", http.Header{HeaderMethod: {MethodToolsCall}, "mcp-method": {MethodToolsCall}, HeaderName: {encodedName}}},
+		{"comma combined method", http.Header{HeaderMethod: {MethodToolsCall + "," + MethodToolsCall}, HeaderName: {encodedName}}},
+		{"mismatched method", http.Header{HeaderMethod: {MethodToolsList}, HeaderName: {encodedName}}},
+		{"missing name", http.Header{HeaderMethod: {MethodToolsCall}}},
+		{"duplicate name", http.Header{HeaderMethod: {MethodToolsCall}, HeaderName: {encodedName, encodedName}}},
+		{"case variant duplicate name", http.Header{HeaderMethod: {MethodToolsCall}, HeaderName: {encodedName}, "mcp-name": {encodedName}}},
+		{"partial wrapper", http.Header{HeaderMethod: {MethodToolsCall}, HeaderName: {"=?base64?Y2Fmw6k="}}},
+		{"invalid base64", http.Header{HeaderMethod: {MethodToolsCall}, HeaderName: {"=?base64?broken?="}}},
+		{"invalid decoded utf8", http.Header{HeaderMethod: {MethodToolsCall}, HeaderName: {"=?base64?/w==?="}}},
+		{"raw unicode", http.Header{HeaderMethod: {MethodToolsCall}, HeaderName: {"café"}}},
+		{"raw control", http.Header{HeaderMethod: {MethodToolsCall}, HeaderName: {"cafe\n"}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := ValidateModernMirroredHeaders(test.header, envelope)
+			require.NotNil(t, err)
+			require.Equal(t, CodeHeaderMismatch, err.Code)
+		})
+	}
+}
+
+func TestModernMirroredHeaderRejectsInvalidPrimitiveNameShapes(t *testing.T) {
+	t.Parallel()
+	for _, params := range []string{`null`, `{}`, `{"name":null}`, `{"name":1}`, `{"name":[]}`} {
+		envelope := &RequestEnvelope{Method: MethodToolsCall, Params: json.RawMessage(params)}
+		headers := http.Header{HeaderMethod: {MethodToolsCall}, HeaderName: {"tool"}}
+		err := ValidateModernMirroredHeaders(headers, envelope)
+		require.NotNil(t, err, params)
+		require.Equal(t, CodeHeaderMismatch, err.Code, params)
+	}
+}
