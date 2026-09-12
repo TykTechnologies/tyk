@@ -1163,6 +1163,50 @@ func TestMCPListFilterResponseHandler_DiscoveryGlobalEditDoesNotDisableCache(t *
 	assert.False(t, options.responseEdited)
 }
 
+func TestMCPListFilterResponseHandler_InvalidDiscoveryFailsClosed(t *testing.T) {
+	h := buildMCPListFilterHandler("api-1", true)
+	for _, test := range []struct {
+		name string
+		body string
+	}{
+		{"truncated", `{"jsonrpc":"2.0","id":9007199254740993,"result":`},
+		{"null result", `{"jsonrpc":"2.0","id":9007199254740993,"result":null}`},
+		{"wrong adjacent id", `{"jsonrpc":"2.0","id":9007199254740992,"result":{"supportedVersions":[],"capabilities":{}}}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+			requestID := json.Number("9007199254740993")
+			httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodServerDiscover, ID: requestID})
+			httpctx.SetMCPProtocolContext(req, mcp.NewProtocolContext(mcp.ModernProtocolVersion, "", &mcp.RequestEnvelope{ID: requestID}, nil))
+			options := &cacheOptions{}
+			ctxSetCacheOptions(req, options)
+			res := makeHTTPResponse([]byte(test.body))
+			res.Header.Set("Cache-Control", "public, max-age=300")
+			res.Header.Set("ETag", `"stale"`)
+			res.Header.Set("Last-Modified", "yesterday")
+
+			require.NoError(t, h.HandleResponse(httptest.NewRecorder(), res, req, nil))
+			require.Equal(t, http.StatusBadGateway, res.StatusCode)
+			require.Equal(t, "application/json", res.Header.Get("Content-Type"))
+			require.Equal(t, "no-store", res.Header.Get("Cache-Control"))
+			require.Empty(t, res.Header.Get("ETag"))
+			require.Empty(t, res.Header.Get("Last-Modified"))
+			body := readResponseBody(t, res)
+			require.NotContains(t, string(body), "stale")
+			var response struct {
+				ID    json.RawMessage    `json:"id"`
+				Error struct{ Code int } `json:"error"`
+			}
+			require.NoError(t, json.Unmarshal(body, &response))
+			require.Equal(t, "9007199254740993", string(response.ID))
+			require.Equal(t, -33006, response.Error.Code)
+			require.Equal(t, response.Error.Code, ctxGetJSONRPCErrorCode(req))
+			require.True(t, options.responseEdited)
+			require.Equal(t, int64(len(body)), res.ContentLength)
+		})
+	}
+}
+
 func TestMCPListFilterResponseHandler_HandleResponse_WrongAPIID(t *testing.T) {
 	h := buildMCPListFilterHandler("api-1", true)
 	rw := httptest.NewRecorder()
