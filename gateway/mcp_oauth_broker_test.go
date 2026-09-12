@@ -33,15 +33,36 @@ type faultingMCPOAuthBrokerStore struct {
 	putPrefix string
 }
 
+type revokingMCPOAuthBrokerIssueStore struct {
+	mcpOAuthBrokerStore
+	broker   *mcpOAuthBroker
+	familyID string
+}
+
+func (s revokingMCPOAuthBrokerIssueStore) Issue(ctx context.Context, revokedKey string, records []mcpOAuthBrokerIssueRecord) error {
+	if err := s.broker.putRecord(ctx, s.broker.revokedFamilyKey(s.familyID), map[string]bool{"revoked": true}, mcpOAuthBrokerReplayMarkerTTL); err != nil {
+		return err
+	}
+	return s.mcpOAuthBrokerStore.Issue(ctx, revokedKey, records)
+}
+
+type failingMCPOAuthBrokerIssueStore struct {
+	mcpOAuthBrokerStore
+}
+
+func (s failingMCPOAuthBrokerIssueStore) Issue(context.Context, string, []mcpOAuthBrokerIssueRecord) error {
+	return errors.New("injected atomic issue failure")
+}
+
 func (s faultingMCPOAuthBrokerStore) Get(ctx context.Context, key string) ([]byte, bool, error) {
-	if strings.HasPrefix(key, s.getPrefix) && s.getPrefix != "" {
+	if strings.Contains(key, s.getPrefix) && s.getPrefix != "" {
 		return nil, false, errors.New("injected OAuth broker get failure")
 	}
 	return s.mcpOAuthBrokerStore.Get(ctx, key)
 }
 
 func (s faultingMCPOAuthBrokerStore) Put(ctx context.Context, key string, value []byte, ttl time.Duration) error {
-	if strings.HasPrefix(key, s.putPrefix) && s.putPrefix != "" {
+	if strings.Contains(key, s.putPrefix) && s.putPrefix != "" {
 		return errors.New("injected OAuth broker put failure")
 	}
 	return s.mcpOAuthBrokerStore.Put(ctx, key, value, ttl)
@@ -397,6 +418,89 @@ func TestRedisMCPOAuthBrokerStoreAtomicConsume(t *testing.T) {
 	require.EqualValues(t, 1, winners.Load())
 }
 
+func TestRedisMCPOAuthBrokerStoreAtomicIssue(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+	store := newRedisMCPOAuthBrokerStore(ts.Gw)
+	newRecords := func(suffix string) []mcpOAuthBrokerIssueRecord {
+		return []mcpOAuthBrokerIssueRecord{
+			{key: "access:" + suffix, value: []byte("access"), ttl: time.Minute},
+			{key: "refresh-family:" + suffix, value: []byte("family"), ttl: time.Minute},
+			{key: "refresh:" + suffix, value: []byte("refresh"), ttl: time.Minute},
+		}
+	}
+	assertMissing := func(t *testing.T, records []mcpOAuthBrokerIssueRecord) {
+		t.Helper()
+		for _, record := range records {
+			_, found, err := store.Get(context.Background(), record.key)
+			require.NoError(t, err)
+			require.False(t, found)
+		}
+	}
+
+	t.Run("revoked has no partial writes", func(t *testing.T) {
+		suffix, err := randomMCPOAuthValue()
+		require.NoError(t, err)
+		revokedKey := "revoked-family:" + suffix
+		records := newRecords(suffix)
+		require.NoError(t, store.Put(context.Background(), revokedKey, []byte("revoked"), time.Minute))
+		require.ErrorIs(t, store.Issue(context.Background(), revokedKey, records), errMCPOAuthBrokerFamilyRevoked)
+		assertMissing(t, records)
+	})
+
+	t.Run("collision has no partial writes", func(t *testing.T) {
+		suffix, err := randomMCPOAuthValue()
+		require.NoError(t, err)
+		records := newRecords(suffix)
+		require.NoError(t, store.Put(context.Background(), records[1].key, []byte("existing"), time.Minute))
+		require.ErrorIs(t, store.Issue(context.Background(), "revoked-family:"+suffix, records), errMCPOAuthBrokerStoreCollision)
+		for index, record := range records {
+			value, found, err := store.Get(context.Background(), record.key)
+			require.NoError(t, err)
+			if index == 1 {
+				require.True(t, found)
+				require.Equal(t, []byte("existing"), value)
+			} else {
+				require.False(t, found)
+			}
+		}
+	})
+
+	t.Run("concurrent revoke or issue leaves a revoked family", func(t *testing.T) {
+		for range 16 {
+			suffix, err := randomMCPOAuthValue()
+			require.NoError(t, err)
+			revokedKey := "revoked-family:" + suffix
+			records := newRecords(suffix)
+			start := make(chan struct{})
+			results := make(chan error, 2)
+			go func() { <-start; results <- store.Issue(context.Background(), revokedKey, records) }()
+			go func() {
+				<-start
+				results <- store.Put(context.Background(), revokedKey, []byte("revoked"), time.Minute)
+			}()
+			close(start)
+			first, second := <-results, <-results
+			require.True(t, first == nil || errors.Is(first, errMCPOAuthBrokerFamilyRevoked))
+			require.True(t, second == nil || errors.Is(second, errMCPOAuthBrokerFamilyRevoked))
+			_, found, err := store.Get(context.Background(), revokedKey)
+			require.NoError(t, err)
+			require.True(t, found)
+		}
+	})
+}
+
+func TestMCPOAuthBrokerKeysShareOnlyTheirHashedAPISlot(t *testing.T) {
+	access := mcpOAuthBrokerKey("access", "org-secret", "api-secret", "access-secret")
+	revoked := mcpOAuthBrokerKey("revoked-family", "org-secret", "api-secret", "family-secret")
+	foreign := mcpOAuthBrokerKey("access", "other-org", "api-secret", "access-secret")
+	require.Equal(t, access[:strings.IndexByte(access, '}')+1], revoked[:strings.IndexByte(revoked, '}')+1])
+	require.NotEqual(t, access[:strings.IndexByte(access, '}')+1], foreign[:strings.IndexByte(foreign, '}')+1])
+	for _, secret := range []string{"org-secret", "api-secret", "access-secret", "family-secret"} {
+		require.NotContains(t, access+revoked+foreign, secret)
+	}
+}
+
 func TestTrustedMCPOAuthEndpoint(t *testing.T) {
 	for _, test := range []struct {
 		name, issuer, endpoint string
@@ -690,6 +794,42 @@ func TestMCPOAuthRefreshStoreFailuresFailClosed(t *testing.T) {
 			require.Equal(t, requestsBefore, capture.tokenRequests, "storage failures must prevent upstream exchange")
 			capture.mu.Unlock()
 		})
+	}
+}
+
+func TestMCPOAuthFamilyRevocationIsAtomicWithTokenIssue(t *testing.T) {
+	ts, _, _ := newMCPBrokerTest(t, "/mcp/")
+	broker := newMCPOAuthBroker(ts.Gw, ts.Gw.getApiSpec("test"))
+	familyID, err := randomMCPOAuthValue()
+	require.NoError(t, err)
+	broker.store = revokingMCPOAuthBrokerIssueStore{
+		mcpOAuthBrokerStore: broker.store, broker: broker, familyID: familyID,
+	}
+	response := httptest.NewRecorder()
+	broker.issueDownstreamTokens(response, httptest.NewRequest(http.MethodPost, "/token", nil), validMCPBrokerIssueGrant(broker, familyID))
+	require.Equal(t, http.StatusBadRequest, response.Code)
+}
+
+func TestMCPOAuthAtomicIssueStorageFailureEmitsNoTokens(t *testing.T) {
+	ts, _, _ := newMCPBrokerTest(t, "/mcp/")
+	broker := newMCPOAuthBroker(ts.Gw, ts.Gw.getApiSpec("test"))
+	broker.store = failingMCPOAuthBrokerIssueStore{mcpOAuthBrokerStore: broker.store}
+	response := httptest.NewRecorder()
+	broker.issueDownstreamTokens(response, httptest.NewRequest(http.MethodPost, "/token", nil), validMCPBrokerIssueGrant(broker, "failed-family"))
+	require.Equal(t, http.StatusServiceUnavailable, response.Code)
+	require.NotContains(t, response.Body.String(), "access_token")
+	require.NotContains(t, response.Body.String(), "refresh_token")
+}
+
+func validMCPBrokerIssueGrant(broker *mcpOAuthBroker, familyID string) mcpOAuthTokenGrant {
+	return mcpOAuthTokenGrant{
+		OrgID: broker.spec.OrgID, APIID: broker.spec.APIID,
+		PublicIssuer: broker.publicIssuer(), PublicResource: broker.config.PublicResource,
+		DownstreamClientID: "atomic-client", Scope: "mcp", FamilyID: familyID,
+		UpstreamIssuer: "http://127.0.0.1", UpstreamResource: broker.config.UpstreamResource,
+		UpstreamToken: "http://127.0.0.1/token", UpstreamClientID: "upstream-client",
+		UpstreamAccessToken: "upstream-secret", UpstreamRefreshToken: "upstream-refresh",
+		UpstreamExpiresAt: time.Now().Add(time.Hour).Unix(),
 	}
 }
 

@@ -10,7 +10,16 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
-var errMCPOAuthBrokerStoreCollision = errors.New("MCP OAuth broker key already exists")
+var (
+	errMCPOAuthBrokerStoreCollision = errors.New("MCP OAuth broker key already exists")
+	errMCPOAuthBrokerFamilyRevoked  = errors.New("MCP OAuth broker token family is revoked")
+)
+
+type mcpOAuthBrokerIssueRecord struct {
+	key   string
+	value []byte
+	ttl   time.Duration
+}
 
 // mcpOAuthBrokerStore is deliberately smaller than storage.Handler. OAuth
 // transaction values must support a real atomic consume operation so callback,
@@ -19,6 +28,7 @@ type mcpOAuthBrokerStore interface {
 	Put(context.Context, string, []byte, time.Duration) error
 	Get(context.Context, string) ([]byte, bool, error)
 	Consume(context.Context, string) ([]byte, bool, error)
+	Issue(context.Context, string, []mcpOAuthBrokerIssueRecord) error
 }
 
 type redisMCPOAuthBrokerStore struct {
@@ -94,4 +104,54 @@ func (s *redisMCPOAuthBrokerStore) Consume(ctx context.Context, key string) ([]b
 		return nil, false, fmt.Errorf("atomically consume OAuth broker value: %w", err)
 	}
 	return []byte(value), true, nil
+}
+
+var issueMCPOAuthBrokerFamily = redis.NewScript(`
+if redis.call("EXISTS", KEYS[1]) == 1 then
+  return 0
+end
+for index = 2, #KEYS do
+  if redis.call("EXISTS", KEYS[index]) == 1 then
+    return -1
+  end
+end
+for index = 2, #KEYS do
+  local argument = ((index - 2) * 2) + 1
+  redis.call("SET", KEYS[index], ARGV[argument], "PX", ARGV[argument + 1])
+end
+return 1
+`)
+
+func (s *redisMCPOAuthBrokerStore) Issue(ctx context.Context, revokedKey string, records []mcpOAuthBrokerIssueRecord) error {
+	client, err := s.client()
+	if err != nil {
+		return err
+	}
+	if len(records) == 0 {
+		return errors.New("MCP OAuth broker issue transaction has no records")
+	}
+	keys := make([]string, 1, len(records)+1)
+	keys[0] = s.key(revokedKey)
+	arguments := make([]any, 0, len(records)*2)
+	for _, record := range records {
+		if record.key == "" || len(record.value) == 0 || record.ttl <= 0 {
+			return errors.New("MCP OAuth broker issue transaction has an invalid record")
+		}
+		keys = append(keys, s.key(record.key))
+		arguments = append(arguments, record.value, record.ttl.Milliseconds())
+	}
+	result, err := issueMCPOAuthBrokerFamily.Run(ctx, client, keys, arguments...).Int64()
+	if err != nil {
+		return fmt.Errorf("atomically issue OAuth broker token family: %w", err)
+	}
+	switch result {
+	case 1:
+		return nil
+	case 0:
+		return errMCPOAuthBrokerFamilyRevoked
+	case -1:
+		return errMCPOAuthBrokerStoreCollision
+	default:
+		return fmt.Errorf("atomically issue OAuth broker token family: unexpected result %d", result)
+	}
 }
