@@ -242,6 +242,13 @@ func (b *upstreamRequestBuilder) applyArg(argName, loc string, raw any) error {
 		}
 		b.query = append(b.query, params...)
 	case loc == oas.DerivedParamLocationHeader:
+		// Classify the original source-OAS name after all MCP-facing renames
+		// have been resolved. Unsafe projections are intentionally dropped
+		// before serialization so attacker-controlled values cannot affect
+		// framing, routing, credentials, or MCP transport metadata.
+		if forbiddenSourceHeader(sourceName) {
+			return nil
+		}
 		value, err := b.headerValue(argName, sourceName, raw)
 		if err != nil {
 			return err
@@ -254,6 +261,36 @@ func (b *upstreamRequestBuilder) applyArg(argName, loc string, raw any) error {
 		return b.applyBodyFieldArg(argName, loc, raw)
 	}
 	return nil
+}
+
+var forbiddenSourceHeaders = map[string]struct{}{
+	"authorization":       {},
+	"proxy-authorization": {},
+	"proxy-authenticate":  {},
+	"cookie":              {},
+	"forwarded":           {},
+	"via":                 {},
+	"x-real-ip":           {},
+	"host":                {},
+	"connection":          {},
+	"keep-alive":          {},
+	"proxy-connection":    {},
+	"te":                  {},
+	"trailer":             {},
+	"transfer-encoding":   {},
+	"upgrade":             {},
+	"content-length":      {},
+	"expect":              {},
+	"origin":              {},
+	"last-event-id":       {},
+}
+
+func forbiddenSourceHeader(name string) bool {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if _, denied := forbiddenSourceHeaders[name]; denied {
+		return true
+	}
+	return strings.HasPrefix(name, "x-forwarded-") || strings.HasPrefix(name, "mcp-")
 }
 
 func (b *upstreamRequestBuilder) sourceName(argName string) string {

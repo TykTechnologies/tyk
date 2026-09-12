@@ -114,6 +114,142 @@ func TestBuildUpstreamRequest_DoesNotForwardParentAuthOrMCPTransportHeaders(t *t
 	assert.Empty(t, req.Header.Get("MCP-Protocol-Version"))
 }
 
+func TestForbiddenSourceHeader(t *testing.T) {
+	t.Parallel()
+
+	denied := []string{
+		"Authorization", "proxy-authorization", "PROXY-AUTHENTICATE", "Cookie", "Forwarded", "Via",
+		"X-Real-IP", "Host", "Connection", "Keep-Alive", "Proxy-Connection", "TE", "Trailer",
+		"Transfer-Encoding", "Upgrade", "Content-Length", "Expect", "Origin", "Last-Event-ID",
+		"X-Forwarded-For", "x-forwarded-attacker", "MCP-Protocol-Version", "mCp-Param-secret",
+		"  Authorization\t",
+	}
+	for _, name := range denied {
+		assert.True(t, forbiddenSourceHeader(name), name)
+	}
+	for _, name := range []string{"X-Region", "x-rEgIoN", "MCP", "X-Forwarded", "Authorization-Info", "X-Mcp-Safe"} {
+		assert.False(t, forbiddenSourceHeader(name), name)
+	}
+}
+
+func TestBuildUpstreamRequest_DropsForbiddenSourceHeadersBeforeSerialization(t *testing.T) {
+	t.Parallel()
+
+	denied := []string{
+		"Authorization", "Proxy-Authorization", "Proxy-Authenticate", "Cookie", "Forwarded", "Via",
+		"X-Real-IP", "Host", "Connection", "Keep-Alive", "Proxy-Connection", "TE", "Trailer",
+		"Transfer-Encoding", "Upgrade", "Content-Length", "Expect", "Origin", "Last-Event-ID",
+		"X-Forwarded-For", "X-Forwarded-Attacker", "Mcp-Protocol-Version", "MCP-Param-secret",
+	}
+	for _, sourceName := range denied {
+		sourceName := sourceName
+		t.Run(sourceName, func(t *testing.T) {
+			t.Parallel()
+			tool := &oas.DerivedTool{
+				Name: "safe", Method: http.MethodGet, PathTemplate: "/safe",
+				ParamLocations:   map[string]string{"projected": oas.DerivedParamLocationHeader},
+				ParamSourceNames: map[string]string{"projected": sourceName},
+			}
+			req, err := BuildUpstreamRequest(httptest.NewRequest(http.MethodPost, "/mcp", nil), tool, "rest-1", map[string]any{
+				"projected": "attacker-value",
+			})
+			require.NoError(t, err)
+			for _, values := range req.Header {
+				assert.NotContains(t, values, "attacker-value")
+			}
+		})
+	}
+
+	t.Run("drop precedes value serialization", func(t *testing.T) {
+		tool := &oas.DerivedTool{
+			Name: "safe", Method: http.MethodGet, PathTemplate: "/safe",
+			ParamLocations:   map[string]string{"projected": oas.DerivedParamLocationHeader},
+			ParamSourceNames: map[string]string{"projected": " Authorization "},
+		}
+		req, err := BuildUpstreamRequest(httptest.NewRequest(http.MethodPost, "/mcp", nil), tool, "rest-1", map[string]any{
+			"projected": map[string]any{"would": "fail header serialization"},
+		})
+		require.NoError(t, err)
+		assert.Empty(t, req.Header)
+	})
+}
+
+func TestBuildUpstreamRequest_ClassifiesResolvedSourceHeaderName(t *testing.T) {
+	t.Parallel()
+	parent := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+
+	t.Run("unsafe source renamed to benign MCP argument is blocked", func(t *testing.T) {
+		tool := &oas.DerivedTool{
+			Name: "renamed", Method: http.MethodGet, PathTemplate: "/safe",
+			ParamLocations:   map[string]string{"region": oas.DerivedParamLocationHeader},
+			ParamSourceNames: map[string]string{"region": "Authorization"},
+		}
+		req, err := BuildUpstreamRequest(parent, tool, "rest-1", map[string]any{"region": "attacker-value"})
+		require.NoError(t, err)
+		assert.Empty(t, req.Header.Get("Authorization"))
+	})
+
+	t.Run("unsafe serialization source fallback is blocked", func(t *testing.T) {
+		tool := &oas.DerivedTool{
+			Name: "serialized", Method: http.MethodGet, PathTemplate: "/safe",
+			ParamLocations: map[string]string{"region": oas.DerivedParamLocationHeader},
+			ParamSerializations: map[string]oas.DerivedParamSerialization{
+				"region": {SourceName: "Cookie", Location: oas.DerivedParamLocationHeader, Style: "simple"},
+			},
+		}
+		req, err := BuildUpstreamRequest(parent, tool, "rest-1", map[string]any{"region": "attacker-value"})
+		require.NoError(t, err)
+		assert.Empty(t, req.Header.Get("Cookie"))
+	})
+
+	t.Run("benign source renamed to unsafe MCP argument remains allowed", func(t *testing.T) {
+		tool := &oas.DerivedTool{
+			Name: "renamed", Method: http.MethodGet, PathTemplate: "/safe",
+			ParamLocations:   map[string]string{"Authorization": oas.DerivedParamLocationHeader},
+			ParamSourceNames: map[string]string{"Authorization": "x-rEgIoN"},
+		}
+		req, err := BuildUpstreamRequest(parent, tool, "rest-1", map[string]any{"Authorization": "eu-west"})
+		require.NoError(t, err)
+		assert.Equal(t, "eu-west", req.Header.Get("X-Region"))
+	})
+}
+
+func TestBuildUpstreamRequest_ForbiddenAndBenignArgumentsCompleteRequest(t *testing.T) {
+	t.Parallel()
+	tool := &oas.DerivedTool{
+		Name: "combined", Method: http.MethodPost, PathTemplate: "/orders/{id}",
+		ParamLocations: map[string]string{
+			"id": oas.DerivedParamLocationPath, "filter": oas.DerivedParamLocationQuery,
+			"credential": oas.DerivedParamLocationHeader, "regions": oas.DerivedParamLocationHeader,
+			"name": oas.DerivedParamLocationBodyPrefix + "name",
+		},
+		ParamSourceNames: map[string]string{
+			"id": "id", "filter": "filter", "credential": "Authorization", "regions": "X-Region", "name": "name",
+		},
+		ParamSerializations: map[string]oas.DerivedParamSerialization{
+			"regions": {SourceName: "X-Region", Location: oas.DerivedParamLocationHeader, Style: "simple", SchemaType: "array"},
+		},
+	}
+	req, err := BuildUpstreamRequest(httptest.NewRequest(http.MethodPost, "/mcp", nil), tool, "rest-1", map[string]any{
+		"id": "42", "filter": "open", "credential": []any{map[string]any{"attacker": true}},
+		"regions": []any{"eu", "us"}, "name": "sample",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "/orders/42", req.URL.Path)
+	assert.Equal(t, "open", req.URL.Query().Get("filter"))
+	assert.Empty(t, req.Header.Get("Authorization"))
+	assert.Equal(t, "eu,us", req.Header.Get("X-Region"))
+	body, err := io.ReadAll(req.Body)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"name":"sample"}`, string(body))
+
+	empty, err := BuildUpstreamRequest(httptest.NewRequest(http.MethodPost, "/mcp", nil), &oas.DerivedTool{
+		Name: "empty", Method: http.MethodGet, PathTemplate: "/empty", ParamLocations: map[string]string{},
+	}, "rest-1", nil)
+	require.NoError(t, err)
+	assert.Equal(t, "/empty", empty.URL.Path)
+}
+
 func TestBuildUpstreamRequest_DetachesFromParentCancellation(t *testing.T) {
 	t.Parallel()
 	type contextKey string
