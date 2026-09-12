@@ -142,10 +142,14 @@ func (t *SSETap) Read(p []byte) (int, error) {
 		}
 
 		// 7. If we produced output, the next iteration will return it.
-		// If upstream hit EOF but processInputBuffer produced nothing,
-		// flush any remaining unparseable bytes as-is (fail-open).
-		if t.upstreamEOF && t.strictFiltering && len(t.inputBuffer) > 0 {
-			t.failStrictFiltering(io.ErrUnexpectedEOF)
+		// Strict discovery filtering converts incomplete input or a clean EOF
+		// while the correlated response is still pending into a protocol error.
+		if t.upstreamEOF && t.strictFiltering {
+			if len(t.inputBuffer) > 0 {
+				t.failStrictFiltering(io.ErrUnexpectedEOF)
+			} else {
+				t.failStrictFiltering(io.EOF)
+			}
 		}
 		if t.outputBuffer.Len() == 0 && t.upstreamEOF {
 			if len(t.inputBuffer) > 0 {
@@ -198,8 +202,7 @@ func (t *SSETap) processInputBuffer() {
 		}
 
 		if t.strictFiltering && len(rawBytes) > maxInputBufferSize {
-			t.inputBuffer = nil
-			t.terminalErr = errFilteredSSETooLarge
+			t.failStrictFiltering(errFilteredSSETooLarge)
 			return
 		}
 

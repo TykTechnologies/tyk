@@ -64,6 +64,15 @@ func TestMCPDiscoverySSEFailsClosedAndTerminates(t *testing.T) {
 		require.Equal(t, -33006, response.Error.Code)
 	})
 
+	t.Run("hybrid method and result is terminal", func(t *testing.T) {
+		hook := NewMCPListFilterSSEHook(spec, nil, newRequest())
+		allowed, modified := hook.FilterEvent(&SSEEvent{Event: "message", Data: []string{`{"jsonrpc":"2.0","id":9007199254740993,"method":"notifications/progress","result":{"supportedVersions":[],"capabilities":{}}}`}})
+		require.True(t, allowed)
+		require.NotNil(t, modified)
+		require.True(t, hook.Terminal())
+		require.Equal(t, 1, strings.Count(strings.Join(modified.Data, "\n"), `"code":-33006`))
+	})
+
 	t.Run("unrelated frames pass before matching response", func(t *testing.T) {
 		hook := NewMCPListFilterSSEHook(spec, nil, newRequest())
 		for _, data := range []string{
@@ -104,6 +113,60 @@ func TestMCPDiscoverySSEFailsClosedAndTerminates(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, strings.Count(string(output), `"code":-33006`))
 		require.True(t, upstream.wasClosed())
+	})
+
+	t.Run("clean EOF after progress becomes terminal error event", func(t *testing.T) {
+		hook := NewMCPListFilterSSEHook(spec, nil, newRequest())
+		progress := `{"jsonrpc":"2.0","method":"notifications/progress","params":{"progress":1}}`
+		upstream := &trackingCloser{Reader: strings.NewReader("data: " + progress + "\n\n")}
+		output, err := io.ReadAll(NewSSETap(upstream, hook))
+		require.NoError(t, err)
+		require.Equal(t, 1, strings.Count(string(output), progress))
+		require.Equal(t, 1, strings.Count(string(output), `"code":-33006`))
+		require.True(t, upstream.wasClosed())
+	})
+
+	t.Run("oversized discovery frames become terminal error events", func(t *testing.T) {
+		for _, test := range []struct {
+			name  string
+			input string
+		}{
+			{
+				name: "complete event",
+				input: "data: {\"jsonrpc\":\"2.0\",\"id\":9007199254740993,\"result\":{\"supportedVersions\":[],\"capabilities\":{},\"padding\":\"" +
+					strings.Repeat("x", maxInputBufferSize) + "\"}}\n\n",
+			},
+			{
+				name:  "pending event",
+				input: "data: {\"padding\":\"" + strings.Repeat("x", maxInputBufferSize),
+			},
+		} {
+			t.Run(test.name, func(t *testing.T) {
+				hook := NewMCPListFilterSSEHook(spec, nil, newRequest())
+				upstream := &trackingCloser{Reader: strings.NewReader(test.input)}
+				output, err := io.ReadAll(NewSSETap(upstream, hook))
+				require.NoError(t, err)
+				require.Equal(t, 1, strings.Count(string(output), `"code":-33006`))
+				require.NotContains(t, string(output), strings.Repeat("x", 32))
+				require.True(t, upstream.wasClosed())
+			})
+		}
+	})
+
+	t.Run("credential-specific upstream error disables cache without rewriting", func(t *testing.T) {
+		req := newRequest()
+		options := &cacheOptions{}
+		ctxSetCacheOptions(req, options)
+		session := &user.SessionState{AccessRights: map[string]user.AccessDefinition{
+			"api": {JSONRPCMethodsAccessRights: user.AccessControlRules{Blocked: []string{"prompts/get"}}},
+		}}
+		hook := NewMCPListFilterSSEHook(spec, session, req)
+		data := `{"jsonrpc":"2.0","id":9007199254740993,"error":{"code":-32001,"message":"upstream","data":{"opaque":true}}}`
+		allowed, modified := hook.FilterEvent(&SSEEvent{Event: "message", Data: []string{data}})
+		require.True(t, allowed)
+		require.Nil(t, modified, "valid upstream error must remain byte-for-byte unchanged")
+		require.False(t, hook.Terminal())
+		require.True(t, options.responseEdited)
 	})
 
 	t.Run("concurrent terminal read and close", func(t *testing.T) {
