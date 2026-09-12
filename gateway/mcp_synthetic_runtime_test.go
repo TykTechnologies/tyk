@@ -16,7 +16,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/ee/middleware/upstreambasicauth"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/middleware"
@@ -490,6 +492,16 @@ func TestCallMCPAdapterTool_DropsUnsafeSourceOASHeaderProjection(t *testing.T) {
 	for _, managedAuth := range []bool{false, true} {
 		t.Run(fmt.Sprintf("managed_auth_%t", managedAuth), func(t *testing.T) {
 			rest := restSourceSpec("rest-headers", "org-1", true)
+			if managedAuth {
+				rest.UpstreamAuth = apidef.UpstreamAuth{
+					Enabled: true,
+					BasicAuth: apidef.UpstreamBasicAuth{
+						Enabled:  true,
+						Username: "managed-user",
+						Password: "managed-password",
+					},
+				}
+			}
 			rest.OAS.Paths.Set("/headers", &openapi3.PathItem{
 				Get: &openapi3.Operation{
 					OperationID: "read_headers",
@@ -519,18 +531,38 @@ func TestCallMCPAdapterTool_DropsUnsafeSourceOASHeaderProjection(t *testing.T) {
 				apisHandlesByID: &sync.Map{},
 			}
 			called := false
-			gw.apisHandlesByID.Store("rest-headers", &ChainObject{ThisHandler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			terminal := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				called = true
 				assert.NotContains(t, r.Header.Values("Authorization"), "attacker-value")
 				assert.Equal(t, "eu,us", r.Header.Get("X-Region"))
 				if managedAuth {
-					r.Header.Set("Authorization", "Bearer managed-source-credential")
-					assert.Equal(t, "Bearer managed-source-credential", r.Header.Get("Authorization"))
+					username, password, ok := r.BasicAuth()
+					assert.True(t, ok)
+					assert.Equal(t, "managed-user", username)
+					assert.Equal(t, "managed-password", password)
 				} else {
 					assert.Empty(t, r.Header.Get("Authorization"))
 				}
 				w.WriteHeader(http.StatusOK)
-			})})
+			})
+			var sourceChain http.Handler = terminal
+			if managedAuth {
+				base := NewBaseMiddleware(gw, rest, nil, nil)
+				authSpec := upstreambasicauth.NewAPISpec(rest.APIID, rest.Name, rest.IsOAS, rest.OAS, rest.UpstreamAuth)
+				upstreamAuth := WrapMiddleware(base, upstreambasicauth.NewMiddleware(gw, base, authSpec))
+				require.True(t, upstreamAuth.EnabledForSpec())
+				upstreamProxy := &ReverseProxy{TykAPISpec: rest, Gw: gw}
+				sourceChain = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					assert.Empty(t, r.Header.Get("Authorization"), "unsafe projection must be dropped before source auth")
+					err, status := upstreamAuth.ProcessRequest(w, r, nil)
+					require.NoError(t, err)
+					require.Equal(t, http.StatusOK, status)
+					outbound := r.Clone(r.Context())
+					upstreamProxy.addAuthInfo(outbound, r)
+					terminal.ServeHTTP(w, outbound)
+				})
+			}
+			gw.apisHandlesByID.Store("rest-headers", &ChainObject{ThisHandler: sourceChain})
 			snapshot, err := computeMCPPairing([]*APISpec{rest, proxy})
 			require.NoError(t, err)
 			gw.mcpPairingIndex.Set(snapshot)
