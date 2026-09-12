@@ -22,6 +22,9 @@ func (b *mcpOAuthBroker) brokerAEAD() (cipher.AEAD, error) {
 	if b == nil || b.gw == nil {
 		return nil, errors.New("OAuth broker encryption is not configured")
 	}
+	// Sealed records deliberately have no implicit previous-key fallback.
+	// Rotating Secret invalidates outstanding broker grants and requires clients
+	// to authorize again.
 	secret := b.gw.GetConfig().Secret
 	if secret == "" {
 		return nil, errors.New("OAuth broker encryption secret is not configured")

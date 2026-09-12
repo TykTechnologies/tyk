@@ -3,6 +3,7 @@ package gateway
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -11,11 +12,33 @@ import (
 )
 
 type mcpOAuthBearerProvider struct {
-	accessToken string
+	accessToken     string
+	targetScheme    string
+	targetAuthority string
+	targetPath      string
 }
 
 func (p mcpOAuthBearerProvider) Fill(r *http.Request) {
+	// The inbound downstream token may still be present on the cloned request.
+	// Remove it before deciding whether the final rewritten target is eligible
+	// for the broker-owned upstream credential.
+	r.Header.Del(header.Authorization)
+	if r.URL == nil || r.URL.Scheme != p.targetScheme || r.URL.Host != p.targetAuthority ||
+		r.URL.EscapedPath() != p.targetPath || r.URL.User != nil || r.URL.RawQuery != "" || r.URL.Fragment != "" {
+		return
+	}
 	r.Header.Set(header.Authorization, "Bearer "+p.accessToken)
+}
+
+func newMCPOAuthBearerProvider(resource, accessToken string) (mcpOAuthBearerProvider, error) {
+	target, err := url.Parse(resource)
+	if err != nil || !target.IsAbs() || target.Host == "" || target.User != nil || target.RawQuery != "" || target.Fragment != "" {
+		return mcpOAuthBearerProvider{}, errors.New("invalid MCP OAuth upstream resource")
+	}
+	return mcpOAuthBearerProvider{
+		accessToken: accessToken, targetScheme: target.Scheme,
+		targetAuthority: target.Host, targetPath: target.EscapedPath(),
+	}, nil
 }
 
 // MCPOAuthBrokerTokenMiddleware validates Gateway-issued resource tokens and
@@ -57,6 +80,10 @@ func (m *MCPOAuthBrokerTokenMiddleware) ProcessRequest(_ http.ResponseWriter, r 
 	} else if found {
 		return errors.New("invalid MCP OAuth access token"), http.StatusUnauthorized
 	}
-	core.SetUpstreamAuth(r, mcpOAuthBearerProvider{accessToken: grant.UpstreamAccessToken})
+	provider, err := newMCPOAuthBearerProvider(grant.UpstreamResource, grant.UpstreamAccessToken)
+	if err != nil {
+		return errors.New("invalid MCP OAuth access token"), http.StatusUnauthorized
+	}
+	core.SetUpstreamAuth(r, provider)
 	return nil, http.StatusOK
 }

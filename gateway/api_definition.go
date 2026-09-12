@@ -243,6 +243,9 @@ func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 			if err := s.MCP.OAuthBroker.Validate(s.Proxy.ListenPath); err != nil {
 				return err
 			}
+			if s.MCP.OAuthBroker.Enabled && s.UpstreamAuth.IsEnabled() {
+				return errors.New("MCP OAuth broker cannot be combined with generic upstream authentication")
+			}
 		}
 	}
 
