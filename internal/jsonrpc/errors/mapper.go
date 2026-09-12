@@ -26,8 +26,8 @@ const (
 	// CodeIPBlocked indicates the IP address is blocked (-32006).
 	CodeIPBlocked = -32006
 
-	// Modern server-defined namespace. The semantic suffix matches the legacy
-	// namespace. Their allocation is explicit and independent of legacy offsets.
+	// Modern server-defined namespace. Its semantic order is explicit and
+	// independent of the legacy offsets.
 	CodeModernServerError       = -33000
 	CodeModernAuthRequired      = -33001
 	CodeModernAccessDenied      = -33002
