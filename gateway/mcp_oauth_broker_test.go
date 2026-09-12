@@ -698,19 +698,53 @@ func TestMCPOAuthBrokerKeysShareOnlyTheirHashedAPISlot(t *testing.T) {
 func TestTrustedMCPOAuthEndpoint(t *testing.T) {
 	for _, test := range []struct {
 		name, issuer, endpoint string
+		trustedOrigins         []string
 		allowLoopback, want    bool
 	}{
 		{name: "same HTTPS authority", issuer: "https://as.example/tenant", endpoint: "https://as.example/token", want: true},
 		{name: "cross authority", issuer: "https://as.example", endpoint: "https://attacker.example/token"},
+		{name: "explicit cross authority", issuer: "https://as.example", endpoint: "https://tokens.example/token", trustedOrigins: []string{"https://tokens.example"}, want: true},
+		{name: "trusted origin is exact", issuer: "https://as.example", endpoint: "https://tokens.example.evil/token", trustedOrigins: []string{"https://tokens.example"}},
 		{name: "userinfo", issuer: "https://as.example", endpoint: "https://user@as.example/token"},
 		{name: "query", issuer: "https://as.example", endpoint: "https://as.example/token?next=attacker"},
 		{name: "loopback explicit", issuer: "http://127.0.0.1:8080", endpoint: "http://127.0.0.1:8080/token", allowLoopback: true, want: true},
 		{name: "loopback disabled", issuer: "http://127.0.0.1:8080", endpoint: "http://127.0.0.1:8080/token"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.want, trustedMCPOAuthEndpoint(test.issuer, test.endpoint, test.allowLoopback))
+			require.Equal(t, test.want, trustedMCPOAuthEndpoint(test.issuer, test.endpoint, test.allowLoopback, test.trustedOrigins...))
 		})
 	}
+}
+
+func TestMCPOAuthBrokerValidPublicRequestPreparesTrustedProxies(t *testing.T) {
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{MCP: &apidef.MCPConfig{OAuthBroker: &apidef.MCPOAuthBrokerConfig{
+			Enabled: true, PublicOrigin: "https://gateway.example",
+		}}},
+		GlobalConfig: config.Config{HttpServerOptions: config.HttpServerOptionsConfig{
+			TrustedProxyCIDRs: []string{"10.0.0.0/8"},
+		}},
+	}
+	broker := &mcpOAuthBroker{spec: spec, config: spec.MCP.OAuthBroker}
+	request := httptest.NewRequest(http.MethodGet, "http://internal.example/__tyk-as/api/token", nil)
+	request.RemoteAddr = "10.1.2.3:4321"
+	request.Header.Set("Forwarded", `for=192.0.2.10;proto=https;host=gateway.example`)
+	require.True(t, broker.validPublicRequest(request), "the broker must initialize trusted proxies on its first root-route request")
+}
+
+func TestMCPOAuthBrokerRejectsAuthorizationGrantWithoutRefresh(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"access_token":"upstream-access","token_type":"Bearer","expires_in":3600,"scope":"mcp"}`)
+	}))
+	defer server.Close()
+	brokerConfig := &apidef.MCPOAuthBrokerConfig{PublicOrigin: server.URL, AllowInsecureLoopback: true}
+	broker := &mcpOAuthBroker{spec: &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "api"}}, config: brokerConfig, client: server.Client()}
+	_, err := broker.exchangeUpstreamCode(context.Background(), mcpOAuthAuthorizationState{
+		UpstreamIssuer: server.URL, UpstreamToken: server.URL, UpstreamClientID: "client",
+		UpstreamVerifier: strings.Repeat("a", 43), UpstreamResource: server.URL + "/mcp", Scope: "mcp",
+	}, "code")
+	require.ErrorContains(t, err, "does not support refresh")
 }
 
 func TestFetchUpstreamASMetadataStrictBoundsAndIssuer(t *testing.T) {

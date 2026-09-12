@@ -139,23 +139,35 @@ func (b *mcpOAuthBroker) resolveUpstream(ctx context.Context) (map[string]any, s
 	}
 	for _, field := range []string{"authorization_endpoint", "token_endpoint"} {
 		endpoint, ok := metadata[field].(string)
-		if !ok || !trustedMCPOAuthEndpoint(issuer, endpoint, b.config.AllowInsecureLoopback) {
+		if !ok || !trustedMCPOAuthEndpoint(issuer, endpoint, b.config.AllowInsecureLoopback, b.config.TrustedEndpointOrigins...) {
 			return nil, "", fmt.Errorf("upstream metadata contains invalid %s", field)
 		}
 	}
 	return metadata, issuer, nil
 }
 
-func trustedMCPOAuthEndpoint(issuer, endpoint string, allowInsecureLoopback bool) bool {
+func trustedMCPOAuthEndpoint(issuer, endpoint string, allowInsecureLoopback bool, trustedOrigins ...string) bool {
 	issuerURL, issuerErr := url.Parse(issuer)
 	endpointURL, endpointErr := url.Parse(endpoint)
 	if issuerErr != nil || endpointErr != nil || !endpointURL.IsAbs() || endpointURL.User != nil ||
 		endpointURL.RawQuery != "" || endpointURL.Fragment != "" ||
-		issuerURL.Scheme != endpointURL.Scheme || issuerURL.Host != endpointURL.Host {
+		issuerURL.Scheme == "" || issuerURL.Host == "" {
 		return false
 	}
-	return endpointURL.Scheme == "https" ||
+	secure := endpointURL.Scheme == "https" ||
 		(endpointURL.Scheme == "http" && allowInsecureLoopback && isLoopbackURL(endpointURL))
+	if !secure {
+		return false
+	}
+	endpointOrigin, err := internalhttputil.CanonicalOrigin(endpointURL.Scheme + "://" + endpointURL.Host)
+	if err != nil {
+		return false
+	}
+	issuerOrigin, err := internalhttputil.CanonicalOrigin(issuerURL.Scheme + "://" + issuerURL.Host)
+	if err == nil && endpointOrigin == issuerOrigin {
+		return true
+	}
+	return slices.Contains(trustedOrigins, endpointOrigin)
 }
 
 func (b *mcpOAuthBroker) metadataHandler(w http.ResponseWriter, r *http.Request) {
@@ -234,7 +246,7 @@ func (b *mcpOAuthBroker) registrationHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	registrationEndpoint, ok := metadata["registration_endpoint"].(string)
-	if !ok || !trustedMCPOAuthEndpoint(upstreamIssuer, registrationEndpoint, b.config.AllowInsecureLoopback) {
+	if !ok || !trustedMCPOAuthEndpoint(upstreamIssuer, registrationEndpoint, b.config.AllowInsecureLoopback, b.config.TrustedEndpointOrigins...) {
 		mcpOAuthError(w, http.StatusBadGateway, "temporarily_unavailable")
 		return
 	}
@@ -436,6 +448,9 @@ func (b *mcpOAuthBroker) validMapping(mapping mcpOAuthClientMapping, redirectURI
 }
 
 func (b *mcpOAuthBroker) validPublicRequest(r *http.Request) bool {
+	if err := b.spec.prepareMCPOriginConfig(); err != nil {
+		return false
+	}
 	origin, err := internalhttputil.ExternalOriginWithTrustedProxies(r, b.spec.mcpTrustedProxyPrefixes)
 	return err == nil && origin == b.config.PublicOrigin
 }

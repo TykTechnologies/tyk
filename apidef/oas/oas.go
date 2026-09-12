@@ -794,11 +794,12 @@ func (s *OAS) validateMCPOrigins(isMCP bool) error {
 	}
 	broker := ext.Server.MCP.OAuthBroker
 	return (&apidef.MCPOAuthBrokerConfig{
-		Enabled:               broker.Enabled,
-		PublicOrigin:          broker.PublicOrigin,
-		PublicResource:        broker.PublicResource,
-		UpstreamResource:      broker.UpstreamResource,
-		AllowInsecureLoopback: broker.AllowInsecureLoopback,
+		Enabled:                broker.Enabled,
+		PublicOrigin:           broker.PublicOrigin,
+		PublicResource:         broker.PublicResource,
+		UpstreamResource:       broker.UpstreamResource,
+		TrustedEndpointOrigins: append([]string(nil), broker.TrustedEndpointOrigins...),
+		AllowInsecureLoopback:  broker.AllowInsecureLoopback,
 	}).Validate(ext.Server.ListenPath.Value)
 }
 
