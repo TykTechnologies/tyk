@@ -27,10 +27,17 @@ func writeMCPJSONRPCError(w http.ResponseWriter, r *http.Request, httpCode int, 
 	} else if protocolContext := httpctx.GetMCPProtocolContext(r); protocolContext != nil && protocolContext.Envelope != nil {
 		requestID = protocolContext.Envelope.ID
 	}
-	code := jsonrpcerrors.SelectJSONRPCCode(httpCode, ctx.GetErrorClassification(r), httpctx.GetMCPProtocolContext(r))
-	ctxSetJSONRPCErrorCode(r, code)
+	code := selectAndStoreMCPJSONRPCCode(r, httpCode)
 	if ingress := httpctx.GetMCPProtocolContext(r); ingress != nil {
 		ingress.Validation = mcp.ProtocolValidation{Checked: true, Code: code, Message: detail, HTTPStatus: httpCode}
 	}
 	return jsonrpcerrors.WriteJSONRPCErrorWithCode(w, requestID, httpCode, code, detail)
+}
+
+// selectAndStoreMCPJSONRPCCode chooses the request's final error code and makes
+// that same value available to logging and analytics.
+func selectAndStoreMCPJSONRPCCode(r *http.Request, httpCode int) int {
+	code := jsonrpcerrors.SelectJSONRPCCode(httpCode, ctx.GetErrorClassification(r), httpctx.GetMCPProtocolContext(r))
+	ctxSetJSONRPCErrorCode(r, code)
+	return code
 }

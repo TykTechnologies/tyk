@@ -335,12 +335,16 @@ func TestCallMCPAdapterTool_RejectsToolHiddenFromCallerProxy(t *testing.T) {
 }
 
 func TestCallMCPAdapterTool_LogsToolHiddenFromCallerProxy(t *testing.T) {
-	logger, hook := logrustest.NewNullLogger()
-	logger.SetLevel(logrus.WarnLevel)
-	originalLog := log
-	log = logger
+	hook := &logrustest.Hook{}
+	originalLevel := log.GetLevel()
+	originalHooks := log.ReplaceHooks(make(logrus.LevelHooks))
+	installedHooks := cloneLogrusHooks(originalHooks)
+	installedHooks.Add(hook)
+	log.ReplaceHooks(installedHooks)
+	log.SetLevel(logrus.WarnLevel)
 	t.Cleanup(func() {
-		log = originalLog
+		log.SetLevel(originalLevel)
+		log.ReplaceHooks(originalHooks)
 	})
 
 	gw, adapterSpec, sourceCalled := syntheticAdapterGatewayForCallTest(t)
@@ -366,6 +370,14 @@ func TestCallMCPAdapterTool_LogsToolHiddenFromCallerProxy(t *testing.T) {
 	assert.Equal(t, "rest-1", warningEntry.Data["source_rest_api_id"])
 	assert.Equal(t, adapterSpec.APIID, warningEntry.Data["adapter_api_id"])
 	assert.NotContains(t, warningEntry.Data, "session_key")
+}
+
+func cloneLogrusHooks(hooks logrus.LevelHooks) logrus.LevelHooks {
+	cloned := make(logrus.LevelHooks, len(hooks))
+	for level, levelHooks := range hooks {
+		cloned[level] = append([]logrus.Hook(nil), levelHooks...)
+	}
+	return cloned
 }
 
 func TestCallMCPAdapterTool_RunsSourceRESTMiddlewareChain(t *testing.T) {
