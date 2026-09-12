@@ -3,10 +3,293 @@ package mcp
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"slices"
 
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )
+
+// FilterDiscoveryBody intersects an upstream server/discover result with the
+// Gateway's routable versions and filters known capabilities using JSON-RPC
+// method rules. Unknown result, capability, metadata, and extension fields are
+// retained byte-for-byte until an actual edit requires re-encoding.
+//
+// Applicable credential method rules make every discovery result private,
+// including results whose advertised capabilities already satisfy the rules.
+func FilterDiscoveryBody(body []byte, globalRules, credentialRules []user.AccessControlRules, endpoints ...ProtocolSupport) (filtered []byte, changed, credentialSpecific bool, invalid error) {
+	envelope, err := decodeOwnedJSONObject(body, "JSON-RPC response", map[string]struct{}{
+		"jsonrpc": {}, "id": {}, "method": {}, "result": {}, "error": {},
+	})
+	if err != nil {
+		return nil, false, false, err
+	}
+	var version string
+	if raw, ok := envelope["jsonrpc"]; !ok || json.Unmarshal(raw, &version) != nil || version != "2.0" {
+		return nil, false, false, invalidDiscovery("missing or invalid jsonrpc version")
+	}
+	if raw, ok := envelope["id"]; !ok || !validJSONRPCResponseID(raw) {
+		return nil, false, false, invalidDiscovery("missing or invalid response id")
+	}
+	if _, present := envelope["method"]; present {
+		return nil, false, false, invalidDiscovery("response must not contain a method")
+	}
+	resultRaw, hasResult := envelope["result"]
+	errorRaw, hasError := envelope["error"]
+	if hasResult == hasError {
+		return nil, false, false, invalidDiscovery("response must contain exactly one of result or error")
+	}
+	credentialSpecific = hasFilterRules(credentialRules)
+	if hasError {
+		errorFields, err := decodeOwnedJSONObject(errorRaw, "JSON-RPC error", map[string]struct{}{"code": {}, "message": {}, "data": {}})
+		if err != nil {
+			return nil, false, false, err
+		}
+		var code json.Number
+		codeDecoder := json.NewDecoder(bytes.NewReader(errorFields["code"]))
+		codeDecoder.UseNumber()
+		if codeDecoder.Decode(&code) != nil {
+			return nil, false, false, invalidDiscovery("missing or invalid JSON-RPC error code")
+		}
+		if _, err := code.Int64(); err != nil {
+			return nil, false, false, invalidDiscovery("JSON-RPC error code must be an integer")
+		}
+		var message string
+		if json.Unmarshal(errorFields["message"], &message) != nil {
+			return nil, false, false, invalidDiscovery("missing or invalid JSON-RPC error message")
+		}
+		return nil, false, credentialSpecific, nil
+	}
+	result, err := decodeOwnedJSONObject(resultRaw, "discovery result", map[string]struct{}{
+		"supportedVersions": {}, "capabilities": {},
+	})
+	if err != nil {
+		return nil, false, false, err
+	}
+	versionsRaw, present := result["supportedVersions"]
+	if !present {
+		return nil, false, false, invalidDiscovery("missing supportedVersions")
+	}
+	var upstream []string
+	if json.Unmarshal(versionsRaw, &upstream) != nil || upstream == nil {
+		return nil, false, false, invalidDiscovery("supportedVersions must be a non-null string array")
+	}
+	capabilitiesRaw, present := result["capabilities"]
+	if !present {
+		return nil, false, false, invalidDiscovery("missing capabilities")
+	}
+	ownedCapabilities := make(map[string]struct{}, len(InitializeCapabilityMethods))
+	for capability := range InitializeCapabilityMethods {
+		ownedCapabilities[capability] = struct{}{}
+	}
+	capabilities, err := decodeOwnedJSONObject(capabilitiesRaw, "discovery capabilities", ownedCapabilities)
+	if err != nil {
+		return nil, false, false, err
+	}
+
+	versionsSupported := ServedProtocolVersions()
+	if len(endpoints) > 0 && endpoints[0] != nil {
+		versionsSupported = endpoints[0].SupportedProtocolVersions()
+	}
+	upstreamSet := make(map[string]struct{}, len(upstream))
+	for _, version := range upstream {
+		upstreamSet[version] = struct{}{}
+	}
+	versions := make([]string, 0, len(versionsSupported))
+	for _, served := range versionsSupported {
+		if _, supported := upstreamSet[served]; supported {
+			versions = append(versions, served)
+		}
+	}
+	if !slices.Equal(versions, upstream) {
+		encodedVersions, err := json.Marshal(versions)
+		if err != nil {
+			return nil, false, false, invalidDiscovery("encode filtered versions")
+		}
+		result["supportedVersions"] = encodedVersions
+		changed = true
+	}
+
+	capabilitiesChanged := false
+	for capability, methods := range InitializeCapabilityMethods {
+		if _, advertised := capabilities[capability]; !advertised {
+			continue
+		}
+		globalDenied := AnyMethodDenied(globalRules, methods)
+		credentialDenied := AnyMethodDenied(credentialRules, methods)
+		if !globalDenied && !credentialDenied {
+			continue
+		}
+		delete(capabilities, capability)
+		capabilitiesChanged = true
+		credentialSpecific = credentialSpecific || (!globalDenied && credentialDenied)
+	}
+	if capabilitiesChanged {
+		encodedCapabilities, err := json.Marshal(capabilities)
+		if err != nil {
+			return nil, false, false, invalidDiscovery("encode filtered capabilities")
+		}
+		result["capabilities"] = encodedCapabilities
+		changed = true
+	}
+
+	if !changed && !credentialSpecific {
+		return nil, false, false, nil
+	}
+	if credentialSpecific {
+		SetPrivateCacheHints(result)
+	}
+	resultBytes, err := json.Marshal(result)
+	if err != nil {
+		return nil, false, false, invalidDiscovery("encode discovery result")
+	}
+	envelope["result"] = resultBytes
+	filtered, err = json.Marshal(envelope)
+	if err != nil {
+		return nil, false, false, invalidDiscovery("encode discovery response")
+	}
+	return filtered, true, credentialSpecific, nil
+}
+
+// InvalidDiscoveryError reports an upstream discovery response that cannot be
+// safely interpreted for policy and version enforcement.
+type InvalidDiscoveryError struct{ Reason string }
+
+func (e *InvalidDiscoveryError) Error() string { return "invalid MCP discovery response: " + e.Reason }
+
+func invalidDiscovery(reason string) error { return &InvalidDiscoveryError{Reason: reason} }
+
+func IsInvalidDiscoveryError(err error) bool {
+	var target *InvalidDiscoveryError
+	return errors.As(err, &target)
+}
+
+func validJSONRPCResponseID(raw json.RawMessage) bool {
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return true
+	}
+	var value any
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	if decoder.Decode(&value) != nil {
+		return false
+	}
+	switch value.(type) {
+	case string, json.Number:
+		return true
+	default:
+		return false
+	}
+}
+
+// JSONRPCResponseIDMatches compares a response ID with the trusted request ID
+// without converting numeric identities through float64.
+func JSONRPCResponseIDMatches(body []byte, expected any) bool {
+	present, matches, err := JSONRPCResponseIDStatus(body, expected)
+	return err == nil && present && matches
+}
+
+// JSONRPCResponseIDStatus reports whether an exact, valid response ID is
+// present and matches the trusted request ID.
+func JSONRPCResponseIDStatus(body []byte, expected any) (present, matches bool, err error) {
+	fields, err := decodeOwnedJSONObject(body, "JSON-RPC response", map[string]struct{}{"id": {}})
+	if err != nil {
+		return false, false, err
+	}
+	raw, ok := fields["id"]
+	if !ok {
+		return false, false, nil
+	}
+	if !validJSONRPCResponseID(raw) {
+		return true, false, invalidDiscovery("invalid response id")
+	}
+	var actual any
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	if decoder.Decode(&actual) != nil {
+		return true, false, invalidDiscovery("invalid response id")
+	}
+	switch actualValue := actual.(type) {
+	case nil:
+		return true, expected == nil, nil
+	case string:
+		expectedValue, ok := expected.(string)
+		return true, ok && actualValue == expectedValue, nil
+	case json.Number:
+		expectedBytes, err := json.Marshal(expected)
+		return true, err == nil && string(bytes.TrimSpace(expectedBytes)) == actualValue.String(), nil
+	default:
+		return true, false, invalidDiscovery("invalid response id")
+	}
+}
+
+// ValidateJSONRPCServerMessage validates an unrelated server request or
+// notification while a discovery response is pending.
+func ValidateJSONRPCServerMessage(body []byte) error {
+	fields, err := decodeOwnedJSONObject(body, "JSON-RPC server message", map[string]struct{}{
+		"jsonrpc": {}, "id": {}, "method": {}, "params": {}, "result": {}, "error": {},
+	})
+	if err != nil {
+		return err
+	}
+	var version, method string
+	if json.Unmarshal(fields["jsonrpc"], &version) != nil || version != "2.0" {
+		return invalidDiscovery("missing or invalid server message jsonrpc version")
+	}
+	if json.Unmarshal(fields["method"], &method) != nil || method == "" {
+		return invalidDiscovery("missing or invalid server message method")
+	}
+	if _, present := fields["result"]; present {
+		return invalidDiscovery("server message must not contain a result")
+	}
+	if _, present := fields["error"]; present {
+		return invalidDiscovery("server message must not contain an error")
+	}
+	if raw, present := fields["id"]; present && !validJSONRPCResponseID(raw) {
+		return invalidDiscovery("invalid server message id")
+	}
+	return nil
+}
+
+func decodeOwnedJSONObject(raw []byte, label string, owned map[string]struct{}) (map[string]json.RawMessage, error) {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	token, err := decoder.Token()
+	if err != nil {
+		return nil, invalidDiscovery("malformed " + label)
+	}
+	if delimiter, ok := token.(json.Delim); !ok || delimiter != '{' {
+		return nil, invalidDiscovery(label + " must be a non-null object")
+	}
+	fields := make(map[string]json.RawMessage)
+	seen := make(map[string]struct{})
+	for decoder.More() {
+		keyToken, err := decoder.Token()
+		if err != nil {
+			return nil, invalidDiscovery("malformed " + label)
+		}
+		key := keyToken.(string)
+		var value json.RawMessage
+		if err := decoder.Decode(&value); err != nil {
+			return nil, invalidDiscovery("malformed " + label)
+		}
+		if _, relevant := owned[key]; relevant {
+			if _, duplicate := seen[key]; duplicate {
+				return nil, invalidDiscovery(fmt.Sprintf("duplicate %s field %q", label, key))
+			}
+			seen[key] = struct{}{}
+		}
+		fields[key] = value
+	}
+	if _, err := decoder.Token(); err != nil {
+		return nil, invalidDiscovery("malformed " + label)
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return nil, invalidDiscovery("multiple JSON values in " + label)
+	}
+	return fields, nil
+}
 
 // ListFilterConfig holds the configuration for filtering a specific list method.
 type ListFilterConfig struct {
