@@ -16,6 +16,7 @@ func TestServer(t *testing.T) {
 			OAuthBroker: &MCPOAuthBroker{
 				Enabled: true, PublicOrigin: "https://gateway.example",
 				PublicResource: "https://gateway.example/mcp/", UpstreamResource: "https://upstream.example/mcp",
+				TrustedEndpointOrigins: []string{"https://tokens.example"},
 			},
 		}}
 		var classic apidef.APIDefinition
