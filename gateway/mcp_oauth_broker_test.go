@@ -78,6 +78,18 @@ func (s faultingMCPOAuthBrokerStore) Put(ctx context.Context, key string, value 
 	return s.mcpOAuthBrokerStore.Put(ctx, key, value, ttl)
 }
 
+func (s faultingMCPOAuthBrokerStore) RegisterClient(ctx context.Context, indexKey, clientKey, member string, value []byte, ttl time.Duration, limit int64) error {
+	if strings.Contains(clientKey, s.putPrefix) && s.putPrefix != "" {
+		return errors.New("injected OAuth broker client registration failure")
+	}
+	return s.mcpOAuthBrokerStore.RegisterClient(ctx, indexKey, clientKey, member, value, ttl, limit)
+}
+
+func (s cancelOnMCPOAuthClientPutStore) RegisterClient(ctx context.Context, indexKey, clientKey, member string, value []byte, ttl time.Duration, limit int64) error {
+	s.cancel()
+	return errors.New("injected persistence failure after request cancellation")
+}
+
 type mcpOAuthBrokerUpstreamCapture struct {
 	mu                    sync.Mutex
 	metadataHeaders       []http.Header
@@ -328,6 +340,30 @@ func registerMCPBrokerClient(t *testing.T, ts *Test, redirectURI string) string 
 	return clientID
 }
 
+type mcpBrokerRegistration struct {
+	ClientID                string `json:"client_id"`
+	RegistrationClientURI   string `json:"registration_client_uri"`
+	RegistrationAccessToken string `json:"registration_access_token"`
+}
+
+func registerManagedMCPBrokerClient(t *testing.T, ts *Test, redirectURI string) mcpBrokerRegistration {
+	t.Helper()
+	body, err := json.Marshal(map[string]any{
+		"redirect_uris": []string{redirectURI}, "token_endpoint_auth_method": "none", "client_name": "managed fixture",
+	})
+	require.NoError(t, err)
+	response, _ := ts.Run(t, test.TestCase{
+		Method: http.MethodPost, Path: "/__tyk-as/test/register", Data: string(body),
+		Headers: map[string]string{"Content-Type": "application/json"}, Code: http.StatusCreated,
+	})
+	var registration mcpBrokerRegistration
+	require.NoError(t, json.NewDecoder(response.Body).Decode(&registration))
+	require.NotEmpty(t, registration.ClientID)
+	require.Equal(t, ts.URL+"/__tyk-as/test/register/"+registration.ClientID, registration.RegistrationClientURI)
+	require.NotEmpty(t, registration.RegistrationAccessToken)
+	return registration
+}
+
 func runMCPBrokerRegistrationWithFailedPersistence(t *testing.T, ts *Test) *httptest.ResponseRecorder {
 	t.Helper()
 	broker := newMCPOAuthBroker(ts.Gw, ts.Gw.getApiSpec("test"))
@@ -472,6 +508,171 @@ func TestMCPOAuthBrokerDCRRejectsInvalidManagementMetadata(t *testing.T) {
 			capture.mu.Unlock()
 		})
 	}
+}
+
+func TestMCPOAuthBrokerDCRManagementCredentialsAreSealed(t *testing.T) {
+	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
+	registration := registerManagedMCPBrokerClient(t, ts, "https://client.example/callback")
+	broker := newMCPOAuthBroker(ts.Gw, ts.Gw.getApiSpec("test"))
+	clientKey := broker.clientKey(registration.ClientID)
+	sealed, found, err := broker.store.Get(context.Background(), clientKey)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.NotContains(t, string(sealed), capture.registrationToken)
+	require.NotContains(t, string(sealed), registration.RegistrationAccessToken)
+
+	var mapping mcpOAuthClientMapping
+	require.NoError(t, broker.openRecord(clientKey, sealed, &mapping))
+	require.Equal(t, capture.registrationToken, mapping.UpstreamManagementToken)
+	require.Equal(t, mcpOAuthManagementTokenHash(registration.RegistrationAccessToken), mapping.ManagementTokenHash)
+	require.NotEqual(t, registration.RegistrationAccessToken, mapping.ManagementTokenHash)
+}
+
+func TestMCPOAuthBrokerDCRAuthenticatedDelete(t *testing.T) {
+	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
+	registration := registerManagedMCPBrokerClient(t, ts, "https://client.example/callback")
+	managementURL, err := url.Parse(registration.RegistrationClientURI)
+	require.NoError(t, err)
+
+	wrong, _ := ts.Run(t, test.TestCase{
+		Method: http.MethodDelete, Path: managementURL.Path,
+		Headers: map[string]string{header.Authorization: "Bearer wrong-token"}, Code: http.StatusUnauthorized,
+	})
+	require.Equal(t, `Bearer error="invalid_token"`, wrong.Header.Get("WWW-Authenticate"))
+	require.Equal(t, "no-store", wrong.Header.Get(header.CacheControl))
+
+	deleted, _ := ts.Run(t, test.TestCase{
+		Method: http.MethodDelete, Path: managementURL.Path,
+		Headers: map[string]string{header.Authorization: "Bearer " + registration.RegistrationAccessToken}, Code: http.StatusNoContent,
+	})
+	require.Equal(t, "no-store", deleted.Header.Get(header.CacheControl))
+
+	replayed, _ := ts.Run(t, test.TestCase{
+		Method: http.MethodDelete, Path: managementURL.Path,
+		Headers: map[string]string{header.Authorization: "Bearer " + registration.RegistrationAccessToken}, Code: http.StatusUnauthorized,
+	})
+	require.Equal(t, `Bearer error="invalid_token"`, replayed.Header.Get("WWW-Authenticate"))
+
+	capture.mu.Lock()
+	defer capture.mu.Unlock()
+	require.Equal(t, 1, capture.registrationDeletes)
+	require.Equal(t, "Bearer "+capture.registrationToken, capture.lastDeleteAuth)
+	require.Zero(t, capture.unrelatedDeletes)
+}
+
+func TestMCPOAuthBrokerDCRDeleteRestoresMappingAfterUpstreamFailure(t *testing.T) {
+	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
+	registration := registerManagedMCPBrokerClient(t, ts, "https://client.example/callback")
+	managementURL, err := url.Parse(registration.RegistrationClientURI)
+	require.NoError(t, err)
+	capture.mu.Lock()
+	capture.deleteStatus = http.StatusInternalServerError
+	capture.mu.Unlock()
+
+	ts.Run(t, test.TestCase{
+		Method: http.MethodDelete, Path: managementURL.Path,
+		Headers: map[string]string{header.Authorization: "Bearer " + registration.RegistrationAccessToken}, Code: http.StatusBadGateway,
+	})
+	broker := newMCPOAuthBroker(ts.Gw, ts.Gw.getApiSpec("test"))
+	var restored mcpOAuthClientMapping
+	found, err := broker.getRecord(context.Background(), broker.clientKey(registration.ClientID), &restored)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, registration.ClientID, restored.DownstreamClientID)
+
+	capture.mu.Lock()
+	capture.deleteStatus = http.StatusNoContent
+	capture.mu.Unlock()
+	ts.Run(t, test.TestCase{
+		Method: http.MethodDelete, Path: managementURL.Path,
+		Headers: map[string]string{header.Authorization: "Bearer " + registration.RegistrationAccessToken}, Code: http.StatusNoContent,
+	})
+}
+
+func TestMCPOAuthBrokerDCRConcurrentDeleteCallsUpstreamOnce(t *testing.T) {
+	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
+	registration := registerManagedMCPBrokerClient(t, ts, "https://client.example/callback")
+	const attempts = 16
+	statuses := make(chan int, attempts)
+	var wg sync.WaitGroup
+	for range attempts {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			request, err := http.NewRequest(http.MethodDelete, registration.RegistrationClientURI, nil)
+			if err != nil {
+				statuses <- 0
+				return
+			}
+			request.Header.Set(header.Authorization, "Bearer "+registration.RegistrationAccessToken)
+			response, err := http.DefaultClient.Do(request)
+			if err != nil {
+				statuses <- 0
+				return
+			}
+			_ = response.Body.Close()
+			statuses <- response.StatusCode
+		}()
+	}
+	wg.Wait()
+	close(statuses)
+	succeeded := 0
+	unauthorized := 0
+	for status := range statuses {
+		switch status {
+		case http.StatusNoContent:
+			succeeded++
+		case http.StatusUnauthorized:
+			unauthorized++
+		default:
+			t.Fatalf("unexpected concurrent deletion status %d", status)
+		}
+	}
+	require.Equal(t, 1, succeeded)
+	require.Equal(t, attempts-1, unauthorized)
+	capture.mu.Lock()
+	defer capture.mu.Unlock()
+	require.Equal(t, 1, capture.registrationDeletes)
+}
+
+func TestRedisMCPOAuthBrokerRegistrationLimitIsAtomicAndExpires(t *testing.T) {
+	ts, _, _ := newMCPBrokerTest(t, "/mcp/")
+	broker := newMCPOAuthBroker(ts.Gw, ts.Gw.getApiSpec("test"))
+	stores := []mcpOAuthBrokerStore{newRedisMCPOAuthBrokerStore(ts.Gw), newRedisMCPOAuthBrokerStore(ts.Gw)}
+	suffix, err := randomMCPOAuthValue()
+	require.NoError(t, err)
+	indexKey := mcpOAuthBrokerKey("client-limit-test", broker.spec.OrgID, broker.spec.APIID, suffix)
+	const limit = int64(5)
+	const attempts = 24
+	ttl := 500 * time.Millisecond
+	var successes atomic.Int64
+	var unexpected atomic.Int64
+	var wg sync.WaitGroup
+	for index := 0; index < attempts; index++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			clientKey := mcpOAuthBrokerKey("client-limit-record", broker.spec.OrgID, broker.spec.APIID, suffix, fmt.Sprint(index))
+			err := stores[index%len(stores)].RegisterClient(context.Background(), indexKey, clientKey, clientKey,
+				[]byte("sealed-placeholder"), ttl, limit)
+			switch {
+			case err == nil:
+				successes.Add(1)
+			case errors.Is(err, errMCPOAuthBrokerClientLimit):
+			default:
+				unexpected.Add(1)
+			}
+		}(index)
+	}
+	wg.Wait()
+	require.Equal(t, limit, successes.Load())
+	require.Zero(t, unexpected.Load())
+
+	require.Eventually(t, func() bool {
+		clientKey := mcpOAuthBrokerKey("client-limit-record", broker.spec.OrgID, broker.spec.APIID, suffix, "after-expiry")
+		return stores[0].RegisterClient(context.Background(), indexKey, clientKey, clientKey,
+			[]byte("sealed-placeholder"), ttl, limit) == nil
+	}, 3*time.Second, 50*time.Millisecond)
 }
 
 func TestMCPOAuthBrokerDCRAndAuthorizeFoundation(t *testing.T) {
