@@ -184,7 +184,9 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			// Direct JSON-RPC rejections have already written their response. Record
 			// them through the normal error analytics path exactly once.
-			if err == nil && errCode == middleware.StatusRespond && mw.Base().Spec.IsMCP() && ctxGetJSONRPCErrorCode(r) != 0 {
+			ingress := httpctx.GetMCPProtocolContext(r)
+			protocolRejected := ingress != nil && ingress.Validation.HTTPStatus >= 400
+			if err == nil && errCode == middleware.StatusRespond && mw.Base().Spec.IsMCP() && (ctxGetJSONRPCErrorCode(r) != 0 || protocolRejected) {
 				status, message := http.StatusForbidden, "MCP request rejected"
 				if ingress := httpctx.GetMCPProtocolContext(r); ingress != nil && ingress.Validation.HTTPStatus != 0 {
 					status, message = ingress.Validation.HTTPStatus, ingress.Validation.Message

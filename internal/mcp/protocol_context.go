@@ -11,6 +11,8 @@ const (
 	HeaderProtocolVersion = "Mcp-Protocol-Version"
 	// HeaderSessionID carries the stateful MCP session identifier.
 	HeaderSessionID = "Mcp-Session-Id"
+	// HeaderLastEventID carries the resumable SSE event cursor.
+	HeaderLastEventID = "Last-Event-ID"
 	// MetaKeyProtocolVersion is the modern namespaced metadata declaration.
 	MetaKeyProtocolVersion = "io.modelcontextprotocol/protocolVersion"
 	// LegacyFallbackProtocolVersion is the effective version for established
@@ -67,6 +69,11 @@ type ProtocolContext struct {
 	MetadataProtocolVersion   string
 	InitializeProtocolVersion string
 	BodyProtocolVersionRaw    json.RawMessage
+	Metadata                  map[string]json.RawMessage
+	ClientCapabilities        json.RawMessage
+	ClientInfo                json.RawMessage
+	MetadataProtocolPresent   bool
+	MetadataProtocolValid     bool
 	HasSession                bool
 	DeclarationMismatch       bool
 
@@ -144,11 +151,17 @@ func (c *ProtocolContext) extractBodyProtocolVersion() (version string, declared
 	if rawMeta, ok := params["_meta"]; ok {
 		var metadata map[string]json.RawMessage
 		if json.Unmarshal(rawMeta, &metadata) == nil {
+			c.Metadata = metadata
+			c.ClientCapabilities = metadata[MetaKeyClientCapabilities]
+			c.ClientInfo = metadata[MetaKeyClientInfo]
 			if raw, exists := metadata[MetaKeyProtocolVersion]; exists {
+				c.MetadataProtocolPresent = true
 				c.BodyProtocolVersionRaw = append([]byte(nil), raw...)
 				declared = true
 				if json.Unmarshal(raw, &c.MetadataProtocolVersion) != nil || c.MetadataProtocolVersion == "" {
 					mismatch = true
+				} else {
+					c.MetadataProtocolValid = true
 				}
 			}
 		}

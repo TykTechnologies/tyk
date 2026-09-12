@@ -208,6 +208,13 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 				r.Header.Get(mcp.HeaderProtocolVersion), r.Header.Get(mcp.HeaderSessionID), nil, nil,
 			))
 		}
+		if ingress := httpctx.GetMCPProtocolContext(r); ingress != nil && ingress.IsModern() && r.Method == http.MethodPost {
+			m.writeJSONRPCError(w, r, nil, mcp.JSONRPCInvalidRequest, "modern MCP POST requires application/json", nil)
+			return nil, middleware.StatusRespond
+		}
+		if rejectModernMCPHTTPMethod(w, r) {
+			return nil, middleware.StatusRespond
+		}
 		if m.Spec.IsSyntheticMCPAdapter() {
 			return m.processSyntheticMCPAdapterRequest(w, r)
 		}
@@ -219,6 +226,17 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		// Error response already written by readAndParseJSONRPC
 		return nil, middleware.StatusRespond //nolint:nilerr
+	}
+	ctxSetMCPMethod(r, rpcReq.Method)
+	ctxSetMCPPrimitiveType(r, primitiveTypeForMethod(rpcReq.Method))
+	switch rpcReq.Method {
+	case mcp.MethodToolsCall, mcp.MethodPromptsGet:
+		ctxSetMCPPrimitiveName(r, mcp.ExtractStringField(rpcReq.Params, "name"))
+	case mcp.MethodResourcesRead:
+		ctxSetMCPPrimitiveName(r, mcp.ExtractStringField(rpcReq.Params, "uri"))
+	}
+	if !m.validateMCPIngress(w, r) {
+		return nil, middleware.StatusRespond
 	}
 	if m.Spec.IsSyntheticMCPAdapter() {
 		return m.processSyntheticMCPAdapterRequest(w, r)
@@ -328,6 +346,8 @@ func (m *JSONRPCMiddleware) mapJSONRPCErrorToHTTP(code int) int {
 		return http.StatusBadRequest
 	case code == mcp.JSONRPCMethodNotFound:
 		return http.StatusNotFound
+	case code == mcp.CodeHeaderMismatch || code == mcp.CodeMissingRequiredClientCapabilities || code == mcp.CodeUnsupportedProtocolVersion:
+		return http.StatusBadRequest
 	case code == mcp.JSONRPCInvalidParams:
 		return http.StatusBadRequest
 	case code >= -32099 && code <= -32000:
