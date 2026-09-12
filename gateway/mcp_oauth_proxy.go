@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 )
 
 // mcpASProxyPathPrefix is the base under which Tyk publishes per-API
@@ -307,8 +308,10 @@ func fetchUpstreamASMetadataWithClient(ctx context.Context, baseClient *http.Cli
 			lastErr = fmt.Errorf("AS metadata %s exceeds %d bytes", candidate, maxUpstreamASMetadataBytes)
 			continue
 		}
-		var doc map[string]any
-		if err := json.Unmarshal(body, &doc); err != nil {
+		doc, err := mcp.DecodeDiscoveryObject(body, maxUpstreamASMetadataBytes,
+			"issuer", "authorization_endpoint", "token_endpoint", "registration_endpoint",
+			"authorization_response_iss_parameter_supported")
+		if err != nil {
 			lastErr = fmt.Errorf("AS metadata %s decode: %w", candidate, err)
 			continue
 		}

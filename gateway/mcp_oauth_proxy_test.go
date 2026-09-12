@@ -310,6 +310,30 @@ func TestFetchUpstreamASMetadata_BadURL(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestFetchUpstreamASMetadata_RejectsAmbiguousIssuer(t *testing.T) {
+	for name, document := range map[string]func(string) string{
+		"duplicate": func(serverURL string) string {
+			return fmt.Sprintf(`{"issuer":"https://evil.example","issuer":%q,"authorization_endpoint":%q,"token_endpoint":%q}`, serverURL, serverURL+"/authorize", serverURL+"/token")
+		},
+		"case alias": func(serverURL string) string {
+			return fmt.Sprintf(`{"Issuer":"https://evil.example","issuer":%q,"authorization_endpoint":%q,"token_endpoint":%q}`, serverURL, serverURL+"/authorize", serverURL+"/token")
+		},
+		"trailing": func(serverURL string) string {
+			return fmt.Sprintf(`{"issuer":%q,"authorization_endpoint":%q,"token_endpoint":%q}{}`, serverURL, serverURL+"/authorize", serverURL+"/token")
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var server *httptest.Server
+			server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = fmt.Fprint(w, document(server.URL))
+			}))
+			defer server.Close()
+			_, err := fetchUpstreamASMetadataWithClient(context.Background(), server.Client(), server.URL, true)
+			require.Error(t, err)
+		})
+	}
+}
+
 // TestRegisterMCPPRMSuffixRoutes_EarlyReturns covers the four early-exit
 // guards in registerMCPPRMSuffixRoutes (nil spec, non-MCP, no PRM, root
 // listen path) — they're no-ops, so the test asserts that no panic

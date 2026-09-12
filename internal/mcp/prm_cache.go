@@ -18,6 +18,8 @@ import (
 // against upstream OAuth metadata endpoints (which change rarely).
 const DefaultPRMCacheTTL = 5 * time.Minute
 
+const maxUpstreamPRMBytes = 64 << 10
+
 // PRMDocument is a minimally-typed representation of an RFC 9728 Protected
 // Resource Metadata document. We keep the parsed map alongside so unknown
 // fields round-trip when we re-serialise after rewriting `resource`.
@@ -146,7 +148,15 @@ func FetchUpstreamPRM(ctx context.Context, client *http.Client, prmURL string) (
 	}
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := client.Do(req)
+	if client == nil {
+		client = http.DefaultClient
+	}
+	boundedClient := *client
+	boundedClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	if boundedClient.Timeout == 0 || boundedClient.Timeout > 10*time.Second {
+		boundedClient.Timeout = 10 * time.Second
+	}
+	resp, err := boundedClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetch upstream PRM: %w", err)
 	}
@@ -160,9 +170,30 @@ func FetchUpstreamPRM(ctx context.Context, client *http.Client, prmURL string) (
 		return nil, fmt.Errorf("upstream PRM returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
-	var raw map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxUpstreamPRMBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("read upstream PRM: %w", err)
+	}
+	raw, err := DecodeDiscoveryObject(body, maxUpstreamPRMBytes, "resource", "authorization_servers")
+	if err != nil {
 		return nil, fmt.Errorf("decode upstream PRM: %w", err)
+	}
+	if servers, present := raw["authorization_servers"]; present {
+		values, ok := servers.([]any)
+		if !ok || len(values) == 0 {
+			return nil, errors.New("upstream PRM authorization_servers must be a non-empty array")
+		}
+		seen := make(map[string]struct{}, len(values))
+		for _, value := range values {
+			server, ok := value.(string)
+			if !ok || server == "" {
+				return nil, errors.New("upstream PRM authorization_servers entries must be non-empty strings")
+			}
+			if _, duplicate := seen[server]; duplicate {
+				return nil, errors.New("upstream PRM authorization_servers entries must be unique")
+			}
+			seen[server] = struct{}{}
+		}
 	}
 	return &PRMDocument{Raw: raw}, nil
 }
