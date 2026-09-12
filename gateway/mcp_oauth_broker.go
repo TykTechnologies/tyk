@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -22,12 +23,15 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/header"
 	internalhttputil "github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/gorilla/mux"
 )
 
 const (
 	mcpOAuthBrokerStateTTL    = 10 * time.Minute
 	mcpOAuthBrokerBodyMax     = 64 << 10
 	mcpOAuthBrokerHTTPTimeout = 10 * time.Second
+	mcpOAuthBrokerClientTTL   = 30 * 24 * time.Hour
+	mcpOAuthBrokerClientLimit = int64(1000)
 )
 
 type mcpOAuthBroker struct {
@@ -49,6 +53,10 @@ type mcpOAuthClientMapping struct {
 	RedirectURIs            []string `json:"redirect_uris"`
 	UpstreamClientID        string   `json:"upstream_client_id"`
 	UpstreamTokenAuthMethod string   `json:"upstream_token_auth_method"`
+	UpstreamRegistrationURL string   `json:"upstream_registration_url"`
+	UpstreamManagementURI   string   `json:"upstream_management_uri"`
+	UpstreamManagementToken string   `json:"upstream_management_token"`
+	ManagementTokenHash     string   `json:"management_token_hash"`
 }
 
 type mcpOAuthAuthorizationState struct {
@@ -85,6 +93,19 @@ func (b *mcpOAuthBroker) callbackURL() string { return b.publicIssuer() + "/call
 
 func (b *mcpOAuthBroker) clientKey(clientID string) string {
 	return mcpOAuthBrokerKey("client", b.spec.OrgID, b.spec.APIID, clientID)
+}
+
+func (b *mcpOAuthBroker) clientIndexKey() string {
+	return mcpOAuthBrokerKey("client-index", b.spec.OrgID, b.spec.APIID)
+}
+
+func (b *mcpOAuthBroker) clientClaimKey(clientID string) string {
+	return mcpOAuthBrokerKey("client-delete", b.spec.OrgID, b.spec.APIID, clientID)
+}
+
+func mcpOAuthManagementTokenHash(token string) string {
+	digest := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(digest[:])
 }
 
 func mcpOAuthBrokerKey(kind string, parts ...string) string {
@@ -297,9 +318,27 @@ func (b *mcpOAuthBroker) registrationHandler(w http.ResponseWriter, r *http.Requ
 		PublicResource: b.config.PublicResource, UpstreamIssuer: upstreamIssuer,
 		UpstreamResource: b.config.UpstreamResource, DownstreamClientID: downstreamClientID,
 		RedirectURIs: slices.Clone(redirects), UpstreamClientID: upstreamClientID,
-		UpstreamTokenAuthMethod: "none",
+		UpstreamTokenAuthMethod: "none", UpstreamRegistrationURL: registrationEndpoint,
+		UpstreamManagementURI:   registrationClientURI,
+		UpstreamManagementToken: registrationAccessToken,
 	}
-	if err := b.putRecord(r.Context(), b.clientKey(downstreamClientID), mapping, 0); err != nil {
+	downstreamManagementToken, err := randomMCPOAuthValue()
+	if err != nil {
+		if rollbackErr := b.rollbackUpstreamRegistration(r.Context(), registrationClientURI, registrationAccessToken); rollbackErr != nil {
+			log.WithField("api_id", b.spec.APIID).WithField("org_id", b.spec.OrgID).
+				Warn("MCP OAuth upstream registration rollback failed")
+		}
+		mcpOAuthError(w, http.StatusInternalServerError, "server_error")
+		return
+	}
+	mapping.ManagementTokenHash = mcpOAuthManagementTokenHash(downstreamManagementToken)
+	clientKey := b.clientKey(downstreamClientID)
+	sealedMapping, err := b.sealRecord(clientKey, mapping)
+	if err == nil {
+		err = b.store.RegisterClient(r.Context(), b.clientIndexKey(), clientKey, clientKey,
+			sealedMapping, mcpOAuthBrokerClientTTL, mcpOAuthBrokerClientLimit)
+	}
+	if err != nil {
 		if rollbackErr := b.rollbackUpstreamRegistration(r.Context(), registrationClientURI, registrationAccessToken); rollbackErr != nil {
 			log.WithField("api_id", b.spec.APIID).WithField("org_id", b.spec.OrgID).
 				Warn("MCP OAuth upstream registration rollback failed")
@@ -313,7 +352,93 @@ func (b *mcpOAuthBroker) registrationHandler(w http.ResponseWriter, r *http.Requ
 	result["token_endpoint_auth_method"] = "none"
 	result["response_types"] = []string{"code"}
 	result["grant_types"] = []string{"authorization_code", "refresh_token"}
+	result["registration_client_uri"] = b.publicIssuer() + "/register/" + url.PathEscape(downstreamClientID)
+	result["registration_access_token"] = downstreamManagementToken
 	mcpOAuthJSON(w, http.StatusCreated, result)
+}
+
+func (b *mcpOAuthBroker) registrationDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	mcpOAuthSetNoStore(w)
+	if !b.validPublicRequest(r) {
+		mcpOAuthError(w, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	clientID := mux.Vars(r)["client_id"]
+	if clientID == "" {
+		mcpOAuthError(w, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	token, ok := mcpOAuthBearerToken(r.Header.Get(header.Authorization))
+	if !ok {
+		w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
+		mcpOAuthError(w, http.StatusUnauthorized, "invalid_token")
+		return
+	}
+	clientKey := b.clientKey(clientID)
+	var mapping mcpOAuthClientMapping
+	found, err := b.getRecord(r.Context(), clientKey, &mapping)
+	if err != nil {
+		mcpOAuthError(w, http.StatusServiceUnavailable, "temporarily_unavailable")
+		return
+	}
+	if !found || !b.validClientMapping(mapping, clientID) || subtle.ConstantTimeCompare(
+		[]byte(mapping.ManagementTokenHash), []byte(mcpOAuthManagementTokenHash(token))) != 1 {
+		w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
+		mcpOAuthError(w, http.StatusUnauthorized, "invalid_token")
+		return
+	}
+	claimKey := b.clientClaimKey(clientID)
+	sealedMapping, claimed, err := b.store.ClaimClient(r.Context(), clientKey, claimKey)
+	if err != nil {
+		mcpOAuthError(w, http.StatusServiceUnavailable, "temporarily_unavailable")
+		return
+	}
+	if !claimed {
+		w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
+		mcpOAuthError(w, http.StatusUnauthorized, "invalid_token")
+		return
+	}
+	if b.openRecord(clientKey, sealedMapping, &mapping) != nil || !b.validClientMapping(mapping, clientID) ||
+		subtle.ConstantTimeCompare([]byte(mapping.ManagementTokenHash), []byte(mcpOAuthManagementTokenHash(token))) != 1 {
+		if restoreErr := b.store.RestoreClient(context.WithoutCancel(r.Context()), claimKey, clientKey); restoreErr != nil {
+			log.WithField("api_id", b.spec.APIID).WithField("org_id", b.spec.OrgID).
+				Warn("MCP OAuth client mapping restoration failed after claim validation")
+		}
+		w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
+		mcpOAuthError(w, http.StatusUnauthorized, "invalid_token")
+		return
+	}
+	if err := b.deleteUpstreamRegistration(r.Context(), mapping.UpstreamManagementURI, mapping.UpstreamManagementToken, true); err != nil {
+		if restoreErr := b.store.RestoreClient(context.WithoutCancel(r.Context()), claimKey, clientKey); restoreErr != nil {
+			log.WithField("api_id", b.spec.APIID).WithField("org_id", b.spec.OrgID).
+				Warn("MCP OAuth client mapping restoration failed after upstream deletion rejection")
+		}
+		mcpOAuthError(w, http.StatusBadGateway, "temporarily_unavailable")
+		return
+	}
+	if err := b.store.FinishClientDeletion(context.WithoutCancel(r.Context()), claimKey, b.clientIndexKey(), clientKey); err != nil {
+		log.WithField("api_id", b.spec.APIID).WithField("org_id", b.spec.OrgID).
+			Warn("MCP OAuth client deletion cleanup failed")
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func mcpOAuthBearerToken(authorization string) (string, bool) {
+	const prefix = "Bearer "
+	if len(authorization) <= len(prefix) || !strings.EqualFold(authorization[:len(prefix)], prefix) {
+		return "", false
+	}
+	token := authorization[len(prefix):]
+	return token, validMCPOAuthBearerValue(token)
+}
+
+func (b *mcpOAuthBroker) validClientMapping(mapping mcpOAuthClientMapping, clientID string) bool {
+	return mapping.OrgID == b.spec.OrgID && mapping.APIID == b.spec.APIID &&
+		mapping.PublicIssuer == b.publicIssuer() && mapping.PublicResource == b.config.PublicResource &&
+		mapping.UpstreamResource == b.config.UpstreamResource && mapping.DownstreamClientID == clientID &&
+		validMCPOAuthRegistrationManagementEndpoint(mapping.UpstreamRegistrationURL, mapping.UpstreamManagementURI,
+			b.config.AllowInsecureLoopback) && validMCPOAuthBearerValue(mapping.UpstreamManagementToken) &&
+		mapping.ManagementTokenHash != ""
 }
 
 func validMCPOAuthRegistrationManagementEndpoint(registrationEndpoint, managementEndpoint string, allowInsecureLoopback bool) bool {
@@ -342,6 +467,10 @@ func validMCPOAuthBearerValue(value string) bool {
 }
 
 func (b *mcpOAuthBroker) rollbackUpstreamRegistration(ctx context.Context, managementEndpoint, accessToken string) error {
+	return b.deleteUpstreamRegistration(ctx, managementEndpoint, accessToken, false)
+}
+
+func (b *mcpOAuthBroker) deleteUpstreamRegistration(ctx context.Context, managementEndpoint, accessToken string, acceptNotFound bool) error {
 	rollbackContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), mcpOAuthBrokerHTTPTimeout)
 	defer cancel()
 	request, err := http.NewRequestWithContext(rollbackContext, http.MethodDelete, managementEndpoint, nil)
@@ -359,7 +488,7 @@ func (b *mcpOAuthBroker) rollbackUpstreamRegistration(ctx context.Context, manag
 	}
 	defer response.Body.Close()
 	body, readErr := io.ReadAll(io.LimitReader(response.Body, mcpOAuthBrokerBodyMax+1))
-	if readErr != nil || len(body) > mcpOAuthBrokerBodyMax || response.StatusCode/100 != 2 {
+	if readErr != nil || len(body) > mcpOAuthBrokerBodyMax || (response.StatusCode/100 != 2 && !(acceptNotFound && response.StatusCode == http.StatusNotFound)) {
 		return errors.New("upstream registration rollback was rejected")
 	}
 	return nil

@@ -13,6 +13,7 @@ import (
 var (
 	errMCPOAuthBrokerStoreCollision = errors.New("MCP OAuth broker key already exists")
 	errMCPOAuthBrokerFamilyRevoked  = errors.New("MCP OAuth broker token family is revoked")
+	errMCPOAuthBrokerClientLimit    = errors.New("MCP OAuth broker client registration limit reached")
 )
 
 type mcpOAuthBrokerIssueRecord struct {
@@ -29,6 +30,10 @@ type mcpOAuthBrokerStore interface {
 	Get(context.Context, string) ([]byte, bool, error)
 	Consume(context.Context, string) ([]byte, bool, error)
 	Issue(context.Context, string, []mcpOAuthBrokerIssueRecord) error
+	RegisterClient(context.Context, string, string, string, []byte, time.Duration, int64) error
+	ClaimClient(context.Context, string, string) ([]byte, bool, error)
+	RestoreClient(context.Context, string, string) error
+	FinishClientDeletion(context.Context, string, string, string) error
 }
 
 type redisMCPOAuthBrokerStore struct {
@@ -154,4 +159,117 @@ func (s *redisMCPOAuthBrokerStore) Issue(ctx context.Context, revokedKey string,
 	default:
 		return fmt.Errorf("atomically issue OAuth broker token family: unexpected result %d", result)
 	}
+}
+
+var registerMCPOAuthBrokerClient = redis.NewScript(`
+redis.call("ZREMRANGEBYSCORE", KEYS[1], "-inf", ARGV[1])
+if redis.call("EXISTS", KEYS[2]) == 1 then
+  return -1
+end
+if redis.call("ZCARD", KEYS[1]) >= tonumber(ARGV[2]) then
+  return 0
+end
+redis.call("SET", KEYS[2], ARGV[4], "PX", ARGV[3])
+redis.call("ZADD", KEYS[1], ARGV[5], ARGV[6])
+redis.call("PEXPIRE", KEYS[1], ARGV[3])
+return 1
+`)
+
+// RegisterClient atomically applies the per-API registration limit and stores
+// the sealed client mapping. The sorted-set index contains only opaque client
+// key hashes and is pruned by expiry on every registration attempt.
+func (s *redisMCPOAuthBrokerStore) RegisterClient(ctx context.Context, indexKey, clientKey, member string, value []byte, ttl time.Duration, limit int64) error {
+	client, err := s.client()
+	if err != nil {
+		return err
+	}
+	if indexKey == "" || clientKey == "" || member == "" || len(value) == 0 || ttl <= 0 || limit <= 0 {
+		return errors.New("MCP OAuth broker client registration has invalid storage parameters")
+	}
+	now := time.Now().UnixMilli()
+	result, err := registerMCPOAuthBrokerClient.Run(ctx, client, []string{s.key(indexKey), s.key(clientKey)}, now, limit, ttl.Milliseconds(), value, now+ttl.Milliseconds(), member).Int64()
+	if err != nil {
+		return fmt.Errorf("atomically register OAuth broker client: %w", err)
+	}
+	switch result {
+	case 1:
+		return nil
+	case 0:
+		return errMCPOAuthBrokerClientLimit
+	case -1:
+		return errMCPOAuthBrokerStoreCollision
+	default:
+		return fmt.Errorf("atomically register OAuth broker client: unexpected result %d", result)
+	}
+}
+
+var claimMCPOAuthBrokerClient = redis.NewScript(`
+if redis.call("EXISTS", KEYS[2]) == 1 then
+  return nil
+end
+local value = redis.call("GET", KEYS[1])
+if not value then
+  return nil
+end
+redis.call("RENAME", KEYS[1], KEYS[2])
+return value
+`)
+
+// ClaimClient atomically makes a mapping unavailable to authorization and to
+// competing management requests while preserving its original TTL.
+func (s *redisMCPOAuthBrokerStore) ClaimClient(ctx context.Context, clientKey, claimKey string) ([]byte, bool, error) {
+	client, err := s.client()
+	if err != nil {
+		return nil, false, err
+	}
+	value, err := claimMCPOAuthBrokerClient.Run(ctx, client, []string{s.key(clientKey), s.key(claimKey)}).Text()
+	if errors.Is(err, redis.Nil) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("atomically claim OAuth broker client: %w", err)
+	}
+	return []byte(value), true, nil
+}
+
+var restoreMCPOAuthBrokerClient = redis.NewScript(`
+if redis.call("EXISTS", KEYS[1]) == 0 then
+  return 0
+end
+if redis.call("RENAMENX", KEYS[1], KEYS[2]) == 0 then
+  return -1
+end
+return 1
+`)
+
+func (s *redisMCPOAuthBrokerStore) RestoreClient(ctx context.Context, claimKey, clientKey string) error {
+	client, err := s.client()
+	if err != nil {
+		return err
+	}
+	result, err := restoreMCPOAuthBrokerClient.Run(ctx, client, []string{s.key(claimKey), s.key(clientKey)}).Int64()
+	if err != nil {
+		return fmt.Errorf("atomically restore OAuth broker client: %w", err)
+	}
+	if result != 1 {
+		return errors.New("OAuth broker client claim cannot be restored")
+	}
+	return nil
+}
+
+var finishMCPOAuthBrokerClientDeletion = redis.NewScript(`
+redis.call("DEL", KEYS[1])
+redis.call("ZREM", KEYS[2], ARGV[1])
+return 1
+`)
+
+func (s *redisMCPOAuthBrokerStore) FinishClientDeletion(ctx context.Context, claimKey, indexKey, member string) error {
+	client, err := s.client()
+	if err != nil {
+		return err
+	}
+	if err := finishMCPOAuthBrokerClientDeletion.Run(ctx, client, []string{s.key(claimKey), s.key(indexKey)}, member).Err(); err != nil {
+		return fmt.Errorf("atomically finish OAuth broker client deletion: %w", err)
+	}
+	return nil
 }
