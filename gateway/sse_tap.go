@@ -134,8 +134,7 @@ func (t *SSETap) Read(p []byte) (int, error) {
 		// to prevent unbounded memory growth from a malicious upstream.
 		if len(t.inputBuffer) > maxInputBufferSize {
 			if t.strictFiltering {
-				t.inputBuffer = nil
-				t.terminalErr = errFilteredSSETooLarge
+				t.failStrictFiltering(errFilteredSSETooLarge)
 				continue
 			}
 			t.outputBuffer.Write(t.inputBuffer)
@@ -146,8 +145,7 @@ func (t *SSETap) Read(p []byte) (int, error) {
 		// If upstream hit EOF but processInputBuffer produced nothing,
 		// flush any remaining unparseable bytes as-is (fail-open).
 		if t.upstreamEOF && t.strictFiltering && len(t.inputBuffer) > 0 {
-			t.inputBuffer = nil
-			t.terminalErr = io.ErrUnexpectedEOF
+			t.failStrictFiltering(io.ErrUnexpectedEOF)
 		}
 		if t.outputBuffer.Len() == 0 && t.upstreamEOF {
 			if len(t.inputBuffer) > 0 {
@@ -246,5 +244,30 @@ func (t *SSETap) processInputBuffer() {
 			// No modification; forward original bytes to preserve formatting.
 			t.outputBuffer.Write(rawBytes)
 		}
+		for _, hook := range t.hooks {
+			if terminal, ok := hook.(SSETerminalHook); ok && terminal.Terminal() {
+				t.inputBuffer = nil
+				t.upstreamEOF = true
+				_ = t.reader.Close()
+				return
+			}
+		}
 	}
+}
+
+func (t *SSETap) failStrictFiltering(err error) {
+	t.inputBuffer = nil
+	for _, hook := range t.hooks {
+		failure, ok := hook.(SSEFailureHook)
+		if !ok {
+			continue
+		}
+		if event := failure.FailureEvent(err); event != nil {
+			t.outputBuffer.Write(serializeSSEEvent(event))
+			t.upstreamEOF = true
+			_ = t.reader.Close()
+			return
+		}
+	}
+	t.terminalErr = err
 }
