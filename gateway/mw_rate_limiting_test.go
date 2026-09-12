@@ -3,6 +3,8 @@ package gateway
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -10,11 +12,124 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
+
+func TestRateLimitAndQuotaCheck_MCPVirtualEndpointLoop(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		spec         *APISpec
+		selfLoop     bool
+		routingState *httpctx.JSONRPCRoutingState
+		wantSkip     bool
+	}{
+		{name: "public MCP JSON-RPC ingress", spec: mcpRateLimitTestSpec(), routingState: &httpctx.JSONRPCRoutingState{}, wantSkip: false},
+		{name: "MCP JSON-RPC virtual endpoint", spec: mcpRateLimitTestSpec(), selfLoop: true, routingState: &httpctx.JSONRPCRoutingState{}, wantSkip: true},
+		{name: "non-MCP JSON-RPC self loop", spec: &APISpec{APIDefinition: &apidef.APIDefinition{}}, selfLoop: true, routingState: &httpctx.JSONRPCRoutingState{}, wantSkip: false},
+		{name: "ordinary MCP self loop", spec: mcpRateLimitTestSpec(), selfLoop: true, wantSkip: false},
+		{name: "ordinary request", spec: &APISpec{APIDefinition: &apidef.APIDefinition{}}, wantSkip: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/", nil)
+			httpctx.SetSelfLooping(req, test.selfLoop)
+			if test.routingState != nil {
+				httpctx.SetJSONRPCRoutingState(req, test.routingState)
+			}
+			assert.Equal(t, test.wantSkip, isMCPJSONRPCVirtualEndpointLoop(test.spec, req))
+		})
+	}
+}
+
+func mcpRateLimitTestSpec() *APISpec {
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	spec.MarkAsMCP()
+	return spec
+}
+
+func TestRateLimitAndQuotaCheck_MCPSequentialRoutingCountsSessionOnce(t *testing.T) {
+	for _, testCase := range []struct {
+		name       string
+		configure  func(*user.SessionState)
+		secondCode int
+	}{
+		{
+			name: "quota",
+			configure: func(session *user.SessionState) {
+				session.Rate = 1000
+				session.Allowance = session.Rate
+				session.QuotaMax = 1
+				session.QuotaRemaining = 1
+			},
+			secondCode: http.StatusForbidden,
+		},
+		{
+			name: "rate",
+			configure: func(session *user.SessionState) {
+				session.Rate = 1
+				session.Allowance = session.Rate
+				session.Per = 60
+				session.QuotaMax = -1
+			},
+			secondCode: http.StatusTooManyRequests,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			var upstreamCalls atomic.Int64
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				upstreamCalls.Add(1)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":{"content":[]}}`))
+			}))
+			defer upstream.Close()
+
+			ts := StartTest(nil)
+			defer ts.Close()
+
+			oasAPI := getSampleOASAPI()
+			ext := oasAPI.GetTykExtension()
+			ext.Server.ListenPath = oas.ListenPath{Value: "/mcp", Strip: false}
+			ext.Upstream.URL = upstream.URL
+			oasAPI.SetTykExtension(ext)
+
+			var def apidef.APIDefinition
+			oasAPI.ExtractTo(&def)
+			def.IsOAS = true
+			def.UseKeylessAccess = false
+			def.Proxy.ListenPath = "/mcp"
+			def.MarkAsMCP()
+			loaded := ts.Gw.LoadAPI(&APISpec{APIDefinition: &def, OAS: oasAPI})[0]
+
+			key := CreateSession(ts.Gw, func(session *user.SessionState) {
+				testCase.configure(session)
+				session.AccessRights = map[string]user.AccessDefinition{
+					loaded.APIID: {APIID: loaded.APIID, APIName: loaded.Name},
+				}
+			})
+			headers := map[string]string{header.Authorization: key}
+			payload := map[string]any{
+				"jsonrpc": "2.0",
+				"method":  "tools/call",
+				"params": map[string]any{
+					"name":      "get-weather",
+					"arguments": map[string]string{"city": "London"},
+				},
+				"id": 1,
+			}
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{Method: http.MethodPost, Path: "/mcp", Headers: headers, Data: payload, Code: http.StatusOK},
+				{Method: http.MethodPost, Path: "/mcp", Headers: headers, Data: payload, Code: testCase.secondCode},
+			}...)
+			assert.Equal(t, int64(1), upstreamCalls.Load(), "only the accepted logical request reaches upstream")
+		})
+	}
+}
 
 func TestRateLimit_Unlimited(t *testing.T) {
 	g := StartTest(nil)

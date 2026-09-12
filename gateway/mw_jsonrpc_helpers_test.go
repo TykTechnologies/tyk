@@ -1,14 +1,43 @@
 package gateway
 
 import (
+	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/ctx"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 )
+
+func TestSelectAndStoreMCPJSONRPCCode(t *testing.T) {
+	tests := []struct {
+		name     string
+		protocol string
+		want     int
+	}{
+		{name: "modern", protocol: mcp.ModernProtocolVersion, want: jsonrpcerrors.CodeModernAuthRequired},
+		{name: "legacy", protocol: mcp.LegacyFallbackProtocolVersion, want: jsonrpcerrors.CodeAccessDenied},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+			httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(test.protocol, "", nil, nil))
+			ctx.SetErrorClassification(r, tykerrors.NewErrorClassification(tykerrors.AKI, "invalid_key"))
+
+			got := selectAndStoreMCPJSONRPCCode(r, http.StatusForbidden)
+
+			assert.Equal(t, test.want, got)
+			assert.Equal(t, got, ctxGetJSONRPCErrorCode(r))
+		})
+	}
+}
 
 func TestWriteJSONRPCAccessDenied_WithState(t *testing.T) {
 	r := httptest.NewRequest("POST", "/mcp", nil)
@@ -25,6 +54,21 @@ func TestWriteJSONRPCAccessDenied_WithState(t *testing.T) {
 	body := w.Body.String()
 	assert.Contains(t, body, "dangerous_tool")
 	assert.Contains(t, body, "jsonrpc")
+}
+
+func TestWriteJSONRPCAccessDenied_ModernCodeIsSharedWithContext(t *testing.T) {
+	r := httptest.NewRequest("POST", "/mcp", nil)
+	envelope := &mcp.RequestEnvelope{JSONRPC: "2.0", Method: "tools/list", ID: 7}
+	httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(mcp.ModernProtocolVersion, "", envelope, nil))
+	httpctx.SetJSONRPCRoutingState(r, &httpctx.JSONRPCRoutingState{Method: envelope.Method, ID: envelope.ID})
+	w := httptest.NewRecorder()
+
+	writeJSONRPCAccessDenied(w, r, "denied")
+
+	var response jsonrpcerrors.JSONRPCErrorResponse
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	assert.Equal(t, jsonrpcerrors.CodeModernAccessDenied, response.Error.Code)
+	assert.Equal(t, response.Error.Code, ctxGetJSONRPCErrorCode(r))
 }
 
 func TestWriteJSONRPCAccessDenied_WithoutState(t *testing.T) {
