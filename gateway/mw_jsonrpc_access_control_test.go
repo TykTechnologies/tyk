@@ -10,6 +10,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -167,6 +168,43 @@ func TestJSONRPCAccessControlMiddleware_BlockedMethod_Denied(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, code)
 	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestJSONRPCAccessControlMiddleware_SamplingUsesRequestMethod(t *testing.T) {
+	tests := []struct {
+		name       string
+		rules      user.AccessControlRules
+		wantDenied bool
+	}{
+		{name: "exact createMessage block denies", rules: user.AccessControlRules{Blocked: []string{mcp.MethodSamplingCreateMessage}}, wantDenied: true},
+		{name: "obsolete create block permits", rules: user.AccessControlRules{Blocked: []string{"sampling/create"}}},
+		{name: "literal sampling block is not a namespace wildcard", rules: user.AccessControlRules{Blocked: []string{"sampling"}}},
+		{name: "explicit createMessage allow permits", rules: user.AccessControlRules{Allowed: []string{mcp.MethodSamplingCreateMessage}}},
+		{name: "block takes precedence over allow", rules: user.AccessControlRules{Allowed: []string{mcp.MethodSamplingCreateMessage}, Blocked: []string{mcp.MethodSamplingCreateMessage}}, wantDenied: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mw := buildJSONRPCACLMiddleware("api-1", true)
+			r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+			w := httptest.NewRecorder()
+			httpctx.SetJSONRPCRoutingState(r, &httpctx.JSONRPCRoutingState{Method: mcp.MethodSamplingCreateMessage, ID: 3})
+			setSessionForTest(r, &user.SessionState{AccessRights: map[string]user.AccessDefinition{
+				"api-1": {APIID: "api-1", JSONRPCMethodsAccessRights: tt.rules},
+			}})
+
+			err, code := mw.ProcessRequest(w, r, nil)
+			require.NoError(t, err)
+			if tt.wantDenied {
+				assert.Equal(t, middleware.StatusRespond, code)
+				assert.Equal(t, http.StatusForbidden, w.Code)
+				assert.Contains(t, w.Body.String(), mcp.MethodSamplingCreateMessage)
+				return
+			}
+			assert.Equal(t, http.StatusOK, code)
+			assert.Empty(t, w.Body.String())
+		})
+	}
 }
 
 func TestJSONRPCAccessControlMiddleware_BlockedRegex_Denied(t *testing.T) {

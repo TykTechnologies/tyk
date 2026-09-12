@@ -801,7 +801,8 @@ func TestMCPListFilterResponseHandler_HandleResponse_InitializeCapabilitiesFilte
 		return capabilities
 	}
 
-	t.Run("session method block removes sampling capability", func(t *testing.T) {
+	runSessionRules := func(t *testing.T, rules user.AccessControlRules) (map[string]json.RawMessage, map[string]json.RawMessage) {
+		t.Helper()
 		h := buildMCPListFilterHandler("api-1", true)
 		rw := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
@@ -812,10 +813,8 @@ func TestMCPListFilterResponseHandler_HandleResponse_InitializeCapabilitiesFilte
 		session := &user.SessionState{
 			AccessRights: map[string]user.AccessDefinition{
 				"api-1": {
-					APIID: "api-1",
-					JSONRPCMethodsAccessRights: user.AccessControlRules{
-						Blocked: []string{mcp.MethodSamplingCreate},
-					},
+					APIID:                      "api-1",
+					JSONRPCMethodsAccessRights: rules,
 				},
 			},
 		}
@@ -823,7 +822,57 @@ func TestMCPListFilterResponseHandler_HandleResponse_InitializeCapabilitiesFilte
 		res := makeHTTPResponse(makeInitializeResponse())
 		require.NoError(t, h.HandleResponse(rw, res, req, session))
 
-		capabilities := extractCapabilityKeys(t, readResponseBody(t, res))
+		body := readResponseBody(t, res)
+		capabilities := extractCapabilityKeys(t, body)
+		var envelope mcp.JSONRPCResponse
+		require.NoError(t, json.Unmarshal(body, &envelope))
+		var result map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(envelope.Result, &result))
+		return capabilities, result
+	}
+
+	t.Run("session createMessage block removes sampling capability", func(t *testing.T) {
+		capabilities, result := runSessionRules(t, user.AccessControlRules{Blocked: []string{mcp.MethodSamplingCreateMessage}})
+		assert.NotContains(t, capabilities, "sampling")
+		assert.Contains(t, capabilities, "tools")
+		assert.Contains(t, capabilities, "resources")
+		assert.Contains(t, capabilities, "prompts")
+		assert.JSONEq(t, `"private"`, string(result["cacheScope"]))
+		assert.JSONEq(t, `0`, string(result["ttlMs"]))
+	})
+
+	t.Run("obsolete create block keeps sampling private", func(t *testing.T) {
+		capabilities, result := runSessionRules(t, user.AccessControlRules{Blocked: []string{"sampling/create"}})
+		assert.Contains(t, capabilities, "sampling")
+		assert.Contains(t, capabilities, "tools")
+		assert.JSONEq(t, `"private"`, string(result["cacheScope"]))
+		assert.JSONEq(t, `0`, string(result["ttlMs"]))
+	})
+
+	t.Run("allowed createMessage keeps sampling private", func(t *testing.T) {
+		capabilities, result := runSessionRules(t, user.AccessControlRules{Allowed: []string{
+			mcp.MethodSamplingCreateMessage,
+			mcp.MethodToolsList,
+			mcp.MethodToolsCall,
+			mcp.MethodResourcesList,
+			mcp.MethodResourcesTemplatesList,
+			mcp.MethodResourcesRead,
+			mcp.MethodPromptsList,
+			mcp.MethodPromptsGet,
+		}})
+		assert.Contains(t, capabilities, "sampling")
+		assert.Contains(t, capabilities, "tools")
+		assert.Contains(t, capabilities, "resources")
+		assert.Contains(t, capabilities, "prompts")
+		assert.JSONEq(t, `"private"`, string(result["cacheScope"]))
+		assert.JSONEq(t, `0`, string(result["ttlMs"]))
+	})
+
+	t.Run("session block takes precedence over allow", func(t *testing.T) {
+		capabilities, _ := runSessionRules(t, user.AccessControlRules{
+			Allowed: []string{mcp.MethodSamplingCreateMessage, mcp.MethodToolsList, mcp.MethodToolsCall},
+			Blocked: []string{mcp.MethodSamplingCreateMessage},
+		})
 		assert.NotContains(t, capabilities, "sampling")
 		assert.Contains(t, capabilities, "tools")
 	})
