@@ -2,11 +2,65 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
+
+func TestFetchUpstreamPRM_StrictDiscovery(t *testing.T) {
+	t.Run("redirect", func(t *testing.T) {
+		var reached atomic.Bool
+		destination := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			reached.Store(true)
+			_, _ = fmt.Fprint(w, `{"resource":"https://resource.example","authorization_servers":["https://as.example"]}`)
+		}))
+		defer destination.Close()
+		source := httptest.NewServer(http.RedirectHandler(destination.URL, http.StatusFound))
+		defer source.Close()
+
+		_, err := FetchUpstreamPRM(context.Background(), http.DefaultClient, source.URL)
+		require.Error(t, err)
+		require.False(t, reached.Load())
+	})
+
+	for name, document := range map[string]string{
+		"oversize":        `{"resource":"https://resource.example","padding":"` + strings.Repeat("x", (64<<10)+1) + `"}`,
+		"duplicate":       `{"resource":"https://resource.example","authorization_servers":["https://evil.example"],"authorization_servers":["https://as.example"]}`,
+		"case alias":      `{"resource":"https://resource.example","Authorization_Servers":["https://evil.example"],"authorization_servers":["https://as.example"]}`,
+		"trailing":        `{"resource":"https://resource.example","authorization_servers":["https://as.example"]}{"authorization_servers":["https://evil.example"]}`,
+		"wrong shape":     `{"resource":"https://resource.example","authorization_servers":"https://as.example"}`,
+		"empty array":     `{"resource":"https://resource.example","authorization_servers":[]}`,
+		"non-string":      `{"resource":"https://resource.example","authorization_servers":[1]}`,
+		"duplicate entry": `{"resource":"https://resource.example","authorization_servers":["https://as.example","https://as.example"]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = fmt.Fprint(w, document)
+			}))
+			defer server.Close()
+			_, err := FetchUpstreamPRM(context.Background(), http.DefaultClient, server.URL)
+			require.Error(t, err)
+		})
+	}
+
+	t.Run("unknown extensions preserved", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = fmt.Fprint(w, `{"resource":"https://resource.example","authorization_servers":["https://as.example"],"Extension":1,"extension":2}`)
+		}))
+		defer server.Close()
+		doc, err := FetchUpstreamPRM(context.Background(), http.DefaultClient, server.URL)
+		require.NoError(t, err)
+		require.Equal(t, json.Number("1"), doc.Raw["Extension"])
+		require.Equal(t, json.Number("2"), doc.Raw["extension"])
+	})
+}
 
 func TestDeriveUpstreamPRMURL(t *testing.T) {
 	cases := []struct {
