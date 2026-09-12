@@ -77,6 +77,7 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 			filtered, changed, credentialSpecific, err := mcp.FilterDiscoveryBody(body, globalRules, credentialRules, h.Spec)
 			if credentialSpecific {
 				markMCPResponseEdited(req)
+				res.Header.Set("Cache-Control", "private, no-store")
 			}
 			return filtered, changed, err
 		}

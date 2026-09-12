@@ -21,7 +21,7 @@ import (
 // including results whose advertised capabilities already satisfy the rules.
 func FilterDiscoveryBody(body []byte, globalRules, credentialRules []user.AccessControlRules, endpoints ...ProtocolSupport) (filtered []byte, changed, credentialSpecific bool, invalid error) {
 	envelope, err := decodeOwnedJSONObject(body, "JSON-RPC response", map[string]struct{}{
-		"jsonrpc": {}, "id": {}, "result": {}, "error": {},
+		"jsonrpc": {}, "id": {}, "method": {}, "result": {}, "error": {},
 	})
 	if err != nil {
 		return nil, false, false, err
@@ -33,11 +33,15 @@ func FilterDiscoveryBody(body []byte, globalRules, credentialRules []user.Access
 	if raw, ok := envelope["id"]; !ok || !validJSONRPCResponseID(raw) {
 		return nil, false, false, invalidDiscovery("missing or invalid response id")
 	}
+	if _, present := envelope["method"]; present {
+		return nil, false, false, invalidDiscovery("response must not contain a method")
+	}
 	resultRaw, hasResult := envelope["result"]
 	errorRaw, hasError := envelope["error"]
 	if hasResult == hasError {
 		return nil, false, false, invalidDiscovery("response must contain exactly one of result or error")
 	}
+	credentialSpecific = hasFilterRules(credentialRules)
 	if hasError {
 		errorFields, err := decodeOwnedJSONObject(errorRaw, "JSON-RPC error", map[string]struct{}{"code": {}, "message": {}, "data": {}})
 		if err != nil {
@@ -56,7 +60,7 @@ func FilterDiscoveryBody(body []byte, globalRules, credentialRules []user.Access
 		if json.Unmarshal(errorFields["message"], &message) != nil {
 			return nil, false, false, invalidDiscovery("missing or invalid JSON-RPC error message")
 		}
-		return nil, false, false, nil
+		return nil, false, credentialSpecific, nil
 	}
 	result, err := decodeOwnedJSONObject(resultRaw, "discovery result", map[string]struct{}{
 		"supportedVersions": {}, "capabilities": {},
@@ -89,7 +93,6 @@ func FilterDiscoveryBody(body []byte, globalRules, credentialRules []user.Access
 	if len(endpoints) > 0 && endpoints[0] != nil {
 		versionsSupported = endpoints[0].SupportedProtocolVersions()
 	}
-	credentialSpecific = hasFilterRules(credentialRules)
 	upstreamSet := make(map[string]struct{}, len(upstream))
 	for _, version := range upstream {
 		upstreamSet[version] = struct{}{}
@@ -226,7 +229,7 @@ func JSONRPCResponseIDStatus(body []byte, expected any) (present, matches bool, 
 // notification while a discovery response is pending.
 func ValidateJSONRPCServerMessage(body []byte) error {
 	fields, err := decodeOwnedJSONObject(body, "JSON-RPC server message", map[string]struct{}{
-		"jsonrpc": {}, "id": {}, "method": {}, "params": {},
+		"jsonrpc": {}, "id": {}, "method": {}, "params": {}, "result": {}, "error": {},
 	})
 	if err != nil {
 		return err
@@ -237,6 +240,12 @@ func ValidateJSONRPCServerMessage(body []byte) error {
 	}
 	if json.Unmarshal(fields["method"], &method) != nil || method == "" {
 		return invalidDiscovery("missing or invalid server message method")
+	}
+	if _, present := fields["result"]; present {
+		return invalidDiscovery("server message must not contain a result")
+	}
+	if _, present := fields["error"]; present {
+		return invalidDiscovery("server message must not contain an error")
 	}
 	if raw, present := fields["id"]; present && !validJSONRPCResponseID(raw) {
 		return invalidDiscovery("invalid server message id")

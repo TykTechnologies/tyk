@@ -1163,6 +1163,30 @@ func TestMCPListFilterResponseHandler_DiscoveryGlobalEditDoesNotDisableCache(t *
 	assert.False(t, options.responseEdited)
 }
 
+func TestMCPListFilterResponseHandler_CredentialDiscoveryErrorDisablesCache(t *testing.T) {
+	h := buildMCPListFilterHandler("api-1", true)
+	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodServerDiscover, ID: "request"})
+	options := &cacheOptions{}
+	ctxSetCacheOptions(req, options)
+	session := &user.SessionState{AccessRights: map[string]user.AccessDefinition{
+		"api-1": {
+			APIID: "api-1",
+			JSONRPCMethodsAccessRights: user.AccessControlRules{
+				Blocked: []string{"prompts/get"},
+			},
+		},
+	}}
+	original := []byte("{ \"jsonrpc\":\"2.0\",\"id\":\"request\",\"error\":{\"code\":-32001,\"message\":\"upstream\",\"data\":{\"opaque\":true}} }")
+	res := makeHTTPResponse(original)
+	res.Header.Set("Cache-Control", "public, max-age=300")
+
+	require.NoError(t, h.HandleResponse(httptest.NewRecorder(), res, req, session))
+	require.Equal(t, original, readResponseBody(t, res), "valid upstream error must remain byte-for-byte unchanged")
+	require.Equal(t, "private, no-store", res.Header.Get("Cache-Control"))
+	require.True(t, options.responseEdited, "credential-specific errors must not enter the shared response cache")
+}
+
 func TestMCPListFilterResponseHandler_InvalidDiscoveryFailsClosed(t *testing.T) {
 	h := buildMCPListFilterHandler("api-1", true)
 	for _, test := range []struct {
@@ -1171,6 +1195,7 @@ func TestMCPListFilterResponseHandler_InvalidDiscoveryFailsClosed(t *testing.T) 
 	}{
 		{"truncated", `{"jsonrpc":"2.0","id":9007199254740993,"result":`},
 		{"null result", `{"jsonrpc":"2.0","id":9007199254740993,"result":null}`},
+		{"hybrid method and result", `{"jsonrpc":"2.0","id":9007199254740993,"method":"notifications/progress","result":{"supportedVersions":[],"capabilities":{}}}`},
 		{"wrong adjacent id", `{"jsonrpc":"2.0","id":9007199254740992,"result":{"supportedVersions":[],"capabilities":{}}}`},
 	} {
 		t.Run(test.name, func(t *testing.T) {

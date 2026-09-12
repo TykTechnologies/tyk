@@ -91,6 +91,8 @@ func TestFilterDiscoveryBodyRejectsMalformedOwnedShapes(t *testing.T) {
 		{"wrong jsonrpc", `{"jsonrpc":"1.0","id":1,"result":{}}`},
 		{"missing id", `{"jsonrpc":"2.0","result":{}}`},
 		{"invalid id", `{"jsonrpc":"2.0","id":true,"result":{}}`},
+		{"hybrid method and result", `{"jsonrpc":"2.0","id":1,"method":"notifications/progress","result":{"supportedVersions":[],"capabilities":{}}}`},
+		{"hybrid method and error", `{"jsonrpc":"2.0","id":1,"method":"notifications/progress","error":{"code":-1,"message":"bad"}}`},
 		{"result and error", `{"jsonrpc":"2.0","id":1,"result":{},"error":{"code":-1}}`},
 		{"neither result nor error", `{"jsonrpc":"2.0","id":1}`},
 		{"null result", `{"jsonrpc":"2.0","id":1,"result":null}`},
@@ -128,6 +130,14 @@ func TestFilterDiscoveryBodyPreservesValidErrorsEmptyValuesAndUnknownFields(t *t
 		require.Nil(t, filtered)
 		require.False(t, changed)
 		require.False(t, private)
+	})
+	t.Run("credential-specific upstream error remains unchanged but private", func(t *testing.T) {
+		body := []byte(`{"jsonrpc":"2.0","id":"request","error":{"code":-32001,"message":"upstream","extension":{"secret":"opaque"}},"unknown":true}`)
+		filtered, changed, private, err := FilterDiscoveryBody(body, nil, []user.AccessControlRules{{Blocked: []string{"prompts/get"}}})
+		require.NoError(t, err)
+		require.Nil(t, filtered)
+		require.False(t, changed)
+		require.True(t, private)
 	})
 	t.Run("empty values", func(t *testing.T) {
 		body := []byte(`{"jsonrpc":"2.0","id":0,"result":{"supportedVersions":[],"capabilities":{},"unknown":{"kept":true}}}`)
