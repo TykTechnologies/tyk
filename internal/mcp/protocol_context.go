@@ -11,6 +11,8 @@ const (
 	HeaderProtocolVersion = "Mcp-Protocol-Version"
 	// HeaderSessionID carries the stateful MCP session identifier.
 	HeaderSessionID = "Mcp-Session-Id"
+	// HeaderLastEventID carries the resumable SSE event cursor.
+	HeaderLastEventID = "Last-Event-ID"
 	// MetaKeyProtocolVersion is the modern namespaced metadata declaration.
 	MetaKeyProtocolVersion = "io.modelcontextprotocol/protocolVersion"
 	// LegacyFallbackProtocolVersion is the effective version for established
