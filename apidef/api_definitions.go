@@ -855,6 +855,22 @@ type MCPConfig struct {
 	// TrustedOrigins contains concrete HTTP(S) origins allowed to send MCP
 	// requests in addition to the API's own externally visible origin.
 	TrustedOrigins []string `bson:"trusted_origins,omitempty" json:"trusted_origins,omitempty"`
+
+	// OAuthBroker enables the Gateway-owned OAuth authorization-server identity
+	// for an MCP mirror API. It is opt-in so existing direct/static OAuth flows
+	// retain their current contract.
+	OAuthBroker *MCPOAuthBrokerConfig `bson:"oauth_broker,omitempty" json:"oauth_broker,omitempty"`
+}
+
+// MCPOAuthBrokerConfig fixes the public and upstream resource identities used
+// by the MCP OAuth broker. PublicOrigin is an origin without a path;
+// PublicResource must equal PublicOrigin plus the API listen path.
+type MCPOAuthBrokerConfig struct {
+	Enabled               bool   `bson:"enabled" json:"enabled"`
+	PublicOrigin          string `bson:"public_origin,omitempty" json:"public_origin,omitempty"`
+	PublicResource        string `bson:"public_resource,omitempty" json:"public_resource,omitempty"`
+	UpstreamResource      string `bson:"upstream_resource,omitempty" json:"upstream_resource,omitempty"`
+	AllowInsecureLoopback bool   `bson:"allow_insecure_loopback,omitempty" json:"allow_insecure_loopback,omitempty"`
 }
 
 // Validate validates MCP request-security configuration.
@@ -862,8 +878,13 @@ func (m *MCPConfig) Validate() error {
 	if m == nil {
 		return nil
 	}
-	_, err := internalhttputil.CanonicalOrigins(m.TrustedOrigins)
-	return err
+	if _, err := internalhttputil.CanonicalOrigins(m.TrustedOrigins); err != nil {
+		return err
+	}
+	if m.OAuthBroker == nil || !m.OAuthBroker.Enabled {
+		return nil
+	}
+	return m.OAuthBroker.Validate("")
 }
 
 type JWK struct {

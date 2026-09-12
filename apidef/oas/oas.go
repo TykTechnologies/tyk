@@ -786,8 +786,20 @@ func (s *OAS) validateMCPOrigins(isMCP bool) error {
 	if !isMCP {
 		return errors.New("server.mcp is valid only for MCP APIs")
 	}
-	_, err := internalhttputil.CanonicalOrigins(ext.Server.MCP.TrustedOrigins)
-	return err
+	if _, err := internalhttputil.CanonicalOrigins(ext.Server.MCP.TrustedOrigins); err != nil {
+		return err
+	}
+	if ext.Server.MCP.OAuthBroker == nil {
+		return nil
+	}
+	broker := ext.Server.MCP.OAuthBroker
+	return (&apidef.MCPOAuthBrokerConfig{
+		Enabled:               broker.Enabled,
+		PublicOrigin:          broker.PublicOrigin,
+		PublicResource:        broker.PublicResource,
+		UpstreamResource:      broker.UpstreamResource,
+		AllowInsecureLoopback: broker.AllowInsecureLoopback,
+	}).Validate(ext.Server.ListenPath.Value)
 }
 
 // APIDef holds both OAS and Classic forms of an API definition.

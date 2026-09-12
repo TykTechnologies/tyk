@@ -145,7 +145,6 @@ func FetchUpstreamPRM(ctx context.Context, client *http.Client, prmURL string) (
 		return nil, fmt.Errorf("build PRM request: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("MCP-Protocol-Version", "2024-11-05")
 
 	resp, err := client.Do(req)
 	if err != nil {

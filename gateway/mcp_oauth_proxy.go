@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -245,9 +246,18 @@ func (gw *Gateway) firstAuthorizationServer(ctx context.Context, spec *APISpec) 
 // the suffix variant first because that's what most tenanted ASes (e.g.
 // auth.atlassian.com) serve.
 func fetchUpstreamASMetadata(ctx context.Context, asURL string) (map[string]any, error) {
+	return fetchUpstreamASMetadataWithClient(ctx, http.DefaultClient, asURL, true)
+}
+
+const maxUpstreamASMetadataBytes = 64 << 10
+
+func fetchUpstreamASMetadataWithClient(ctx context.Context, baseClient *http.Client, asURL string, allowInsecureLoopback bool) (map[string]any, error) {
 	u, err := url.Parse(asURL)
-	if err != nil {
-		return nil, fmt.Errorf("parse AS URL: %w", err)
+	if err != nil || !u.IsAbs() || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return nil, fmt.Errorf("invalid upstream AS issuer URL")
+	}
+	if u.Scheme != "https" && !(u.Scheme == "http" && allowInsecureLoopback && isLoopbackURL(u)) {
+		return nil, fmt.Errorf("upstream AS issuer must use HTTPS")
 	}
 
 	path := strings.TrimRight(u.Path, "/")
@@ -262,6 +272,14 @@ func fetchUpstreamASMetadata(ctx context.Context, asURL string) (map[string]any,
 	}
 
 	var lastErr error
+	if baseClient == nil {
+		baseClient = http.DefaultClient
+	}
+	client := *baseClient
+	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+	if client.Timeout == 0 || client.Timeout > 10*time.Second {
+		client.Timeout = 10 * time.Second
+	}
 	for _, candidate := range candidates {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, candidate, nil)
 		if err != nil {
@@ -269,14 +287,13 @@ func fetchUpstreamASMetadata(ctx context.Context, asURL string) (map[string]any,
 			continue
 		}
 		req.Header.Set("Accept", "application/json")
-		req.Header.Set("MCP-Protocol-Version", "2024-11-05")
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			lastErr = err
 			continue
 		}
-		body, readErr := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxUpstreamASMetadataBytes+1))
 		_ = resp.Body.Close()
 		if readErr != nil {
 			lastErr = fmt.Errorf("AS metadata %s body read: %w", candidate, readErr)
@@ -286,9 +303,18 @@ func fetchUpstreamASMetadata(ctx context.Context, asURL string) (map[string]any,
 			lastErr = fmt.Errorf("AS metadata %s returned %d", candidate, resp.StatusCode)
 			continue
 		}
+		if len(body) > maxUpstreamASMetadataBytes {
+			lastErr = fmt.Errorf("AS metadata %s exceeds %d bytes", candidate, maxUpstreamASMetadataBytes)
+			continue
+		}
 		var doc map[string]any
 		if err := json.Unmarshal(body, &doc); err != nil {
 			lastErr = fmt.Errorf("AS metadata %s decode: %w", candidate, err)
+			continue
+		}
+		issuer, ok := doc["issuer"].(string)
+		if !ok || issuer != asURL {
+			lastErr = fmt.Errorf("AS metadata issuer does not exactly match selected issuer")
 			continue
 		}
 		return doc, nil
@@ -297,4 +323,16 @@ func fetchUpstreamASMetadata(ctx context.Context, asURL string) (map[string]any,
 		lastErr = fmt.Errorf("no AS metadata endpoints tried")
 	}
 	return nil, lastErr
+}
+
+func isLoopbackURL(u *url.URL) bool {
+	if u == nil {
+		return false
+	}
+	host := u.Hostname()
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
