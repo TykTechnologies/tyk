@@ -265,8 +265,12 @@ func (b *mcpOAuthBroker) registrationHandler(w http.ResponseWriter, r *http.Requ
 	}
 	upstreamClientID, ok := upstream["client_id"].(string)
 	upstreamMethod, _ := upstream["token_endpoint_auth_method"].(string)
+	registrationClientURI, registrationClientURIOK := upstream["registration_client_uri"].(string)
+	registrationAccessToken, registrationAccessTokenOK := upstream["registration_access_token"].(string)
 	if !ok || upstreamClientID == "" || (upstreamMethod != "" && upstreamMethod != "none") ||
-		upstream["client_secret"] != nil || upstream["registration_access_token"] != nil {
+		upstream["client_secret"] != nil || !registrationClientURIOK || !registrationAccessTokenOK ||
+		!validMCPOAuthRegistrationManagementEndpoint(registrationEndpoint, registrationClientURI,
+			b.config.AllowInsecureLoopback) || !validMCPOAuthBearerValue(registrationAccessToken) {
 		mcpOAuthError(w, http.StatusBadGateway, "temporarily_unavailable")
 		return
 	}
@@ -283,6 +287,10 @@ func (b *mcpOAuthBroker) registrationHandler(w http.ResponseWriter, r *http.Requ
 		UpstreamTokenAuthMethod: "none",
 	}
 	if err := b.putRecord(r.Context(), b.clientKey(downstreamClientID), mapping, 0); err != nil {
+		if rollbackErr := b.rollbackUpstreamRegistration(r.Context(), registrationClientURI, registrationAccessToken); rollbackErr != nil {
+			log.WithField("api_id", b.spec.APIID).WithField("org_id", b.spec.OrgID).
+				Warn("MCP OAuth upstream registration rollback failed")
+		}
 		mcpOAuthError(w, http.StatusServiceUnavailable, "temporarily_unavailable")
 		return
 	}
@@ -293,6 +301,53 @@ func (b *mcpOAuthBroker) registrationHandler(w http.ResponseWriter, r *http.Requ
 	result["response_types"] = []string{"code"}
 	result["grant_types"] = []string{"authorization_code", "refresh_token"}
 	mcpOAuthJSON(w, http.StatusCreated, result)
+}
+
+func validMCPOAuthRegistrationManagementEndpoint(registrationEndpoint, managementEndpoint string, allowInsecureLoopback bool) bool {
+	if !trustedMCPOAuthEndpoint(registrationEndpoint, managementEndpoint, allowInsecureLoopback) {
+		return false
+	}
+	parsed, err := url.Parse(managementEndpoint)
+	if err != nil || parsed.Opaque != "" || parsed.ForceQuery {
+		return false
+	}
+	// Require the exact canonical serialization returned by the registration
+	// response. The broker never resolves or accepts a caller-supplied target.
+	return parsed.String() == managementEndpoint
+}
+
+func validMCPOAuthBearerValue(value string) bool {
+	if value == "" || strings.TrimSpace(value) != value {
+		return false
+	}
+	for _, char := range value {
+		if char <= 0x20 || char == 0x7f {
+			return false
+		}
+	}
+	return true
+}
+
+func (b *mcpOAuthBroker) rollbackUpstreamRegistration(ctx context.Context, managementEndpoint, accessToken string) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, managementEndpoint, nil)
+	if err != nil {
+		return errors.New("invalid upstream registration rollback request")
+	}
+	request.Header.Set(header.Accept, header.ApplicationJSON)
+	request.Header.Set(header.Authorization, "Bearer "+accessToken)
+	client := *b.client
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	client.Timeout = 10 * time.Second
+	response, err := client.Do(request)
+	if err != nil {
+		return errors.New("upstream registration rollback request failed")
+	}
+	defer response.Body.Close()
+	body, readErr := io.ReadAll(io.LimitReader(response.Body, mcpOAuthBrokerBodyMax+1))
+	if readErr != nil || len(body) > mcpOAuthBrokerBodyMax || response.StatusCode/100 != 2 {
+		return errors.New("upstream registration rollback was rejected")
+	}
+	return nil
 }
 
 func (b *mcpOAuthBroker) authorizeHandler(w http.ResponseWriter, r *http.Request) {
