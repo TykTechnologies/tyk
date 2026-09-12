@@ -33,7 +33,8 @@ type mcpOAuthBrokerStore interface {
 	RegisterClient(context.Context, string, string, string, []byte, time.Duration, int64) error
 	ClaimClient(context.Context, string, string) ([]byte, bool, error)
 	RestoreClient(context.Context, string, string) error
-	FinishClientDeletion(context.Context, string, string, string) error
+	ReplaceClaimedClient(context.Context, string, string, string, string, []byte, time.Duration) error
+	FinishClientDeletion(context.Context, string, string, string, string) error
 }
 
 type redisMCPOAuthBrokerStore struct {
@@ -257,18 +258,53 @@ func (s *redisMCPOAuthBrokerStore) RestoreClient(ctx context.Context, claimKey, 
 	return nil
 }
 
-var finishMCPOAuthBrokerClientDeletion = redis.NewScript(`
+var replaceClaimedMCPOAuthBrokerClient = redis.NewScript(`
+if redis.call("EXISTS", KEYS[1]) == 0 or redis.call("EXISTS", KEYS[2]) == 1 then
+  return 0
+end
+redis.call("SET", KEYS[2], ARGV[1], "PX", ARGV[2])
 redis.call("DEL", KEYS[1])
-redis.call("ZREM", KEYS[2], ARGV[1])
+redis.call("ZADD", KEYS[3], ARGV[3], ARGV[4])
+redis.call("PEXPIRE", KEYS[3], ARGV[2])
 return 1
 `)
 
-func (s *redisMCPOAuthBrokerStore) FinishClientDeletion(ctx context.Context, claimKey, indexKey, member string) error {
+// ReplaceClaimedClient atomically publishes a rotated sealed mapping and
+// releases the management claim. A successful update renews the registration
+// lifetime and its limit-index entry together.
+func (s *redisMCPOAuthBrokerStore) ReplaceClaimedClient(ctx context.Context, claimKey, clientKey, indexKey, member string, value []byte, ttl time.Duration) error {
 	client, err := s.client()
 	if err != nil {
 		return err
 	}
-	if err := finishMCPOAuthBrokerClientDeletion.Run(ctx, client, []string{s.key(claimKey), s.key(indexKey)}, member).Err(); err != nil {
+	if claimKey == "" || clientKey == "" || indexKey == "" || member == "" || len(value) == 0 || ttl <= 0 {
+		return errors.New("MCP OAuth broker client replacement has invalid storage parameters")
+	}
+	now := time.Now().UnixMilli()
+	result, err := replaceClaimedMCPOAuthBrokerClient.Run(ctx, client,
+		[]string{s.key(claimKey), s.key(clientKey), s.key(indexKey)}, value, ttl.Milliseconds(), now+ttl.Milliseconds(), member).Int64()
+	if err != nil {
+		return fmt.Errorf("atomically replace OAuth broker client: %w", err)
+	}
+	if result != 1 {
+		return errors.New("OAuth broker claimed client cannot be replaced")
+	}
+	return nil
+}
+
+var finishMCPOAuthBrokerClientDeletion = redis.NewScript(`
+redis.call("DEL", KEYS[1], KEYS[2])
+redis.call("ZREM", KEYS[3], ARGV[1])
+return 1
+`)
+
+func (s *redisMCPOAuthBrokerStore) FinishClientDeletion(ctx context.Context, claimKey, clientKey, indexKey, member string) error {
+	client, err := s.client()
+	if err != nil {
+		return err
+	}
+	if err := finishMCPOAuthBrokerClientDeletion.Run(ctx, client,
+		[]string{s.key(claimKey), s.key(clientKey), s.key(indexKey)}, member).Err(); err != nil {
 		return fmt.Errorf("atomically finish OAuth broker client deletion: %w", err)
 	}
 	return nil

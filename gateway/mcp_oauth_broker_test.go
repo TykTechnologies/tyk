@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/gorilla/mux"
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/require"
 
@@ -53,6 +54,12 @@ type failingMCPOAuthBrokerIssueStore struct {
 type cancelOnMCPOAuthClientPutStore struct {
 	mcpOAuthBrokerStore
 	cancel context.CancelFunc
+}
+
+type failingMCPOAuthClientReplaceStore struct{ mcpOAuthBrokerStore }
+
+func (s failingMCPOAuthClientReplaceStore) ReplaceClaimedClient(context.Context, string, string, string, string, []byte, time.Duration) error {
+	return errors.New("injected OAuth broker client replacement failure")
 }
 
 func (s cancelOnMCPOAuthClientPutStore) Put(context.Context, string, []byte, time.Duration) error {
@@ -100,11 +107,17 @@ type mcpOAuthBrokerUpstreamCapture struct {
 	registrationToken     string
 	registrationRequests  int
 	registrationDeletes   int
+	registrationUpdates   int
 	unrelatedDeletes      int
 	lastDeleteAuth        string
+	lastUpdateAuth        string
+	updatedClientID       string
+	updatedRedirects      []string
 	deleteStatus          int
 	deleteRedirect        string
 	deleteBody            string
+	updateStatus          int
+	updateResponse        string
 	authorizationRequests int
 	tokenRequests         int
 	runtimeRequests       int
@@ -117,10 +130,12 @@ type mcpOAuthBrokerUpstreamCapture struct {
 
 func newMCPBrokerTest(t *testing.T, listenPath string) (*Test, *httptest.Server, *mcpOAuthBrokerUpstreamCapture) {
 	t.Helper()
+	var gatewayCallbackURL string
 	capture := &mcpOAuthBrokerUpstreamCapture{
 		registeredClientID: "upstream-public-client",
 		registrationToken:  "upstream-management-secret",
 		deleteStatus:       http.StatusNoContent,
+		updateStatus:       http.StatusOK,
 		codeChallenges:     map[string]string{},
 		refreshToken:       "upstream-refresh-1",
 	}
@@ -159,6 +174,28 @@ func newMCPBrokerTest(t *testing.T, listenPath string) (*Test, *httptest.Server,
 			w.WriteHeader(http.StatusCreated)
 			_, _ = io.WriteString(w, responseBody)
 		case "/register/upstream-public-client":
+			if r.Method == http.MethodPut {
+				capture.mu.Lock()
+				capture.registrationUpdates++
+				capture.lastUpdateAuth = r.Header.Get(header.Authorization)
+				var registration struct {
+					ClientID     string   `json:"client_id"`
+					RedirectURIs []string `json:"redirect_uris"`
+				}
+				_ = json.NewDecoder(r.Body).Decode(&registration)
+				capture.updatedClientID = registration.ClientID
+				capture.updatedRedirects = append([]string(nil), registration.RedirectURIs...)
+				status := capture.updateStatus
+				responseBody := capture.updateResponse
+				if responseBody == "" {
+					responseBody = fmt.Sprintf(`{"client_id":%q,"token_endpoint_auth_method":"none","redirect_uris":[%q],"registration_client_uri":%q,"registration_access_token":"upstream-management-secret-rotated"}`,
+						capture.registeredClientID, gatewayCallbackURL, upstream.URL+"/register/"+capture.registeredClientID)
+				}
+				capture.mu.Unlock()
+				w.WriteHeader(status)
+				_, _ = io.WriteString(w, responseBody)
+				return
+			}
 			if r.Method != http.MethodDelete {
 				w.WriteHeader(http.StatusMethodNotAllowed)
 				return
@@ -242,6 +279,7 @@ func newMCPBrokerTest(t *testing.T, listenPath string) (*Test, *httptest.Server,
 
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
+	gatewayCallbackURL = ts.URL + "/__tyk-as/test/callback"
 	doc := oas.OAS{T: openapi3.T{OpenAPI: "3.0.3", Info: &openapi3.Info{Title: "broker", Version: "1"}, Paths: openapi3.NewPaths()}}
 	doc.SetTykExtension(&oas.XTykAPIGateway{
 		Info:     oas.Info{Name: "broker", State: oas.State{Active: true}},
@@ -633,6 +671,217 @@ func TestMCPOAuthBrokerDCRConcurrentDeleteCallsUpstreamOnce(t *testing.T) {
 	capture.mu.Lock()
 	defer capture.mu.Unlock()
 	require.Equal(t, 1, capture.registrationDeletes)
+}
+
+func managedMCPBrokerUpdateBody(t *testing.T, clientID, redirectURI string) string {
+	t.Helper()
+	body, err := json.Marshal(map[string]any{
+		"client_id": clientID, "redirect_uris": []string{redirectURI},
+		"token_endpoint_auth_method": "none", "response_types": []string{"code"},
+		"grant_types": []string{"authorization_code", "refresh_token"}, "client_name": "rotated fixture",
+	})
+	require.NoError(t, err)
+	return string(body)
+}
+
+func TestMCPOAuthBrokerDCRAuthenticatedUpdateRotatesCredentials(t *testing.T) {
+	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
+	registration := registerManagedMCPBrokerClient(t, ts, "https://client.example/old-callback")
+	managementURL, err := url.Parse(registration.RegistrationClientURI)
+	require.NoError(t, err)
+	newRedirect := "https://client.example/new-callback"
+	response, _ := ts.Run(t, test.TestCase{
+		Method: http.MethodPut, Path: managementURL.Path,
+		Data: managedMCPBrokerUpdateBody(t, registration.ClientID, newRedirect),
+		Headers: map[string]string{
+			header.Authorization: "Bearer " + registration.RegistrationAccessToken,
+			header.ContentType:   header.ApplicationJSON,
+		}, Code: http.StatusOK,
+	})
+	var rotated mcpBrokerRegistration
+	require.NoError(t, json.NewDecoder(response.Body).Decode(&rotated))
+	require.Equal(t, registration.ClientID, rotated.ClientID)
+	require.Equal(t, registration.RegistrationClientURI, rotated.RegistrationClientURI)
+	require.NotEmpty(t, rotated.RegistrationAccessToken)
+	require.NotEqual(t, registration.RegistrationAccessToken, rotated.RegistrationAccessToken)
+	require.Equal(t, "no-store", response.Header.Get(header.CacheControl))
+
+	ts.Run(t, test.TestCase{
+		Method: http.MethodPut, Path: managementURL.Path,
+		Data: managedMCPBrokerUpdateBody(t, registration.ClientID, newRedirect),
+		Headers: map[string]string{
+			header.Authorization: "Bearer " + registration.RegistrationAccessToken,
+			header.ContentType:   header.ApplicationJSON,
+		}, Code: http.StatusUnauthorized,
+	})
+	ts.Run(t, test.TestCase{
+		Method: http.MethodDelete, Path: managementURL.Path,
+		Headers: map[string]string{header.Authorization: "Bearer " + rotated.RegistrationAccessToken}, Code: http.StatusNoContent,
+	})
+
+	capture.mu.Lock()
+	defer capture.mu.Unlock()
+	require.Equal(t, 1, capture.registrationUpdates)
+	require.Equal(t, "Bearer "+capture.registrationToken, capture.lastUpdateAuth)
+	require.Equal(t, capture.registeredClientID, capture.updatedClientID)
+	require.Equal(t, []string{ts.URL + "/__tyk-as/test/callback"}, capture.updatedRedirects)
+	require.Equal(t, "Bearer upstream-management-secret-rotated", capture.lastDeleteAuth)
+}
+
+func TestMCPOAuthBrokerDCRUpdatePreservesMappingOnUpstreamFailure(t *testing.T) {
+	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
+	registration := registerManagedMCPBrokerClient(t, ts, "https://client.example/old-callback")
+	managementURL, err := url.Parse(registration.RegistrationClientURI)
+	require.NoError(t, err)
+	capture.mu.Lock()
+	capture.updateStatus = http.StatusInternalServerError
+	capture.mu.Unlock()
+	ts.Run(t, test.TestCase{
+		Method: http.MethodPut, Path: managementURL.Path,
+		Data: managedMCPBrokerUpdateBody(t, registration.ClientID, "https://client.example/new-callback"),
+		Headers: map[string]string{
+			header.Authorization: "Bearer " + registration.RegistrationAccessToken,
+			header.ContentType:   header.ApplicationJSON,
+		}, Code: http.StatusBadGateway,
+	})
+
+	// The same downstream management credential still controls the restored
+	// mapping, and the original upstream management bearer remains pinned.
+	ts.Run(t, test.TestCase{
+		Method: http.MethodDelete, Path: managementURL.Path,
+		Headers: map[string]string{header.Authorization: "Bearer " + registration.RegistrationAccessToken}, Code: http.StatusNoContent,
+	})
+	capture.mu.Lock()
+	defer capture.mu.Unlock()
+	require.Equal(t, 1, capture.registrationUpdates)
+	require.Equal(t, "Bearer "+capture.registrationToken, capture.lastDeleteAuth)
+}
+
+func TestMCPOAuthBrokerDCRUpdateRejectsInvalidManagementResponse(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		response func(gatewayURL, upstreamURL string) string
+	}{
+		{name: "changed client identity", response: func(gatewayURL, upstreamURL string) string {
+			return fmt.Sprintf(`{"client_id":"different-client","token_endpoint_auth_method":"none","redirect_uris":[%q],"registration_client_uri":%q,"registration_access_token":"rotated"}`,
+				gatewayURL+"/__tyk-as/test/callback", upstreamURL+"/register/upstream-public-client")
+		}},
+		{name: "cross-authority management URI", response: func(gatewayURL, _ string) string {
+			return fmt.Sprintf(`{"client_id":"upstream-public-client","token_endpoint_auth_method":"none","redirect_uris":[%q],"registration_client_uri":"https://attacker.example/client","registration_access_token":"rotated"}`,
+				gatewayURL+"/__tyk-as/test/callback")
+		}},
+		{name: "invalid management bearer", response: func(gatewayURL, upstreamURL string) string {
+			return fmt.Sprintf(`{"client_id":"upstream-public-client","token_endpoint_auth_method":"none","redirect_uris":[%q],"registration_client_uri":%q,"registration_access_token":" rotated"}`,
+				gatewayURL+"/__tyk-as/test/callback", upstreamURL+"/register/upstream-public-client")
+		}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			ts, upstream, capture := newMCPBrokerTest(t, "/mcp/")
+			registration := registerManagedMCPBrokerClient(t, ts, "https://client.example/old-callback")
+			managementURL, err := url.Parse(registration.RegistrationClientURI)
+			require.NoError(t, err)
+			capture.mu.Lock()
+			capture.updateResponse = testCase.response(ts.URL, upstream.URL)
+			capture.mu.Unlock()
+			response, _ := ts.Run(t, test.TestCase{
+				Method: http.MethodPut, Path: managementURL.Path,
+				Data: managedMCPBrokerUpdateBody(t, registration.ClientID, "https://client.example/new-callback"),
+				Headers: map[string]string{
+					header.Authorization: "Bearer " + registration.RegistrationAccessToken,
+					header.ContentType:   header.ApplicationJSON,
+				}, Code: http.StatusBadGateway,
+			})
+			responseBody, err := io.ReadAll(response.Body)
+			require.NoError(t, err)
+			require.NotContains(t, string(responseBody), "rotated")
+			// A malformed 2xx response is an ambiguous provider success. The
+			// broker fails closed instead of restoring potentially stale credentials.
+			ts.Run(t, test.TestCase{
+				Method: http.MethodDelete, Path: managementURL.Path,
+				Headers: map[string]string{header.Authorization: "Bearer " + registration.RegistrationAccessToken}, Code: http.StatusUnauthorized,
+			})
+			capture.mu.Lock()
+			require.Zero(t, capture.registrationDeletes)
+			capture.mu.Unlock()
+		})
+	}
+}
+
+func TestMCPOAuthBrokerDCRUpdateReplacementFailureCleansUpAndFailsClosed(t *testing.T) {
+	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
+	registration := registerManagedMCPBrokerClient(t, ts, "https://client.example/old-callback")
+	broker := newMCPOAuthBroker(ts.Gw, ts.Gw.getApiSpec("test"))
+	baseStore := broker.store
+	broker.store = failingMCPOAuthClientReplaceStore{mcpOAuthBrokerStore: baseStore}
+	request := httptest.NewRequest(http.MethodPut, registration.RegistrationClientURI,
+		strings.NewReader(managedMCPBrokerUpdateBody(t, registration.ClientID, "https://client.example/new-callback")))
+	request = mux.SetURLVars(request, map[string]string{"client_id": registration.ClientID})
+	request.Header.Set(header.Authorization, "Bearer "+registration.RegistrationAccessToken)
+	request.Header.Set(header.ContentType, header.ApplicationJSON)
+	response := httptest.NewRecorder()
+	broker.registrationUpdateHandler(response, request)
+	require.Equal(t, http.StatusServiceUnavailable, response.Code)
+	require.NotContains(t, response.Body.String(), "upstream-management-secret-rotated")
+
+	_, mappingFound, err := baseStore.Get(context.Background(), broker.clientKey(registration.ClientID))
+	require.NoError(t, err)
+	require.False(t, mappingFound)
+	_, claimFound, err := baseStore.Get(context.Background(), broker.clientClaimKey(registration.ClientID))
+	require.NoError(t, err)
+	require.False(t, claimFound)
+	capture.mu.Lock()
+	defer capture.mu.Unlock()
+	require.Equal(t, 1, capture.registrationUpdates)
+	require.Equal(t, 1, capture.registrationDeletes)
+	require.Equal(t, "Bearer upstream-management-secret-rotated", capture.lastDeleteAuth)
+}
+
+func TestMCPOAuthBrokerDCRConcurrentUpdateCallsUpstreamOnce(t *testing.T) {
+	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
+	registration := registerManagedMCPBrokerClient(t, ts, "https://client.example/old-callback")
+	body := managedMCPBrokerUpdateBody(t, registration.ClientID, "https://client.example/new-callback")
+	const attempts = 16
+	statuses := make(chan int, attempts)
+	var wg sync.WaitGroup
+	for range attempts {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			request, err := http.NewRequest(http.MethodPut, registration.RegistrationClientURI, strings.NewReader(body))
+			if err != nil {
+				statuses <- 0
+				return
+			}
+			request.Header.Set(header.Authorization, "Bearer "+registration.RegistrationAccessToken)
+			request.Header.Set(header.ContentType, header.ApplicationJSON)
+			response, err := http.DefaultClient.Do(request)
+			if err != nil {
+				statuses <- 0
+				return
+			}
+			_ = response.Body.Close()
+			statuses <- response.StatusCode
+		}()
+	}
+	wg.Wait()
+	close(statuses)
+	succeeded := 0
+	unauthorized := 0
+	for status := range statuses {
+		switch status {
+		case http.StatusOK:
+			succeeded++
+		case http.StatusUnauthorized:
+			unauthorized++
+		default:
+			t.Fatalf("unexpected concurrent update status %d", status)
+		}
+	}
+	require.Equal(t, 1, succeeded)
+	require.Equal(t, attempts-1, unauthorized)
+	capture.mu.Lock()
+	defer capture.mu.Unlock()
+	require.Equal(t, 1, capture.registrationUpdates)
 }
 
 func TestRedisMCPOAuthBrokerRegistrationLimitIsAtomicAndExpires(t *testing.T) {
