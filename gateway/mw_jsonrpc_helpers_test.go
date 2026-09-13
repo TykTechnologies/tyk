@@ -97,7 +97,7 @@ func TestMCPAdapterUsesStatelessHandler(t *testing.T) {
 	}{
 		{"modern", request(mcp.ModernProtocolVersion, "", mcp.MethodToolsList, modernMetadata), true},
 		{"modern ignores session header", request(mcp.ModernProtocolVersion, "session", mcp.MethodToolsList, modernMetadata), true},
-		{"modern initialize remains stateful", request(mcp.ModernProtocolVersion, "", mcp.MethodInitialize, modernMetadata), false},
+		{"modern initialize", request(mcp.ModernProtocolVersion, "", mcp.MethodInitialize, modernMetadata), true},
 		{"explicit legacy", request(mcp.LegacyFallbackProtocolVersion, "", mcp.MethodToolsList, `{}`), false},
 		{"session fallback", request("", "session", mcp.MethodToolsList, `{}`), false},
 		{"declaration free fallback", request("", "", mcp.MethodToolsList, `{}`), false},

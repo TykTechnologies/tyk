@@ -423,25 +423,104 @@ func TestSDKAdapter_ProtocolHandlersAreCachedAndShareServer(t *testing.T) {
 }
 
 func TestSDKAdapter_ConcurrentMixedHandlersAndToolRefresh(t *testing.T) {
-	t.Parallel()
-	adapter := newProtocolTestAdapter(t, []oas.DerivedTool{protocolTestTool("initial")})
+	const (
+		modernToolsList = "tools/list"
+		modernToolsCall = "tools/call"
+	)
+	stable := protocolTestTool("stable")
+	adapter := newProtocolTestAdapter(t, []oas.DerivedTool{stable, protocolTestTool("changing-0")})
+	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "mixed-handler-test", Version: "1"}, nil)
+	legacy, err := client.Connect(context.Background(), &mcpsdk.StreamableClientTransport{
+		Endpoint: "http://mcp.test/mcp",
+		HTTPClient: &http.Client{Transport: loopbackRoundTripper{
+			handler: adapter.ProtocolHTTPHandler(false),
+		}},
+	}, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, legacy.Close()) })
+
+	modernCall := func(method string) ([]byte, error) {
+		params := map[string]any{
+			"_meta": map[string]any{
+				mcpsdk.MetaKeyProtocolVersion:    sdkModernProtocolVersion,
+				mcpsdk.MetaKeyClientCapabilities: map[string]any{},
+				mcpsdk.MetaKeyClientInfo:         map[string]any{"name": "mixed-handler-test", "version": "1"},
+			},
+		}
+		if method == modernToolsCall {
+			params["name"] = stable.Name
+			params["arguments"] = map[string]any{}
+		}
+		body, marshalErr := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 9007199254740993, "method": method, "params": params})
+		if marshalErr != nil {
+			return nil, marshalErr
+		}
+		req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		req.Header.Set("Mcp-Protocol-Version", sdkModernProtocolVersion)
+		req.Header.Set("Mcp-Method", method)
+		if method == modernToolsCall {
+			req.Header.Set("Mcp-Name", stable.Name)
+		}
+		rec := httptest.NewRecorder()
+		adapter.ProtocolHTTPHandler(true).ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			return nil, fmt.Errorf("modern %s returned %d: %s", method, rec.Code, rec.Body.String())
+		}
+		return rec.Body.Bytes(), nil
+	}
+
+	errCh := make(chan error, 200)
 	var wg sync.WaitGroup
-	for index := 0; index < 40; index++ {
+	for index := 0; index < 8; index++ {
 		wg.Add(1)
 		go func(index int) {
 			defer wg.Done()
-			for iteration := 0; iteration < 50; iteration++ {
-				require.NotNil(t, adapter.ProtocolHTTPHandler((index+iteration)%2 == 0))
-				adapter.mu.RLock()
-				_ = len(adapter.tools)
-				adapter.mu.RUnlock()
+			for iteration := 0; iteration < 12; iteration++ {
+				if index%2 == 0 {
+					if _, callErr := legacy.ListTools(context.Background(), nil); callErr != nil {
+						errCh <- callErr
+					}
+					if _, callErr := legacy.CallTool(context.Background(), &mcpsdk.CallToolParams{Name: stable.Name, Arguments: map[string]any{}}); callErr != nil {
+						errCh <- callErr
+					}
+					continue
+				}
+				if _, callErr := modernCall(modernToolsList); callErr != nil {
+					errCh <- callErr
+				}
+				if _, callErr := modernCall(modernToolsCall); callErr != nil {
+					errCh <- callErr
+				}
 			}
 		}(index)
 	}
-	for iteration := 0; iteration < 25; iteration++ {
-		require.NoError(t, adapter.UpdateTools([]oas.DerivedTool{protocolTestTool(fmt.Sprintf("tool-%d", iteration))}))
+	for iteration := 1; iteration <= 12; iteration++ {
+		require.NoError(t, adapter.UpdateTools([]oas.DerivedTool{stable, protocolTestTool(fmt.Sprintf("changing-%d", iteration))}))
 	}
 	wg.Wait()
+	close(errCh)
+	for callErr := range errCh {
+		require.NoError(t, callErr)
+	}
+
+	final := protocolTestTool("final")
+	require.NoError(t, adapter.UpdateTools([]oas.DerivedTool{stable, final}))
+	legacyList, err := legacy.ListTools(context.Background(), nil)
+	require.NoError(t, err)
+	require.Contains(t, toolNames(legacyList.Tools), final.Name)
+	modernList, err := modernCall(modernToolsList)
+	require.NoError(t, err)
+	require.Contains(t, string(modernList), `"name":"final"`)
+}
+
+func toolNames(tools []*mcpsdk.Tool) []string {
+	names := make([]string, 0, len(tools))
+	for _, tool := range tools {
+		names = append(names, tool.Name)
+	}
+	return names
 }
 
 func newProtocolTestAdapter(t *testing.T, tools []oas.DerivedTool) *SDKAdapter {

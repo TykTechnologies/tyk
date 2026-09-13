@@ -427,16 +427,15 @@ func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWri
 }
 
 // mcpAdapterHTTPHandler selects only from the already-validated ingress
-// context. Initialize remains stateful for legacy session establishment;
-// otherwise only unambiguously modern traffic is stateless.
+// context. All unambiguously modern traffic is stateless; legacy initialize
+// and established/fallback sessions remain on the stateful handler.
 func mcpAdapterHTTPHandler(r *http.Request, sdkAdapter *restmcpadapter.SDKAdapter) http.Handler {
 	protocolContext := httpctx.GetMCPProtocolContext(r)
 	return sdkAdapter.ProtocolHTTPHandler(mcpAdapterUsesStatelessHandler(protocolContext))
 }
 
 func mcpAdapterUsesStatelessHandler(protocolContext *mcp.ProtocolContext) bool {
-	return protocolContext != nil && protocolContext.IsModern() &&
-		(protocolContext.Envelope == nil || protocolContext.Envelope.Method != mcp.MethodInitialize)
+	return protocolContext != nil && protocolContext.IsModern()
 }
 
 func syntheticJSONRPCMethod(r *http.Request) string {

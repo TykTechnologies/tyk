@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/sirupsen/logrus"
@@ -120,23 +121,101 @@ func TestSyntheticAdapterProcessRequest_RunsWithExistingJSONRPCRoutingState(t *t
 	assert.Contains(t, rec.Body.String(), `"result"`)
 }
 
-func TestRESTAsMCPAdapter_RejectsNonPOSTMethods(t *testing.T) {
+func TestRESTAsMCPAdapter_ProtocolSpecificGETAndDELETE(t *testing.T) {
 	adapterSpec := buildSyntheticAdapterForRuntimeTest(t)
-	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec}}
+	gw, _, _ := syntheticAdapterGatewayForCallTest(t)
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec, Gw: gw}}
 
-	for _, method := range []string{http.MethodGet, http.MethodDelete} {
-		t.Run(method, func(t *testing.T) {
-			req := httptest.NewRequest(method, "/mcp", nil)
-			req.Header.Set("Accept", "application/json, text/event-stream")
-			rec := httptest.NewRecorder()
+	t.Run("modern methods are rejected with POST allowance", func(t *testing.T) {
+		for _, method := range []string{http.MethodGet, http.MethodDelete} {
+			t.Run(method, func(t *testing.T) {
+				req := httptest.NewRequest(method, "/mcp", nil)
+				req.Header.Set("Accept", "application/json, text/event-stream")
+				req.Header.Set(mcp.HeaderProtocolVersion, mcp.ModernProtocolVersion)
+				rec := httptest.NewRecorder()
 
-			err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
-			require.NoError(t, err)
-			assert.Equal(t, middleware.StatusRespond, status)
-			assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
-			assert.Equal(t, http.MethodPost, rec.Header().Get("Allow"))
-		})
+				err, status := mw.ProcessRequest(rec, req, nil)
+				require.NoError(t, err)
+				assert.Equal(t, middleware.StatusRespond, status)
+				assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+				assert.Equal(t, http.MethodPost, rec.Header().Get("Allow"))
+			})
+		}
+	})
+
+	sessionID := initializeSyntheticAdapterSession(t, mw)
+	prepareLegacy := func(method string) *http.Request {
+		req := httptest.NewRequest(method, "/mcp", nil)
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		req.Header.Set(mcp.HeaderSessionID, sessionID)
+		ctxSetMCPAdapterCallerProxyID(req, "proxy-1")
+		caller := gw.apisByID["proxy-1"]
+		require.NotNil(t, caller)
+		acceptMCPOrigin(req, caller, "")
+		require.True(t, establishMCPAdapterOriginHop(req, gw, caller, adapterSpec))
+		return req
 	}
+
+	t.Run("legacy GET opens and cancellation closes the SSE stream", func(t *testing.T) {
+		req := prepareLegacy(http.MethodGet)
+		ctx, cancel := context.WithCancel(req.Context())
+		req = req.WithContext(ctx)
+		rec := newHeaderSignalRecorder()
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			_, _ = mw.ProcessRequest(rec, req, nil)
+		}()
+		select {
+		case <-rec.wroteHeader:
+		case <-time.After(2 * time.Second):
+			t.Fatal("legacy GET did not open an SSE response")
+		}
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		require.Contains(t, rec.Header().Get("Content-Type"), "text/event-stream")
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("legacy GET did not stop after request cancellation")
+		}
+	})
+
+	t.Run("legacy DELETE terminates the session", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		err, status := mw.ProcessRequest(rec, prepareLegacy(http.MethodDelete), nil)
+		require.NoError(t, err)
+		require.Equal(t, middleware.StatusRespond, status)
+		require.Equal(t, http.StatusNoContent, rec.Code, rec.Body.String())
+	})
+}
+
+type headerSignalRecorder struct {
+	*httptest.ResponseRecorder
+	once        sync.Once
+	wroteHeader chan struct{}
+}
+
+func newHeaderSignalRecorder() *headerSignalRecorder {
+	return &headerSignalRecorder{ResponseRecorder: httptest.NewRecorder(), wroteHeader: make(chan struct{})}
+}
+
+func (r *headerSignalRecorder) signal() { r.once.Do(func() { close(r.wroteHeader) }) }
+
+func (r *headerSignalRecorder) WriteHeader(status int) {
+	r.ResponseRecorder.WriteHeader(status)
+	r.signal()
+}
+
+func (r *headerSignalRecorder) Write(body []byte) (int, error) {
+	written, err := r.ResponseRecorder.Write(body)
+	r.signal()
+	return written, err
+}
+
+func (r *headerSignalRecorder) Flush() {
+	r.ResponseRecorder.Flush()
+	r.signal()
 }
 
 func TestRESTAsMCPToolView_RewritesToolsListForCallerProxy(t *testing.T) {
