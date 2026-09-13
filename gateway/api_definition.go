@@ -233,11 +233,13 @@ func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 		}
 	}
 	if s.MCP != nil {
-		if !s.IsMCPManaged() {
+		if !s.IsMCPManaged() && len(s.MCP.TrustedOrigins) > 0 {
 			return errors.New("mcp configuration is valid only for MCP APIs")
 		}
-		if err := s.MCP.Validate(); err != nil {
-			return err
+		if s.IsMCPManaged() {
+			if err := s.MCP.Validate(); err != nil {
+				return err
+			}
 		}
 	}
 
