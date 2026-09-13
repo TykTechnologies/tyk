@@ -515,6 +515,197 @@ func TestSDKAdapter_ConcurrentMixedHandlersAndToolRefresh(t *testing.T) {
 	require.Contains(t, string(modernList), `"name":"final"`)
 }
 
+func TestSDKAdapter_ModernCancellationIsIsolatedByExactRequest(t *testing.T) {
+	started := make(chan string, 2)
+	cancelled := make(chan string, 1)
+	releaseSuccess := make(chan struct{})
+	tool := protocolTestTool("wait")
+	tool.InputSchema = map[string]any{
+		"type":       "object",
+		"properties": map[string]any{"operation": map[string]any{"type": "string"}},
+		"required":   []string{"operation"},
+	}
+	adapter, err := NewSDKAdapter(SDKServerConfig{
+		Name: "cancellation-test", Tools: []oas.DerivedTool{tool},
+		CallTool: func(ctx context.Context, _ *oas.DerivedTool, args map[string]any) (*Recorder, error) {
+			operation := args["operation"].(string)
+			started <- operation
+			if operation == "cancel" {
+				<-ctx.Done()
+				cancelled <- operation
+				return nil, ctx.Err()
+			}
+			select {
+			case <-releaseSuccess:
+				rec := NewRecorder()
+				_, writeErr := rec.Write([]byte(`{"operation":"success"}`))
+				return rec, writeErr
+			case <-ctx.Done():
+				return nil, fmt.Errorf("unrelated operation was cancelled: %w", ctx.Err())
+			}
+		},
+	})
+	require.NoError(t, err)
+
+	serve := func(ctx context.Context, id int64, operation string) (*httptest.ResponseRecorder, <-chan struct{}) {
+		body := fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"method":"tools/call","params":{"name":"wait","arguments":{"operation":%q},"_meta":{"%s":"%s","%s":{},"%s":{"name":"cancel-test","version":"1"}}}}`,
+			id, operation, mcpsdk.MetaKeyProtocolVersion, sdkModernProtocolVersion,
+			mcpsdk.MetaKeyClientCapabilities, mcpsdk.MetaKeyClientInfo)
+		req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body)).WithContext(ctx)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		req.Header.Set("Mcp-Protocol-Version", sdkModernProtocolVersion)
+		req.Header.Set("Mcp-Method", "tools/call")
+		req.Header.Set("Mcp-Name", "wait")
+		rec := httptest.NewRecorder()
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			adapter.ProtocolHTTPHandler(true).ServeHTTP(rec, req)
+		}()
+		return rec, done
+	}
+
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	cancelRec, cancelDone := serve(cancelCtx, 9007199254740993, "cancel")
+	successRec, successDone := serve(context.Background(), 9007199254740994, "success")
+	seen := map[string]bool{}
+	for len(seen) < 2 {
+		select {
+		case operation := <-started:
+			seen[operation] = true
+		case <-time.After(time.Second):
+			t.Fatal("both modern source operations did not start")
+		}
+	}
+	cancel()
+	select {
+	case operation := <-cancelled:
+		assert.Equal(t, "cancel", operation)
+	case <-time.After(time.Second):
+		t.Fatal("selected modern operation did not observe HTTP cancellation")
+	}
+	close(releaseSuccess)
+	select {
+	case <-successDone:
+	case <-time.After(time.Second):
+		t.Fatal("unrelated modern operation did not complete")
+	}
+	select {
+	case <-cancelDone:
+	case <-time.After(time.Second):
+		t.Fatal("cancelled modern HTTP handler did not return")
+	}
+	assert.Equal(t, http.StatusOK, successRec.Code, successRec.Body.String())
+	assert.Contains(t, successRec.Body.String(), `"id":9007199254740994`)
+	assert.NotContains(t, successRec.Body.String(), `9007199254740993`)
+	_ = cancelRec
+}
+
+func TestSDKAdapter_LegacyExplicitCancellationIsolatedByExactRequestID(t *testing.T) {
+	started := make(chan string, 2)
+	cancelled := make(chan string, 1)
+	releaseSuccess := make(chan struct{})
+	tool := protocolTestTool("wait")
+	tool.InputSchema = map[string]any{
+		"type":       "object",
+		"properties": map[string]any{"operation": map[string]any{"type": "string"}},
+		"required":   []string{"operation"},
+	}
+	adapter, err := NewSDKAdapter(SDKServerConfig{
+		Name: "legacy-cancellation-test", Tools: []oas.DerivedTool{tool},
+		CallTool: func(ctx context.Context, _ *oas.DerivedTool, args map[string]any) (*Recorder, error) {
+			operation := args["operation"].(string)
+			started <- operation
+			if operation == "cancel" {
+				<-ctx.Done()
+				cancelled <- operation
+				return nil, ctx.Err()
+			}
+			select {
+			case <-releaseSuccess:
+				rec := NewRecorder()
+				_, writeErr := rec.Write([]byte(`{"operation":"success"}`))
+				return rec, writeErr
+			case <-ctx.Done():
+				return nil, fmt.Errorf("unrelated legacy operation was cancelled: %w", ctx.Err())
+			}
+		},
+	})
+	require.NoError(t, err)
+	handler := adapter.ProtocolHTTPHandler(false)
+	serve := func(body, sessionID string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		req.Header.Set("Mcp-Protocol-Version", "2025-06-18")
+		if sessionID != "" {
+			req.Header.Set("Mcp-Session-Id", sessionID)
+		}
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec
+	}
+
+	initialize := serve(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"cancel-test","version":"1"}}}`, "")
+	require.Equal(t, http.StatusOK, initialize.Code, initialize.Body.String())
+	sessionID := initialize.Header().Get("Mcp-Session-Id")
+	require.NotEmpty(t, sessionID)
+	initialized := serve(`{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}`, sessionID)
+	require.Contains(t, []int{http.StatusAccepted, http.StatusNoContent}, initialized.Code)
+
+	serveCall := func(id int64, operation string) (*httptest.ResponseRecorder, <-chan struct{}) {
+		body := fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"method":"tools/call","params":{"name":"wait","arguments":{"operation":%q}}}`, id, operation)
+		rec := httptest.NewRecorder()
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			request := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Accept", "application/json, text/event-stream")
+			request.Header.Set("Mcp-Protocol-Version", "2025-06-18")
+			request.Header.Set("Mcp-Session-Id", sessionID)
+			handler.ServeHTTP(rec, request)
+		}()
+		return rec, done
+	}
+
+	cancelRec, cancelDone := serveCall(9007199254740993, "cancel")
+	successRec, successDone := serveCall(9007199254740994, "success")
+	seen := map[string]bool{}
+	for len(seen) < 2 {
+		select {
+		case operation := <-started:
+			seen[operation] = true
+		case <-time.After(time.Second):
+			t.Fatal("both legacy source operations did not start")
+		}
+	}
+	cancelNotification := serve(`{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":9007199254740993,"reason":"cancel selected call"}}`, sessionID)
+	require.Contains(t, []int{http.StatusAccepted, http.StatusNoContent}, cancelNotification.Code, cancelNotification.Body.String())
+	select {
+	case operation := <-cancelled:
+		assert.Equal(t, "cancel", operation)
+	case <-time.After(time.Second):
+		t.Fatal("selected legacy operation did not observe explicit cancellation")
+	}
+	close(releaseSuccess)
+	select {
+	case <-successDone:
+	case <-time.After(time.Second):
+		t.Fatal("unrelated legacy operation did not complete")
+	}
+	select {
+	case <-cancelDone:
+	case <-time.After(time.Second):
+		t.Fatal("cancelled legacy call did not return")
+	}
+	assert.Equal(t, http.StatusOK, successRec.Code, successRec.Body.String())
+	assert.Contains(t, successRec.Body.String(), `"id":9007199254740994`)
+	assert.NotContains(t, successRec.Body.String(), `9007199254740993`)
+	_ = cancelRec
+}
+
 func toolNames(tools []*mcpsdk.Tool) []string {
 	names := make([]string, 0, len(tools))
 	for _, tool := range tools {

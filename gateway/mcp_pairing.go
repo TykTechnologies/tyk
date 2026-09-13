@@ -361,6 +361,7 @@ func callerProxyIDs(proxies []*APISpec) []string {
 }
 
 func defaultMCPAdapterCallTool(ctx context.Context, tool *oas.DerivedTool, args map[string]any) (*restmcpadapter.Recorder, error) {
+	operationCtx := ctx
 	current, ok := restmcpadapter.CurrentRequestContext(ctx)
 	if !ok {
 		return nil, fmt.Errorf("REST-as-MCP current request binding is missing")
@@ -372,10 +373,10 @@ func defaultMCPAdapterCallTool(ctx context.Context, tool *oas.DerivedTool, args 
 	if gw == nil || adapterSpec == nil || parentReq == nil {
 		return nil, fmt.Errorf("REST-as-MCP adapter callback is not installed")
 	}
-	return gw.callMCPAdapterTool(parentReq, adapterSpec, tool, args)
+	return gw.callMCPAdapterTool(operationCtx, parentReq, adapterSpec, tool, args)
 }
 
-func (gw *Gateway) callMCPAdapterTool(parentReq *http.Request, adapterSpec *APISpec, tool *oas.DerivedTool, args map[string]any) (*restmcpadapter.Recorder, error) {
+func (gw *Gateway) callMCPAdapterTool(operationCtx context.Context, parentReq *http.Request, adapterSpec *APISpec, tool *oas.DerivedTool, args map[string]any) (*restmcpadapter.Recorder, error) {
 	if gw == nil {
 		return nil, fmt.Errorf("gateway is nil")
 	}
@@ -408,7 +409,7 @@ func (gw *Gateway) callMCPAdapterTool(parentReq *http.Request, adapterSpec *APIS
 	}
 
 	sourceRESTAPIID := adapterSpec.MCPAdapter.SourceRESTAPIID
-	upstreamReq, err := restmcpadapter.BuildUpstreamRequest(parentReq, &callerTool, sourceRESTAPIID, args)
+	upstreamReq, err := restmcpadapter.BuildUpstreamRequestWithContext(parentReq, operationCtx, &callerTool, sourceRESTAPIID, args)
 	if err != nil {
 		return nil, err
 	}
