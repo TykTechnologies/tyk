@@ -226,4 +226,16 @@ func TestAPISpecValidate_ClassicMCPTrustedOrigins(t *testing.T) {
 		MCP: &apidef.MCPConfig{},
 	}}
 	require.NoError(t, emptyNonMCP.Validate(config.OASConfig{}))
+
+	brokerNonMCP := &APISpec{APIDefinition: &apidef.APIDefinition{
+		MCP: &apidef.MCPConfig{OAuthBroker: &apidef.MCPOAuthBrokerConfig{}},
+	}}
+	require.NoError(t, brokerNonMCP.Validate(config.OASConfig{}))
+
+	configuredBrokerNonMCP := &APISpec{APIDefinition: &apidef.APIDefinition{
+		MCP: &apidef.MCPConfig{OAuthBroker: &apidef.MCPOAuthBrokerConfig{
+			PublicOrigin: "https://gateway.example",
+		}},
+	}}
+	assert.Error(t, configuredBrokerNonMCP.Validate(config.OASConfig{}))
 }
