@@ -467,6 +467,40 @@ func TestNewSDKStreamableHTTPHandler_HandlesInitializeAsJSON(t *testing.T) {
 	assert.NotContains(t, tools, "listChanged")
 }
 
+func TestNewSDKStreamableHTTPHandler_PreservesExactNumericRequestID(t *testing.T) {
+	t.Parallel()
+
+	handler, err := NewSDKStreamableHTTPHandler(SDKServerConfig{
+		Name:  "Orders [MCP adapter]",
+		Tools: sampleTools(),
+		CallTool: func(context.Context, *oas.DerivedTool, map[string]any) (*Recorder, error) {
+			return NewRecorder(), nil
+		},
+	}, nil)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{
+		"jsonrpc":"2.0",
+		"id":9007199254740993,
+		"method":"initialize",
+		"params":{
+			"protocolVersion":"2025-06-18",
+			"clientInfo":{"name":"exact-id-test","version":"v0.0.1"},
+			"capabilities":{}
+		}
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.JSONEq(t, `9007199254740993`, string(body["id"]))
+}
+
 func TestNewSDKStreamableHTTPHandler_UnknownToolArgumentsReturnInvalidParams(t *testing.T) {
 	t.Parallel()
 
