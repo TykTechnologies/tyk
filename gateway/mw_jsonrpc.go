@@ -416,16 +416,17 @@ func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWri
 		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 		return nil, middleware.StatusRespond
 	}
+	sdkRequest := requestForMCPAdapterSDK(r)
 
 	if method == mcp.MethodToolsList || (policyCtx != nil && policyCtx.listConfig != nil) {
 		rec := newBufferedResponseWriter()
-		m.Spec.MCPAdapter.SDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(rec, r)
+		m.Spec.MCPAdapter.SDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(rec, sdkRequest)
 		view, ok := m.syntheticMCPToolViewForCaller(r)
 		m.writeSyntheticMCPToolsListResponse(w, r, rec, view, ok, policyCtx)
 		return nil, middleware.StatusRespond
 	}
 
-	m.Spec.MCPAdapter.SDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(w, r)
+	m.Spec.MCPAdapter.SDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(w, sdkRequest)
 	return nil, middleware.StatusRespond
 }
 
