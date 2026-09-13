@@ -7,12 +7,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/mcp"
 )
 
-// SupportedProtocolVersions describes the runtime behind this endpoint.
-// Synthetic adapters remain legacy-only until their runtime supports modern requests.
+// SupportedProtocolVersions describes the runtime behind this endpoint. Native
+// and paired REST-as-MCP endpoints serve the same four Gateway-qualified
+// versions once the cached stateless adapter handler is active.
 func (s *APISpec) SupportedProtocolVersions() []string {
-	if s != nil && (s.IsSyntheticMCPAdapter() || s.IsPairedMCPAdapterProxy()) {
-		return mcp.LegacyProtocolVersions()
-	}
 	return mcp.ServedProtocolVersions()
 }
 
