@@ -171,14 +171,14 @@ func TestRESTAsMCPAdapter_ProtocolSpecificGETAndDELETE(t *testing.T) {
 		case <-time.After(2 * time.Second):
 			t.Fatal("legacy GET did not open an SSE response")
 		}
-		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-		require.Contains(t, rec.Header().Get("Content-Type"), "text/event-stream")
 		cancel()
 		select {
 		case <-done:
 		case <-time.After(2 * time.Second):
 			t.Fatal("legacy GET did not stop after request cancellation")
 		}
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		require.Contains(t, rec.Header().Get("Content-Type"), "text/event-stream")
 	})
 
 	t.Run("legacy DELETE terminates the session", func(t *testing.T) {
