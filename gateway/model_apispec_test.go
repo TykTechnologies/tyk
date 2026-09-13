@@ -221,4 +221,9 @@ func TestAPISpecValidate_ClassicMCPTrustedOrigins(t *testing.T) {
 		MCP: &apidef.MCPConfig{TrustedOrigins: []string{"https://client.example"}},
 	}}
 	assert.Error(t, nonMCP.Validate(config.OASConfig{}))
+
+	emptyNonMCP := &APISpec{APIDefinition: &apidef.APIDefinition{
+		MCP: &apidef.MCPConfig{},
+	}}
+	require.NoError(t, emptyNonMCP.Validate(config.OASConfig{}))
 }
