@@ -74,6 +74,50 @@ func (o NormalizedPath) RawOpIdPrefix() string {
 // it finds in a user-defined path. A name the user chose never matches.
 var generatedName = regexp.MustCompile(`^` + regexp.QuoteMeta(RePrefix) + `\d+$`)
 
+// Denormalize turns a normalized path back into the user-defined path it was
+// generated from, and is the inverse of what Parser does to a path.
+//
+// Normalizing replaces each regex segment with a generated placeholder and
+// moves the regex onto that placeholder's parameter, so /users/[a-z]+ becomes
+// /users/{customRegex1} carrying pattern [a-z]+. Anything reading the path
+// alone, Tyk Classic routing among them, sees only a placeholder and treats it
+// as "one segment, any value", which makes every regex endpoint on a path match
+// the same requests. Putting the regex back into the path is what keeps them
+// apart, and only the raw form does it: {name:regex} is read as a placeholder
+// too.
+//
+// Only placeholders this package mints are substituted. A parameter the user
+// named is left alone, since the name means something to them and the shape of
+// their path is theirs to choose.
+func Denormalize(path string, params openapi3.Parameters) string {
+	if len(params) == 0 || !strings.ContainsRune(path, curlyBraceLeft) {
+		return path
+	}
+
+	denormalized := path
+
+	for _, ref := range params {
+		if ref == nil || ref.Value == nil || ref.Value.In != openapi3.ParameterInPath {
+			continue
+		}
+
+		if !generatedName.MatchString(ref.Value.Name) {
+			continue
+		}
+
+		schema := ref.Value.Schema
+		if schema == nil || schema.Value == nil || schema.Value.Pattern == "" {
+			continue
+		}
+
+		denormalized = strings.ReplaceAll(denormalized,
+			string(curlyBraceLeft)+ref.Value.Name+string(curlyBraceRight),
+			schema.Value.Pattern)
+	}
+
+	return denormalized
+}
+
 // IsGeneratedName reports whether name is one this package mints for an
 // anonymous regex, rather than one the user chose.
 func IsGeneratedName(name string) bool {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
+	"github.com/TykTechnologies/tyk/internal/pathnormalizer"
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
@@ -289,32 +290,48 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 	}
 
 	for _, pathItem := range oasutil.SortByPathLength(*s.Paths) {
-		for id, tykOp := range tykOperations {
-			path := pathItem.Path
-			for method, operation := range pathItem.Operations() {
-				if id == operation.OperationID {
-					tykOp.extractAllowanceTo(ep, path, method, allow)
-					tykOp.extractAllowanceTo(ep, path, method, block)
-					tykOp.extractAllowanceTo(ep, path, method, ignoreAuthentication)
-					tykOp.extractInternalTo(ep, path, method)
-					tykOp.extractTransformRequestMethodTo(ep, path, method)
-					tykOp.extractTransformRequestBodyTo(ep, path, method)
-					tykOp.extractTransformResponseBodyTo(ep, path, method)
-					tykOp.extractTransformRequestHeadersTo(ep, path, method)
-					tykOp.extractTransformResponseHeadersTo(ep, path, method)
-					tykOp.extractURLRewriteTo(ep, path, method)
-					tykOp.extractCacheTo(ep, path, method)
-					tykOp.extractEnforceTimeoutTo(ep, path, method)
-					tykOp.extractVirtualEndpointTo(ep, path, method)
-					tykOp.extractEndpointPostPluginTo(ep, path, method)
-					tykOp.extractCircuitBreakerTo(ep, path, method)
-					tykOp.extractTrackEndpointTo(ep, path, method)
-					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
-					tykOp.extractRequestSizeLimitTo(ep, path, method)
-					tykOp.extractRateLimitEndpointTo(ep, path, method)
-					break
-				}
+		// The regex a generated placeholder stands for has to come back into the
+		// path: whatever reads this, Tyk Classic routing included, sees the path
+		// alone and never the parameter carrying the regex.
+		path := pathnormalizer.Denormalize(pathItem.Path, pathItem.Parameters)
+
+		operations := pathItem.Operations()
+
+		methods := make([]string, 0, len(operations))
+		for method := range operations {
+			methods = append(methods, method)
+		}
+
+		// Operations are held in a map, so without this the endpoints land in
+		// ep in a different order on every run and two saves of one API produce
+		// two different definitions.
+		sort.Strings(methods)
+
+		for _, method := range methods {
+			tykOp, ok := tykOperations[operations[method].OperationID]
+			if !ok {
+				continue
 			}
+
+			tykOp.extractAllowanceTo(ep, path, method, allow)
+			tykOp.extractAllowanceTo(ep, path, method, block)
+			tykOp.extractAllowanceTo(ep, path, method, ignoreAuthentication)
+			tykOp.extractInternalTo(ep, path, method)
+			tykOp.extractTransformRequestMethodTo(ep, path, method)
+			tykOp.extractTransformRequestBodyTo(ep, path, method)
+			tykOp.extractTransformResponseBodyTo(ep, path, method)
+			tykOp.extractTransformRequestHeadersTo(ep, path, method)
+			tykOp.extractTransformResponseHeadersTo(ep, path, method)
+			tykOp.extractURLRewriteTo(ep, path, method)
+			tykOp.extractCacheTo(ep, path, method)
+			tykOp.extractEnforceTimeoutTo(ep, path, method)
+			tykOp.extractVirtualEndpointTo(ep, path, method)
+			tykOp.extractEndpointPostPluginTo(ep, path, method)
+			tykOp.extractCircuitBreakerTo(ep, path, method)
+			tykOp.extractTrackEndpointTo(ep, path, method)
+			tykOp.extractDoNotTrackEndpointTo(ep, path, method)
+			tykOp.extractRequestSizeLimitTo(ep, path, method)
+			tykOp.extractRateLimitEndpointTo(ep, path, method)
 		}
 	}
 
