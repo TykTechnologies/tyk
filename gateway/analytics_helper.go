@@ -91,5 +91,5 @@ func recordDetailUnsafe(r *http.Request, spec *APISpec) bool {
 	}
 
 	// no org session found, use global config
-	return spec.GraphQL.Enabled || spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
+	return spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
 }
