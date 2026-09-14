@@ -117,9 +117,9 @@ func ReencodeEnvelope(envelope *JSONRPCResponse, result map[string]json.RawMessa
 }
 
 // FilterJSONRPCBody parses a JSON-RPC response body, filters the list items
-// according to the given config and rules, and returns the re-encoded body.
-// Returns (nil, false) when any parsing or marshalling step fails, signalling
-// that the caller should pass through the original body unmodified.
+// according to the given config and rules, and returns the re-encoded body only
+// when at least one item was removed. Returns (nil, false) for parse failures or
+// unchanged content, signalling that the caller must retain the original bytes.
 func FilterJSONRPCBody(body []byte, cfg *ListFilterConfig, rules user.AccessControlRules) ([]byte, bool) {
 	return FilterJSONRPCBodyWithRuleSets(body, cfg, []user.AccessControlRules{rules})
 }
@@ -147,7 +147,7 @@ func FilterJSONRPCBodyWithRuleSets(body []byte, cfg *ListFilterConfig, ruleSets 
 
 // FilterParsedJSONRPC filters items in an already-parsed JSON-RPC result and
 // re-encodes the envelope. Returns (nil, false) when the array key is missing,
-// items cannot be parsed, or re-encoding fails.
+// items cannot be parsed, no items were removed, or re-encoding fails.
 func FilterParsedJSONRPC(envelope *JSONRPCResponse, result map[string]json.RawMessage, cfg *ListFilterConfig, rules user.AccessControlRules) ([]byte, bool) {
 	return FilterParsedJSONRPCWithRuleSets(envelope, result, cfg, []user.AccessControlRules{rules})
 }
@@ -166,6 +166,11 @@ func FilterParsedJSONRPCWithRuleSets(envelope *JSONRPCResponse, result map[strin
 	}
 
 	filtered := FilterItemsWithRuleSets(items, cfg.NameField, ruleSets)
+	if len(filtered) == len(items) {
+		return nil, false
+	}
+
+	SetPrivateCacheHints(result)
 
 	newBody, err := ReencodeEnvelope(envelope, result, cfg.ArrayKey, filtered)
 	if err != nil {
@@ -173,6 +178,15 @@ func FilterParsedJSONRPCWithRuleSets(envelope *JSONRPCResponse, result map[strin
 	}
 
 	return newBody, true
+}
+
+// SetPrivateCacheHints prevents an authorization-specific MCP result from
+// being reused for a different caller. It operates on the raw result map so
+// unknown fields and pagination cursors are preserved when the envelope is
+// re-encoded.
+func SetPrivateCacheHints(result map[string]json.RawMessage) {
+	result["cacheScope"] = json.RawMessage(`"private"`)
+	result["ttlMs"] = json.RawMessage(`0`)
 }
 
 // InferListConfigFromResult determines the list type by inspecting which
@@ -247,6 +261,7 @@ func FilterInitializeCapabilitiesParsed(envelope *JSONRPCResponse, result map[st
 	if !changed {
 		return nil, false
 	}
+	SetPrivateCacheHints(result)
 
 	capabilitiesBytes, err := json.Marshal(capabilities)
 	if err != nil {
