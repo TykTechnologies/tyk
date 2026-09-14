@@ -163,6 +163,57 @@ func TestJSONRPCContentTypeIsUnambiguousApplicationJSON(t *testing.T) {
 	}
 }
 
+func TestPairedMCPProxyStrictIngressRunsBeforeInternalHop(t *testing.T) {
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{
+		Proxy: apidef.ProxyConfig{TargetURL: "tyk://rest-1/mcp"},
+	}}
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec}}
+	require.True(t, mw.EnabledForSpec())
+
+	t.Run("valid request continues without public routing", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(
+			`{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`,
+		))
+		req.Header.Set("Content-Type", "application/json; charset=utf-8")
+		req.Header.Set(mcp.HeaderProtocolVersion, "2025-03-26")
+		rec := httptest.NewRecorder()
+
+		err, status := mw.ProcessRequest(rec, req, nil)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, status)
+		require.Nil(t, httpctx.GetJSONRPCRoutingState(req))
+		require.Equal(t, "tools/list", ctxGetMCPMethod(req))
+	})
+
+	for _, test := range []struct {
+		name   string
+		values []string
+	}{
+		{name: "JSONP", values: []string{"application/jsonp"}},
+		{name: "JSON sequence", values: []string{"application/json-seq"}},
+		{name: "comma list", values: []string{"application/json, text/plain"}},
+		{name: "duplicate header", values: []string{"application/json", "application/json"}},
+		{name: "duplicate parameter", values: []string{"application/json; charset=utf-8; charset=latin1"}},
+		{name: "malformed parameter", values: []string{"application/json; charset"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(
+				`{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`,
+			))
+			req.Header[mcp.HeaderProtocolVersion] = []string{"2025-03-26"}
+			req.Header[headerContentType] = test.values
+			rec := httptest.NewRecorder()
+
+			err, status := mw.ProcessRequest(rec, req, nil)
+			require.NoError(t, err)
+			require.Equal(t, middleware.StatusRespond, status)
+			require.Equal(t, http.StatusBadRequest, rec.Code)
+			require.Nil(t, httpctx.GetJSONRPCRoutingState(req))
+			require.Empty(t, ctxGetMCPMethod(req))
+		})
+	}
+}
+
 func TestStrictJSONRPCIngressRejectsBeforeRouting(t *testing.T) {
 	for _, synthetic := range []bool{false, true} {
 		kind := map[bool]string{false: "native", true: "REST-as-MCP"}[synthetic]
