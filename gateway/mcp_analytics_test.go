@@ -328,5 +328,5 @@ func TestMCPAnalytics_RejectedEnvelopeRetainsDeclaration(t *testing.T) {
 	assert.Equal(t, "header", rec.MCPStats.ProtocolVersionSource)
 	assert.Equal(t, "server/discover", rec.MCPStats.JSONRPCMethod)
 	assert.Equal(t, "discovery", rec.MCPStats.PrimitiveType)
-	assert.Equal(t, -32600, rec.MCPStats.JSONRPCErrorCode)
+	assert.EqualValues(t, -32600, rec.MCPStats.JSONRPCErrorCode)
 }

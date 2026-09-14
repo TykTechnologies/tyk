@@ -375,7 +375,7 @@ func TestRecordMCPDetails(t *testing.T) {
 		assert.Equal(t, "2026-07-28", rec.MCPStats.EffectiveProtocolVersion)
 		assert.Equal(t, "2026-07-28", rec.MCPStats.DeclaredProtocolVersion)
 		assert.Equal(t, "header", rec.MCPStats.ProtocolVersionSource)
-		assert.Equal(t, -33002, rec.MCPStats.JSONRPCErrorCode)
+		assert.EqualValues(t, -33002, rec.MCPStats.JSONRPCErrorCode)
 	})
 
 	t.Run("list operation has empty PrimitiveType and PrimitiveName", func(t *testing.T) {

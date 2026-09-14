@@ -299,7 +299,7 @@ func (m *JSONRPCMiddleware) writeMCPTraceContext(r *http.Request, body []byte) {
 
 // writeJSONRPCError writes a JSON-RPC 2.0 error response.
 func (m *JSONRPCMiddleware) writeJSONRPCError(w http.ResponseWriter, r *http.Request, id any, code int, message string, data any) {
-	ctxSetJSONRPCErrorCode(r, code)
+	ctxSetJSONRPCErrorCode(r, int64(code))
 	if ingress := httpctx.GetMCPProtocolContext(r); ingress != nil {
 		ingress.Validation = mcp.ProtocolValidation{Checked: true, Code: code, Message: message, HTTPStatus: m.mapJSONRPCErrorToHTTP(code)}
 	}
