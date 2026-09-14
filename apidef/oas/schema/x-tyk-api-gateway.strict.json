@@ -1561,6 +1561,9 @@
         "loadBalancing": {
           "$ref": "#/definitions/X-Tyk-LoadBalancing"
         },
+        "dnsDiscovery": {
+          "$ref": "#/definitions/X-Tyk-DNSDiscovery"
+        },
         "preserveHostHeader": {
           "$ref": "#/definitions/X-Tyk-PreserveHostHeader"
         },
@@ -3028,6 +3031,25 @@
       "properties": {
         "enabled": {
           "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "X-Tyk-DNSDiscovery": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "refreshInterval": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "staleTTL": {
+          "type": "integer"
         }
       },
       "required": [
