@@ -37,6 +37,26 @@ type pathMapper interface {
 	mapEndpoint(s *OAS, path, method string) (operationID string, ok bool)
 }
 
+// fallbackPathMapper places an endpoint with primary, and with fallback when
+// primary cannot place it.
+//
+// The ordinary fill cycle must not drop an endpoint it would previously have
+// placed, however odd its path, so a failure there is a reason to fall back
+// rather than to skip. Migration wants the opposite and uses the normalizing
+// mapper directly, so that it can report what it could not convert.
+type fallbackPathMapper struct {
+	primary  pathMapper
+	fallback pathMapper
+}
+
+func (m *fallbackPathMapper) mapEndpoint(s *OAS, path, method string) (string, bool) {
+	if operationID, ok := m.primary.mapEndpoint(s, path, method); ok {
+		return operationID, true
+	}
+
+	return m.fallback.mapEndpoint(s, path, method)
+}
+
 // legacyPathMapper is the frozen conversion. Do not change its behaviour: see
 // pathMapper. It cannot fail, which is why only the normalizing mapper reports
 // errors.
@@ -148,4 +168,58 @@ func (s *OAS) ensurePaths() *openapi3.Paths {
 	}
 
 	return s.Paths
+}
+
+// usesGeneratedPlaceholders reports whether the document holds a path parameter
+// migration generated: customRegexN carrying a regex. Only migration mints
+// those names together with a pattern.
+func (s *OAS) usesGeneratedPlaceholders() bool {
+	if s.Paths == nil {
+		return false
+	}
+
+	for _, pathItem := range s.Paths.Map() {
+		for _, ref := range pathItem.Parameters {
+			if ref == nil || ref.Value == nil || ref.Value.In != openapi3.ParameterInPath {
+				continue
+			}
+
+			if !pathnormalizer.IsGeneratedName(ref.Value.Name) {
+				continue
+			}
+
+			if schema := ref.Value.Schema; schema != nil && schema.Value != nil && schema.Value.Pattern != "" {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// ordinaryPathMapper picks how Fill places endpoints for this document.
+//
+// The legacy conversion cannot read a document migration produced. It numbers
+// placeholders from one for every path it is given, so two Classic endpoints
+// differing only by their regex both resolve to {customRegex1}: the second one
+// lands on the first one's operation and writes its middleware there, which is
+// how a mock response body ends up on the wrong endpoint. The normalizing
+// mapper resolves an endpoint by the operation ID migration gave it, so it
+// lands where it belongs.
+//
+// Every other document keeps the legacy conversion, which is the frozen
+// contract, and a document this cannot place still falls back to it, so nothing
+// that used to be placed is dropped.
+func (s *OAS) ordinaryPathMapper() pathMapper {
+	if !s.usesGeneratedPlaceholders() {
+		return &legacyPathMapper{}
+	}
+
+	mapper, err := newNormalizingPathMapper(s.Paths)
+	if err != nil {
+		log.WithError(err).Error("cannot read the generated paths of this API, falling back to the legacy conversion")
+		return &legacyPathMapper{}
+	}
+
+	return &fallbackPathMapper{primary: mapper, fallback: &legacyPathMapper{}}
 }
