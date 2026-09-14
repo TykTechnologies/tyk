@@ -175,6 +175,72 @@ func TestJSONRPCMiddleware_ProcessRequest_NonJSONPassthrough(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 }
 
+// TestIsJSONRPCContentType guards the security gate against a parser
+// differential: HTTP media types are case-insensitive (RFC 9110 §8.3.1) and the
+// MCP execution engine accepts them case-insensitively, so the gate must too. A
+// byte-exact check would fail open on variants like "Application/json", letting
+// a request skip MCP access control while the engine still executes it.
+func TestIsJSONRPCContentType(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		want        bool
+	}{
+		{"lowercase", "application/json", true},
+		{"capital A", "Application/json", true},
+		{"uppercase", "APPLICATION/JSON", true},
+		{"mixed with charset", "Application/JSON; charset=utf-8", true},
+		{"leading whitespace", "  application/json", true},
+		{"structured suffix", "application/vnd.api+json", true},
+		{"structured suffix mixed case", "Application/VND.api+JSON", true},
+		{"plain text", "text/plain", false},
+		{"empty", "", false},
+		{"json substring not media type", "text/json-ish", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, isJSONRPCContentType(tt.contentType))
+		})
+	}
+}
+
+// TestJSONRPCMiddleware_ProcessRequest_CaseInsensitiveContentType ensures a
+// case-variant Content-Type is still recognised as JSON-RPC and routed (so
+// downstream MCP access control runs) rather than passed through unrouted.
+func TestJSONRPCMiddleware_ProcessRequest_CaseInsensitiveContentType(t *testing.T) {
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			ApplicationProtocol: apidef.AppProtocolMCP,
+			JsonRpcVersion:      apidef.JsonRPC20,
+		},
+		MCPPrimitives: map[string]string{
+			"tool:get-weather": mcp.ToolPrefix + "get-weather",
+		},
+		JSONRPCRouter: mcp.NewRouter(),
+	}
+
+	m := &JSONRPCMiddleware{
+		BaseMiddleware: &BaseMiddleware{Spec: spec},
+	}
+
+	body := []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get-weather","arguments":{}}}`)
+	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	r.Header.Set("Content-Type", "Application/json")
+	w := httptest.NewRecorder()
+
+	err, code := m.ProcessRequest(w, r, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, code)
+
+	// Routing state must exist: this is what every downstream MCP access-control
+	// gate keys on. Without it (the fail-open bug) the gates all no-op.
+	state := httpctx.GetJSONRPCRoutingState(r)
+	require.NotNil(t, state, "case-variant Content-Type must still be routed")
+	assert.Equal(t, "tools/call", state.Method)
+	assert.Equal(t, mcp.PrimitiveTypeTool, state.PrimitiveType)
+}
+
 func TestJSONRPCMiddleware_ProcessRequest_InvalidJSON(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
