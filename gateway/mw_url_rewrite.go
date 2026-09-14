@@ -61,114 +61,13 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 	// Check triggers
 	rewriteToPath := meta.RewriteTo
 	if len(meta.Triggers) > 0 {
-
 		// This feature uses context, we must force it if it doesn't exist
-		contextData := ctxGetData(r)
-		if contextData == nil {
-			contextDataObject := make(map[string]interface{})
-			ctxSetData(r, contextDataObject)
-		}
+		forceContextData(r)
 
 		for tn, triggerOpts := range meta.Triggers {
-			checkAny := false
-			setCount := 0
-			if triggerOpts.On == apidef.Any {
-				checkAny = true
-			}
-
-			// Check headers
-			if len(triggerOpts.Options.HeaderMatches) > 0 {
-				if checkHeaderTrigger(r, triggerOpts.Options.HeaderMatches, checkAny, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
-				}
-			}
-
-			// Check query string
-			if len(triggerOpts.Options.QueryValMatches) > 0 {
-				if checkQueryString(r, triggerOpts.Options.QueryValMatches, checkAny, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
-				}
-			}
-
-			// Check path parts
-			if len(triggerOpts.Options.PathPartMatches) > 0 {
-				if checkPathParts(r, triggerOpts.Options.PathPartMatches, checkAny, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
-				}
-			}
-
-			// Check session meta
-			if session := ctxGetSession(r); session != nil {
-				if len(triggerOpts.Options.SessionMetaMatches) > 0 {
-					if checkSessionTrigger(r, session, triggerOpts.Options.SessionMetaMatches, checkAny, tn) {
-						setCount += 1
-						if checkAny {
-							rewriteToPath = triggerOpts.RewriteTo
-							break
-						}
-					}
-				}
-			}
-
-			// Request context meta
-			if len(triggerOpts.Options.RequestContextMatches) > 0 {
-				if checkContextTrigger(r, triggerOpts.Options.RequestContextMatches, checkAny, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
-				}
-			}
-
-			// Check payload
-			if triggerOpts.Options.PayloadMatches.MatchPattern != "" {
-				if checkPayload(r, triggerOpts.Options.PayloadMatches, tn) {
-					setCount += 1
-					if checkAny {
-						rewriteToPath = triggerOpts.RewriteTo
-						break
-					}
-				}
-			}
-
-			if !checkAny {
-				// Set total count:
-				total := 0
-				if len(triggerOpts.Options.HeaderMatches) > 0 {
-					total += 1
-				}
-				if len(triggerOpts.Options.QueryValMatches) > 0 {
-					total += 1
-				}
-				if len(triggerOpts.Options.PathPartMatches) > 0 {
-					total += 1
-				}
-				if len(triggerOpts.Options.SessionMetaMatches) > 0 {
-					total += 1
-				}
-				if len(triggerOpts.Options.RequestContextMatches) > 0 {
-					total += 1
-				}
-				if triggerOpts.Options.PayloadMatches.MatchPattern != "" {
-					total += 1
-				}
-				if total == setCount {
-					rewriteToPath = triggerOpts.RewriteTo
-					break
-				}
+			if checkTriggerOptions(r, triggerOpts.Options, triggerOpts.On, tn) {
+				rewriteToPath = triggerOpts.RewriteTo
+				break
 			}
 		}
 	}
@@ -536,6 +435,98 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		ctxSetURLRewriteTarget(r, newURL)
 	}
 	return nil, http.StatusOK
+}
+
+// forceContextData ensures the request carries a context data map. The trigger
+// checks below write their captured matches into it, so it must not be nil.
+func forceContextData(r *http.Request) {
+	if ctxGetData(r) == nil {
+		ctxSetData(r, make(map[string]interface{}))
+	}
+}
+
+// triggerOptionCheck is one configured group of trigger options, paired with
+// the check that decides whether the request satisfies it.
+type triggerOptionCheck struct {
+	configured bool
+	check      func() bool
+}
+
+// triggerOptionChecks returns the option groups of a trigger, in evaluation
+// order.
+func triggerOptionChecks(r *http.Request, options apidef.RoutingTriggerOptions, checkAny bool, triggernum int) []triggerOptionCheck {
+	return []triggerOptionCheck{
+		{
+			configured: len(options.HeaderMatches) > 0,
+			check:      func() bool { return checkHeaderTrigger(r, options.HeaderMatches, checkAny, triggernum) },
+		},
+		{
+			configured: len(options.QueryValMatches) > 0,
+			check:      func() bool { return checkQueryString(r, options.QueryValMatches, checkAny, triggernum) },
+		},
+		{
+			configured: len(options.PathPartMatches) > 0,
+			check:      func() bool { return checkPathParts(r, options.PathPartMatches, checkAny, triggernum) },
+		},
+		{
+			// A request without a session can never satisfy these, but they
+			// still count towards the total so an "all" trigger won't fire.
+			configured: len(options.SessionMetaMatches) > 0,
+			check: func() bool {
+				session := ctxGetSession(r)
+				return session != nil && checkSessionTrigger(r, session, options.SessionMetaMatches, checkAny, triggernum)
+			},
+		},
+		{
+			configured: len(options.RequestContextMatches) > 0,
+			check:      func() bool { return checkContextTrigger(r, options.RequestContextMatches, checkAny, triggernum) },
+		},
+		{
+			configured: options.PayloadMatches.MatchPattern != "",
+			check:      func() bool { return checkPayload(r, options.PayloadMatches, triggernum) },
+		},
+	}
+}
+
+// checkTriggerOptions reports whether the request satisfies options. With
+// apidef.Any a single matching option is enough and the remaining ones are not
+// evaluated; otherwise every configured option has to match.
+//
+// Note that under "all" the remaining options are still evaluated after one
+// fails. That is deliberate: the checks record their matches in the request
+// context data for rewrite templates to reference, so skipping them would change
+// what a rewrite can interpolate.
+//
+// triggernum namespaces the matches this records in the request context data,
+// which callers can reference as $tyk_context.trigger-<triggernum>-<name>.
+// Callers must have run forceContextData on the request first.
+func checkTriggerOptions(r *http.Request, options apidef.RoutingTriggerOptions, on apidef.RoutingTriggerOnType, triggernum int) bool {
+	checkAny := on == apidef.Any
+
+	// total counts the configured options, setCount the ones that matched.
+	total, setCount := 0, 0
+
+	for _, option := range triggerOptionChecks(r, options, checkAny, triggernum) {
+		if !option.configured {
+			continue
+		}
+
+		total++
+
+		if option.check() {
+			if checkAny {
+				return true
+			}
+
+			setCount++
+		}
+	}
+
+	if checkAny {
+		return false
+	}
+
+	return total == setCount
 }
 
 func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {

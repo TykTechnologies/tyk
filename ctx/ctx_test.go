@@ -111,6 +111,45 @@ func TestGetOASDefinitionRaw(t *testing.T) {
 	})
 }
 
+func TestGetOASConfigData(t *testing.T) {
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+
+	// Test when OAS definition is not in context
+	configData, err := ctx.GetOASConfigData(req)
+	assert.Nil(t, configData)
+	assert.Error(t, err)
+	assert.Equal(t, "OAS definition not found in request context", err.Error())
+
+	// Test when OAS definition is in context but no config data
+	oasDef := &oas.OAS{}
+	ctx.SetOASDefinition(req, oasDef)
+	configData, err = ctx.GetOASConfigData(req)
+	assert.Nil(t, configData)
+	assert.Error(t, err)
+	assert.Equal(t, "config data is nil", err.Error())
+
+	// Test when config data is present
+	expectedConfigData := map[string]any{
+		"key": "value",
+	}
+	oasDefWithConfig := &oas.OAS{}
+	oasDefWithConfig.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Global: &oas.Global{
+				PluginConfig: &oas.PluginConfig{
+					Data: &oas.PluginConfigData{
+						Value: expectedConfigData,
+					},
+				},
+			},
+		},
+	})
+	ctx.SetOASDefinition(req, oasDefWithConfig)
+	configData, err = ctx.GetOASConfigData(req)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedConfigData, configData)
+}
+
 // Benchmark for GetDefinition
 func BenchmarkGetDefinition(b *testing.B) {
 	apiDef := &apidef.APIDefinition{
@@ -122,7 +161,7 @@ func BenchmarkGetDefinition(b *testing.B) {
 	ctx.SetDefinition(req, apiDef)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		cloned := ctx.GetDefinition(req)
 		assert.Equal(b, apiDef, cloned)
 	}
@@ -172,6 +211,39 @@ func loadPetstoreOAS(tb testing.TB) *oas.OAS {
 	require.NoError(tb, json.Unmarshal(contents, &petstore))
 
 	return &petstore
+	for b.Loop() {
+		cloned := ctx.GetOASDefinition(req)
+		assert.Equal(b, oasDef, cloned)
+	}
+}
+
+// Benchmark for GetOASConfigData
+func BenchmarkGetOASConfigData(b *testing.B) {
+	expectedConfigData := map[string]interface{}{
+		"key": "value",
+	}
+	oasDefWithConfig := &oas.OAS{}
+	oasDefWithConfig.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Global: &oas.Global{
+				PluginConfig: &oas.PluginConfig{
+					Data: &oas.PluginConfigData{
+						Value: expectedConfigData,
+					},
+				},
+			},
+		},
+	})
+
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	ctx.SetOASDefinition(req, oasDefWithConfig)
+
+	b.ResetTimer()
+	for b.Loop() {
+		configData, err := ctx.GetOASConfigData(req)
+		assert.NoError(b, err)
+		assert.Equal(b, expectedConfigData, configData)
+	}
 }
 
 // TestContextKeyUniqueness verifies all context keys have unique values
