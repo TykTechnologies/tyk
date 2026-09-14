@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 // classicWithWhiteList builds the smallest Classic definition that carries the
@@ -273,6 +274,34 @@ func TestOAS_fillForMigration_reportsUnreadableDocument(t *testing.T) {
 	assert.Contains(t, err.Error(), "cannot read the existing paths")
 }
 
+// TestOAS_ExtractTo_restoresRegexEndpoints covers the round trip the gateway
+// actually routes on. Classic routing never reads a path parameter, and a mux
+// placeholder compiles to ([^/]+), so handing back /users/{customRegex1} and
+// /users/{customRegex2} made both endpoints match the same requests. The
+// regexes have to come back into the path for them to stay apart.
+func TestOAS_ExtractTo_restoresRegexEndpoints(t *testing.T) {
+	t.Parallel()
+
+	var s OAS
+	require.NoError(t, s.fillForMigration(classicWithWhiteList(
+		apidef.EndPointMeta{Path: "/users/[a-z]+", Method: http.MethodGet},
+		apidef.EndPointMeta{Path: "/users/[0-9]+", Method: http.MethodGet},
+	)))
+
+	require.Equal(t, []string{"/users/{customRegex1}", "/users/{customRegex2}"}, pathKeysOf(s.Paths))
+
+	var classic apidef.APIDefinition
+	s.ExtractTo(&classic)
+
+	paths := make([]string, 0, 2)
+	for _, endpoint := range classic.VersionData.Versions[Main].ExtendedPaths.WhiteList {
+		paths = append(paths, endpoint.Path)
+	}
+
+	sort.Strings(paths)
+	assert.Equal(t, []string{"/users/[0-9]+", "/users/[a-z]+"}, paths)
+}
+
 // TestOAS_usesGeneratedPlaceholders pins what marks a document as one migration
 // produced, since that is what decides which conversion the ordinary fill cycle
 // uses.
@@ -344,4 +373,42 @@ func TestOAS_Fill_keepsMiddlewareOnItsOwnEndpoint(t *testing.T) {
 
 	assert.Equal(t, `{"by_name":true}`, operations["users/[a-z]+GET"].MockResponse.Body)
 	assert.Equal(t, `{"by_number":true}`, operations["users/[0-9]+GET"].MockResponse.Body)
+}
+
+// TestOAS_ExtractTo_namedRegexKeepsMatchingLoosely pins the other half of the
+// contract. Tyk Classic reads {hex:[0-9a-f]+} as a placeholder and matches any
+// single segment against it, so the regex a user writes inside a named
+// parameter never narrowed anything. Migrating the endpoint must not start
+// narrowing it: only an anonymous regex, which Classic did apply, comes back
+// into the path.
+func TestOAS_ExtractTo_namedRegexKeepsMatchingLoosely(t *testing.T) {
+	t.Parallel()
+
+	const named = "/users/{hex:[0-9a-f]+}"
+
+	require.Equal(t, "^/users/([^/]+)$", httputil.PreparePathRegexp(named, true, true),
+		"Classic has always matched a named parameter loosely")
+
+	var s OAS
+	require.NoError(t, s.fillForMigration(classicWithWhiteList(
+		apidef.EndPointMeta{Path: named, Method: http.MethodGet},
+		apidef.EndPointMeta{Path: "/users/[0-9a-f]+", Method: http.MethodGet},
+	)))
+
+	var classic apidef.APIDefinition
+	s.ExtractTo(&classic)
+
+	matchers := make(map[string]string)
+	for _, endpoint := range classic.VersionData.Versions[Main].ExtendedPaths.WhiteList {
+		matchers[endpoint.Path] = httputil.PreparePathRegexp(endpoint.Path, true, true)
+	}
+
+	assert.Equal(t, map[string]string{
+		// The name survives, the loose matching survives, and the regex stays on
+		// the parameter where migration put it.
+		"/users/{hex}": "^/users/([^/]+)$",
+		// An anonymous regex did narrow the match in Classic, so it has to keep
+		// doing so.
+		"/users/[0-9a-f]+": "^/users/[0-9a-f]+$",
+	}, matchers)
 }
