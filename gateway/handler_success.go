@@ -401,15 +401,26 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
 
+	proxyWriter := w
+	var mcpResponseObserver *mcpCompletionObserver
+	if s.Spec.IsMCP() && !s.Spec.IsSyntheticMCPAdapter() {
+		mcpResponseObserver, proxyWriter = observeMCPCompletion(w)
+	}
+
 	t1 := time.Now()
 	var resp ProxyResponse
 	if s.Spec.GraphQL.Enabled {
-		resp = s.Proxy.ServeHTTPForCache(w, r)
+		resp = s.Proxy.ServeHTTPForCache(proxyWriter, r)
 	} else {
-		resp = s.Proxy.ServeHTTP(w, r)
+		resp = s.Proxy.ServeHTTP(proxyWriter, r)
 	}
 
 	t2 := time.Now()
+	if mcpResponseObserver != nil {
+		if code, ok := jsonRPCCompletionErrorCode(mcpResponseObserver.observedBody()); ok {
+			ctxSetJSONRPCErrorCode(r, code)
+		}
+	}
 	proxyDuration := t2.Sub(t1)
 	millisec := DurationToMillisecond(proxyDuration)
 	log.Debug("Upstream request took (ms): ", millisec)

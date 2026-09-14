@@ -75,6 +75,30 @@ func (w *allOptionalMCPResponseWriter) ReadFrom(src io.Reader) (int64, error) {
 
 func (w *allOptionalMCPResponseWriter) Push(string, *http.PushOptions) error { return nil }
 
+type nativeMCPAnalyticsProxy struct {
+	contentType string
+	body        string
+}
+
+func (p nativeMCPAnalyticsProxy) ServeHTTP(w http.ResponseWriter, _ *http.Request) ProxyResponse {
+	w.Header().Set("Content-Type", p.contentType)
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.WriteString(w, p.body)
+	return ProxyResponse{Response: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     w.Header().Clone(),
+	}}
+}
+
+func (p nativeMCPAnalyticsProxy) ServeHTTPForCache(w http.ResponseWriter, r *http.Request) ProxyResponse {
+	return p.ServeHTTP(w, r)
+}
+
+func (nativeMCPAnalyticsProxy) CopyResponse(dst io.Writer, src io.Reader, _ time.Duration) error {
+	_, err := io.Copy(dst, src)
+	return err
+}
+
 func TestObserveMCPCompletionPreservesResponseWriterInterfaces(t *testing.T) {
 	minimal := newMinimalMCPResponseWriter()
 	_, wrappedMinimal := observeMCPCompletion(minimal)
@@ -106,6 +130,50 @@ func TestObserveMCPCompletionPreservesResponseWriterInterfaces(t *testing.T) {
 	status, observed, _ := observer.snapshot(httptest.NewRequest(http.MethodPost, "/mcp", nil))
 	assert.Equal(t, http.StatusOK, status)
 	assert.Equal(t, body, string(observed))
+}
+
+func TestSuccessHandlerObservesNativeMCPErrorCode(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+		want        int64
+	}{
+		{name: "JSON minimum", contentType: "application/json", body: `{"jsonrpc":"2.0","id":1,"error":{"code":-9223372036854775808,"message":"minimum"}}`, want: -9223372036854775808},
+		{name: "SSE maximum", contentType: "text/event-stream", body: "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":9223372036854775807,\"message\":\"maximum\"}}\n\n", want: 9223372036854775807},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			conf := config.Default
+			conf.EnableAnalytics = true
+			spec := restSourceSpec("native-analytics", "org-analytics", true)
+			spec.MarkAsMCP()
+			spec.Name = "Native MCP Analytics"
+			spec.GlobalConfig = conf
+
+			gw := &Gateway{}
+			gw.SetConfig(conf)
+			gw.MetricInstruments, _ = testMetricInstruments(t, nil)
+			capture := &mcpAnalyticsCapture{}
+			gw.Analytics.mockEnabled = true
+			gw.Analytics.mockRecordHit = capture.add
+			proxy := nativeMCPAnalyticsProxy{contentType: test.contentType, body: test.body}
+			handler := &SuccessHandler{BaseMiddleware: NewBaseMiddleware(gw, spec, proxy, nil)}
+
+			request := httptest.NewRequest(http.MethodPost, "http://public.example/native-mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"signed_code","arguments":{}}}`))
+			request.Header.Set("Content-Type", "application/json")
+			ctxSetMCPMethod(request, mcp.MethodToolsCall)
+			ctxSetMCPPrimitiveType(request, mcp.PrimitiveTypeTool)
+			ctxSetMCPPrimitiveName(request, "signed_code")
+			ctxSetOriginalRequestPath(request, request.URL.Path)
+
+			handler.ServeHTTP(httptest.NewRecorder(), request)
+			records := capture.snapshot()
+			require.Len(t, records, 1)
+			assert.Equal(t, test.want, records[0].MCPStats.JSONRPCErrorCode)
+		})
+	}
 }
 
 func TestObserveMCPCompletionIsBoundedAndPassThrough(t *testing.T) {

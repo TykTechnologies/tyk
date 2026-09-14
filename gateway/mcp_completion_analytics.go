@@ -100,6 +100,12 @@ func (o *mcpCompletionObserver) append(data []byte) {
 	o.body = append(o.body, data...)
 }
 
+func (o *mcpCompletionObserver) observedBody() []byte {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return append([]byte(nil), o.body...)
+}
+
 func (o *mcpCompletionObserver) snapshot(r *http.Request) (int, []byte, *http.Response) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
