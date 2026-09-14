@@ -8,6 +8,52 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestRequestEnvelopeUnmarshalJSONStrictOwnedFields(t *testing.T) {
+	t.Parallel()
+
+	valid := `{"jsonrpc":"2.0","method":"tools/call","params":{"name":"tool","_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{"sampling":{}}},"arguments":{"name":1,"Name":2,"name":3}},"id":9007199254740993}`
+	var envelope RequestEnvelope
+	require.NoError(t, json.Unmarshal([]byte(valid), &envelope))
+	require.Equal(t, json.Number("9007199254740993"), envelope.ID)
+	require.JSONEq(t, `{"name":"tool","_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{"sampling":{}}},"arguments":{"name":1,"Name":2,"name":3}}`, string(envelope.Params))
+
+	tests := []struct {
+		name string
+		body string
+	}{
+		{"duplicate jsonrpc", `{"jsonrpc":"2.0","jsonrpc":"2.0","method":"tools/list"}`},
+		{"noncanonical jsonrpc", `{"JsonRpc":"2.0","method":"tools/list"}`},
+		{"duplicate method", `{"jsonrpc":"2.0","method":"tools/list","method":"tools/call"}`},
+		{"noncanonical method", `{"jsonrpc":"2.0","Method":"tools/list"}`},
+		{"duplicate params", `{"jsonrpc":"2.0","method":"tools/list","params":{},"params":{}}`},
+		{"noncanonical params", `{"jsonrpc":"2.0","method":"tools/list","Params":{}}`},
+		{"duplicate id", `{"jsonrpc":"2.0","method":"tools/list","id":1,"id":2}`},
+		{"noncanonical id", `{"jsonrpc":"2.0","method":"tools/list","ID":1}`},
+		{"duplicate protocol version", `{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2026-07-28","protocolVersion":"2025-03-26"}}`},
+		{"noncanonical protocol version", `{"jsonrpc":"2.0","method":"initialize","params":{"ProtocolVersion":"2026-07-28"}}`},
+		{"duplicate meta", `{"jsonrpc":"2.0","method":"tools/list","params":{"_meta":{},"_meta":{}}}`},
+		{"noncanonical meta", `{"jsonrpc":"2.0","method":"tools/list","params":{"_Meta":{}}}`},
+		{"duplicate name", `{"jsonrpc":"2.0","method":"tools/call","params":{"name":"one","name":"two"}}`},
+		{"noncanonical name", `{"jsonrpc":"2.0","method":"tools/call","params":{"Name":"tool"}}`},
+		{"duplicate uri", `{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"one","uri":"two"}}`},
+		{"noncanonical uri", `{"jsonrpc":"2.0","method":"resources/read","params":{"URI":"resource"}}`},
+		{"duplicate metadata protocol", `{"jsonrpc":"2.0","method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/protocolVersion":"2026-07-28"}}}`},
+		{"noncanonical metadata protocol", `{"jsonrpc":"2.0","method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/ProtocolVersion":"2026-07-28"}}}`},
+		{"duplicate client capabilities", `{"jsonrpc":"2.0","method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientCapabilities":{}}}}`},
+		{"noncanonical client capabilities", `{"jsonrpc":"2.0","method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/ClientCapabilities":{}}}}`},
+		{"duplicate client info", `{"jsonrpc":"2.0","method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/clientInfo":{},"io.modelcontextprotocol/clientInfo":{}}}}`},
+		{"noncanonical client info", `{"jsonrpc":"2.0","method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/ClientInfo":{}}}}`},
+		{"duplicate inspected capability", `{"jsonrpc":"2.0","method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/clientCapabilities":{"sampling":{},"sampling":{}}}}}`},
+		{"noncanonical inspected capability", `{"jsonrpc":"2.0","method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/clientCapabilities":{"Sampling":{}}}}}`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var got RequestEnvelope
+			require.Error(t, json.Unmarshal([]byte(test.body), &got))
+		})
+	}
+}
+
 func TestNewProtocolContext(t *testing.T) {
 	t.Parallel()
 
