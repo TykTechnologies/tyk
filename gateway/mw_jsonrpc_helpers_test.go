@@ -34,7 +34,7 @@ func TestSelectAndStoreMCPJSONRPCCode(t *testing.T) {
 			got := selectAndStoreMCPJSONRPCCode(r, http.StatusForbidden)
 
 			assert.Equal(t, test.want, got)
-			assert.Equal(t, got, ctxGetJSONRPCErrorCode(r))
+			assert.EqualValues(t, got, ctxGetJSONRPCErrorCode(r))
 		})
 	}
 }
@@ -68,7 +68,7 @@ func TestWriteJSONRPCAccessDenied_ModernCodeIsSharedWithContext(t *testing.T) {
 	var response jsonrpcerrors.JSONRPCErrorResponse
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 	assert.Equal(t, jsonrpcerrors.CodeModernAccessDenied, response.Error.Code)
-	assert.Equal(t, response.Error.Code, ctxGetJSONRPCErrorCode(r))
+	assert.EqualValues(t, response.Error.Code, ctxGetJSONRPCErrorCode(r))
 }
 
 func TestWriteJSONRPCAccessDenied_WithoutState(t *testing.T) {

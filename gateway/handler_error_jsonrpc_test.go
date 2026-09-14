@@ -234,9 +234,9 @@ func TestErrorHandler_ModernClassifiedCodeWireAndContextConsistency(t *testing.T
 			var response jsonrpcerrors.JSONRPCErrorResponse
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 			assert.Equal(t, tc.expected, response.Error.Code)
-			assert.Equal(t, response.Error.Code, ctxGetJSONRPCErrorCode(r))
+			assert.EqualValues(t, response.Error.Code, ctxGetJSONRPCErrorCode(r))
 			require.NotNil(t, hook.LastEntry())
-			assert.Equal(t, response.Error.Code, hook.LastEntry().Data["jsonrpc_error_code"])
+			assert.EqualValues(t, response.Error.Code, hook.LastEntry().Data["jsonrpc_error_code"])
 		})
 	}
 }
