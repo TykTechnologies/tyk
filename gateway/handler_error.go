@@ -387,7 +387,7 @@ func (e *ErrorHandler) writeJSONRPCErrorResponse(w http.ResponseWriter, r *http.
 		requestID = state.ID
 	}
 
-	ctxSetJSONRPCErrorCode(r, jsonrpcerrors.MapHTTPStatusToJSONRPCCode(httpCode))
+	ctxSetJSONRPCErrorCode(r, int64(jsonrpcerrors.MapHTTPStatusToJSONRPCCode(httpCode)))
 
 	responseBody := jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
 

@@ -207,6 +207,9 @@ func buildMCPAdapterSpec(rest *APISpec, proxies []*APISpec, existing *APISpec) (
 		Active:   true,
 		IsOAS:    true,
 		Internal: true,
+		// The public paired proxy owns MCP completion analytics. Suppress only
+		// this hidden protocol adapter; the source REST API keeps its record.
+		DoNotTrack: true,
 		// The hidden adapter is only reachable through paired MCP proxies.
 		// Caller-facing auth and policies are enforced on those proxies.
 		UseKeylessAccess: true,

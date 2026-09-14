@@ -30,7 +30,7 @@ require (
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
 	github.com/TykTechnologies/storage v1.5.0
-	github.com/TykTechnologies/tyk-pump v1.17.0-rc1.0.20260906204536-977a5ddcda4a
+	github.com/TykTechnologies/tyk-pump v1.17.0-rc1.0.20260914104601-ef8bafa9b2d9
 	github.com/akutz/memconn v0.1.0
 	github.com/bshuster-repo/logrus-logstash-hook v1.1.0
 	github.com/buger/jsonparser v1.1.2
@@ -104,6 +104,7 @@ require (
 	github.com/coder/websocket v1.8.13
 	github.com/dop251/goja v0.0.0-20241024094426-79f3a7efcdbd
 	github.com/eclipse/paho.mqtt.golang v1.5.1
+	github.com/felixge/httpsnoop v1.0.4
 	github.com/getkin/kin-openapi v0.133.0
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/go-redis/redismock/v9 v9.2.0
@@ -323,7 +324,6 @@ require (
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
-	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect

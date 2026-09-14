@@ -241,9 +241,12 @@ func GetMCPPrimitiveName(r *http.Request) string {
 }
 
 // GetJSONRPCErrorCode returns the JSON-RPC error code from the request context.
-func GetJSONRPCErrorCode(r *http.Request) int {
-	if v, ok := r.Context().Value(JSONRPCErrorCode).(int); ok {
+func GetJSONRPCErrorCode(r *http.Request) int64 {
+	switch v := r.Context().Value(JSONRPCErrorCode).(type) {
+	case int64:
 		return v
+	case int:
+		return int64(v)
 	}
 	return 0
 }
