@@ -64,7 +64,8 @@ func (m *JSONRPCMiddleware) Name() string {
 // EnabledForSpec returns true if this middleware should be enabled for the API spec.
 // It requires the API to use JSON-RPC 2.0 protocol.
 func (m *JSONRPCMiddleware) EnabledForSpec() bool {
-	return m.Spec.IsMCP() && m.Spec.JsonRpcVersion == apidef.JsonRPC20
+	return m.Spec.IsPairedMCPAdapterProxy() ||
+		(m.Spec.IsMCP() && m.Spec.JsonRpcVersion == apidef.JsonRPC20)
 }
 
 // validateJSONRPCRequest checks if the request is a valid POST with JSON content type.
@@ -230,8 +231,8 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 				r.Header.Get(mcp.HeaderProtocolVersion), r.Header.Get(mcp.HeaderSessionID), nil, nil,
 			))
 		}
-		if ingress := httpctx.GetMCPProtocolContext(r); ingress != nil && ingress.IsModern() && r.Method == http.MethodPost {
-			m.writeJSONRPCError(w, r, nil, mcp.JSONRPCInvalidRequest, "modern MCP POST requires application/json", nil)
+		if r.Method == http.MethodPost && m.Spec.IsMCPManaged() {
+			m.writeJSONRPCError(w, r, nil, mcp.JSONRPCInvalidRequest, "MCP POST requires application/json", nil)
 			return nil, middleware.StatusRespond
 		}
 		if rejectModernMCPHTTPMethod(w, r) {
@@ -259,6 +260,13 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 	if !m.validateMCPIngress(w, r) {
 		return nil, middleware.StatusRespond
+	}
+	// Paired REST-as-MCP proxies own the public ingress boundary but leave
+	// method routing and SDK execution to their hidden synthetic adapter. Parse
+	// and validate here, before public auth/policy/quota middleware, then allow
+	// the unmodified request body to continue to the internal hop.
+	if m.Spec.IsPairedMCPAdapterProxy() {
+		return nil, http.StatusOK
 	}
 	if m.Spec.IsSyntheticMCPAdapter() {
 		return m.processSyntheticMCPAdapterRequest(w, r)
