@@ -19,6 +19,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -173,7 +174,7 @@ func TestJSONRPCMiddleware_ProcessRequest_NonPostPassthrough(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 }
 
-func TestJSONRPCMiddleware_ProcessRequest_NonJSONPassthrough(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_NonJSONRejected(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -191,7 +192,13 @@ func TestJSONRPCMiddleware_ProcessRequest_NonJSONPassthrough(t *testing.T) {
 
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
-	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, middleware.StatusRespond, code)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var response JSONRPCErrorResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&response))
+	assert.Equal(t, mcp.JSONRPCInvalidRequest, response.Error.Code)
+	assert.Equal(t, "MCP POST requires application/json", response.Error.Message)
 }
 
 func TestJSONRPCMiddleware_ProcessRequest_InvalidJSON(t *testing.T) {
