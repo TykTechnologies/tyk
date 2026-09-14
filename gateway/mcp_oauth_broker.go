@@ -944,6 +944,7 @@ func decodeStrictMCPOAuthObject(body []byte, target any) error {
 			"redirect_uris", "token_endpoint_auth_method", "client_id", "client_secret",
 			"registration_access_token", "registration_client_uri",
 			"access_token", "refresh_token", "token_type", "expires_in", "scope",
+			"error", "error_description", "error_uri",
 		} {
 			if strings.EqualFold(name, securityField) {
 				if _, duplicate := seenSecurity[securityField]; duplicate {

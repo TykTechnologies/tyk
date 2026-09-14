@@ -30,8 +30,12 @@ import (
 
 type faultingMCPOAuthBrokerStore struct {
 	mcpOAuthBrokerStore
-	getPrefix string
-	putPrefix string
+	getPrefix     string
+	putPrefix     string
+	beginFailure  bool
+	abortFailure  bool
+	commitFailure bool
+	revokeFailure bool
 }
 
 type revokingMCPOAuthBrokerIssueStore struct {
@@ -85,6 +89,34 @@ func (s faultingMCPOAuthBrokerStore) Put(ctx context.Context, key string, value 
 	return s.mcpOAuthBrokerStore.Put(ctx, key, value, ttl)
 }
 
+func (s faultingMCPOAuthBrokerStore) BeginRefresh(ctx context.Context, attempt mcpOAuthBrokerRefreshAttempt, ttl time.Duration) error {
+	if s.beginFailure {
+		return errors.New("injected OAuth broker refresh begin failure")
+	}
+	return s.mcpOAuthBrokerStore.BeginRefresh(ctx, attempt, ttl)
+}
+
+func (s faultingMCPOAuthBrokerStore) AbortRefresh(ctx context.Context, attempt mcpOAuthBrokerRefreshAttempt) error {
+	if s.abortFailure {
+		return errors.New("injected OAuth broker refresh abort failure")
+	}
+	return s.mcpOAuthBrokerStore.AbortRefresh(ctx, attempt)
+}
+
+func (s faultingMCPOAuthBrokerStore) CommitRefresh(ctx context.Context, attempt mcpOAuthBrokerRefreshAttempt, records []mcpOAuthBrokerIssueRecord) error {
+	if s.commitFailure {
+		return errors.New("injected OAuth broker refresh commit failure")
+	}
+	return s.mcpOAuthBrokerStore.CommitRefresh(ctx, attempt, records)
+}
+
+func (s faultingMCPOAuthBrokerStore) RevokeRefreshFamily(ctx context.Context, attempt *mcpOAuthBrokerRefreshAttempt, record mcpOAuthBrokerIssueRecord) error {
+	if s.revokeFailure {
+		return errors.New("injected OAuth broker refresh revocation failure")
+	}
+	return s.mcpOAuthBrokerStore.RevokeRefreshFamily(ctx, attempt, record)
+}
+
 func (s faultingMCPOAuthBrokerStore) RegisterClient(ctx context.Context, indexKey, clientKey, member string, value []byte, ttl time.Duration, limit int64) error {
 	if strings.Contains(clientKey, s.putPrefix) && s.putPrefix != "" {
 		return errors.New("injected OAuth broker client registration failure")
@@ -126,6 +158,11 @@ type mcpOAuthBrokerUpstreamCapture struct {
 	lastRuntimePath       string
 	codeChallenges        map[string]string
 	refreshToken          string
+	refreshDelay          time.Duration
+	refreshStatus         int
+	refreshResponse       string
+	refreshStarted        chan struct{}
+	refreshRelease        chan struct{}
 }
 
 func newMCPBrokerTest(t *testing.T, listenPath string) (*Test, *httptest.Server, *mcpOAuthBrokerUpstreamCapture) {
@@ -237,16 +274,57 @@ func newMCPBrokerTest(t *testing.T, listenPath string) (*Test, *httptest.Server,
 			capture.tokenRequests++
 			capture.lastTokenForm = cloneURLValues(r.PostForm)
 			grantType := r.PostForm.Get("grant_type")
+			challenge := capture.codeChallenges[r.PostForm.Get("code")]
+			refreshDelay := capture.refreshDelay
+			refreshStatus := capture.refreshStatus
+			refreshResponse := capture.refreshResponse
+			refreshStarted := capture.refreshStarted
+			refreshRelease := capture.refreshRelease
+			capture.mu.Unlock()
+
+			if grantType == "refresh_token" {
+				if refreshStarted != nil {
+					select {
+					case refreshStarted <- struct{}{}:
+					default:
+					}
+				}
+				if refreshRelease != nil {
+					select {
+					case <-refreshRelease:
+					case <-r.Context().Done():
+						return
+					}
+				}
+				if refreshDelay > 0 {
+					timer := time.NewTimer(refreshDelay)
+					defer timer.Stop()
+					select {
+					case <-timer.C:
+					case <-r.Context().Done():
+						return
+					}
+				}
+				if refreshStatus != 0 || refreshResponse != "" {
+					status := refreshStatus
+					if status == 0 {
+						status = http.StatusOK
+					}
+					w.WriteHeader(status)
+					_, _ = io.WriteString(w, refreshResponse)
+					return
+				}
+			}
+
+			capture.mu.Lock()
+			defer capture.mu.Unlock()
 			if grantType == "authorization_code" {
-				challenge := capture.codeChallenges[r.PostForm.Get("code")]
 				if challenge == "" || mcpOAuthPKCEChallenge(r.PostForm.Get("code_verifier")) != challenge {
-					capture.mu.Unlock()
 					w.WriteHeader(http.StatusBadRequest)
 					_, _ = io.WriteString(w, `{"error":"invalid_grant"}`)
 					return
 				}
 			} else if grantType != "refresh_token" || r.PostForm.Get("refresh_token") != capture.refreshToken {
-				capture.mu.Unlock()
 				w.WriteHeader(http.StatusBadRequest)
 				_, _ = io.WriteString(w, `{"error":"invalid_grant"}`)
 				return
@@ -254,7 +332,6 @@ func newMCPBrokerTest(t *testing.T, listenPath string) (*Test, *httptest.Server,
 			access := fmt.Sprintf("upstream-access-%d", capture.tokenRequests)
 			capture.refreshToken = fmt.Sprintf("upstream-refresh-%d", capture.tokenRequests+1)
 			refresh := capture.refreshToken
-			capture.mu.Unlock()
 			_, _ = fmt.Fprintf(w, `{"access_token":%q,"token_type":"Bearer","expires_in":3600,"refresh_token":%q,"scope":"mcp"}`, access, refresh)
 		case "/", "/v1/mcp", "/v1/mcp/":
 			capture.mu.Lock()
@@ -1134,14 +1211,101 @@ func TestRedisMCPOAuthBrokerStoreAtomicIssue(t *testing.T) {
 	})
 }
 
+func TestRedisMCPOAuthBrokerStoreRefreshTransitions(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+	store := newRedisMCPOAuthBrokerStore(ts.Gw)
+	ctx := context.Background()
+	newAttempt := func(suffix, nonce string) mcpOAuthBrokerRefreshAttempt {
+		replacements := []string{"access:" + suffix, "refresh-family:new:" + suffix, "refresh:new:" + suffix}
+		return mcpOAuthBrokerRefreshAttempt{
+			refreshKey: "refresh:old:" + suffix, revokedKey: "revoked:" + suffix,
+			leaseKey: "lease:" + suffix, expected: []byte("sealed:" + suffix), nonce: nonce,
+			replacementKeys: replacements,
+			reservationKeys: []string{"reservation:access:" + suffix, "reservation:family:" + suffix, "reservation:refresh:" + suffix},
+		}
+	}
+
+	t.Run("abort preserves the source and releases only the owner", func(t *testing.T) {
+		attempt := newAttempt("abort", "owner")
+		require.NoError(t, store.Put(ctx, attempt.refreshKey, attempt.expected, time.Minute))
+		require.NoError(t, store.BeginRefresh(ctx, attempt, mcpOAuthBrokerRefreshLeaseTTL))
+		value, found, err := store.Get(ctx, attempt.refreshKey)
+		require.NoError(t, err)
+		require.True(t, found)
+		require.Equal(t, attempt.expected, value)
+
+		competitor := attempt
+		competitor.nonce = "competitor"
+		require.ErrorIs(t, store.BeginRefresh(ctx, competitor, mcpOAuthBrokerRefreshLeaseTTL), errMCPOAuthBrokerRefreshBusy)
+		require.ErrorIs(t, store.AbortRefresh(ctx, competitor), errMCPOAuthBrokerRefreshLease)
+		require.NoError(t, store.AbortRefresh(ctx, attempt))
+		require.NoError(t, store.BeginRefresh(ctx, competitor, mcpOAuthBrokerRefreshLeaseTTL), "the original grant must be retryable after abort")
+		require.NoError(t, store.AbortRefresh(ctx, competitor))
+	})
+
+	t.Run("commit consumes the source and publishes every replacement", func(t *testing.T) {
+		attempt := newAttempt("commit", "owner")
+		require.NoError(t, store.Put(ctx, attempt.refreshKey, attempt.expected, time.Minute))
+		require.NoError(t, store.BeginRefresh(ctx, attempt, mcpOAuthBrokerRefreshLeaseTTL))
+		records := make([]mcpOAuthBrokerIssueRecord, len(attempt.replacementKeys))
+		for index, key := range attempt.replacementKeys {
+			records[index] = mcpOAuthBrokerIssueRecord{key: key, value: []byte(fmt.Sprintf("replacement:%d", index)), ttl: time.Minute}
+		}
+		require.NoError(t, store.CommitRefresh(ctx, attempt, records))
+		_, found, err := store.Get(ctx, attempt.refreshKey)
+		require.NoError(t, err)
+		require.False(t, found)
+		for index, record := range records {
+			value, found, err := store.Get(ctx, record.key)
+			require.NoError(t, err)
+			require.True(t, found)
+			require.Equal(t, []byte(fmt.Sprintf("replacement:%d", index)), value)
+			_, reserved, err := store.Get(ctx, attempt.reservationKeys[index])
+			require.NoError(t, err)
+			require.False(t, reserved)
+		}
+		require.ErrorIs(t, store.AbortRefresh(ctx, attempt), errMCPOAuthBrokerRefreshLease)
+	})
+
+	t.Run("terminal revocation clears the owned attempt without publishing", func(t *testing.T) {
+		attempt := newAttempt("revoke", "owner")
+		require.NoError(t, store.Put(ctx, attempt.refreshKey, attempt.expected, time.Minute))
+		require.NoError(t, store.BeginRefresh(ctx, attempt, mcpOAuthBrokerRefreshLeaseTTL))
+		revocation := mcpOAuthBrokerIssueRecord{key: attempt.revokedKey, value: []byte("sealed-revocation"), ttl: time.Minute}
+		require.NoError(t, store.RevokeRefreshFamily(ctx, &attempt, revocation))
+		_, found, err := store.Get(ctx, attempt.refreshKey)
+		require.NoError(t, err)
+		require.False(t, found)
+		value, found, err := store.Get(ctx, attempt.revokedKey)
+		require.NoError(t, err)
+		require.True(t, found)
+		require.Equal(t, revocation.value, value)
+		for index := range attempt.replacementKeys {
+			_, found, err := store.Get(ctx, attempt.replacementKeys[index])
+			require.NoError(t, err)
+			require.False(t, found)
+			_, found, err = store.Get(ctx, attempt.reservationKeys[index])
+			require.NoError(t, err)
+			require.False(t, found)
+		}
+		require.ErrorIs(t, store.BeginRefresh(ctx, attempt, mcpOAuthBrokerRefreshLeaseTTL), errMCPOAuthBrokerFamilyRevoked)
+		require.NoError(t, store.RevokeRefreshFamily(ctx, nil, revocation), "terminal replay revocation must be idempotent")
+	})
+}
+
 func TestMCPOAuthBrokerKeysShareOnlyTheirHashedAPISlot(t *testing.T) {
 	access := mcpOAuthBrokerKey("access", "org-secret", "api-secret", "access-secret")
 	revoked := mcpOAuthBrokerKey("revoked-family", "org-secret", "api-secret", "family-secret")
+	lease := mcpOAuthBrokerKey("refresh-lease", "org-secret", "api-secret", "refresh-secret")
+	reservation := mcpOAuthBrokerKey("refresh-reservation", "org-secret", "api-secret", access)
 	foreign := mcpOAuthBrokerKey("access", "other-org", "api-secret", "access-secret")
 	require.Equal(t, access[:strings.IndexByte(access, '}')+1], revoked[:strings.IndexByte(revoked, '}')+1])
+	require.Equal(t, access[:strings.IndexByte(access, '}')+1], lease[:strings.IndexByte(lease, '}')+1])
+	require.Equal(t, access[:strings.IndexByte(access, '}')+1], reservation[:strings.IndexByte(reservation, '}')+1])
 	require.NotEqual(t, access[:strings.IndexByte(access, '}')+1], foreign[:strings.IndexByte(foreign, '}')+1])
-	for _, secret := range []string{"org-secret", "api-secret", "access-secret", "family-secret"} {
-		require.NotContains(t, access+revoked+foreign, secret)
+	for _, secret := range []string{"org-secret", "api-secret", "access-secret", "family-secret", "refresh-secret"} {
+		require.NotContains(t, access+revoked+lease+reservation+foreign, secret)
 	}
 }
 
@@ -1197,6 +1361,25 @@ func TestMCPOAuthBrokerRejectsAuthorizationGrantWithoutRefresh(t *testing.T) {
 	require.ErrorContains(t, err, "does not support refresh")
 }
 
+func TestExactMCPOAuthJSONContentType(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		header  http.Header
+		matches bool
+	}{
+		{name: "JSON", header: http.Header{"Content-Type": {"application/json"}}, matches: true},
+		{name: "parameterized JSON", header: http.Header{"Content-Type": {"application/json; charset=utf-8"}}, matches: true},
+		{name: "duplicate values", header: http.Header{"Content-Type": {"application/json", "application/json"}}},
+		{name: "case variant duplicate", header: http.Header{"Content-Type": {"application/json"}, "content-type": {"application/json"}}},
+		{name: "comma list", header: http.Header{"Content-Type": {"application/json, text/plain"}}},
+		{name: "lookalike", header: http.Header{"Content-Type": {"application/jsonp"}}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			require.Equal(t, testCase.matches, exactMCPOAuthJSONContentType(testCase.header))
+		})
+	}
+}
+
 func TestFetchUpstreamASMetadataStrictBoundsAndIssuer(t *testing.T) {
 	var header http.Header
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1223,6 +1406,12 @@ type mcpBrokerTokens struct {
 	TokenType    string `json:"token_type"`
 	Scope        string `json:"scope"`
 	ExpiresIn    int64  `json:"expires_in"`
+}
+
+type mcpOAuthRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f mcpOAuthRoundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return f(request)
 }
 
 func runMCPBrokerAuthorization(t *testing.T, ts *Test, redirectURI, clientState string) (string, string, string) {
@@ -1276,6 +1465,164 @@ func exchangeMCPBrokerToken(t *testing.T, ts *Test, form url.Values, wantStatus 
 		require.NoError(t, json.NewDecoder(response.Body).Decode(&tokens))
 	}
 	return tokens
+}
+
+func requireMCPBrokerAccessStatus(t *testing.T, ts *Test, accessToken string, wantStatus int) {
+	t.Helper()
+	spec := ts.Gw.getApiSpec("test")
+	middleware := &MCPOAuthBrokerTokenMiddleware{BaseMiddleware: &BaseMiddleware{Gw: ts.Gw, Spec: spec}}
+	request := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+	err, status := middleware.ProcessRequest(httptest.NewRecorder(), request, nil)
+	require.Equal(t, wantStatus, status)
+	if wantStatus == http.StatusOK {
+		require.NoError(t, err)
+	} else {
+		require.Error(t, err)
+	}
+}
+
+func issueMCPBrokerTestTokens(t *testing.T, ts *Test, state string) (string, mcpBrokerTokens) {
+	t.Helper()
+	redirectURI := "https://client.example/callback"
+	clientID, verifier, code := runMCPBrokerAuthorization(t, ts, redirectURI, state)
+	tokens := exchangeMCPBrokerToken(t, ts, url.Values{
+		"grant_type": {"authorization_code"}, "code": {code}, "client_id": {clientID},
+		"redirect_uri": {redirectURI}, "code_verifier": {verifier}, "resource": {ts.URL + "/mcp/"},
+	}, http.StatusOK)
+	return clientID, tokens
+}
+
+func refreshMCPBrokerForm(ts *Test, clientID, refreshToken string) url.Values {
+	return url.Values{
+		"grant_type": {"refresh_token"}, "refresh_token": {refreshToken},
+		"client_id": {clientID}, "resource": {ts.URL + "/mcp/"},
+	}
+}
+
+func TestMCPOAuthRefreshBindingFailuresPreserveGrantAndAccess(t *testing.T) {
+	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
+	clientID, tokens := issueMCPBrokerTestTokens(t, ts, "binding-state")
+	capture.mu.Lock()
+	requestsBefore := capture.tokenRequests
+	capture.mu.Unlock()
+
+	wrongClient := refreshMCPBrokerForm(ts, "wrong-client", tokens.RefreshToken)
+	exchangeMCPBrokerToken(t, ts, wrongClient, http.StatusBadRequest)
+	wrongResource := refreshMCPBrokerForm(ts, clientID, tokens.RefreshToken)
+	wrongResource.Set("resource", ts.URL+"/other-resource")
+	exchangeMCPBrokerToken(t, ts, wrongResource, http.StatusBadRequest)
+	capture.mu.Lock()
+	require.Equal(t, requestsBefore, capture.tokenRequests, "binding failures must not reach the provider")
+	capture.mu.Unlock()
+	requireMCPBrokerAccessStatus(t, ts, tokens.AccessToken, http.StatusOK)
+
+	rotated := exchangeMCPBrokerToken(t, ts, refreshMCPBrokerForm(ts, clientID, tokens.RefreshToken), http.StatusOK)
+	require.NotEmpty(t, rotated.AccessToken, "the original refresh grant must remain usable")
+}
+
+func TestMCPOAuthRecoverableProviderFailuresPreserveGrantAndAccess(t *testing.T) {
+	for _, testCase := range []struct {
+		name, body string
+		status     int
+	}{
+		{name: "rate limited", status: http.StatusTooManyRequests, body: `{"error":"temporarily_unavailable"}`},
+		{name: "server failure", status: http.StatusInternalServerError, body: `{"error":"server_error"}`},
+		{name: "malformed success", status: http.StatusOK, body: `{"access_token":"incomplete"}`},
+		{name: "malformed OAuth error", status: http.StatusBadRequest, body: `{"error":"invalid_grant"`},
+		{name: "non-terminal OAuth error", status: http.StatusBadRequest, body: `{"error":"invalid_client"}`},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			ts, _, capture := newMCPBrokerTest(t, "/mcp/")
+			clientID, tokens := issueMCPBrokerTestTokens(t, ts, "recoverable-"+testCase.name)
+			capture.mu.Lock()
+			capture.refreshStatus = testCase.status
+			capture.refreshResponse = testCase.body
+			capture.mu.Unlock()
+
+			exchangeMCPBrokerToken(t, ts, refreshMCPBrokerForm(ts, clientID, tokens.RefreshToken), http.StatusBadGateway)
+			requireMCPBrokerAccessStatus(t, ts, tokens.AccessToken, http.StatusOK)
+			broker := newMCPOAuthBroker(ts.Gw, ts.Gw.getApiSpec("test"))
+			_, found, err := broker.store.Get(context.Background(), broker.refreshKey(tokens.RefreshToken))
+			require.NoError(t, err)
+			require.True(t, found, "recoverable provider failures must preserve the source grant")
+
+			capture.mu.Lock()
+			capture.refreshStatus = 0
+			capture.refreshResponse = ""
+			capture.mu.Unlock()
+			rotated := exchangeMCPBrokerToken(t, ts, refreshMCPBrokerForm(ts, clientID, tokens.RefreshToken), http.StatusOK)
+			require.NotEmpty(t, rotated.RefreshToken)
+		})
+	}
+}
+
+func TestMCPOAuthRefreshTransportAndCancellationPreserveGrant(t *testing.T) {
+	for _, testCase := range []struct {
+		name      string
+		configure func(*mcpOAuthBroker, *mcpOAuthBrokerUpstreamCapture)
+		context   func() (context.Context, context.CancelFunc)
+	}{
+		{
+			name: "transport error",
+			configure: func(broker *mcpOAuthBroker, _ *mcpOAuthBrokerUpstreamCapture) {
+				broker.client = &http.Client{Transport: mcpOAuthRoundTripFunc(func(*http.Request) (*http.Response, error) {
+					return nil, errors.New("injected transport failure")
+				})}
+			},
+			context: func() (context.Context, context.CancelFunc) { return context.WithCancel(context.Background()) },
+		},
+		{
+			name: "request timeout",
+			configure: func(_ *mcpOAuthBroker, capture *mcpOAuthBrokerUpstreamCapture) {
+				capture.mu.Lock()
+				capture.refreshDelay = 200 * time.Millisecond
+				capture.mu.Unlock()
+			},
+			context: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), 20*time.Millisecond)
+			},
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			ts, _, capture := newMCPBrokerTest(t, "/mcp/")
+			clientID, tokens := issueMCPBrokerTestTokens(t, ts, "transport-"+testCase.name)
+			broker := newMCPOAuthBroker(ts.Gw, ts.Gw.getApiSpec("test"))
+			testCase.configure(broker, capture)
+			ctx, cancel := testCase.context()
+			defer cancel()
+			request := httptest.NewRequest(http.MethodPost, "/token", nil).WithContext(ctx)
+			response := httptest.NewRecorder()
+			broker.refreshToken(response, request, refreshMCPBrokerForm(ts, clientID, tokens.RefreshToken))
+			require.Equal(t, http.StatusBadGateway, response.Code)
+			_, found, err := broker.store.Get(context.Background(), broker.refreshKey(tokens.RefreshToken))
+			require.NoError(t, err)
+			require.True(t, found)
+			requireMCPBrokerAccessStatus(t, ts, tokens.AccessToken, http.StatusOK)
+
+			capture.mu.Lock()
+			capture.refreshDelay = 0
+			capture.mu.Unlock()
+			rotated := exchangeMCPBrokerToken(t, ts, refreshMCPBrokerForm(ts, clientID, tokens.RefreshToken), http.StatusOK)
+			require.NotEmpty(t, rotated.RefreshToken)
+		})
+	}
+}
+
+func TestMCPOAuthAuthenticatedInvalidGrantRevokesOnlyMappedFamily(t *testing.T) {
+	ts, _, _ := newMCPBrokerTest(t, "/mcp/")
+	firstClient, first := issueMCPBrokerTestTokens(t, ts, "terminal-first")
+	secondClient, second := issueMCPBrokerTestTokens(t, ts, "terminal-second")
+	requireMCPBrokerAccessStatus(t, ts, first.AccessToken, http.StatusOK)
+	requireMCPBrokerAccessStatus(t, ts, second.AccessToken, http.StatusOK)
+
+	// The second authorization rotates the deterministic provider fixture, so
+	// the first family's upstream refresh grant now receives invalid_grant.
+	exchangeMCPBrokerToken(t, ts, refreshMCPBrokerForm(ts, firstClient, first.RefreshToken), http.StatusBadRequest)
+	requireMCPBrokerAccessStatus(t, ts, first.AccessToken, http.StatusUnauthorized)
+	requireMCPBrokerAccessStatus(t, ts, second.AccessToken, http.StatusOK)
+	rotated := exchangeMCPBrokerToken(t, ts, refreshMCPBrokerForm(ts, secondClient, second.RefreshToken), http.StatusOK)
+	require.NotEmpty(t, rotated.AccessToken)
 }
 
 func TestMCPOAuthBrokerCallbackTokenRuntimeAndRefresh(t *testing.T) {
@@ -1430,14 +1777,16 @@ func TestMCPOAuthBearerProviderFinalTargetBinding(t *testing.T) {
 
 func TestMCPOAuthRefreshStoreFailuresFailClosed(t *testing.T) {
 	for _, tc := range []struct {
-		name       string
-		getPrefix  string
-		putPrefix  string
-		preconsume bool
+		name          string
+		getPrefix     string
+		preconsume    bool
+		beginFailure  bool
+		revokeFailure bool
 	}{
 		{name: "revocation marker read", getPrefix: "revoked-family:"},
 		{name: "refresh family lookup", getPrefix: "refresh-family:", preconsume: true},
-		{name: "revocation marker write", putPrefix: "revoked-family:", preconsume: true},
+		{name: "revocation marker write", revokeFailure: true, preconsume: true},
+		{name: "refresh begin", beginFailure: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ts, _, capture := newMCPBrokerTest(t, "/mcp/")
@@ -1455,7 +1804,8 @@ func TestMCPOAuthRefreshStoreFailuresFailClosed(t *testing.T) {
 				require.True(t, found)
 			}
 			broker.store = faultingMCPOAuthBrokerStore{
-				mcpOAuthBrokerStore: broker.store, getPrefix: tc.getPrefix, putPrefix: tc.putPrefix,
+				mcpOAuthBrokerStore: broker.store, getPrefix: tc.getPrefix,
+				beginFailure: tc.beginFailure, revokeFailure: tc.revokeFailure,
 			}
 			capture.mu.Lock()
 			requestsBefore := capture.tokenRequests
@@ -1700,8 +2050,8 @@ func TestMCPOAuthBrokerRecordsAreSealedAndBoundToKey(t *testing.T) {
 	require.Error(t, broker.openRecord("record-one", first, &opened), "tampering must fail authentication")
 }
 
-func TestMCPOAuthBrokerConcurrentRefreshReplayRevokesFamily(t *testing.T) {
-	ts, _, _ := newMCPBrokerTest(t, "/mcp/")
+func TestMCPOAuthBrokerConcurrentRefreshIsRetryableUntilCommittedReplay(t *testing.T) {
+	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
 	redirectURI := "https://client.example/callback"
 	clientID, verifier, code := runMCPBrokerAuthorization(t, ts, redirectURI, "concurrent-state")
 	tokens := exchangeMCPBrokerToken(t, ts, url.Values{
@@ -1714,60 +2064,78 @@ func TestMCPOAuthBrokerConcurrentRefreshReplayRevokesFamily(t *testing.T) {
 		tokens mcpBrokerTokens
 		err    error
 	}
-	results := make(chan refreshResult, 2)
-	start := make(chan struct{})
-	for range 2 {
-		go func() {
-			<-start
-			form := url.Values{
-				"grant_type": {"refresh_token"}, "refresh_token": {tokens.RefreshToken},
-				"client_id": {clientID}, "resource": {ts.URL + "/mcp/"},
-			}
-			request, err := http.NewRequest(http.MethodPost, ts.URL+"/__tyk-as/test/token", strings.NewReader(form.Encode()))
-			if err != nil {
-				results <- refreshResult{err: err}
-				return
-			}
-			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			response, err := http.DefaultClient.Do(request)
-			if err != nil {
-				results <- refreshResult{err: err}
-				return
-			}
-			defer response.Body.Close()
-			result := refreshResult{status: response.StatusCode}
-			if response.StatusCode == http.StatusOK {
-				result.err = json.NewDecoder(response.Body).Decode(&result.tokens)
-			}
-			results <- result
-		}()
-	}
-	close(start)
-	statuses := map[int]int{}
-	var rotated mcpBrokerTokens
-	for range 2 {
-		result := <-results
-		require.NoError(t, result.err)
-		statuses[result.status]++
-		if result.status == http.StatusOK {
-			rotated = result.tokens
+	results := make(chan refreshResult, 1)
+	capture.mu.Lock()
+	capture.refreshStarted = make(chan struct{}, 1)
+	capture.refreshRelease = make(chan struct{})
+	refreshStarted := capture.refreshStarted
+	refreshRelease := capture.refreshRelease
+	capture.mu.Unlock()
+	go func() {
+		form := url.Values{
+			"grant_type": {"refresh_token"}, "refresh_token": {tokens.RefreshToken},
+			"client_id": {clientID}, "resource": {ts.URL + "/mcp/"},
 		}
+		request, err := http.NewRequest(http.MethodPost, ts.URL+"/__tyk-as/test/token", strings.NewReader(form.Encode()))
+		if err != nil {
+			results <- refreshResult{err: err}
+			return
+		}
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		response, err := http.DefaultClient.Do(request)
+		if err != nil {
+			results <- refreshResult{err: err}
+			return
+		}
+		defer response.Body.Close()
+		result := refreshResult{status: response.StatusCode}
+		if response.StatusCode == http.StatusOK {
+			result.err = json.NewDecoder(response.Body).Decode(&result.tokens)
+		}
+		results <- result
+	}()
+	select {
+	case <-refreshStarted:
+	case <-time.After(time.Second):
+		t.Fatal("first refresh did not reach upstream")
 	}
-	require.LessOrEqual(t, statuses[http.StatusOK], 1)
-	require.GreaterOrEqual(t, statuses[http.StatusBadRequest], 1)
-	require.Equal(t, 2, statuses[http.StatusOK]+statuses[http.StatusBadRequest])
+
+	retryable := exchangeMCPBrokerToken(t, ts, url.Values{
+		"grant_type": {"refresh_token"}, "refresh_token": {tokens.RefreshToken},
+		"client_id": {clientID}, "resource": {ts.URL + "/mcp/"},
+	}, http.StatusServiceUnavailable)
+	require.Empty(t, retryable.AccessToken)
+	close(refreshRelease)
+	result := <-results
+	require.NoError(t, result.err)
+	require.Equal(t, http.StatusOK, result.status)
+	rotated := result.tokens
+	require.NotEmpty(t, rotated.AccessToken)
+	capture.mu.Lock()
+	capture.refreshStarted = nil
+	capture.refreshRelease = nil
+	capture.mu.Unlock()
 
 	spec := ts.Gw.getApiSpec("test")
 	middleware := &MCPOAuthBrokerTokenMiddleware{BaseMiddleware: &BaseMiddleware{Gw: ts.Gw, Spec: spec}}
-	accessTokens := []string{tokens.AccessToken}
-	if rotated.AccessToken != "" {
-		accessTokens = append(accessTokens, rotated.AccessToken)
+	accessTokens := []string{tokens.AccessToken, rotated.AccessToken}
+	for _, accessToken := range accessTokens {
+		request := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
+		request.Header.Set("Authorization", "Bearer "+accessToken)
+		err, status := middleware.ProcessRequest(httptest.NewRecorder(), request, nil)
+		require.NoError(t, err, "an in-progress loser must not revoke the family")
+		require.Equal(t, http.StatusOK, status)
 	}
+
+	exchangeMCPBrokerToken(t, ts, url.Values{
+		"grant_type": {"refresh_token"}, "refresh_token": {tokens.RefreshToken},
+		"client_id": {clientID}, "resource": {ts.URL + "/mcp/"},
+	}, http.StatusBadRequest)
 	for _, accessToken := range accessTokens {
 		request := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
 		request.Header.Set("Authorization", "Bearer "+accessToken)
 		err, status := middleware.ProcessRequest(httptest.NewRecorder(), request, nil)
 		require.Error(t, err)
-		require.Equal(t, http.StatusUnauthorized, status)
+		require.Equal(t, http.StatusUnauthorized, status, "reuse after commit must revoke only this family")
 	}
 }

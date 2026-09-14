@@ -21,8 +21,14 @@ const (
 	mcpOAuthBrokerAccessTokenTTL    = time.Hour
 	mcpOAuthBrokerRefreshTokenTTL   = 24 * time.Hour
 	mcpOAuthBrokerReplayMarkerTTL   = 24 * time.Hour
+	mcpOAuthBrokerRefreshLeaseTTL   = 30 * time.Second
 	mcpOAuthBrokerTokenType         = "Bearer"
 	mcpOAuthBrokerMaxErrorTextBytes = 256
+)
+
+var (
+	errMCPOAuthUpstreamInvalidGrant = errors.New("upstream OAuth refresh grant is invalid")
+	errMCPOAuthUpstreamTokenExpired = errors.New("upstream OAuth access token is expired")
 )
 
 type mcpOAuthDownstreamCode struct {
@@ -233,7 +239,7 @@ func (b *mcpOAuthBroker) refreshToken(w http.ResponseWriter, r *http.Request, fo
 	}
 	refreshKey := b.refreshKey(refreshValue)
 	var grant mcpOAuthTokenGrant
-	found, err := b.consumeRecord(r.Context(), refreshKey, &grant)
+	sealedGrant, found, err := b.store.Get(r.Context(), refreshKey)
 	if err != nil {
 		mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
 		return
@@ -246,16 +252,16 @@ func (b *mcpOAuthBroker) refreshToken(w http.ResponseWriter, r *http.Request, fo
 			return
 		}
 		if replay {
-			if issued.FamilyID == "" {
-				mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
-				return
-			}
-			if err := b.putRecord(r.Context(), b.revokedFamilyKey(issued.FamilyID), map[string]bool{"revoked": true}, mcpOAuthBrokerReplayMarkerTTL); err != nil && !errors.Is(err, errMCPOAuthBrokerStoreCollision) {
+			if issued.FamilyID == "" || b.revokeRefreshFamily(context.WithoutCancel(r.Context()), nil, issued.FamilyID) != nil {
 				mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
 				return
 			}
 		}
 		mcpOAuthErrorNoStore(w, http.StatusBadRequest, "invalid_grant")
+		return
+	}
+	if err := b.openRecord(refreshKey, sealedGrant, &grant); err != nil {
+		mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
 		return
 	}
 	if !b.validGrant(grant, clientID, resource) || grant.UpstreamRefreshToken == "" {
@@ -269,8 +275,32 @@ func (b *mcpOAuthBroker) refreshToken(w http.ResponseWriter, r *http.Request, fo
 		mcpOAuthErrorNoStore(w, http.StatusBadRequest, "invalid_grant")
 		return
 	}
+	accessToken, refreshToken, attempt, err := b.prepareRefreshAttempt(refreshValue, sealedGrant, grant.FamilyID)
+	if err != nil {
+		mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
+		return
+	}
+	if err := b.store.BeginRefresh(r.Context(), attempt, mcpOAuthBrokerRefreshLeaseTTL); errors.Is(err, errMCPOAuthBrokerFamilyRevoked) {
+		mcpOAuthErrorNoStore(w, http.StatusBadRequest, "invalid_grant")
+		return
+	} else if err != nil {
+		mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
+		return
+	}
 	upstream, err := b.exchangeUpstreamRefresh(r.Context(), grant)
 	if err != nil {
+		if errors.Is(err, errMCPOAuthUpstreamInvalidGrant) {
+			if revokeErr := b.revokeRefreshFamily(context.WithoutCancel(r.Context()), &attempt, grant.FamilyID); revokeErr != nil {
+				mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
+				return
+			}
+			mcpOAuthErrorNoStore(w, http.StatusBadRequest, "invalid_grant")
+			return
+		}
+		if abortErr := b.store.AbortRefresh(context.WithoutCancel(r.Context()), attempt); abortErr != nil {
+			mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
+			return
+		}
 		mcpOAuthErrorNoStore(w, http.StatusBadGateway, "temporarily_unavailable")
 		return
 	}
@@ -280,7 +310,23 @@ func (b *mcpOAuthBroker) refreshToken(w http.ResponseWriter, r *http.Request, fo
 	}
 	grant.Scope = upstream.Scope
 	grant.UpstreamExpiresAt = time.Now().Add(upstream.ExpiresIn).Unix()
-	b.issueDownstreamTokens(w, r, grant)
+	records, accessTTL, err := b.prepareDownstreamTokenRecords(grant, accessToken, refreshToken)
+	if err != nil {
+		if abortErr := b.store.AbortRefresh(context.WithoutCancel(r.Context()), attempt); abortErr != nil {
+			mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
+			return
+		}
+		mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
+		return
+	}
+	if err := b.store.CommitRefresh(context.WithoutCancel(r.Context()), attempt, records); errors.Is(err, errMCPOAuthBrokerFamilyRevoked) {
+		mcpOAuthErrorNoStore(w, http.StatusBadRequest, "invalid_grant")
+		return
+	} else if err != nil {
+		mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
+		return
+	}
+	b.writeDownstreamTokens(w, accessToken, refreshToken, grant.Scope, accessTTL)
 }
 
 func (b *mcpOAuthBroker) issueDownstreamTokens(w http.ResponseWriter, r *http.Request, grant mcpOAuthTokenGrant) {
@@ -294,14 +340,32 @@ func (b *mcpOAuthBroker) issueDownstreamTokens(w http.ResponseWriter, r *http.Re
 		mcpOAuthErrorNoStore(w, http.StatusInternalServerError, "server_error")
 		return
 	}
+	records, accessTTL, err := b.prepareDownstreamTokenRecords(grant, accessToken, refreshToken)
+	if errors.Is(err, errMCPOAuthUpstreamTokenExpired) {
+		mcpOAuthErrorNoStore(w, http.StatusBadRequest, "invalid_grant")
+		return
+	} else if err != nil {
+		mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
+		return
+	}
+	if err := b.store.Issue(r.Context(), b.revokedFamilyKey(grant.FamilyID), records); errors.Is(err, errMCPOAuthBrokerFamilyRevoked) {
+		mcpOAuthErrorNoStore(w, http.StatusBadRequest, "invalid_grant")
+		return
+	} else if err != nil {
+		mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
+		return
+	}
+	b.writeDownstreamTokens(w, accessToken, refreshToken, grant.Scope, accessTTL)
+}
+
+func (b *mcpOAuthBroker) prepareDownstreamTokenRecords(grant mcpOAuthTokenGrant, accessToken, refreshToken string) ([]mcpOAuthBrokerIssueRecord, time.Duration, error) {
 	now := time.Now()
 	accessTTL := mcpOAuthBrokerAccessTokenTTL
 	if remaining := time.Until(time.Unix(grant.UpstreamExpiresAt, 0)); remaining < accessTTL {
 		accessTTL = remaining
 	}
 	if accessTTL <= 0 {
-		mcpOAuthErrorNoStore(w, http.StatusBadRequest, "invalid_grant")
-		return
+		return nil, 0, errMCPOAuthUpstreamTokenExpired
 	}
 	grant.ExpiresAt = now.Add(accessTTL).Unix()
 	records := make([]mcpOAuthBrokerIssueRecord, 0, 3)
@@ -315,22 +379,54 @@ func (b *mcpOAuthBroker) issueDownstreamTokens(w http.ResponseWriter, r *http.Re
 	} {
 		sealed, err := b.sealRecord(record.key, grant)
 		if err != nil {
-			mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
-			return
+			return nil, 0, err
 		}
 		records = append(records, mcpOAuthBrokerIssueRecord{key: record.key, value: sealed, ttl: record.ttl})
 	}
-	if err := b.store.Issue(r.Context(), b.revokedFamilyKey(grant.FamilyID), records); errors.Is(err, errMCPOAuthBrokerFamilyRevoked) {
-		mcpOAuthErrorNoStore(w, http.StatusBadRequest, "invalid_grant")
-		return
-	} else if err != nil {
-		mcpOAuthErrorNoStore(w, http.StatusServiceUnavailable, "temporarily_unavailable")
-		return
-	}
+	return records, accessTTL, nil
+}
+
+func (b *mcpOAuthBroker) writeDownstreamTokens(w http.ResponseWriter, accessToken, refreshToken, scope string, accessTTL time.Duration) {
 	mcpOAuthJSONNoStore(w, http.StatusOK, map[string]any{
 		"access_token": accessToken, "token_type": mcpOAuthBrokerTokenType,
 		"expires_in": int64(accessTTL / time.Second), "refresh_token": refreshToken,
-		"scope": grant.Scope,
+		"scope": scope,
+	})
+}
+
+func (b *mcpOAuthBroker) prepareRefreshAttempt(refreshValue string, expected []byte, familyID string) (string, string, mcpOAuthBrokerRefreshAttempt, error) {
+	accessToken, err := randomMCPOAuthValue()
+	if err != nil {
+		return "", "", mcpOAuthBrokerRefreshAttempt{}, err
+	}
+	refreshToken, err := randomMCPOAuthValue()
+	if err != nil {
+		return "", "", mcpOAuthBrokerRefreshAttempt{}, err
+	}
+	nonce, err := randomMCPOAuthValue()
+	if err != nil {
+		return "", "", mcpOAuthBrokerRefreshAttempt{}, err
+	}
+	replacementKeys := []string{b.accessKey(accessToken), b.refreshFamilyKey(refreshToken), b.refreshKey(refreshToken)}
+	reservationKeys := make([]string, len(replacementKeys))
+	for index, key := range replacementKeys {
+		reservationKeys[index] = b.refreshReservationKey(key)
+	}
+	return accessToken, refreshToken, mcpOAuthBrokerRefreshAttempt{
+		refreshKey: b.refreshKey(refreshValue), revokedKey: b.revokedFamilyKey(familyID),
+		leaseKey: b.refreshLeaseKey(refreshValue), expected: append([]byte(nil), expected...), nonce: nonce,
+		replacementKeys: replacementKeys, reservationKeys: reservationKeys,
+	}, nil
+}
+
+func (b *mcpOAuthBroker) revokeRefreshFamily(ctx context.Context, attempt *mcpOAuthBrokerRefreshAttempt, familyID string) error {
+	key := b.revokedFamilyKey(familyID)
+	sealed, err := b.sealRecord(key, map[string]bool{"revoked": true})
+	if err != nil {
+		return err
+	}
+	return b.store.RevokeRefreshFamily(ctx, attempt, mcpOAuthBrokerIssueRecord{
+		key: key, value: sealed, ttl: mcpOAuthBrokerReplayMarkerTTL,
 	})
 }
 
@@ -376,9 +472,22 @@ func (b *mcpOAuthBroker) exchangeUpstreamToken(ctx context.Context, issuer, endp
 	}
 	defer response.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(response.Body, mcpOAuthBrokerBodyMax+1))
-	mediaType, _, mediaErr := mime.ParseMediaType(response.Header.Get(header.ContentType))
-	if err != nil || len(body) > mcpOAuthBrokerBodyMax || response.StatusCode/100 != 2 || mediaErr != nil || mediaType != header.ApplicationJSON {
+	jsonContentType := exactMCPOAuthJSONContentType(response.Header)
+	if err != nil || len(body) > mcpOAuthBrokerBodyMax {
 		return mcpOAuthUpstreamTokenResponse{}, errors.New("upstream token exchange failed")
+	}
+	if response.StatusCode/100 != 2 {
+		if response.StatusCode == http.StatusBadRequest && jsonContentType {
+			var oauthError map[string]any
+			if decodeStrictMCPOAuthObject(body, &oauthError) == nil && oauthError["error"] == "invalid_grant" &&
+				validOptionalOAuthErrorText(oauthError, "error_description") && validOptionalOAuthErrorText(oauthError, "error_uri") {
+				return mcpOAuthUpstreamTokenResponse{}, errMCPOAuthUpstreamInvalidGrant
+			}
+		}
+		return mcpOAuthUpstreamTokenResponse{}, errors.New("upstream token exchange failed")
+	}
+	if !jsonContentType {
+		return mcpOAuthUpstreamTokenResponse{}, errors.New("invalid upstream token response")
 	}
 	var value map[string]any
 	if err := decodeStrictMCPOAuthObject(body, &value); err != nil {
@@ -397,6 +506,29 @@ func (b *mcpOAuthBroker) exchangeUpstreamToken(ctx context.Context, issuer, endp
 		return mcpOAuthUpstreamTokenResponse{}, errors.New("invalid upstream token response")
 	}
 	return mcpOAuthUpstreamTokenResponse{AccessToken: accessToken, RefreshToken: refreshToken, Scope: returnedScope, ExpiresIn: expiresIn}, nil
+}
+
+func exactMCPOAuthJSONContentType(headers http.Header) bool {
+	var values []string
+	for name, entries := range headers {
+		if strings.EqualFold(name, header.ContentType) {
+			values = append(values, entries...)
+		}
+	}
+	if len(values) != 1 {
+		return false
+	}
+	mediaType, _, err := mime.ParseMediaType(values[0])
+	return err == nil && mediaType == header.ApplicationJSON
+}
+
+func validOptionalOAuthErrorText(value map[string]any, field string) bool {
+	item, present := value[field]
+	if !present {
+		return true
+	}
+	text, ok := item.(string)
+	return ok && len(text) <= mcpOAuthBrokerMaxErrorTextBytes
 }
 
 func (b *mcpOAuthBroker) validAuthorizationState(state mcpOAuthAuthorizationState) bool {
@@ -433,6 +565,14 @@ func (b *mcpOAuthBroker) refreshKey(value string) string {
 
 func (b *mcpOAuthBroker) refreshFamilyKey(value string) string {
 	return mcpOAuthBrokerKey("refresh-family", b.spec.OrgID, b.spec.APIID, value)
+}
+
+func (b *mcpOAuthBroker) refreshLeaseKey(value string) string {
+	return mcpOAuthBrokerKey("refresh-lease", b.spec.OrgID, b.spec.APIID, value)
+}
+
+func (b *mcpOAuthBroker) refreshReservationKey(replacementKey string) string {
+	return mcpOAuthBrokerKey("refresh-reservation", b.spec.OrgID, b.spec.APIID, replacementKey)
 }
 
 func (b *mcpOAuthBroker) revokedFamilyKey(value string) string {
