@@ -1,6 +1,7 @@
 package pathnormalizer
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -67,4 +68,14 @@ func (o NormalizedPath) OperationId(method string) string {
 // RawOpIdPrefix returns prefix.
 func (o NormalizedPath) RawOpIdPrefix() string {
 	return strings.TrimPrefix(o.path, string(slash))
+}
+
+// generatedName matches the placeholder names Parser mints for regex segments
+// it finds in a user-defined path. A name the user chose never matches.
+var generatedName = regexp.MustCompile(`^` + regexp.QuoteMeta(RePrefix) + `\d+$`)
+
+// IsGeneratedName reports whether name is one this package mints for an
+// anonymous regex, rather than one the user chose.
+func IsGeneratedName(name string) bool {
+	return generatedName.MatchString(name)
 }

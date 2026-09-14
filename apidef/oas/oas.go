@@ -80,7 +80,7 @@ func (s *OAS) MarshalJSON() ([]byte, error) {
 // onto the normalizing mapper: migration is the only place a changed conversion
 // belongs, and it has fillForMigration.
 func (s *OAS) Fill(api apidef.APIDefinition) {
-	s.fill(api, &legacyPathMapper{})
+	s.fill(api, s.ordinaryPathMapper())
 }
 
 // fillForMigration fills *OAS definition from apidef.APIDefinition as part of a
