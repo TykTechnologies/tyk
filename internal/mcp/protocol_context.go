@@ -3,6 +3,8 @@ package mcp
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"strings"
 )
 
@@ -49,12 +51,186 @@ type ProtocolValidation struct {
 	Message    string
 }
 
-// UnmarshalJSON preserves numeric identifiers without float64 rounding.
+type ownedJSONField struct {
+	children map[string]ownedJSONField
+}
+
+var requestEnvelopeFields = map[string]ownedJSONField{
+	"jsonrpc": {},
+	"method":  {},
+	"params": {children: map[string]ownedJSONField{
+		"protocolVersion": {},
+		"_meta": {children: map[string]ownedJSONField{
+			MetaKeyProtocolVersion: {},
+			MetaKeyClientCapabilities: {children: map[string]ownedJSONField{
+				"sampling":    {},
+				"roots":       {},
+				"elicitation": {},
+				"tasks":       {},
+			}},
+			MetaKeyClientInfo: {},
+		}},
+		"name": {},
+		"uri":  {},
+	}},
+	"id": {},
+}
+
+// UnmarshalJSON preserves numeric identifiers without float64 rounding and
+// rejects ambiguous spellings of fields interpreted by Gateway. Objects that
+// Gateway treats as opaque, including tool arguments, retain normal JSON
+// decoding semantics.
 func (r *RequestEnvelope) UnmarshalJSON(data []byte) error {
-	type request RequestEnvelope
+	*r = RequestEnvelope{}
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
-	return decoder.Decode((*request)(r))
+
+	start, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+	if start == nil {
+		return requireJSONEOF(decoder)
+	}
+	if delimiter, ok := start.(json.Delim); !ok || delimiter != '{' {
+		return fmt.Errorf("JSON-RPC request envelope must be an object")
+	}
+
+	seen := make(map[string]struct{}, len(requestEnvelopeFields))
+	for decoder.More() {
+		keyToken, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		key, ok := keyToken.(string)
+		if !ok {
+			return fmt.Errorf("JSON-RPC request envelope contains a non-string field name")
+		}
+
+		var raw json.RawMessage
+		if err := decoder.Decode(&raw); err != nil {
+			return err
+		}
+		canonical, rule, owned := matchOwnedJSONField(key, requestEnvelopeFields)
+		if !owned {
+			continue
+		}
+		if key != canonical {
+			return fmt.Errorf("JSON-RPC request field %q must use canonical spelling %q", key, canonical)
+		}
+		if _, duplicate := seen[canonical]; duplicate {
+			return fmt.Errorf("duplicate JSON-RPC request field %q", canonical)
+		}
+		seen[canonical] = struct{}{}
+		if err := validateOwnedJSONObject(raw, "JSON-RPC request."+canonical, rule.children); err != nil {
+			return err
+		}
+
+		switch canonical {
+		case "jsonrpc":
+			if err := json.Unmarshal(raw, &r.JSONRPC); err != nil {
+				return err
+			}
+		case "method":
+			if err := json.Unmarshal(raw, &r.Method); err != nil {
+				return err
+			}
+		case "params":
+			r.Params = append(r.Params[:0], raw...)
+		case "id":
+			if err := decodeJSONNumber(raw, &r.ID); err != nil {
+				return err
+			}
+		}
+	}
+	if _, err := decoder.Token(); err != nil {
+		return err
+	}
+	return requireJSONEOF(decoder)
+}
+
+func validateOwnedJSONObject(raw json.RawMessage, path string, fields map[string]ownedJSONField) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	start, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+	if start == nil {
+		return requireJSONEOF(decoder)
+	}
+	delimiter, object := start.(json.Delim)
+	if !object || delimiter != '{' {
+		// Shape validation belongs to the method-specific ingress checks. There
+		// are no field names to disambiguate in a scalar or array value.
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(fields))
+	for decoder.More() {
+		keyToken, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		key, ok := keyToken.(string)
+		if !ok {
+			return fmt.Errorf("%s contains a non-string field name", path)
+		}
+		var value json.RawMessage
+		if err := decoder.Decode(&value); err != nil {
+			return err
+		}
+		canonical, rule, owned := matchOwnedJSONField(key, fields)
+		if !owned {
+			continue
+		}
+		if key != canonical {
+			return fmt.Errorf("field %q in %s must use canonical spelling %q", key, path, canonical)
+		}
+		if _, duplicate := seen[canonical]; duplicate {
+			return fmt.Errorf("duplicate field %q in %s", canonical, path)
+		}
+		seen[canonical] = struct{}{}
+		if err := validateOwnedJSONObject(value, path+"."+canonical, rule.children); err != nil {
+			return err
+		}
+	}
+	if _, err := decoder.Token(); err != nil {
+		return err
+	}
+	return requireJSONEOF(decoder)
+}
+
+func matchOwnedJSONField(key string, fields map[string]ownedJSONField) (string, ownedJSONField, bool) {
+	for canonical, rule := range fields {
+		if strings.EqualFold(key, canonical) {
+			return canonical, rule, true
+		}
+	}
+	return "", ownedJSONField{}, false
+}
+
+func decodeJSONNumber(raw json.RawMessage, destination any) error {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	if err := decoder.Decode(destination); err != nil {
+		return err
+	}
+	return requireJSONEOF(decoder)
+}
+
+func requireJSONEOF(decoder *json.Decoder) error {
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return fmt.Errorf("unexpected data after JSON value")
+		}
+		return err
+	}
+	return nil
 }
 
 // ProtocolContext contains raw protocol declarations and their normalized

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -74,8 +75,18 @@ func (m *JSONRPCMiddleware) validateJSONRPCRequest(r *http.Request) bool {
 		return false
 	}
 
-	contentType := r.Header.Get(headerContentType)
-	return strings.HasPrefix(contentType, contentTypeJSON)
+	var contentTypes []string
+	for name, values := range r.Header {
+		if strings.EqualFold(name, headerContentType) {
+			contentTypes = append(contentTypes, values...)
+		}
+	}
+	if len(contentTypes) != 1 {
+		return false
+	}
+
+	mediaType, _, err := mime.ParseMediaType(contentTypes[0])
+	return err == nil && mediaType == contentTypeJSON
 }
 
 // readAndParseJSONRPC reads the request body and parses it as JSON-RPC 2.0.

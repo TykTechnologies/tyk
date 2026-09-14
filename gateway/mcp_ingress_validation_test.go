@@ -133,6 +133,78 @@ func TestJSONRPCIngressPreservesExactRequestIDs(t *testing.T) {
 	}
 }
 
+func TestJSONRPCContentTypeIsUnambiguousApplicationJSON(t *testing.T) {
+	t.Parallel()
+	mw := &JSONRPCMiddleware{}
+	tests := []struct {
+		name    string
+		headers http.Header
+		valid   bool
+	}{
+		{name: "bare", headers: http.Header{"Content-Type": {"application/json"}}, valid: true},
+		{name: "parameterized", headers: http.Header{"Content-Type": {"application/json; charset=utf-8"}}, valid: true},
+		{name: "quoted parameter", headers: http.Header{"Content-Type": {`application/json; charset="utf-8"`}}, valid: true},
+		{name: "case insensitive media type", headers: http.Header{"Content-Type": {"Application/JSON"}}, valid: true},
+		{name: "missing", headers: http.Header{}, valid: false},
+		{name: "JSONP lookalike", headers: http.Header{"Content-Type": {"application/jsonp"}}, valid: false},
+		{name: "JSON sequence", headers: http.Header{"Content-Type": {"application/json-seq"}}, valid: false},
+		{name: "comma list", headers: http.Header{"Content-Type": {"application/json, text/plain"}}, valid: false},
+		{name: "duplicate values", headers: http.Header{"Content-Type": {"application/json", "application/json"}}, valid: false},
+		{name: "case variant duplicate keys", headers: http.Header{"Content-Type": {"application/json"}, "content-type": {"application/json"}}, valid: false},
+		{name: "duplicate parameter", headers: http.Header{"Content-Type": {"application/json; charset=utf-8; charset=latin1"}}, valid: false},
+		{name: "malformed parameter", headers: http.Header{"Content-Type": {"application/json; charset"}}, valid: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+			r.Header = test.headers.Clone()
+			require.Equal(t, test.valid, mw.validateJSONRPCRequest(r))
+		})
+	}
+}
+
+func TestStrictJSONRPCIngressRejectsBeforeRouting(t *testing.T) {
+	for _, synthetic := range []bool{false, true} {
+		kind := map[bool]string{false: "native", true: "REST-as-MCP"}[synthetic]
+		t.Run(kind, func(t *testing.T) {
+			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+			spec.MarkAsMCP()
+			if synthetic {
+				spec = buildSyntheticAdapterForRuntimeTest(t)
+			}
+			mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec}}
+
+			for _, test := range []struct {
+				name        string
+				contentType []string
+				body        string
+			}{
+				{name: "JSONP", contentType: []string{"application/jsonp"}, body: `{"jsonrpc":"2.0","method":"tools/list"}`},
+				{name: "comma list", contentType: []string{"application/json, text/plain"}, body: `{"jsonrpc":"2.0","method":"tools/list"}`},
+				{name: "duplicate header", contentType: []string{"application/json", "application/json"}, body: `{"jsonrpc":"2.0","method":"tools/list"}`},
+				{name: "duplicate envelope field", contentType: []string{"application/json"}, body: `{"jsonrpc":"2.0","method":"tools/list","method":"tools/call"}`},
+				{name: "duplicate interpreted params field", contentType: []string{"application/json"}, body: `{"jsonrpc":"2.0","method":"tools/call","params":{"name":"one","name":"two"}}`},
+				{name: "duplicate modern metadata field", contentType: []string{"application/json"}, body: `{"jsonrpc":"2.0","method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/protocolVersion":"2026-07-28"}}}`},
+			} {
+				t.Run(test.name, func(t *testing.T) {
+					req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(test.body))
+					req.Header[mcp.HeaderProtocolVersion] = []string{mcp.ModernProtocolVersion}
+					req.Header[headerContentType] = test.contentType
+					rec := httptest.NewRecorder()
+
+					err, status := mw.ProcessRequest(rec, req, nil)
+					require.NoError(t, err)
+					require.Equal(t, middleware.StatusRespond, status)
+					require.Equal(t, http.StatusBadRequest, rec.Code)
+					require.Nil(t, httpctx.GetJSONRPCRoutingState(req))
+					require.Empty(t, ctxGetMCPMethod(req))
+					require.Empty(t, ctxGetMCPPrimitiveName(req))
+				})
+			}
+		})
+	}
+}
+
 func TestJSONRPCIngressReadLimitBoundary(t *testing.T) {
 	t.Parallel()
 	base := `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
