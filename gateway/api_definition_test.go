@@ -31,6 +31,7 @@ import (
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/policy"
+	"github.com/TykTechnologies/tyk/pkg/osutil"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
@@ -1306,10 +1307,27 @@ func TestAPIDefinitionLoader(t *testing.T) {
 	})
 
 	t.Run("loadFileTemplate", func(t *testing.T) {
-		temp, err := l.loadFileTemplate(testTemplatePath)
-		assert.NoError(t, err)
+		// Setup OSRoot on the Gateway
+		absRoot, err := filepath.Abs("../")
+		require.NoError(t, err)
 
+		root, err := osutil.NewRoot(absRoot)
+		require.NoError(t, err)
+
+		ts.Gw.OSRoot = root
+
+		temp, err := l.loadFileTemplate("templates/transform_test.tmpl")
+		assert.NoError(t, err)
 		executeAndAssert(t, temp)
+
+		_, err = l.loadFileTemplate("../outside.tmpl")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "attempts to escape root directory")
+
+		ts.Gw.OSRoot = nil
+		_, err = l.loadFileTemplate("templates/transform_test.tmpl")
+		assert.Error(t, err)
+		assert.Equal(t, "OSRoot is not initialized", err.Error())
 	})
 
 	t.Run("loadBlobTemplate", func(t *testing.T) {

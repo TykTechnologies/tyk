@@ -68,6 +68,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	tyklog "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/pkg/osutil"
 	"github.com/TykTechnologies/tyk/pkg/validator"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
@@ -275,6 +276,9 @@ type Gateway struct {
 	// shims and new-syntax references share one code path. Guaranteed non-nil
 	// after construction, alongside kvRegistry.
 	kvResolver resolver.Resolver
+
+	// manage safe file paths
+	OSRoot *osutil.Root
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -344,6 +348,13 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	// cannot even build its local stores is unusable.
 	if err := gw.ensureKVRegistry(config); err != nil {
 		log.WithError(err).Fatal("could not initialize KV registry")
+	}
+
+	// Initialize the OSRoot with your desired base path
+	if root, err := osutil.NewRoot(config.TemplatePath); err == nil {
+		gw.OSRoot = root
+	} else {
+		log.WithError(err).Error("Failed to initialize Gateway OSRoot")
 	}
 
 	return gw
