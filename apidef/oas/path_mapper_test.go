@@ -272,3 +272,76 @@ func TestOAS_fillForMigration_reportsUnreadableDocument(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot read the existing paths")
 }
+
+// TestOAS_usesGeneratedPlaceholders pins what marks a document as one migration
+// produced, since that is what decides which conversion the ordinary fill cycle
+// uses.
+func TestOAS_usesGeneratedPlaceholders(t *testing.T) {
+	t.Parallel()
+
+	docWith := func(name, pattern string) *OAS {
+		schema := openapi3.NewStringSchema()
+		if pattern != "" {
+			schema = schema.WithPattern(pattern)
+		}
+
+		item := &openapi3.PathItem{}
+		item.SetOperation(http.MethodGet, &openapi3.Operation{})
+		item.Parameters = openapi3.Parameters{{Value: &openapi3.Parameter{
+			Name: name, In: openapi3.ParameterInPath, Required: true,
+			Schema: &openapi3.SchemaRef{Value: schema},
+		}}}
+
+		s := &OAS{}
+		s.Paths = openapi3.NewPaths()
+		s.Paths.Set("/users/{"+name+"}", item)
+
+		return s
+	}
+
+	assert.True(t, docWith("customRegex1", "[a-z]+").usesGeneratedPlaceholders())
+	assert.False(t, docWith("customRegex1", "").usesGeneratedPlaceholders(),
+		"a placeholder carrying no regex is not migration output")
+	assert.False(t, docWith("userId", "[a-z]+").usesGeneratedPlaceholders(),
+		"a parameter the user named is not migration output")
+	assert.False(t, (&OAS{}).usesGeneratedPlaceholders(), "an empty document has no paths")
+}
+
+// TestOAS_Fill_keepsMiddlewareOnItsOwnEndpoint covers the state the dashboard
+// stores while staging a migration: the migrated OAS next to a Classic
+// definition that still holds the original regex paths. Filling that with the
+// legacy conversion resolved both Classic paths to {customRegex1}, so the
+// second endpoint wrote its mock response body onto the first one's operation.
+func TestOAS_Fill_keepsMiddlewareOnItsOwnEndpoint(t *testing.T) {
+	t.Parallel()
+
+	var classic apidef.APIDefinition
+	classic.VersionData.Versions = map[string]apidef.VersionInfo{
+		Main: {ExtendedPaths: apidef.ExtendedPathsSet{
+			WhiteList: []apidef.EndPointMeta{
+				{Path: "/users/[a-z]+", Method: http.MethodGet},
+				{Path: "/users/[0-9]+", Method: http.MethodGet},
+			},
+			MockResponse: []apidef.MockResponseMeta{
+				{Path: "/users/[a-z]+", Method: http.MethodGet, Code: 200, Body: `{"by_name":true}`},
+				{Path: "/users/[0-9]+", Method: http.MethodGet, Code: 200, Body: `{"by_number":true}`},
+			},
+		}},
+	}
+
+	var s OAS
+	require.NoError(t, s.fillForMigration(classic))
+	require.Equal(t, []string{"/users/{customRegex1}", "/users/{customRegex2}"}, pathKeysOf(s.Paths))
+
+	// The save the dashboard performs next, over the Classic side migration left.
+	s.Fill(classic)
+
+	operations := s.GetTykExtension().Middleware.Operations
+	require.Contains(t, operations, "users/[a-z]+GET")
+	require.Contains(t, operations, "users/[0-9]+GET")
+	require.NotNil(t, operations["users/[a-z]+GET"].MockResponse)
+	require.NotNil(t, operations["users/[0-9]+GET"].MockResponse)
+
+	assert.Equal(t, `{"by_name":true}`, operations["users/[a-z]+GET"].MockResponse.Body)
+	assert.Equal(t, `{"by_number":true}`, operations["users/[0-9]+GET"].MockResponse.Body)
+}
