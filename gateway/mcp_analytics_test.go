@@ -319,7 +319,7 @@ func TestMCPAnalytics_RejectedEnvelopeRetainsDeclaration(t *testing.T) {
 	captured := captureAnalytics(ts)
 	_, _ = ts.Run(t, test.TestCase{
 		Method: http.MethodPost, Path: "/mcp", Code: http.StatusBadRequest,
-		Headers: map[string]string{"Content-Type": "application/json", "MCP-Protocol-Version": "2026-07-28"},
+		Headers: map[string]string{"MCP-Protocol-Version": "2026-07-28"},
 		Data:    `{"jsonrpc":"wrong","id":9007199254740993,"method":"server/discover"}`,
 	})
 	rec := captured.Load()
