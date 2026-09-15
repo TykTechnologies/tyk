@@ -1749,3 +1749,118 @@ func TestValidateNonMCPFieldsOnMCPProxy(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateAccessConditions(t *testing.T) {
+	specWith := func(conditions ...user.AccessCondition) user.AccessSpec {
+		return user.AccessSpec{URL: "/orders", Methods: []string{"GET"}, Conditions: conditions}
+	}
+	queryCondition := func(pattern string) user.AccessCondition {
+		return user.AccessCondition{
+			On: apidef.All,
+			Options: apidef.RoutingTriggerOptions{
+				QueryValMatches: map[string]apidef.StringRegexMap{"customer_id": {MatchPattern: pattern}},
+			},
+		}
+	}
+
+	testCases := []struct {
+		name         string
+		accessRights map[string]user.AccessDefinition
+		wantErr      string
+	}{
+		{
+			name:         "no access rights",
+			accessRights: nil,
+		},
+		{
+			name: "allowed urls without conditions",
+			accessRights: map[string]user.AccessDefinition{
+				"api-1": {AllowedURLs: []user.AccessSpec{{URL: "/orders", Methods: []string{"GET"}}}},
+			},
+		},
+		{
+			name: "valid conditions",
+			accessRights: map[string]user.AccessDefinition{
+				"api-1": {AllowedURLs: []user.AccessSpec{specWith(queryCondition("^[0-9]+$"))}},
+			},
+		},
+		{
+			name: "uncompilable pattern is rejected and names the api",
+			accessRights: map[string]user.AccessDefinition{
+				"api-1": {AllowedURLs: []user.AccessSpec{specWith(queryCondition("[unclosed"))}},
+			},
+			wantErr: `access_rights["api-1"]`,
+		},
+		{
+			name: "condition with no options is rejected",
+			accessRights: map[string]user.AccessDefinition{
+				"api-1": {AllowedURLs: []user.AccessSpec{specWith(user.AccessCondition{On: apidef.All})}},
+			},
+			wantErr: "no options set",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateAccessConditions(tc.accessRights)
+
+			if tc.wantErr == "" {
+				assert.NoError(t, err)
+				return
+			}
+
+			assert.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+}
+
+// TestKeyHandler_RejectsInvalidAccessConditions checks the Gateway refuses a
+// key it would not be able to evaluate. A condition that cannot be compiled
+// denies every request the entry would otherwise grant, so accepting the key
+// would trade an error message for a silent outage on live traffic.
+func TestKeyHandler_RejectsInvalidAccessConditions(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.Proxy.ListenPath = "/test"
+	})[0]
+
+	session := func(pattern string) string {
+		s := CreateStandardSession()
+		s.AccessRights = map[string]user.AccessDefinition{
+			api.APIID: {
+				APIID:   api.APIID,
+				APIName: api.Name,
+				AllowedURLs: []user.AccessSpec{{
+					URL:     "/test/orders",
+					Methods: []string{"GET"},
+					Conditions: []user.AccessCondition{{
+						On: apidef.All,
+						Options: apidef.RoutingTriggerOptions{
+							QueryValMatches: map[string]apidef.StringRegexMap{"customer_id": {MatchPattern: pattern}},
+						},
+					}},
+				}},
+			},
+		}
+
+		body, err := json.Marshal(s)
+		assert.NoError(t, err)
+
+		return string(body)
+	}
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{
+			Method: "POST", Path: "/tyk/keys/create", AdminAuth: true,
+			Data: session("^[0-9]+$"), Code: http.StatusOK,
+		},
+		{
+			Method: "POST", Path: "/tyk/keys/create", AdminAuth: true,
+			Data: session("[unclosed"), Code: http.StatusBadRequest,
+			BodyMatch: "cannot compile match_rx",
+		},
+	}...)
+}
