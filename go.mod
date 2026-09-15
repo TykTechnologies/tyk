@@ -646,3 +646,5 @@ replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi 
 //      (still pins v2.29.0 as of v0.21.0, 2026-07), or
 //   2. a fixed github.com/hamba/avro/v2 release appears (archived, so unlikely).
 replace github.com/hamba/avro/v2 => github.com/iskorotkov/avro/v2 v2.34.0
+
+replace github.com/modelcontextprotocol/go-sdk => github.com/andrei-tyk/go-sdk v1.6.1-0.20260912063509-f590438c4671
