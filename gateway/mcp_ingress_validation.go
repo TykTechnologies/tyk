@@ -41,6 +41,32 @@ func (m *JSONRPCMiddleware) validateMCPIngress(w http.ResponseWriter, r *http.Re
 	return true
 }
 
+// requestForMCPAdapterSDK bridges the already validated SEP-2243 Mcp-Name
+// representation to the pinned SDK's literal-name comparison. It clones the
+// request so the public wire headers and middleware-visible request are never
+// rewritten. TT-18011 validation remains the sole decoder and trust boundary.
+func requestForMCPAdapterSDK(r *http.Request) *http.Request {
+	if r == nil {
+		return nil
+	}
+	ingress := httpctx.GetMCPProtocolContext(r)
+	if ingress == nil || !ingress.IsModern() || !ingress.Validation.Checked {
+		return r
+	}
+	raw := r.Header.Get(mcp.HeaderName)
+	if raw == "" {
+		return r
+	}
+	decoded, ok := mcp.DecodeMirroredHeader(raw)
+	if !ok || decoded == raw {
+		return r
+	}
+	local := r.Clone(r.Context())
+	local.Header = r.Header.Clone()
+	local.Header.Set(mcp.HeaderName, decoded)
+	return local
+}
+
 func (m *JSONRPCMiddleware) writeMCPIngressError(w http.ResponseWriter, r *http.Request, err *mcp.IngressError) {
 	var id any
 	if ingress := httpctx.GetMCPProtocolContext(r); ingress != nil && ingress.Envelope != nil {

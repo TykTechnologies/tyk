@@ -24,7 +24,7 @@ func TestModernErrorAllocation(t *testing.T) {
 		"SDK parse":        sdkjsonrpc.CodeParseError, "SDK invalid request": sdkjsonrpc.CodeInvalidRequest,
 		"SDK method not found": sdkjsonrpc.CodeMethodNotFound, "SDK invalid params": sdkjsonrpc.CodeInvalidParams,
 		"SDK internal": sdkjsonrpc.CodeInternalError, "SDK header mismatch": sdkmcp.CodeHeaderMismatch,
-		"SDK resource not found": sdkmcp.CodeResourceNotFound, "SDK URL elicitation required": sdkmcp.CodeURLElicitationRequired,
+		"SDK resource not found": int(sdkmcp.CodeResourceNotFound), "SDK URL elicitation required": sdkmcp.CodeURLElicitationRequired,
 		"legacy server": CodeServerError, "legacy auth": CodeAuthRequired,
 		"legacy access": CodeAccessDenied, "legacy quota": CodeQuotaExceeded,
 		"legacy rate limit": CodeRateLimitExceeded, "legacy IP": CodeIPBlocked,
@@ -50,7 +50,7 @@ func TestModernErrorAllocation(t *testing.T) {
 	}
 }
 
-func TestLegacyAllocationDocumentsPinnedSDKCollisions(t *testing.T) {
-	require.Equal(t, sdkmcp.CodeHeaderMismatch, CodeAuthRequired)
-	require.Equal(t, sdkmcp.CodeResourceNotFound, CodeAccessDenied)
+func TestLegacyAllocationDoesNotCollideWithPinnedSDK(t *testing.T) {
+	require.NotEqualValues(t, sdkmcp.CodeHeaderMismatch, CodeAuthRequired)
+	require.NotEqualValues(t, sdkmcp.CodeResourceNotFound, CodeAccessDenied)
 }
