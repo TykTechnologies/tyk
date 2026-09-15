@@ -3739,11 +3739,11 @@ func ctxGetMCPPrimitiveName(r *http.Request) string {
 	return ctx.GetMCPPrimitiveName(r)
 }
 
-func ctxSetJSONRPCErrorCode(r *http.Request, code int) {
+func ctxSetJSONRPCErrorCode(r *http.Request, code int64) {
 	setCtxValue(r, ctx.JSONRPCErrorCode, code)
 }
 
-func ctxGetJSONRPCErrorCode(r *http.Request) int {
+func ctxGetJSONRPCErrorCode(r *http.Request) int64 {
 	return ctx.GetJSONRPCErrorCode(r)
 }
 

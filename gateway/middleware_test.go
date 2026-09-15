@@ -1286,7 +1286,7 @@ func TestRecordAccessLog_APIType(t *testing.T) {
 				assert.Equal(t, "tools/call", fields["mcp_method"])
 				assert.Equal(t, "tool", fields["mcp_primitive_type"])
 				assert.Equal(t, "unknown_tool", fields["mcp_primitive_name"])
-				assert.Equal(t, -32601, fields["mcp_error_code"])
+				assert.Equal(t, int64(-32601), fields["mcp_error_code"])
 			},
 		},
 		{
