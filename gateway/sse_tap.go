@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"sync"
 )
@@ -15,6 +16,8 @@ const readChunkSize = 4096
 // upstream from consuming unbounded memory by never sending an event boundary.
 const maxInputBufferSize = 1 << 20 // 1 MB
 
+var errFilteredSSETooLarge = errors.New("MCP filtering event exceeds size limit")
+
 // SSETap wraps an upstream http.Response.Body and intercepts individual SSE
 // events, running them through a chain of SSEHook implementations before
 // forwarding them to the downstream consumer (typically CopyResponse).
@@ -26,23 +29,29 @@ const maxInputBufferSize = 1 << 20 // 1 MB
 // The mutex is released during blocking upstream reads so that Close can
 // be called from another goroutine (e.g. a deadline timer) without deadlocking.
 type SSETap struct {
-	reader       io.ReadCloser // upstream response body
-	inputBuffer  []byte        // accumulates raw upstream bytes
-	outputBuffer bytes.Buffer  // holds serialized events ready for the client
-	upstreamEOF  bool          // set once the upstream reader returns io.EOF
-	closed       bool          // set by Close; checked after re-acquiring the mutex
-	hooks        []SSEHook
-	mu           sync.Mutex
-	readBuf      [readChunkSize]byte // reusable read buffer — avoids per-Read allocation
+	strictFiltering bool
+	terminalErr     error
+	readMu          sync.Mutex    // serialize reads while allowing Close to interrupt upstream reads
+	reader          io.ReadCloser // upstream response body
+	inputBuffer     []byte        // accumulates raw upstream bytes
+	outputBuffer    bytes.Buffer  // holds serialized events ready for the client
+	upstreamEOF     bool          // set once the upstream reader returns io.EOF
+	closed          bool          // set by Close; checked after re-acquiring the mutex
+	hooks           []SSEHook
+	mu              sync.Mutex
+	readBuf         [readChunkSize]byte // reusable read buffer — avoids per-Read allocation
 }
 
 // NewSSETap creates a new SSETap wrapping reader. If no hooks are provided
 // the tap operates in a fast pass-through mode.
 func NewSSETap(reader io.ReadCloser, hooks ...SSEHook) *SSETap {
-	return &SSETap{
-		reader: reader,
-		hooks:  hooks,
+	tap := &SSETap{reader: reader, hooks: hooks}
+	for _, hook := range hooks {
+		if _, ok := hook.(*MCPListFilterSSEHook); ok {
+			tap.strictFiltering = true
+		}
 	}
+	return tap
 }
 
 // Read satisfies io.Reader. It never returns (0, nil) which would violate the
@@ -52,6 +61,11 @@ func NewSSETap(reader io.ReadCloser, hooks ...SSEHook) *SSETap {
 // The mutex is released while waiting on the upstream reader so that Close
 // can be called concurrently (e.g. from a deadline timer) without deadlocking.
 func (t *SSETap) Read(p []byte) (int, error) {
+	t.readMu.Lock()
+	defer t.readMu.Unlock()
+	if len(p) == 0 {
+		return 0, nil
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -61,6 +75,10 @@ func (t *SSETap) Read(p []byte) (int, error) {
 		// 1. Drain any buffered output first.
 		if t.outputBuffer.Len() > 0 {
 			return t.outputBuffer.Read(p)
+		}
+
+		if t.terminalErr != nil {
+			return 0, t.terminalErr
 		}
 
 		// 2. If upstream is done and no output remains, signal EOF.
@@ -115,6 +133,11 @@ func (t *SSETap) Read(p []byte) (int, error) {
 		// producing a complete event boundary, flush it as-is (fail-open)
 		// to prevent unbounded memory growth from a malicious upstream.
 		if len(t.inputBuffer) > maxInputBufferSize {
+			if t.strictFiltering {
+				t.inputBuffer = nil
+				t.terminalErr = errFilteredSSETooLarge
+				continue
+			}
 			t.outputBuffer.Write(t.inputBuffer)
 			t.inputBuffer = nil
 		}
@@ -122,6 +145,10 @@ func (t *SSETap) Read(p []byte) (int, error) {
 		// 7. If we produced output, the next iteration will return it.
 		// If upstream hit EOF but processInputBuffer produced nothing,
 		// flush any remaining unparseable bytes as-is (fail-open).
+		if t.upstreamEOF && t.strictFiltering && len(t.inputBuffer) > 0 {
+			t.inputBuffer = nil
+			t.terminalErr = io.ErrUnexpectedEOF
+		}
 		if t.outputBuffer.Len() == 0 && t.upstreamEOF {
 			if len(t.inputBuffer) > 0 {
 				// Forward leftover bytes unchanged (incomplete event
@@ -169,6 +196,12 @@ func (t *SSETap) processInputBuffer() {
 		event, rawBytes, rest, err := parseSSEEvent(t.inputBuffer)
 		if err != nil {
 			// errIncompleteEvent: wait for more data.
+			return
+		}
+
+		if t.strictFiltering && len(rawBytes) > maxInputBufferSize {
+			t.inputBuffer = nil
+			t.terminalErr = errFilteredSSETooLarge
 			return
 		}
 
