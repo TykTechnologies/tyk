@@ -35,11 +35,13 @@ func newMCPTestGateway(t *testing.T, appPath ...string) *Gateway {
 	}
 
 	gw := &Gateway{apisByID: map[string]*APISpec{}}
-	gw.SetConfig(config.Config{
+	cfg := config.Config{
 		AppPath:    path,
 		HostName:   "localhost",
 		ListenPort: 8080,
-	})
+	}
+	gw.SetConfig(cfg)
+	gw.initMembers(cfg)
 	return gw
 }
 
@@ -1026,11 +1028,13 @@ func TestHandleGetMCPListOAS_IncludesPairedProxy(t *testing.T) {
 
 func TestHandleAddApiOAS_ValidatesPairedMCPAdapterUpstream(t *testing.T) {
 	gw := &Gateway{apisByID: map[string]*APISpec{}}
-	gw.SetConfig(config.Config{
+	cfg := config.Config{
 		AppPath:    "/",
 		HostName:   "localhost",
 		ListenPort: 8080,
-	})
+	}
+	gw.SetConfig(cfg)
+	gw.initMembers(cfg)
 
 	body, err := json.Marshal(pairedMCPProxyOAS("proxy-1", "org-1", "missing-rest"))
 	require.NoError(t, err)
@@ -1111,11 +1115,13 @@ func TestHandleMCP_AlignsSourceRESTGatewayTagsToPairedProxy(t *testing.T) {
 
 func pairedMCPGatewayForTagAlignment(loadProxy, loadSource bool) *Gateway {
 	gw := &Gateway{apisByID: map[string]*APISpec{}}
-	gw.SetConfig(config.Config{
+	cfg := config.Config{
 		AppPath:    "/apps",
 		HostName:   "localhost",
 		ListenPort: 8080,
-	})
+	}
+	gw.SetConfig(cfg)
+	gw.initMembers(cfg)
 	if loadSource {
 		gw.apisByID["rest-1"] = restSourceSpec("rest-1", "org-1", true)
 		gw.apisByID["rest-1"].TagsDisabled = false
