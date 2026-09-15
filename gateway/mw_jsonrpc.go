@@ -17,6 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	restmcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	otelmcp "github.com/TykTechnologies/tyk/internal/otel/mcp"
@@ -384,8 +385,14 @@ func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWri
 		return nil, middleware.StatusRespond
 	}
 	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		// Modern GET and DELETE were rejected before this function. Keep the
+		// stateful transport surface available to established legacy sessions.
+		normaliseMCPStreamableAccept(r)
+		if !installMCPAdapterRequestBinding(r, m.Gw, m.Spec) {
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return nil, middleware.StatusRespond
+		}
+		mcpAdapterHTTPHandler(r, m.Spec.MCPAdapter.SDKAdapter).ServeHTTP(w, requestForMCPAdapterSDK(r))
 		return nil, middleware.StatusRespond
 	}
 
@@ -409,14 +416,26 @@ func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWri
 
 	if method == mcp.MethodToolsList || (policyCtx != nil && policyCtx.listConfig != nil) {
 		rec := newBufferedResponseWriter()
-		m.Spec.MCPAdapter.SDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(rec, sdkRequest)
+		mcpAdapterHTTPHandler(r, m.Spec.MCPAdapter.SDKAdapter).ServeHTTP(rec, sdkRequest)
 		view, ok := m.syntheticMCPToolViewForCaller(r)
 		m.writeSyntheticMCPToolsListResponse(w, r, rec, view, ok, policyCtx)
 		return nil, middleware.StatusRespond
 	}
 
-	m.Spec.MCPAdapter.SDKAdapter.StreamableHTTPHandler(nil).ServeHTTP(w, sdkRequest)
+	mcpAdapterHTTPHandler(r, m.Spec.MCPAdapter.SDKAdapter).ServeHTTP(w, sdkRequest)
 	return nil, middleware.StatusRespond
+}
+
+// mcpAdapterHTTPHandler selects only from the already-validated ingress
+// context. All unambiguously modern traffic is stateless; legacy initialize
+// and established/fallback sessions remain on the stateful handler.
+func mcpAdapterHTTPHandler(r *http.Request, sdkAdapter *restmcpadapter.SDKAdapter) http.Handler {
+	protocolContext := httpctx.GetMCPProtocolContext(r)
+	return sdkAdapter.ProtocolHTTPHandler(mcpAdapterUsesStatelessHandler(protocolContext))
+}
+
+func mcpAdapterUsesStatelessHandler(protocolContext *mcp.ProtocolContext) bool {
+	return protocolContext != nil && protocolContext.IsModern()
 }
 
 func syntheticJSONRPCMethod(r *http.Request) string {
