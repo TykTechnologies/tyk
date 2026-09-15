@@ -1853,6 +1853,7 @@ func (gw *Gateway) initSystem() error {
 func (gw *Gateway) initMembers(cfg config.Config) {
 	gw.validator = validator.New(
 		validator.WithAllowUnsafePolicyIds(cfg.AllowUnsafePolicyIds),
+		validator.WithAllowUnsafeApiIds(cfg.AllowUnsafeApiIds),
 	)
 }
 
