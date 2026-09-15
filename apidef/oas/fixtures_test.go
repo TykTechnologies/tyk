@@ -341,7 +341,7 @@ func TestFixtures(t *testing.T) {
 						}
 
 						assert.True(t, ok, "expected key %s in output", k)
-						assert.Equal(t, v, got, "expected key %s=\"%v\", got \"%v\"", k, want, got)
+						assert.Equal(t, v, got, "expected key %s=\"%v\", got \"%v\"", k, v, got)
 					}
 				})
 			}
