@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	mcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -36,7 +37,12 @@ func TestResolveInternalHTTPHandlerForMCPAdapterLoop_StampsCallerAndUsesCanonica
 	})
 	gw.apisHandlesByID.Store(adapterSpec.APIID, &ChainObject{ThisHandler: handler})
 
+	snapshot, err := computeMCPPairing([]*APISpec{restSourceSpec("rest-1", "org-1", true), caller})
+	require.NoError(t, err)
+	gw.mcpPairingIndex.Set(snapshot)
 	req := httptest.NewRequest(http.MethodPost, "/proxy/mcp", nil)
+	setSessionForTest(req, &user.SessionState{KeyID: "test-key"})
+	acceptMCPOrigin(req, caller, "")
 	gotHandler, target, ok := gw.findInternalHTTPHandlerForLoop("rest-1", caller, req)
 	require.True(t, ok)
 	assert.Equal(t, adapterSpec, target)
@@ -65,7 +71,7 @@ func TestSyntheticAdapterProcessRequest_UsesSDKAdapter(t *testing.T) {
 	req.Header.Set("Accept", "application/json")
 	rec := httptest.NewRecorder()
 
-	err, status := mw.ProcessRequest(rec, req, nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -104,7 +110,7 @@ func TestSyntheticAdapterProcessRequest_RunsWithExistingJSONRPCRoutingState(t *t
 	httpctx.SetJsonRPCRouting(req, true)
 	rec := httptest.NewRecorder()
 
-	err, status := mw.ProcessRequest(rec, req, nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -121,7 +127,7 @@ func TestRESTAsMCPAdapter_RejectsNonPOSTMethods(t *testing.T) {
 			req.Header.Set("Accept", "application/json, text/event-stream")
 			rec := httptest.NewRecorder()
 
-			err, status := mw.ProcessRequest(rec, req, nil)
+			err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
 			require.NoError(t, err)
 			assert.Equal(t, middleware.StatusRespond, status)
 			assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
@@ -148,7 +154,7 @@ func TestRESTAsMCPToolView_RewritesToolsListForCallerProxy(t *testing.T) {
 	ctxSetMCPAdapterCallerProxyID(req, "proxy-1")
 	rec := httptest.NewRecorder()
 
-	err, status := mw.ProcessRequest(rec, req, nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -471,7 +477,7 @@ func TestCallMCPAdapterTool_ForwardsQueryParamsThroughJSONRPC(t *testing.T) {
 	ctxSetMCPAdapterCallerProxyID(req, "proxy-query")
 	rec := httptest.NewRecorder()
 
-	err, status := mw.ProcessRequest(rec, req, nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
 	require.NoError(t, err)
 	require.Equal(t, middleware.StatusRespond, status)
 	require.Equal(t, http.StatusOK, rec.Code)
@@ -505,7 +511,7 @@ func initializeSyntheticAdapterSession(t *testing.T, mw *JSONRPCMiddleware, call
 	}
 	rec := httptest.NewRecorder()
 
-	err, status := mw.ProcessRequest(rec, req, nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
 	require.NoError(t, err)
 	require.Equal(t, middleware.StatusRespond, status)
 	require.Equal(t, http.StatusOK, rec.Code)
@@ -576,7 +582,7 @@ func mcpAdapterCallContext(t *testing.T, gw *Gateway, adapterSpec *APISpec, call
 	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
 	ctxSetMCPAdapterCallerProxyID(req, callerProxyID)
 	installMCPAdapterCallContext(req, gw, adapterSpec)
-	return req.Context()
+	return mcpadapter.WithRequestBinding(req.Context(), req.Context(), "test-owner")
 }
 
 func mustAdapterTool(t *testing.T, adapterSpec *APISpec, name string) oas.DerivedTool {
@@ -589,4 +595,28 @@ func mustAdapterTool(t *testing.T, adapterSpec *APISpec, name string) oas.Derive
 	}
 	t.Fatalf("adapter tool %q not found", name)
 	return oas.DerivedTool{}
+}
+
+// Unit tests entering the synthetic boundary directly must model the verified
+// public hop explicitly; production never admits caller-ID-only context.
+func processAdmittedSyntheticForTest(t *testing.T, mw *JSONRPCMiddleware, w http.ResponseWriter, req *http.Request) (error, int) {
+	t.Helper()
+	if mw.Gw == nil {
+		mw.Gw, _, _ = syntheticAdapterGatewayForCallTest(t)
+	}
+	callerID := ctxGetMCPAdapterCallerProxyID(req)
+	if callerID == "" {
+		callerID = "proxy-1"
+	}
+	caller := mw.Gw.apisByID[callerID]
+	require.NotNil(t, caller)
+	callerCopy := *caller
+	def := *caller.APIDefinition
+	callerCopy.APIDefinition = &def
+	// Policy fixtures own their session rules. Model one stable keyless public
+	// principal here; dedicated identity tests exercise authenticated ownership.
+	callerCopy.UseKeylessAccess = true
+	acceptMCPOrigin(req, &callerCopy, "")
+	require.True(t, establishMCPAdapterOriginHop(req, mw.Gw, &callerCopy, mw.Spec))
+	return mw.ProcessRequest(w, req, nil)
 }
