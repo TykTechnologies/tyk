@@ -205,11 +205,14 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 					job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 				}
 
-				logger.
+				finishedLogger := logger.
 					WithError(err).
 					WithField("code", errCode).
-					WithField("ns", finishTime.Nanoseconds()).
-					Log(errpack.LogLevel(err, logrus.DebugLevel), "Finished")
+					WithField("ns", finishTime.Nanoseconds())
+				if rpcCode := ctxGetJSONRPCErrorCode(r); rpcCode != 0 {
+					finishedLogger = finishedLogger.WithField("jsonrpc_error_code", rpcCode)
+				}
+				finishedLogger.Log(errpack.LogLevel(err, logrus.DebugLevel), "Finished")
 
 				return
 			}
@@ -221,7 +224,11 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 				job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 			}
 
-			logger.WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+			finishedLogger := logger.WithField("code", errCode).WithField("ns", finishTime.Nanoseconds())
+			if rpcCode := ctxGetJSONRPCErrorCode(r); rpcCode != 0 {
+				finishedLogger = finishedLogger.WithField("jsonrpc_error_code", rpcCode)
+			}
+			finishedLogger.Debug("Finished")
 
 			mw.Base().UpdateRequestSession(r)
 			// Special code, bypasses all other execution

@@ -15,6 +15,8 @@ const (
 	// LegacyFallbackProtocolVersion is the effective version for established
 	// sessions and declaration-free legacy requests.
 	LegacyFallbackProtocolVersion = "2025-03-26"
+	// ModernProtocolVersion selects the GA stateless protocol behavior.
+	ModernProtocolVersion = "2026-07-28"
 )
 
 // ProtocolVersionSource describes how the effective MCP version was detected.
@@ -35,6 +37,12 @@ type RequestEnvelope struct {
 	Method  string          `json:"method"`
 	Params  json.RawMessage `json:"params,omitempty"`
 	ID      any             `json:"id,omitempty"`
+}
+
+// IsModern reports whether the normalized context unambiguously selected the
+// GA modern protocol.
+func (c *ProtocolContext) IsModern() bool {
+	return c != nil && !c.DeclarationMismatch && c.EffectiveProtocolVersion == ModernProtocolVersion
 }
 
 // ProtocolContext contains raw protocol declarations and their normalized

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 )
 
@@ -83,6 +84,46 @@ func TestMapHTTPStatusToJSONRPCCode(t *testing.T) {
 			assert.Equal(t, tt.expectedRPCCode, result)
 		})
 	}
+}
+
+func TestSelectJSONRPCCode_ProtocolNamespaceAndClassification(t *testing.T) {
+	modern := mcp.NewProtocolContext(mcp.ModernProtocolVersion, "", nil, nil)
+	legacy := mcp.NewProtocolContext("2025-03-26", "", nil, nil)
+
+	tests := []struct {
+		name       string
+		status     int
+		class      *tykerrors.ErrorClassification
+		legacyCode int
+		modernCode int
+	}{
+		{name: "authentication", status: http.StatusForbidden, class: tykerrors.NewErrorClassification(tykerrors.AKI, "invalid_key"), legacyCode: CodeAuthRequired, modernCode: CodeModernAuthRequired},
+		{name: "access", status: http.StatusForbidden, class: tykerrors.NewErrorClassification(tykerrors.ACD, "access_denied"), legacyCode: CodeAccessDenied, modernCode: CodeModernAccessDenied},
+		{name: "rate limit", status: http.StatusTooManyRequests, class: tykerrors.NewErrorClassification(tykerrors.RLT, "rate_limited"), legacyCode: CodeRateLimitExceeded, modernCode: CodeModernRateLimitExceeded},
+		{name: "upstream", status: http.StatusInternalServerError, class: tykerrors.NewErrorClassification(tykerrors.UCF, "connection_failed"), legacyCode: CodeUpstreamError, modernCode: CodeModernUpstreamError},
+		{name: "quota", status: http.StatusForbidden, class: tykerrors.NewErrorClassification(tykerrors.QEX, "quota_exceeded"), legacyCode: CodeQuotaExceeded, modernCode: CodeModernQuotaExceeded},
+		{name: "IP blocked", status: http.StatusForbidden, class: tykerrors.NewErrorClassification(tykerrors.IPB, "ip_blocked"), legacyCode: CodeIPBlocked, modernCode: CodeModernIPBlocked},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.legacyCode, SelectJSONRPCCode(test.status, test.class, legacy))
+			assert.Equal(t, test.modernCode, SelectJSONRPCCode(test.status, test.class, modern))
+		})
+	}
+
+	t.Run("standard codes do not move namespaces", func(t *testing.T) {
+		assert.Equal(t, mcp.JSONRPCInvalidRequest, SelectJSONRPCCode(http.StatusBadRequest, nil, modern))
+		assert.Equal(t, mcp.JSONRPCMethodNotFound, SelectJSONRPCCode(http.StatusNotFound, nil, modern))
+		assert.Equal(t, mcp.JSONRPCInternalError, SelectJSONRPCCode(http.StatusInternalServerError, nil, modern))
+	})
+
+	t.Run("mismatch remains legacy", func(t *testing.T) {
+		mismatch := mcp.NewProtocolContext(mcp.ModernProtocolVersion, "", &mcp.RequestEnvelope{
+			Params: []byte(`{"_meta":{"io.modelcontextprotocol/protocolVersion":"2025-03-26"}}`),
+		}, nil)
+		assert.Equal(t, CodeAccessDenied, SelectJSONRPCCode(http.StatusForbidden, nil, mismatch))
+	})
 }
 
 func TestMapHTTPStatusToJSONRPCCode_AllDefinedCodes(t *testing.T) {
