@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -423,6 +424,46 @@ func TestCallMCPAdapterTool_AliasUsesCanonicalRequest(t *testing.T) {
 	assert.Equal(t, "/orders", gotPath)
 }
 
+func TestCallMCPAdapterTool_PropagatesSDKOperationCancellationToSource(t *testing.T) {
+	gw, adapterSpec, _ := syntheticAdapterGatewayForCallTest(t)
+	started := make(chan struct{})
+	observedCause := make(chan error, 1)
+	gw.apisHandlesByID.Store("rest-1", &ChainObject{ThisHandler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-r.Context().Done()
+		observedCause <- context.Cause(r.Context())
+		w.WriteHeader(http.StatusRequestTimeout)
+	})})
+
+	tool := mustAdapterTool(t, adapterSpec, "orders")
+	operationCtx, cancel := context.WithCancelCause(mcpAdapterCallContext(t, gw, adapterSpec, "proxy-1"))
+	result := make(chan error, 1)
+	go func() {
+		_, err := defaultMCPAdapterCallTool(operationCtx, &tool, map[string]any{})
+		result <- err
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("source operation did not start")
+	}
+	cause := errors.New("cancel selected MCP call")
+	cancel(cause)
+	select {
+	case got := <-observedCause:
+		assert.ErrorIs(t, got, cause)
+	case <-time.After(time.Second):
+		t.Fatal("source handler did not observe cancellation")
+	}
+	select {
+	case err := <-result:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("cancelled adapter call did not return")
+	}
+}
+
 func TestCallMCPAdapterTool_RejectsToolHiddenFromCallerProxy(t *testing.T) {
 	gw, adapterSpec, sourceCalled := syntheticAdapterGatewayForCallTest(t)
 	tool := mustAdapterTool(t, adapterSpec, "make_order")
@@ -456,7 +497,7 @@ func TestCallMCPAdapterTool_LogsToolHiddenFromCallerProxy(t *testing.T) {
 	ctxSetMCPAdapterCallerProxyID(req, "proxy-1")
 	setSessionForTest(req, &user.SessionState{KeyID: "session-key-1"})
 
-	_, err := gw.callMCPAdapterTool(req, adapterSpec, &tool, map[string]any{})
+	_, err := gw.callMCPAdapterTool(context.Background(), req, adapterSpec, &tool, map[string]any{})
 	require.Error(t, err)
 	assert.False(t, *sourceCalled)
 

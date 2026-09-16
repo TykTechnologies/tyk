@@ -63,16 +63,53 @@ func BuildUpstreamRequest(
 	restAPIID string,
 	args map[string]any,
 ) (*http.Request, error) {
+	return BuildUpstreamRequestWithContext(parent, context.WithoutCancel(parent.Context()), tool, restAPIID, args)
+}
+
+// BuildUpstreamRequestWithContext builds a source REST request whose lifetime
+// follows operationCtx while its request-scoped values come from parent. This
+// keeps legacy HTTP disconnect behavior under the SDK's control and lets both
+// explicit legacy cancellation and modern request cancellation stop only the
+// matching source operation.
+func BuildUpstreamRequestWithContext(
+	parent *http.Request,
+	operationCtx context.Context,
+	tool *oas.DerivedTool,
+	restAPIID string,
+	args map[string]any,
+) (*http.Request, error) {
 
 	if tool == nil {
 		return nil, fmt.Errorf("nil tool")
+	}
+	if operationCtx == nil {
+		return nil, fmt.Errorf("nil operation context")
 	}
 	if err := ValidateToolMetadata(tool); err != nil {
 		return nil, err
 	}
 
-	builder := newUpstreamRequestBuilder(parent, tool, restAPIID)
+	executionCtx := operationLifetimeWithCurrentValues{
+		Context: operationCtx,
+		values:  context.WithoutCancel(parent.Context()),
+	}
+	builder := newUpstreamRequestBuilder(executionCtx, tool, restAPIID)
 	return builder.build(args)
+}
+
+// operationLifetimeWithCurrentValues delegates cancellation, deadlines and
+// cancellation cause to the SDK operation. Current-request values win over
+// any session-initialization values retained by a stateful SDK callback.
+type operationLifetimeWithCurrentValues struct {
+	context.Context
+	values context.Context
+}
+
+func (c operationLifetimeWithCurrentValues) Value(key any) any {
+	if value := c.values.Value(key); value != nil {
+		return value
+	}
+	return c.Context.Value(key)
 }
 
 // InvalidParamsError marks client-supplied MCP call arguments that should be
@@ -124,7 +161,7 @@ type queryParam struct {
 }
 
 type upstreamRequestBuilder struct {
-	parent   *http.Request
+	ctx      context.Context
 	tool     *oas.DerivedTool
 	restID   string
 	path     string
@@ -134,9 +171,9 @@ type upstreamRequestBuilder struct {
 	hasBody  bool
 }
 
-func newUpstreamRequestBuilder(parent *http.Request, tool *oas.DerivedTool, restAPIID string) upstreamRequestBuilder {
+func newUpstreamRequestBuilder(ctx context.Context, tool *oas.DerivedTool, restAPIID string) upstreamRequestBuilder {
 	return upstreamRequestBuilder{
-		parent:  parent,
+		ctx:     ctx,
 		tool:    tool,
 		restID:  restAPIID,
 		path:    tool.PathTemplate,
@@ -494,7 +531,7 @@ func (b *upstreamRequestBuilder) request() (*http.Request, error) {
 		body = bytes.NewReader(buf)
 	}
 
-	req, err := http.NewRequestWithContext(context.WithoutCancel(b.parent.Context()), b.tool.Method, b.path, body)
+	req, err := http.NewRequestWithContext(b.ctx, b.tool.Method, b.path, body)
 	if err != nil {
 		return nil, err
 	}
