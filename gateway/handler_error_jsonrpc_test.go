@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -769,6 +770,46 @@ func TestErrorHandler_JSONRPC_LatencyRecording(t *testing.T) {
 	assert.Equal(t, record.RequestTime, record.Latency.Total)
 	assert.Equal(t, record.Latency.Gateway, record.Latency.Total-record.Latency.Upstream)
 	assert.Zero(t, record.Latency.Upstream)
+}
+
+func TestErrorHandler_PairedMCPPolicyDenialKeepsPublicAnalyticsPath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	conf := ts.Gw.GetConfig()
+	conf.EnableAnalytics = true
+	ts.Gw.SetConfig(conf)
+
+	spec := pairedMCPProxySpec("paired-public", "org-1", "rest-1", nil)
+	spec.Name = "Paired Public"
+	spec.DoNotTrack = false
+	spec.Proxy.StripListenPath = true
+	spec.GlobalConfig = conf
+
+	var record *analytics.AnalyticsRecord
+	ts.Gw.Analytics.mockEnabled = true
+	ts.Gw.Analytics.mockRecordHit = func(got *analytics.AnalyticsRecord) {
+		copy := *got
+		record = &copy
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/paired-public/mcp", nil)
+	ctxSetOriginalRequestPath(req, req.URL.Path)
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{
+		Method:        mcp.MethodToolsCall,
+		ID:            json.Number("9007199254740993"),
+		PrimitiveType: mcp.PrimitiveTypeTool,
+		PrimitiveName: "blocked_tool",
+	})
+	recorder := httptest.NewRecorder()
+	handler := ErrorHandler{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: ts.Gw}}
+
+	handler.HandleError(recorder, req, "access denied", http.StatusForbidden, true)
+
+	require.NotNil(t, record)
+	assert.Equal(t, "/paired-public/mcp", record.Path)
+	assert.Equal(t, "/paired-public/mcp", record.RawPath)
+	assert.Equal(t, "/paired-public/mcp", record.OriginalPath)
 }
 
 func TestErrorHandler_AccessLogAndHealthUnconditional(t *testing.T) {

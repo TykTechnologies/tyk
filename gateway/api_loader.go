@@ -869,7 +869,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if d.SH.Spec.target.Scheme == "tyk" {
-		handler, _, found := d.Gw.findInternalHTTPHandlerForLoop(d.SH.Spec.target.Host, d.SH.Spec, r)
+		handler, targetSpec, found := d.Gw.findInternalHTTPHandlerForLoop(d.SH.Spec.target.Host, d.SH.Spec, r)
 
 		if !found {
 			handler := ErrorHandler{d.SH.Base()}
@@ -884,6 +884,12 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			handler := ErrorHandler{d.SH.Base()}
 			handler.HandleError(w, r, "Failed to perform internal redirect", http.StatusInternalServerError, true)
 			return
+		}
+
+		if d.SH.Spec.IsPairedMCPAdapterProxy() && targetSpec != nil && targetSpec.IsSyntheticMCPAdapter() {
+			owner, observedWriter := newMCPCompletionAnalyticsOwner(&d.SH, r, w)
+			defer owner.Complete(r)
+			w = observedWriter
 		}
 
 		d.SH.Spec.SanitizeProxyPaths(r)
