@@ -22,6 +22,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/pkg/identifier"
 )
 
 func newMCPTestGateway(t *testing.T, appPath ...string) *Gateway {
@@ -1476,5 +1477,89 @@ func TestValidateMCP_PRM(t *testing.T) {
 
 		assert.True(t, nextCalled, "next handler should be called")
 		assert.Equal(t, http.StatusOK, w.Code)
+	})
+}
+
+func TestHandleMCP_CustomApiIdValidation(t *testing.T) {
+	// Passes sanitize.ValidatePathComponent but is not made of the allowed identifier characters.
+	const unsafeAPIID = "żuk"
+
+	mcpGateway := func(t *testing.T, allowUnsafeApiIds bool) *Gateway {
+		t.Helper()
+
+		gw := newMCPTestGateway(t, "/apps")
+		cnf := gw.GetConfig()
+		cnf.AllowUnsafeApiIds = allowUnsafeApiIds
+		gw.SetConfig(cnf)
+		gw.initMembers(cnf)
+
+		return gw
+	}
+
+	mcpRequest := func(t *testing.T, method, apiID string) *http.Request {
+		t.Helper()
+
+		doc := &oas.OAS{T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info:    &openapi3.Info{Title: apiID, Version: "1.0.0"},
+			Paths:   openapi3.NewPaths(),
+		}}
+		doc.SetTykExtension(&oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:    apiID,
+				OrgID: "org-1",
+				Name:  apiID,
+				State: oas.State{Active: true},
+			},
+			Server:   oas.Server{ListenPath: oas.ListenPath{Value: "/" + apiID + "/"}},
+			Upstream: oas.Upstream{URL: "http://upstream.url"},
+		})
+
+		body, err := json.Marshal(doc)
+		require.NoError(t, err)
+
+		return httptest.NewRequest(method, "/tyk/mcps", bytes.NewReader(body))
+	}
+
+	t.Run("AllowUnsafeApiIds=false", func(t *testing.T) {
+		t.Run("rejects create", func(t *testing.T) {
+			gw := mcpGateway(t, false)
+
+			response, statusCode := gw.handleAddMCP(mcpRequest(t, http.MethodPost, unsafeAPIID), afero.NewMemMapFs())
+
+			errorResponse, ok := response.(apiStatusMessage)
+			require.True(t, ok)
+			assert.Equal(t, identifier.ErrInvalidCustomApiId.Error(), errorResponse.Message)
+			assert.Equal(t, http.StatusBadRequest, statusCode)
+		})
+
+		t.Run("rejects update", func(t *testing.T) {
+			gw := mcpGateway(t, false)
+			gw.apisByID[unsafeAPIID] = mcpManagedTestSpec(unsafeAPIID)
+
+			response, statusCode := gw.handleUpdateMCP(unsafeAPIID, mcpRequest(t, http.MethodPut, unsafeAPIID), afero.NewMemMapFs())
+
+			errorResponse, ok := response.(apiStatusMessage)
+			require.True(t, ok)
+			assert.Equal(t, identifier.ErrInvalidCustomApiId.Error(), errorResponse.Message)
+			assert.Equal(t, http.StatusBadRequest, statusCode)
+		})
+	})
+
+	t.Run("AllowUnsafeApiIds=true", func(t *testing.T) {
+		t.Run("accepts create", func(t *testing.T) {
+			gw := mcpGateway(t, true)
+
+			_, statusCode := gw.handleAddMCP(mcpRequest(t, http.MethodPost, unsafeAPIID), afero.NewMemMapFs())
+			assert.Equal(t, http.StatusOK, statusCode)
+		})
+
+		t.Run("accepts update", func(t *testing.T) {
+			gw := mcpGateway(t, true)
+			gw.apisByID[unsafeAPIID] = mcpManagedTestSpec(unsafeAPIID)
+
+			_, statusCode := gw.handleUpdateMCP(unsafeAPIID, mcpRequest(t, http.MethodPut, unsafeAPIID), afero.NewMemMapFs())
+			assert.Equal(t, http.StatusOK, statusCode)
+		})
 	})
 }
