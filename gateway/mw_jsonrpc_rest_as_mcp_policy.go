@@ -70,7 +70,7 @@ func (m *JSONRPCMiddleware) routeSyntheticAdapterJSONRPC(rpcReq *JSONRPCRequest)
 }
 
 func (c *restAsMCPPolicyContext) setJSONRPCState(r *http.Request, vemChain []string, primitiveName string) {
-	primitiveType := primitiveTypeForMethod(c.rpcReq.Method)
+	primitiveType, primitiveName := primitiveInfoForMethod(c.rpcReq.Method, primitiveName)
 	httpctx.SetJSONRPCRoutingState(r, &httpctx.JSONRPCRoutingState{
 		Method:        c.rpcReq.Method,
 		Params:        c.rpcReq.Params,

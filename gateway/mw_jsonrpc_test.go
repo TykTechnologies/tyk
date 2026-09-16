@@ -1555,6 +1555,16 @@ func TestJSONRPCMiddleware_setupSequentialRouting(t *testing.T) {
 			expectedPrimitiveName: "summarize",
 		},
 		{
+			name:                  "initialize - ignores router metadata for non-primitive method",
+			method:                mcp.MethodInitialize,
+			primitiveName:         "initialize",
+			expectedNextVEM:       "",
+			expectedVEMChain:      []string{jsonrpc.MethodVEMPrefix + mcp.MethodInitialize},
+			expectedRedirectTo:    jsonrpc.MethodVEMPrefix + mcp.MethodInitialize,
+			expectedPrimitiveType: "",
+			expectedPrimitiveName: "",
+		},
+		{
 			name:                  "tools/list - 1-stage routing (operation only)",
 			method:                "tools/list",
 			primitiveName:         "",

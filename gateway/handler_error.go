@@ -143,7 +143,11 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			version = "Non Versioned"
 		}
 
-		if e.Spec.Proxy.StripListenPath {
+		// A paired MCP proxy owns the public completion record. Keep routed
+		// JSON-RPC errors on that same client-facing path, matching successful
+		// paired completions instead of exposing the stripped proxy path.
+		pairedMCPCompletion := e.Spec.IsPairedMCPAdapterProxy() && httpctx.GetJSONRPCRoutingState(r) != nil
+		if e.Spec.Proxy.StripListenPath && !pairedMCPCompletion {
 			r.URL.Path = e.Spec.StripListenPath(r.URL.Path)
 		}
 

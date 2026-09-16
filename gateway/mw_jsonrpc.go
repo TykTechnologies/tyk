@@ -142,6 +142,7 @@ func (m *JSONRPCMiddleware) setupSequentialRouting(r *http.Request, rpcReq *JSON
 	}
 
 	method := rpcReq.Method
+	primitiveType, primitiveName := primitiveInfoForMethod(method, result.PrimitiveName)
 
 	var nextVEM string
 	if len(result.VEMChain) > 1 {
@@ -156,8 +157,8 @@ func (m *JSONRPCMiddleware) setupSequentialRouting(r *http.Request, rpcReq *JSON
 		OriginalPath:  r.URL.Path,
 		VEMChain:      result.VEMChain,
 		VisitedVEMs:   []string{},
-		PrimitiveType: primitiveTypeForMethod(method),
-		PrimitiveName: result.PrimitiveName,
+		PrimitiveType: primitiveType,
+		PrimitiveName: primitiveName,
 	}
 
 	httpctx.SetJSONRPCRoutingState(r, state)
@@ -189,6 +190,16 @@ func primitiveTypeForMethod(method string) string {
 	default:
 		return ""
 	}
+}
+
+// primitiveInfoForMethod keeps non-primitive operations from inheriting router
+// metadata as a primitive name in policy and analytics contexts.
+func primitiveInfoForMethod(method, primitiveName string) (string, string) {
+	primitiveType := primitiveTypeForMethod(method)
+	if primitiveType == "" {
+		return "", ""
+	}
+	return primitiveType, primitiveName
 }
 
 // ProcessRequest handles JSON-RPC request detection and routing.
