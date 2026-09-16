@@ -190,6 +190,21 @@ func TestRESTAsMCPAdapter_ProtocolSpecificGETAndDELETE(t *testing.T) {
 	})
 }
 
+func TestRESTAsMCPProxy_GETWithoutLegacySessionIsMethodNotAllowed(t *testing.T) {
+	proxy := pairedMCPProxySpec("proxy-1", "org-1", "rest-1", nil)
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: proxy}}
+	req := httptest.NewRequest(http.MethodGet, "/mcp", nil)
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	rec := httptest.NewRecorder()
+
+	err, status := mw.ProcessRequest(rec, req, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, middleware.StatusRespond, status)
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+	assert.Equal(t, http.MethodPost, rec.Header().Get("Allow"))
+}
+
 type headerSignalRecorder struct {
 	*httptest.ResponseRecorder
 	once        sync.Once

@@ -73,12 +73,19 @@ func (m *JSONRPCMiddleware) writeMCPIngressError(w http.ResponseWriter, r *http.
 	m.writeJSONRPCError(w, r, id, err.Code, err.Message, err.Data)
 }
 
-func rejectModernMCPHTTPMethod(w http.ResponseWriter, r *http.Request) bool {
-	ingress := httpctx.GetMCPProtocolContext(r)
-	if ingress == nil || !ingress.IsModern() || r.Method == http.MethodPost || r.Method == http.MethodOptions {
+func rejectUnsupportedMCPHTTPMethod(w http.ResponseWriter, r *http.Request, spec *APISpec) bool {
+	if r.Method == http.MethodPost || r.Method == http.MethodOptions {
 		return false
 	}
-	ingress.Validation = mcp.ProtocolValidation{Checked: true, HTTPStatus: http.StatusMethodNotAllowed, Message: http.StatusText(http.StatusMethodNotAllowed)}
+
+	ingress := httpctx.GetMCPProtocolContext(r)
+	pairedWithoutLegacySession := spec != nil && spec.IsPairedMCPAdapterProxy() && (ingress == nil || !ingress.HasSession)
+	if (ingress == nil || !ingress.IsModern()) && !pairedWithoutLegacySession {
+		return false
+	}
+	if ingress != nil {
+		ingress.Validation = mcp.ProtocolValidation{Checked: true, HTTPStatus: http.StatusMethodNotAllowed, Message: http.StatusText(http.StatusMethodNotAllowed)}
+	}
 	w.Header().Set("Allow", http.MethodPost)
 	http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	return true

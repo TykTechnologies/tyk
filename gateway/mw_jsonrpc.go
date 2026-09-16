@@ -236,7 +236,7 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			m.writeJSONRPCError(w, r, nil, mcp.JSONRPCInvalidRequest, "MCP POST requires application/json", nil)
 			return nil, middleware.StatusRespond
 		}
-		if rejectModernMCPHTTPMethod(w, r) {
+		if rejectUnsupportedMCPHTTPMethod(w, r, m.Spec) {
 			return nil, middleware.StatusRespond
 		}
 		if m.Spec.IsSyntheticMCPAdapter() {
@@ -261,13 +261,6 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 	if !m.validateMCPIngress(w, r) {
 		return nil, middleware.StatusRespond
-	}
-	// Paired REST-as-MCP proxies own the public ingress boundary but leave
-	// method routing and SDK execution to their hidden synthetic adapter. Parse
-	// and validate here, before public auth/policy/quota middleware, then allow
-	// the unmodified request body to continue to the internal hop.
-	if m.Spec.IsPairedMCPAdapterProxy() {
-		return nil, http.StatusOK
 	}
 	if m.Spec.IsSyntheticMCPAdapter() {
 		return m.processSyntheticMCPAdapterRequest(w, r)
