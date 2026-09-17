@@ -179,9 +179,25 @@ type applyRun struct {
 	// applied. An API absent from the map has had nothing applied yet.
 	byAPI map[apiId]appliedPartitions
 
-	// didPerAPI is set once a per_api policy has been applied; didPartition
-	// once a partitioned policy has. Mixing the two kinds in one session is
-	// an error, and these two flags are how it is detected.
+	// didPerAPI and didPartition together record which kind of policy the
+	// run has seen so far, because per_api and partitioned policies must not
+	// be mixed on one key. Read them as the run's mode:
+	//
+	//   didPerAPI  didPartition  mode              next policy may be
+	//   false      false         nothing yet       anything
+	//   true       false         per_api           per_api or full; partitioned is an error
+	//   false      true          partitioned       partitioned or full; per_api is an error
+	//   true       true          unreachable       (the checks fail before the second flag is set)
+	//
+	// applyPerAPI sets didPerAPI and rejects the policy if didPartition is
+	// set; applyPartitions sets didPartition and rejects a partitioned policy
+	// if didPerAPI is set. A full policy (no partitions) passes both checks.
+	//
+	// Long-standing quirk, kept on purpose: applyPartitions assigns
+	// didPartition = Partitions.Enabled() rather than OR-ing it, so a full
+	// policy resets it to false, and "partitioned, full, per_api" is accepted
+	// although "partitioned, per_api" is not. Changing this would reject keys
+	// that work today.
 	didPerAPI    bool
 	didPartition bool
 }
@@ -350,9 +366,7 @@ func (r *applyRun) applyPerAPI(policy user.Policy) error {
 		})
 	}
 
-	if len(policy.AccessRights) > 0 {
-		r.didPerAPI = true
-	}
+	r.didPerAPI = len(policy.AccessRights) > 0
 
 	return nil
 }
