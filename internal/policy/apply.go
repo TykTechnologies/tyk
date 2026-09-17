@@ -239,6 +239,9 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 	appliedPoliciesCount, err := run.applyPolicies()
 	if err != nil {
+		// Logged here, once, for every failure below. Some callers in
+		// gateway/api.go discard this error, so this must not rely on them.
+		t.logger.Error(err)
 		return err
 	}
 
@@ -323,7 +326,6 @@ func (r *applyRun) applyPerAPI(policy user.Policy) error {
 	session, rights := r.session, r.rights
 
 	if r.didPartition {
-		r.logger.Error(ErrMixedPartitionAndPerAPIPolicies)
 		return ErrMixedPartitionAndPerAPIPolicies
 	}
 
@@ -379,15 +381,11 @@ func (r *applyRun) applyPolicy(policy user.Policy) error {
 	// Check ownership, policy org owner must be the same as API,
 	// otherwise you could overwrite a session key with a policy from a different org!
 	if r.orgID != nil && policy.OrgID != *r.orgID {
-		err := errors.New("attempting to apply policy from different organisation to key, skipping")
-		r.logger.Error(err)
-		return err
+		return errors.New("attempting to apply policy from different organisation to key, skipping")
 	}
 
 	if policy.Partitions.PerAPI && policy.Partitions.Enabled() {
-		err := fmt.Errorf("cannot apply policy %s which has per_api and any of partitions set", policy.ID)
-		r.logger.Error(err)
-		return err
+		return fmt.Errorf("cannot apply policy %s which has per_api and any of partitions set", policy.ID)
 	}
 
 	if policy.Partitions.PerAPI {
@@ -459,9 +457,10 @@ func (r *applyRun) lookupPolicy(id model.PolicyID) (policy user.Policy, found bo
 	}
 
 	err = fmt.Errorf("policy not found: %q", id)
-	r.logger.Error(err)
 
 	if len(r.policyIDs) > 1 {
+		// Skipped rather than returned, so this is the only trace of it.
+		r.logger.Error(err)
 		return user.Policy{}, false, nil
 	}
 
@@ -508,7 +507,6 @@ func (r *applyRun) applyPartitions(policy user.Policy) error {
 	usePartitions := policy.Partitions.Enabled()
 
 	if usePartitions && r.didPerAPI {
-		r.logger.Error(ErrMixedPartitionAndPerAPIPolicies)
 		return ErrMixedPartitionAndPerAPIPolicies
 	}
 
