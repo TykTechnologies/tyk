@@ -70,32 +70,31 @@ func allowedURLKey(spec user.AccessSpec) string {
 	return spec.URL + "\x00" + string(conditions)
 }
 
-// appendIfMissing ensures dest slice is unique with new items.
+// appendIfMissing appends to dest every item of in that dest does not already
+// contain, in input order. dest itself is returned unchanged in content and
+// order, including any duplicates it already had; only new items are
+// deduplicated. O(len(dest)+len(in)) via a seen-set.
 func appendIfMissing(dest []string, in ...string) []string {
+	if len(in) == 0 {
+		return dest
+	}
+
+	seen := make(map[string]struct{}, len(dest)+len(in))
+	for _, v := range dest {
+		seen[v] = struct{}{}
+	}
+
+	// At most one reallocation, even if every item of in is new.
+	dest = slices.Grow(dest, len(in))
+
 	for _, v := range in {
-		if slices.Contains(dest, v) {
+		if _, ok := seen[v]; ok {
 			continue
 		}
+		seen[v] = struct{}{}
 		dest = append(dest, v)
 	}
 	return dest
-}
-
-// intersection gets intersection of the given two slices.
-func intersection(a []string, b []string) (inter []string) {
-	m := make(map[string]bool)
-
-	for _, item := range a {
-		m[item] = true
-	}
-
-	for _, item := range b {
-		if _, ok := m[item]; ok {
-			inter = append(inter, item)
-		}
-	}
-
-	return
 }
 
 // greaterThanInt64 checks whether first int64 value is bigger than second int64 value.
