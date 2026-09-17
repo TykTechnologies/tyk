@@ -911,6 +911,40 @@ func TestHandleGetMCPWithExpand_ReturnsExpandedCatalogueForSavedProxy(t *testing
 	assert.Nil(t, storedExt.Primitives[0].InputSchema)
 }
 
+func TestHandleGetMCPWithExpand_SkipsStaleSavedPrimitive(t *testing.T) {
+	gw := newMCPTestGateway(t)
+	rest := restSourceSpec("rest-1", "org-1", true)
+	rest.OAS.Paths = openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get: &openapi3.Operation{OperationID: "list_orders", Summary: "list orders"},
+		}),
+	)
+	gw.apisByID["rest-1"] = rest
+	gw.apisByID["proxy-1"] = pairedMCPProxySpec("proxy-1", "org-1", "rest-1", &oas.TykMCPServer{
+		Primitives: []oas.TykMCPServerPrimitive{
+			{Source: oas.TykMCPServerSource{OperationID: "create_order"}, Allow: boolPtr(true)},
+			{Source: oas.TykMCPServerSource{OperationID: "list_orders"}, Allow: boolPtr(true)},
+		},
+	})
+
+	obj, code := gw.handleGetMCPWithExpand("proxy-1", true)
+
+	require.Equal(t, http.StatusOK, code)
+	expanded, ok := obj.(*oas.OAS)
+	require.True(t, ok)
+	ext := expanded.GetTykMCPServerExtension()
+	require.NotNil(t, ext)
+	require.Len(t, ext.Primitives, 1)
+	assert.Equal(t, "list_orders", ext.Primitives[0].Name)
+	require.NotNil(t, ext.Primitives[0].Allow)
+	assert.True(t, *ext.Primitives[0].Allow)
+
+	storedExt := gw.apisByID["proxy-1"].OAS.GetTykMCPServerExtension()
+	require.NotNil(t, storedExt)
+	require.Len(t, storedExt.Primitives, 2)
+	assert.Equal(t, "create_order", storedExt.Primitives[0].Source.OperationID)
+}
+
 func TestHandleGetMCPWithExpand_NormalReadReturnsStoredShape(t *testing.T) {
 	gw := newMCPTestGateway(t)
 	gw.apisByID["rest-1"] = restSourceSpec("rest-1", "org-1", true)

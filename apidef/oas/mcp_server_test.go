@@ -573,6 +573,68 @@ func TestExpandMCPServerConfig_PartialSelectionIncludesUnselectedPrimitives(t *t
 	assert.False(t, *deleteOrder.Allow)
 }
 
+func TestExpandMCPServerConfigTolerant_StalePrimitiveSource(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get:  &openapi3.Operation{OperationID: "list_orders"},
+			Post: &openapi3.Operation{OperationID: "create_order"},
+		}),
+	))
+	config := &TykMCPServer{
+		Primitives: []TykMCPServerPrimitive{
+			{Source: TykMCPServerSource{OperationID: "list_orders"}, Name: "orders", Allow: boolPtr(true)},
+			{Source: TykMCPServerSource{OperationID: "deleted_order"}, Name: "stale_orders", Allow: boolPtr(true)},
+		},
+	}
+
+	expanded, warnings, err := ExpandMCPServerConfigTolerant(src, config)
+
+	require.NoError(t, err)
+	require.Len(t, warnings, 1)
+	assert.Equal(t, "operationId:deleted_order", warnings[0].Source)
+	assert.Equal(t, "stale_orders", warnings[0].ToolName)
+	assert.Equal(t, warningMCPServerStaleSource, warnings[0].Reason)
+	require.Len(t, expanded.Primitives, 2)
+
+	orders := primitiveByName(expanded.Primitives, "orders")
+	require.NotNil(t, orders)
+	require.NotNil(t, orders.Allow)
+	assert.True(t, *orders.Allow)
+
+	createOrder := primitiveByName(expanded.Primitives, "create_order")
+	require.NotNil(t, createOrder)
+	require.NotNil(t, createOrder.Allow)
+	assert.False(t, *createOrder.Allow)
+
+	_, _, err = ExpandMCPServerConfig(src, config)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "operationId:deleted_order")
+}
+
+func TestExpandMCPServerConfigTolerant_AllSelectedPrimitivesAreStale(t *testing.T) {
+	t.Parallel()
+
+	src := newDeriveTestOAS(openapi3.NewPaths(
+		openapi3.WithPath("/orders", &openapi3.PathItem{
+			Get: &openapi3.Operation{OperationID: "list_orders"},
+		}),
+	))
+
+	expanded, warnings, err := ExpandMCPServerConfigTolerant(src, &TykMCPServer{
+		Primitives: []TykMCPServerPrimitive{
+			{Source: TykMCPServerSource{OperationID: "deleted_order"}, Allow: boolPtr(true)},
+		},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, warnings, 1)
+	require.Len(t, expanded.Primitives, 1)
+	require.NotNil(t, expanded.Primitives[0].Allow)
+	assert.False(t, *expanded.Primitives[0].Allow)
+}
+
 func TestExpandMCPServerConfig_MethodPathOperationWithoutOperationID(t *testing.T) {
 	t.Parallel()
 

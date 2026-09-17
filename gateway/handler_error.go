@@ -225,11 +225,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		rawResponse := ""
 		if recordDetail(r, e.Spec) {
 
-			// Get the wire format representation
-
-			var wireFormatReq bytes.Buffer
-			r.Write(&wireFormatReq)
-			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
+			rawRequest = getRawRequest(r, e.Spec)
 
 			var wireFormatRes bytes.Buffer
 			response.Write(&wireFormatRes)

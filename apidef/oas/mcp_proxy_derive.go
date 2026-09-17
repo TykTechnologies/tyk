@@ -21,15 +21,15 @@ import (
 //
 // It carries everything the adapter middleware needs — method, path
 // template, where each argument lives (path / query / header / body /
-// body.<field>), and the synthesised input JSON schema that is served
+// `body.<field>`), and the synthesised input JSON schema that is served
 // back on `tools/list`.
 type DerivedTool struct {
 	// OperationID is the source REST operationId this tool calls.
 	OperationID string `json:"-"`
 
 	// SourceKey identifies the source operation even when operationId is
-	// absent. OperationId-backed tools use "operationId:<id>"; path+method
-	// fallbacks use "http:<METHOD> <PATH>".
+	// absent. OperationId-backed tools use `operationId:<id>`; path+method
+	// fallbacks use `http:<METHOD> <PATH>`.
 	SourceKey string `json:"-"`
 
 	// CanonicalName is the source-derived MCP tool name before any proxy-side
@@ -45,16 +45,16 @@ type DerivedTool struct {
 	// Method is the HTTP method (GET, POST, ...).
 	Method string `json:"-"`
 
-	// PathTemplate is the OAS path template (e.g. "/orders/{id}").
+	// PathTemplate is the OAS path template (e.g. `/orders/{id}`).
 	PathTemplate string `json:"-"`
 
 	// ParamLocations maps each argument name to its source location.
 	// Recognised values:
-	//   - "path"
-	//   - "query"
-	//   - "header"
-	//   - "body"          (the whole JSON body)
-	//   - "body.<field>"  (a single JSON body field)
+	//   - `path`
+	//   - `query`
+	//   - `header`
+	//   - `body`          (the whole JSON body)
+	//   - `body.<field>`  (a single JSON body field)
 	// Locations are used internally by the REST-as-MCP adapter.
 	ParamLocations map[string]string `json:"-"`
 
@@ -1207,6 +1207,17 @@ func buildMCPToolViewWithMode(canonical []DerivedTool, config *TykMCPServer, str
 // ExpandMCPServerConfig builds a full configurable primitive catalogue from a
 // source REST OAS and a compact proxy-side x-tyk-mcp-server extension.
 func ExpandMCPServerConfig(srcOAS *OAS, config *TykMCPServer) (*TykMCPServer, []DeriveWarning, error) {
+	return expandMCPServerConfig(srcOAS, config, true)
+}
+
+// ExpandMCPServerConfigTolerant builds a full configurable primitive catalogue
+// while skipping configured primitive sources that are no longer present in the
+// source catalogue. It is intended for derived views of saved proxy definitions.
+func ExpandMCPServerConfigTolerant(srcOAS *OAS, config *TykMCPServer) (*TykMCPServer, []DeriveWarning, error) {
+	return expandMCPServerConfig(srcOAS, config, false)
+}
+
+func expandMCPServerConfig(srcOAS *OAS, config *TykMCPServer, strict bool) (*TykMCPServer, []DeriveWarning, error) {
 	primitives, warnings, err := DeriveSourcePrimitives(srcOAS)
 	if err != nil {
 		return nil, warnings, err
@@ -1214,7 +1225,7 @@ func ExpandMCPServerConfig(srcOAS *OAS, config *TykMCPServer) (*TykMCPServer, []
 
 	tools := ToolPrimitives(primitives)
 	catalogue := newMCPToolViewCatalogue(tools)
-	selection, viewWarnings, err := buildMCPToolViewSelection(config, catalogue, true)
+	selection, viewWarnings, err := buildMCPToolViewSelection(config, catalogue, strict)
 	warnings = append(warnings, viewWarnings...)
 	if err != nil {
 		return nil, warnings, err

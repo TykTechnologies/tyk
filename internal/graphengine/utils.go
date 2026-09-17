@@ -141,10 +141,14 @@ func additionalUpstreamHeaders(logger abstractlogger.Logger, outreq *http.Reques
 	}
 
 	// When StripAuthData is false, propagate auth headers from the original request
-	// to the upstream. For regular proxy-only queries the transport layer also
-	// forwards headers via setProxyOnlyHeaders, but the headerModifier guards
-	// against double-writes (only sets when absent). For proxy-only subscriptions,
-	// the transport path is not used so this is the only propagation point.
+	// to the upstream. This is the only propagation point for a proxy-only websocket
+	// upgrade, where the transport is not involved at all.
+	//
+	// Every other proxy-only path also reaches setProxyOnlyHeaders, which forwards the
+	// consumer's headers again, so this writes a value that is about to be written a
+	// second time. The only-when-absent guard in the header modifier does not prevent
+	// that: it runs while the fetch input is built, long before the transport adds
+	// anything. setProxyOnlyHeaders is what drops the duplicate.
 	if !apiDefinition.StripAuthData {
 		propagateAuthHeaders(outreq, upstreamHeaders, apiDefinition)
 	}
