@@ -261,15 +261,15 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 		sessionInactiveState = sessionInactiveState || policy.IsInactive
 
-		mergePolicyMetadata(policy, session, run.tags)
+		run.mergePolicyMetadata(policy)
 	}
 
 	session.IsInactive = sessionInactiveState
 
-	writeSessionTags(session, run.tags)
+	run.writeSessionTags()
 
 	if len(policyIDs) == 0 {
-		scopeKeyLevelLimits(session)
+		run.scopeKeyLevelLimits()
 	}
 
 	run.finaliseRights()
@@ -623,7 +623,9 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 // the session: tags (collected into the set, written back later), metadata
 // (policy wins on key clash), the newest LastUpdated, and post-expiry
 // settings when the policy defines them.
-func mergePolicyMetadata(policy user.Policy, session *user.SessionState, tags map[tagName]bool) {
+func (r *applyRun) mergePolicyMetadata(policy user.Policy) {
+	session, tags := r.session, r.tags
+
 	for _, tag := range policy.Tags {
 		tags[tag] = true
 	}
@@ -648,7 +650,9 @@ func mergePolicyMetadata(policy user.Policy, session *user.SessionState, tags ma
 // policies and writes the result back. Map iteration order is random, so the
 // order of session.Tags is not stable between calls; this is long-standing
 // behaviour.
-func writeSessionTags(session *user.SessionState, tags map[tagName]bool) {
+func (r *applyRun) writeSessionTags() {
+	session, tags := r.session, r.tags
+
 	for _, tag := range session.Tags {
 		tags[tag] = true
 	}
@@ -662,7 +666,9 @@ func writeSessionTags(session *user.SessionState, tags map[tagName]bool) {
 // scopeKeyLevelLimits handles a key with no policies at all: every access
 // right that carries its own limit gets AllowanceScope set to its API ID, so
 // rate limiting and quotas are counted per API rather than per key.
-func scopeKeyLevelLimits(session *user.SessionState) {
+func (r *applyRun) scopeKeyLevelLimits() {
+	session := r.session
+
 	for apiID, accessRight := range session.AccessRights {
 		if !accessRight.Limit.IsEmpty() {
 			accessRight.AllowanceScope = apiID
@@ -685,7 +691,7 @@ func scopeKeyLevelLimits(session *user.SessionState) {
 func (r *applyRun) finaliseRights() {
 	session, rights := r.session, r.rights
 
-	multipleACL := limitsFromMultiplePolicies(rights)
+	multipleACL := r.limitsFromMultiplePolicies()
 
 	for k, v := range rights {
 		applied := r.state.byAPI[k]
@@ -713,9 +719,9 @@ func (r *applyRun) finaliseRights() {
 // limitsFromMultiplePolicies reports whether the limits in rights were set by at
 // least two different policies (Limit.SetBy holds the policy ID). It stops
 // as soon as a second distinct policy is seen.
-func limitsFromMultiplePolicies(rights rightsByAPI) bool {
+func (r *applyRun) limitsFromMultiplePolicies() bool {
 	first := ""
-	for _, v := range rights {
+	for _, v := range r.rights {
 		setBy := v.Limit.SetBy
 		if setBy == "" {
 			continue
