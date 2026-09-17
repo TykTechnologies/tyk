@@ -151,21 +151,53 @@ func (s applyStatus) counts() partitionCounts {
 	return c
 }
 
+// applyRun is one execution of Apply for one session. It owns the working
+// state that the individual steps read and write, so those steps take no
+// parameters beyond what varies per call. It has no reference back to
+// Service; Service only builds it (newApplyRun) and drives it.
+type applyRun struct {
+	// orgID, when set, must match every applied policy's OrgID.
+	orgID *string
+	// logger receives the same errors Apply always logged.
+	logger *logrus.Logger
+
+	// session is the session being (re)computed, modified in place.
+	session *user.SessionState
+
+	// rights is the working access-rights map built from the policies. At
+	// the end it either replaces session.AccessRights or is discarded.
+	rights rightsByAPI
+	// tags collects tags from policies and the session; written back once.
+	tags map[tagName]bool
+	// state tracks which partitions were applied per API.
+	state applyStatus
+}
+
+// newApplyRun prepares the working state for one Apply on session.
+func (t *Service) newApplyRun(session *user.SessionState) *applyRun {
+	return &applyRun{
+		orgID:   t.orgID,
+		logger:  t.logger,
+		session: session,
+		rights:  make(rightsByAPI),
+		tags:    make(map[tagName]bool),
+		state: applyStatus{
+			byAPI: make(map[apiId]appliedPartitions),
+		},
+	}
+}
+
 // Apply will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t *Service) Apply(session *user.SessionState) error {
-	rights := make(rightsByAPI)
-	tags := make(map[tagName]bool)
+	run := t.newApplyRun(session)
+
 	if session.MetaData == nil {
 		session.MetaData = make(map[string]interface{})
 	}
 
 	if err := t.ClearSession(session); err != nil {
 		t.logger.WithError(err).Warn("error clearing session")
-	}
-
-	applyState := applyStatus{
-		byAPI: make(map[apiId]appliedPartitions),
 	}
 
 	var (
@@ -218,29 +250,29 @@ func (t *Service) Apply(session *user.SessionState) error {
 		}
 
 		if policy.Partitions.PerAPI {
-			if err := t.applyPerAPI(policy, session, rights, &applyState); err != nil {
+			if err := t.applyPerAPI(policy, session, run.rights, &run.state); err != nil {
 				return err
 			}
 		} else {
-			if err := t.applyPartitions(policy, session, rights, &applyState); err != nil {
+			if err := t.applyPartitions(policy, session, run.rights, &run.state); err != nil {
 				return err
 			}
 		}
 
 		sessionInactiveState = sessionInactiveState || policy.IsInactive
 
-		mergePolicyMetadata(policy, session, tags)
+		mergePolicyMetadata(policy, session, run.tags)
 	}
 
 	session.IsInactive = sessionInactiveState
 
-	writeSessionTags(session, tags)
+	writeSessionTags(session, run.tags)
 
 	if len(policyIDs) == 0 {
 		scopeKeyLevelLimits(session)
 	}
 
-	t.finaliseRights(session, rights, applyState)
+	run.finaliseRights()
 
 	if appliedPoliciesCount == 0 && policyIDs != nil {
 		return errors.New("key has no valid policies to be applied")
@@ -650,25 +682,27 @@ func scopeKeyLevelLimits(session *user.SessionState) {
 //
 // Afterwards the legacy session-root limits are updated and, if any policy
 // granted ACL, `rights` replaces session.AccessRights wholesale.
-func (t *Service) finaliseRights(session *user.SessionState, rights rightsByAPI, applyState applyStatus) {
+func (r *applyRun) finaliseRights() {
+	session, rights := r.session, r.rights
+
 	multipleACL := limitsFromMultiplePolicies(rights)
 
 	for k, v := range rights {
-		applied := applyState.byAPI[k]
+		applied := r.state.byAPI[k]
 
 		if !applied.acl {
-			t.updateExistingAccessRightLimits(session, k, v, applied)
+			r.updateExistingAccessRightLimits(k, v, applied)
 			delete(rights, k)
 			continue
 		}
 
-		rights[k] = t.inheritUnappliedFromSessionRoot(session, v, applied, multipleACL)
+		rights[k] = r.inheritUnappliedFromSessionRoot(v, applied, multipleACL)
 	}
 
-	counts := applyState.counts()
+	counts := r.state.counts()
 
 	// If we have policies defining rules for one single API, update session root vars (legacy)
-	t.updateSessionRootVars(session, rights, counts)
+	r.updateSessionRootVars(counts)
 
 	// Override session ACL if at least one policy define it
 	if counts.acl > 0 {
@@ -703,7 +737,9 @@ func limitsFromMultiplePolicies(rights rightsByAPI) bool {
 // Versions, GraphQL/MCP restrictions) is left untouched. If the key has no
 // access right for api, nothing happens: a policy without ACL cannot grant
 // access to a new API.
-func (t *Service) updateExistingAccessRightLimits(session *user.SessionState, api apiId, computed user.AccessDefinition, applied appliedPartitions) {
+func (r *applyRun) updateExistingAccessRightLimits(api apiId, computed user.AccessDefinition, applied appliedPartitions) {
+	session := r.session
+
 	existing, ok := session.AccessRights[api]
 	if !ok {
 		return
@@ -737,7 +773,9 @@ func (t *Service) updateExistingAccessRightLimits(session *user.SessionState, ap
 // session's access right for that API. When more than one policy set ACLs,
 // the AllowanceScope is pinned to the policy that set the limit so that
 // quotas and rate limits are counted per policy.
-func (t *Service) inheritUnappliedFromSessionRoot(session *user.SessionState, ar user.AccessDefinition, applied appliedPartitions, multipleACL bool) user.AccessDefinition {
+func (r *applyRun) inheritUnappliedFromSessionRoot(ar user.AccessDefinition, applied appliedPartitions, multipleACL bool) user.AccessDefinition {
+	session := r.session
+
 	if !applied.rateLimit {
 		ar.Limit.Rate = session.Rate
 		ar.Limit.Per = session.Per
@@ -766,7 +804,9 @@ func (t *Service) inheritUnappliedFromSessionRoot(session *user.SessionState, ar
 	return ar
 }
 
-func (t *Service) updateSessionRootVars(session *user.SessionState, rights rightsByAPI, c partitionCounts) {
+func (r *applyRun) updateSessionRootVars(c partitionCounts) {
+	session, rights := r.session, r.rights
+
 	// Only when exactly one API received all three partitions. This has been
 	// an AND since the check was introduced (2019, #2462); a rate-limit-only
 	// policy for a single API deliberately does not touch the session root.
