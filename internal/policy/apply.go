@@ -54,14 +54,16 @@ func (r *applyRun) clearSession() error {
 			return fmt.Errorf("policy not found: %s", polID)
 		}
 
-		all := !(policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity)
+		// A policy with no partition enabled is a full policy: it will
+		// overwrite every limit, so every limit is cleared first.
+		clearAll := !policy.Partitions.Enabled()
 
-		if policy.Partitions.Quota || all {
+		if policy.Partitions.Quota || clearAll {
 			session.QuotaMax = 0
 			session.QuotaRemaining = 0
 		}
 
-		if policy.Partitions.RateLimit || all {
+		if policy.Partitions.RateLimit || clearAll {
 			session.Rate = 0
 			session.Per = 0
 			session.Smoothing = nil
@@ -69,7 +71,7 @@ func (r *applyRun) clearSession() error {
 			session.ThrottleInterval = 0
 		}
 
-		if policy.Partitions.Complexity || all {
+		if policy.Partitions.Complexity || clearAll {
 			session.MaxQueryDepth = 0
 		}
 	}
