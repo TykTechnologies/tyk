@@ -965,19 +965,20 @@ func (r *applyRun) applyEndpointLevelLimits(policyEndpoints user.Endpoints, curr
 	return result.Endpoints()
 }
 
-// mergeACLRules merges two AccessControlRules using union semantics, consistent
-// with how AllowedURLs are merged across policies: both Allowed and Blocked lists
-// are unioned. If src is empty (not configured), dst is returned unchanged.
-func mergeACLRules(dst, src user.AccessControlRules) user.AccessControlRules {
-	if src.IsEmpty() {
-		return dst
+// mergeACLRules returns the union of two AccessControlRules, consistent with
+// how AllowedURLs are merged across policies: both Allowed and Blocked lists
+// are unioned. The content is symmetric; the order is not: a's entries come
+// first, then b's new ones. An empty side leaves the other unchanged.
+func mergeACLRules(a, b user.AccessControlRules) user.AccessControlRules {
+	if b.IsEmpty() {
+		return a
 	}
-	if dst.IsEmpty() {
-		return src
+	if a.IsEmpty() {
+		return b
 	}
 	return user.AccessControlRules{
-		Allowed: appendIfMissing(dst.Allowed, src.Allowed...),
-		Blocked: appendIfMissing(dst.Blocked, src.Blocked...),
+		Allowed: appendIfMissing(a.Allowed, b.Allowed...),
+		Blocked: appendIfMissing(a.Blocked, b.Blocked...),
 	}
 }
 
