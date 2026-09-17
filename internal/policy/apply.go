@@ -229,79 +229,18 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 		sessionInactiveState = sessionInactiveState || policy.IsInactive
 
-		for _, tag := range policy.Tags {
-			tags[tag] = true
-		}
-
-		for k, v := range policy.MetaData {
-			session.MetaData[k] = v
-		}
-
-		if policy.LastUpdated > session.LastUpdated {
-			session.LastUpdated = policy.LastUpdated
-		}
-
-		if policy.PostExpiryAction != "" {
-			session.PostExpiryAction = policy.PostExpiryAction
-		}
-		if policy.PostExpiryGracePeriod != 0 {
-			session.PostExpiryGracePeriod = policy.PostExpiryGracePeriod
-		}
+		mergePolicyMetadata(policy, session, tags)
 	}
 
 	session.IsInactive = sessionInactiveState
 
-	for _, tag := range session.Tags {
-		tags[tag] = true
-	}
-
-	// set tags
-	session.Tags = []string{}
-	for tag := range tags {
-		session.Tags = appendIfMissing(session.Tags, tag)
-	}
+	writeSessionTags(session, tags)
 
 	if len(policyIDs) == 0 {
-		for apiID, accessRight := range session.AccessRights {
-			// check if the api in the session has per api limit
-			if !accessRight.Limit.IsEmpty() {
-				accessRight.AllowanceScope = apiID
-				session.AccessRights[apiID] = accessRight
-			}
-		}
+		scopeKeyLevelLimits(session)
 	}
 
-	multipleACL := limitsFromMultiplePolicies(rights)
-
-	// Finalise the working `rights` map. Every API in it falls into one of
-	// two cases:
-	//
-	//   - no policy granted ACL for it: the API must not become a session
-	//     entry (its ACL would be empty), so push the computed limits into
-	//     the key's own entry, if any, and drop it from `rights`;
-	//   - some policy granted ACL for it: it will replace the session entry,
-	//     so fill the partitions no policy applied from the session root.
-	for k, v := range rights {
-		applied := applyState.byAPI[k]
-
-		if !applied.acl {
-			t.updateExistingAccessRightLimits(session, k, v, applied)
-			delete(rights, k)
-			continue
-		}
-
-		rights[k] = t.inheritUnappliedFromSessionRoot(session, v, applied, multipleACL)
-	}
-
-	counts := applyState.counts()
-
-	// If we have policies defining rules for one single API, update session root vars (legacy)
-	t.updateSessionRootVars(session, rights, counts)
-
-	// Override session ACL if at least one policy define it
-	if counts.acl > 0 {
-		session.AccessRights = rights
-	}
+	t.finaliseRights(session, rights, applyState)
 
 	if appliedPoliciesCount == 0 && policyIDs != nil {
 		return errors.New("key has no valid policies to be applied")
@@ -646,6 +585,95 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 	applyState.didPartition = usePartitions
 
 	return nil
+}
+
+// mergePolicyMetadata copies the non-limit, non-ACL parts of a policy into
+// the session: tags (collected into the set, written back later), metadata
+// (policy wins on key clash), the newest LastUpdated, and post-expiry
+// settings when the policy defines them.
+func mergePolicyMetadata(policy user.Policy, session *user.SessionState, tags map[tagName]bool) {
+	for _, tag := range policy.Tags {
+		tags[tag] = true
+	}
+
+	for k, v := range policy.MetaData {
+		session.MetaData[k] = v
+	}
+
+	if policy.LastUpdated > session.LastUpdated {
+		session.LastUpdated = policy.LastUpdated
+	}
+
+	if policy.PostExpiryAction != "" {
+		session.PostExpiryAction = policy.PostExpiryAction
+	}
+	if policy.PostExpiryGracePeriod != 0 {
+		session.PostExpiryGracePeriod = policy.PostExpiryGracePeriod
+	}
+}
+
+// writeSessionTags merges the session's own tags into the set collected from
+// policies and writes the result back. Map iteration order is random, so the
+// order of session.Tags is not stable between calls; this is long-standing
+// behaviour.
+func writeSessionTags(session *user.SessionState, tags map[tagName]bool) {
+	for _, tag := range session.Tags {
+		tags[tag] = true
+	}
+
+	session.Tags = []string{}
+	for tag := range tags {
+		session.Tags = appendIfMissing(session.Tags, tag)
+	}
+}
+
+// scopeKeyLevelLimits handles a key with no policies at all: every access
+// right that carries its own limit gets AllowanceScope set to its API ID, so
+// rate limiting and quotas are counted per API rather than per key.
+func scopeKeyLevelLimits(session *user.SessionState) {
+	for apiID, accessRight := range session.AccessRights {
+		if !accessRight.Limit.IsEmpty() {
+			accessRight.AllowanceScope = apiID
+			session.AccessRights[apiID] = accessRight
+		}
+	}
+}
+
+// finaliseRights turns the working `rights` map into the session's access
+// rights. Every API in it falls into one of two cases:
+//
+//   - no policy granted ACL for it: the API must not become a session entry
+//     (its ACL would be empty), so push the computed limits into the key's
+//     own entry, if any, and drop it from `rights`;
+//   - some policy granted ACL for it: it will replace the session entry, so
+//     fill the partitions no policy applied from the session root.
+//
+// Afterwards the legacy session-root limits are updated and, if any policy
+// granted ACL, `rights` replaces session.AccessRights wholesale.
+func (t *Service) finaliseRights(session *user.SessionState, rights rightsByAPI, applyState applyStatus) {
+	multipleACL := limitsFromMultiplePolicies(rights)
+
+	for k, v := range rights {
+		applied := applyState.byAPI[k]
+
+		if !applied.acl {
+			t.updateExistingAccessRightLimits(session, k, v, applied)
+			delete(rights, k)
+			continue
+		}
+
+		rights[k] = t.inheritUnappliedFromSessionRoot(session, v, applied, multipleACL)
+	}
+
+	counts := applyState.counts()
+
+	// If we have policies defining rules for one single API, update session root vars (legacy)
+	t.updateSessionRootVars(session, rights, counts)
+
+	// Override session ACL if at least one policy define it
+	if counts.acl > 0 {
+		session.AccessRights = rights
+	}
 }
 
 // limitsFromMultiplePolicies reports whether the limits in rights were set by at
