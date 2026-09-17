@@ -33,12 +33,22 @@ func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Se
 	}
 }
 
-// ClearSession clears the quota, rate limit and complexity values so that partitioned policies can apply their values.
-// Otherwise, if the session has already a higher value, an applied policy will not win, and its values will be ignored.
+// ClearSession see applyRun.clearSession.
 func (t *Service) ClearSession(session *user.SessionState) error {
+	return t.newApplyRun(session).clearSession()
+}
 
-	for _, polID := range t.policyIds(session) {
-		policy, ok := t.storage.PolicyByID(polID)
+// clearSession clears the quota, rate limit and complexity values so that partitioned policies can apply their values.
+// Otherwise, if the session has already a higher value, an applied policy will not win, and its values will be ignored.
+//
+// It looks policies up in the Service's store only and ignores the session's
+// custom policies (long-standing behaviour), so Apply must call it before
+// resolvePolicies swaps r.storage.
+func (r *applyRun) clearSession() error {
+	session := r.session
+
+	for _, polID := range r.policyIds() {
+		policy, ok := r.storage.PolicyByID(polID)
 
 		if !ok {
 			return fmt.Errorf("policy not found: %s", polID)
@@ -155,6 +165,15 @@ type applyRun struct {
 	// session is the session being (re)computed, modified in place.
 	session *user.SessionState
 
+	// storage is where policies are looked up. It starts as the Service's
+	// store and resolvePolicies swaps it for a store built from the
+	// session's custom policies when the session carries any.
+	storage model.PolicyProvider
+	// policyIDs are the policies to apply, as resolved by resolvePolicies:
+	// either the custom policies' IDs or the session's policy IDs scoped to
+	// the org. nil when the session names no policies at all.
+	policyIDs []model.PolicyID
+
 	// rights is the working access-rights map built from the policies. At
 	// the end it either replaces session.AccessRights or is discarded.
 	rights rightsByAPI
@@ -181,6 +200,7 @@ func (t *Service) newApplyRun(session *user.SessionState) *applyRun {
 	return &applyRun{
 		orgID:   t.orgID,
 		logger:  t.logger,
+		storage: t.storage,
 		session: session,
 		// Size hints: policies usually cover the APIs and tags the session
 		// already has. Only matters above 8 entries; harmless below.
@@ -199,21 +219,13 @@ func (t *Service) Apply(session *user.SessionState) error {
 		session.MetaData = make(map[string]interface{})
 	}
 
-	if err := t.ClearSession(session); err != nil {
+	// clearSession must run before resolvePolicies; see its doc comment.
+	if err := run.clearSession(); err != nil {
 		t.logger.WithError(err).Warn("error clearing session")
 	}
 
-	var (
-		policyIDs []model.PolicyID
-	)
-
-	storage := t.storage
-	if customPolicies, err := session.GetCustomPolicies(); err == nil {
-		storage = NewStore(customPolicies)
-		policyIDs = storage.PolicyIDs()
-	} else {
-		policyIDs = t.policyIds(session)
-	}
+	run.resolvePolicies()
+	storage, policyIDs := run.storage, run.policyIDs
 
 	// Only the status of policies applied to a key should determine the validity of the key.
 	// If no policies are applied, preserve the session's own IsInactive state.
@@ -405,15 +417,33 @@ func (r *applyRun) applyPerAPI(policy user.Policy) error {
 	return nil
 }
 
-func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
+// resolvePolicies decides where policies come from for this run. A session
+// carrying custom policies (embedded policy documents) is served from a
+// store built out of them; otherwise the session's policy IDs, scoped to the
+// org, are looked up in the Service's store.
+func (r *applyRun) resolvePolicies() {
+	if customPolicies, err := r.session.GetCustomPolicies(); err == nil {
+		r.storage = NewStore(customPolicies)
+		r.policyIDs = r.storage.PolicyIDs()
+		return
+	}
+
+	r.policyIDs = r.policyIds()
+}
+
+// policyIds returns the session's policy IDs scoped to an org: the session's
+// own OrgID, or the Service's when the session has none.
+func (r *applyRun) policyIds() []model.PolicyID {
+	session := r.session
+
 	if ids := session.PolicyIDs(); ids == nil {
 		return nil
 	}
 
 	orgID := session.OrgID
-	if orgID == "" && t.orgID != nil {
+	if orgID == "" && r.orgID != nil {
 		// Use the API spec's organization ID if the session's organization ID is empty
-		orgID = *t.orgID
+		orgID = *r.orgID
 	}
 
 	return lo.Map(session.PolicyIDs(), func(item string, _ int) model.PolicyID {
