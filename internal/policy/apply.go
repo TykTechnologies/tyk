@@ -283,7 +283,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 // ApplyRateLimits see applyRun.applyRateLimits.
 func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy, apiLimits *user.APILimit) {
-	(&applyRun{}).applyRateLimits(session, policy, apiLimits)
+	t.newApplyRun(session).applyRateLimits(policy, apiLimits)
 }
 
 // ApplyEndpointLevelLimits see applyRun.applyEndpointLevelLimits.
@@ -304,7 +304,9 @@ func (t *Service) ApplyMCPPrimitiveLimits(policy, current []user.MCPPrimitiveLim
 // applyRateLimits will write policy limits to session and apiLimits.
 // The limits get written if either are empty.
 // The limits get written if filled and policyLimits allows a higher request rate.
-func (r *applyRun) applyRateLimits(session *user.SessionState, policy user.Policy, apiLimits *user.APILimit) {
+func (r *applyRun) applyRateLimits(policy user.Policy, apiLimits *user.APILimit) {
+	session := r.session
+
 	policyLimits := policy.APILimit()
 	if r.emptyRateLimit(policyLimits) {
 		return
@@ -559,7 +561,7 @@ func (r *applyRun) applyPartitions(policy user.Policy) error {
 		if !usePartitions || policy.Partitions.RateLimit {
 			r.mark(k, func(p *appliedPartitions) { p.rateLimit = true })
 
-			r.applyRateLimits(session, policy, &ar.Limit)
+			r.applyRateLimits(policy, &ar.Limit)
 
 			if rightsAR, ok := rights[k]; ok {
 				ar.Endpoints = r.applyEndpointLevelLimits(v.Endpoints, rightsAR.Endpoints)
