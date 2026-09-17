@@ -368,7 +368,12 @@ func (r *applyRun) applyPerAPI(policy user.Policy) error {
 		})
 	}
 
-	r.didPerAPI = len(policy.AccessRights) > 0
+	// Sticky: once a per_api policy with access rights was seen, the run
+	// stays in per_api mode. Must not be a plain assignment (a later per_api
+	// policy without access rights would reset it).
+	if len(policy.AccessRights) > 0 {
+		r.didPerAPI = true
+	}
 
 	return nil
 }
