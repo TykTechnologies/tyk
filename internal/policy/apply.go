@@ -106,22 +106,13 @@ type appliedPartitions struct {
 	complexity bool
 }
 
-type applyStatus struct {
-	// byAPI holds, per API, which partitions some policy has already
-	// applied. An API absent from the map has had nothing applied yet.
-	byAPI map[apiId]appliedPartitions
-
-	didPerAPI    bool
-	didPartition bool
-}
-
 // mark applies fn to the appliedPartitions entry of api, creating the entry
 // if it does not exist yet. Use it only where a partition is being set; plain
 // reads must go through byAPI[api] so that they never create entries.
-func (s *applyStatus) mark(api apiId, fn func(p *appliedPartitions)) {
-	p := s.byAPI[api]
+func (r *applyRun) mark(api apiId, fn func(p *appliedPartitions)) {
+	p := r.byAPI[api]
 	fn(&p)
-	s.byAPI[api] = p
+	r.byAPI[api] = p
 }
 
 // partitionCounts says, for each partition, how many APIs had it applied.
@@ -132,9 +123,9 @@ type partitionCounts struct {
 // counts tallies byAPI in one pass. It replaces the old `len(didX)` checks:
 // those maps only ever received `true`, so their length was the number of
 // APIs with that partition applied.
-func (s applyStatus) counts() partitionCounts {
+func (r *applyRun) counts() partitionCounts {
 	var c partitionCounts
-	for _, p := range s.byAPI {
+	for _, p := range r.byAPI {
 		if p.acl {
 			c.acl++
 		}
@@ -169,8 +160,15 @@ type applyRun struct {
 	rights rightsByAPI
 	// tags collects tags from policies and the session; written back once.
 	tags map[tagName]bool
-	// state tracks which partitions were applied per API.
-	state applyStatus
+	// byAPI holds, per API, which partitions some policy has already
+	// applied. An API absent from the map has had nothing applied yet.
+	byAPI map[apiId]appliedPartitions
+
+	// didPerAPI is set once a per_api policy has been applied; didPartition
+	// once a partitioned policy has. Mixing the two kinds in one session is
+	// an error, and these two flags are how it is detected.
+	didPerAPI    bool
+	didPartition bool
 }
 
 // newApplyRun prepares the working state for one Apply on session.
@@ -181,9 +179,7 @@ func (t *Service) newApplyRun(session *user.SessionState) *applyRun {
 		session: session,
 		rights:  make(rightsByAPI),
 		tags:    make(map[tagName]bool),
-		state: applyStatus{
-			byAPI: make(map[apiId]appliedPartitions),
-		},
+		byAPI:   make(map[apiId]appliedPartitions),
 	}
 }
 
@@ -250,11 +246,11 @@ func (t *Service) Apply(session *user.SessionState) error {
 		}
 
 		if policy.Partitions.PerAPI {
-			if err := t.applyPerAPI(policy, session, run.rights, &run.state); err != nil {
+			if err := t.applyPerAPI(policy, session, run.rights, run); err != nil {
 				return err
 			}
 		} else {
-			if err := t.applyPartitions(policy, session, run.rights, &run.state); err != nil {
+			if err := t.applyPartitions(policy, session, run.rights, run); err != nil {
 				return err
 			}
 		}
@@ -328,9 +324,9 @@ func (t *Service) emptyRateLimit(m user.APILimit) bool {
 }
 
 func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, rights rightsByAPI,
-	applyState *applyStatus) error {
+	run *applyRun) error {
 
-	if applyState.didPartition {
+	if run.didPartition {
 		t.logger.Error(ErrMixedPartitionAndPerAPIPolicies)
 		return ErrMixedPartitionAndPerAPIPolicies
 	}
@@ -366,7 +362,7 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 		rights[apiID] = accessRights
 
 		// identify that limit for that API is set (to allow set it only once)
-		applyState.mark(apiID, func(p *appliedPartitions) {
+		run.mark(apiID, func(p *appliedPartitions) {
 			p.acl = true
 			p.quota = true
 			p.rateLimit = true
@@ -375,7 +371,7 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 	}
 
 	if len(policy.AccessRights) > 0 {
-		applyState.didPerAPI = true
+		run.didPerAPI = true
 	}
 
 	return nil
@@ -398,11 +394,11 @@ func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
 }
 
 func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState, rights rightsByAPI,
-	applyState *applyStatus) error {
+	run *applyRun) error {
 
 	usePartitions := policy.Partitions.Enabled()
 
-	if usePartitions && applyState.didPerAPI {
+	if usePartitions && run.didPerAPI {
 		t.logger.Error(ErrMixedPartitionAndPerAPIPolicies)
 		return ErrMixedPartitionAndPerAPIPolicies
 	}
@@ -421,7 +417,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		ar := rights[k]
 
 		if !usePartitions || policy.Partitions.Acl {
-			applyState.mark(k, func(p *appliedPartitions) { p.acl = true })
+			run.mark(k, func(p *appliedPartitions) { p.acl = true })
 
 			// Merge ACLs for the same API
 			if r, ok := rights[k]; ok {
@@ -524,7 +520,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		}
 
 		if !usePartitions || policy.Partitions.Quota {
-			applyState.mark(k, func(p *appliedPartitions) { p.quota = true })
+			run.mark(k, func(p *appliedPartitions) { p.quota = true })
 
 			if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 				ar.Limit.QuotaMax = policy.QuotaMax
@@ -542,7 +538,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		}
 
 		if !usePartitions || policy.Partitions.RateLimit {
-			applyState.mark(k, func(p *appliedPartitions) { p.rateLimit = true })
+			run.mark(k, func(p *appliedPartitions) { p.rateLimit = true })
 
 			t.ApplyRateLimits(session, policy, &ar.Limit)
 
@@ -568,7 +564,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		}
 
 		if !usePartitions || policy.Partitions.Complexity {
-			applyState.mark(k, func(p *appliedPartitions) { p.complexity = true })
+			run.mark(k, func(p *appliedPartitions) { p.complexity = true })
 
 			if greaterThanInt(policy.MaxQueryDepth, ar.Limit.MaxQueryDepth) {
 				ar.Limit.MaxQueryDepth = policy.MaxQueryDepth
@@ -614,7 +610,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		session.EnableHTTPSignatureValidation = policy.EnableHTTPSignatureValidation
 	}
 
-	applyState.didPartition = usePartitions
+	run.didPartition = usePartitions
 
 	return nil
 }
@@ -694,7 +690,7 @@ func (r *applyRun) finaliseRights() {
 	multipleACL := r.limitsFromMultiplePolicies()
 
 	for k, v := range rights {
-		applied := r.state.byAPI[k]
+		applied := r.byAPI[k]
 
 		if !applied.acl {
 			r.updateExistingAccessRightLimits(k, v, applied)
@@ -705,7 +701,7 @@ func (r *applyRun) finaliseRights() {
 		rights[k] = r.inheritUnappliedFromSessionRoot(v, applied, multipleACL)
 	}
 
-	counts := r.state.counts()
+	counts := r.counts()
 
 	// If we have policies defining rules for one single API, update session root vars (legacy)
 	r.updateSessionRootVars(counts)
