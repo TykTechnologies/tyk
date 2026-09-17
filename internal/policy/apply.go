@@ -87,10 +87,6 @@ type apiId = string
 // user.SessionState.AccessRights, which has the same underlying type.
 type rightsByAPI = map[apiId]user.AccessDefinition
 
-// tagName is a session/policy tag. Apply collects tags into a set before
-// writing them back to the session.
-type tagName = string
-
 // appliedPartitions records, for one API, which policy partitions have
 // already been written into the working `rights` map while iterating over
 // the session's policies. It does not remember which policy did it, only
@@ -177,8 +173,6 @@ type applyRun struct {
 	// rights is the working access-rights map built from the policies. At
 	// the end it either replaces session.AccessRights or is discarded.
 	rights rightsByAPI
-	// tags collects tags from policies and the session; written back once.
-	tags map[tagName]bool
 	// byAPI holds, per API, which partitions some policy has already
 	// applied. An API absent from the map has had nothing applied yet.
 	byAPI map[apiId]appliedPartitions
@@ -196,12 +190,15 @@ type applyRun struct {
 }
 
 // newApplyRun prepares the working state for one Apply on session. It also
-// makes sure session.MetaData is a map, so mergePolicyMetadata can write into
-// it without a nil check; a session leaves Apply with an empty map at worst.
+// prepares the session itself: MetaData becomes a map so mergePolicyMetadata
+// can write into it without a nil check, and the key's own Tags are
+// deduplicated once (order kept) so policy tags can be appended with
+// appendIfMissing.
 func (t *Service) newApplyRun(session *user.SessionState) *applyRun {
 	if session.MetaData == nil {
 		session.MetaData = make(map[string]any)
 	}
+	session.Tags = lo.Uniq(session.Tags)
 
 	return &applyRun{
 		orgID:   t.orgID,
@@ -211,7 +208,6 @@ func (t *Service) newApplyRun(session *user.SessionState) *applyRun {
 		// Size hints: policies usually cover the APIs and tags the session
 		// already has. Only matters above 8 entries; harmless below.
 		rights: make(rightsByAPI, len(session.AccessRights)),
-		tags:   make(map[tagName]bool, len(session.Tags)),
 		byAPI:  make(map[apiId]appliedPartitions, len(session.AccessRights)),
 	}
 }
@@ -227,52 +223,16 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	run.resolvePolicies()
-	storage, policyIDs := run.storage, run.policyIDs
 
-	// Only the status of policies applied to a key should determine the validity of the key.
-	// If no policies are applied, preserve the session's own IsInactive state.
-	sessionInactiveState := session.IsInactive
-	hasPolicies := len(policyIDs) > 0
-	if hasPolicies {
-		sessionInactiveState = false
+	appliedPoliciesCount, err := run.applyPolicies()
+	if err != nil {
+		return err
 	}
 
-	var appliedPoliciesCount int
-
-	for _, polID := range policyIDs {
-		policy, ok := storage.PolicyByID(polID)
-
-		if !ok {
-			err := fmt.Errorf("policy not found: %q", polID)
-			t.logger.Error(err)
-			if len(policyIDs) > 1 {
-				continue
-			}
-
-			return err
-		}
-		appliedPoliciesCount++
-
-		if err := run.applyPolicy(policy); err != nil {
-			return err
-		}
-
-		sessionInactiveState = sessionInactiveState || policy.IsInactive
-
-		run.mergePolicyMetadata(policy)
-	}
-
-	session.IsInactive = sessionInactiveState
-
-	run.writeSessionTags()
-
-	if len(policyIDs) == 0 {
-		run.scopeKeyLevelLimits()
-	}
-
+	run.scopeKeyLevelLimits()
 	run.finaliseRights()
 
-	if appliedPoliciesCount == 0 && policyIDs != nil {
+	if appliedPoliciesCount == 0 && run.policyIDs != nil {
 		return errors.New("key has no valid policies to be applied")
 	}
 
@@ -424,6 +384,77 @@ func (r *applyRun) applyPolicy(policy user.Policy) error {
 	}
 
 	return r.applyPartitions(policy)
+}
+
+// applyPolicies applies every policy in r.policyIDs to the working state, in
+// order, and returns how many were actually found and applied. Policies are
+// merged, not replaced: rights for the same API are unioned and the higher
+// limit wins. A missing policy is skipped when others exist (see
+// lookupPolicy); any other failure stops the run and is returned.
+//
+// It also decides session.IsInactive. Only the status of the policies applied
+// to a key determines the validity of the key: with policies present the
+// key's own flag is ignored and any inactive policy deactivates the key; with
+// no policies the key's own flag is preserved. The result is written back
+// only when the run succeeds, as before; on error the session keeps its
+// original flag.
+func (r *applyRun) applyPolicies() (applied int, err error) {
+	session := r.session
+
+	inactive := session.IsInactive
+	if len(r.policyIDs) > 0 {
+		inactive = false
+	}
+	defer func() {
+		if err == nil {
+			session.IsInactive = inactive
+		}
+	}()
+
+	for _, polID := range r.policyIDs {
+		var (
+			policy user.Policy
+			found  bool
+		)
+		if policy, found, err = r.lookupPolicy(polID); err != nil {
+			return applied, err
+		}
+		if !found {
+			continue
+		}
+		applied++
+
+		if err = r.applyPolicy(policy); err != nil {
+			return applied, err
+		}
+
+		inactive = inactive || policy.IsInactive
+
+		r.mergePolicyMetadata(policy)
+	}
+
+	return applied, nil
+}
+
+// lookupPolicy fetches one of the run's policies from r.storage. A missing
+// policy is always logged; what happens next depends on how many policies the
+// session names. With several, the missing one is skipped (found=false) and
+// the rest still apply. With exactly one, it is an error, so a key whose only
+// policy was deleted is rejected instead of silently keeping its old rights.
+func (r *applyRun) lookupPolicy(id model.PolicyID) (policy user.Policy, found bool, err error) {
+	policy, found = r.storage.PolicyByID(id)
+	if found {
+		return policy, true, nil
+	}
+
+	err = fmt.Errorf("policy not found: %q", id)
+	r.logger.Error(err)
+
+	if len(r.policyIDs) > 1 {
+		return user.Policy{}, false, nil
+	}
+
+	return user.Policy{}, false, err
 }
 
 // resolvePolicies decides where policies come from for this run. A session
@@ -683,15 +714,13 @@ func (r *applyRun) applyPartitions(policy user.Policy) error {
 }
 
 // mergePolicyMetadata copies the non-limit, non-ACL parts of a policy into
-// the session: tags (collected into the set, written back later), metadata
+// the session: tags (appended to the key's own, deduplicated, in order), metadata
 // (policy wins on key clash), the newest LastUpdated, and post-expiry
 // settings when the policy defines them.
 func (r *applyRun) mergePolicyMetadata(policy user.Policy) {
-	session, tags := r.session, r.tags
+	session := r.session
 
-	for _, tag := range policy.Tags {
-		tags[tag] = true
-	}
+	session.Tags = appendIfMissing(session.Tags, policy.Tags...)
 
 	for k, v := range policy.MetaData {
 		session.MetaData[k] = v
@@ -709,28 +738,16 @@ func (r *applyRun) mergePolicyMetadata(policy user.Policy) {
 	}
 }
 
-// writeSessionTags merges the session's own tags into the set collected from
-// policies and writes the result back. Map iteration order is random, so the
-// order of session.Tags is not stable between calls; this is long-standing
-// behaviour.
-func (r *applyRun) writeSessionTags() {
-	session, tags := r.session, r.tags
-
-	for _, tag := range session.Tags {
-		tags[tag] = true
-	}
-
-	// tags is a set, so no per-item dedup is needed here.
-	session.Tags = make([]string, 0, len(tags))
-	for tag := range tags {
-		session.Tags = append(session.Tags, tag)
-	}
-}
-
 // scopeKeyLevelLimits handles a key with no policies at all: every access
 // right that carries its own limit gets AllowanceScope set to its API ID, so
-// rate limiting and quotas are counted per API rather than per key.
+// rate limiting and quotas are counted per API rather than per key. It does
+// nothing when the session has policies; their limits are scoped in
+// finaliseRights instead.
 func (r *applyRun) scopeKeyLevelLimits() {
+	if len(r.policyIDs) > 0 {
+		return
+	}
+
 	session := r.session
 
 	for apiID, accessRight := range session.AccessRights {
