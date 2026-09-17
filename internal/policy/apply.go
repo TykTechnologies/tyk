@@ -184,11 +184,6 @@ type applyRun struct {
 	// an error, and these two flags are how it is detected.
 	didPerAPI    bool
 	didPartition bool
-
-	// multipleACL is set by finaliseRights when the ACLs in rights came from
-	// more than one policy; it decides whether AllowanceScope is pinned to
-	// the policy that set each limit.
-	multipleACL bool
 }
 
 // newApplyRun prepares the working state for one Apply on session. It also
@@ -774,7 +769,7 @@ func (r *applyRun) scopeKeyLevelLimits() {
 func (r *applyRun) finaliseRights() {
 	session, rights := r.session, r.rights
 
-	r.multipleACL = r.limitsFromMultiplePolicies()
+	multipleACL := r.limitsFromMultiplePolicies()
 
 	for k := range rights {
 		if !r.byAPI[k].acl {
@@ -783,7 +778,7 @@ func (r *applyRun) finaliseRights() {
 			continue
 		}
 
-		rights[k] = r.inheritUnappliedFromSessionRoot(k)
+		rights[k] = r.inheritUnappliedFromSessionRoot(k, multipleACL)
 	}
 
 	// If we have policies defining rules for one single API, update session root vars (legacy)
@@ -856,12 +851,13 @@ func (r *applyRun) updateExistingAccessRightLimits(api apiId) {
 
 // inheritUnappliedFromSessionRoot returns ar with every partition no policy
 // applied filled from the session root values, ready to become the
-// session's access right for that API. When more than one policy set ACLs,
-// the AllowanceScope is pinned to the policy that set the limit so that
+// session's access right for that API. multipleACL says whether the ACLs in
+// rights came from more than one policy (see limitsFromMultiplePolicies); if
+// so, the AllowanceScope is pinned to the policy that set the limit so that
 // quotas and rate limits are counted per policy.
-func (r *applyRun) inheritUnappliedFromSessionRoot(api apiId) user.AccessDefinition {
+func (r *applyRun) inheritUnappliedFromSessionRoot(api apiId, multipleACL bool) user.AccessDefinition {
 	session := r.session
-	ar, applied, multipleACL := r.rights[api], r.byAPI[api], r.multipleACL
+	ar, applied := r.rights[api], r.byAPI[api]
 
 	if !applied.rateLimit {
 		ar.Limit.Rate = session.Rate
