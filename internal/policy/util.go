@@ -3,6 +3,7 @@ package policy
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -82,6 +83,9 @@ func appendIfMissing(dest []string, in ...string) []string {
 	for _, v := range dest {
 		seen[v] = struct{}{}
 	}
+
+	// At most one reallocation, even if every item of in is new.
+	dest = slices.Grow(dest, len(in))
 
 	for _, v := range in {
 		if _, ok := seen[v]; ok {
