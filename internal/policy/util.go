@@ -3,7 +3,6 @@ package policy
 import (
 	"encoding/json"
 	"fmt"
-	"slices"
 
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -70,12 +69,25 @@ func allowedURLKey(spec user.AccessSpec) string {
 	return spec.URL + "\x00" + string(conditions)
 }
 
-// appendIfMissing ensures dest slice is unique with new items.
+// appendIfMissing appends to dest every item of in that dest does not already
+// contain, in input order. dest itself is returned unchanged in content and
+// order, including any duplicates it already had; only new items are
+// deduplicated. O(len(dest)+len(in)) via a seen-set.
 func appendIfMissing(dest []string, in ...string) []string {
+	if len(in) == 0 {
+		return dest
+	}
+
+	seen := make(map[string]struct{}, len(dest)+len(in))
+	for _, v := range dest {
+		seen[v] = struct{}{}
+	}
+
 	for _, v := range in {
-		if slices.Contains(dest, v) {
+		if _, ok := seen[v]; ok {
 			continue
 		}
+		seen[v] = struct{}{}
 		dest = append(dest, v)
 	}
 	return dest
