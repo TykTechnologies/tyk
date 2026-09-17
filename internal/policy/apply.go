@@ -195,8 +195,14 @@ type applyRun struct {
 	multipleACL bool
 }
 
-// newApplyRun prepares the working state for one Apply on session.
+// newApplyRun prepares the working state for one Apply on session. It also
+// makes sure session.MetaData is a map, so mergePolicyMetadata can write into
+// it without a nil check; a session leaves Apply with an empty map at worst.
 func (t *Service) newApplyRun(session *user.SessionState) *applyRun {
+	if session.MetaData == nil {
+		session.MetaData = make(map[string]any)
+	}
+
 	return &applyRun{
 		orgID:   t.orgID,
 		logger:  t.logger,
@@ -214,10 +220,6 @@ func (t *Service) newApplyRun(session *user.SessionState) *applyRun {
 // will overwrite the session state to use the policy values.
 func (t *Service) Apply(session *user.SessionState) error {
 	run := t.newApplyRun(session)
-
-	if session.MetaData == nil {
-		session.MetaData = make(map[string]interface{})
-	}
 
 	// clearSession must run before resolvePolicies; see its doc comment.
 	if err := run.clearSession(); err != nil {
