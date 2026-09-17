@@ -1014,6 +1014,9 @@ type TestConfig struct {
 	overrideDefaults   bool
 	CoprocessConfig    config.CoProcessConfig
 	EnableTestDNSMock  bool
+	// TestHTTPListen overrides the auxiliary upstream listener. Using port 0
+	// permits multiple Gateway test harnesses in independent processes.
+	TestHTTPListen string
 }
 
 type Test struct {
@@ -1209,8 +1212,12 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	skip := gwConfig.HttpServerOptions.SkipURLCleaning
 	s.TestServerRouter.SkipClean(skip)
+	auxiliaryListen := testHttpListen
+	if s.config.TestHTTPListen != "" {
+		auxiliaryListen = s.config.TestHTTPListen
+	}
 	s.HttpHandler = &http.Server{
-		Addr:           testHttpListen,
+		Addr:           auxiliaryListen,
 		Handler:        s.TestServerRouter,
 		ReadTimeout:    1 * time.Second,
 		WriteTimeout:   1 * time.Second,
