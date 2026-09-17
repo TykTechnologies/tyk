@@ -720,9 +720,10 @@ func (r *applyRun) writeSessionTags() {
 		tags[tag] = true
 	}
 
-	session.Tags = []string{}
+	// tags is a set, so no per-item dedup is needed here.
+	session.Tags = make([]string, 0, len(tags))
 	for tag := range tags {
-		session.Tags = appendIfMissing(session.Tags, tag)
+		session.Tags = append(session.Tags, tag)
 	}
 }
 
