@@ -67,20 +67,95 @@ func (t *Service) ClearSession(session *user.SessionState) error {
 	return nil
 }
 
+// apiId is the key used throughout Apply for anything tracked per API.
+// It is the same value as user.AccessDefinition.APIID and the key of
+// user.Policy.AccessRights / user.SessionState.AccessRights.
+type apiId = string
+
+// rightsByAPI is the working map Apply builds from the session's policies,
+// keyed by apiId. Aliased so it can be assigned straight to
+// user.SessionState.AccessRights, which has the same underlying type.
+type rightsByAPI = map[apiId]user.AccessDefinition
+
+// tagName is a session/policy tag. Apply collects tags into a set before
+// writing them back to the session.
+type tagName = string
+
+// appliedPartitions records, for one API, which policy partitions have
+// already been written into the working `rights` map while iterating over
+// the session's policies. It does not remember which policy did it, only
+// that some policy did. A non-partitioned policy sets all four at once.
+type appliedPartitions struct {
+	// acl is set when a policy granted access to this API (access rights,
+	// allowed URLs, versions, GraphQL/MCP type restrictions). Without it
+	// the API is dropped from `rights` at the end of Apply, so the key's
+	// own access list stays untouched.
+	acl bool
+
+	// rateLimit is set when a policy wrote request rate limits for this
+	// API: Rate, Per, Smoothing, Throttle* and per-endpoint rate limits
+	// (Endpoints, JSONRPCMethods, MCPPrimitives).
+	rateLimit bool
+
+	// quota is set when a policy wrote QuotaMax and QuotaRenewalRate for
+	// this API.
+	quota bool
+
+	// complexity is set when a policy wrote GraphQL MaxQueryDepth for this
+	// API.
+	complexity bool
+}
+
 type applyStatus struct {
-	didQuota      map[string]bool
-	didRateLimit  map[string]bool
-	didAcl        map[string]bool
-	didComplexity map[string]bool
-	didPerAPI     bool
-	didPartition  bool
+	// byAPI holds, per API, which partitions some policy has already
+	// applied. An API absent from the map has had nothing applied yet.
+	byAPI map[apiId]appliedPartitions
+
+	didPerAPI    bool
+	didPartition bool
+}
+
+// mark applies fn to the appliedPartitions entry of api, creating the entry
+// if it does not exist yet. Use it only where a partition is being set; plain
+// reads must go through byAPI[api] so that they never create entries.
+func (s *applyStatus) mark(api apiId, fn func(p *appliedPartitions)) {
+	p := s.byAPI[api]
+	fn(&p)
+	s.byAPI[api] = p
+}
+
+// partitionCounts says, for each partition, how many APIs had it applied.
+type partitionCounts struct {
+	acl, rateLimit, quota, complexity int
+}
+
+// counts tallies byAPI in one pass. It replaces the old `len(didX)` checks:
+// those maps only ever received `true`, so their length was the number of
+// APIs with that partition applied.
+func (s applyStatus) counts() partitionCounts {
+	var c partitionCounts
+	for _, p := range s.byAPI {
+		if p.acl {
+			c.acl++
+		}
+		if p.rateLimit {
+			c.rateLimit++
+		}
+		if p.quota {
+			c.quota++
+		}
+		if p.complexity {
+			c.complexity++
+		}
+	}
+	return c
 }
 
 // Apply will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t *Service) Apply(session *user.SessionState) error {
-	rights := make(map[string]user.AccessDefinition)
-	tags := make(map[string]bool)
+	rights := make(rightsByAPI)
+	tags := make(map[tagName]bool)
 	if session.MetaData == nil {
 		session.MetaData = make(map[string]interface{})
 	}
@@ -90,10 +165,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	applyState := applyStatus{
-		didQuota:      make(map[string]bool),
-		didRateLimit:  make(map[string]bool),
-		didAcl:        make(map[string]bool),
-		didComplexity: make(map[string]bool),
+		byAPI: make(map[apiId]appliedPartitions),
 	}
 
 	var (
@@ -199,76 +271,35 @@ func (t *Service) Apply(session *user.SessionState) error {
 		}
 	}
 
-	distinctACL := make(map[string]bool)
+	multipleACL := limitsFromMultiplePolicies(rights)
 
-	for _, v := range rights {
-		if v.Limit.SetBy != "" {
-			distinctACL[v.Limit.SetBy] = true
-		}
-	}
-
-	// If some APIs had only ACL partitions, inherit rest from session level
+	// Finalise the working `rights` map. Every API in it falls into one of
+	// two cases:
+	//
+	//   - no policy granted ACL for it: the API must not become a session
+	//     entry (its ACL would be empty), so push the computed limits into
+	//     the key's own entry, if any, and drop it from `rights`;
+	//   - some policy granted ACL for it: it will replace the session entry,
+	//     so fill the partitions no policy applied from the session root.
 	for k, v := range rights {
-		if !applyState.didAcl[k] {
-			if existingAR, ok := session.AccessRights[k]; ok {
-				if applyState.didRateLimit[k] {
-					existingAR.Limit.Rate = v.Limit.Rate
-					existingAR.Limit.Per = v.Limit.Per
-					existingAR.Limit.Smoothing = v.Limit.Smoothing
-					existingAR.Limit.ThrottleInterval = v.Limit.ThrottleInterval
-					existingAR.Limit.ThrottleRetryLimit = v.Limit.ThrottleRetryLimit
-					existingAR.Endpoints = v.Endpoints
-				}
-				if applyState.didQuota[k] {
-					existingAR.Limit.QuotaMax = v.Limit.QuotaMax
-					existingAR.Limit.QuotaRenewalRate = v.Limit.QuotaRenewalRate
-					existingAR.Limit.QuotaRenews = v.Limit.QuotaRenews
-				}
-				if applyState.didComplexity[k] {
-					existingAR.Limit.MaxQueryDepth = v.Limit.MaxQueryDepth
-				}
-				session.AccessRights[k] = existingAR
-			}
+		applied := applyState.byAPI[k]
+
+		if !applied.acl {
+			t.updateExistingAccessRightLimits(session, k, v, applied)
 			delete(rights, k)
 			continue
 		}
 
-		if !applyState.didRateLimit[k] {
-			v.Limit.Rate = session.Rate
-			v.Limit.Per = session.Per
-			v.Limit.Smoothing = session.Smoothing
-			v.Limit.ThrottleInterval = session.ThrottleInterval
-			v.Limit.ThrottleRetryLimit = session.ThrottleRetryLimit
-			v.Endpoints = nil
-		}
-
-		if !applyState.didComplexity[k] {
-			v.Limit.MaxQueryDepth = session.MaxQueryDepth
-		}
-
-		if !applyState.didQuota[k] {
-			v.Limit.QuotaMax = session.QuotaMax
-			v.Limit.QuotaRenewalRate = session.QuotaRenewalRate
-			v.Limit.QuotaRenews = session.QuotaRenews
-		}
-
-		// If multime ACL
-		if len(distinctACL) > 1 {
-			if v.AllowanceScope == "" && v.Limit.SetBy != "" {
-				v.AllowanceScope = v.Limit.SetBy
-			}
-		}
-
-		v.Limit.SetBy = ""
-
-		rights[k] = v
+		rights[k] = t.inheritUnappliedFromSessionRoot(session, v, applied, multipleACL)
 	}
 
+	counts := applyState.counts()
+
 	// If we have policies defining rules for one single API, update session root vars (legacy)
-	t.updateSessionRootVars(session, rights, applyState)
+	t.updateSessionRootVars(session, rights, counts)
 
 	// Override session ACL if at least one policy define it
-	if len(applyState.didAcl) > 0 {
+	if counts.acl > 0 {
 		session.AccessRights = rights
 	}
 
@@ -325,7 +356,7 @@ func (t *Service) emptyRateLimit(m user.APILimit) bool {
 	return m.Rate == 0 || m.Per == 0
 }
 
-func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
+func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, rights rightsByAPI,
 	applyState *applyStatus) error {
 
 	if applyState.didPartition {
@@ -364,10 +395,12 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 		rights[apiID] = accessRights
 
 		// identify that limit for that API is set (to allow set it only once)
-		applyState.didAcl[apiID] = true
-		applyState.didQuota[apiID] = true
-		applyState.didRateLimit[apiID] = true
-		applyState.didComplexity[apiID] = true
+		applyState.mark(apiID, func(p *appliedPartitions) {
+			p.acl = true
+			p.quota = true
+			p.rateLimit = true
+			p.complexity = true
+		})
 	}
 
 	if len(policy.AccessRights) > 0 {
@@ -378,24 +411,22 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 }
 
 func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
-	ids := session.PolicyIDs()
-
-	if ids == nil {
+	if ids := session.PolicyIDs(); ids == nil {
 		return nil
-	} else {
-		orgID := session.OrgID
-		if orgID == "" && t.orgID != nil {
-			// Use the API spec's organization ID if the session's organization ID is empty
-			orgID = *t.orgID
-		}
-
-		return lo.Map(session.PolicyIDs(), func(item string, _ int) model.PolicyID {
-			return model.NewScopedCustomPolicyId(orgID, item)
-		})
 	}
+
+	orgID := session.OrgID
+	if orgID == "" && t.orgID != nil {
+		// Use the API spec's organization ID if the session's organization ID is empty
+		orgID = *t.orgID
+	}
+
+	return lo.Map(session.PolicyIDs(), func(item string, _ int) model.PolicyID {
+		return model.NewScopedCustomPolicyId(orgID, item)
+	})
 }
 
-func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
+func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState, rights rightsByAPI,
 	applyState *applyStatus) error {
 
 	usePartitions := policy.Partitions.Enabled()
@@ -419,7 +450,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		ar := rights[k]
 
 		if !usePartitions || policy.Partitions.Acl {
-			applyState.didAcl[k] = true
+			applyState.mark(k, func(p *appliedPartitions) { p.acl = true })
 
 			// Merge ACLs for the same API
 			if r, ok := rights[k]; ok {
@@ -522,7 +553,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		}
 
 		if !usePartitions || policy.Partitions.Quota {
-			applyState.didQuota[k] = true
+			applyState.mark(k, func(p *appliedPartitions) { p.quota = true })
 
 			if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 				ar.Limit.QuotaMax = policy.QuotaMax
@@ -540,7 +571,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		}
 
 		if !usePartitions || policy.Partitions.RateLimit {
-			applyState.didRateLimit[k] = true
+			applyState.mark(k, func(p *appliedPartitions) { p.rateLimit = true })
 
 			t.ApplyRateLimits(session, policy, &ar.Limit)
 
@@ -566,7 +597,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		}
 
 		if !usePartitions || policy.Partitions.Complexity {
-			applyState.didComplexity[k] = true
+			applyState.mark(k, func(p *appliedPartitions) { p.complexity = true })
 
 			if greaterThanInt(policy.MaxQueryDepth, ar.Limit.MaxQueryDepth) {
 				ar.Limit.MaxQueryDepth = policy.MaxQueryDepth
@@ -617,25 +648,114 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 	return nil
 }
 
-func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[string]user.AccessDefinition, applyState applyStatus) {
-	if len(applyState.didQuota) == 1 && len(applyState.didRateLimit) == 1 && len(applyState.didComplexity) == 1 {
-		for _, v := range rights {
-			if len(applyState.didRateLimit) == 1 {
-				session.Rate = v.Limit.Rate
-				session.Per = v.Limit.Per
-				session.Smoothing = v.Limit.Smoothing
-			}
-
-			if len(applyState.didQuota) == 1 {
-				session.QuotaMax = v.Limit.QuotaMax
-				session.QuotaRenews = v.Limit.QuotaRenews
-				session.QuotaRenewalRate = v.Limit.QuotaRenewalRate
-			}
-
-			if len(applyState.didComplexity) == 1 {
-				session.MaxQueryDepth = v.Limit.MaxQueryDepth
-			}
+// limitsFromMultiplePolicies reports whether the limits in rights were set by at
+// least two different policies (Limit.SetBy holds the policy ID). It stops
+// as soon as a second distinct policy is seen.
+func limitsFromMultiplePolicies(rights rightsByAPI) bool {
+	first := ""
+	for _, v := range rights {
+		setBy := v.Limit.SetBy
+		if setBy == "" {
+			continue
 		}
+		if first == "" {
+			first = setBy
+			continue
+		}
+		if setBy != first {
+			return true
+		}
+	}
+	return false
+}
+
+// updateExistingAccessRightLimits copies the limits computed in `computed`
+// into the session's own access right for api, but only for the partitions
+// some policy actually applied. The session entry's ACL (AllowedURLs,
+// Versions, GraphQL/MCP restrictions) is left untouched. If the key has no
+// access right for api, nothing happens: a policy without ACL cannot grant
+// access to a new API.
+func (t *Service) updateExistingAccessRightLimits(session *user.SessionState, api apiId, computed user.AccessDefinition, applied appliedPartitions) {
+	existing, ok := session.AccessRights[api]
+	if !ok {
+		return
+	}
+
+	if applied.rateLimit {
+		existing.Limit.Rate = computed.Limit.Rate
+		existing.Limit.Per = computed.Limit.Per
+		existing.Limit.Smoothing = computed.Limit.Smoothing
+		existing.Limit.ThrottleInterval = computed.Limit.ThrottleInterval
+		existing.Limit.ThrottleRetryLimit = computed.Limit.ThrottleRetryLimit
+		existing.Endpoints = computed.Endpoints
+	}
+
+	if applied.quota {
+		existing.Limit.QuotaMax = computed.Limit.QuotaMax
+		existing.Limit.QuotaRenewalRate = computed.Limit.QuotaRenewalRate
+		existing.Limit.QuotaRenews = computed.Limit.QuotaRenews
+	}
+
+	if applied.complexity {
+		existing.Limit.MaxQueryDepth = computed.Limit.MaxQueryDepth
+	}
+
+	// `existing` is a copy; write it back.
+	session.AccessRights[api] = existing
+}
+
+// inheritUnappliedFromSessionRoot returns ar with every partition no policy
+// applied filled from the session root values, ready to become the
+// session's access right for that API. When more than one policy set ACLs,
+// the AllowanceScope is pinned to the policy that set the limit so that
+// quotas and rate limits are counted per policy.
+func (t *Service) inheritUnappliedFromSessionRoot(session *user.SessionState, ar user.AccessDefinition, applied appliedPartitions, multipleACL bool) user.AccessDefinition {
+	if !applied.rateLimit {
+		ar.Limit.Rate = session.Rate
+		ar.Limit.Per = session.Per
+		ar.Limit.Smoothing = session.Smoothing
+		ar.Limit.ThrottleInterval = session.ThrottleInterval
+		ar.Limit.ThrottleRetryLimit = session.ThrottleRetryLimit
+		ar.Endpoints = nil
+	}
+
+	if !applied.complexity {
+		ar.Limit.MaxQueryDepth = session.MaxQueryDepth
+	}
+
+	if !applied.quota {
+		ar.Limit.QuotaMax = session.QuotaMax
+		ar.Limit.QuotaRenewalRate = session.QuotaRenewalRate
+		ar.Limit.QuotaRenews = session.QuotaRenews
+	}
+
+	if multipleACL && ar.AllowanceScope == "" && ar.Limit.SetBy != "" {
+		ar.AllowanceScope = ar.Limit.SetBy
+	}
+
+	ar.Limit.SetBy = ""
+
+	return ar
+}
+
+func (t *Service) updateSessionRootVars(session *user.SessionState, rights rightsByAPI, c partitionCounts) {
+	// Only when exactly one API received all three partitions. This has been
+	// an AND since the check was introduced (2019, #2462); a rate-limit-only
+	// policy for a single API deliberately does not touch the session root.
+	if c.quota != 1 || c.rateLimit != 1 || c.complexity != 1 {
+		return
+	}
+
+	for _, v := range rights {
+		session.Rate = v.Limit.Rate
+		session.Per = v.Limit.Per
+		session.Smoothing = v.Limit.Smoothing
+
+		session.QuotaMax = v.Limit.QuotaMax
+		session.QuotaRenews = v.Limit.QuotaRenews
+		session.QuotaRenewalRate = v.Limit.QuotaRenewalRate
+
+		session.MaxQueryDepth = v.Limit.MaxQueryDepth
 	}
 }
 
